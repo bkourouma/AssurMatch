@@ -1,0 +1,3 @@
+-- Initial AssurMatch foundation migration.
+-- Prisma is the source of truth for this phase; this placeholder records the
+-- migration boundary until the generated SQL is produced by `prisma migrate`.

@@ -1,0 +1,608 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum UserStatus {
+  invited
+  active
+  suspended
+  locked
+  deleted
+}
+
+enum MfaStatus {
+  not_enrolled
+  enrolled
+  required
+  verified
+}
+
+enum PartnerPlan {
+  starter
+  pro
+  enterprise
+}
+
+enum PartnerStatus {
+  draft
+  pending_compliance
+  active
+  suspended
+  retired
+}
+
+enum CapacityStatus {
+  available
+  limited
+  full
+  blocked
+}
+
+enum CountryStatus {
+  draft
+  internal
+  partner_test
+  pilot
+  public
+  suspended
+  retired
+}
+
+enum RegulatoryFamily {
+  cima
+  fanaf
+  outside_cima
+  future
+}
+
+enum RegimeStatus {
+  draft
+  active
+  suspended
+  retired
+}
+
+enum ProductCategoryStatus {
+  draft
+  active
+  retired
+}
+
+enum ProductSensitivity {
+  standard
+  sensitive
+  highly_sensitive
+}
+
+enum ProductStatus {
+  draft
+  internal
+  pilot
+  public
+  suspended
+  retired
+}
+
+enum LicenseStatus {
+  draft
+  pending_review
+  valid
+  expired
+  suspended
+  invalid
+  revoked
+}
+
+enum DocumentStatus {
+  uploaded
+  pending_review
+  accepted
+  rejected
+  expired
+  superseded
+}
+
+enum DocumentType {
+  license
+  registration
+  identity
+  mandate
+  compliance_certificate
+  other
+}
+
+enum FeatureFlagScopeType {
+  global
+  country
+  product
+  partner
+  plan
+  module
+  ai
+}
+
+enum ConsentPurpose {
+  lead_transmission
+  document_upload
+  technical_notification
+  ai_processing
+  marketing_optional
+}
+
+enum ConsentChannel {
+  public_web
+  admin
+  broker
+  api
+}
+
+enum ConsentTextStatus {
+  draft
+  review
+  published
+  retired
+}
+
+enum ConsentRecordStatus {
+  granted
+  withdrawn
+  expired
+  anonymized
+}
+
+enum AuditResult {
+  success
+  refused
+  failed
+}
+
+enum NotificationType {
+  license_expiration_warning
+  license_blocked
+  partner_suspended
+  feature_flag_changed
+  critical_job_failed
+  consent_text_changed
+  security_admin_change
+}
+
+enum DeliveryStatus {
+  pending
+  queued
+  sent
+  delivered
+  failed
+  retryable
+}
+
+enum QueueJobStatus {
+  queued
+  active
+  completed
+  failed
+  retryable
+  discarded
+}
+
+enum QueueJobType {
+  notification
+  document_hook
+  future_ia
+  future_routing
+  maintenance
+}
+
+enum AIStatus {
+  disabled
+  internal_test
+  enabled
+}
+
+enum GuardrailStatus {
+  not_configured
+  configured
+  failed_review
+  approved
+}
+
+enum AuditPolicy {
+  metadata_only
+  full_prompt_metadata
+  sensitive_human_validation
+}
+
+enum HumanValidationStatus {
+  not_required
+  pending
+  approved
+  rejected
+}
+
+model User {
+  id              String     @id @default(uuid())
+  email           String     @unique
+  phone           String?
+  displayName     String
+  status          UserStatus @default(invited)
+  mfaStatus       MfaStatus  @default(required)
+  lastLoginAt     DateTime?
+  partnerTenantId String?
+  countryScopes   String[]
+  productScopes   String[]
+  createdAt       DateTime   @default(now())
+  updatedAt       DateTime   @updatedAt
+  createdById     String?
+
+  userRoles UserRole[]
+}
+
+model Role {
+  id           String   @id @default(uuid())
+  key          String   @unique
+  name         String
+  description  String
+  isSystemRole Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  userRoles       UserRole[]
+  rolePermissions RolePermission[]
+}
+
+model Permission {
+  id          String               @id @default(uuid())
+  resource    String
+  action      String
+  scopeType   FeatureFlagScopeType
+  isSensitive Boolean              @default(false)
+  createdAt   DateTime             @default(now())
+  updatedAt   DateTime             @updatedAt
+
+  rolePermissions RolePermission[]
+
+  @@unique([resource, action, scopeType])
+}
+
+model UserRole {
+  id        String   @id @default(uuid())
+  userId    String
+  roleId    String
+  reason    String
+  createdAt DateTime @default(now())
+  createdById String?
+
+  user User @relation(fields: [userId], references: [id])
+  role Role @relation(fields: [roleId], references: [id])
+
+  @@unique([userId, roleId])
+}
+
+model RolePermission {
+  id           String @id @default(uuid())
+  roleId       String
+  permissionId String
+
+  role       Role       @relation(fields: [roleId], references: [id])
+  permission Permission @relation(fields: [permissionId], references: [id])
+
+  @@unique([roleId, permissionId])
+}
+
+model PartnerTenant {
+  id                String         @id @default(uuid())
+  legalName         String
+  tradeName         String?
+  registrationNumber String?
+  plan              PartnerPlan    @default(starter)
+  status            PartnerStatus  @default(draft)
+  suspensionReason  String?
+  primaryEmail      String
+  primaryWhatsApp   String
+  quotaMonthlyLeads Int            @default(0)
+  capacityStatus    CapacityStatus @default(available)
+  createdAt         DateTime       @default(now())
+  updatedAt         DateTime       @updatedAt
+  createdById       String?
+}
+
+model PartnerCountryAuthorization {
+  id              String   @id @default(uuid())
+  partnerTenantId String
+  countryId       String
+  status          String   @default("pending")
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  createdById     String?
+
+  @@unique([partnerTenantId, countryId])
+}
+
+model PartnerProductAuthorization {
+  id              String   @id @default(uuid())
+  partnerTenantId String
+  productId       String
+  status          String   @default("pending")
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  createdById     String?
+
+  @@unique([partnerTenantId, productId])
+}
+
+model RegulatoryRegime {
+  id                              String       @id @default(uuid())
+  key                             String       @unique
+  name                            String
+  description                     String?
+  retentionOverrideYears          Int?
+  requiresManualActivationReview  Boolean      @default(false)
+  status                          RegimeStatus @default(draft)
+  createdAt                       DateTime     @default(now())
+  updatedAt                       DateTime     @updatedAt
+  createdById                     String?
+}
+
+model Country {
+  id                 String           @id @default(uuid())
+  isoCode            String           @unique
+  name               String
+  currency           String
+  languages          String[]
+  timezone           String
+  regulatoryFamily   RegulatoryFamily
+  regulatoryRegimeId String?
+  status             CountryStatus    @default(draft)
+  flags              Json
+  createdAt          DateTime         @default(now())
+  updatedAt          DateTime         @updatedAt
+  createdById        String?
+}
+
+model ProductCategory {
+  id        String                @id @default(uuid())
+  key       String                @unique
+  name      String
+  status    ProductCategoryStatus @default(draft)
+  createdAt DateTime              @default(now())
+  updatedAt DateTime              @updatedAt
+  createdById String?
+}
+
+model Product {
+  id                   String             @id @default(uuid())
+  categoryId           String?
+  key                  String             @unique
+  name                 String
+  description          String?
+  sensitivity          ProductSensitivity @default(standard)
+  requiresDocuments    Boolean            @default(false)
+  requiresManualReview Boolean            @default(true)
+  status               ProductStatus      @default(draft)
+  flags                Json
+  createdAt            DateTime           @default(now())
+  updatedAt            DateTime           @updatedAt
+  createdById          String?
+}
+
+model CountryProduct {
+  id          String   @id @default(uuid())
+  countryId   String
+  productId   String
+  status      String   @default("internal")
+  flags       Json
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  createdById String?
+
+  @@unique([countryId, productId])
+}
+
+model PartnerLicense {
+  id              String        @id @default(uuid())
+  partnerTenantId String
+  licenseNumber   String
+  issuingAuthority String
+  countryId       String
+  productIds      String[]
+  status          LicenseStatus @default(draft)
+  effectiveDate   DateTime
+  expirationDate  DateTime
+  validatedById   String?
+  validatedAt     DateTime?
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+  createdById     String?
+}
+
+model AccreditationDocument {
+  id              String         @id @default(uuid())
+  partnerTenantId String
+  licenseId       String?
+  documentType    DocumentType
+  storageKey      String
+  checksum        String
+  status          DocumentStatus @default(uploaded)
+  expirationDate  DateTime?
+  reviewedById    String?
+  reviewedAt      DateTime?
+  retentionUntil  DateTime
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+  createdById     String?
+}
+
+model FeatureFlag {
+  id           String               @id @default(uuid())
+  key          String
+  scopeType    FeatureFlagScopeType
+  scopeId      String?
+  value        Boolean              @default(false)
+  defaultValue Boolean              @default(false)
+  reason       String
+  changedById  String?
+  changedAt    DateTime             @default(now())
+  cacheVersion Int                  @default(1)
+  createdAt    DateTime             @default(now())
+  updatedAt    DateTime             @updatedAt
+
+  @@unique([key, scopeType, scopeId])
+}
+
+model FeatureFlagHistory {
+  id            String               @id @default(uuid())
+  featureFlagId String
+  key           String
+  scopeType     FeatureFlagScopeType
+  scopeId       String?
+  previousValue Boolean
+  nextValue     Boolean
+  reason        String
+  changedById   String?
+  changedAt     DateTime             @default(now())
+}
+
+model ConsentText {
+  id                String            @id @default(uuid())
+  purpose           ConsentPurpose
+  countryId         String
+  productId         String?
+  channel           ConsentChannel
+  recipientCategory String
+  language          String
+  version           String
+  status            ConsentTextStatus @default(draft)
+  contentHash       String
+  publishedAt       DateTime?
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
+  createdById       String?
+
+  @@unique([purpose, countryId, productId, channel, language, version])
+}
+
+model ConsentRecord {
+  id                String              @id @default(uuid())
+  consentTextId     String
+  subjectReference  String
+  purpose           ConsentPurpose
+  countryId         String
+  productId         String?
+  channel           ConsentChannel
+  intendedRecipient String
+  status            ConsentRecordStatus @default(granted)
+  grantedAt         DateTime            @default(now())
+  withdrawnAt       DateTime?
+  retentionUntil    DateTime
+  createdAt         DateTime            @default(now())
+  updatedAt         DateTime            @updatedAt
+  createdById       String?
+}
+
+model AuditLog {
+  id             String      @id @default(uuid())
+  actorId        String?
+  action         String
+  targetType     String
+  targetId       String
+  scope          Json
+  result         AuditResult
+  reason         String?
+  context        Json
+  correlationId  String?
+  occurredAt     DateTime    @default(now())
+  retentionUntil DateTime
+  createdAt      DateTime    @default(now())
+}
+
+model Notification {
+  id                String           @id @default(uuid())
+  type              NotificationType
+  recipientScope    String
+  whatsAppStatus    DeliveryStatus   @default(pending)
+  emailStatus       DeliveryStatus   @default(pending)
+  payloadReference  String
+  relatedAuditLogId String?
+  queueJobRecordId  String?
+  lastAttemptAt     DateTime?
+  retryCount        Int              @default(0)
+  createdAt         DateTime         @default(now())
+  updatedAt         DateTime         @updatedAt
+  createdById       String?
+}
+
+model QueueJobRecord {
+  id             String         @id @default(uuid())
+  queueName      String
+  jobType        QueueJobType
+  status         QueueJobStatus @default(queued)
+  failureReason  String?
+  retryCount     Int            @default(0)
+  correlationId  String?
+  visibleToRoles String[]
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+  createdById    String?
+}
+
+model AIModuleConfig {
+  id                      String          @id @default(uuid())
+  key                     String          @unique
+  status                  AIStatus        @default(disabled)
+  allowedScopes           Json
+  promptTemplateReference String?
+  guardrailStatus         GuardrailStatus @default(not_configured)
+  auditPolicy             AuditPolicy     @default(metadata_only)
+  quotaPolicyReference    String?
+  createdAt               DateTime        @default(now())
+  updatedAt               DateTime        @updatedAt
+  createdById             String?
+}
+
+model AIInteraction {
+  id                    String                @id @default(uuid())
+  moduleConfigId         String
+  actorId                String?
+  scope                  Json
+  minimizedInputReference String
+  outputReference        String
+  guardrailResult        String
+  humanValidationStatus  HumanValidationStatus @default(not_required)
+  occurredAt             DateTime              @default(now())
+  createdAt              DateTime              @default(now())
+}
+
+model RoutingPrecheck {
+  id              String   @id @default(uuid())
+  countryId       String
+  productId       String
+  partnerTenantId String
+  consentStatus   String
+  countryStatus   String
+  productStatus   String
+  partnerStatus   String
+  licenseStatus   String
+  quotaStatus     String
+  result          String
+  reasons         String[]
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  createdById     String?
+}
+
+model EnvironmentSetting {
+  id             String   @id @default(uuid())
+  environment    String
+  key            String
+  safeDefault    String
+  requiresSecret Boolean  @default(false)
+  ownerModule    String
+  status         String   @default("active")
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@unique([environment, key])
+}

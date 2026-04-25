@@ -1,0 +1,10 @@
+{
+  "name": "@assurmatch/shared",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./contracts": "./contracts/index.ts",
+    "./validation": "./validation/index.ts",
+    "./rbac": "./rbac/index.ts"
+  }
+}

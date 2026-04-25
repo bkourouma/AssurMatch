@@ -5,6 +5,16 @@
 **Status**: Draft
 **Input**: User description: "Creer la premiere specification fonctionnelle du socle AssurMatch a partir de la constitution ratifiee et du PRD projet."
 
+## Clarifications
+
+### Session 2026-04-25
+
+- Q: What default retention rule should the socle apply for audit, consent and accreditation evidence when country/regime-specific rules are not yet defined? → A: 10-year default for audit, consent and accreditation evidence, overridden by country/regime rules.
+- Q: Who can activate, reactivate or deactivate countries, products, partners and modules in the socle? → A: A single scoped authorized admin can activate, reactivate or deactivate countries, products, partners and modules.
+- Q: What baseline delivery channel should the socle use for technical and compliance notifications? → A: WhatsApp baseline.
+- Q: What fallback or visibility rule applies when WhatsApp notifications are used? → A: WhatsApp + email always.
+- Q: What scale assumption should guide foundation data volume, pagination, rate limits and acceptance tests? → A: Enterprise-ready from day one: 50 countries, 500 products, 5,000 partners, 100,000 users and 50 million monthly public reads.
+
 ## Constitutional Scope & Compliance *(mandatory)*
 
 - **Technical platform role**: Ce socle definit AssurMatch comme plateforme technique B2B2C de comparaison indicative et de mise en relation avec des courtiers agrees. Il doit empecher toute vente directe, souscription directe, collecte de primes en V1, emission de contrat, emission d'attestation ou conseil personnalise engageant. Les modules commerciaux avances restent desactives tant qu'ils ne sont pas couverts par une specification et une validation conformite dediees.
@@ -150,6 +160,7 @@ Un operateur technique ou admin autorise veut disposer d'un socle observable pou
 - **FR-016**: System MUST support partner accreditation document metadata, secure storage references, document type, status, expiration date, review status and access permissions.
 - **FR-017**: System MUST support feature flags at global, country and product levels, plus operational suspend controls for partner and module-level shutdowns.
 - **FR-018**: System MUST make feature flag changes auditable, attributable, reversible through recorded history, and reflected in public/admin reads within a measurable operational delay.
+- **FR-018a**: System MUST allow a single scoped authorized admin to activate, reactivate or deactivate countries, products, partners and modules when all mandatory compliance blockers for that scope are satisfied.
 - **FR-019**: System MUST use Redis-backed operational capabilities for active country/product/flag cache, rate limiting, anti-spam controls, temporary routing locks, duplicate prevention hooks and job coordination where relevant.
 - **FR-020**: System MUST invalidate or refresh affected cached reads when countries, products, partners, licenses or feature flags change.
 - **FR-021**: System MUST define BullMQ-backed asynchronous job categories for technical notifications, document processing hooks, future IA jobs, future routing jobs and maintenance tasks without executing heavy work synchronously in public endpoints.
@@ -159,7 +170,8 @@ Un operateur technique ou admin autorise veut disposer d'un socle observable pou
 - **FR-025**: System MUST block and audit any future lead transmission attempt without a valid ConsentRecord scoped to the intended recipient, country, product and purpose.
 - **FR-026**: System MUST create AuditLog entries for sensitive successes and failures, including auth events, MFA changes, role/permission changes, country/product changes, regulatory changes, partner changes, license changes, document access, consent text publication, consent record access, feature flag changes, routing pre-checks, AI configuration changes, exports, anonymization and queue/job intervention.
 - **FR-027**: System MUST retain audit logs with actor, action, target, scope, timestamp, result, reason, correlationId when available and enough context to support compliance review without exposing unnecessary PII.
-- **FR-028**: System MUST provide technical notifications for minimum operational events: license expiration warning, license blocked, partner suspended, feature flag changed, critical job failed, consent text changed and security-sensitive admin change.
+- **FR-027a**: System MUST apply a 10-year default retention period for audit logs, consent evidence and accreditation evidence unless the applicable country or regulatory regime defines an overriding retention or anonymization rule.
+- **FR-028**: System MUST send every WhatsApp technical or compliance notification by email as well, covering minimum operational events: license expiration warning, license blocked, partner suspended, feature flag changed, critical job failed, consent text changed and security-sensitive admin change.
 - **FR-029**: System MUST allow authorized recipients to view notification status and delivery failures without exposing unrelated partner data.
 - **FR-030**: System MUST provide a base AI module registry with AI feature flags, module status, allowed scopes, prompt/template metadata, quota hooks, audit categories and guardrail status, while keeping advanced AI functions inactive.
 - **FR-031**: System MUST prevent any AI output from being treated as official recommendation, underwriting decision, binding advice, pricing decision, eligibility decision or routing decision.
@@ -172,6 +184,7 @@ Un operateur technique ou admin autorise veut disposer d'un socle observable pou
 - **FR-038**: System MUST require pagination or bounded result sets for administrative lists of users, partners, countries, products, consent records, documents, notifications and audit logs.
 - **FR-039**: System MUST provide health/readiness visibility for the foundation domains needed before later phases can be planned: database, cache, jobs, notifications, documents, auth and feature flags.
 - **FR-040**: System MUST provide test conventions for unit, integration, RBAC, feature flags, audit, consent, license blocking, AI guardrails, Redis cache behavior, BullMQ job behavior and constitutional regression cases.
+- **FR-041**: System MUST define pagination, filtering, cache, rate-limit and acceptance-test assumptions for a foundation capable of preparing 50 countries, 500 products, 5,000 partners, 100,000 users and 50 million monthly public reads without implying public activation of all scopes.
 
 ### Role Permissions
 
@@ -236,7 +249,7 @@ The following endpoints define the minimum API surface the foundation must make 
 - Suspending a partner must make the partner ineligible for activation, routing, lead notification and future portal access beyond allowed account/compliance views.
 - Expiring, suspending or invalidating a partner license must automatically block that partner for the affected country/product scope.
 - Disabling an AI flag at any scope must prevent model calls and generated AI output for that scope.
-- Emergency disable actions must require an authorized role, a reason, timestamped audit, and visible status for admins who operate the affected scope.
+- Activation, reactivation and deactivation actions may be performed by one scoped authorized admin, must require a reason, timestamped audit and visible status for admins who operate the affected scope, and must never bypass mandatory compliance blockers.
 
 ### Audit Rules
 
@@ -277,7 +290,7 @@ The following endpoints define the minimum API surface the foundation must make 
 - **ConsentText**: Versioned text for a specific purpose, country, product, channel, language and recipient category.
 - **ConsentRecord**: Evidence of a user's consent with purpose, text version, country, product, channel, intended recipient, timestamp, source and withdrawal/anonymization state.
 - **AuditLog**: Immutable compliance event with actor, action, target, scope, context, result, reason and correlationId.
-- **Notification**: Technical notification event with recipient scope, type, status, delivery channel, retry state and related audit reference.
+- **Notification**: Technical notification event with recipient scope, type, WhatsApp and email delivery statuses, retry state and related audit reference.
 - **QueueJobRecord**: Operational view of asynchronous job category, status, failure reason, retry eligibility and correlationId.
 - **AIModuleConfig**: AI module registry entry with enabled state, allowed scopes, guardrails, prompt/template references, audit policy and quota hooks.
 - **AIInteraction**: Future auditable AI event containing minimized input metadata, prompt/template reference, output metadata, guardrail result and human validation status.
@@ -295,17 +308,19 @@ The following endpoints define the minimum API surface the foundation must make 
 - **SC-005**: Emergency disable of a country, product, partner or AI/module flag prevents the affected public exposure or sensitive execution within 2 minutes of the authorized change in acceptance testing.
 - **SC-006**: 100% of activation or routing eligibility checks block partners with missing, expired, suspended, invalid or out-of-scope licenses.
 - **SC-007**: 95% of public catalog reads for enabled countries/products return the correct enabled/disabled status to users in under 1 second during acceptance testing.
-- **SC-008**: 95% of technical notification jobs reach a visible queued, delivered, failed or retryable state within 5 minutes during operational acceptance testing.
+- **SC-008**: 95% of paired WhatsApp and email technical notification jobs reach a visible queued, delivered, failed or retryable state within 5 minutes during operational acceptance testing.
 - **SC-009**: 0 AI model calls occur when the relevant global, country, product, partner or plan AI flag is disabled in acceptance testing.
 - **SC-010**: The planned test suite covers 100% of applicable constitutional blockers: disabled country, disabled product, no consent, expired license, unauthorized broker, disabled AI, unauthorized export and non-routable lead.
+- **SC-011**: Acceptance testing validates foundation list, flag resolution and public catalog-read behavior against a data set representing 50 countries, 500 products, 5,000 partners and 100,000 users, with public-read assumptions up to 50 million per month.
 
 ## Assumptions
 
 - The first public launch remains limited by explicit activation; all countries, products and commercial modules are internal or disabled until approved.
+- The foundation is sized for enterprise-readiness from day one: 50 countries, 500 products, 5,000 partners, 100,000 users and up to 50 million monthly public reads as planning and acceptance-test assumptions.
 - This spec prepares Phase 1 "Socle plateforme" and does not activate the public comparator, full quote request flow, Starter portal, Pro CRM, advanced dashboard, billing, payments, e-signature, policy issuance, claims, partner API, advanced webhooks, AI recommendation/scoring or advanced routing.
 - The PRD is the primary business source, but the constitution is authoritative whenever scope, wording, compliance or activation rules diverge.
 - Consent management is included as foundation data and control logic; real visitor quote submission and lead transmission will be specified later.
 - Partner documents are stored and controlled as accreditation evidence; legal review workflow may be expanded in later specs.
-- Notifications are limited to technical and compliance operations such as license warnings, job failures, security-sensitive changes and flag changes.
+- WhatsApp is the baseline channel for technical and compliance notifications, and every WhatsApp communication must also be sent by email; this does not activate public/commercial WhatsApp messaging unless separately approved by flags and later specs.
 - API endpoints listed here are foundation contracts to plan; detailed schemas, transport security and implementation details belong to the planning phase.
-- Data retention and anonymization rules are configurable by country/regime and will follow the compliance policy validated for each market.
+- Data retention and anonymization rules are configurable by country/regime and default to 10 years for audit logs, consent evidence and accreditation evidence when no stricter market rule has been defined.

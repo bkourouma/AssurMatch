@@ -1,0 +1,1244 @@
+openapi: 3.1.0
+info:
+  title: AssurMatch Foundation API
+  version: 0.1.0
+  description: >
+    Foundation API contract for auth, RBAC, countries, products, partners,
+    licenses, documents, feature flags, consent, audit logs, notifications,
+    routing pre-checks, AI module configuration and health/readiness.
+servers:
+  - url: https://api.assurmatch.example
+    description: Production-like HTTPS endpoint
+  - url: http://localhost:3000
+    description: Local development endpoint
+security:
+  - bearerAuth: []
+tags:
+  - name: Auth
+  - name: Users
+  - name: RBAC
+  - name: Countries
+  - name: RegulatoryRegimes
+  - name: Products
+  - name: Partners
+  - name: Licenses
+  - name: Documents
+  - name: FeatureFlags
+  - name: Consent
+  - name: Audit
+  - name: Notifications
+  - name: RoutingBase
+  - name: AIBase
+  - name: System
+paths:
+  /auth/login:
+    post:
+      tags: [Auth]
+      summary: Authenticate a user and begin MFA when required.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+      responses:
+        '200':
+          description: Login accepted.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthSession'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+  /auth/logout:
+    post:
+      tags: [Auth]
+      summary: End the active session.
+      responses:
+        '204':
+          description: Logged out.
+  /auth/me:
+    get:
+      tags: [Auth]
+      summary: Return current identity, roles, scopes and MFA status.
+      responses:
+        '200':
+          description: Current user.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CurrentUser'
+  /auth/mfa/enroll:
+    post:
+      tags: [Auth]
+      summary: Enroll MFA for an eligible admin or broker user.
+      responses:
+        '200':
+          description: MFA enrollment challenge.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MfaEnrollment'
+  /auth/mfa/verify:
+    post:
+      tags: [Auth]
+      summary: Verify MFA before sensitive access.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MfaVerifyRequest'
+      responses:
+        '200':
+          description: MFA verified.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthSession'
+  /admin/users:
+    get:
+      tags: [Users]
+      summary: List users with pagination and scope filters.
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+        - $ref: '#/components/parameters/Country'
+        - $ref: '#/components/parameters/PartnerId'
+      responses:
+        '200':
+          description: Paginated users.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserList'
+    post:
+      tags: [Users]
+      summary: Create a user within the caller's permitted scope.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserCreate'
+      responses:
+        '201':
+          description: User created.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+  /admin/users/{id}:
+    patch:
+      tags: [Users]
+      summary: Update account status, profile or scope.
+      parameters:
+        - $ref: '#/components/parameters/Id'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserUpdate'
+      responses:
+        '200':
+          description: User updated.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+  /admin/users/{id}/roles:
+    patch:
+      tags: [RBAC]
+      summary: Assign or revoke roles with audit.
+      parameters:
+        - $ref: '#/components/parameters/Id'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserRolesUpdate'
+      responses:
+        '200':
+          description: Roles updated.
+  /admin/roles:
+    get:
+      tags: [RBAC]
+      summary: List roles and permissions.
+      responses:
+        '200':
+          description: Roles.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Role'
+  /countries:
+    get:
+      tags: [Countries]
+      summary: Return only public or waitlist-eligible countries to public callers.
+      security: []
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+      responses:
+        '200':
+          description: Public country list.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CountryList'
+  /admin/countries:
+    get:
+      tags: [Countries]
+      summary: List all countries visible to the scoped admin.
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+      responses:
+        '200':
+          description: Country list.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CountryList'
+    post:
+      tags: [Countries]
+      summary: Create a country.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CountryCreate'
+      responses:
+        '201':
+          description: Country created.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Country'
+  /admin/countries/{id}:
+    patch:
+      tags: [Countries]
+      summary: Update, activate, deactivate, suspend or retire a country when blockers allow.
+      parameters:
+        - $ref: '#/components/parameters/Id'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CountryUpdate'
+      responses:
+        '200':
+          description: Country updated.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Country'
+  /admin/regulatory-regimes:
+    get:
+      tags: [RegulatoryRegimes]
+      summary: List regulatory regimes.
+      responses:
+        '200':
+          description: Regime list.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/RegulatoryRegime'
+    post:
+      tags: [RegulatoryRegimes]
+      summary: Create a regulatory regime.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegulatoryRegime'
+      responses:
+        '201':
+          description: Regime created.
+  /products:
+    get:
+      tags: [Products]
+      summary: Return products visible for the requested country and caller scope.
+      security: []
+      parameters:
+        - $ref: '#/components/parameters/Country'
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+      responses:
+        '200':
+          description: Public product list.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProductList'
+  /admin/products:
+    get:
+      tags: [Products]
+      summary: List products for scoped admins.
+      parameters:
+        - $ref: '#/components/parameters/Country'
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+      responses:
+        '200':
+          description: Product list.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProductList'
+    post:
+      tags: [Products]
+      summary: Create a product or country-product association.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProductCreate'
+      responses:
+        '201':
+          description: Product created.
+  /admin/products/{id}:
+    patch:
+      tags: [Products]
+      summary: Update product status, sensitivity, documents, review rule or flags.
+      parameters:
+        - $ref: '#/components/parameters/Id'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProductUpdate'
+      responses:
+        '200':
+          description: Product updated.
+  /admin/partners:
+    get:
+      tags: [Partners]
+      summary: List partner brokers by scope.
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+        - $ref: '#/components/parameters/Country'
+      responses:
+        '200':
+          description: Partner list.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PartnerList'
+    post:
+      tags: [Partners]
+      summary: Create a partner broker record.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PartnerCreate'
+      responses:
+        '201':
+          description: Partner created.
+  /admin/partners/{id}:
+    patch:
+      tags: [Partners]
+      summary: Update partner status, plan, scope, quota or suspension reason.
+      parameters:
+        - $ref: '#/components/parameters/Id'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PartnerUpdate'
+      responses:
+        '200':
+          description: Partner updated.
+  /admin/partners/{partnerId}/licenses:
+    get:
+      tags: [Licenses]
+      summary: List partner licenses.
+      parameters:
+        - $ref: '#/components/parameters/PartnerPathId'
+      responses:
+        '200':
+          description: License list.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/PartnerLicense'
+    post:
+      tags: [Licenses]
+      summary: Create or submit a partner license for review.
+      parameters:
+        - $ref: '#/components/parameters/PartnerPathId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PartnerLicense'
+      responses:
+        '201':
+          description: License created.
+  /admin/partners/{partnerId}/documents:
+    post:
+      tags: [Documents]
+      summary: Register or upload partner accreditation document metadata.
+      parameters:
+        - $ref: '#/components/parameters/PartnerPathId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AccreditationDocument'
+      responses:
+        '201':
+          description: Document registered.
+  /admin/documents/{id}:
+    get:
+      tags: [Documents]
+      summary: Retrieve authorized document metadata or access reference.
+      parameters:
+        - $ref: '#/components/parameters/Id'
+      responses:
+        '200':
+          description: Document metadata.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AccreditationDocument'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /admin/feature-flags:
+    get:
+      tags: [FeatureFlags]
+      summary: List feature flags by scope.
+      parameters:
+        - name: scopeType
+          in: query
+          schema:
+            type: string
+        - name: scopeId
+          in: query
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Feature flags.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/FeatureFlag'
+  /admin/feature-flags/{id}:
+    patch:
+      tags: [FeatureFlags]
+      summary: Change a flag with reason, scope and audit.
+      parameters:
+        - $ref: '#/components/parameters/Id'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/FeatureFlagUpdate'
+      responses:
+        '200':
+          description: Feature flag updated.
+  /admin/consent-texts:
+    get:
+      tags: [Consent]
+      summary: List consent texts.
+      responses:
+        '200':
+          description: Consent text list.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ConsentText'
+    post:
+      tags: [Consent]
+      summary: Create a consent text version.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ConsentText'
+      responses:
+        '201':
+          description: Consent text created.
+  /admin/consent-records:
+    get:
+      tags: [Consent]
+      summary: Search consent evidence with strict scope.
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+        - $ref: '#/components/parameters/Country'
+      responses:
+        '200':
+          description: Consent records.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ConsentRecord'
+  /admin/audit-logs:
+    get:
+      tags: [Audit]
+      summary: Search audit logs with filters and export controls.
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+        - name: action
+          in: query
+          schema:
+            type: string
+        - name: result
+          in: query
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Audit logs.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/AuditLog'
+  /admin/notifications:
+    get:
+      tags: [Notifications]
+      summary: View technical notifications by scope.
+      responses:
+        '200':
+          description: Notifications.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Notification'
+  /admin/notifications/test:
+    post:
+      tags: [Notifications]
+      summary: Queue a paired WhatsApp and email technical test notification.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TestNotificationRequest'
+      responses:
+        '202':
+          description: Notification job queued.
+  /admin/routing/precheck:
+    post:
+      tags: [RoutingBase]
+      summary: Evaluate non-transmissive routing eligibility and refusal reasons.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RoutingPrecheckRequest'
+      responses:
+        '200':
+          description: Precheck result.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RoutingPrecheckResult'
+  /admin/ai/modules:
+    get:
+      tags: [AIBase]
+      summary: List AI module status, flags and guardrails.
+      responses:
+        '200':
+          description: AI modules.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/AIModuleConfig'
+  /admin/ai/modules/{id}:
+    patch:
+      tags: [AIBase]
+      summary: Configure base AI module state without activating advanced features.
+      parameters:
+        - $ref: '#/components/parameters/Id'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AIModuleConfigUpdate'
+      responses:
+        '200':
+          description: AI module updated.
+  /admin/system/health:
+    get:
+      tags: [System]
+      summary: View foundation health and readiness signals.
+      responses:
+        '200':
+          description: Health status.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SystemHealth'
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  parameters:
+    Id:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    PartnerPathId:
+      name: partnerId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    PartnerId:
+      name: partnerId
+      in: query
+      schema:
+        type: string
+        format: uuid
+    Country:
+      name: country
+      in: query
+      schema:
+        type: string
+        minLength: 2
+        maxLength: 3
+    Page:
+      name: page
+      in: query
+      schema:
+        type: integer
+        minimum: 1
+        default: 1
+    PageSize:
+      name: pageSize
+      in: query
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 100
+        default: 25
+  responses:
+    Unauthorized:
+      description: Authentication required or failed.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    Forbidden:
+      description: Permission, tenant or scope check failed.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+  schemas:
+    ErrorResponse:
+      type: object
+      required: [code, message, correlationId]
+      properties:
+        code:
+          type: string
+        message:
+          type: string
+        correlationId:
+          type: string
+    LoginRequest:
+      type: object
+      required: [email, password]
+      properties:
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+          minLength: 12
+    AuthSession:
+      type: object
+      required: [accessToken, mfaRequired]
+      properties:
+        accessToken:
+          type: string
+        mfaRequired:
+          type: boolean
+    MfaEnrollment:
+      type: object
+      required: [challengeId]
+      properties:
+        challengeId:
+          type: string
+        qrCodeUri:
+          type: string
+    MfaVerifyRequest:
+      type: object
+      required: [challengeId, code]
+      properties:
+        challengeId:
+          type: string
+        code:
+          type: string
+          minLength: 6
+          maxLength: 10
+    CurrentUser:
+      type: object
+      required: [id, email, roles, scopes, mfaStatus]
+      properties:
+        id:
+          type: string
+          format: uuid
+        email:
+          type: string
+          format: email
+        roles:
+          type: array
+          items:
+            type: string
+        scopes:
+          type: object
+        mfaStatus:
+          type: string
+    User:
+      type: object
+      required: [id, email, status, mfaStatus]
+      properties:
+        id:
+          type: string
+          format: uuid
+        email:
+          type: string
+          format: email
+        phone:
+          type: string
+        displayName:
+          type: string
+        status:
+          type: string
+          enum: [invited, active, suspended, locked, deleted]
+        mfaStatus:
+          type: string
+          enum: [not_enrolled, enrolled, required, verified]
+        partnerTenantId:
+          type: string
+          format: uuid
+    UserCreate:
+      type: object
+      required: [email, displayName, roles]
+      properties:
+        email:
+          type: string
+          format: email
+        displayName:
+          type: string
+        phone:
+          type: string
+        roles:
+          type: array
+          items:
+            type: string
+        partnerTenantId:
+          type: string
+          format: uuid
+    UserUpdate:
+      type: object
+      properties:
+        displayName:
+          type: string
+        phone:
+          type: string
+        status:
+          type: string
+    UserRolesUpdate:
+      type: object
+      required: [roles, reason]
+      properties:
+        roles:
+          type: array
+          items:
+            type: string
+        reason:
+          type: string
+    UserList:
+      type: object
+      required: [items, page, pageSize, total]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/User'
+        page:
+          type: integer
+        pageSize:
+          type: integer
+        total:
+          type: integer
+    Role:
+      type: object
+      required: [key, permissions]
+      properties:
+        key:
+          type: string
+        permissions:
+          type: array
+          items:
+            type: string
+    Country:
+      type: object
+      required: [id, isoCode, name, status, flags]
+      properties:
+        id:
+          type: string
+          format: uuid
+        isoCode:
+          type: string
+        name:
+          type: string
+        currency:
+          type: string
+        languages:
+          type: array
+          items:
+            type: string
+        timezone:
+          type: string
+        regulatoryRegimeId:
+          type: string
+          format: uuid
+        status:
+          type: string
+          enum: [draft, internal, partner_test, pilot, public, suspended, retired]
+        flags:
+          type: object
+          additionalProperties:
+            type: boolean
+    CountryCreate:
+      allOf:
+        - $ref: '#/components/schemas/Country'
+    CountryUpdate:
+      type: object
+      required: [reason]
+      properties:
+        status:
+          type: string
+        flags:
+          type: object
+          additionalProperties:
+            type: boolean
+        reason:
+          type: string
+    CountryList:
+      type: object
+      required: [items, page, pageSize, total]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/Country'
+        page:
+          type: integer
+        pageSize:
+          type: integer
+        total:
+          type: integer
+    RegulatoryRegime:
+      type: object
+      required: [key, name, status]
+      properties:
+        id:
+          type: string
+          format: uuid
+        key:
+          type: string
+        name:
+          type: string
+        retentionOverrideYears:
+          type: integer
+        requiresManualActivationReview:
+          type: boolean
+        status:
+          type: string
+    Product:
+      type: object
+      required: [id, key, name, status, flags]
+      properties:
+        id:
+          type: string
+          format: uuid
+        categoryId:
+          type: string
+          format: uuid
+        key:
+          type: string
+        name:
+          type: string
+        sensitivity:
+          type: string
+          enum: [standard, sensitive, highly_sensitive]
+        requiresDocuments:
+          type: boolean
+        requiresManualReview:
+          type: boolean
+        status:
+          type: string
+        flags:
+          type: object
+          additionalProperties:
+            type: boolean
+    ProductCreate:
+      allOf:
+        - $ref: '#/components/schemas/Product'
+    ProductUpdate:
+      type: object
+      required: [reason]
+      properties:
+        status:
+          type: string
+        flags:
+          type: object
+          additionalProperties:
+            type: boolean
+        reason:
+          type: string
+    ProductList:
+      type: object
+      required: [items, page, pageSize, total]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/Product'
+        page:
+          type: integer
+        pageSize:
+          type: integer
+        total:
+          type: integer
+    Partner:
+      type: object
+      required: [id, legalName, plan, status]
+      properties:
+        id:
+          type: string
+          format: uuid
+        legalName:
+          type: string
+        tradeName:
+          type: string
+        plan:
+          type: string
+          enum: [starter, pro, enterprise]
+        status:
+          type: string
+          enum: [draft, pending_compliance, active, suspended, retired]
+        primaryEmail:
+          type: string
+          format: email
+        primaryWhatsApp:
+          type: string
+        quotaMonthlyLeads:
+          type: integer
+    PartnerCreate:
+      allOf:
+        - $ref: '#/components/schemas/Partner'
+    PartnerUpdate:
+      type: object
+      required: [reason]
+      properties:
+        status:
+          type: string
+        suspensionReason:
+          type: string
+        reason:
+          type: string
+    PartnerList:
+      type: object
+      required: [items, page, pageSize, total]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/Partner'
+        page:
+          type: integer
+        pageSize:
+          type: integer
+        total:
+          type: integer
+    PartnerLicense:
+      type: object
+      required: [licenseNumber, issuingAuthority, countryId, status, effectiveDate, expirationDate]
+      properties:
+        id:
+          type: string
+          format: uuid
+        licenseNumber:
+          type: string
+        issuingAuthority:
+          type: string
+        countryId:
+          type: string
+          format: uuid
+        productIds:
+          type: array
+          items:
+            type: string
+            format: uuid
+        status:
+          type: string
+          enum: [draft, pending_review, valid, expired, suspended, invalid, revoked]
+        effectiveDate:
+          type: string
+          format: date
+        expirationDate:
+          type: string
+          format: date
+    AccreditationDocument:
+      type: object
+      required: [documentType, storageKey, status]
+      properties:
+        id:
+          type: string
+          format: uuid
+        documentType:
+          type: string
+        storageKey:
+          type: string
+        checksum:
+          type: string
+        status:
+          type: string
+          enum: [uploaded, pending_review, accepted, rejected, expired, superseded]
+        expirationDate:
+          type: string
+          format: date
+    FeatureFlag:
+      type: object
+      required: [id, key, scopeType, value]
+      properties:
+        id:
+          type: string
+          format: uuid
+        key:
+          type: string
+        scopeType:
+          type: string
+        scopeId:
+          type: string
+        value:
+          type: boolean
+        cacheVersion:
+          type: integer
+    FeatureFlagUpdate:
+      type: object
+      required: [value, reason]
+      properties:
+        value:
+          type: boolean
+        reason:
+          type: string
+    ConsentText:
+      type: object
+      required: [purpose, countryId, channel, recipientCategory, language, version, status, contentHash]
+      properties:
+        id:
+          type: string
+          format: uuid
+        purpose:
+          type: string
+        countryId:
+          type: string
+          format: uuid
+        productId:
+          type: string
+          format: uuid
+        channel:
+          type: string
+        recipientCategory:
+          type: string
+        language:
+          type: string
+        version:
+          type: string
+        status:
+          type: string
+        contentHash:
+          type: string
+    ConsentRecord:
+      type: object
+      required: [id, consentTextId, purpose, countryId, channel, status, grantedAt]
+      properties:
+        id:
+          type: string
+          format: uuid
+        consentTextId:
+          type: string
+          format: uuid
+        purpose:
+          type: string
+        countryId:
+          type: string
+          format: uuid
+        productId:
+          type: string
+          format: uuid
+        channel:
+          type: string
+        intendedRecipient:
+          type: string
+        status:
+          type: string
+          enum: [granted, withdrawn, expired, anonymized]
+        grantedAt:
+          type: string
+          format: date-time
+    AuditLog:
+      type: object
+      required: [id, action, targetType, targetId, result, occurredAt]
+      properties:
+        id:
+          type: string
+          format: uuid
+        actorId:
+          type: string
+          format: uuid
+        action:
+          type: string
+        targetType:
+          type: string
+        targetId:
+          type: string
+        result:
+          type: string
+          enum: [success, refused, failed]
+        reason:
+          type: string
+        correlationId:
+          type: string
+        occurredAt:
+          type: string
+          format: date-time
+    Notification:
+      type: object
+      required: [id, type, whatsAppStatus, emailStatus]
+      properties:
+        id:
+          type: string
+          format: uuid
+        type:
+          type: string
+        recipientScope:
+          type: string
+        whatsAppStatus:
+          type: string
+        emailStatus:
+          type: string
+        retryCount:
+          type: integer
+    TestNotificationRequest:
+      type: object
+      required: [recipientUserId, type]
+      properties:
+        recipientUserId:
+          type: string
+          format: uuid
+        type:
+          type: string
+    RoutingPrecheckRequest:
+      type: object
+      required: [countryId, productId, partnerTenantId]
+      properties:
+        countryId:
+          type: string
+          format: uuid
+        productId:
+          type: string
+          format: uuid
+        partnerTenantId:
+          type: string
+          format: uuid
+        consentRecordId:
+          type: string
+          format: uuid
+    RoutingPrecheckResult:
+      type: object
+      required: [result, reasons]
+      properties:
+        result:
+          type: string
+          enum: [eligible, not_eligible]
+        reasons:
+          type: array
+          items:
+            type: string
+    AIModuleConfig:
+      type: object
+      required: [id, key, status, guardrailStatus]
+      properties:
+        id:
+          type: string
+          format: uuid
+        key:
+          type: string
+        status:
+          type: string
+          enum: [disabled, internal_test, enabled]
+        guardrailStatus:
+          type: string
+    AIModuleConfigUpdate:
+      type: object
+      required: [status, reason]
+      properties:
+        status:
+          type: string
+          enum: [disabled, internal_test, enabled]
+        reason:
+          type: string
+    SystemHealth:
+      type: object
+      required: [status, checks]
+      properties:
+        status:
+          type: string
+          enum: [ok, degraded, down]
+        checks:
+          type: object
+          additionalProperties:
+            type: string
