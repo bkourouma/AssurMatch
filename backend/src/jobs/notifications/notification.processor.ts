@@ -10,6 +10,15 @@ export class NotificationProcessor {
     this.queue.transition(jobId, "completed");
   }
 
+  processQuoteNotification(notificationId: string, jobId: string): void {
+    this.process(notificationId, jobId);
+  }
+
+  processAiSummary(jobId: string): void {
+    this.queue.transition(jobId, "active");
+    this.queue.transition(jobId, "completed");
+  }
+
   fail(jobId: string, reason: string): void {
     this.queue.transition(jobId, "retryable", reason);
   }

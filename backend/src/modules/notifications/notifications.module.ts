@@ -2,6 +2,8 @@ import { notificationSchema, type NotificationDto, type NotificationRecordDto } 
 import { AuditLogWriter } from "../audit-logs/audit-log-writer.service";
 import { InMemoryQueue, type QueueJobRecord } from "../common/queues/queues.module";
 import type { ActorContext } from "../common/types";
+import { AdminNotificationsController } from "./admin-notifications.controller";
+import { QuoteNotificationService } from "./quote-notification.service";
 
 export interface NotificationRecord extends NotificationRecordDto {
   id: string;
@@ -46,6 +48,10 @@ export class NotificationsService {
     return [...this.notifications];
   }
 
+  mutableList(): NotificationRecord[] {
+    return this.notifications;
+  }
+
   updateDelivery(id: string, whatsAppStatus: NotificationRecord["whatsAppStatus"], emailStatus: NotificationRecord["emailStatus"]): NotificationRecord {
     const notification = this.notifications.find((candidate) => candidate.id === id);
     if (!notification) throw new Error(`Notification ${id} not found`);
@@ -59,8 +65,12 @@ export class NotificationsService {
 export class NotificationsModule {
   readonly queue = new InMemoryQueue();
   readonly service: NotificationsService;
+  readonly quoteService: QuoteNotificationService;
+  readonly adminController: AdminNotificationsController;
 
   constructor(audit = new AuditLogWriter()) {
     this.service = new NotificationsService(audit, this.queue);
+    this.quoteService = new QuoteNotificationService(this.service.mutableList(), this.queue, audit);
+    this.adminController = new AdminNotificationsController(this.service);
   }
 }

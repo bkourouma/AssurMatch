@@ -10,7 +10,11 @@ export const notificationSchema = z.object({
     "feature_flag_changed",
     "critical_job_failed",
     "consent_text_changed",
-    "security_admin_change"
+    "security_admin_change",
+    "visitor_quote_confirmation",
+    "visitor_quote_non_routable",
+    "broker_lead_assigned",
+    "quote_notification_failed"
   ]),
   recipientScope: nonEmptyStringSchema,
   whatsAppStatus: z.enum(["pending", "queued", "sent", "delivered", "failed", "retryable"]).default("pending"),

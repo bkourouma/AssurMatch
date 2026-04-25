@@ -2,15 +2,15 @@ import { maskPii } from "../common/logging/pii-masker";
 import type { ActorContext, AuditEntry, AuditResult } from "../common/types";
 
 export interface AuditWriteInput {
-  actor?: ActorContext;
+  actor?: ActorContext | undefined;
   action: string;
   targetType: string;
   targetId: string;
-  scope?: Record<string, unknown>;
+  scope?: Record<string, unknown> | undefined;
   result: AuditResult;
-  reason?: string;
-  context?: Record<string, unknown>;
-  retentionUntil?: Date;
+  reason?: string | undefined;
+  context?: Record<string, unknown> | undefined;
+  retentionUntil?: Date | undefined;
 }
 
 export class AuditLogWriter {

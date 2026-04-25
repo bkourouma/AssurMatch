@@ -8,4 +8,14 @@ export class PublicProductsController {
     assertNoHeavyPublicSynchronousWork({ publicEndpoint: true, heavySynchronousWork: false });
     return this.products.listPublic(countryId);
   }
+
+  listForCountry(countryId: string, countryFlags: Parameters<ProductsService["listPublicForCountry"]>[1]) {
+    assertNoHeavyPublicSynchronousWork({ publicEndpoint: true, heavySynchronousWork: false });
+    return this.products.listPublicForCountry(countryId, countryFlags);
+  }
+
+  detail(countryId: string, productKey: string, countryFlags: Parameters<ProductsService["getPublicProductPage"]>[2]) {
+    assertNoHeavyPublicSynchronousWork({ publicEndpoint: true, heavySynchronousWork: false });
+    return this.products.getPublicProductPage(countryId, productKey, countryFlags);
+  }
 }

@@ -168,6 +168,10 @@ enum NotificationType {
   critical_job_failed
   consent_text_changed
   security_admin_change
+  visitor_quote_confirmation
+  visitor_quote_non_routable
+  broker_lead_assigned
+  quote_notification_failed
 }
 
 enum DeliveryStatus {
@@ -194,6 +198,70 @@ enum QueueJobType {
   future_ia
   future_routing
   maintenance
+  visitor_quote_notification
+  broker_lead_notification
+  ai_quote_summary
+  quote_manual_review
+}
+
+enum OfferStatus {
+  draft
+  review
+  validated
+  active
+  suspended
+  expired
+  retired
+}
+
+enum OfferValidationStatus {
+  pending
+  validated
+  rejected
+}
+
+enum QuoteFormStatus {
+  draft
+  published
+  suspended
+  retired
+}
+
+enum QuoteRequestStatus {
+  draft_refused
+  created
+  manual_review
+  routed
+  non_routable
+  duplicate
+  spam_blocked
+  cancelled
+}
+
+enum RoutingStatus {
+  not_started
+  eligible
+  assigned
+  blocked
+  no_broker_available
+  manual_review_required
+}
+
+enum DuplicateStatus {
+  not_checked
+  unique
+  possible_duplicate
+  blocked_duplicate
+}
+
+enum LeadAssignmentStatus {
+  assigned
+  broker_notified
+  received
+  contacted
+  rejected
+  closed
+  disputed
 }
 
 enum AIStatus {
@@ -591,6 +659,158 @@ model RoutingPrecheck {
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
   createdById     String?
+}
+
+model Offer {
+  id                  String                @id @default(uuid())
+  countryId           String
+  productId           String
+  partnerTenantId     String?
+  publicKey           String
+  name                String
+  shortDescription    String?
+  guaranteeSummary    String?
+  indicativePriceMin  Decimal?
+  indicativePriceMax  Decimal?
+  currency            String
+  pricingUnit         String?
+  status              OfferStatus          @default(draft)
+  validationStatus    OfferValidationStatus @default(pending)
+  validFrom           DateTime
+  validUntil          DateTime
+  isSponsored         Boolean               @default(false)
+  sponsorLabel        String?
+  displayPriority     Int                   @default(0)
+  publicDisclaimers   String[]
+  validatedById       String?
+  validatedAt         DateTime?
+  createdAt           DateTime              @default(now())
+  updatedAt           DateTime              @updatedAt
+  createdById         String?
+
+  @@unique([countryId, productId, publicKey])
+  @@index([countryId, productId, status, validationStatus, validFrom, validUntil])
+}
+
+model OfferHistory {
+  id            String   @id @default(uuid())
+  offerId       String
+  changedById   String?
+  changeType    String
+  previousValue Json?
+  nextValue     Json?
+  reason        String
+  changedAt     DateTime @default(now())
+
+  @@index([offerId, changedAt])
+}
+
+model QuoteFormDefinition {
+  id                    String          @id @default(uuid())
+  countryId             String
+  productId             String
+  language              String
+  version               String
+  status                QuoteFormStatus @default(draft)
+  fields                Json
+  validationSchema      Json?
+  consentTextId         String
+  dataMinimizationNotes String?
+  publishedAt           DateTime?
+  retiredAt             DateTime?
+  createdAt             DateTime        @default(now())
+  updatedAt             DateTime        @updatedAt
+  createdById           String?
+
+  @@index([countryId, productId, language, status, version])
+}
+
+model Prospect {
+  id                      String   @id @default(uuid())
+  countryId               String
+  productId               String
+  emailNormalized         String?
+  phoneNormalized         String?
+  emailFingerprint        String?
+  phoneFingerprint        String?
+  displayName             String?
+  preferredContactChannel String?
+  consentRecordIds        String[]
+  retentionUntil          DateTime
+  createdAt               DateTime @default(now())
+  updatedAt               DateTime @updatedAt
+
+  @@index([countryId, productId, emailFingerprint, phoneFingerprint, createdAt])
+}
+
+model QuoteRequest {
+  id                    String             @id @default(uuid())
+  publicReference       String             @unique
+  verificationTokenHash String
+  countryId             String
+  productId             String
+  selectedOfferId       String?
+  quoteFormDefinitionId String
+  prospectId            String
+  consentRecordId       String
+  source                String
+  payload               Json
+  status                QuoteRequestStatus @default(created)
+  duplicateStatus       DuplicateStatus    @default(not_checked)
+  routingStatus         RoutingStatus      @default(not_started)
+  refusalReason         String?
+  manualReviewReason    String?
+  correlationId         String?
+  retentionUntil        DateTime
+  createdAt             DateTime           @default(now())
+  updatedAt             DateTime           @updatedAt
+
+  @@index([countryId, productId, status, routingStatus, createdAt])
+}
+
+model LeadAssignment {
+  id                    String               @id @default(uuid())
+  quoteRequestId         String
+  partnerTenantId        String
+  status                LeadAssignmentStatus @default(assigned)
+  assignedAt             DateTime             @default(now())
+  assignmentReason       String
+  routingDecisionId      String?
+  brokerNotificationId   String?
+  lastBrokerActionAt     DateTime?
+  createdAt              DateTime             @default(now())
+  updatedAt              DateTime             @updatedAt
+
+  @@unique([quoteRequestId])
+  @@index([partnerTenantId, status, assignedAt])
+}
+
+model RoutingDecision {
+  id                      String   @id @default(uuid())
+  quoteRequestId           String
+  result                  String
+  selectedPartnerTenantId String?
+  candidateCount          Int
+  excludedCandidates      Json
+  reasons                 String[]
+  correlationId           String?
+  createdAt               DateTime @default(now())
+
+  @@index([quoteRequestId, createdAt])
+}
+
+model QuoteAISummary {
+  id                    String                @id @default(uuid())
+  quoteRequestId         String
+  aiInteractionId        String?
+  summaryReference       String?
+  guardrailResult        String
+  humanValidationStatus  HumanValidationStatus @default(not_required)
+  visibleToBroker        Boolean               @default(false)
+  createdAt             DateTime               @default(now())
+  updatedAt             DateTime               @updatedAt
+
+  @@index([quoteRequestId])
 }
 
 model EnvironmentSetting {

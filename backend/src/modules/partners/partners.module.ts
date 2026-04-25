@@ -10,6 +10,8 @@ export interface PartnerTenant extends PartnerRecord {
 
 export class PartnersService {
   private readonly partners: PartnerTenant[] = [];
+  private readonly countryAuthorizations = new Map<string, Set<string>>();
+  private readonly productAuthorizations = new Map<string, Set<string>>();
 
   constructor(private readonly audit: AuditLogWriter) {}
 
@@ -62,6 +64,46 @@ export class PartnersService {
 
   list(): PartnerTenant[] {
     return [...this.partners];
+  }
+
+  authorizeCountry(partnerTenantId: string, countryId: string, actor: ActorContext): void {
+    this.require(partnerTenantId);
+    const scopes = this.countryAuthorizations.get(partnerTenantId) ?? new Set<string>();
+    scopes.add(countryId);
+    this.countryAuthorizations.set(partnerTenantId, scopes);
+    this.audit.write({
+      actor,
+      action: "partner.country_authorized",
+      targetType: "PartnerTenant",
+      targetId: partnerTenantId,
+      scope: { partnerTenantId, countryId },
+      result: "success",
+      context: {}
+    });
+  }
+
+  authorizeProduct(partnerTenantId: string, productId: string, actor: ActorContext): void {
+    this.require(partnerTenantId);
+    const scopes = this.productAuthorizations.get(partnerTenantId) ?? new Set<string>();
+    scopes.add(productId);
+    this.productAuthorizations.set(partnerTenantId, scopes);
+    this.audit.write({
+      actor,
+      action: "partner.product_authorized",
+      targetType: "PartnerTenant",
+      targetId: partnerTenantId,
+      scope: { partnerTenantId, productId },
+      result: "success",
+      context: {}
+    });
+  }
+
+  isAuthorizedForCountry(partnerTenantId: string, countryId: string): boolean {
+    return this.countryAuthorizations.get(partnerTenantId)?.has(countryId) === true;
+  }
+
+  isAuthorizedForProduct(partnerTenantId: string, productId: string): boolean {
+    return this.productAuthorizations.get(partnerTenantId)?.has(productId) === true;
   }
 }
 

@@ -8,4 +8,9 @@ export class PublicCountriesController {
     assertNoHeavyPublicSynchronousWork({ publicEndpoint: true, heavySynchronousWork: false });
     return this.countries.listPublic();
   }
+
+  detail(countryCode: string) {
+    assertNoHeavyPublicSynchronousWork({ publicEndpoint: true, heavySynchronousWork: false });
+    return this.countries.getPublicPage(countryCode);
+  }
 }

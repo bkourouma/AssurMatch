@@ -1,6 +1,6 @@
-# Quickstart: Spec 002 planning handoff
+# Quickstart: Spec 002 implementation handoff
 
-This quickstart is for the future implementation phase. It does not activate the feature by itself.
+This quickstart documents the implemented spec 002 surfaces. It does not activate the feature by itself.
 
 ## Read First
 
@@ -52,14 +52,9 @@ Flags that must remain inactive for this journey:
 
 ## Minimum Seed Data For Local Acceptance
 
-- One public pilot country with regulatory regime and public/comparison/quote flags enabled.
-- One disabled country to prove public blocking.
-- Two public products associated to the pilot country.
-- One disabled product and one quote-disabled product.
-- One published `ConsentText` for `lead_transmission`, channel `public_web`, country/product and recipient category `courtier_partenaire_eligible`.
-- At least three offers: one active validated offer, one expired offer, one non-validated offer. Add one sponsored offer when testing sponsorship.
-- One eligible active broker with country/product authorization, valid license, available capacity and quota.
-- One inactive broker, one unauthorized broker and one broker with expired/suspended/invalid license for guardrail tests.
+- Integration seed helper: `backend/tests/integration/helpers/comparator-quote-seed.ts`.
+- Pilot seed values: country `CI`, product `auto`, one published lead-transmission consent text, one published quote form, one active validated indicative offer and one expired validated offer.
+- Broker seed: one active authorized broker with valid scoped license. Routing blocker tests add inactive, unauthorized, over-quota and expired-license brokers.
 
 ## Verification Commands After Implementation
 
@@ -71,7 +66,25 @@ npm run test:integration
 npm run test:contract
 npm run test:guardrails
 npm run test:web
+npm run test
+npm run build
+npx prisma validate --schema backend/prisma/schema.prisma
+npm audit --audit-level=high
+git diff --check
 ```
+
+When validating Prisma locally, export a PostgreSQL-compatible `DATABASE_URL` first if it is absent from the shell environment.
+
+## Implementation Evidence
+
+- `npm run typecheck`: passed during implementation.
+- `npm run lint`: passed during implementation.
+- `npm run test:unit`: passed during implementation.
+- `npm run test:integration`: passed during implementation.
+- `npm run test:contract`: passed during implementation.
+- `npm run test:guardrails`: passed during implementation.
+- `npm run test:web`: passed during implementation.
+- Constitution v1.0.0 reread on 2026-04-25 before final validation; no intentional exception recorded.
 
 ## Manual Smoke Checklist
 

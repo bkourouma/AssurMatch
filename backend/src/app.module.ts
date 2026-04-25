@@ -16,6 +16,12 @@ import { FeatureFlagsModule } from "./modules/feature-flags/feature-flags.module
 import { ConsentModule } from "./modules/consent/consent.module";
 import { NotificationsModule } from "./modules/notifications/notifications.module";
 import { AIModule } from "./modules/ai/ai.module";
+import { QuoteAISummaryService } from "./modules/ai/quote-summary/quote-ai-summary.service";
+import { OffersModule } from "./modules/offers/offers.module";
+import { QuoteFormsModule } from "./modules/quote-forms/quote-forms.module";
+import { ProspectsModule } from "./modules/prospects/prospects.module";
+import { LeadsModule } from "./modules/leads/leads.module";
+import { QuoteRequestsModule } from "./modules/quote-requests/quote-requests.module";
 
 @Module({})
 export class AppModule {
@@ -36,4 +42,40 @@ export class AppModule {
   readonly consent = new ConsentModule(this.audit.writer);
   readonly notifications = new NotificationsModule(this.audit.writer);
   readonly ai = new AIModule(this.audit.writer);
+  readonly quoteAiSummary = new QuoteAISummaryService(this.notifications.queue, this.audit.writer, {
+    id: "00000000-0000-4000-8000-000000000002",
+    key: "quote_summary",
+    status: "disabled",
+    guardrailStatus: "not_configured",
+    auditPolicy: "metadata_only",
+    modelCallCount: 0,
+    createdAt: new Date(),
+    updatedAt: new Date()
+  }, {
+    globalFlags: { ai_summary_enabled: false },
+    countryFlags: { country_ai_enabled: false },
+    productFlags: { product_ai_form_assistant_enabled: false }
+  });
+  readonly offers = new OffersModule(this.audit.writer, this.redis.client);
+  readonly quoteForms = new QuoteFormsModule(this.audit.writer, () => this.consent.service.listTexts().map((text) => ({
+    id: text.id,
+    version: text.version,
+    contentHash: text.contentHash,
+    purpose: "lead_transmission",
+    recipientCategory: text.recipientCategory,
+    status: text.status ?? "draft"
+  })));
+  readonly prospects = new ProspectsModule(this.audit.writer);
+  readonly leads = new LeadsModule(this.partners.service, this.partnerLicenses.service, this.audit.writer);
+  readonly quoteRequests = new QuoteRequestsModule({
+    countries: this.countries.service,
+    products: this.products.service,
+    forms: this.quoteForms.service,
+    consent: this.consent.service,
+    identity: this.prospects.identity,
+    prospects: this.prospects.service,
+    routing: this.leads.routing,
+    notifications: this.notifications.quoteService,
+    aiSummary: this.quoteAiSummary
+  }, this.audit.writer, this.redis.client);
 }

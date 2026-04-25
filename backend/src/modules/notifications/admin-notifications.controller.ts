@@ -13,6 +13,16 @@ export class AdminNotificationsController {
     return this.notifications.list();
   }
 
+  listQuoteNotifications(actor: ActorContext): NotificationRecord[] {
+    this.rbac.assert(actor, "notifications:read");
+    return this.notifications.list().filter((notification) =>
+      notification.type === "visitor_quote_confirmation" ||
+      notification.type === "visitor_quote_non_routable" ||
+      notification.type === "broker_lead_assigned" ||
+      notification.type === "quote_notification_failed"
+    );
+  }
+
   test(actor: ActorContext, input: NotificationDto) {
     this.rbac.assert(actor, "notifications:create");
     return this.notifications.queuePaired(input, actor);
