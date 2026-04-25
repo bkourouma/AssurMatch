@@ -1,0 +1,801 @@
+openapi: 3.1.0
+info:
+  title: AssurMatch Comparator and Quote API
+  version: 0.1.0
+  description: >
+    Public indicative comparison, quote request, broker lead and admin offer
+    operations for spec 002. All public offers are indicative and quote
+    transmission requires explicit consent.
+servers:
+  - url: https://api.assurmatch.example
+    description: Production-like HTTPS endpoint
+  - url: http://localhost:3000
+    description: Local development endpoint
+security:
+  - bearerAuth: []
+tags:
+  - name: PublicCountries
+  - name: PublicProducts
+  - name: PublicOffers
+  - name: PublicQuotes
+  - name: BrokerLeads
+  - name: AdminOffers
+  - name: AdminQuotes
+  - name: AdminQuoteForms
+paths:
+  /countries:
+    get:
+      tags: [PublicCountries]
+      summary: List public or waitlist-eligible countries.
+      security: []
+      responses:
+        "200":
+          description: Public country list.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/PublicCountry"
+  /countries/{countryCode}:
+    get:
+      tags: [PublicCountries]
+      summary: Return public country page data and journey state.
+      security: []
+      parameters:
+        - $ref: "#/components/parameters/CountryCode"
+      responses:
+        "200":
+          description: Country page.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CountryPage"
+        "404":
+          $ref: "#/components/responses/PublicNotAvailable"
+  /countries/{countryCode}/products:
+    get:
+      tags: [PublicProducts]
+      summary: List active public products for a country.
+      security: []
+      parameters:
+        - $ref: "#/components/parameters/CountryCode"
+      responses:
+        "200":
+          description: Product list.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/PublicProduct"
+  /countries/{countryCode}/products/{productKey}:
+    get:
+      tags: [PublicProducts]
+      summary: Return product page data and journey availability.
+      security: []
+      parameters:
+        - $ref: "#/components/parameters/CountryCode"
+        - $ref: "#/components/parameters/ProductKey"
+      responses:
+        "200":
+          description: Product page.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProductPage"
+        "404":
+          $ref: "#/components/responses/PublicNotAvailable"
+  /countries/{countryCode}/products/{productKey}/offers:
+    get:
+      tags: [PublicOffers]
+      summary: List active validated indicative offers.
+      security: []
+      parameters:
+        - $ref: "#/components/parameters/CountryCode"
+        - $ref: "#/components/parameters/ProductKey"
+        - name: minPrice
+          in: query
+          schema:
+            type: number
+        - name: maxPrice
+          in: query
+          schema:
+            type: number
+        - name: broker
+          in: query
+          schema:
+            type: string
+        - name: sort
+          in: query
+          schema:
+            type: string
+            enum: [price_asc, price_desc, name_asc, updated_desc, sponsored_explicit]
+      responses:
+        "200":
+          description: Indicative offers.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items, disclaimer]
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/OfferSummary"
+                  disclaimer:
+                    type: string
+  /offers/{offerId}:
+    get:
+      tags: [PublicOffers]
+      summary: Return public offer detail when still valid.
+      security: []
+      parameters:
+        - $ref: "#/components/parameters/Id"
+      responses:
+        "200":
+          description: Offer detail.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OfferDetail"
+        "404":
+          $ref: "#/components/responses/PublicNotAvailable"
+  /countries/{countryCode}/products/{productKey}/quote-form:
+    get:
+      tags: [PublicQuotes]
+      summary: Return dynamic quote form and consent text reference.
+      security: []
+      parameters:
+        - $ref: "#/components/parameters/CountryCode"
+        - $ref: "#/components/parameters/ProductKey"
+      responses:
+        "200":
+          description: Quote form.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PublicQuoteForm"
+        "409":
+          $ref: "#/components/responses/PublicNotAvailable"
+  /quote-requests:
+    post:
+      tags: [PublicQuotes]
+      summary: Create a consented quote request and route if eligible.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/QuoteRequestCreate"
+      responses:
+        "201":
+          description: Quote request accepted.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/QuoteConfirmation"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "409":
+          $ref: "#/components/responses/PublicNotAvailable"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+  /quote-requests/{publicReference}:
+    get:
+      tags: [PublicQuotes]
+      summary: Return minimal visitor-safe quote status.
+      security: []
+      parameters:
+        - name: publicReference
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: token
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Quote status.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/QuoteStatus"
+  /broker/leads:
+    get:
+      tags: [BrokerLeads]
+      summary: List leads assigned to the authenticated broker tenant.
+      responses:
+        "200":
+          description: Broker lead list.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items, page, pageSize, total]
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/BrokerLeadSummary"
+                  page:
+                    type: integer
+                  pageSize:
+                    type: integer
+                  total:
+                    type: integer
+  /broker/leads/{leadAssignmentId}:
+    get:
+      tags: [BrokerLeads]
+      summary: Read one assigned lead.
+      parameters:
+        - name: leadAssignmentId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Broker lead detail.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BrokerLeadDetail"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+  /broker/leads/{leadAssignmentId}/status:
+    patch:
+      tags: [BrokerLeads]
+      summary: Update assigned lead handling status.
+      parameters:
+        - name: leadAssignmentId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BrokerLeadStatusUpdate"
+      responses:
+        "200":
+          description: Status updated.
+  /admin/offers:
+    get:
+      tags: [AdminOffers]
+      summary: Search indicative offers.
+      responses:
+        "200":
+          description: Offer list.
+    post:
+      tags: [AdminOffers]
+      summary: Create an indicative offer.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AdminOfferUpsert"
+      responses:
+        "201":
+          description: Offer created.
+  /admin/offers/{offerId}:
+    patch:
+      tags: [AdminOffers]
+      summary: Update offer content, status, validity or sponsorship.
+      parameters:
+        - name: offerId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AdminOfferUpsert"
+      responses:
+        "200":
+          description: Offer updated.
+  /admin/offers/{offerId}/validate:
+    post:
+      tags: [AdminOffers]
+      summary: Validate or reject an offer for public display.
+      parameters:
+        - name: offerId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [validationStatus, reason]
+              properties:
+                validationStatus:
+                  type: string
+                  enum: [validated, rejected]
+                reason:
+                  type: string
+      responses:
+        "200":
+          description: Validation recorded.
+  /admin/quote-form-definitions:
+    get:
+      tags: [AdminQuoteForms]
+      summary: Search quote form definitions.
+      responses:
+        "200":
+          description: Form definitions.
+    post:
+      tags: [AdminQuoteForms]
+      summary: Create a quote form definition.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AdminQuoteFormDefinition"
+      responses:
+        "201":
+          description: Form definition created.
+  /admin/quote-requests:
+    get:
+      tags: [AdminQuotes]
+      summary: Search quote requests with scope and PII controls.
+      responses:
+        "200":
+          description: Quote request list.
+  /admin/quote-requests/{quoteRequestId}:
+    get:
+      tags: [AdminQuotes]
+      summary: Inspect quote request, consent, routing and notification state.
+      parameters:
+        - name: quoteRequestId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Quote request detail.
+  /admin/quote-requests/{quoteRequestId}/review-status:
+    patch:
+      tags: [AdminQuotes]
+      summary: Mark non-routable, duplicate or manual-review state without bypassing blockers.
+      parameters:
+        - name: quoteRequestId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [status, reason]
+              properties:
+                status:
+                  type: string
+                  enum: [manual_review, non_routable, duplicate, cancelled]
+                reason:
+                  type: string
+      responses:
+        "200":
+          description: Review status updated.
+  /admin/prospects:
+    get:
+      tags: [AdminQuotes]
+      summary: Search prospects under strict PII/RBAC controls.
+      responses:
+        "200":
+          description: Prospect list.
+  /admin/lead-assignments:
+    get:
+      tags: [AdminQuotes]
+      summary: Search routing outcomes and lead assignments.
+      responses:
+        "200":
+          description: Lead assignment list.
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  parameters:
+    Id:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    CountryCode:
+      name: countryCode
+      in: path
+      required: true
+      schema:
+        type: string
+        minLength: 2
+        maxLength: 3
+    ProductKey:
+      name: productKey
+      in: path
+      required: true
+      schema:
+        type: string
+  responses:
+    ValidationError:
+      description: Input validation failed without exposing sensitive details.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    Forbidden:
+      description: Permission, tenant or scope check failed.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    PublicNotAvailable:
+      description: Country, product, offer or quote path is not publicly available.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    RateLimited:
+      description: Public rate limit or anti-spam rule blocked the request.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+  schemas:
+    ErrorResponse:
+      type: object
+      required: [code, message, correlationId]
+      properties:
+        code:
+          type: string
+        message:
+          type: string
+        correlationId:
+          type: string
+    PublicCountry:
+      type: object
+      required: [isoCode, name, journeyState]
+      properties:
+        isoCode:
+          type: string
+        name:
+          type: string
+        journeyState:
+          $ref: "#/components/schemas/JourneyState"
+    CountryPage:
+      allOf:
+        - $ref: "#/components/schemas/PublicCountry"
+        - type: object
+          required: [technicalRoleNotice]
+          properties:
+            technicalRoleNotice:
+              type: string
+    PublicProduct:
+      type: object
+      required: [key, name, comparisonEnabled, quoteEnabled]
+      properties:
+        key:
+          type: string
+        name:
+          type: string
+        comparisonEnabled:
+          type: boolean
+        quoteEnabled:
+          type: boolean
+    ProductPage:
+      allOf:
+        - $ref: "#/components/schemas/PublicProduct"
+        - type: object
+          required: [indicativeNotice]
+          properties:
+            indicativeNotice:
+              type: string
+    JourneyState:
+      type: object
+      required: [publicEnabled, comparisonEnabled, quoteEnabled]
+      properties:
+        publicEnabled:
+          type: boolean
+        comparisonEnabled:
+          type: boolean
+        quoteEnabled:
+          type: boolean
+        waitlistOnly:
+          type: boolean
+    OfferSummary:
+      type: object
+      required: [id, name, indicativePriceLabel, isSponsored, disclaimer]
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        brokerName:
+          type: string
+        indicativePriceMin:
+          type: number
+        indicativePriceMax:
+          type: number
+        indicativePriceLabel:
+          type: string
+        guaranteeSummary:
+          type: string
+        isSponsored:
+          type: boolean
+        sponsorLabel:
+          type: string
+        disclaimer:
+          type: string
+    OfferDetail:
+      allOf:
+        - $ref: "#/components/schemas/OfferSummary"
+        - type: object
+          required: [validUntil, publicDisclaimers]
+          properties:
+            validUntil:
+              type: string
+              format: date-time
+            publicDisclaimers:
+              type: array
+              items:
+                type: string
+    PublicQuoteForm:
+      type: object
+      required: [formDefinitionId, version, fields, consent]
+      properties:
+        formDefinitionId:
+          type: string
+          format: uuid
+        version:
+          type: string
+        fields:
+          type: array
+          items:
+            $ref: "#/components/schemas/QuoteFormField"
+        consent:
+          $ref: "#/components/schemas/PublicConsentText"
+    QuoteFormField:
+      type: object
+      required: [key, label, type, required, sensitivity]
+      properties:
+        key:
+          type: string
+        label:
+          type: string
+        type:
+          type: string
+          enum: [text, email, phone, number, select, checkbox, date]
+        required:
+          type: boolean
+        sensitivity:
+          type: string
+          enum: [public, personal, sensitive]
+        options:
+          type: array
+          items:
+            type: string
+    PublicConsentText:
+      type: object
+      required: [consentTextId, version, contentHash, purpose, recipientCategory]
+      properties:
+        consentTextId:
+          type: string
+          format: uuid
+        version:
+          type: string
+        contentHash:
+          type: string
+        purpose:
+          type: string
+          enum: [lead_transmission]
+        recipientCategory:
+          type: string
+    QuoteRequestCreate:
+      type: object
+      required: [countryCode, productKey, formDefinitionId, contact, answers, consent]
+      properties:
+        countryCode:
+          type: string
+        productKey:
+          type: string
+        selectedOfferId:
+          type: string
+          format: uuid
+        formDefinitionId:
+          type: string
+          format: uuid
+        contact:
+          type: object
+          required: [email, phone]
+          properties:
+            displayName:
+              type: string
+            email:
+              type: string
+              format: email
+            phone:
+              type: string
+        answers:
+          type: object
+          additionalProperties: true
+        consent:
+          type: object
+          required: [accepted, consentTextId, version, contentHash]
+          properties:
+            accepted:
+              type: boolean
+            consentTextId:
+              type: string
+              format: uuid
+            version:
+              type: string
+            contentHash:
+              type: string
+    QuoteConfirmation:
+      type: object
+      required: [publicReference, status, routed, message]
+      properties:
+        publicReference:
+          type: string
+        status:
+          type: string
+          enum: [routed, non_routable, manual_review, duplicate]
+        routed:
+          type: boolean
+        brokerName:
+          type: string
+        message:
+          type: string
+        verificationToken:
+          type: string
+    QuoteStatus:
+      type: object
+      required: [publicReference, status]
+      properties:
+        publicReference:
+          type: string
+        status:
+          type: string
+        brokerName:
+          type: string
+    BrokerLeadSummary:
+      type: object
+      required: [leadAssignmentId, publicReference, countryCode, productKey, status, assignedAt]
+      properties:
+        leadAssignmentId:
+          type: string
+          format: uuid
+        publicReference:
+          type: string
+        countryCode:
+          type: string
+        productKey:
+          type: string
+        status:
+          type: string
+        assignedAt:
+          type: string
+          format: date-time
+    BrokerLeadDetail:
+      allOf:
+        - $ref: "#/components/schemas/BrokerLeadSummary"
+        - type: object
+          properties:
+            contact:
+              type: object
+              additionalProperties: true
+            answers:
+              type: object
+              additionalProperties: true
+            aiSummary:
+              type: string
+              description: Assistance only, never an official recommendation.
+    BrokerLeadStatusUpdate:
+      type: object
+      required: [status, reason]
+      properties:
+        status:
+          type: string
+          enum: [received, contacted, rejected, closed, disputed]
+        reason:
+          type: string
+    AdminOfferUpsert:
+      type: object
+      required: [countryId, productId, name, validFrom, validUntil, reason]
+      properties:
+        countryId:
+          type: string
+          format: uuid
+        productId:
+          type: string
+          format: uuid
+        partnerTenantId:
+          type: string
+          format: uuid
+        name:
+          type: string
+        shortDescription:
+          type: string
+        guaranteeSummary:
+          type: string
+        indicativePriceMin:
+          type: number
+        indicativePriceMax:
+          type: number
+        currency:
+          type: string
+        validFrom:
+          type: string
+          format: date-time
+        validUntil:
+          type: string
+          format: date-time
+        isSponsored:
+          type: boolean
+        sponsorLabel:
+          type: string
+        reason:
+          type: string
+    AdminQuoteFormDefinition:
+      type: object
+      required: [countryId, productId, language, version, fields, consentTextId, reason]
+      properties:
+        countryId:
+          type: string
+          format: uuid
+        productId:
+          type: string
+          format: uuid
+        language:
+          type: string
+        version:
+          type: string
+        status:
+          type: string
+          enum: [draft, published, suspended, retired]
+        fields:
+          type: array
+          items:
+            $ref: "#/components/schemas/QuoteFormField"
+        consentTextId:
+          type: string
+          format: uuid
+        reason:
+          type: string
