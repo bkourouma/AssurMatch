@@ -1,41 +1,34 @@
 <!--
 Sync Impact Report
-Version change: template -> 1.0.0
+Version change: 1.1.0 -> 1.2.0
 Modified principles:
-- Template Principle 1 -> I. Positionnement de plateforme technique
-- Template Principle 2 -> II. Conformite reglementaire et consentement
-- Template Principle 3 -> III. Architecture modulaire et activation progressive
-- Template Principle 4 -> IV. Securite, acces et protection des donnees
-- Template Principle 5 -> V. Intelligence artificielle assistee et auditee
-- Added -> VI. Donnees critiques et historique opposable
-- Added -> VII. Routage responsable des leads
-- Added -> VIII. UX, contenu et promesses publiques
-- Added -> IX. Discipline de tests constitutionnels
-- Added -> X. Qualite de code et maintenabilite
-- Added -> XI. Gouvernance Spec Kit et activation des features
+- XI. Gouvernance Spec Kit et activation des features: ajout d'une regle de
+  workflow continu apres spec validee pour les features standards.
 Added sections:
-- Constitutional Acceptance Criteria
-- Implementation Compliance Checklists
-- Metadata: version, date and status
+- Workflow Spec Kit continu
 Removed sections:
-- Placeholder template examples and unresolved bracket tokens
+- none
 Templates requiring updates:
 - updated: .specify/templates/plan-template.md
 - updated: .specify/templates/spec-template.md
 - updated: .specify/templates/tasks-template.md
 - updated: .specify/templates/checklist-template.md
-- not present: .specify/templates/commands/*.md
+- reviewed: .specify/templates/commands/*.md not present
 - reviewed: .specify/extensions/git/commands/*.md
 - updated: AGENTS.md
-Runtime hook remediation:
-- updated: .specify/extensions/git/scripts/powershell/initialize-repo.ps1
+Existing specs impact:
+- Specs terminees existantes restent valides et ne sont pas amendees par cette
+  regle. Elle guide les prochaines features standards.
+Runtime hook status:
+- before_constitution speckit.git.initialize executed; repository already
+  initialized, so no Git initialization change was needed.
 Follow-up TODOs: none
 -->
 
 # AssurMatch Constitution
 
-**Version**: 1.0.0
-**Date**: 2026-04-25
+**Version**: 1.2.0
+**Date**: 2026-04-26
 **Statut**: Ratified
 
 ## Core Principles
@@ -102,8 +95,8 @@ peut prevoir plusieurs pays, produits et modules, mais l'exposition publique
 DOIT etre controlee par feature flags globaux, par pays et par produit.
 
 Architecture cible:
-- Frontend: Next.js et React pour le site public, le portail courtier et le
-  back-office admin.
+- Frontend: deux applications web Next.js/React separees: Web Publique Client
+  et Back-office Partenaires/Plateforme.
 - Backend: NestJS en monolithe modulaire initial, organise pour evoluer vers
   des frontieres de domaines plus autonomes si le besoin est prouve.
 - Donnees: PostgreSQL est la source de verite; Prisma est l'ORM recommande.
@@ -114,6 +107,44 @@ Architecture cible:
 - Documents: stockage compatible S3.
 - API: REST structuree, avec preparation future pour webhooks et API
   partenaires.
+
+Separation des applications frontend:
+- Application Web Publique Client: destinee aux visiteurs, prospects,
+  particuliers, professionnels et entreprises. Elle couvre accueil public,
+  pages pays, pages produits, comparateur d'offres indicatives, detail d'offre,
+  demande de devis, consentement explicite, confirmation de demande, suivi
+  public minimal si prevu, contenus publics, FAQ, mentions legales et politique
+  de confidentialite.
+- Application Back-office Partenaires et Plateforme: destinee aux utilisateurs
+  authentifies, dont courtiers Starter, Pro et Enterprise, agents courtiers,
+  managers courtiers, administrateurs plateforme, compliance admins, support
+  admins, finance admins, content admins et AI admins. Elle couvre portail
+  Starter, CRM Pro/Enterprise, dashboards courtiers, back-office admin
+  plateforme, gestion pays, produits, offres, partenaires, licences, routage,
+  audit logs, consentements, facturation B2B, configuration IA, rapports,
+  support et conformite.
+- Les parcours visiteurs et les parcours partenaires/admins DOIVENT etre
+  separes applicativement.
+- L'application publique NE DOIT JAMAIS embarquer d'ecrans, routes,
+  privileges, layouts ou politiques d'acces back-office.
+- L'application back-office DOIT etre protegee par authentification, RBAC
+  strict, MFA selon role, audit et controle du tenant partenaire.
+- Les composants UI PEUVENT partager un design system ou des packages communs,
+  mais routes, layouts, politiques d'acces et responsabilites fonctionnelles
+  DOIVENT rester separes.
+- Les API PEUVENT rester dans le meme backend NestJS modulaire, mais les scopes
+  d'acces DOIVENT distinguer clairement public, broker et admin.
+- Toute fonctionnalite publique DOIT eviter de dependre d'un etat
+  d'authentification partenaire ou admin.
+- Toute fonctionnalite back-office DOIT etre inaccessible depuis l'application
+  publique.
+- Les tests Playwright DOIVENT distinguer les smoke tests publics et les smoke
+  tests back-office lorsque les deux surfaces sont concernees.
+- Les variables d'environnement, domaines, routes et deploiements DOIVENT
+  pouvoir etre configures separement pour les deux applications.
+- Les futures specs DOIVENT preciser les surfaces impactees: Web Publique
+  Client, Back-office Partenaires/Plateforme, Backend API, packages partages,
+  ou plusieurs de ces scopes.
 
 Modules backend prevus:
 - auth, users, countries, regulatory-regimes, products, offers, partners,
@@ -127,6 +158,8 @@ Must:
 - Aucun traitement lourd NE DOIT etre execute synchronement dans un endpoint
   public.
 - Tout module public DOIT etre protege par les feature flags pertinents.
+- Toute spec ou plan DOIT identifier explicitement quelle application ou quel
+  package est impacte.
 - Le lancement public PEUT etre limite a un pays, deux produits, trois a cinq
   courtiers, portail Starter, CRM Pro, dashboard simple et IA limitee.
 
@@ -324,6 +357,32 @@ Toute nouvelle feature DOIT commencer par `/speckit.specify`, puis passer par
 planification, taches et implementation selon Spec Kit. Les specs, plans et
 taches DOIVENT citer les impacts constitutionnels applicables.
 
+Workflow Spec Kit continu:
+- Une fois une spec validee et sans marqueur `[NEEDS CLARIFICATION]`, Code AI
+  PEUT enchainer `/speckit.plan`, `/speckit.tasks`, `/speckit.implement` et les
+  validations finales sans demander de confirmation intermediaire.
+- Cette regle s'applique uniquement si la spec est deja validee, committee ou
+  explicitement approuvee par l'utilisateur.
+- Code AI DOIT s'arreter avant ou pendant l'enchainement en cas de conflit avec
+  la constitution, exigence ambigue ou contradictoire, risque reglementaire,
+  risque de securite, risque de fuite de donnees, activation accidentelle d'un
+  module interdit, besoin de decision produit non couverte par la spec, ou
+  echec bloquant des tests ou validations.
+- Code AI NE DOIT PAS faire de commit automatiquement apres implementation,
+  sauf instruction explicite de l'utilisateur.
+- Code AI DOIT toujours executer les validations finales apres implementation.
+- Code AI DOIT cocher les taches terminees dans `tasks.md` au fur et a mesure
+  ou a la fin de l'implementation.
+- Le rapport final DOIT lister le plan cree, le `tasks.md` cree, le nombre de
+  taches terminees, les fichiers principaux modifies, les migrations creees,
+  les tests executes, les resultats des validations, les points non termines,
+  les risques residuels et la prochaine etape recommandee.
+- Cette regle NE PERMET PAS de sauter `/speckit.specify`, de contourner les
+  controles constitutionnels, ni d'activer des modules reglementes interdits ou
+  desactives par defaut.
+- Cette regle NE S'APPLIQUE PAS aux features sensibles ou reglementees futures
+  sans validation explicite.
+
 Must:
 - Toute implementation DOIT respecter cette constitution.
 - Toute exception DOIT etre documentee avec justification, portee, risque,
@@ -333,6 +392,9 @@ Must:
 - Les plans DOIVENT mentionner impacts securite, conformite, donnees, IA,
   feature flags, routage et tests.
 - Les taches DOIVENT etre decoupees par increments testables.
+- Pour les features standards dont la spec est validee, le workflow recommande
+  DOIT etre `/speckit.plan` -> `/speckit.tasks` -> `/speckit.implement` ->
+  validations finales.
 - Aucune feature reglementee future, notamment paiements, e-signature,
   emission de police, sinistres, API assureur ou recommandation IA avancee, NE
   DOIT etre activee sans validation explicite.
@@ -410,21 +472,47 @@ des features concernees.
    s'execute, Then le lead reste non transmis, la raison est conservee et aucun
    courtier non eligible n'est notifie.
 
+13. Application publique sans back-office
+   Given une fonctionnalite de l'Application Web Publique Client, When un
+   visiteur accede aux routes publiques, Then aucun ecran, privilege, layout,
+   route ou etat d'authentification back-office n'est charge ou requis.
+
+14. Back-office inaccessible depuis le public
+   Given une fonctionnalite du Back-office Partenaires/Plateforme, When un
+   visiteur non authentifie ou non autorise tente d'y acceder depuis
+   l'application publique, Then l'acces est refuse, audite lorsque pertinent et
+   aucune donnee partenaire/admin n'est exposee.
+
 ## Implementation Compliance Checklists
 
 Avant toute implementation:
 - Verifier que la spec commence par `/speckit.specify` et cite les principes
   applicables.
+- Verifier que la spec est validee, committee ou explicitement approuvee avant
+  tout enchainement automatique `/speckit.plan` -> `/speckit.tasks` ->
+  `/speckit.implement`.
+- Verifier qu'aucun marqueur `[NEEDS CLARIFICATION]` ne reste avant
+  l'enchainement automatique.
+- Identifier les surfaces impactees: Web Publique Client, Back-office
+  Partenaires/Plateforme, Backend API, packages partages, ou plusieurs.
+- Confirmer que routes, layouts, politiques d'acces, variables d'environnement,
+  domaines et deploiements restent separables entre les deux applications web.
 - Definir pays, produits, plans, roles et feature flags touches.
 - Documenter les impacts securite, conformite, donnees, IA, routage,
   notifications, billing et documents.
 - Ecrire des criteres Given/When/Then pour les cas heureux et interdits.
 - Prevoir tests unitaires, integration, RBAC, flags, audit et garde-fous IA
   selon le scope.
+- Prevoir des smoke tests Playwright publics et back-office distincts lorsque
+  les deux applications web sont concernees.
 - Confirmer qu'aucune formulation interdite ni promesse reglementee n'est
   introduite.
 - Confirmer que les endpoints publics ne portent pas de traitements lourds
   synchrones.
+- Ne pas faire de commit automatique apres implementation sans instruction
+  explicite de l'utilisateur.
+- Cocher les taches terminees dans `tasks.md` et executer les validations
+  finales avant le rapport final.
 
 Avant activation d'un pays:
 - Verifier country_public_enabled et les flags pays associes.
@@ -469,6 +557,12 @@ Amendment procedure:
   fichier.
 - Toute modification DOIT propager les changements aux templates Spec Kit et aux
   guides runtime concernes dans le meme changement.
+- Toute spec future DOIT declarer si elle impacte Web Publique Client,
+  Back-office Partenaires/Plateforme, Backend API, packages partages ou
+  plusieurs scopes.
+- Une spec validee, sans marqueur `[NEEDS CLARIFICATION]`, PEUT declencher un
+  workflow continu plan, taches, implementation et validations finales pour les
+  features standards, sous reserve des limites de cette constitution.
 - Les exceptions temporaires DOIVENT etre tracees avec approbateur, echeance et
   plan de retour a la conformite.
 
@@ -486,9 +580,14 @@ Compliance review:
   apres Phase 1.
 - Les tasks DOIVENT contenir les travaux de tests et garde-fous requis avant
   implementation.
+- Les workflows continus DOIVENT s'interrompre sur conflit constitutionnel,
+  ambiguite majeure, risque de conformite, risque de securite, risque de fuite
+  de donnees, activation interdite ou validation bloquante.
+- Les reviews DOIVENT verifier que les parcours publics et back-office restent
+  applicativement separes lorsque le frontend est touche.
 - Les reviews DOIVENT verifier consentement, audit, RBAC, feature flags,
   licences, routage, IA, contenu public et donnees critiques.
 - Une feature reglementee ou sensible NE DOIT PAS etre activee sans validation
   explicite de conformite.
 
-**Version**: 1.0.0 | **Ratified**: 2026-04-25 | **Last Amended**: 2026-04-25
+**Version**: 1.2.0 | **Ratified**: 2026-04-25 | **Last Amended**: 2026-04-26

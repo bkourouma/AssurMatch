@@ -28,41 +28,62 @@ on feature context, requirements and the AssurMatch constitution.
 - [ ] CHK003 Confirms public offers, prices and comparisons remain indicative
 - [ ] CHK004 Confirms forbidden phrases are absent from public UX and notifications
 
+## Frontend Application Separation
+
+- [ ] CHK005 Confirms impacted application(s) are declared: Web Publique Client, Back-office Partenaires/Plateforme, Backend API, packages partages or multiple
+- [ ] CHK006 Confirms public visitor routes do not load back-office screens, privileges, layouts or partner/admin authentication state
+- [ ] CHK007 Confirms back-office routes require authentication, RBAC, MFA where applicable, audit and tenant checks
+- [ ] CHK008 Confirms shared UI packages do not merge public and back-office routes, layouts, access policies or functional responsibilities
+- [ ] CHK009 Confirms env vars, domains, route prefixes and deployments can be configured separately for public and back-office applications
+- [ ] CHK010 Confirms back-office functionality is inaccessible from the public application
+
 ## Consent, Licenses & Routing
 
-- [ ] CHK005 Confirms ConsentRecord exists before any lead transmission
-- [ ] CHK006 Confirms broker license verification and expired-license blocking are implemented
-- [ ] CHK007 Confirms disabled country and disabled product cases block exposure or routing
-- [ ] CHK008 Confirms routing decisions and non-routable reasons are audited
-- [ ] CHK009 Confirms quotas and configurable routing rules are respected
+- [ ] CHK011 Confirms ConsentRecord exists before any lead transmission
+- [ ] CHK012 Confirms broker license verification and expired-license blocking are implemented
+- [ ] CHK013 Confirms disabled country and disabled product cases block exposure or routing
+- [ ] CHK014 Confirms routing decisions and non-routable reasons are audited
+- [ ] CHK015 Confirms quotas and configurable routing rules are respected
 
 ## Security, Data & Audit
 
-- [ ] CHK010 Confirms RBAC, tenant isolation and export permissions are tested
-- [ ] CHK011 Confirms PII is masked or excluded from logs
-- [ ] CHK012 Confirms sensitive actions create AuditLog entries
-- [ ] CHK013 Confirms critical entities include required timestamps and authorship where applicable
-- [ ] CHK014 Confirms offers, licenses, routing changes and feature flag changes are historized
+- [ ] CHK016 Confirms RBAC, tenant isolation and export permissions are tested
+- [ ] CHK017 Confirms PII is masked or excluded from logs
+- [ ] CHK018 Confirms sensitive actions create AuditLog entries
+- [ ] CHK019 Confirms critical entities include required timestamps and authorship where applicable
+- [ ] CHK020 Confirms offers, licenses, routing changes and feature flag changes are historized
 
 ## Feature Flags & Activation
 
-- [ ] CHK015 Confirms global, country, product, partner, plan and AI flags are defined where applicable
-- [ ] CHK016 Confirms default disabled states are safe for regulated or incomplete features
-- [ ] CHK017 Confirms quick deactivation path is tested
+- [ ] CHK021 Confirms global, country, product, partner, plan and AI flags are defined where applicable
+- [ ] CHK022 Confirms default disabled states are safe for regulated or incomplete features
+- [ ] CHK023 Confirms quick deactivation path is tested
+
+## Continuous Spec Kit Workflow
+
+- [ ] CHK024 Confirms the spec was validated, committed or explicitly approved before any continuous workflow
+- [ ] CHK025 Confirms no `[NEEDS CLARIFICATION]` marker remains before plan -> tasks -> implement continuation
+- [ ] CHK026 Confirms the feature is standard, or that sensitive/regulatory continuation has explicit approval
+- [ ] CHK027 Confirms stop conditions were monitored: constitutional conflict, ambiguity, regulatory/security/data leakage risk, forbidden activation, uncovered product decision and blocking validation failure
+- [ ] CHK028 Confirms no automatic post-implementation commit occurred without explicit user instruction
+- [ ] CHK029 Confirms completed tasks were checked off in tasks.md
+- [ ] CHK030 Confirms final validations ran after implementation
+- [ ] CHK031 Confirms final report includes plan, tasks.md, completed task count, main files, migrations, tests, validation results, unfinished items, residual risks and next step
 
 ## AI Controls
 
-- [ ] CHK018 Confirms AI calls go through the backend ai module
-- [ ] CHK019 Confirms prompts, outputs and guardrail results are audited
-- [ ] CHK020 Confirms PII minimization is applied before model calls
-- [ ] CHK021 Confirms AI content is marked as assistance and sensitive suggestions require human validation
+- [ ] CHK032 Confirms AI calls go through the backend ai module
+- [ ] CHK033 Confirms prompts, outputs and guardrail results are audited
+- [ ] CHK034 Confirms PII minimization is applied before model calls
+- [ ] CHK035 Confirms AI content is marked as assistance and sensitive suggestions require human validation
 
 ## Tests & Evidence
 
-- [ ] CHK022 Confirms required unit tests exist for critical modules
-- [ ] CHK023 Confirms integration tests cover public endpoints in scope
-- [ ] CHK024 Confirms constitutional blockers are tested: no consent, expired license, disabled country/product, unauthorized broker, disabled AI, expired offer, unauthorized export and non-routable lead
-- [ ] CHK025 Confirms quickstart or manual validation evidence is linked
+- [ ] CHK036 Confirms required unit tests exist for critical modules
+- [ ] CHK037 Confirms integration tests cover public endpoints in scope
+- [ ] CHK038 Confirms Playwright smoke tests distinguish public smoke tests from back-office smoke tests when frontend is in scope
+- [ ] CHK039 Confirms constitutional blockers are tested: no consent, expired license, disabled country/product, unauthorized broker, disabled AI, expired offer, unauthorized export and non-routable lead
+- [ ] CHK040 Confirms quickstart or manual validation evidence is linked
 
 ## Notes
 

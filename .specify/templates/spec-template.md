@@ -4,6 +4,8 @@
 **Created**: [DATE]
 **Status**: Draft
 **Input**: User description: "$ARGUMENTS"
+**Validation State**: [Draft | Validated by user | Committed | Explicitly approved]
+**Continuous Workflow Eligible**: [Yes/No - requires validated/committed/explicitly approved spec and no NEEDS CLARIFICATION markers]
 
 ## Constitutional Scope & Compliance *(mandatory)*
 
@@ -13,7 +15,9 @@
 -->
 
 - **Technical platform role**: [How this feature avoids direct sale, direct subscription, premium collection in V1, contract issuance, attestation issuance and binding personalized advice]
+- **Impacted application(s)**: [Web Publique Client, Back-office Partenaires/Plateforme, Backend API, packages partages, or multiple]
 - **Affected scopes**: [Countries, products, partners, plans, roles, portals, modules]
+- **Frontend separation**: [How public visitor journeys stay separate from authenticated partner/admin journeys; N/A if no frontend impact]
 - **Required feature flags**: [Global, country, product, partner, plan and AI flags touched]
 - **Consent and transmission**: [Whether ConsentRecord is required before any lead transmission; N/A reason if not]
 - **Partner license controls**: [License verification, expiration blocking and responsible broker display]
@@ -22,6 +26,7 @@
 - **Routing impact**: [Lead eligibility, quotas, configurable rules, non-routable states]
 - **AI impact**: [AI module usage, flags, prompt/result audit, PII minimization, human validation, N/A reason]
 - **UX/content restrictions**: [Allowed CTA wording, indicative offer wording, sponsored offer disclosure, forbidden phrases avoided]
+- **Workflow continuity**: [Whether, after validation, this standard feature may proceed through /speckit.plan -> /speckit.tasks -> /speckit.implement -> final validations without intermediate confirmation; N/A for sensitive or regulated future features unless explicitly approved]
 
 ## User Scenarios & Testing *(mandatory)*
 
@@ -95,6 +100,8 @@
 - What happens when an offer is expired, sponsored or only indicative?
 - What happens when AI is disabled globally, by country, by product, by partner or by plan?
 - What happens when a user lacks permission to view, mutate or export the resource?
+- What happens when a public route tries to load partner/admin authentication, privileges or back-office UI?
+- What happens when an unauthenticated or unauthorized visitor attempts to reach back-office functionality?
 - What happens when public input is spammy, rate-limited, malformed or duplicate?
 
 ## Requirements *(mandatory)*
@@ -117,11 +124,13 @@
 - **FR-008**: System MUST block routing to inactive, unauthorized or expired-license brokers where routing is in scope
 - **FR-009**: System MUST mark offers and prices as indicative where public comparison is in scope
 - **FR-010**: System MUST ensure AI outputs are assistance only, audited and disabled by scope where AI is in scope
+- **FR-011**: System MUST keep public visitor routes, layouts and access policies separate from back-office routes, layouts and access policies where frontend is in scope
+- **FR-012**: System MUST make back-office functionality inaccessible from the public application and require authentication, RBAC, MFA where applicable, audit and tenant checks
 
 *Example of marking unclear requirements:*
 
-- **FR-011**: System MUST retain ConsentRecord evidence for [NEEDS CLARIFICATION: retention period not specified]
-- **FR-012**: System MUST notify brokers through [NEEDS CLARIFICATION: email, WhatsApp, SMS or in-app notification]
+- **FR-013**: System MUST retain ConsentRecord evidence for [NEEDS CLARIFICATION: retention period not specified]
+- **FR-014**: System MUST notify brokers through [NEEDS CLARIFICATION: email, WhatsApp, SMS or in-app notification]
 
 ### Key Entities *(include if feature involves data)*
 
@@ -150,6 +159,7 @@
 - **SC-002**: [Measurable reliability, latency or throughput outcome]
 - **SC-003**: [Measurable compliance outcome, e.g., 100% of lead transmissions have ConsentRecord and AuditLog]
 - **SC-004**: [Measurable safety outcome, e.g., 0 unauthorized cross-broker lead reads in RBAC tests]
+- **SC-005**: [Measurable frontend separation outcome, e.g., 0 public routes load back-office privileges or partner/admin auth state]
 
 ## Assumptions
 
@@ -159,6 +169,7 @@
 -->
 
 - [Assumption about target users, countries, products or plans]
+- [Assumption about impacted application boundary: Web Publique Client, Back-office Partenaires/Plateforme, Backend API or shared package]
 - [Assumption about regulatory status, partner responsibility or consent scope]
 - [Assumption about data retention, feature flag defaults or rollout scope]
 - [Dependency on existing system/service/module]

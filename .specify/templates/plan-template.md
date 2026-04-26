@@ -6,6 +6,12 @@
 **Note**: This template is filled in by the `/speckit.plan` command. See
 `.specify/templates/plan-template.md` for the execution workflow.
 
+**Continuous Workflow Eligibility**: [Eligible / Not eligible / N/A]
+[State whether the spec is validated, committed or explicitly user-approved,
+contains no `[NEEDS CLARIFICATION]` markers, and can continue through
+`/speckit.tasks` and `/speckit.implement` without intermediate confirmation.
+List any stop condition if not eligible.]
+
 ## Summary
 
 [Extract from feature spec: primary requirement + technical approach from research]
@@ -21,8 +27,9 @@
 **Language/Version**: TypeScript strict; Next.js/React frontend; NestJS backend; exact versions [NEEDS CLARIFICATION]
 **Primary Dependencies**: Next.js, React, NestJS, Prisma, BullMQ, Redis client, validation/RBAC libraries [NEEDS CLARIFICATION]
 **Storage**: PostgreSQL source of truth; Redis for cache, queues, rate limiting, feature flags and locks; S3-compatible documents
-**Testing**: Unit, integration, RBAC, routing rules, feature flags, public endpoint and AI guardrail tests [NEEDS CLARIFICATION: runner]
-**Target Platform**: SaaS web platform with public site, broker portal, admin back-office and backend API
+**Testing**: Unit, integration, RBAC, routing rules, feature flags, public endpoint, AI guardrail, public Playwright smoke and back-office Playwright smoke tests [NEEDS CLARIFICATION: runner]
+**Target Platform**: SaaS web platform with two separated web applications: Web Publique Client and Back-office Partenaires/Plateforme, plus Backend API and shared packages
+**Impacted Application(s)**: [Web Publique Client | Back-office Partenaires/Plateforme | Backend API | packages partages | multiple - NEEDS CLARIFICATION]
 **Project Type**: B2B2C regulated marketplace web application
 **Performance Goals**: Public endpoints remain responsive; heavy work runs asynchronously via BullMQ; concrete SLOs [NEEDS CLARIFICATION]
 **Constraints**: No direct sale, no direct subscription, no premium collection in V1, consent before transmission, auditable sensitive actions
@@ -43,6 +50,13 @@ Complexity Tracking entry plus an explicit compliance exception.
   or invalid licenses.
 - **Feature flags and activation**: Lists every global, country, product,
   partner, plan or AI flag needed, including deactivation behavior.
+- **Frontend application separation**: Identifies impacted application(s). Public
+  visitor journeys stay in Web Publique Client without back-office screens,
+  routes, privileges or partner/admin auth dependencies. Partner/admin journeys
+  stay in Back-office Partenaires/Plateforme with authentication, strict RBAC,
+  role-based MFA, audit and tenant checks. Shared UI packages are allowed only
+  when routes, layouts, access policies and functional responsibilities remain
+  separate.
 - **Security and RBAC**: Defines roles, tenant isolation, MFA impact, permission
   checks, export limits, PII masking, rate limiting and input validation.
 - **Data and auditability**: Defines createdAt, updatedAt, createdBy where
@@ -60,10 +74,16 @@ Complexity Tracking entry plus an explicit compliance exception.
   "garantie acceptee".
 - **Testing discipline**: Lists required unit, integration, RBAC, feature flag,
   non-consent, expired-license, disabled-country/product, routing and AI
-  guardrail tests.
+  guardrail tests, plus separated Playwright smoke tests for public and
+  back-office surfaces when frontend is in scope.
 - **Async and reliability**: Confirms heavy work, notifications, document
   processing, duplicate detection and non-trivial routing support asynchronous
   execution with Redis/BullMQ where appropriate.
+- **Continuous workflow safety**: Confirms whether automatic continuation from
+  plan to tasks to implementation is allowed. It is allowed only for validated,
+  committed or explicitly approved standard specs with no
+  `[NEEDS CLARIFICATION]` markers and no constitutional, regulatory, security,
+  data leakage, product-decision or blocking-validation risk.
 
 ## Project Structure
 
@@ -88,9 +108,8 @@ specs/[###-feature]/
 
 ```text
 apps/
-  public/                 # Next.js public comparator and quote request flows
-  broker/                 # Next.js broker portal and CRM
-  admin/                  # Next.js back-office admin
+  public/                 # Web Publique Client: visitor, product, comparator and quote flows
+  backoffice/             # Back-office Partenaires/Plateforme: broker, admin and platform flows
 backend/
   src/
     modules/
@@ -126,11 +145,12 @@ backend/
     integration/
     contract/
 packages/
-  shared/                 # Shared types, DTO contracts and validation helpers
+  shared/                 # Shared types, DTO contracts, validation helpers and design-system packages
 ```
 
 **Structure Decision**: [Document the selected structure and reference the real
-directories captured above]
+directories captured above, including how public and back-office routes,
+layouts, env vars, domains and deployments remain separable]
 
 ## Complexity Tracking
 

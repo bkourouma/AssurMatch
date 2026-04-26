@@ -3,6 +3,14 @@ import type { PartnerLicensesService } from "../partner-licenses/partner-license
 import type { PartnersService } from "../partners/partners.module";
 import { AdminLeadAssignmentsController } from "./admin-lead-assignments.controller";
 import { BrokerEligibilityPolicy } from "./broker-eligibility-policy";
+import { BrokerCrmAccessPolicy } from "./broker-crm-access-policy";
+import { BrokerCrmActivityService } from "./broker-crm-activity.service";
+import { BrokerCrmController } from "./broker-crm.controller";
+import { BrokerCrmExportPolicy } from "./broker-crm-export-policy";
+import { BrokerCrmHistoryService } from "./broker-crm-history.service";
+import { BrokerCrmLeadsService } from "./broker-crm-leads.service";
+import { BrokerCrmNotificationsService } from "./broker-crm-notifications.service";
+import { BrokerCrmPipelineService } from "./broker-crm-pipeline.service";
 import { BrokerLeadsController } from "./broker-leads.controller";
 import { BrokerStarterAccessPolicy } from "./broker-starter-access-policy";
 import { BrokerStarterController } from "./broker-starter.controller";
@@ -28,9 +36,17 @@ export class LeadsModule {
   readonly brokerStarterActions: BrokerStarterLeadActionsService;
   readonly brokerStarterNotifications: BrokerStarterNotificationsService;
   readonly brokerStarterController: BrokerStarterController;
+  readonly brokerCrmAccess: BrokerCrmAccessPolicy;
+  readonly brokerCrmHistory: BrokerCrmHistoryService;
+  readonly brokerCrmExportPolicy: BrokerCrmExportPolicy;
+  readonly brokerCrmActivity: BrokerCrmActivityService;
+  readonly brokerCrmLeads: BrokerCrmLeadsService;
+  readonly brokerCrmPipeline: BrokerCrmPipelineService;
+  readonly brokerCrmNotifications: BrokerCrmNotificationsService;
+  readonly brokerCrmController: BrokerCrmController;
   readonly adminController: AdminLeadAssignmentsController;
 
-  constructor(partners: PartnersService, licenses: PartnerLicensesService, audit = new AuditLogWriter()) {
+  constructor(partners: PartnersService, licenses: PartnerLicensesService, audit = new AuditLogWriter(), brokerCrmConfig?: ConstructorParameters<typeof BrokerCrmAccessPolicy>[1]) {
     this.assignments = new LeadAssignmentService(audit);
     this.decisions = new RoutingDecisionService(audit);
     this.eligibility = new BrokerEligibilityPolicy(partners, licenses, (partnerTenantId) => this.assignments.activeCountForPartner(partnerTenantId));
@@ -43,6 +59,14 @@ export class LeadsModule {
     this.brokerStarterActions = new BrokerStarterLeadActionsService(this.assignments, this.brokerStarterAccess, this.brokerStarterHistory, audit);
     this.brokerStarterNotifications = new BrokerStarterNotificationsService(this.assignments, this.brokerStarterAccess, this.brokerStarterHistory, audit);
     this.brokerStarterController = new BrokerStarterController(this.brokerStarterLeads, this.brokerStarterActions, this.brokerStarterNotifications, this.brokerStarterAccess, audit);
+    this.brokerCrmAccess = new BrokerCrmAccessPolicy(audit, brokerCrmConfig);
+    this.brokerCrmHistory = new BrokerCrmHistoryService();
+    this.brokerCrmExportPolicy = new BrokerCrmExportPolicy(this.brokerCrmAccess, audit);
+    this.brokerCrmActivity = new BrokerCrmActivityService(this.assignments, this.brokerCrmAccess, this.brokerCrmHistory, audit);
+    this.brokerCrmLeads = new BrokerCrmLeadsService(this.assignments, this.brokerCrmAccess, this.brokerCrmHistory, audit, this.brokerCrmExportPolicy, this.brokerCrmActivity);
+    this.brokerCrmPipeline = new BrokerCrmPipelineService(this.assignments, this.brokerCrmAccess, this.brokerCrmHistory, audit);
+    this.brokerCrmNotifications = new BrokerCrmNotificationsService(this.assignments, this.brokerCrmAccess, audit);
+    this.brokerCrmController = new BrokerCrmController(this.brokerCrmLeads, this.brokerCrmPipeline, this.brokerCrmActivity, this.brokerCrmNotifications);
     this.adminController = new AdminLeadAssignmentsController(this.assignments);
   }
 }

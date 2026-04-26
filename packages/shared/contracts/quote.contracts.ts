@@ -288,6 +288,180 @@ export const brokerStarterPlanCapabilitiesSchema = z.object({
   blocked: z.array(nonEmptyStringSchema)
 });
 
+export const brokerCrmPipelineStatusSchema = z.enum([
+  "nouveau",
+  "accepte",
+  "contact_tente",
+  "contacte",
+  "qualifie",
+  "documents_demandes",
+  "devis_en_preparation",
+  "devis_envoye",
+  "negociation",
+  "gagne",
+  "perdu",
+  "doublon",
+  "injoignable",
+  "hors_cible",
+  "rejete_conteste"
+]);
+
+export const brokerCrmUrgencySchema = z.enum(["low", "normal", "high", "urgent"]);
+export const brokerCrmSourceSchema = z.enum(["comparator", "quote_request", "manual_import", "partner_referral", "support"]);
+export const brokerCrmOutcomeReasonSchema = z.enum(["price", "coverage", "unreachable", "duplicate", "wrong_scope", "out_of_target", "invalid_lead", "client_abandoned", "compliance_concern"]);
+
+const brokerCrmLeadListQueryBaseSchema = paginationQuerySchema.extend({
+  status: brokerCrmPipelineStatusSchema.optional(),
+  productKey: nonEmptyStringSchema.optional(),
+  countryCode: isoCountrySchema.optional(),
+  advisorId: z.string().trim().optional(),
+  urgency: brokerCrmUrgencySchema.optional(),
+  source: brokerCrmSourceSchema.optional(),
+  dateFrom: dateTimeStringSchema.optional(),
+  dateTo: dateTimeStringSchema.optional(),
+  search: z.string().trim().max(120).optional()
+});
+
+export const brokerCrmLeadListQuerySchema = brokerCrmLeadListQueryBaseSchema.refine((value) => !value.dateFrom || !value.dateTo || new Date(value.dateFrom) <= new Date(value.dateTo), {
+  message: "dateFrom must be before dateTo"
+});
+
+export const brokerCrmLeadSummarySchema = z.object({
+  leadAssignmentId: uuidSchema,
+  publicReference: nonEmptyStringSchema,
+  countryCode: isoCountrySchema,
+  productKey: nonEmptyStringSchema,
+  status: brokerCrmPipelineStatusSchema,
+  assignedAt: dateTimeStringSchema,
+  urgency: brokerCrmUrgencySchema,
+  source: brokerCrmSourceSchema,
+  advisorId: z.string().optional(),
+  prospectName: z.string().optional(),
+  emailMasked: z.string().optional(),
+  phoneMasked: z.string().optional()
+});
+
+export const brokerCrmHistoryEventSchema = z.object({
+  id: z.string(),
+  eventType: z.enum(["status_changed", "note_created", "task_created", "reminder_created", "assigned", "document_added", "proposal_added", "disputed", "exported"]),
+  previousStatus: brokerCrmPipelineStatusSchema.optional(),
+  nextStatus: brokerCrmPipelineStatusSchema.optional(),
+  reason: brokerCrmOutcomeReasonSchema.optional(),
+  occurredAt: dateTimeStringSchema
+});
+
+export const brokerCrmNoteSchema = z.object({
+  id: z.string(),
+  leadAssignmentId: z.string(),
+  body: z.string(),
+  authorId: z.string().optional(),
+  createdAt: dateTimeStringSchema
+});
+
+export const brokerCrmTaskSchema = z.object({
+  id: z.string(),
+  leadAssignmentId: z.string(),
+  title: nonEmptyStringSchema,
+  assigneeId: z.string().optional(),
+  dueAt: dateTimeStringSchema.optional(),
+  completedAt: dateTimeStringSchema.optional(),
+  createdAt: dateTimeStringSchema
+});
+
+export const brokerCrmReminderSchema = z.object({
+  id: z.string(),
+  leadAssignmentId: z.string(),
+  assigneeId: z.string().optional(),
+  remindAt: dateTimeStringSchema,
+  message: z.string().optional(),
+  createdAt: dateTimeStringSchema
+});
+
+export const brokerCrmDocumentSchema = z.object({
+  id: z.string(),
+  leadAssignmentId: z.string(),
+  label: nonEmptyStringSchema,
+  storageKey: nonEmptyStringSchema,
+  visibility: z.enum(["internal", "prospect_provided"]),
+  createdAt: dateTimeStringSchema
+});
+
+export const brokerCrmProposalSchema = z.object({
+  id: z.string(),
+  leadAssignmentId: z.string(),
+  reference: nonEmptyStringSchema,
+  amountIndicative: z.number().nonnegative().optional(),
+  currency: z.string().min(3).max(3).default("XOF"),
+  notes: z.string().optional(),
+  nonContractual: z.literal(true).default(true),
+  createdAt: dateTimeStringSchema
+});
+
+export const brokerCrmDisputeSchema = z.object({
+  id: z.string(),
+  leadAssignmentId: z.string(),
+  reason: brokerCrmOutcomeReasonSchema,
+  comment: z.string().optional(),
+  status: z.enum(["opened", "under_review", "accepted", "rejected"]).default("opened"),
+  createdAt: dateTimeStringSchema
+});
+
+export const brokerCrmLeadDetailSchema = brokerCrmLeadSummarySchema.extend({
+  contact: z.record(z.string(), z.unknown()).default({}),
+  answers: z.record(z.string(), z.unknown()).default({}),
+  history: z.array(brokerCrmHistoryEventSchema).default([]),
+  notes: z.array(brokerCrmNoteSchema).default([]),
+  tasks: z.array(brokerCrmTaskSchema).default([]),
+  reminders: z.array(brokerCrmReminderSchema).default([]),
+  documents: z.array(brokerCrmDocumentSchema).default([]),
+  proposals: z.array(brokerCrmProposalSchema).default([]),
+  disputes: z.array(brokerCrmDisputeSchema).default([])
+});
+
+export const brokerCrmStatusUpdateSchema = z.object({
+  status: brokerCrmPipelineStatusSchema,
+  reason: brokerCrmOutcomeReasonSchema.optional()
+}).superRefine((value, ctx) => {
+  if (["perdu", "doublon", "injoignable", "hors_cible", "rejete_conteste"].includes(value.status) && !value.reason) {
+    ctx.addIssue({ code: "custom", message: "reason is required for final or disputed CRM statuses" });
+  }
+});
+
+export const brokerCrmNoteCreateSchema = z.object({ body: z.string().trim().min(1).max(1000) });
+export const brokerCrmTaskCreateSchema = z.object({ title: nonEmptyStringSchema, assigneeId: z.string().optional(), dueAt: dateTimeStringSchema.optional() });
+export const brokerCrmReminderCreateSchema = z.object({ assigneeId: z.string().optional(), remindAt: dateTimeStringSchema, message: z.string().trim().max(500).optional() });
+export const brokerCrmAssignRequestSchema = z.object({ advisorId: nonEmptyStringSchema, advisorPartnerTenantId: nonEmptyStringSchema });
+export const brokerCrmDocumentCreateSchema = z.object({ label: nonEmptyStringSchema, storageKey: nonEmptyStringSchema, visibility: z.enum(["internal", "prospect_provided"]).default("internal") });
+export const brokerCrmProposalCreateSchema = z.object({ reference: nonEmptyStringSchema, amountIndicative: z.number().nonnegative().optional(), currency: z.string().min(3).max(3).default("XOF"), notes: z.string().max(500).optional() });
+export const brokerCrmDisputeCreateSchema = z.object({ reason: brokerCrmOutcomeReasonSchema, comment: z.string().max(500).optional() });
+
+export const brokerCrmDashboardSchema = z.object({
+  total: z.number().int().nonnegative(),
+  byStatus: z.record(z.string(), z.number().int().nonnegative()),
+  urgent: z.number().int().nonnegative(),
+  overdueTasks: z.number().int().nonnegative()
+});
+
+export const brokerCrmExportQuerySchema = brokerCrmLeadListQueryBaseSchema.omit({ page: true, pageSize: true }).extend({
+  maxRows: z.coerce.number().int().positive().max(2000).default(500)
+}).refine((value) => !value.dateFrom || !value.dateTo || new Date(value.dateFrom) <= new Date(value.dateTo), {
+  message: "dateFrom must be before dateTo"
+});
+
+export const brokerCrmNotificationSchema = z.object({
+  id: z.string(),
+  type: z.enum(["lead_assigned", "task_due", "reminder_due", "status_changed"]),
+  leadAssignmentId: z.string(),
+  read: z.boolean(),
+  createdAt: dateTimeStringSchema
+});
+
+export const brokerCrmAiFoundationsSchema = z.object({
+  enabled: z.literal(false),
+  availableAssistTypes: z.array(z.enum(["lead_summary", "next_action", "relaunch_message", "loss_analysis"])),
+  message: nonEmptyStringSchema
+});
+
 export const adminQuoteRequestQuerySchema = paginationQuerySchema.extend({
   countryId: uuidSchema.optional(),
   productId: uuidSchema.optional(),
@@ -330,4 +504,23 @@ export type BrokerStarterDashboard = z.output<typeof brokerStarterDashboardSchem
 export type BrokerStarterNotification = z.output<typeof brokerStarterNotificationSchema>;
 export type BrokerStarterExportQuery = z.input<typeof brokerStarterExportQuerySchema>;
 export type BrokerStarterPlanCapabilities = z.output<typeof brokerStarterPlanCapabilitiesSchema>;
+export type BrokerCrmPipelineStatus = z.output<typeof brokerCrmPipelineStatusSchema>;
+export type BrokerCrmUrgency = z.output<typeof brokerCrmUrgencySchema>;
+export type BrokerCrmSource = z.output<typeof brokerCrmSourceSchema>;
+export type BrokerCrmOutcomeReason = z.output<typeof brokerCrmOutcomeReasonSchema>;
+export type BrokerCrmLeadListQuery = z.input<typeof brokerCrmLeadListQuerySchema>;
+export type BrokerCrmLeadSummary = z.output<typeof brokerCrmLeadSummarySchema>;
+export type BrokerCrmLeadDetail = z.output<typeof brokerCrmLeadDetailSchema>;
+export type BrokerCrmHistoryEvent = z.output<typeof brokerCrmHistoryEventSchema>;
+export type BrokerCrmStatusUpdate = z.input<typeof brokerCrmStatusUpdateSchema>;
+export type BrokerCrmNote = z.output<typeof brokerCrmNoteSchema>;
+export type BrokerCrmTask = z.output<typeof brokerCrmTaskSchema>;
+export type BrokerCrmReminder = z.output<typeof brokerCrmReminderSchema>;
+export type BrokerCrmDocument = z.output<typeof brokerCrmDocumentSchema>;
+export type BrokerCrmProposal = z.output<typeof brokerCrmProposalSchema>;
+export type BrokerCrmDispute = z.output<typeof brokerCrmDisputeSchema>;
+export type BrokerCrmDashboard = z.output<typeof brokerCrmDashboardSchema>;
+export type BrokerCrmExportQuery = z.input<typeof brokerCrmExportQuerySchema>;
+export type BrokerCrmNotification = z.output<typeof brokerCrmNotificationSchema>;
+export type BrokerCrmAiFoundations = z.output<typeof brokerCrmAiFoundationsSchema>;
 export type AdminQuoteRequestQuery = z.output<typeof adminQuoteRequestQuerySchema>;

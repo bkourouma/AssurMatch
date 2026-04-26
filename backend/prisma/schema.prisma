@@ -266,6 +266,31 @@ enum LeadAssignmentStatus {
   disputed
 }
 
+enum BrokerCrmPipelineStatus {
+  nouveau
+  accepte
+  contact_tente
+  contacte
+  qualifie
+  documents_demandes
+  devis_en_preparation
+  devis_envoye
+  negociation
+  gagne
+  perdu
+  doublon
+  injoignable
+  hors_cible
+  rejete_conteste
+}
+
+enum BrokerCrmUrgency {
+  low
+  normal
+  high
+  urgent
+}
+
 enum AIStatus {
   disabled
   internal_test
@@ -811,6 +836,137 @@ model LeadActionHistory {
 
   @@index([leadAssignmentId, occurredAt])
   @@index([partnerTenantId, occurredAt])
+}
+
+model BrokerCrmLeadState {
+  id                String                  @id @default(uuid())
+  leadAssignmentId  String                  @unique
+  partnerTenantId   String
+  status            BrokerCrmPipelineStatus @default(nouveau)
+  urgency           BrokerCrmUrgency        @default(normal)
+  source            String                  @default("quote_request")
+  assignedAdvisorId String?
+  tags              String[]
+  createdAt         DateTime                @default(now())
+  updatedAt         DateTime                @updatedAt
+  createdById       String?
+
+  @@index([partnerTenantId, status, updatedAt])
+  @@index([partnerTenantId, assignedAdvisorId])
+}
+
+model BrokerCrmPipelineHistory {
+  id               String                  @id @default(uuid())
+  leadAssignmentId String
+  partnerTenantId  String
+  actorId          String?
+  previousStatus   BrokerCrmPipelineStatus?
+  nextStatus       BrokerCrmPipelineStatus
+  reason           String?
+  occurredAt       DateTime                @default(now())
+  createdAt        DateTime                @default(now())
+
+  @@index([leadAssignmentId, occurredAt])
+  @@index([partnerTenantId, occurredAt])
+}
+
+model BrokerCrmNote {
+  id               String   @id @default(uuid())
+  leadAssignmentId String
+  partnerTenantId  String
+  authorId         String?
+  body             String
+  createdAt        DateTime @default(now())
+
+  @@index([leadAssignmentId, createdAt])
+  @@index([partnerTenantId, createdAt])
+}
+
+model BrokerCrmTask {
+  id               String    @id @default(uuid())
+  leadAssignmentId String
+  partnerTenantId  String
+  assigneeId       String?
+  title            String
+  dueAt            DateTime?
+  completedAt      DateTime?
+  createdById      String?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  @@index([partnerTenantId, assigneeId, dueAt])
+  @@index([leadAssignmentId, createdAt])
+}
+
+model BrokerCrmReminder {
+  id               String   @id @default(uuid())
+  leadAssignmentId String
+  partnerTenantId  String
+  assigneeId       String?
+  remindAt         DateTime
+  message          String?
+  createdById      String?
+  createdAt        DateTime @default(now())
+
+  @@index([partnerTenantId, assigneeId, remindAt])
+}
+
+model BrokerCrmDocument {
+  id               String   @id @default(uuid())
+  leadAssignmentId String
+  partnerTenantId  String
+  label            String
+  storageKey       String
+  visibility       String   @default("internal")
+  uploadedById     String?
+  createdAt        DateTime @default(now())
+
+  @@index([leadAssignmentId, createdAt])
+  @@index([partnerTenantId, visibility])
+}
+
+model BrokerCrmProposal {
+  id               String   @id @default(uuid())
+  leadAssignmentId String
+  partnerTenantId  String
+  reference        String
+  amountIndicative Decimal?
+  currency         String   @default("XOF")
+  notes            String?
+  nonContractual   Boolean  @default(true)
+  createdById      String?
+  createdAt        DateTime @default(now())
+
+  @@index([leadAssignmentId, createdAt])
+  @@index([partnerTenantId, createdAt])
+}
+
+model BrokerCrmDispute {
+  id               String   @id @default(uuid())
+  leadAssignmentId String
+  partnerTenantId  String
+  reason           String
+  comment          String?
+  status           String   @default("opened")
+  createdById      String?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  @@index([leadAssignmentId, createdAt])
+  @@index([partnerTenantId, status])
+}
+
+model BrokerCrmAiAssistRequest {
+  id               String   @id @default(uuid())
+  leadAssignmentId String
+  partnerTenantId  String
+  assistType       String
+  status           String   @default("disabled")
+  auditLogId       String?
+  createdById      String?
+  createdAt        DateTime @default(now())
+
+  @@index([partnerTenantId, assistType, createdAt])
 }
 
 model RoutingDecision {

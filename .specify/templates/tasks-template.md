@@ -8,9 +8,19 @@ description: "Task list template for AssurMatch feature implementation"
 **Input**: Design documents from `/specs/[###-feature-name]/`
 **Prerequisites**: plan.md (required), spec.md (required for user stories), research.md, data-model.md, contracts/
 
+**Continuous Workflow**: If `plan.md` marks the feature eligible and the spec is
+validated, committed or explicitly approved with no `[NEEDS CLARIFICATION]`
+markers, `/speckit.implement` may proceed without intermediate confirmation.
+Stop on constitutional conflict, major ambiguity, regulatory/security/data
+leakage risk, accidental activation of a forbidden module, uncovered product
+decision, or blocking validation failure. Do not commit automatically after
+implementation unless the user explicitly asks.
+
 **Tests**: Constitutional tests are REQUIRED for critical modules, routing, RBAC,
 feature flags, non-consent, expired license, disabled country/product, public
-endpoints and AI guardrails when those areas are in scope.
+endpoints, frontend application separation and AI guardrails when those areas
+are in scope. Playwright smoke tests MUST distinguish public smoke tests from
+back-office smoke tests when frontend surfaces are in scope.
 
 **Organization**: Tasks are grouped by user story to enable independent
 implementation and testing of each story.
@@ -21,13 +31,13 @@ implementation and testing of each story.
 - **[Story]**: Which user story this task belongs to (e.g., US1, US2, US3)
 - Include exact file paths in descriptions
 - Include the constitutional concern in the task when relevant: consent, audit,
-  RBAC, feature flag, license, routing, IA, data history, UX wording or async job
+  RBAC, feature flag, license, routing, IA, data history, frontend separation,
+  UX wording or async job
 
 ## Path Conventions
 
 - **Public app**: `apps/public/`
-- **Broker app**: `apps/broker/`
-- **Admin app**: `apps/admin/`
+- **Back-office app**: `apps/backoffice/`
 - **Backend**: `backend/src/modules/<module>/`
 - **Prisma**: `backend/prisma/`
 - **Backend tests**: `backend/tests/unit/`, `backend/tests/integration/`, `backend/tests/contract/`
@@ -67,15 +77,16 @@ implementation and testing of each story.
 phase are complete or explicitly marked N/A in plan.md.
 
 - [ ] T005 Define feature flags and default disabled states in backend/src/modules/feature-flags/
-- [ ] T006 Define RBAC permissions, role mappings and tenant isolation checks in backend/src/modules/auth/
-- [ ] T007 Define AuditLog coverage for sensitive actions in backend/src/modules/audit-logs/
-- [ ] T008 Define ConsentRecord requirements in backend/src/modules/consent/
-- [ ] T009 Define partner license validation and expiration blocking in backend/src/modules/partner-licenses/
-- [ ] T010 Define routing eligibility prerequisites in backend/src/modules/routing/
-- [ ] T011 Define data model changes and migrations in backend/prisma/
-- [ ] T012 Configure structured errors and logs in backend/src/modules/common/
-- [ ] T013 Configure Redis/BullMQ jobs for heavy or asynchronous processing where required
-- [ ] T014 Define AI guardrails in backend/src/modules/ai/ when AI is in scope
+- [ ] T006 Define impacted application boundaries, route ownership, env vars and domain/deployment separation for apps/public/ and apps/backoffice/
+- [ ] T007 Define RBAC permissions, role mappings and tenant isolation checks in backend/src/modules/auth/
+- [ ] T008 Define AuditLog coverage for sensitive actions in backend/src/modules/audit-logs/
+- [ ] T009 Define ConsentRecord requirements in backend/src/modules/consent/
+- [ ] T010 Define partner license validation and expiration blocking in backend/src/modules/partner-licenses/
+- [ ] T011 Define routing eligibility prerequisites in backend/src/modules/routing/
+- [ ] T012 Define data model changes and migrations in backend/prisma/
+- [ ] T013 Configure structured errors and logs in backend/src/modules/common/
+- [ ] T014 Configure Redis/BullMQ jobs for heavy or asynchronous processing where required
+- [ ] T015 Define AI guardrails in backend/src/modules/ai/ when AI is in scope
 
 **Checkpoint**: Foundation ready; user story implementation can now begin.
 
@@ -91,21 +102,22 @@ phase are complete or explicitly marked N/A in plan.md.
 
 > Write applicable tests FIRST and ensure they fail before implementation.
 
-- [ ] T015 [P] [US1] Unit test for business rules in backend/tests/unit/[module]/[test-name].spec.ts
-- [ ] T016 [P] [US1] Integration test for public or portal flow in backend/tests/integration/[test-name].spec.ts
-- [ ] T017 [P] [US1] RBAC and tenant isolation test in backend/tests/integration/auth/[test-name].spec.ts
-- [ ] T018 [P] [US1] Feature flag disabled-state test in backend/tests/integration/feature-flags/[test-name].spec.ts
-- [ ] T019 [P] [US1] Consent, license, routing or AI guardrail test when applicable
+- [ ] T016 [P] [US1] Unit test for business rules in backend/tests/unit/[module]/[test-name].spec.ts
+- [ ] T017 [P] [US1] Integration test for public or back-office flow in backend/tests/integration/[test-name].spec.ts
+- [ ] T018 [P] [US1] RBAC and tenant isolation test in backend/tests/integration/auth/[test-name].spec.ts
+- [ ] T019 [P] [US1] Feature flag disabled-state test in backend/tests/integration/feature-flags/[test-name].spec.ts
+- [ ] T020 [P] [US1] Frontend separation or Playwright smoke test when public or back-office UI is in scope
+- [ ] T021 [P] [US1] Consent, license, routing or AI guardrail test when applicable
 
 ### Implementation for User Story 1
 
-- [ ] T020 [P] [US1] Create or update DTOs and validation in packages/shared/ or backend/src/modules/[module]/
-- [ ] T021 [P] [US1] Create or update Prisma model/service in backend/src/modules/[module]/
-- [ ] T022 [US1] Implement application service without controller business logic
-- [ ] T023 [US1] Implement controller or resolver with RBAC, validation and feature flag checks
-- [ ] T024 [US1] Add AuditLog, ConsentRecord, license, routing and data history behavior where applicable
-- [ ] T025 [US1] Add async job or notification behavior where applicable
-- [ ] T026 [US1] Add public, broker or admin UI changes with constitution-safe wording where applicable
+- [ ] T022 [P] [US1] Create or update DTOs and validation in packages/shared/ or backend/src/modules/[module]/
+- [ ] T023 [P] [US1] Create or update Prisma model/service in backend/src/modules/[module]/
+- [ ] T024 [US1] Implement application service without controller business logic
+- [ ] T025 [US1] Implement controller or resolver with RBAC, validation and feature flag checks
+- [ ] T026 [US1] Add AuditLog, ConsentRecord, license, routing and data history behavior where applicable
+- [ ] T027 [US1] Add async job or notification behavior where applicable
+- [ ] T028 [US1] Add Web Publique Client or Back-office UI changes with separated routes/layouts and constitution-safe wording where applicable
 
 **Checkpoint**: User Story 1 is functional, independently testable and passes
 its constitutional tests.
@@ -120,15 +132,15 @@ its constitutional tests.
 
 ### Tests for User Story 2
 
-- [ ] T027 [P] [US2] Unit test for business rules in backend/tests/unit/[module]/[test-name].spec.ts
-- [ ] T028 [P] [US2] Integration, RBAC, feature flag or guardrail test as required by plan.md
+- [ ] T029 [P] [US2] Unit test for business rules in backend/tests/unit/[module]/[test-name].spec.ts
+- [ ] T030 [P] [US2] Integration, RBAC, feature flag, frontend separation or guardrail test as required by plan.md
 
 ### Implementation for User Story 2
 
-- [ ] T029 [P] [US2] Create or update data contracts and validation
-- [ ] T030 [US2] Implement application service behavior
-- [ ] T031 [US2] Implement API or UI integration with required controls
-- [ ] T032 [US2] Add audit, data history, notification or async processing where applicable
+- [ ] T031 [P] [US2] Create or update data contracts and validation
+- [ ] T032 [US2] Implement application service behavior
+- [ ] T033 [US2] Implement API or UI integration with required controls
+- [ ] T034 [US2] Add audit, data history, notification or async processing where applicable
 
 **Checkpoint**: User Stories 1 and 2 both work independently.
 
@@ -142,15 +154,15 @@ its constitutional tests.
 
 ### Tests for User Story 3
 
-- [ ] T033 [P] [US3] Unit test for business rules in backend/tests/unit/[module]/[test-name].spec.ts
-- [ ] T034 [P] [US3] Integration, RBAC, feature flag or guardrail test as required by plan.md
+- [ ] T035 [P] [US3] Unit test for business rules in backend/tests/unit/[module]/[test-name].spec.ts
+- [ ] T036 [P] [US3] Integration, RBAC, feature flag, frontend separation or guardrail test as required by plan.md
 
 ### Implementation for User Story 3
 
-- [ ] T035 [P] [US3] Create or update data contracts and validation
-- [ ] T036 [US3] Implement application service behavior
-- [ ] T037 [US3] Implement API or UI integration with required controls
-- [ ] T038 [US3] Add audit, data history, notification or async processing where applicable
+- [ ] T037 [P] [US3] Create or update data contracts and validation
+- [ ] T038 [US3] Implement application service behavior
+- [ ] T039 [US3] Implement API or UI integration with required controls
+- [ ] T040 [US3] Add audit, data history, notification or async processing where applicable
 
 **Checkpoint**: All selected user stories are independently functional.
 
@@ -170,8 +182,11 @@ its constitutional tests.
 - [ ] TXXX [P] Additional unit, integration, RBAC, flag, routing or AI guardrail tests
 - [ ] TXXX Security hardening and PII log masking review
 - [ ] TXXX UX copy review for forbidden phrases and indicative-offer wording
+- [ ] TXXX Frontend separation review for public/back-office routes, layouts, auth state, env vars and domains
 - [ ] TXXX Run quickstart.md validation
 - [ ] TXXX Re-run Constitution Check evidence against completed implementation
+- [ ] TXXX Check off every completed task in this file
+- [ ] TXXX Produce final report with plan created, tasks.md created, completed task count, main files changed, migrations, tests run, validation results, unfinished items, residual risks and recommended next step
 
 ---
 
@@ -243,5 +258,5 @@ With multiple developers:
 - [P] tasks = different files, no dependencies
 - [Story] label maps task to a specific user story for traceability
 - Each user story must be independently completable and testable
-- Commit after each task or logical group when the git workflow requires it
+- Do not commit automatically after implementation unless explicitly requested
 - Avoid vague tasks, same-file conflicts and cross-story dependencies that break independence
