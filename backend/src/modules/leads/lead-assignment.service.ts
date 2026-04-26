@@ -2,7 +2,7 @@ import { AuditLogWriter } from "../audit-logs/audit-log-writer.service";
 import { QuoteAuditActions } from "../audit-logs/quote-audit-actions";
 import type { ActorContext } from "../common/types";
 
-export type LeadAssignmentStatus = "assigned" | "broker_notified" | "received" | "contacted" | "rejected" | "closed" | "disputed";
+export type LeadAssignmentStatus = "assigned" | "broker_notified" | "seen" | "accepted" | "received" | "contacted" | "rejected" | "closed" | "disputed";
 
 export interface LeadAssignmentRecord {
   id: string;
@@ -11,8 +11,22 @@ export interface LeadAssignmentRecord {
   status: LeadAssignmentStatus;
   assignedAt: Date;
   assignmentReason: string;
+  publicReference?: string;
+  countryCode?: string;
+  productKey?: string;
+  contact?: Record<string, unknown>;
+  answers?: Record<string, unknown>;
+  consentRecordId?: string;
   routingDecisionId?: string;
   brokerNotificationId?: string;
+  seenAt?: Date;
+  seenById?: string;
+  acceptedAt?: Date;
+  rejectedAt?: Date;
+  disputedAt?: Date;
+  actionReason?: string;
+  actionComment?: string;
+  lastBrokerActionById?: string;
   lastBrokerActionAt?: Date;
   createdAt: Date;
   updatedAt: Date;
@@ -23,7 +37,18 @@ export class LeadAssignmentService {
 
   constructor(private readonly audit: AuditLogWriter) {}
 
-  create(input: { quoteRequestId: string; partnerTenantId: string; assignmentReason: string; routingDecisionId?: string }, actor: ActorContext): LeadAssignmentRecord {
+  create(input: {
+    quoteRequestId: string;
+    partnerTenantId: string;
+    assignmentReason: string;
+    publicReference?: string;
+    countryCode?: string;
+    productKey?: string;
+    contact?: Record<string, unknown>;
+    answers?: Record<string, unknown>;
+    consentRecordId?: string;
+    routingDecisionId?: string;
+  }, actor: ActorContext): LeadAssignmentRecord {
     if (this.assignments.some((assignment) => assignment.quoteRequestId === input.quoteRequestId && assignment.status !== "closed")) {
       throw new Error("Quote request already has an active lead assignment");
     }
@@ -35,6 +60,12 @@ export class LeadAssignmentService {
       status: "assigned",
       assignedAt: now,
       assignmentReason: input.assignmentReason,
+      publicReference: input.publicReference ?? input.quoteRequestId,
+      countryCode: input.countryCode ?? "CI",
+      productKey: input.productKey ?? "unknown",
+      contact: input.contact ?? {},
+      answers: input.answers ?? {},
+      ...(input.consentRecordId ? { consentRecordId: input.consentRecordId } : {}),
       ...(input.routingDecisionId ? { routingDecisionId: input.routingDecisionId } : {}),
       createdAt: now,
       updatedAt: now
@@ -62,9 +93,16 @@ export class LeadAssignmentService {
 
   updateStatus(id: string, status: LeadAssignmentStatus, actor: ActorContext, reason: string): LeadAssignmentRecord {
     const assignment = this.require(id);
+    const now = new Date();
     assignment.status = status;
-    assignment.lastBrokerActionAt = new Date();
-    assignment.updatedAt = new Date();
+    assignment.lastBrokerActionAt = now;
+    if (actor.actorId) assignment.lastBrokerActionById = actor.actorId;
+    assignment.actionReason = reason;
+    assignment.updatedAt = now;
+    if (status === "seen") assignment.seenAt = assignment.seenAt ?? now;
+    if (status === "accepted") assignment.acceptedAt = now;
+    if (status === "rejected") assignment.rejectedAt = now;
+    if (status === "disputed") assignment.disputedAt = now;
     this.audit.write({
       actor,
       action: QuoteAuditActions.brokerLeadStatusUpdated,

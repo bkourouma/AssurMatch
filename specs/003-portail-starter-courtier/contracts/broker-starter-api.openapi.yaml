@@ -1,0 +1,303 @@
+openapi: 3.1.0
+info:
+  title: AssurMatch Broker Starter Portal API
+  version: 0.1.0
+paths:
+  /broker/starter/dashboard:
+    get:
+      summary: Basic Starter dashboard for the connected broker tenant
+      parameters:
+        - $ref: '#/components/parameters/Status'
+        - $ref: '#/components/parameters/Product'
+        - $ref: '#/components/parameters/Country'
+        - $ref: '#/components/parameters/DateFrom'
+        - $ref: '#/components/parameters/DateTo'
+      responses:
+        '200':
+          description: Dashboard counters scoped to connected broker tenant
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BrokerStarterDashboard'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /broker/starter/leads:
+    get:
+      summary: List assigned leads for the connected broker tenant
+      parameters:
+        - $ref: '#/components/parameters/Status'
+        - $ref: '#/components/parameters/Product'
+        - $ref: '#/components/parameters/Country'
+        - $ref: '#/components/parameters/DateFrom'
+        - $ref: '#/components/parameters/DateTo'
+        - name: page
+          in: query
+          schema: { type: integer, minimum: 1, default: 1 }
+        - name: pageSize
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 100, default: 20 }
+      responses:
+        '200':
+          description: Paginated assigned leads
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items, page, pageSize, total]
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/BrokerStarterLeadSummary'
+                  page: { type: integer }
+                  pageSize: { type: integer }
+                  total: { type: integer }
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /broker/starter/leads/{leadId}:
+    get:
+      summary: Get assigned lead detail and mark seen when applicable
+      parameters:
+        - $ref: '#/components/parameters/LeadId'
+      responses:
+        '200':
+          description: Assigned lead detail
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BrokerStarterLeadDetail'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /broker/starter/leads/{leadId}/accept:
+    post:
+      summary: Accept an assigned lead
+      parameters:
+        - $ref: '#/components/parameters/LeadId'
+      responses:
+        '200':
+          description: Updated lead
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BrokerStarterLeadDetail'
+  /broker/starter/leads/{leadId}/reject:
+    post:
+      summary: Reject an assigned lead with required reason
+      parameters:
+        - $ref: '#/components/parameters/LeadId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BrokerStarterLeadActionRequest'
+      responses:
+        '200':
+          description: Updated lead
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BrokerStarterLeadDetail'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+  /broker/starter/leads/{leadId}/dispute:
+    post:
+      summary: Contest an assigned lead with required reason
+      parameters:
+        - $ref: '#/components/parameters/LeadId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BrokerStarterLeadActionRequest'
+      responses:
+        '200':
+          description: Updated lead
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BrokerStarterLeadDetail'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+  /broker/starter/leads/{leadId}/history:
+    get:
+      summary: Minimal lead action history
+      parameters:
+        - $ref: '#/components/parameters/LeadId'
+      responses:
+        '200':
+          description: Lead history
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/BrokerStarterHistoryEvent'
+  /broker/starter/notifications:
+    get:
+      summary: Minimal in-app notifications for connected broker tenant
+      responses:
+        '200':
+          description: Notifications
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/BrokerStarterNotification'
+  /broker/starter/notifications/{notificationId}/read:
+    post:
+      summary: Mark an authorized notification as read
+      parameters:
+        - name: notificationId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: Notification marked read
+  /broker/starter/leads/export.csv:
+    get:
+      summary: Export assigned leads when permission allows it
+      parameters:
+        - $ref: '#/components/parameters/Status'
+        - $ref: '#/components/parameters/Product'
+        - $ref: '#/components/parameters/Country'
+        - $ref: '#/components/parameters/DateFrom'
+        - $ref: '#/components/parameters/DateTo'
+      responses:
+        '200':
+          description: CSV export
+          content:
+            text/csv:
+              schema:
+                type: string
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /broker/starter/plan-capabilities:
+    get:
+      summary: Starter plan capabilities and blocked CRM features
+      responses:
+        '200':
+          description: Capability map
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BrokerStarterPlanCapabilities'
+components:
+  parameters:
+    LeadId:
+      name: leadId
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+    Status:
+      name: status
+      in: query
+      schema:
+        type: string
+        enum: [assigned, broker_notified, seen, accepted, rejected, disputed, closed]
+    Product:
+      name: productKey
+      in: query
+      schema: { type: string }
+    Country:
+      name: countryCode
+      in: query
+      schema: { type: string, minLength: 2, maxLength: 2 }
+    DateFrom:
+      name: dateFrom
+      in: query
+      schema: { type: string, format: date-time }
+    DateTo:
+      name: dateTo
+      in: query
+      schema: { type: string, format: date-time }
+  responses:
+    Forbidden:
+      description: Refused without sensitive data
+    NotFound:
+      description: Resource not found or not visible
+    BadRequest:
+      description: Invalid request
+  schemas:
+    BrokerStarterLeadSummary:
+      type: object
+      required: [leadAssignmentId, publicReference, countryCode, productKey, status, assignedAt, seen]
+      properties:
+        leadAssignmentId: { type: string, format: uuid }
+        publicReference: { type: string }
+        countryCode: { type: string }
+        productKey: { type: string }
+        status: { type: string }
+        assignedAt: { type: string, format: date-time }
+        seen: { type: boolean }
+    BrokerStarterLeadDetail:
+      allOf:
+        - $ref: '#/components/schemas/BrokerStarterLeadSummary'
+        - type: object
+          required: [contact, answers, history]
+          properties:
+            contact:
+              type: object
+              additionalProperties: true
+            answers:
+              type: object
+              additionalProperties: true
+            history:
+              type: array
+              items:
+                $ref: '#/components/schemas/BrokerStarterHistoryEvent'
+    BrokerStarterLeadActionRequest:
+      type: object
+      required: [reason]
+      properties:
+        reason:
+          type: string
+          enum: [lead_quality, wrong_scope, unreachable_prospect, duplicate, compliance_concern]
+        comment:
+          type: string
+          maxLength: 500
+    BrokerStarterHistoryEvent:
+      type: object
+      required: [id, eventType, occurredAt]
+      properties:
+        id: { type: string }
+        eventType: { type: string }
+        previousStatus: { type: string }
+        nextStatus: { type: string }
+        reason: { type: string }
+        comment: { type: string }
+        occurredAt: { type: string, format: date-time }
+    BrokerStarterDashboard:
+      type: object
+      required: [received, seen, accepted, rejected, disputed]
+      properties:
+        received: { type: integer }
+        seen: { type: integer }
+        accepted: { type: integer }
+        rejected: { type: integer }
+        disputed: { type: integer }
+    BrokerStarterNotification:
+      type: object
+      required: [id, type, leadAssignmentId, createdAt, read]
+      properties:
+        id: { type: string }
+        type: { type: string }
+        leadAssignmentId: { type: string }
+        createdAt: { type: string, format: date-time }
+        read: { type: boolean }
+    BrokerStarterPlanCapabilities:
+      type: object
+      required: [plan, allowed, blocked]
+      properties:
+        plan: { type: string, enum: [starter] }
+        allowed:
+          type: array
+          items: { type: string }
+        blocked:
+          type: array
+          items: { type: string }

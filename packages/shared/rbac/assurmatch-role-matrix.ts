@@ -20,7 +20,7 @@ export const RolePermissions: Record<AssurMatchRole, string[]> = {
   admin_pays: ["countries:*", "products:*", "offers:*", "quote_requests:read", "lead_assignments:read", "feature_flags:read", "feature_flags:update", "audit_logs:read"],
   compliance_admin: ["partners:*", "licenses:*", "documents:*", "consent:*", "offers:read", "quote_form_definitions:*", "quote_requests:*", "prospects:read", "lead_assignments:read", "audit_logs:read"],
   support_admin: ["users:read", "partners:read", "quote_requests:read", "prospects:read", "lead_assignments:read", "audit_logs:read"],
-  broker_owner_starter: ["broker_leads:read", "broker_leads:update", "notifications:read"],
+  broker_owner_starter: ["broker_leads:read", "broker_leads:update", "broker_leads:export", "notifications:read"],
   broker_owner_pro: ["broker_leads:*", "broker_crm:*", "notifications:read"],
   broker_manager: ["broker_leads:read", "broker_leads:update", "broker_crm:update"],
   broker_agent: ["broker_leads:read", "broker_leads:update"],

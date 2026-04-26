@@ -257,6 +257,8 @@ enum DuplicateStatus {
 enum LeadAssignmentStatus {
   assigned
   broker_notified
+  seen
+  accepted
   received
   contacted
   rejected
@@ -777,12 +779,38 @@ model LeadAssignment {
   assignmentReason       String
   routingDecisionId      String?
   brokerNotificationId   String?
+  seenAt                DateTime?
+  seenById              String?
+  acceptedAt            DateTime?
+  rejectedAt            DateTime?
+  disputedAt            DateTime?
+  actionReason          String?
+  actionComment         String?
+  lastBrokerActionById  String?
   lastBrokerActionAt     DateTime?
   createdAt              DateTime             @default(now())
   updatedAt              DateTime             @updatedAt
 
   @@unique([quoteRequestId])
   @@index([partnerTenantId, status, assignedAt])
+}
+
+model LeadActionHistory {
+  id               String   @id @default(uuid())
+  leadAssignmentId String
+  partnerTenantId  String
+  actorId          String?
+  eventType        String
+  previousStatus   String?
+  nextStatus       String?
+  reason           String?
+  comment          String?
+  context          Json
+  occurredAt       DateTime @default(now())
+  createdAt        DateTime @default(now())
+
+  @@index([leadAssignmentId, occurredAt])
+  @@index([partnerTenantId, occurredAt])
 }
 
 model RoutingDecision {

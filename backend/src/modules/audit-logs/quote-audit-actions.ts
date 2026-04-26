@@ -30,5 +30,22 @@ export const QuoteAuditActions = {
   aiSummaryGuardrailRefused: "ai_summary.guardrail_refused",
   brokerLeadRead: "broker_lead.read",
   brokerLeadCrossTenantRefused: "broker_lead.cross_tenant_refused",
-  brokerLeadStatusUpdated: "broker_lead.status_updated"
+  brokerLeadStatusUpdated: "broker_lead.status_updated",
+  brokerStarterPortalOpened: "broker_starter.portal_opened",
+  brokerStarterDashboardViewed: "broker_starter.dashboard_viewed",
+  brokerStarterLeadListViewed: "broker_starter.lead_list_viewed",
+  brokerStarterLeadDetailViewed: "broker_starter.lead_detail_viewed",
+  brokerStarterLeadMarkedSeen: "broker_starter.lead_marked_seen",
+  brokerStarterLeadAccepted: "broker_starter.lead_accepted",
+  brokerStarterLeadRejected: "broker_starter.lead_rejected",
+  brokerStarterLeadDisputed: "broker_starter.lead_disputed",
+  brokerStarterHistoryViewed: "broker_starter.history_viewed",
+  brokerStarterNotificationViewed: "broker_starter.notification_viewed",
+  brokerStarterNotificationRead: "broker_starter.notification_read",
+  brokerStarterExportRequested: "broker_starter.export_requested",
+  brokerStarterExportCompleted: "broker_starter.export_completed",
+  brokerStarterExportRefused: "broker_starter.export_refused",
+  brokerStarterCrossTenantRefused: "broker_starter.cross_tenant_refused",
+  brokerStarterProFeatureBlocked: "broker_starter.pro_feature_blocked",
+  brokerStarterActionBlockedLicenseOrScope: "broker_starter.action_blocked_license_or_scope"
 } as const;

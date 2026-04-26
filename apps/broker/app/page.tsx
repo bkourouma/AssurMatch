@@ -1,8 +1,49 @@
 export default function BrokerShellPage() {
   return (
-    <main>
-      <h1>Espace courtier</h1>
-      <p>Socle de compte partenaire prepare sans portail Starter complet ni CRM Pro complet.</p>
+    <main style={{ maxWidth: 1120, margin: "0 auto", padding: "32px 20px", fontFamily: "system-ui, sans-serif", color: "#172033" }}>
+      <header style={{ display: "flex", justifyContent: "space-between", gap: 16, alignItems: "flex-start", marginBottom: 28 }}>
+        <div>
+          <p style={{ margin: "0 0 8px", color: "#516070", fontSize: 14 }}>Plan Starter</p>
+          <h1 style={{ margin: 0, fontSize: 32 }}>Portail courtier</h1>
+          <p style={{ maxWidth: 680, lineHeight: 1.6 }}>
+            Suivi simple des leads transmis par AssurMatch. Le courtier partenaire reste responsable de la prise de contact et de la suite commerciale.
+          </p>
+        </div>
+        <a href="/leads" style={{ padding: "10px 14px", border: "1px solid #245f73", color: "#245f73", textDecoration: "none", borderRadius: 6 }}>
+          Voir les leads
+        </a>
+      </header>
+
+      <section aria-label="Dashboard Starter" style={{ display: "grid", gridTemplateColumns: "repeat(5, minmax(120px, 1fr))", gap: 12, marginBottom: 28 }}>
+        {[
+          ["Recus", "18"],
+          ["Vus", "12"],
+          ["Acceptes", "7"],
+          ["Rejetes", "3"],
+          ["Contestes", "2"]
+        ].map(([label, value]) => (
+          <div key={label} style={{ border: "1px solid #d7dde4", borderRadius: 6, padding: 16, minHeight: 82 }}>
+            <div style={{ color: "#516070", fontSize: 13 }}>{label}</div>
+            <strong style={{ display: "block", marginTop: 8, fontSize: 28 }}>{value}</strong>
+          </div>
+        ))}
+      </section>
+
+      <section style={{ display: "grid", gridTemplateColumns: "2fr 1fr", gap: 16 }}>
+        <div style={{ borderTop: "1px solid #d7dde4", paddingTop: 18 }}>
+          <h2 style={{ margin: "0 0 10px", fontSize: 20 }}>Notifications minimales</h2>
+          <ul style={{ margin: 0, paddingLeft: 18, lineHeight: 1.8 }}>
+            <li>Nouveau lead auto assigne disponible dans la liste.</li>
+            <li>Les notifications restent limitees au tenant courtier connecte.</li>
+          </ul>
+        </div>
+        <aside style={{ border: "1px solid #d7dde4", borderRadius: 6, padding: 16 }}>
+          <h2 style={{ margin: "0 0 10px", fontSize: 18 }}>CRM complet</h2>
+          <p style={{ margin: 0, lineHeight: 1.6 }}>
+            Le plan Starter ne comprend pas Kanban, pipeline avance, taches, rappels, assignation equipe, notes avancees ou IA commerciale.
+          </p>
+        </aside>
+      </section>
     </main>
   );
 }
