@@ -145,4 +145,9 @@ export class QueuesModule {
       this.maintenance = new InMemoryQueue();
     }
   }
+
+  async close(): Promise<void> {
+    if (!this.bullQueues) return;
+    await Promise.all(Object.values(this.bullQueues).map((queue) => queue.close()));
+  }
 }

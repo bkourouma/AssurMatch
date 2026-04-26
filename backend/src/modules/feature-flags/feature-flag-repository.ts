@@ -43,36 +43,34 @@ export class PrismaFeatureFlagRepository implements FeatureFlagRepository {
     const client = this.prisma.requireRuntimeClient() as unknown as {
       featureFlag: { findMany(): Promise<Array<FeatureFlag & { changedAt: Date }>> };
     };
-    return client.featureFlag.findMany();
+    return (await client.featureFlag.findMany()).map((flag) => this.toDomain(flag));
   }
 
   async upsert(flag: FeatureFlag, history: FeatureFlagHistory): Promise<void> {
     const client = this.prisma.requireRuntimeClient() as unknown as {
-      featureFlag: { upsert(input: unknown): Promise<unknown> };
+      featureFlag: {
+        create(input: unknown): Promise<unknown>;
+        findFirst(input: unknown): Promise<{ id: string } | null>;
+        update(input: unknown): Promise<unknown>;
+        upsert(input: unknown): Promise<unknown>;
+      };
       featureFlagHistory: { create(input: unknown): Promise<unknown> };
     };
-    await client.featureFlag.upsert({
-      where: { key_scopeType_scopeId: { key: flag.key, scopeType: flag.scopeType, scopeId: flag.scopeId ?? null } },
-      create: {
-        id: flag.id,
-        key: flag.key,
-        scopeType: flag.scopeType,
-        scopeId: flag.scopeId,
-        value: flag.value,
-        defaultValue: false,
-        reason: flag.reason,
-        changedById: flag.changedById,
-        changedAt: flag.changedAt,
-        cacheVersion: flag.cacheVersion
-      },
-      update: {
-        value: flag.value,
-        reason: flag.reason,
-        changedById: flag.changedById,
-        changedAt: flag.changedAt,
-        cacheVersion: flag.cacheVersion
-      }
-    });
+    const create = this.toPrismaCreate(flag);
+    const update = this.toPrismaUpdate(flag);
+    if (flag.scopeId) {
+      await client.featureFlag.upsert({
+        where: { key_scopeType_scopeId: { key: flag.key, scopeType: flag.scopeType, scopeId: flag.scopeId } },
+        create,
+        update
+      });
+    } else {
+      const existing = await client.featureFlag.findFirst({
+        where: { key: flag.key, scopeType: flag.scopeType, scopeId: null }
+      });
+      if (existing) await client.featureFlag.update({ where: { id: existing.id }, data: update });
+      else await client.featureFlag.create({ data: create });
+    }
     await client.featureFlagHistory.create({
       data: {
         id: history.id,
@@ -94,5 +92,41 @@ export class PrismaFeatureFlagRepository implements FeatureFlagRepository {
       featureFlagHistory: { findMany(input: unknown): Promise<FeatureFlagHistory[]> };
     };
     return client.featureFlagHistory.findMany({ where: { featureFlagId }, orderBy: { changedAt: "asc" } });
+  }
+
+  private toPrismaCreate(flag: FeatureFlag): Record<string, unknown> {
+    return {
+      id: flag.id,
+      key: flag.key,
+      scopeType: flag.scopeType,
+      scopeId: flag.scopeId,
+      value: flag.value,
+      defaultValue: false,
+      reason: flag.reason,
+      changedById: flag.changedById,
+      changedAt: flag.changedAt,
+      cacheVersion: flag.cacheVersion
+    };
+  }
+
+  private toPrismaUpdate(flag: FeatureFlag): Record<string, unknown> {
+    return {
+      value: flag.value,
+      reason: flag.reason,
+      changedById: flag.changedById,
+      changedAt: flag.changedAt,
+      cacheVersion: flag.cacheVersion
+    };
+  }
+
+  private toDomain(flag: FeatureFlag & { scopeId?: string | null }): FeatureFlag {
+    if (flag.scopeId === null) {
+      const rest = { ...flag };
+      delete rest.scopeId;
+      return rest;
+    }
+    return {
+      ...flag
+    };
   }
 }

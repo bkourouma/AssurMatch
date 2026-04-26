@@ -15,7 +15,7 @@ interface PrismaRuntimeClient {
 }
 
 interface PrismaClientModule {
-  PrismaClient?: new () => PrismaRuntimeClient;
+  PrismaClient?: new (input?: unknown) => PrismaRuntimeClient;
 }
 
 export class PrismaService implements OnModuleInit, OnModuleDestroy {
@@ -27,9 +27,10 @@ export class PrismaService implements OnModuleInit, OnModuleDestroy {
     validateRuntimeEnvironment();
     if (this.runtimeMode !== "prisma-client") return;
     if (!process.env.DATABASE_URL) throw new Error("DATABASE_URL is required for Prisma runtime");
+    const adapterModule = await import("@prisma/adapter-pg") as unknown as { PrismaPg: new (input: string) => unknown };
     const prismaModule = await import("@prisma/client") as unknown as PrismaClientModule;
     if (!prismaModule.PrismaClient) throw new Error("@prisma/client PrismaClient is not available");
-    this.client = new prismaModule.PrismaClient();
+    this.client = new prismaModule.PrismaClient({ adapter: new adapterModule.PrismaPg(process.env.DATABASE_URL) });
     await this.client.$connect();
   }
 

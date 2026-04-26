@@ -38,6 +38,15 @@ export class FeatureFlagsService {
     return [...this.flags];
   }
 
+  async hydrateFromRepository(): Promise<void> {
+    const persisted = await this.repository.list();
+    this.flags.splice(0, this.flags.length, ...persisted);
+  }
+
+  isEnabled(key: string, scopeType: FeatureFlag["scopeType"] = "global", scopeId?: string): boolean {
+    return this.flags.find((flag) => flag.key === key && flag.scopeType === scopeType && flag.scopeId === scopeId)?.value ?? false;
+  }
+
   async setFlag(input: Omit<FeatureFlag, "id" | "changedAt" | "cacheVersion">, actor: ActorContext): Promise<FeatureFlag> {
     const existing = this.flags.find((flag) => flag.key === input.key && flag.scopeType === input.scopeType && flag.scopeId === input.scopeId);
     const flag: FeatureFlag = existing ?? {

@@ -141,4 +141,9 @@ export class RedisModule {
       this.client = new InMemoryRedisClient();
     }
   }
+
+  async close(): Promise<void> {
+    if (!this.runtimeClient?.isOpen) return;
+    await this.runtimeClient.quit();
+  }
 }

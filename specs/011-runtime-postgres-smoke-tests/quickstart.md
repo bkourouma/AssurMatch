@@ -17,7 +17,7 @@ Do not run this against production, staging shared data or real PII.
 Start the repository services:
 
 ```powershell
-docker compose up -d postgres redis
+docker compose up -d postgres
 ```
 
 Create or choose a dedicated smoke database inside PostgreSQL, for example:
@@ -47,9 +47,12 @@ non-smoke databases.
 $env:NODE_ENV="runtime-smoke"
 $env:ASSURMATCH_RUNTIME_SMOKE="true"
 $env:DATABASE_URL="postgresql://assurmatch:assurmatch@localhost:5432/assurmatch_runtime_smoke"
-$env:REDIS_URL="redis://localhost:6379"
 $env:BULLMQ_PREFIX="assurmatch-runtime-smoke"
 ```
+
+`REDIS_URL` is optional for the PostgreSQL smoke suite. If it is set, point it
+to a disposable runtime-smoke Redis instance; otherwise the suite focuses on the
+Prisma/PostgreSQL repository proof.
 
 Ensure memory overrides are not enabled:
 
@@ -79,6 +82,12 @@ Recommended command:
 ```powershell
 npm run test:runtime:postgres
 ```
+
+The implemented command uses `node --import tsx backend/tests/runtime-postgres/run-runtime-postgres-smoke.ts`.
+It sets a default `NODE_ENV=runtime-smoke` only when `NODE_ENV` is absent, and
+it refuses to continue if `NODE_ENV=test`, `ASSURMATCH_RUNTIME_SMOKE` is not
+`true`, memory overrides are enabled, or `DATABASE_URL` does not look like a
+dedicated smoke PostgreSQL target.
 
 Expected high-level phases:
 
@@ -148,4 +157,3 @@ Keep this job separate from fast unit/integration checks until stable.
   broad deletes.
 - **Audit rows remain**: this can be intentional when audit deletion is not
   acceptable. They must be isolated by smoke run id.
-

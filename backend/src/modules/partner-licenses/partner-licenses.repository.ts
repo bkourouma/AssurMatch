@@ -67,11 +67,11 @@ export class PrismaPartnerLicensesRepository implements PartnerLicensesRepositor
   constructor(private readonly prisma: PrismaService) {}
 
   async create(license: PartnerLicense): Promise<PartnerLicense> {
-    return this.toDomain(await this.client().create({ data: { ...license } }));
+    return this.toDomain(await this.client().create({ data: this.toPrismaData(license) }));
   }
 
   async update(id: string, update: Partial<PartnerLicense>): Promise<PartnerLicense> {
-    const data = { ...update } as Record<string, unknown>;
+    const data = this.toPrismaData(update);
     delete data.id;
     delete data.createdAt;
     return this.toDomain(await this.client().update({ where: { id }, data }));
@@ -99,7 +99,24 @@ export class PrismaPartnerLicensesRepository implements PartnerLicensesRepositor
     return (this.prisma.requireRuntimeClient() as unknown as { partnerLicense: PartnerLicenseDelegate }).partnerLicense;
   }
 
+  private toPrismaData(license: Partial<PartnerLicense>): Record<string, unknown> {
+    const data = { ...license } as Record<string, unknown>;
+    if (typeof license.effectiveDate === "string") data.effectiveDate = new Date(`${license.effectiveDate}T00:00:00.000Z`);
+    if (typeof license.expirationDate === "string") data.expirationDate = new Date(`${license.expirationDate}T00:00:00.000Z`);
+    return data;
+  }
+
   private toDomain(row: unknown): PartnerLicense {
-    return row as PartnerLicense;
+    const record = row as PartnerLicense & { effectiveDate: Date | string; expirationDate: Date | string };
+    return {
+      ...record,
+      effectiveDate: this.toDateOnly(record.effectiveDate),
+      expirationDate: this.toDateOnly(record.expirationDate)
+    };
+  }
+
+  private toDateOnly(value: Date | string): string {
+    if (value instanceof Date) return value.toISOString().slice(0, 10);
+    return value.slice(0, 10);
   }
 }

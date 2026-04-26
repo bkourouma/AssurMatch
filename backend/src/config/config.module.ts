@@ -1,5 +1,5 @@
 export interface AppConfig {
-  appEnv: "local" | "test" | "staging" | "production";
+  appEnv: "local" | "test" | "runtime-smoke" | "staging" | "production";
   databaseUrl: string;
   redisUrl: string;
   queueNamespace: string;
@@ -12,7 +12,7 @@ export interface AppConfig {
   whatsappEnabled: boolean;
 }
 
-const runtimeEnvironments = new Set(["local", "staging", "production"]);
+const runtimeEnvironments = new Set(["local", "runtime-smoke", "staging", "production"]);
 
 export function isTestEnvironment(env: Record<string, string | undefined> = process.env): boolean {
   return (env.NODE_ENV ?? env.APP_ENV) === "test";
@@ -62,7 +62,7 @@ export class ConfigModule {
       prismaMemory: bool(env.ASSURMATCH_PRISMA_MEMORY),
       redisMemory: bool(env.ASSURMATCH_REDIS_MEMORY),
       queueMemory: bool(env.ASSURMATCH_QUEUE_MEMORY),
-      httpsRequired: appEnv !== "local" && appEnv !== "test",
+      httpsRequired: appEnv !== "local" && appEnv !== "test" && appEnv !== "runtime-smoke",
       publicComparatorEnabled: env.PUBLIC_COMPARATOR_ENABLED === "true",
       quoteRequestEnabled: env.QUOTE_REQUEST_ENABLED === "true",
       whatsappEnabled: env.WHATSAPP_ENABLED === "true"

@@ -45,22 +45,35 @@ export class AssurMatchRuntime {
   readonly prisma = new PrismaService();
   readonly redis = new RedisModule();
   readonly queues = new QueuesModule();
-  readonly audit = new AuditLogsModule(this.auditRepository());
+  private readonly auditLogRepository = this.auditRepository();
+  private readonly featureFlagRepository = this.runtimeRepository(new PrismaFeatureFlagRepository(this.prisma));
+  private readonly countriesRepository = this.runtimeRepository(new PrismaCountriesRepository(this.prisma));
+  private readonly productsRepository = this.runtimeRepository(new PrismaProductsRepository(this.prisma));
+  private readonly partnersRepository = this.runtimeRepository(new PrismaPartnersRepository(this.prisma));
+  private readonly partnerLicensesRepository = this.runtimeRepository(new PrismaPartnerLicensesRepository(this.prisma));
+  private readonly consentRecordsRepository = this.runtimeRepository(new PrismaConsentRecordsRepository(this.prisma));
+  private readonly notificationsRepository = this.runtimeRepository(new PrismaNotificationsRepository(this.prisma));
+  private readonly offersRepository = this.runtimeRepository(new PrismaOffersRepository(this.prisma));
+  private readonly prospectsRepository = this.runtimeRepository(new PrismaProspectsRepository(this.prisma));
+  private readonly quoteRequestsRepository = this.runtimeRepository(new PrismaQuoteRequestsRepository(this.prisma));
+  private readonly leadRepositorySet = this.leadRepositories();
+  private readonly brokerCrmConfig = { brokerCrmEnabled: process.env.ASSURMATCH_BROKER_CRM_ENABLED === "true" };
+  readonly audit = new AuditLogsModule(this.auditLogRepository);
   readonly regulatoryRegimes = new RegulatoryRegimesModule(this.audit.writer);
-  readonly countries = new CountriesModule(this.audit.writer, this.runtimeRepository(new PrismaCountriesRepository(this.prisma)));
-  readonly products = new ProductsModule(this.audit.writer, this.runtimeRepository(new PrismaProductsRepository(this.prisma)));
-  readonly partners = new PartnersModule(this.audit.writer, this.runtimeRepository(new PrismaPartnersRepository(this.prisma)));
-  readonly partnerLicenses = new PartnerLicensesModule(this.audit.writer, this.runtimeRepository(new PrismaPartnerLicensesRepository(this.prisma)));
+  readonly countries = new CountriesModule(this.audit.writer, this.countriesRepository);
+  readonly products = new ProductsModule(this.audit.writer, this.productsRepository);
+  readonly partners = new PartnersModule(this.audit.writer, this.partnersRepository);
+  readonly partnerLicenses = new PartnerLicensesModule(this.audit.writer, this.partnerLicensesRepository);
   readonly documents = new DocumentsModule(this.audit.writer);
   readonly users = new UsersModule(this.audit.writer);
   readonly auth = new AuthModule(this.users.service);
   readonly featureFlags = new FeatureFlagsModule(
     this.audit.writer,
     new FeatureFlagCacheService(this.redis.client),
-    process.env.NODE_ENV === "test" ? undefined : new PrismaFeatureFlagRepository(this.prisma)
+    this.featureFlagRepository
   );
-  readonly consent = new ConsentModule(this.audit.writer, this.runtimeRepository(new PrismaConsentRecordsRepository(this.prisma)));
-  readonly notifications = new NotificationsModule(this.audit.writer, this.queues.notifications, this.runtimeRepository(new PrismaNotificationsRepository(this.prisma)));
+  readonly consent = new ConsentModule(this.audit.writer, this.consentRecordsRepository);
+  readonly notifications = new NotificationsModule(this.audit.writer, this.queues.notifications, this.notificationsRepository);
   readonly ai = new AIModule(this.audit.writer);
   readonly quoteAiSummary = new QuoteAISummaryService(this.notifications.queue, this.audit.writer, {
     id: "00000000-0000-4000-8000-000000000002",
@@ -76,7 +89,7 @@ export class AssurMatchRuntime {
     countryFlags: { country_ai_enabled: false },
     productFlags: { product_ai_form_assistant_enabled: false }
   });
-  readonly offers = new OffersModule(this.audit.writer, this.redis.client, this.runtimeRepository(new PrismaOffersRepository(this.prisma)));
+  readonly offers = new OffersModule(this.audit.writer, this.redis.client, this.offersRepository);
   readonly quoteForms = new QuoteFormsModule(this.audit.writer, async () => (await this.consent.service.listTexts()).map((text) => ({
     id: text.id,
     version: text.version,
@@ -85,13 +98,13 @@ export class AssurMatchRuntime {
     recipientCategory: text.recipientCategory,
     status: text.status ?? "draft"
   })));
-  readonly prospects = new ProspectsModule(this.audit.writer, this.runtimeRepository(new PrismaProspectsRepository(this.prisma)));
+  readonly prospects = new ProspectsModule(this.audit.writer, this.prospectsRepository);
   readonly leads = new LeadsModule(
     this.partners.service,
     this.partnerLicenses.service,
     this.audit.writer,
-    { brokerCrmEnabled: process.env.ASSURMATCH_BROKER_CRM_ENABLED === "true" },
-    this.leadRepositories()
+    this.brokerCrmConfig,
+    this.leadRepositorySet
   );
   readonly quoteRequests = new QuoteRequestsModule({
     countries: this.countries.service,
@@ -103,17 +116,51 @@ export class AssurMatchRuntime {
     routing: this.leads.routing,
     notifications: this.notifications.quoteService,
     aiSummary: this.quoteAiSummary
-  }, this.audit.writer, this.redis.client, this.runtimeRepository(new PrismaQuoteRequestsRepository(this.prisma)));
+  }, this.audit.writer, this.redis.client, this.quoteRequestsRepository);
   readonly partnerEligibility = new PartnerEligibilityService(this.partners.service, this.partnerLicenses.service, this.documents.service);
   readonly routing = new RoutingModule(this.consent.service, this.partnerEligibility, this.audit.writer);
   readonly systemHealth = new SystemHealthModule(this.prisma, this.redis.client, this.queues.notifications);
 
   async onModuleInit(): Promise<void> {
     await this.prisma.onModuleInit();
+    await this.featureFlags.service.hydrateFromRepository();
+    this.refreshRuntimeFeatureFlags();
   }
 
   async onModuleDestroy(): Promise<void> {
     await this.prisma.onModuleDestroy();
+    await this.redis.close();
+    await this.queues.close();
+  }
+
+  async reloadRuntimeFeatureFlags(): Promise<void> {
+    await this.featureFlags.service.hydrateFromRepository();
+    this.refreshRuntimeFeatureFlags();
+  }
+
+  runtimeRepositoryModes(): Record<string, string | undefined> {
+    return {
+      AuditLogRepository: this.auditLogRepository?.mode,
+      FeatureFlagRepository: this.featureFlagRepository?.mode,
+      CountriesRepository: this.countriesRepository?.mode,
+      ProductsRepository: this.productsRepository?.mode,
+      OffersRepository: this.offersRepository?.mode,
+      ProspectsRepository: this.prospectsRepository?.mode,
+      ConsentRecordsRepository: this.consentRecordsRepository?.mode,
+      QuoteRequestsRepository: this.quoteRequestsRepository?.mode,
+      LeadAssignmentsRepository: this.leadRepositorySet.assignments?.mode,
+      RoutingDecisionsRepository: this.leadRepositorySet.decisions?.mode,
+      PartnersRepository: this.partnersRepository?.mode,
+      PartnerLicensesRepository: this.partnerLicensesRepository?.mode,
+      CrmActivityRepository: this.leadRepositorySet.crmActivity?.mode,
+      NotificationsRepository: this.notificationsRepository?.mode
+    };
+  }
+
+  private refreshRuntimeFeatureFlags(): void {
+    this.brokerCrmConfig.brokerCrmEnabled =
+      this.featureFlags.service.isEnabled("broker_crm_enabled") ||
+      process.env.ASSURMATCH_BROKER_CRM_ENABLED === "true";
   }
 
   private auditRepository() {
