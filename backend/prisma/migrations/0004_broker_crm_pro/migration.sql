@@ -1,24 +1,32 @@
-CREATE TYPE "BrokerCrmPipelineStatus" AS ENUM (
-  'nouveau',
-  'accepte',
-  'contact_tente',
-  'contacte',
-  'qualifie',
-  'documents_demandes',
-  'devis_en_preparation',
-  'devis_envoye',
-  'negociation',
-  'gagne',
-  'perdu',
-  'doublon',
-  'injoignable',
-  'hors_cible',
-  'rejete_conteste'
-);
+DO $$ BEGIN
+  CREATE TYPE "BrokerCrmPipelineStatus" AS ENUM (
+    'nouveau',
+    'accepte',
+    'contact_tente',
+    'contacte',
+    'qualifie',
+    'documents_demandes',
+    'devis_en_preparation',
+    'devis_envoye',
+    'negociation',
+    'gagne',
+    'perdu',
+    'doublon',
+    'injoignable',
+    'hors_cible',
+    'rejete_conteste'
+  );
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
+END $$;
 
-CREATE TYPE "BrokerCrmUrgency" AS ENUM ('low', 'normal', 'high', 'urgent');
+DO $$ BEGIN
+  CREATE TYPE "BrokerCrmUrgency" AS ENUM ('low', 'normal', 'high', 'urgent');
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
+END $$;
 
-CREATE TABLE "BrokerCrmLeadState" (
+CREATE TABLE IF NOT EXISTS "BrokerCrmLeadState" (
   "id" TEXT NOT NULL,
   "leadAssignmentId" TEXT NOT NULL,
   "partnerTenantId" TEXT NOT NULL,
@@ -33,7 +41,7 @@ CREATE TABLE "BrokerCrmLeadState" (
   CONSTRAINT "BrokerCrmLeadState_pkey" PRIMARY KEY ("id")
 );
 
-CREATE TABLE "BrokerCrmPipelineHistory" (
+CREATE TABLE IF NOT EXISTS "BrokerCrmPipelineHistory" (
   "id" TEXT NOT NULL,
   "leadAssignmentId" TEXT NOT NULL,
   "partnerTenantId" TEXT NOT NULL,
@@ -46,7 +54,7 @@ CREATE TABLE "BrokerCrmPipelineHistory" (
   CONSTRAINT "BrokerCrmPipelineHistory_pkey" PRIMARY KEY ("id")
 );
 
-CREATE TABLE "BrokerCrmNote" (
+CREATE TABLE IF NOT EXISTS "BrokerCrmNote" (
   "id" TEXT NOT NULL,
   "leadAssignmentId" TEXT NOT NULL,
   "partnerTenantId" TEXT NOT NULL,
@@ -56,7 +64,7 @@ CREATE TABLE "BrokerCrmNote" (
   CONSTRAINT "BrokerCrmNote_pkey" PRIMARY KEY ("id")
 );
 
-CREATE TABLE "BrokerCrmTask" (
+CREATE TABLE IF NOT EXISTS "BrokerCrmTask" (
   "id" TEXT NOT NULL,
   "leadAssignmentId" TEXT NOT NULL,
   "partnerTenantId" TEXT NOT NULL,
@@ -70,7 +78,7 @@ CREATE TABLE "BrokerCrmTask" (
   CONSTRAINT "BrokerCrmTask_pkey" PRIMARY KEY ("id")
 );
 
-CREATE TABLE "BrokerCrmReminder" (
+CREATE TABLE IF NOT EXISTS "BrokerCrmReminder" (
   "id" TEXT NOT NULL,
   "leadAssignmentId" TEXT NOT NULL,
   "partnerTenantId" TEXT NOT NULL,
@@ -82,7 +90,7 @@ CREATE TABLE "BrokerCrmReminder" (
   CONSTRAINT "BrokerCrmReminder_pkey" PRIMARY KEY ("id")
 );
 
-CREATE TABLE "BrokerCrmDocument" (
+CREATE TABLE IF NOT EXISTS "BrokerCrmDocument" (
   "id" TEXT NOT NULL,
   "leadAssignmentId" TEXT NOT NULL,
   "partnerTenantId" TEXT NOT NULL,
@@ -94,7 +102,7 @@ CREATE TABLE "BrokerCrmDocument" (
   CONSTRAINT "BrokerCrmDocument_pkey" PRIMARY KEY ("id")
 );
 
-CREATE TABLE "BrokerCrmProposal" (
+CREATE TABLE IF NOT EXISTS "BrokerCrmProposal" (
   "id" TEXT NOT NULL,
   "leadAssignmentId" TEXT NOT NULL,
   "partnerTenantId" TEXT NOT NULL,
@@ -108,7 +116,7 @@ CREATE TABLE "BrokerCrmProposal" (
   CONSTRAINT "BrokerCrmProposal_pkey" PRIMARY KEY ("id")
 );
 
-CREATE TABLE "BrokerCrmDispute" (
+CREATE TABLE IF NOT EXISTS "BrokerCrmDispute" (
   "id" TEXT NOT NULL,
   "leadAssignmentId" TEXT NOT NULL,
   "partnerTenantId" TEXT NOT NULL,
@@ -121,7 +129,7 @@ CREATE TABLE "BrokerCrmDispute" (
   CONSTRAINT "BrokerCrmDispute_pkey" PRIMARY KEY ("id")
 );
 
-CREATE TABLE "BrokerCrmAiAssistRequest" (
+CREATE TABLE IF NOT EXISTS "BrokerCrmAiAssistRequest" (
   "id" TEXT NOT NULL,
   "leadAssignmentId" TEXT NOT NULL,
   "partnerTenantId" TEXT NOT NULL,
@@ -133,20 +141,20 @@ CREATE TABLE "BrokerCrmAiAssistRequest" (
   CONSTRAINT "BrokerCrmAiAssistRequest_pkey" PRIMARY KEY ("id")
 );
 
-CREATE UNIQUE INDEX "BrokerCrmLeadState_leadAssignmentId_key" ON "BrokerCrmLeadState"("leadAssignmentId");
-CREATE INDEX "BrokerCrmLeadState_partnerTenantId_status_updatedAt_idx" ON "BrokerCrmLeadState"("partnerTenantId", "status", "updatedAt");
-CREATE INDEX "BrokerCrmLeadState_partnerTenantId_assignedAdvisorId_idx" ON "BrokerCrmLeadState"("partnerTenantId", "assignedAdvisorId");
-CREATE INDEX "BrokerCrmPipelineHistory_leadAssignmentId_occurredAt_idx" ON "BrokerCrmPipelineHistory"("leadAssignmentId", "occurredAt");
-CREATE INDEX "BrokerCrmPipelineHistory_partnerTenantId_occurredAt_idx" ON "BrokerCrmPipelineHistory"("partnerTenantId", "occurredAt");
-CREATE INDEX "BrokerCrmNote_leadAssignmentId_createdAt_idx" ON "BrokerCrmNote"("leadAssignmentId", "createdAt");
-CREATE INDEX "BrokerCrmNote_partnerTenantId_createdAt_idx" ON "BrokerCrmNote"("partnerTenantId", "createdAt");
-CREATE INDEX "BrokerCrmTask_partnerTenantId_assigneeId_dueAt_idx" ON "BrokerCrmTask"("partnerTenantId", "assigneeId", "dueAt");
-CREATE INDEX "BrokerCrmTask_leadAssignmentId_createdAt_idx" ON "BrokerCrmTask"("leadAssignmentId", "createdAt");
-CREATE INDEX "BrokerCrmReminder_partnerTenantId_assigneeId_remindAt_idx" ON "BrokerCrmReminder"("partnerTenantId", "assigneeId", "remindAt");
-CREATE INDEX "BrokerCrmDocument_leadAssignmentId_createdAt_idx" ON "BrokerCrmDocument"("leadAssignmentId", "createdAt");
-CREATE INDEX "BrokerCrmDocument_partnerTenantId_visibility_idx" ON "BrokerCrmDocument"("partnerTenantId", "visibility");
-CREATE INDEX "BrokerCrmProposal_leadAssignmentId_createdAt_idx" ON "BrokerCrmProposal"("leadAssignmentId", "createdAt");
-CREATE INDEX "BrokerCrmProposal_partnerTenantId_createdAt_idx" ON "BrokerCrmProposal"("partnerTenantId", "createdAt");
-CREATE INDEX "BrokerCrmDispute_leadAssignmentId_createdAt_idx" ON "BrokerCrmDispute"("leadAssignmentId", "createdAt");
-CREATE INDEX "BrokerCrmDispute_partnerTenantId_status_idx" ON "BrokerCrmDispute"("partnerTenantId", "status");
-CREATE INDEX "BrokerCrmAiAssistRequest_partnerTenantId_assistType_createdAt_idx" ON "BrokerCrmAiAssistRequest"("partnerTenantId", "assistType", "createdAt");
+CREATE UNIQUE INDEX IF NOT EXISTS "BrokerCrmLeadState_leadAssignmentId_key" ON "BrokerCrmLeadState"("leadAssignmentId");
+CREATE INDEX IF NOT EXISTS "BrokerCrmLeadState_partnerTenantId_status_updatedAt_idx" ON "BrokerCrmLeadState"("partnerTenantId", "status", "updatedAt");
+CREATE INDEX IF NOT EXISTS "BrokerCrmLeadState_partnerTenantId_assignedAdvisorId_idx" ON "BrokerCrmLeadState"("partnerTenantId", "assignedAdvisorId");
+CREATE INDEX IF NOT EXISTS "BrokerCrmPipelineHistory_leadAssignmentId_occurredAt_idx" ON "BrokerCrmPipelineHistory"("leadAssignmentId", "occurredAt");
+CREATE INDEX IF NOT EXISTS "BrokerCrmPipelineHistory_partnerTenantId_occurredAt_idx" ON "BrokerCrmPipelineHistory"("partnerTenantId", "occurredAt");
+CREATE INDEX IF NOT EXISTS "BrokerCrmNote_leadAssignmentId_createdAt_idx" ON "BrokerCrmNote"("leadAssignmentId", "createdAt");
+CREATE INDEX IF NOT EXISTS "BrokerCrmNote_partnerTenantId_createdAt_idx" ON "BrokerCrmNote"("partnerTenantId", "createdAt");
+CREATE INDEX IF NOT EXISTS "BrokerCrmTask_partnerTenantId_assigneeId_dueAt_idx" ON "BrokerCrmTask"("partnerTenantId", "assigneeId", "dueAt");
+CREATE INDEX IF NOT EXISTS "BrokerCrmTask_leadAssignmentId_createdAt_idx" ON "BrokerCrmTask"("leadAssignmentId", "createdAt");
+CREATE INDEX IF NOT EXISTS "BrokerCrmReminder_partnerTenantId_assigneeId_remindAt_idx" ON "BrokerCrmReminder"("partnerTenantId", "assigneeId", "remindAt");
+CREATE INDEX IF NOT EXISTS "BrokerCrmDocument_leadAssignmentId_createdAt_idx" ON "BrokerCrmDocument"("leadAssignmentId", "createdAt");
+CREATE INDEX IF NOT EXISTS "BrokerCrmDocument_partnerTenantId_visibility_idx" ON "BrokerCrmDocument"("partnerTenantId", "visibility");
+CREATE INDEX IF NOT EXISTS "BrokerCrmProposal_leadAssignmentId_createdAt_idx" ON "BrokerCrmProposal"("leadAssignmentId", "createdAt");
+CREATE INDEX IF NOT EXISTS "BrokerCrmProposal_partnerTenantId_createdAt_idx" ON "BrokerCrmProposal"("partnerTenantId", "createdAt");
+CREATE INDEX IF NOT EXISTS "BrokerCrmDispute_leadAssignmentId_createdAt_idx" ON "BrokerCrmDispute"("leadAssignmentId", "createdAt");
+CREATE INDEX IF NOT EXISTS "BrokerCrmDispute_partnerTenantId_status_idx" ON "BrokerCrmDispute"("partnerTenantId", "status");
+CREATE INDEX IF NOT EXISTS "BrokerCrmAiAssistRequest_partnerTenantId_assistType_createdAt_idx" ON "BrokerCrmAiAssistRequest"("partnerTenantId", "assistType", "createdAt");

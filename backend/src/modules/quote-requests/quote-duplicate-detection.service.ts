@@ -1,10 +1,10 @@
 import { QuoteRedisKeys } from "../common/redis/quote-redis-keys";
-import type { InMemoryRedisClient } from "../common/redis/redis.module";
+import type { RedisClientPort } from "../common/redis/redis.module";
 
 export type DuplicateDecision = "unique" | "possible_duplicate" | "blocked_duplicate";
 
 export class QuoteDuplicateDetectionService {
-  constructor(private readonly redis: InMemoryRedisClient, private readonly ttlSeconds = 30 * 24 * 60 * 60) {}
+  constructor(private readonly redis: RedisClientPort, private readonly ttlSeconds = 30 * 24 * 60 * 60) {}
 
   async evaluate(countryId: string, productId: string, contactFingerprint: string): Promise<DuplicateDecision> {
     const key = QuoteRedisKeys.duplicate(countryId, productId, contactFingerprint);

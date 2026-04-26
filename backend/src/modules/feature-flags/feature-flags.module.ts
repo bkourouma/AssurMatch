@@ -1,6 +1,7 @@
 import { AuditLogWriter } from "../audit-logs/audit-log-writer.service";
 import type { ActorContext } from "../common/types";
 import { FeatureFlagCacheService } from "./feature-flag-cache.service";
+import { MemoryFeatureFlagRepository, type FeatureFlagRepository } from "./feature-flag-repository";
 import type { FlagRecord } from "./feature-flag-precedence.service";
 
 export interface FeatureFlag extends FlagRecord {
@@ -24,7 +25,11 @@ export class FeatureFlagsService {
   private readonly flags: FeatureFlag[] = [];
   private readonly history: FeatureFlagHistory[] = [];
 
-  constructor(private readonly audit: AuditLogWriter, private readonly cache?: FeatureFlagCacheService) {}
+  constructor(
+    private readonly audit: AuditLogWriter,
+    private readonly cache?: FeatureFlagCacheService,
+    private readonly repository: FeatureFlagRepository = new MemoryFeatureFlagRepository()
+  ) {}
 
   list(): FeatureFlag[] {
     return [...this.flags];
@@ -57,6 +62,8 @@ export class FeatureFlagsService {
       reason: flag.reason,
       changedAt: flag.changedAt
     });
+    const history = this.history.at(-1);
+    if (history) await this.repository.upsert(flag, history);
     await this.cache?.put(flag);
     this.audit.write({
       actor,
@@ -79,7 +86,7 @@ export class FeatureFlagsService {
 export class FeatureFlagsModule {
   readonly service: FeatureFlagsService;
 
-  constructor(audit = new AuditLogWriter(), cache?: FeatureFlagCacheService) {
-    this.service = new FeatureFlagsService(audit, cache);
+  constructor(audit = new AuditLogWriter(), cache?: FeatureFlagCacheService, repository?: FeatureFlagRepository) {
+    this.service = new FeatureFlagsService(audit, cache, repository);
   }
 }

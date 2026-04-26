@@ -16,5 +16,13 @@ describe("prisma migration fresh-base readiness", () => {
     for (const model of ["AuditLog", "FeatureFlag", "ConsentRecord", "QuoteRequest", "LeadAssignment", "BrokerCrmLeadState"]) {
       expect(schema).toContain(`model ${model}`);
     }
+    const foundation = readFileSync(join(migrationsDir, "0001_foundation", "migration.sql"), "utf8");
+    expect(foundation).toContain('CREATE TYPE "UserStatus"');
+    expect(foundation).toContain('CREATE TABLE "AuditLog"');
+    expect(foundation).not.toContain("placeholder records");
+    const starter = readFileSync(join(migrationsDir, "0003_broker_starter_portal", "migration.sql"), "utf8");
+    const crm = readFileSync(join(migrationsDir, "0004_broker_crm_pro", "migration.sql"), "utf8");
+    expect(starter).toContain("ADD COLUMN IF NOT EXISTS");
+    expect(crm).toContain("CREATE TABLE IF NOT EXISTS");
   });
 });

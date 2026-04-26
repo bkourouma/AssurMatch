@@ -18,7 +18,7 @@ describe("runtime audit repository", () => {
     const prisma = new CapturingPrismaAuditService();
     const writer = new AuditLogWriter(new PrismaAuditLogRepository(prisma as unknown as PrismaService));
 
-    const entry = writer.write({
+    const entry = await writer.writeAsync({
       actor: { actorId: "admin", roles: ["super_admin"], mfaVerified: true },
       action: "runtime.audit.persistence_test",
       targetType: "AuditLog",
@@ -27,10 +27,8 @@ describe("runtime audit repository", () => {
       context: {}
     });
 
-    await new Promise((resolve) => setTimeout(resolve, 0));
     expect(writer.runtimeMode).toBe("durable-boundary");
     expect(writer.repository.mode).toBe("prisma-runtime");
     expect(prisma.persisted).toEqual([entry]);
   });
 });
-

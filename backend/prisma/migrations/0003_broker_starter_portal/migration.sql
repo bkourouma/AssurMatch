@@ -1,17 +1,17 @@
-ALTER TYPE "LeadAssignmentStatus" ADD VALUE 'seen';
-ALTER TYPE "LeadAssignmentStatus" ADD VALUE 'accepted';
+ALTER TYPE "LeadAssignmentStatus" ADD VALUE IF NOT EXISTS 'seen';
+ALTER TYPE "LeadAssignmentStatus" ADD VALUE IF NOT EXISTS 'accepted';
 
 ALTER TABLE "LeadAssignment"
-  ADD COLUMN "seenAt" TIMESTAMP(3),
-  ADD COLUMN "seenById" TEXT,
-  ADD COLUMN "acceptedAt" TIMESTAMP(3),
-  ADD COLUMN "rejectedAt" TIMESTAMP(3),
-  ADD COLUMN "disputedAt" TIMESTAMP(3),
-  ADD COLUMN "actionReason" TEXT,
-  ADD COLUMN "actionComment" TEXT,
-  ADD COLUMN "lastBrokerActionById" TEXT;
+  ADD COLUMN IF NOT EXISTS "seenAt" TIMESTAMP(3),
+  ADD COLUMN IF NOT EXISTS "seenById" TEXT,
+  ADD COLUMN IF NOT EXISTS "acceptedAt" TIMESTAMP(3),
+  ADD COLUMN IF NOT EXISTS "rejectedAt" TIMESTAMP(3),
+  ADD COLUMN IF NOT EXISTS "disputedAt" TIMESTAMP(3),
+  ADD COLUMN IF NOT EXISTS "actionReason" TEXT,
+  ADD COLUMN IF NOT EXISTS "actionComment" TEXT,
+  ADD COLUMN IF NOT EXISTS "lastBrokerActionById" TEXT;
 
-CREATE TABLE "LeadActionHistory" (
+CREATE TABLE IF NOT EXISTS "LeadActionHistory" (
   "id" TEXT NOT NULL,
   "leadAssignmentId" TEXT NOT NULL,
   "partnerTenantId" TEXT NOT NULL,
@@ -28,5 +28,5 @@ CREATE TABLE "LeadActionHistory" (
   CONSTRAINT "LeadActionHistory_pkey" PRIMARY KEY ("id")
 );
 
-CREATE INDEX "LeadActionHistory_leadAssignmentId_occurredAt_idx" ON "LeadActionHistory"("leadAssignmentId", "occurredAt");
-CREATE INDEX "LeadActionHistory_partnerTenantId_occurredAt_idx" ON "LeadActionHistory"("partnerTenantId", "occurredAt");
+CREATE INDEX IF NOT EXISTS "LeadActionHistory_leadAssignmentId_occurredAt_idx" ON "LeadActionHistory"("leadAssignmentId", "occurredAt");
+CREATE INDEX IF NOT EXISTS "LeadActionHistory_partnerTenantId_occurredAt_idx" ON "LeadActionHistory"("partnerTenantId", "occurredAt");

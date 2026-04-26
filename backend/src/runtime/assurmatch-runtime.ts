@@ -10,6 +10,8 @@ import { ConsentModule } from "../modules/consent/consent.module";
 import { CountriesModule } from "../modules/countries/countries.module";
 import { DocumentsModule } from "../modules/documents/documents.module";
 import { FeatureFlagsModule } from "../modules/feature-flags/feature-flags.module";
+import { FeatureFlagCacheService } from "../modules/feature-flags/feature-flag-cache.service";
+import { PrismaFeatureFlagRepository } from "../modules/feature-flags/feature-flag-repository";
 import { LeadsModule } from "../modules/leads/leads.module";
 import { NotificationsModule } from "../modules/notifications/notifications.module";
 import { OffersModule } from "../modules/offers/offers.module";
@@ -40,9 +42,13 @@ export class AssurMatchRuntime {
   readonly documents = new DocumentsModule(this.audit.writer);
   readonly users = new UsersModule(this.audit.writer);
   readonly auth = new AuthModule(this.users.service);
-  readonly featureFlags = new FeatureFlagsModule(this.audit.writer);
+  readonly featureFlags = new FeatureFlagsModule(
+    this.audit.writer,
+    new FeatureFlagCacheService(this.redis.client),
+    process.env.NODE_ENV === "test" ? undefined : new PrismaFeatureFlagRepository(this.prisma)
+  );
   readonly consent = new ConsentModule(this.audit.writer);
-  readonly notifications = new NotificationsModule(this.audit.writer);
+  readonly notifications = new NotificationsModule(this.audit.writer, this.queues.notifications);
   readonly ai = new AIModule(this.audit.writer);
   readonly quoteAiSummary = new QuoteAISummaryService(this.notifications.queue, this.audit.writer, {
     id: "00000000-0000-4000-8000-000000000002",
@@ -95,7 +101,7 @@ export class AssurMatchRuntime {
   }
 
   private auditRepository() {
-    if (process.env.NODE_ENV === "test" || process.env.ASSURMATCH_AUDIT_MEMORY === "true") return undefined;
+    if (process.env.NODE_ENV === "test") return undefined;
     return new PrismaAuditLogRepository(this.prisma);
   }
 }

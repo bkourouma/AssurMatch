@@ -1,5 +1,5 @@
 import { AuditLogWriter } from "../audit-logs/audit-log-writer.service";
-import { InMemoryRedisClient } from "../common/redis/redis.module";
+import { InMemoryRedisClient, type RedisClientPort } from "../common/redis/redis.module";
 import type { ConsentService } from "../consent/consent.module";
 import type { CountriesService } from "../countries/countries.module";
 import type { QuoteAISummaryService } from "../ai/quote-summary/quote-ai-summary.service";
@@ -38,7 +38,7 @@ export class QuoteRequestsModule {
   readonly statusController: PublicQuoteStatusController;
   readonly adminController: AdminQuoteRequestsController;
 
-  constructor(deps: QuoteRequestsModuleDeps, audit = new AuditLogWriter(), redis = new InMemoryRedisClient()) {
+  constructor(deps: QuoteRequestsModuleDeps, audit = new AuditLogWriter(), redis: RedisClientPort = new InMemoryRedisClient()) {
     this.rateLimit = new PublicQuoteRateLimitService(redis);
     this.antiSpam = new PublicAntiSpamService(redis);
     this.duplicate = new QuoteDuplicateDetectionService(redis);

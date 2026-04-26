@@ -1,8 +1,8 @@
-import type { InMemoryQueue } from "../../modules/common/queues/queues.module";
+import type { QueuePort } from "../../modules/common/queues/queues.module";
 import type { NotificationsService } from "../../modules/notifications/notifications.module";
 
 export class NotificationProcessor {
-  constructor(private readonly notifications: NotificationsService, private readonly queue: InMemoryQueue) {}
+  constructor(private readonly notifications: NotificationsService, private readonly queue: QueuePort) {}
 
   process(notificationId: string, jobId: string): void {
     this.queue.transition(jobId, "active");

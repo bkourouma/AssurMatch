@@ -1,8 +1,8 @@
 import { QuoteRedisKeys } from "../common/redis/quote-redis-keys";
-import type { InMemoryRedisClient } from "../common/redis/redis.module";
+import type { RedisClientPort } from "../common/redis/redis.module";
 
 export class PublicAntiSpamService {
-  constructor(private readonly redis: InMemoryRedisClient) {}
+  constructor(private readonly redis: RedisClientPort) {}
 
   async assertClean(input: { sessionId?: string; answers: Record<string, unknown> }): Promise<void> {
     if (typeof input.answers.website === "string" && input.answers.website.trim().length > 0) {

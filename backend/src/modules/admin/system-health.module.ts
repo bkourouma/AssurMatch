@@ -1,6 +1,6 @@
 import type { PrismaService } from "../common/prisma/prisma.service";
-import type { InMemoryRedisClient } from "../common/redis/redis.module";
-import type { InMemoryQueue } from "../common/queues/queues.module";
+import type { RedisClientPort } from "../common/redis/redis.module";
+import type { QueuePort } from "../common/queues/queues.module";
 
 export interface SystemHealth {
   status: "ok" | "degraded" | "down";
@@ -10,15 +10,15 @@ export interface SystemHealth {
 export class SystemHealthService {
   constructor(
     private readonly prisma: PrismaService,
-    private readonly redis: InMemoryRedisClient,
-    private readonly queue: InMemoryQueue
+    private readonly redis: RedisClientPort,
+    private readonly queue: QueuePort
   ) {}
 
   async check(): Promise<SystemHealth> {
     const checks: Record<string, "ok" | "degraded" | "down"> = {
       database: await this.prisma.health(),
       redis: await this.redis.health(),
-      queue: this.queue.list().some((job) => job.status === "failed") ? "degraded" : "ok",
+      queue: this.queue.health(),
       documents: "ok",
       auth: "ok",
       featureFlags: "ok"
@@ -31,7 +31,7 @@ export class SystemHealthService {
 export class SystemHealthModule {
   readonly service: SystemHealthService;
 
-  constructor(prisma: PrismaService, redis: InMemoryRedisClient, queue: InMemoryQueue) {
+  constructor(prisma: PrismaService, redis: RedisClientPort, queue: QueuePort) {
     this.service = new SystemHealthService(prisma, redis, queue);
   }
 }

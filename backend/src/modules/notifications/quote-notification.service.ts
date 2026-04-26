@@ -1,6 +1,6 @@
 import { AuditLogWriter } from "../audit-logs/audit-log-writer.service";
 import { QuoteAuditActions } from "../audit-logs/quote-audit-actions";
-import { InMemoryQueue, type QueueJobRecord } from "../common/queues/queues.module";
+import type { QueueJobRecord, QueuePort } from "../common/queues/queues.module";
 import type { ActorContext } from "../common/types";
 import type { LeadAssignmentRecord } from "../leads/lead-assignment.service";
 import type { QuoteRequestRecord } from "../quote-requests/quote-submission.service";
@@ -12,7 +12,7 @@ export class QuoteNotificationService {
 
   constructor(
     private readonly notifications: NotificationRecord[],
-    private readonly queue: InMemoryQueue,
+    private readonly queue: QueuePort,
     private readonly audit: AuditLogWriter
   ) {}
 

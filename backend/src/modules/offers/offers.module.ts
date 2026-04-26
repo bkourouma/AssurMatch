@@ -1,5 +1,5 @@
 import { AuditLogWriter } from "../audit-logs/audit-log-writer.service";
-import { InMemoryRedisClient } from "../common/redis/redis.module";
+import { InMemoryRedisClient, type RedisClientPort } from "../common/redis/redis.module";
 import { AdminOffersController } from "./admin-offers.controller";
 import { OfferAdminService } from "./offer-admin.service";
 import { OfferCacheService } from "./offer-cache.service";
@@ -57,7 +57,7 @@ export class OffersModule {
   readonly publicController: PublicOffersController;
   readonly adminController: AdminOffersController;
 
-  constructor(audit = new AuditLogWriter(), redis = new InMemoryRedisClient()) {
+  constructor(audit = new AuditLogWriter(), redis: RedisClientPort = new InMemoryRedisClient()) {
     this.adminService = new OfferAdminService(this.offers, this.history, audit);
     this.publicCatalog = new PublicOfferCatalogService(this.offers, audit);
     this.cache = new OfferCacheService(redis);

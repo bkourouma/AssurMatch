@@ -8,8 +8,8 @@ new public API and does not add business functionality.
 ### Normal Runtime
 
 - `PrismaService` connects to a real PrismaClient using `DATABASE_URL`.
-- Redis-dependent providers bind a real Redis adapter using `REDIS_URL`.
-- Queue providers bind BullMQ queues using Redis.
+- Redis-dependent providers bind `RuntimeRedisClient` using `REDIS_URL`.
+- Queue providers bind `BullMqQueuePort` using Redis-backed BullMQ queues.
 - AuditLog writer binds a Prisma-backed repository.
 - Memory repositories, memory Redis and memory queues are not registered.
 - Missing required dependencies fail startup or fail the affected sensitive path
@@ -17,7 +17,8 @@ new public API and does not add business functionality.
 
 ### Test Runtime
 
-- Unit tests may bind memory repositories, memory Redis and memory queues.
+- Unit tests may bind `MemoryFeatureFlagRepository`, `InMemoryRedisClient`,
+  `InMemoryQueue` and other explicit memory repositories.
 - Test memory adapters must be selected explicitly by test module/factory.
 - Runtime integration tests must prove the normal module graph does not default
   to memory adapters.
@@ -140,6 +141,13 @@ Production rules:
 - Missing `DATABASE_URL` is fatal.
 - Missing `REDIS_URL` is fatal for Redis/BullMQ-dependent runtime.
 - Regulated module flags default false.
+
+Implemented adapter mode names:
+
+- Prisma: `prisma-client` / `test-adapter`
+- Redis: `redis-client` / `memory-test`
+- Queue: `bullmq` / `memory-test`
+- Audit: `durable-boundary` / `memory-test`
 
 ## Acceptance Contract
 

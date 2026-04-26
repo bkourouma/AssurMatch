@@ -1,6 +1,6 @@
 import { AuditLogWriter } from "../../audit-logs/audit-log-writer.service";
 import { QuoteAuditActions } from "../../audit-logs/quote-audit-actions";
-import { InMemoryQueue } from "../../common/queues/queues.module";
+import type { QueuePort } from "../../common/queues/queues.module";
 import type { ActorContext } from "../../common/types";
 import type { QuoteRequestRecord } from "../../quote-requests/quote-submission.service";
 import type { AIModuleConfig } from "../ai.module";
@@ -22,7 +22,7 @@ export class QuoteAISummaryService {
   private readonly guardrails = new QuoteAISummaryGuardrails();
 
   constructor(
-    private readonly queue: InMemoryQueue,
+    private readonly queue: QueuePort,
     private readonly audit: AuditLogWriter,
     private readonly moduleConfig: AIModuleConfig,
     private readonly flags: { globalFlags?: Partial<Record<string, boolean>>; countryFlags?: Partial<Record<string, boolean>>; productFlags?: Partial<Record<string, boolean>> } = {}

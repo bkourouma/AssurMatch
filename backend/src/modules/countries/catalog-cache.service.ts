@@ -1,7 +1,7 @@
-import type { InMemoryRedisClient } from "../common/redis/redis.module";
+import type { RedisClientPort } from "../common/redis/redis.module";
 
 export class CatalogCacheService {
-  constructor(private readonly redis: InMemoryRedisClient) {}
+  constructor(private readonly redis: RedisClientPort) {}
 
   async invalidateCountry(countryId: string): Promise<void> {
     await this.redis.del(`catalog:country:${countryId}`);

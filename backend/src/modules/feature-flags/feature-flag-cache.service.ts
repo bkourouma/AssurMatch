@@ -1,4 +1,4 @@
-import type { InMemoryRedisClient } from "../common/redis/redis.module";
+import type { RedisClientPort } from "../common/redis/redis.module";
 
 export interface CachedFlag {
   key: string;
@@ -15,7 +15,7 @@ function cacheKey(key: string, scopeType: string, scopeId?: string): string {
 export class FeatureFlagCacheService {
   private coherent = true;
 
-  constructor(private readonly redis: InMemoryRedisClient) {}
+  constructor(private readonly redis: RedisClientPort) {}
 
   markIncoherent(): void {
     this.coherent = false;

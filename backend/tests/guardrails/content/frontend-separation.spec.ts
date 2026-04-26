@@ -18,5 +18,7 @@ describe("frontend runtime separation", () => {
     expect(publicSource).not.toContain("/admin/");
     expect(publicSource).not.toContain("broker-api");
     expect(publicSource).not.toContain("admin-api");
+    expect(publicSource).not.toContain("BullMQ");
+    expect(publicSource).not.toContain("RedisModule");
   });
 });

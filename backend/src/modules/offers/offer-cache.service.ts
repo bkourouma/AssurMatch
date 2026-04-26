@@ -1,8 +1,8 @@
 import { QuoteRedisKeys } from "../common/redis/quote-redis-keys";
-import type { InMemoryRedisClient } from "../common/redis/redis.module";
+import type { RedisClientPort } from "../common/redis/redis.module";
 
 export class OfferCacheService {
-  constructor(private readonly redis: InMemoryRedisClient) {}
+  constructor(private readonly redis: RedisClientPort) {}
 
   key(countryCode: string, productKey: string, filterHash: string): string {
     return QuoteRedisKeys.catalogOffers(countryCode, productKey, filterHash);

@@ -1,6 +1,6 @@
 import { notificationSchema, type NotificationDto, type NotificationRecordDto } from "../../../../packages/shared/contracts/ops.contracts";
 import { AuditLogWriter } from "../audit-logs/audit-log-writer.service";
-import { InMemoryQueue, type QueueJobRecord } from "../common/queues/queues.module";
+import { InMemoryQueue, type QueueJobRecord, type QueuePort } from "../common/queues/queues.module";
 import type { ActorContext } from "../common/types";
 import { AdminNotificationsController } from "./admin-notifications.controller";
 import { QuoteNotificationService } from "./quote-notification.service";
@@ -16,7 +16,7 @@ export interface NotificationRecord extends NotificationRecordDto {
 export class NotificationsService {
   private readonly notifications: NotificationRecord[] = [];
 
-  constructor(private readonly audit: AuditLogWriter, private readonly queue: InMemoryQueue) {}
+  constructor(private readonly audit: AuditLogWriter, private readonly queue: QueuePort) {}
 
   queuePaired(input: NotificationDto, actor: ActorContext): { notification: NotificationRecord; job: QueueJobRecord } {
     const parsed = notificationSchema.parse(input);
@@ -63,12 +63,13 @@ export class NotificationsService {
 }
 
 export class NotificationsModule {
-  readonly queue = new InMemoryQueue();
+  readonly queue: QueuePort;
   readonly service: NotificationsService;
   readonly quoteService: QuoteNotificationService;
   readonly adminController: AdminNotificationsController;
 
-  constructor(audit = new AuditLogWriter()) {
+  constructor(audit = new AuditLogWriter(), queue: QueuePort = new InMemoryQueue()) {
+    this.queue = queue;
     this.service = new NotificationsService(audit, this.queue);
     this.quoteService = new QuoteNotificationService(this.service.mutableList(), this.queue, audit);
     this.adminController = new AdminNotificationsController(this.service);

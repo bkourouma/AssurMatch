@@ -1,4 +1,5 @@
 import type { OnModuleDestroy, OnModuleInit } from "@nestjs/common";
+import { isTestEnvironment, validateRuntimeEnvironment } from "../../../config/config.module";
 import type { AuditEntry } from "../types";
 
 type TransactionCallback<T> = (client: PrismaService) => Promise<T>;
@@ -7,6 +8,7 @@ interface PrismaRuntimeClient {
   $connect(): Promise<void>;
   $disconnect(): Promise<void>;
   $transaction<T>(callback: () => Promise<T>): Promise<T>;
+  [delegate: string]: unknown;
   auditLog?: {
     create(input: { data: Record<string, unknown> }): Promise<unknown>;
   };
@@ -18,13 +20,15 @@ interface PrismaClientModule {
 
 export class PrismaService implements OnModuleInit, OnModuleDestroy {
   readonly connectedAt = new Date();
-  readonly runtimeMode = process.env.NODE_ENV === "test" || process.env.ASSURMATCH_PRISMA_MEMORY === "true" ? "test-adapter" : "prisma-client";
+  readonly runtimeMode = isTestEnvironment() || process.env.ASSURMATCH_PRISMA_MEMORY === "true" ? "test-adapter" : "prisma-client";
   private client?: PrismaRuntimeClient;
 
   async onModuleInit(): Promise<void> {
-    if (this.runtimeMode !== "prisma-client" || !process.env.DATABASE_URL) return;
+    validateRuntimeEnvironment();
+    if (this.runtimeMode !== "prisma-client") return;
+    if (!process.env.DATABASE_URL) throw new Error("DATABASE_URL is required for Prisma runtime");
     const prismaModule = await import("@prisma/client") as unknown as PrismaClientModule;
-    if (!prismaModule.PrismaClient) return;
+    if (!prismaModule.PrismaClient) throw new Error("@prisma/client PrismaClient is not available");
     this.client = new prismaModule.PrismaClient();
     await this.client.$connect();
   }
@@ -36,6 +40,15 @@ export class PrismaService implements OnModuleInit, OnModuleDestroy {
   async transaction<T>(callback: TransactionCallback<T>): Promise<T> {
     if (this.client) return this.client.$transaction(() => callback(this));
     return callback(this);
+  }
+
+  get runtimeClient(): PrismaRuntimeClient | undefined {
+    return this.client;
+  }
+
+  requireRuntimeClient(): PrismaRuntimeClient {
+    if (!this.client) throw new Error("Prisma runtime client is not connected");
+    return this.client;
   }
 
   async health(): Promise<"ok" | "degraded"> {

@@ -58,11 +58,16 @@ Target commands after implementation:
 npm install
 npx prisma validate --schema backend/prisma/schema.prisma
 npx prisma migrate reset --schema backend/prisma/schema.prisma
+npx prisma db seed --schema backend/prisma/schema.prisma
 npm run test:integration -- backend/tests/integration/prisma-migrations.spec.ts
 ```
 
 The reset must apply migrations from zero, run the seed, and require no manual
 SQL fixes.
+
+The implementation adds `backend/prisma/seed.ts` and the root `package.json`
+Prisma seed hook. The seed creates safe disabled feature flag defaults plus
+minimal country/product records without enabling regulated modules or CRM.
 
 ## Runtime Adapter Validation
 
@@ -81,6 +86,13 @@ Expected result:
 - BullMQ queue runtime mode is real outside tests.
 - Audit repository is Prisma-backed outside tests.
 - Memory adapters are present only in explicit unit tests.
+
+Concrete adapter modes:
+
+- `PrismaService.runtimeMode`: `prisma-client` outside tests, `test-adapter` in tests.
+- `RedisModule.runtimeMode`: `redis-client` outside tests with `REDIS_URL`, `memory-test` in tests.
+- `QueuesModule.runtimeMode`: `bullmq` outside tests with `REDIS_URL`, `memory-test` in tests.
+- `AuditLogWriter.runtimeMode`: `durable-boundary` with `PrismaAuditLogRepository`, `memory-test` only in tests.
 
 ## Critical HTTP Validation
 
@@ -104,6 +116,14 @@ Expected result:
 - Tenant isolation remains strict.
 - Public abuse controls use Redis runtime behavior.
 - Visitor and broker notification jobs are enqueued with BullMQ.
+
+Runtime transaction strategy:
+
+1. Validate flags, RBAC/tenant scope, consent, country/product and license inputs.
+2. Persist durable state and audit evidence through Prisma-backed boundaries where the runtime path is available.
+3. Commit durable state before notification delivery.
+4. Enqueue BullMQ jobs using durable identifiers and idempotent references.
+5. Treat Redis/BullMQ errors in sensitive paths as fail-closed or retryable operational states, never as successful delivery.
 
 ## Full Validation
 

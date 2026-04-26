@@ -22,9 +22,26 @@ export class AuditLogWriter {
   constructor(repository?: AuditLogRepository) {
     this.repository = repository ?? new MemoryAuditLogRepository();
     this.runtimeMode = this.repository.mode === "prisma-runtime" ? "durable-boundary" : "memory-test";
+    if (process.env.NODE_ENV !== "test" && this.repository.mode === "memory-test" && process.env.ASSURMATCH_AUDIT_MEMORY !== "true") {
+      throw new Error("Memory audit repository is test-only in runtime normal");
+    }
   }
 
   write(input: AuditWriteInput): AuditEntry {
+    const entry = this.createEntry(input);
+    this.entries.push(entry);
+    Promise.resolve(this.repository.persist(entry)).catch(() => undefined);
+    return entry;
+  }
+
+  async writeAsync(input: AuditWriteInput): Promise<AuditEntry> {
+    const entry = this.createEntry(input);
+    this.entries.push(entry);
+    await this.repository.persist(entry);
+    return entry;
+  }
+
+  private createEntry(input: AuditWriteInput): AuditEntry {
     const entry: AuditEntry = {
       id: crypto.randomUUID(),
       ...(input.actor?.actorId ? { actorId: input.actor.actorId } : {}),
@@ -39,8 +56,6 @@ export class AuditLogWriter {
       occurredAt: new Date(),
       retentionUntil: input.retentionUntil ?? new Date(Date.now() + 10 * 365 * 24 * 60 * 60 * 1000)
     };
-    this.entries.push(entry);
-    Promise.resolve(this.repository.persist(entry)).catch(() => undefined);
     return entry;
   }
 
