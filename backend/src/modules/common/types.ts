@@ -5,6 +5,8 @@ export interface ActorContext {
   roles: AssurMatchRole[];
   mfaVerified?: boolean;
   partnerTenantId?: string;
+  partnerPlan?: "starter" | "pro" | "enterprise";
+  brokerUserTenantIds?: Record<string, string>;
   countryScopes?: string[];
   productScopes?: string[];
   correlationId?: string;

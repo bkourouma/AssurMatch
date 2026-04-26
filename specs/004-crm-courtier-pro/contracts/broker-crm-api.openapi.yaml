@@ -1,0 +1,101 @@
+openapi: 3.1.0
+info:
+  title: AssurMatch Broker CRM API
+  version: 0.1.0
+paths:
+  /broker/crm/dashboard:
+    get:
+      summary: Scoped CRM dashboard
+      responses:
+        "200":
+          description: CRM dashboard counters
+  /broker/crm/leads:
+    get:
+      summary: Paginated CRM lead list
+      responses:
+        "200":
+          description: CRM lead page
+  /broker/crm/leads/kanban:
+    get:
+      summary: CRM Kanban grouped by pipeline status
+      responses:
+        "200":
+          description: Kanban columns
+  /broker/crm/leads/{leadId}:
+    get:
+      summary: CRM lead detail
+      parameters:
+        - name: leadId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: CRM lead detail
+  /broker/crm/leads/{leadId}/status:
+    post:
+      summary: Change controlled pipeline status
+      responses:
+        "200":
+          description: Updated lead
+  /broker/crm/leads/{leadId}/notes:
+    post:
+      summary: Add internal CRM note
+      responses:
+        "200":
+          description: Created note
+  /broker/crm/leads/{leadId}/tasks:
+    post:
+      summary: Add CRM task
+      responses:
+        "200":
+          description: Created task
+  /broker/crm/leads/{leadId}/reminders:
+    post:
+      summary: Add CRM reminder
+      responses:
+        "200":
+          description: Created reminder
+  /broker/crm/leads/{leadId}/assign:
+    post:
+      summary: Assign lead to same-tenant advisor
+      responses:
+        "200":
+          description: Updated assignment
+  /broker/crm/leads/{leadId}/documents:
+    post:
+      summary: Add internal document metadata
+      responses:
+        "200":
+          description: Created document metadata
+  /broker/crm/leads/{leadId}/proposals:
+    post:
+      summary: Add non-contractual proposal reference
+      responses:
+        "200":
+          description: Created proposal reference
+  /broker/crm/leads/{leadId}/disputes:
+    post:
+      summary: Contest billed or invalid lead
+      responses:
+        "200":
+          description: Created dispute
+  /broker/crm/leads/export.csv:
+    get:
+      summary: Permission-limited CRM export
+      responses:
+        "200":
+          description: CSV export
+  /broker/crm/notifications:
+    get:
+      summary: Minimal internal CRM notifications
+      responses:
+        "200":
+          description: Notifications
+  /broker/crm/ai-foundations:
+    get:
+      summary: Future AI foundations metadata without model calls
+      responses:
+        "200":
+          description: AI foundation availability metadata

@@ -3,6 +3,22 @@ import { QuoteAuditActions } from "../audit-logs/quote-audit-actions";
 import type { ActorContext } from "../common/types";
 
 export type LeadAssignmentStatus = "assigned" | "broker_notified" | "seen" | "accepted" | "received" | "contacted" | "rejected" | "closed" | "disputed";
+export type BrokerCrmPipelineStatus =
+  | "nouveau"
+  | "accepte"
+  | "contact_tente"
+  | "contacte"
+  | "qualifie"
+  | "documents_demandes"
+  | "devis_en_preparation"
+  | "devis_envoye"
+  | "negociation"
+  | "gagne"
+  | "perdu"
+  | "doublon"
+  | "injoignable"
+  | "hors_cible"
+  | "rejete_conteste";
 
 export interface LeadAssignmentRecord {
   id: string;
@@ -28,6 +44,12 @@ export interface LeadAssignmentRecord {
   actionComment?: string;
   lastBrokerActionById?: string;
   lastBrokerActionAt?: Date;
+  crmStatus?: BrokerCrmPipelineStatus;
+  urgency?: "low" | "normal" | "high" | "urgent";
+  source?: "comparator" | "quote_request" | "manual_import" | "partner_referral" | "support";
+  assignedAdvisorId?: string;
+  crmUpdatedAt?: Date;
+  tags?: string[];
   createdAt: Date;
   updatedAt: Date;
 }
@@ -80,6 +102,27 @@ export class LeadAssignmentService {
       result: "success",
       context: { status: assignment.status }
     });
+    return assignment;
+  }
+
+  updateCrmMetadata(id: string, input: {
+    crmStatus?: BrokerCrmPipelineStatus;
+    urgency?: LeadAssignmentRecord["urgency"];
+    source?: LeadAssignmentRecord["source"];
+    assignedAdvisorId?: string;
+    tags?: string[];
+  }, actor: ActorContext): LeadAssignmentRecord {
+    const assignment = this.require(id);
+    const now = new Date();
+    if (input.crmStatus) assignment.crmStatus = input.crmStatus;
+    if (input.urgency) assignment.urgency = input.urgency;
+    if (input.source) assignment.source = input.source;
+    if (input.assignedAdvisorId !== undefined) assignment.assignedAdvisorId = input.assignedAdvisorId;
+    if (input.tags) assignment.tags = [...input.tags];
+    assignment.crmUpdatedAt = now;
+    assignment.updatedAt = now;
+    if (actor.actorId) assignment.lastBrokerActionById = actor.actorId;
+    assignment.lastBrokerActionAt = now;
     return assignment;
   }
 
