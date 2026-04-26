@@ -1,25 +1,24 @@
-const BROKER_API_BASE_URL = process.env.NEXT_PUBLIC_ASSURMATCH_BROKER_API_URL ?? process.env.NEXT_PUBLIC_ASSURMATCH_API_URL ?? "http://127.0.0.1:3000";
+import { backOfficeApiBaseUrl, getBackOfficeToken } from "./backoffice-auth";
 
 export interface BrokerApiState<T> {
   data: T;
   error?: string;
+  unauthenticated?: boolean;
   forbidden?: boolean;
-}
-
-function brokerHeaders(): Record<string, string> {
-  return {
-    "x-assurmatch-actor-id": process.env.ASSURMATCH_DEV_BROKER_ACTOR_ID ?? "dev-broker",
-    "x-assurmatch-roles": process.env.ASSURMATCH_DEV_BROKER_ROLES ?? "broker_owner_starter",
-    "x-assurmatch-partner-tenant-id": process.env.ASSURMATCH_DEV_BROKER_TENANT_ID ?? "dev-tenant",
-    "x-assurmatch-partner-plan": process.env.ASSURMATCH_DEV_BROKER_PLAN ?? "starter",
-    "x-assurmatch-mfa-verified": process.env.ASSURMATCH_DEV_BROKER_MFA ?? "true"
-  };
+  mfaRequired?: boolean;
 }
 
 async function readBroker<T>(path: string, fallback: T): Promise<BrokerApiState<T>> {
+  const token = await getBackOfficeToken();
+  if (!token) return { data: fallback, unauthenticated: true, error: "session_required" };
+
   try {
-    const response = await fetch(`${BROKER_API_BASE_URL}${path}`, { headers: brokerHeaders(), cache: "no-store" });
-    if (response.status === 401 || response.status === 403) return { data: fallback, forbidden: true, error: `api_${response.status}` };
+    const response = await fetch(`${backOfficeApiBaseUrl()}${path}`, {
+      headers: { Authorization: `Bearer ${token}` },
+      cache: "no-store"
+    });
+    if (response.status === 401) return { data: fallback, unauthenticated: true, error: "session_expired" };
+    if (response.status === 403) return { data: fallback, forbidden: true, mfaRequired: true, error: "access_denied" };
     if (!response.ok) return { data: fallback, error: `api_${response.status}` };
     return { data: await response.json() as T };
   } catch (error) {

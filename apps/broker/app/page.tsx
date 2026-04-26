@@ -1,4 +1,29 @@
-export default function BrokerShellPage() {
+import { redirect } from "next/navigation";
+import { isBrokerProfile, loginRedirect, readBackOfficeSession } from "./lib/backoffice-auth";
+import { logoutAction } from "./lib/backoffice-session-actions";
+
+export default async function BrokerShellPage() {
+  const session = await readBackOfficeSession();
+  if (session.status === "unauthenticated" || session.status === "expired") redirect(loginRedirect("/", session.status));
+  if (session.status === "mfa_required") {
+    return (
+      <main style={{ maxWidth: 720, margin: "0 auto", padding: "32px 20px", fontFamily: "system-ui, sans-serif", color: "#172033" }}>
+        <h1>MFA requise</h1>
+        <p>Votre profil est reconnu, mais l'acces au portail courtier reste bloque tant que la MFA n'est pas verifiee.</p>
+        <form action={logoutAction}><button type="submit">Retour au login</button></form>
+      </main>
+    );
+  }
+  if (session.status !== "authenticated" || !isBrokerProfile(session.profile)) {
+    return (
+      <main style={{ maxWidth: 720, margin: "0 auto", padding: "32px 20px", fontFamily: "system-ui, sans-serif", color: "#172033" }}>
+        <h1>Acces refuse</h1>
+        <p>Ce compte ne dispose pas d'un acces courtier autorise.</p>
+        <form action={logoutAction}><button type="submit">Changer de compte</button></form>
+      </main>
+    );
+  }
+
   return (
     <main style={{ maxWidth: 1120, margin: "0 auto", padding: "32px 20px", fontFamily: "system-ui, sans-serif", color: "#172033" }}>
       <header style={{ display: "flex", justifyContent: "space-between", gap: 16, alignItems: "flex-start", marginBottom: 28 }}>
@@ -8,10 +33,16 @@ export default function BrokerShellPage() {
           <p style={{ maxWidth: 680, lineHeight: 1.6 }}>
             Suivi simple des leads transmis par AssurMatch. Le courtier partenaire reste responsable de la prise de contact et de la suite commerciale.
           </p>
+          <p style={{ margin: "8px 0 0", color: "#516070", fontSize: 13 }}>Connecte: {session.profile.actorId ?? "profil courtier"}</p>
         </div>
-        <a href="/leads" style={{ padding: "10px 14px", border: "1px solid #245f73", color: "#245f73", textDecoration: "none", borderRadius: 6 }}>
-          Voir les leads
-        </a>
+        <div style={{ display: "flex", gap: 8 }}>
+          <a href="/leads" style={{ padding: "10px 14px", border: "1px solid #245f73", color: "#245f73", textDecoration: "none", borderRadius: 6 }}>
+            Voir les leads
+          </a>
+          <form action={logoutAction}>
+            <button type="submit" style={{ padding: "10px 14px", border: "1px solid #b9c3cf", background: "#fff", borderRadius: 6 }}>Deconnexion</button>
+          </form>
+        </div>
       </header>
 
       <section aria-label="Dashboard Starter" style={{ display: "grid", gridTemplateColumns: "repeat(5, minmax(120px, 1fr))", gap: 12, marginBottom: 28 }}>

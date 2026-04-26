@@ -1,3 +1,7 @@
+import { redirect } from "next/navigation";
+import { loginRedirect } from "../lib/backoffice-auth";
+import { readCrmDashboard } from "../lib/broker-api";
+
 const pipeline = [
   ["Nouveau", "12"],
   ["Contacte", "8"],
@@ -13,7 +17,18 @@ const metrics = [
   { label: "Exports autorises", value: "Scope role" }
 ];
 
-export default function BrokerCrmPage() {
+export default async function BrokerCrmPage() {
+  const dashboard = await readCrmDashboard();
+  if (dashboard.unauthenticated) redirect(loginRedirect("/crm", dashboard.error ?? "session_required"));
+  if (dashboard.forbidden) {
+    return (
+      <main style={{ maxWidth: 760, margin: "0 auto", padding: "28px 20px", fontFamily: "system-ui, sans-serif", color: "#172033" }}>
+        <h1>Acces CRM refuse</h1>
+        <p>Le CRM exige un plan Pro/Enterprise, la MFA verifiee, le flag broker_crm_enabled et les permissions CRM.</p>
+      </main>
+    );
+  }
+
   return (
     <main style={{ maxWidth: 1180, margin: "0 auto", padding: "28px 20px", fontFamily: "system-ui, sans-serif", color: "#172033" }}>
       <header style={{ display: "flex", justifyContent: "space-between", gap: 16, alignItems: "flex-start", marginBottom: 22 }}>

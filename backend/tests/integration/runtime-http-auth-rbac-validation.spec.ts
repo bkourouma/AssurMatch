@@ -42,6 +42,36 @@ describe("runtime HTTP auth RBAC and validation boundaries", () => {
     expect((await harness.request("/broker/starter/leads", { headers: actorHeaders(noMfa) })).status).toBe(403);
   });
 
+  it("uses login-issued bearer tokens for /auth/me and protected broker routes", async () => {
+    harness = await createRuntimeHttpHarness();
+    const adminActor = { actorId: "seed-admin", roles: ["super_admin" as const], mfaVerified: true };
+    const brokerUser = harness.runtime.users.service.create({
+      id: crypto.randomUUID(),
+      email: "broker-login@example.com",
+      displayName: "Broker Login",
+      roles: ["broker_owner_starter"],
+      partnerTenantId: "00000000-0000-4000-8000-0000000000b1",
+      scopes: { countryIds: [], productIds: [] }
+    }, adminActor);
+    brokerUser.mfaStatus = "verified";
+
+    const login = await harness.request("/auth/login", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ email: "broker-login@example.com", password: "very-secure-pass" })
+    });
+    expect(login.ok).toBe(true);
+    const session = await login.json() as { accessToken: string };
+    expect(session.accessToken).toBeTruthy();
+
+    const bearerHeaders = { authorization: `Bearer ${session.accessToken}` };
+    const me = await harness.request("/auth/me", { headers: bearerHeaders });
+    expect(me.status).toBe(200);
+    expect((await me.json() as { actorId: string }).actorId).toBe(brokerUser.id);
+    expect((await harness.request("/broker/starter/leads", { headers: bearerHeaders })).status).toBe(200);
+    expect((await harness.request("/admin/audit-logs", { headers: bearerHeaders })).status).toBe(403);
+  });
+
   it("allows test simulation headers only when explicitly enabled in test mode", async () => {
     harness = await createRuntimeHttpHarness();
     process.env.ASSURMATCH_ALLOW_TEST_AUTH_HEADERS = "false";
@@ -115,4 +145,3 @@ describe("runtime HTTP auth RBAC and validation boundaries", () => {
     expect(invalidLogin.status).toBe(400);
   });
 });
-

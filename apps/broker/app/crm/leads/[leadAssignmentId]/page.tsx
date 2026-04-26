@@ -1,4 +1,18 @@
-export default function BrokerCrmLeadDetailPage() {
+import { redirect } from "next/navigation";
+import { isStarterCrmDenied, loginRedirect, readBackOfficeSession } from "../../../lib/backoffice-auth";
+
+export default async function BrokerCrmLeadDetailPage() {
+  const session = await readBackOfficeSession();
+  if (session.status === "unauthenticated" || session.status === "expired") redirect(loginRedirect("/crm/leads/demo-lead", session.status));
+  if (session.status !== "authenticated" || isStarterCrmDenied(session.profile)) {
+    return (
+      <main style={{ maxWidth: 760, margin: "0 auto", padding: "28px 20px", fontFamily: "system-ui, sans-serif", color: "#172033" }}>
+        <h1>Acces CRM refuse</h1>
+        <p>Le detail CRM exige un plan Pro/Enterprise, la MFA verifiee, le flag broker_crm_enabled et les permissions CRM.</p>
+      </main>
+    );
+  }
+
   return (
     <main style={{ maxWidth: 1120, margin: "0 auto", padding: "28px 20px", fontFamily: "system-ui, sans-serif", color: "#172033" }}>
       <header style={{ marginBottom: 22 }}>

@@ -1,4 +1,18 @@
-export default function BrokerLeadDetailPage() {
+import { redirect } from "next/navigation";
+import { loginRedirect, readBackOfficeSession } from "../../lib/backoffice-auth";
+
+export default async function BrokerLeadDetailPage() {
+  const session = await readBackOfficeSession();
+  if (session.status === "unauthenticated" || session.status === "expired") redirect(loginRedirect("/leads/demo-lead", session.status));
+  if (session.status === "mfa_required" || session.status === "forbidden" || session.status === "error") {
+    return (
+      <main style={{ maxWidth: 760, margin: "0 auto", padding: "32px 20px", fontFamily: "system-ui, sans-serif", color: "#172033" }}>
+        <h1>Acces refuse</h1>
+        <p>Le detail du lead reste masque tant que la session, la MFA et le tenant courtier ne sont pas valides.</p>
+      </main>
+    );
+  }
+
   return (
     <main style={{ maxWidth: 960, margin: "0 auto", padding: "32px 20px", fontFamily: "system-ui, sans-serif", color: "#172033" }}>
       <a href="/leads" style={{ color: "#245f73", textDecoration: "none" }}>Retour aux leads</a>

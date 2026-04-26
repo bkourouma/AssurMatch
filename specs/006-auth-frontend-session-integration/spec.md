@@ -2,10 +2,10 @@
 
 **Feature Branch**: `006-auth-frontend-session-integration`
 **Created**: 2026-04-26
-**Status**: Draft
+**Status**: Validated
 **Input**: User description: "Connecter l'application Back-office Partenaires/Plateforme a l'authentification reelle par Bearer token, supprimer la dependance aux headers dev cote frontend, preparer une session frontend utilisable par les courtiers et admins, sans generer le plan, tasks.md ni implementation."
-**Validation State**: Draft
-**Continuous Workflow Eligible**: No - the user explicitly requested specification only and asked not to generate plan, tasks or implementation yet.
+**Validation State**: Explicitly approved by user on 2026-04-26
+**Continuous Workflow Eligible**: Yes - the user explicitly requested `/speckit.plan` then `/speckit.tasks` then `/speckit.implement` without intermediate confirmation, and no `[NEEDS CLARIFICATION]` markers remain.
 
 ## Constitutional Scope & Compliance *(mandatory)*
 
@@ -21,7 +21,7 @@
 - **Routing impact**: Aucun changement de routage. La session frontend ne doit pas donner acces a des leads hors tenant ni contourner les refus de routage/licence existants.
 - **AI impact**: N/A: aucune fonction IA, prompt, scoring ou assistant n'est ajoute. Les flags IA existants restent inchanges et aucun appel modele n'est introduit.
 - **UX/content restrictions**: Les ecrans back-office doivent afficher des etats login, session expiree, acces refuse et MFA sans promesse publique de vente, souscription, contrat valide, attestation ou conseil reglemente. La Web Publique Client ne doit afficher aucune donnee admin/broker.
-- **Workflow continuity**: Non eligible dans cet etat Draft et parce que l'utilisateur a explicitement demande de ne pas generer le plan, tasks.md ni implementation. Apres validation explicite et absence de marqueur de clarification, la suite pourra demarrer par `/speckit.plan` seulement si aucun risque securite/conformite bloquant n'est identifie.
+- **Workflow continuity**: Eligible apres validation explicite utilisateur dans la demande `/speckit.plan`. La suite peut enchainer `/speckit.plan` -> `/speckit.tasks` -> `/speckit.implement` -> validations finales sans confirmation intermediaire, sauf conflit constitutionnel, risque securite/conformite/donnees ou validation bloquante. Aucun commit automatique n'est autorise.
 
 ## User Scenarios & Testing *(mandatory)*
 
