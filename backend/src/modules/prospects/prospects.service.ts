@@ -1,6 +1,7 @@
 import { AuditLogWriter } from "../audit-logs/audit-log-writer.service";
 import type { ActorContext } from "../common/types";
 import type { NormalizedProspectContact } from "./prospect-identity.service";
+import { MemoryProspectsRepository, type ProspectsRepository } from "./prospects.repository";
 
 export interface ProspectRecord extends NormalizedProspectContact {
   id: string;
@@ -13,33 +14,12 @@ export interface ProspectRecord extends NormalizedProspectContact {
 }
 
 export class ProspectsService {
-  private readonly prospects: ProspectRecord[] = [];
-
-  constructor(private readonly audit: AuditLogWriter) {}
+  constructor(private readonly audit: AuditLogWriter, private readonly repository: ProspectsRepository = new MemoryProspectsRepository()) {}
 
   createOrLink(countryId: string, productId: string, contact: NormalizedProspectContact, consentRecordId: string, actor: ActorContext): ProspectRecord {
-    const existing = this.prospects.find((prospect) =>
-      prospect.countryId === countryId &&
-      prospect.productId === productId &&
-      (prospect.emailFingerprint === contact.emailFingerprint || prospect.phoneFingerprint === contact.phoneFingerprint)
-    );
-    if (existing) {
-      if (!existing.consentRecordIds.includes(consentRecordId)) existing.consentRecordIds.push(consentRecordId);
-      existing.updatedAt = new Date();
-      return existing;
-    }
-    const now = new Date();
-    const prospect: ProspectRecord = {
-      id: crypto.randomUUID(),
-      countryId,
-      productId,
-      ...contact,
-      consentRecordIds: [consentRecordId],
-      retentionUntil: new Date(now.getTime() + 10 * 365 * 24 * 60 * 60 * 1000),
-      createdAt: now,
-      updatedAt: now
-    };
-    this.prospects.push(prospect);
+    const before = this.repository.list().length;
+    const prospect = this.repository.createOrLink(countryId, productId, contact, consentRecordId);
+    if (this.repository.list().length === before) return prospect;
     this.audit.write({
       actor,
       action: "prospect.created",
@@ -53,12 +33,12 @@ export class ProspectsService {
   }
 
   list(): ProspectRecord[] {
-    return [...this.prospects];
+    return this.repository.list();
   }
 
   require(id: string): ProspectRecord {
-    const prospect = this.prospects.find((candidate) => candidate.id === id);
-    if (!prospect) throw new Error(`Prospect ${id} not found`);
-    return prospect;
+    return this.repository.require(id);
   }
 }
+
+export { PROSPECTS_REPOSITORY, MemoryProspectsRepository, type ProspectsRepository } from "./prospects.repository";

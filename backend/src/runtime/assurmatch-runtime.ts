@@ -74,9 +74,13 @@ export class AssurMatchRuntime {
     status: text.status ?? "draft"
   })));
   readonly prospects = new ProspectsModule(this.audit.writer);
-  readonly leads = new LeadsModule(this.partners.service, this.partnerLicenses.service, this.audit.writer, {
-    brokerCrmEnabled: process.env.ASSURMATCH_BROKER_CRM_ENABLED === "true"
-  });
+  readonly leads = new LeadsModule(
+    this.partners.service,
+    this.partnerLicenses.service,
+    this.audit.writer,
+    { brokerCrmEnabled: process.env.ASSURMATCH_BROKER_CRM_ENABLED === "true" },
+    {}
+  );
   readonly quoteRequests = new QuoteRequestsModule({
     countries: this.countries.service,
     products: this.products.service,
@@ -104,4 +108,5 @@ export class AssurMatchRuntime {
     if (process.env.NODE_ENV === "test") return undefined;
     return new PrismaAuditLogRepository(this.prisma);
   }
+
 }

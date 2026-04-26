@@ -5,15 +5,26 @@ import { QuoteAuditActions } from "../audit-logs/quote-audit-actions";
 import type { ActorContext } from "../common/types";
 import { OfferPublicationPolicy } from "./offer-publication-policy";
 import type { OfferRecord } from "./offers.module";
+import { MemoryOffersRepository, type OffersRepository } from "./offers.repository";
 
 export class PublicOfferCatalogService {
   private readonly policy = new OfferPublicationPolicy();
 
-  constructor(private readonly offers: OfferRecord[], private readonly audit: AuditLogWriter) {}
+  private readonly repository: OffersRepository;
+
+  constructor(repositoryOrOffers: OffersRepository | OfferRecord[], private readonly audit: AuditLogWriter) {
+    if (Array.isArray(repositoryOrOffers)) {
+      const repository = new MemoryOffersRepository();
+      for (const offer of repositoryOrOffers) repository.create(offer);
+      this.repository = repository;
+    } else {
+      this.repository = repositoryOrOffers;
+    }
+  }
 
   list(countryId: string, productId: string, query: Partial<OfferListQuery> = {}, actor?: ActorContext): OfferSummary[] {
     const parsed = offerListQuerySchema.parse(query);
-    const visible = this.offers
+    const visible = this.repository.list()
       .filter((offer) => offer.countryId === countryId && offer.productId === productId)
       .filter((offer) => this.policy.evaluate(offer).public)
       .filter((offer) => parsed.minPrice === undefined || (offer.indicativePriceMin ?? 0) >= parsed.minPrice)
@@ -33,7 +44,7 @@ export class PublicOfferCatalogService {
   }
 
   detail(offerId: string, actor?: ActorContext): OfferDetail {
-    const offer = this.offers.find((candidate) => candidate.id === offerId);
+    const offer = this.repository.list().find((candidate) => candidate.id === offerId);
     const decision = offer ? this.policy.evaluate(offer) : { public: false, reasons: ["offer_not_found"] };
     if (!offer || !decision.public) {
       this.audit.write({

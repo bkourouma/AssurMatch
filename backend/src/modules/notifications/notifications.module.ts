@@ -3,6 +3,7 @@ import { AuditLogWriter } from "../audit-logs/audit-log-writer.service";
 import { InMemoryQueue, type QueueJobRecord, type QueuePort } from "../common/queues/queues.module";
 import type { ActorContext } from "../common/types";
 import { AdminNotificationsController } from "./admin-notifications.controller";
+import { MemoryNotificationsRepository, type NotificationsRepository } from "./notifications.repository";
 import { QuoteNotificationService } from "./quote-notification.service";
 
 export interface NotificationRecord extends NotificationRecordDto {
@@ -14,9 +15,7 @@ export interface NotificationRecord extends NotificationRecordDto {
 }
 
 export class NotificationsService {
-  private readonly notifications: NotificationRecord[] = [];
-
-  constructor(private readonly audit: AuditLogWriter, private readonly queue: QueuePort) {}
+  constructor(private readonly audit: AuditLogWriter, private readonly queue: QueuePort, private readonly repository: NotificationsRepository = new MemoryNotificationsRepository()) {}
 
   queuePaired(input: NotificationDto, actor: ActorContext): { notification: NotificationRecord; job: QueueJobRecord } {
     const parsed = notificationSchema.parse(input);
@@ -32,7 +31,7 @@ export class NotificationsService {
       createdAt: now,
       updatedAt: now
     };
-    this.notifications.push(notification);
+    this.repository.create(notification);
     this.audit.write({
       actor,
       action: "notification.queued",
@@ -45,20 +44,15 @@ export class NotificationsService {
   }
 
   list(): NotificationRecord[] {
-    return [...this.notifications];
+    return this.repository.list();
   }
 
   mutableList(): NotificationRecord[] {
-    return this.notifications;
+    return this.repository.mutableList();
   }
 
   updateDelivery(id: string, whatsAppStatus: NotificationRecord["whatsAppStatus"], emailStatus: NotificationRecord["emailStatus"]): NotificationRecord {
-    const notification = this.notifications.find((candidate) => candidate.id === id);
-    if (!notification) throw new Error(`Notification ${id} not found`);
-    notification.whatsAppStatus = whatsAppStatus;
-    notification.emailStatus = emailStatus;
-    notification.updatedAt = new Date();
-    return notification;
+    return this.repository.updateDelivery(id, { whatsAppStatus, emailStatus, updatedAt: new Date() });
   }
 }
 
@@ -68,10 +62,12 @@ export class NotificationsModule {
   readonly quoteService: QuoteNotificationService;
   readonly adminController: AdminNotificationsController;
 
-  constructor(audit = new AuditLogWriter(), queue: QueuePort = new InMemoryQueue()) {
+  constructor(audit = new AuditLogWriter(), queue: QueuePort = new InMemoryQueue(), repository?: NotificationsRepository) {
     this.queue = queue;
-    this.service = new NotificationsService(audit, this.queue);
+    this.service = new NotificationsService(audit, this.queue, repository);
     this.quoteService = new QuoteNotificationService(this.service.mutableList(), this.queue, audit);
     this.adminController = new AdminNotificationsController(this.service);
   }
 }
+
+export { NOTIFICATIONS_REPOSITORY, MemoryNotificationsRepository, type NotificationsRepository } from "./notifications.repository";

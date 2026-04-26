@@ -1,5 +1,6 @@
 import type { PrismaService } from "../common/prisma/prisma.service";
 import type { RuntimeRepository } from "../common/repositories/runtime-repository";
+import { assertRuntimeRepository } from "../common/repositories/runtime-repository";
 import type { FeatureFlag, FeatureFlagHistory } from "./feature-flags.module";
 
 export interface FeatureFlagRepository extends RuntimeRepository {
@@ -12,6 +13,10 @@ export class MemoryFeatureFlagRepository implements FeatureFlagRepository {
   readonly mode = "memory-test" as const;
   private readonly flags: FeatureFlag[] = [];
   private readonly history: FeatureFlagHistory[] = [];
+
+  constructor() {
+    assertRuntimeRepository(this.mode, "FeatureFlagRepository");
+  }
 
   async list(): Promise<FeatureFlag[]> {
     return [...this.flags];

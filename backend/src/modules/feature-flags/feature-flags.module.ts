@@ -1,4 +1,5 @@
 import { AuditLogWriter } from "../audit-logs/audit-log-writer.service";
+import { assertRuntimeRepository } from "../common/repositories/runtime-repository";
 import type { ActorContext } from "../common/types";
 import { FeatureFlagCacheService } from "./feature-flag-cache.service";
 import { MemoryFeatureFlagRepository, type FeatureFlagRepository } from "./feature-flag-repository";
@@ -29,7 +30,9 @@ export class FeatureFlagsService {
     private readonly audit: AuditLogWriter,
     private readonly cache?: FeatureFlagCacheService,
     private readonly repository: FeatureFlagRepository = new MemoryFeatureFlagRepository()
-  ) {}
+  ) {
+    assertRuntimeRepository(this.repository.mode, "FeatureFlagRepository");
+  }
 
   list(): FeatureFlag[] {
     return [...this.flags];

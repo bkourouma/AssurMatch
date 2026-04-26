@@ -1,6 +1,7 @@
 import { partnerCreateSchema, type PartnerDto, type PartnerRecord } from "../../../../packages/shared/contracts/partner.contracts";
 import { AuditLogWriter } from "../audit-logs/audit-log-writer.service";
 import type { ActorContext } from "../common/types";
+import { MemoryPartnersRepository, type PartnersRepository } from "./partners.repository";
 
 export interface PartnerTenant extends PartnerRecord {
   id: string;
@@ -9,11 +10,7 @@ export interface PartnerTenant extends PartnerRecord {
 }
 
 export class PartnersService {
-  private readonly partners: PartnerTenant[] = [];
-  private readonly countryAuthorizations = new Map<string, Set<string>>();
-  private readonly productAuthorizations = new Map<string, Set<string>>();
-
-  constructor(private readonly audit: AuditLogWriter) {}
+  constructor(private readonly audit: AuditLogWriter, private readonly repository: PartnersRepository = new MemoryPartnersRepository()) {}
 
   create(input: PartnerDto, actor: ActorContext): PartnerTenant {
     const parsed = partnerCreateSchema.parse(input);
@@ -24,7 +21,7 @@ export class PartnersService {
       createdAt: now,
       updatedAt: now
     };
-    this.partners.push(partner);
+    this.repository.create(partner);
     this.audit.write({
       actor,
       action: "partner.created",
@@ -43,6 +40,7 @@ export class PartnersService {
       throw new Error("Suspension reason is required");
     }
     Object.assign(partner, input, { updatedAt: new Date() });
+    this.repository.update(id, partner);
     this.audit.write({
       actor,
       action: "partner.updated",
@@ -57,20 +55,15 @@ export class PartnersService {
   }
 
   require(id: string): PartnerTenant {
-    const partner = this.partners.find((candidate) => candidate.id === id);
-    if (!partner) throw new Error(`Partner ${id} not found`);
-    return partner;
+    return this.repository.require(id);
   }
 
   list(): PartnerTenant[] {
-    return [...this.partners];
+    return this.repository.list();
   }
 
   authorizeCountry(partnerTenantId: string, countryId: string, actor: ActorContext): void {
-    this.require(partnerTenantId);
-    const scopes = this.countryAuthorizations.get(partnerTenantId) ?? new Set<string>();
-    scopes.add(countryId);
-    this.countryAuthorizations.set(partnerTenantId, scopes);
+    this.repository.authorizeCountry(partnerTenantId, countryId);
     this.audit.write({
       actor,
       action: "partner.country_authorized",
@@ -83,10 +76,7 @@ export class PartnersService {
   }
 
   authorizeProduct(partnerTenantId: string, productId: string, actor: ActorContext): void {
-    this.require(partnerTenantId);
-    const scopes = this.productAuthorizations.get(partnerTenantId) ?? new Set<string>();
-    scopes.add(productId);
-    this.productAuthorizations.set(partnerTenantId, scopes);
+    this.repository.authorizeProduct(partnerTenantId, productId);
     this.audit.write({
       actor,
       action: "partner.product_authorized",
@@ -99,18 +89,20 @@ export class PartnersService {
   }
 
   isAuthorizedForCountry(partnerTenantId: string, countryId: string): boolean {
-    return this.countryAuthorizations.get(partnerTenantId)?.has(countryId) === true;
+    return this.repository.isAuthorizedForCountry(partnerTenantId, countryId);
   }
 
   isAuthorizedForProduct(partnerTenantId: string, productId: string): boolean {
-    return this.productAuthorizations.get(partnerTenantId)?.has(productId) === true;
+    return this.repository.isAuthorizedForProduct(partnerTenantId, productId);
   }
 }
 
 export class PartnersModule {
   readonly service: PartnersService;
 
-  constructor(audit = new AuditLogWriter()) {
-    this.service = new PartnersService(audit);
+  constructor(audit = new AuditLogWriter(), repository?: PartnersRepository) {
+    this.service = new PartnersService(audit, repository);
   }
 }
+
+export { PARTNERS_REPOSITORY, MemoryPartnersRepository, type PartnersRepository } from "./partners.repository";

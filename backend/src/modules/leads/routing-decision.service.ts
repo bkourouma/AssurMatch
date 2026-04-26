@@ -1,6 +1,7 @@
 import { AuditLogWriter } from "../audit-logs/audit-log-writer.service";
 import { QuoteAuditActions } from "../audit-logs/quote-audit-actions";
 import type { ActorContext } from "../common/types";
+import { MemoryRoutingDecisionsRepository, type RoutingDecisionsRepository } from "./routing-decisions.repository";
 
 export interface RoutingDecisionRecord {
   id: string;
@@ -15,9 +16,7 @@ export interface RoutingDecisionRecord {
 }
 
 export class RoutingDecisionService {
-  private readonly decisions: RoutingDecisionRecord[] = [];
-
-  constructor(private readonly audit: AuditLogWriter) {}
+  constructor(private readonly audit: AuditLogWriter, private readonly repository: RoutingDecisionsRepository = new MemoryRoutingDecisionsRepository()) {}
 
   record(input: Omit<RoutingDecisionRecord, "id" | "createdAt">, actor: ActorContext): RoutingDecisionRecord {
     const decision: RoutingDecisionRecord = {
@@ -25,7 +24,7 @@ export class RoutingDecisionService {
       ...input,
       createdAt: new Date()
     };
-    this.decisions.push(decision);
+    this.repository.create(decision);
     const action = decision.result === "assigned" ? QuoteAuditActions.routingAssigned : QuoteAuditActions.routingNoBrokerAvailable;
     this.audit.write({
       actor,
@@ -41,6 +40,8 @@ export class RoutingDecisionService {
   }
 
   list(): RoutingDecisionRecord[] {
-    return [...this.decisions];
+    return this.repository.list();
   }
 }
+
+export { ROUTING_DECISIONS_REPOSITORY, MemoryRoutingDecisionsRepository, type RoutingDecisionsRepository } from "./routing-decisions.repository";

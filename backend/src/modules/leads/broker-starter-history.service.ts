@@ -1,5 +1,6 @@
 import type { BrokerStarterLeadHistoryEvent, BrokerStarterLeadStatus, BrokerStarterReason } from "../../../../packages/shared/contracts/quote.contracts";
 import type { ActorContext } from "../common/types";
+import { MemoryLeadAssignmentsRepository, type LeadAssignmentHistoryRecord, type LeadAssignmentsRepository } from "./lead-assignments.repository";
 
 export interface BrokerStarterHistoryInput {
   leadAssignmentId: string;
@@ -12,17 +13,11 @@ export interface BrokerStarterHistoryInput {
   comment?: string;
 }
 
-interface StoredHistoryEvent extends BrokerStarterLeadHistoryEvent {
-  leadAssignmentId: string;
-  partnerTenantId: string;
-  actorId?: string;
-}
-
 export class BrokerStarterHistoryService {
-  private readonly events: StoredHistoryEvent[] = [];
+  constructor(private readonly repository: LeadAssignmentsRepository = new MemoryLeadAssignmentsRepository()) {}
 
   append(input: BrokerStarterHistoryInput): BrokerStarterLeadHistoryEvent {
-    const event: StoredHistoryEvent = {
+    const event: LeadAssignmentHistoryRecord = {
       id: crypto.randomUUID(),
       leadAssignmentId: input.leadAssignmentId,
       partnerTenantId: input.partnerTenantId,
@@ -34,22 +29,18 @@ export class BrokerStarterHistoryService {
       ...(input.comment ? { comment: input.comment.slice(0, 500) } : {}),
       occurredAt: new Date().toISOString()
     };
-    this.events.push(event);
-    return this.toDto(event);
+    return this.toDto(this.repository.appendHistory(event));
   }
 
   forLead(leadAssignmentId: string): BrokerStarterLeadHistoryEvent[] {
-    return this.events
-      .filter((event) => event.leadAssignmentId === leadAssignmentId)
-      .sort((left, right) => left.occurredAt.localeCompare(right.occurredAt))
-      .map((event) => this.toDto(event));
+    return this.repository.historyForLead(leadAssignmentId).map((event) => this.toDto(event));
   }
 
   forTenant(partnerTenantId: string): BrokerStarterLeadHistoryEvent[] {
-    return this.events.filter((event) => event.partnerTenantId === partnerTenantId).map((event) => this.toDto(event));
+    return this.repository.historyForTenant(partnerTenantId).map((event) => this.toDto(event));
   }
 
-  private toDto(event: StoredHistoryEvent): BrokerStarterLeadHistoryEvent {
+  private toDto(event: LeadAssignmentHistoryRecord): BrokerStarterLeadHistoryEvent {
     return {
       id: event.id,
       eventType: event.eventType,

@@ -1,4 +1,5 @@
 import { maskPii } from "../common/logging/pii-masker";
+import { assertRuntimeRepository } from "../common/repositories/runtime-repository";
 import type { ActorContext, AuditEntry, AuditResult } from "../common/types";
 import { MemoryAuditLogRepository, type AuditLogRepository } from "./audit-log-repository";
 
@@ -22,9 +23,7 @@ export class AuditLogWriter {
   constructor(repository?: AuditLogRepository) {
     this.repository = repository ?? new MemoryAuditLogRepository();
     this.runtimeMode = this.repository.mode === "prisma-runtime" ? "durable-boundary" : "memory-test";
-    if (process.env.NODE_ENV !== "test" && this.repository.mode === "memory-test" && process.env.ASSURMATCH_AUDIT_MEMORY !== "true") {
-      throw new Error("Memory audit repository is test-only in runtime normal");
-    }
+    if (process.env.ASSURMATCH_AUDIT_MEMORY !== "true") assertRuntimeRepository(this.repository.mode, "AuditLogRepository");
   }
 
   write(input: AuditWriteInput): AuditEntry {

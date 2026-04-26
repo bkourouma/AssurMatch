@@ -4,6 +4,7 @@ import { AuditLogWriter } from "../audit-logs/audit-log-writer.service";
 import { QuoteAuditActions } from "../audit-logs/quote-audit-actions";
 import type { ActorContext } from "../common/types";
 import { PublicJourneyFlagPolicy } from "../feature-flags/public-journey-flag-policy";
+import { MemoryProductsRepository, type ProductsRepository } from "./products.repository";
 
 export interface Product extends Omit<ProductRecord, "id" | "flags"> {
   id: string;
@@ -14,9 +15,7 @@ export interface Product extends Omit<ProductRecord, "id" | "flags"> {
 }
 
 export class ProductsService {
-  private readonly products: Product[] = [];
-
-  constructor(private readonly audit: AuditLogWriter) {}
+  constructor(private readonly audit: AuditLogWriter, private readonly repository: ProductsRepository = new MemoryProductsRepository()) {}
 
   create(input: ProductDto, actor: ActorContext): Product {
     const parsed = productCreateSchema.parse(input);
@@ -30,7 +29,7 @@ export class ProductsService {
       createdAt: now,
       updatedAt: now
     };
-    this.products.push(product);
+    this.repository.create(product);
     this.audit.write({
       actor,
       action: "product.created",
@@ -44,8 +43,7 @@ export class ProductsService {
 
   associateCountry(productId: string, countryId: string, actor: ActorContext): Product {
     const product = this.require(productId);
-    if (!product.countryIds.includes(countryId)) product.countryIds.push(countryId);
-    product.updatedAt = new Date();
+    this.repository.associateCountry(productId, countryId);
     this.audit.write({
       actor,
       action: "product.country_associated",
@@ -68,6 +66,7 @@ export class ProductsService {
       flags: { ...product.flags, ...(parsed.flags ?? {}) },
       updatedAt: new Date()
     });
+    this.repository.update(id, product);
     this.audit.write({
       actor,
       action: "product.updated",
@@ -82,18 +81,16 @@ export class ProductsService {
   }
 
   listAdmin(countryId?: string): Product[] {
-    return countryId ? this.products.filter((product) => product.countryIds.includes(countryId)) : [...this.products];
+    return this.repository.list(countryId);
   }
 
   listPublic(countryId: string): Product[] {
-    return this.products.filter((product) =>
-      product.countryIds.includes(countryId) && product.status === "public" && product.flags.product_public_enabled
-    );
+    return this.repository.listPublic(countryId);
   }
 
   listPublicForCountry(countryId: string, countryFlags: Parameters<PublicJourneyFlagPolicy["resolve"]>[0]["countryFlags"], globalFlags: Partial<Record<string, boolean>> = { public_comparator_enabled: true }): PublicProductDto[] {
     const policy = new PublicJourneyFlagPolicy();
-    return this.products
+    return this.repository.list(countryId)
       .filter((product) => product.countryIds.includes(countryId) && product.status === "public")
       .map((product) => {
         const state = policy.resolve({ globalFlags, countryFlags, productFlags: product.flags });
@@ -109,7 +106,7 @@ export class ProductsService {
   }
 
   getPublicProductPage(countryId: string, productKey: string, countryFlags: Parameters<PublicJourneyFlagPolicy["resolve"]>[0]["countryFlags"], globalFlags: Partial<Record<string, boolean>> = { public_comparator_enabled: true, quote_request_enabled: true }, actor?: ActorContext): ProductPageResponse {
-    const product = this.products.find((candidate) => candidate.key === productKey && candidate.countryIds.includes(countryId));
+    const product = this.repository.list(countryId).find((candidate) => candidate.key === productKey);
     const state = product ? new PublicJourneyFlagPolicy().resolve({ globalFlags, countryFlags, productFlags: product.flags }) : undefined;
     if (!product || product.status !== "public" || !state?.publicEnabled) {
       this.audit.write({
@@ -144,20 +141,20 @@ export class ProductsService {
   }
 
   findByKey(productKey: string): Product | undefined {
-    return this.products.find((candidate) => candidate.key === productKey);
+    return this.repository.findByKey(productKey);
   }
 
   require(id: string): Product {
-    const product = this.products.find((candidate) => candidate.id === id);
-    if (!product) throw new Error(`Product ${id} not found`);
-    return product;
+    return this.repository.require(id);
   }
 }
 
 export class ProductsModule {
   readonly service: ProductsService;
 
-  constructor(audit = new AuditLogWriter()) {
-    this.service = new ProductsService(audit);
+  constructor(audit = new AuditLogWriter(), repository?: ProductsRepository) {
+    this.service = new ProductsService(audit, repository);
   }
 }
+
+export { PRODUCTS_REPOSITORY, MemoryProductsRepository, type ProductsRepository } from "./products.repository";

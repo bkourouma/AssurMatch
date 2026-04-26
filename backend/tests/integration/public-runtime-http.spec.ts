@@ -11,7 +11,7 @@ describe("public runtime HTTP catalog", () => {
 
   it("serves public countries products and valid offers through HTTP", async () => {
     harness = await createRuntimeHttpHarness();
-    seedPublicRuntime(harness.runtime);
+    const seed = seedPublicRuntime(harness.runtime);
 
     const countries = await readJson<unknown[]>(await harness.request("/countries"));
     expect(countries).toHaveLength(1);
@@ -21,5 +21,7 @@ describe("public runtime HTTP catalog", () => {
 
     const offers = await readJson<unknown[]>(await harness.request("/countries/CI/products/auto/offers"));
     expect(offers).toHaveLength(1);
+    expect(harness.runtime.countries.service.listPublic()).toHaveLength(1);
+    expect(harness.runtime.products.service.listPublic(seed.country.id)).toHaveLength(1);
   });
 });

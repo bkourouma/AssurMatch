@@ -19,9 +19,18 @@ import { BrokerStarterHistoryService } from "./broker-starter-history.service";
 import { BrokerStarterLeadActionsService } from "./broker-starter-lead-actions.service";
 import { BrokerStarterLeadsService } from "./broker-starter-leads.service";
 import { BrokerStarterNotificationsService } from "./broker-starter-notifications.service";
+import { MemoryCrmActivityRepository, type CrmActivityRepository } from "./crm-activity.repository";
 import { LeadAssignmentService } from "./lead-assignment.service";
+import { MemoryLeadAssignmentsRepository, type LeadAssignmentsRepository } from "./lead-assignments.repository";
 import { QuoteRoutingService } from "./quote-routing.service";
 import { RoutingDecisionService } from "./routing-decision.service";
+import type { RoutingDecisionsRepository } from "./routing-decisions.repository";
+
+export interface LeadsModuleRepositories {
+  assignments?: LeadAssignmentsRepository;
+  decisions?: RoutingDecisionsRepository;
+  crmActivity?: CrmActivityRepository;
+}
 
 export class LeadsModule {
   readonly assignments: LeadAssignmentService;
@@ -46,23 +55,25 @@ export class LeadsModule {
   readonly brokerCrmController: BrokerCrmController;
   readonly adminController: AdminLeadAssignmentsController;
 
-  constructor(partners: PartnersService, licenses: PartnerLicensesService, audit = new AuditLogWriter(), brokerCrmConfig?: ConstructorParameters<typeof BrokerCrmAccessPolicy>[1]) {
-    this.assignments = new LeadAssignmentService(audit);
-    this.decisions = new RoutingDecisionService(audit);
+  constructor(partners: PartnersService, licenses: PartnerLicensesService, audit = new AuditLogWriter(), brokerCrmConfig?: ConstructorParameters<typeof BrokerCrmAccessPolicy>[1], repositories: LeadsModuleRepositories = {}) {
+    const assignmentRepository = repositories.assignments ?? new MemoryLeadAssignmentsRepository();
+    const crmActivityRepository = repositories.crmActivity ?? new MemoryCrmActivityRepository();
+    this.assignments = new LeadAssignmentService(audit, assignmentRepository);
+    this.decisions = new RoutingDecisionService(audit, repositories.decisions);
     this.eligibility = new BrokerEligibilityPolicy(partners, licenses, (partnerTenantId) => this.assignments.activeCountForPartner(partnerTenantId));
     this.routing = new QuoteRoutingService(this.eligibility, this.decisions, this.assignments, audit);
     this.brokerController = new BrokerLeadsController(this.assignments, audit);
     this.brokerStarterAccess = new BrokerStarterAccessPolicy(audit);
-    this.brokerStarterHistory = new BrokerStarterHistoryService();
+    this.brokerStarterHistory = new BrokerStarterHistoryService(assignmentRepository);
     this.brokerStarterExportPolicy = new BrokerStarterExportPolicy(this.brokerStarterAccess, audit);
     this.brokerStarterLeads = new BrokerStarterLeadsService(this.assignments, this.brokerStarterAccess, this.brokerStarterHistory, audit, this.brokerStarterExportPolicy);
     this.brokerStarterActions = new BrokerStarterLeadActionsService(this.assignments, this.brokerStarterAccess, this.brokerStarterHistory, audit);
     this.brokerStarterNotifications = new BrokerStarterNotificationsService(this.assignments, this.brokerStarterAccess, this.brokerStarterHistory, audit);
     this.brokerStarterController = new BrokerStarterController(this.brokerStarterLeads, this.brokerStarterActions, this.brokerStarterNotifications, this.brokerStarterAccess, audit);
     this.brokerCrmAccess = new BrokerCrmAccessPolicy(audit, brokerCrmConfig);
-    this.brokerCrmHistory = new BrokerCrmHistoryService();
+    this.brokerCrmHistory = new BrokerCrmHistoryService(crmActivityRepository);
     this.brokerCrmExportPolicy = new BrokerCrmExportPolicy(this.brokerCrmAccess, audit);
-    this.brokerCrmActivity = new BrokerCrmActivityService(this.assignments, this.brokerCrmAccess, this.brokerCrmHistory, audit);
+    this.brokerCrmActivity = new BrokerCrmActivityService(this.assignments, this.brokerCrmAccess, this.brokerCrmHistory, audit, crmActivityRepository);
     this.brokerCrmLeads = new BrokerCrmLeadsService(this.assignments, this.brokerCrmAccess, this.brokerCrmHistory, audit, this.brokerCrmExportPolicy, this.brokerCrmActivity);
     this.brokerCrmPipeline = new BrokerCrmPipelineService(this.assignments, this.brokerCrmAccess, this.brokerCrmHistory, audit);
     this.brokerCrmNotifications = new BrokerCrmNotificationsService(this.assignments, this.brokerCrmAccess, audit);
@@ -70,3 +81,5 @@ export class LeadsModule {
     this.adminController = new AdminLeadAssignmentsController(this.assignments);
   }
 }
+
+export { CRM_ACTIVITY_REPOSITORY, MemoryCrmActivityRepository, type CrmActivityRepository } from "./crm-activity.repository";

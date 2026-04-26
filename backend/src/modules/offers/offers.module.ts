@@ -3,6 +3,7 @@ import { InMemoryRedisClient, type RedisClientPort } from "../common/redis/redis
 import { AdminOffersController } from "./admin-offers.controller";
 import { OfferAdminService } from "./offer-admin.service";
 import { OfferCacheService } from "./offer-cache.service";
+import { MemoryOffersRepository, type OffersRepository } from "./offers.repository";
 import { PublicOfferCatalogService } from "./public-offer-catalog.service";
 import { PublicOffersController } from "./public-offers.controller";
 
@@ -49,19 +50,21 @@ export interface OfferHistoryRecord {
 }
 
 export class OffersModule {
-  readonly offers: OfferRecord[] = [];
-  readonly history: OfferHistoryRecord[] = [];
+  readonly repository: OffersRepository;
   readonly adminService: OfferAdminService;
   readonly publicCatalog: PublicOfferCatalogService;
   readonly cache: OfferCacheService;
   readonly publicController: PublicOffersController;
   readonly adminController: AdminOffersController;
 
-  constructor(audit = new AuditLogWriter(), redis: RedisClientPort = new InMemoryRedisClient()) {
-    this.adminService = new OfferAdminService(this.offers, this.history, audit);
-    this.publicCatalog = new PublicOfferCatalogService(this.offers, audit);
+  constructor(audit = new AuditLogWriter(), redis: RedisClientPort = new InMemoryRedisClient(), repository: OffersRepository = new MemoryOffersRepository()) {
+    this.repository = repository;
+    this.adminService = new OfferAdminService(this.repository, audit);
+    this.publicCatalog = new PublicOfferCatalogService(this.repository, audit);
     this.cache = new OfferCacheService(redis);
     this.publicController = new PublicOffersController(this.publicCatalog);
     this.adminController = new AdminOffersController(this.adminService);
   }
 }
+
+export { OFFERS_REPOSITORY, MemoryOffersRepository, type OffersRepository } from "./offers.repository";

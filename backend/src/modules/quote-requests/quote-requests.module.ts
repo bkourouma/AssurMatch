@@ -15,6 +15,7 @@ import { PublicQuoteRateLimitService } from "./public-quote-rate-limit.service";
 import { PublicQuoteRequestsController } from "./public-quote-requests.controller";
 import { PublicQuoteStatusController } from "./public-quote-status.controller";
 import { QuoteDuplicateDetectionService } from "./quote-duplicate-detection.service";
+import type { QuoteRequestsRepository } from "./quote-requests.repository";
 import { QuoteSubmissionService } from "./quote-submission.service";
 
 export interface QuoteRequestsModuleDeps {
@@ -38,7 +39,7 @@ export class QuoteRequestsModule {
   readonly statusController: PublicQuoteStatusController;
   readonly adminController: AdminQuoteRequestsController;
 
-  constructor(deps: QuoteRequestsModuleDeps, audit = new AuditLogWriter(), redis: RedisClientPort = new InMemoryRedisClient()) {
+  constructor(deps: QuoteRequestsModuleDeps, audit = new AuditLogWriter(), redis: RedisClientPort = new InMemoryRedisClient(), repository?: QuoteRequestsRepository) {
     this.rateLimit = new PublicQuoteRateLimitService(redis);
     this.antiSpam = new PublicAntiSpamService(redis);
     this.duplicate = new QuoteDuplicateDetectionService(redis);
@@ -55,7 +56,7 @@ export class QuoteRequestsModule {
       ...(deps.routing ? { routing: deps.routing } : {}),
       ...(deps.notifications ? { notifications: deps.notifications } : {}),
       ...(deps.aiSummary ? { aiSummary: deps.aiSummary } : {})
-    }, audit);
+    }, audit, repository);
     this.publicController = new PublicQuoteRequestsController(this.submissions);
     this.statusController = new PublicQuoteStatusController(this.submissions);
     this.adminController = new AdminQuoteRequestsController(this.submissions);

@@ -15,6 +15,7 @@ import type { QuoteAISummaryService } from "../ai/quote-summary/quote-ai-summary
 import type { PublicAntiSpamService } from "./public-anti-spam.service";
 import type { PublicQuoteRateLimitService } from "./public-quote-rate-limit.service";
 import type { QuoteDuplicateDetectionService } from "./quote-duplicate-detection.service";
+import { MemoryQuoteRequestsRepository, type QuoteRequestsRepository } from "./quote-requests.repository";
 
 export type QuoteRequestStatus = "created" | "manual_review" | "routed" | "non_routable" | "duplicate" | "spam_blocked" | "cancelled";
 export type RoutingStatus = "not_started" | "assigned" | "no_broker_available" | "manual_review_required" | "blocked";
@@ -61,9 +62,11 @@ export interface QuoteSubmissionDependencies {
 }
 
 export class QuoteSubmissionService {
-  private readonly requests: QuoteRequestRecord[] = [];
-
-  constructor(private readonly deps: QuoteSubmissionDependencies, private readonly audit: AuditLogWriter) {}
+  constructor(
+    private readonly deps: QuoteSubmissionDependencies,
+    private readonly audit: AuditLogWriter,
+    private readonly repository: QuoteRequestsRepository = new MemoryQuoteRequestsRepository()
+  ) {}
 
   async submit(input: QuoteRequestCreateDto, actor: ActorContext): Promise<QuoteConfirmation> {
     const parsedResult = quoteRequestCreateSchema.safeParse(input);
@@ -183,7 +186,7 @@ export class QuoteSubmissionService {
       createdAt: now,
       updatedAt: now
     };
-    this.requests.push(quote);
+    this.repository.create(quote);
     this.audit.write({
       actor,
       action: QuoteAuditActions.quoteRequestCreated,
@@ -203,6 +206,7 @@ export class QuoteSubmissionService {
       quote.refusalReason = "no_eligible_broker";
     }
     quote.updatedAt = new Date();
+    this.repository.update(quote.id, quote);
     this.deps.notifications?.queueVisitor(quote, actor);
     if (routingResult?.assignment) {
       const brokerNotification = this.deps.notifications?.queueBroker(quote, routingResult.assignment, actor);
@@ -222,7 +226,7 @@ export class QuoteSubmissionService {
   }
 
   status(publicReference: string, token: string) {
-    const quote = this.requests.find((candidate) => candidate.publicReference === publicReference);
+    const quote = this.repository.findByPublicReference(publicReference);
     if (!quote || quote.verificationTokenHash !== this.hash(token)) throw new Error("Quote status not available");
     return {
       publicReference: quote.publicReference,
@@ -232,7 +236,7 @@ export class QuoteSubmissionService {
   }
 
   list(): QuoteRequestRecord[] {
-    return [...this.requests];
+    return this.repository.list();
   }
 
   private duplicateConfirmation(): QuoteConfirmation {
@@ -249,3 +253,5 @@ export class QuoteSubmissionService {
     return createHash("sha256").update(value).digest("hex");
   }
 }
+
+export { QUOTE_REQUESTS_REPOSITORY, MemoryQuoteRequestsRepository, type QuoteRequestsRepository } from "./quote-requests.repository";

@@ -34,6 +34,9 @@ describe("public quote runtime HTTP", () => {
       body: JSON.stringify(payload)
     });
     expect(accepted.status).toBe(201);
+    expect(harness.runtime.quoteRequests.submissions.list()).toHaveLength(1);
+    expect(harness.runtime.prospects.service.list()).toHaveLength(1);
+    expect(harness.runtime.consent.service.searchRecords(seed.admin)).toHaveLength(1);
 
     const refused = await harness.request("/quote-requests", {
       method: "POST",

@@ -2,6 +2,7 @@ import { consentRecordSchema, consentTextSchema, type ConsentRecordDto, type Con
 import { AuditLogWriter } from "../audit-logs/audit-log-writer.service";
 import { RetentionPolicyService } from "../audit-logs/retention-policy.service";
 import type { ActorContext } from "../common/types";
+import { MemoryConsentRecordsRepository, type ConsentRecordsRepository } from "./consent-records.repository";
 
 export interface ConsentText extends ConsentTextDto {
   id: string;
@@ -18,11 +19,9 @@ export interface ConsentRecord extends ConsentRecordDto {
 }
 
 export class ConsentService {
-  private readonly texts: ConsentText[] = [];
-  private readonly records: ConsentRecord[] = [];
   private readonly retention = new RetentionPolicyService();
 
-  constructor(private readonly audit: AuditLogWriter) {}
+  constructor(private readonly audit: AuditLogWriter, private readonly repository: ConsentRecordsRepository = new MemoryConsentRecordsRepository()) {}
 
   createText(input: ConsentTextDto, actor: ActorContext): ConsentText {
     const parsed = consentTextSchema.parse(input);
@@ -33,7 +32,7 @@ export class ConsentService {
       createdAt: now,
       updatedAt: now
     };
-    this.texts.push(text);
+    this.repository.createText(text);
     this.audit.write({
       actor,
       action: "consent_text.created",
@@ -52,6 +51,7 @@ export class ConsentService {
     text.status = "published";
     text.publishedAt = new Date();
     text.updatedAt = new Date();
+    this.repository.updateText(id, text);
     this.audit.write({
       actor,
       action: "consent_text.published",
@@ -78,7 +78,7 @@ export class ConsentService {
       createdAt: now,
       updatedAt: now
     };
-    this.records.push(record);
+    this.repository.createRecord(record);
     this.audit.write({
       actor,
       action: "consent_record.created",
@@ -92,38 +92,31 @@ export class ConsentService {
   }
 
   hasValidConsent(recordId: string | undefined, purpose: string, countryId: string, productId?: string): boolean {
-    if (!recordId) return false;
-    return this.records.some((record) =>
-      record.id === recordId &&
-      record.purpose === purpose &&
-      record.countryId === countryId &&
-      (productId === undefined || record.productId === productId) &&
-      record.status === "granted"
-    );
+    return this.repository.hasValidConsent(recordId, purpose, countryId, productId);
   }
 
   searchRecords(actor: ActorContext): ConsentRecord[] {
     if (!actor.roles.some((role) => ["super_admin", "compliance_admin", "support_admin"].includes(role))) {
       throw new Error("Consent access denied");
     }
-    return [...this.records];
+    return this.repository.searchRecords();
   }
 
   listTexts(): ConsentText[] {
-    return [...this.texts];
+    return this.repository.listTexts();
   }
 
   private requireText(id: string): ConsentText {
-    const text = this.texts.find((candidate) => candidate.id === id);
-    if (!text) throw new Error(`Consent text ${id} not found`);
-    return text;
+    return this.repository.requireText(id);
   }
 }
 
 export class ConsentModule {
   readonly service: ConsentService;
 
-  constructor(audit = new AuditLogWriter()) {
-    this.service = new ConsentService(audit);
+  constructor(audit = new AuditLogWriter(), repository?: ConsentRecordsRepository) {
+    this.service = new ConsentService(audit, repository);
   }
 }
+
+export { CONSENT_RECORDS_REPOSITORY, MemoryConsentRecordsRepository, type ConsentRecordsRepository } from "./consent-records.repository";

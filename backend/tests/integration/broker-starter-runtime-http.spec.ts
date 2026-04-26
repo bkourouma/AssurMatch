@@ -21,5 +21,11 @@ describe("broker Starter runtime HTTP", () => {
 
     const denied = await harness.request(`/broker/starter/leads/${other.id}`, { headers: actorHeaders(actor) });
     expect(denied.status).toBe(403);
+
+    const accepted = await harness.request(`/broker/starter/leads/${own.id}/accept`, { method: "POST", headers: actorHeaders(actor) });
+    expect(accepted.status).toBe(201);
+    const history = await readJson<unknown[]>(await harness.request(`/broker/starter/leads/${own.id}/history`, { headers: actorHeaders(actor) }));
+    expect(history).toHaveLength(1);
+    expect(harness.runtime.leads.assignments.require(own.id).status).toBe("accepted");
   });
 });

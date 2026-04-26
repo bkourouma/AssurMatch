@@ -9,3 +9,13 @@ export function assertRuntimeRepository(mode: RuntimeRepositoryMode, context: st
     throw new Error(`${context} memory repository is test-only`);
   }
 }
+
+export function assertRuntimeRepositories(repositories: Record<string, RuntimeRepository>): void {
+  for (const [context, repository] of Object.entries(repositories)) {
+    assertRuntimeRepository(repository.mode, context);
+  }
+}
+
+export function isRuntimeMemoryAllowed(): boolean {
+  return process.env.NODE_ENV === "test";
+}

@@ -1,6 +1,7 @@
 import { AuditLogWriter } from "../audit-logs/audit-log-writer.service";
 import { QuoteAuditActions } from "../audit-logs/quote-audit-actions";
 import type { ActorContext } from "../common/types";
+import { MemoryLeadAssignmentsRepository, type LeadAssignmentsRepository } from "./lead-assignments.repository";
 
 export type LeadAssignmentStatus = "assigned" | "broker_notified" | "seen" | "accepted" | "received" | "contacted" | "rejected" | "closed" | "disputed";
 export type BrokerCrmPipelineStatus =
@@ -55,9 +56,7 @@ export interface LeadAssignmentRecord {
 }
 
 export class LeadAssignmentService {
-  private readonly assignments: LeadAssignmentRecord[] = [];
-
-  constructor(private readonly audit: AuditLogWriter) {}
+  constructor(private readonly audit: AuditLogWriter, private readonly repository: LeadAssignmentsRepository = new MemoryLeadAssignmentsRepository()) {}
 
   create(input: {
     quoteRequestId: string;
@@ -71,9 +70,6 @@ export class LeadAssignmentService {
     consentRecordId?: string;
     routingDecisionId?: string;
   }, actor: ActorContext): LeadAssignmentRecord {
-    if (this.assignments.some((assignment) => assignment.quoteRequestId === input.quoteRequestId && assignment.status !== "closed")) {
-      throw new Error("Quote request already has an active lead assignment");
-    }
     const now = new Date();
     const assignment: LeadAssignmentRecord = {
       id: crypto.randomUUID(),
@@ -92,7 +88,7 @@ export class LeadAssignmentService {
       createdAt: now,
       updatedAt: now
     };
-    this.assignments.push(assignment);
+    this.repository.create(assignment);
     this.audit.write({
       actor,
       action: QuoteAuditActions.routingAssigned,
@@ -123,6 +119,7 @@ export class LeadAssignmentService {
     assignment.updatedAt = now;
     if (actor.actorId) assignment.lastBrokerActionById = actor.actorId;
     assignment.lastBrokerActionAt = now;
+    this.repository.update(id, assignment);
     return assignment;
   }
 
@@ -131,6 +128,7 @@ export class LeadAssignmentService {
     assignment.brokerNotificationId = notificationId;
     assignment.status = "broker_notified";
     assignment.updatedAt = new Date();
+    this.repository.update(id, assignment);
     return assignment;
   }
 
@@ -146,6 +144,7 @@ export class LeadAssignmentService {
     if (status === "accepted") assignment.acceptedAt = now;
     if (status === "rejected") assignment.rejectedAt = now;
     if (status === "disputed") assignment.disputedAt = now;
+    this.repository.updateStatus(id, status, assignment);
     this.audit.write({
       actor,
       action: QuoteAuditActions.brokerLeadStatusUpdated,
@@ -160,16 +159,16 @@ export class LeadAssignmentService {
   }
 
   activeCountForPartner(partnerTenantId: string): number {
-    return this.assignments.filter((assignment) => assignment.partnerTenantId === partnerTenantId && assignment.status !== "closed").length;
+    return this.repository.activeCountForPartner(partnerTenantId);
   }
 
   list(): LeadAssignmentRecord[] {
-    return [...this.assignments];
+    return this.repository.list();
   }
 
   require(id: string): LeadAssignmentRecord {
-    const assignment = this.assignments.find((candidate) => candidate.id === id);
-    if (!assignment) throw new Error(`Lead assignment ${id} not found`);
-    return assignment;
+    return this.repository.require(id);
   }
 }
+
+export { LEAD_ASSIGNMENTS_REPOSITORY, MemoryLeadAssignmentsRepository, type LeadAssignmentsRepository } from "./lead-assignments.repository";

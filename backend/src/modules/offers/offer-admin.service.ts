@@ -7,12 +7,12 @@ import {
 import { AuditLogWriter } from "../audit-logs/audit-log-writer.service";
 import { QuoteAuditActions } from "../audit-logs/quote-audit-actions";
 import type { ActorContext } from "../common/types";
-import type { OfferHistoryRecord, OfferRecord } from "./offers.module";
+import type { OfferRecord } from "./offers.module";
+import type { OffersRepository } from "./offers.repository";
 
 export class OfferAdminService {
   constructor(
-    private readonly offers: OfferRecord[],
-    private readonly history: OfferHistoryRecord[],
+    private readonly repository: OffersRepository,
     private readonly audit: AuditLogWriter
   ) {}
 
@@ -44,7 +44,7 @@ export class OfferAdminService {
       updatedAt: now,
       ...(actor.actorId ? { createdById: actor.actorId } : {})
     };
-    this.offers.push(offer);
+    this.repository.create(offer);
     this.recordHistory(offer.id, "created", undefined, offer, parsed.reason, actor);
     this.audit.write({
       actor,
@@ -81,6 +81,7 @@ export class OfferAdminService {
       publicDisclaimers: parsed.publicDisclaimers,
       updatedAt: new Date()
     });
+    this.repository.update(id, offer);
     this.recordHistory(offer.id, "updated", previous, offer, parsed.reason, actor);
     return offer;
   }
@@ -95,6 +96,7 @@ export class OfferAdminService {
       offer.validatedAt = new Date();
     }
     offer.updatedAt = new Date();
+    this.repository.update(id, offer);
     this.recordHistory(offer.id, "validated", undefined, { validationStatus: offer.validationStatus, status: offer.status }, parsed.reason, actor);
     this.audit.write({
       actor,
@@ -113,6 +115,7 @@ export class OfferAdminService {
     const offer = this.require(id);
     offer.status = "suspended";
     offer.updatedAt = new Date();
+    this.repository.update(id, offer);
     this.recordHistory(offer.id, "suspended", undefined, { status: offer.status }, reason, actor);
     this.audit.write({
       actor,
@@ -128,17 +131,15 @@ export class OfferAdminService {
   }
 
   list(): OfferRecord[] {
-    return [...this.offers];
+    return this.repository.list();
   }
 
   require(id: string): OfferRecord {
-    const offer = this.offers.find((candidate) => candidate.id === id);
-    if (!offer) throw new Error(`Offer ${id} not found`);
-    return offer;
+    return this.repository.require(id);
   }
 
   private recordHistory(offerId: string, changeType: string, previousValue: unknown, nextValue: unknown, reason: string, actor: ActorContext): void {
-    this.history.push({
+    this.repository.appendHistory({
       id: crypto.randomUUID(),
       offerId,
       ...(actor.actorId ? { changedById: actor.actorId } : {}),

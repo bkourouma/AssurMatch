@@ -85,7 +85,7 @@ export class BullMqQueuePort implements QueuePort {
     };
     this.jobs.push(job);
     const queue = this.queues[queueName] ?? this.queues.notifications;
-    void queue?.add(jobType, { payloadReference, correlationId, queueJobRecordId: job.id }, { jobId: job.id });
+    void queue?.add(jobType, { payloadReference, correlationId, queueJobRecordId: job.id }, { jobId: job.id }).catch(() => undefined);
     return job;
   }
 

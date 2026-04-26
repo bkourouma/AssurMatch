@@ -1,5 +1,6 @@
 import type { BrokerCrmHistoryEvent, BrokerCrmOutcomeReason, BrokerCrmPipelineStatus } from "../../../../packages/shared/contracts/quote.contracts";
 import type { ActorContext } from "../common/types";
+import { MemoryCrmActivityRepository, type BrokerCrmPipelineHistoryRecord, type CrmActivityRepository } from "./crm-activity.repository";
 
 export interface BrokerCrmHistoryInput {
   leadAssignmentId: string;
@@ -11,17 +12,11 @@ export interface BrokerCrmHistoryInput {
   reason?: BrokerCrmOutcomeReason;
 }
 
-interface StoredCrmHistoryEvent extends BrokerCrmHistoryEvent {
-  leadAssignmentId: string;
-  partnerTenantId: string;
-  actorId?: string;
-}
-
 export class BrokerCrmHistoryService {
-  private readonly events: StoredCrmHistoryEvent[] = [];
+  constructor(private readonly repository: CrmActivityRepository = new MemoryCrmActivityRepository()) {}
 
   append(input: BrokerCrmHistoryInput): BrokerCrmHistoryEvent {
-    const event: StoredCrmHistoryEvent = {
+    const event: BrokerCrmPipelineHistoryRecord = {
       id: crypto.randomUUID(),
       leadAssignmentId: input.leadAssignmentId,
       partnerTenantId: input.partnerTenantId,
@@ -32,18 +27,14 @@ export class BrokerCrmHistoryService {
       ...(input.reason ? { reason: input.reason } : {}),
       occurredAt: new Date().toISOString()
     };
-    this.events.push(event);
-    return this.toDto(event);
+    return this.toDto(this.repository.appendPipelineHistory(event));
   }
 
   forLead(leadAssignmentId: string): BrokerCrmHistoryEvent[] {
-    return this.events
-      .filter((event) => event.leadAssignmentId === leadAssignmentId)
-      .sort((left, right) => left.occurredAt.localeCompare(right.occurredAt))
-      .map((event) => this.toDto(event));
+    return this.repository.pipelineHistoryForLead(leadAssignmentId).map((event) => this.toDto(event));
   }
 
-  private toDto(event: StoredCrmHistoryEvent): BrokerCrmHistoryEvent {
+  private toDto(event: BrokerCrmPipelineHistoryRecord): BrokerCrmHistoryEvent {
     return {
       id: event.id,
       eventType: event.eventType,

@@ -4,6 +4,7 @@ import { AuditLogWriter } from "../audit-logs/audit-log-writer.service";
 import { QuoteAuditActions } from "../audit-logs/quote-audit-actions";
 import type { ActorContext } from "../common/types";
 import { PublicJourneyFlagPolicy } from "../feature-flags/public-journey-flag-policy";
+import { MemoryCountriesRepository, type CountriesRepository } from "./countries.repository";
 
 export interface Country extends Omit<CountryRecord, "id" | "flags"> {
   id: string;
@@ -13,9 +14,7 @@ export interface Country extends Omit<CountryRecord, "id" | "flags"> {
 }
 
 export class CountriesService {
-  private readonly countries: Country[] = [];
-
-  constructor(private readonly audit: AuditLogWriter) {}
+  constructor(private readonly audit: AuditLogWriter, private readonly repository: CountriesRepository = new MemoryCountriesRepository()) {}
 
   create(input: CountryDto, actor: ActorContext): Country {
     const parsed = countryCreateSchema.parse(input);
@@ -27,7 +26,7 @@ export class CountriesService {
       createdAt: now,
       updatedAt: now
     };
-    this.countries.push(country);
+    this.repository.create(country);
     this.audit.write({
       actor,
       action: "country.created",
@@ -50,6 +49,7 @@ export class CountriesService {
       flags: { ...country.flags, ...(parsed.flags ?? {}) },
       updatedAt: new Date()
     });
+    this.repository.update(id, country);
     this.audit.write({
       actor,
       action: "country.updated",
@@ -64,17 +64,15 @@ export class CountriesService {
   }
 
   listAdmin(): Country[] {
-    return [...this.countries];
+    return this.repository.list();
   }
 
   listPublic(): Country[] {
-    return this.countries.filter((country) =>
-      country.status === "public" && (country.flags.country_public_enabled || country.flags.country_waitlist_enabled)
-    );
+    return this.repository.listPublic();
   }
 
   getPublicPage(countryCode: string, globalFlags: Partial<Record<string, boolean>> = { public_comparator_enabled: true }, actor?: ActorContext): CountryPageResponse {
-    const country = this.countries.find((candidate) => candidate.isoCode.toUpperCase() === countryCode.toUpperCase());
+    const country = this.repository.findByIsoCode(countryCode);
     const policy = new PublicJourneyFlagPolicy();
     if (!country) {
       this.audit.write({
@@ -121,20 +119,20 @@ export class CountriesService {
   }
 
   findByIsoCode(countryCode: string): Country | undefined {
-    return this.countries.find((candidate) => candidate.isoCode.toUpperCase() === countryCode.toUpperCase());
+    return this.repository.findByIsoCode(countryCode);
   }
 
   require(id: string): Country {
-    const country = this.countries.find((candidate) => candidate.id === id);
-    if (!country) throw new Error(`Country ${id} not found`);
-    return country;
+    return this.repository.require(id);
   }
 }
 
 export class CountriesModule {
   readonly service: CountriesService;
 
-  constructor(audit = new AuditLogWriter()) {
-    this.service = new CountriesService(audit);
+  constructor(audit = new AuditLogWriter(), repository?: CountriesRepository) {
+    this.service = new CountriesService(audit, repository);
   }
 }
+
+export { COUNTRIES_REPOSITORY, MemoryCountriesRepository, type CountriesRepository } from "./countries.repository";
