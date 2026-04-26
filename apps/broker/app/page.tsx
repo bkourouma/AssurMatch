@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { isBrokerProfile, loginRedirect, readBackOfficeSession } from "./lib/backoffice-auth";
 import { logoutAction } from "./lib/backoffice-session-actions";
+import { readBrokerDashboard } from "./lib/broker-api";
 
 export default async function BrokerShellPage() {
   const session = await readBackOfficeSession();
@@ -45,20 +46,7 @@ export default async function BrokerShellPage() {
         </div>
       </header>
 
-      <section aria-label="Dashboard Starter" style={{ display: "grid", gridTemplateColumns: "repeat(5, minmax(120px, 1fr))", gap: 12, marginBottom: 28 }}>
-        {[
-          ["Recus", "18"],
-          ["Vus", "12"],
-          ["Acceptes", "7"],
-          ["Rejetes", "3"],
-          ["Contestes", "2"]
-        ].map(([label, value]) => (
-          <div key={label} style={{ border: "1px solid #d7dde4", borderRadius: 6, padding: 16, minHeight: 82 }}>
-            <div style={{ color: "#516070", fontSize: 13 }}>{label}</div>
-            <strong style={{ display: "block", marginTop: 8, fontSize: 28 }}>{value}</strong>
-          </div>
-        ))}
-      </section>
+      <BrokerDashboardSection />
 
       <section style={{ display: "grid", gridTemplateColumns: "2fr 1fr", gap: 16 }}>
         <div style={{ borderTop: "1px solid #d7dde4", paddingTop: 18 }}>
@@ -76,5 +64,51 @@ export default async function BrokerShellPage() {
         </aside>
       </section>
     </main>
+  );
+}
+
+async function BrokerDashboardSection() {
+  const dashboard = await readBrokerDashboard();
+  if (dashboard.unauthenticated) {
+    return <p role="status">Session expiree. Reconnectez-vous pour voir le dashboard.</p>;
+  }
+  if (dashboard.forbidden) {
+    return <p role="alert">Acces dashboard refuse. Le flag broker_dashboard_enabled est ferme ou la MFA est requise.</p>;
+  }
+  if (dashboard.status === "error") {
+    return <p role="status">Dashboard indisponible: {dashboard.error ?? "erreur inconnue"}.</p>;
+  }
+  const starter = dashboard.data.starter;
+  const cards: Array<[string, string | number]> = [
+    ["Recus", starter.received],
+    ["Acceptes", starter.accepted],
+    ["Rejetes", starter.rejected],
+    ["Contestes", starter.disputed],
+    ["En attente", starter.pendingAction]
+  ];
+  return (
+    <>
+      <section aria-label="Dashboard Starter" style={{ display: "grid", gridTemplateColumns: "repeat(5, minmax(120px, 1fr))", gap: 12, marginBottom: 28 }}>
+        {cards.map(([label, value]) => (
+          <div key={label} style={{ border: "1px solid #d7dde4", borderRadius: 6, padding: 16, minHeight: 82 }}>
+            <div style={{ color: "#516070", fontSize: 13 }}>{label}</div>
+            <strong style={{ display: "block", marginTop: 8, fontSize: 28 }}>{value}</strong>
+          </div>
+        ))}
+      </section>
+      {dashboard.data.licenseAlerts.length > 0 ? (
+        <section aria-label="Alertes licence" style={{ marginBottom: 28 }}>
+          <h2 style={{ margin: "0 0 8px", fontSize: 18 }}>Alertes licence</h2>
+          <ul style={{ margin: 0, paddingLeft: 18 }}>
+            {dashboard.data.licenseAlerts.map((alert) => (
+              <li key={alert.licenseId}>
+                {alert.countryCode} — licence {alert.status === "expired" ? "expiree" : "expirant prochainement"} (
+                {new Date(alert.expiresAt).toISOString().slice(0, 10)})
+              </li>
+            ))}
+          </ul>
+        </section>
+      ) : null}
+    </>
   );
 }

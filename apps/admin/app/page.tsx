@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import { isAdminProfile, loginRedirect, readBackOfficeSession } from "./lib/backoffice-auth";
 import { logoutAction } from "./lib/backoffice-session-actions";
-import { readAdminHealth } from "./lib/admin-api";
+import { readAdminHealth, readAdminDashboard } from "./lib/admin-api";
 
 export default async function AdminHomePage() {
   const session = await readBackOfficeSession();
@@ -26,12 +26,24 @@ export default async function AdminHomePage() {
   }
   const health = await readAdminHealth();
   if (health.unauthenticated) redirect(loginRedirect("/", health.error ?? "session_required"));
+  const dashboard = await readAdminDashboard();
+  if (dashboard.unauthenticated) redirect(loginRedirect("/", dashboard.error ?? "session_required"));
 
   return (
     <main>
       <h1>AssurMatch Admin</h1>
       {health.forbidden ? <p role="alert">Acces sante systeme refuse pour ce role admin.</p> : null}
       {health.error && !health.forbidden ? <p role="status">Sante systeme indisponible: {health.error}</p> : null}
+      {dashboard.forbidden ? (
+        <p role="alert">Acces dashboard plateforme refuse pour ce role admin.</p>
+      ) : dashboard.status === "error" ? (
+        <p role="status">Dashboard plateforme indisponible: {dashboard.error}</p>
+      ) : (
+        <section aria-label="Dashboard plateforme synthese">
+          <p>Leads recus: {dashboard.data.leadVolumes.received}. Transmis: {dashboard.data.leadVolumes.transmitted}. Refuses: {dashboard.data.leadVolumes.refused}. Non routes: {dashboard.data.leadVolumes.nonRouted}.</p>
+          <p>Licences expirees: {dashboard.data.licenseAlerts.expired}. Licences expirantes (30j): {dashboard.data.licenseAlerts.expiringSoon}.</p>
+        </section>
+      )}
       <nav aria-label="Administration socle">
         <a href="/catalog">Catalogue</a>
         <a href="/partners">Partenaires</a>
@@ -39,6 +51,7 @@ export default async function AdminHomePage() {
         <a href="/feature-flags">Feature flags</a>
         <a href="/compliance">Conformite</a>
         <a href="/operations">Operations</a>
+        <a href="/dashboard">Dashboard plateforme</a>
       </nav>
       <form action={logoutAction}>
         <button type="submit">Deconnexion</button>

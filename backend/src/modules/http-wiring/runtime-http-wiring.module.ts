@@ -22,6 +22,10 @@ import {
   type OfferListQuery,
   type QuoteRequestCreateDto
 } from "../../../../packages/shared/contracts/quote.contracts";
+import {
+  complianceAlertsQuerySchema,
+  dashboardScopeQuerySchema
+} from "../../../../packages/shared/contracts/dashboard.contracts";
 import { roleHasPermission, type AssurMatchRole } from "../../../../packages/shared/rbac/assurmatch-role-matrix";
 import { isoCountrySchema, languageCodeSchema, nonEmptyStringSchema, reasonSchema, uuidSchema } from "../../../../packages/shared/validation/common.schemas";
 import { AssurMatchRuntime } from "../../runtime/assurmatch-runtime";
@@ -285,6 +289,29 @@ export class BrokerCrmController {
   }
 }
 
+export class BrokerDashboardController {
+  constructor(private readonly runtime: AssurMatchRuntime) {}
+
+  dashboard(request: AssurMatchHttpRequest, query: Record<string, string>) {
+    const actor = protectedActorFromRequest(request);
+    return this.runtime.dashboards.broker.dashboard(actor, parseHttpInput(dashboardScopeQuerySchema, query));
+  }
+}
+
+export class AdminDashboardController {
+  constructor(private readonly runtime: AssurMatchRuntime) {}
+
+  dashboard(request: AssurMatchHttpRequest, query: Record<string, string>) {
+    const actor = protectedActorFromRequest(request);
+    return this.runtime.dashboards.admin.dashboard(actor, parseHttpInput(dashboardScopeQuerySchema, query));
+  }
+
+  complianceAlerts(request: AssurMatchHttpRequest, query: Record<string, string>) {
+    const actor = protectedActorFromRequest(request);
+    return this.runtime.dashboards.complianceAlerts.list(actor, parseHttpInput(complianceAlertsQuerySchema, query));
+  }
+}
+
 export class AdminFeatureFlagsController {
   constructor(private readonly runtime: AssurMatchRuntime) {}
 
@@ -397,6 +424,13 @@ decorate(BrokerCrmController, "dispute", [Post("leads/:leadId/disputes") as Meth
 decorate(BrokerCrmController, "notifications", [Get("notifications") as MethodDecoratorFactory], [[0, Req() as ParamDecoratorFactory]]);
 decorate(BrokerCrmController, "aiFoundations", [Get("ai-foundations") as MethodDecoratorFactory], [[0, Req() as ParamDecoratorFactory]]);
 
+controller("broker/dashboard", BrokerDashboardController, true);
+decorate(BrokerDashboardController, "dashboard", [Get() as MethodDecoratorFactory], [[0, Req() as ParamDecoratorFactory], [1, Query() as ParamDecoratorFactory]]);
+
+controller("admin/dashboard", AdminDashboardController, true);
+decorate(AdminDashboardController, "dashboard", [Get() as MethodDecoratorFactory], [[0, Req() as ParamDecoratorFactory], [1, Query() as ParamDecoratorFactory]]);
+decorate(AdminDashboardController, "complianceAlerts", [Get("compliance-alerts") as MethodDecoratorFactory], [[0, Req() as ParamDecoratorFactory], [1, Query() as ParamDecoratorFactory]]);
+
 controller("admin", AdminFeatureFlagsController, true);
 decorate(AdminFeatureFlagsController, "list", [Get("feature-flags") as MethodDecoratorFactory], [[0, Req() as ParamDecoratorFactory]]);
 decorate(AdminFeatureFlagsController, "update", [Patch("feature-flags/:id") as MethodDecoratorFactory], [[0, Param("id") as ParamDecoratorFactory], [1, Body() as ParamDecoratorFactory], [2, Req() as ParamDecoratorFactory]]);
@@ -422,6 +456,8 @@ Module({
     PublicQuoteRequestsController,
     BrokerStarterController,
     BrokerCrmController,
+    BrokerDashboardController,
+    AdminDashboardController,
     AdminFeatureFlagsController,
     AdminAuditLogsController,
     AdminHealthController,

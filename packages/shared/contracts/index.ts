@@ -2,6 +2,7 @@ export * from "./auth.contracts";
 export * from "./catalog.contracts";
 export * from "./compliance.contracts";
 export * from "./content-safety";
+export * from "./dashboard.contracts";
 export * from "./error-codes";
 export * from "./feature-flag.contracts";
 export * from "./ops.contracts";

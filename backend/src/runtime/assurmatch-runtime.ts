@@ -39,6 +39,7 @@ import { PrismaLeadAssignmentsRepository } from "../modules/leads/lead-assignmen
 import { PrismaRoutingDecisionsRepository } from "../modules/leads/routing-decisions.repository";
 import { PrismaCrmActivityRepository } from "../modules/leads/crm-activity.repository";
 import { PrismaNotificationsRepository } from "../modules/notifications/notifications.repository";
+import { DashboardsModule } from "../modules/dashboards/dashboards.module";
 
 export class AssurMatchRuntime {
   readonly config = new ConfigModule();
@@ -56,7 +57,7 @@ export class AssurMatchRuntime {
   private readonly offersRepository = this.runtimeRepository(new PrismaOffersRepository(this.prisma));
   private readonly prospectsRepository = this.runtimeRepository(new PrismaProspectsRepository(this.prisma));
   private readonly quoteRequestsRepository = this.runtimeRepository(new PrismaQuoteRequestsRepository(this.prisma));
-  private readonly leadRepositorySet = this.leadRepositories();
+  readonly leadRepositorySet = this.leadRepositories();
   private readonly brokerCrmConfig = { brokerCrmEnabled: process.env.ASSURMATCH_BROKER_CRM_ENABLED === "true" };
   readonly audit = new AuditLogsModule(this.auditLogRepository);
   readonly regulatoryRegimes = new RegulatoryRegimesModule(this.audit.writer);
@@ -120,6 +121,19 @@ export class AssurMatchRuntime {
   readonly partnerEligibility = new PartnerEligibilityService(this.partners.service, this.partnerLicenses.service, this.documents.service);
   readonly routing = new RoutingModule(this.consent.service, this.partnerEligibility, this.audit.writer);
   readonly systemHealth = new SystemHealthModule(this.prisma, this.redis.client, this.queues.notifications);
+  readonly dashboards = new DashboardsModule({
+    audit: this.audit.writer,
+    featureFlags: this.featureFlags.service,
+    assignments: this.leads.assignments,
+    decisions: this.leads.decisions,
+    partnerLicenses: this.partnerLicenses.service,
+    partners: this.partners.service,
+    countries: this.countries.service,
+    offers: this.offers,
+    quoteRequests: this.quoteRequests.submissions,
+    crmActivity: this.leadRepositorySet.crmActivity,
+    brokerCrmConfig: this.brokerCrmConfig
+  });
 
   async onModuleInit(): Promise<void> {
     await this.prisma.onModuleInit();
