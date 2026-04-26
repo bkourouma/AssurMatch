@@ -7,7 +7,7 @@ import {
 } from "../../../../packages/shared/contracts/quote.contracts";
 
 describe("quote DTO contracts", () => {
-  it("validates offer query order, consent and broker status updates", () => {
+  it("validates offer query order, consent and broker status updates", async () => {
     expect(offerListQuerySchema.safeParse({ minPrice: 10, maxPrice: 5 }).success).toBe(false);
     expect(brokerLeadStatusUpdateSchema.parse({ status: "contacted", reason: "courtier a pris contact" }).status).toBe("contacted");
     expect(quoteRequestCreateSchema.safeParse({
@@ -20,7 +20,7 @@ describe("quote DTO contracts", () => {
     }).success).toBe(false);
   });
 
-  it("keeps public form schema explicit about consent text reference", () => {
+  it("keeps public form schema explicit about consent text reference", async () => {
     const form = publicQuoteFormResponseSchema.parse({
       formDefinitionId: crypto.randomUUID(),
       version: "v1",

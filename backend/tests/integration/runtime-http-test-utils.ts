@@ -58,9 +58,9 @@ export async function readJson<T>(response: Response): Promise<T> {
   return response.json() as Promise<T>;
 }
 
-export function seedPublicRuntime(runtime: AssurMatchRuntime) {
+export async function seedPublicRuntime(runtime: AssurMatchRuntime) {
   const admin: ActorContext = { actorId: "admin-runtime", roles: ["super_admin"], mfaVerified: true };
-  const country = runtime.countries.service.create({
+  const country = await runtime.countries.service.create({
     isoCode: "CI",
     name: "Cote d'Ivoire",
     currency: "XOF",
@@ -69,14 +69,14 @@ export function seedPublicRuntime(runtime: AssurMatchRuntime) {
     regulatoryFamily: "cima",
     regulatoryRegimeId: "00000000-0000-4000-8000-000000000010"
   }, admin);
-  runtime.countries.service.update(country.id, {
+  await runtime.countries.service.update(country.id, {
     status: "public",
     flags: { country_public_enabled: true, country_comparison_enabled: true, country_quote_enabled: true },
     reason: "runtime public seed"
   }, admin);
-  const product = runtime.products.service.create({ key: "auto", name: "Assurance auto" }, admin);
-  runtime.products.service.associateCountry(product.id, country.id, admin);
-  runtime.products.service.update(product.id, {
+  const product = await runtime.products.service.create({ key: "auto", name: "Assurance auto" }, admin);
+  await runtime.products.service.associateCountry(product.id, country.id, admin);
+  await runtime.products.service.update(product.id, {
     status: "public",
     flags: {
       product_public_enabled: true,
@@ -86,7 +86,7 @@ export function seedPublicRuntime(runtime: AssurMatchRuntime) {
     },
     reason: "runtime product seed"
   }, admin);
-  const consentText = runtime.consent.service.createText({
+  const consentText = await runtime.consent.service.createText({
     purpose: "lead_transmission",
     countryId: country.id,
     productId: product.id,
@@ -97,8 +97,8 @@ export function seedPublicRuntime(runtime: AssurMatchRuntime) {
     status: "draft",
     contentHash: "runtime-consent-hash"
   }, admin);
-  runtime.consent.service.publishText(consentText.id, admin);
-  const form = runtime.quoteForms.service.create({
+  await runtime.consent.service.publishText(consentText.id, admin);
+  const form = await runtime.quoteForms.service.create({
     countryId: country.id,
     productId: product.id,
     language: "fr",
@@ -108,16 +108,16 @@ export function seedPublicRuntime(runtime: AssurMatchRuntime) {
     consentTextId: consentText.id,
     reason: "runtime form seed"
   }, admin);
-  const partner = runtime.partners.service.create({
+  const partner = await runtime.partners.service.create({
     legalName: "Broker CI Runtime",
     primaryEmail: "runtime@broker.example",
     primaryWhatsApp: "+2250102030405",
     status: "active",
     quotaMonthlyLeads: 10
   }, admin);
-  runtime.partners.service.authorizeCountry(partner.id, country.id, admin);
-  runtime.partners.service.authorizeProduct(partner.id, product.id, admin);
-  runtime.partnerLicenses.service.create({
+  await runtime.partners.service.authorizeCountry(partner.id, country.id, admin);
+  await runtime.partners.service.authorizeProduct(partner.id, product.id, admin);
+  await runtime.partnerLicenses.service.create({
     partnerTenantId: partner.id,
     licenseNumber: "LIC-RUNTIME",
     issuingAuthority: "Regulator",
@@ -127,7 +127,7 @@ export function seedPublicRuntime(runtime: AssurMatchRuntime) {
     effectiveDate: "2026-01-01",
     expirationDate: "2030-01-01"
   }, admin);
-  const offer = runtime.offers.adminService.create({
+  const offer = await runtime.offers.adminService.create({
     countryId: country.id,
     productId: product.id,
     partnerTenantId: partner.id,
@@ -138,6 +138,6 @@ export function seedPublicRuntime(runtime: AssurMatchRuntime) {
     validUntil: "2030-01-01T00:00:00.000Z",
     reason: "runtime offer seed"
   }, admin);
-  runtime.offers.adminService.validate(offer.id, { validationStatus: "validated", reason: "runtime validate" }, admin);
+  await runtime.offers.adminService.validate(offer.id, { validationStatus: "validated", reason: "runtime validate" }, admin);
   return { admin, country, product, partner, consentText, form, offer };
 }

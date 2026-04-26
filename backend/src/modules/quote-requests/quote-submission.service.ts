@@ -47,8 +47,8 @@ export interface QuoteRequestRecord {
 }
 
 export interface QuoteSubmissionDependencies {
-  findCountryByCode: (countryCode: string) => Country | undefined;
-  findProductByKey: (productKey: string) => Product | undefined;
+  findCountryByCode: (countryCode: string) => Country | undefined | Promise<Country | undefined>;
+  findProductByKey: (productKey: string) => Product | undefined | Promise<Product | undefined>;
   forms: QuoteFormDefinitionService;
   consent: ConsentService;
   identity: ProspectIdentityService;
@@ -83,8 +83,8 @@ export class QuoteSubmissionService {
       throw new Error("Quote request validation failed");
     }
     const parsed = parsedResult.data;
-    const country = this.deps.findCountryByCode(parsed.countryCode);
-    const product = this.deps.findProductByKey(parsed.productKey);
+    const country = await this.deps.findCountryByCode(parsed.countryCode);
+    const product = await this.deps.findProductByKey(parsed.productKey);
     if (!country || !product || !product.countryIds.includes(country.id)) {
       throw new Error("Country or product is not available");
     }
@@ -106,7 +106,7 @@ export class QuoteSubmissionService {
       ...(parsed.sessionId ? { sessionId: parsed.sessionId } : {}),
       answers: parsed.answers
     });
-    const publicForm = this.deps.forms.publicForm(country.id, product.id);
+    const publicForm = await this.deps.forms.publicForm(country.id, product.id);
     if (publicForm.formDefinitionId !== parsed.formDefinitionId || publicForm.consent.consentTextId !== parsed.consent.consentTextId || publicForm.consent.contentHash !== parsed.consent.contentHash) {
       this.audit.write({
         actor,
@@ -141,7 +141,7 @@ export class QuoteSubmissionService {
       });
       return this.duplicateConfirmation();
     }
-    const consentRecord = this.deps.consent.record({
+    const consentRecord = await this.deps.consent.record({
       consentTextId: parsed.consent.consentTextId,
       subjectReference: contact.emailFingerprint,
       purpose: "lead_transmission",
@@ -161,7 +161,7 @@ export class QuoteSubmissionService {
       result: "success",
       context: { intendedRecipient: consentRecord.intendedRecipient }
     });
-    const prospect = this.deps.prospects.createOrLink(country.id, product.id, contact, consentRecord.id, actor);
+    const prospect = await this.deps.prospects.createOrLink(country.id, product.id, contact, consentRecord.id, actor);
     const token = crypto.randomUUID();
     const now = new Date();
     const quote: QuoteRequestRecord = {
@@ -186,7 +186,7 @@ export class QuoteSubmissionService {
       createdAt: now,
       updatedAt: now
     };
-    this.repository.create(quote);
+    await this.repository.create(quote);
     this.audit.write({
       actor,
       action: QuoteAuditActions.quoteRequestCreated,
@@ -196,7 +196,7 @@ export class QuoteSubmissionService {
       result: "success",
       context: { duplicateStatus: quote.duplicateStatus, routingStatus: quote.routingStatus }
     });
-    const routingResult = quote.routingStatus === "manual_review_required" ? undefined : this.deps.routing?.route(quote, actor);
+    const routingResult = quote.routingStatus === "manual_review_required" ? undefined : await this.deps.routing?.route(quote, actor);
     if (routingResult?.assignment) {
       quote.status = "routed";
       quote.routingStatus = "assigned";
@@ -206,10 +206,10 @@ export class QuoteSubmissionService {
       quote.refusalReason = "no_eligible_broker";
     }
     quote.updatedAt = new Date();
-    this.repository.update(quote.id, quote);
-    this.deps.notifications?.queueVisitor(quote, actor);
+    await this.repository.update(quote.id, quote);
+    await this.deps.notifications?.queueVisitor(quote, actor);
     if (routingResult?.assignment) {
-      const brokerNotification = this.deps.notifications?.queueBroker(quote, routingResult.assignment, actor);
+      const brokerNotification = await this.deps.notifications?.queueBroker(quote, routingResult.assignment, actor);
       if (brokerNotification) routingResult.assignment.brokerNotificationId = brokerNotification.notification.id;
     }
     await this.deps.aiSummary?.enqueueIfAllowed(quote, actor);
@@ -225,8 +225,8 @@ export class QuoteSubmissionService {
     };
   }
 
-  status(publicReference: string, token: string) {
-    const quote = this.repository.findByPublicReference(publicReference);
+  async status(publicReference: string, token: string) {
+    const quote = await this.repository.findByPublicReference(publicReference);
     if (!quote || quote.verificationTokenHash !== this.hash(token)) throw new Error("Quote status not available");
     return {
       publicReference: quote.publicReference,
@@ -235,7 +235,7 @@ export class QuoteSubmissionService {
     };
   }
 
-  list(): QuoteRequestRecord[] {
+  list(): Promise<QuoteRequestRecord[]> {
     return this.repository.list();
   }
 

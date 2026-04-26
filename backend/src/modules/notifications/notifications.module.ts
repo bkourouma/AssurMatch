@@ -17,7 +17,7 @@ export interface NotificationRecord extends NotificationRecordDto {
 export class NotificationsService {
   constructor(private readonly audit: AuditLogWriter, private readonly queue: QueuePort, private readonly repository: NotificationsRepository = new MemoryNotificationsRepository()) {}
 
-  queuePaired(input: NotificationDto, actor: ActorContext): { notification: NotificationRecord; job: QueueJobRecord } {
+  async queuePaired(input: NotificationDto, actor: ActorContext): Promise<{ notification: NotificationRecord; job: QueueJobRecord }> {
     const parsed = notificationSchema.parse(input);
     const now = new Date();
     const job = this.queue.add("notifications", "notification", parsed.payloadReference, actor.correlationId);
@@ -31,7 +31,7 @@ export class NotificationsService {
       createdAt: now,
       updatedAt: now
     };
-    this.repository.create(notification);
+    await this.repository.create(notification);
     this.audit.write({
       actor,
       action: "notification.queued",
@@ -43,7 +43,20 @@ export class NotificationsService {
     return { notification, job };
   }
 
-  list(): NotificationRecord[] {
+  async recordQueued(notification: NotificationRecord, actor: ActorContext): Promise<NotificationRecord> {
+    await this.repository.create(notification);
+    this.audit.write({
+      actor,
+      action: "notification.queued",
+      targetType: "Notification",
+      targetId: notification.id,
+      result: "success",
+      context: { type: notification.type, pairedDelivery: true }
+    });
+    return notification;
+  }
+
+  list(): Promise<NotificationRecord[]> {
     return this.repository.list();
   }
 
@@ -51,7 +64,7 @@ export class NotificationsService {
     return this.repository.mutableList();
   }
 
-  updateDelivery(id: string, whatsAppStatus: NotificationRecord["whatsAppStatus"], emailStatus: NotificationRecord["emailStatus"]): NotificationRecord {
+  updateDelivery(id: string, whatsAppStatus: NotificationRecord["whatsAppStatus"], emailStatus: NotificationRecord["emailStatus"]): Promise<NotificationRecord> {
     return this.repository.updateDelivery(id, { whatsAppStatus, emailStatus, updatedAt: new Date() });
   }
 }
@@ -65,7 +78,7 @@ export class NotificationsModule {
   constructor(audit = new AuditLogWriter(), queue: QueuePort = new InMemoryQueue(), repository?: NotificationsRepository) {
     this.queue = queue;
     this.service = new NotificationsService(audit, this.queue, repository);
-    this.quoteService = new QuoteNotificationService(this.service.mutableList(), this.queue, audit);
+    this.quoteService = new QuoteNotificationService(repository ? this.service : this.service.mutableList(), this.queue, audit);
     this.adminController = new AdminNotificationsController(this.service);
   }
 }

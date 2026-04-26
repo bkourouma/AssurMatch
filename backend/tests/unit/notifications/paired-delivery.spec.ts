@@ -4,9 +4,9 @@ import { NotificationsModule } from "../../../src/modules/notifications/notifica
 import { superAdminActor } from "../../integration/helpers/enterprise-seed";
 
 describe("paired notification delivery", () => {
-  it("queues WhatsApp and email for every notification", () => {
+  it("queues WhatsApp and email for every notification", async () => {
     const module = new NotificationsModule(new AuditLogWriter());
-    const result = module.service.queuePaired({
+    const result = await module.service.queuePaired({
       type: "feature_flag_changed",
       recipientScope: "platform",
       payloadReference: "flag-change"

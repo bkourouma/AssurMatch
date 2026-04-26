@@ -4,7 +4,7 @@ import { QuoteFormDefinitionService } from "../../../src/modules/quote-forms/quo
 import { superAdminActor } from "../../integration/helpers/enterprise-seed";
 
 describe("QuoteFormDefinitionService", () => {
-  it("exposes only published forms bound to a published lead-transmission consent text", () => {
+  it("exposes only published forms bound to a published lead-transmission consent text", async () => {
     const consentTextId = crypto.randomUUID();
     const service = new QuoteFormDefinitionService(new AuditLogWriter(), () => [{
       id: consentTextId,
@@ -16,7 +16,7 @@ describe("QuoteFormDefinitionService", () => {
     }]);
     const countryId = crypto.randomUUID();
     const productId = crypto.randomUUID();
-    const form = service.create({
+    const form = await service.create({
       countryId,
       productId,
       language: "fr",
@@ -27,14 +27,14 @@ describe("QuoteFormDefinitionService", () => {
       reason: "test form"
     }, superAdminActor);
 
-    expect(service.publicForm(countryId, productId).formDefinitionId).toBe(form.id);
+    expect((await service.publicForm(countryId, productId)).formDefinitionId).toBe(form.id);
   });
 
-  it("fails closed when consent text is not published", () => {
+  it("fails closed when consent text is not published", async () => {
     const service = new QuoteFormDefinitionService(new AuditLogWriter(), () => []);
     const countryId = crypto.randomUUID();
     const productId = crypto.randomUUID();
-    service.create({
+    await service.create({
       countryId,
       productId,
       language: "fr",
@@ -45,6 +45,6 @@ describe("QuoteFormDefinitionService", () => {
       reason: "test form"
     }, superAdminActor);
 
-    expect(() => service.publicForm(countryId, productId)).toThrow("Consent text is not available");
+    await expect(service.publicForm(countryId, productId)).rejects.toThrow("Consent text is not available");
   });
 });

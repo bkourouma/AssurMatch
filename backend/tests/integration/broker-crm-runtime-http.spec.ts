@@ -25,7 +25,7 @@ describe("broker CRM runtime HTTP", () => {
     process.env.ASSURMATCH_BROKER_CRM_ENABLED = "true";
     harness = await createRuntimeHttpHarness();
     const pro = { actorId: "pro", roles: ["broker_owner_pro" as const], partnerTenantId: "broker-a", partnerPlan: "pro" as const, mfaVerified: true };
-    const lead = harness.runtime.leads.assignments.create({ quoteRequestId: "q-crm-a", partnerTenantId: "broker-a", assignmentReason: "routing", publicReference: "CRM-A" }, pro);
+    const lead = await harness.runtime.leads.assignments.create({ quoteRequestId: "q-crm-a", partnerTenantId: "broker-a", assignmentReason: "routing", publicReference: "CRM-A" }, pro);
     const response = await harness.request("/broker/crm/leads", { headers: actorHeaders(pro) });
     expect(response.status).toBe(200);
     const page = await readJson<{ items: Array<{ leadAssignmentId: string; publicReference: string }> }>(response);

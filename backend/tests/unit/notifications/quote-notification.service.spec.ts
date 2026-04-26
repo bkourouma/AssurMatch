@@ -32,7 +32,7 @@ function quote(status: QuoteRequestRecord["status"]): QuoteRequestRecord {
 }
 
 describe("QuoteNotificationService", () => {
-  it("queues minimized visitor and broker notifications idempotently", () => {
+  it("queues minimized visitor and broker notifications idempotently", async () => {
     const notifications: NotificationRecord[] = [];
     const service = new QuoteNotificationService(notifications, new InMemoryQueue(), new AuditLogWriter());
     const routedQuote = quote("routed");
@@ -47,9 +47,9 @@ describe("QuoteNotificationService", () => {
       updatedAt: new Date()
     };
 
-    expect(service.queueVisitor(routedQuote, superAdminActor)?.notification.type).toBe("visitor_quote_confirmation");
-    expect(service.queueVisitor(routedQuote, superAdminActor)).toBeUndefined();
-    expect(service.queueBroker(routedQuote, assignment, superAdminActor)?.notification.recipientScope).toBe(`partner:${assignment.partnerTenantId}`);
+    expect((await service.queueVisitor(routedQuote, superAdminActor))?.notification.type).toBe("visitor_quote_confirmation");
+    expect(await service.queueVisitor(routedQuote, superAdminActor)).toBeUndefined();
+    expect((await service.queueBroker(routedQuote, assignment, superAdminActor))?.notification.recipientScope).toBe(`partner:${assignment.partnerTenantId}`);
     expect(notifications.map((notification) => notification.payloadReference)).toEqual([routedQuote.id, routedQuote.id]);
   });
 });

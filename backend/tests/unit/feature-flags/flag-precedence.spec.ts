@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { FeatureFlagPrecedenceService } from "../../../src/modules/feature-flags/feature-flag-precedence.service";
 
 describe("feature flag precedence", () => {
-  it("lets global disable override lower-scope enable", () => {
+  it("lets global disable override lower-scope enable", async () => {
     const service = new FeatureFlagPrecedenceService();
     const enabled = service.resolve("country_public_enabled", [
       { key: "country_public_enabled", scopeType: "global", value: false },

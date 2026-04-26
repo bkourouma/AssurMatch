@@ -15,7 +15,7 @@ export interface BrokerCrmHistoryInput {
 export class BrokerCrmHistoryService {
   constructor(private readonly repository: CrmActivityRepository = new MemoryCrmActivityRepository()) {}
 
-  append(input: BrokerCrmHistoryInput): BrokerCrmHistoryEvent {
+  async append(input: BrokerCrmHistoryInput): Promise<BrokerCrmHistoryEvent> {
     const event: BrokerCrmPipelineHistoryRecord = {
       id: crypto.randomUUID(),
       leadAssignmentId: input.leadAssignmentId,
@@ -27,11 +27,11 @@ export class BrokerCrmHistoryService {
       ...(input.reason ? { reason: input.reason } : {}),
       occurredAt: new Date().toISOString()
     };
-    return this.toDto(this.repository.appendPipelineHistory(event));
+    return this.toDto(await this.repository.appendPipelineHistory(event));
   }
 
-  forLead(leadAssignmentId: string): BrokerCrmHistoryEvent[] {
-    return this.repository.pipelineHistoryForLead(leadAssignmentId).map((event) => this.toDto(event));
+  async forLead(leadAssignmentId: string): Promise<BrokerCrmHistoryEvent[]> {
+    return (await this.repository.pipelineHistoryForLead(leadAssignmentId)).map((event) => this.toDto(event));
   }
 
   private toDto(event: BrokerCrmPipelineHistoryRecord): BrokerCrmHistoryEvent {

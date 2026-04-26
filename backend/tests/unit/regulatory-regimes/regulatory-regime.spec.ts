@@ -4,9 +4,9 @@ import { RegulatoryRegimesService } from "../../../src/modules/regulatory-regime
 import { superAdminActor } from "../../integration/helpers/enterprise-seed";
 
 describe("regulatory regime retention", () => {
-  it("accepts bounded retention overrides for active regimes", () => {
+  it("accepts bounded retention overrides for active regimes", async () => {
     const service = new RegulatoryRegimesService(new AuditLogWriter());
-    const regime = service.create({
+    const regime = await service.create({
       key: "cima-ci",
       name: "CIMA CI",
       retentionOverrideYears: 10,

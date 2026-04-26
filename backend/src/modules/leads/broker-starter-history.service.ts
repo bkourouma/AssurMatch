@@ -16,7 +16,7 @@ export interface BrokerStarterHistoryInput {
 export class BrokerStarterHistoryService {
   constructor(private readonly repository: LeadAssignmentsRepository = new MemoryLeadAssignmentsRepository()) {}
 
-  append(input: BrokerStarterHistoryInput): BrokerStarterLeadHistoryEvent {
+  async append(input: BrokerStarterHistoryInput): Promise<BrokerStarterLeadHistoryEvent> {
     const event: LeadAssignmentHistoryRecord = {
       id: crypto.randomUUID(),
       leadAssignmentId: input.leadAssignmentId,
@@ -29,15 +29,15 @@ export class BrokerStarterHistoryService {
       ...(input.comment ? { comment: input.comment.slice(0, 500) } : {}),
       occurredAt: new Date().toISOString()
     };
-    return this.toDto(this.repository.appendHistory(event));
+    return this.toDto(await this.repository.appendHistory(event));
   }
 
-  forLead(leadAssignmentId: string): BrokerStarterLeadHistoryEvent[] {
-    return this.repository.historyForLead(leadAssignmentId).map((event) => this.toDto(event));
+  async forLead(leadAssignmentId: string): Promise<BrokerStarterLeadHistoryEvent[]> {
+    return (await this.repository.historyForLead(leadAssignmentId)).map((event) => this.toDto(event));
   }
 
-  forTenant(partnerTenantId: string): BrokerStarterLeadHistoryEvent[] {
-    return this.repository.historyForTenant(partnerTenantId).map((event) => this.toDto(event));
+  async forTenant(partnerTenantId: string): Promise<BrokerStarterLeadHistoryEvent[]> {
+    return (await this.repository.historyForTenant(partnerTenantId)).map((event) => this.toDto(event));
   }
 
   private toDto(event: LeadAssignmentHistoryRecord): BrokerStarterLeadHistoryEvent {

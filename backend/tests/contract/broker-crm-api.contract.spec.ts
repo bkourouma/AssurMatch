@@ -9,7 +9,7 @@ import {
 const contract = readFileSync("specs/004-crm-courtier-pro/contracts/broker-crm-api.openapi.yaml", "utf8");
 
 describe("spec 004 broker CRM OpenAPI contract", () => {
-  it("declares broker CRM endpoints", () => {
+  it("declares broker CRM endpoints", async () => {
     [
       "/broker/crm/dashboard",
       "/broker/crm/leads",
@@ -29,7 +29,7 @@ describe("spec 004 broker CRM OpenAPI contract", () => {
     ].forEach((path) => expect(contract).toContain(path));
   });
 
-  it("keeps shared CRM schemas controlled", () => {
+  it("keeps shared CRM schemas controlled", async () => {
     expect(brokerCrmLeadListQuerySchema.parse({ status: "qualifie", countryCode: "CI" }).status).toBe("qualifie");
     expect(() => brokerCrmStatusUpdateSchema.parse({ status: "perdu" })).toThrow();
     expect(brokerCrmStatusUpdateSchema.parse({ status: "perdu", reason: "price" }).reason).toBe("price");

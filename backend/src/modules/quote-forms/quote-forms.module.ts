@@ -8,7 +8,7 @@ export class QuoteFormsModule {
   readonly adminController: AdminQuoteFormDefinitionsController;
   readonly publicController: PublicQuoteFormsController;
 
-  constructor(audit = new AuditLogWriter(), consentTexts: () => ConsentTextReference[] = () => []) {
+  constructor(audit = new AuditLogWriter(), consentTexts: () => ConsentTextReference[] | Promise<ConsentTextReference[]> = () => []) {
     this.service = new QuoteFormDefinitionService(audit, consentTexts);
     this.adminController = new AdminQuoteFormDefinitionsController(this.service);
     this.publicController = new PublicQuoteFormsController(this.service);

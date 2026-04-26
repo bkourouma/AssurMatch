@@ -5,7 +5,7 @@ import { superAdminActor } from "../helpers/enterprise-seed";
 
 describe("quote duplicate detection", () => {
   it("returns duplicate confirmation without a second active assignment", async () => {
-    const seed = seedComparatorQuote();
+    const seed = await seedComparatorQuote();
     await seed.app.quoteRequests.publicController.submit(validQuotePayload(seed) as QuoteRequestCreateDto, superAdminActor);
     const duplicatePayload = validQuotePayload(seed);
     duplicatePayload.ipAddress = "203.0.113.11";
@@ -14,6 +14,6 @@ describe("quote duplicate detection", () => {
     const duplicate = await seed.app.quoteRequests.publicController.submit(duplicatePayload as QuoteRequestCreateDto, superAdminActor);
 
     expect(duplicate.status).toBe("duplicate");
-    expect(seed.app.leads.assignments.list()).toHaveLength(1);
+    expect(await seed.app.leads.assignments.list()).toHaveLength(1);
   });
 });

@@ -27,6 +27,18 @@ import { SystemHealthModule } from "../modules/admin/system-health.module";
 import { UsersModule } from "../modules/users/users.module";
 import { AuthModule } from "../modules/auth/auth.module";
 import { PartnerEligibilityService } from "../modules/partners/partner-eligibility.service";
+import { PrismaConsentRecordsRepository } from "../modules/consent/consent-records.repository";
+import { PrismaCountriesRepository } from "../modules/countries/countries.repository";
+import { PrismaProductsRepository } from "../modules/products/products.repository";
+import { PrismaOffersRepository } from "../modules/offers/offers.repository";
+import { PrismaPartnersRepository } from "../modules/partners/partners.repository";
+import { PrismaPartnerLicensesRepository } from "../modules/partner-licenses/partner-licenses.repository";
+import { PrismaProspectsRepository } from "../modules/prospects/prospects.repository";
+import { PrismaQuoteRequestsRepository } from "../modules/quote-requests/quote-requests.repository";
+import { PrismaLeadAssignmentsRepository } from "../modules/leads/lead-assignments.repository";
+import { PrismaRoutingDecisionsRepository } from "../modules/leads/routing-decisions.repository";
+import { PrismaCrmActivityRepository } from "../modules/leads/crm-activity.repository";
+import { PrismaNotificationsRepository } from "../modules/notifications/notifications.repository";
 
 export class AssurMatchRuntime {
   readonly config = new ConfigModule();
@@ -35,10 +47,10 @@ export class AssurMatchRuntime {
   readonly queues = new QueuesModule();
   readonly audit = new AuditLogsModule(this.auditRepository());
   readonly regulatoryRegimes = new RegulatoryRegimesModule(this.audit.writer);
-  readonly countries = new CountriesModule(this.audit.writer);
-  readonly products = new ProductsModule(this.audit.writer);
-  readonly partners = new PartnersModule(this.audit.writer);
-  readonly partnerLicenses = new PartnerLicensesModule(this.audit.writer);
+  readonly countries = new CountriesModule(this.audit.writer, this.runtimeRepository(new PrismaCountriesRepository(this.prisma)));
+  readonly products = new ProductsModule(this.audit.writer, this.runtimeRepository(new PrismaProductsRepository(this.prisma)));
+  readonly partners = new PartnersModule(this.audit.writer, this.runtimeRepository(new PrismaPartnersRepository(this.prisma)));
+  readonly partnerLicenses = new PartnerLicensesModule(this.audit.writer, this.runtimeRepository(new PrismaPartnerLicensesRepository(this.prisma)));
   readonly documents = new DocumentsModule(this.audit.writer);
   readonly users = new UsersModule(this.audit.writer);
   readonly auth = new AuthModule(this.users.service);
@@ -47,8 +59,8 @@ export class AssurMatchRuntime {
     new FeatureFlagCacheService(this.redis.client),
     process.env.NODE_ENV === "test" ? undefined : new PrismaFeatureFlagRepository(this.prisma)
   );
-  readonly consent = new ConsentModule(this.audit.writer);
-  readonly notifications = new NotificationsModule(this.audit.writer, this.queues.notifications);
+  readonly consent = new ConsentModule(this.audit.writer, this.runtimeRepository(new PrismaConsentRecordsRepository(this.prisma)));
+  readonly notifications = new NotificationsModule(this.audit.writer, this.queues.notifications, this.runtimeRepository(new PrismaNotificationsRepository(this.prisma)));
   readonly ai = new AIModule(this.audit.writer);
   readonly quoteAiSummary = new QuoteAISummaryService(this.notifications.queue, this.audit.writer, {
     id: "00000000-0000-4000-8000-000000000002",
@@ -64,8 +76,8 @@ export class AssurMatchRuntime {
     countryFlags: { country_ai_enabled: false },
     productFlags: { product_ai_form_assistant_enabled: false }
   });
-  readonly offers = new OffersModule(this.audit.writer, this.redis.client);
-  readonly quoteForms = new QuoteFormsModule(this.audit.writer, () => this.consent.service.listTexts().map((text) => ({
+  readonly offers = new OffersModule(this.audit.writer, this.redis.client, this.runtimeRepository(new PrismaOffersRepository(this.prisma)));
+  readonly quoteForms = new QuoteFormsModule(this.audit.writer, async () => (await this.consent.service.listTexts()).map((text) => ({
     id: text.id,
     version: text.version,
     contentHash: text.contentHash,
@@ -73,13 +85,13 @@ export class AssurMatchRuntime {
     recipientCategory: text.recipientCategory,
     status: text.status ?? "draft"
   })));
-  readonly prospects = new ProspectsModule(this.audit.writer);
+  readonly prospects = new ProspectsModule(this.audit.writer, this.runtimeRepository(new PrismaProspectsRepository(this.prisma)));
   readonly leads = new LeadsModule(
     this.partners.service,
     this.partnerLicenses.service,
     this.audit.writer,
     { brokerCrmEnabled: process.env.ASSURMATCH_BROKER_CRM_ENABLED === "true" },
-    {}
+    this.leadRepositories()
   );
   readonly quoteRequests = new QuoteRequestsModule({
     countries: this.countries.service,
@@ -91,7 +103,7 @@ export class AssurMatchRuntime {
     routing: this.leads.routing,
     notifications: this.notifications.quoteService,
     aiSummary: this.quoteAiSummary
-  }, this.audit.writer, this.redis.client);
+  }, this.audit.writer, this.redis.client, this.runtimeRepository(new PrismaQuoteRequestsRepository(this.prisma)));
   readonly partnerEligibility = new PartnerEligibilityService(this.partners.service, this.partnerLicenses.service, this.documents.service);
   readonly routing = new RoutingModule(this.consent.service, this.partnerEligibility, this.audit.writer);
   readonly systemHealth = new SystemHealthModule(this.prisma, this.redis.client, this.queues.notifications);
@@ -107,6 +119,19 @@ export class AssurMatchRuntime {
   private auditRepository() {
     if (process.env.NODE_ENV === "test") return undefined;
     return new PrismaAuditLogRepository(this.prisma);
+  }
+
+  private runtimeRepository<T>(repository: T): T | undefined {
+    return process.env.NODE_ENV === "test" ? undefined : repository;
+  }
+
+  private leadRepositories() {
+    if (process.env.NODE_ENV === "test") return {};
+    return {
+      assignments: new PrismaLeadAssignmentsRepository(this.prisma),
+      decisions: new PrismaRoutingDecisionsRepository(this.prisma),
+      crmActivity: new PrismaCrmActivityRepository(this.prisma)
+    };
   }
 
 }

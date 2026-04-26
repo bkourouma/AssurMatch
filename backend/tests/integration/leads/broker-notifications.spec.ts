@@ -5,11 +5,11 @@ import { superAdminActor } from "../helpers/enterprise-seed";
 
 describe("broker lead notifications", () => {
   it("queues broker notification only after assignment persistence", async () => {
-    const seed = seedComparatorQuote();
+    const seed = await seedComparatorQuote();
     await seed.app.quoteRequests.publicController.submit(validQuotePayload(seed) as QuoteRequestCreateDto, superAdminActor);
 
-    const assignment = seed.app.leads.assignments.list()[0];
-    const notification = seed.app.notifications.service.list().find((candidate) => candidate.type === "broker_lead_assigned");
+    const assignment = (await seed.app.leads.assignments.list())[0];
+    const notification = (await seed.app.notifications.service.list()).find((candidate) => candidate.type === "broker_lead_assigned");
 
     expect(assignment?.brokerNotificationId).toBe(notification?.id);
     expect(notification?.recipientScope).toBe(`partner:${seed.partnerTenantId}`);

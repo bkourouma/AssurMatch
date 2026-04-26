@@ -12,7 +12,7 @@ function readFiles(root: string): string {
 }
 
 describe("frontend runtime separation", () => {
-  it("keeps public app free of broker/admin API clients and routes", () => {
+  it("keeps public app free of broker/admin API clients and routes", async () => {
     const publicSource = readFiles(join(process.cwd(), "apps", "public", "app"));
     expect(publicSource).not.toContain("/broker/");
     expect(publicSource).not.toContain("/admin/");

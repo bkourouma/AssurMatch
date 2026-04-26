@@ -4,7 +4,7 @@ import { readFileSync } from "node:fs";
 describe("catalog OpenAPI contract", () => {
   const contract = readFileSync("specs/001-socle-plateforme/contracts/foundation-api.openapi.yaml", "utf8");
 
-  it("declares public and admin catalog endpoints", () => {
+  it("declares public and admin catalog endpoints", async () => {
     expect(contract).toContain("/countries:");
     expect(contract).toContain("/products:");
     expect(contract).toContain("/admin/countries:");

@@ -8,17 +8,17 @@ export class AdminPartnersController {
 
   constructor(private readonly partners: PartnersService) {}
 
-  list(actor: ActorContext): PartnerTenant[] {
+  list(actor: ActorContext): Promise<PartnerTenant[]> {
     this.rbac.assert(actor, "partners:read");
     return this.partners.list();
   }
 
-  create(actor: ActorContext, input: PartnerDto): PartnerTenant {
+  create(actor: ActorContext, input: PartnerDto): Promise<PartnerTenant> {
     this.rbac.assert(actor, "partners:create");
     return this.partners.create(input, actor);
   }
 
-  update(actor: ActorContext, id: string, input: Partial<PartnerDto> & { reason: string }): PartnerTenant {
+  update(actor: ActorContext, id: string, input: Partial<PartnerDto> & { reason: string }): Promise<PartnerTenant> {
     this.rbac.assert(actor, "partners:update", { partnerTenantId: id });
     return this.partners.update(id, input, actor);
   }

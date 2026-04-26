@@ -3,7 +3,7 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 
 describe("prisma migration fresh-base readiness", () => {
-  it("contains ordered migrations for foundation through broker CRM runtime entities", () => {
+  it("contains ordered migrations for foundation through broker CRM runtime entities", async () => {
     const migrationsDir = join(process.cwd(), "backend", "prisma", "migrations");
     const migrations = readdirSync(migrationsDir).filter((entry) => existsSync(join(migrationsDir, entry, "migration.sql"))).sort();
     expect(migrations).toEqual([

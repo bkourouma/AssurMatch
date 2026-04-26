@@ -7,7 +7,7 @@ import { BrokerStarterExportPolicy } from "../../../src/modules/leads/broker-sta
 const owner: ActorContext = { actorId: "owner", roles: ["broker_owner_starter"], partnerTenantId: "broker-a", mfaVerified: true };
 
 describe("BrokerStarterExportPolicy", () => {
-  it("exports only allowed columns when permission exists", () => {
+  it("exports only allowed columns when permission exists", async () => {
     const audit = new AuditLogWriter();
     const policy = new BrokerStarterExportPolicy(new BrokerStarterAccessPolicy(audit), audit);
 

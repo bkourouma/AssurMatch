@@ -12,12 +12,13 @@ export interface Product extends Omit<ProductRecord, "id" | "flags"> {
   countryIds: string[];
   createdAt: Date;
   updatedAt: Date;
+  createdById?: string;
 }
 
 export class ProductsService {
   constructor(private readonly audit: AuditLogWriter, private readonly repository: ProductsRepository = new MemoryProductsRepository()) {}
 
-  create(input: ProductDto, actor: ActorContext): Product {
+  async create(input: ProductDto, actor: ActorContext): Promise<Product> {
     const parsed = productCreateSchema.parse(input);
     const now = new Date();
     const product: Product = {
@@ -29,7 +30,7 @@ export class ProductsService {
       createdAt: now,
       updatedAt: now
     };
-    this.repository.create(product);
+    await this.repository.create(product);
     this.audit.write({
       actor,
       action: "product.created",
@@ -41,9 +42,8 @@ export class ProductsService {
     return product;
   }
 
-  associateCountry(productId: string, countryId: string, actor: ActorContext): Product {
-    const product = this.require(productId);
-    this.repository.associateCountry(productId, countryId);
+  async associateCountry(productId: string, countryId: string, actor: ActorContext): Promise<Product> {
+    const product = await this.repository.associateCountry(productId, countryId);
     this.audit.write({
       actor,
       action: "product.country_associated",
@@ -56,9 +56,9 @@ export class ProductsService {
     return product;
   }
 
-  update(id: string, input: Partial<ProductDto> & { reason: string }, actor: ActorContext): Product {
+  async update(id: string, input: Partial<ProductDto> & { reason: string }, actor: ActorContext): Promise<Product> {
     const parsed = productUpdateSchema.parse(input);
-    const product = this.require(id);
+    const product = await this.require(id);
     if (parsed.status === "public" && (!product.countryIds.length || parsed.flags?.product_public_enabled !== true)) {
       throw new Error("Product public activation requires country association and product_public_enabled");
     }
@@ -66,7 +66,7 @@ export class ProductsService {
       flags: { ...product.flags, ...(parsed.flags ?? {}) },
       updatedAt: new Date()
     });
-    this.repository.update(id, product);
+    await this.repository.update(id, product);
     this.audit.write({
       actor,
       action: "product.updated",
@@ -80,17 +80,17 @@ export class ProductsService {
     return product;
   }
 
-  listAdmin(countryId?: string): Product[] {
+  listAdmin(countryId?: string): Promise<Product[]> {
     return this.repository.list(countryId);
   }
 
-  listPublic(countryId: string): Product[] {
+  listPublic(countryId: string): Promise<Product[]> {
     return this.repository.listPublic(countryId);
   }
 
-  listPublicForCountry(countryId: string, countryFlags: Parameters<PublicJourneyFlagPolicy["resolve"]>[0]["countryFlags"], globalFlags: Partial<Record<string, boolean>> = { public_comparator_enabled: true }): PublicProductDto[] {
+  async listPublicForCountry(countryId: string, countryFlags: Parameters<PublicJourneyFlagPolicy["resolve"]>[0]["countryFlags"], globalFlags: Partial<Record<string, boolean>> = { public_comparator_enabled: true }): Promise<PublicProductDto[]> {
     const policy = new PublicJourneyFlagPolicy();
-    return this.repository.list(countryId)
+    return (await this.repository.list(countryId))
       .filter((product) => product.countryIds.includes(countryId) && product.status === "public")
       .map((product) => {
         const state = policy.resolve({ globalFlags, countryFlags, productFlags: product.flags });
@@ -105,8 +105,8 @@ export class ProductsService {
       .filter((product) => product.comparisonEnabled || product.quoteEnabled);
   }
 
-  getPublicProductPage(countryId: string, productKey: string, countryFlags: Parameters<PublicJourneyFlagPolicy["resolve"]>[0]["countryFlags"], globalFlags: Partial<Record<string, boolean>> = { public_comparator_enabled: true, quote_request_enabled: true }, actor?: ActorContext): ProductPageResponse {
-    const product = this.repository.list(countryId).find((candidate) => candidate.key === productKey);
+  async getPublicProductPage(countryId: string, productKey: string, countryFlags: Parameters<PublicJourneyFlagPolicy["resolve"]>[0]["countryFlags"], globalFlags: Partial<Record<string, boolean>> = { public_comparator_enabled: true, quote_request_enabled: true }, actor?: ActorContext): Promise<ProductPageResponse> {
+    const product = (await this.repository.list(countryId)).find((candidate) => candidate.key === productKey);
     const state = product ? new PublicJourneyFlagPolicy().resolve({ globalFlags, countryFlags, productFlags: product.flags }) : undefined;
     if (!product || product.status !== "public" || !state?.publicEnabled) {
       this.audit.write({
@@ -140,11 +140,11 @@ export class ProductsService {
     };
   }
 
-  findByKey(productKey: string): Product | undefined {
+  findByKey(productKey: string): Promise<Product | undefined> {
     return this.repository.findByKey(productKey);
   }
 
-  require(id: string): Product {
+  require(id: string): Promise<Product> {
     return this.repository.require(id);
   }
 }

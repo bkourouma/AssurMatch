@@ -8,17 +8,17 @@ export class PartnerLicensesController {
 
   constructor(private readonly licenses: PartnerLicensesService) {}
 
-  list(actor: ActorContext, partnerTenantId: string): PartnerLicense[] {
+  list(actor: ActorContext, partnerTenantId: string): Promise<PartnerLicense[]> {
     this.rbac.assert(actor, "licenses:read", { partnerTenantId });
     return this.licenses.listForPartner(partnerTenantId);
   }
 
-  create(actor: ActorContext, input: PartnerLicenseDto): PartnerLicense {
+  create(actor: ActorContext, input: PartnerLicenseDto): Promise<PartnerLicense> {
     this.rbac.assert(actor, "licenses:create", { partnerTenantId: input.partnerTenantId, countryId: input.countryId });
     return this.licenses.create(input, actor);
   }
 
-  validate(actor: ActorContext, licenseId: string): PartnerLicense {
+  validate(actor: ActorContext, licenseId: string): Promise<PartnerLicense> {
     this.rbac.assert(actor, "licenses:approve");
     return this.licenses.validate(licenseId, actor);
   }

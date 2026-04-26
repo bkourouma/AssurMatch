@@ -29,7 +29,7 @@ export class QuoteRoutingService {
     private readonly audit: AuditLogWriter
   ) {}
 
-  route(quote: RoutableQuoteRequest, actor: ActorContext): QuoteRoutingResult {
+  async route(quote: RoutableQuoteRequest, actor: ActorContext): Promise<QuoteRoutingResult> {
     if (!quote.consentRecordId) {
       this.audit.write({
         actor,
@@ -43,13 +43,13 @@ export class QuoteRoutingService {
       });
       return { routingStatus: "blocked", reasons: ["consent_missing"] };
     }
-    const candidates = this.eligibility.candidates(quote.countryId, quote.productId);
+    const candidates = await this.eligibility.candidates(quote.countryId, quote.productId);
     const eligible = candidates.filter((candidate) => candidate.eligible).sort((a, b) => a.partner.id.localeCompare(b.partner.id));
     const excludedCandidates = candidates
       .filter((candidate) => !candidate.eligible)
       .map((candidate) => ({ partnerTenantId: candidate.partner.id, reasons: candidate.reasons }));
     if (eligible.length === 0) {
-      this.decisions.record({
+      await this.decisions.record({
         quoteRequestId: quote.id,
         result: "no_broker_available",
         candidateCount: candidates.length,
@@ -61,7 +61,7 @@ export class QuoteRoutingService {
     }
     const selected = eligible[0];
     if (!selected) return { routingStatus: "no_broker_available", reasons: ["no_eligible_broker"] };
-    const decision = this.decisions.record({
+    const decision = await this.decisions.record({
       quoteRequestId: quote.id,
       result: "assigned",
       selectedPartnerTenantId: selected.partner.id,
@@ -70,7 +70,7 @@ export class QuoteRoutingService {
       reasons: ["eligible_broker_selected"],
       ...(quote.correlationId ? { correlationId: quote.correlationId } : {})
     }, actor);
-    const assignment = this.assignments.create({
+    const assignment = await this.assignments.create({
       quoteRequestId: quote.id,
       partnerTenantId: selected.partner.id,
       assignmentReason: "eligible_broker_selected",

@@ -5,7 +5,7 @@ import { superAdminActor } from "../helpers/enterprise-seed";
 
 describe("quote submission SLO", () => {
   it("returns confirmation under 5 seconds excluding async delivery", async () => {
-    const seed = seedComparatorQuote();
+    const seed = await seedComparatorQuote();
     const start = performance.now();
 
     await seed.app.quoteRequests.publicController.submit(validQuotePayload(seed) as QuoteRequestCreateDto, superAdminActor);

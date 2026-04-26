@@ -25,7 +25,7 @@ function offer(overrides: Partial<OfferRecord> = {}): OfferRecord {
 }
 
 describe("OfferPublicationPolicy", () => {
-  it("allows only active validated in-period indicative offers", () => {
+  it("allows only active validated in-period indicative offers", async () => {
     const policy = new OfferPublicationPolicy();
 
     expect(policy.evaluate(offer()).public).toBe(true);

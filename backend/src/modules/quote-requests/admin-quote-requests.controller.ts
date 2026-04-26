@@ -9,9 +9,9 @@ export class AdminQuoteRequestsController {
     return this.submissions.list();
   }
 
-  review(id: string, input: unknown, _actor: ActorContext) {
+  async review(id: string, input: unknown, _actor: ActorContext) {
     const parsed = adminReviewStatusUpdateSchema.parse(input);
-    const quote = this.submissions.list().find((candidate) => candidate.id === id);
+    const quote = (await this.submissions.list()).find((candidate) => candidate.id === id);
     if (!quote) throw new Error(`Quote request ${id} not found`);
     quote.status = parsed.status;
     quote.refusalReason = parsed.reason;

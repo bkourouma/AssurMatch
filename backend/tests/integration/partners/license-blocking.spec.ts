@@ -6,11 +6,11 @@ import { PartnersService } from "../../../src/modules/partners/partners.module";
 import { superAdminActor } from "../helpers/enterprise-seed";
 
 describe("license blocking", () => {
-  it("makes partner ineligible when license is invalid", () => {
+  it("makes partner ineligible when license is invalid", async () => {
     const audit = new AuditLogWriter();
     const partners = new PartnersService(audit);
     const licenses = new PartnerLicensesService(audit);
-    const partner = partners.create({ legalName: "Broker CI", primaryEmail: "ops@broker.example", primaryWhatsApp: "+2250102030405", status: "active" }, superAdminActor);
+    const partner = await partners.create({ legalName: "Broker CI", primaryEmail: "ops@broker.example", primaryWhatsApp: "+2250102030405", status: "active" }, superAdminActor);
     licenses.create({
       partnerTenantId: partner.id,
       licenseNumber: "LIC-CI-2",
@@ -22,7 +22,7 @@ describe("license blocking", () => {
       expirationDate: "2028-01-01"
     }, superAdminActor);
 
-    const result = new PartnerEligibilityService(partners, licenses).evaluate(partner.id, "00000000-0000-4000-8000-000000000030");
+    const result = await new PartnerEligibilityService(partners, licenses).evaluate(partner.id, "00000000-0000-4000-8000-000000000030");
     expect(result.eligible).toBe(false);
     expect(result.reasons).toContain("license_not_valid_for_scope");
   });

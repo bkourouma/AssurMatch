@@ -17,7 +17,7 @@ import type { PrismaService } from "../../../src/modules/common/prisma/prisma.se
 import { assertRuntimeRepository } from "../../../src/modules/common/repositories/runtime-repository";
 
 describe("domain repository contracts", () => {
-  it("declares memory adapters as explicit test-only repositories", () => {
+  it("declares memory adapters as explicit test-only repositories", async () => {
     const repositories = [
       new MemoryAuditLogRepository(),
       new MemoryFeatureFlagRepository(),
@@ -38,7 +38,7 @@ describe("domain repository contracts", () => {
     expect(repositories.map((repository) => repository.mode)).toEqual(repositories.map(() => "memory-test"));
   });
 
-  it("rejects memory repositories outside test runtime", () => {
+  it("rejects memory repositories outside test runtime", async () => {
     const previous = process.env.NODE_ENV;
     process.env.NODE_ENV = "production";
     try {
@@ -49,7 +49,7 @@ describe("domain repository contracts", () => {
     }
   });
 
-  it("declares only completed Prisma adapters as runtime repositories", () => {
+  it("declares only completed Prisma adapters as runtime repositories", async () => {
     const prisma = {} as PrismaService;
     const repositories = [
       new PrismaAuditLogRepository(prisma),

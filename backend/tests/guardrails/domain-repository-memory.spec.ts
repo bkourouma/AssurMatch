@@ -22,7 +22,7 @@ const extractedDomainFiles = [
 ];
 
 describe("domain repository memory guardrails", () => {
-  it("keeps extracted services from declaring primary array/map runtime state", () => {
+  it("keeps extracted services from declaring primary array/map runtime state", async () => {
     for (const file of extractedDomainFiles) {
       const source = readFileSync(join(root, file), "utf8");
       expect(source, file).not.toMatch(/private readonly \w+:\s*[^=]+?\[\]\s*=\s*\[\]/);
@@ -30,7 +30,7 @@ describe("domain repository memory guardrails", () => {
     }
   });
 
-  it("keeps memory adapters isolated in explicit repository files", () => {
+  it("keeps memory adapters isolated in explicit repository files", async () => {
     for (const file of extractedDomainFiles) {
       const source = readFileSync(join(root, file), "utf8");
       expect(source, file).not.toContain('readonly mode = "memory-test"');

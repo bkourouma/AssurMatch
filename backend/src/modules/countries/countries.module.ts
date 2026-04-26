@@ -11,12 +11,13 @@ export interface Country extends Omit<CountryRecord, "id" | "flags"> {
   flags: CountryFlags;
   createdAt: Date;
   updatedAt: Date;
+  createdById?: string;
 }
 
 export class CountriesService {
   constructor(private readonly audit: AuditLogWriter, private readonly repository: CountriesRepository = new MemoryCountriesRepository()) {}
 
-  create(input: CountryDto, actor: ActorContext): Country {
+  async create(input: CountryDto, actor: ActorContext): Promise<Country> {
     const parsed = countryCreateSchema.parse(input);
     const now = new Date();
     const country: Country = {
@@ -26,7 +27,7 @@ export class CountriesService {
       createdAt: now,
       updatedAt: now
     };
-    this.repository.create(country);
+    await this.repository.create(country);
     this.audit.write({
       actor,
       action: "country.created",
@@ -39,9 +40,9 @@ export class CountriesService {
     return country;
   }
 
-  update(id: string, input: Partial<CountryDto> & { reason: string }, actor: ActorContext): Country {
+  async update(id: string, input: Partial<CountryDto> & { reason: string }, actor: ActorContext): Promise<Country> {
     const parsed = countryUpdateSchema.parse(input);
-    const country = this.require(id);
+    const country = await this.require(id);
     if (parsed.status === "public" && (!country.regulatoryRegimeId || parsed.flags?.country_public_enabled !== true)) {
       throw new Error("Country public activation requires regime and country_public_enabled");
     }
@@ -49,7 +50,7 @@ export class CountriesService {
       flags: { ...country.flags, ...(parsed.flags ?? {}) },
       updatedAt: new Date()
     });
-    this.repository.update(id, country);
+    await this.repository.update(id, country);
     this.audit.write({
       actor,
       action: "country.updated",
@@ -63,16 +64,16 @@ export class CountriesService {
     return country;
   }
 
-  listAdmin(): Country[] {
+  listAdmin(): Promise<Country[]> {
     return this.repository.list();
   }
 
-  listPublic(): Country[] {
+  listPublic(): Promise<Country[]> {
     return this.repository.listPublic();
   }
 
-  getPublicPage(countryCode: string, globalFlags: Partial<Record<string, boolean>> = { public_comparator_enabled: true }, actor?: ActorContext): CountryPageResponse {
-    const country = this.repository.findByIsoCode(countryCode);
+  async getPublicPage(countryCode: string, globalFlags: Partial<Record<string, boolean>> = { public_comparator_enabled: true }, actor?: ActorContext): Promise<CountryPageResponse> {
+    const country = await this.repository.findByIsoCode(countryCode);
     const policy = new PublicJourneyFlagPolicy();
     if (!country) {
       this.audit.write({
@@ -118,11 +119,11 @@ export class CountriesService {
     };
   }
 
-  findByIsoCode(countryCode: string): Country | undefined {
+  findByIsoCode(countryCode: string): Promise<Country | undefined> {
     return this.repository.findByIsoCode(countryCode);
   }
 
-  require(id: string): Country {
+  require(id: string): Promise<Country> {
     return this.repository.require(id);
   }
 }

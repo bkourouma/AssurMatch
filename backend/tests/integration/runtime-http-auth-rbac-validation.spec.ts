@@ -45,7 +45,7 @@ describe("runtime HTTP auth RBAC and validation boundaries", () => {
   it("uses login-issued bearer tokens for /auth/me and protected broker routes", async () => {
     harness = await createRuntimeHttpHarness();
     const adminActor = { actorId: "seed-admin", roles: ["super_admin" as const], mfaVerified: true };
-    const brokerUser = harness.runtime.users.service.create({
+    const brokerUser = await harness.runtime.users.service.create({
       id: crypto.randomUUID(),
       email: "broker-login@example.com",
       displayName: "Broker Login",

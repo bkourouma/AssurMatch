@@ -28,7 +28,7 @@ function offer(name: string, price: number, overrides: Partial<OfferRecord> = {}
 }
 
 describe("PublicOfferCatalogService", () => {
-  it("filters hidden offers and sorts without recommendation wording", () => {
+  it("filters hidden offers and sorts without recommendation wording", async () => {
     const countryId = "00000000-0000-4000-8000-000000000030";
     const productId = "00000000-0000-4000-8000-000000000040";
     const service = new PublicOfferCatalogService([
@@ -37,7 +37,7 @@ describe("PublicOfferCatalogService", () => {
       offer("Expired", 1, { countryId, productId, validUntil: new Date("2024-01-01T00:00:00.000Z") })
     ], new AuditLogWriter());
 
-    const items = service.list(countryId, productId, { sort: "price_asc" });
+    const items = await service.list(countryId, productId, { sort: "price_asc" });
     expect(items.map((item) => item.name)).toEqual(["Auto A", "Auto B"]);
     expect(items.map((item) => item.disclaimer).join(" ")).not.toContain("meilleure");
   });

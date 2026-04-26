@@ -5,16 +5,16 @@ import { LeadTransmissionConsentPolicy } from "../../../src/modules/quote-reques
 import { superAdminActor } from "../../integration/helpers/enterprise-seed";
 
 describe("LeadTransmissionConsentPolicy", () => {
-  it("blocks missing consent and allows valid lead-transmission consent", () => {
+  it("blocks missing consent and allows valid lead-transmission consent", async () => {
     const audit = new AuditLogWriter();
     const consent = new ConsentService(audit);
     const policy = new LeadTransmissionConsentPolicy(consent, audit);
     const countryId = crypto.randomUUID();
     const productId = crypto.randomUUID();
 
-    expect(() => policy.assertValid(superAdminActor, { countryId, productId, targetId: "quote" })).toThrow("Consent required before transmission");
+    await expect(policy.assertValid(superAdminActor, { countryId, productId, targetId: "quote" })).rejects.toThrow("Consent required before transmission");
 
-    const record = consent.record({
+    const record = await consent.record({
       consentTextId: crypto.randomUUID(),
       subjectReference: "fingerprint",
       purpose: "lead_transmission",
@@ -26,6 +26,6 @@ describe("LeadTransmissionConsentPolicy", () => {
       grantedAt: "2026-04-25T00:00:00.000Z"
     }, superAdminActor);
 
-    expect(() => policy.assertValid(superAdminActor, { consentRecordId: record.id, countryId, productId, targetId: "quote" })).not.toThrow();
+    await expect(policy.assertValid(superAdminActor, { consentRecordId: record.id, countryId, productId, targetId: "quote" })).resolves.toBeUndefined();
   });
 });

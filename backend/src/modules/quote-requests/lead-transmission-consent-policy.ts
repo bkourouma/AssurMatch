@@ -6,8 +6,8 @@ import { ConsentService } from "../consent/consent.module";
 export class LeadTransmissionConsentPolicy {
   constructor(private readonly consent: ConsentService, private readonly audit: AuditLogWriter) {}
 
-  assertValid(actor: ActorContext, input: { consentRecordId?: string; countryId: string; productId: string; targetId: string }): void {
-    if (!this.consent.hasValidConsent(input.consentRecordId, "lead_transmission", input.countryId, input.productId)) {
+  async assertValid(actor: ActorContext, input: { consentRecordId?: string; countryId: string; productId: string; targetId: string }): Promise<void> {
+    if (!await this.consent.hasValidConsent(input.consentRecordId, "lead_transmission", input.countryId, input.productId)) {
       this.audit.write({
         actor,
         action: QuoteAuditActions.consentLeadTransmissionRefused,

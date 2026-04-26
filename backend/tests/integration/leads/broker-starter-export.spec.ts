@@ -9,17 +9,17 @@ const owner: ActorContext = { actorId: "owner-a", roles: ["broker_owner_starter"
 const agent: ActorContext = { actorId: "agent-a", roles: ["broker_agent"], partnerTenantId: "broker-a", mfaVerified: true };
 
 describe("broker Starter export", () => {
-  it("exports scoped CSV only when export permission exists", () => {
+  it("exports scoped CSV only when export permission exists", async () => {
     const audit = new AuditLogWriter();
     const leads = new LeadsModule(new PartnersService(audit), new PartnerLicensesService(audit), audit);
-    leads.assignments.create({ quoteRequestId: "q1", partnerTenantId: "broker-a", assignmentReason: "routing", publicReference: "AM-1" }, owner);
-    leads.assignments.create({ quoteRequestId: "q2", partnerTenantId: "broker-b", assignmentReason: "routing", publicReference: "AM-2" }, { ...owner, partnerTenantId: "broker-b" });
+    await leads.assignments.create({ quoteRequestId: "q1", partnerTenantId: "broker-a", assignmentReason: "routing", publicReference: "AM-1" }, owner);
+    await leads.assignments.create({ quoteRequestId: "q2", partnerTenantId: "broker-b", assignmentReason: "routing", publicReference: "AM-2" }, { ...owner, partnerTenantId: "broker-b" });
 
-    const csv = leads.brokerStarterController.exportCsv(owner, { maxRows: 10 });
+    const csv = await leads.brokerStarterController.exportCsv(owner, { maxRows: 10 });
 
     expect(csv).toContain("AM-1");
     expect(csv).not.toContain("AM-2");
-    expect(() => leads.brokerStarterController.exportCsv(agent, { maxRows: 10 })).toThrow("Lead export denied");
+    await expect(leads.brokerStarterController.exportCsv(agent, { maxRows: 10 })).rejects.toThrow("Lead export denied");
     expect(audit.search({ action: "broker_starter.export_refused", result: "refused" })).toHaveLength(1);
   });
 });

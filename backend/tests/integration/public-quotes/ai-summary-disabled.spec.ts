@@ -5,7 +5,7 @@ import { superAdminActor } from "../helpers/enterprise-seed";
 
 describe("AI quote summary disabled", () => {
   it("produces zero model calls when flags or module state are disabled", async () => {
-    const seed = seedComparatorQuote();
+    const seed = await seedComparatorQuote();
     await seed.app.quoteRequests.publicController.submit(validQuotePayload(seed) as QuoteRequestCreateDto, superAdminActor);
 
     expect(seed.app.quoteAiSummary.list()).toHaveLength(0);

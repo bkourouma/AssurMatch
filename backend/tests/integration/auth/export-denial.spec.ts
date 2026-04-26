@@ -3,7 +3,7 @@ import { AuditLogWriter } from "../../../src/modules/audit-logs/audit-log-writer
 import { ExportPolicyService } from "../../../src/modules/users/export-policy.service";
 
 describe("export denial", () => {
-  it("refuses exports without scoped permission and audits the refusal", () => {
+  it("refuses exports without scoped permission and audits the refusal", async () => {
     const audit = new AuditLogWriter();
     const exportPolicy = new ExportPolicyService(audit);
 

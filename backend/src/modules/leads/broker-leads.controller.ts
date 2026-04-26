@@ -12,19 +12,19 @@ export class BrokerLeadsController {
     this.access = new LeadAccessPolicy(audit);
   }
 
-  list(actor: ActorContext) {
-    return this.assignments.list().filter((assignment) => assignment.partnerTenantId === actor.partnerTenantId);
+  async list(actor: ActorContext) {
+    return (await this.assignments.list()).filter((assignment) => assignment.partnerTenantId === actor.partnerTenantId);
   }
 
-  detail(id: string, actor: ActorContext) {
-    const assignment = this.assignments.require(id);
+  async detail(id: string, actor: ActorContext) {
+    const assignment = await this.assignments.require(id);
     this.access.assertBrokerCanAccess(actor, assignment);
     return assignment;
   }
 
-  updateStatus(id: string, input: BrokerLeadStatusUpdateDto, actor: ActorContext) {
+  async updateStatus(id: string, input: BrokerLeadStatusUpdateDto, actor: ActorContext) {
     const parsed = brokerLeadStatusUpdateSchema.parse(input);
-    const assignment = this.assignments.require(id);
+    const assignment = await this.assignments.require(id);
     this.access.assertBrokerCanAccess(actor, assignment);
     return this.assignments.updateStatus(id, parsed.status, actor, parsed.reason);
   }

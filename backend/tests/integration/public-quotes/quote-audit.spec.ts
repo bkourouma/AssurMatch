@@ -5,7 +5,7 @@ import { superAdminActor } from "../helpers/enterprise-seed";
 
 describe("quote audit coverage", () => {
   it("audits consent, prospect, quote and routing-sensitive decisions", async () => {
-    const seed = seedComparatorQuote();
+    const seed = await seedComparatorQuote();
     await seed.app.quoteRequests.publicController.submit(validQuotePayload(seed) as QuoteRequestCreateDto, superAdminActor);
 
     const actions = seed.app.audit.writer.all().map((entry) => entry.action);

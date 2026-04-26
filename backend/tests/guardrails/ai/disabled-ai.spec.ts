@@ -5,7 +5,7 @@ import { expectZeroModelCalls } from "../helpers/ai-call-assertions";
 import { superAdminActor } from "../../integration/helpers/enterprise-seed";
 
 describe("disabled AI guardrail", () => {
-  it("does not make model calls when AI module is disabled", () => {
+  it("does not make model calls when AI module is disabled", async () => {
     const ai = new AIService(new AuditLogWriter());
     const module = ai.register({ key: "lead_scoring", status: "disabled" }, superAdminActor);
 

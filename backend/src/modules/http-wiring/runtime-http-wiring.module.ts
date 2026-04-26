@@ -117,17 +117,17 @@ export class PublicCountriesController {
 export class PublicProductsController {
   constructor(private readonly runtime: AssurMatchRuntime) {}
 
-  list(countryCode: string) {
+  async list(countryCode: string) {
     const parsedCountryCode = parseParam("countryCode", countryCode, isoCountrySchema);
-    const country = this.runtime.countries.service.findByIsoCode(parsedCountryCode);
+    const country = await this.runtime.countries.service.findByIsoCode(parsedCountryCode);
     if (!country) return [];
     return this.runtime.products.service.listPublicForCountry(country.id, country.flags);
   }
 
-  detail(countryCode: string, productKey: string, request: AssurMatchHttpRequest) {
+  async detail(countryCode: string, productKey: string, request: AssurMatchHttpRequest) {
     const parsedCountryCode = parseParam("countryCode", countryCode, isoCountrySchema);
     const parsedProductKey = parseParam("productKey", productKey);
-    const country = this.runtime.countries.service.findByIsoCode(parsedCountryCode);
+    const country = await this.runtime.countries.service.findByIsoCode(parsedCountryCode);
     if (!country) throw new Error("Country is not publicly available");
     return this.runtime.products.service.getPublicProductPage(country.id, parsedProductKey, country.flags, { public_comparator_enabled: true, quote_request_enabled: true }, actorFromRequest(request));
   }
@@ -136,12 +136,12 @@ export class PublicProductsController {
 export class PublicOffersController {
   constructor(private readonly runtime: AssurMatchRuntime) {}
 
-  list(countryCode: string, productKey: string, query: Partial<OfferListQuery>) {
+  async list(countryCode: string, productKey: string, query: Partial<OfferListQuery>) {
     const parsedCountryCode = parseParam("countryCode", countryCode, isoCountrySchema);
     const parsedProductKey = parseParam("productKey", productKey);
     const parsedQuery = parseHttpInput(offerListQuerySchema, query);
-    const country = this.runtime.countries.service.findByIsoCode(parsedCountryCode);
-    const product = this.runtime.products.service.findByKey(parsedProductKey);
+    const country = await this.runtime.countries.service.findByIsoCode(parsedCountryCode);
+    const product = await this.runtime.products.service.findByKey(parsedProductKey);
     if (!country || !product) return { items: [], total: 0, page: 1, pageSize: 20 };
     return this.runtime.offers.publicCatalog.list(country.id, product.id, parsedQuery);
   }
@@ -154,12 +154,12 @@ export class PublicOffersController {
 export class PublicQuoteRequestsController {
   constructor(private readonly runtime: AssurMatchRuntime) {}
 
-  quoteForm(countryCode: string, productKey: string, language?: string) {
+  async quoteForm(countryCode: string, productKey: string, language?: string) {
     const parsedCountryCode = parseParam("countryCode", countryCode, isoCountrySchema);
     const parsedProductKey = parseParam("productKey", productKey);
     const parsedLanguage = parseParam("language", language ?? "fr", languageCodeSchema);
-    const country = this.runtime.countries.service.findByIsoCode(parsedCountryCode);
-    const product = this.runtime.products.service.findByKey(parsedProductKey);
+    const country = await this.runtime.countries.service.findByIsoCode(parsedCountryCode);
+    const product = await this.runtime.products.service.findByKey(parsedProductKey);
     if (!country || !product) throw new Error("Quote form is not publicly available");
     return this.runtime.quoteForms.service.publicForm(country.id, product.id, parsedLanguage);
   }
@@ -294,12 +294,12 @@ export class AdminFeatureFlagsController {
     return this.runtime.featureFlags.service.list();
   }
 
-  update(id: string, input: { value: boolean; reason: string }, request: AssurMatchHttpRequest) {
+  async update(id: string, input: { value: boolean; reason: string }, request: AssurMatchHttpRequest) {
     const actor = protectedActorFromRequest(request);
     assertPermission(actor, "feature_flags:update");
     const flagId = parseParam("id", id, uuidSchema);
     const parsed = parseHttpInput(updateFeatureFlagSchema, input);
-    const existing = this.runtime.featureFlags.service.list().find((flag) => flag.id === flagId);
+    const existing = (await this.runtime.featureFlags.service.list()).find((flag) => flag.id === flagId);
     if (!existing) throw new Error("Feature flag not found");
     return this.runtime.featureFlags.service.setFlag({ ...existing, value: parsed.value, reason: parsed.reason }, actor);
   }

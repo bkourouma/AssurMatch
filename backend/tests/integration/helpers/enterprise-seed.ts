@@ -23,9 +23,9 @@ export function createFoundationServices() {
   };
 }
 
-export function seedMiniCatalog() {
+export async function seedMiniCatalog() {
   const services = createFoundationServices();
-  const country = services.countries.create(
+  const country = await services.countries.create(
     {
       isoCode: "CI",
       name: "Cote d'Ivoire",
@@ -37,7 +37,7 @@ export function seedMiniCatalog() {
     },
     superAdminActor
   );
-  const product = services.products.create(
+  const product = await services.products.create(
     {
       key: "auto",
       name: "Assurance auto",
@@ -45,6 +45,6 @@ export function seedMiniCatalog() {
     },
     superAdminActor
   );
-  services.products.associateCountry(product.id, country.id, superAdminActor);
+  await services.products.associateCountry(product.id, country.id, superAdminActor);
   return { ...services, country, product };
 }

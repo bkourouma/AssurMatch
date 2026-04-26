@@ -10,7 +10,7 @@ function restoreEnv(): void {
 describe("runtime configuration hardening", () => {
   afterEach(restoreEnv);
 
-  it("rejects memory adapters outside explicit test runtime", () => {
+  it("rejects memory adapters outside explicit test runtime", async () => {
     expect(() =>
       validateRuntimeEnvironment({
         NODE_ENV: "production",
@@ -22,7 +22,7 @@ describe("runtime configuration hardening", () => {
     ).toThrow(/Memory runtime adapters are test-only/);
   });
 
-  it("requires DATABASE_URL outside test runtime", () => {
+  it("requires DATABASE_URL outside test runtime", async () => {
     expect(() =>
       validateRuntimeEnvironment({
         NODE_ENV: "production",
@@ -32,7 +32,7 @@ describe("runtime configuration hardening", () => {
     ).toThrow(/DATABASE_URL is required/);
   });
 
-  it("keeps regulated module flags false by default", () => {
+  it("keeps regulated module flags false by default", async () => {
     const config = new ConfigModule({
       NODE_ENV: "test",
       APP_ENV: "test"

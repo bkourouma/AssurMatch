@@ -8,14 +8,14 @@ export class AdminNotificationsController {
 
   constructor(private readonly notifications: NotificationsService) {}
 
-  list(actor: ActorContext): NotificationRecord[] {
+  list(actor: ActorContext): Promise<NotificationRecord[]> {
     this.rbac.assert(actor, "notifications:read");
     return this.notifications.list();
   }
 
-  listQuoteNotifications(actor: ActorContext): NotificationRecord[] {
+  async listQuoteNotifications(actor: ActorContext): Promise<NotificationRecord[]> {
     this.rbac.assert(actor, "notifications:read");
-    return this.notifications.list().filter((notification) =>
+    return (await this.notifications.list()).filter((notification) =>
       notification.type === "visitor_quote_confirmation" ||
       notification.type === "visitor_quote_non_routable" ||
       notification.type === "broker_lead_assigned" ||

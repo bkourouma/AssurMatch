@@ -4,7 +4,7 @@ import { ProductsService, type Product } from "./products.module";
 export class PublicProductsController {
   constructor(private readonly products: ProductsService) {}
 
-  list(countryId: string): Product[] {
+  list(countryId: string): Promise<Product[]> {
     assertNoHeavyPublicSynchronousWork({ publicEndpoint: true, heavySynchronousWork: false });
     return this.products.listPublic(countryId);
   }

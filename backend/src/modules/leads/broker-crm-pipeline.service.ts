@@ -14,13 +14,13 @@ export class BrokerCrmPipelineService {
     private readonly audit: AuditLogWriter
   ) {}
 
-  changeStatus(id: string, input: BrokerCrmStatusUpdate, actor: ActorContext): LeadAssignmentRecord {
+  async changeStatus(id: string, input: BrokerCrmStatusUpdate, actor: ActorContext): Promise<LeadAssignmentRecord> {
     const parsed = brokerCrmStatusUpdateSchema.parse(input);
-    const assignment = this.assignments.require(id);
+    const assignment = await this.assignments.require(id);
     this.access.assertMutation(actor, assignment);
     const previousStatus = assignment.crmStatus ?? "nouveau";
-    const updated = this.assignments.updateCrmMetadata(id, { crmStatus: parsed.status as BrokerCrmPipelineStatus }, actor);
-    this.history.append({
+    const updated = await this.assignments.updateCrmMetadata(id, { crmStatus: parsed.status as BrokerCrmPipelineStatus }, actor);
+    await this.history.append({
       leadAssignmentId: id,
       partnerTenantId: assignment.partnerTenantId,
       actor,

@@ -8,22 +8,22 @@ export class AdminProductsController {
 
   constructor(private readonly products: ProductsService) {}
 
-  list(actor: ActorContext, countryId?: string): Product[] {
+  list(actor: ActorContext, countryId?: string): Promise<Product[]> {
     this.rbac.assert(actor, "products:read", countryId ? { countryId } : {});
     return this.products.listAdmin(countryId);
   }
 
-  create(actor: ActorContext, input: ProductDto): Product {
+  create(actor: ActorContext, input: ProductDto): Promise<Product> {
     this.rbac.assert(actor, "products:create");
     return this.products.create(input, actor);
   }
 
-  associateCountry(actor: ActorContext, productId: string, countryId: string): Product {
+  associateCountry(actor: ActorContext, productId: string, countryId: string): Promise<Product> {
     this.rbac.assert(actor, "products:update", { countryId, productId });
     return this.products.associateCountry(productId, countryId, actor);
   }
 
-  update(actor: ActorContext, id: string, input: Partial<ProductDto> & { reason: string }): Product {
+  update(actor: ActorContext, id: string, input: Partial<ProductDto> & { reason: string }): Promise<Product> {
     this.rbac.assert(actor, "products:update", { productId: id });
     return this.products.update(id, input, actor);
   }

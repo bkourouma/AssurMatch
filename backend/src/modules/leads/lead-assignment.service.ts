@@ -58,7 +58,7 @@ export interface LeadAssignmentRecord {
 export class LeadAssignmentService {
   constructor(private readonly audit: AuditLogWriter, private readonly repository: LeadAssignmentsRepository = new MemoryLeadAssignmentsRepository()) {}
 
-  create(input: {
+  async create(input: {
     quoteRequestId: string;
     partnerTenantId: string;
     assignmentReason: string;
@@ -69,7 +69,7 @@ export class LeadAssignmentService {
     answers?: Record<string, unknown>;
     consentRecordId?: string;
     routingDecisionId?: string;
-  }, actor: ActorContext): LeadAssignmentRecord {
+  }, actor: ActorContext): Promise<LeadAssignmentRecord> {
     const now = new Date();
     const assignment: LeadAssignmentRecord = {
       id: crypto.randomUUID(),
@@ -88,7 +88,7 @@ export class LeadAssignmentService {
       createdAt: now,
       updatedAt: now
     };
-    this.repository.create(assignment);
+    await this.repository.create(assignment);
     this.audit.write({
       actor,
       action: QuoteAuditActions.routingAssigned,
@@ -101,14 +101,14 @@ export class LeadAssignmentService {
     return assignment;
   }
 
-  updateCrmMetadata(id: string, input: {
+  async updateCrmMetadata(id: string, input: {
     crmStatus?: BrokerCrmPipelineStatus;
     urgency?: LeadAssignmentRecord["urgency"];
     source?: LeadAssignmentRecord["source"];
     assignedAdvisorId?: string;
     tags?: string[];
-  }, actor: ActorContext): LeadAssignmentRecord {
-    const assignment = this.require(id);
+  }, actor: ActorContext): Promise<LeadAssignmentRecord> {
+    const assignment = await this.require(id);
     const now = new Date();
     if (input.crmStatus) assignment.crmStatus = input.crmStatus;
     if (input.urgency) assignment.urgency = input.urgency;
@@ -119,21 +119,21 @@ export class LeadAssignmentService {
     assignment.updatedAt = now;
     if (actor.actorId) assignment.lastBrokerActionById = actor.actorId;
     assignment.lastBrokerActionAt = now;
-    this.repository.update(id, assignment);
+    await this.repository.update(id, assignment);
     return assignment;
   }
 
-  setBrokerNotification(id: string, notificationId: string): LeadAssignmentRecord {
-    const assignment = this.require(id);
+  async setBrokerNotification(id: string, notificationId: string): Promise<LeadAssignmentRecord> {
+    const assignment = await this.require(id);
     assignment.brokerNotificationId = notificationId;
     assignment.status = "broker_notified";
     assignment.updatedAt = new Date();
-    this.repository.update(id, assignment);
+    await this.repository.update(id, assignment);
     return assignment;
   }
 
-  updateStatus(id: string, status: LeadAssignmentStatus, actor: ActorContext, reason: string): LeadAssignmentRecord {
-    const assignment = this.require(id);
+  async updateStatus(id: string, status: LeadAssignmentStatus, actor: ActorContext, reason: string): Promise<LeadAssignmentRecord> {
+    const assignment = await this.require(id);
     const now = new Date();
     assignment.status = status;
     assignment.lastBrokerActionAt = now;
@@ -144,7 +144,7 @@ export class LeadAssignmentService {
     if (status === "accepted") assignment.acceptedAt = now;
     if (status === "rejected") assignment.rejectedAt = now;
     if (status === "disputed") assignment.disputedAt = now;
-    this.repository.updateStatus(id, status, assignment);
+    await this.repository.updateStatus(id, status, assignment);
     this.audit.write({
       actor,
       action: QuoteAuditActions.brokerLeadStatusUpdated,
@@ -158,15 +158,15 @@ export class LeadAssignmentService {
     return assignment;
   }
 
-  activeCountForPartner(partnerTenantId: string): number {
+  activeCountForPartner(partnerTenantId: string): Promise<number> {
     return this.repository.activeCountForPartner(partnerTenantId);
   }
 
-  list(): LeadAssignmentRecord[] {
+  list(): Promise<LeadAssignmentRecord[]> {
     return this.repository.list();
   }
 
-  require(id: string): LeadAssignmentRecord {
+  require(id: string): Promise<LeadAssignmentRecord> {
     return this.repository.require(id);
   }
 }

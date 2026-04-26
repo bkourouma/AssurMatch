@@ -16,7 +16,7 @@ export class OfferAdminService {
     private readonly audit: AuditLogWriter
   ) {}
 
-  create(input: AdminOfferUpsertDto, actor: ActorContext): OfferRecord {
+  async create(input: AdminOfferUpsertDto, actor: ActorContext): Promise<OfferRecord> {
     const parsed = adminOfferUpsertSchema.parse(input);
     const now = new Date();
     const offer: OfferRecord = {
@@ -44,8 +44,8 @@ export class OfferAdminService {
       updatedAt: now,
       ...(actor.actorId ? { createdById: actor.actorId } : {})
     };
-    this.repository.create(offer);
-    this.recordHistory(offer.id, "created", undefined, offer, parsed.reason, actor);
+    await this.repository.create(offer);
+    await this.recordHistory(offer.id, "created", undefined, offer, parsed.reason, actor);
     this.audit.write({
       actor,
       action: QuoteAuditActions.offerAdminCreated,
@@ -59,9 +59,9 @@ export class OfferAdminService {
     return offer;
   }
 
-  update(id: string, input: AdminOfferUpsertDto, actor: ActorContext): OfferRecord {
+  async update(id: string, input: AdminOfferUpsertDto, actor: ActorContext): Promise<OfferRecord> {
     const parsed = adminOfferUpsertSchema.parse(input);
-    const offer = this.require(id);
+    const offer = await this.require(id);
     const previous = { ...offer };
     Object.assign(offer, {
       countryId: parsed.countryId,
@@ -81,14 +81,14 @@ export class OfferAdminService {
       publicDisclaimers: parsed.publicDisclaimers,
       updatedAt: new Date()
     });
-    this.repository.update(id, offer);
-    this.recordHistory(offer.id, "updated", previous, offer, parsed.reason, actor);
+    await this.repository.update(id, offer);
+    await this.recordHistory(offer.id, "updated", previous, offer, parsed.reason, actor);
     return offer;
   }
 
-  validate(id: string, input: OfferValidationDto, actor: ActorContext): OfferRecord {
+  async validate(id: string, input: OfferValidationDto, actor: ActorContext): Promise<OfferRecord> {
     const parsed = offerValidationSchema.parse(input);
-    const offer = this.require(id);
+    const offer = await this.require(id);
     offer.validationStatus = parsed.validationStatus;
     offer.status = parsed.validationStatus === "validated" ? "active" : "review";
     if (parsed.validationStatus === "validated") {
@@ -96,8 +96,8 @@ export class OfferAdminService {
       offer.validatedAt = new Date();
     }
     offer.updatedAt = new Date();
-    this.repository.update(id, offer);
-    this.recordHistory(offer.id, "validated", undefined, { validationStatus: offer.validationStatus, status: offer.status }, parsed.reason, actor);
+    await this.repository.update(id, offer);
+    await this.recordHistory(offer.id, "validated", undefined, { validationStatus: offer.validationStatus, status: offer.status }, parsed.reason, actor);
     this.audit.write({
       actor,
       action: QuoteAuditActions.offerAdminValidated,
@@ -111,12 +111,12 @@ export class OfferAdminService {
     return offer;
   }
 
-  suspend(id: string, reason: string, actor: ActorContext): OfferRecord {
-    const offer = this.require(id);
+  async suspend(id: string, reason: string, actor: ActorContext): Promise<OfferRecord> {
+    const offer = await this.require(id);
     offer.status = "suspended";
     offer.updatedAt = new Date();
-    this.repository.update(id, offer);
-    this.recordHistory(offer.id, "suspended", undefined, { status: offer.status }, reason, actor);
+    await this.repository.update(id, offer);
+    await this.recordHistory(offer.id, "suspended", undefined, { status: offer.status }, reason, actor);
     this.audit.write({
       actor,
       action: QuoteAuditActions.offerAdminSuspended,
@@ -130,16 +130,16 @@ export class OfferAdminService {
     return offer;
   }
 
-  list(): OfferRecord[] {
+  list(): Promise<OfferRecord[]> {
     return this.repository.list();
   }
 
-  require(id: string): OfferRecord {
+  require(id: string): Promise<OfferRecord> {
     return this.repository.require(id);
   }
 
-  private recordHistory(offerId: string, changeType: string, previousValue: unknown, nextValue: unknown, reason: string, actor: ActorContext): void {
-    this.repository.appendHistory({
+  private async recordHistory(offerId: string, changeType: string, previousValue: unknown, nextValue: unknown, reason: string, actor: ActorContext): Promise<void> {
+    await this.repository.appendHistory({
       id: crypto.randomUUID(),
       offerId,
       ...(actor.actorId ? { changedById: actor.actorId } : {}),

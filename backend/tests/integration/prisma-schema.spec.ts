@@ -2,7 +2,7 @@ import { execSync } from "node:child_process";
 import { describe, expect, it } from "vitest";
 
 describe("prisma schema validation", () => {
-  it("validates the runtime schema", () => {
+  it("validates the runtime schema", async () => {
     const output = execSync("npx prisma validate --schema backend/prisma/schema.prisma", {
       cwd: process.cwd(),
       env: {

@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { QuoteRedisKeys } from "../../../src/modules/common/redis/quote-redis-keys";
 
 describe("QuoteRedisKeys", () => {
-  it("hashes IP, session and contact inputs so raw PII is absent", () => {
+  it("hashes IP, session and contact inputs so raw PII is absent", async () => {
     const keys = [
       QuoteRedisKeys.publicCatalogRateLimit("203.0.113.8"),
       QuoteRedisKeys.quoteRateLimit("203.0.113.8", "country-ci", "product-auto"),

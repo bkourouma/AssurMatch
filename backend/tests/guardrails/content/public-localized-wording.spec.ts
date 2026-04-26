@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 
 describe("public localized wording", () => {
-  it("keeps French legal notices and safe CTAs available on public pages", () => {
+  it("keeps French legal notices and safe CTAs available on public pages", async () => {
     const text = [
       "apps/public/app/components/public-journey.tsx",
       "apps/public/app/components/quote-form.tsx",

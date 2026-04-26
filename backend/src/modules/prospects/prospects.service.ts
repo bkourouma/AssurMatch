@@ -16,10 +16,10 @@ export interface ProspectRecord extends NormalizedProspectContact {
 export class ProspectsService {
   constructor(private readonly audit: AuditLogWriter, private readonly repository: ProspectsRepository = new MemoryProspectsRepository()) {}
 
-  createOrLink(countryId: string, productId: string, contact: NormalizedProspectContact, consentRecordId: string, actor: ActorContext): ProspectRecord {
-    const before = this.repository.list().length;
-    const prospect = this.repository.createOrLink(countryId, productId, contact, consentRecordId);
-    if (this.repository.list().length === before) return prospect;
+  async createOrLink(countryId: string, productId: string, contact: NormalizedProspectContact, consentRecordId: string, actor: ActorContext): Promise<ProspectRecord> {
+    const before = (await this.repository.list()).length;
+    const prospect = await this.repository.createOrLink(countryId, productId, contact, consentRecordId);
+    if ((await this.repository.list()).length === before) return prospect;
     this.audit.write({
       actor,
       action: "prospect.created",
@@ -32,11 +32,11 @@ export class ProspectsService {
     return prospect;
   }
 
-  list(): ProspectRecord[] {
+  list(): Promise<ProspectRecord[]> {
     return this.repository.list();
   }
 
-  require(id: string): ProspectRecord {
+  require(id: string): Promise<ProspectRecord> {
     return this.repository.require(id);
   }
 }

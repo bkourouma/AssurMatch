@@ -13,8 +13,8 @@ describe("broker Starter runtime HTTP", () => {
     harness = await createRuntimeHttpHarness();
     const actor = { actorId: "starter-owner", roles: ["broker_owner_starter" as const], partnerTenantId: "broker-a", partnerPlan: "starter" as const, mfaVerified: true };
     const otherActor = { ...actor, actorId: "other-owner", partnerTenantId: "broker-b" };
-    const own = harness.runtime.leads.assignments.create({ quoteRequestId: "q-runtime-a", partnerTenantId: "broker-a", assignmentReason: "routing", publicReference: "AM-A" }, actor);
-    const other = harness.runtime.leads.assignments.create({ quoteRequestId: "q-runtime-b", partnerTenantId: "broker-b", assignmentReason: "routing", publicReference: "AM-B" }, otherActor);
+    const own = await harness.runtime.leads.assignments.create({ quoteRequestId: "q-runtime-a", partnerTenantId: "broker-a", assignmentReason: "routing", publicReference: "AM-A" }, actor);
+    const other = await harness.runtime.leads.assignments.create({ quoteRequestId: "q-runtime-b", partnerTenantId: "broker-b", assignmentReason: "routing", publicReference: "AM-B" }, otherActor);
 
     const list = await readJson<{ items: Array<{ publicReference: string }> }>(await harness.request("/broker/starter/leads", { headers: actorHeaders(actor) }));
     expect(list.items.map((item) => item.publicReference)).toEqual([own.publicReference]);
@@ -26,6 +26,6 @@ describe("broker Starter runtime HTTP", () => {
     expect(accepted.status).toBe(201);
     const history = await readJson<unknown[]>(await harness.request(`/broker/starter/leads/${own.id}/history`, { headers: actorHeaders(actor) }));
     expect(history).toHaveLength(1);
-    expect(harness.runtime.leads.assignments.require(own.id).status).toBe("accepted");
+    expect((await harness.runtime.leads.assignments.require(own.id)).status).toBe("accepted");
   });
 });

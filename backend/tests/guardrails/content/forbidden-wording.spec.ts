@@ -12,7 +12,7 @@ const checkedFiles = [
 ];
 
 describe("forbidden regulated wording", () => {
-  it("does not include forbidden sales or binding-advice wording", () => {
+  it("does not include forbidden sales or binding-advice wording", async () => {
     const findings = checkedFiles.flatMap((file) => findForbiddenWording(readFileSync(file, "utf8")).map((wording) => `${file}:${wording}`));
     expect(findings).toEqual([]);
   });

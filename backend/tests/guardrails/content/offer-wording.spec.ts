@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 import { findForbiddenWording } from "../../../../packages/shared/contracts/content-safety";
 
 describe("offer wording", () => {
-  it("keeps offers indicative and never presents an official recommendation", () => {
+  it("keeps offers indicative and never presents an official recommendation", async () => {
     const text = [
       "backend/src/modules/offers/public-offer-catalog.service.ts",
       "apps/public/app/countries/[countryCode]/products/[productKey]/offers/page.tsx",

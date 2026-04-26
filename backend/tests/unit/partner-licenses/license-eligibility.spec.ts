@@ -4,9 +4,9 @@ import { PartnerLicensesService } from "../../../src/modules/partner-licenses/pa
 import { superAdminActor } from "../../integration/helpers/enterprise-seed";
 
 describe("license eligibility", () => {
-  it("blocks expired or out-of-scope licenses", () => {
+  it("blocks expired or out-of-scope licenses", async () => {
     const licenses = new PartnerLicensesService(new AuditLogWriter());
-    const license = licenses.create({
+    const license = await licenses.create({
       partnerTenantId: "00000000-0000-4000-8000-000000000020",
       licenseNumber: "LIC-001",
       issuingAuthority: "Regulator",
@@ -18,7 +18,7 @@ describe("license eligibility", () => {
     }, superAdminActor);
 
     expect(license.status).toBe("valid");
-    expect(licenses.eligible(license.partnerTenantId, license.countryId, license.productIds[0])).toBe(true);
-    expect(licenses.eligible(license.partnerTenantId, license.countryId, "00000000-0000-4000-8000-000000000041")).toBe(false);
+    expect(await licenses.eligible(license.partnerTenantId, license.countryId, license.productIds[0])).toBe(true);
+    expect(await licenses.eligible(license.partnerTenantId, license.countryId, "00000000-0000-4000-8000-000000000041")).toBe(false);
   });
 });

@@ -4,9 +4,9 @@ import { ConsentService } from "../../../src/modules/consent/consent.module";
 import { superAdminActor } from "../../integration/helpers/enterprise-seed";
 
 describe("consent text versioning", () => {
-  it("makes published consent texts immutable", () => {
+  it("makes published consent texts immutable", async () => {
     const service = new ConsentService(new AuditLogWriter());
-    const text = service.createText({
+    const text = await service.createText({
       purpose: "lead_transmission",
       countryId: "00000000-0000-4000-8000-000000000030",
       channel: "public_web",

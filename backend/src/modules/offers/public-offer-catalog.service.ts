@@ -15,16 +15,16 @@ export class PublicOfferCatalogService {
   constructor(repositoryOrOffers: OffersRepository | OfferRecord[], private readonly audit: AuditLogWriter) {
     if (Array.isArray(repositoryOrOffers)) {
       const repository = new MemoryOffersRepository();
-      for (const offer of repositoryOrOffers) repository.create(offer);
+      for (const offer of repositoryOrOffers) void repository.create(offer);
       this.repository = repository;
     } else {
       this.repository = repositoryOrOffers;
     }
   }
 
-  list(countryId: string, productId: string, query: Partial<OfferListQuery> = {}, actor?: ActorContext): OfferSummary[] {
+  async list(countryId: string, productId: string, query: Partial<OfferListQuery> = {}, actor?: ActorContext): Promise<OfferSummary[]> {
     const parsed = offerListQuerySchema.parse(query);
-    const visible = this.repository.list()
+    const visible = (await this.repository.list())
       .filter((offer) => offer.countryId === countryId && offer.productId === productId)
       .filter((offer) => this.policy.evaluate(offer).public)
       .filter((offer) => parsed.minPrice === undefined || (offer.indicativePriceMin ?? 0) >= parsed.minPrice)
@@ -43,8 +43,8 @@ export class PublicOfferCatalogService {
     return sorted.map((offer) => this.toSummary(offer));
   }
 
-  detail(offerId: string, actor?: ActorContext): OfferDetail {
-    const offer = this.repository.list().find((candidate) => candidate.id === offerId);
+  async detail(offerId: string, actor?: ActorContext): Promise<OfferDetail> {
+    const offer = (await this.repository.list()).find((candidate) => candidate.id === offerId);
     const decision = offer ? this.policy.evaluate(offer) : { public: false, reasons: ["offer_not_found"] };
     if (!offer || !decision.public) {
       this.audit.write({

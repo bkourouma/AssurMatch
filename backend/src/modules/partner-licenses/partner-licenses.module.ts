@@ -14,7 +14,7 @@ export interface PartnerLicense extends PartnerLicenseRecord {
 export class PartnerLicensesService {
   constructor(private readonly audit: AuditLogWriter, private readonly repository: PartnerLicensesRepository = new MemoryPartnerLicensesRepository()) {}
 
-  create(input: PartnerLicenseDto, actor: ActorContext): PartnerLicense {
+  async create(input: PartnerLicenseDto, actor: ActorContext): Promise<PartnerLicense> {
     const parsed = partnerLicenseSchema.parse(input);
     const now = new Date();
     const license: PartnerLicense = {
@@ -23,7 +23,7 @@ export class PartnerLicensesService {
       createdAt: now,
       updatedAt: now
     };
-    this.repository.create(license);
+    await this.repository.create(license);
     this.audit.write({
       actor,
       action: "partner_license.created",
@@ -36,8 +36,8 @@ export class PartnerLicensesService {
     return license;
   }
 
-  validate(id: string, actor: ActorContext): PartnerLicense {
-    const license = this.require(id);
+  async validate(id: string, actor: ActorContext): Promise<PartnerLicense> {
+    const license = await this.require(id);
     if (new Date(license.expirationDate) <= new Date()) {
       license.status = "expired";
       throw new Error("Expired license cannot be validated");
@@ -46,7 +46,7 @@ export class PartnerLicensesService {
     if (actor.actorId) license.validatedById = actor.actorId;
     license.validatedAt = new Date();
     license.updatedAt = new Date();
-    this.repository.update(id, license);
+    await this.repository.update(id, license);
     this.audit.write({
       actor,
       action: "partner_license.validated",
@@ -59,15 +59,15 @@ export class PartnerLicensesService {
     return license;
   }
 
-  listForPartner(partnerTenantId: string): PartnerLicense[] {
+  listForPartner(partnerTenantId: string): Promise<PartnerLicense[]> {
     return this.repository.listForPartner(partnerTenantId);
   }
 
-  eligible(partnerTenantId: string, countryId: string, productId?: string): boolean {
+  eligible(partnerTenantId: string, countryId: string, productId?: string): Promise<boolean> {
     return this.repository.eligible(partnerTenantId, countryId, productId);
   }
 
-  require(id: string): PartnerLicense {
+  require(id: string): Promise<PartnerLicense> {
     return this.repository.require(id);
   }
 }

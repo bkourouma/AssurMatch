@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { PublicJourneyFlagPolicy } from "../../../src/modules/feature-flags/public-journey-flag-policy";
 
 describe("PublicJourneyFlagPolicy", () => {
-  it("fails closed when global comparator, country or product flags are disabled", () => {
+  it("fails closed when global comparator, country or product flags are disabled", async () => {
     const policy = new PublicJourneyFlagPolicy();
 
     expect(policy.resolve({
@@ -18,7 +18,7 @@ describe("PublicJourneyFlagPolicy", () => {
     }).reasons).toContain("product_public_disabled");
   });
 
-  it("requires quote flags at global, country and product scope", () => {
+  it("requires quote flags at global, country and product scope", async () => {
     const state = new PublicJourneyFlagPolicy().resolve({
       globalFlags: { public_comparator_enabled: true, quote_request_enabled: false },
       countryFlags: { country_public_enabled: true, country_comparison_enabled: true, country_quote_enabled: true },

@@ -45,9 +45,9 @@ export class BrokerCrmLeadsService {
     private readonly activity?: BrokerCrmActivityService
   ) {}
 
-  list(actor: ActorContext, query: BrokerCrmLeadListQuery = {}): Page<BrokerCrmLeadSummary> {
+  async list(actor: ActorContext, query: BrokerCrmLeadListQuery = {}): Promise<Page<BrokerCrmLeadSummary>> {
     const parsed = brokerCrmLeadListQuerySchema.parse(query);
-    const filtered = this.applyFilters(actor, parsed).map((assignment) => this.toSummary(assignment));
+    const filtered = (await this.applyFilters(actor, parsed)).map((assignment) => this.toSummary(assignment));
     this.audit.write({
       actor,
       action: QuoteAuditActions.brokerCrmLeadListViewed,
@@ -63,12 +63,12 @@ export class BrokerCrmLeadsService {
     return { items: filtered.slice(start, start + pageSize), page, pageSize, total: filtered.length };
   }
 
-  kanban(actor: ActorContext, query: BrokerCrmLeadListQuery = {}): Record<BrokerCrmPipelineStatus, BrokerCrmLeadSummary[]> {
+  async kanban(actor: ActorContext, query: BrokerCrmLeadListQuery = {}): Promise<Record<BrokerCrmPipelineStatus, BrokerCrmLeadSummary[]>> {
     const columns = {} as Record<BrokerCrmPipelineStatus, BrokerCrmLeadSummary[]>;
     CRM_STATUSES.forEach((status) => {
       columns[status] = [];
     });
-    this.applyFilters(actor, brokerCrmLeadListQuerySchema.parse(query)).forEach((assignment) => {
+    (await this.applyFilters(actor, brokerCrmLeadListQuerySchema.parse(query))).forEach((assignment) => {
       columns[this.statusOf(assignment)].push(this.toSummary(assignment));
     });
     this.audit.write({
@@ -83,8 +83,8 @@ export class BrokerCrmLeadsService {
     return columns;
   }
 
-  detail(id: string, actor: ActorContext): BrokerCrmLeadDetail {
-    const assignment = this.assignments.require(id);
+  async detail(id: string, actor: ActorContext): Promise<BrokerCrmLeadDetail> {
+    const assignment = await this.assignments.require(id);
     this.access.assertLeadRead(actor, assignment);
     this.audit.write({
       actor,
@@ -99,24 +99,24 @@ export class BrokerCrmLeadsService {
       ...this.toSummary(assignment),
       contact: assignment.contact ?? {},
       answers: assignment.answers ?? {},
-      history: this.history.forLead(id),
-      notes: this.activity?.notesForLead(id) ?? [],
-      tasks: this.activity?.tasksForLead(id) ?? [],
-      reminders: this.activity?.remindersForLead(id) ?? [],
-      documents: this.activity?.documentsForLead(id) ?? [],
-      proposals: this.activity?.proposalsForLead(id) ?? [],
-      disputes: this.activity?.disputesForLead(id) ?? []
+      history: await this.history.forLead(id),
+      notes: await this.activity?.notesForLead(id) ?? [],
+      tasks: await this.activity?.tasksForLead(id) ?? [],
+      reminders: await this.activity?.remindersForLead(id) ?? [],
+      documents: await this.activity?.documentsForLead(id) ?? [],
+      proposals: await this.activity?.proposalsForLead(id) ?? [],
+      disputes: await this.activity?.disputesForLead(id) ?? []
     };
   }
 
-  dashboard(actor: ActorContext, query: BrokerCrmLeadListQuery = {}): BrokerCrmDashboard {
-    const rows = this.applyFilters(actor, query);
+  async dashboard(actor: ActorContext, query: BrokerCrmLeadListQuery = {}): Promise<BrokerCrmDashboard> {
+    const rows = await this.applyFilters(actor, query);
     const byStatus = Object.fromEntries(CRM_STATUSES.map((status) => [status, rows.filter((assignment) => this.statusOf(assignment) === status).length])) as Record<BrokerCrmPipelineStatus, number>;
     const dashboard = {
       total: rows.length,
       byStatus,
       urgent: rows.filter((assignment) => assignment.urgency === "urgent").length,
-      overdueTasks: this.activity?.overdueTaskCount(actor) ?? 0
+      overdueTasks: await this.activity?.overdueTaskCount(actor) ?? 0
     };
     this.audit.write({
       actor,
@@ -130,15 +130,15 @@ export class BrokerCrmLeadsService {
     return dashboard;
   }
 
-  exportCsv(actor: ActorContext, query: BrokerCrmExportQuery = {}): string {
+  async exportCsv(actor: ActorContext, query: BrokerCrmExportQuery = {}): Promise<string> {
     const parsed = brokerCrmExportQuerySchema.parse(query);
     this.exportPolicy.assertCanExport(actor, parsed);
-    return this.exportPolicy.toCsv(actor, this.applyFilters(actor, parsed).map((assignment) => this.toSummary(assignment)), parsed);
+    return this.exportPolicy.toCsv(actor, (await this.applyFilters(actor, parsed)).map((assignment) => this.toSummary(assignment)), parsed);
   }
 
-  applyFilters(actor: ActorContext, query: Partial<BrokerCrmLeadListQuery>): LeadAssignmentRecord[] {
+  async applyFilters(actor: ActorContext, query: Partial<BrokerCrmLeadListQuery>): Promise<LeadAssignmentRecord[]> {
     this.access.assertCrmAccess(actor);
-    return this.assignments.list()
+    return (await this.assignments.list())
       .filter((assignment) => assignment.partnerTenantId === actor.partnerTenantId)
       .filter((assignment) => {
         try {

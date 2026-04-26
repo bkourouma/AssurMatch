@@ -4,7 +4,7 @@ import { CountriesService, type Country } from "./countries.module";
 export class PublicCountriesController {
   constructor(private readonly countries: CountriesService) {}
 
-  list(): Country[] {
+  list(): Promise<Country[]> {
     assertNoHeavyPublicSynchronousWork({ publicEndpoint: true, heavySynchronousWork: false });
     return this.countries.listPublic();
   }

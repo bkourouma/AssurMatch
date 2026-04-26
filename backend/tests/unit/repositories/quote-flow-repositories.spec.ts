@@ -7,7 +7,7 @@ import type { QuoteRequestRecord } from "../../../src/modules/quote-requests/quo
 import { MemoryQuoteRequestsRepository } from "../../../src/modules/quote-requests/quote-requests.repository";
 
 describe("quote flow memory repositories", () => {
-  it("creates consent evidence, links prospects and stores quote requests", () => {
+  it("creates consent evidence, links prospects and stores quote requests", async () => {
     const now = new Date("2026-01-01T00:00:00.000Z");
     const consent = new MemoryConsentRecordsRepository();
     const prospects = new MemoryProspectsRepository();
@@ -71,13 +71,13 @@ describe("quote flow memory repositories", () => {
       updatedAt: now
     };
 
-    consent.createText(text);
-    consent.createRecord(record);
-    const prospect = prospects.createOrLink(text.countryId, productId, contact, record.id);
-    quotes.create({ ...quote, prospectId: prospect.id });
+    await consent.createText(text);
+    await consent.createRecord(record);
+    const prospect = await prospects.createOrLink(text.countryId, productId, contact, record.id);
+    await quotes.create({ ...quote, prospectId: prospect.id });
 
-    expect(consent.hasValidConsent(record.id, "lead_transmission", text.countryId, text.productId)).toBe(true);
-    expect(prospects.require(prospect.id).consentRecordIds).toEqual([record.id]);
-    expect(quotes.findByPublicReference(quote.publicReference)?.consentRecordId).toBe(record.id);
+    expect(await consent.hasValidConsent(record.id, "lead_transmission", text.countryId, text.productId)).toBe(true);
+    expect((await prospects.require(prospect.id)).consentRecordIds).toEqual([record.id]);
+    expect((await quotes.findByPublicReference(quote.publicReference))?.consentRecordId).toBe(record.id);
   });
 });

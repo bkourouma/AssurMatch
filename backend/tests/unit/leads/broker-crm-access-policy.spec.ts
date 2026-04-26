@@ -17,7 +17,7 @@ const assignment: LeadAssignmentRecord = {
 };
 
 describe("BrokerCrmAccessPolicy", () => {
-  it("refuses CRM when the flag is absent false or not resolved", () => {
+  it("refuses CRM when the flag is absent false or not resolved", async () => {
     const audit = new AuditLogWriter();
     expect(() => new BrokerCrmAccessPolicy(audit).assertCrmAccess(owner)).toThrow("Broker CRM access denied");
     expect(() => new BrokerCrmAccessPolicy(audit, { brokerCrmEnabled: false }).assertCrmAccess(owner)).toThrow("Broker CRM access denied");
@@ -25,7 +25,7 @@ describe("BrokerCrmAccessPolicy", () => {
     expect(audit.search({ action: "broker_crm.access_refused", result: "refused" })).toHaveLength(3);
   });
 
-  it("allows CRM only when flag is true and plan is Pro or Enterprise", () => {
+  it("allows CRM only when flag is true and plan is Pro or Enterprise", async () => {
     const policy = new BrokerCrmAccessPolicy(new AuditLogWriter(), { brokerCrmEnabled: true });
     const actorWithoutPlan: ActorContext = { actorId: "owner-no-plan", roles: ["broker_owner_pro"], partnerTenantId: "broker-a", mfaVerified: true };
 
@@ -35,7 +35,7 @@ describe("BrokerCrmAccessPolicy", () => {
     expect(() => policy.assertCrmAccess({ ...owner, partnerPlan: "starter" })).toThrow("Broker CRM access denied");
   });
 
-  it("refuses every Starter tenant broker role even when CRM permissions exist", () => {
+  it("refuses every Starter tenant broker role even when CRM permissions exist", async () => {
     const policy = new BrokerCrmAccessPolicy(new AuditLogWriter(), { brokerCrmEnabled: true });
 
     expect(() => policy.assertCrmAccess({ ...owner, roles: ["broker_owner_starter"], partnerPlan: "starter" })).toThrow("Broker CRM access denied");
@@ -44,7 +44,7 @@ describe("BrokerCrmAccessPolicy", () => {
     expect(() => policy.assertCrmAccess({ ...owner, roles: ["broker_read_only"], partnerPlan: "starter" })).toThrow("Broker CRM access denied");
   });
 
-  it("limits agents to assigned leads and blocks read-only mutations", () => {
+  it("limits agents to assigned leads and blocks read-only mutations", async () => {
     const audit = new AuditLogWriter();
     const policy = new BrokerCrmAccessPolicy(audit, { brokerCrmEnabled: true });
     const agent: ActorContext = { actorId: "agent-a", roles: ["broker_agent"], partnerTenantId: "broker-a", partnerPlan: "pro", mfaVerified: true };

@@ -4,19 +4,19 @@ import type { QueueJobRecord, QueuePort } from "../common/queues/queues.module";
 import type { ActorContext } from "../common/types";
 import type { LeadAssignmentRecord } from "../leads/lead-assignment.service";
 import type { QuoteRequestRecord } from "../quote-requests/quote-submission.service";
-import type { NotificationRecord } from "./notifications.module";
+import type { NotificationRecord, NotificationsService } from "./notifications.module";
 
 export class QuoteNotificationService {
   private readonly queuedVisitor = new Set<string>();
   private readonly queuedBroker = new Set<string>();
 
   constructor(
-    private readonly notifications: NotificationRecord[],
+    private readonly notifications: NotificationRecord[] | NotificationsService,
     private readonly queue: QueuePort,
     private readonly audit: AuditLogWriter
   ) {}
 
-  queueVisitor(quote: QuoteRequestRecord, actor: ActorContext): { notification: NotificationRecord; job: QueueJobRecord } | undefined {
+  async queueVisitor(quote: QuoteRequestRecord, actor: ActorContext): Promise<{ notification: NotificationRecord; job: QueueJobRecord } | undefined> {
     if (this.queuedVisitor.has(quote.id)) return undefined;
     this.queuedVisitor.add(quote.id);
     const now = new Date();
@@ -33,7 +33,7 @@ export class QuoteNotificationService {
       createdAt: now,
       updatedAt: now
     };
-    this.notifications.push(notification);
+    await this.persist(notification);
     this.audit.write({
       actor,
       action: QuoteAuditActions.notificationVisitorQueued,
@@ -46,7 +46,7 @@ export class QuoteNotificationService {
     return { notification, job };
   }
 
-  queueBroker(quote: QuoteRequestRecord, assignment: LeadAssignmentRecord, actor: ActorContext): { notification: NotificationRecord; job: QueueJobRecord } | undefined {
+  async queueBroker(quote: QuoteRequestRecord, assignment: LeadAssignmentRecord, actor: ActorContext): Promise<{ notification: NotificationRecord; job: QueueJobRecord } | undefined> {
     if (this.queuedBroker.has(assignment.id)) return undefined;
     this.queuedBroker.add(assignment.id);
     const now = new Date();
@@ -63,7 +63,7 @@ export class QuoteNotificationService {
       createdAt: now,
       updatedAt: now
     };
-    this.notifications.push(notification);
+    await this.persist(notification);
     this.audit.write({
       actor,
       action: QuoteAuditActions.notificationBrokerQueued,
@@ -74,5 +74,16 @@ export class QuoteNotificationService {
       context: { type: notification.type }
     });
     return { notification, job };
+  }
+
+  private async persist(notification: NotificationRecord): Promise<void> {
+    if (Array.isArray(this.notifications)) {
+      this.notifications.push(notification);
+      return;
+    }
+    await this.notifications.recordQueued(notification, {
+      roles: ["super_admin"],
+      ...(notification.queueJobRecordId ? { correlationId: notification.queueJobRecordId } : {})
+    });
   }
 }

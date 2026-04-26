@@ -18,7 +18,7 @@ const extractedRepositoryFiles = [
 ];
 
 describe("runtime memory boundaries", () => {
-  it("keeps memory adapters declared as test-only constructs", () => {
+  it("keeps memory adapters declared as test-only constructs", async () => {
     const redisModule = readFileSync(join(process.cwd(), "backend", "src", "modules", "common", "redis", "redis.module.ts"), "utf8");
     const queueModule = readFileSync(join(process.cwd(), "backend", "src", "modules", "common", "queues", "queues.module.ts"), "utf8");
     const auditWriter = readFileSync(join(process.cwd(), "backend", "src", "modules", "audit-logs", "audit-log-writer.service.ts"), "utf8");
@@ -28,7 +28,7 @@ describe("runtime memory boundaries", () => {
     expect(auditWriter).toContain('assertRuntimeRepository(this.repository.mode, "AuditLogRepository")');
   });
 
-  it("keeps extracted domain state out of AssurMatchRuntime residual ownership", () => {
+  it("keeps extracted domain state out of AssurMatchRuntime residual ownership", async () => {
     const runtime = readFileSync(join(process.cwd(), "backend", "src", "runtime", "assurmatch-runtime.ts"), "utf8");
     const residuals = readFileSync(join(process.cwd(), "specs", "009-domain-repositories-extraction", "runtime-residuals.md"), "utf8");
 
@@ -49,7 +49,7 @@ describe("runtime memory boundaries", () => {
       "PrismaNotificationsRepository",
       "PrismaRoutingDecisionsRepository"
     ]) {
-      expect(runtime).not.toContain(repositoryName);
+      expect(runtime).toContain(repositoryName);
     }
     expect(runtime).not.toMatch(/private readonly \w+:\s*[^=]+?\[\]\s*=\s*\[\]/);
     expect(runtime).not.toMatch(/private readonly \w+\s*=\s*new Map/);
@@ -57,13 +57,13 @@ describe("runtime memory boundaries", () => {
     expect(residuals).toContain("Completed Prisma runtime repositories");
   });
 
-  it("does not expose incomplete Prisma repositories for extracted synchronous domains", () => {
+  it("exposes complete Prisma repositories for extracted runtime domains", async () => {
     for (const file of extractedRepositoryFiles) {
       const source = readFileSync(join(process.cwd(), file), "utf8");
       expect(source, file).not.toContain("requires async Prisma service integration");
       expect(source, file).not.toContain("TODO Prisma");
-      expect(source, file).not.toMatch(/export class Prisma\w+Repository/);
-      expect(source, file).not.toContain('mode = "prisma-runtime"');
+      expect(source, file).toMatch(/export class Prisma\w+Repository/);
+      expect(source, file).toContain('mode = "prisma-runtime"');
     }
   });
 });

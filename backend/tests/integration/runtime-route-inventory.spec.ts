@@ -43,7 +43,7 @@ describe("runtime HTTP route inventory", () => {
     }
   });
 
-  it("uses the runtime HTTP wiring module instead of registering RuntimeHttpController in AppModule", () => {
+  it("uses the runtime HTTP wiring module instead of registering RuntimeHttpController in AppModule", async () => {
     const appImports = Reflect.getMetadata("imports", AppModule) as unknown[];
     const appControllers = (Reflect.getMetadata("controllers", AppModule) as unknown[] | undefined) ?? [];
 
@@ -51,7 +51,7 @@ describe("runtime HTTP route inventory", () => {
     expect(appControllers).not.toContain(RuntimeHttpController);
   });
 
-  it("declares decorated P1 domain controllers for public broker admin and auth route ownership", () => {
+  it("declares decorated P1 domain controllers for public broker admin and auth route ownership", async () => {
     const controllers = [
       AuthController,
       PublicCountriesController,

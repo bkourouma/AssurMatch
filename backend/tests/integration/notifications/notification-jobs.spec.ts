@@ -5,9 +5,9 @@ import { NotificationsModule } from "../../../src/modules/notifications/notifica
 import { superAdminActor } from "../helpers/enterprise-seed";
 
 describe("notification jobs", () => {
-  it("makes paired delivery status visible through queue records", () => {
+  it("makes paired delivery status visible through queue records", async () => {
     const module = new NotificationsModule(new AuditLogWriter());
-    const queued = module.service.queuePaired({
+    const queued = await module.service.queuePaired({
       type: "critical_job_failed",
       recipientScope: "platform",
       payloadReference: "job-failure"
@@ -15,6 +15,6 @@ describe("notification jobs", () => {
     new NotificationProcessor(module.service, module.queue).process(queued.notification.id, queued.job.id);
 
     expect(module.queue.list()[0]?.status).toBe("completed");
-    expect(module.service.list()[0]?.emailStatus).toBe("sent");
+    expect((await module.service.list())[0]?.emailStatus).toBe("sent");
   });
 });

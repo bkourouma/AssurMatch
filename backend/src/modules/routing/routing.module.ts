@@ -18,12 +18,12 @@ export class RoutingPrecheckService {
     private readonly audit: AuditLogWriter
   ) {}
 
-  evaluate(actor: ActorContext, input: RoutingPrecheckRequestDto): RoutingPrecheckResult {
+  async evaluate(actor: ActorContext, input: RoutingPrecheckRequestDto): Promise<RoutingPrecheckResult> {
     const reasons: string[] = [];
-    if (!this.consent.hasValidConsent(input.consentRecordId, "lead_transmission", input.countryId, input.productId)) {
+    if (!await this.consent.hasValidConsent(input.consentRecordId, "lead_transmission", input.countryId, input.productId)) {
       reasons.push("consent_missing_or_out_of_scope");
     }
-    const partner = this.partnerEligibility.evaluate(input.partnerTenantId, input.countryId, input.productId);
+    const partner = await this.partnerEligibility.evaluate(input.partnerTenantId, input.countryId, input.productId);
     reasons.push(...partner.reasons);
     const result: RoutingPrecheckResult = {
       result: reasons.length === 0 ? "eligible" : "not_eligible",

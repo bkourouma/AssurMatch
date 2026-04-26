@@ -13,7 +13,7 @@ const moduleConfig = {
 };
 
 describe("AISummaryFlagPolicy", () => {
-  it("requires global, country, product and module guardrail approval", () => {
+  it("requires global, country, product and module guardrail approval", async () => {
     const policy = new AISummaryFlagPolicy();
 
     expect(policy.canRun({

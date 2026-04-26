@@ -6,15 +6,15 @@ import { superAdminActor } from "../helpers/enterprise-seed";
 
 describe("broker lead tenant isolation", () => {
   it("allows only the assigned broker tenant to read a lead", async () => {
-    const seed = seedComparatorQuote();
+    const seed = await seedComparatorQuote();
     await seed.app.quoteRequests.publicController.submit(validQuotePayload(seed) as QuoteRequestCreateDto, superAdminActor);
-    const assignment = seed.app.leads.assignments.list()[0];
+    const assignment = (await seed.app.leads.assignments.list())[0];
     if (!assignment) throw new Error("Expected lead assignment");
 
     const assignedActor: ActorContext = { roles: ["broker_agent"], partnerTenantId: seed.partnerTenantId, correlationId: "broker-ok" };
     const otherActor: ActorContext = { roles: ["broker_agent"], partnerTenantId: crypto.randomUUID(), correlationId: "broker-no" };
 
-    expect(seed.app.leads.brokerController.detail(assignment.id, assignedActor).id).toBe(assignment.id);
-    expect(() => seed.app.leads.brokerController.detail(assignment.id, otherActor)).toThrow("Lead access denied");
+    expect((await seed.app.leads.brokerController.detail(assignment.id, assignedActor)).id).toBe(assignment.id);
+    await expect(seed.app.leads.brokerController.detail(assignment.id, otherActor)).rejects.toThrow("Lead access denied");
   });
 });

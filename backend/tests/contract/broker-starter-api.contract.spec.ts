@@ -9,7 +9,7 @@ import {
 const contract = readFileSync("specs/003-portail-starter-courtier/contracts/broker-starter-api.openapi.yaml", "utf8");
 
 describe("spec 003 broker Starter OpenAPI contract", () => {
-  it("declares all broker Starter endpoints", () => {
+  it("declares all broker Starter endpoints", async () => {
     [
       "/broker/starter/dashboard",
       "/broker/starter/leads",
@@ -25,7 +25,7 @@ describe("spec 003 broker Starter OpenAPI contract", () => {
     ].forEach((path) => expect(contract).toContain(path));
   });
 
-  it("keeps rejection and dispute reasons allowlisted in shared schemas", () => {
+  it("keeps rejection and dispute reasons allowlisted in shared schemas", async () => {
     expect(brokerStarterLeadActionRequestSchema.parse({ reason: "duplicate" }).reason).toBe("duplicate");
     expect(() => brokerStarterLeadActionRequestSchema.parse({ reason: "freeform" })).toThrow();
     expect(brokerStarterLeadListQuerySchema.parse({ countryCode: "CI", page: 1 }).countryCode).toBe("CI");

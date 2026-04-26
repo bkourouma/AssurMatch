@@ -3,7 +3,7 @@ import type { LeadAssignmentRecord } from "../../../src/modules/leads/lead-assig
 import { MemoryLeadAssignmentsRepository } from "../../../src/modules/leads/lead-assignments.repository";
 
 describe("lead assignment memory repository", () => {
-  it("stores assignments, status changes and Starter history by tenant", () => {
+  it("stores assignments, status changes and Starter history by tenant", async () => {
     const now = new Date("2026-01-01T00:00:00.000Z");
     const repository = new MemoryLeadAssignmentsRepository();
     const assignment: LeadAssignmentRecord = {
@@ -20,9 +20,9 @@ describe("lead assignment memory repository", () => {
       updatedAt: now
     };
 
-    repository.create(assignment);
-    repository.updateStatus(assignment.id, "accepted", { acceptedAt: now, updatedAt: now });
-    repository.appendHistory({
+    await repository.create(assignment);
+    await repository.updateStatus(assignment.id, "accepted", { acceptedAt: now, updatedAt: now });
+    await repository.appendHistory({
       id: "history-1",
       leadAssignmentId: assignment.id,
       partnerTenantId: assignment.partnerTenantId,
@@ -31,8 +31,8 @@ describe("lead assignment memory repository", () => {
       occurredAt: now.toISOString()
     });
 
-    expect(repository.activeCountForPartner("partner-a")).toBe(1);
-    expect(repository.require(assignment.id).status).toBe("accepted");
-    expect(repository.historyForTenant("partner-a")).toHaveLength(1);
+    expect(await repository.activeCountForPartner("partner-a")).toBe(1);
+    expect((await repository.require(assignment.id)).status).toBe("accepted");
+    expect(await repository.historyForTenant("partner-a")).toHaveLength(1);
   });
 });

@@ -6,13 +6,13 @@ import { PartnersService } from "../../../src/modules/partners/partners.module";
 import { superAdminActor } from "../helpers/enterprise-seed";
 
 describe("partner compliance workflow", () => {
-  it("creates partner, license and accreditation evidence", () => {
+  it("creates partner, license and accreditation evidence", async () => {
     const audit = new AuditLogWriter();
     const partners = new PartnersService(audit);
     const licenses = new PartnerLicensesService(audit);
     const documents = new DocumentsService(audit);
-    const partner = partners.create({ legalName: "Broker CI", primaryEmail: "ops@broker.example", primaryWhatsApp: "+2250102030405" }, superAdminActor);
-    const license = licenses.create({
+    const partner = await partners.create({ legalName: "Broker CI", primaryEmail: "ops@broker.example", primaryWhatsApp: "+2250102030405" }, superAdminActor);
+    const license = await licenses.create({
       partnerTenantId: partner.id,
       licenseNumber: "LIC-CI-1",
       issuingAuthority: "Regulator",

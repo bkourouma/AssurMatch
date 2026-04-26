@@ -104,27 +104,27 @@ export class RuntimeHttpController {
     return this.runtime.countries.service.getPublicPage(parsedCountryCode, { public_comparator_enabled: true }, actorFromHeaders(headers));
   }
 
-  products(countryCode: string) {
+  async products(countryCode: string) {
     const parsedCountryCode = parseParam("countryCode", countryCode, isoCountrySchema);
-    const country = this.runtime.countries.service.findByIsoCode(parsedCountryCode);
+    const country = await this.runtime.countries.service.findByIsoCode(parsedCountryCode);
     if (!country) return [];
     return this.runtime.products.service.listPublicForCountry(country.id, country.flags);
   }
 
-  productDetail(countryCode: string, productKey: string, headers: IncomingHttpHeaders) {
+  async productDetail(countryCode: string, productKey: string, headers: IncomingHttpHeaders) {
     const parsedCountryCode = parseParam("countryCode", countryCode, isoCountrySchema);
     const parsedProductKey = parseParam("productKey", productKey);
-    const country = this.runtime.countries.service.findByIsoCode(parsedCountryCode);
+    const country = await this.runtime.countries.service.findByIsoCode(parsedCountryCode);
     if (!country) throw new Error("Country is not publicly available");
     return this.runtime.products.service.getPublicProductPage(country.id, parsedProductKey, country.flags, { public_comparator_enabled: true, quote_request_enabled: true }, actorFromHeaders(headers));
   }
 
-  offers(countryCode: string, productKey: string, query: Partial<OfferListQuery>) {
+  async offers(countryCode: string, productKey: string, query: Partial<OfferListQuery>) {
     const parsedCountryCode = parseParam("countryCode", countryCode, isoCountrySchema);
     const parsedProductKey = parseParam("productKey", productKey);
     const parsedQuery = parseHttpInput(offerListQuerySchema, query);
-    const country = this.runtime.countries.service.findByIsoCode(parsedCountryCode);
-    const product = this.runtime.products.service.findByKey(parsedProductKey);
+    const country = await this.runtime.countries.service.findByIsoCode(parsedCountryCode);
+    const product = await this.runtime.products.service.findByKey(parsedProductKey);
     if (!country || !product) return { items: [], total: 0, page: 1, pageSize: 20 };
     return this.runtime.offers.publicCatalog.list(country.id, product.id, parsedQuery);
   }
@@ -133,12 +133,12 @@ export class RuntimeHttpController {
     return this.runtime.offers.publicCatalog.detail(parseParam("offerId", offerId, optionalUuidParamSchema));
   }
 
-  quoteForm(countryCode: string, productKey: string, language = "fr") {
+  async quoteForm(countryCode: string, productKey: string, language = "fr") {
     const parsedCountryCode = parseParam("countryCode", countryCode, isoCountrySchema);
     const parsedProductKey = parseParam("productKey", productKey);
     const parsedLanguage = parseParam("language", language, languageCodeSchema);
-    const country = this.runtime.countries.service.findByIsoCode(parsedCountryCode);
-    const product = this.runtime.products.service.findByKey(parsedProductKey);
+    const country = await this.runtime.countries.service.findByIsoCode(parsedCountryCode);
+    const product = await this.runtime.products.service.findByKey(parsedProductKey);
     if (!country || !product) throw new Error("Quote form is not publicly available");
     return this.runtime.quoteForms.service.publicForm(country.id, product.id, parsedLanguage);
   }

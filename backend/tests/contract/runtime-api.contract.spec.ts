@@ -36,7 +36,7 @@ describe("runtime API contract smoke", () => {
     expect([400, 422]).toContain(quoteRequest.status);
   });
 
-  it("documents controller ownership for the P1 HTTP wiring routes", () => {
+  it("documents controller ownership for the P1 HTTP wiring routes", async () => {
     const ownership: Array<{ controller: { name: string; prototype: object }; path: string }> = [
       { controller: AuthController, path: "auth" },
       { controller: PublicCountriesController, path: "countries" },

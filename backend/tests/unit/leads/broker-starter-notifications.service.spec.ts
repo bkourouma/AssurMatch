@@ -9,14 +9,14 @@ import { LeadAssignmentService } from "../../../src/modules/leads/lead-assignmen
 const actor: ActorContext = { actorId: "owner", roles: ["broker_owner_starter"], partnerTenantId: "broker-a", mfaVerified: true };
 
 describe("BrokerStarterNotificationsService", () => {
-  it("lists and reads notifications only for the connected tenant", () => {
+  it("lists and reads notifications only for the connected tenant", async () => {
     const audit = new AuditLogWriter();
     const assignments = new LeadAssignmentService(audit);
     const history = new BrokerStarterHistoryService();
     const service = new BrokerStarterNotificationsService(assignments, new BrokerStarterAccessPolicy(audit), history, audit);
-    const lead = assignments.create({ quoteRequestId: "q1", partnerTenantId: "broker-a", assignmentReason: "routing" }, actor);
+    const lead = await assignments.create({ quoteRequestId: "q1", partnerTenantId: "broker-a", assignmentReason: "routing" }, actor);
 
-    const notification = service.createLeadAssigned(lead.id);
+    const notification = await service.createLeadAssigned(lead.id);
 
     expect(service.list(actor)).toHaveLength(1);
     expect(service.markRead(notification.id, actor).read).toBe(true);

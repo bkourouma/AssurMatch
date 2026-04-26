@@ -5,7 +5,7 @@ import type { PartnerTenant } from "../../../src/modules/partners/partners.modul
 import { MemoryPartnersRepository } from "../../../src/modules/partners/partners.repository";
 
 describe("partner and license memory repositories", () => {
-  it("stores partner authorizations and valid license eligibility", () => {
+  it("stores partner authorizations and valid license eligibility", async () => {
     const now = new Date("2026-01-01T00:00:00.000Z");
     const partners = new MemoryPartnersRepository();
     const licenses = new MemoryPartnerLicensesRepository();
@@ -35,14 +35,14 @@ describe("partner and license memory repositories", () => {
       updatedAt: now
     };
 
-    partners.create(partner);
-    partners.authorizeCountry(partner.id, "country-ci");
-    partners.authorizeProduct(partner.id, "product-auto");
-    licenses.create(license);
+    await partners.create(partner);
+    await partners.authorizeCountry(partner.id, "country-ci");
+    await partners.authorizeProduct(partner.id, "product-auto");
+    await licenses.create(license);
 
-    expect(partners.isAuthorizedForCountry(partner.id, "country-ci")).toBe(true);
-    expect(partners.isAuthorizedForProduct(partner.id, "product-auto")).toBe(true);
-    expect(licenses.eligible(partner.id, "country-ci", "product-auto")).toBe(true);
-    expect(licenses.eligible(partner.id, "country-ci", "product-habitation")).toBe(false);
+    expect(await partners.isAuthorizedForCountry(partner.id, "country-ci")).toBe(true);
+    expect(await partners.isAuthorizedForProduct(partner.id, "product-auto")).toBe(true);
+    expect(await licenses.eligible(partner.id, "country-ci", "product-auto")).toBe(true);
+    expect(await licenses.eligible(partner.id, "country-ci", "product-habitation")).toBe(false);
   });
 });

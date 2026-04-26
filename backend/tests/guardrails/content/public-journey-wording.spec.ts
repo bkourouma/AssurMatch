@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 import { findForbiddenWording } from "../../../../packages/shared/contracts/content-safety";
 
 describe("public journey wording", () => {
-  it("uses technical platform wording and avoids forbidden public phrases", () => {
+  it("uses technical platform wording and avoids forbidden public phrases", async () => {
     const text = [
       "apps/public/app/countries/[countryCode]/page.tsx",
       "apps/public/app/countries/[countryCode]/products/[productKey]/page.tsx",

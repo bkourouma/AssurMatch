@@ -17,38 +17,38 @@ export class BrokerStarterLeadActionsService {
     private readonly audit: AuditLogWriter
   ) {}
 
-  accept(id: string, actor: ActorContext): LeadAssignmentRecord {
+  accept(id: string, actor: ActorContext): Promise<LeadAssignmentRecord> {
     return this.transition(id, actor, "accepted", QuoteAuditActions.brokerStarterLeadAccepted, {});
   }
 
-  reject(id: string, input: BrokerStarterLeadActionRequest, actor: ActorContext): LeadAssignmentRecord {
+  reject(id: string, input: BrokerStarterLeadActionRequest, actor: ActorContext): Promise<LeadAssignmentRecord> {
     const parsed = this.requireReason(input);
     return this.transition(id, actor, "rejected", QuoteAuditActions.brokerStarterLeadRejected, parsed);
   }
 
-  dispute(id: string, input: BrokerStarterLeadActionRequest, actor: ActorContext): LeadAssignmentRecord {
+  dispute(id: string, input: BrokerStarterLeadActionRequest, actor: ActorContext): Promise<LeadAssignmentRecord> {
     const parsed = this.requireReason(input);
     return this.transition(id, actor, "disputed", QuoteAuditActions.brokerStarterLeadDisputed, parsed);
   }
 
-  private transition(
+  private async transition(
     id: string,
     actor: ActorContext,
     status: LeadAssignmentStatus,
     auditAction: string,
     input: { reason?: BrokerStarterReason; comment?: string }
-  ): LeadAssignmentRecord {
-    const assignment = this.assignments.require(id);
+  ): Promise<LeadAssignmentRecord> {
+    const assignment = await this.assignments.require(id);
     this.access.assertMutationAccess(actor, assignment);
     if (FINAL_STATUSES.has(assignment.status)) {
       throw new Error("Final lead cannot be mutated");
     }
     const previousStatus = assignment.status;
-    const updated = this.assignments.updateStatus(id, status, actor, input.reason ?? "starter_action");
+    const updated = await this.assignments.updateStatus(id, status, actor, input.reason ?? "starter_action");
     if (input.comment) updated.actionComment = input.comment.slice(0, 500);
     const eventType: BrokerStarterLeadHistoryEvent["eventType"] =
       status === "accepted" ? "accepted" : status === "rejected" ? "rejected" : "disputed";
-    this.history.append({
+    await this.history.append({
       leadAssignmentId: updated.id,
       partnerTenantId: updated.partnerTenantId,
       actor,

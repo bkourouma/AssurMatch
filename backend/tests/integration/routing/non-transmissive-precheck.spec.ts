@@ -8,11 +8,11 @@ import { RoutingPrecheckService } from "../../../src/modules/routing/routing.mod
 import { superAdminActor } from "../helpers/enterprise-seed";
 
 describe("non-transmissive routing precheck", () => {
-  it("does not notify brokers or transmit leads", () => {
+  it("does not notify brokers or transmit leads", async () => {
     const audit = new AuditLogWriter();
     const partners = new PartnersService(audit);
-    const partner = partners.create({ legalName: "Broker", primaryEmail: "ops@broker.example", primaryWhatsApp: "+2250102030405", status: "active" }, superAdminActor);
-    const result = new RoutingPrecheckService(
+    const partner = await partners.create({ legalName: "Broker", primaryEmail: "ops@broker.example", primaryWhatsApp: "+2250102030405", status: "active" }, superAdminActor);
+    const result = await new RoutingPrecheckService(
       new ConsentService(audit),
       new PartnerEligibilityService(partners, new PartnerLicensesService(audit)),
       audit

@@ -20,8 +20,8 @@ export class BrokerStarterNotificationsService {
     private readonly audit: AuditLogWriter
   ) {}
 
-  createLeadAssigned(leadAssignmentId: string): BrokerStarterNotification {
-    const assignment = this.assignments.require(leadAssignmentId);
+  async createLeadAssigned(leadAssignmentId: string): Promise<BrokerStarterNotification> {
+    const assignment = await this.assignments.require(leadAssignmentId);
     const notification: StoredStarterNotification = {
       id: crypto.randomUUID(),
       type: "broker_lead_assigned",

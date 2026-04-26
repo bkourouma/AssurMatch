@@ -10,9 +10,9 @@ export class BrokerCrmNotificationsService {
 
   constructor(private readonly assignments: LeadAssignmentService, private readonly access: BrokerCrmAccessPolicy, private readonly audit: AuditLogWriter) {}
 
-  list(actor: ActorContext): BrokerCrmNotification[] {
+  async list(actor: ActorContext): Promise<BrokerCrmNotification[]> {
     this.access.assertCrmAccess(actor);
-    const notifications = this.assignments.list()
+    const notifications = (await this.assignments.list())
       .filter((assignment) => assignment.partnerTenantId === actor.partnerTenantId)
       .slice(0, 20)
       .map((assignment) => ({

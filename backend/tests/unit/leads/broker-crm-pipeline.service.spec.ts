@@ -8,14 +8,14 @@ import { LeadsModule } from "../../../src/modules/leads/leads.module";
 const owner: ActorContext = { actorId: "owner-a", roles: ["broker_owner_pro"], partnerTenantId: "broker-a", partnerPlan: "pro", mfaVerified: true };
 
 describe("BrokerCrmPipelineService", () => {
-  it("requires controlled reasons for loss-like statuses and writes history", () => {
+  it("requires controlled reasons for loss-like statuses and writes history", async () => {
     const audit = new AuditLogWriter();
     const module = new LeadsModule(new PartnersService(audit), new PartnerLicensesService(audit), audit, { brokerCrmEnabled: true });
-    const lead = module.assignments.create({ quoteRequestId: "pipeline-q1", partnerTenantId: "broker-a", assignmentReason: "routing" }, owner);
+    const lead = await module.assignments.create({ quoteRequestId: "pipeline-q1", partnerTenantId: "broker-a", assignmentReason: "routing" }, owner);
 
-    expect(() => module.brokerCrmController.changeStatus(lead.id, { status: "perdu" }, owner)).toThrow();
-    expect(module.brokerCrmController.changeStatus(lead.id, { status: "perdu", reason: "price" }, owner).crmStatus).toBe("perdu");
-    expect(module.brokerCrmHistory.forLead(lead.id)[0]?.nextStatus).toBe("perdu");
+    await expect(module.brokerCrmController.changeStatus(lead.id, { status: "perdu" }, owner)).rejects.toThrow();
+    expect((await module.brokerCrmController.changeStatus(lead.id, { status: "perdu", reason: "price" }, owner)).crmStatus).toBe("perdu");
+    expect((await module.brokerCrmHistory.forLead(lead.id))[0]?.nextStatus).toBe("perdu");
     expect(audit.search({ action: "broker_crm.status_changed", result: "success" })).toHaveLength(1);
   });
 });

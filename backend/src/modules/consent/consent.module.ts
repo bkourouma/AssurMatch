@@ -23,7 +23,7 @@ export class ConsentService {
 
   constructor(private readonly audit: AuditLogWriter, private readonly repository: ConsentRecordsRepository = new MemoryConsentRecordsRepository()) {}
 
-  createText(input: ConsentTextDto, actor: ActorContext): ConsentText {
+  async createText(input: ConsentTextDto, actor: ActorContext): Promise<ConsentText> {
     const parsed = consentTextSchema.parse(input);
     const now = new Date();
     const text: ConsentText = {
@@ -32,7 +32,7 @@ export class ConsentService {
       createdAt: now,
       updatedAt: now
     };
-    this.repository.createText(text);
+    await this.repository.createText(text);
     this.audit.write({
       actor,
       action: "consent_text.created",
@@ -45,13 +45,13 @@ export class ConsentService {
     return text;
   }
 
-  publishText(id: string, actor: ActorContext): ConsentText {
-    const text = this.requireText(id);
+  async publishText(id: string, actor: ActorContext): Promise<ConsentText> {
+    const text = await this.requireText(id);
     if (text.status === "published") return text;
     text.status = "published";
     text.publishedAt = new Date();
     text.updatedAt = new Date();
-    this.repository.updateText(id, text);
+    await this.repository.updateText(id, text);
     this.audit.write({
       actor,
       action: "consent_text.published",
@@ -68,7 +68,7 @@ export class ConsentService {
     throw new Error("Published consent text is immutable; create a new version");
   }
 
-  record(input: ConsentRecordDto, actor: ActorContext): ConsentRecord {
+  async record(input: ConsentRecordDto, actor: ActorContext): Promise<ConsentRecord> {
     const parsed = consentRecordSchema.parse(input);
     const now = new Date();
     const record: ConsentRecord = {
@@ -78,7 +78,7 @@ export class ConsentService {
       createdAt: now,
       updatedAt: now
     };
-    this.repository.createRecord(record);
+    await this.repository.createRecord(record);
     this.audit.write({
       actor,
       action: "consent_record.created",
@@ -91,22 +91,22 @@ export class ConsentService {
     return record;
   }
 
-  hasValidConsent(recordId: string | undefined, purpose: string, countryId: string, productId?: string): boolean {
+  hasValidConsent(recordId: string | undefined, purpose: string, countryId: string, productId?: string): Promise<boolean> {
     return this.repository.hasValidConsent(recordId, purpose, countryId, productId);
   }
 
-  searchRecords(actor: ActorContext): ConsentRecord[] {
+  async searchRecords(actor: ActorContext): Promise<ConsentRecord[]> {
     if (!actor.roles.some((role) => ["super_admin", "compliance_admin", "support_admin"].includes(role))) {
       throw new Error("Consent access denied");
     }
     return this.repository.searchRecords();
   }
 
-  listTexts(): ConsentText[] {
+  listTexts(): Promise<ConsentText[]> {
     return this.repository.listTexts();
   }
 
-  private requireText(id: string): ConsentText {
+  private requireText(id: string): Promise<ConsentText> {
     return this.repository.requireText(id);
   }
 }

@@ -4,7 +4,7 @@ import { BrokerStarterAccessPolicy } from "../../../src/modules/leads/broker-sta
 import { AuditLogWriter } from "../../../src/modules/audit-logs/audit-log-writer.service";
 
 describe("broker Starter constitutional exclusions", () => {
-  it("keeps CRM Pro, AI commercial and regulated modules disabled by default", () => {
+  it("keeps CRM Pro, AI commercial and regulated modules disabled by default", async () => {
     expect(GLOBAL_FEATURE_FLAG_DEFAULTS.broker_crm_enabled).toBe(false);
     expect(GLOBAL_FEATURE_FLAG_DEFAULTS.ai_broker_assistant_enabled).toBe(false);
     expect(GLOBAL_FEATURE_FLAG_DEFAULTS.payments_enabled).toBe(false);
@@ -12,7 +12,7 @@ describe("broker Starter constitutional exclusions", () => {
     expect(GLOBAL_FEATURE_FLAG_DEFAULTS.claims_enabled).toBe(false);
   });
 
-  it("does not expose blocked capabilities in Starter allowed capabilities", () => {
+  it("does not expose blocked capabilities in Starter allowed capabilities", async () => {
     const capabilities = new BrokerStarterAccessPolicy(new AuditLogWriter()).capabilities();
 
     expect(capabilities.allowed).toContain("lead_list");

@@ -25,10 +25,10 @@ export class BrokerStarterLeadsService {
     private readonly exportPolicy: BrokerStarterExportPolicy
   ) {}
 
-  list(actor: ActorContext, query: BrokerStarterLeadListQuery = {}): Page<BrokerStarterLeadSummary> {
+  async list(actor: ActorContext, query: BrokerStarterLeadListQuery = {}): Promise<Page<BrokerStarterLeadSummary>> {
     this.access.assertPortalAccess(actor);
     const parsed = brokerStarterLeadListQuerySchema.parse(query);
-    const filtered = this.applyFilters(actor, parsed).map((assignment) => this.toSummary(assignment));
+    const filtered = (await this.applyFilters(actor, parsed)).map((assignment) => this.toSummary(assignment));
     this.audit.write({
       actor,
       action: QuoteAuditActions.brokerStarterLeadListViewed,
@@ -44,8 +44,8 @@ export class BrokerStarterLeadsService {
     return { items: filtered.slice(start, start + pageSize), page, pageSize, total: filtered.length };
   }
 
-  detail(id: string, actor: ActorContext): BrokerStarterLeadDetail {
-    const assignment = this.assignments.require(id);
+  async detail(id: string, actor: ActorContext): Promise<BrokerStarterLeadDetail> {
+    const assignment = await this.assignments.require(id);
     this.access.assertLeadAccess(actor, assignment);
     this.audit.write({
       actor,
@@ -58,7 +58,7 @@ export class BrokerStarterLeadsService {
     });
     if (!assignment.seenAt) {
       const previousStatus = assignment.status;
-      this.assignments.updateStatus(id, "seen", actor, "viewed");
+      await this.assignments.updateStatus(id, "seen", actor, "viewed");
       this.audit.write({
         actor,
         action: QuoteAuditActions.brokerStarterLeadMarkedSeen,
@@ -68,7 +68,7 @@ export class BrokerStarterLeadsService {
         result: "success",
         context: { previousStatus }
       });
-      this.history.append({
+      await this.history.append({
         leadAssignmentId: assignment.id,
         partnerTenantId: assignment.partnerTenantId,
         actor,
@@ -77,11 +77,11 @@ export class BrokerStarterLeadsService {
         nextStatus: "seen"
       });
     }
-    return this.toDetail(assignment);
+    return this.toDetail(assignment, await this.history.forLead(assignment.id));
   }
 
-  historyForLead(id: string, actor: ActorContext) {
-    const assignment = this.assignments.require(id);
+  async historyForLead(id: string, actor: ActorContext) {
+    const assignment = await this.assignments.require(id);
     this.access.assertLeadAccess(actor, assignment);
     this.audit.write({
       actor,
@@ -95,9 +95,9 @@ export class BrokerStarterLeadsService {
     return this.history.forLead(id);
   }
 
-  dashboard(actor: ActorContext, query: BrokerStarterDashboardQuery = {}): BrokerStarterDashboard {
+  async dashboard(actor: ActorContext, query: BrokerStarterDashboardQuery = {}): Promise<BrokerStarterDashboard> {
     this.access.assertDashboardAccess(actor);
-    const filtered = this.applyFilters(actor, query);
+    const filtered = await this.applyFilters(actor, query);
     const dashboard = {
       received: filtered.length,
       seen: filtered.filter((assignment) => Boolean(assignment.seenAt) || assignment.status === "seen").length,
@@ -117,15 +117,15 @@ export class BrokerStarterLeadsService {
     return dashboard;
   }
 
-  exportCsv(actor: ActorContext, query: BrokerStarterExportQuery = {}): string {
+  async exportCsv(actor: ActorContext, query: BrokerStarterExportQuery = {}): Promise<string> {
     const parsed = brokerStarterExportQuerySchema.parse(query);
     this.exportPolicy.assertCanExport(actor, parsed);
-    const rows = this.applyFilters(actor, parsed).map((assignment) => this.toSummary(assignment));
+    const rows = (await this.applyFilters(actor, parsed)).map((assignment) => this.toSummary(assignment));
     return this.exportPolicy.toCsv(actor, rows, parsed);
   }
 
-  private applyFilters(actor: ActorContext, query: Partial<BrokerStarterLeadListQuery>): LeadAssignmentRecord[] {
-    return this.assignments.list()
+  private async applyFilters(actor: ActorContext, query: Partial<BrokerStarterLeadListQuery>): Promise<LeadAssignmentRecord[]> {
+    return (await this.assignments.list())
       .filter((assignment) => assignment.partnerTenantId === actor.partnerTenantId)
       .filter((assignment) => !query.status || this.normalizeStatus(assignment) === query.status)
       .filter((assignment) => !query.productKey || assignment.productKey === query.productKey)
@@ -147,12 +147,12 @@ export class BrokerStarterLeadsService {
     };
   }
 
-  private toDetail(assignment: LeadAssignmentRecord): BrokerStarterLeadDetail {
+  private toDetail(assignment: LeadAssignmentRecord, history: BrokerStarterLeadDetail["history"]): BrokerStarterLeadDetail {
     return {
       ...this.toSummary(assignment),
       contact: assignment.contact ?? {},
       answers: assignment.answers ?? {},
-      history: this.history.forLead(assignment.id)
+      history
     };
   }
 

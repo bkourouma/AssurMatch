@@ -8,13 +8,13 @@ import { LeadsModule } from "../../../src/modules/leads/leads.module";
 const manager: ActorContext = { actorId: "manager-a", roles: ["broker_manager"], partnerTenantId: "broker-a", partnerPlan: "pro", mfaVerified: true };
 
 describe("BrokerCrmExportPolicy", () => {
-  it("exports scoped CSV for permitted roles and refuses agents", () => {
+  it("exports scoped CSV for permitted roles and refuses agents", async () => {
     const audit = new AuditLogWriter();
     const module = new LeadsModule(new PartnersService(audit), new PartnerLicensesService(audit), audit, { brokerCrmEnabled: true });
-    module.assignments.create({ quoteRequestId: "export-q1", partnerTenantId: "broker-a", assignmentReason: "routing", publicReference: "AM-EXPORT-1" }, manager);
+    await module.assignments.create({ quoteRequestId: "export-q1", partnerTenantId: "broker-a", assignmentReason: "routing", publicReference: "AM-EXPORT-1" }, manager);
 
-    expect(module.brokerCrmController.exportCsv(manager, {})).toContain("AM-EXPORT-1");
-    expect(() => module.brokerCrmController.exportCsv({ ...manager, roles: ["broker_agent"], actorId: "agent-a" }, {})).toThrow("CRM export denied");
+    expect(await module.brokerCrmController.exportCsv(manager, {})).toContain("AM-EXPORT-1");
+    await expect(module.brokerCrmController.exportCsv({ ...manager, roles: ["broker_agent"], actorId: "agent-a" }, {})).rejects.toThrow("CRM export denied");
     expect(audit.search({ action: "broker_crm.export_refused", result: "refused" })).toHaveLength(1);
   });
 });

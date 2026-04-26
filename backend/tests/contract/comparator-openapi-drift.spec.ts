@@ -4,7 +4,7 @@ import { readFileSync } from "node:fs";
 const contract = readFileSync("specs/002-comparateur-demande-devis/contracts/comparator-quote-api.openapi.yaml", "utf8");
 
 describe("comparator API contract drift", () => {
-  it("matches implemented controller surfaces for spec 002", () => {
+  it("matches implemented controller surfaces for spec 002", async () => {
     const controllers = [
       "backend/src/modules/countries/public-countries.controller.ts",
       "backend/src/modules/products/public-products.controller.ts",

@@ -8,7 +8,7 @@ import type { Product } from "../../../src/modules/products/products.module";
 import { MemoryProductsRepository } from "../../../src/modules/products/products.repository";
 
 describe("catalog memory repositories", () => {
-  it("stores public countries and products behind repository ports", () => {
+  it("stores public countries and products behind repository ports", async () => {
     const now = new Date("2026-01-01T00:00:00.000Z");
     const countries = new MemoryCountriesRepository();
     const products = new MemoryProductsRepository();
@@ -40,15 +40,15 @@ describe("catalog memory repositories", () => {
       updatedAt: now
     };
 
-    countries.create(country);
-    products.create(product);
+    await countries.create(country);
+    await products.create(product);
 
-    expect(countries.findByIsoCode("ci")?.id).toBe(country.id);
-    expect(countries.listPublic()).toHaveLength(1);
-    expect(products.listPublic(country.id)).toEqual([product]);
+    expect((await countries.findByIsoCode("ci"))?.id).toBe(country.id);
+    expect(await countries.listPublic()).toHaveLength(1);
+    expect(await products.listPublic(country.id)).toEqual([product]);
   });
 
-  it("stores offers and history through the offer repository", () => {
+  it("stores offers and history through the offer repository", async () => {
     const now = new Date("2026-01-01T00:00:00.000Z");
     const offers = new MemoryOffersRepository();
     const offer: OfferRecord = {
@@ -71,10 +71,10 @@ describe("catalog memory repositories", () => {
       updatedAt: now
     };
 
-    offers.create(offer);
-    offers.appendHistory({ id: "history-1", offerId: offer.id, changeType: "created", reason: "test", changedAt: now });
+    await offers.create(offer);
+    await offers.appendHistory({ id: "history-1", offerId: offer.id, changeType: "created", reason: "test", changedAt: now });
 
-    expect(offers.require(offer.id)).toBe(offer);
-    expect(offers.history()).toHaveLength(1);
+    expect(await offers.require(offer.id)).toBe(offer);
+    expect(await offers.history()).toHaveLength(1);
   });
 });

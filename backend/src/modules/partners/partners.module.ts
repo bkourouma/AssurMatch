@@ -12,7 +12,7 @@ export interface PartnerTenant extends PartnerRecord {
 export class PartnersService {
   constructor(private readonly audit: AuditLogWriter, private readonly repository: PartnersRepository = new MemoryPartnersRepository()) {}
 
-  create(input: PartnerDto, actor: ActorContext): PartnerTenant {
+  async create(input: PartnerDto, actor: ActorContext): Promise<PartnerTenant> {
     const parsed = partnerCreateSchema.parse(input);
     const now = new Date();
     const partner: PartnerTenant = {
@@ -21,7 +21,7 @@ export class PartnersService {
       createdAt: now,
       updatedAt: now
     };
-    this.repository.create(partner);
+    await this.repository.create(partner);
     this.audit.write({
       actor,
       action: "partner.created",
@@ -34,13 +34,13 @@ export class PartnersService {
     return partner;
   }
 
-  update(id: string, input: Partial<PartnerDto> & { reason: string }, actor: ActorContext): PartnerTenant {
-    const partner = this.require(id);
+  async update(id: string, input: Partial<PartnerDto> & { reason: string }, actor: ActorContext): Promise<PartnerTenant> {
+    const partner = await this.require(id);
     if (input.status === "suspended" && !input.suspensionReason) {
       throw new Error("Suspension reason is required");
     }
     Object.assign(partner, input, { updatedAt: new Date() });
-    this.repository.update(id, partner);
+    await this.repository.update(id, partner);
     this.audit.write({
       actor,
       action: "partner.updated",
@@ -54,16 +54,16 @@ export class PartnersService {
     return partner;
   }
 
-  require(id: string): PartnerTenant {
+  require(id: string): Promise<PartnerTenant> {
     return this.repository.require(id);
   }
 
-  list(): PartnerTenant[] {
+  list(): Promise<PartnerTenant[]> {
     return this.repository.list();
   }
 
-  authorizeCountry(partnerTenantId: string, countryId: string, actor: ActorContext): void {
-    this.repository.authorizeCountry(partnerTenantId, countryId);
+  async authorizeCountry(partnerTenantId: string, countryId: string, actor: ActorContext): Promise<void> {
+    await this.repository.authorizeCountry(partnerTenantId, countryId);
     this.audit.write({
       actor,
       action: "partner.country_authorized",
@@ -75,8 +75,8 @@ export class PartnersService {
     });
   }
 
-  authorizeProduct(partnerTenantId: string, productId: string, actor: ActorContext): void {
-    this.repository.authorizeProduct(partnerTenantId, productId);
+  async authorizeProduct(partnerTenantId: string, productId: string, actor: ActorContext): Promise<void> {
+    await this.repository.authorizeProduct(partnerTenantId, productId);
     this.audit.write({
       actor,
       action: "partner.product_authorized",
@@ -88,11 +88,11 @@ export class PartnersService {
     });
   }
 
-  isAuthorizedForCountry(partnerTenantId: string, countryId: string): boolean {
+  isAuthorizedForCountry(partnerTenantId: string, countryId: string): Promise<boolean> {
     return this.repository.isAuthorizedForCountry(partnerTenantId, countryId);
   }
 
-  isAuthorizedForProduct(partnerTenantId: string, productId: string): boolean {
+  isAuthorizedForProduct(partnerTenantId: string, productId: string): Promise<boolean> {
     return this.repository.isAuthorizedForProduct(partnerTenantId, productId);
   }
 }

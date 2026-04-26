@@ -10,7 +10,7 @@ const checkedFiles = [
 ];
 
 describe("comparator scope exclusions", () => {
-  it("does not activate payment, subscription, issuance, attestation, claims or binding recommendation scope", () => {
+  it("does not activate payment, subscription, issuance, attestation, claims or binding recommendation scope", async () => {
     const text = checkedFiles.map((file) => readFileSync(file, "utf8")).join("\n").toLocaleLowerCase("fr-FR");
 
     ["paymentintent", "checkout", "signature electronique", "emission de police", "attestation telechargeable", "gestion sinistre", "je recommande"].forEach((forbidden) => {

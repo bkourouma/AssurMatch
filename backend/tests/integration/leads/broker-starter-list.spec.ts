@@ -8,14 +8,14 @@ import { LeadsModule } from "../../../src/modules/leads/leads.module";
 const actor: ActorContext = { actorId: "owner-a", roles: ["broker_owner_starter"], partnerTenantId: "broker-a", mfaVerified: true };
 
 describe("broker Starter lead list", () => {
-  it("lists only assigned leads for the connected broker tenant", () => {
+  it("lists only assigned leads for the connected broker tenant", async () => {
     const audit = new AuditLogWriter();
     const leads = new LeadsModule(new PartnersService(audit), new PartnerLicensesService(audit), audit);
 
     leads.assignments.create({ quoteRequestId: "q1", partnerTenantId: "broker-a", assignmentReason: "routing", productKey: "auto", countryCode: "CI" }, actor);
     leads.assignments.create({ quoteRequestId: "q2", partnerTenantId: "broker-b", assignmentReason: "routing", productKey: "sante", countryCode: "CI" }, { ...actor, partnerTenantId: "broker-b" });
 
-    const page = leads.brokerStarterController.list(actor, { productKey: "auto" });
+    const page = await leads.brokerStarterController.list(actor, { productKey: "auto" });
 
     expect(page.total).toBe(1);
     expect(page.items[0]?.productKey).toBe("auto");

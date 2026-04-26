@@ -6,15 +6,15 @@ import { LeadAssignmentService } from "../../../src/modules/leads/lead-assignmen
 import { superAdminActor } from "../helpers/enterprise-seed";
 
 describe("lead assignment lock", () => {
-  it("prevents multiple active assignments for one quote request", () => {
+  it("prevents multiple active assignments for one quote request", async () => {
     const service = new LeadAssignmentService(new AuditLogWriter());
     const quoteRequestId = crypto.randomUUID();
-    service.create({ quoteRequestId, partnerTenantId: crypto.randomUUID(), assignmentReason: "first" }, superAdminActor);
+    await service.create({ quoteRequestId, partnerTenantId: crypto.randomUUID(), assignmentReason: "first" }, superAdminActor);
 
-    expect(() => service.create({ quoteRequestId, partnerTenantId: crypto.randomUUID(), assignmentReason: "second" }, superAdminActor)).toThrow("already has an active lead assignment");
+    await expect(service.create({ quoteRequestId, partnerTenantId: crypto.randomUUID(), assignmentReason: "second" }, superAdminActor)).rejects.toThrow("already has an active lead assignment");
   });
 
-  it("uses a routing lock key scoped by quote request id", () => {
+  it("uses a routing lock key scoped by quote request id", async () => {
     const quoteRequestId = crypto.randomUUID();
     expect(QuoteRedisKeys.routingLock(quoteRequestId)).toBe(`lock:routing:quote:${quoteRequestId}`);
   });

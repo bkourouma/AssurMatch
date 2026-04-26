@@ -4,7 +4,7 @@ import { ConsentService, type ConsentRecord } from "./consent.module";
 export class AdminConsentRecordsController {
   constructor(private readonly consent: ConsentService) {}
 
-  search(actor: ActorContext): ConsentRecord[] {
+  search(actor: ActorContext): Promise<ConsentRecord[]> {
     return this.consent.searchRecords(actor);
   }
 }

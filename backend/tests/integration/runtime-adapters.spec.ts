@@ -15,14 +15,14 @@ function withEnv<T>(env: Record<string, string | undefined>, callback: () => T):
 }
 
 describe("runtime adapter boundaries", () => {
-  it("keeps memory adapters explicit in test mode", () => {
+  it("keeps memory adapters explicit in test mode", async () => {
     expect(new PrismaService().runtimeMode).toBe("test-adapter");
     expect(new RedisModule().runtimeMode).toBe("memory-test");
     expect(new QueuesModule().runtimeMode).toBe("memory-test");
     expect(new AuditLogWriter().runtimeMode).toBe("memory-test");
   });
 
-  it("selects real runtime adapters outside tests when required URLs are configured", () => {
+  it("selects real runtime adapters outside tests when required URLs are configured", async () => {
     withEnv({
       NODE_ENV: "local",
       APP_ENV: "local",
@@ -40,7 +40,7 @@ describe("runtime adapter boundaries", () => {
     });
   });
 
-  it("rejects memory adapter overrides outside tests", () => {
+  it("rejects memory adapter overrides outside tests", async () => {
     withEnv({
       NODE_ENV: "local",
       APP_ENV: "local",

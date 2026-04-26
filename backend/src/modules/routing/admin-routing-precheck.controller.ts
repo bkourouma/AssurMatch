@@ -8,7 +8,7 @@ export class AdminRoutingPrecheckController {
 
   constructor(private readonly routing: RoutingPrecheckService) {}
 
-  precheck(actor: ActorContext, input: RoutingPrecheckRequestDto): RoutingPrecheckResult {
+  precheck(actor: ActorContext, input: RoutingPrecheckRequestDto): Promise<RoutingPrecheckResult> {
     this.rbac.assert(actor, "partners:read", { partnerTenantId: input.partnerTenantId, countryId: input.countryId, productId: input.productId });
     return this.routing.evaluate(actor, input);
   }

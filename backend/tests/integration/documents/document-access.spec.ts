@@ -4,7 +4,7 @@ import { DocumentsService } from "../../../src/modules/documents/documents.modul
 import { superAdminActor } from "../helpers/enterprise-seed";
 
 describe("document access RBAC", () => {
-  it("denies cross-partner document reads", () => {
+  it("denies cross-partner document reads", async () => {
     const documents = new DocumentsService(new AuditLogWriter());
     const document = documents.register({
       partnerTenantId: "00000000-0000-4000-8000-000000000020",

@@ -5,9 +5,9 @@ import { UsersService } from "../../../src/modules/users/users.module";
 import { superAdminActor } from "../helpers/enterprise-seed";
 
 describe("auth and MFA", () => {
-  it("logs in, enrolls MFA and verifies challenge", () => {
+  it("logs in, enrolls MFA and verifies challenge", async () => {
     const users = new UsersService(new AuditLogWriter());
-    const user = users.create({ email: "admin@example.com", displayName: "Admin", roles: ["super_admin"] }, superAdminActor);
+    const user = await users.create({ email: "admin@example.com", displayName: "Admin", roles: ["super_admin"] }, superAdminActor);
     const auth = new AuthModule(users).service;
     const session = auth.login({ email: "admin@example.com", password: "very-secure-pass" });
     const challenge = auth.enrollMfa(user);

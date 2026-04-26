@@ -11,7 +11,7 @@ describe("no-consent repository blocker", () => {
 
   it("does not persist quote transmission side effects when public consent is refused", async () => {
     harness = await createRuntimeHttpHarness();
-    const seed = seedPublicRuntime(harness.runtime);
+    const seed = await seedPublicRuntime(harness.runtime);
     const response = await harness.request("/quote-requests", {
       method: "POST",
       headers: { "content-type": "application/json" },
@@ -33,8 +33,8 @@ describe("no-consent repository blocker", () => {
     });
 
     expect([400, 422]).toContain(response.status);
-    expect(harness.runtime.leads.assignments.list()).toHaveLength(0);
-    expect(harness.runtime.notifications.service.list()).toHaveLength(0);
-    expect(harness.runtime.quoteRequests.submissions.list()).toHaveLength(0);
+    expect(await harness.runtime.leads.assignments.list()).toHaveLength(0);
+    expect(await harness.runtime.notifications.service.list()).toHaveLength(0);
+    expect(await harness.runtime.quoteRequests.submissions.list()).toHaveLength(0);
   });
 });

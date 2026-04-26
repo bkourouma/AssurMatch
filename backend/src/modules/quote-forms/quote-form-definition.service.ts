@@ -39,7 +39,7 @@ export interface ConsentTextReference {
 export class QuoteFormDefinitionService {
   private readonly forms: QuoteFormDefinitionRecord[] = [];
 
-  constructor(private readonly audit: AuditLogWriter, private readonly consentTexts: () => ConsentTextReference[] = () => []) {}
+  constructor(private readonly audit: AuditLogWriter, private readonly consentTexts: () => ConsentTextReference[] | Promise<ConsentTextReference[]> = () => []) {}
 
   create(input: AdminQuoteFormDefinitionDto, actor: ActorContext): QuoteFormDefinitionRecord {
     const parsed = adminQuoteFormDefinitionSchema.parse(input);
@@ -80,7 +80,7 @@ export class QuoteFormDefinitionService {
     return form;
   }
 
-  publicForm(countryId: string, productId: string, language = "fr", actor?: ActorContext): PublicQuoteFormResponse {
+  async publicForm(countryId: string, productId: string, language = "fr", actor?: ActorContext): Promise<PublicQuoteFormResponse> {
     const form = this.forms
       .filter((candidate) => candidate.countryId === countryId && candidate.productId === productId && candidate.status === "published")
       .find((candidate) => candidate.language === language) ?? this.forms.find((candidate) => candidate.countryId === countryId && candidate.productId === productId && candidate.status === "published");
@@ -97,7 +97,7 @@ export class QuoteFormDefinitionService {
       });
       throw new Error("Quote form is not available");
     }
-    const consent = this.consentTexts().find((text) => text.id === form.consentTextId && text.status === "published" && text.purpose === "lead_transmission");
+    const consent = (await this.consentTexts()).find((text) => text.id === form.consentTextId && text.status === "published" && text.purpose === "lead_transmission");
     if (!consent) {
       this.audit.write({
         actor,

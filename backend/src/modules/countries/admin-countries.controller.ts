@@ -8,17 +8,17 @@ export class AdminCountriesController {
 
   constructor(private readonly countries: CountriesService) {}
 
-  list(actor: ActorContext): Country[] {
+  list(actor: ActorContext): Promise<Country[]> {
     this.rbac.assert(actor, "countries:read");
     return this.countries.listAdmin();
   }
 
-  create(actor: ActorContext, input: CountryDto): Country {
+  create(actor: ActorContext, input: CountryDto): Promise<Country> {
     this.rbac.assert(actor, "countries:create");
     return this.countries.create(input, actor);
   }
 
-  update(actor: ActorContext, id: string, input: Partial<CountryDto> & { reason: string }): Country {
+  update(actor: ActorContext, id: string, input: Partial<CountryDto> & { reason: string }): Promise<Country> {
     this.rbac.assert(actor, "countries:update", { countryId: id });
     return this.countries.update(id, input, actor);
   }

@@ -4,7 +4,7 @@ import { readFileSync } from "node:fs";
 const contract = readFileSync("specs/002-comparateur-demande-devis/contracts/comparator-quote-api.openapi.yaml", "utf8");
 
 describe("spec 002 comparator quote OpenAPI contract", () => {
-  it("declares the public country, product, offer and quote endpoints", () => {
+  it("declares the public country, product, offer and quote endpoints", async () => {
     [
       "/countries",
       "/countries/{countryCode}",
@@ -18,7 +18,7 @@ describe("spec 002 comparator quote OpenAPI contract", () => {
     ].forEach((path) => expect(contract).toContain(path));
   });
 
-  it("declares admin offer, quote form, quote operation and broker lead endpoints", () => {
+  it("declares admin offer, quote form, quote operation and broker lead endpoints", async () => {
     [
       "/admin/offers",
       "/admin/offers/{offerId}",
@@ -34,7 +34,7 @@ describe("spec 002 comparator quote OpenAPI contract", () => {
     ].forEach((path) => expect(contract).toContain(path));
   });
 
-  it("keeps public quote creation anonymous and consent based", () => {
+  it("keeps public quote creation anonymous and consent based", async () => {
     expect(contract).toContain("security: []");
     expect(contract).toContain("QuoteRequestCreate");
     expect(contract).toContain("accepted");

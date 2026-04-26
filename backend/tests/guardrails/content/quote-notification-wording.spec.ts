@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 import { findForbiddenWording } from "../../../../packages/shared/contracts/content-safety";
 
 describe("quote notification wording", () => {
-  it("excludes firm price, acceptance, contract, attestation and guaranteed callback claims", () => {
+  it("excludes firm price, acceptance, contract, attestation and guaranteed callback claims", async () => {
     const text = [
       "backend/src/modules/notifications/quote-notification.service.ts",
       "backend/src/modules/quote-requests/quote-submission.service.ts",

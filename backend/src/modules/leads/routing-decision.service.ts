@@ -18,13 +18,13 @@ export interface RoutingDecisionRecord {
 export class RoutingDecisionService {
   constructor(private readonly audit: AuditLogWriter, private readonly repository: RoutingDecisionsRepository = new MemoryRoutingDecisionsRepository()) {}
 
-  record(input: Omit<RoutingDecisionRecord, "id" | "createdAt">, actor: ActorContext): RoutingDecisionRecord {
+  async record(input: Omit<RoutingDecisionRecord, "id" | "createdAt">, actor: ActorContext): Promise<RoutingDecisionRecord> {
     const decision: RoutingDecisionRecord = {
       id: crypto.randomUUID(),
       ...input,
       createdAt: new Date()
     };
-    this.repository.create(decision);
+    await this.repository.create(decision);
     const action = decision.result === "assigned" ? QuoteAuditActions.routingAssigned : QuoteAuditActions.routingNoBrokerAvailable;
     this.audit.write({
       actor,
@@ -39,7 +39,7 @@ export class RoutingDecisionService {
     return decision;
   }
 
-  list(): RoutingDecisionRecord[] {
+  list(): Promise<RoutingDecisionRecord[]> {
     return this.repository.list();
   }
 }

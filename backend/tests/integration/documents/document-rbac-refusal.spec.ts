@@ -4,7 +4,7 @@ import { DocumentsService } from "../../../src/modules/documents/documents.modul
 import { superAdminActor } from "../helpers/enterprise-seed";
 
 describe("document RBAC refusal", () => {
-  it("audits refused access without document permission", () => {
+  it("audits refused access without document permission", async () => {
     const audit = new AuditLogWriter();
     const documents = new DocumentsService(audit);
     const document = documents.register({

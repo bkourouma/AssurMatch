@@ -5,7 +5,7 @@ import { superAdminActor } from "../helpers/enterprise-seed";
 
 describe("public quote rate limit", () => {
   it("blocks over-limit submissions before broker notification", async () => {
-    const seed = seedComparatorQuote();
+    const seed = await seedComparatorQuote();
     for (let index = 0; index < 5; index += 1) {
       const payload = validQuotePayload(seed);
       payload.contact.email = `visitor-${index}@example.com`;

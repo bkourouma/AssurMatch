@@ -4,7 +4,7 @@ import { AuditLogsService } from "../../../src/modules/audit-logs/audit-logs.mod
 import { superAdminActor } from "../helpers/enterprise-seed";
 
 describe("audit log search and masking", () => {
-  it("filters audit logs and masks PII in contexts", () => {
+  it("filters audit logs and masks PII in contexts", async () => {
     const writer = new AuditLogWriter();
     writer.write({
       actor: superAdminActor,

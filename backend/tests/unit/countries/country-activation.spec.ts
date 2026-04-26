@@ -4,9 +4,9 @@ import { AuditLogWriter } from "../../../src/modules/audit-logs/audit-log-writer
 import { superAdminActor } from "../../integration/helpers/enterprise-seed";
 
 describe("country activation rules", () => {
-  it("keeps countries hidden publicly until explicit public flag is enabled", () => {
+  it("keeps countries hidden publicly until explicit public flag is enabled", async () => {
     const service = new CountriesService(new AuditLogWriter());
-    service.create({
+    await service.create({
       isoCode: "CI",
       name: "Cote d'Ivoire",
       currency: "XOF",
@@ -15,12 +15,12 @@ describe("country activation rules", () => {
       regulatoryFamily: "cima"
     }, superAdminActor);
 
-    expect(service.listPublic()).toHaveLength(0);
+    expect(await service.listPublic()).toHaveLength(0);
   });
 
-  it("requires a regime and public flag for public status", () => {
+  it("requires a regime and public flag for public status", async () => {
     const service = new CountriesService(new AuditLogWriter());
-    const country = service.create({
+    const country = await service.create({
       isoCode: "SN",
       name: "Senegal",
       currency: "XOF",
@@ -29,6 +29,6 @@ describe("country activation rules", () => {
       regulatoryFamily: "cima"
     }, superAdminActor);
 
-    expect(() => service.update(country.id, { status: "public", reason: "activation test" }, superAdminActor)).toThrow();
+    await expect(service.update(country.id, { status: "public", reason: "activation test" }, superAdminActor)).rejects.toThrow();
   });
 });

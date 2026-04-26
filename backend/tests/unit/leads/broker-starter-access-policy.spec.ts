@@ -18,7 +18,7 @@ const assignment: LeadAssignmentRecord = {
 };
 
 describe("BrokerStarterAccessPolicy", () => {
-  it("allows assigned Starter brokers with MFA and refuses cross-tenant access", () => {
+  it("allows assigned Starter brokers with MFA and refuses cross-tenant access", async () => {
     const audit = new AuditLogWriter();
     const policy = new BrokerStarterAccessPolicy(audit);
 
@@ -27,7 +27,7 @@ describe("BrokerStarterAccessPolicy", () => {
     expect(audit.search({ action: "broker_starter.cross_tenant_refused", result: "refused" })).toHaveLength(1);
   });
 
-  it("requires MFA and an explicit export permission", () => {
+  it("requires MFA and an explicit export permission", async () => {
     const audit = new AuditLogWriter();
     const policy = new BrokerStarterAccessPolicy(audit);
 
@@ -36,7 +36,7 @@ describe("BrokerStarterAccessPolicy", () => {
     expect(audit.search({ action: "broker_starter.export_refused", result: "refused" })).toHaveLength(1);
   });
 
-  it("blocks Pro capabilities for Starter plan", () => {
+  it("blocks Pro capabilities for Starter plan", async () => {
     const audit = new AuditLogWriter();
     const policy = new BrokerStarterAccessPolicy(audit);
 

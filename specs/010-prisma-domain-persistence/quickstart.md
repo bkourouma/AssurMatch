@@ -1,8 +1,7 @@
-# Quickstart: Prisma Domain Persistence Planning
+# Quickstart: Prisma Domain Persistence
 
-This quickstart is for future implementation of spec
-010-prisma-domain-persistence. It does not generate `tasks.md` and does not
-implement code.
+This quickstart records the implemented Prisma-domain persistence posture for
+spec 010-prisma-domain-persistence.
 
 ## Preconditions
 
@@ -13,19 +12,30 @@ implement code.
 - Spec 010 is treated as validated by the user request.
 - No clarification markers remain.
 
-## No-Implementation Guard
+## Implementation Status
 
-For this planning invocation, verify only planning artifacts changed:
+The following priority domains are Prisma-runtime outside `NODE_ENV=test` and
+remain memory-backed only in explicit tests:
 
-```powershell
-git status --short
-Test-Path specs\010-prisma-domain-persistence\tasks.md
-```
+- Countries
+- Products
+- Offers
+- Prospects
+- ConsentRecords
+- QuoteRequests
+- LeadAssignments
+- RoutingDecisions
+- Partners
+- PartnerLicenses
+- CRMActivity
+- Notifications
 
-Expected:
+Audit logs and feature flags remain Prisma-runtime as established by spec 007.
+Runtime bindings are centralized in `AssurMatchRuntime`; memory repositories are
+guarded by `assertRuntimeRepository` and fail outside test.
 
-- `tasks.md` is `False` or absent.
-- No backend runtime source file is modified during planning.
+No new business feature, frontend screen, payment, subscription, policy
+issuance, attestation, e-signature or claims flow is activated by this spec.
 
 ## Planning Artifacts
 
@@ -44,9 +54,7 @@ specs/010-prisma-domain-persistence/
     requirements.md
 ```
 
-## Future Implementation Setup
-
-Recommended implementation order from `plan.md`:
+## Implementation Order Used
 
 1. Inventory ports, service consumers, route consumers and current memory
    bindings.
@@ -93,9 +101,10 @@ npx prisma validate --schema backend/prisma/schema.prisma
 
 ## Repository Test Focus
 
-Future tests must cover:
+Tests cover:
 
-- Prisma repositories for all priority domains.
+- Complete Prisma-runtime classes for all priority domains through guardrails
+  and runtime binding checks.
 - Memory repositories in explicit test-only usage.
 - Runtime-normal failure when memory repositories are bound.
 - No transition/TODO/non-implemented throws in priority Prisma repositories.
@@ -110,18 +119,15 @@ Future tests must cover:
 - Durable notifications, audit and feature flags.
 - Fresh database reconstruction and migration checks.
 
-## Seed And Fixture Rules
+## Schema, Migration And Seed
 
-- Runtime defaults stay closed for sensitive modules.
-- Test fixtures may enable only the flags needed by the scenario.
-- Public fixture seed should include active country, product, country-product
-  link, valid public offer and published consent text.
-- Routing fixture seed should include active partner, authorizations, valid
-  license and capacity/quota data.
-- CRM fixture seed should include Pro/Enterprise broker scope and
-  `broker_crm_enabled` only when testing CRM access.
-- Negative fixtures should cover disabled country/product, expired license,
-  absent consent, no eligible broker and cross-tenant lead access.
+- No Prisma migration was added for 010: existing migrations 0001-0004 already
+  cover the priority persistence entities required by the repositories.
+- `backend/prisma/seed.ts` remains the minimal development seed source.
+- Test fixtures now create catalog, consent, quote, partner, license, lead,
+  routing and CRM data through async services/repositories.
+- Fresh-base readiness is validated by Prisma schema validation, migration
+  inventory tests and an empty-schema Prisma diff.
 
 ## HTTP Non-Regression Smoke List
 

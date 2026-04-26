@@ -51,7 +51,7 @@ export function createComparatorApp(): ComparatorApp {
   const partners = new PartnersModule(audit.writer);
   const partnerLicenses = new PartnerLicensesModule(audit.writer);
   const offers = new OffersModule(audit.writer, redis.client);
-  const quoteForms = new QuoteFormsModule(audit.writer, () => consent.service.listTexts().map((text) => ({
+  const quoteForms = new QuoteFormsModule(audit.writer, async () => (await consent.service.listTexts()).map((text) => ({
     id: text.id,
     version: text.version,
     contentHash: text.contentHash,
@@ -106,9 +106,9 @@ export function createComparatorApp(): ComparatorApp {
   };
 }
 
-export function seedComparatorQuote(): ComparatorSeed {
+export async function seedComparatorQuote(): Promise<ComparatorSeed> {
   const app = createComparatorApp();
-  const country = app.countries.service.create({
+  const country = await app.countries.service.create({
     isoCode: "CI",
     name: "Cote d'Ivoire",
     currency: "XOF",
@@ -117,7 +117,7 @@ export function seedComparatorQuote(): ComparatorSeed {
     regulatoryFamily: "cima",
     regulatoryRegimeId: "00000000-0000-4000-8000-000000000010"
   }, superAdminActor);
-  app.countries.service.update(country.id, {
+  await app.countries.service.update(country.id, {
     status: "public",
     flags: {
       country_public_enabled: true,
@@ -127,9 +127,9 @@ export function seedComparatorQuote(): ComparatorSeed {
     reason: "activate comparator pilot"
   }, superAdminActor);
 
-  const product = app.products.service.create({ key: "auto", name: "Assurance auto" }, superAdminActor);
-  app.products.service.associateCountry(product.id, country.id, superAdminActor);
-  app.products.service.update(product.id, {
+  const product = await app.products.service.create({ key: "auto", name: "Assurance auto" }, superAdminActor);
+  await app.products.service.associateCountry(product.id, country.id, superAdminActor);
+  await app.products.service.update(product.id, {
     status: "public",
     flags: {
       product_public_enabled: true,
@@ -140,7 +140,7 @@ export function seedComparatorQuote(): ComparatorSeed {
     reason: "activate quote product"
   }, superAdminActor);
 
-  const consentText = app.consent.service.createText({
+  const consentText = await app.consent.service.createText({
     purpose: "lead_transmission",
     countryId: country.id,
     productId: product.id,
@@ -151,9 +151,9 @@ export function seedComparatorQuote(): ComparatorSeed {
     status: "draft",
     contentHash: "hash-lead-transmission-v1"
   }, superAdminActor);
-  app.consent.service.publishText(consentText.id, superAdminActor);
+  await app.consent.service.publishText(consentText.id, superAdminActor);
 
-  const form = app.quoteForms.service.create({
+  const form = await app.quoteForms.service.create({
     countryId: country.id,
     productId: product.id,
     language: "fr",
@@ -166,16 +166,16 @@ export function seedComparatorQuote(): ComparatorSeed {
     reason: "publish pilot quote form"
   }, superAdminActor);
 
-  const partner = app.partners.service.create({
+  const partner = await app.partners.service.create({
     legalName: "Broker CI",
     primaryEmail: "ops@broker.example",
     primaryWhatsApp: "+2250102030405",
     status: "active",
     quotaMonthlyLeads: 10
   }, superAdminActor);
-  app.partners.service.authorizeCountry(partner.id, country.id, superAdminActor);
-  app.partners.service.authorizeProduct(partner.id, product.id, superAdminActor);
-  app.partnerLicenses.service.create({
+  await app.partners.service.authorizeCountry(partner.id, country.id, superAdminActor);
+  await app.partners.service.authorizeProduct(partner.id, product.id, superAdminActor);
+  await app.partnerLicenses.service.create({
     partnerTenantId: partner.id,
     licenseNumber: "LIC-CI-AUTO",
     issuingAuthority: "Regulator",
@@ -186,7 +186,7 @@ export function seedComparatorQuote(): ComparatorSeed {
     expirationDate: "2030-01-01"
   }, superAdminActor);
 
-  const activeOffer = app.offers.adminService.create({
+  const activeOffer = await app.offers.adminService.create({
     countryId: country.id,
     productId: product.id,
     partnerTenantId: partner.id,
@@ -200,9 +200,9 @@ export function seedComparatorQuote(): ComparatorSeed {
     isSponsored: false,
     reason: "seed active indicative offer"
   }, superAdminActor);
-  app.offers.adminService.validate(activeOffer.id, { validationStatus: "validated", reason: "validate public offer" }, superAdminActor);
+  await app.offers.adminService.validate(activeOffer.id, { validationStatus: "validated", reason: "validate public offer" }, superAdminActor);
 
-  const expiredOffer = app.offers.adminService.create({
+  const expiredOffer = await app.offers.adminService.create({
     countryId: country.id,
     productId: product.id,
     name: "Auto Expiree",
@@ -212,7 +212,7 @@ export function seedComparatorQuote(): ComparatorSeed {
     validUntil: "2021-01-01T00:00:00.000Z",
     reason: "seed expired offer"
   }, superAdminActor);
-  app.offers.adminService.validate(expiredOffer.id, { validationStatus: "validated", reason: "validate expired fixture" }, superAdminActor);
+  await app.offers.adminService.validate(expiredOffer.id, { validationStatus: "validated", reason: "validate expired fixture" }, superAdminActor);
 
   return {
     app,

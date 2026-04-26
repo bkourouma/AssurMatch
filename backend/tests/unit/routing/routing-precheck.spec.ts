@@ -8,13 +8,13 @@ import { RoutingPrecheckService } from "../../../src/modules/routing/routing.mod
 import { superAdminActor } from "../../integration/helpers/enterprise-seed";
 
 describe("routing precheck blockers", () => {
-  it("returns not eligible when consent and license blockers exist", () => {
+  it("returns not eligible when consent and license blockers exist", async () => {
     const audit = new AuditLogWriter();
     const partners = new PartnersService(audit);
-    const partner = partners.create({ legalName: "Broker", primaryEmail: "ops@broker.example", primaryWhatsApp: "+2250102030405", status: "active" }, superAdminActor);
+    const partner = await partners.create({ legalName: "Broker", primaryEmail: "ops@broker.example", primaryWhatsApp: "+2250102030405", status: "active" }, superAdminActor);
     const service = new RoutingPrecheckService(new ConsentService(audit), new PartnerEligibilityService(partners, new PartnerLicensesService(audit)), audit);
 
-    const result = service.evaluate(superAdminActor, {
+    const result = await service.evaluate(superAdminActor, {
       countryId: "00000000-0000-4000-8000-000000000030",
       productId: "00000000-0000-4000-8000-000000000040",
       partnerTenantId: partner.id
