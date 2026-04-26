@@ -3,10 +3,11 @@ import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
 
 test.describe("public runtime browser smoke", () => {
-  test.skip(!process.env.ASSURMATCH_E2E_BASE_URL, "Set ASSURMATCH_E2E_BASE_URL to run real public runtime smoke");
+  const baseUrl = process.env.ASSURMATCH_E2E_PUBLIC_URL ?? process.env.ASSURMATCH_E2E_BASE_URL;
+  test.skip(!baseUrl, "Set ASSURMATCH_E2E_PUBLIC_URL to run real public runtime smoke");
 
   test("public runtime smoke navigates public catalog when server is provided", async ({ page }) => {
-    await page.goto(`${process.env.ASSURMATCH_E2E_BASE_URL}/catalog`);
+    await page.goto(`${baseUrl}/catalog`);
     await expect(page.getByRole("heading", { name: "Catalogue indicatif" })).toBeVisible();
     await expect(page.getByText(/Aucun pays public actif|pays public actif|Catalogue public temporairement indisponible/)).toBeVisible();
   });

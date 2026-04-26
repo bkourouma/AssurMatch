@@ -1,6 +1,7 @@
 import { backOfficeApiBaseUrl, getBackOfficeToken } from "./backoffice-auth";
 
 export interface BrokerApiState<T> {
+  status: "success" | "error" | "unauthenticated" | "forbidden";
   data: T;
   error?: string;
   unauthenticated?: boolean;
@@ -10,19 +11,19 @@ export interface BrokerApiState<T> {
 
 async function readBroker<T>(path: string, fallback: T): Promise<BrokerApiState<T>> {
   const token = await getBackOfficeToken();
-  if (!token) return { data: fallback, unauthenticated: true, error: "session_required" };
+  if (!token) return { status: "unauthenticated", data: fallback, unauthenticated: true, error: "session_required" };
 
   try {
     const response = await fetch(`${backOfficeApiBaseUrl()}${path}`, {
       headers: { Authorization: `Bearer ${token}` },
       cache: "no-store"
     });
-    if (response.status === 401) return { data: fallback, unauthenticated: true, error: "session_expired" };
-    if (response.status === 403) return { data: fallback, forbidden: true, mfaRequired: true, error: "access_denied" };
-    if (!response.ok) return { data: fallback, error: `api_${response.status}` };
-    return { data: await response.json() as T };
+    if (response.status === 401) return { status: "unauthenticated", data: fallback, unauthenticated: true, error: "session_expired" };
+    if (response.status === 403) return { status: "forbidden", data: fallback, forbidden: true, mfaRequired: true, error: "access_denied" };
+    if (!response.ok) return { status: "error", data: fallback, error: `api_${response.status}` };
+    return { status: "success", data: await response.json() as T };
   } catch (error) {
-    return { data: fallback, error: error instanceof Error ? error.message : "api_unavailable" };
+    return { status: "error", data: fallback, error: error instanceof Error ? error.message : "api_unavailable" };
   }
 }
 

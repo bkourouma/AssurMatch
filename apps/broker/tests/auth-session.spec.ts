@@ -32,6 +32,8 @@ test("broker runtime client uses bearer authorization and no simulation headers"
 
   expect(apiSource).toContain("Authorization: `Bearer ${token}`");
   expect(apiSource).toContain("session_expired");
+  expect(apiSource).toContain("status: \"error\"");
+  expect(apiSource).toContain("status: \"forbidden\"");
   for (const header of forbiddenRuntimeHeaders) {
     expect(apiSource).not.toContain(header);
   }

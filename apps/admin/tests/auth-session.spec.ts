@@ -32,6 +32,7 @@ test("admin runtime client uses bearer authorization and no simulation headers",
 
   expect(apiSource).toContain("Authorization: `Bearer ${token}`");
   expect(apiSource).toContain("session_expired");
+  expect(apiSource).toContain("ok: false");
   for (const header of forbiddenRuntimeHeaders) {
     expect(apiSource).not.toContain(header);
   }
