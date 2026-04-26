@@ -1,3 +1,5 @@
+import { createClient, type RedisClientType } from "redis";
+
 interface CacheValue {
   value: string;
   expiresAt?: number;
@@ -40,4 +42,15 @@ export class InMemoryRedisClient {
 
 export class RedisModule {
   readonly client = new InMemoryRedisClient();
+  readonly runtimeClient?: RedisClientType;
+  readonly runtimeMode: "memory-test" | "redis-client";
+
+  constructor() {
+    const redisUrl = process.env.REDIS_URL;
+    const useRealRedis = process.env.NODE_ENV !== "test" && redisUrl && process.env.ASSURMATCH_REDIS_MEMORY !== "true";
+    this.runtimeMode = useRealRedis ? "redis-client" : "memory-test";
+    if (useRealRedis && redisUrl) {
+      this.runtimeClient = createClient({ url: redisUrl });
+    }
+  }
 }

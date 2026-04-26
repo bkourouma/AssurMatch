@@ -1,6 +1,7 @@
 import { loginRequestSchema, type LoginRequest } from "../../../../packages/shared/contracts/auth.contracts";
 import type { ActorContext } from "../common/types";
 import type { UserAccount, UsersService } from "../users/users.module";
+import { signActorToken } from "./http-auth-token.service";
 import { MfaService } from "./mfa.service";
 
 export interface AuthSession {
@@ -20,7 +21,7 @@ export class AuthService {
     }
     user.status = "active";
     return {
-      accessToken: `foundation.${user.id}.${crypto.randomUUID()}`,
+      accessToken: signActorToken({ actorId: user.id, roles: user.roles, ...(user.partnerTenantId ? { partnerTenantId: user.partnerTenantId } : {}), mfaVerified: user.mfaStatus === "verified" }),
       mfaRequired: user.mfaStatus !== "verified",
       user
     };
@@ -41,7 +42,7 @@ export class AuthService {
   verifyMfa(user: UserAccount, challengeId: string, code: string): AuthSession {
     if (!this.mfa.verify(user, challengeId, code)) throw new Error("Invalid MFA code");
     return {
-      accessToken: `foundation.${user.id}.${crypto.randomUUID()}`,
+      accessToken: signActorToken({ actorId: user.id, roles: user.roles, ...(user.partnerTenantId ? { partnerTenantId: user.partnerTenantId } : {}), mfaVerified: true }),
       mfaRequired: false,
       user
     };

@@ -1,5 +1,6 @@
 import { RbacGuard } from "../auth/guards/rbac.guard";
 import type { ActorContext, AuditEntry, AuditResult } from "../common/types";
+import type { AuditLogRepository } from "./audit-log-repository";
 import { AuditLogWriter } from "./audit-log-writer.service";
 
 export interface AuditSearchFilters {
@@ -22,6 +23,11 @@ export class AuditLogsService {
 }
 
 export class AuditLogsModule {
-  readonly writer = new AuditLogWriter();
-  readonly service = new AuditLogsService(this.writer);
+  readonly writer: AuditLogWriter;
+  readonly service: AuditLogsService;
+
+  constructor(repository?: AuditLogRepository) {
+    this.writer = new AuditLogWriter(repository);
+    this.service = new AuditLogsService(this.writer);
+  }
 }

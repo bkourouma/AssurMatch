@@ -1,10 +1,25 @@
-const leads = [
+import { listCrmLeads } from "../../lib/broker-api";
+
+const fallbackLeads = [
   { reference: "AM-LEAD-2048", pays: "CI", produit: "auto", statut: "Nouveau", conseiller: "Awa", urgence: "Urgent", source: "Comparateur" },
   { reference: "AM-LEAD-2037", pays: "SN", produit: "sante", statut: "Qualifie", conseiller: "Moussa", urgence: "Normal", source: "Demande devis" },
   { reference: "AM-LEAD-2029", pays: "CI", produit: "habitation", statut: "Negociation", conseiller: "Awa", urgence: "Eleve", source: "Support" }
 ];
 
-export default function BrokerCrmLeadsPage() {
+export default async function BrokerCrmLeadsPage() {
+  const apiLeads = await listCrmLeads();
+  const leads = apiLeads.data.items.length
+    ? apiLeads.data.items.map((lead) => ({
+        reference: String(lead.publicReference ?? lead.id ?? "lead"),
+        pays: String(lead.countryCode ?? "-"),
+        produit: String(lead.productKey ?? "-"),
+        statut: String(lead.status ?? "-"),
+        conseiller: String(lead.assignedAdvisorId ?? "-"),
+        urgence: String(lead.urgency ?? "-"),
+        source: String(lead.source ?? "-")
+      }))
+    : fallbackLeads;
+
   return (
     <main style={{ maxWidth: 1180, margin: "0 auto", padding: "28px 20px", fontFamily: "system-ui, sans-serif", color: "#172033" }}>
       <header style={{ display: "flex", justifyContent: "space-between", gap: 16, alignItems: "flex-start", marginBottom: 20 }}>
@@ -35,6 +50,9 @@ export default function BrokerCrmLeadsPage() {
         Recherche autorisee
         <input placeholder="Nom, reference, telephone ou email selon permission" style={{ minHeight: 38, border: "1px solid #bac4cf", borderRadius: 6, padding: "0 10px" }} />
       </label>
+
+      {apiLeads.forbidden ? <p role="alert">Acces CRM refuse, verifiez le plan, la MFA et le flag broker_crm_enabled.</p> : null}
+      {apiLeads.error && !apiLeads.forbidden ? <p role="status">API CRM indisponible, affichage de secours.</p> : null}
 
       <table style={{ width: "100%", borderCollapse: "collapse", borderTop: "1px solid #d8dde3" }}>
         <thead>

@@ -1,5 +1,6 @@
 import { maskPii } from "../common/logging/pii-masker";
 import type { ActorContext, AuditEntry, AuditResult } from "../common/types";
+import { MemoryAuditLogRepository, type AuditLogRepository } from "./audit-log-repository";
 
 export interface AuditWriteInput {
   actor?: ActorContext | undefined;
@@ -15,6 +16,13 @@ export interface AuditWriteInput {
 
 export class AuditLogWriter {
   private readonly entries: AuditEntry[] = [];
+  readonly repository: AuditLogRepository;
+  readonly runtimeMode: "memory-test" | "durable-boundary";
+
+  constructor(repository?: AuditLogRepository) {
+    this.repository = repository ?? new MemoryAuditLogRepository();
+    this.runtimeMode = this.repository.mode === "prisma-runtime" ? "durable-boundary" : "memory-test";
+  }
 
   write(input: AuditWriteInput): AuditEntry {
     const entry: AuditEntry = {
@@ -32,6 +40,7 @@ export class AuditLogWriter {
       retentionUntil: input.retentionUntil ?? new Date(Date.now() + 10 * 365 * 24 * 60 * 60 * 1000)
     };
     this.entries.push(entry);
+    Promise.resolve(this.repository.persist(entry)).catch(() => undefined);
     return entry;
   }
 

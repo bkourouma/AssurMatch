@@ -1,9 +1,22 @@
-export default function BrokerLeadsPage() {
-  const leads = [
+import { listStarterLeads } from "../lib/broker-api";
+
+export default async function BrokerLeadsPage() {
+  const apiLeads = await listStarterLeads();
+  const fallbackLeads = [
     { reference: "AM-LEAD-1042", pays: "CI", produit: "auto", statut: "Nouveau", date: "2026-04-25", vu: "Non" },
     { reference: "AM-LEAD-1039", pays: "CI", produit: "sante", statut: "Vu", date: "2026-04-24", vu: "Oui" },
     { reference: "AM-LEAD-1032", pays: "SN", produit: "auto", statut: "Conteste", date: "2026-04-22", vu: "Oui" }
   ];
+  const leads = apiLeads.data.items.length
+    ? apiLeads.data.items.map((lead) => ({
+        reference: String(lead.publicReference ?? lead.id ?? "lead"),
+        pays: String(lead.countryCode ?? "-"),
+        produit: String(lead.productKey ?? "-"),
+        statut: String(lead.status ?? "-"),
+        date: String(lead.assignedAt ?? "-"),
+        vu: lead.seenAt ? "Oui" : "Non"
+      }))
+    : fallbackLeads;
 
   return (
     <main style={{ maxWidth: 1120, margin: "0 auto", padding: "32px 20px", fontFamily: "system-ui, sans-serif", color: "#172033" }}>
@@ -30,6 +43,9 @@ export default function BrokerLeadsPage() {
           </label>
         ))}
       </form>
+
+      {apiLeads.forbidden ? <p role="alert">Acces refuse ou MFA requis pour ce portail.</p> : null}
+      {apiLeads.error && !apiLeads.forbidden ? <p role="status">API leads indisponible, affichage de secours.</p> : null}
 
       <table style={{ width: "100%", borderCollapse: "collapse", borderTop: "1px solid #d7dde4" }}>
         <thead>

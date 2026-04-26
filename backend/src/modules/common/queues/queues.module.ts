@@ -1,3 +1,5 @@
+import { Queue } from "bullmq";
+
 export type QueueJobStatus = "queued" | "active" | "completed" | "failed" | "retryable" | "discarded";
 
 export interface QueueJobRecord {
@@ -49,8 +51,30 @@ export class InMemoryQueue {
 }
 
 export class QueuesModule {
+  readonly runtimeMode: "memory-test" | "bullmq";
   readonly notifications = new InMemoryQueue();
   readonly futureIa = new InMemoryQueue();
   readonly futureRouting = new InMemoryQueue();
   readonly maintenance = new InMemoryQueue();
+  readonly bullQueues?: {
+    notifications: Queue;
+    futureIa: Queue;
+    futureRouting: Queue;
+    maintenance: Queue;
+  };
+
+  constructor() {
+    const redisUrl = process.env.REDIS_URL;
+    const useBullMq = process.env.NODE_ENV !== "test" && redisUrl && process.env.ASSURMATCH_QUEUE_MEMORY !== "true";
+    this.runtimeMode = useBullMq ? "bullmq" : "memory-test";
+    if (useBullMq && redisUrl) {
+      const connection = { url: redisUrl };
+      this.bullQueues = {
+        notifications: new Queue("assurmatch.notifications", { connection }),
+        futureIa: new Queue("assurmatch.future-ia", { connection }),
+        futureRouting: new Queue("assurmatch.future-routing", { connection }),
+        maintenance: new Queue("assurmatch.maintenance", { connection })
+      };
+    }
+  }
 }
