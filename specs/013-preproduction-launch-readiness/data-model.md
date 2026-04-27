@@ -13,7 +13,7 @@ This document specifies which data is **versioned in Git as reference seed** and
 
 ### R.1 Countries
 
-`countries.json` — array of:
+`countries.json` — confirmed initial list (9 CIMA countries). Each entry:
 
 ```json
 {
@@ -23,7 +23,7 @@ This document specifies which data is **versioned in Git as reference seed** and
   "languages": ["fr"],
   "timezone": "Africa/Abidjan",
   "regulatoryFamily": "cima",
-  "regulatoryRegimeId": "<uuid of seeded regime>",
+  "regulatoryRegimeId": "<uuid of seeded regime cima>",
   "status": "draft",
   "flags": {
     "country_public_enabled": false,
@@ -36,7 +36,21 @@ This document specifies which data is **versioned in Git as reference seed** and
 }
 ```
 
-Target list spans CIMA, FANAF, and any hors-CIMA country product/compliance prescribes. Final list provided before /speckit.tasks.
+Confirmed initial entries:
+
+| isoCode | name                          | currency | languages | timezone              | regulatoryFamily |
+|---------|-------------------------------|----------|-----------|-----------------------|------------------|
+| BJ      | Benin                         | XOF      | ["fr"]    | Africa/Porto-Novo     | cima             |
+| BF      | Burkina Faso                  | XOF      | ["fr"]    | Africa/Ouagadougou    | cima             |
+| CM      | Cameroun                      | XAF      | ["fr","en"] | Africa/Douala       | cima             |
+| CF      | Republique Centrafricaine     | XAF      | ["fr"]    | Africa/Bangui         | cima             |
+| CI      | Cote d'Ivoire                 | XOF      | ["fr"]    | Africa/Abidjan        | cima             |
+| GA      | Gabon                         | XAF      | ["fr"]    | Africa/Libreville     | cima             |
+| ML      | Mali                          | XOF      | ["fr"]    | Africa/Bamako         | cima             |
+| NE      | Niger                         | XOF      | ["fr"]    | Africa/Niamey         | cima             |
+| SN      | Senegal                       | XOF      | ["fr"]    | Africa/Dakar          | cima             |
+
+Adding more countries later: edit this JSON and re-run the seed.
 
 ### R.2 Currencies
 
@@ -48,11 +62,11 @@ Target list spans CIMA, FANAF, and any hors-CIMA country product/compliance pres
 
 ### R.4 Regulatory regimes
 
-`regulatory-regimes.json` — generic regimes:
+`regulatory-regimes.json` — generic regimes seeded:
 
-- `cima` — generic CIMA template.
-- `fanaf` — generic FANAF template.
-- `domestic-<isoCode>` — placeholder for hors-CIMA regimes (filled in by compliance per country).
+- `cima` — generic CIMA template (covers all 9 confirmed countries).
+- `fanaf` — generic FANAF template (reserved for future hors-CIMA additions).
+- `domestic-<isoCode>` — placeholder for hors-CIMA regimes if compliance later expands the catalog.
 
 ### R.5 Product categories
 
@@ -60,7 +74,7 @@ Target list spans CIMA, FANAF, and any hors-CIMA country product/compliance pres
 
 ### R.6 Products
 
-`products.json` — array of:
+`products.json` — confirmed initial list (full PRD). Each entry:
 
 ```json
 {
@@ -80,9 +94,27 @@ Target list spans CIMA, FANAF, and any hors-CIMA country product/compliance pres
 }
 ```
 
-Full list (templates):
+Confirmed initial entries:
 
-- auto, moto, sante, voyage, habitation, vie-epargne, entreprise, transport, agricole, scolaire, microassurance, credit-caution, cyber, evenementiel, construction, others-as-prescribed.
+| key            | name                              | category          |
+|----------------|-----------------------------------|-------------------|
+| auto           | Assurance auto                    | personal-lines    |
+| moto           | Assurance moto                    | personal-lines    |
+| sante          | Assurance sante                   | personal-lines    |
+| voyage         | Assurance voyage                  | personal-lines    |
+| habitation     | Assurance habitation              | personal-lines    |
+| vie-epargne    | Vie / epargne                     | life-savings      |
+| entreprise     | Assurance entreprise              | commercial-lines  |
+| transport      | Assurance transport               | commercial-lines  |
+| agricole       | Assurance agricole                | commercial-lines  |
+| scolaire       | Assurance scolaire                | personal-lines    |
+| microassurance | Microassurance                    | microassurance    |
+| credit-caution | Credit et caution                 | specialty         |
+| cyber          | Cyber                             | specialty         |
+| evenementiel   | Evenementiel                      | specialty         |
+| construction   | Construction                      | commercial-lines  |
+
+Adding more products later: edit this JSON and re-run the seed.
 
 ### R.7 Default feature flags
 

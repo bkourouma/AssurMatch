@@ -72,8 +72,7 @@ imports/<batch-id>/
 {
   "batchId": "2026-04-27-001",
   "createdAt": "2026-04-27T10:00:00Z",
-  "createdBy": "compliance@assurmatch.net",
-  "signature": "base64(ed25519 signature of file list)",
+  "createdBy": "compliance@allianceconsultants.net",
   "files": [
     { "name": "partners.json",  "sha256": "..." },
     { "name": "licenses.json",  "sha256": "..." },
@@ -85,13 +84,13 @@ imports/<batch-id>/
 }
 ```
 
-The signature scheme (which key, where it lives) is finalized in /speckit.tasks. Default recommendation: ed25519 key held by compliance, public key stored on the VPS.
+**Signature deferred**: cryptographic signing of bundles is NOT required for 013. The security model relies on procedural controls (out-of-Git delivery, file-based ingestion on the VPS, dry-run mandatory, zod validation, SHA-256 manifest checksum, full audit trail). A future hardening spec will add ed25519 signing. Implementations of `import-partners.ts` for 013 MUST verify the SHA-256 of each listed file against the manifest before applying.
 
 ### Validation pipeline
 
 1. Verify `manifest.json` exists and parses.
-2. Verify all listed files exist with matching `sha256`.
-3. Verify signature against the configured public key.
+2. Verify all listed files exist with matching `sha256` (mandatory in 013).
+3. (Deferred to a future spec) Verify cryptographic signature against a configured public key.
 4. Run zod validation on each row (rules in `data-model.md`).
 5. Resolve foreign keys (country isoCode → existing seeded country, productKey → existing seeded product, partnerLegalName → existing partner if `mode=upsert`).
 6. Check uniqueness (legalName + registrationNumber, license number, offer (partner+country+product+name+validFrom)).
@@ -150,7 +149,11 @@ A future task adds a verify-step `gitleaks` scan with rules forbidding:
 
 ## E. Open questions for /speckit.tasks
 
-1. Final ed25519 signature scheme and key custody.
-2. Whether the operational import should be invocable from the back-office UI for compliance teams (out of scope here; would be a new spec).
-3. Whether deletions should ever be allowed (default: no; document the exception path).
-4. Encryption-at-rest for `imports/<batch-id>/documents/` after apply (default: encrypt with `gpg --symmetric` using the same `BACKUP_PASSPHRASE`).
+1. Whether the operational import should be invocable from the back-office UI for compliance teams (out of scope here; would be a new spec).
+2. Whether deletions should ever be allowed (default: no; document the exception path).
+3. Encryption-at-rest for `imports/<batch-id>/documents/` after apply (default: encrypt with `gpg --symmetric` using the same `BACKUP_PASSPHRASE`).
+4. Final delivery channel for operational bundles (one-shot via SCP, or continuous trickle via a dedicated import folder watched by a script).
+
+## F. Future hardening spec (not 013)
+
+A separate spec will introduce ed25519 signing of bundles and signature verification at ingest. Until then, operational discipline (out-of-Git, dry-run, zod, SHA-256, audit) is the control.

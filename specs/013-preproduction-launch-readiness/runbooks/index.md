@@ -4,16 +4,16 @@ Each outline below describes the runbook's purpose, prerequisites, steps, and ro
 
 ## 1. `deployment.md`
 
-- Purpose: deploy a new image to preprod (or production future).
-- Prerequisites: CI verify green; SSH access as `deployer`.
-- Steps: trigger `git push origin main`, monitor pipeline, observe health on `/admin/system/health`, watch logs.
+- Purpose: deploy a new set of images to preprod (or production future).
+- Prerequisites: CI verify green; SSH access as `deployer`; Nginx in place; DNS records active; Let's Encrypt certs valid.
+- Steps: trigger `git push origin main`, monitor pipeline, observe health on the three surfaces (`api-assurmatch`, `assurmatch`, `backoffice-assurmatch`), watch `docker logs assurmatch-app`/`-public`/`-backoffice`.
 - Rollback: pipeline auto-reverts on health failure; manual rollback below.
 
 ## 2. `rollback.md`
 
-- Purpose: roll back to the previous image SHA.
+- Purpose: roll back the three containers to the previous image SHA.
 - Prerequisites: previous SHA known (visible in GHCR or in `env-history/`).
-- Steps: SSH, `docker pull <prev-sha>`, `docker stop && rm`, `docker run` with prev SHA, health check, prune.
+- Steps: SSH, `docker pull <prev-sha>` for the three images (`assurmatch`, `assurmatch-public`, `assurmatch-backoffice`), `docker stop && rm` then `docker run` with prev SHA each, health check on the three ports, `docker image prune -f`.
 - Rollback: not applicable.
 
 ## 3. `migrations.md`
@@ -77,5 +77,18 @@ Each outline below describes the runbook's purpose, prerequisites, steps, and ro
 ## 16. `secret-rotation.md`
 
 - Purpose: rotate JWT/SESSION/ENCRYPTION/SMTP/DB secrets without service interruption.
+- Notes: rotating `EMAIL_SMTP_PASS` requires generating a new Gmail app password and revoking the previous one in the Google account.
+
+## 17. `email-mode-toggle.md`
+
+- Purpose: switch `EMAIL_DELIVERY_MODE` between `preview` and `send` in preprod.
+- Prerequisites: compliance signoff for `send`; controlled inbox for the first real-send test.
+- Steps: edit `.env.production`, `docker restart assurmatch-app`, observe logs, send a test email, verify delivery and audit.
+- Rollback: edit back to `preview`, restart container.
+
+## 18. `nginx-config.md`
+
+- Purpose: maintain the three Nginx server blocks (HSTS, security headers, upstream definitions, certs) and renew Let's Encrypt certificates.
+- Steps: edit `/etc/nginx/conf.d/assurmatch-*.conf`, `nginx -t`, `systemctl reload nginx`, verify HTTPS, verify HSTS via `curl -I`.
 
 These runbooks are written in /speckit.implement, not here.

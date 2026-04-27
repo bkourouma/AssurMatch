@@ -1,13 +1,25 @@
 # Contract: Deployment, CI/CD, and Runtime
 
+## 0. Decisions (confirmed)
+
+- **Topology**: B (three containers).
+- **Reverse proxy**: Nginx (terminates HTTPS, sub-domain routing).
+- **Domains**:
+  - `assurmatch.allianceconsultants.net` → public (3601).
+  - `backoffice-assurmatch.allianceconsultants.net` → back-office (3602).
+  - `api-assurmatch.allianceconsultants.net` → API (3600).
+- **Email**: Gmail SMTP (`smtp.gmail.com:587`); preprod default `EMAIL_DELIVERY_MODE=preview`.
+- **Monitoring**: Uptime Kuma initial.
+- **Backups**: local 14 days.
+- **Import signature**: deferred (procedural controls suffice for 013).
+
 ## 1. Repository assets to add (no implementation in this spec invocation)
 
 ```
 .github/workflows/ci.yml
-backend/Dockerfile
-apps/public/Dockerfile               # Option B only
-apps/admin/Dockerfile                # Option B only (or merged with broker)
-apps/broker/Dockerfile               # Option B only (or merged with admin)
+backend/Dockerfile                   # API image
+apps/public/Dockerfile               # public Next image
+apps/admin/Dockerfile                # back-office Next image (packages both apps/admin and apps/broker)
 .dockerignore                        # extend the existing one
 .env.preproduction.example
 scripts/preprod/pre-deploy-check.sh
@@ -17,6 +29,7 @@ scripts/preprod/seeds/reference/*.json
 docs/preproduction/architecture.md
 docs/preproduction/environments.md
 docs/preproduction/domains.md
+docs/preproduction/nginx.md
 docs/runbooks/*.md
 ```
 
@@ -78,9 +91,7 @@ jobs:
           tags: |
             ghcr.io/bkourouma/assurmatch:latest
             ghcr.io/bkourouma/assurmatch:sha-${{ github.sha }}
-      # Option B only: build and push public + back-office images
       - name: Build and push image (public)
-        if: ${{ env.TOPOLOGY == 'B' }}
         uses: docker/build-push-action@v6
         with:
           context: .
@@ -90,7 +101,6 @@ jobs:
             ghcr.io/bkourouma/assurmatch-public:latest
             ghcr.io/bkourouma/assurmatch-public:sha-${{ github.sha }}
       - name: Build and push image (back-office)
-        if: ${{ env.TOPOLOGY == 'B' }}
         uses: docker/build-push-action@v6
         with:
           context: .
@@ -107,9 +117,21 @@ jobs:
           key: ${{ secrets.VPS_SSH_PRIVATE_KEY }}
           script_stop: true
           script: |
+            set -euo pipefail
             cd /home/deployer/apps/assurmatch
             ./scripts/pre-deploy-check.sh
-            docker pull ghcr.io/bkourouma/assurmatch:sha-${{ github.sha }}
+
+            SHA=sha-${{ github.sha }}
+            NETWORK_FLAG=""
+            if [ -n "${{ secrets.DEPLOY_NETWORK_NAME }}" ]; then
+              NETWORK_FLAG="--network ${{ secrets.DEPLOY_NETWORK_NAME }}"
+            fi
+
+            docker pull ghcr.io/bkourouma/assurmatch:$SHA
+            docker pull ghcr.io/bkourouma/assurmatch-public:$SHA
+            docker pull ghcr.io/bkourouma/assurmatch-backoffice:$SHA
+
+            # API
             docker stop assurmatch-app || true
             docker rm assurmatch-app || true
             docker run -d \
@@ -119,16 +141,44 @@ jobs:
               -p 127.0.0.1:3600:3600 \
               -v /home/deployer/apps/assurmatch/uploads:/app/uploads \
               -v /home/deployer/apps/assurmatch/data:/app/data \
-              ${{ secrets.DEPLOY_NETWORK_NAME && format('--network {0}', secrets.DEPLOY_NETWORK_NAME) || '' }} \
-              ghcr.io/bkourouma/assurmatch:sha-${{ github.sha }}
-            # repeat for assurmatch-public and assurmatch-backoffice when TOPOLOGY=B
-            for i in 1 2 3 4 5 6 7 8 9 10; do
-              if curl -fsS http://127.0.0.1:3600/admin/system/health > /dev/null; then
-                echo "OK"; exit 0
+              $NETWORK_FLAG \
+              ghcr.io/bkourouma/assurmatch:$SHA
+
+            # Public Next
+            docker stop assurmatch-public || true
+            docker rm assurmatch-public || true
+            docker run -d \
+              --name assurmatch-public \
+              --restart unless-stopped \
+              --env-file /home/deployer/apps/assurmatch/.env.production \
+              -p 127.0.0.1:3601:3601 \
+              $NETWORK_FLAG \
+              ghcr.io/bkourouma/assurmatch-public:$SHA
+
+            # Back-office Next
+            docker stop assurmatch-backoffice || true
+            docker rm assurmatch-backoffice || true
+            docker run -d \
+              --name assurmatch-backoffice \
+              --restart unless-stopped \
+              --env-file /home/deployer/apps/assurmatch/.env.production \
+              -p 127.0.0.1:3602:3602 \
+              $NETWORK_FLAG \
+              ghcr.io/bkourouma/assurmatch-backoffice:$SHA
+
+            # Health probes (10 attempts each, 3 s back-off)
+            for surface in "127.0.0.1:3600/admin/system/health" "127.0.0.1:3601" "127.0.0.1:3602"; do
+              ok=0
+              for i in 1 2 3 4 5 6 7 8 9 10; do
+                if curl -fsS "http://${surface}" > /dev/null; then ok=1; break; fi
+                sleep 3
+              done
+              if [ "$ok" -ne 1 ]; then
+                echo "Health check failed for $surface"
+                exit 1
               fi
-              sleep 3
             done
-            echo "Health check failed"; exit 1
+
             docker image prune -f
 ```
 
@@ -189,7 +239,7 @@ CMD ["node", "backend/dist/main.js"]
 
 (Adjust paths if Nest emits to `dist/` rather than `backend/dist/`. Implementation team verifies during /speckit.tasks.)
 
-For Option B, `apps/public/Dockerfile` and `apps/admin/Dockerfile` follow the same pattern but `CMD` runs `next start -p 3601` and `next start -p 3602` respectively, with their build outputs.
+`apps/public/Dockerfile` and `apps/admin/Dockerfile` follow the same multi-stage pattern but their `CMD` runs `next start -p 3601` and `next start -p 3602` respectively, with their build outputs. They share the monorepo `node_modules` for build (so `npm ci` is run once at the repo root in the deps stage) and they set `NEXT_PUBLIC_*` env vars at build time as needed.
 
 ## 5. Runtime contract
 
@@ -200,18 +250,52 @@ The container expects the following environment (see `plan.md` §1 for full matr
 - `GET /admin/system/health` returns 200 with body `{ status: "ok", postgres: "ok", redis: "ok"|"degraded"|"down", queues: "ok"|"degraded" }`.
 - The deploy script polls this endpoint with backoff. If healthy after deploy, the script proceeds; if not, it auto-reverts to the prior image tag.
 
-## 7. Reverse proxy contract
+## 7. Reverse proxy contract (Nginx)
 
-Documented at `docs/preproduction/domains.md` (post-implement). Required headers:
+Sub-domain layout. Each `server { ... }` block forwards a sub-domain to its container port on `127.0.0.1`.
+
+Skeleton snippets (full files land in `docs/preproduction/nginx.md` during /speckit.implement):
+
+```nginx
+# /etc/nginx/conf.d/assurmatch-public.conf
+server {
+    listen 80;
+    server_name assurmatch.allianceconsultants.net;
+    return 301 https://$host$request_uri;
+}
+server {
+    listen 443 ssl http2;
+    server_name assurmatch.allianceconsultants.net;
+    ssl_certificate     /etc/letsencrypt/live/assurmatch.allianceconsultants.net/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/assurmatch.allianceconsultants.net/privkey.pem;
+    add_header Strict-Transport-Security "max-age=31536000; includeSubDomains; preload" always;
+    add_header X-Frame-Options SAMEORIGIN always;
+    add_header X-Content-Type-Options nosniff always;
+    add_header Referrer-Policy strict-origin-when-cross-origin always;
+    location / {
+        proxy_pass http://127.0.0.1:3601;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+}
+
+# /etc/nginx/conf.d/assurmatch-backoffice.conf — same pattern, port 3602, X-Frame-Options DENY
+# /etc/nginx/conf.d/assurmatch-api.conf      — same pattern, port 3600, no Next-specific tweaks
+```
+
+Required response headers (set in Nginx and also in the backend as defense in depth):
 
 - `Strict-Transport-Security: max-age=31536000; includeSubDomains; preload`
-- `X-Frame-Options: DENY` (back-office) / `SAMEORIGIN` (public if needed)
+- `X-Frame-Options: DENY` (back-office) / `SAMEORIGIN` (public)
 - `X-Content-Type-Options: nosniff`
 - `Referrer-Policy: strict-origin-when-cross-origin`
 - `Content-Security-Policy: <basic CSP per surface>` (refined in tasks)
 - `Permissions-Policy: <minimal>`
 
-The backend also sets these so misconfigured proxies do not silently weaken security.
+Certificates: Let's Encrypt via certbot's `--nginx` plugin, one cert per sub-domain (or a wildcard for `*.allianceconsultants.net` if the DNS provider supports DNS-01).
 
 ## 8. Rollback contract
 
@@ -229,4 +313,56 @@ The backend also sets these so misconfigured proxies do not silently weaken secu
 
 ## 10. Topology decision
 
-Final pick (A or B) recorded here before /speckit.tasks. Default recommendation: **B**.
+**Confirmed: Option B — three containers.**
+
+## 11. Email contract (preprod default = preview mode)
+
+Env vars (full values held only in `.env.production` on the VPS):
+
+```
+EMAIL_SERVICE_TYPE=smtp
+EMAIL_FROM=rotaryabidjan2plateaux@gmail.com
+EMAIL_SMTP_HOST=smtp.gmail.com
+EMAIL_SMTP_PORT=587
+EMAIL_SMTP_USER=rotaryabidjan2plateaux@gmail.com
+EMAIL_SMTP_PASS=REDACTED              # Gmail app password — never in Git
+EMAIL_DELIVERY_MODE=preview            # preview | send
+EMAIL_TEST_RECIPIENT=                  # optional override that redirects all preprod emails
+```
+
+Behavior:
+
+- `preview`: log message metadata at `info`, store the body in Mailpit if available, do NOT call `smtp.gmail.com`.
+- `send`: real delivery via Gmail SMTP. Requires explicit operator opt-in.
+- If `EMAIL_TEST_RECIPIENT` is set, all delivered emails go to that single address regardless of original recipient (defense against accidental partner contact).
+
+Gmail prerequisites:
+
+- 2-step verification enabled on the Gmail account.
+- An **app password** generated for "AssurMatch SMTP" — that 16-char value is stored in `EMAIL_SMTP_PASS`. The regular account password will not authenticate via SMTP.
+- The app password can be revoked from the Google account at any time. Rotation runbook documents the steps.
+
+## 12. Monitoring contract (Uptime Kuma)
+
+Initial monitor list (configured in Uptime Kuma admin UI, on the same VPS):
+
+| Monitor | Type | Target | Notes |
+|---------|------|--------|-------|
+| AssurMatch API health | HTTP keyword | `https://api-assurmatch.allianceconsultants.net/admin/system/health` keyword `"ok"` | Add admin Bearer header if Kuma supports it; otherwise use a public sub-endpoint |
+| AssurMatch public | HTTP | `https://assurmatch.allianceconsultants.net` 200 | |
+| AssurMatch back-office | HTTP | `https://backoffice-assurmatch.allianceconsultants.net` 200 or 401 | |
+| PostgreSQL | TCP | `127.0.0.1:5432` | only from VPS-internal Kuma |
+| Redis | TCP | `127.0.0.1:6379` | only from VPS-internal Kuma |
+
+Notification channel(s): operator email by default. Telegram/Slack optional.
+
+## 13. Backup contract
+
+| Asset | Tool | Schedule (UTC) | Retention | Encryption |
+|-------|------|----------------|-----------|------------|
+| PostgreSQL | `pg_dump -Fc` piped to `gzip` | daily 02:00 | 14 days | `gpg --symmetric --cipher-algo AES256` if `BACKUP_PASSPHRASE` is set |
+| Uploads volume | `tar -czf` | daily 02:30 | 14 days | same |
+
+Storage path: `/home/deployer/apps/assurmatch/backups/{postgres,uploads}/<date>.{sql.gz,tar.gz}[.gpg]`.
+
+Restore-test runbook is mandatory before global go.

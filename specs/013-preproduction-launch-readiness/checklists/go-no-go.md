@@ -5,15 +5,19 @@ This checklist gates **public activation** of a scope. There is no global "go" b
 ## A. Preprod-readiness pre-check (one-time, before any scope activation)
 
 - [ ] CI verify green on `main`.
-- [ ] CI build-and-deploy succeeded; container responds 200 on `/admin/system/health`.
-- [ ] Three domains resolve over HTTPS with valid certs.
-- [ ] CORS strict on all three; no wildcard.
+- [ ] CI build-and-deploy succeeded; three containers respond on `127.0.0.1:3600/3601/3602`.
+- [ ] `assurmatch.allianceconsultants.net`, `backoffice-assurmatch.allianceconsultants.net`, `api-assurmatch.allianceconsultants.net` resolve over HTTPS with valid certs.
+- [ ] Nginx route map verified (each sub-domain → expected upstream).
+- [ ] CORS strict on all three; no wildcard. Back-office origin is the only origin in `CORS_ORIGINS` for the API.
 - [ ] Security headers present on all three (HSTS, X-Frame-Options, X-Content-Type-Options, Referrer-Policy, basic CSP).
-- [ ] `.env.production` on the VPS is `0600`, owned by `deployer`, contains all mandatory vars.
-- [ ] Reference seed applied; PG/Redis/queues healthy.
+- [ ] `.env.production` on the VPS is `0600`, owned by `deployer`, contains all mandatory vars including `EMAIL_*`.
+- [ ] `EMAIL_SMTP_PASS` is a Gmail **app password** (not the regular account password); 2FA is enabled on the Gmail account.
+- [ ] `EMAIL_DELIVERY_MODE=preview` confirmed for the initial activation phase.
+- [ ] Reference seed applied (9 countries, 15 products); PG/Redis/queues healthy.
 - [ ] Sensitive flags fail-closed in DB (payments, e_signature, policy_issuance, claims, insurer_api, ai_recommendation, ai_lead_scoring, ai_summary, ai_broker_assistant, whatsapp, sponsored_offers, multi_broker_routing, billing).
 - [ ] At least one Super Admin account created with MFA enrolled.
-- [ ] Backup cron in place; one restore test executed and documented.
+- [ ] Backup cron in place (PostgreSQL daily 02:00 UTC, uploads daily 02:30 UTC, retention 14 days, encrypted if `BACKUP_PASSPHRASE` set); one restore test executed and documented.
+- [ ] Uptime Kuma monitors configured (API health, public, back-office, PG TCP, Redis TCP); operator email channel verified.
 - [ ] Audit visible at `/admin/audit-logs`; entries durable in PostgreSQL.
 - [ ] No `.env*` (other than `.env*.example`) and no `imports/` content tracked by Git.
 - [ ] `npm audit --audit-level=high` clean.
@@ -21,20 +25,21 @@ This checklist gates **public activation** of a scope. There is no global "go" b
 
 ## B. Country activation checklist (per country)
 
-- [ ] Country present in seeded reference catalog with correct ISO code, currency, languages, timezone, regulatory regime.
+- [ ] Country present in the 9-country seeded catalog (BJ, BF, CM, CF, CI, GA, ML, NE, SN) with correct ISO code, currency, languages, timezone, CIMA regulatory regime.
 - [ ] Mentions legales, politique de confidentialite, conditions d'utilisation **published** for this country (file references stored in DB / docs).
 - [ ] Consent text(s) published for this country and the products to be opened.
 - [ ] At least one validated, licensed partner authorized for this country (license valid, dates current).
 - [ ] Routing rules for this country reviewed and approved by compliance.
 - [ ] Smoke checks executed against this country: catalog, quote consented, quote refused, license-expired exclusion, dashboard gating.
 - [ ] AuditLog visible for the activations that already occurred for this country (consent publish, partner activation).
+- [ ] If notifications are involved, an end-to-end email test was executed in `EMAIL_DELIVERY_MODE=preview` and the rendered output was reviewed.
 - [ ] Compliance officer signoff (named person + date + reason) recorded as the `reason` field when flipping the flag.
 
 → **If all checked**, flip `country_public_enabled=true` (scopeId = country uuid). Optionally flip `country_quote_enabled`, `country_comparison_enabled`, `country_broker_onboarding_enabled` per decision.
 
 ## C. Product activation checklist (per product within a country)
 
-- [ ] Product present in seeded reference catalog with metadata.
+- [ ] Product present in the seeded PRD catalog (auto / moto / sante / voyage / habitation / vie-epargne / entreprise / transport / agricole / scolaire / microassurance / credit-caution / cyber / evenementiel / construction).
 - [ ] Form definition (`QuoteFormDefinition`) published for this country/product.
 - [ ] Required documents list defined; upload pipeline tested.
 - [ ] Disclaimers ("offre indicative", "prix a confirmer par le courtier partenaire") visible in the public form.

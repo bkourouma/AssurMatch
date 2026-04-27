@@ -29,7 +29,7 @@ No `tasks.md`. No source code changes. No automatic commit.
 **Primary Dependencies**: existing `AssurMatchRuntime`, `RuntimeHttpWiringModule`, repositories Prisma-runtime listed in spec 011, dashboards module from spec 012, `packages/shared/contracts/*`, `@prisma/client`, `@prisma/adapter-pg`, `pg`, `redis`, `bullmq`, `zod`, `next`, `react`.
 **Storage**: PostgreSQL is the source of truth. **Documents are stored locally** for now in a Docker volume (`/home/deployer/apps/assurmatch/uploads` mounted into the container). S3 remains optional and configurable for the future via env vars but is not used in preprod. Redis is enabled for cache, rate limiting, queues. BullMQ is enabled for queued jobs.
 **Testing**: existing scripts (`npm run typecheck`, `npm run lint`, `npm run test`, `npm run test:web`, `npm run build`, `npx prisma validate`, `npm audit --audit-level=high`, `git diff --check`, `npm run test:runtime:postgres`). The CI verify job runs the unit/integration suite; runtime-postgres runs in a dedicated job or on-demand.
-**Target Platform**: existing Linux VPS hosting other applications. Docker runtime. Image registry: `ghcr.io/bkourouma/assurmatch`. Internal port 3600 bound to `127.0.0.1:3600` on the host. A reverse proxy already running on the VPS (Nginx/Caddy/Traefik — to confirm) terminates HTTPS and routes domain → container.
+**Target Platform**: existing Linux VPS hosting other applications. Docker runtime. Image registry: `ghcr.io/bkourouma/assurmatch`. Three containers exposed on `127.0.0.1:3600` (API), `127.0.0.1:3601` (public Next), `127.0.0.1:3602` (back-office Next). **Reverse proxy: Nginx (confirmed)** terminates HTTPS and routes per sub-domain to each container.
 **Impacted Application(s)**: Backend API (Dockerfile + runtime config + health), Web Publique Client (Next.js build, public domain), Back-office Partenaires/Plateforme (broker app + admin app, separate routes/domains, MFA/RBAC), Base PostgreSQL (preprod instance, migrations, seeds, backup), Redis/BullMQ (preprod instance, cache and queues), shared packages, scripts, CI/CD workflow.
 **Project Type**: B2B2C regulated marketplace; this feature is operational/infrastructure readiness, not business behavior.
 **Performance Goals**: Backend boot < 10 s after image pull; health endpoint < 200 ms p95 on warm container; full smoke (without runtime-postgres) < 2 min in CI verify.
@@ -122,25 +122,32 @@ backend/prisma/
   seed-reference.ts                      # OPTIONAL alternative path; tasks decision
 ```
 
-**Structure Decision**: 1) Reuse the existing monorepo (`apps/public`, `apps/admin`, `apps/broker`, `backend`, `packages/shared`). 2) Add a single multi-stage `backend/Dockerfile` that builds the Nest backend (and serves the public + back-office Next apps as separate processes inside the container *or* as separate containers — see deployment-contract.md). 3) Add `.github/workflows/ci.yml` mirroring the user-provided CI shape but adapted to npm and to AssurMatch's three-app structure. 4) Documents and runbooks live under `docs/`. 5) Seed and import scripts live under `scripts/preprod/` with secure inputs and audit. 6) No code refactor of existing modules.
+**Structure Decision**: 1) Reuse the existing monorepo (`apps/public`, `apps/admin`, `apps/broker`, `backend`, `packages/shared`). 2) **Topology B confirmed**: three Dockerfiles produce three images from the same source — `backend/Dockerfile` (API, port 3600), `apps/public/Dockerfile` (public Next, port 3601), `apps/admin/Dockerfile` or shared back-office image (back-office Next, port 3602). 3) Add `.github/workflows/ci.yml` adapted to npm and to AssurMatch's three-app structure. 4) Documents and runbooks live under `docs/`. 5) Seed and import scripts live under `scripts/preprod/` with file-based inputs, zod validation, dry-run and audit (cryptographic signature deferred to a future hardening spec). 6) No code refactor of existing modules.
 
 ## Phase 0 Research Decisions
 
 See [research.md](./research.md). Headlines:
 
-1. **Hosting**: Linux VPS, Docker, GHCR registry `ghcr.io/bkourouma/assurmatch`. Internal port 3600 bound to `127.0.0.1:3600`. Reverse proxy on the VPS terminates HTTPS and routes per-domain (Nginx/Caddy/Traefik — confirm in tasks).
-2. **Domains**: `assurmatch.net` (public), `backoffice.assurmatch.net` (back-office), `api.assurmatch.net` (API). Variables let alternative domains be substituted without code changes.
-3. **Container topology**: a single image `ghcr.io/bkourouma/assurmatch:latest` exposes the three Next/Nest entry points behind a thin process supervisor (start backend on 3600 and serve the two Next apps from the same image either internally on 3001/3002 or as separately launched containers). The plan recommends **option B: three containers from the same image** (`assurmatch-app` for the API on 3600, `assurmatch-public` for the public Next app on 3601, `assurmatch-backoffice` for the broker+admin Next apps on 3602/3603) so the reverse proxy can map domains directly. The deployment-contract documents both options; the implementation team picks A or B before /speckit.tasks.
+1. **Hosting**: Linux VPS, Docker, GHCR registry `ghcr.io/bkourouma/assurmatch`. Three containers exposed on `127.0.0.1:3600/3601/3602`. **Nginx (confirmed)** terminates HTTPS and routes per sub-domain.
+2. **Domains (confirmed)**: sub-domain layout under `allianceconsultants.net`:
+   - Public: `https://assurmatch.allianceconsultants.net` → 127.0.0.1:3601
+   - Back-office: `https://backoffice-assurmatch.allianceconsultants.net` → 127.0.0.1:3602
+   - API: `https://api-assurmatch.allianceconsultants.net` → 127.0.0.1:3600
+   Sub-domain layout chosen (vs path-based) because: clean CORS per surface, distinct CSP per surface, no Nginx path-rewrites for upstream Next apps, no collision with internal `/api` Next routes, independent Let's Encrypt certs.
+3. **Container topology (confirmed)**: **Option B**. Three containers built from three Dockerfiles in the same repo: `assurmatch-app` (API, 3600), `assurmatch-public` (Next public, 3601), `assurmatch-backoffice` (Next back-office, 3602). Each is independently restartable and aligns runtime separation with the constitutional Web Publique / Back-office / API separation.
 4. **Package manager**: npm. CI uses `npm ci` (replaces the pnpm steps in the inspiration workflow).
-5. **CI/CD**: `verify` runs on PR + push main; `build-and-deploy` runs only on push main. Docker build uses Buildx; image tagged `latest` and `sha-<short>`. SSH deploy pulls, swaps containers, runs health checks, prunes.
+5. **CI/CD**: `verify` runs on PR + push main; `build-and-deploy` runs only on push main. Docker build uses Buildx; three images tagged `latest` and `sha-<short>`. SSH deploy pulls, swaps containers, runs health checks, prunes.
 6. **Storage**: local Docker volume mounted at `/app/uploads` (host: `/home/deployer/apps/assurmatch/uploads`). S3 stays optional via env.
-7. **SMTP**: defer choice; preprod ships with Mailpit container or with notifications disabled. The plan documents both, default = disabled.
-8. **Monitoring**: `/admin/system/health`, structured JSON logs, optional Uptime Kuma + Sentry. Default = host-level monitoring + log file rotation, with explicit upgrade path.
-9. **Backups**: `pg_dump` daily on host, retention 14 days, encrypted via `gpg --symmetric` if a passphrase is provisioned. Uploads volume backed up daily. Manual restore test mandatory before global go.
+7. **SMTP (confirmed)**: Gmail SMTP for transactional email. Variables `EMAIL_SERVICE_TYPE=smtp`, `EMAIL_FROM`, `EMAIL_SMTP_HOST=smtp.gmail.com`, `EMAIL_SMTP_PORT=587`, `EMAIL_SMTP_USER`, `EMAIL_SMTP_PASS`. The password is NEVER in Git (use a Gmail **app password** generated in the account settings; the regular Google account password will not authenticate via SMTP because of MFA on the account). Preprod ships with a "preview-only" mode by default (`EMAIL_DELIVERY_MODE=preview` — log + Mailpit if available) until an explicit operator switches to `EMAIL_DELIVERY_MODE=send` after validation.
+8. **Monitoring (confirmed initial)**: Uptime Kuma probing the four critical surfaces: API health (`/admin/system/health`), public root, back-office root, plus PG/Redis indirectly via API health. Sentry optional/future.
+9. **Backups (confirmed initial)**: local only. `pg_dump` daily 02:00 UTC; uploads `tar.gz` daily 02:30 UTC; retention 14 days; encrypted with `gpg --symmetric` if `BACKUP_PASSPHRASE` is set. Manual restore test mandatory before global go. Offsite backup is a documented future improvement.
 10. **Secrets**: `.env.production` on the VPS only, owned by `deployer:deployer`, `0600`. No secret in repo. JWT/SESSION secrets ≥ 32 bytes from `openssl rand -base64`. Documented rotation runbook.
 11. **Reference vs operational data**: reference catalogs (countries, currencies, languages, product categories, products, default flags, statuses, generic regulatory regimes, consent text templates) are seeded from the repo. Real partners/licenses/offers/users/contacts are imported via secure scripts on the VPS, never committed.
-12. **Catalogs**: target country list and target product list are *required inputs* before /speckit.tasks. Plan provides templates and seed scaffolding; final lists come from product/compliance.
+12. **Catalogs (confirmed initial)**:
+    - **Countries**: Benin, Burkina Faso, Cameroun, Republique Centrafricaine, Cote d'Ivoire, Gabon, Mali, Niger, Senegal (CIMA zone). Future additions handled by editing `scripts/preprod/seeds/reference/countries.json`.
+    - **Products**: full PRD list — auto, moto, sante, voyage, habitation, vie-epargne, entreprise, transport, agricole, scolaire, microassurance, credit-caution, cyber, evenementiel, construction, plus any extra product modeled in the PRD.
 13. **Activation publique**: per-scope. The runbook + go/no-go checklist are scope-driven. No global "go" button.
+14. **Import signature (deferred)**: cryptographic signature of import bundles is a future hardening (a separate spec). For 013, the security model relies on: out-of-Git delivery, file-based ingestion on the VPS, mandatory `--dry-run`, zod validation, SHA-256 manifest checksum, full audit trail.
 
 ## Phase 1 Design Outputs
 
@@ -168,19 +175,29 @@ Variable matrix (full list in `docs/preproduction/environments.md`, rendered pos
 
 ```text
 Mandatory (boot fails if absent in preprod/production):
-  NODE_ENV, APP_ENV, PORT (default 3600)
+  NODE_ENV, APP_ENV, PORT (default 3600 for API; 3601 for public; 3602 for back-office)
   DATABASE_URL (postgres, must NOT match production patterns when APP_ENV=preproduction)
   REDIS_URL
   JWT_SECRET (>= 32 bytes)
   SESSION_SECRET (>= 32 bytes)
-  PUBLIC_APP_URL (e.g. https://assurmatch.net)
-  BACKOFFICE_APP_URL (e.g. https://backoffice.assurmatch.net)
-  API_BASE_URL (e.g. https://api.assurmatch.net)
-  CORS_ORIGINS (comma-separated absolute origins, no wildcard)
+  PUBLIC_APP_URL=https://assurmatch.allianceconsultants.net
+  BACKOFFICE_APP_URL=https://backoffice-assurmatch.allianceconsultants.net
+  API_BASE_URL=https://api-assurmatch.allianceconsultants.net
+  CORS_ORIGINS=https://assurmatch.allianceconsultants.net,https://backoffice-assurmatch.allianceconsultants.net
   LOCAL_STORAGE_ROOT (e.g. /app/uploads)
 
+Email (preprod confirmed; password kept off Git):
+  EMAIL_SERVICE_TYPE=smtp
+  EMAIL_FROM=rotaryabidjan2plateaux@gmail.com
+  EMAIL_SMTP_HOST=smtp.gmail.com
+  EMAIL_SMTP_PORT=587
+  EMAIL_SMTP_USER=rotaryabidjan2plateaux@gmail.com
+  EMAIL_SMTP_PASS=REDACTED              # Gmail app password, set via env file on the VPS only
+  EMAIL_DELIVERY_MODE=preview            # preview = log + Mailpit if available; send = real delivery (operator opt-in)
+  EMAIL_TEST_RECIPIENT=                  # optional override that redirects all preprod emails to this address
+
 Mandatory in production only (warn in preprod if missing):
-  COOKIE_DOMAIN (.assurmatch.net or scoped)
+  COOKIE_DOMAIN=.allianceconsultants.net (or scoped per surface)
   ENCRYPTION_KEY (>= 32 bytes; for any field-level encryption when needed)
 
 Optional (with documented defaults):
@@ -189,9 +206,10 @@ Optional (with documented defaults):
   RATE_LIMIT_GLOBAL_PER_MIN (default: 600)
   RATE_LIMIT_PUBLIC_PER_IP_PER_MIN (default: 60)
   RATE_LIMIT_QUOTE_PER_IP_PER_HOUR (default: 10)
-  SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASSWORD, SMTP_FROM (notifications disabled if any missing)
   SENTRY_DSN
+  BACKUP_PASSPHRASE                      # used by gpg --symmetric for encrypted backups
   S3_ENDPOINT/S3_BUCKET/S3_ACCESS_KEY_ID/S3_SECRET_ACCESS_KEY (only if migrating to S3)
+  UPTIME_KUMA_PUSH_URL                   # optional: push monitor URL if Uptime Kuma push mode is used
 
 Memory overrides (must remain false in preprod/production):
   ASSURMATCH_PRISMA_MEMORY=false
@@ -203,16 +221,21 @@ Memory overrides (must remain false in preprod/production):
 
 The backend's `ConfigModule` is extended to validate these per `APP_ENV`. Boot fails fast on missing/invalid values without echoing the value.
 
-### 2. Container topology decision (final pick deferred to tasks)
+### 2. Container topology (CONFIRMED: Option B)
 
-- **Option A (single container)**: one container starts the Nest API on 3600 and serves both Next apps (public + back-office) on 3601/3602 internally via a tiny process supervisor (e.g. `pm2-runtime` or `npm-run-all` with proper signal handling). Reverse proxy maps domains to ports. Simpler ops, single image pull.
-- **Option B (three containers from one image)**: image `ghcr.io/bkourouma/assurmatch` is built once. Three containers are launched on the VPS: `assurmatch-app` (API, 3600), `assurmatch-public` (Next public, 3601), `assurmatch-backoffice` (Next broker+admin, 3602). Reverse proxy maps each domain to its container. Cleaner separation, slight resource overhead.
+Three containers built from three Dockerfiles, deployed in lockstep:
 
-The plan **recommends Option B** because (a) it matches the constitution's "frontend separation" requirement at the runtime layer too, (b) it lets each surface scale independently later, (c) it avoids a process supervisor we'd otherwise have to maintain. The CI/CD contract documents both; the team confirms during /speckit.tasks.
+| Container | Image | Internal port | Purpose |
+|-----------|-------|---------------|---------|
+| `assurmatch-app` | `ghcr.io/bkourouma/assurmatch:<sha>` | 3600 | NestJS backend API |
+| `assurmatch-public` | `ghcr.io/bkourouma/assurmatch-public:<sha>` | 3601 | Next.js Web Publique Client |
+| `assurmatch-backoffice` | `ghcr.io/bkourouma/assurmatch-backoffice:<sha>` | 3602 | Next.js Back-office (broker + admin merged) |
+
+The three images are produced from the same monorepo by three Dockerfiles. They share `package-lock.json` and `packages/shared/` to guarantee version coherence.
 
 ### 3. Dockerfile (multi-stage, npm)
 
-Single `backend/Dockerfile` builds the API image. If Option B is retained, two more thin Dockerfiles (or one Dockerfile with build args) build the Next apps. Pseudocode in deployment-contract.md.
+Three Dockerfiles: `backend/Dockerfile`, `apps/public/Dockerfile`, `apps/admin/Dockerfile` (the latter packages both `apps/admin` and `apps/broker` because both are back-office surfaces sharing middleware/auth). Pseudocode in deployment-contract.md.
 
 ```text
 Stage 1 (deps): node:24-alpine, copy package.json + package-lock.json, npm ci --omit=dev=false, copy prisma schema, npx prisma generate
@@ -256,28 +279,26 @@ Stage 3 (runtime): node:24-alpine, copy node_modules pruned, copy dist, copy pri
 
 GitHub secrets to provision (documented in deployment-contract.md): `GHCR_TOKEN`, `VPS_HOST`, `VPS_SSH_USER`, `VPS_SSH_PRIVATE_KEY`, `VPS_KNOWN_HOSTS`, optionally `DEPLOY_NETWORK_NAME`.
 
-### 5. Reverse proxy contract
+### 5. Reverse proxy contract (Nginx, confirmed)
 
-The VPS already runs a reverse proxy (probably Nginx, Caddy, or Traefik — to confirm in tasks). The plan defines the route map:
-
-```text
-assurmatch.net           -> 127.0.0.1:3601 (public)        # Option B
-www.assurmatch.net       -> redirect to assurmatch.net
-backoffice.assurmatch.net -> 127.0.0.1:3602 (back-office)
-api.assurmatch.net       -> 127.0.0.1:3600 (API)
-```
-
-For Option A:
+Route map:
 
 ```text
-assurmatch.net           -> 127.0.0.1:3601
-backoffice.assurmatch.net -> 127.0.0.1:3602
-api.assurmatch.net       -> 127.0.0.1:3600
+assurmatch.allianceconsultants.net            -> 127.0.0.1:3601 (public)
+backoffice-assurmatch.allianceconsultants.net -> 127.0.0.1:3602 (back-office)
+api-assurmatch.allianceconsultants.net        -> 127.0.0.1:3600 (API)
 ```
 
-(Same ports because the single container exposes all three.)
+Each sub-domain has its own Nginx `server { ... }` block, its own Let's Encrypt certificate, its own security headers and its own CSP. HTTPS is terminated at Nginx; `proxy_pass http://127.0.0.1:<port>;` forwards to the container. The backend also sets the same security headers as a defense in depth.
 
-HTTPS is terminated at the reverse proxy. HSTS, X-Frame-Options, Referrer-Policy, X-Content-Type-Options, basic CSP are added at the proxy layer; the backend also sets them so they hold even if the proxy is misconfigured.
+CSP per surface (refined in tasks):
+- public: tight default-src 'self', allow inline-style minimal, no third-party scripts.
+- back-office: similar but allows the backend API origin in connect-src.
+- API: minimal — `default-src 'none'` for API responses; this matters for error pages.
+
+CORS:
+- public app does not need cross-origin to API (server-side rendering); CORS not relied upon.
+- back-office app calls API from server actions / fetch; `CORS_ORIGINS=https://backoffice-assurmatch.allianceconsultants.net` (single explicit origin in preprod).
 
 ### 6. Reference catalog seed (versioned in repo)
 
@@ -326,12 +347,17 @@ Reuses spec 011's runtime-postgres smoke as a base, plus a simpler "preprod smok
 - Retention: 14 days locally; offsite copy plan deferred to /speckit.tasks (rsync to remote, or `rclone` to object storage).
 - Restore test: documented in runbook, mandatory before global go on a separate temporary database/container.
 
-### 11. Monitoring (minimal)
+### 11. Monitoring (Uptime Kuma confirmed initial)
 
-- `GET /admin/system/health`: existing endpoint serves PG/Redis/BullMQ status. Probed every 60 s by the reverse proxy or by Uptime Kuma if installed.
-- Logs: structured JSON to stdout via existing logger. Docker captures; `docker logs` and host-level log rotation.
-- Alerts: optional Uptime Kuma → Telegram/email. Sentry remains optional.
-- Custom alerts (license expiring, import failure) ride on the existing audit log + a small daily digest job (deferred to a future spec — not implemented in 013).
+- `GET /admin/system/health`: existing endpoint serves PG/Redis/BullMQ status.
+- **Uptime Kuma** monitors:
+  1. `https://api-assurmatch.allianceconsultants.net/admin/system/health` (HTTP keyword check on `"ok"`, every 60 s, with admin token if Kuma supports a header).
+  2. `https://assurmatch.allianceconsultants.net` (HTTP 200, every 60 s).
+  3. `https://backoffice-assurmatch.allianceconsultants.net` (HTTP 200 or 401 acceptable depending on session, every 60 s).
+  4. PostgreSQL and Redis are observed indirectly through the API health endpoint; Uptime Kuma can also probe TCP `127.0.0.1:5432` and `127.0.0.1:6379` from the same VPS.
+- Notifications from Uptime Kuma: email to the operator inbox; future Telegram/Slack channel on demand.
+- Logs: structured JSON to stdout via existing logger. Docker captures; host-level log rotation via `/etc/logrotate.d/docker`.
+- Sentry remains optional / future.
 
 ### 12. Security hardening
 
@@ -383,15 +409,16 @@ No UI redesign. No new pages. Source-marker Playwright tests get *one* additiona
 
 ## Risks
 
-- VPS reverse proxy not yet identified → wrong header set / wrong cert / route mismatch. Mitigation: confirm Nginx/Caddy/Traefik in /speckit.tasks before deploy.
-- Catalog target lists not finalized → tasks blocked. Mitigation: provide templates and accept "TBD" rows that won't activate until final.
 - Confidential data leaking into Git via accidental commit. Mitigation: explicit `.gitignore`, secret scanner in verify (deferred), runbook training, pre-commit hook recommendation.
-- Container topology change between A and B late in tasks. Mitigation: deployment-contract documents both with same secrets/env.
 - Existing CI inspiration uses pnpm; copy-pasting it would break npm workflows. Mitigation: this plan explicitly enforces npm.
 - npm audit may surface high-severity vulns from transitive deps. Mitigation: existing project already passes `npm audit --audit-level=high`; CI gate confirms.
 - BullMQ + Redis versions in the image must match dev. Mitigation: pinned versions in package.json, image build uses package-lock.json.
 - Backup passphrase loss → unrecoverable backups. Mitigation: documented passphrase storage in secrets manager; restore test exercises decryption.
 - Public activation simultaneous on many countries/products → operator overload. Mitigation: runbook recommends staged activation per scope with a wait/observe period; not enforced by code.
+- Gmail SMTP rate limits / spam classification → emails not delivered or marked as spam. Mitigation: preprod default `EMAIL_DELIVERY_MODE=preview`; switch to `send` only after compliance and product validation; consider switching to a transactional provider (Postmark, Resend, SendGrid) for production.
+- Gmail app password expiry / account suspension → email outage. Mitigation: rotation runbook + Uptime Kuma alert if `/admin/system/health` reports email queue failures.
+- Import without cryptographic signature → trust is procedural rather than cryptographic. Mitigation: 013 keeps imports out of Git, requires dry-run + zod + audit + SHA-256 manifest; signature hardening is a separate future spec.
+- Uptime Kuma single point of monitoring → if Kuma itself is down, no alerts. Mitigation: documented; Sentry or external probe can be added later.
 
 ## Rollback And Cleanup Strategy
 
@@ -403,18 +430,18 @@ No UI redesign. No new pages. Source-marker Playwright tests get *one* additiona
 
 ## Recommended Implementation Order (for a future /speckit.tasks)
 
-1. Confirm: container topology (A vs B), reverse proxy choice, target country list, target product list, partner import format, SMTP decision, monitoring decision.
-2. Add `.dockerignore` adjustments and `backend/Dockerfile` (Option B → also `apps/public/Dockerfile`, `apps/admin/Dockerfile` or shared multi-stage build).
-3. Add `.github/workflows/ci.yml` (verify + build-and-deploy).
-4. Extend `ConfigModule` env validation per APP_ENV (preproduction).
-5. Extend `.env.example` and add `.env.preproduction.example`.
-6. Add `scripts/preprod/seed-reference.ts` and JSON files under `scripts/preprod/seeds/reference/`.
-7. Add `scripts/preprod/import-partners.ts` with dry-run + audit.
-8. Add `scripts/preprod/pre-deploy-check.sh`.
-9. Add `docs/preproduction/architecture.md`, `environments.md`, `domains.md`.
-10. Add `docs/runbooks/*.md` (the runbooks listed in spec FR-029).
-11. Add CI tests: source-marker Playwright spec verifying no hardcoded localhost in built bundles; unit tests for env validation.
-12. Manual: provision VPS env file, GitHub secrets, DNS records.
+1. Add `.dockerignore` adjustments and three Dockerfiles: `backend/Dockerfile`, `apps/public/Dockerfile`, `apps/admin/Dockerfile` (back-office combined).
+2. Add `.github/workflows/ci.yml` (verify + build-and-deploy, three image builds).
+3. Extend `ConfigModule` env validation per APP_ENV (preproduction), include `EMAIL_*` variables.
+4. Extend `.env.example` and add `.env.preproduction.example` (with `EMAIL_SMTP_PASS=REDACTED`).
+5. Add `scripts/preprod/seed-reference.ts` and JSON files under `scripts/preprod/seeds/reference/` populated with the 9 confirmed countries + 15 confirmed products.
+6. Add `scripts/preprod/import-partners.ts` with dry-run + zod + SHA-256 manifest + audit (no signature requirement in 013).
+7. Add `scripts/preprod/pre-deploy-check.sh`.
+8. Add `docs/preproduction/architecture.md`, `environments.md`, `domains.md`, `nginx.md` (Nginx upstream snippets per sub-domain).
+9. Add `docs/runbooks/*.md` (the runbooks listed in spec FR-029).
+10. Add CI tests: source-marker Playwright spec verifying no hardcoded localhost in built bundles; unit tests for env validation.
+11. Manual: provision VPS env file, GitHub secrets, three DNS A/AAAA records (`assurmatch`, `api-assurmatch`, `backoffice-assurmatch`), three Let's Encrypt certs via Nginx.
+12. Configure Uptime Kuma with the four monitors.
 13. First deploy on preprod; run smoke; run go/no-go for the first scope.
 
 ## Complexity Tracking
