@@ -14,6 +14,9 @@ RUN npm ci
 
 FROM node:24-alpine AS build
 WORKDIR /app
+# Placeholder DATABASE_URL satisfies prisma.config.ts at build time.
+# The real DATABASE_URL is injected at runtime via the env file.
+ENV DATABASE_URL=postgresql://placeholder:placeholder@localhost:5432/placeholder
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 RUN npx prisma generate --schema backend/prisma/schema.prisma
