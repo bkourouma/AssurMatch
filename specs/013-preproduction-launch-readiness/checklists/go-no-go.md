@@ -12,7 +12,7 @@ This checklist gates **public activation** of a scope. There is no global "go" b
 - [ ] Security headers present on all three (HSTS, X-Frame-Options, X-Content-Type-Options, Referrer-Policy, basic CSP).
 - [ ] `.env.production` on the VPS is `0600`, owned by `deployer`, contains all mandatory vars including `EMAIL_*`.
 - [ ] `EMAIL_SMTP_PASS` is a Gmail **app password** (not the regular account password); 2FA is enabled on the Gmail account.
-- [ ] `EMAIL_DELIVERY_MODE=preview` confirmed for the initial activation phase.
+- [ ] `EMAIL_PREVIEW_MODE=true` confirmed for the initial activation phase.
 - [ ] Reference seed applied (9 countries, 15 products); PG/Redis/queues healthy.
 - [ ] Sensitive flags fail-closed in DB (payments, e_signature, policy_issuance, claims, insurer_api, ai_recommendation, ai_lead_scoring, ai_summary, ai_broker_assistant, whatsapp, sponsored_offers, multi_broker_routing, billing).
 - [ ] At least one Super Admin account created with MFA enrolled.
@@ -32,7 +32,7 @@ This checklist gates **public activation** of a scope. There is no global "go" b
 - [ ] Routing rules for this country reviewed and approved by compliance.
 - [ ] Smoke checks executed against this country: catalog, quote consented, quote refused, license-expired exclusion, dashboard gating.
 - [ ] AuditLog visible for the activations that already occurred for this country (consent publish, partner activation).
-- [ ] If notifications are involved, an end-to-end email test was executed in `EMAIL_DELIVERY_MODE=preview` and the rendered output was reviewed.
+- [ ] If notifications are involved, an end-to-end email test was executed with `EMAIL_PREVIEW_MODE=true` and the rendered output was reviewed.
 - [ ] Compliance officer signoff (named person + date + reason) recorded as the `reason` field when flipping the flag.
 
 → **If all checked**, flip `country_public_enabled=true` (scopeId = country uuid). Optionally flip `country_quote_enabled`, `country_comparison_enabled`, `country_broker_onboarding_enabled` per decision.

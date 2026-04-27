@@ -32,10 +32,15 @@ COPY --from=build --chown=app:app /app/node_modules ./node_modules
 COPY --from=build --chown=app:app /app/backend ./backend
 COPY --from=build --chown=app:app /app/packages ./packages
 COPY --from=build --chown=app:app /app/package.json ./package.json
+COPY --from=build --chown=app:app /app/package-lock.json ./package-lock.json
 COPY --from=build --chown=app:app /app/tsconfig.base.json ./tsconfig.base.json
+COPY --from=build --chown=app:app /app/prisma.config.ts ./prisma.config.ts
+COPY --from=build --chown=app:app /app/scripts ./scripts
 USER app
 EXPOSE 3600
 HEALTHCHECK --interval=30s --timeout=5s --retries=3 \
-  CMD wget -qO- "http://127.0.0.1:${PORT:-3600}/admin/system/health" >/dev/null || exit 1
-# Bootstrap is selected at /speckit.tasks: Nest emits to backend/dist/main.js (typical) — adjust if differs.
-CMD ["node", "backend/dist/main.js"]
+  CMD wget -qO- "http://127.0.0.1:${PORT:-3600}/countries" >/dev/null || exit 1
+# The repo's npm run build is a typecheck only (tsc --noEmit) — no JS is emitted.
+# Run the TS source via tsx (same pattern as test:runtime:postgres). A future task may add
+# a real JS emission step (tsc emit or nest build) for a smaller runtime image.
+CMD ["node", "--import", "tsx", "backend/src/main.ts"]

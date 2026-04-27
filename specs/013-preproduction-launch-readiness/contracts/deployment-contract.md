@@ -8,7 +8,7 @@
   - `assurmatch.allianceconsultants.net` → public (3601).
   - `backoffice-assurmatch.allianceconsultants.net` → back-office (3602).
   - `api-assurmatch.allianceconsultants.net` → API (3600).
-- **Email**: Gmail SMTP (`smtp.gmail.com:587`); preprod default `EMAIL_DELIVERY_MODE=preview`.
+- **Email**: Gmail SMTP (`smtp.gmail.com:587`); preprod default `EMAIL_PREVIEW_MODE=true`.
 - **Monitoring**: Uptime Kuma initial.
 - **Backups**: local 14 days.
 - **Import signature**: deferred (procedural controls suffice for 013).
@@ -326,14 +326,14 @@ EMAIL_SMTP_HOST=smtp.gmail.com
 EMAIL_SMTP_PORT=587
 EMAIL_SMTP_USER=rotaryabidjan2plateaux@gmail.com
 EMAIL_SMTP_PASS=REDACTED              # Gmail app password — never in Git
-EMAIL_DELIVERY_MODE=preview            # preview | send
+EMAIL_PREVIEW_MODE=true                # true = preview/log only; false = real delivery
 EMAIL_TEST_RECIPIENT=                  # optional override that redirects all preprod emails
 ```
 
 Behavior:
 
-- `preview`: log message metadata at `info`, store the body in Mailpit if available, do NOT call `smtp.gmail.com`.
-- `send`: real delivery via Gmail SMTP. Requires explicit operator opt-in.
+- `EMAIL_PREVIEW_MODE=true`: log message metadata at `info`, store the body in Mailpit if available, do NOT call `smtp.gmail.com`.
+- `EMAIL_PREVIEW_MODE=false`: real delivery via Gmail SMTP. Requires explicit operator opt-in.
 - If `EMAIL_TEST_RECIPIENT` is set, all delivered emails go to that single address regardless of original recipient (defense against accidental partner contact).
 
 Gmail prerequisites:

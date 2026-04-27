@@ -59,7 +59,7 @@ This document captures the technical decisions taken for spec 013 and the ration
   - `EMAIL_SMTP_PORT=587` (STARTTLS)
   - `EMAIL_SMTP_USER=rotaryabidjan2plateaux@gmail.com`
   - `EMAIL_SMTP_PASS` — **Gmail app password** (not the regular account password). Generated from the Google account security settings while 2FA is enabled. The value lives only in `.env.production` on the VPS, never in Git.
-  - `EMAIL_DELIVERY_MODE=preview` by default in preprod. Two modes:
+  - `EMAIL_PREVIEW_MODE=true` by default in preprod. Two modes:
     - `preview`: emails are logged at `info` and stored in a local Mailpit if configured, but never sent over SMTP.
     - `send`: real SMTP delivery; an operator opt-in is required to flip to this mode after validation.
   - `EMAIL_TEST_RECIPIENT` (optional): if set, all preprod emails are redirected to this address regardless of the recipient field — useful for end-to-end testing without affecting real broker contacts.

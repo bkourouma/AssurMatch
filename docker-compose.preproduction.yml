@@ -1,0 +1,129 @@
+# AssurMatch — local repro of preprod stack.
+# Build the three images first:
+#   docker build -f backend/Dockerfile        -t assurmatch-api:test .
+#   docker build -f apps/public/Dockerfile    -t assurmatch-public:test .
+#   docker build -f apps/admin/Dockerfile     -t assurmatch-backoffice:test .
+#
+# Then bring everything up:
+#   docker compose -f docker-compose.preproduction.yml up -d
+#
+# First-time setup (in another shell, after services are healthy):
+#   docker compose -f docker-compose.preproduction.yml exec assurmatch-app \
+#     npx prisma migrate deploy --schema /app/backend/prisma/schema.prisma
+#   docker compose -f docker-compose.preproduction.yml exec assurmatch-app \
+#     node --import tsx /app/scripts/preprod/seed-reference.ts
+#
+# Verify:
+#   curl http://localhost:3600/admin/system/health   (needs admin token; expect 401 if unauthenticated)
+#   curl http://localhost:3600/countries
+#   open http://localhost:3601    (public)
+#   open http://localhost:3602    (back-office)
+#
+# Tear down:
+#   docker compose -f docker-compose.preproduction.yml down
+#   docker compose -f docker-compose.preproduction.yml down -v   # also drop volumes
+
+services:
+  postgres:
+    image: postgres:18-alpine
+    environment:
+      POSTGRES_DB: assurmatch_preproduction
+      POSTGRES_USER: assurmatch
+      POSTGRES_PASSWORD: assurmatch
+    # No host port binding — services reach postgres via the compose network on port 5432.
+    # Add `ports: ["127.0.0.1:55432:5432"]` if you want to inspect from the host (avoid 5432/5433
+    # which may already be taken by the existing docker-compose.yml).
+    volumes:
+      - postgres-preprod-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U assurmatch -d assurmatch_preproduction"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  redis:
+    image: redis:8-alpine
+    # No host port binding — same reason as postgres.
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  mailpit:
+    image: axllent/mailpit:latest
+    ports:
+      - "127.0.0.1:8025:8025"   # web UI for inspecting captured emails
+      - "127.0.0.1:1025:1025"   # SMTP server
+    environment:
+      MP_MAX_MESSAGES: 500
+      MP_SMTP_AUTH_ACCEPT_ANY: 1
+      MP_SMTP_AUTH_ALLOW_INSECURE: 1
+
+  assurmatch-app:
+    image: assurmatch-api:test
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      NODE_ENV: production
+      APP_ENV: preproduction
+      PORT: "3600"
+      DATABASE_URL: postgresql://assurmatch:assurmatch@postgres:5432/assurmatch_preproduction
+      REDIS_URL: redis://redis:6379
+      BULLMQ_PREFIX: assurmatch-preprod-local
+      JWT_SECRET: local-preprod-jwt-secret-please-change-32bytes
+      SESSION_SECRET: local-preprod-session-secret-please-change-32bytes
+      PUBLIC_APP_URL: http://localhost:3601
+      BACKOFFICE_APP_URL: http://localhost:3602
+      API_BASE_URL: http://localhost:3600
+      CORS_ORIGINS: http://localhost:3601,http://localhost:3602
+      LOCAL_STORAGE_ROOT: /app/uploads
+      LOG_LEVEL: info
+      EMAIL_SERVICE_TYPE: mailpit
+      EMAIL_FROM: dev@assurmatch.local
+      EMAIL_SMTP_HOST: mailpit
+      EMAIL_SMTP_PORT: "1025"
+      EMAIL_SMTP_SECURE: "false"
+      EMAIL_PREVIEW_MODE: "true"
+      ASSURMATCH_PRISMA_MEMORY: "false"
+      ASSURMATCH_REDIS_MEMORY: "false"
+      ASSURMATCH_QUEUE_MEMORY: "false"
+      ASSURMATCH_AUDIT_MEMORY: "false"
+    ports:
+      - "127.0.0.1:3600:3600"
+    volumes:
+      - assurmatch-uploads:/app/uploads
+      - assurmatch-data:/app/data
+
+  assurmatch-public:
+    image: assurmatch-public:test
+    depends_on:
+      - assurmatch-app
+    environment:
+      NODE_ENV: production
+      PORT: "3601"
+      # Server-side rendering inside the container reaches the API via the compose network.
+      API_BASE_URL: http://assurmatch-app:3600
+      PUBLIC_APP_URL: http://localhost:3601
+    ports:
+      - "127.0.0.1:3601:3601"
+
+  assurmatch-backoffice:
+    image: assurmatch-backoffice:test
+    depends_on:
+      - assurmatch-app
+    environment:
+      NODE_ENV: production
+      PORT: "3602"
+      API_BASE_URL: http://assurmatch-app:3600
+      BACKOFFICE_APP_URL: http://localhost:3602
+    ports:
+      - "127.0.0.1:3602:3602"
+
+volumes:
+  postgres-preprod-data:
+  assurmatch-uploads:
+  assurmatch-data:

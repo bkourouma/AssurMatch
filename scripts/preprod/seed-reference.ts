@@ -12,6 +12,7 @@
 
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
+import { PrismaPg } from "@prisma/adapter-pg";
 import { PrismaClient } from "@prisma/client";
 
 interface CountrySeed {
@@ -66,7 +67,13 @@ async function main(): Promise<void> {
     process.exit(2);
   }
   const dryRun = isDryRun();
-  const prisma = new PrismaClient();
+  const databaseUrl = process.env.DATABASE_URL;
+  if (!databaseUrl) {
+    console.error("[seed-reference] DATABASE_URL is required");
+    process.exit(2);
+  }
+  const adapter = new PrismaPg(databaseUrl) as unknown as ConstructorParameters<typeof PrismaClient>[0]["adapter"];
+  const prisma = new PrismaClient({ adapter });
   try {
     const countries = readJson<CountrySeed[]>("countries.json");
     const regimes = readJson<RegulatoryRegimeSeed[]>("regulatory-regimes.json");

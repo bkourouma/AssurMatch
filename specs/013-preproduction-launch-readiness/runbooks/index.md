@@ -81,7 +81,7 @@ Each outline below describes the runbook's purpose, prerequisites, steps, and ro
 
 ## 17. `email-mode-toggle.md`
 
-- Purpose: switch `EMAIL_DELIVERY_MODE` between `preview` and `send` in preprod.
+- Purpose: switch `EMAIL_PREVIEW_MODE` between preview-only (`true`) and real SMTP send (`false`) in preprod.
 - Prerequisites: compliance signoff for `send`; controlled inbox for the first real-send test.
 - Steps: edit `.env.production`, `docker restart assurmatch-app`, observe logs, send a test email, verify delivery and audit.
 - Rollback: edit back to `preview`, restart container.

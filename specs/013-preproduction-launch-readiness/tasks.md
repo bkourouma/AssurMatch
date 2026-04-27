@@ -23,7 +23,7 @@ description: "Task list for Preproduction Launch Readiness"
 - [x] T001 Extend `.gitignore` to forbid operational imports and backups directories outside reference seed: add `scripts/preprod/imports/`, `backups/`, `*.gpg`, `*.app-password`. Keep existing `.env.*` exclusion (with `.example` allow-list).
 - [x] T002 Extend `.dockerignore` to exclude `specs/`, `docs/runbooks/`, `tests/`, `.git/`, `.github/`, all `.env*` (except `.env.example`), `node_modules`, build outputs, scripts not needed at runtime.
 - [x] T003 [P] Extend `.env.example` (local) with `EMAIL_*`, `LOCAL_STORAGE_ROOT`, `LOG_LEVEL`, `RATE_LIMIT_*`, `BACKUP_PASSPHRASE`. Real values stay placeholders.
-- [x] T004 [P] Create `.env.preproduction.example` with the full preprod variable matrix. **All secrets are placeholders or `REDACTED`.** Use `EMAIL_DELIVERY_MODE=preview` and `EMAIL_SMTP_PASS=REDACTED`.
+- [x] T004 [P] Create `.env.preproduction.example` with the full preprod variable matrix. **All secrets are placeholders or `REDACTED`.** Use `EMAIL_PREVIEW_MODE=true` and `EMAIL_SMTP_PASS=REDACTED`.
 
 ## Phase 2: Foundational — Three Dockerfiles for topology B
 

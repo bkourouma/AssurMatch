@@ -138,7 +138,7 @@ See [research.md](./research.md). Headlines:
 4. **Package manager**: npm. CI uses `npm ci` (replaces the pnpm steps in the inspiration workflow).
 5. **CI/CD**: `verify` runs on PR + push main; `build-and-deploy` runs only on push main. Docker build uses Buildx; three images tagged `latest` and `sha-<short>`. SSH deploy pulls, swaps containers, runs health checks, prunes.
 6. **Storage**: local Docker volume mounted at `/app/uploads` (host: `/home/deployer/apps/assurmatch/uploads`). S3 stays optional via env.
-7. **SMTP (confirmed)**: Gmail SMTP for transactional email. Variables `EMAIL_SERVICE_TYPE=smtp`, `EMAIL_FROM`, `EMAIL_SMTP_HOST=smtp.gmail.com`, `EMAIL_SMTP_PORT=587`, `EMAIL_SMTP_USER`, `EMAIL_SMTP_PASS`. The password is NEVER in Git (use a Gmail **app password** generated in the account settings; the regular Google account password will not authenticate via SMTP because of MFA on the account). Preprod ships with a "preview-only" mode by default (`EMAIL_DELIVERY_MODE=preview` — log + Mailpit if available) until an explicit operator switches to `EMAIL_DELIVERY_MODE=send` after validation.
+7. **SMTP (confirmed)**: Gmail SMTP for transactional email. Variables `EMAIL_SERVICE_TYPE=smtp`, `EMAIL_FROM`, `EMAIL_SMTP_HOST=smtp.gmail.com`, `EMAIL_SMTP_PORT=587`, `EMAIL_SMTP_USER`, `EMAIL_SMTP_PASS`. The password is NEVER in Git (use a Gmail **app password** generated in the account settings; the regular Google account password will not authenticate via SMTP because of MFA on the account). Preprod ships with a "preview-only" mode by default (`EMAIL_PREVIEW_MODE=true` — log + Mailpit if available) until an explicit operator switches to `EMAIL_PREVIEW_MODE=false` after validation.
 8. **Monitoring (confirmed initial)**: Uptime Kuma probing the four critical surfaces: API health (`/admin/system/health`), public root, back-office root, plus PG/Redis indirectly via API health. Sentry optional/future.
 9. **Backups (confirmed initial)**: local only. `pg_dump` daily 02:00 UTC; uploads `tar.gz` daily 02:30 UTC; retention 14 days; encrypted with `gpg --symmetric` if `BACKUP_PASSPHRASE` is set. Manual restore test mandatory before global go. Offsite backup is a documented future improvement.
 10. **Secrets**: `.env.production` on the VPS only, owned by `deployer:deployer`, `0600`. No secret in repo. JWT/SESSION secrets ≥ 32 bytes from `openssl rand -base64`. Documented rotation runbook.
@@ -193,7 +193,7 @@ Email (preprod confirmed; password kept off Git):
   EMAIL_SMTP_PORT=587
   EMAIL_SMTP_USER=rotaryabidjan2plateaux@gmail.com
   EMAIL_SMTP_PASS=REDACTED              # Gmail app password, set via env file on the VPS only
-  EMAIL_DELIVERY_MODE=preview            # preview = log + Mailpit if available; send = real delivery (operator opt-in)
+  EMAIL_PREVIEW_MODE=true                # true = preview/log only; false = real delivery (operator opt-in)
   EMAIL_TEST_RECIPIENT=                  # optional override that redirects all preprod emails to this address
 
 Mandatory in production only (warn in preprod if missing):
@@ -415,7 +415,7 @@ No UI redesign. No new pages. Source-marker Playwright tests get *one* additiona
 - BullMQ + Redis versions in the image must match dev. Mitigation: pinned versions in package.json, image build uses package-lock.json.
 - Backup passphrase loss → unrecoverable backups. Mitigation: documented passphrase storage in secrets manager; restore test exercises decryption.
 - Public activation simultaneous on many countries/products → operator overload. Mitigation: runbook recommends staged activation per scope with a wait/observe period; not enforced by code.
-- Gmail SMTP rate limits / spam classification → emails not delivered or marked as spam. Mitigation: preprod default `EMAIL_DELIVERY_MODE=preview`; switch to `send` only after compliance and product validation; consider switching to a transactional provider (Postmark, Resend, SendGrid) for production.
+- Gmail SMTP rate limits / spam classification → emails not delivered or marked as spam. Mitigation: preprod default `EMAIL_PREVIEW_MODE=true`; switch to `false` only after compliance and product validation; consider switching to a transactional provider (Postmark, Resend, SendGrid) for production.
 - Gmail app password expiry / account suspension → email outage. Mitigation: rotation runbook + Uptime Kuma alert if `/admin/system/health` reports email queue failures.
 - Import without cryptographic signature → trust is procedural rather than cryptographic. Mitigation: 013 keeps imports out of Git, requires dry-run + zod + audit + SHA-256 manifest; signature hardening is a separate future spec.
 - Uptime Kuma single point of monitoring → if Kuma itself is down, no alerts. Mitigation: documented; Sentry or external probe can be added later.

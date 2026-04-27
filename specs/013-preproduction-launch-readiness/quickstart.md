@@ -34,7 +34,7 @@ EMAIL_SMTP_HOST=smtp.gmail.com
 EMAIL_SMTP_PORT=587
 EMAIL_SMTP_USER=rotaryabidjan2plateaux@gmail.com
 EMAIL_SMTP_PASS=REDACTED
-EMAIL_DELIVERY_MODE=preview
+EMAIL_PREVIEW_MODE=true
 EMAIL_TEST_RECIPIENT=
 
 # Backups (used on the VPS; locally optional)
@@ -175,7 +175,7 @@ When emails have been validated in preview mode and compliance allows:
 ```bash
 ssh deployer@<vps>
 # Edit /home/deployer/apps/assurmatch/.env.production
-# EMAIL_DELIVERY_MODE=send
+# EMAIL_PREVIEW_MODE=false
 docker restart assurmatch-app
 docker logs --tail 50 assurmatch-app | grep -i email
 ```

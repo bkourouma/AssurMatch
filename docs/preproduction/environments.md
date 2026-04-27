@@ -26,12 +26,12 @@ EMAIL_SMTP_HOST=smtp.gmail.com
 EMAIL_SMTP_PORT=587
 EMAIL_SMTP_USER=rotaryabidjan2plateaux@gmail.com
 EMAIL_SMTP_PASS=REDACTED   # Gmail app password — never in Git
-EMAIL_DELIVERY_MODE=preview # preview | send
+EMAIL_PREVIEW_MODE=true # true = preview, false = real SMTP send
 EMAIL_TEST_RECIPIENT=
 ```
 
 The Gmail account must have 2FA enabled and a 16-char **app password** generated in Google account
-settings. `preview` mode does NOT call Gmail; switch to `send` only after compliance signoff.
+settings. `EMAIL_PREVIEW_MODE=true` does NOT call Gmail; switch it to `false` only after compliance signoff.
 
 ## GitHub secrets (required for build-and-deploy)
 
