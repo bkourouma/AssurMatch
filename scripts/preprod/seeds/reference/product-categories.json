@@ -1,0 +1,7 @@
+[
+  { "key": "personal-lines", "name": "Lignes personnelles" },
+  { "key": "commercial-lines", "name": "Lignes commerciales" },
+  { "key": "life-savings", "name": "Vie et epargne" },
+  { "key": "microassurance", "name": "Microassurance" },
+  { "key": "specialty", "name": "Specialites" }
+]

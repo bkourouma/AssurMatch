@@ -1,0 +1,7 @@
+[
+  { "code": "XOF", "name": "Franc CFA BCEAO" },
+  { "code": "XAF", "name": "Franc CFA BEAC" },
+  { "code": "EUR", "name": "Euro" },
+  { "code": "USD", "name": "Dollar US" },
+  { "code": "MAD", "name": "Dirham marocain" }
+]
