@@ -2,10 +2,10 @@
 
 **Feature Branch**: `014-auth-users-persistence`
 **Created**: 2026-04-28
-**Status**: Draft
+**Status**: Approved for task generation
 **Input**: User description: "Persist users and auth in Prisma — replace in-memory UsersService with Prisma-runtime repository, real password hashing, real MFA TOTP, admin user creation endpoint, account lockout, audit. The current implementation has a placeholder AuthService and an in-memory UsersService; the back-office cannot be used end-to-end locally because users do not survive container restarts and login does not verify passwords. This feature closes that gap without activating any forbidden module."
-**Validation State**: Draft
-**Continuous Workflow Eligible**: Yes after validation. This feature is sensitive (authentication, password hashing, MFA, persisted PII for users). The `/speckit.plan` step is allowed but each subsequent step requires explicit human review of the test matrix and audit coverage.
+**Validation State**: Approved for `/speckit.tasks` on 2026-04-28 after audit and required-test review. `/speckit.implement` remains gated by explicit human approval because this feature is sensitive (authentication, password hashing, MFA, persisted PII for users).
+**Continuous Workflow Eligible**: Approved through `/speckit.tasks`. This feature is sensitive (authentication, password hashing, MFA, persisted PII for users), so implementation requires explicit human review of the generated `tasks.md`, test matrix and audit coverage.
 
 ## Constitutional Scope & Compliance *(mandatory)*
 
@@ -16,12 +16,12 @@
 - **Required feature flags**: No new flag required. The auth module is always on (it has been since spec 001). MFA enforcement remains gated by the existing `MfaRequiredHttpGuard`. Password reset flow stays admin-driven (no public reset link in V1).
 - **Consent and transmission**: N/A. No lead transmission introduced.
 - **Partner license controls**: N/A.
-- **Audit and data history**: All sensitive auth actions DOIVENT etre auditees: `user.created`, `user.updated`, `user.activated`, `user.suspended`, `user.locked`, `user.deleted`, `user.role_changed`, `user.password_changed` (no password value), `user.password_change_required`, `user.mfa_enrolled`, `user.mfa_reset`, `user.mfa_verified`, `user.mfa_failed`, `user.login_succeeded`, `user.login_failed`, `user.locked_after_failed_logins`. PII is masked: passwords NEVER logged, MFA secrets NEVER logged, only the user id and email and outcome.
+- **Audit and data history**: All sensitive auth actions DOIVENT etre auditees: `user.created`, `user.updated`, `user.activated`, `user.suspended`, `user.unsuspended`, `user.locked`, `user.unlocked`, `user.deleted`, `user.role_changed`, `user.password_changed` (no password value), `user.password_change_failed`, `user.password_change_required`, `user.password_reset_issued`, `user.password_reset_consumed`, `user.password_reset_invalid`, `user.mfa_enrolled`, `user.mfa_reset`, `user.mfa_verified`, `user.mfa_failed`, `user.login_succeeded`, `user.login_failed`, `user.login_refused_suspended`, `user.locked_after_failed_logins`, `local_bootstrap_admin.created`, `local_bootstrap_admin.refused_in_production`. PII is masked: passwords NEVER logged, MFA secrets NEVER logged, tokens NEVER logged, only the user id, masked email, outcome, hashed IP and correlation id when available.
 - **Security and RBAC**: Passwords hashed with **argon2id** (memory-hard, modern KDF). MFA secrets stored either encrypted at rest (with `ENCRYPTION_KEY`) or hashed (one-way) — final choice in plan; default = encrypted to keep TOTP working. Account lockout after N failed login attempts within a window. Rate limiting on `/auth/login`. RBAC: `super_admin` may create users with any role; `admin_pays` only within authorized country scope; `compliance_admin` may suspend/lock; broker roles cannot create users. MFA admin remains obligatoire. Sessions remain JWT-signed via the existing `signActorToken`.
 - **Routing impact**: N/A.
 - **AI impact**: N/A.
 - **UX/content restrictions**: Login forms keep technical-platform language. No marketing copy. Forbidden phrases not introduced.
-- **Workflow continuity**: Yes after validation. Stops apply: any deviation from password hashing standard, any silent reduction of MFA enforcement, any storage of passwords in plain text, any public sign-up endpoint, any audit gap, any lockfile drift after `npm install`.
+- **Workflow continuity**: Approved for `/speckit.tasks`. Stops apply before implementation: any deviation from password hashing standard, any silent reduction of MFA enforcement, any storage of passwords or MFA seeds in plain text, any public sign-up endpoint, any audit gap, any lockfile drift after `npm install`.
 
 ## User Scenarios & Testing *(mandatory)*
 
@@ -139,7 +139,7 @@ In local dev or preproduction, the API can be bootstrapped with an initial Super
 
 **Acceptance Scenarios**:
 
-1. **Given** `APP_ENV=preproduction` AND `LOCAL_BOOTSTRAP_ADMIN_EMAIL` set AND no Super Admin exists in the database, **When** the API starts, **Then** it creates a Super Admin with that email and the hashed password from `LOCAL_BOOTSTRAP_ADMIN_PASSWORD`, `mfaStatus=enrolled` with a fixed dev-only TOTP seed printed to logs (NEVER on production), and audit `user.created` with `reason="local-bootstrap"`.
+1. **Given** `APP_ENV=preproduction` AND `LOCAL_BOOTSTRAP_ADMIN_EMAIL` set AND no Super Admin exists in the database, **When** the API starts, **Then** it creates a Super Admin with that email and the hashed password from `LOCAL_BOOTSTRAP_ADMIN_PASSWORD`, `mfaStatus=required`, no MFA secret logged, and audit `user.created` with `reason="local-bootstrap"`.
 2. **Given** any Super Admin exists already, **When** the API starts with the bootstrap vars set, **Then** no action is taken and a structured log line indicates the bootstrap was skipped.
 3. **Given** `APP_ENV=production`, **When** the bootstrap vars are set, **Then** the API logs a fatal startup error and refuses to serve. This is a safety guarantee.
 
@@ -168,7 +168,7 @@ In local dev or preproduction, the API can be bootstrapped with an initial Super
 ### Functional Requirements
 
 - **FR-001**: The system MUST persist `User` rows in PostgreSQL via Prisma-runtime, replacing the in-memory `UsersService` array.
-- **FR-002**: The system MUST add a Prisma migration extending the `User` model with: `passwordHash` (string nullable), `passwordChangedAt` (DateTime nullable), `passwordChangeRequired` (boolean default true), `failedLoginCount` (int default 0), `lockedAt` (DateTime nullable), `mfaSecretEncrypted` (string nullable), `mfaSecretIssuedAt` (DateTime nullable), `mfaBackupCodesHashes` (string array), `passwordResetTokenHash` (string nullable), `passwordResetTokenExpiresAt` (DateTime nullable), `deletedAt` (DateTime nullable), `lastLoginIp` (string nullable, masked in logs).
+- **FR-002**: The system MUST add a Prisma migration extending the `User` model with: `passwordHash` (string nullable), `passwordChangedAt` (DateTime nullable), `passwordChangeRequired` (boolean default true), `failedLoginCount` (int default 0), `lastFailedLoginAt` (DateTime nullable), `lockedAt` (DateTime nullable), `lockedReason` (string nullable), `mfaSecretEncrypted` (string nullable), `mfaSecretIssuedAt` (DateTime nullable), `mfaBackupCodesHashes` (string array), `passwordResetTokenHash` (string nullable), `passwordResetTokenExpiresAt` (DateTime nullable), `deletedAt` (DateTime nullable), `lastLoginAt` (DateTime nullable), `lastLoginIpHash` (string nullable, never plain IP).
 - **FR-003**: Passwords MUST be hashed with `argon2id` using parameters: memory ≥ 64 MiB, time cost ≥ 3, parallelism ≥ 1. The chosen implementation MUST be a maintained Node.js library audited by the team.
 - **FR-004**: The system MUST verify passwords using a timing-safe comparison.
 - **FR-005**: The system MUST enforce a password policy: length 12–512, not equal to email or displayName, not common-password (a small built-in deny-list MAY apply).
@@ -179,7 +179,7 @@ In local dev or preproduction, the API can be bootstrapped with an initial Super
 - **FR-010**: The system MUST expose `POST /auth/login`, `POST /auth/logout`, `POST /auth/activate`, `POST /auth/password-change`, `POST /auth/password-reset`, `POST /auth/mfa/enroll`, `POST /auth/mfa/verify`, `GET /auth/me`. Rate limiting applies to `/auth/login`, `/auth/password-reset`, `/auth/mfa/verify`.
 - **FR-011**: All sensitive auth events MUST produce a durable `AuditLog` entry with action, actor (when known), target user, result, and PII-masked context. Passwords and secrets MUST never appear in audit context.
 - **FR-012**: JWT access tokens issued by `signActorToken` MUST carry `mfaVerified` strictly reflecting MFA state. JWT TTL SHOULD be short (15 minutes by default); a refresh-token mechanism is OUT of V1 scope (re-login required at expiry).
-- **FR-013**: The system MUST NOT log password values, MFA secrets, JWT tokens, or reset tokens at any log level.
+- **FR-013**: The system MUST NOT log password values, MFA secrets, bootstrap MFA seeds, JWT tokens, or reset tokens at any log level.
 - **FR-014**: The system MUST NOT introduce a public sign-up endpoint. Users are created exclusively by authorized admins.
 - **FR-015**: The Web Publique Client MUST NOT gain any auth surface or session pathway.
 - **FR-016**: When `APP_ENV=preproduction` AND `LOCAL_BOOTSTRAP_ADMIN_EMAIL` and `LOCAL_BOOTSTRAP_ADMIN_PASSWORD` are present AND no Super Admin exists, the API MUST create a single Super Admin at startup. When `APP_ENV=production`, the presence of these env vars MUST be a fatal error refusing to serve.
@@ -217,7 +217,7 @@ In local dev or preproduction, the API can be bootstrapped with an initial Super
 
 ### Key Entities
 
-- **User**: extended with password hash, MFA secret encrypted, backup codes hashes, password reset token hash + expiry, failed-login counter, lockedAt, deletedAt, lastLoginIp.
+- **User**: extended with password hash, MFA secret encrypted, backup codes hashes, password reset token hash + expiry, failed-login counter, lockedAt, deletedAt, lastLoginIpHash.
 - **AuditLog**: receives all auth events.
 - **PasswordResetToken** (logical, stored on User): one active token at a time.
 - **MfaBackupCode** (logical, array on User): hashed, single-use.
@@ -262,19 +262,19 @@ In local dev or preproduction, the API can be bootstrapped with an initial Super
 - Race condition on lockout counter under concurrent failures. Mitigation: atomic increment via Prisma `update({ data: { failedLoginCount: { increment: 1 } } })`.
 - Token reuse attack on reset tokens. Mitigation: single-use enforcement + immediate invalidation on consumption.
 
-## Open Questions for the Plan
+## Resolved Plan Questions
 
-1. Argon2 library choice: `argon2` (native) vs `@node-rs/argon2` (Rust binding)?
-2. TOTP library: `otplib`, `speakeasy`, `@otplib/preset-default`?
-3. Email templates: which translations, branding?
-4. JWT TTL final value (15 min default proposed) — too short for back-office UX?
-5. Should MFA reset auto-issue a new enrolment in the same response, or require the user to re-enrol from scratch?
-6. Backup codes count and format (8 codes of 10 hex chars proposed).
-7. Should `lastLoginIp` be hashed or stored plain (PII implications)?
-8. Refresh-token decision: confirmed out of V1, but at what point does that become a UX problem?
-9. Activation invitation email: is the activation token sent via email (preferred) or shown to admin to communicate out-of-band? V1 default: email when SMTP is configured, else admin sees the token once in the create response.
-10. Should we add a `passwordHistory` to forbid the last N passwords? (Default: no in V1, document as future hardening.)
-11. Should we add WebAuthn as an additional or alternative MFA factor? (Default: future spec.)
+1. Argon2 library: `argon2` native binding by default; `@node-rs/argon2` remains an escape hatch only if install or CI issues appear.
+2. TOTP library: `otplib`.
+3. Email templates: activation, password reset and MFA reset notices use the existing notifications module and constitution-safe operational wording.
+4. JWT TTL: 15 minutes by default, configurable via `AUTH_JWT_TTL_MINUTES`.
+5. MFA reset: require the user to re-enrol from scratch; do not auto-issue a secret from the admin action.
+6. Backup codes: 8 codes of 10 hex characters, hashed and single-use.
+7. Login IP storage: store `lastLoginIpHash` only; never plain IP.
+8. Refresh tokens: out of V1.
+9. Activation invitation email: send via configured email channel; when unavailable, return the activation token once to the authorized admin caller.
+10. Password history: out of V1, future hardening.
+11. WebAuthn/passkeys: out of V1, future spec.
 
 ## Out Of Scope
 

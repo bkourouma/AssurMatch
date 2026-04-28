@@ -1,5 +1,80 @@
 import { backOfficeApiBaseUrl, getBackOfficeToken } from "./backoffice-auth";
 
+export const BROKER_AUTH_SOURCE_MARKER = "broker-auth-client:014";
+
+export interface BackOfficeLoginResult {
+  status: "success" | "mfa_required" | "activation_required" | "locked" | "suspended" | "validation_error" | "invalid_credentials" | "error";
+  accessToken?: string;
+  mfaRequired?: boolean;
+  error?: string;
+}
+
+export async function loginBackOffice(email: string, password: string): Promise<BackOfficeLoginResult> {
+  const response = await fetch(`${backOfficeApiBaseUrl()}/auth/login`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ email, password }),
+    cache: "no-store"
+  });
+  if (response.status === 400 || response.status === 422) return { status: "validation_error", error: `api_${response.status}` };
+  if (response.status === 403) return { status: "suspended", error: "account_suspended" };
+  if (response.status === 423) return { status: "locked", error: "account_locked" };
+  if (response.status === 428) return { status: "activation_required", error: "activation_required" };
+  if (response.status === 401) return { status: "invalid_credentials", error: "invalid_credentials" };
+  if (!response.ok) return { status: "error", error: `api_${response.status}` };
+  const session = await response.json() as { accessToken?: string; mfaRequired?: boolean };
+  if (!session.accessToken) return { status: "error", error: "invalid_session" };
+  return session.mfaRequired ? { status: "mfa_required", ...session } : { status: "success", ...session };
+}
+
+export async function readMe() {
+  const token = await getBackOfficeToken();
+  if (!token) return undefined;
+  const response = await fetch(`${backOfficeApiBaseUrl()}/auth/me`, {
+    headers: { Authorization: `Bearer ${token}` },
+    cache: "no-store"
+  });
+  if (!response.ok) return undefined;
+  return response.json();
+}
+
+export async function enrollMfa() {
+  const token = await getBackOfficeToken();
+  if (!token) throw new Error("session_required");
+  const response = await fetch(`${backOfficeApiBaseUrl()}/auth/mfa/enroll`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}` },
+    cache: "no-store"
+  });
+  if (!response.ok) throw new Error(`api_${response.status}`);
+  return response.json() as Promise<{ secret: string; otpauthUri: string; backupCodes: string[] }>;
+}
+
+export async function verifyMfa(code: string, kind: "totp" | "backup" = "totp") {
+  const token = await getBackOfficeToken();
+  if (!token) throw new Error("session_required");
+  const response = await fetch(`${backOfficeApiBaseUrl()}/auth/mfa/verify`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}`, "content-type": "application/json" },
+    body: JSON.stringify({ code, kind }),
+    cache: "no-store"
+  });
+  if (!response.ok) throw new Error(`api_${response.status}`);
+  return response.json();
+}
+
+export async function changePassword(oldPassword: string, newPassword: string): Promise<void> {
+  const token = await getBackOfficeToken();
+  if (!token) throw new Error("session_required");
+  const response = await fetch(`${backOfficeApiBaseUrl()}/auth/password-change`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}`, "content-type": "application/json" },
+    body: JSON.stringify({ oldPassword, newPassword }),
+    cache: "no-store"
+  });
+  if (!response.ok) throw new Error(`api_${response.status}`);
+}
+
 export interface BrokerApiState<T> {
   status: "success" | "error" | "unauthenticated" | "forbidden";
   data: T;

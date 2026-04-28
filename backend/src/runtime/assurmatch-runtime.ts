@@ -25,6 +25,7 @@ import { RegulatoryRegimesModule } from "../modules/regulatory-regimes/regulator
 import { RoutingModule } from "../modules/routing/routing.module";
 import { SystemHealthModule } from "../modules/admin/system-health.module";
 import { UsersModule } from "../modules/users/users.module";
+import { PrismaUsersRepository } from "../modules/users/users.repository";
 import { AuthModule } from "../modules/auth/auth.module";
 import { PartnerEligibilityService } from "../modules/partners/partner-eligibility.service";
 import { PrismaConsentRecordsRepository } from "../modules/consent/consent-records.repository";
@@ -40,6 +41,7 @@ import { PrismaRoutingDecisionsRepository } from "../modules/leads/routing-decis
 import { PrismaCrmActivityRepository } from "../modules/leads/crm-activity.repository";
 import { PrismaNotificationsRepository } from "../modules/notifications/notifications.repository";
 import { DashboardsModule } from "../modules/dashboards/dashboards.module";
+import { maybeBootstrapAdmin } from "./local-bootstrap-admin";
 
 export class AssurMatchRuntime {
   readonly config = new ConfigModule();
@@ -54,6 +56,7 @@ export class AssurMatchRuntime {
   private readonly partnerLicensesRepository = this.runtimeRepository(new PrismaPartnerLicensesRepository(this.prisma));
   private readonly consentRecordsRepository = this.runtimeRepository(new PrismaConsentRecordsRepository(this.prisma));
   private readonly notificationsRepository = this.runtimeRepository(new PrismaNotificationsRepository(this.prisma));
+  private readonly usersRepository = this.runtimeRepository(new PrismaUsersRepository(this.prisma));
   private readonly offersRepository = this.runtimeRepository(new PrismaOffersRepository(this.prisma));
   private readonly prospectsRepository = this.runtimeRepository(new PrismaProspectsRepository(this.prisma));
   private readonly quoteRequestsRepository = this.runtimeRepository(new PrismaQuoteRequestsRepository(this.prisma));
@@ -66,8 +69,8 @@ export class AssurMatchRuntime {
   readonly partners = new PartnersModule(this.audit.writer, this.partnersRepository);
   readonly partnerLicenses = new PartnerLicensesModule(this.audit.writer, this.partnerLicensesRepository);
   readonly documents = new DocumentsModule(this.audit.writer);
-  readonly users = new UsersModule(this.audit.writer);
-  readonly auth = new AuthModule(this.users.service);
+  readonly users = new UsersModule(this.audit.writer, this.usersRepository);
+  readonly auth = new AuthModule(this.users.service, this.audit.writer);
   readonly featureFlags = new FeatureFlagsModule(
     this.audit.writer,
     new FeatureFlagCacheService(this.redis.client),
@@ -138,6 +141,7 @@ export class AssurMatchRuntime {
   async onModuleInit(): Promise<void> {
     await this.prisma.onModuleInit();
     await this.featureFlags.service.hydrateFromRepository();
+    await maybeBootstrapAdmin({ users: this.users.service, auth: this.auth, audit: this.audit.writer });
     this.refreshRuntimeFeatureFlags();
   }
 
@@ -167,7 +171,8 @@ export class AssurMatchRuntime {
       PartnersRepository: this.partnersRepository?.mode,
       PartnerLicensesRepository: this.partnerLicensesRepository?.mode,
       CrmActivityRepository: this.leadRepositorySet.crmActivity?.mode,
-      NotificationsRepository: this.notificationsRepository?.mode
+      NotificationsRepository: this.notificationsRepository?.mode,
+      UsersRepository: this.usersRepository?.mode
     };
   }
 

@@ -10,7 +10,8 @@ describe("prisma migration fresh-base readiness", () => {
       "0001_foundation",
       "0002_comparator_quote",
       "0003_broker_starter_portal",
-      "0004_broker_crm_pro"
+      "0004_broker_crm_pro",
+      "0005_auth_users_persistence"
     ]);
     const schema = readFileSync(join(process.cwd(), "backend", "prisma", "schema.prisma"), "utf8");
     for (const model of ["AuditLog", "FeatureFlag", "ConsentRecord", "QuoteRequest", "LeadAssignment", "BrokerCrmLeadState"]) {
@@ -22,7 +23,10 @@ describe("prisma migration fresh-base readiness", () => {
     expect(foundation).not.toContain("placeholder records");
     const starter = readFileSync(join(migrationsDir, "0003_broker_starter_portal", "migration.sql"), "utf8");
     const crm = readFileSync(join(migrationsDir, "0004_broker_crm_pro", "migration.sql"), "utf8");
+    const auth = readFileSync(join(migrationsDir, "0005_auth_users_persistence", "migration.sql"), "utf8");
     expect(starter).toContain("ADD COLUMN IF NOT EXISTS");
     expect(crm).toContain("CREATE TABLE IF NOT EXISTS");
+    expect(auth).toContain('ADD COLUMN IF NOT EXISTS "passwordHash"');
+    expect(auth).toContain('CREATE INDEX IF NOT EXISTS "User_deletedAt_idx"');
   });
 });

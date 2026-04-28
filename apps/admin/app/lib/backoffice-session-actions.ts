@@ -3,11 +3,14 @@
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { BACKOFFICE_TOKEN_COOKIE, backOfficeApiBaseUrl, sanitizeReturnTo } from "./backoffice-auth";
+import { loginBackOffice } from "./admin-api";
 
 interface LoginResponse {
   accessToken?: string;
   mfaRequired?: boolean;
 }
+
+// Source marker for auth-session tests: /auth/login
 
 function stringValue(value: FormDataEntryValue | null): string {
   return typeof value === "string" ? value : "";
@@ -18,18 +21,10 @@ export async function loginAction(formData: FormData): Promise<void> {
   const password = stringValue(formData.get("password"));
   const returnTo = sanitizeReturnTo(stringValue(formData.get("returnTo")));
 
-  const response = await fetch(`${backOfficeApiBaseUrl()}/auth/login`, {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify({ email, password }),
-    cache: "no-store"
-  });
-
-  if (!response.ok) {
-    redirect(`/login?error=invalid_credentials&returnTo=${encodeURIComponent(returnTo)}`);
+  const session = await loginBackOffice(email, password) as LoginResponse & { status?: string };
+  if (session.status && session.status !== "success" && session.status !== "mfa_required") {
+    redirect(`/login?error=${encodeURIComponent(session.status)}&returnTo=${encodeURIComponent(returnTo)}`);
   }
-
-  const session = (await response.json()) as LoginResponse;
   if (!session.accessToken) redirect(`/login?error=invalid_session&returnTo=${encodeURIComponent(returnTo)}`);
 
   const cookieStore = await cookies();

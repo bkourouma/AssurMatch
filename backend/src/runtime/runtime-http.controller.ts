@@ -1,7 +1,7 @@
-import { Body, Controller, Get, Headers, Param, Patch, Post, Query, UseGuards } from "@nestjs/common";
+import { Body, Controller, Delete, Get, Headers, Param, Patch, Post, Query, UseGuards } from "@nestjs/common";
 import type { IncomingHttpHeaders } from "node:http";
 import { z } from "zod";
-import { loginRequestSchema, mfaVerifyRequestSchema, type LoginRequest } from "../../../packages/shared/contracts/auth.contracts";
+import { activateRequestSchema, loginRequestSchema, mfaVerifyRequestSchema, passwordChangeRequestSchema, passwordResetRequestSchema, type ActivateRequest, type LoginRequest, type PasswordChangeRequest, type PasswordResetRequest } from "../../../packages/shared/contracts/auth.contracts";
 import {
   brokerCrmAssignRequestSchema,
   brokerCrmDisputeCreateSchema,
@@ -23,12 +23,15 @@ import {
   type OfferListQuery,
   type QuoteRequestCreateDto
 } from "../../../packages/shared/contracts/quote.contracts";
+import { adminUserActionRequestSchema, adminUserCreateRequestSchema, adminUserRoleUpdateRequestSchema, adminUsersListQuerySchema, adminUserUpdateRequestSchema, type AdminUserActionRequest, type AdminUserCreateRequest, type AdminUserRoleUpdateRequest, type AdminUserUpdateRequest } from "../../../packages/shared/contracts/user.contracts";
 import { isoCountrySchema, languageCodeSchema, nonEmptyStringSchema, reasonSchema, uuidSchema } from "../../../packages/shared/validation/common.schemas";
 import { roleHasPermission, type AssurMatchRole } from "../../../packages/shared/rbac/assurmatch-role-matrix";
 import { AuthRequiredHttpGuard, MfaRequiredHttpGuard } from "../modules/auth/guards/http-auth.guard";
 import { actorFromHeaders, requireActor } from "../modules/common/http/actor-context";
 import { parseHttpInput } from "../modules/common/http/zod-validation";
 import type { ActorContext } from "../modules/common/types";
+import { AdminUsersController as AdminUsersDomainController } from "../modules/users/admin-users.controller";
+import { AdminUserRolesController as AdminUserRolesDomainController } from "../modules/users/admin-user-roles.controller";
 import { AssurMatchRuntime } from "./assurmatch-runtime";
 
 type MethodDecoratorFactory = (target: object, propertyKey: string | symbol, descriptor: PropertyDescriptor) => void;
@@ -76,6 +79,10 @@ export class RuntimeHttpController {
     return this.runtime.auth.service.login(parseHttpInput(loginRequestSchema, input));
   }
 
+  activate(input: ActivateRequest) {
+    return this.runtime.auth.service.activate(parseHttpInput(activateRequestSchema, input));
+  }
+
   logout() {
     return this.runtime.auth.service.logout();
   }
@@ -84,15 +91,80 @@ export class RuntimeHttpController {
     return this.runtime.auth.service.me(actorFromProtectedHeaders(headers));
   }
 
-  enrollMfa(headers: IncomingHttpHeaders) {
-    const actor = actorFromProtectedHeaders(headers);
-    return this.runtime.auth.service.enrollMfa(this.runtime.users.service.require(actor.actorId ?? ""));
+  passwordChange(headers: IncomingHttpHeaders, input: PasswordChangeRequest) {
+    return this.runtime.auth.service.changePassword(actorFromProtectedHeaders(headers), parseHttpInput(passwordChangeRequestSchema, input));
   }
 
-  verifyMfa(headers: IncomingHttpHeaders, input: { challengeId: string; code: string }) {
+  passwordReset(input: PasswordResetRequest) {
+    return this.runtime.auth.service.resetPassword(parseHttpInput(passwordResetRequestSchema, input));
+  }
+
+  async enrollMfa(headers: IncomingHttpHeaders) {
+    const actor = actorFromProtectedHeaders(headers);
+    return this.runtime.auth.service.enrollMfa(await this.runtime.users.service.require(actor.actorId ?? ""));
+  }
+
+  async verifyMfa(headers: IncomingHttpHeaders, input: { challengeId: string; code: string }) {
     const actor = actorFromProtectedHeaders(headers);
     const parsed = parseHttpInput(mfaVerifyRequestSchema, input);
-    return this.runtime.auth.service.verifyMfa(this.runtime.users.service.require(actor.actorId ?? ""), parsed.challengeId, parsed.code);
+    return this.runtime.auth.service.verifyMfa(await this.runtime.users.service.require(actor.actorId ?? ""), parsed.challengeId ?? "", parsed.code, parsed.kind);
+  }
+
+  private usersController(): AdminUsersDomainController {
+    return new AdminUsersDomainController(this.runtime.users.service, this.runtime.audit.writer, this.runtime.auth.passwordReset);
+  }
+
+  private rolesController(): AdminUserRolesDomainController {
+    return new AdminUserRolesDomainController(this.runtime.users.service, this.runtime.audit.writer);
+  }
+
+  adminUsers(headers: IncomingHttpHeaders, query: unknown) {
+    return this.usersController().list(actorFromProtectedHeaders(headers), parseHttpInput(adminUsersListQuerySchema, query ?? {}));
+  }
+
+  adminUserDetail(userId: string, headers: IncomingHttpHeaders) {
+    return this.usersController().detail(actorFromProtectedHeaders(headers), parseParam("userId", userId, optionalUuidParamSchema));
+  }
+
+  adminUserCreate(headers: IncomingHttpHeaders, input: AdminUserCreateRequest) {
+    return this.usersController().create(actorFromProtectedHeaders(headers), parseHttpInput(adminUserCreateRequestSchema, input));
+  }
+
+  adminUserUpdate(userId: string, input: AdminUserUpdateRequest, headers: IncomingHttpHeaders) {
+    return this.usersController().update(actorFromProtectedHeaders(headers), parseParam("userId", userId, optionalUuidParamSchema), parseHttpInput(adminUserUpdateRequestSchema, input));
+  }
+
+  adminUserRoleUpdate(userId: string, input: AdminUserRoleUpdateRequest, headers: IncomingHttpHeaders) {
+    const parsed = parseHttpInput(adminUserRoleUpdateRequestSchema, input);
+    return this.rolesController().updateRoles(actorFromProtectedHeaders(headers), parseParam("userId", userId, optionalUuidParamSchema), parsed.roles, parsed.reason);
+  }
+
+  adminUserPasswordReset(userId: string, input: AdminUserActionRequest, headers: IncomingHttpHeaders) {
+    return this.usersController().issuePasswordReset(actorFromProtectedHeaders(headers), parseParam("userId", userId, optionalUuidParamSchema), parseHttpInput(adminUserActionRequestSchema, input));
+  }
+
+  adminUserSuspend(userId: string, input: AdminUserActionRequest, headers: IncomingHttpHeaders) {
+    return this.usersController().suspend(actorFromProtectedHeaders(headers), parseParam("userId", userId, optionalUuidParamSchema), parseHttpInput(adminUserActionRequestSchema, input));
+  }
+
+  adminUserUnsuspend(userId: string, input: AdminUserActionRequest, headers: IncomingHttpHeaders) {
+    return this.usersController().unsuspend(actorFromProtectedHeaders(headers), parseParam("userId", userId, optionalUuidParamSchema), parseHttpInput(adminUserActionRequestSchema, input));
+  }
+
+  adminUserLock(userId: string, input: AdminUserActionRequest, headers: IncomingHttpHeaders) {
+    return this.usersController().lock(actorFromProtectedHeaders(headers), parseParam("userId", userId, optionalUuidParamSchema), parseHttpInput(adminUserActionRequestSchema, input));
+  }
+
+  adminUserUnlock(userId: string, input: AdminUserActionRequest, headers: IncomingHttpHeaders) {
+    return this.usersController().unlock(actorFromProtectedHeaders(headers), parseParam("userId", userId, optionalUuidParamSchema), parseHttpInput(adminUserActionRequestSchema, input));
+  }
+
+  adminUserMfaReset(userId: string, input: AdminUserActionRequest, headers: IncomingHttpHeaders) {
+    return this.usersController().resetMfa(actorFromProtectedHeaders(headers), parseParam("userId", userId, optionalUuidParamSchema), parseHttpInput(adminUserActionRequestSchema, input));
+  }
+
+  adminUserDelete(userId: string, input: AdminUserActionRequest, headers: IncomingHttpHeaders) {
+    return this.usersController().delete(actorFromProtectedHeaders(headers), parseParam("userId", userId, optionalUuidParamSchema), parseHttpInput(adminUserActionRequestSchema, input));
   }
 
   countries() {
@@ -302,8 +374,11 @@ Controller()(RuntimeHttpController);
 Reflect.defineMetadata("design:paramtypes", [AssurMatchRuntime], RuntimeHttpController);
 
 decorate("login", [Post("auth/login") as MethodDecoratorFactory], [[0, Body() as ParamDecoratorFactory]]);
+decorate("activate", [Post("auth/activate") as MethodDecoratorFactory], [[0, Body() as ParamDecoratorFactory]]);
 decorate("logout", [authRoute, Post("auth/logout") as MethodDecoratorFactory]);
 decorate("me", [authRoute, Get("auth/me") as MethodDecoratorFactory], [[0, Headers() as ParamDecoratorFactory]]);
+decorate("passwordChange", [authRoute, Post("auth/password-change") as MethodDecoratorFactory], [[0, Headers() as ParamDecoratorFactory], [1, Body() as ParamDecoratorFactory]]);
+decorate("passwordReset", [Post("auth/password-reset") as MethodDecoratorFactory], [[0, Body() as ParamDecoratorFactory]]);
 decorate("enrollMfa", [authRoute, Post("auth/mfa/enroll") as MethodDecoratorFactory], [[0, Headers() as ParamDecoratorFactory]]);
 decorate("verifyMfa", [authRoute, Post("auth/mfa/verify") as MethodDecoratorFactory], [[0, Headers() as ParamDecoratorFactory], [1, Body() as ParamDecoratorFactory]]);
 decorate("countries", [Get("countries") as MethodDecoratorFactory]);
@@ -343,6 +418,18 @@ decorate("crmNotifications", [protectedRoute, Get("broker/crm/notifications") as
 decorate("crmAiFoundations", [protectedRoute, Get("broker/crm/ai-foundations") as MethodDecoratorFactory], [[0, Headers() as ParamDecoratorFactory]]);
 decorate("featureFlags", [protectedRoute, Get("admin/feature-flags") as MethodDecoratorFactory], [[0, Headers() as ParamDecoratorFactory]]);
 decorate("updateFeatureFlag", [protectedRoute, Patch("admin/feature-flags/:id") as MethodDecoratorFactory], [[0, Param("id") as ParamDecoratorFactory], [1, Body() as ParamDecoratorFactory], [2, Headers() as ParamDecoratorFactory]]);
+decorate("adminUsers", [protectedRoute, Get("admin/users") as MethodDecoratorFactory], [[0, Headers() as ParamDecoratorFactory], [1, Query() as ParamDecoratorFactory]]);
+decorate("adminUserDetail", [protectedRoute, Get("admin/users/:userId") as MethodDecoratorFactory], [[0, Param("userId") as ParamDecoratorFactory], [1, Headers() as ParamDecoratorFactory]]);
+decorate("adminUserCreate", [protectedRoute, Post("admin/users") as MethodDecoratorFactory], [[0, Headers() as ParamDecoratorFactory], [1, Body() as ParamDecoratorFactory]]);
+decorate("adminUserUpdate", [protectedRoute, Patch("admin/users/:userId") as MethodDecoratorFactory], [[0, Param("userId") as ParamDecoratorFactory], [1, Body() as ParamDecoratorFactory], [2, Headers() as ParamDecoratorFactory]]);
+decorate("adminUserRoleUpdate", [protectedRoute, Post("admin/users/:userId/role-update") as MethodDecoratorFactory], [[0, Param("userId") as ParamDecoratorFactory], [1, Body() as ParamDecoratorFactory], [2, Headers() as ParamDecoratorFactory]]);
+decorate("adminUserPasswordReset", [protectedRoute, Post("admin/users/:userId/password-reset") as MethodDecoratorFactory], [[0, Param("userId") as ParamDecoratorFactory], [1, Body() as ParamDecoratorFactory], [2, Headers() as ParamDecoratorFactory]]);
+decorate("adminUserSuspend", [protectedRoute, Post("admin/users/:userId/suspend") as MethodDecoratorFactory], [[0, Param("userId") as ParamDecoratorFactory], [1, Body() as ParamDecoratorFactory], [2, Headers() as ParamDecoratorFactory]]);
+decorate("adminUserUnsuspend", [protectedRoute, Post("admin/users/:userId/unsuspend") as MethodDecoratorFactory], [[0, Param("userId") as ParamDecoratorFactory], [1, Body() as ParamDecoratorFactory], [2, Headers() as ParamDecoratorFactory]]);
+decorate("adminUserLock", [protectedRoute, Post("admin/users/:userId/lock") as MethodDecoratorFactory], [[0, Param("userId") as ParamDecoratorFactory], [1, Body() as ParamDecoratorFactory], [2, Headers() as ParamDecoratorFactory]]);
+decorate("adminUserUnlock", [protectedRoute, Post("admin/users/:userId/unlock") as MethodDecoratorFactory], [[0, Param("userId") as ParamDecoratorFactory], [1, Body() as ParamDecoratorFactory], [2, Headers() as ParamDecoratorFactory]]);
+decorate("adminUserMfaReset", [protectedRoute, Post("admin/users/:userId/mfa-reset") as MethodDecoratorFactory], [[0, Param("userId") as ParamDecoratorFactory], [1, Body() as ParamDecoratorFactory], [2, Headers() as ParamDecoratorFactory]]);
+decorate("adminUserDelete", [protectedRoute, Delete("admin/users/:userId") as MethodDecoratorFactory], [[0, Param("userId") as ParamDecoratorFactory], [1, Body() as ParamDecoratorFactory], [2, Headers() as ParamDecoratorFactory]]);
 decorate("auditLogs", [protectedRoute, Get("admin/audit-logs") as MethodDecoratorFactory], [[0, Headers() as ParamDecoratorFactory]]);
 decorate("quoteRequests", [protectedRoute, Get("admin/quote-requests") as MethodDecoratorFactory], [[0, Headers() as ParamDecoratorFactory]]);
 decorate("leadAssignments", [protectedRoute, Get("admin/lead-assignments") as MethodDecoratorFactory], [[0, Headers() as ParamDecoratorFactory]]);
