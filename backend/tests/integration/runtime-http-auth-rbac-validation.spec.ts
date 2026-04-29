@@ -54,6 +54,8 @@ describe("runtime HTTP auth RBAC and validation boundaries", () => {
       scopes: { countryIds: [], productIds: [] }
     }, adminActor);
     brokerUser.mfaStatus = "verified";
+    await harness.runtime.users.service.update(brokerUser);
+    await harness.runtime.users.service.setPassword(brokerUser.id, await harness.runtime.auth.passwordHashing.hash("very-secure-pass"));
 
     const login = await harness.request("/auth/login", {
       method: "POST",

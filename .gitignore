@@ -13,6 +13,9 @@ node_modules/
 dist/
 build/
 .next/
+apps/*/.next/
+apps/*/next-env.d.ts
+apps/*/tsconfig.json
 out/
 .turbo/
 .vite/

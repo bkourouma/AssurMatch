@@ -1,6 +1,6 @@
-import { Body, Controller, Get, Module, Param, Patch, Post, Query, Req, UseGuards } from "@nestjs/common";
+import { Body, Controller, Delete, Get, Module, Param, Patch, Post, Query, Req, UseGuards } from "@nestjs/common";
 import { z } from "zod";
-import { loginRequestSchema, mfaVerifyRequestSchema, type LoginRequest } from "../../../../packages/shared/contracts/auth.contracts";
+import { activateRequestSchema, loginRequestSchema, mfaVerifyRequestSchema, passwordChangeRequestSchema, passwordResetRequestSchema, type ActivateRequest, type LoginRequest, type PasswordChangeRequest, type PasswordResetRequest } from "../../../../packages/shared/contracts/auth.contracts";
 import {
   brokerCrmAssignRequestSchema,
   brokerCrmDisputeCreateSchema,
@@ -26,6 +26,7 @@ import {
   complianceAlertsQuerySchema,
   dashboardScopeQuerySchema
 } from "../../../../packages/shared/contracts/dashboard.contracts";
+import { adminUserActionRequestSchema, adminUserCreateRequestSchema, adminUserRoleUpdateRequestSchema, adminUsersListQuerySchema, adminUserUpdateRequestSchema, type AdminUserActionRequest, type AdminUserCreateRequest, type AdminUserRoleUpdateRequest, type AdminUserUpdateRequest } from "../../../../packages/shared/contracts/user.contracts";
 import { roleHasPermission, type AssurMatchRole } from "../../../../packages/shared/rbac/assurmatch-role-matrix";
 import { isoCountrySchema, languageCodeSchema, nonEmptyStringSchema, reasonSchema, uuidSchema } from "../../../../packages/shared/validation/common.schemas";
 import { AssurMatchRuntime } from "../../runtime/assurmatch-runtime";
@@ -33,6 +34,8 @@ import { AuthRequiredHttpGuard, MfaRequiredHttpGuard } from "../auth/guards/http
 import { actorFromRequest, protectedActorFromRequest, type AssurMatchHttpRequest } from "../common/http/request-actor";
 import { parseHttpInput } from "../common/http/zod-validation";
 import type { ActorContext } from "../common/types";
+import { AdminUsersController as AdminUsersDomainController } from "../users/admin-users.controller";
+import { AdminUserRolesController as AdminUserRolesDomainController } from "../users/admin-user-roles.controller";
 
 type MethodDecoratorFactory = (target: object, propertyKey: string | symbol, descriptor: PropertyDescriptor) => void;
 type ParamDecoratorFactory = (target: object, propertyKey: string | symbol | undefined, parameterIndex: number) => void;
@@ -85,6 +88,10 @@ export class AuthController {
     return this.runtime.auth.service.login(parseHttpInput(loginRequestSchema, input));
   }
 
+  activate(input: ActivateRequest) {
+    return this.runtime.auth.service.activate(parseHttpInput(activateRequestSchema, input));
+  }
+
   logout() {
     return this.runtime.auth.service.logout();
   }
@@ -93,15 +100,84 @@ export class AuthController {
     return this.runtime.auth.service.me(protectedActorFromRequest(request));
   }
 
-  enrollMfa(request: AssurMatchHttpRequest) {
-    const actor = protectedActorFromRequest(request);
-    return this.runtime.auth.service.enrollMfa(this.runtime.users.service.require(actor.actorId ?? ""));
+  passwordChange(request: AssurMatchHttpRequest, input: PasswordChangeRequest) {
+    return this.runtime.auth.service.changePassword(protectedActorFromRequest(request), parseHttpInput(passwordChangeRequestSchema, input));
   }
 
-  verifyMfa(request: AssurMatchHttpRequest, input: { challengeId: string; code: string }) {
+  passwordReset(input: PasswordResetRequest) {
+    return this.runtime.auth.service.resetPassword(parseHttpInput(passwordResetRequestSchema, input));
+  }
+
+  async enrollMfa(request: AssurMatchHttpRequest) {
+    const actor = protectedActorFromRequest(request);
+    return this.runtime.auth.service.enrollMfa(await this.runtime.users.service.require(actor.actorId ?? ""));
+  }
+
+  async verifyMfa(request: AssurMatchHttpRequest, input: { challengeId: string; code: string }) {
     const actor = protectedActorFromRequest(request);
     const parsed = parseHttpInput(mfaVerifyRequestSchema, input);
-    return this.runtime.auth.service.verifyMfa(this.runtime.users.service.require(actor.actorId ?? ""), parsed.challengeId, parsed.code);
+    return this.runtime.auth.service.verifyMfa(await this.runtime.users.service.require(actor.actorId ?? ""), parsed.challengeId ?? "", parsed.code, parsed.kind);
+  }
+}
+
+export class AdminUsersHttpController {
+  constructor(private readonly runtime: AssurMatchRuntime) {}
+
+  private usersController(): AdminUsersDomainController {
+    return new AdminUsersDomainController(this.runtime.users.service, this.runtime.audit.writer, this.runtime.auth.passwordReset);
+  }
+
+  private rolesController(): AdminUserRolesDomainController {
+    return new AdminUserRolesDomainController(this.runtime.users.service, this.runtime.audit.writer);
+  }
+
+  list(request: AssurMatchHttpRequest, query: unknown) {
+    return this.usersController().list(protectedActorFromRequest(request), parseHttpInput(adminUsersListQuerySchema, query ?? {}));
+  }
+
+  detail(id: string, request: AssurMatchHttpRequest) {
+    return this.usersController().detail(protectedActorFromRequest(request), parseParam("id", id, optionalUuidParamSchema));
+  }
+
+  create(request: AssurMatchHttpRequest, input: AdminUserCreateRequest) {
+    return this.usersController().create(protectedActorFromRequest(request), parseHttpInput(adminUserCreateRequestSchema, input));
+  }
+
+  update(id: string, input: AdminUserUpdateRequest, request: AssurMatchHttpRequest) {
+    return this.usersController().update(protectedActorFromRequest(request), parseParam("id", id, optionalUuidParamSchema), parseHttpInput(adminUserUpdateRequestSchema, input));
+  }
+
+  roleUpdate(id: string, input: AdminUserRoleUpdateRequest, request: AssurMatchHttpRequest) {
+    const parsed = parseHttpInput(adminUserRoleUpdateRequestSchema, input);
+    return this.rolesController().updateRoles(protectedActorFromRequest(request), parseParam("id", id, optionalUuidParamSchema), parsed.roles, parsed.reason);
+  }
+
+  passwordReset(id: string, input: AdminUserActionRequest, request: AssurMatchHttpRequest) {
+    return this.usersController().issuePasswordReset(protectedActorFromRequest(request), parseParam("id", id, optionalUuidParamSchema), parseHttpInput(adminUserActionRequestSchema, input));
+  }
+
+  suspend(id: string, input: AdminUserActionRequest, request: AssurMatchHttpRequest) {
+    return this.usersController().suspend(protectedActorFromRequest(request), parseParam("id", id, optionalUuidParamSchema), parseHttpInput(adminUserActionRequestSchema, input));
+  }
+
+  unsuspend(id: string, input: AdminUserActionRequest, request: AssurMatchHttpRequest) {
+    return this.usersController().unsuspend(protectedActorFromRequest(request), parseParam("id", id, optionalUuidParamSchema), parseHttpInput(adminUserActionRequestSchema, input));
+  }
+
+  lock(id: string, input: AdminUserActionRequest, request: AssurMatchHttpRequest) {
+    return this.usersController().lock(protectedActorFromRequest(request), parseParam("id", id, optionalUuidParamSchema), parseHttpInput(adminUserActionRequestSchema, input));
+  }
+
+  unlock(id: string, input: AdminUserActionRequest, request: AssurMatchHttpRequest) {
+    return this.usersController().unlock(protectedActorFromRequest(request), parseParam("id", id, optionalUuidParamSchema), parseHttpInput(adminUserActionRequestSchema, input));
+  }
+
+  mfaReset(id: string, input: AdminUserActionRequest, request: AssurMatchHttpRequest) {
+    return this.usersController().resetMfa(protectedActorFromRequest(request), parseParam("id", id, optionalUuidParamSchema), parseHttpInput(adminUserActionRequestSchema, input));
+  }
+
+  delete(id: string, input: AdminUserActionRequest, request: AssurMatchHttpRequest) {
+    return this.usersController().delete(protectedActorFromRequest(request), parseParam("id", id, optionalUuidParamSchema), parseHttpInput(adminUserActionRequestSchema, input));
   }
 }
 
@@ -372,8 +448,11 @@ export class AdminRuntimeSupportController {
 
 controller("auth", AuthController);
 decorate(AuthController, "login", [Post("login") as MethodDecoratorFactory], [[0, Body() as ParamDecoratorFactory]]);
+decorate(AuthController, "activate", [Post("activate") as MethodDecoratorFactory], [[0, Body() as ParamDecoratorFactory]]);
 decorate(AuthController, "logout", [authRoute, Post("logout") as MethodDecoratorFactory]);
 decorate(AuthController, "me", [authRoute, Get("me") as MethodDecoratorFactory], [[0, Req() as ParamDecoratorFactory]]);
+decorate(AuthController, "passwordChange", [authRoute, Post("password-change") as MethodDecoratorFactory], [[0, Req() as ParamDecoratorFactory], [1, Body() as ParamDecoratorFactory]]);
+decorate(AuthController, "passwordReset", [Post("password-reset") as MethodDecoratorFactory], [[0, Body() as ParamDecoratorFactory]]);
 decorate(AuthController, "enrollMfa", [authRoute, Post("mfa/enroll") as MethodDecoratorFactory], [[0, Req() as ParamDecoratorFactory]]);
 decorate(AuthController, "verifyMfa", [authRoute, Post("mfa/verify") as MethodDecoratorFactory], [[0, Req() as ParamDecoratorFactory], [1, Body() as ParamDecoratorFactory]]);
 
@@ -435,6 +514,20 @@ controller("admin", AdminFeatureFlagsController, true);
 decorate(AdminFeatureFlagsController, "list", [Get("feature-flags") as MethodDecoratorFactory], [[0, Req() as ParamDecoratorFactory]]);
 decorate(AdminFeatureFlagsController, "update", [Patch("feature-flags/:id") as MethodDecoratorFactory], [[0, Param("id") as ParamDecoratorFactory], [1, Body() as ParamDecoratorFactory], [2, Req() as ParamDecoratorFactory]]);
 
+controller("admin/users", AdminUsersHttpController, true);
+decorate(AdminUsersHttpController, "list", [Get() as MethodDecoratorFactory], [[0, Req() as ParamDecoratorFactory], [1, Query() as ParamDecoratorFactory]]);
+decorate(AdminUsersHttpController, "detail", [Get(":id") as MethodDecoratorFactory], [[0, Param("id") as ParamDecoratorFactory], [1, Req() as ParamDecoratorFactory]]);
+decorate(AdminUsersHttpController, "create", [Post() as MethodDecoratorFactory], [[0, Req() as ParamDecoratorFactory], [1, Body() as ParamDecoratorFactory]]);
+decorate(AdminUsersHttpController, "update", [Patch(":id") as MethodDecoratorFactory], [[0, Param("id") as ParamDecoratorFactory], [1, Body() as ParamDecoratorFactory], [2, Req() as ParamDecoratorFactory]]);
+decorate(AdminUsersHttpController, "roleUpdate", [Post(":id/role-update") as MethodDecoratorFactory], [[0, Param("id") as ParamDecoratorFactory], [1, Body() as ParamDecoratorFactory], [2, Req() as ParamDecoratorFactory]]);
+decorate(AdminUsersHttpController, "passwordReset", [Post(":id/password-reset") as MethodDecoratorFactory], [[0, Param("id") as ParamDecoratorFactory], [1, Body() as ParamDecoratorFactory], [2, Req() as ParamDecoratorFactory]]);
+decorate(AdminUsersHttpController, "suspend", [Post(":id/suspend") as MethodDecoratorFactory], [[0, Param("id") as ParamDecoratorFactory], [1, Body() as ParamDecoratorFactory], [2, Req() as ParamDecoratorFactory]]);
+decorate(AdminUsersHttpController, "unsuspend", [Post(":id/unsuspend") as MethodDecoratorFactory], [[0, Param("id") as ParamDecoratorFactory], [1, Body() as ParamDecoratorFactory], [2, Req() as ParamDecoratorFactory]]);
+decorate(AdminUsersHttpController, "lock", [Post(":id/lock") as MethodDecoratorFactory], [[0, Param("id") as ParamDecoratorFactory], [1, Body() as ParamDecoratorFactory], [2, Req() as ParamDecoratorFactory]]);
+decorate(AdminUsersHttpController, "unlock", [Post(":id/unlock") as MethodDecoratorFactory], [[0, Param("id") as ParamDecoratorFactory], [1, Body() as ParamDecoratorFactory], [2, Req() as ParamDecoratorFactory]]);
+decorate(AdminUsersHttpController, "mfaReset", [Post(":id/mfa-reset") as MethodDecoratorFactory], [[0, Param("id") as ParamDecoratorFactory], [1, Body() as ParamDecoratorFactory], [2, Req() as ParamDecoratorFactory]]);
+decorate(AdminUsersHttpController, "delete", [Delete(":id") as MethodDecoratorFactory], [[0, Param("id") as ParamDecoratorFactory], [1, Body() as ParamDecoratorFactory], [2, Req() as ParamDecoratorFactory]]);
+
 controller("admin", AdminAuditLogsController, true);
 decorate(AdminAuditLogsController, "list", [Get("audit-logs") as MethodDecoratorFactory], [[0, Req() as ParamDecoratorFactory]]);
 
@@ -459,6 +552,7 @@ Module({
     BrokerDashboardController,
     AdminDashboardController,
     AdminFeatureFlagsController,
+    AdminUsersHttpController,
     AdminAuditLogsController,
     AdminHealthController,
     AdminRuntimeSupportController

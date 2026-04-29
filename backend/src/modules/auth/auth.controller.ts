@@ -1,4 +1,4 @@
-import type { LoginRequest } from "../../../../packages/shared/contracts/auth.contracts";
+import type { ActivateRequest, LoginRequest, MfaVerifyRequest, PasswordChangeRequest, PasswordResetRequest } from "../../../../packages/shared/contracts/auth.contracts";
 import type { ActorContext } from "../common/types";
 import type { UserAccount } from "../users/users.module";
 import { AuthService, type AuthSession } from "./auth.module";
@@ -6,7 +6,7 @@ import { AuthService, type AuthSession } from "./auth.module";
 export class AuthController {
   constructor(private readonly auth: AuthService) {}
 
-  login(input: LoginRequest): AuthSession {
+  login(input: LoginRequest): Promise<AuthSession> {
     return this.auth.login(input);
   }
 
@@ -18,11 +18,23 @@ export class AuthController {
     return this.auth.me(actor);
   }
 
+  activate(input: ActivateRequest): Promise<AuthSession> {
+    return this.auth.activate(input);
+  }
+
+  passwordChange(actor: ActorContext, input: PasswordChangeRequest): Promise<void> {
+    return this.auth.changePassword(actor, input);
+  }
+
+  passwordReset(input: PasswordResetRequest): Promise<void> {
+    return this.auth.resetPassword(input);
+  }
+
   enrollMfa(user: UserAccount) {
     return this.auth.enrollMfa(user);
   }
 
-  verifyMfa(user: UserAccount, challengeId: string, code: string): AuthSession {
-    return this.auth.verifyMfa(user, challengeId, code);
+  verifyMfa(user: UserAccount, input: MfaVerifyRequest): Promise<AuthSession> {
+    return this.auth.verifyMfa(user, input.challengeId ?? "", input.code, input.kind ?? "totp");
   }
 }

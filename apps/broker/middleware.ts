@@ -27,7 +27,13 @@ function accessDeniedUrl(request: NextRequest, reason: string): URL {
 }
 
 function isPublicPath(pathname: string): boolean {
-  return pathname.startsWith("/login") || pathname.startsWith("/_next") || pathname === "/favicon.ico" || pathname === "/robots.txt";
+  return pathname.startsWith("/login") ||
+    pathname.startsWith("/activate") ||
+    pathname.startsWith("/password-reset") ||
+    pathname.startsWith("/mfa") ||
+    pathname.startsWith("/_next") ||
+    pathname === "/favicon.ico" ||
+    pathname === "/robots.txt";
 }
 
 function isBrokerProfile(profile: Profile): boolean {

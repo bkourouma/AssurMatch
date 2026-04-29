@@ -8,3 +8,4 @@ export * from "./feature-flag.contracts";
 export * from "./ops.contracts";
 export * from "./partner.contracts";
 export * from "./quote.contracts";
+export * from "./user.contracts";

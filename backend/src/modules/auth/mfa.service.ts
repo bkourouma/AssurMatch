@@ -1,31 +1,58 @@
+import { randomBytes } from "node:crypto";
+import { generateSecret, generateURI, verify } from "otplib";
 import type { UserAccount } from "../users/users.module";
+import { EncryptionService } from "./encryption.service";
+import { PasswordHashingService } from "./password-hashing.service";
 
 export interface MfaChallenge {
-  challengeId: string;
-  userId: string;
-  code: string;
-  createdAt: Date;
+  secret: string;
+  otpauthUri: string;
+  backupCodes: string[];
+  encryptedSecret: string;
+  backupCodeHashes: string[];
+}
+
+export interface MfaVerifyResult {
+  verified: boolean;
+  backupCodeHashes?: string[];
 }
 
 export class MfaService {
-  private readonly challenges: MfaChallenge[] = [];
+  constructor(
+    private readonly encryption = new EncryptionService(),
+    private readonly hashing = new PasswordHashingService()
+  ) {}
 
-  enroll(user: UserAccount): MfaChallenge {
-    const challenge: MfaChallenge = {
-      challengeId: crypto.randomUUID(),
-      userId: user.id,
-      code: "123456",
-      createdAt: new Date()
+  async enroll(user: UserAccount): Promise<MfaChallenge> {
+    const secret = generateSecret({ length: 32 });
+    const backupCodes = Array.from({ length: 8 }, () => randomBytes(5).toString("hex"));
+    const backupCodeHashes = await Promise.all(backupCodes.map((code) => this.hashing.hash(code)));
+    return {
+      secret,
+      otpauthUri: generateURI({ issuer: "AssurMatch", label: user.email, secret, strategy: "totp", digits: 6, period: 30 }),
+      backupCodes,
+      encryptedSecret: this.encryption.encrypt(secret),
+      backupCodeHashes
     };
-    user.mfaStatus = "enrolled";
-    this.challenges.push(challenge);
-    return challenge;
   }
 
-  verify(user: UserAccount, challengeId: string, code: string): boolean {
-    const challenge = this.challenges.find((candidate) => candidate.challengeId === challengeId && candidate.userId === user.id);
-    if (!challenge || challenge.code !== code) return false;
-    user.mfaStatus = "verified";
-    return true;
+  async verify(user: UserAccount, code: string, kind: "totp" | "backup" = "totp"): Promise<MfaVerifyResult> {
+    if (kind === "backup") return this.verifyBackupCode(user, code);
+    if (!user.mfaSecretEncrypted) return { verified: false };
+    const secret = this.encryption.decrypt(user.mfaSecretEncrypted);
+    const result = await verify({ token: code, secret, strategy: "totp", digits: 6, period: 30, epochTolerance: 30 });
+    return { verified: result.valid };
+  }
+
+  private async verifyBackupCode(user: UserAccount, code: string): Promise<MfaVerifyResult> {
+    for (let index = 0; index < user.mfaBackupCodesHashes.length; index += 1) {
+      const hash = user.mfaBackupCodesHashes[index];
+      if (hash && await this.hashing.verify(hash, code)) {
+        const next = [...user.mfaBackupCodesHashes];
+        next[index] = "";
+        return { verified: true, backupCodeHashes: next };
+      }
+    }
+    return { verified: false };
   }
 }

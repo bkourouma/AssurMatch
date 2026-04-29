@@ -36,6 +36,8 @@
     "dist",
     "build",
     ".next",
+    "apps/**/.next",
+    "apps/**/next-env.d.ts",
     "coverage"
   ]
 }

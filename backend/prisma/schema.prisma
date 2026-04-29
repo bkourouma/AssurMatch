@@ -325,6 +325,20 @@ model User {
   status          UserStatus @default(invited)
   mfaStatus       MfaStatus  @default(required)
   lastLoginAt     DateTime?
+  passwordHash    String?
+  passwordChangedAt DateTime?
+  passwordChangeRequired Boolean @default(true)
+  failedLoginCount Int @default(0)
+  lastFailedLoginAt DateTime?
+  lockedAt       DateTime?
+  lockedReason   String?
+  mfaSecretEncrypted String?
+  mfaSecretIssuedAt DateTime?
+  mfaBackupCodesHashes String[] @default([])
+  passwordResetTokenHash String?
+  passwordResetTokenExpiresAt DateTime?
+  deletedAt      DateTime?
+  lastLoginIpHash String?
   partnerTenantId String?
   countryScopes   String[]
   productScopes   String[]
@@ -333,6 +347,8 @@ model User {
   createdById     String?
 
   userRoles UserRole[]
+
+  @@index([deletedAt])
 }
 
 model Role {

@@ -37,6 +37,12 @@ export default async function BrokerShellPage() {
           <p style={{ margin: "8px 0 0", color: "#516070", fontSize: 13 }}>Connecte: {session.profile.actorId ?? "profil courtier"}</p>
         </div>
         <div style={{ display: "flex", gap: 8 }}>
+          <a href="/account" style={{ padding: "10px 14px", border: "1px solid #245f73", color: "#245f73", textDecoration: "none", borderRadius: 6 }}>
+            Compte
+          </a>
+          <a href="/team" style={{ padding: "10px 14px", border: "1px solid #245f73", color: "#245f73", textDecoration: "none", borderRadius: 6 }}>
+            Equipe
+          </a>
           <a href="/leads" style={{ padding: "10px 14px", border: "1px solid #245f73", color: "#245f73", textDecoration: "none", borderRadius: 6 }}>
             Voir les leads
           </a>

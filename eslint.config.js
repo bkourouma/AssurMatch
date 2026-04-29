@@ -8,6 +8,8 @@ export default tseslint.config(
       "dist/",
       "build/",
       ".next/",
+      "apps/**/.next/",
+      "apps/**/next-env.d.ts",
       "coverage/",
       "playwright-report/",
       "test-results/",
