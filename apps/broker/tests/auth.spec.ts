@@ -18,14 +18,33 @@ function files(dir: string): string[] {
 test("broker auth client exposes login MFA source markers", () => {
   const api = read("lib/broker-api.ts");
   const login = read("login/page.tsx");
+  const flow = read("auth-flow-form.tsx");
+  const flowActions = read("lib/auth-flow-actions.ts");
 
   expect(api).toContain("broker-auth-client:014");
   expect(api).toContain("/auth/mfa/enroll");
   expect(api).toContain("/auth/mfa/verify");
   expect(api).toContain("/auth/password-change");
+  expect(api).toContain("/auth/activate");
+  expect(api).toContain("/auth/password-reset");
   expect(login).toContain("Activation requise");
   expect(login).toContain("Compte verrouille");
   expect(login).toContain("Compte suspendu");
+  expect(login).toContain("/activate");
+  expect(flow).toContain("ActivationForm");
+  expect(flow).toContain("MfaPanel");
+  expect(flow).toContain("PasswordChangeForm");
+  expect(flow).toContain("PasswordResetConsumeForm");
+  expect(flowActions).toContain("redirect(`/mfa");
+});
+
+test("broker auth completion and account pages exist", () => {
+  expect(read("activate/page.tsx")).toContain("Activer le compte");
+  expect(read("mfa/page.tsx")).toContain("MFA requise");
+  expect(read("password-change/page.tsx")).toContain("Changer le mot de passe");
+  expect(read("password-reset/page.tsx")).toContain("Consommer un jeton");
+  expect(read("account/page.tsx")).toContain("Securite du compte");
+  expect(read("team/page.tsx")).toContain("Lecture tenant-safe");
 });
 
 test("broker app does not import the public app", () => {

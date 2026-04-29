@@ -75,6 +75,30 @@ export async function changePassword(oldPassword: string, newPassword: string): 
   if (!response.ok) throw new Error(`api_${response.status}`);
 }
 
+export async function activateWithToken(token: string, password: string): Promise<BackOfficeLoginResult> {
+  const response = await fetch(`${backOfficeApiBaseUrl()}/auth/activate`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ token, password }),
+    cache: "no-store"
+  });
+  if (response.status === 400 || response.status === 422) return { status: "validation_error", error: `api_${response.status}` };
+  if (!response.ok) return { status: "error", error: `api_${response.status}` };
+  const session = await response.json() as { accessToken?: string; mfaRequired?: boolean };
+  if (!session.accessToken) return { status: "error", error: "invalid_session" };
+  return session.mfaRequired ? { status: "mfa_required", ...session } : { status: "success", ...session };
+}
+
+export async function consumePasswordReset(token: string, newPassword: string): Promise<void> {
+  const response = await fetch(`${backOfficeApiBaseUrl()}/auth/password-reset`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ token, newPassword }),
+    cache: "no-store"
+  });
+  if (!response.ok) throw new Error(`api_${response.status}`);
+}
+
 export interface BrokerApiState<T> {
   status: "success" | "error" | "unauthenticated" | "forbidden";
   data: T;
@@ -160,4 +184,19 @@ const emptyDashboard: BrokerDashboardData = {
 
 export function readBrokerDashboard() {
   return readBroker<BrokerDashboardData>("/broker/dashboard", emptyDashboard);
+}
+
+export interface BrokerTeamUser {
+  id: string;
+  email: string;
+  displayName: string;
+  roles: string[];
+  partnerTenantId?: string | null;
+  status: "invited" | "active" | "suspended" | "locked" | "deleted";
+  mfaStatus: "not_enrolled" | "required" | "enrolled" | "verified";
+  lastLoginAt?: string | null;
+}
+
+export function readBrokerTeamUsers() {
+  return readBroker<BrokerTeamUser[]>("/admin/users?page=1&pageSize=100", []);
 }

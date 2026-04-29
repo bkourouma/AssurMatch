@@ -38,7 +38,7 @@ export async function loginAction(formData: FormData): Promise<void> {
     maxAge: 15 * 60
   });
 
-  if (session.mfaRequired) redirect(`/login?mfa=required&returnTo=${encodeURIComponent(returnTo)}`);
+  if (session.mfaRequired) redirect(`/mfa?returnTo=${encodeURIComponent(returnTo)}`);
   redirect(returnTo);
 }
 

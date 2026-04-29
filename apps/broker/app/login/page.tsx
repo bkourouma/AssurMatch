@@ -22,7 +22,7 @@ export default async function BrokerLoginPage({ searchParams }: LoginPageProps) 
       {reason === "session_expired" ? <p role="status">Votre session a expire. Connectez-vous a nouveau.</p> : null}
       {reason === "session_required" ? <p role="status">Connectez-vous pour acceder au back-office.</p> : null}
       {mfa === "required" ? <p role="alert">MFA requise. Votre profil est reconnu, mais l'acces protege reste bloque tant que la verification MFA n'est pas terminee.</p> : null}
-      {error === "activation_required" ? <p role="alert">Activation requise. Utilisez le lien d'activation fourni par votre administrateur.</p> : null}
+      {error === "activation_required" ? <p role="alert">Activation requise. Ouvrez l'ecran d'activation avec le jeton fourni par votre administrateur.</p> : null}
       {error === "mfa_required" ? <p role="alert">MFA requise. Terminez la verification MFA avant d'ouvrir le back-office courtier.</p> : null}
       {error === "locked" ? <p role="alert">Compte verrouille. Contactez votre administrateur plateforme.</p> : null}
       {error === "suspended" ? <p role="alert">Compte suspendu. Contactez votre responsable habilite.</p> : null}
@@ -43,6 +43,7 @@ export default async function BrokerLoginPage({ searchParams }: LoginPageProps) 
           Se connecter
         </button>
       </form>
+      <p style={{ marginTop: 14 }}><a href={`/activate?returnTo=${encodeURIComponent(returnTo)}`}>Activer un compte</a> · <a href="/password-reset">Consommer un jeton de reinitialisation</a></p>
     </main>
   );
 }

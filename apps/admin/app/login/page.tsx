@@ -22,7 +22,7 @@ export default async function AdminLoginPage({ searchParams }: LoginPageProps) {
       {reason === "session_expired" ? <p role="status">Votre session a expire. Connectez-vous a nouveau.</p> : null}
       {reason === "session_required" ? <p role="status">Connectez-vous pour acceder a l'administration.</p> : null}
       {mfa === "required" ? <p role="alert">MFA requise. L'acces admin reste bloque tant que la verification MFA n'est pas terminee.</p> : null}
-      {error === "activation_required" ? <p role="alert">Activation requise. Utilisez le lien d'activation fourni par votre administrateur.</p> : null}
+      {error === "activation_required" ? <p role="alert">Activation requise. Ouvrez l'ecran d'activation avec le jeton fourni par votre administrateur.</p> : null}
       {error === "mfa_required" ? <p role="alert">MFA requise. Terminez la verification MFA avant d'ouvrir les espaces admin.</p> : null}
       {error === "locked" ? <p role="alert">Compte verrouille. Contactez un Super Admin ou un administrateur conformite.</p> : null}
       {error === "suspended" ? <p role="alert">Compte suspendu. Contactez un administrateur habilite.</p> : null}
@@ -43,6 +43,7 @@ export default async function AdminLoginPage({ searchParams }: LoginPageProps) {
           Se connecter
         </button>
       </form>
+      <p style={{ marginTop: 14 }}><a href={`/activate?returnTo=${encodeURIComponent(returnTo)}`}>Activer un compte</a> · <a href="/password-reset">Consommer un jeton de reinitialisation</a></p>
     </main>
   );
 }
