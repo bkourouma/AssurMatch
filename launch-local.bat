@@ -21,7 +21,7 @@ echo Admin:  http://127.0.0.1:3702/login
 echo Broker: http://127.0.0.1:3703/login
 echo.
 
-start "AssurMatch API 3700" cmd /k "cd /d "%ROOT%" && set "PATH=%PATH%" && set "NODE_ENV=test" && set "PORT=3700" && node --import tsx "%API_RUNNER%""
+start "AssurMatch API 3700" cmd /k "cd /d "%ROOT%" && set "PATH=%PATH%" && set "NODE_ENV=test" && set "EMAIL_SERVICE_TYPE=disabled" && set "PORT=3700" && node --import tsx "%API_RUNNER%""
 
 start "AssurMatch Public 3701" cmd /k "cd /d "%ROOT%apps\public" && set "PATH=%PATH%" && set "NEXT_PUBLIC_ASSURMATCH_API_URL=http://127.0.0.1:3700" && npx next dev --hostname 127.0.0.1 --port 3701"
 

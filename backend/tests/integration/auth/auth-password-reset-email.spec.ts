@@ -20,24 +20,16 @@ const user: UserAccount = {
 
 describe("password reset email fallback", () => {
   it("returns a one-time token preview when SMTP is not configured", async () => {
-    const previousSmtpHost = process.env.SMTP_HOST;
-    delete process.env.SMTP_HOST;
-    try {
-      const service = new UserAuthNotificationService();
-      await expect(service.deliverPasswordReset(user, "preview-token")).resolves.toEqual({
-        emailStatus: "not_configured",
-        token: "preview-token"
-      });
-    } finally {
-      if (previousSmtpHost !== undefined) process.env.SMTP_HOST = previousSmtpHost;
-    }
+    const service = new UserAuthNotificationService();
+    await expect(service.deliverPasswordReset(user, "preview-token")).resolves.toEqual({
+      emailStatus: "not_configured",
+      token: "preview-token"
+    });
   });
 
   it("falls back to a one-time token if sending fails", async () => {
     const service = new UserAuthNotificationService({
-      send: async () => {
-        throw new Error("SMTP unavailable");
-      }
+      send: async () => ({ status: "failed", provider: "smtp", errorClass: "smtp_unavailable" })
     });
 
     await expect(service.deliverPasswordReset(user, "fallback-token")).resolves.toEqual({
@@ -51,11 +43,13 @@ describe("password reset email fallback", () => {
     const service = new UserAuthNotificationService({
       send: async (payload) => {
         sent.push(payload);
+        return { status: "sent", provider: "smtp" };
       }
     });
 
     await expect(service.deliverPasswordReset(user, "sent-token")).resolves.toEqual({ emailStatus: "sent" });
     expect(sent[0]).toMatchObject({ to: user.email, subject: expect.stringContaining("Reinitialisation") });
     expect(sent[0]?.body).toContain("sent-token");
+    expect(sent[0]?.purpose).toBe("auth_password_reset");
   });
 });

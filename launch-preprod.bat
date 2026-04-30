@@ -32,8 +32,12 @@ set "APP_ENV=preproduction"
 set "NODE_ENV=development"
 if not defined ENCRYPTION_KEY set "ENCRYPTION_KEY=local-preprod-encryption-key-32-bytes-minimum"
 if not defined ASSURMATCH_AUTH_TOKEN_SECRET set "ASSURMATCH_AUTH_TOKEN_SECRET=local-preprod-auth-token-secret-32-bytes-minimum"
-set "SMTP_HOST=127.0.0.1"
-set "SMTP_PORT=1025"
+set "EMAIL_SERVICE_TYPE=mailpit"
+set "EMAIL_FROM=no-reply@assurmatch.local"
+set "EMAIL_SMTP_HOST=127.0.0.1"
+set "EMAIL_SMTP_PORT=1025"
+set "EMAIL_SMTP_SECURE=false"
+set "EMAIL_PREVIEW_MODE=true"
 
 echo Running Prisma migrate deploy...
 npx prisma migrate deploy --schema backend/prisma/schema.prisma

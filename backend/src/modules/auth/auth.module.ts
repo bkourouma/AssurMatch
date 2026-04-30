@@ -10,6 +10,7 @@ import { MfaService } from "./mfa.service";
 import { PasswordHashingService } from "./password-hashing.service";
 import { PasswordPolicyService } from "./password-policy.service";
 import { PasswordResetService } from "./password-reset.service";
+import { UserAuthNotificationService, type AuthEmailDeliveryPort } from "../notifications/user-auth-notification.service";
 
 export interface AuthSession {
   accessToken: string;
@@ -168,9 +169,11 @@ export class AuthModule {
   readonly passwordPolicy = new PasswordPolicyService();
   readonly passwordReset = new PasswordResetService(this.passwordHashing, this.passwordPolicy);
   readonly mfa = new MfaService(this.encryption, this.passwordHashing);
+  readonly userNotifications: UserAuthNotificationService;
   readonly service: AuthService;
 
-  constructor(users: UsersService, audit = new AuditLogWriter()) {
+  constructor(users: UsersService, audit = new AuditLogWriter(), emailSender?: AuthEmailDeliveryPort) {
+    this.userNotifications = new UserAuthNotificationService(emailSender);
     this.service = new AuthService(users, this.mfa, audit, this.passwordHashing, this.passwordReset);
   }
 }
