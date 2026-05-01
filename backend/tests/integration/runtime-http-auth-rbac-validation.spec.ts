@@ -110,6 +110,32 @@ describe("runtime HTTP auth RBAC and validation boundaries", () => {
     expect((await harness.request("/admin/system/health", { headers: actorHeaders(superAdmin) })).status).toBe(200);
   });
 
+  it("refuses brokers from issuing admin password reset tokens", async () => {
+    harness = await createRuntimeHttpHarness();
+
+    const adminActor = { actorId: "seed-admin", roles: ["super_admin" as const], mfaVerified: true };
+    const user = await harness.runtime.users.service.create({
+      id: crypto.randomUUID(),
+      email: "rbac-reset-denied@example.com",
+      displayName: "RBAC Reset Denied",
+      roles: ["support_admin"],
+      scopes: { countryIds: [], productIds: [] }
+    }, adminActor);
+
+    const response = await harness.request(`/admin/users/${user.id}/password-reset`, {
+      method: "POST",
+      headers: { ...actorHeaders(starter), "content-type": "application/json" },
+      body: JSON.stringify({ reason: "Broker must be denied from issuing password resets" })
+    });
+
+    expect(response.status).toBe(403);
+    const payload = await response.json() as { message?: string };
+    expect(payload).toMatchObject({ message: expect.stringMatching(/rbac/i) });
+    expect(JSON.stringify(payload)).not.toContain("token");
+
+    expect((await harness.runtime.users.service.require(user.id)).passwordResetTokenHash).toBeUndefined();
+  });
+
   it("rejects invalid HTTP DTOs params and query at the controller boundary", async () => {
     process.env.ASSURMATCH_BROKER_CRM_ENABLED = "true";
     harness = await createRuntimeHttpHarness();

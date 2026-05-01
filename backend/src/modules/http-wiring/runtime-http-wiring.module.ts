@@ -124,7 +124,7 @@ export class AdminUsersHttpController {
   constructor(private readonly runtime: AssurMatchRuntime) {}
 
   private usersController(): AdminUsersDomainController {
-    return new AdminUsersDomainController(this.runtime.users.service, this.runtime.audit.writer, this.runtime.auth.passwordReset);
+    return new AdminUsersDomainController(this.runtime.users.service, this.runtime.audit.writer, this.runtime.auth.passwordReset, this.runtime.auth.userNotifications);
   }
 
   private rolesController(): AdminUserRolesDomainController {

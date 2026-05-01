@@ -1,3 +1,6 @@
+import type { EmailRuntimeConfig } from "../modules/notifications/email/email-config";
+import { resolveEmailRuntimeConfig, validateEmailRuntimeEnvironment } from "../modules/notifications/email/email-config";
+
 export interface AppConfig {
   appEnv: "local" | "test" | "runtime-smoke" | "staging" | "preproduction" | "production";
   databaseUrl: string;
@@ -15,6 +18,7 @@ export interface AppConfig {
   publicComparatorEnabled: boolean;
   quoteRequestEnabled: boolean;
   whatsappEnabled: boolean;
+  email: EmailRuntimeConfig;
 }
 
 const runtimeEnvironments = new Set(["local", "runtime-smoke", "staging", "preproduction", "production"]);
@@ -66,6 +70,7 @@ export function validateRuntimeEnvironment(env: Record<string, string | undefine
   positiveInt(env, "AUTH_LOCKOUT_THRESHOLD", 5);
   positiveInt(env, "AUTH_LOCKOUT_WINDOW_MINUTES", 15);
   positiveInt(env, "AUTH_LOCKOUT_COOLDOWN_MINUTES", 30);
+  validateEmailRuntimeEnvironment(env);
 }
 
 export class ConfigModule {
@@ -90,7 +95,8 @@ export class ConfigModule {
       httpsRequired: appEnv !== "local" && appEnv !== "test" && appEnv !== "runtime-smoke",
       publicComparatorEnabled: env.PUBLIC_COMPARATOR_ENABLED === "true",
       quoteRequestEnabled: env.QUOTE_REQUEST_ENABLED === "true",
-      whatsappEnabled: env.WHATSAPP_ENABLED === "true"
+      whatsappEnabled: env.WHATSAPP_ENABLED === "true",
+      email: resolveEmailRuntimeConfig(env)
     };
   }
 }

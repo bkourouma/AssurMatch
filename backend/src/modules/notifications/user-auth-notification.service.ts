@@ -1,14 +1,8 @@
 import type { UserAccount } from "../users/users.module";
+import { AuthEmailTemplateService } from "./email/email-template.service";
+import type { AuthEmailDeliveryPort, AuthEmailPayload } from "./email/email-delivery.service";
 
-export interface AuthEmailPayload {
-  to: string;
-  subject: string;
-  body: string;
-}
-
-export interface AuthEmailDeliveryPort {
-  send(payload: AuthEmailPayload): Promise<void>;
-}
+export type { AuthEmailDeliveryPort, AuthEmailPayload } from "./email/email-delivery.service";
 
 export interface AuthTokenDeliveryResult {
   emailStatus: "not_configured" | "sent" | "failed";
@@ -16,14 +10,16 @@ export interface AuthTokenDeliveryResult {
 }
 
 export class UserAuthNotificationService {
+  private readonly templates = new AuthEmailTemplateService();
+
   constructor(private readonly sender?: AuthEmailDeliveryPort) {}
 
   buildActivationEmail(user: UserAccount, token: string): AuthEmailPayload {
-    return this.buildUserTokenEmail(user, token, "Activation de votre acces AssurMatch");
+    return this.templates.activation(user, token);
   }
 
   buildPasswordResetEmail(user: UserAccount, token: string): AuthEmailPayload {
-    return this.buildUserTokenEmail(user, token, "Reinitialisation de votre mot de passe AssurMatch");
+    return this.templates.passwordReset(user, token);
   }
 
   async deliverPasswordReset(user: UserAccount, token: string): Promise<AuthTokenDeliveryResult> {
@@ -35,28 +31,13 @@ export class UserAuthNotificationService {
   }
 
   private async deliver(payload: AuthEmailPayload, token: string): Promise<AuthTokenDeliveryResult> {
-    if (!process.env.SMTP_HOST && !this.sender) return { emailStatus: "not_configured", token };
+    if (!this.sender) return { emailStatus: "not_configured", token };
     try {
-      await this.sender?.send(payload);
+      const result = await this.sender.send(payload);
+      if (result && result.status !== "sent") return { emailStatus: result.status, token };
       return { emailStatus: "sent" };
     } catch {
       return { emailStatus: "failed", token };
     }
-  }
-
-  private buildUserTokenEmail(user: UserAccount, token: string, subject: string): AuthEmailPayload {
-    return {
-      to: user.email,
-      subject,
-      body: [
-        `Bonjour ${user.displayName},`,
-        "",
-        "Une action de securite a ete initiee par votre administrateur AssurMatch.",
-        "Utilisez le lien ou le jeton temporaire transmis par votre canal securise interne.",
-        `Jeton temporaire: ${token}`,
-        "",
-        "Ce jeton expire dans 30 minutes. Ignorez ce message si vous n'etes pas a l'origine de cette demande."
-      ].join("\n")
-    };
   }
 }

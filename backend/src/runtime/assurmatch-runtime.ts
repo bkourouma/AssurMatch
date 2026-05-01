@@ -27,6 +27,7 @@ import { SystemHealthModule } from "../modules/admin/system-health.module";
 import { UsersModule } from "../modules/users/users.module";
 import { PrismaUsersRepository } from "../modules/users/users.repository";
 import { AuthModule } from "../modules/auth/auth.module";
+import { RuntimeEmailDeliveryService } from "../modules/notifications/email/email-delivery.service";
 import { PartnerEligibilityService } from "../modules/partners/partner-eligibility.service";
 import { PrismaConsentRecordsRepository } from "../modules/consent/consent-records.repository";
 import { PrismaCountriesRepository } from "../modules/countries/countries.repository";
@@ -63,6 +64,7 @@ export class AssurMatchRuntime {
   readonly leadRepositorySet = this.leadRepositories();
   private readonly brokerCrmConfig = { brokerCrmEnabled: process.env.ASSURMATCH_BROKER_CRM_ENABLED === "true" };
   readonly audit = new AuditLogsModule(this.auditLogRepository);
+  readonly emailDelivery = new RuntimeEmailDeliveryService(this.config.config.email, this.audit.writer);
   readonly regulatoryRegimes = new RegulatoryRegimesModule(this.audit.writer);
   readonly countries = new CountriesModule(this.audit.writer, this.countriesRepository);
   readonly products = new ProductsModule(this.audit.writer, this.productsRepository);
@@ -70,7 +72,7 @@ export class AssurMatchRuntime {
   readonly partnerLicenses = new PartnerLicensesModule(this.audit.writer, this.partnerLicensesRepository);
   readonly documents = new DocumentsModule(this.audit.writer);
   readonly users = new UsersModule(this.audit.writer, this.usersRepository);
-  readonly auth = new AuthModule(this.users.service, this.audit.writer);
+  readonly auth = new AuthModule(this.users.service, this.audit.writer, this.emailDelivery);
   readonly featureFlags = new FeatureFlagsModule(
     this.audit.writer,
     new FeatureFlagCacheService(this.redis.client),
