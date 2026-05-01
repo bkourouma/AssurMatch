@@ -1,8 +1,9 @@
 # AssurMatch CI/CD
 # - verify: PR + push main (typecheck, lint, test, build, prisma validate, audit, playwright source-marker)
 # - secret-scan: ensure no real EMAIL_SMTP_PASS / private key shipped
-# - build-and-deploy: push main only — three GHCR images (assurmatch, assurmatch-public, assurmatch-backoffice)
-#   then SSH deploy to the VPS (three containers behind Nginx). Health checks across the three surfaces.
+# - build-images: push main only - three GHCR images (assurmatch, assurmatch-public, assurmatch-backoffice)
+# - deploy-preproduction: push main only - self-hosted runner deploys three containers behind Nginx.
+#   Health checks cover the three surfaces.
 
 name: CI
 
@@ -56,7 +57,7 @@ jobs:
         run: |
           node scripts/ci/secret-scan.mjs
 
-  build-and-deploy:
+  build-images:
     needs: [verify, secret-scan]
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
@@ -106,70 +107,79 @@ jobs:
             ghcr.io/bkourouma/assurmatch-backoffice:latest
             ghcr.io/bkourouma/assurmatch-backoffice:${{ env.SHA }}
 
-      - name: Deploy via SSH (three containers, health checks, prune)
-        uses: appleboy/ssh-action@v1
+  deploy-preproduction:
+    needs: build-images
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: [self-hosted, assurmatch-preprod]
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      packages: read
+    env:
+      DEPLOY_ENV_FILE: /home/deployer/apps/assurmatch/.env.production
+      DEPLOY_NETWORK_NAME: ${{ vars.DEPLOY_NETWORK_NAME }}
+      SHA: sha-${{ github.sha }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Login to GHCR
+        uses: docker/login-action@v3
         with:
-          host: ${{ secrets.VPS_HOST }}
-          username: ${{ secrets.VPS_SSH_USER }}
-          key: ${{ secrets.VPS_SSH_PRIVATE_KEY }}
-          script_stop: true
-          script: |
-            set -euo pipefail
-            cd /home/deployer/apps/assurmatch
-            ./scripts/preprod/pre-deploy-check.sh
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ github.token }}
+      - name: Deploy local containers (three containers, health checks, prune)
+        run: |
+          set -euo pipefail
+          ./scripts/preprod/pre-deploy-check.sh
 
-            SHA="sha-${{ github.sha }}"
-            NETWORK_FLAG=""
-            if [ -n "${{ secrets.DEPLOY_NETWORK_NAME }}" ]; then
-              NETWORK_FLAG="--network ${{ secrets.DEPLOY_NETWORK_NAME }}"
+          NETWORK_FLAG=""
+          if [ -n "${DEPLOY_NETWORK_NAME:-}" ]; then
+            NETWORK_FLAG="--network ${DEPLOY_NETWORK_NAME}"
+          fi
+
+          for IMG in assurmatch assurmatch-public assurmatch-backoffice; do
+            docker pull "ghcr.io/bkourouma/${IMG}:${SHA}"
+          done
+
+          docker stop assurmatch-app || true
+          docker rm assurmatch-app || true
+          docker run -d \
+            --name assurmatch-app --restart unless-stopped \
+            --env-file "${DEPLOY_ENV_FILE}" \
+            -p 127.0.0.1:3600:3600 \
+            -v /home/deployer/apps/assurmatch/uploads:/app/uploads \
+            -v /home/deployer/apps/assurmatch/data:/app/data \
+            $NETWORK_FLAG \
+            "ghcr.io/bkourouma/assurmatch:${SHA}"
+
+          docker stop assurmatch-public || true
+          docker rm assurmatch-public || true
+          docker run -d \
+            --name assurmatch-public --restart unless-stopped \
+            --env-file "${DEPLOY_ENV_FILE}" \
+            -p 127.0.0.1:3601:3601 \
+            $NETWORK_FLAG \
+            "ghcr.io/bkourouma/assurmatch-public:${SHA}"
+
+          docker stop assurmatch-backoffice || true
+          docker rm assurmatch-backoffice || true
+          docker run -d \
+            --name assurmatch-backoffice --restart unless-stopped \
+            --env-file "${DEPLOY_ENV_FILE}" \
+            -p 127.0.0.1:3602:3602 \
+            $NETWORK_FLAG \
+            "ghcr.io/bkourouma/assurmatch-backoffice:${SHA}"
+
+          for surface in "127.0.0.1:3600/admin/system/health" "127.0.0.1:3601" "127.0.0.1:3602"; do
+            ok=0
+            for i in 1 2 3 4 5 6 7 8 9 10; do
+              if curl -fsS "http://${surface}" > /dev/null; then ok=1; break; fi
+              sleep 3
+            done
+            if [ "$ok" -ne 1 ]; then
+              echo "::error::Health check failed for $surface"
+              exit 1
             fi
+          done
 
-            for IMG in assurmatch assurmatch-public assurmatch-backoffice; do
-              docker pull "ghcr.io/bkourouma/${IMG}:${SHA}"
-            done
-
-            # API
-            docker stop assurmatch-app || true
-            docker rm assurmatch-app || true
-            docker run -d \
-              --name assurmatch-app --restart unless-stopped \
-              --env-file /home/deployer/apps/assurmatch/.env.production \
-              -p 127.0.0.1:3600:3600 \
-              -v /home/deployer/apps/assurmatch/uploads:/app/uploads \
-              -v /home/deployer/apps/assurmatch/data:/app/data \
-              $NETWORK_FLAG \
-              "ghcr.io/bkourouma/assurmatch:${SHA}"
-
-            # Public Next
-            docker stop assurmatch-public || true
-            docker rm assurmatch-public || true
-            docker run -d \
-              --name assurmatch-public --restart unless-stopped \
-              --env-file /home/deployer/apps/assurmatch/.env.production \
-              -p 127.0.0.1:3601:3601 \
-              $NETWORK_FLAG \
-              "ghcr.io/bkourouma/assurmatch-public:${SHA}"
-
-            # Back-office Next
-            docker stop assurmatch-backoffice || true
-            docker rm assurmatch-backoffice || true
-            docker run -d \
-              --name assurmatch-backoffice --restart unless-stopped \
-              --env-file /home/deployer/apps/assurmatch/.env.production \
-              -p 127.0.0.1:3602:3602 \
-              $NETWORK_FLAG \
-              "ghcr.io/bkourouma/assurmatch-backoffice:${SHA}"
-
-            for surface in "127.0.0.1:3600/admin/system/health" "127.0.0.1:3601" "127.0.0.1:3602"; do
-              ok=0
-              for i in 1 2 3 4 5 6 7 8 9 10; do
-                if curl -fsS "http://${surface}" > /dev/null; then ok=1; break; fi
-                sleep 3
-              done
-              if [ "$ok" -ne 1 ]; then
-                echo "::error::Health check failed for $surface"
-                exit 1
-              fi
-            done
-
-            docker image prune -f
+          docker image prune -f
