@@ -1,0 +1,79 @@
+{
+  "version": 1,
+  "metadata": {
+    "batchId": "fake-sample-001",
+    "fakeData": true,
+    "source": "assurmatch-docs-sample"
+  },
+  "partners": [
+    {
+      "legalName": "Fake Courtage CI Example",
+      "tradeName": "Fake Courtage",
+      "registrationNumber": "FAKE-CI-001",
+      "plan": "pro",
+      "status": "pending_compliance",
+      "primaryEmail": "ops@fake-courtage.example",
+      "primaryWhatsApp": "+2250000000000",
+      "quotaMonthlyLeads": 25,
+      "capacityStatus": "available"
+    }
+  ],
+  "partnerUsers": [
+    {
+      "partnerRegistrationNumber": "FAKE-CI-001",
+      "email": "owner@fake-courtage.example",
+      "displayName": "Fake Owner",
+      "role": "broker_owner_pro"
+    }
+  ],
+  "licenses": [
+    {
+      "partnerRegistrationNumber": "FAKE-CI-001",
+      "licenseNumber": "FAKE-LIC-001",
+      "issuingAuthority": "Fake Regulator",
+      "countryIsoCode": "CI",
+      "productKeys": ["auto"],
+      "status": "valid",
+      "effectiveDate": "2026-01-01",
+      "expirationDate": "2027-01-01"
+    }
+  ],
+  "coverage": [
+    {
+      "partnerRegistrationNumber": "FAKE-CI-001",
+      "countryIsoCode": "CI",
+      "productKeys": ["auto"],
+      "status": "active"
+    }
+  ],
+  "offers": [
+    {
+      "countryIsoCode": "CI",
+      "productKey": "auto",
+      "partnerRegistrationNumber": "FAKE-CI-001",
+      "publicKey": "fake-auto-basic",
+      "name": "Fake Auto Basic",
+      "shortDescription": "Fake indicative auto offer",
+      "guaranteeSummary": "Fake civil liability summary",
+      "indicativePriceMin": 10000,
+      "indicativePriceMax": 25000,
+      "currency": "XOF",
+      "pricingUnit": "year",
+      "status": "draft",
+      "validationStatus": "pending",
+      "validFrom": "2026-01-01",
+      "validUntil": "2027-01-01",
+      "isSponsored": false,
+      "displayPriority": 0,
+      "publicDisclaimers": [
+        "Fake indicative offer to be confirmed by an authorized partner."
+      ]
+    }
+  ],
+  "routingRules": [
+    {
+      "key": "fake-routing-rule",
+      "reason": "Routing rules are not imported until modeled."
+    }
+  ]
+}

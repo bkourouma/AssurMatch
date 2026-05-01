@@ -27,6 +27,7 @@
     "test:runtime:postgres:clean": "node scripts/runtime-smoke/runtime-smoke-down.mjs --volumes",
     "test:runtime:postgres:docker": "node scripts/runtime-smoke/runtime-smoke-run.mjs --with-docker",
     "local:health": "node scripts/local-app/local-health.mjs",
+    "ops:import:partners": "node --import tsx scripts/import-partners.ts",
     "test:web:local": "node scripts/local-app/local-browser-smoke.mjs",
     "test:web": "playwright test",
     "validate": "npm run typecheck && npm run lint && npm run test"
