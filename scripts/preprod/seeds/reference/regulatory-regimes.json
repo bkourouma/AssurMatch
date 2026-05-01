@@ -1,0 +1,20 @@
+[
+  {
+    "key": "cima",
+    "name": "CIMA (Conference Interafricaine des Marches d'Assurances)",
+    "scope": "regional",
+    "notes": "Regime applicable aux 9 pays initiaux du catalogue AssurMatch."
+  },
+  {
+    "key": "fanaf",
+    "name": "FANAF (Federation des Societes d'Assurances de Droit National Africaines)",
+    "scope": "regional",
+    "notes": "Reserve pour de futures additions hors-CIMA."
+  },
+  {
+    "key": "domestic-template",
+    "name": "Regime national (template)",
+    "scope": "national",
+    "notes": "Placeholder a specialiser par pays hors-CIMA si la conformite l'exige."
+  }
+]

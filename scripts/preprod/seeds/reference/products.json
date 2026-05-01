@@ -1,0 +1,227 @@
+[
+  {
+    "key": "auto",
+    "name": "Assurance auto",
+    "category": "personal-lines",
+    "defaultFlags": {
+      "product_public_enabled": false,
+      "product_quote_enabled": false,
+      "product_comparison_enabled": false,
+      "product_document_upload_enabled": false,
+      "product_sensitive_data_enabled": false,
+      "product_manual_review_required": true,
+      "product_ai_scoring_enabled": false,
+      "product_ai_form_assistant_enabled": false
+    }
+  },
+  {
+    "key": "moto",
+    "name": "Assurance moto",
+    "category": "personal-lines",
+    "defaultFlags": {
+      "product_public_enabled": false,
+      "product_quote_enabled": false,
+      "product_comparison_enabled": false,
+      "product_document_upload_enabled": false,
+      "product_sensitive_data_enabled": false,
+      "product_manual_review_required": true,
+      "product_ai_scoring_enabled": false,
+      "product_ai_form_assistant_enabled": false
+    }
+  },
+  {
+    "key": "sante",
+    "name": "Assurance sante",
+    "category": "personal-lines",
+    "defaultFlags": {
+      "product_public_enabled": false,
+      "product_quote_enabled": false,
+      "product_comparison_enabled": false,
+      "product_document_upload_enabled": false,
+      "product_sensitive_data_enabled": true,
+      "product_manual_review_required": true,
+      "product_ai_scoring_enabled": false,
+      "product_ai_form_assistant_enabled": false
+    }
+  },
+  {
+    "key": "voyage",
+    "name": "Assurance voyage",
+    "category": "personal-lines",
+    "defaultFlags": {
+      "product_public_enabled": false,
+      "product_quote_enabled": false,
+      "product_comparison_enabled": false,
+      "product_document_upload_enabled": false,
+      "product_sensitive_data_enabled": false,
+      "product_manual_review_required": true,
+      "product_ai_scoring_enabled": false,
+      "product_ai_form_assistant_enabled": false
+    }
+  },
+  {
+    "key": "habitation",
+    "name": "Assurance habitation",
+    "category": "personal-lines",
+    "defaultFlags": {
+      "product_public_enabled": false,
+      "product_quote_enabled": false,
+      "product_comparison_enabled": false,
+      "product_document_upload_enabled": false,
+      "product_sensitive_data_enabled": false,
+      "product_manual_review_required": true,
+      "product_ai_scoring_enabled": false,
+      "product_ai_form_assistant_enabled": false
+    }
+  },
+  {
+    "key": "vie-epargne",
+    "name": "Vie / epargne",
+    "category": "life-savings",
+    "defaultFlags": {
+      "product_public_enabled": false,
+      "product_quote_enabled": false,
+      "product_comparison_enabled": false,
+      "product_document_upload_enabled": false,
+      "product_sensitive_data_enabled": true,
+      "product_manual_review_required": true,
+      "product_ai_scoring_enabled": false,
+      "product_ai_form_assistant_enabled": false
+    }
+  },
+  {
+    "key": "entreprise",
+    "name": "Assurance entreprise",
+    "category": "commercial-lines",
+    "defaultFlags": {
+      "product_public_enabled": false,
+      "product_quote_enabled": false,
+      "product_comparison_enabled": false,
+      "product_document_upload_enabled": false,
+      "product_sensitive_data_enabled": false,
+      "product_manual_review_required": true,
+      "product_ai_scoring_enabled": false,
+      "product_ai_form_assistant_enabled": false
+    }
+  },
+  {
+    "key": "transport",
+    "name": "Assurance transport",
+    "category": "commercial-lines",
+    "defaultFlags": {
+      "product_public_enabled": false,
+      "product_quote_enabled": false,
+      "product_comparison_enabled": false,
+      "product_document_upload_enabled": false,
+      "product_sensitive_data_enabled": false,
+      "product_manual_review_required": true,
+      "product_ai_scoring_enabled": false,
+      "product_ai_form_assistant_enabled": false
+    }
+  },
+  {
+    "key": "agricole",
+    "name": "Assurance agricole",
+    "category": "commercial-lines",
+    "defaultFlags": {
+      "product_public_enabled": false,
+      "product_quote_enabled": false,
+      "product_comparison_enabled": false,
+      "product_document_upload_enabled": false,
+      "product_sensitive_data_enabled": false,
+      "product_manual_review_required": true,
+      "product_ai_scoring_enabled": false,
+      "product_ai_form_assistant_enabled": false
+    }
+  },
+  {
+    "key": "scolaire",
+    "name": "Assurance scolaire",
+    "category": "personal-lines",
+    "defaultFlags": {
+      "product_public_enabled": false,
+      "product_quote_enabled": false,
+      "product_comparison_enabled": false,
+      "product_document_upload_enabled": false,
+      "product_sensitive_data_enabled": false,
+      "product_manual_review_required": true,
+      "product_ai_scoring_enabled": false,
+      "product_ai_form_assistant_enabled": false
+    }
+  },
+  {
+    "key": "microassurance",
+    "name": "Microassurance",
+    "category": "microassurance",
+    "defaultFlags": {
+      "product_public_enabled": false,
+      "product_quote_enabled": false,
+      "product_comparison_enabled": false,
+      "product_document_upload_enabled": false,
+      "product_sensitive_data_enabled": false,
+      "product_manual_review_required": true,
+      "product_ai_scoring_enabled": false,
+      "product_ai_form_assistant_enabled": false
+    }
+  },
+  {
+    "key": "credit-caution",
+    "name": "Credit et caution",
+    "category": "specialty",
+    "defaultFlags": {
+      "product_public_enabled": false,
+      "product_quote_enabled": false,
+      "product_comparison_enabled": false,
+      "product_document_upload_enabled": false,
+      "product_sensitive_data_enabled": false,
+      "product_manual_review_required": true,
+      "product_ai_scoring_enabled": false,
+      "product_ai_form_assistant_enabled": false
+    }
+  },
+  {
+    "key": "cyber",
+    "name": "Cyber",
+    "category": "specialty",
+    "defaultFlags": {
+      "product_public_enabled": false,
+      "product_quote_enabled": false,
+      "product_comparison_enabled": false,
+      "product_document_upload_enabled": false,
+      "product_sensitive_data_enabled": false,
+      "product_manual_review_required": true,
+      "product_ai_scoring_enabled": false,
+      "product_ai_form_assistant_enabled": false
+    }
+  },
+  {
+    "key": "evenementiel",
+    "name": "Evenementiel",
+    "category": "specialty",
+    "defaultFlags": {
+      "product_public_enabled": false,
+      "product_quote_enabled": false,
+      "product_comparison_enabled": false,
+      "product_document_upload_enabled": false,
+      "product_sensitive_data_enabled": false,
+      "product_manual_review_required": true,
+      "product_ai_scoring_enabled": false,
+      "product_ai_form_assistant_enabled": false
+    }
+  },
+  {
+    "key": "construction",
+    "name": "Construction",
+    "category": "commercial-lines",
+    "defaultFlags": {
+      "product_public_enabled": false,
+      "product_quote_enabled": false,
+      "product_comparison_enabled": false,
+      "product_document_upload_enabled": false,
+      "product_sensitive_data_enabled": false,
+      "product_manual_review_required": true,
+      "product_ai_scoring_enabled": false,
+      "product_ai_form_assistant_enabled": false
+    }
+  }
+]

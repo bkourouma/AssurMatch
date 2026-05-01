@@ -3,7 +3,7 @@ import type { EmailRuntimeConfig } from "./email-config";
 import { classifySmtpError, SmtpEmailSender } from "./smtp-email-sender";
 
 export type EmailPurpose = "auth_activation" | "auth_password_reset";
-export type EmailDeliveryStatus = "not_configured" | "sent" | "failed";
+export type EmailDeliveryStatus = "not_configured" | "previewed" | "sent" | "failed";
 export type EmailProvider = "disabled" | "mailpit" | "smtp";
 
 export interface AuthEmailPayload {
@@ -46,6 +46,12 @@ export class RuntimeEmailDeliveryService implements AuthEmailDeliveryPort {
       return result;
     }
 
+    if (this.config.serviceType === "smtp" && this.config.previewMode) {
+      const result: AuthEmailDeliveryResult = { status: "previewed", provider: "smtp" };
+      this.auditDelivery(payload, result);
+      return result;
+    }
+
     try {
       await this.transport.send(payload);
       const result: AuthEmailDeliveryResult = { status: "sent", provider: this.config.serviceType };
@@ -81,7 +87,7 @@ export class RuntimeEmailDeliveryService implements AuthEmailDeliveryPort {
       action: `email.delivery.${result.status}`,
       targetType: "EmailDelivery",
       targetId: payload.purpose,
-      result: result.status === "sent" ? "success" : result.status === "failed" ? "failed" : "refused",
+      result: result.status === "sent" || result.status === "previewed" ? "success" : result.status === "failed" ? "failed" : "refused",
       context: {
         purpose: payload.purpose,
         recipientMasked: maskEmail(payload.to),

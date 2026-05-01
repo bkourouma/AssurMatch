@@ -1,0 +1,155 @@
+[
+  {
+    "isoCode": "BJ",
+    "name": "Benin",
+    "currency": "XOF",
+    "languages": ["fr"],
+    "timezone": "Africa/Porto-Novo",
+    "regulatoryFamily": "cima",
+    "status": "draft",
+    "flags": {
+      "country_public_enabled": false,
+      "country_quote_enabled": false,
+      "country_comparison_enabled": false,
+      "country_broker_onboarding_enabled": false,
+      "country_ai_enabled": false,
+      "country_waitlist_enabled": false
+    }
+  },
+  {
+    "isoCode": "BF",
+    "name": "Burkina Faso",
+    "currency": "XOF",
+    "languages": ["fr"],
+    "timezone": "Africa/Ouagadougou",
+    "regulatoryFamily": "cima",
+    "status": "draft",
+    "flags": {
+      "country_public_enabled": false,
+      "country_quote_enabled": false,
+      "country_comparison_enabled": false,
+      "country_broker_onboarding_enabled": false,
+      "country_ai_enabled": false,
+      "country_waitlist_enabled": false
+    }
+  },
+  {
+    "isoCode": "CM",
+    "name": "Cameroun",
+    "currency": "XAF",
+    "languages": ["fr", "en"],
+    "timezone": "Africa/Douala",
+    "regulatoryFamily": "cima",
+    "status": "draft",
+    "flags": {
+      "country_public_enabled": false,
+      "country_quote_enabled": false,
+      "country_comparison_enabled": false,
+      "country_broker_onboarding_enabled": false,
+      "country_ai_enabled": false,
+      "country_waitlist_enabled": false
+    }
+  },
+  {
+    "isoCode": "CF",
+    "name": "Republique Centrafricaine",
+    "currency": "XAF",
+    "languages": ["fr"],
+    "timezone": "Africa/Bangui",
+    "regulatoryFamily": "cima",
+    "status": "draft",
+    "flags": {
+      "country_public_enabled": false,
+      "country_quote_enabled": false,
+      "country_comparison_enabled": false,
+      "country_broker_onboarding_enabled": false,
+      "country_ai_enabled": false,
+      "country_waitlist_enabled": false
+    }
+  },
+  {
+    "isoCode": "CI",
+    "name": "Cote d'Ivoire",
+    "currency": "XOF",
+    "languages": ["fr"],
+    "timezone": "Africa/Abidjan",
+    "regulatoryFamily": "cima",
+    "status": "draft",
+    "flags": {
+      "country_public_enabled": false,
+      "country_quote_enabled": false,
+      "country_comparison_enabled": false,
+      "country_broker_onboarding_enabled": false,
+      "country_ai_enabled": false,
+      "country_waitlist_enabled": false
+    }
+  },
+  {
+    "isoCode": "GA",
+    "name": "Gabon",
+    "currency": "XAF",
+    "languages": ["fr"],
+    "timezone": "Africa/Libreville",
+    "regulatoryFamily": "cima",
+    "status": "draft",
+    "flags": {
+      "country_public_enabled": false,
+      "country_quote_enabled": false,
+      "country_comparison_enabled": false,
+      "country_broker_onboarding_enabled": false,
+      "country_ai_enabled": false,
+      "country_waitlist_enabled": false
+    }
+  },
+  {
+    "isoCode": "ML",
+    "name": "Mali",
+    "currency": "XOF",
+    "languages": ["fr"],
+    "timezone": "Africa/Bamako",
+    "regulatoryFamily": "cima",
+    "status": "draft",
+    "flags": {
+      "country_public_enabled": false,
+      "country_quote_enabled": false,
+      "country_comparison_enabled": false,
+      "country_broker_onboarding_enabled": false,
+      "country_ai_enabled": false,
+      "country_waitlist_enabled": false
+    }
+  },
+  {
+    "isoCode": "NE",
+    "name": "Niger",
+    "currency": "XOF",
+    "languages": ["fr"],
+    "timezone": "Africa/Niamey",
+    "regulatoryFamily": "cima",
+    "status": "draft",
+    "flags": {
+      "country_public_enabled": false,
+      "country_quote_enabled": false,
+      "country_comparison_enabled": false,
+      "country_broker_onboarding_enabled": false,
+      "country_ai_enabled": false,
+      "country_waitlist_enabled": false
+    }
+  },
+  {
+    "isoCode": "SN",
+    "name": "Senegal",
+    "currency": "XOF",
+    "languages": ["fr"],
+    "timezone": "Africa/Dakar",
+    "regulatoryFamily": "cima",
+    "status": "draft",
+    "flags": {
+      "country_public_enabled": false,
+      "country_quote_enabled": false,
+      "country_comparison_enabled": false,
+      "country_broker_onboarding_enabled": false,
+      "country_ai_enabled": false,
+      "country_waitlist_enabled": false
+    }
+  }
+]

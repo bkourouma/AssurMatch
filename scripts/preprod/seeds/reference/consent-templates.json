@@ -1,0 +1,20 @@
+[
+  {
+    "templateKey": "lead-transmission-fr",
+    "purpose": "lead_transmission",
+    "language": "fr",
+    "status": "draft",
+    "mode": "template",
+    "bodyTemplate": "En cochant cette case, vous acceptez que vos coordonnees ({{contactFields}}) soient transmises au courtier partenaire {{brokerName}} pour le pays {{countryName}} et le produit {{productName}}. AssurMatch est une plateforme technique de comparaison; elle n'est ni courtier ni assureur.",
+    "notes": "Modele non sensible. La version legale finale est publiee par la conformite par pays/produit avant activation publique."
+  },
+  {
+    "templateKey": "lead-transmission-en",
+    "purpose": "lead_transmission",
+    "language": "en",
+    "status": "draft",
+    "mode": "template",
+    "bodyTemplate": "By checking this box, you authorize the transmission of your contact details ({{contactFields}}) to the partner broker {{brokerName}} for {{countryName}} and product {{productName}}. AssurMatch is a technical comparison platform; it is neither a broker nor an insurer.",
+    "notes": "Template only. Final legal text is published per country/product by compliance before public activation."
+  }
+]

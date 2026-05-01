@@ -5,7 +5,7 @@ import type { AuthEmailDeliveryPort, AuthEmailPayload } from "./email/email-deli
 export type { AuthEmailDeliveryPort, AuthEmailPayload } from "./email/email-delivery.service";
 
 export interface AuthTokenDeliveryResult {
-  emailStatus: "not_configured" | "sent" | "failed";
+  emailStatus: "not_configured" | "previewed" | "sent" | "failed";
   token?: string;
 }
 

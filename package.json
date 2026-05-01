@@ -30,6 +30,8 @@
     "ops:import:partners": "node --import tsx scripts/import-partners.ts",
     "test:web:local": "node scripts/local-app/local-browser-smoke.mjs",
     "test:web": "playwright test",
+    "seed:reference": "node --import tsx scripts/preprod/seed-reference.ts",
+    "import:partners": "node --import tsx scripts/preprod/import-partners.ts",
     "validate": "npm run typecheck && npm run lint && npm run test"
   },
   "dependencies": {
