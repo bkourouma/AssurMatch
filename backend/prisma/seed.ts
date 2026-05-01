@@ -1,6 +1,10 @@
 import { PrismaClient } from "@prisma/client";
+import { PrismaPg } from "@prisma/adapter-pg";
 
-const prisma = new PrismaClient();
+const databaseUrl = process.env.DATABASE_URL;
+if (!databaseUrl) throw new Error("DATABASE_URL is required for Prisma seed");
+
+const prisma = new PrismaClient({ adapter: new PrismaPg(databaseUrl) });
 
 const disabledFlags = [
   "public_comparator_enabled",
@@ -26,21 +30,29 @@ const disabledFlags = [
 
 async function main(): Promise<void> {
   for (const key of disabledFlags) {
-    await prisma.featureFlag.upsert({
-      where: { key_scopeType_scopeId: { key, scopeType: "global", scopeId: null } },
-      create: {
-        key,
-        scopeType: "global",
-        value: false,
-        defaultValue: false,
-        reason: "Safe disabled default for local development seed"
-      },
-      update: {
-        value: false,
-        defaultValue: false,
-        reason: "Safe disabled default for local development seed"
-      }
+    const existingFlag = await prisma.featureFlag.findFirst({
+      where: { key, scopeType: "global", scopeId: null }
     });
+    if (existingFlag) {
+      await prisma.featureFlag.update({
+        where: { id: existingFlag.id },
+        data: {
+          value: false,
+          defaultValue: false,
+          reason: "Safe disabled default for local development seed"
+        }
+      });
+    } else {
+      await prisma.featureFlag.create({
+        data: {
+          key,
+          scopeType: "global",
+          value: false,
+          defaultValue: false,
+          reason: "Safe disabled default for local development seed"
+        }
+      });
+    }
   }
 
   await prisma.country.upsert({
