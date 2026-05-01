@@ -56,12 +56,23 @@ export function runDockerCompose(args, options = {}) {
   }
 }
 
-export function maskDatabaseUrl(url = process.env.DATABASE_URL ?? defaultDatabaseUrl()) {
+export function maskUrl(url) {
   try {
     const parsed = new URL(url);
+    if (parsed.username) parsed.username = "***";
     if (parsed.password) parsed.password = "***";
     return parsed.toString();
   } catch {
-    return "<invalid DATABASE_URL>";
+    return "<invalid URL>";
   }
+}
+
+export function maskDatabaseUrl(url = process.env.DATABASE_URL ?? defaultDatabaseUrl()) {
+  const masked = maskUrl(url);
+  return masked === "<invalid URL>" ? "<invalid DATABASE_URL>" : masked;
+}
+
+export function maskRedisUrl(url = process.env.REDIS_URL ?? redisUrl) {
+  const masked = maskUrl(url);
+  return masked === "<invalid URL>" ? "<invalid REDIS_URL>" : masked;
 }
