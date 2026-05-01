@@ -30,6 +30,7 @@ yarn-error.log*
 pnpm-debug.log*
 
 # Local caches and temp files
+.local/
 .cache/
 .parcel-cache/
 .eslintcache
