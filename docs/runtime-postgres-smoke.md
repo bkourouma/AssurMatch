@@ -1,36 +1,93 @@
 # Runtime PostgreSQL Smoke Tests
 
 This suite proves that the AssurMatch backend can start outside `NODE_ENV=test`
-with real PostgreSQL and Prisma-runtime repositories.
+with real PostgreSQL and Prisma-runtime repositories. It must run against the
+dedicated runtime smoke Docker Compose environment by default, not a local
+PostgreSQL service on `5432`.
 
-## Required Environment
+## Dedicated Docker Smoke Environment
 
-```powershell
-$env:NODE_ENV="runtime-smoke"
-$env:APP_ENV="runtime-smoke"
-$env:ASSURMATCH_RUNTIME_SMOKE="true"
-$env:DATABASE_URL="postgresql://assurmatch:assurmatch@localhost:5432/assurmatch_runtime_smoke"
-```
-
-`DATABASE_URL` must point to a dedicated smoke database and include a smoke
-marker in the database name or query string. Production-like targets are
-rejected before migrations or seed.
-
-`REDIS_URL` is optional for this PostgreSQL smoke suite. If supplied, it must
-point to a disposable runtime-smoke Redis instance.
-
-## Local Docker
+Start PostgreSQL and Redis smoke services:
 
 ```powershell
-docker compose up -d postgres
+npm run test:runtime:postgres:up
 ```
 
-Create a dedicated database such as `assurmatch_runtime_smoke` in that
-PostgreSQL instance, then run:
+Default smoke targets:
+
+```text
+PostgreSQL: localhost:55432
+Redis:      localhost:56379
+Database:   assurmatch_runtime_smoke
+User:       assurmatch_smoke
+Password:   assurmatch_smoke
+```
+
+The credentials above are non-sensitive local/CI smoke credentials. Do not
+replace them with production, staging, preproduction or personal credentials.
+
+## Run The Smoke
 
 ```powershell
 npm run test:runtime:postgres
 ```
+
+The npm wrapper provides safe defaults when the operator has not already set
+them. The sanitized target looks like:
+
+```text
+NODE_ENV=runtime-smoke
+APP_ENV=runtime-smoke
+ASSURMATCH_RUNTIME_SMOKE=true
+DATABASE_URL=postgresql://assurmatch_smoke:***@localhost:55432/assurmatch_runtime_smoke
+REDIS_URL=redis://localhost:56379
+```
+
+The runner logs a sanitized database target and never needs the Windows/local
+PostgreSQL service on `127.0.0.1:5432`.
+
+## Full Local Lifecycle
+
+```powershell
+npm run test:runtime:postgres:docker
+```
+
+This starts the dedicated Docker services, runs the runtime PostgreSQL smoke and
+stops the smoke containers afterward.
+
+## Stop And Cleanup
+
+Stop smoke containers while keeping smoke volumes:
+
+```powershell
+npm run test:runtime:postgres:down
+```
+
+Stop smoke containers and remove smoke-scoped volumes:
+
+```powershell
+npm run test:runtime:postgres:clean
+```
+
+Both commands use the dedicated Compose project and file. They must not target
+non-smoke Docker resources.
+
+## Guardrails
+
+The smoke refuses to start before migrations, seed or HTTP calls when:
+
+- `NODE_ENV=test`;
+- `DATABASE_URL` is missing or invalid;
+- the database name does not contain `smoke`;
+- `DATABASE_URL` contains `schema=runtime_smoke`;
+- the target is `localhost:5432` or `127.0.0.1:5432` without explicit override;
+- the target looks production-like, including `prod`, `production`, `staging`,
+  `preprod` or `live`;
+- any `ASSURMATCH_*_MEMORY=true` variable is present.
+
+If an operator explicitly allows `localhost:5432` for a dedicated smoke
+database, the override must be documented in that environment. It is never the
+default.
 
 ## Covered Scenarios
 
@@ -44,15 +101,23 @@ npm run test:runtime:postgres
 - sensitive feature flags fail-closed;
 - durable audit in DB and admin audit endpoint.
 
-## Cleanup
+## Port Conflicts
 
-Every run uses a generated smoke run id and synthetic data. Cleanup is scoped to
-that run id, synthetic prefixes and related IDs. Set
-`ASSURMATCH_RUNTIME_SMOKE_KEEP_DATA=true` only for debugging a dedicated smoke
-database.
+If `55432` or `56379` is already occupied, the Docker start command fails. Free
+the port or set an explicit smoke port override for both the Compose command and
+the smoke runner. Do not fall back to `5432` or `6379`.
 
 ## CI
 
-CI can run this as a separate job with an ephemeral PostgreSQL service, migration
-deploy, then `npm run test:runtime:postgres`. Keep logs sanitized; the runner
-does not print full credentials.
+CI can run the same command contract:
+
+```bash
+npm ci
+npm run test:runtime:postgres:up
+npm run test:runtime:postgres
+npm run test:runtime:postgres:down
+```
+
+If Docker is unavailable in a runner, validate the guardrail tests and run the
+Docker smoke on a Docker-capable runner. This is an environment limitation, not
+a code failure.

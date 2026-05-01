@@ -3,9 +3,9 @@
 **Feature Branch**: `020-runtime-smoke-docker-compose`
 **Created**: 2026-04-30
 **Status**: Draft
-**Input**: User description: "Creer la specification technique 020-runtime-smoke-docker-compose pour AssurMatch. Objectif: rendre le smoke PostgreSQL runtime entierement reproductible en local et en CI grace a une configuration Docker Compose dediee qui demarre PostgreSQL et Redis smoke sur des ports non conflictuels, fournit une DATABASE_URL correcte, et evite les erreurs liees au PostgreSQL local de la machine. Ne genere pas le plan. Ne genere pas tasks.md. N'implemente rien."
-**Validation State**: Draft
-**Continuous Workflow Eligible**: No - cette invocation est limitee a la specification; le user a explicitement demande de ne pas generer le plan, les taches ni l'implementation.
+**Input**: User description: "Creer la specification technique 020-runtime-smoke-docker-compose, puis enchainer automatiquement avec /speckit.plan, /speckit.tasks et /speckit.implement, sans s'arreter entre les etapes sauf blocage critique, conflit constitutionnel, risque de conformite ou risque de fuite de secrets. Standardiser l'environnement smoke PostgreSQL runtime avec Docker Compose dedie, PostgreSQL sur 55432, Redis sur 56379, DATABASE_URL smoke correcte, guardrails contre NODE_ENV=test, ?schema=runtime_smoke, localhost:5432 par defaut, ASSURMATCH_*_MEMORY=true, cibles production/staging/preprod/live, et documentation quickstart. Ne pas faire de commit automatiquement."
+**Validation State**: Explicitly approved
+**Continuous Workflow Eligible**: Yes - standard runtime hardening feature explicitly approved for continuous plan, tasks, implementation and final validations; contains no `[NEEDS CLARIFICATION]` markers. Do not commit automatically.
 
 ## Constitutional Scope & Compliance *(mandatory)*
 
@@ -21,7 +21,7 @@
 - **Routing impact**: Aucun changement de routage. L'environnement smoke sert uniquement a executer les regles existantes avec PostgreSQL et Redis dedies.
 - **AI impact**: N/A. Aucun module IA, prompt, appel modele, scoring, recommandation ou validation humaine IA n'est introduit.
 - **UX/content restrictions**: Aucun contenu public, CTA ou wording commercial n'est ajoute. La feature ne doit pas introduire les formulations interdites par la constitution.
-- **Workflow continuity**: Apres validation explicite et absence de marqueur de clarification, cette feature technique standard pourra passer a `/speckit.plan`, puis `/speckit.tasks`, puis `/speckit.implement`, sauf conflit constitutionnel, risque securite/conformite/donnees, activation interdite, decision produit non couverte ou validation bloquante. Aucun commit automatique apres implementation sans demande explicite.
+- **Workflow continuity**: Cette feature technique standard est explicitement approuvee pour enchainer `/speckit.plan`, puis `/speckit.tasks`, puis `/speckit.implement` et les validations finales sans confirmation intermediaire. S'arreter seulement en cas de conflit constitutionnel, risque securite/conformite/donnees, fuite de secrets, activation interdite, decision produit non couverte ou validation bloquante. Aucun commit automatique.
 
 ## User Scenarios & Testing *(mandatory)*
 
@@ -75,6 +75,7 @@ Comme mainteneur, je veux que le smoke refuse les modes d'execution incompatible
 3. **Given** `DATABASE_URL` contient un indicateur production, preproduction partagee ou staging non dedie, **When** le smoke demarre, **Then** il est refuse avant toute connexion destructrice.
 4. **Given** une configuration tente d'utiliser une base smoke via query schema au lieu d'un nom de base smoke, **When** le guardrail s'execute, **Then** le refus mentionne explicitement l'interdiction de `?schema=runtime_smoke`.
 5. **Given** un override autorise explicitement `localhost:5432`, **When** il est utilise, **Then** le message de lancement doit rendre cette exception visible et auditable dans les logs smoke.
+6. **Given** une variable `ASSURMATCH_*_MEMORY=true` est presente, **When** le smoke demarre, **Then** il est refuse avant toute connexion afin de garantir l'usage du runtime PostgreSQL reel.
 
 ---
 
@@ -124,6 +125,7 @@ Comme nouvel arrivant ou mainteneur CI, je veux une documentation claire afin de
 - Redis smoke indisponible: la suite echoue ou degrade uniquement si le contrat runtime le permet explicitement, sans pointer vers Redis local par defaut.
 - Cleanup apres echec partiel: idempotent, cible uniquement les containers, volumes et reseaux smoke.
 - Execution CI parallele: les noms de projet, containers, reseaux ou volumes doivent pouvoir eviter les collisions ou documenter la contrainte d'unicite.
+- Une variable `ASSURMATCH_*_MEMORY=true` est presente: le smoke est refuse afin d'empecher les adapters memoire hors test.
 - Logs CI: ils ne doivent pas afficher une `DATABASE_URL` complete avec mot de passe, meme non sensible, afin de conserver une discipline de secret handling.
 
 ## Requirements *(mandatory)*
@@ -155,6 +157,9 @@ Comme nouvel arrivant ou mainteneur CI, je veux une documentation claire afin de
 - **FR-023**: Les commandes npm DOIVENT etre mises a jour si necessaire pour exposer un parcours operateur simple: start, test, stop et cleanup.
 - **FR-024**: Le workflow NE DOIT PAS modifier le schema Prisma, les regles metier, les routes frontend ou les comportements de paiement, souscription, emission, signature, sinistres, SMTP reel ou CI/CD global.
 - **FR-025**: Un test, guardrail ou validation executable DOIT prouver le refus de `localhost:5432` par defaut lorsque l'autorisation explicite n'est pas presente.
+- **FR-026**: Le smoke DOIT refuser toute variable `ASSURMATCH_*_MEMORY=true` afin de garantir que les adapters memoire ne sont pas utilises.
+- **FR-027**: Un script npm dedie DOIT lancer le smoke complet avec demarrage de l'environnement, execution du smoke runtime reel et arret/cleanup documente.
+- **FR-028**: Le workflow DOIT privilegier Windows PowerShell lorsque possible, tout en restant utilisable en CI GitHub Actions sans secret reel.
 
 ### Configuration Requirements
 
@@ -168,6 +173,7 @@ Comme nouvel arrivant ou mainteneur CI, je veux une documentation claire afin de
 - **CFG-008**: Les scripts doivent pouvoir definir ou exporter les variables minimales sans masquer les erreurs de configuration fournies par l'operateur.
 - **CFG-009**: Les noms de containers, reseaux et volumes doivent etre reconnaissables comme smoke afin d'eviter les suppressions accidentelles hors scope.
 - **CFG-010**: Toute autorisation exceptionnelle de `localhost:5432` doit etre explicite, documentee et absente du comportement par defaut.
+- **CFG-011**: Les variables `ASSURMATCH_*_MEMORY=true` sont incompatibles avec ce smoke runtime.
 
 ### Security Requirements
 
@@ -178,6 +184,7 @@ Comme nouvel arrivant ou mainteneur CI, je veux une documentation claire afin de
 - **SEC-005**: Les donnees de test doivent rester synthetiques; aucune PII reelle ne doit etre requise pour lancer le smoke.
 - **SEC-006**: Les guardrails doivent echouer ferme avant migration, seed ou suppression lorsqu'une configuration est ambigue.
 - **SEC-007**: Les exceptions de securite, notamment l'autorisation d'un port local par defaut, doivent etre visibles dans les logs smoke afin de faciliter la revue.
+- **SEC-008**: Aucun secret reel ne doit etre ajoute aux fichiers Compose, scripts, documentation, tests ou exemples.
 
 ### Documentation Requirements
 
@@ -187,6 +194,7 @@ Comme nouvel arrivant ou mainteneur CI, je veux une documentation claire afin de
 - **DOC-004**: `docs/runtime-postgres-smoke.md` DOIT expliquer que `5432` n'est plus la cible par defaut du smoke runtime.
 - **DOC-005**: La documentation DOIT decrire la strategie CI minimale sans refonte globale du pipeline.
 - **DOC-006**: La documentation DOIT indiquer comment conserver temporairement les donnees smoke pour diagnostic puis les nettoyer.
+- **DOC-007**: La documentation DOIT inclure les commandes Windows PowerShell et les commandes CI pertinentes lorsque possible.
 
 ### Key Entities *(include if feature involves data)*
 
@@ -213,6 +221,7 @@ Comme nouvel arrivant ou mainteneur CI, je veux une documentation claire afin de
 - **SC-008**: Un developpeur equipe de Docker et Node peut suivre le quickstart et lancer start -> test -> stop en moins de 15 minutes.
 - **SC-009**: 0 secret production, credential personnel, token ou `DATABASE_URL` complete avec mot de passe n'apparait dans la documentation, les scripts ou les logs attendus.
 - **SC-010**: 0 changement de schema Prisma, regle metier, paiement, souscription, emission, signature, sinistre, SMTP reel ou refonte CI/CD globale n'est introduit par cette feature.
+- **SC-011**: 100% des tentatives avec `ASSURMATCH_*_MEMORY=true` sont refusees avant lancement du smoke runtime.
 
 ## Assumptions
 
@@ -234,7 +243,7 @@ Comme nouvel arrivant ou mainteneur CI, je veux une documentation claire afin de
 
 ## Out Of Scope
 
-- Generation de `plan.md`, generation de `tasks.md`, implementation ou commit automatique dans cette invocation.
+- Commit automatique dans cette invocation.
 - Nouvelle fonctionnalite metier.
 - Changement du schema Prisma.
 - Changement des regles metier, de consentement, de routage ou de licence courtier.

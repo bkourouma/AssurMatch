@@ -20,7 +20,12 @@
     "test:integration": "vitest run backend/tests/integration",
     "test:contract": "vitest run backend/tests/contract",
     "test:guardrails": "vitest run backend/tests/guardrails",
-    "test:runtime:postgres": "node --import tsx backend/tests/runtime-postgres/run-runtime-postgres-smoke.ts",
+    "test:runtime:postgres": "node scripts/runtime-smoke/runtime-smoke-run.mjs",
+    "test:runtime:postgres:direct": "node --import tsx backend/tests/runtime-postgres/run-runtime-postgres-smoke.ts",
+    "test:runtime:postgres:up": "node scripts/runtime-smoke/runtime-smoke-up.mjs",
+    "test:runtime:postgres:down": "node scripts/runtime-smoke/runtime-smoke-down.mjs",
+    "test:runtime:postgres:clean": "node scripts/runtime-smoke/runtime-smoke-down.mjs --volumes",
+    "test:runtime:postgres:docker": "node scripts/runtime-smoke/runtime-smoke-run.mjs --with-docker",
     "test:web": "playwright test",
     "validate": "npm run typecheck && npm run lint && npm run test"
   },
