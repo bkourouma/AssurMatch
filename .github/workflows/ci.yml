@@ -54,20 +54,7 @@ jobs:
           fetch-depth: 0
       - name: Forbid real SMTP password in tracked files
         run: |
-          set -e
-          # EMAIL_SMTP_PASS may only be empty or REDACTED
-          if grep -RInE 'EMAIL_SMTP_PASS=([^R\s]|R[^E]|RE[^D]|RED[^A]|REDA[^C]|REDAC[^T]|REDACT[^E]|REDACTE[^D])' \
-              --exclude-dir=node_modules --exclude-dir=.git --exclude=package-lock.json . ; then
-            echo "::error::A non-REDACTED EMAIL_SMTP_PASS value was found in tracked files."
-            exit 1
-          fi
-          # No private OpenSSH key blocks in the repo
-          if grep -RIn 'BEGIN OPENSSH PRIVATE KEY\|BEGIN RSA PRIVATE KEY\|BEGIN EC PRIVATE KEY' \
-              --exclude-dir=node_modules --exclude-dir=.git --exclude=package-lock.json . ; then
-            echo "::error::A private key block was found in tracked files."
-            exit 1
-          fi
-          echo "Secret scan OK."
+          node scripts/ci/secret-scan.mjs
 
   build-and-deploy:
     needs: [verify, secret-scan]

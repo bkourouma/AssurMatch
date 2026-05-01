@@ -49,6 +49,33 @@ describe("RuntimeEmailDeliveryService", () => {
     expect(JSON.stringify(audit.all())).not.toContain("super-secret-token");
   });
 
+  it("does not call SMTP transport when preview mode is enabled", async () => {
+    const audit = new AuditLogWriter();
+    let calls = 0;
+    const service = new RuntimeEmailDeliveryService({
+      serviceType: "smtp",
+      from: "no-reply@example.com",
+      smtpHost: "smtp.example.com",
+      smtpPort: 587,
+      smtpUser: "sender@example.com",
+      smtpPass: "runtime-only-secret",
+      smtpSecure: false,
+      sendTimeoutMs: 5000,
+      previewMode: true
+    }, audit, { send: async () => { calls += 1; } });
+
+    await expect(service.send(payload)).resolves.toEqual({ status: "previewed", provider: "smtp" });
+    expect(calls).toBe(0);
+    const entry = audit.search({ action: "email.delivery.previewed" })[0];
+    expect(entry?.context).toMatchObject({
+      purpose: "auth_activation",
+      provider: "smtp",
+      status: "previewed"
+    });
+    expect(JSON.stringify(audit.all())).not.toContain("super-secret-token");
+    expect(JSON.stringify(audit.all())).not.toContain("recipient@example.test");
+  });
+
   it("maps transport failures to safe error classes", async () => {
     const audit = new AuditLogWriter();
     const service = new RuntimeEmailDeliveryService({

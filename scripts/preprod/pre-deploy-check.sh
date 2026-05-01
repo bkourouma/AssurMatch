@@ -38,8 +38,32 @@ APP_ENV_VALUE=$(grep -E '^APP_ENV=' "$ENV_FILE" | tail -n1 | sed -E 's/^APP_ENV=
 DB_URL=$(grep -E '^DATABASE_URL=' "$ENV_FILE" | tail -n1 | sed -E 's/^DATABASE_URL=//' | tr -d '\r')
 if [ "$APP_ENV_VALUE" = "preproduction" ]; then
   case "$DB_URL" in
-    *prod*|*production*|*live*) echo "[pre-deploy] preproduction APP_ENV with production-like DATABASE_URL" >&2; exit 1 ;;
+    *preprod*|*preproduction*) ;;
+    *production*|*live*) echo "[pre-deploy] preproduction APP_ENV with production-like DATABASE_URL" >&2; exit 1 ;;
   esac
+fi
+
+EMAIL_SERVICE_TYPE=$(grep -E '^EMAIL_SERVICE_TYPE=' "$ENV_FILE" | tail -n1 | sed -E 's/^EMAIL_SERVICE_TYPE=//' | tr -d '\r')
+EMAIL_PREVIEW_MODE=$(grep -E '^EMAIL_PREVIEW_MODE=' "$ENV_FILE" | tail -n1 | sed -E 's/^EMAIL_PREVIEW_MODE=//' | tr -d '\r')
+if [ "$EMAIL_SERVICE_TYPE" = "smtp" ]; then
+  EMAIL_MISSING=""
+  for var in EMAIL_FROM EMAIL_SMTP_HOST EMAIL_SMTP_PORT EMAIL_SMTP_USER EMAIL_SMTP_PASS; do
+    value=$(grep -E "^${var}=" "$ENV_FILE" | tail -n1 | sed -E "s/^${var}=//" | tr -d '\r')
+    if [ -z "$value" ] || [ "$value" = "REDACTED" ]; then
+      EMAIL_MISSING="$EMAIL_MISSING $var"
+    fi
+  done
+  if [ -n "$EMAIL_MISSING" ]; then
+    echo "[pre-deploy] Missing or REDACTED SMTP env vars:$EMAIL_MISSING" >&2
+    exit 1
+  fi
+  if [ "$EMAIL_PREVIEW_MODE" = "true" ]; then
+    echo "[pre-deploy] EMAIL_PREVIEW_MODE=true; runtime will audit previewed SMTP emails without sending."
+  fi
+fi
+if [ "$EMAIL_SERVICE_TYPE" = "mailpit" ] && [ "$APP_ENV_VALUE" = "production" ]; then
+  echo "[pre-deploy] EMAIL_SERVICE_TYPE=mailpit is forbidden when APP_ENV=production" >&2
+  exit 1
 fi
 
 # Sensitive flags must remain false in env file (defense in depth; the runtime validates too)
