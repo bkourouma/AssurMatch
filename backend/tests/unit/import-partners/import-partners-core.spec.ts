@@ -65,7 +65,7 @@ const fakePayload = {
   routingRules: [{ key: "fake-routing-rule", reason: "Not modeled yet" }]
 };
 
-function payloadText(input = fakePayload): string {
+function payloadText(input: unknown = fakePayload): string {
   return JSON.stringify(input);
 }
 
@@ -86,6 +86,40 @@ describe("secure partner import core", () => {
     const badEmailPayload = structuredClone(fakePayload);
     badEmailPayload.partners[0]!.primaryEmail = "person@gmail.com";
     expect(() => parsePartnerImportPayload(payloadText(badEmailPayload))).toThrow();
+  });
+
+  it("rejects unknown partner fields before they can hide secret-like values", () => {
+    const payload = mutablePayload();
+    records(payload, "partners")[0]!.unexpectedToken = "ghp_abcdefghijklmnopqrstuvwxyz123456";
+    expect(() => parsePartnerImportPayload(payloadText(payload))).toThrow(/secret-like/i);
+  });
+
+  it("rejects unknown offer fields", () => {
+    const payload = mutablePayload();
+    records(payload, "offers")[0]!.unexpectedOfferField = "fake-extra-value";
+    expect(() => parsePartnerImportPayload(payloadText(payload))).toThrow();
+  });
+
+  it("rejects unknown license fields", () => {
+    const payload = mutablePayload();
+    records(payload, "licenses")[0]!.unexpectedLicenseField = "fake-extra-value";
+    expect(() => parsePartnerImportPayload(payloadText(payload))).toThrow();
+  });
+
+  it("rejects unknown partner user fields", () => {
+    const payload = mutablePayload();
+    records(payload, "partnerUsers")[0]!.unexpectedUserField = "fake-extra-value";
+    expect(() => parsePartnerImportPayload(payloadText(payload))).toThrow();
+  });
+
+  it("rejects known fields containing secret-like values", () => {
+    const payload = mutablePayload();
+    records(payload, "partners")[0]!.legalName = "ghp_abcdefghijklmnopqrstuvwxyz123456";
+    expect(() => parsePartnerImportPayload(payloadText(payload))).toThrow(/secret-like/i);
+  });
+
+  it("continues to accept valid fake payloads", () => {
+    expect(parsePartnerImportPayload(payloadText()).metadata.fakeData).toBe(true);
   });
 
   it("dry-runs by default without audit writes", async () => {
@@ -127,3 +161,11 @@ describe("secure partner import core", () => {
     ]);
   });
 });
+
+function mutablePayload(): Record<string, unknown> {
+  return structuredClone(fakePayload) as unknown as Record<string, unknown>;
+}
+
+function records(payload: Record<string, unknown>, key: string): Array<Record<string, unknown>> {
+  return payload[key] as Array<Record<string, unknown>>;
+}

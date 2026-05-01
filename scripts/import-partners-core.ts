@@ -17,14 +17,14 @@ const partnerSchema = z.object({
   primaryWhatsApp: z.string().regex(/^\+2250{6,12}$/),
   quotaMonthlyLeads: z.number().int().min(0).default(0),
   capacityStatus: z.enum(["available", "limited", "full", "blocked"]).default("available")
-});
+}).strict();
 
 const partnerUserSchema = z.object({
   partnerRegistrationNumber: z.string().min(3),
   email: allowedEmail,
   displayName: z.string().min(2),
   role: z.enum(["broker_owner_starter", "broker_owner_pro", "broker_manager", "broker_agent", "broker_readonly"])
-});
+}).strict();
 
 const licenseSchema = z.object({
   partnerRegistrationNumber: z.string().min(3),
@@ -35,14 +35,14 @@ const licenseSchema = z.object({
   status: z.enum(["draft", "pending_review", "valid", "expired", "suspended", "invalid", "revoked"]),
   effectiveDate: dateOnly,
   expirationDate: dateOnly
-}).refine((license) => license.expirationDate > license.effectiveDate, "expirationDate must be after effectiveDate");
+}).strict().refine((license) => license.expirationDate > license.effectiveDate, "expirationDate must be after effectiveDate");
 
 const coverageSchema = z.object({
   partnerRegistrationNumber: z.string().min(3),
   countryIsoCode: z.string().length(2),
   productKeys: z.array(z.string().min(2)).default([]),
   status: z.enum(["pending", "active", "suspended"]).default("active")
-});
+}).strict();
 
 const offerSchema = z.object({
   countryIsoCode: z.string().length(2),
@@ -64,12 +64,12 @@ const offerSchema = z.object({
   sponsorLabel: z.string().min(1).optional(),
   displayPriority: z.number().int().default(0),
   publicDisclaimers: z.array(z.string().min(3)).min(1)
-}).refine((offer) => offer.validUntil > offer.validFrom, "validUntil must be after validFrom");
+}).strict().refine((offer) => offer.validUntil > offer.validFrom, "validUntil must be after validFrom");
 
 const routingRuleSchema = z.object({
   key: z.string().min(3),
   reason: z.string().min(3)
-});
+}).strict();
 
 export const partnerImportPayloadSchema = z.object({
   version: z.literal(1),
@@ -77,14 +77,14 @@ export const partnerImportPayloadSchema = z.object({
     batchId: z.string().min(3),
     fakeData: z.literal(true),
     source: z.string().min(3)
-  }),
+  }).strict(),
   partners: z.array(partnerSchema).default([]),
   partnerUsers: z.array(partnerUserSchema).default([]),
   licenses: z.array(licenseSchema).default([]),
   coverage: z.array(coverageSchema).default([]),
   offers: z.array(offerSchema).default([]),
   routingRules: z.array(routingRuleSchema).default([])
-});
+}).strict();
 
 export type PartnerImportPayload = z.infer<typeof partnerImportPayloadSchema>;
 export type PartnerInput = z.infer<typeof partnerSchema>;
@@ -144,6 +144,7 @@ export function verifySha256(input: string | Buffer, expectedChecksum: string): 
 
 export function parsePartnerImportPayload(rawInput: string): PartnerImportPayload {
   const parsedJson = JSON.parse(rawInput) as unknown;
+  assertNoSecretLikeValues(parsedJson);
   const payload = partnerImportPayloadSchema.parse(parsedJson);
   assertNoSecretLikeValues(payload);
   return payload;
@@ -255,7 +256,7 @@ function countLogicalRecords(payload: PartnerImportPayload): number {
     payload.routingRules.length;
 }
 
-function assertNoSecretLikeValues(payload: PartnerImportPayload): void {
+function assertNoSecretLikeValues(payload: unknown): void {
   const textValues = collectStrings(payload);
   const secretPatterns = [
     /-----BEGIN [A-Z ]*PRIVATE KEY-----/,
