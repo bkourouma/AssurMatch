@@ -3,6 +3,8 @@ import { isAdminProfile, loginRedirect, readBackOfficeSession } from "../lib/bac
 import { readAdminUsers, type AdminUser } from "../lib/admin-api";
 import { CreateUserForm } from "./user-action-forms";
 import { adminRoleOptions, userStatusOptions } from "./user-options";
+import { Badge, Card, DataTable, PageHeader, StateMessage } from "../lib/ui/admin-ui";
+import { roleLabel } from "../lib/ui/admin-view-models";
 
 interface UsersPageProps {
   searchParams?: Promise<Record<string, string | string[] | undefined>>;
@@ -39,85 +41,70 @@ export default async function UserManagementPage({ searchParams }: UsersPageProp
   const filtered = users.data.filter((user) => includesSearch(user, search));
 
   return (
-    <main style={{ maxWidth: 1240, margin: "0 auto", padding: "32px 20px", fontFamily: "system-ui, sans-serif", color: "#172033" }}>
-      <header style={{ display: "flex", justifyContent: "space-between", gap: 16, alignItems: "flex-start", marginBottom: 24 }}>
-        <div>
-          <p style={{ margin: "0 0 8px", color: "#516070", fontSize: 14 }}>Back-office plateforme</p>
-          <h1 style={{ margin: 0, fontSize: 32 }}>Utilisateurs et roles</h1>
-          <p style={{ maxWidth: 720, lineHeight: 1.55 }}>
-            Gestion persistee des comptes, roles, scopes, statuts, MFA et actions sensibles. Les changements sont valides et audites cote API.
-          </p>
-        </div>
-        <a href="/" style={{ color: "#245f73" }}>Retour admin</a>
-      </header>
+    <div className="page-stack">
+      <PageHeader
+        kicker="Back-office plateforme"
+        title="Utilisateurs et roles"
+        description="Gestion persistee des comptes, roles, scopes, statuts, MFA et actions sensibles. Les changements sont valides et audites cote API."
+        actions={<a className="button button--secondary" href="/">Retour admin</a>}
+      />
 
-      {notice ? <p role="status">Action terminee: {notice}.</p> : null}
-      {users.forbidden ? <p role="alert">Acces refuse: votre role ne permet pas de lire les utilisateurs.</p> : null}
-      {users.status === "error" ? <p role="status">Liste indisponible: {users.error}.</p> : null}
+      {notice ? <StateMessage>Action terminee: {notice}.</StateMessage> : null}
+      {users.forbidden ? <StateMessage tone="danger">Acces refuse: votre role ne permet pas de lire les utilisateurs.</StateMessage> : null}
+      {users.status === "error" ? <StateMessage tone="danger">Liste indisponible: {users.error}.</StateMessage> : null}
 
-      <section style={{ display: "grid", gridTemplateColumns: "minmax(0, 2fr) minmax(320px, 1fr)", gap: 18, alignItems: "start" }}>
+      <section className="split-layout">
         <div style={{ display: "grid", gap: 16 }}>
-          <form action="/users" style={{ display: "grid", gridTemplateColumns: "minmax(220px, 1fr) 180px 220px auto", gap: 10, alignItems: "end", border: "1px solid #d7dde4", borderRadius: 6, padding: 14 }}>
-            <label style={{ display: "grid", gap: 6 }}>
+          <form action="/users" className="admin-card admin-card__body form-grid" aria-label="Filtres utilisateurs">
+            <label className="field">
               Recherche
-              <input name="search" defaultValue={search} placeholder="Email, nom, tenant, role" style={{ minHeight: 38, border: "1px solid #b9c3cf", borderRadius: 6, padding: "0 10px" }} />
+              <input name="search" defaultValue={search} placeholder="Email, nom, tenant, role" />
             </label>
-            <label style={{ display: "grid", gap: 6 }}>
+            <label className="field">
               Statut
-              <select name="status" defaultValue={status} style={{ minHeight: 40, border: "1px solid #b9c3cf", borderRadius: 6, padding: "0 10px" }}>
+              <select name="status" defaultValue={status}>
                 <option value="">Tous</option>
                 {userStatusOptions.map((option) => <option key={option} value={option}>{option}</option>)}
               </select>
             </label>
-            <label style={{ display: "grid", gap: 6 }}>
+            <label className="field">
               Role
-              <select name="role" defaultValue={role} style={{ minHeight: 40, border: "1px solid #b9c3cf", borderRadius: 6, padding: "0 10px" }}>
+              <select name="role" defaultValue={role}>
                 <option value="">Tous</option>
                 {adminRoleOptions.map((option) => <option key={option} value={option}>{option}</option>)}
               </select>
             </label>
-            <button type="submit" style={{ minHeight: 40, border: "1px solid #245f73", background: "#245f73", color: "#fff", borderRadius: 6 }}>Filtrer</button>
+            <button className="button" type="submit">Filtrer</button>
           </form>
 
-          <section aria-label="Liste utilisateurs" style={{ overflowX: "auto", border: "1px solid #d7dde4", borderRadius: 6 }}>
-            <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 14 }}>
-              <thead>
-                <tr style={{ textAlign: "left", background: "#f6f8fb" }}>
-                  <th style={{ padding: 10 }}>Utilisateur</th>
-                  <th style={{ padding: 10 }}>Roles</th>
-                  <th style={{ padding: 10 }}>Statut</th>
-                  <th style={{ padding: 10 }}>MFA</th>
-                  <th style={{ padding: 10 }}>Derniere connexion</th>
-                  <th style={{ padding: 10 }}>Detail</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filtered.map((user) => (
-                  <tr key={user.id} style={{ borderTop: "1px solid #e3e8ef" }}>
-                    <td style={{ padding: 10 }}>
+          <section aria-label="Liste utilisateurs">
+            <DataTable
+              columns={[
+                {
+                  header: "Utilisateur",
+                  render: (user) => (
+                    <>
                       <strong>{user.displayName}</strong>
-                      <div style={{ color: "#516070" }}>{user.email}</div>
-                      {user.partnerTenantId ? <div style={{ color: "#516070" }}>Tenant {user.partnerTenantId}</div> : null}
-                    </td>
-                    <td style={{ padding: 10 }}>{user.roles.join(", ")}</td>
-                    <td style={{ padding: 10 }}>{user.status}</td>
-                    <td style={{ padding: 10 }}>{user.mfaStatus}</td>
-                    <td style={{ padding: 10 }}>{formatDate(user.lastLoginAt)}</td>
-                    <td style={{ padding: 10 }}><a href={`/users/${encodeURIComponent(user.id)}`}>Ouvrir</a></td>
-                  </tr>
-                ))}
-                {filtered.length === 0 ? (
-                  <tr>
-                    <td colSpan={6} style={{ padding: 14 }}>Aucun utilisateur pour ces filtres.</td>
-                  </tr>
-                ) : null}
-              </tbody>
-            </table>
+                      <div>{user.email}</div>
+                      {user.partnerTenantId ? <div>Tenant {user.partnerTenantId}</div> : null}
+                    </>
+                  )
+                },
+                { header: "Roles", render: (user) => roleLabel(user.roles) },
+                { header: "Statut", render: (user) => <Badge tone={user.status === "active" ? "success" : user.status === "suspended" || user.status === "locked" ? "danger" : "warning"}>{user.status}</Badge> },
+                { header: "MFA", render: (user) => <Badge tone={user.mfaStatus === "verified" || user.mfaStatus === "enrolled" ? "success" : "warning"}>{user.mfaStatus}</Badge> },
+                { header: "Derniere connexion", render: (user) => formatDate(user.lastLoginAt) },
+                { header: "Detail", render: (user) => <a href={`/users/${encodeURIComponent(user.id)}`}>Ouvrir</a> }
+              ]}
+              items={filtered}
+              getKey={(user) => user.id}
+              emptyLabel="Aucun utilisateur pour ces filtres."
+            />
           </section>
         </div>
 
-        <CreateUserForm />
+        <Card><CreateUserForm /></Card>
       </section>
-    </main>
+    </div>
   );
 }
