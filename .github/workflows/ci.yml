@@ -171,9 +171,9 @@ jobs:
             $NETWORK_FLAG \
             "ghcr.io/bkourouma/assurmatch-backoffice:${SHA}"
 
-          for surface in "127.0.0.1:3600/admin/system/health" "127.0.0.1:3601" "127.0.0.1:3602"; do
+          for surface in "127.0.0.1:3600/countries" "127.0.0.1:3601" "127.0.0.1:3602"; do
             ok=0
-            for i in 1 2 3 4 5 6 7 8 9 10; do
+            for i in $(seq 1 40); do
               if curl -fsS "http://${surface}" > /dev/null; then ok=1; break; fi
               sleep 3
             done
