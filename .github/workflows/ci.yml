@@ -130,8 +130,9 @@ jobs:
       - name: Deploy local containers (three containers, health checks, prune)
         run: |
           set -euo pipefail
-          ./scripts/preprod/pre-deploy-check.sh
+          sh ./scripts/preprod/pre-deploy-check.sh
 
+          DEPLOY_NETWORK_NAME="${DEPLOY_NETWORK_NAME:-assurmatch-preprod}"
           NETWORK_FLAG=""
           if [ -n "${DEPLOY_NETWORK_NAME:-}" ]; then
             NETWORK_FLAG="--network ${DEPLOY_NETWORK_NAME}"
