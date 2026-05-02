@@ -11,6 +11,7 @@ $CommonEnv = @(
   'set "NODE_ENV=development"',
   "set `"DATABASE_URL=$DatabaseUrl`"",
   "set `"REDIS_URL=$RedisUrl`"",
+  'set "ASSURMATCH_AUTH_TOKEN_SECRET=assurmatch-local-dev-auth-token-secret-32-plus"',
   'set "EMAIL_SERVICE_TYPE=mailpit"',
   'set "EMAIL_FROM=local@assurmatch.local"',
   'set "EMAIL_SMTP_HOST=127.0.0.1"',
