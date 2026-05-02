@@ -27,7 +27,7 @@ test("admin dashboard page renders aggregates and feature flag summary", () => {
   expect(dashboard).toContain("Volumes de leads");
   expect(dashboard).toContain("Feature flags sensibles");
   expect(dashboard).toContain("Alertes conformite");
-  expect(dashboard).toContain("indicatifs");
+  expect(dashboard).toContain("signaux de pilotage");
 });
 
 test("admin compliance alerts page paginates and refuses without admin", () => {

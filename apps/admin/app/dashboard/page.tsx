@@ -1,80 +1,90 @@
 import { redirect } from "next/navigation";
 import { isAdminProfile, loginRedirect, readBackOfficeSession } from "../lib/backoffice-auth";
 import { readAdminDashboard } from "../lib/admin-api";
+import { Badge, Card, DataTable, KpiCard, PageHeader, StateMessage } from "../lib/ui/admin-ui";
+import { dashboardKpis, flagTone, sensitiveFeatureFlagKeys } from "../lib/ui/admin-view-models";
 
 export default async function AdminDashboardPage() {
   const session = await readBackOfficeSession();
   if (session.status === "unauthenticated" || session.status === "expired") redirect(loginRedirect("/dashboard", session.status));
-  if (session.status === "mfa_required") return <main><h1>MFA requise</h1><p>L'acces dashboard reste bloque tant que la MFA n'est pas verifiee.</p></main>;
+  if (session.status === "mfa_required") return <div className="page-stack"><PageHeader title="MFA requise" description="L'acces dashboard reste bloque tant que la MFA n'est pas verifiee." /></div>;
   if (session.status !== "authenticated" || !isAdminProfile(session.profile)) {
-    return <main><h1>Acces refuse</h1><p>Ce compte ne dispose pas d'un acces admin autorise.</p></main>;
+    return <div className="page-stack"><PageHeader title="Acces refuse" description="Ce compte ne dispose pas d'un acces admin autorise." /></div>;
   }
   const dashboard = await readAdminDashboard();
   if (dashboard.unauthenticated) redirect(loginRedirect("/dashboard", dashboard.error ?? "session_required"));
-  if (dashboard.forbidden) return <main><h1>Acces refuse</h1><p>Le role connecte ne permet pas la lecture du dashboard plateforme.</p></main>;
-  if (dashboard.status === "error") return <main><h1>Dashboard plateforme</h1><p role="status">Dashboard indisponible: {dashboard.error}</p></main>;
+  if (dashboard.forbidden) return <div className="page-stack"><PageHeader title="Acces refuse" description="Le role connecte ne permet pas la lecture du dashboard plateforme." /></div>;
+  if (dashboard.status === "error") return <div className="page-stack"><PageHeader title="Dashboard plateforme" /><StateMessage tone="danger">Dashboard indisponible: {dashboard.error}</StateMessage></div>;
   const data = dashboard.data;
   return (
-    <main style={{ maxWidth: 1180, margin: "0 auto", padding: "28px 20px", fontFamily: "system-ui, sans-serif", color: "#172033" }}>
-      <header style={{ marginBottom: 22 }}>
-        <h1 style={{ margin: 0, fontSize: 28 }}>Dashboard plateforme</h1>
-        <p style={{ color: "#516070" }}>Indicateurs internes operationnels et conformite. Les chiffres sont indicatifs.</p>
-      </header>
-      <section aria-label="Volumes de leads" style={{ display: "grid", gridTemplateColumns: "repeat(4, minmax(160px, 1fr))", gap: 12, marginBottom: 22 }}>
-        {[
-          ["Recus", data.leadVolumes.received],
-          ["Transmis", data.leadVolumes.transmitted],
-          ["Refuses", data.leadVolumes.refused],
-          ["Non routes", data.leadVolumes.nonRouted]
-        ].map(([label, value]) => (
-          <div key={String(label)} style={{ border: "1px solid #d8dde3", borderRadius: 6, padding: 14 }}>
-            <div style={{ color: "#516070", fontSize: 13 }}>{label}</div>
-            <strong style={{ display: "block", marginTop: 8, fontSize: 24 }}>{value}</strong>
+    <div className="page-stack">
+      <PageHeader
+        kicker="Back-office plateforme"
+        title="Dashboard plateforme"
+        description="Indicateurs internes operationnels et conformite. Les chiffres restent des signaux de pilotage et ne modifient aucune regle de routage."
+      />
+      <section aria-label="Volumes de leads" className="admin-grid admin-grid--kpi">
+        {dashboardKpis(data).map((kpi) => <KpiCard key={kpi.label} label={kpi.label} value={kpi.value} helper={kpi.helper} tone={kpi.tone} />)}
+      </section>
+      <section className="admin-grid admin-grid--two" aria-label="Raisons et repartition">
+        <Card>
+          <h2 className="section-title">Raisons de non-routage</h2>
+          {data.nonRoutedReasons.length === 0 ? <StateMessage>Aucune raison enregistree dans la fenetre.</StateMessage> : (
+            <DataTable
+              columns={[
+                { header: "Raison", render: (item) => item.reason },
+                { header: "Total", render: (item) => item.total }
+              ]}
+              items={data.nonRoutedReasons}
+              getKey={(item) => item.reason}
+              emptyLabel="Aucune raison enregistree."
+            />
+          )}
+        </Card>
+        <Card>
+          <h2 className="section-title">Partenaires et offres</h2>
+          <ul className="simple-list">
+            <li>Partenaires actifs: {data.partners.active}</li>
+            <li>Partenaires inactifs: {data.partners.inactive}</li>
+            <li>Offres expirees encore referencees: {data.expiredOffersStillReferenced}</li>
+            <li>Licences expirant dans 30 jours: {data.licenseAlerts.expiringSoon}</li>
+          </ul>
+        </Card>
+      </section>
+      <section aria-label="Repartition" className="admin-grid admin-grid--two">
+        <Card>
+          <h2 className="section-title">Par pays</h2>
+          <DataTable columns={[{ header: "Pays", render: (item) => item.countryCode }, { header: "Total", render: (item) => item.total }]} items={data.byCountry} getKey={(item) => item.countryCode} emptyLabel="Aucun pays dans cette fenetre." />
+        </Card>
+        <Card>
+          <h2 className="section-title">Par produit</h2>
+          <DataTable columns={[{ header: "Produit", render: (item) => item.productKey }, { header: "Total", render: (item) => item.total }]} items={data.byProduct} getKey={(item) => item.productKey} emptyLabel="Aucun produit dans cette fenetre." />
+        </Card>
+      </section>
+      <section aria-label="Alertes conformite (synthese)">
+        <Card>
+          <h2 className="section-title">Alertes conformite</h2>
+          <div className="admin-grid admin-grid--kpi">
+            <KpiCard label="Consentement absent" value={data.complianceAlertCounts.consentMissing} tone={data.complianceAlertCounts.consentMissing > 0 ? "danger" : "success"} />
+            <KpiCard label="CRM ferme" value={data.complianceAlertCounts.crmFlagClosed} tone={data.complianceAlertCounts.crmFlagClosed > 0 ? "warning" : "success"} />
+            <KpiCard label="RBAC refuses" value={data.complianceAlertCounts.rbacDenied} tone={data.complianceAlertCounts.rbacDenied > 0 ? "warning" : "success"} />
+            <KpiCard label="Tentatives inter-tenant" value={data.complianceAlertCounts.crossTenantAttempt} tone={data.complianceAlertCounts.crossTenantAttempt > 0 ? "danger" : "success"} />
           </div>
-        ))}
-      </section>
-      <section aria-label="Raisons de non-routage" style={{ marginBottom: 22 }}>
-        <h2 style={{ margin: "0 0 8px", fontSize: 20 }}>Raisons de non-routage</h2>
-        {data.nonRoutedReasons.length === 0 ? <p>Aucune raison enregistree dans la fenetre.</p> : (
-          <ul style={{ margin: 0, paddingLeft: 18 }}>
-            {data.nonRoutedReasons.map(({ reason, total }) => (
-              <li key={reason}>{reason}: {total}</li>
-            ))}
-          </ul>
-        )}
-      </section>
-      <section aria-label="Repartition" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 22 }}>
-        <div>
-          <h2 style={{ margin: "0 0 8px", fontSize: 18 }}>Par pays</h2>
-          <ul style={{ margin: 0, paddingLeft: 18 }}>
-            {data.byCountry.map(({ countryCode, total }) => <li key={countryCode}>{countryCode}: {total}</li>)}
-          </ul>
-        </div>
-        <div>
-          <h2 style={{ margin: "0 0 8px", fontSize: 18 }}>Par produit</h2>
-          <ul style={{ margin: 0, paddingLeft: 18 }}>
-            {data.byProduct.map(({ productKey, total }) => <li key={productKey}>{productKey}: {total}</li>)}
-          </ul>
-        </div>
-      </section>
-      <section aria-label="Partenaires et offres" style={{ marginBottom: 22 }}>
-        <p>Partenaires actifs: {data.partners.active}. Inactifs: {data.partners.inactive}.</p>
-        <p>Offres expirees encore referencees: {data.expiredOffersStillReferenced}.</p>
-        <p>Licences expirees: {data.licenseAlerts.expired}. Licences expirant dans 30 jours: {data.licenseAlerts.expiringSoon}.</p>
-      </section>
-      <section aria-label="Alertes conformite (synthese)" style={{ marginBottom: 22 }}>
-        <h2 style={{ margin: "0 0 8px", fontSize: 18 }}>Alertes conformite</h2>
-        <p>Consentement absent: {data.complianceAlertCounts.consentMissing}. CRM ferme: {data.complianceAlertCounts.crmFlagClosed}. RBAC refuses: {data.complianceAlertCounts.rbacDenied}. Tentatives inter-tenant: {data.complianceAlertCounts.crossTenantAttempt}. Autres: {data.complianceAlertCounts.other}.</p>
-        <p><a href="/dashboard/compliance-alerts">Voir le detail des alertes</a></p>
+          <p><a href="/dashboard/compliance-alerts">Voir le detail des alertes</a></p>
+        </Card>
       </section>
       <section aria-label="Feature flags sensibles">
-        <h2 style={{ margin: "0 0 8px", fontSize: 18 }}>Feature flags sensibles (lecture seule)</h2>
-        <ul style={{ margin: 0, paddingLeft: 18 }}>
-          {data.sensitiveFeatureFlags.map((flag) => (
-            <li key={`${flag.key}|${flag.scopeType}|${flag.scopeId ?? ""}`}>{flag.key} ({flag.scopeType}{flag.scopeId ? `:${flag.scopeId}` : ""}): {flag.value ? "ouvert" : "ferme"}</li>
-          ))}
-        </ul>
+        <Card>
+          <h2 className="section-title">Feature flags sensibles (lecture seule)</h2>
+          <div className="admin-grid">
+            {sensitiveFeatureFlagKeys.map((key) => {
+              const flag = data.sensitiveFeatureFlags.find((item) => item.key === key);
+              const scope = flag ? `${flag.scopeType}${flag.scopeId ? `:${flag.scopeId}` : ""}` : "global";
+              return <Badge key={key} tone={flagTone(flag?.value ?? false)}>{key} ({scope}): {flag?.value ? "actif" : "desactive"}</Badge>;
+            })}
+          </div>
+        </Card>
       </section>
-    </main>
+    </div>
   );
 }
