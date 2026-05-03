@@ -24,4 +24,6 @@ test("public app has no back-office auth surface", () => {
   expect(combined).not.toContain("Navigation admin principale");
   expect(combined).not.toContain("admin-api");
   expect(combined).not.toContain("broker-api");
+  expect(combined).not.toContain("broker-shell");
+  expect(combined).not.toContain("Navigation courtier principale");
 });

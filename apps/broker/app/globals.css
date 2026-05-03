@@ -1,0 +1,588 @@
+:root {
+  --broker-bg: #f4f7f6;
+  --broker-surface: #ffffff;
+  --broker-surface-muted: #f8fafc;
+  --broker-border: #d8e2df;
+  --broker-border-strong: #b7c8c3;
+  --broker-text: #14211f;
+  --broker-muted: #596b66;
+  --broker-strong: #071916;
+  --broker-primary: #0f3d35;
+  --broker-primary-soft: #e6f2ef;
+  --broker-accent: #0f766e;
+  --broker-blue: #2563eb;
+  --broker-success: #047857;
+  --broker-warning: #b45309;
+  --broker-danger: #b42318;
+  --broker-disabled: #64748b;
+  --broker-focus: #0891b2;
+  --broker-radius: 8px;
+  --broker-shadow: 0 16px 34px rgba(15, 23, 42, 0.07);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  background: var(--broker-bg);
+  color: var(--broker-text);
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  background: var(--broker-bg);
+  color: var(--broker-text);
+}
+
+a {
+  color: var(--broker-accent);
+  text-decoration: none;
+}
+
+a:hover {
+  text-decoration: underline;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+}
+
+:focus-visible {
+  outline: 3px solid var(--broker-focus);
+  outline-offset: 3px;
+}
+
+.broker-shell {
+  min-height: 100vh;
+  display: grid;
+  grid-template-columns: 276px minmax(0, 1fr);
+  background: var(--broker-bg);
+}
+
+.broker-sidebar {
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+  padding: 22px 16px;
+  background: var(--broker-primary);
+  color: #edfdf8;
+}
+
+.broker-brand {
+  display: grid;
+  gap: 4px;
+  padding: 4px 6px 10px;
+}
+
+.broker-brand__name {
+  color: #ffffff;
+  font-size: 20px;
+  font-weight: 760;
+  line-height: 1.1;
+}
+
+.broker-brand__scope {
+  color: #bfe6dc;
+  font-size: 13px;
+}
+
+.broker-nav {
+  display: grid;
+  gap: 6px;
+}
+
+.broker-nav__link {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  min-height: 42px;
+  padding: 10px 12px;
+  border-radius: var(--broker-radius);
+  color: #dcf7f0;
+  font-weight: 680;
+}
+
+.broker-nav__link:hover,
+.broker-nav__link[aria-current="page"] {
+  background: rgba(255, 255, 255, 0.13);
+  color: #ffffff;
+  text-decoration: none;
+}
+
+.broker-sidebar__footer {
+  margin-top: auto;
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: var(--broker-radius);
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.broker-user {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.broker-user__label {
+  overflow: hidden;
+  color: #ffffff;
+  font-size: 14px;
+  font-weight: 720;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.broker-user__role {
+  color: #bfe6dc;
+  font-size: 12px;
+}
+
+.broker-main {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.broker-topbar {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  min-height: 72px;
+  padding: 16px 28px;
+  border-bottom: 1px solid var(--broker-border);
+  background: rgba(255, 255, 255, 0.93);
+  backdrop-filter: blur(12px);
+}
+
+.broker-topbar__title {
+  margin: 0;
+  color: var(--broker-strong);
+  font-size: 18px;
+  font-weight: 760;
+}
+
+.broker-content {
+  width: 100%;
+  max-width: 1320px;
+  margin: 0 auto;
+  padding: 28px;
+}
+
+.auth-shell {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: 28px;
+  background: #f6faf9;
+}
+
+.auth-shell__panel {
+  width: min(100%, 480px);
+}
+
+.page-stack {
+  display: grid;
+  gap: 20px;
+}
+
+.page-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 18px;
+}
+
+.page-kicker {
+  margin: 0 0 7px;
+  color: var(--broker-accent);
+  font-size: 13px;
+  font-weight: 760;
+  text-transform: uppercase;
+}
+
+.page-title {
+  margin: 0;
+  color: var(--broker-strong);
+  font-size: clamp(26px, 4vw, 34px);
+  line-height: 1.12;
+}
+
+.page-description {
+  max-width: 780px;
+  margin: 10px 0 0;
+  color: var(--broker-muted);
+  line-height: 1.6;
+}
+
+.broker-card {
+  border: 1px solid var(--broker-border);
+  border-radius: var(--broker-radius);
+  background: var(--broker-surface);
+  box-shadow: var(--broker-shadow);
+}
+
+.broker-card--plain {
+  box-shadow: none;
+}
+
+.broker-card__body {
+  padding: 18px;
+}
+
+.broker-grid {
+  display: grid;
+  gap: 14px;
+}
+
+.broker-grid--kpi {
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+}
+
+.broker-grid--two {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.kpi-card {
+  min-height: 126px;
+  display: grid;
+  align-content: space-between;
+  gap: 12px;
+  border: 1px solid var(--broker-border);
+  border-left: 4px solid var(--broker-accent);
+  border-radius: var(--broker-radius);
+  background: var(--broker-surface);
+  padding: 16px;
+}
+
+.kpi-card[data-tone="danger"] {
+  border-left-color: var(--broker-danger);
+}
+
+.kpi-card[data-tone="warning"] {
+  border-left-color: var(--broker-warning);
+}
+
+.kpi-card[data-tone="success"] {
+  border-left-color: var(--broker-success);
+}
+
+.kpi-card[data-tone="disabled"] {
+  border-left-color: var(--broker-disabled);
+}
+
+.kpi-card[data-tone="info"] {
+  border-left-color: var(--broker-blue);
+}
+
+.kpi-card__label {
+  margin: 0;
+  color: var(--broker-muted);
+  font-size: 13px;
+  font-weight: 760;
+}
+
+.kpi-card__value {
+  margin: 0;
+  color: var(--broker-strong);
+  font-size: 31px;
+  font-weight: 820;
+  line-height: 1;
+}
+
+.kpi-card__helper {
+  margin: 0;
+  color: var(--broker-muted);
+  font-size: 13px;
+  line-height: 1.35;
+}
+
+.section-title {
+  margin: 0 0 10px;
+  color: var(--broker-strong);
+  font-size: 18px;
+}
+
+.broker-table-wrap {
+  overflow-x: auto;
+  border: 1px solid var(--broker-border);
+  border-radius: var(--broker-radius);
+  background: var(--broker-surface);
+}
+
+.broker-table {
+  width: 100%;
+  min-width: 700px;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+
+.broker-table th,
+.broker-table td {
+  padding: 12px;
+  border-bottom: 1px solid #e7eeeb;
+  text-align: left;
+  vertical-align: top;
+}
+
+.broker-table th {
+  background: var(--broker-surface-muted);
+  color: var(--broker-muted);
+  font-size: 12px;
+  font-weight: 820;
+  text-transform: uppercase;
+}
+
+.broker-table tr:last-child td {
+  border-bottom: 0;
+}
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  min-height: 26px;
+  max-width: 100%;
+  padding: 4px 9px;
+  border: 1px solid var(--broker-border);
+  border-radius: 999px;
+  background: #f8fafc;
+  color: var(--broker-muted);
+  font-size: 12px;
+  font-weight: 760;
+  line-height: 1.2;
+}
+
+.badge[data-tone="success"] {
+  border-color: #a7f3d0;
+  background: #ecfdf5;
+  color: var(--broker-success);
+}
+
+.badge[data-tone="warning"] {
+  border-color: #fed7aa;
+  background: #fff7ed;
+  color: var(--broker-warning);
+}
+
+.badge[data-tone="danger"] {
+  border-color: #fecaca;
+  background: #fef2f2;
+  color: var(--broker-danger);
+}
+
+.badge[data-tone="info"] {
+  border-color: #bfdbfe;
+  background: #eff6ff;
+  color: #1d4ed8;
+}
+
+.badge[data-tone="disabled"] {
+  border-color: #cbd5e1;
+  background: #f1f5f9;
+  color: var(--broker-disabled);
+}
+
+.button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 40px;
+  padding: 9px 13px;
+  border: 1px solid var(--broker-primary);
+  border-radius: var(--broker-radius);
+  background: var(--broker-primary);
+  color: #ffffff;
+  font-weight: 760;
+  cursor: pointer;
+}
+
+.button:hover {
+  text-decoration: none;
+}
+
+.button--secondary {
+  border-color: var(--broker-border-strong);
+  background: var(--broker-surface);
+  color: var(--broker-primary);
+}
+
+.button--ghost {
+  border-color: transparent;
+  background: transparent;
+  color: inherit;
+}
+
+.form-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(150px, 1fr));
+  gap: 10px;
+  align-items: end;
+}
+
+.form-grid--crm {
+  grid-template-columns: repeat(6, minmax(120px, 1fr));
+}
+
+.field {
+  display: grid;
+  gap: 6px;
+  color: var(--broker-muted);
+  font-size: 13px;
+  font-weight: 760;
+}
+
+.field input,
+.field select {
+  min-height: 40px;
+  border: 1px solid var(--broker-border-strong);
+  border-radius: var(--broker-radius);
+  padding: 0 10px;
+  background: #ffffff;
+  color: var(--broker-text);
+}
+
+.state-message {
+  border: 1px solid var(--broker-border);
+  border-radius: var(--broker-radius);
+  background: var(--broker-surface);
+  padding: 16px;
+  color: var(--broker-muted);
+}
+
+.state-message[data-tone="danger"] {
+  border-color: #fecaca;
+  background: #fef2f2;
+  color: var(--broker-danger);
+}
+
+.state-message[data-tone="warning"] {
+  border-color: #fed7aa;
+  background: #fff7ed;
+  color: var(--broker-warning);
+}
+
+.state-message[data-tone="info"] {
+  border-color: #bfdbfe;
+  background: #eff6ff;
+  color: #1d4ed8;
+}
+
+.simple-list {
+  margin: 0;
+  padding-left: 18px;
+  color: var(--broker-muted);
+  line-height: 1.7;
+}
+
+.split-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(320px, 1fr);
+  gap: 18px;
+  align-items: start;
+}
+
+.definition-list {
+  display: grid;
+  grid-template-columns: minmax(120px, 180px) minmax(0, 1fr);
+  gap: 10px 14px;
+  margin: 0;
+}
+
+.definition-list dt {
+  color: var(--broker-muted);
+  font-weight: 720;
+}
+
+.definition-list dd {
+  margin: 0;
+}
+
+.inline-cluster {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+@media (max-width: 1120px) {
+  .broker-shell {
+    grid-template-columns: 232px minmax(0, 1fr);
+  }
+
+  .broker-grid--kpi {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .split-layout,
+  .broker-grid--two {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 780px) {
+  .broker-shell {
+    display: block;
+  }
+
+  .broker-sidebar {
+    position: static;
+    height: auto;
+    padding: 16px;
+  }
+
+  .broker-nav {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .broker-nav__link {
+    min-height: 38px;
+    padding: 9px 10px;
+    font-size: 13px;
+  }
+
+  .broker-sidebar__footer {
+    display: none;
+  }
+
+  .broker-topbar {
+    position: static;
+    min-height: auto;
+    padding: 14px 18px;
+  }
+
+  .broker-content {
+    padding: 18px;
+  }
+
+  .page-header {
+    display: grid;
+  }
+
+  .broker-grid--kpi {
+    grid-template-columns: 1fr;
+  }
+
+  .form-grid,
+  .form-grid--crm {
+    grid-template-columns: 1fr;
+  }
+
+  .definition-list {
+    grid-template-columns: 1fr;
+  }
+}
