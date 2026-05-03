@@ -40,8 +40,9 @@ export class BrokerDashboardService {
     const tenantId = actor.partnerTenantId as string;
     const assignments = (await this.deps.assignments.list()).filter((assignment) => assignment.partnerTenantId === tenantId);
     const inWindow = assignments.filter((assignment) => isWithinWindow(assignment.assignedAt, window));
-    const filtered = this.applyOptionalFilters(inWindow, query);
     const plan = this.resolvePlan(actor);
+    this.deps.access.assertBrokerDashboardScope(actor, query, plan);
+    const filtered = this.applyOptionalFilters(inWindow, query);
     const licenseAlerts = await this.collectLicenseAlerts(tenantId);
     const starter = this.buildStarter(filtered);
     const includeCrm = plan !== "starter" && this.deps.access.crmSectionAllowed(actor, config.brokerCrmEnabled);

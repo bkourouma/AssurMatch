@@ -54,6 +54,21 @@ describe("DashboardsAccessPolicy", () => {
     expect(policy.crmSectionAllowed(makeBrokerActor({ partnerPlan: "starter", roles: ["broker_owner_pro"] }), true)).toBe(false);
   });
 
+  it("refuses Starter agent filters on the broker dashboard", () => {
+    const audit = new AuditLogWriter();
+    const policy = new DashboardsAccessPolicy(audit);
+    expect(() => policy.assertBrokerDashboardScope(makeBrokerActor(), { agentId: "advisor-1" }, "starter")).toThrow(DashboardAccessRefusedError);
+    expect(audit.search({ result: "refused" })[0]?.reason).toBe("starter_agent_filter_forbidden");
+  });
+
+  it("allows only Pro owners and managers to use agent filters", () => {
+    const audit = new AuditLogWriter();
+    const policy = new DashboardsAccessPolicy(audit);
+    expect(() => policy.assertBrokerDashboardScope(makeBrokerActor({ roles: ["broker_agent"], partnerPlan: "pro" }), { agentId: "advisor-1" }, "pro")).toThrow(DashboardAccessRefusedError);
+    expect(audit.search({ result: "refused" })[0]?.reason).toBe("agent_filter_not_allowed");
+    expect(() => policy.assertBrokerDashboardScope(makeBrokerActor({ roles: ["broker_manager"], partnerPlan: "pro" }), { agentId: "advisor-1" }, "pro")).not.toThrow();
+  });
+
   it("refuses admin access when role is not in allow-list", () => {
     const audit = new AuditLogWriter();
     const policy = new DashboardsAccessPolicy(audit);
@@ -72,5 +87,14 @@ describe("DashboardsAccessPolicy", () => {
     const role = policy.resolveAdminAccess(actor);
     expect(() => policy.resolveAdminScope(actor, role, { country: "FR" })).toThrow(DashboardAccessRefusedError);
     expect(audit.search({ result: "refused" })[0]?.reason).toBe("out_of_scope_country");
+  });
+
+  it("refuses partner filters for admin roles that cannot scope by partner", () => {
+    const audit = new AuditLogWriter();
+    const policy = new DashboardsAccessPolicy(audit);
+    const actor = { actorId: "support", roles: ["support_admin"], mfaVerified: true } as ActorContext;
+    const role = policy.resolveAdminAccess(actor);
+    expect(() => policy.resolveAdminScope(actor, role, { partnerId: "partner-a" })).toThrow(DashboardAccessRefusedError);
+    expect(audit.search({ result: "refused" })[0]?.reason).toBe("partner_filter_not_allowed");
   });
 });
