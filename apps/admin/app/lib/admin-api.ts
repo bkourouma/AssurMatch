@@ -243,6 +243,59 @@ export interface AIAssistanceData {
   message: string;
 }
 
+export interface PartnerIntegrationsData {
+  apiKeys: {
+    generatedAt: string;
+    total: number;
+    items: Array<{
+      id: string;
+      partnerTenantId: string;
+      name: string;
+      keyPrefix: string;
+      scopes: string[];
+      status: "active" | "revoked";
+      createdAt: string;
+      updatedAt: string;
+      lastUsedAt?: string;
+      revokedAt?: string;
+    }>;
+  };
+  webhookEndpoints: {
+    generatedAt: string;
+    total: number;
+    items: Array<{
+      id: string;
+      partnerTenantId: string;
+      url: string;
+      description?: string;
+      eventTypes: string[];
+      status: "disabled" | "active" | "suspended";
+      secretConfigured: true;
+      createdAt: string;
+      updatedAt: string;
+    }>;
+  };
+  webhookDeliveries: {
+    generatedAt: string;
+    total: number;
+    items: Array<{
+      id: string;
+      endpointId?: string;
+      partnerTenantId: string;
+      eventId: string;
+      eventType: string;
+      status: "skipped" | "pending" | "retryable" | "delivered" | "failed" | "dead_letter";
+      attemptCount: number;
+      nextAttemptAt?: string;
+      lastResponseClass?: string;
+      idempotencyKey: string;
+      payloadMetadata: Record<string, unknown>;
+      createdAt: string;
+      updatedAt: string;
+    }>;
+  };
+}
+
 const emptyAdminDashboard: AdminDashboardData = {
   window: { from: "", to: "" },
   scope: { countries: [], products: [], partnerId: null, role: "support_admin" },
@@ -288,6 +341,11 @@ const emptyAIAssistance: AIAssistanceData = {
   flags: [],
   guardrails: { centralAiModuleOnly: true, piiMinimized: true, outputIsAdvisory: true, noAutomatedDecision: true },
   message: ""
+};
+const emptyPartnerIntegrations: PartnerIntegrationsData = {
+  apiKeys: { generatedAt: "", total: 0, items: [] },
+  webhookEndpoints: { generatedAt: "", total: 0, items: [] },
+  webhookDeliveries: { generatedAt: "", total: 0, items: [] }
 };
 
 async function readAdmin<T>(path: string, fallback: T): Promise<AdminApiState<T>> {
@@ -351,6 +409,25 @@ export function readBillingFoundation(filters: { partnerId?: string; page?: numb
 
 export function readAdminAIAssistance() {
   return readAdmin<AIAssistanceData>("/admin/ai/assistance", emptyAIAssistance);
+}
+
+export async function readPartnerIntegrations(): Promise<AdminApiState<PartnerIntegrationsData>> {
+  const [apiKeys, webhookEndpoints, webhookDeliveries] = await Promise.all([
+    readAdmin<PartnerIntegrationsData["apiKeys"]>("/admin/partner-integrations/api-keys", emptyPartnerIntegrations.apiKeys),
+    readAdmin<PartnerIntegrationsData["webhookEndpoints"]>("/admin/partner-integrations/webhook-endpoints", emptyPartnerIntegrations.webhookEndpoints),
+    readAdmin<PartnerIntegrationsData["webhookDeliveries"]>("/admin/partner-integrations/webhook-deliveries", emptyPartnerIntegrations.webhookDeliveries)
+  ]);
+  const status = [apiKeys.status, webhookEndpoints.status, webhookDeliveries.status].find((item) => item !== "success") ?? "success";
+  const error = apiKeys.error ?? webhookEndpoints.error ?? webhookDeliveries.error;
+  const unauthenticated = apiKeys.unauthenticated || webhookEndpoints.unauthenticated || webhookDeliveries.unauthenticated;
+  const forbidden = apiKeys.forbidden || webhookEndpoints.forbidden || webhookDeliveries.forbidden;
+  return {
+    status,
+    data: { apiKeys: apiKeys.data, webhookEndpoints: webhookEndpoints.data, webhookDeliveries: webhookDeliveries.data },
+    ...(unauthenticated ? { unauthenticated } : {}),
+    ...(forbidden ? { forbidden } : {}),
+    ...(error ? { error } : {})
+  };
 }
 
 export function readAdminUsers(filters: { role?: string; status?: string } = {}) {

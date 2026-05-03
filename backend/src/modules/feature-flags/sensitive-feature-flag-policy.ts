@@ -18,7 +18,9 @@ const explicitlyProtectedFeatureFlags = new Set([
   "multi_broker_routing_enabled",
   "billing_enabled",
   "sms_enabled",
-  "whatsapp_enabled"
+  "whatsapp_enabled",
+  "partner_api_enabled",
+  "partner_webhooks_enabled"
 ]);
 
 const regulatedFlagKeyFragments = [
@@ -32,7 +34,8 @@ const regulatedFlagKeyFragments = [
   "attestation",
   "claim",
   "insurer_api",
-  "insurer"
+  "insurer",
+  "webhook"
 ];
 
 export interface FeatureFlagMutationPolicyInput {

@@ -31,6 +31,8 @@ import { PrismaUsersRepository } from "../modules/users/users.repository";
 import { AuthModule } from "../modules/auth/auth.module";
 import { RuntimeEmailDeliveryService } from "../modules/notifications/email/email-delivery.service";
 import { PartnerEligibilityService } from "../modules/partners/partner-eligibility.service";
+import { PartnerIntegrationsModule } from "../modules/partner-integrations/partner-integrations.module";
+import { PrismaPartnerIntegrationsRepository } from "../modules/partner-integrations/partner-integrations.repository";
 import { PrismaConsentRecordsRepository } from "../modules/consent/consent-records.repository";
 import { PrismaCountriesRepository } from "../modules/countries/countries.repository";
 import { PrismaProductsRepository } from "../modules/products/products.repository";
@@ -60,6 +62,7 @@ export class AssurMatchRuntime {
   private readonly consentRecordsRepository = this.runtimeRepository(new PrismaConsentRecordsRepository(this.prisma));
   private readonly notificationsRepository = this.runtimeRepository(new PrismaNotificationsRepository(this.prisma));
   private readonly usersRepository = this.runtimeRepository(new PrismaUsersRepository(this.prisma));
+  private readonly partnerIntegrationsRepository = this.runtimeRepository(new PrismaPartnerIntegrationsRepository(this.prisma));
   private readonly offersRepository = this.runtimeRepository(new PrismaOffersRepository(this.prisma));
   private readonly prospectsRepository = this.runtimeRepository(new PrismaProspectsRepository(this.prisma));
   private readonly quoteRequestsRepository = this.runtimeRepository(new PrismaQuoteRequestsRepository(this.prisma));
@@ -164,6 +167,14 @@ export class AssurMatchRuntime {
     partners: this.partners.service,
     assignments: this.leads.assignments
   });
+  readonly partnerIntegrations = new PartnerIntegrationsModule({
+    audit: this.audit.writer,
+    featureFlags: this.featureFlags.service,
+    partners: this.partners.service,
+    assignments: this.leads.assignments,
+    notifications: this.notifications.service,
+    ...(this.partnerIntegrationsRepository ? { repository: this.partnerIntegrationsRepository } : {})
+  });
 
   async onModuleInit(): Promise<void> {
     await this.prisma.onModuleInit();
@@ -218,7 +229,8 @@ export class AssurMatchRuntime {
       PartnerLicensesRepository: this.partnerLicensesRepository?.mode,
       CrmActivityRepository: this.leadRepositorySet.crmActivity?.mode,
       NotificationsRepository: this.notificationsRepository?.mode,
-      UsersRepository: this.usersRepository?.mode
+      UsersRepository: this.usersRepository?.mode,
+      PartnerIntegrationsRepository: this.partnerIntegrationsRepository?.mode
     };
   }
 

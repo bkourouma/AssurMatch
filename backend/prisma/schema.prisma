@@ -317,6 +317,32 @@ enum HumanValidationStatus {
   rejected
 }
 
+enum PartnerApiKeyStatus {
+  active
+  revoked
+}
+
+enum PartnerWebhookEndpointStatus {
+  disabled
+  active
+  suspended
+}
+
+enum PartnerWebhookDeliveryStatus {
+  skipped
+  pending
+  retryable
+  delivered
+  failed
+  dead_letter
+}
+
+enum PartnerWebhookEventType {
+  lead_assigned
+  lead_status_changed
+  notification_failed
+}
+
 model User {
   id              String     @id @default(uuid())
   email           String     @unique
@@ -983,6 +1009,59 @@ model BrokerCrmAiAssistRequest {
   createdAt        DateTime @default(now())
 
   @@index([partnerTenantId, assistType, createdAt])
+}
+
+model PartnerApiKey {
+  id              String              @id @default(uuid())
+  partnerTenantId String
+  name            String
+  keyPrefix       String              @unique
+  keyHash         String
+  scopes          String[]            @default([])
+  status          PartnerApiKeyStatus @default(active)
+  lastUsedAt      DateTime?
+  revokedAt       DateTime?
+  createdAt       DateTime            @default(now())
+  updatedAt       DateTime            @updatedAt
+  createdById     String?
+
+  @@index([partnerTenantId, status])
+}
+
+model PartnerWebhookEndpoint {
+  id              String                       @id @default(uuid())
+  partnerTenantId String
+  url             String
+  description     String?
+  eventTypes      String[]                     @default([])
+  status          PartnerWebhookEndpointStatus @default(disabled)
+  secretEncrypted String
+  secretHash      String
+  createdAt       DateTime                     @default(now())
+  updatedAt       DateTime                     @updatedAt
+  createdById     String?
+
+  @@index([partnerTenantId, status])
+}
+
+model PartnerWebhookDelivery {
+  id                String                       @id @default(uuid())
+  endpointId        String?
+  partnerTenantId   String
+  eventId           String
+  eventType         String
+  payload           Json
+  payloadMetadata   Json
+  status            PartnerWebhookDeliveryStatus @default(pending)
+  attemptCount      Int                          @default(0)
+  nextAttemptAt     DateTime?
+  lastResponseClass String?
+  idempotencyKey    String                       @unique
+  createdAt         DateTime                     @default(now())
+  updatedAt         DateTime                     @updatedAt
+
+  @@index([partnerTenantId, eventType, createdAt])
+  @@index([endpointId, status, nextAttemptAt])
 }
 
 model RoutingDecision {

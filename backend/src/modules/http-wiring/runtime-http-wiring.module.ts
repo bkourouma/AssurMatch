@@ -4,6 +4,12 @@ import { activateRequestSchema, loginRequestSchema, mfaVerifyRequestSchema, pass
 import { activationChecklistQuerySchema } from "../../../../packages/shared/contracts/activation-checklist.contracts";
 import { billingFoundationQuerySchema } from "../../../../packages/shared/contracts/billing.contracts";
 import {
+  partnerApiKeyCreateSchema,
+  partnerApiPaginationQuerySchema,
+  partnerWebhookEndpointCreateSchema,
+  partnerWebhookEndpointUpdateSchema
+} from "../../../../packages/shared/contracts/partner-integration.contracts";
+import {
   brokerCrmAssignRequestSchema,
   brokerCrmDisputeCreateSchema,
   brokerCrmDocumentCreateSchema,
@@ -507,6 +513,74 @@ export class AdminMessagingProvidersController {
   }
 }
 
+export class AdminPartnerIntegrationsController {
+  constructor(private readonly runtime: AssurMatchRuntime) {}
+
+  apiKeys(request: AssurMatchHttpRequest) {
+    return this.runtime.partnerIntegrations.service.listApiKeys(protectedActorFromRequest(request));
+  }
+
+  createApiKey(request: AssurMatchHttpRequest, input: unknown) {
+    return this.runtime.partnerIntegrations.service.createApiKey(protectedActorFromRequest(request), parseHttpInput(partnerApiKeyCreateSchema, input));
+  }
+
+  revokeApiKey(id: string, input: unknown, request: AssurMatchHttpRequest) {
+    return this.runtime.partnerIntegrations.service.revokeApiKey(protectedActorFromRequest(request), parseParam("id", id, uuidSchema), input);
+  }
+
+  webhookEndpoints(request: AssurMatchHttpRequest) {
+    return this.runtime.partnerIntegrations.service.listWebhookEndpoints(protectedActorFromRequest(request));
+  }
+
+  createWebhookEndpoint(request: AssurMatchHttpRequest, input: unknown) {
+    return this.runtime.partnerIntegrations.service.createWebhookEndpoint(protectedActorFromRequest(request), parseHttpInput(partnerWebhookEndpointCreateSchema, input));
+  }
+
+  updateWebhookEndpoint(id: string, input: unknown, request: AssurMatchHttpRequest) {
+    return this.runtime.partnerIntegrations.service.updateWebhookEndpoint(protectedActorFromRequest(request), parseParam("id", id, uuidSchema), parseHttpInput(partnerWebhookEndpointUpdateSchema, input));
+  }
+
+  webhookDeliveries(request: AssurMatchHttpRequest) {
+    return this.runtime.partnerIntegrations.service.listWebhookDeliveries(protectedActorFromRequest(request));
+  }
+}
+
+export class PartnerApiController {
+  constructor(private readonly runtime: AssurMatchRuntime) {}
+
+  leads(request: AssurMatchHttpRequest, query: Record<string, string>) {
+    return this.runtime.partnerIntegrations.service.listAssignedLeads(partnerApiKeyFromRequest(request), parseHttpInput(partnerApiPaginationQuerySchema, query ?? {}));
+  }
+
+  notifications(request: AssurMatchHttpRequest, query: Record<string, string>) {
+    return this.runtime.partnerIntegrations.service.listNotifications(partnerApiKeyFromRequest(request), parseHttpInput(partnerApiPaginationQuerySchema, query ?? {}));
+  }
+
+  webhookEndpoints(request: AssurMatchHttpRequest) {
+    return this.runtime.partnerIntegrations.service.listWebhookEndpointsFromApiKey(partnerApiKeyFromRequest(request));
+  }
+
+  createWebhookEndpoint(request: AssurMatchHttpRequest, input: unknown) {
+    return this.runtime.partnerIntegrations.service.createWebhookEndpointFromApiKey(partnerApiKeyFromRequest(request), parseHttpInput(partnerWebhookEndpointCreateSchema.omit({ partnerTenantId: true }), input));
+  }
+
+  updateWebhookEndpoint(id: string, request: AssurMatchHttpRequest, input: unknown) {
+    return this.runtime.partnerIntegrations.service.updateWebhookEndpointFromApiKey(partnerApiKeyFromRequest(request), parseParam("id", id, uuidSchema), parseHttpInput(partnerWebhookEndpointUpdateSchema, input));
+  }
+}
+
+function partnerApiKeyFromRequest(request: AssurMatchHttpRequest): string {
+  const authorization = headerValue(request.headers.authorization);
+  if (authorization?.startsWith("Bearer ")) return authorization.slice("Bearer ".length).trim();
+  const apiKey = headerValue(request.headers["x-assurmatch-partner-api-key"]);
+  if (apiKey) return apiKey;
+  throw new Error("Partner API authentication required");
+}
+
+function headerValue(value: string | string[] | undefined): string | undefined {
+  return Array.isArray(value) ? value[0] : value;
+}
+
 controller("auth", AuthController);
 decorate(AuthController, "login", [Post("login") as MethodDecoratorFactory], [[0, Body() as ParamDecoratorFactory]]);
 decorate(AuthController, "activate", [Post("activate") as MethodDecoratorFactory], [[0, Body() as ParamDecoratorFactory]]);
@@ -612,6 +686,22 @@ decorate(AdminRuntimeSupportController, "leadAssignments", [Get("lead-assignment
 controller("admin", AdminMessagingProvidersController, true);
 decorate(AdminMessagingProvidersController, "read", [Get("messaging/providers") as MethodDecoratorFactory], [[0, Req() as ParamDecoratorFactory]]);
 
+controller("admin/partner-integrations", AdminPartnerIntegrationsController, true);
+decorate(AdminPartnerIntegrationsController, "apiKeys", [Get("api-keys") as MethodDecoratorFactory], [[0, Req() as ParamDecoratorFactory]]);
+decorate(AdminPartnerIntegrationsController, "createApiKey", [Post("api-keys") as MethodDecoratorFactory], [[0, Req() as ParamDecoratorFactory], [1, Body() as ParamDecoratorFactory]]);
+decorate(AdminPartnerIntegrationsController, "revokeApiKey", [Post("api-keys/:id/revoke") as MethodDecoratorFactory], [[0, Param("id") as ParamDecoratorFactory], [1, Body() as ParamDecoratorFactory], [2, Req() as ParamDecoratorFactory]]);
+decorate(AdminPartnerIntegrationsController, "webhookEndpoints", [Get("webhook-endpoints") as MethodDecoratorFactory], [[0, Req() as ParamDecoratorFactory]]);
+decorate(AdminPartnerIntegrationsController, "createWebhookEndpoint", [Post("webhook-endpoints") as MethodDecoratorFactory], [[0, Req() as ParamDecoratorFactory], [1, Body() as ParamDecoratorFactory]]);
+decorate(AdminPartnerIntegrationsController, "updateWebhookEndpoint", [Patch("webhook-endpoints/:id") as MethodDecoratorFactory], [[0, Param("id") as ParamDecoratorFactory], [1, Body() as ParamDecoratorFactory], [2, Req() as ParamDecoratorFactory]]);
+decorate(AdminPartnerIntegrationsController, "webhookDeliveries", [Get("webhook-deliveries") as MethodDecoratorFactory], [[0, Req() as ParamDecoratorFactory]]);
+
+controller("partner-api/v1", PartnerApiController);
+decorate(PartnerApiController, "leads", [Get("leads") as MethodDecoratorFactory], [[0, Req() as ParamDecoratorFactory], [1, Query() as ParamDecoratorFactory]]);
+decorate(PartnerApiController, "notifications", [Get("notifications") as MethodDecoratorFactory], [[0, Req() as ParamDecoratorFactory], [1, Query() as ParamDecoratorFactory]]);
+decorate(PartnerApiController, "webhookEndpoints", [Get("webhook-endpoints") as MethodDecoratorFactory], [[0, Req() as ParamDecoratorFactory]]);
+decorate(PartnerApiController, "createWebhookEndpoint", [Post("webhook-endpoints") as MethodDecoratorFactory], [[0, Req() as ParamDecoratorFactory], [1, Body() as ParamDecoratorFactory]]);
+decorate(PartnerApiController, "updateWebhookEndpoint", [Patch("webhook-endpoints/:id") as MethodDecoratorFactory], [[0, Param("id") as ParamDecoratorFactory], [1, Req() as ParamDecoratorFactory], [2, Body() as ParamDecoratorFactory]]);
+
 export class RuntimeHttpWiringModule {}
 
 Module({
@@ -633,7 +723,9 @@ Module({
     AdminBillingFoundationController,
     AdminAIAssistanceController,
     AdminRuntimeSupportController,
-    AdminMessagingProvidersController
+    AdminMessagingProvidersController,
+    AdminPartnerIntegrationsController,
+    PartnerApiController
   ],
   providers: [AssurMatchRuntime, AuthRequiredHttpGuard, MfaRequiredHttpGuard],
   exports: [AssurMatchRuntime]

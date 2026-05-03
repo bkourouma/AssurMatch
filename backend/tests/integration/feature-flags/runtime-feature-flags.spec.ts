@@ -33,17 +33,19 @@ describe("runtime feature flags", () => {
     const admin: ActorContext = { actorId: "feature-flag-admin", roles: ["super_admin"], mfaVerified: true, correlationId: "feature-flag-denial" };
     try {
       const disable = new RapidDisableService(harness.runtime.featureFlags.service);
-      const protectedFlag = await disable.disable("global", undefined, "payments_enabled", "seed protected disabled flag", admin);
+      for (const key of ["payments_enabled", "partner_api_enabled", "partner_webhooks_enabled"]) {
+        const protectedFlag = await disable.disable("global", undefined, key, "seed protected disabled flag", admin);
 
-      const response = await harness.request(`/admin/feature-flags/${protectedFlag.id}`, {
-        method: "PATCH",
-        headers: { ...actorHeaders(admin), "content-type": "application/json" },
-        body: JSON.stringify({ value: true, reason: "attempt protected activation" })
-      });
+        const response = await harness.request(`/admin/feature-flags/${protectedFlag.id}`, {
+          method: "PATCH",
+          headers: { ...actorHeaders(admin), "content-type": "application/json" },
+          body: JSON.stringify({ value: true, reason: "attempt protected activation" })
+        });
 
-      expect(response.status).toBe(403);
-      expect(harness.runtime.featureFlags.service.list().find((flag) => flag.id === protectedFlag.id)?.value).toBe(false);
-      expect(harness.runtime.audit.writer.search({ action: featureFlagMutationRefusedAction, result: "refused" })).toHaveLength(1);
+        expect(response.status).toBe(403);
+        expect(harness.runtime.featureFlags.service.list().find((flag) => flag.id === protectedFlag.id)?.value).toBe(false);
+      }
+      expect(harness.runtime.audit.writer.search({ action: featureFlagMutationRefusedAction, result: "refused" })).toHaveLength(3);
     } finally {
       await harness.close();
     }

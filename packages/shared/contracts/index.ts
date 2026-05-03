@@ -11,5 +11,6 @@ export * from "./feature-flag.contracts";
 export * from "./messaging-provider.contracts";
 export * from "./ops.contracts";
 export * from "./partner.contracts";
+export * from "./partner-integration.contracts";
 export * from "./quote.contracts";
 export * from "./user.contracts";
