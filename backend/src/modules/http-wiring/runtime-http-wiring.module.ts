@@ -2,6 +2,7 @@ import { Body, Controller, Delete, Get, Module, Param, Patch, Post, Query, Req, 
 import { z } from "zod";
 import { activateRequestSchema, loginRequestSchema, mfaVerifyRequestSchema, passwordChangeRequestSchema, passwordResetRequestSchema, type ActivateRequest, type LoginRequest, type PasswordChangeRequest, type PasswordResetRequest } from "../../../../packages/shared/contracts/auth.contracts";
 import { activationChecklistQuerySchema } from "../../../../packages/shared/contracts/activation-checklist.contracts";
+import { billingFoundationQuerySchema } from "../../../../packages/shared/contracts/billing.contracts";
 import {
   brokerCrmAssignRequestSchema,
   brokerCrmDisputeCreateSchema,
@@ -456,6 +457,14 @@ export class AdminActivationChecklistController {
   }
 }
 
+export class AdminBillingFoundationController {
+  constructor(private readonly runtime: AssurMatchRuntime) {}
+
+  read(request: AssurMatchHttpRequest, query: Record<string, string>) {
+    return this.runtime.billing.foundation.read(protectedActorFromRequest(request), parseHttpInput(billingFoundationQuerySchema, query));
+  }
+}
+
 export class AdminRuntimeSupportController {
   constructor(private readonly runtime: AssurMatchRuntime) {}
 
@@ -565,6 +574,9 @@ decorate(AdminHealthController, "health", [Get("system/health") as MethodDecorat
 controller("admin", AdminActivationChecklistController, true);
 decorate(AdminActivationChecklistController, "read", [Get("activation-checklist") as MethodDecoratorFactory], [[0, Req() as ParamDecoratorFactory], [1, Query() as ParamDecoratorFactory]]);
 
+controller("admin", AdminBillingFoundationController, true);
+decorate(AdminBillingFoundationController, "read", [Get("billing/foundation") as MethodDecoratorFactory], [[0, Req() as ParamDecoratorFactory], [1, Query() as ParamDecoratorFactory]]);
+
 controller("admin", AdminRuntimeSupportController, true);
 decorate(AdminRuntimeSupportController, "quoteRequests", [Get("quote-requests") as MethodDecoratorFactory], [[0, Req() as ParamDecoratorFactory]]);
 decorate(AdminRuntimeSupportController, "leadAssignments", [Get("lead-assignments") as MethodDecoratorFactory], [[0, Req() as ParamDecoratorFactory]]);
@@ -587,6 +599,7 @@ Module({
     AdminAuditLogsController,
     AdminHealthController,
     AdminActivationChecklistController,
+    AdminBillingFoundationController,
     AdminRuntimeSupportController
   ],
   providers: [AssurMatchRuntime, AuthRequiredHttpGuard, MfaRequiredHttpGuard],

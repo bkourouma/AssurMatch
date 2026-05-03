@@ -1,6 +1,7 @@
 import { QuoteAISummaryService } from "../modules/ai/quote-summary/quote-ai-summary.service";
 import { ActivationChecklistModule } from "../modules/activation-checklist/activation-checklist.module";
 import { AIModule } from "../modules/ai/ai.module";
+import { BillingModule } from "../modules/billing/billing.module";
 import { AuditLogsModule } from "../modules/audit-logs/audit-logs.module";
 import { PrismaAuditLogRepository } from "../modules/audit-logs/audit-log-repository";
 import { ConfigModule } from "../config/config.module";
@@ -151,6 +152,12 @@ export class AssurMatchRuntime {
     offers: this.offers,
     quoteForms: this.quoteForms.service,
     consent: this.consent.service
+  });
+  readonly billing = new BillingModule({
+    audit: this.audit.writer,
+    featureFlags: this.featureFlags.service,
+    partners: this.partners.service,
+    assignments: this.leads.assignments
   });
 
   async onModuleInit(): Promise<void> {

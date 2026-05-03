@@ -201,6 +201,30 @@ export interface ActivationChecklistData {
   }>;
 }
 
+export interface BillingFoundationData {
+  generatedAt: string;
+  billingEnabled: boolean;
+  paymentsEnabled: false;
+  collectionEnabled: false;
+  currency: "XOF";
+  period: { from: string; to: string };
+  page: number;
+  pageSize: number;
+  total: number;
+  totals: { partners: number; acceptedLeadCount: number; disputedLeadCount: number };
+  partners: Array<{
+    partnerId: string;
+    partnerName: string;
+    plan: "starter" | "pro" | "enterprise";
+    acceptedLeadCount: number;
+    disputedLeadCount: number;
+    draftNonBillableReference: string;
+    invoiceStatus: "draft_not_billable";
+    paymentStatus: "not_applicable";
+  }>;
+  restrictions: string[];
+}
+
 const emptyAdminDashboard: AdminDashboardData = {
   window: { from: "", to: "" },
   scope: { countries: [], products: [], partnerId: null, role: "support_admin" },
@@ -220,6 +244,20 @@ const emptyActivationChecklist: ActivationChecklistData = {
   generatedAt: "",
   summary: { passed: 0, warning: 0, blocked: 0 },
   sections: []
+};
+const emptyBillingFoundation: BillingFoundationData = {
+  generatedAt: "",
+  billingEnabled: false,
+  paymentsEnabled: false,
+  collectionEnabled: false,
+  currency: "XOF",
+  period: { from: "", to: "" },
+  page: 1,
+  pageSize: 25,
+  total: 0,
+  totals: { partners: 0, acceptedLeadCount: 0, disputedLeadCount: 0 },
+  partners: [],
+  restrictions: []
 };
 
 async function readAdmin<T>(path: string, fallback: T): Promise<AdminApiState<T>> {
@@ -270,6 +308,15 @@ export function readActivationChecklist(filters: { country?: string; product?: s
   if (filters.partnerId) params.set("partnerId", filters.partnerId);
   const query = params.toString();
   return readAdmin<ActivationChecklistData>(`/admin/activation-checklist${query ? `?${query}` : ""}`, emptyActivationChecklist);
+}
+
+export function readBillingFoundation(filters: { partnerId?: string; page?: number; pageSize?: number } = {}) {
+  const params = new URLSearchParams();
+  if (filters.partnerId) params.set("partnerId", filters.partnerId);
+  if (filters.page) params.set("page", String(filters.page));
+  if (filters.pageSize) params.set("pageSize", String(filters.pageSize));
+  const query = params.toString();
+  return readAdmin<BillingFoundationData>(`/admin/billing/foundation${query ? `?${query}` : ""}`, emptyBillingFoundation);
 }
 
 export function readAdminUsers(filters: { role?: string; status?: string } = {}) {
