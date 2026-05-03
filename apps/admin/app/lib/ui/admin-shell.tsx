@@ -19,6 +19,7 @@ const navigationItems = [
   { label: "Billing", href: "/billing", match: ["/billing"] },
   { label: "Utilisateurs", href: "/users", match: ["/users"] },
   { label: "Feature flags", href: "/feature-flags", match: ["/feature-flags"] },
+  { label: "IA", href: "/ai-assistance", match: ["/ai-assistance"] },
   { label: "Conformite", href: "/compliance", match: ["/compliance", "/dashboard/compliance-alerts"] },
   { label: "Operations", href: "/operations", match: ["/operations", "/lead-assignments", "/prospects", "/quote-requests"] }
 ];

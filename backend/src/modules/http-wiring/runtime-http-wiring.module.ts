@@ -384,6 +384,12 @@ export class BrokerCrmController {
   aiFoundations(request: AssurMatchHttpRequest) {
     return this.runtime.leads.brokerCrmController.aiFoundations(protectedActorFromRequest(request));
   }
+
+  aiAssistance(request: AssurMatchHttpRequest) {
+    const assistance = this.runtime.ai.assistance;
+    if (!assistance) throw new Error("AI assistance is not configured");
+    return assistance.status(protectedActorFromRequest(request), "broker_crm");
+  }
 }
 
 export class BrokerDashboardController {
@@ -465,6 +471,16 @@ export class AdminBillingFoundationController {
   }
 }
 
+export class AdminAIAssistanceController {
+  constructor(private readonly runtime: AssurMatchRuntime) {}
+
+  read(request: AssurMatchHttpRequest) {
+    const assistance = this.runtime.ai.assistance;
+    if (!assistance) throw new Error("AI assistance is not configured");
+    return assistance.status(protectedActorFromRequest(request), "admin_platform");
+  }
+}
+
 export class AdminRuntimeSupportController {
   constructor(private readonly runtime: AssurMatchRuntime) {}
 
@@ -539,6 +555,7 @@ decorate(BrokerCrmController, "proposal", [Post("leads/:leadId/proposals") as Me
 decorate(BrokerCrmController, "dispute", [Post("leads/:leadId/disputes") as MethodDecoratorFactory], [[0, Param("leadId") as ParamDecoratorFactory], [1, Body() as ParamDecoratorFactory], [2, Req() as ParamDecoratorFactory]]);
 decorate(BrokerCrmController, "notifications", [Get("notifications") as MethodDecoratorFactory], [[0, Req() as ParamDecoratorFactory]]);
 decorate(BrokerCrmController, "aiFoundations", [Get("ai-foundations") as MethodDecoratorFactory], [[0, Req() as ParamDecoratorFactory]]);
+decorate(BrokerCrmController, "aiAssistance", [Get("ai-assistance") as MethodDecoratorFactory], [[0, Req() as ParamDecoratorFactory]]);
 
 controller("broker/dashboard", BrokerDashboardController, true);
 decorate(BrokerDashboardController, "dashboard", [Get() as MethodDecoratorFactory], [[0, Req() as ParamDecoratorFactory], [1, Query() as ParamDecoratorFactory]]);
@@ -577,6 +594,9 @@ decorate(AdminActivationChecklistController, "read", [Get("activation-checklist"
 controller("admin", AdminBillingFoundationController, true);
 decorate(AdminBillingFoundationController, "read", [Get("billing/foundation") as MethodDecoratorFactory], [[0, Req() as ParamDecoratorFactory], [1, Query() as ParamDecoratorFactory]]);
 
+controller("admin", AdminAIAssistanceController, true);
+decorate(AdminAIAssistanceController, "read", [Get("ai/assistance") as MethodDecoratorFactory], [[0, Req() as ParamDecoratorFactory]]);
+
 controller("admin", AdminRuntimeSupportController, true);
 decorate(AdminRuntimeSupportController, "quoteRequests", [Get("quote-requests") as MethodDecoratorFactory], [[0, Req() as ParamDecoratorFactory]]);
 decorate(AdminRuntimeSupportController, "leadAssignments", [Get("lead-assignments") as MethodDecoratorFactory], [[0, Req() as ParamDecoratorFactory]]);
@@ -600,6 +620,7 @@ Module({
     AdminHealthController,
     AdminActivationChecklistController,
     AdminBillingFoundationController,
+    AdminAIAssistanceController,
     AdminRuntimeSupportController
   ],
   providers: [AssurMatchRuntime, AuthRequiredHttpGuard, MfaRequiredHttpGuard],

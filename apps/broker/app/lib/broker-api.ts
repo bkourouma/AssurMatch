@@ -175,13 +175,40 @@ export interface BrokerDashboardData {
   licenseAlerts: BrokerDashboardLicenseAlert[];
 }
 
+export interface BrokerAIAssistanceData {
+  generatedAt: string;
+  surface: "broker_crm";
+  enabled: false;
+  modelCall: false;
+  humanValidationRequired: true;
+  auditPolicy: "metadata_only";
+  availableAssistTypes: string[];
+  flags: Array<{ key: string; value: boolean; required: boolean }>;
+  message: string;
+}
+
 const emptyDashboard: BrokerDashboardData = {
   plan: "starter",
   window: { from: "", to: "" },
   starter: { received: 0, accepted: 0, rejected: 0, disputed: 0, pendingAction: 0, averageFirstActionMinutes: null, byProduct: [], byCountry: [] },
   licenseAlerts: []
 };
+const emptyAIAssistance: BrokerAIAssistanceData = {
+  generatedAt: "",
+  surface: "broker_crm",
+  enabled: false,
+  modelCall: false,
+  humanValidationRequired: true,
+  auditPolicy: "metadata_only",
+  availableAssistTypes: [],
+  flags: [],
+  message: ""
+};
 
 export function readBrokerDashboard() {
   return readBroker<BrokerDashboardData>("/broker/dashboard", emptyDashboard);
+}
+
+export function readBrokerAIAssistance() {
+  return readBroker<BrokerAIAssistanceData>("/broker/crm/ai-assistance", emptyAIAssistance);
 }

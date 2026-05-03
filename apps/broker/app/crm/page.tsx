@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import { isStarterCrmDenied, loginRedirect, readBackOfficeSession } from "../lib/backoffice-auth";
-import { readBrokerDashboard } from "../lib/broker-api";
+import { readBrokerAIAssistance, readBrokerDashboard } from "../lib/broker-api";
 import { Badge, Card, KpiCard, PageHeader, StateMessage } from "../lib/ui/broker-ui";
 import { crmKpis, dashboardKpis } from "../lib/ui/broker-view-models";
 
@@ -40,6 +40,7 @@ export default async function BrokerCrmPage() {
   }
 
   const dashboard = await readBrokerDashboard();
+  const aiAssistance = await readBrokerAIAssistance();
   if (dashboard.unauthenticated) redirect(loginRedirect("/crm", dashboard.error ?? "session_required"));
   if (dashboard.forbidden) {
     return (
@@ -112,6 +113,18 @@ export default async function BrokerCrmPage() {
           {starterBlocked ? "Le CRM complet est disponible avec le plan Pro." : "Le flag broker_crm_enabled est ferme ou le scope ne permet pas le CRM avance."}
         </StateMessage>
       )}
+
+      {aiAssistance.status === "success" ? (
+        <Card plain>
+          <h2 className="section-title">Assistance IA</h2>
+          <div className="broker-grid">
+            <Badge tone="disabled">enabled: false</Badge>
+            <Badge tone="disabled">modelCall: false</Badge>
+            <Badge tone="warning">validation humaine obligatoire</Badge>
+          </div>
+          <p className="page-description">{aiAssistance.data.message}</p>
+        </Card>
+      ) : null}
 
       {dashboard.data.licenseAlerts.length > 0 ? (
         <Card plain>

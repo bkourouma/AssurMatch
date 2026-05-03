@@ -225,6 +225,24 @@ export interface BillingFoundationData {
   restrictions: string[];
 }
 
+export interface AIAssistanceData {
+  generatedAt: string;
+  surface: "broker_crm" | "admin_platform";
+  enabled: false;
+  modelCall: false;
+  humanValidationRequired: true;
+  auditPolicy: "metadata_only";
+  availableAssistTypes: string[];
+  flags: Array<{ key: string; value: boolean; required: boolean }>;
+  guardrails: {
+    centralAiModuleOnly: true;
+    piiMinimized: true;
+    outputIsAdvisory: true;
+    noAutomatedDecision: true;
+  };
+  message: string;
+}
+
 const emptyAdminDashboard: AdminDashboardData = {
   window: { from: "", to: "" },
   scope: { countries: [], products: [], partnerId: null, role: "support_admin" },
@@ -258,6 +276,18 @@ const emptyBillingFoundation: BillingFoundationData = {
   totals: { partners: 0, acceptedLeadCount: 0, disputedLeadCount: 0 },
   partners: [],
   restrictions: []
+};
+const emptyAIAssistance: AIAssistanceData = {
+  generatedAt: "",
+  surface: "admin_platform",
+  enabled: false,
+  modelCall: false,
+  humanValidationRequired: true,
+  auditPolicy: "metadata_only",
+  availableAssistTypes: [],
+  flags: [],
+  guardrails: { centralAiModuleOnly: true, piiMinimized: true, outputIsAdvisory: true, noAutomatedDecision: true },
+  message: ""
 };
 
 async function readAdmin<T>(path: string, fallback: T): Promise<AdminApiState<T>> {
@@ -317,6 +347,10 @@ export function readBillingFoundation(filters: { partnerId?: string; page?: numb
   if (filters.pageSize) params.set("pageSize", String(filters.pageSize));
   const query = params.toString();
   return readAdmin<BillingFoundationData>(`/admin/billing/foundation${query ? `?${query}` : ""}`, emptyBillingFoundation);
+}
+
+export function readAdminAIAssistance() {
+  return readAdmin<AIAssistanceData>("/admin/ai/assistance", emptyAIAssistance);
 }
 
 export function readAdminUsers(filters: { role?: string; status?: string } = {}) {
