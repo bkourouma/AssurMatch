@@ -7,6 +7,16 @@ import { leadSummary } from "../../lib/ui/broker-view-models";
 export default async function BrokerCrmLeadsPage() {
   const apiLeads = await listCrmLeads();
   if (apiLeads.unauthenticated) redirect(loginRedirect("/crm/leads", apiLeads.error ?? "session_required"));
+  if (apiLeads.forbidden) {
+    return (
+      <div className="page-stack">
+        <StateMessage tone="danger" title="Acces CRM refuse">
+          Acces CRM refuse, verifiez le plan, la MFA et le flag broker_crm_enabled. Aucune donnee CRM n'est affichee.
+        </StateMessage>
+      </div>
+    );
+  }
+
   const leads = apiLeads.data.items.map(leadSummary);
 
   return (
@@ -34,25 +44,22 @@ export default async function BrokerCrmLeadsPage() {
         <input placeholder="Nom, reference, telephone ou email selon permission" />
       </label>
 
-      {apiLeads.forbidden ? <StateMessage tone="danger">Acces CRM refuse, verifiez le plan, la MFA et le flag broker_crm_enabled. Aucune donnee CRM n'est affichee.</StateMessage> : null}
-      {apiLeads.error && !apiLeads.forbidden ? <StateMessage tone="warning">API CRM indisponible. Aucune donnee protegee n'est affichee en mode erreur.</StateMessage> : null}
+      {apiLeads.error ? <StateMessage tone="warning">API CRM indisponible. Aucune donnee protegee n'est affichee en mode erreur.</StateMessage> : null}
 
-      {!apiLeads.forbidden ? (
-        <DataTable
-          items={leads}
-          getKey={(lead) => lead.id}
-          emptyLabel="Aucun lead CRM autorise a afficher."
-          columns={[
-            { header: "Reference", render: (lead) => <a href={`/crm/leads/${lead.id}`}>{lead.reference}</a> },
-            { header: "Pays", render: (lead) => lead.country },
-            { header: "Produit", render: (lead) => lead.product },
-            { header: "Statut", render: (lead) => <Badge tone={lead.statusTone}>{lead.status}</Badge> },
-            { header: "Conseiller", render: (lead) => lead.advisor ?? "-" },
-            { header: "Urgence", render: (lead) => lead.urgency ?? "-" },
-            { header: "Source", render: (lead) => lead.source ?? "-" }
-          ]}
-        />
-      ) : null}
+      <DataTable
+        items={leads}
+        getKey={(lead) => lead.id}
+        emptyLabel="Aucun lead CRM autorise a afficher."
+        columns={[
+          { header: "Reference", render: (lead) => <a href={`/crm/leads/${lead.id}`}>{lead.reference}</a> },
+          { header: "Pays", render: (lead) => lead.country },
+          { header: "Produit", render: (lead) => lead.product },
+          { header: "Statut", render: (lead) => <Badge tone={lead.statusTone}>{lead.status}</Badge> },
+          { header: "Conseiller", render: (lead) => lead.advisor ?? "-" },
+          { header: "Urgence", render: (lead) => lead.urgency ?? "-" },
+          { header: "Source", render: (lead) => lead.source ?? "-" }
+        ]}
+      />
     </div>
   );
 }

@@ -58,6 +58,8 @@ test("Starter CRM entry points show required Pro availability message", () => {
   for (const fileSource of [crm, leads, detail, viewModels]) {
     expect(fileSource).toContain("Le CRM complet est disponible avec le plan Pro.");
   }
+  expect(crm.indexOf("const session = await readBackOfficeSession();")).toBeLessThan(crm.indexOf("const dashboard = await readBrokerDashboard();"));
+  expect(crm.indexOf("if (isStarterCrmDenied(session.profile))")).toBeLessThan(crm.indexOf("const dashboard = await readBrokerDashboard();"));
   expect(detail).toContain("ne presente pas Kanban");
 });
 
@@ -70,6 +72,8 @@ test("Pro and Enterprise CRM surfaces are gated by plan/flag availability", () =
   expect(crm).toContain("Module indisponible");
   expect(crmList).toContain("Acces CRM refuse");
   expect(crmList).toContain("flag broker_crm_enabled");
+  expect(crmList.indexOf("if (apiLeads.forbidden)")).toBeLessThan(crmList.indexOf("const leads = apiLeads.data.items.map(leadSummary);"));
+  expect(crmList.indexOf("if (apiLeads.forbidden)")).toBeLessThan(crmList.indexOf("<PageHeader"));
   expect(crmDetail).toContain("isStarterCrmDenied");
   expect(crmDetail).toContain("CRM autorise");
 });

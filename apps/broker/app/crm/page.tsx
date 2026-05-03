@@ -1,10 +1,44 @@
 import { redirect } from "next/navigation";
-import { loginRedirect } from "../lib/backoffice-auth";
+import { isStarterCrmDenied, loginRedirect, readBackOfficeSession } from "../lib/backoffice-auth";
 import { readBrokerDashboard } from "../lib/broker-api";
 import { Badge, Card, KpiCard, PageHeader, StateMessage } from "../lib/ui/broker-ui";
 import { crmKpis, dashboardKpis } from "../lib/ui/broker-view-models";
 
 export default async function BrokerCrmPage() {
+  const session = await readBackOfficeSession();
+  if (session.status !== "authenticated") {
+    if (session.status === "unauthenticated" || session.status === "expired") redirect(loginRedirect("/crm", session.error ?? "session_required"));
+    if (session.status === "mfa_required") redirect(loginRedirect("/crm", "mfa_required"));
+    if (session.status === "forbidden") {
+      return (
+        <div className="page-stack">
+          <PageHeader
+            kicker="CRM"
+            title="Acces CRM refuse"
+            description="Le CRM courtier exige un courtier authentifie, la MFA verifiee et les permissions CRM."
+          />
+        </div>
+      );
+    }
+
+    return <StateMessage tone="warning">CRM indisponible: {session.error ?? "erreur inconnue"}.</StateMessage>;
+  }
+  if (isStarterCrmDenied(session.profile)) {
+    return (
+      <div className="page-stack">
+        <PageHeader
+          kicker="CRM"
+          title="CRM complet indisponible"
+          description="Le portail Starter reste centre sur les leads recus et leurs actions autorisees."
+          actions={<Badge tone="disabled">Module indisponible</Badge>}
+        />
+        <StateMessage tone="info" title="Plan Starter">
+          Le CRM complet est disponible avec le plan Pro.
+        </StateMessage>
+      </div>
+    );
+  }
+
   const dashboard = await readBrokerDashboard();
   if (dashboard.unauthenticated) redirect(loginRedirect("/crm", dashboard.error ?? "session_required"));
   if (dashboard.forbidden) {
