@@ -275,6 +275,20 @@ export interface PartnerIntegrationsData {
       updatedAt: string;
     }>;
   };
+  webhookAllowlist: {
+    generatedAt: string;
+    total: number;
+    items: Array<{
+      id: string;
+      partnerTenantId: string;
+      origin: string;
+      path?: string;
+      status: "active" | "revoked";
+      createdAt: string;
+      updatedAt: string;
+      revokedAt?: string;
+    }>;
+  };
   webhookDeliveries: {
     generatedAt: string;
     total: number;
@@ -345,6 +359,7 @@ const emptyAIAssistance: AIAssistanceData = {
 const emptyPartnerIntegrations: PartnerIntegrationsData = {
   apiKeys: { generatedAt: "", total: 0, items: [] },
   webhookEndpoints: { generatedAt: "", total: 0, items: [] },
+  webhookAllowlist: { generatedAt: "", total: 0, items: [] },
   webhookDeliveries: { generatedAt: "", total: 0, items: [] }
 };
 
@@ -412,18 +427,19 @@ export function readAdminAIAssistance() {
 }
 
 export async function readPartnerIntegrations(): Promise<AdminApiState<PartnerIntegrationsData>> {
-  const [apiKeys, webhookEndpoints, webhookDeliveries] = await Promise.all([
+  const [apiKeys, webhookEndpoints, webhookAllowlist, webhookDeliveries] = await Promise.all([
     readAdmin<PartnerIntegrationsData["apiKeys"]>("/admin/partner-integrations/api-keys", emptyPartnerIntegrations.apiKeys),
     readAdmin<PartnerIntegrationsData["webhookEndpoints"]>("/admin/partner-integrations/webhook-endpoints", emptyPartnerIntegrations.webhookEndpoints),
+    readAdmin<PartnerIntegrationsData["webhookAllowlist"]>("/admin/partner-integrations/webhook-allowlist", emptyPartnerIntegrations.webhookAllowlist),
     readAdmin<PartnerIntegrationsData["webhookDeliveries"]>("/admin/partner-integrations/webhook-deliveries", emptyPartnerIntegrations.webhookDeliveries)
   ]);
-  const status = [apiKeys.status, webhookEndpoints.status, webhookDeliveries.status].find((item) => item !== "success") ?? "success";
-  const error = apiKeys.error ?? webhookEndpoints.error ?? webhookDeliveries.error;
-  const unauthenticated = apiKeys.unauthenticated || webhookEndpoints.unauthenticated || webhookDeliveries.unauthenticated;
-  const forbidden = apiKeys.forbidden || webhookEndpoints.forbidden || webhookDeliveries.forbidden;
+  const status = [apiKeys.status, webhookEndpoints.status, webhookAllowlist.status, webhookDeliveries.status].find((item) => item !== "success") ?? "success";
+  const error = apiKeys.error ?? webhookEndpoints.error ?? webhookAllowlist.error ?? webhookDeliveries.error;
+  const unauthenticated = apiKeys.unauthenticated || webhookEndpoints.unauthenticated || webhookAllowlist.unauthenticated || webhookDeliveries.unauthenticated;
+  const forbidden = apiKeys.forbidden || webhookEndpoints.forbidden || webhookAllowlist.forbidden || webhookDeliveries.forbidden;
   return {
     status,
-    data: { apiKeys: apiKeys.data, webhookEndpoints: webhookEndpoints.data, webhookDeliveries: webhookDeliveries.data },
+    data: { apiKeys: apiKeys.data, webhookEndpoints: webhookEndpoints.data, webhookAllowlist: webhookAllowlist.data, webhookDeliveries: webhookDeliveries.data },
     ...(unauthenticated ? { unauthenticated } : {}),
     ...(forbidden ? { forbidden } : {}),
     ...(error ? { error } : {})

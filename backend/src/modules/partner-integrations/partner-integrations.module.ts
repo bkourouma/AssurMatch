@@ -12,3 +12,4 @@ export { PartnerIntegrationAuditActions } from "./partner-integration-audit-acti
 export { MemoryPartnerIntegrationsRepository, PrismaPartnerIntegrationsRepository, type PartnerIntegrationsRepository } from "./partner-integrations.repository";
 export { PartnerIntegrationAccessRefusedError, PartnerIntegrationsService } from "./partner-integrations.service";
 export { signWebhookPayload, verifyWebhookSignature } from "./webhook-signature.service";
+export { assertWebhookDnsPublic, assertWebhookUrlShape, nodeWebhookDnsResolver, type WebhookDnsResolver } from "./webhook-url-policy";

@@ -1,4 +1,4 @@
-import type { PartnerApiKeyStatus, PartnerApiScope, PartnerWebhookDeliveryStatus, PartnerWebhookEndpointStatus, PartnerWebhookEventType } from "../../../../packages/shared/contracts/partner-integration.contracts";
+import type { PartnerApiKeyStatus, PartnerApiScope, PartnerWebhookAllowlistStatus, PartnerWebhookDeliveryStatus, PartnerWebhookEndpointStatus, PartnerWebhookEventType } from "../../../../packages/shared/contracts/partner-integration.contracts";
 import type { PrismaService } from "../common/prisma/prisma.service";
 import { assertRuntimeRepository, type RuntimeRepository } from "../common/repositories/runtime-repository";
 
@@ -41,11 +41,23 @@ export interface PartnerWebhookDeliveryRecord {
   payloadMetadata: Record<string, unknown>;
   status: PartnerWebhookDeliveryStatus;
   attemptCount: number;
-  nextAttemptAt?: Date;
+  nextAttemptAt?: Date | null;
   lastResponseClass?: string;
   idempotencyKey: string;
   createdAt: Date;
   updatedAt: Date;
+}
+
+export interface PartnerWebhookAllowlistRecord {
+  id: string;
+  partnerTenantId: string;
+  origin: string;
+  path?: string;
+  status: PartnerWebhookAllowlistStatus;
+  revokedAt?: Date;
+  createdAt: Date;
+  updatedAt: Date;
+  createdById?: string;
 }
 
 export interface PartnerIntegrationsRepository extends RuntimeRepository {
@@ -58,15 +70,21 @@ export interface PartnerIntegrationsRepository extends RuntimeRepository {
   updateEndpoint(id: string, update: Partial<PartnerWebhookEndpointRecord>): Promise<PartnerWebhookEndpointRecord>;
   listEndpoints(): Promise<PartnerWebhookEndpointRecord[]>;
   requireEndpoint(id: string): Promise<PartnerWebhookEndpointRecord>;
+  createAllowlistEntry(record: PartnerWebhookAllowlistRecord): Promise<PartnerWebhookAllowlistRecord>;
+  updateAllowlistEntry(id: string, update: Partial<PartnerWebhookAllowlistRecord>): Promise<PartnerWebhookAllowlistRecord>;
+  listAllowlistEntries(): Promise<PartnerWebhookAllowlistRecord[]>;
+  requireAllowlistEntry(id: string): Promise<PartnerWebhookAllowlistRecord>;
   createDelivery(record: PartnerWebhookDeliveryRecord): Promise<PartnerWebhookDeliveryRecord>;
   updateDelivery(id: string, update: Partial<PartnerWebhookDeliveryRecord>): Promise<PartnerWebhookDeliveryRecord>;
   listDeliveries(): Promise<PartnerWebhookDeliveryRecord[]>;
+  requireDelivery(id: string): Promise<PartnerWebhookDeliveryRecord>;
 }
 
 export class MemoryPartnerIntegrationsRepository implements PartnerIntegrationsRepository {
   readonly mode = "memory-test" as const;
   private readonly apiKeys: PartnerApiKeyRecord[] = [];
   private readonly endpoints: PartnerWebhookEndpointRecord[] = [];
+  private readonly allowlistEntries: PartnerWebhookAllowlistRecord[] = [];
   private readonly deliveries: PartnerWebhookDeliveryRecord[] = [];
 
   constructor() {
@@ -119,6 +137,27 @@ export class MemoryPartnerIntegrationsRepository implements PartnerIntegrationsR
     return record;
   }
 
+  async createAllowlistEntry(record: PartnerWebhookAllowlistRecord): Promise<PartnerWebhookAllowlistRecord> {
+    this.allowlistEntries.push(record);
+    return record;
+  }
+
+  async updateAllowlistEntry(id: string, update: Partial<PartnerWebhookAllowlistRecord>): Promise<PartnerWebhookAllowlistRecord> {
+    const record = await this.requireAllowlistEntry(id);
+    Object.assign(record, update);
+    return record;
+  }
+
+  async listAllowlistEntries(): Promise<PartnerWebhookAllowlistRecord[]> {
+    return [...this.allowlistEntries];
+  }
+
+  async requireAllowlistEntry(id: string): Promise<PartnerWebhookAllowlistRecord> {
+    const record = this.allowlistEntries.find((candidate) => candidate.id === id);
+    if (!record) throw new Error(`Partner webhook allow-list entry ${id} not found`);
+    return record;
+  }
+
   async createDelivery(record: PartnerWebhookDeliveryRecord): Promise<PartnerWebhookDeliveryRecord> {
     this.deliveries.push(record);
     return record;
@@ -133,6 +172,12 @@ export class MemoryPartnerIntegrationsRepository implements PartnerIntegrationsR
 
   async listDeliveries(): Promise<PartnerWebhookDeliveryRecord[]> {
     return [...this.deliveries];
+  }
+
+  async requireDelivery(id: string): Promise<PartnerWebhookDeliveryRecord> {
+    const record = this.deliveries.find((candidate) => candidate.id === id);
+    if (!record) throw new Error(`Partner webhook delivery ${id} not found`);
+    return record;
   }
 }
 
@@ -190,6 +235,24 @@ export class PrismaPartnerIntegrationsRepository implements PartnerIntegrationsR
     return this.toEndpoint(row);
   }
 
+  async createAllowlistEntry(record: PartnerWebhookAllowlistRecord): Promise<PartnerWebhookAllowlistRecord> {
+    return this.toAllowlistEntry(await this.allowlist().create({ data: record }));
+  }
+
+  async updateAllowlistEntry(id: string, update: Partial<PartnerWebhookAllowlistRecord>): Promise<PartnerWebhookAllowlistRecord> {
+    return this.toAllowlistEntry(await this.allowlist().update({ where: { id }, data: this.clean(update) }));
+  }
+
+  async listAllowlistEntries(): Promise<PartnerWebhookAllowlistRecord[]> {
+    return (await this.allowlist().findMany({ orderBy: { createdAt: "desc" } })).map((row) => this.toAllowlistEntry(row));
+  }
+
+  async requireAllowlistEntry(id: string): Promise<PartnerWebhookAllowlistRecord> {
+    const row = await this.allowlist().findUnique({ where: { id } });
+    if (!row) throw new Error(`Partner webhook allow-list entry ${id} not found`);
+    return this.toAllowlistEntry(row);
+  }
+
   async createDelivery(record: PartnerWebhookDeliveryRecord): Promise<PartnerWebhookDeliveryRecord> {
     return this.toDelivery(await this.deliveries().create({ data: record }));
   }
@@ -202,6 +265,12 @@ export class PrismaPartnerIntegrationsRepository implements PartnerIntegrationsR
     return (await this.deliveries().findMany({ orderBy: { createdAt: "desc" } })).map((row) => this.toDelivery(row));
   }
 
+  async requireDelivery(id: string): Promise<PartnerWebhookDeliveryRecord> {
+    const row = await this.deliveries().findUnique({ where: { id } });
+    if (!row) throw new Error(`Partner webhook delivery ${id} not found`);
+    return this.toDelivery(row);
+  }
+
   private apiKeys(): Delegate {
     return (this.prisma.requireRuntimeClient() as unknown as { partnerApiKey: Delegate }).partnerApiKey;
   }
@@ -212,6 +281,10 @@ export class PrismaPartnerIntegrationsRepository implements PartnerIntegrationsR
 
   private deliveries(): Delegate {
     return (this.prisma.requireRuntimeClient() as unknown as { partnerWebhookDelivery: Delegate }).partnerWebhookDelivery;
+  }
+
+  private allowlist(): Delegate {
+    return (this.prisma.requireRuntimeClient() as unknown as { partnerWebhookAllowlistEntry: Delegate }).partnerWebhookAllowlistEntry;
   }
 
   private clean(update: Record<string, unknown>): Record<string, unknown> {
@@ -228,5 +301,9 @@ export class PrismaPartnerIntegrationsRepository implements PartnerIntegrationsR
 
   private toDelivery(row: unknown): PartnerWebhookDeliveryRecord {
     return row as PartnerWebhookDeliveryRecord;
+  }
+
+  private toAllowlistEntry(row: unknown): PartnerWebhookAllowlistRecord {
+    return row as PartnerWebhookAllowlistRecord;
   }
 }

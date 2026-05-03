@@ -28,6 +28,7 @@ export default async function PartnerIntegrationsPage() {
           <section className="admin-grid admin-grid--kpi" aria-label="Synthese integrations partenaires">
             <KpiCard label="Cles API" value={integrations.data.apiKeys.total} />
             <KpiCard label="Endpoints webhook" value={integrations.data.webhookEndpoints.total} tone="info" />
+            <KpiCard label="Origines autorisees" value={integrations.data.webhookAllowlist.total} tone="success" />
             <KpiCard label="Livraisons journalisees" value={integrations.data.webhookDeliveries.total} tone="warning" />
           </section>
 
@@ -39,6 +40,8 @@ export default async function PartnerIntegrationsPage() {
                 <Badge tone="disabled">partner_webhooks_enabled: desactive par defaut</Badge>
                 <Badge tone="success">cles hachees Argon2</Badge>
                 <Badge tone="success">secrets webhook chiffres</Badge>
+                <Badge tone="success">allow-list tenant obligatoire</Badge>
+                <Badge tone="disabled">redirects HTTP bloques</Badge>
               </div>
             </Card>
             <Card>
@@ -64,6 +67,21 @@ export default async function PartnerIntegrationsPage() {
               items={integrations.data.apiKeys.items}
               getKey={(key) => key.id}
               emptyLabel="Aucune cle API partenaire configuree."
+            />
+          </Card>
+
+          <Card>
+            <h2 className="section-title">Allow-list webhook</h2>
+            <DataTable
+              columns={[
+                { header: "Origine", render: (entry) => <code>{entry.origin}</code> },
+                { header: "Chemin", render: (entry) => entry.path ? <code>{entry.path}</code> : "tous chemins" },
+                { header: "Partenaire", render: (entry) => <code>{entry.partnerTenantId}</code> },
+                { header: "Statut", render: (entry) => <Badge tone={statusTone(entry.status)}>{entry.status}</Badge> }
+              ]}
+              items={integrations.data.webhookAllowlist.items}
+              getKey={(entry) => entry.id}
+              emptyLabel="Aucune origine webhook autorisee."
             />
           </Card>
 

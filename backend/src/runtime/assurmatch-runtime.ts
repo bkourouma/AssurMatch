@@ -173,6 +173,7 @@ export class AssurMatchRuntime {
     partners: this.partners.service,
     assignments: this.leads.assignments,
     notifications: this.notifications.service,
+    webhookDeliveryEnabled: process.env.ASSURMATCH_PARTNER_WEBHOOK_DELIVERY_ENABLED === "true",
     ...(this.partnerIntegrationsRepository ? { repository: this.partnerIntegrationsRepository } : {})
   });
 

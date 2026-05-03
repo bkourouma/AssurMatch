@@ -337,6 +337,11 @@ enum PartnerWebhookDeliveryStatus {
   dead_letter
 }
 
+enum PartnerWebhookAllowlistStatus {
+  active
+  revoked
+}
+
 enum PartnerWebhookEventType {
   lead_assigned
   lead_status_changed
@@ -1042,6 +1047,21 @@ model PartnerWebhookEndpoint {
   createdById     String?
 
   @@index([partnerTenantId, status])
+}
+
+model PartnerWebhookAllowlistEntry {
+  id              String                        @id @default(uuid())
+  partnerTenantId String
+  origin          String
+  path            String?
+  status          PartnerWebhookAllowlistStatus @default(active)
+  revokedAt       DateTime?
+  createdAt       DateTime                      @default(now())
+  updatedAt       DateTime                      @updatedAt
+  createdById     String?
+
+  @@index([partnerTenantId, status])
+  @@unique([partnerTenantId, origin, path])
 }
 
 model PartnerWebhookDelivery {

@@ -6,6 +6,7 @@ import { billingFoundationQuerySchema } from "../../../../packages/shared/contra
 import {
   partnerApiKeyCreateSchema,
   partnerApiPaginationQuerySchema,
+  partnerWebhookAllowlistCreateSchema,
   partnerWebhookEndpointCreateSchema,
   partnerWebhookEndpointUpdateSchema
 } from "../../../../packages/shared/contracts/partner-integration.contracts";
@@ -543,6 +544,18 @@ export class AdminPartnerIntegrationsController {
   webhookDeliveries(request: AssurMatchHttpRequest) {
     return this.runtime.partnerIntegrations.service.listWebhookDeliveries(protectedActorFromRequest(request));
   }
+
+  webhookAllowlist(request: AssurMatchHttpRequest) {
+    return this.runtime.partnerIntegrations.service.listWebhookAllowlist(protectedActorFromRequest(request));
+  }
+
+  createWebhookAllowlist(request: AssurMatchHttpRequest, input: unknown) {
+    return this.runtime.partnerIntegrations.service.createWebhookAllowlistEntry(protectedActorFromRequest(request), parseHttpInput(partnerWebhookAllowlistCreateSchema, input));
+  }
+
+  revokeWebhookAllowlist(id: string, input: unknown, request: AssurMatchHttpRequest) {
+    return this.runtime.partnerIntegrations.service.revokeWebhookAllowlistEntry(protectedActorFromRequest(request), parseParam("id", id, uuidSchema), input);
+  }
 }
 
 export class PartnerApiController {
@@ -694,6 +707,9 @@ decorate(AdminPartnerIntegrationsController, "webhookEndpoints", [Get("webhook-e
 decorate(AdminPartnerIntegrationsController, "createWebhookEndpoint", [Post("webhook-endpoints") as MethodDecoratorFactory], [[0, Req() as ParamDecoratorFactory], [1, Body() as ParamDecoratorFactory]]);
 decorate(AdminPartnerIntegrationsController, "updateWebhookEndpoint", [Patch("webhook-endpoints/:id") as MethodDecoratorFactory], [[0, Param("id") as ParamDecoratorFactory], [1, Body() as ParamDecoratorFactory], [2, Req() as ParamDecoratorFactory]]);
 decorate(AdminPartnerIntegrationsController, "webhookDeliveries", [Get("webhook-deliveries") as MethodDecoratorFactory], [[0, Req() as ParamDecoratorFactory]]);
+decorate(AdminPartnerIntegrationsController, "webhookAllowlist", [Get("webhook-allowlist") as MethodDecoratorFactory], [[0, Req() as ParamDecoratorFactory]]);
+decorate(AdminPartnerIntegrationsController, "createWebhookAllowlist", [Post("webhook-allowlist") as MethodDecoratorFactory], [[0, Req() as ParamDecoratorFactory], [1, Body() as ParamDecoratorFactory]]);
+decorate(AdminPartnerIntegrationsController, "revokeWebhookAllowlist", [Post("webhook-allowlist/:id/revoke") as MethodDecoratorFactory], [[0, Param("id") as ParamDecoratorFactory], [1, Body() as ParamDecoratorFactory], [2, Req() as ParamDecoratorFactory]]);
 
 controller("partner-api/v1", PartnerApiController);
 decorate(PartnerApiController, "leads", [Get("leads") as MethodDecoratorFactory], [[0, Req() as ParamDecoratorFactory], [1, Query() as ParamDecoratorFactory]]);

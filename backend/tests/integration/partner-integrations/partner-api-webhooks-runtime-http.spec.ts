@@ -1,6 +1,8 @@
 import { afterEach, describe, expect, it } from "vitest";
 import { partnerApiKeyCreateResponseSchema, partnerApiKeysResponseSchema, partnerApiLeadsResponseSchema, partnerWebhookDeliveriesResponseSchema, partnerWebhookEndpointCreateResponseSchema, partnerWebhookEndpointsResponseSchema } from "../../../../packages/shared/contracts";
 import { PartnerIntegrationAuditActions } from "../../../src/modules/partner-integrations/partner-integrations.module";
+import { MemoryPartnerIntegrationsRepository } from "../../../src/modules/partner-integrations/partner-integrations.repository";
+import { PartnerIntegrationsService } from "../../../src/modules/partner-integrations/partner-integrations.service";
 import { signWebhookPayload, verifyWebhookSignature } from "../../../src/modules/partner-integrations/webhook-signature.service";
 import { actorHeaders, createRuntimeHttpHarness, readJson, simulationActorHeaders, type RuntimeHttpHarness } from "../runtime-http-test-utils";
 
@@ -131,6 +133,19 @@ describe("partner API and webhooks runtime HTTP", () => {
       body: JSON.stringify({ partnerTenantId: partner.id, url: "https://127.0.0.1/hooks", eventTypes: ["lead.assigned"], reason: "Partner webhook unsafe URL test" })
     });
     expect(unsafe.status).toBe(400);
+    const query = await harness.request("/admin/partner-integrations/webhook-endpoints", {
+      method: "POST",
+      headers: { ...actorHeaders(admin), "content-type": "application/json" },
+      body: JSON.stringify({ partnerTenantId: partner.id, url: "https://hooks.partner.example/assurmatch?token=bad", eventTypes: ["lead.assigned"], reason: "Partner webhook query URL test" })
+    });
+    expect(query.status).toBe(400);
+
+    const allowlist = await harness.request("/admin/partner-integrations/webhook-allowlist", {
+      method: "POST",
+      headers: { ...actorHeaders(admin), "content-type": "application/json" },
+      body: JSON.stringify({ partnerTenantId: partner.id, origin: "https://hooks.partner.example", path: "/assurmatch", reason: "Partner webhook allow-list test" })
+    });
+    expect(allowlist.status).toBe(201);
 
     const endpointResponse = await harness.request("/admin/partner-integrations/webhook-endpoints", {
       method: "POST",
@@ -176,6 +191,137 @@ describe("partner API and webhooks runtime HTTP", () => {
     const signature = signWebhookPayload(created.signingSecret, timestamp, "evt_test", "idem_test", payload);
     expect(verifyWebhookSignature({ secret: created.signingSecret, timestamp, eventId: "evt_test", idempotencyKey: "idem_test", payload, signature })).toBe(true);
     expect(verifyWebhookSignature({ secret: created.signingSecret, timestamp: String(Number(timestamp) - 1000), eventId: "evt_test", idempotencyKey: "idem_test", payload, signature })).toBe(false);
+  });
+
+  it("delivers only from the worker gate with DNS recheck, no redirects and redacted persistence", async () => {
+    harness = await createRuntimeHttpHarness();
+    enableFlag(harness, "partner_webhooks_enabled");
+    const admin = { actorId: "super", roles: ["super_admin" as const], mfaVerified: true };
+    const partner = await harness.runtime.partners.service.create({
+      legalName: "Delivery Broker",
+      plan: "enterprise",
+      primaryEmail: "delivery@broker.example",
+      primaryWhatsApp: "+2250102030405",
+      status: "active",
+      quotaMonthlyLeads: 10
+    }, admin);
+    const repository = new MemoryPartnerIntegrationsRepository();
+    let fetchCount = 0;
+    let capturedSignature = "";
+    const service = new PartnerIntegrationsService({
+      audit: harness.runtime.audit.writer,
+      featureFlags: harness.runtime.featureFlags.service,
+      partners: harness.runtime.partners.service,
+      assignments: harness.runtime.leads.assignments,
+      notifications: harness.runtime.notifications.service,
+      repository,
+      webhookDeliveryEnabled: true,
+      enforceDnsValidation: true,
+      dnsResolver: { lookup: async () => [{ address: "93.184.216.34", family: 4 }] },
+      fetch: async (_url, init) => {
+        fetchCount += 1;
+        capturedSignature = new Headers(init?.headers).get("X-AssurMatch-Signature") ?? "";
+        return { status: 204 } as Response;
+      }
+    });
+    await service.createWebhookAllowlistEntry(admin, { partnerTenantId: partner.id, origin: "https://hooks.partner.example", path: "/assurmatch", reason: "Partner webhook delivery allow-list" });
+    const endpoint = await service.createWebhookEndpoint(admin, { partnerTenantId: partner.id, url: "https://hooks.partner.example/assurmatch", eventTypes: ["lead.assigned"], reason: "Partner webhook delivery endpoint" });
+    await service.updateWebhookEndpoint(admin, endpoint.endpoint.id, { status: "active", reason: "Activate worker delivery test" });
+    await service.prepareWebhookDelivery({
+      partnerTenantId: partner.id,
+      eventType: "lead.assigned",
+      data: { leadAssignmentId: "00000000-0000-4000-8000-000000000777", publicReference: "HOOK-2", countryCode: "CI", productKey: "auto", status: "assigned" }
+    });
+    expect(JSON.stringify(await repository.listDeliveries())).not.toContain("HOOK-2");
+    expect(JSON.stringify(await repository.listDeliveries())).not.toContain("00000000-0000-4000-8000-000000000777");
+
+    const disabledService = new PartnerIntegrationsService({
+      audit: harness.runtime.audit.writer,
+      featureFlags: harness.runtime.featureFlags.service,
+      partners: harness.runtime.partners.service,
+      assignments: harness.runtime.leads.assignments,
+      notifications: harness.runtime.notifications.service,
+      repository,
+      webhookDeliveryEnabled: false,
+      fetch: async () => {
+        throw new Error("disabled worker must not fetch");
+      }
+    });
+    expect(await disabledService.processDueWebhookDeliveries()).toMatchObject({ attempted: 0 });
+
+    const delivered = await service.processDueWebhookDeliveries();
+    expect(delivered).toMatchObject({ attempted: 1, delivered: 1 });
+    expect(fetchCount).toBe(1);
+    expect(capturedSignature).toMatch(/^v1=/);
+    const deliveries = await service.listWebhookDeliveries(admin);
+    expect(deliveries.items[0]).toMatchObject({ status: "delivered" });
+    expect(deliveries.items[0]?.nextAttemptAt).toBeUndefined();
+    expect(JSON.stringify(deliveries)).not.toContain(capturedSignature);
+    expect(JSON.stringify(deliveries)).not.toContain(endpoint.signingSecret);
+  });
+
+  it("rechecks DNS at delivery time and treats redirects as retryable without following them", async () => {
+    harness = await createRuntimeHttpHarness();
+    enableFlag(harness, "partner_webhooks_enabled");
+    const admin = { actorId: "super", roles: ["super_admin" as const], mfaVerified: true };
+    const partner = await harness.runtime.partners.service.create({
+      legalName: "Rebind Broker",
+      plan: "enterprise",
+      primaryEmail: "rebind@broker.example",
+      primaryWhatsApp: "+2250102030405",
+      status: "active",
+      quotaMonthlyLeads: 10
+    }, admin);
+    const repository = new MemoryPartnerIntegrationsRepository();
+    let lookupCount = 0;
+    let fetchCount = 0;
+    const redirectFetch: typeof fetch = async () => {
+      fetchCount += 1;
+      return { status: 302 } as Response;
+    };
+    const service = new PartnerIntegrationsService({
+      audit: harness.runtime.audit.writer,
+      featureFlags: harness.runtime.featureFlags.service,
+      partners: harness.runtime.partners.service,
+      assignments: harness.runtime.leads.assignments,
+      notifications: harness.runtime.notifications.service,
+      repository,
+      webhookDeliveryEnabled: true,
+      enforceDnsValidation: true,
+      dnsResolver: { lookup: async () => {
+        lookupCount += 1;
+        return [{ address: lookupCount >= 4 ? "10.0.0.5" : "93.184.216.34", family: 4 }];
+      } },
+      fetch: redirectFetch
+    });
+    await service.createWebhookAllowlistEntry(admin, { partnerTenantId: partner.id, origin: "https://hooks.partner.example", path: "/assurmatch", reason: "Partner webhook DNS policy" });
+    const endpoint = await service.createWebhookEndpoint(admin, { partnerTenantId: partner.id, url: "https://hooks.partner.example/assurmatch", eventTypes: ["lead.assigned"], reason: "Partner webhook DNS endpoint" });
+    await service.updateWebhookEndpoint(admin, endpoint.endpoint.id, { status: "active", reason: "Activate DNS policy test" });
+    await service.prepareWebhookDelivery({ partnerTenantId: partner.id, eventType: "lead.assigned", data: { leadAssignmentId: "00000000-0000-4000-8000-000000000778", countryCode: "CI", productKey: "auto", status: "assigned" } });
+
+    const blocked = await service.processDueWebhookDeliveries();
+    expect(blocked).toMatchObject({ attempted: 1, retryable: 1 });
+    expect(fetchCount).toBe(0);
+
+    const firstDelivery = (await repository.listDeliveries())[0];
+    expect(firstDelivery).toBeDefined();
+    await repository.updateDelivery(firstDelivery?.id ?? "", { nextAttemptAt: new Date(Date.now() - 1), status: "retryable" });
+    lookupCount = 0;
+    const redirectService = new PartnerIntegrationsService({
+      audit: harness.runtime.audit.writer,
+      featureFlags: harness.runtime.featureFlags.service,
+      partners: harness.runtime.partners.service,
+      assignments: harness.runtime.leads.assignments,
+      notifications: harness.runtime.notifications.service,
+      repository,
+      webhookDeliveryEnabled: true,
+      enforceDnsValidation: true,
+      dnsResolver: { lookup: async () => [{ address: "93.184.216.34", family: 4 }] },
+      fetch: redirectFetch
+    });
+    const redirected = await redirectService.processDueWebhookDeliveries();
+    expect(redirected).toMatchObject({ attempted: 1, retryable: 1 });
+    expect(fetchCount).toBe(1);
   });
 });
 

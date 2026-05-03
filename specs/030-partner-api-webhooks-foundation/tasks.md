@@ -10,3 +10,5 @@
 - [x] T006 Design rate limits, replay protection, idempotency and retry/dead-letter policy.
 - [x] T007 Implement only after explicit approval of migration/secrets/deployment risks.
 - [x] T008 Validate backend contracts, Prisma migration, HTTP runtime paths, admin surface and local release browser pass.
+- [x] T009 Implement approved production delivery policy: tenant allow-list, DNS/IP checks, redirect blocking, worker env gate and redacted delivery persistence.
+- [x] T010 Validate delivery worker guardrails, allow-list migration and admin visibility.

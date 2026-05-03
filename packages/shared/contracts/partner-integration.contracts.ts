@@ -6,6 +6,7 @@ export const partnerWebhookEventTypeSchema = z.enum(["lead.assigned", "lead.stat
 export const partnerApiKeyStatusSchema = z.enum(["active", "revoked"]);
 export const partnerWebhookEndpointStatusSchema = z.enum(["disabled", "active", "suspended"]);
 export const partnerWebhookDeliveryStatusSchema = z.enum(["skipped", "pending", "retryable", "delivered", "failed", "dead_letter"]);
+export const partnerWebhookAllowlistStatusSchema = z.enum(["active", "revoked"]);
 
 export const partnerApiPaginationQuerySchema = paginationQuerySchema;
 
@@ -51,6 +52,34 @@ export const partnerWebhookEndpointCreateSchema = z.object({
   description: nonEmptyStringSchema.max(240).optional(),
   eventTypes: z.array(partnerWebhookEventTypeSchema).min(1).max(10),
   reason: reasonSchema
+});
+
+export const partnerWebhookAllowlistCreateSchema = z.object({
+  partnerTenantId: uuidSchema,
+  origin: z.url().refine((value) => value.startsWith("https://"), "Webhook allow-list origin must use HTTPS"),
+  path: z.string().trim().startsWith("/").max(240).optional(),
+  reason: reasonSchema
+});
+
+export const partnerWebhookAllowlistRevokeSchema = z.object({
+  reason: reasonSchema
+});
+
+export const partnerWebhookAllowlistEntrySchema = z.object({
+  id: uuidSchema,
+  partnerTenantId: uuidSchema,
+  origin: z.url(),
+  path: z.string().startsWith("/").optional(),
+  status: partnerWebhookAllowlistStatusSchema,
+  createdAt: dateTimeStringSchema,
+  updatedAt: dateTimeStringSchema,
+  revokedAt: dateTimeStringSchema.optional()
+});
+
+export const partnerWebhookAllowlistResponseSchema = z.object({
+  generatedAt: dateTimeStringSchema,
+  items: z.array(partnerWebhookAllowlistEntrySchema),
+  total: z.number().int().nonnegative()
 });
 
 export const partnerWebhookEndpointUpdateSchema = z.object({
@@ -145,6 +174,7 @@ export type PartnerWebhookEventType = z.infer<typeof partnerWebhookEventTypeSche
 export type PartnerApiKeyStatus = z.infer<typeof partnerApiKeyStatusSchema>;
 export type PartnerWebhookEndpointStatus = z.infer<typeof partnerWebhookEndpointStatusSchema>;
 export type PartnerWebhookDeliveryStatus = z.infer<typeof partnerWebhookDeliveryStatusSchema>;
+export type PartnerWebhookAllowlistStatus = z.infer<typeof partnerWebhookAllowlistStatusSchema>;
 export type PartnerApiKeyCreate = z.infer<typeof partnerApiKeyCreateSchema>;
 export type PartnerApiKeySummary = z.infer<typeof partnerApiKeySummarySchema>;
 export type PartnerApiKeyCreateResponse = z.infer<typeof partnerApiKeyCreateResponseSchema>;
@@ -154,6 +184,9 @@ export type PartnerWebhookEndpointUpdate = z.infer<typeof partnerWebhookEndpoint
 export type PartnerWebhookEndpointSummary = z.infer<typeof partnerWebhookEndpointSummarySchema>;
 export type PartnerWebhookEndpointCreateResponse = z.infer<typeof partnerWebhookEndpointCreateResponseSchema>;
 export type PartnerWebhookEndpointsResponse = z.infer<typeof partnerWebhookEndpointsResponseSchema>;
+export type PartnerWebhookAllowlistCreate = z.infer<typeof partnerWebhookAllowlistCreateSchema>;
+export type PartnerWebhookAllowlistEntry = z.infer<typeof partnerWebhookAllowlistEntrySchema>;
+export type PartnerWebhookAllowlistResponse = z.infer<typeof partnerWebhookAllowlistResponseSchema>;
 export type PartnerWebhookDeliverySummary = z.infer<typeof partnerWebhookDeliverySummarySchema>;
 export type PartnerWebhookDeliveriesResponse = z.infer<typeof partnerWebhookDeliveriesResponseSchema>;
 export type PartnerApiLeadsResponse = z.infer<typeof partnerApiLeadsResponseSchema>;

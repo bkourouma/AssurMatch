@@ -7,6 +7,8 @@ import type {
   PartnerApiLeadsResponse,
   PartnerApiNotificationsResponse,
   PartnerApiScope,
+  PartnerWebhookAllowlistCreate,
+  PartnerWebhookAllowlistResponse,
   PartnerWebhookDeliveriesResponse,
   PartnerWebhookDeliveryStatus,
   PartnerWebhookEndpointCreate,
@@ -16,7 +18,7 @@ import type {
   PartnerWebhookEventType
 } from "../../../../packages/shared/contracts/partner-integration.contracts";
 import type { NotificationRecord } from "../notifications/notifications.module";
-import { partnerApiKeyCreateSchema, partnerApiKeyRevokeSchema, partnerApiPaginationQuerySchema, partnerWebhookEndpointCreateSchema, partnerWebhookEndpointUpdateSchema } from "../../../../packages/shared/contracts/partner-integration.contracts";
+import { partnerApiKeyCreateSchema, partnerApiKeyRevokeSchema, partnerApiPaginationQuerySchema, partnerWebhookAllowlistCreateSchema, partnerWebhookAllowlistRevokeSchema, partnerWebhookEndpointCreateSchema, partnerWebhookEndpointUpdateSchema } from "../../../../packages/shared/contracts/partner-integration.contracts";
 import { roleHasPermission } from "../../../../packages/shared/rbac/assurmatch-role-matrix";
 import { EncryptionService } from "../auth/encryption.service";
 import { Argon2idParameters } from "../auth/password-hashing.service";
@@ -27,8 +29,9 @@ import type { LeadAssignmentRecord, LeadAssignmentService } from "../leads/lead-
 import type { NotificationsService } from "../notifications/notifications.module";
 import type { PartnersService } from "../partners/partners.module";
 import { PartnerIntegrationAuditActions } from "./partner-integration-audit-actions";
-import { MemoryPartnerIntegrationsRepository, type PartnerApiKeyRecord, type PartnerIntegrationsRepository, type PartnerWebhookDeliveryRecord, type PartnerWebhookEndpointRecord } from "./partner-integrations.repository";
+import { MemoryPartnerIntegrationsRepository, type PartnerApiKeyRecord, type PartnerIntegrationsRepository, type PartnerWebhookAllowlistRecord, type PartnerWebhookDeliveryRecord, type PartnerWebhookEndpointRecord } from "./partner-integrations.repository";
 import { signWebhookPayload } from "./webhook-signature.service";
+import { assertWebhookDnsPublic, assertWebhookUrlShape, nodeWebhookDnsResolver, type WebhookDnsResolver } from "./webhook-url-policy";
 
 const API_KEY_PREFIX = "am_pk_";
 const WEBHOOK_SECRET_PREFIX = "whsec_";
@@ -53,6 +56,10 @@ export interface PartnerIntegrationsDeps {
   notifications: NotificationsService;
   repository?: PartnerIntegrationsRepository;
   encryption?: EncryptionService;
+  dnsResolver?: WebhookDnsResolver;
+  enforceDnsValidation?: boolean;
+  webhookDeliveryEnabled?: boolean;
+  fetch?: typeof fetch;
 }
 
 interface AuthenticatedPartnerApiKey {
@@ -63,11 +70,15 @@ interface AuthenticatedPartnerApiKey {
 export class PartnerIntegrationsService {
   private readonly repository: PartnerIntegrationsRepository;
   private readonly encryption: EncryptionService;
+  private readonly dnsResolver: WebhookDnsResolver;
+  private readonly fetcher: typeof fetch;
   private readonly rateLimitBuckets = new Map<string, { resetAt: number; count: number }>();
 
   constructor(private readonly deps: PartnerIntegrationsDeps) {
     this.repository = deps.repository ?? new MemoryPartnerIntegrationsRepository();
     this.encryption = deps.encryption ?? new EncryptionService();
+    this.dnsResolver = deps.dnsResolver ?? nodeWebhookDnsResolver;
+    this.fetcher = deps.fetch ?? fetch;
   }
 
   async createApiKey(actor: ActorContext, input: PartnerApiKeyCreate): Promise<PartnerApiKeyCreateResponse> {
@@ -139,6 +150,62 @@ export class PartnerIntegrationsService {
     return this.createWebhookEndpointRecord(actor, parsed);
   }
 
+  async createWebhookAllowlistEntry(actor: ActorContext, input: PartnerWebhookAllowlistCreate): Promise<PartnerWebhookAllowlistResponse> {
+    this.assertAdminAccess(actor);
+    const parsed = partnerWebhookAllowlistCreateSchema.parse(input);
+    const originUrl = assertWebhookUrlShape(parsed.origin);
+    if (originUrl.pathname !== "/") throw new Error("Invalid webhook allow-list origin must not contain a path");
+    if (this.shouldEnforceDnsValidation()) await assertWebhookDnsPublic(originUrl, this.dnsResolver);
+    await this.deps.partners.require(parsed.partnerTenantId);
+    const now = new Date();
+    const record: PartnerWebhookAllowlistRecord = {
+      id: crypto.randomUUID(),
+      partnerTenantId: parsed.partnerTenantId,
+      origin: originUrl.origin,
+      ...(parsed.path ? { path: parsed.path } : {}),
+      status: "active",
+      createdAt: now,
+      updatedAt: now,
+      ...(actor.actorId ? { createdById: actor.actorId } : {})
+    };
+    await this.repository.createAllowlistEntry(record);
+    await this.deps.audit.writeAsync({
+      actor,
+      action: PartnerIntegrationAuditActions.webhookAllowlistCreated,
+      targetType: "PartnerWebhookAllowlistEntry",
+      targetId: record.id,
+      scope: { partnerTenantId: record.partnerTenantId },
+      result: "success",
+      reason: parsed.reason,
+      context: { origin: record.origin, path: record.path ?? null }
+    });
+    return this.listWebhookAllowlist(actor);
+  }
+
+  async listWebhookAllowlist(actor: ActorContext): Promise<PartnerWebhookAllowlistResponse> {
+    this.assertAdminAccess(actor);
+    const items = (await this.repository.listAllowlistEntries()).map((record) => this.toAllowlistSummary(record));
+    return { generatedAt: new Date().toISOString(), items, total: items.length };
+  }
+
+  async revokeWebhookAllowlistEntry(actor: ActorContext, id: string, input: unknown): Promise<PartnerWebhookAllowlistResponse> {
+    this.assertAdminAccess(actor);
+    const parsed = partnerWebhookAllowlistRevokeSchema.parse(input);
+    const existing = await this.repository.requireAllowlistEntry(id);
+    await this.repository.updateAllowlistEntry(id, { status: "revoked", revokedAt: new Date(), updatedAt: new Date() });
+    await this.deps.audit.writeAsync({
+      actor,
+      action: PartnerIntegrationAuditActions.webhookAllowlistRevoked,
+      targetType: "PartnerWebhookAllowlistEntry",
+      targetId: id,
+      scope: { partnerTenantId: existing.partnerTenantId },
+      result: "success",
+      reason: parsed.reason,
+      context: { origin: existing.origin, path: existing.path ?? null }
+    });
+    return this.listWebhookAllowlist(actor);
+  }
+
   async createWebhookEndpointFromApiKey(apiKey: string, input: Omit<PartnerWebhookEndpointCreate, "partnerTenantId">): Promise<PartnerWebhookEndpointCreateResponse> {
     const auth = await this.authenticate(apiKey, "webhooks:manage");
     const parsed = partnerWebhookEndpointCreateSchema.parse({ ...input, partnerTenantId: auth.record.partnerTenantId });
@@ -164,7 +231,7 @@ export class PartnerIntegrationsService {
 
   private async createWebhookEndpointRecord(actor: ActorContext, parsed: PartnerWebhookEndpointCreate): Promise<PartnerWebhookEndpointCreateResponse> {
     this.assertWebhookSecretStorageConfigured();
-    this.assertWebhookUrlAllowed(parsed.url);
+    await this.assertWebhookEndpointApproved(parsed.partnerTenantId, parsed.url);
     await this.deps.partners.require(parsed.partnerTenantId);
     const now = new Date();
     const signingSecret = `${WEBHOOK_SECRET_PREFIX}${randomBytes(32).toString("base64url")}`;
@@ -209,6 +276,7 @@ export class PartnerIntegrationsService {
     if (requireAdmin) this.assertAdminAccess(actor);
     const parsed = partnerWebhookEndpointUpdateSchema.parse(input);
     const existing = await this.repository.requireEndpoint(id);
+    if (parsed.status === "active") await this.assertWebhookEndpointApproved(existing.partnerTenantId, existing.url);
     await this.repository.updateEndpoint(id, {
       ...(parsed.status ? { status: parsed.status } : {}),
       ...(parsed.eventTypes ? { eventTypes: [...new Set(parsed.eventTypes)] } : {}),
@@ -320,8 +388,7 @@ export class PartnerIntegrationsService {
   }
 
   async recordWebhookAttempt(deliveryId: string, responseClass: string): Promise<PartnerWebhookDeliveryRecord> {
-    const delivery = (await this.repository.listDeliveries()).find((candidate) => candidate.id === deliveryId);
-    if (!delivery) throw new Error(`Partner webhook delivery ${deliveryId} not found`);
+    const delivery = await this.repository.requireDelivery(deliveryId);
     const attemptCount = delivery.attemptCount + 1;
     const successful = responseClass.startsWith("2");
     const status: PartnerWebhookDeliveryStatus = successful ? "delivered" : attemptCount >= MAX_DELIVERY_ATTEMPTS ? "dead_letter" : "retryable";
@@ -331,7 +398,7 @@ export class PartnerIntegrationsService {
       attemptCount,
       status,
       lastResponseClass: responseClass,
-      ...(nextAttemptAt ? { nextAttemptAt } : {}),
+      nextAttemptAt: nextAttemptAt ?? null,
       updatedAt: new Date()
     });
     this.deps.audit.write({
@@ -343,6 +410,39 @@ export class PartnerIntegrationsService {
       context: { responseClass, attemptCount, status }
     });
     return updated;
+  }
+
+  async processDueWebhookDeliveries(input: { now?: Date; limit?: number } = {}): Promise<{ attempted: number; delivered: number; retryable: number; deadLetter: number; refused: number }> {
+    if (!this.deps.featureFlags.isEnabled("partner_webhooks_enabled") || this.deps.webhookDeliveryEnabled !== true) {
+      this.deps.audit.write({
+        action: PartnerIntegrationAuditActions.webhookDeliveryRefused,
+        targetType: "PartnerWebhookDeliveryWorker",
+        targetId: "disabled",
+        result: "refused",
+        reason: "delivery_disabled",
+        context: { flag: this.deps.featureFlags.isEnabled("partner_webhooks_enabled"), workerEnabled: this.deps.webhookDeliveryEnabled === true }
+      });
+      return { attempted: 0, delivered: 0, retryable: 0, deadLetter: 0, refused: 0 };
+    }
+    const now = input.now ?? new Date();
+    const due = (await this.repository.listDeliveries())
+      .filter((delivery) =>
+        (delivery.status === "pending" || delivery.status === "retryable")
+        && Boolean(delivery.endpointId)
+        && (!delivery.nextAttemptAt || delivery.nextAttemptAt <= now)
+      )
+      .sort((left, right) => left.createdAt.getTime() - right.createdAt.getTime())
+      .slice(0, input.limit ?? 25);
+    const summary = { attempted: 0, delivered: 0, retryable: 0, deadLetter: 0, refused: 0 };
+    for (const delivery of due) {
+      const result = await this.deliverWebhook(delivery);
+      summary.attempted += 1;
+      if (result.status === "delivered") summary.delivered += 1;
+      else if (result.status === "dead_letter") summary.deadLetter += 1;
+      else if (result.status === "retryable") summary.retryable += 1;
+      else summary.refused += 1;
+    }
+    return summary;
   }
 
   private async authenticate(rawKey: string, requiredScope: PartnerApiScope): Promise<AuthenticatedPartnerApiKey> {
@@ -432,7 +532,7 @@ export class PartnerIntegrationsService {
       partnerTenantId,
       eventId,
       eventType,
-      payload,
+      payload: this.redactedWebhookPayload(payload),
       payloadMetadata: this.payloadMetadata(payload, reason),
       status: "skipped",
       attemptCount: 0,
@@ -446,7 +546,6 @@ export class PartnerIntegrationsService {
     const now = new Date();
     const timestamp = String(Math.floor(now.getTime() / 1000));
     const idempotencyKey = `${eventId}:${endpoint.id}:1`;
-    const secret = this.encryption.decrypt(endpoint.secretEncrypted);
     const signedPayload = { ...payload, idempotencyKey };
     return this.repository.createDelivery({
       id: crypto.randomUUID(),
@@ -454,7 +553,7 @@ export class PartnerIntegrationsService {
       partnerTenantId: endpoint.partnerTenantId,
       eventId,
       eventType,
-      payload: signedPayload,
+      payload: this.redactedWebhookPayload(signedPayload),
       payloadMetadata: {
         ...this.payloadMetadata(signedPayload, "pending"),
         headers: {
@@ -463,7 +562,7 @@ export class PartnerIntegrationsService {
           "X-AssurMatch-Signature": "[redacted]",
           "X-AssurMatch-Idempotency-Key": idempotencyKey
         },
-        signed: signWebhookPayload(secret, timestamp, eventId, idempotencyKey, signedPayload).startsWith("v1=")
+        signatureGeneratedAtDelivery: true
       },
       status: "pending",
       attemptCount: 0,
@@ -486,6 +585,48 @@ export class PartnerIntegrationsService {
     });
   }
 
+  private async deliverWebhook(delivery: PartnerWebhookDeliveryRecord): Promise<PartnerWebhookDeliveryRecord> {
+    if (!delivery.endpointId) return this.repository.updateDelivery(delivery.id, { status: "failed", updatedAt: new Date() });
+    const endpoint = await this.repository.requireEndpoint(delivery.endpointId);
+    if (endpoint.status !== "active") return this.recordWebhookAttempt(delivery.id, "endpoint_inactive");
+    try {
+      await this.assertWebhookEndpointApproved(endpoint.partnerTenantId, endpoint.url);
+      const url = assertWebhookUrlShape(endpoint.url);
+      if (this.shouldEnforceDnsValidation()) await assertWebhookDnsPublic(url, this.dnsResolver);
+      const body = JSON.stringify(delivery.payload);
+      if (Buffer.byteLength(body, "utf8") > 64 * 1024) return this.recordWebhookAttempt(delivery.id, "payload_too_large");
+      const response = await this.fetcher(endpoint.url, {
+        method: "POST",
+        redirect: "manual",
+        signal: AbortSignal.timeout(10_000),
+        headers: {
+          "content-type": "application/json",
+          "user-agent": "AssurMatch-Webhook/1.0",
+          ...this.signedWebhookHeaders(endpoint, delivery, body)
+        },
+        body
+      });
+      const responseClass = response.status >= 300 && response.status < 400
+        ? "3xx_redirect_blocked"
+        : `${Math.floor(response.status / 100)}xx`;
+      return this.recordWebhookAttempt(delivery.id, responseClass);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "delivery_failed";
+      return this.recordWebhookAttempt(delivery.id, message.includes("Invalid webhook") ? "endpoint_policy_blocked" : "network_error");
+    }
+  }
+
+  private signedWebhookHeaders(endpoint: PartnerWebhookEndpointRecord, delivery: PartnerWebhookDeliveryRecord, rawBody: string): Record<string, string> {
+    const timestamp = String(Math.floor(Date.now() / 1000));
+    const secret = this.encryption.decrypt(endpoint.secretEncrypted);
+    return {
+      "X-AssurMatch-Event-Id": delivery.eventId,
+      "X-AssurMatch-Timestamp": timestamp,
+      "X-AssurMatch-Signature": signWebhookPayload(secret, timestamp, delivery.eventId, delivery.idempotencyKey, rawBody),
+      "X-AssurMatch-Idempotency-Key": delivery.idempotencyKey
+    };
+  }
+
   private minimizedData(data: Record<string, unknown>): Record<string, unknown> {
     const allowed = new Set(["leadAssignmentId", "publicReference", "countryCode", "productKey", "status", "previousStatus", "notificationId", "notificationType", "failureClass"]);
     return Object.fromEntries(Object.entries(data).filter(([key]) => allowed.has(key)));
@@ -498,6 +639,18 @@ export class PartnerIntegrationsService {
       dataKeys: Object.keys(data).sort(),
       containsPii: false,
       payloadBytes: JSON.stringify(payload).length
+    };
+  }
+
+  private redactedWebhookPayload(payload: Record<string, unknown>): Record<string, unknown> {
+    const data = payload.data && typeof payload.data === "object" ? payload.data as Record<string, unknown> : {};
+    return {
+      id: payload.id,
+      type: payload.type,
+      occurredAt: payload.occurredAt,
+      partnerTenantId: payload.partnerTenantId,
+      ...(payload.idempotencyKey ? { idempotencyKey: payload.idempotencyKey } : {}),
+      data: { keys: Object.keys(data).sort() }
     };
   }
 
@@ -552,6 +705,19 @@ export class PartnerIntegrationsService {
     };
   }
 
+  private toAllowlistSummary(record: PartnerWebhookAllowlistRecord) {
+    return {
+      id: record.id,
+      partnerTenantId: record.partnerTenantId,
+      origin: record.origin,
+      ...(record.path ? { path: record.path } : {}),
+      status: record.status,
+      createdAt: record.createdAt.toISOString(),
+      updatedAt: record.updatedAt.toISOString(),
+      ...(record.revokedAt ? { revokedAt: record.revokedAt.toISOString() } : {})
+    };
+  }
+
   private toDeliverySummary(record: PartnerWebhookDeliveryRecord) {
     return {
       id: record.id,
@@ -591,22 +757,16 @@ export class PartnerIntegrationsService {
     return { keyId, secret };
   }
 
-  private assertWebhookUrlAllowed(value: string): void {
-    const url = new URL(value);
-    if (url.protocol !== "https:") throw new Error("Invalid webhook endpoint URL must use HTTPS");
-    if (url.username || url.password) throw new Error("Invalid webhook endpoint URL must not contain credentials");
-    const host = url.hostname.toLowerCase();
-    if (host === "localhost" || host.endsWith(".localhost") || host === "metadata.google.internal") {
-      throw new Error("Invalid webhook endpoint URL cannot target internal hosts");
-    }
-    if (/^\d+\.\d+\.\d+\.\d+$/.test(host)) {
-      const [a = 0, b = 0] = host.split(".").map(Number);
-      if (a === 10 || a === 127 || (a === 169 && b === 254) || (a === 172 && b >= 16 && b <= 31) || (a === 192 && b === 168)) {
-        throw new Error("Invalid webhook endpoint URL cannot target internal hosts");
-      }
-    }
-    if (host === "::1" || host.startsWith("fc") || host.startsWith("fd") || host.startsWith("fe80")) {
-      throw new Error("Invalid webhook endpoint URL cannot target internal hosts");
-    }
+  private async assertWebhookEndpointApproved(partnerTenantId: string, value: string): Promise<void> {
+    const url = assertWebhookUrlShape(value);
+    if (this.shouldEnforceDnsValidation()) await assertWebhookDnsPublic(url, this.dnsResolver);
+    const allowed = (await this.repository.listAllowlistEntries())
+      .filter((entry) => entry.partnerTenantId === partnerTenantId && entry.status === "active")
+      .some((entry) => entry.origin === url.origin && (!entry.path || entry.path === url.pathname));
+    if (!allowed) throw new Error("Invalid webhook endpoint URL is not allow-listed for this partner");
+  }
+
+  private shouldEnforceDnsValidation(): boolean {
+    return this.deps.enforceDnsValidation ?? ((process.env.NODE_ENV ?? process.env.APP_ENV) !== "test");
   }
 }
