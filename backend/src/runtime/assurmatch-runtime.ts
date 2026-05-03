@@ -1,4 +1,5 @@
 import { QuoteAISummaryService } from "../modules/ai/quote-summary/quote-ai-summary.service";
+import { ActivationChecklistModule } from "../modules/activation-checklist/activation-checklist.module";
 import { AIModule } from "../modules/ai/ai.module";
 import { AuditLogsModule } from "../modules/audit-logs/audit-logs.module";
 import { PrismaAuditLogRepository } from "../modules/audit-logs/audit-log-repository";
@@ -139,6 +140,17 @@ export class AssurMatchRuntime {
     quoteRequests: this.quoteRequests.submissions,
     crmActivity: this.leadRepositorySet.crmActivity,
     brokerCrmConfig: this.brokerCrmConfig
+  });
+  readonly activationChecklist = new ActivationChecklistModule({
+    audit: this.audit.writer,
+    featureFlags: this.featureFlags.service,
+    countries: this.countries.service,
+    products: this.products.service,
+    partners: this.partners.service,
+    partnerLicenses: this.partnerLicenses.service,
+    offers: this.offers,
+    quoteForms: this.quoteForms.service,
+    consent: this.consent.service
   });
 
   async onModuleInit(): Promise<void> {

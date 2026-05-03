@@ -177,6 +177,30 @@ export interface ComplianceAlertsData {
   }>;
 }
 
+export interface ActivationChecklistData {
+  generatedAt: string;
+  summary: { passed: number; warning: number; blocked: number };
+  sections: Array<{
+    key: string;
+    title: string;
+    status: "passed" | "warning" | "blocked";
+    scope: {
+      countryId: string | null;
+      countryCode: string | null;
+      productId: string | null;
+      productKey: string | null;
+      partnerId: string | null;
+    };
+    controls: Array<{
+      key: string;
+      label: string;
+      status: "passed" | "warning" | "blocked";
+      evidence: string;
+      blocking: boolean;
+    }>;
+  }>;
+}
+
 const emptyAdminDashboard: AdminDashboardData = {
   window: { from: "", to: "" },
   scope: { countries: [], products: [], partnerId: null, role: "support_admin" },
@@ -192,6 +216,11 @@ const emptyAdminDashboard: AdminDashboardData = {
 };
 
 const emptyComplianceAlerts: ComplianceAlertsData = { page: 1, pageSize: 25, total: 0, items: [] };
+const emptyActivationChecklist: ActivationChecklistData = {
+  generatedAt: "",
+  summary: { passed: 0, warning: 0, blocked: 0 },
+  sections: []
+};
 
 async function readAdmin<T>(path: string, fallback: T): Promise<AdminApiState<T>> {
   const token = await getBackOfficeToken();
@@ -232,6 +261,15 @@ export function readAdminDashboard() {
 export function readComplianceAlerts(page = 1, pageSize = 25) {
   const params = new URLSearchParams({ page: String(page), pageSize: String(pageSize) });
   return readAdmin<ComplianceAlertsData>(`/admin/dashboard/compliance-alerts?${params.toString()}`, emptyComplianceAlerts);
+}
+
+export function readActivationChecklist(filters: { country?: string; product?: string; partnerId?: string } = {}) {
+  const params = new URLSearchParams();
+  if (filters.country) params.set("country", filters.country);
+  if (filters.product) params.set("product", filters.product);
+  if (filters.partnerId) params.set("partnerId", filters.partnerId);
+  const query = params.toString();
+  return readAdmin<ActivationChecklistData>(`/admin/activation-checklist${query ? `?${query}` : ""}`, emptyActivationChecklist);
 }
 
 export function readAdminUsers(filters: { role?: string; status?: string } = {}) {

@@ -14,6 +14,7 @@ const authRoutePrefixes = ["/login", "/mfa", "/activate", "/password-change", "/
 const navigationItems = [
   { label: "Dashboard", href: "/", match: ["/", "/dashboard"] },
   { label: "Catalogue", href: "/catalog", match: ["/catalog", "/offers", "/quote-form-definitions"] },
+  { label: "Activation", href: "/activation-checklist", match: ["/activation-checklist"] },
   { label: "Partenaires", href: "/partners", match: ["/partners"] },
   { label: "Utilisateurs", href: "/users", match: ["/users"] },
   { label: "Feature flags", href: "/feature-flags", match: ["/feature-flags"] },

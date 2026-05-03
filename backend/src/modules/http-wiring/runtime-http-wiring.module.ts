@@ -1,6 +1,7 @@
 import { Body, Controller, Delete, Get, Module, Param, Patch, Post, Query, Req, UseGuards } from "@nestjs/common";
 import { z } from "zod";
 import { activateRequestSchema, loginRequestSchema, mfaVerifyRequestSchema, passwordChangeRequestSchema, passwordResetRequestSchema, type ActivateRequest, type LoginRequest, type PasswordChangeRequest, type PasswordResetRequest } from "../../../../packages/shared/contracts/auth.contracts";
+import { activationChecklistQuerySchema } from "../../../../packages/shared/contracts/activation-checklist.contracts";
 import {
   brokerCrmAssignRequestSchema,
   brokerCrmDisputeCreateSchema,
@@ -447,6 +448,14 @@ export class AdminHealthController {
   }
 }
 
+export class AdminActivationChecklistController {
+  constructor(private readonly runtime: AssurMatchRuntime) {}
+
+  read(request: AssurMatchHttpRequest, query: Record<string, string>) {
+    return this.runtime.activationChecklist.service.read(protectedActorFromRequest(request), parseHttpInput(activationChecklistQuerySchema, query));
+  }
+}
+
 export class AdminRuntimeSupportController {
   constructor(private readonly runtime: AssurMatchRuntime) {}
 
@@ -553,6 +562,9 @@ decorate(AdminAuditLogsController, "list", [Get("audit-logs") as MethodDecorator
 controller("admin", AdminHealthController, true);
 decorate(AdminHealthController, "health", [Get("system/health") as MethodDecoratorFactory], [[0, Req() as ParamDecoratorFactory]]);
 
+controller("admin", AdminActivationChecklistController, true);
+decorate(AdminActivationChecklistController, "read", [Get("activation-checklist") as MethodDecoratorFactory], [[0, Req() as ParamDecoratorFactory], [1, Query() as ParamDecoratorFactory]]);
+
 controller("admin", AdminRuntimeSupportController, true);
 decorate(AdminRuntimeSupportController, "quoteRequests", [Get("quote-requests") as MethodDecoratorFactory], [[0, Req() as ParamDecoratorFactory]]);
 decorate(AdminRuntimeSupportController, "leadAssignments", [Get("lead-assignments") as MethodDecoratorFactory], [[0, Req() as ParamDecoratorFactory]]);
@@ -574,6 +586,7 @@ Module({
     AdminUsersHttpController,
     AdminAuditLogsController,
     AdminHealthController,
+    AdminActivationChecklistController,
     AdminRuntimeSupportController
   ],
   providers: [AssurMatchRuntime, AuthRequiredHttpGuard, MfaRequiredHttpGuard],

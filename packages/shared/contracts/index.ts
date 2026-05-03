@@ -1,4 +1,5 @@
 export * from "./auth.contracts";
+export * from "./activation-checklist.contracts";
 export * from "./catalog.contracts";
 export * from "./compliance.contracts";
 export * from "./content-safety";
