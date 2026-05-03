@@ -116,7 +116,15 @@ describe("activation checklist runtime HTTP", () => {
   it("blocks the checklist when a sensitive future flag is enabled", async () => {
     harness = await createRuntimeHttpHarness();
     const admin = { actorId: "activation-admin", roles: ["super_admin" as const], mfaVerified: true };
-    await harness.runtime.featureFlags.service.setFlag({ key: "billing_enabled", scopeType: "global", value: true, reason: "activation checklist guard test" }, admin);
+    (harness.runtime.featureFlags.service as unknown as { flags: unknown[] }).flags.push({
+      id: "bad-billing-flag",
+      key: "billing_enabled",
+      scopeType: "global",
+      value: true,
+      reason: "simulated bad persisted state",
+      changedAt: new Date(),
+      cacheVersion: 1
+    });
 
     const response = await harness.request("/admin/activation-checklist", { headers: actorHeaders(admin) });
     expect(response.status).toBe(200);
