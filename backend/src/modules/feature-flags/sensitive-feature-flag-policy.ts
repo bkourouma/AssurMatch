@@ -16,7 +16,9 @@ const explicitlyProtectedFeatureFlags = new Set([
   "ai_duplicate_detection_enabled",
   "ai_broker_assistant_enabled",
   "multi_broker_routing_enabled",
-  "billing_enabled"
+  "billing_enabled",
+  "sms_enabled",
+  "whatsapp_enabled"
 ]);
 
 const regulatedFlagKeyFragments = [

@@ -81,7 +81,12 @@ export class AssurMatchRuntime {
     this.featureFlagRepository
   );
   readonly consent = new ConsentModule(this.audit.writer, this.consentRecordsRepository);
-  readonly notifications = new NotificationsModule(this.audit.writer, this.queues.notifications, this.notificationsRepository);
+  readonly notifications = new NotificationsModule(this.audit.writer, this.queues.notifications, this.notificationsRepository, {
+    smsProvider: process.env.ASSURMATCH_SMS_PROVIDER,
+    smsSecretConfigured: Boolean(process.env.ASSURMATCH_SMS_API_KEY),
+    whatsappProvider: process.env.ASSURMATCH_WHATSAPP_PROVIDER,
+    whatsappSecretConfigured: Boolean(process.env.ASSURMATCH_WHATSAPP_API_KEY)
+  }, this.featureFlags.service);
   readonly ai = new AIModule(this.audit.writer, this.featureFlags.service);
   readonly quoteAiSummary = new QuoteAISummaryService(this.notifications.queue, this.audit.writer, {
     id: "00000000-0000-4000-8000-000000000002",

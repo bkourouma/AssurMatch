@@ -499,6 +499,14 @@ export class AdminRuntimeSupportController {
   }
 }
 
+export class AdminMessagingProvidersController {
+  constructor(private readonly runtime: AssurMatchRuntime) {}
+
+  read(request: AssurMatchHttpRequest) {
+    return this.runtime.notifications.messagingProviders.status(protectedActorFromRequest(request));
+  }
+}
+
 controller("auth", AuthController);
 decorate(AuthController, "login", [Post("login") as MethodDecoratorFactory], [[0, Body() as ParamDecoratorFactory]]);
 decorate(AuthController, "activate", [Post("activate") as MethodDecoratorFactory], [[0, Body() as ParamDecoratorFactory]]);
@@ -601,6 +609,9 @@ controller("admin", AdminRuntimeSupportController, true);
 decorate(AdminRuntimeSupportController, "quoteRequests", [Get("quote-requests") as MethodDecoratorFactory], [[0, Req() as ParamDecoratorFactory]]);
 decorate(AdminRuntimeSupportController, "leadAssignments", [Get("lead-assignments") as MethodDecoratorFactory], [[0, Req() as ParamDecoratorFactory]]);
 
+controller("admin", AdminMessagingProvidersController, true);
+decorate(AdminMessagingProvidersController, "read", [Get("messaging/providers") as MethodDecoratorFactory], [[0, Req() as ParamDecoratorFactory]]);
+
 export class RuntimeHttpWiringModule {}
 
 Module({
@@ -621,7 +632,8 @@ Module({
     AdminActivationChecklistController,
     AdminBillingFoundationController,
     AdminAIAssistanceController,
-    AdminRuntimeSupportController
+    AdminRuntimeSupportController,
+    AdminMessagingProvidersController
   ],
   providers: [AssurMatchRuntime, AuthRequiredHttpGuard, MfaRequiredHttpGuard],
   exports: [AssurMatchRuntime]
