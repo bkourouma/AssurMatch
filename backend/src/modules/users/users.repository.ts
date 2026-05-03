@@ -137,9 +137,9 @@ export class PrismaUsersRepository implements UsersRepository {
   }
 
   async update(user: UserAccount): Promise<UserAccount> {
-    const row = await this.delegate.update({ where: { id: user.id }, data: this.toPrismaUpdate(user) });
+    await this.delegate.update({ where: { id: user.id }, data: this.toPrismaUpdate(user) });
     await this.replaceRoles(user.id, user.roles, "user-updated");
-    return this.toDomain(row);
+    return this.requireById(user.id);
   }
 
   async findById(id: string): Promise<UserAccount | undefined> {
