@@ -15,11 +15,25 @@ import type { PartnerLicense, PartnerLicensesService } from "../partner-licenses
 import type { PartnerTenant, PartnersService } from "../partners/partners.module";
 import type { Product, ProductsService } from "../products/products.module";
 import type { QuoteFormDefinitionService } from "../quote-forms/quote-form-definition.service";
+import { OfferPublicationPolicy } from "../offers/offer-publication-policy";
 import { ActivationChecklistAuditActions } from "./activation-checklist-audit-actions";
 
-type ActivationChecklistRole = "super_admin" | "admin_pays" | "compliance_admin" | "support_admin";
+type ActivationChecklistRole = "super_admin" | "admin_pays" | "compliance_admin";
 
-const ALLOWED_ROLES = new Set<ActivationChecklistRole>(["super_admin", "admin_pays", "compliance_admin", "support_admin"]);
+const ALLOWED_ROLES = new Set<ActivationChecklistRole>(["super_admin", "admin_pays", "compliance_admin"]);
+const FORBIDDEN_FLAG_KEYS = [
+  "payments_enabled",
+  "e_signature_enabled",
+  "policy_issuance_enabled",
+  "claims_enabled",
+  "insurer_api_enabled",
+  "ai_lead_scoring_enabled",
+  "ai_recommendation_enabled",
+  "ai_broker_assistant_enabled",
+  "multi_broker_routing_enabled",
+  "whatsapp_enabled",
+  "billing_enabled"
+] as const;
 
 export interface ActivationChecklistDeps {
   audit: AuditLogWriter;
@@ -59,7 +73,7 @@ export class ActivationChecklistService {
       ...products.map((product) => this.productSection(product, countries)),
       ...this.quoteReadinessSections(countries, products, forms, consentTexts),
       ...await this.partnerSections(partners, countries, products),
-      ...this.offerSections(offers, countries, products, partners)
+      ...await this.offerSections(offers, countries, products, partners)
     ];
     const response: ActivationChecklistResponse = {
       generatedAt: new Date().toISOString(),
@@ -87,6 +101,9 @@ export class ActivationChecklistService {
 
   private async resolveCountries(actor: ActorContext, role: ActivationChecklistRole, query: ActivationChecklistQuery): Promise<Country[]> {
     const all = await this.deps.countries.listAdmin();
+    if (role === "admin_pays" && !actor.countryScopes?.length) {
+      this.refuse(actor, "missing_country_scope");
+    }
     if (query.country) {
       if (role === "admin_pays" && actor.countryScopes?.length && !actor.countryScopes.includes(query.country)) {
         this.refuse(actor, "out_of_scope_country");
@@ -124,7 +141,10 @@ export class ActivationChecklistService {
     return this.section("global", "Flags globaux publics", {}, [
       this.control("public_comparator_enabled", "Comparateur public global", this.deps.featureFlags.isEnabled("public_comparator_enabled"), true),
       this.control("quote_request_enabled", "Demande de devis globale", this.deps.featureFlags.isEnabled("quote_request_enabled"), true),
-      this.control("sponsored_offers_enabled", "Offres sponsorisees", !this.deps.featureFlags.isEnabled("sponsored_offers_enabled"), false, "Desactive attendu sauf activation explicite")
+      this.control("sponsored_offers_enabled", "Offres sponsorisees", !this.deps.featureFlags.isEnabled("sponsored_offers_enabled"), false, "Desactive attendu sauf activation explicite"),
+      ...FORBIDDEN_FLAG_KEYS.map((key) =>
+        this.control(key, `${key} ferme`, !this.deps.featureFlags.isEnabled(key), true, this.deps.featureFlags.isEnabled(key) ? "actif interdit" : "desactive")
+      )
     ]);
   }
 
@@ -175,57 +195,88 @@ export class ActivationChecklistService {
   private async partnerSections(partners: PartnerTenant[], countries: Country[], products: Product[]): Promise<ActivationChecklistSection[]> {
     const sections: ActivationChecklistSection[] = [];
     for (const partner of partners) {
-      const licenses = await this.deps.partnerLicenses.listForPartner(partner.id);
-      sections.push(this.section(`partner:${partner.id}`, partner.legalName, { partnerId: partner.id }, [
-        this.control("partner_active", "Partenaire actif", partner.status === "active", true, partner.status),
-        this.control("partner_capacity", "Capacite disponible", partner.capacityStatus !== "blocked" && partner.capacityStatus !== "full", true, partner.capacityStatus),
-        this.control("partner_country_authorized", "Autorisation pays", await this.anyCountryAuthorized(partner.id, countries), true),
-        this.control("partner_product_authorized", "Autorisation produit", await this.anyProductAuthorized(partner.id, products), true),
-        this.control("partner_license_valid", "Licence valide sur scope", this.hasValidLicense(licenses, countries, products), true)
-      ]));
+      for (const country of countries) {
+        for (const product of products.filter((candidate) => candidate.countryIds.includes(country.id))) {
+          const eligibility = await this.partnerEligibility(partner.id, country.id, product.id);
+          sections.push(this.section(`partner:${partner.id}:${country.id}:${product.id}`, `${partner.legalName} - ${country.isoCode}/${product.key}`, {
+            partnerId: partner.id,
+            countryId: country.id,
+            countryCode: country.isoCode,
+            productId: product.id,
+            productKey: product.key
+          }, [
+            this.control("partner_active", "Partenaire actif", partner.status === "active", true, partner.status),
+            this.control("partner_capacity", "Capacite disponible", partner.capacityStatus !== "blocked" && partner.capacityStatus !== "full", true, partner.capacityStatus),
+            this.control("partner_country_authorized", "Autorisation pays", eligibility.countryAuthorized, true),
+            this.control("partner_product_authorized", "Autorisation produit", eligibility.productAuthorized, true),
+            this.control("partner_license_valid", "Licence valide sur scope", eligibility.licenseValid, true)
+          ]));
+        }
+      }
     }
     return sections;
   }
 
-  private offerSections(offers: OfferRecord[], countries: Country[], products: Product[], partners: PartnerTenant[]): ActivationChecklistSection[] {
+  private async offerSections(offers: OfferRecord[], countries: Country[], products: Product[], partners: PartnerTenant[]): Promise<ActivationChecklistSection[]> {
     const countryIds = new Set(countries.map((country) => country.id));
     const productIds = new Set(products.map((product) => product.id));
     const partnerIds = partners.length ? new Set(partners.map((partner) => partner.id)) : null;
+    const policy = new OfferPublicationPolicy();
     const scopedOffers = offers.filter((offer) =>
       countryIds.has(offer.countryId)
       && productIds.has(offer.productId)
       && (!partnerIds || (offer.partnerTenantId ? partnerIds.has(offer.partnerTenantId) : true))
     );
+    const publicationResults = await Promise.all(scopedOffers.map(async (offer) => {
+      const publication = policy.evaluate(offer);
+      const sponsoredAllowed = !offer.isSponsored || this.deps.featureFlags.isEnabled("sponsored_offers_enabled");
+      const partnerEligible = offer.partnerTenantId ? await this.partnerEligibility(offer.partnerTenantId, offer.countryId, offer.productId) : { eligible: false };
+      return {
+        offer,
+        public: publication.public && sponsoredAllowed && partnerEligible.eligible,
+        reasons: [
+          ...publication.reasons,
+          ...(sponsoredAllowed ? [] : ["sponsored_offers_disabled"]),
+          ...(partnerEligible.eligible ? [] : ["partner_not_eligible"])
+        ]
+      };
+    }));
     return [this.section("offers", "Offres publiques candidates", {}, [
-      this.control("active_validated_offer", "Au moins une offre active validee", scopedOffers.some((offer) => offer.status === "active" && offer.validationStatus === "validated"), true),
-      this.control("no_unvalidated_public_offer", "Aucune offre active non validee", !scopedOffers.some((offer) => offer.status === "active" && offer.validationStatus !== "validated"), true)
+      this.control("publishable_offer", "Au moins une offre publiable et eligible", publicationResults.some((result) => result.public), true),
+      this.control(
+        "no_blocked_active_offer",
+        "Aucune offre active bloquee par la politique",
+        !publicationResults.some((result) => result.offer.status === "active" && !result.public),
+        true,
+        publicationResults.flatMap((result) => result.reasons).join(", ") || "pret"
+      )
     ])];
   }
 
-  private async anyCountryAuthorized(partnerId: string, countries: Country[]): Promise<boolean> {
-    for (const country of countries) {
-      if (await this.deps.partners.isAuthorizedForCountry(partnerId, country.id)) return true;
-    }
-    return false;
-  }
-
-  private async anyProductAuthorized(partnerId: string, products: Product[]): Promise<boolean> {
-    for (const product of products) {
-      if (await this.deps.partners.isAuthorizedForProduct(partnerId, product.id)) return true;
-    }
-    return false;
-  }
-
-  private hasValidLicense(licenses: PartnerLicense[], countries: Country[], products: Product[]): boolean {
-    const countryIds = new Set(countries.map((country) => country.id));
-    const productIds = new Set(products.map((product) => product.id));
+  private async partnerEligibility(partnerId: string, countryId: string, productId: string): Promise<{
+    countryAuthorized: boolean;
+    productAuthorized: boolean;
+    licenseValid: boolean;
+    eligible: boolean;
+  }> {
+    const [countryAuthorized, productAuthorized, licenses] = await Promise.all([
+      this.deps.partners.isAuthorizedForCountry(partnerId, countryId),
+      this.deps.partners.isAuthorizedForProduct(partnerId, productId),
+      this.deps.partnerLicenses.listForPartner(partnerId)
+    ]);
     const today = Date.now();
-    return licenses.some((license) =>
+    const licenseValid = licenses.some((license: PartnerLicense) =>
       license.status === "valid"
-      && countryIds.has(license.countryId)
+      && license.countryId === countryId
       && new Date(license.expirationDate).getTime() > today
-      && (license.productIds.length === 0 || license.productIds.some((productId) => productIds.has(productId)))
+      && (license.productIds.length === 0 || license.productIds.includes(productId))
     );
+    return {
+      countryAuthorized,
+      productAuthorized,
+      licenseValid,
+      eligible: countryAuthorized && productAuthorized && licenseValid
+    };
   }
 
   private section(

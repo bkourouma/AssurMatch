@@ -95,7 +95,7 @@ describe("activation checklist runtime HTTP", () => {
     expect(response.status).toBe(200);
     const checklist = activationChecklistResponseSchema.parse(await readJson<ActivationChecklistResponse>(response));
     expect(checklist.summary.blocked).toBe(0);
-    expect(checklist.sections.map((section) => section.key)).toEqual(expect.arrayContaining(["global", `country:${country.id}`, `product:${product.id}`, `quote:${country.id}:${product.id}`, `partner:${partner.id}`, "offers"]));
+    expect(checklist.sections.map((section) => section.key)).toEqual(expect.arrayContaining(["global", `country:${country.id}`, `product:${product.id}`, `quote:${country.id}:${product.id}`, `partner:${partner.id}:${country.id}:${product.id}`, "offers"]));
     expect(harness.runtime.audit.writer.search({ action: ActivationChecklistAuditActions.read })[0]?.result).toBe("success");
   });
 
@@ -111,5 +111,31 @@ describe("activation checklist runtime HTTP", () => {
     const response = await harness.request("/admin/activation-checklist", { headers: actorHeaders(broker) });
     expect(response.status).toBe(403);
     expect(harness.runtime.audit.writer.search({ action: ActivationChecklistAuditActions.refused })[0]?.reason).toBe("forbidden_role");
+  });
+
+  it("blocks the checklist when a sensitive future flag is enabled", async () => {
+    harness = await createRuntimeHttpHarness();
+    const admin = { actorId: "activation-admin", roles: ["super_admin" as const], mfaVerified: true };
+    await harness.runtime.featureFlags.service.setFlag({ key: "billing_enabled", scopeType: "global", value: true, reason: "activation checklist guard test" }, admin);
+
+    const response = await harness.request("/admin/activation-checklist", { headers: actorHeaders(admin) });
+    expect(response.status).toBe(200);
+    const checklist = await readJson<ActivationChecklistResponse>(response);
+    expect(checklist.summary.blocked).toBeGreaterThan(0);
+    expect(checklist.sections.find((section) => section.key === "global")?.controls).toContainEqual(expect.objectContaining({
+      key: "billing_enabled",
+      status: "blocked"
+    }));
+  });
+
+  it("refuses support admin and Admin Pays actors without explicit scopes", async () => {
+    harness = await createRuntimeHttpHarness();
+    const support = { actorId: "support", roles: ["support_admin" as const], mfaVerified: true };
+    const adminPaysWithoutScope = { actorId: "admin-pays", roles: ["admin_pays" as const], mfaVerified: true };
+
+    expect((await harness.request("/admin/activation-checklist", { headers: actorHeaders(support) })).status).toBe(403);
+    expect((await harness.request("/admin/activation-checklist", { headers: actorHeaders(adminPaysWithoutScope) })).status).toBe(403);
+    const reasons = harness.runtime.audit.writer.search({ action: ActivationChecklistAuditActions.refused }).map((entry) => entry.reason);
+    expect(reasons).toEqual(expect.arrayContaining(["forbidden_role", "missing_country_scope"]));
   });
 });

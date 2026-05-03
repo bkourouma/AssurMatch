@@ -14,8 +14,8 @@ export default async function ActivationChecklistPage() {
     <div className="page-stack">
       <PageHeader
         kicker="Activation controlee"
-        title="Checklist d'activation"
-        description="Verification lecture seule des preconditions pays, produit, consentement, formulaire, partenaire, licence, offre et flags avant exposition publique."
+        title="Checklist technique d'activation"
+        description="Verification lecture seule des preconditions techniques pays, produit, consentement, formulaire, partenaire, licence, offre et flags avant exposition publique."
       />
 
       {checklist.unauthenticated ? <StateMessage tone="danger">Session admin requise.</StateMessage> : null}
@@ -25,7 +25,7 @@ export default async function ActivationChecklistPage() {
       {checklist.status === "success" ? (
         <>
           <section className="admin-grid admin-grid--kpi" aria-label="Synthese checklist activation">
-            <KpiCard label="Prets" value={checklist.data.summary.passed} tone="success" />
+            <KpiCard label="Prets techniquement" value={checklist.data.summary.passed} tone="success" />
             <KpiCard label="A surveiller" value={checklist.data.summary.warning} tone="warning" />
             <KpiCard label="Bloquants" value={checklist.data.summary.blocked} tone="danger" />
           </section>
@@ -63,7 +63,7 @@ export default async function ActivationChecklistPage() {
           </Card>
 
           <StateMessage tone="warning">
-            Cette surface ne modifie aucun flag, pays, produit, partenaire, licence, offre ou formulaire. Les activations restent traitees par les controles existants et leurs audits.
+            Cette surface ne modifie aucun flag, pays, produit, partenaire, licence, offre ou formulaire. Elle ne remplace pas le go/no-go conformite, juridique, support ou operations.
           </StateMessage>
         </>
       ) : null}

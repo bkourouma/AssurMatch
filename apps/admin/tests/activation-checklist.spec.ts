@@ -12,9 +12,10 @@ test("admin activation checklist client and page are read-only", () => {
 
   expect(api).toContain("readActivationChecklist");
   expect(api).toContain("/admin/activation-checklist");
-  expect(page).toContain("Checklist d'activation");
+  expect(page).toContain("Checklist technique d'activation");
   expect(page).toContain("readActivationChecklist");
   expect(page).toContain("Cette surface ne modifie aucun flag");
+  expect(page).toContain("ne remplace pas le go/no-go");
   expect(shell).toContain("/activation-checklist");
   expect(page).not.toContain("PATCH");
   expect(page).not.toContain("POST");
