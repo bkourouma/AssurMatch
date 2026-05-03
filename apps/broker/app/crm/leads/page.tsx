@@ -1,80 +1,58 @@
-import { listCrmLeads } from "../../lib/broker-api";
 import { redirect } from "next/navigation";
 import { loginRedirect } from "../../lib/backoffice-auth";
+import { listCrmLeads } from "../../lib/broker-api";
+import { Badge, DataTable, PageHeader, StateMessage } from "../../lib/ui/broker-ui";
+import { leadSummary } from "../../lib/ui/broker-view-models";
 
 export default async function BrokerCrmLeadsPage() {
   const apiLeads = await listCrmLeads();
   if (apiLeads.unauthenticated) redirect(loginRedirect("/crm/leads", apiLeads.error ?? "session_required"));
-  const leads = apiLeads.data.items.map((lead) => ({
-    reference: String(lead.publicReference ?? lead.id ?? "lead"),
-    pays: String(lead.countryCode ?? "-"),
-    produit: String(lead.productKey ?? "-"),
-    statut: String(lead.status ?? "-"),
-    conseiller: String(lead.assignedAdvisorId ?? "-"),
-    urgence: String(lead.urgency ?? "-"),
-    source: String(lead.source ?? "-")
-  }));
+  const leads = apiLeads.data.items.map(leadSummary);
 
   return (
-    <main style={{ maxWidth: 1180, margin: "0 auto", padding: "28px 20px", fontFamily: "system-ui, sans-serif", color: "#172033" }}>
-      <header style={{ display: "flex", justifyContent: "space-between", gap: 16, alignItems: "flex-start", marginBottom: 20 }}>
-        <div>
-          <p style={{ margin: "0 0 6px", color: "#52616f", fontSize: 13 }}>CRM Pro/Enterprise</p>
-          <h1 style={{ margin: 0, fontSize: 28 }}>Leads CRM</h1>
-          <p style={{ maxWidth: 760, lineHeight: 1.55 }}>
-            Vue tableau des leads autorises selon role, tenant, conseiller et permissions PII.
-          </p>
-        </div>
-        <button type="button" style={{ padding: "10px 14px", border: "1px solid #24695c", color: "#24695c", background: "#fff", borderRadius: 6 }}>
-          Export CSV controle
-        </button>
-      </header>
+    <div className="page-stack">
+      <PageHeader
+        kicker="CRM Pro/Enterprise"
+        title="Leads CRM"
+        description="Vue tableau des leads autorises selon role, tenant, conseiller et permissions PII."
+        actions={<Badge tone="info">Export controle par permission et audit</Badge>}
+      />
 
-      <form aria-label="Filtres CRM" style={{ display: "grid", gridTemplateColumns: "repeat(6, minmax(120px, 1fr))", gap: 10, marginBottom: 16 }}>
+      <form aria-label="Filtres CRM" className="form-grid form-grid--crm">
         {["Statut", "Produit", "Pays", "Conseiller", "Urgence", "Source"].map((label) => (
-          <label key={label} style={{ display: "grid", gap: 6, fontSize: 13, color: "#52616f" }}>
+          <label key={label} className="field">
             {label}
-            <select style={{ minHeight: 38, border: "1px solid #bac4cf", borderRadius: 6, padding: "0 10px", background: "#fff" }}>
+            <select>
               <option>Tous</option>
             </select>
           </label>
         ))}
       </form>
 
-      <label style={{ display: "grid", gap: 6, marginBottom: 14, color: "#52616f", fontSize: 13 }}>
+      <label className="field">
         Recherche autorisee
-        <input placeholder="Nom, reference, telephone ou email selon permission" style={{ minHeight: 38, border: "1px solid #bac4cf", borderRadius: 6, padding: "0 10px" }} />
+        <input placeholder="Nom, reference, telephone ou email selon permission" />
       </label>
 
-      {apiLeads.forbidden ? <p role="alert">Acces CRM refuse, verifiez le plan, la MFA et le flag broker_crm_enabled. Aucune donnee CRM n'est affichee.</p> : null}
-      {apiLeads.error && !apiLeads.forbidden ? <p role="status">API CRM indisponible. Aucune donnee protegee n'est affichee en mode erreur.</p> : null}
+      {apiLeads.forbidden ? <StateMessage tone="danger">Acces CRM refuse, verifiez le plan, la MFA et le flag broker_crm_enabled. Aucune donnee CRM n'est affichee.</StateMessage> : null}
+      {apiLeads.error && !apiLeads.forbidden ? <StateMessage tone="warning">API CRM indisponible. Aucune donnee protegee n'est affichee en mode erreur.</StateMessage> : null}
 
-      {!apiLeads.forbidden && leads.length === 0 ? <p>Aucun lead CRM autorise a afficher.</p> : null}
-
-      {!apiLeads.forbidden && leads.length > 0 ? <table style={{ width: "100%", borderCollapse: "collapse", borderTop: "1px solid #d8dde3" }}>
-        <thead>
-          <tr>
-            {["Reference", "Pays", "Produit", "Statut", "Conseiller", "Urgence", "Source"].map((header) => (
-              <th key={header} style={{ textAlign: "left", padding: "12px 10px", borderBottom: "1px solid #d8dde3", color: "#52616f", fontSize: 13 }}>{header}</th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-          {leads.map((lead) => (
-            <tr key={lead.reference}>
-              <td style={{ padding: "12px 10px", borderBottom: "1px solid #edf0f3" }}>
-                <a href="/crm/leads/demo-lead" style={{ color: "#24695c" }}>{lead.reference}</a>
-              </td>
-              <td style={{ padding: "12px 10px", borderBottom: "1px solid #edf0f3" }}>{lead.pays}</td>
-              <td style={{ padding: "12px 10px", borderBottom: "1px solid #edf0f3" }}>{lead.produit}</td>
-              <td style={{ padding: "12px 10px", borderBottom: "1px solid #edf0f3" }}>{lead.statut}</td>
-              <td style={{ padding: "12px 10px", borderBottom: "1px solid #edf0f3" }}>{lead.conseiller}</td>
-              <td style={{ padding: "12px 10px", borderBottom: "1px solid #edf0f3" }}>{lead.urgence}</td>
-              <td style={{ padding: "12px 10px", borderBottom: "1px solid #edf0f3" }}>{lead.source}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table> : null}
-    </main>
+      {!apiLeads.forbidden ? (
+        <DataTable
+          items={leads}
+          getKey={(lead) => lead.id}
+          emptyLabel="Aucun lead CRM autorise a afficher."
+          columns={[
+            { header: "Reference", render: (lead) => <a href={`/crm/leads/${lead.id}`}>{lead.reference}</a> },
+            { header: "Pays", render: (lead) => lead.country },
+            { header: "Produit", render: (lead) => lead.product },
+            { header: "Statut", render: (lead) => <Badge tone={lead.statusTone}>{lead.status}</Badge> },
+            { header: "Conseiller", render: (lead) => lead.advisor ?? "-" },
+            { header: "Urgence", render: (lead) => lead.urgency ?? "-" },
+            { header: "Source", render: (lead) => lead.source ?? "-" }
+          ]}
+        />
+      ) : null}
+    </div>
   );
 }
