@@ -7,6 +7,15 @@ import { OfferPublicationPolicy } from "./offer-publication-policy";
 import type { OfferRecord } from "./offers.module";
 import { MemoryOffersRepository, type OffersRepository } from "./offers.repository";
 
+export interface PublicOfferVisibilityContext {
+  globalFlags?: Partial<Record<string, boolean>>;
+  countryFlags?: Partial<Record<string, boolean>>;
+  productFlags?: Partial<Record<string, boolean>>;
+  resolveCountryFlags?: (countryId: string) => Promise<Partial<Record<string, boolean>> | undefined> | Partial<Record<string, boolean>> | undefined;
+  resolveProductFlags?: (productId: string) => Promise<Partial<Record<string, boolean>> | undefined> | Partial<Record<string, boolean>> | undefined;
+  evaluatePartnerEligibility?: (partnerTenantId: string, countryId: string, productId: string) => Promise<{ eligible: boolean; reasons: string[] }>;
+}
+
 export class PublicOfferCatalogService {
   private readonly policy = new OfferPublicationPolicy();
 
@@ -22,14 +31,18 @@ export class PublicOfferCatalogService {
     }
   }
 
-  async list(countryId: string, productId: string, query: Partial<OfferListQuery> = {}, actor?: ActorContext): Promise<OfferSummary[]> {
+  async list(countryId: string, productId: string, query: Partial<OfferListQuery> = {}, actor?: ActorContext, context?: PublicOfferVisibilityContext): Promise<OfferSummary[]> {
     const parsed = offerListQuerySchema.parse(query);
-    const visible = (await this.repository.list())
-      .filter((offer) => offer.countryId === countryId && offer.productId === productId)
-      .filter((offer) => this.policy.evaluate(offer).public)
-      .filter((offer) => parsed.minPrice === undefined || (offer.indicativePriceMin ?? 0) >= parsed.minPrice)
-      .filter((offer) => parsed.maxPrice === undefined || (offer.indicativePriceMax ?? offer.indicativePriceMin ?? 0) <= parsed.maxPrice)
-      .filter((offer) => !parsed.broker || offer.partnerTenantId === parsed.broker);
+    const visible: OfferRecord[] = [];
+    for (const offer of await this.repository.list()) {
+      if (offer.countryId !== countryId || offer.productId !== productId) continue;
+      const decision = await this.visibilityDecision(offer, context);
+      if (!decision.public) continue;
+      if (parsed.minPrice !== undefined && (offer.indicativePriceMin ?? 0) < parsed.minPrice) continue;
+      if (parsed.maxPrice !== undefined && (offer.indicativePriceMax ?? offer.indicativePriceMin ?? 0) > parsed.maxPrice) continue;
+      if (parsed.broker && offer.partnerTenantId !== parsed.broker) continue;
+      visible.push(offer);
+    }
     const sorted = this.sort(visible, parsed.sort);
     this.audit.write({
       actor,
@@ -43,9 +56,9 @@ export class PublicOfferCatalogService {
     return sorted.map((offer) => this.toSummary(offer));
   }
 
-  async detail(offerId: string, actor?: ActorContext): Promise<OfferDetail> {
+  async detail(offerId: string, actor?: ActorContext, context?: PublicOfferVisibilityContext): Promise<OfferDetail> {
     const offer = (await this.repository.list()).find((candidate) => candidate.id === offerId);
-    const decision = offer ? this.policy.evaluate(offer) : { public: false, reasons: ["offer_not_found"] };
+    const decision = offer ? await this.visibilityDecision(offer, context) : { public: false, reasons: ["offer_not_found"] };
     if (!offer || !decision.public) {
       this.audit.write({
         actor,
@@ -63,6 +76,26 @@ export class PublicOfferCatalogService {
       validUntil: offer.validUntil.toISOString(),
       publicDisclaimers: offer.publicDisclaimers
     };
+  }
+
+  private async visibilityDecision(offer: OfferRecord, context?: PublicOfferVisibilityContext) {
+    const decision = this.policy.evaluate(offer);
+    const reasons = [...decision.reasons];
+    if (context) {
+      const countryFlags = context.countryFlags ?? await context.resolveCountryFlags?.(offer.countryId);
+      const productFlags = context.productFlags ?? await context.resolveProductFlags?.(offer.productId);
+      if (context.globalFlags?.public_comparator_enabled !== true) reasons.push("public_comparator_disabled");
+      if (countryFlags?.country_public_enabled !== true) reasons.push("country_public_disabled");
+      if (countryFlags?.country_comparison_enabled !== true) reasons.push("country_comparison_disabled");
+      if (productFlags?.product_public_enabled !== true) reasons.push("product_public_disabled");
+      if (productFlags?.product_comparison_enabled !== true) reasons.push("product_comparison_disabled");
+      if (offer.isSponsored && context.globalFlags?.sponsored_offers_enabled !== true) reasons.push("sponsored_offers_disabled");
+      if (offer.partnerTenantId && context.evaluatePartnerEligibility) {
+        const eligibility = await context.evaluatePartnerEligibility(offer.partnerTenantId, offer.countryId, offer.productId);
+        if (!eligibility.eligible) reasons.push(...eligibility.reasons);
+      }
+    }
+    return { public: reasons.length === 0, reasons };
   }
 
   private sort(offers: OfferRecord[], sort: OfferListQuery["sort"]): OfferRecord[] {

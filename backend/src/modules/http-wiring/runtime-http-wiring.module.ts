@@ -34,6 +34,7 @@ import { AuthRequiredHttpGuard, MfaRequiredHttpGuard } from "../auth/guards/http
 import { actorFromRequest, protectedActorFromRequest, type AssurMatchHttpRequest } from "../common/http/request-actor";
 import { parseHttpInput } from "../common/http/zod-validation";
 import type { ActorContext } from "../common/types";
+import { PublicJourneyFlagPolicy } from "../feature-flags/public-journey-flag-policy";
 import { AdminUsersController as AdminUsersDomainController } from "../users/admin-users.controller";
 import { AdminUserRolesController as AdminUserRolesDomainController } from "../users/admin-user-roles.controller";
 
@@ -185,12 +186,13 @@ export class PublicCountriesController {
   constructor(private readonly runtime: AssurMatchRuntime) {}
 
   list() {
+    if (this.runtime.publicJourneyGlobalFlags().public_comparator_enabled !== true) return [];
     return this.runtime.countries.service.listPublic();
   }
 
   detail(countryCode: string, request: AssurMatchHttpRequest) {
     const parsedCountryCode = parseParam("countryCode", countryCode, isoCountrySchema);
-    return this.runtime.countries.service.getPublicPage(parsedCountryCode, { public_comparator_enabled: true }, actorFromRequest(request));
+    return this.runtime.countries.service.getPublicPage(parsedCountryCode, this.runtime.publicJourneyGlobalFlags(), actorFromRequest(request));
   }
 }
 
@@ -201,7 +203,7 @@ export class PublicProductsController {
     const parsedCountryCode = parseParam("countryCode", countryCode, isoCountrySchema);
     const country = await this.runtime.countries.service.findByIsoCode(parsedCountryCode);
     if (!country) return [];
-    return this.runtime.products.service.listPublicForCountry(country.id, country.flags);
+    return this.runtime.products.service.listPublicForCountry(country.id, country.flags, this.runtime.publicJourneyGlobalFlags());
   }
 
   async detail(countryCode: string, productKey: string, request: AssurMatchHttpRequest) {
@@ -209,7 +211,7 @@ export class PublicProductsController {
     const parsedProductKey = parseParam("productKey", productKey);
     const country = await this.runtime.countries.service.findByIsoCode(parsedCountryCode);
     if (!country) throw new Error("Country is not publicly available");
-    return this.runtime.products.service.getPublicProductPage(country.id, parsedProductKey, country.flags, { public_comparator_enabled: true, quote_request_enabled: true }, actorFromRequest(request));
+    return this.runtime.products.service.getPublicProductPage(country.id, parsedProductKey, country.flags, this.runtime.publicJourneyGlobalFlags(), actorFromRequest(request));
   }
 }
 
@@ -223,11 +225,21 @@ export class PublicOffersController {
     const country = await this.runtime.countries.service.findByIsoCode(parsedCountryCode);
     const product = await this.runtime.products.service.findByKey(parsedProductKey);
     if (!country || !product) return { items: [], total: 0, page: 1, pageSize: 20 };
-    return this.runtime.offers.publicCatalog.list(country.id, product.id, parsedQuery);
+    return this.runtime.offers.publicCatalog.list(country.id, product.id, parsedQuery, undefined, {
+      globalFlags: this.runtime.publicJourneyGlobalFlags(),
+      countryFlags: country.flags,
+      productFlags: product.flags,
+      evaluatePartnerEligibility: (partnerTenantId, offerCountryId, offerProductId) => this.runtime.publicOfferPartnerEligibility(partnerTenantId, offerCountryId, offerProductId)
+    });
   }
 
   detail(offerId: string) {
-    return this.runtime.offers.publicCatalog.detail(parseParam("offerId", offerId, optionalUuidParamSchema));
+    return this.runtime.offers.publicCatalog.detail(parseParam("offerId", offerId, optionalUuidParamSchema), undefined, {
+      globalFlags: this.runtime.publicJourneyGlobalFlags(),
+      resolveCountryFlags: async (countryId) => (await this.runtime.countries.service.require(countryId)).flags,
+      resolveProductFlags: async (productId) => (await this.runtime.products.service.require(productId)).flags,
+      evaluatePartnerEligibility: (partnerTenantId, countryId, productId) => this.runtime.publicOfferPartnerEligibility(partnerTenantId, countryId, productId)
+    });
   }
 }
 
@@ -241,6 +253,13 @@ export class PublicQuoteRequestsController {
     const country = await this.runtime.countries.service.findByIsoCode(parsedCountryCode);
     const product = await this.runtime.products.service.findByKey(parsedProductKey);
     if (!country || !product) throw new Error("Quote form is not publicly available");
+    const state = new PublicJourneyFlagPolicy().resolve({
+      globalFlags: this.runtime.publicJourneyGlobalFlags(),
+      countryFlags: country.flags,
+      productFlags: product.flags,
+      requireProductFlags: true
+    });
+    if (!state.quoteEnabled) throw new Error("Quote form is not publicly available");
     return this.runtime.quoteForms.service.publicForm(country.id, product.id, parsedLanguage);
   }
 

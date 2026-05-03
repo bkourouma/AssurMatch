@@ -121,7 +121,8 @@ export class AssurMatchRuntime {
     prospects: this.prospects.service,
     routing: this.leads.routing,
     notifications: this.notifications.quoteService,
-    aiSummary: this.quoteAiSummary
+    aiSummary: this.quoteAiSummary,
+    isGlobalFlagEnabled: (key) => this.featureFlags.service.isEnabled(key)
   }, this.audit.writer, this.redis.client, this.quoteRequestsRepository);
   readonly partnerEligibility = new PartnerEligibilityService(this.partners.service, this.partnerLicenses.service, this.documents.service);
   readonly routing = new RoutingModule(this.consent.service, this.partnerEligibility, this.audit.writer);
@@ -156,6 +157,25 @@ export class AssurMatchRuntime {
   async reloadRuntimeFeatureFlags(): Promise<void> {
     await this.featureFlags.service.hydrateFromRepository();
     this.refreshRuntimeFeatureFlags();
+  }
+
+  publicJourneyGlobalFlags(): Partial<Record<string, boolean>> {
+    return {
+      public_comparator_enabled: this.featureFlags.service.isEnabled("public_comparator_enabled"),
+      quote_request_enabled: this.featureFlags.service.isEnabled("quote_request_enabled"),
+      sponsored_offers_enabled: this.featureFlags.service.isEnabled("sponsored_offers_enabled")
+    };
+  }
+
+  async publicOfferPartnerEligibility(partnerTenantId: string, countryId: string, productId: string): Promise<{ eligible: boolean; reasons: string[] }> {
+    const reasons: string[] = [];
+    const partner = await this.partners.service.require(partnerTenantId);
+    if (partner.status !== "active") reasons.push("partner_not_active");
+    if (partner.capacityStatus === "blocked" || partner.capacityStatus === "full") reasons.push("partner_capacity_blocked");
+    if (!await this.partners.service.isAuthorizedForCountry(partnerTenantId, countryId)) reasons.push("partner_country_not_authorized");
+    if (!await this.partners.service.isAuthorizedForProduct(partnerTenantId, productId)) reasons.push("partner_product_not_authorized");
+    if (!await this.partnerLicenses.service.eligible(partnerTenantId, countryId, productId)) reasons.push("license_not_valid_for_scope");
+    return { eligible: reasons.length === 0, reasons };
   }
 
   runtimeRepositoryModes(): Record<string, string | undefined> {

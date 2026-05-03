@@ -4,6 +4,7 @@ import type { ActorContext } from "../common/types";
 import { FeatureFlagCacheService } from "./feature-flag-cache.service";
 import { MemoryFeatureFlagRepository, type FeatureFlagRepository } from "./feature-flag-repository";
 import type { FlagRecord } from "./feature-flag-precedence.service";
+import { evaluateFeatureFlagMutation, featureFlagMutationRefusedAction } from "./sensitive-feature-flag-policy";
 
 export interface FeatureFlag extends FlagRecord {
   id: string;
@@ -20,6 +21,10 @@ export interface FeatureFlagHistory {
   nextValue: boolean;
   reason: string;
   changedAt: Date;
+}
+
+export interface FeatureFlagMutationOptions {
+  allowSensitiveDisable?: boolean;
 }
 
 export class FeatureFlagsService {
@@ -47,8 +52,33 @@ export class FeatureFlagsService {
     return this.flags.find((flag) => flag.key === key && flag.scopeType === scopeType && flag.scopeId === scopeId)?.value ?? false;
   }
 
-  async setFlag(input: Omit<FeatureFlag, "id" | "changedAt" | "cacheVersion">, actor: ActorContext): Promise<FeatureFlag> {
+  async setFlag(input: Omit<FeatureFlag, "id" | "changedAt" | "cacheVersion">, actor: ActorContext, options: FeatureFlagMutationOptions = {}): Promise<FeatureFlag> {
     const existing = this.flags.find((flag) => flag.key === input.key && flag.scopeType === input.scopeType && flag.scopeId === input.scopeId);
+    const mutationDecision = evaluateFeatureFlagMutation({
+      key: input.key,
+      scopeType: input.scopeType,
+      ...(input.scopeId ? { scopeId: input.scopeId } : {}),
+      value: input.value,
+      ...(options.allowSensitiveDisable ? { allowSensitiveDisable: true } : {})
+    });
+    if (!mutationDecision.allowed) {
+      this.audit.write({
+        actor,
+        action: featureFlagMutationRefusedAction,
+        targetType: "FeatureFlag",
+        targetId: existing?.id ?? `${input.scopeType}:${input.scopeId ?? "global"}:${input.key}`,
+        scope: { scopeType: input.scopeType, scopeId: input.scopeId },
+        result: "refused",
+        reason: mutationDecision.reason,
+        context: {
+          key: input.key,
+          previousValue: existing?.value ?? false,
+          requestedValue: input.value,
+          policy: mutationDecision.policy
+        }
+      });
+      throw new Error(mutationDecision.message);
+    }
     const flag: FeatureFlag = existing ?? {
       id: crypto.randomUUID(),
       key: input.key,

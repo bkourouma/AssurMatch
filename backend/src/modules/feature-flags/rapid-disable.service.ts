@@ -13,7 +13,8 @@ export class RapidDisableService {
         value: false,
         reason
       },
-      actor
+      actor,
+      { allowSensitiveDisable: true }
     );
   }
 }

@@ -1,5 +1,8 @@
 import type { AssurMatchRole } from "../../../../packages/shared/rbac/assurmatch-role-matrix";
+import type { ActorContext } from "../common/types";
 import type { PrismaService } from "../common/prisma/prisma.service";
+
+type PartnerPlan = NonNullable<ActorContext["partnerPlan"]>;
 
 export interface UserAccount {
   id: string;
@@ -10,6 +13,7 @@ export interface UserAccount {
   status: "invited" | "active" | "suspended" | "locked" | "deleted";
   mfaStatus: "not_enrolled" | "enrolled" | "required" | "verified";
   partnerTenantId?: string;
+  partnerPlan?: PartnerPlan;
   countryScopes: string[];
   productScopes: string[];
   passwordHash?: string;
@@ -95,6 +99,15 @@ interface PrismaUserRoleDelegate {
   deleteMany(input: unknown): Promise<unknown>;
 }
 
+interface PrismaPartnerTenantDelegate {
+  findMany(input: unknown): Promise<PrismaPartnerPlanRow[]>;
+}
+
+interface PrismaPartnerPlanRow {
+  id: string;
+  plan: string;
+}
+
 interface PrismaUserRow {
   id: string;
   email: string;
@@ -144,17 +157,18 @@ export class PrismaUsersRepository implements UsersRepository {
 
   async findById(id: string): Promise<UserAccount | undefined> {
     const row = await this.delegate.findUnique({ where: { id }, include: this.includeRoles() });
-    return row ? this.toDomain(row) : undefined;
+    return row ? this.toDomain(row, await this.partnerPlanFor(row.partnerTenantId)) : undefined;
   }
 
   async findByEmail(email: string): Promise<UserAccount | undefined> {
     const row = await this.delegate.findFirst({ where: { email: email.toLowerCase() }, include: this.includeRoles() });
-    return row ? this.toDomain(row) : undefined;
+    return row ? this.toDomain(row, await this.partnerPlanFor(row.partnerTenantId)) : undefined;
   }
 
   async list(): Promise<UserAccount[]> {
     const rows = await this.delegate.findMany({ include: this.includeRoles(), orderBy: { createdAt: "asc" } });
-    return rows.map((row) => this.toDomain(row));
+    const partnerPlans = await this.partnerPlansFor(rows.map((row) => row.partnerTenantId));
+    return rows.map((row) => this.toDomain(row, row.partnerTenantId ? partnerPlans.get(row.partnerTenantId) : undefined));
   }
 
   async findManyRaw(): Promise<unknown[]> {
@@ -186,6 +200,11 @@ export class PrismaUsersRepository implements UsersRepository {
     const userRole = client.userRole as PrismaUserRoleDelegate | undefined;
     if (!userRole) throw new Error("Prisma userRole delegate is not connected");
     return userRole;
+  }
+
+  private get partnerTenantDelegate(): PrismaPartnerTenantDelegate | undefined {
+    const client = this.prisma.requireRuntimeClient();
+    return (client as { partnerTenant?: PrismaPartnerTenantDelegate }).partnerTenant;
   }
 
   private async replaceRoles(userId: string, roles: AssurMatchRole[], reason: string): Promise<void> {
@@ -242,7 +261,29 @@ export class PrismaUsersRepository implements UsersRepository {
     return data;
   }
 
-  private toDomain(row: PrismaUserRow): UserAccount {
+  private async partnerPlanFor(partnerTenantId?: string | null): Promise<PartnerPlan | undefined> {
+    if (!partnerTenantId) return undefined;
+    return (await this.partnerPlansFor([partnerTenantId])).get(partnerTenantId);
+  }
+
+  private async partnerPlansFor(partnerTenantIds: Array<string | null | undefined>): Promise<Map<string, PartnerPlan>> {
+    const ids = [...new Set(partnerTenantIds.filter((id): id is string => !!id))];
+    if (ids.length === 0) return new Map();
+    const partnerTenant = this.partnerTenantDelegate;
+    if (!partnerTenant) return new Map();
+    const rows = await partnerTenant.findMany({ where: { id: { in: ids } }, select: { id: true, plan: true } });
+    return new Map(
+      rows
+        .filter((row): row is PrismaPartnerPlanRow & { plan: PartnerPlan } => this.isPartnerPlan(row.plan))
+        .map((row) => [row.id, row.plan])
+    );
+  }
+
+  private isPartnerPlan(plan: string): plan is PartnerPlan {
+    return plan === "starter" || plan === "pro" || plan === "enterprise";
+  }
+
+  private toDomain(row: PrismaUserRow, partnerPlan?: PartnerPlan): UserAccount {
     const roles = row.userRoles?.map((userRole) => userRole.role?.key).filter((role): role is AssurMatchRole => !!role) ?? [];
     return {
       id: row.id,
@@ -253,6 +294,7 @@ export class PrismaUsersRepository implements UsersRepository {
       status: row.status,
       mfaStatus: row.mfaStatus,
       ...(row.partnerTenantId ? { partnerTenantId: row.partnerTenantId } : {}),
+      ...(partnerPlan ? { partnerPlan } : {}),
       countryScopes: row.countryScopes,
       productScopes: row.productScopes,
       ...(row.passwordHash ? { passwordHash: row.passwordHash } : {}),

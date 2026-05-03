@@ -30,4 +30,17 @@ describe("PublicJourneyFlagPolicy", () => {
     expect(state.quoteEnabled).toBe(false);
     expect(state.reasons).toContain("quote_disabled");
   });
+
+  it("fails closed when product flags are required but absent", async () => {
+    const state = new PublicJourneyFlagPolicy().resolve({
+      globalFlags: { public_comparator_enabled: true, quote_request_enabled: true },
+      countryFlags: { country_public_enabled: true, country_comparison_enabled: true, country_quote_enabled: true },
+      requireProductFlags: true
+    });
+
+    expect(state.publicEnabled).toBe(false);
+    expect(state.comparisonEnabled).toBe(false);
+    expect(state.quoteEnabled).toBe(false);
+    expect(state.reasons).toContain("product_public_disabled");
+  });
 });
