@@ -33,6 +33,22 @@ test("broker login stores bearer token in an http-only back-office session cooki
   expect(actionSource).toContain("/auth/logout");
   expect(loginPage).toContain("Connexion");
   expect(loginPage).toContain("MFA requise");
+  expect(loginPage).toContain("DevAccountPicker");
+});
+
+test("broker local demo account selector is gated to local app env", async () => {
+  const actionSource = source("apps/broker/app/lib/dev-demo-login-actions.ts");
+  const accountsSource = source("apps/broker/app/lib/dev-demo-accounts.ts");
+  const pickerSource = source("apps/broker/app/login/dev-account-picker.tsx");
+
+  expect(accountsSource).toContain("process.env.APP_ENV === \"local\"");
+  expect(accountsSource).toContain("process.env.NODE_ENV !== \"production\"");
+  expect(actionSource).toContain("isLocalBrokerDemoLoginEnabled()");
+  expect(actionSource).toContain("signActorToken");
+  expect(actionSource).toContain("local_demo_broker_login.selected");
+  expect(pickerSource).toContain("requestSubmit");
+  expect(accountsSource).toContain("starter.owner@broker.example");
+  expect(accountsSource).toContain("enterprise.owner@broker.example");
 });
 
 test("broker runtime client uses bearer authorization and no simulation headers", async () => {

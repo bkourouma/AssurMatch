@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, Get, Module, Param, Patch, Post, Query, Req, UseGuards } from "@nestjs/common";
+import { Body, Controller, Delete, ForbiddenException, Get, Module, NotFoundException, Param, Patch, Post, Query, Req, UseGuards } from "@nestjs/common";
 import { z } from "zod";
 import { activateRequestSchema, loginRequestSchema, mfaVerifyRequestSchema, passwordChangeRequestSchema, passwordResetRequestSchema, type ActivateRequest, type LoginRequest, type PasswordChangeRequest, type PasswordResetRequest } from "../../../../packages/shared/contracts/auth.contracts";
 import { activationChecklistQuerySchema } from "../../../../packages/shared/contracts/activation-checklist.contracts";
@@ -57,6 +57,8 @@ interface ControllerTarget {
 const optionalUuidParamSchema = uuidSchema.or(nonEmptyStringSchema);
 const starterActionWithReasonSchema = brokerStarterLeadActionRequestSchema.extend({ reason: brokerStarterReasonSchema });
 const updateFeatureFlagSchema = z.object({ value: z.boolean(), reason: reasonSchema });
+const localDevReloadHeader = "x-assurmatch-local-dev";
+const localDevReloadToken = "broker-demo-seed";
 const protectedRoute = UseGuards(AuthRequiredHttpGuard, MfaRequiredHttpGuard) as MethodDecoratorFactory & ClassDecorator;
 const authRoute = UseGuards(AuthRequiredHttpGuard) as MethodDecoratorFactory;
 const adminRoleAllowList = {
@@ -89,6 +91,15 @@ function assertPermission(actor: ActorContext, permission: string): void {
 
 function assertAnyRole(actor: ActorContext, allowed: Set<AssurMatchRole>): void {
   if (!actor.roles.some((role) => allowed.has(role))) throw new Error("RBAC denied");
+}
+
+function assertLocalDevReloadAllowed(request: AssurMatchHttpRequest): void {
+  if (process.env.APP_ENV !== "local" || process.env.NODE_ENV === "production") {
+    throw new NotFoundException("Local dev reload unavailable");
+  }
+  if (headerValue(request.headers[localDevReloadHeader]) !== localDevReloadToken) {
+    throw new ForbiddenException("Local dev reload denied");
+  }
 }
 
 export class AuthController {
@@ -506,6 +517,16 @@ export class AdminRuntimeSupportController {
   }
 }
 
+export class LocalDevRuntimeController {
+  constructor(private readonly runtime: AssurMatchRuntime) {}
+
+  async reloadFeatureFlags(request: AssurMatchHttpRequest) {
+    assertLocalDevReloadAllowed(request);
+    await this.runtime.reloadRuntimeFeatureFlags();
+    return { ok: true };
+  }
+}
+
 export class AdminMessagingProvidersController {
   constructor(private readonly runtime: AssurMatchRuntime) {}
 
@@ -696,6 +717,9 @@ controller("admin", AdminRuntimeSupportController, true);
 decorate(AdminRuntimeSupportController, "quoteRequests", [Get("quote-requests") as MethodDecoratorFactory], [[0, Req() as ParamDecoratorFactory]]);
 decorate(AdminRuntimeSupportController, "leadAssignments", [Get("lead-assignments") as MethodDecoratorFactory], [[0, Req() as ParamDecoratorFactory]]);
 
+controller("local/dev", LocalDevRuntimeController);
+decorate(LocalDevRuntimeController, "reloadFeatureFlags", [Post("reload-feature-flags") as MethodDecoratorFactory], [[0, Req() as ParamDecoratorFactory]]);
+
 controller("admin", AdminMessagingProvidersController, true);
 decorate(AdminMessagingProvidersController, "read", [Get("messaging/providers") as MethodDecoratorFactory], [[0, Req() as ParamDecoratorFactory]]);
 
@@ -739,6 +763,7 @@ Module({
     AdminBillingFoundationController,
     AdminAIAssistanceController,
     AdminRuntimeSupportController,
+    LocalDevRuntimeController,
     AdminMessagingProvidersController,
     AdminPartnerIntegrationsController,
     PartnerApiController

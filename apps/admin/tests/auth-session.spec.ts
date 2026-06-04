@@ -25,6 +25,27 @@ test("admin login stores bearer token in an http-only back-office session cookie
   expect(actionSource).toContain("/auth/logout");
   expect(loginPage).toContain("Connexion admin");
   expect(loginPage).toContain("MFA requise");
+  expect(loginPage).toContain("DevAccountPicker");
+});
+
+test("admin local demo account selector is gated to local app env", async () => {
+  const actionSource = source("apps/admin/app/lib/dev-demo-login-actions.ts");
+  const accountsSource = source("apps/admin/app/lib/dev-demo-accounts.ts");
+  const pickerSource = source("apps/admin/app/login/dev-account-picker.tsx");
+  const seedSource = source("scripts/local-app/seed-broker-demo.ts");
+
+  expect(accountsSource).toContain('process.env.APP_ENV === "local"');
+  expect(accountsSource).toContain('process.env.NODE_ENV !== "production"');
+  expect(accountsSource).toContain("super.admin@assurmatch.local");
+  expect(accountsSource).toContain("compliance.admin@assurmatch.local");
+  expect(actionSource).toContain("signActorToken");
+  expect(actionSource).toContain("mfaVerified: true");
+  expect(actionSource).toContain("local_demo_admin_login.selected");
+  expect(actionSource).toContain("BACKOFFICE_TOKEN_COOKIE");
+  expect(actionSource).toContain("surface: \"admin\"");
+  expect(pickerSource).toContain("requestSubmit");
+  expect(seedSource).toContain("seedAdminUsers");
+  expect(seedSource).toContain("super.admin@assurmatch.local");
 });
 
 test("admin runtime client uses bearer authorization and no simulation headers", async () => {

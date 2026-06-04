@@ -8,8 +8,11 @@ import type { LeadAssignmentRecord } from "../../../src/modules/leads/lead-assig
 const tenantId = "00000000-0000-4000-8000-000000000101";
 const advisorId = "00000000-0000-4000-8000-000000000201";
 
+const BASE_NOW = new Date();
+const BASE_ASSIGNED_AT = new Date(BASE_NOW.getTime() - 24 * 60 * 60 * 1000);
+
 function assignment(overrides: Partial<LeadAssignmentRecord>): LeadAssignmentRecord {
-  const assignedAt = new Date("2026-04-10T10:00:00.000Z");
+  const assignedAt = BASE_ASSIGNED_AT;
   return {
     id: crypto.randomUUID(),
     quoteRequestId: crypto.randomUUID(),
@@ -52,7 +55,7 @@ function makeService(records: LeadAssignmentRecord[], config = { brokerDashboard
     crmActivity: {
       tasksForLead: async () => [{ dueAt: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString() }],
       remindersForLead: async () => [{ remindAt: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString() }],
-      pipelineHistoryForLead: async () => [{ occurredAt: "2026-04-10T11:00:00.000Z" }]
+      pipelineHistoryForLead: async () => [{ occurredAt: new Date(BASE_ASSIGNED_AT.getTime() + 60 * 60 * 1000).toISOString() }]
     } as never,
     config: () => config
   });
@@ -72,7 +75,7 @@ function actor(overrides: Partial<ActorContext> = {}): ActorContext {
 describe("BrokerDashboardService", () => {
   it("returns Starter sections, status counts, first-action average and license alerts", async () => {
     const service = makeService([
-      assignment({ status: "accepted", seenAt: new Date("2026-04-10T10:30:00.000Z") }),
+      assignment({ status: "accepted", seenAt: new Date(BASE_ASSIGNED_AT.getTime() + 30 * 60 * 1000) }),
       assignment({ status: "rejected", productKey: "home", countryCode: "SN" }),
       assignment({ status: "disputed" })
     ]);

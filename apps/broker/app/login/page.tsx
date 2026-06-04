@@ -1,4 +1,6 @@
 import { loginAction } from "../lib/backoffice-session-actions";
+import { isLocalBrokerDemoLoginEnabled } from "../lib/dev-demo-accounts";
+import { DevAccountPicker } from "./dev-account-picker";
 
 interface LoginPageProps {
   searchParams?: Promise<Record<string, string | string[] | undefined>>;
@@ -27,7 +29,11 @@ export default async function BrokerLoginPage({ searchParams }: LoginPageProps) 
       {error === "locked" ? <p role="alert">Compte verrouille. Contactez votre administrateur plateforme.</p> : null}
       {error === "suspended" ? <p role="alert">Compte suspendu. Contactez votre responsable habilite.</p> : null}
       {error === "validation_error" ? <p role="alert">Verifiez le format de l'email et du mot de passe.</p> : null}
-      {error && !["activation_required", "mfa_required", "locked", "suspended", "validation_error"].includes(error) ? <p role="alert">Acces refuse ou identifiants invalides.</p> : null}
+      {error === "dev_login_missing_seed" ? <p role="alert">Donnees demo locales absentes. Relancez le seed broker demo.</p> : null}
+      {error === "dev_login_database" ? <p role="alert">Base locale indisponible pour le selecteur demo.</p> : null}
+      {error && !["activation_required", "mfa_required", "locked", "suspended", "validation_error", "dev_login_missing_seed", "dev_login_database", "dev_login_disabled", "dev_login_invalid"].includes(error) ? <p role="alert">Acces refuse ou identifiants invalides.</p> : null}
+
+      {isLocalBrokerDemoLoginEnabled() ? <DevAccountPicker returnTo={returnTo} /> : null}
 
       <form action={loginAction} style={{ display: "grid", gap: 12 }}>
         <input type="hidden" name="returnTo" value={returnTo} />
