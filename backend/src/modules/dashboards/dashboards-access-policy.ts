@@ -36,6 +36,8 @@ export interface ResolvedAdminScope {
   role: AdminDashboardRole;
 }
 
+export type BrokerDashboardPlan = "starter" | "pro" | "enterprise";
+
 export class DashboardAccessRefusedError extends Error {
   constructor(public readonly reason: string) {
     super(`Dashboard access denied: ${reason}`);
@@ -53,6 +55,14 @@ export class DashboardsAccessPolicy {
     if (!actor.roles.some((role) => BROKER_ROLES.has(role))) this.refuseBroker(actor, "missing_broker_role");
     if (!actor.roles.some((role) => roleHasPermission(role, "broker_leads:read"))) {
       this.refuseBroker(actor, "missing_broker_read_permission");
+    }
+  }
+
+  assertBrokerDashboardScope(actor: ActorContext, query: DashboardScopeInput, plan: BrokerDashboardPlan): void {
+    if (query.agentId) {
+      if (plan === "starter") this.refuseBroker(actor, "starter_agent_filter_forbidden");
+      const canFilterByAgent = actor.roles.some((role) => role === "broker_owner_pro" || role === "broker_manager");
+      if (!canFilterByAgent) this.refuseBroker(actor, "agent_filter_not_allowed");
     }
   }
 
@@ -97,10 +107,12 @@ export class DashboardsAccessPolicy {
       if (countries.length === 0 && countryScopes.length > 0) countries = [...countryScopes];
     } else if (role === "support_admin") {
       // Support admin reads cross-tenant aggregates but can be narrowed.
+      if (query.partnerId) this.refuseAdmin(actor, "partner_filter_not_allowed");
       if (query.country && countryScopes.length > 0 && !countryScopes.includes(query.country.toUpperCase())) {
         this.refuseAdmin(actor, "out_of_scope_country");
       }
     } else if (role === "finance_admin" || role === "content_admin") {
+      if (query.partnerId) this.refuseAdmin(actor, "partner_filter_not_allowed");
       if (query.country && countryScopes.length > 0 && !countryScopes.includes(query.country.toUpperCase())) {
         this.refuseAdmin(actor, "out_of_scope_country");
       }

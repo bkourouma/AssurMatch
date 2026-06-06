@@ -175,28 +175,40 @@ export interface BrokerDashboardData {
   licenseAlerts: BrokerDashboardLicenseAlert[];
 }
 
+export interface BrokerAIAssistanceData {
+  generatedAt: string;
+  surface: "broker_crm";
+  enabled: false;
+  modelCall: false;
+  humanValidationRequired: true;
+  auditPolicy: "metadata_only";
+  availableAssistTypes: string[];
+  flags: Array<{ key: string; value: boolean; required: boolean }>;
+  message: string;
+}
+
 const emptyDashboard: BrokerDashboardData = {
   plan: "starter",
   window: { from: "", to: "" },
   starter: { received: 0, accepted: 0, rejected: 0, disputed: 0, pendingAction: 0, averageFirstActionMinutes: null, byProduct: [], byCountry: [] },
   licenseAlerts: []
 };
+const emptyAIAssistance: BrokerAIAssistanceData = {
+  generatedAt: "",
+  surface: "broker_crm",
+  enabled: false,
+  modelCall: false,
+  humanValidationRequired: true,
+  auditPolicy: "metadata_only",
+  availableAssistTypes: [],
+  flags: [],
+  message: ""
+};
 
 export function readBrokerDashboard() {
   return readBroker<BrokerDashboardData>("/broker/dashboard", emptyDashboard);
 }
 
-export interface BrokerTeamUser {
-  id: string;
-  email: string;
-  displayName: string;
-  roles: string[];
-  partnerTenantId?: string | null;
-  status: "invited" | "active" | "suspended" | "locked" | "deleted";
-  mfaStatus: "not_enrolled" | "required" | "enrolled" | "verified";
-  lastLoginAt?: string | null;
-}
-
-export function readBrokerTeamUsers() {
-  return readBroker<BrokerTeamUser[]>("/admin/users?page=1&pageSize=100", []);
+export function readBrokerAIAssistance() {
+  return readBroker<BrokerAIAssistanceData>("/broker/crm/ai-assistance", emptyAIAssistance);
 }

@@ -1,5 +1,7 @@
 import { QuoteAISummaryService } from "../modules/ai/quote-summary/quote-ai-summary.service";
+import { ActivationChecklistModule } from "../modules/activation-checklist/activation-checklist.module";
 import { AIModule } from "../modules/ai/ai.module";
+import { BillingModule } from "../modules/billing/billing.module";
 import { AuditLogsModule } from "../modules/audit-logs/audit-logs.module";
 import { PrismaAuditLogRepository } from "../modules/audit-logs/audit-log-repository";
 import { ConfigModule } from "../config/config.module";
@@ -29,6 +31,8 @@ import { PrismaUsersRepository } from "../modules/users/users.repository";
 import { AuthModule } from "../modules/auth/auth.module";
 import { RuntimeEmailDeliveryService } from "../modules/notifications/email/email-delivery.service";
 import { PartnerEligibilityService } from "../modules/partners/partner-eligibility.service";
+import { PartnerIntegrationsModule } from "../modules/partner-integrations/partner-integrations.module";
+import { PrismaPartnerIntegrationsRepository } from "../modules/partner-integrations/partner-integrations.repository";
 import { PrismaConsentRecordsRepository } from "../modules/consent/consent-records.repository";
 import { PrismaCountriesRepository } from "../modules/countries/countries.repository";
 import { PrismaProductsRepository } from "../modules/products/products.repository";
@@ -58,6 +62,7 @@ export class AssurMatchRuntime {
   private readonly consentRecordsRepository = this.runtimeRepository(new PrismaConsentRecordsRepository(this.prisma));
   private readonly notificationsRepository = this.runtimeRepository(new PrismaNotificationsRepository(this.prisma));
   private readonly usersRepository = this.runtimeRepository(new PrismaUsersRepository(this.prisma));
+  private readonly partnerIntegrationsRepository = this.runtimeRepository(new PrismaPartnerIntegrationsRepository(this.prisma));
   private readonly offersRepository = this.runtimeRepository(new PrismaOffersRepository(this.prisma));
   private readonly prospectsRepository = this.runtimeRepository(new PrismaProspectsRepository(this.prisma));
   private readonly quoteRequestsRepository = this.runtimeRepository(new PrismaQuoteRequestsRepository(this.prisma));
@@ -79,8 +84,13 @@ export class AssurMatchRuntime {
     this.featureFlagRepository
   );
   readonly consent = new ConsentModule(this.audit.writer, this.consentRecordsRepository);
-  readonly notifications = new NotificationsModule(this.audit.writer, this.queues.notifications, this.notificationsRepository);
-  readonly ai = new AIModule(this.audit.writer);
+  readonly notifications = new NotificationsModule(this.audit.writer, this.queues.notifications, this.notificationsRepository, {
+    smsProvider: process.env.ASSURMATCH_SMS_PROVIDER,
+    smsSecretConfigured: Boolean(process.env.ASSURMATCH_SMS_API_KEY),
+    whatsappProvider: process.env.ASSURMATCH_WHATSAPP_PROVIDER,
+    whatsappSecretConfigured: Boolean(process.env.ASSURMATCH_WHATSAPP_API_KEY)
+  }, this.featureFlags.service);
+  readonly ai = new AIModule(this.audit.writer, this.featureFlags.service);
   readonly quoteAiSummary = new QuoteAISummaryService(this.notifications.queue, this.audit.writer, {
     id: "00000000-0000-4000-8000-000000000002",
     key: "quote_summary",
@@ -121,7 +131,8 @@ export class AssurMatchRuntime {
     prospects: this.prospects.service,
     routing: this.leads.routing,
     notifications: this.notifications.quoteService,
-    aiSummary: this.quoteAiSummary
+    aiSummary: this.quoteAiSummary,
+    isGlobalFlagEnabled: (key) => this.featureFlags.service.isEnabled(key)
   }, this.audit.writer, this.redis.client, this.quoteRequestsRepository);
   readonly partnerEligibility = new PartnerEligibilityService(this.partners.service, this.partnerLicenses.service, this.documents.service);
   readonly routing = new RoutingModule(this.consent.service, this.partnerEligibility, this.audit.writer);
@@ -138,6 +149,32 @@ export class AssurMatchRuntime {
     quoteRequests: this.quoteRequests.submissions,
     crmActivity: this.leadRepositorySet.crmActivity,
     brokerCrmConfig: this.brokerCrmConfig
+  });
+  readonly activationChecklist = new ActivationChecklistModule({
+    audit: this.audit.writer,
+    featureFlags: this.featureFlags.service,
+    countries: this.countries.service,
+    products: this.products.service,
+    partners: this.partners.service,
+    partnerLicenses: this.partnerLicenses.service,
+    offers: this.offers,
+    quoteForms: this.quoteForms.service,
+    consent: this.consent.service
+  });
+  readonly billing = new BillingModule({
+    audit: this.audit.writer,
+    featureFlags: this.featureFlags.service,
+    partners: this.partners.service,
+    assignments: this.leads.assignments
+  });
+  readonly partnerIntegrations = new PartnerIntegrationsModule({
+    audit: this.audit.writer,
+    featureFlags: this.featureFlags.service,
+    partners: this.partners.service,
+    assignments: this.leads.assignments,
+    notifications: this.notifications.service,
+    webhookDeliveryEnabled: process.env.ASSURMATCH_PARTNER_WEBHOOK_DELIVERY_ENABLED === "true",
+    ...(this.partnerIntegrationsRepository ? { repository: this.partnerIntegrationsRepository } : {})
   });
 
   async onModuleInit(): Promise<void> {
@@ -158,6 +195,25 @@ export class AssurMatchRuntime {
     this.refreshRuntimeFeatureFlags();
   }
 
+  publicJourneyGlobalFlags(): Partial<Record<string, boolean>> {
+    return {
+      public_comparator_enabled: this.featureFlags.service.isEnabled("public_comparator_enabled"),
+      quote_request_enabled: this.featureFlags.service.isEnabled("quote_request_enabled"),
+      sponsored_offers_enabled: this.featureFlags.service.isEnabled("sponsored_offers_enabled")
+    };
+  }
+
+  async publicOfferPartnerEligibility(partnerTenantId: string, countryId: string, productId: string): Promise<{ eligible: boolean; reasons: string[] }> {
+    const reasons: string[] = [];
+    const partner = await this.partners.service.require(partnerTenantId);
+    if (partner.status !== "active") reasons.push("partner_not_active");
+    if (partner.capacityStatus === "blocked" || partner.capacityStatus === "full") reasons.push("partner_capacity_blocked");
+    if (!await this.partners.service.isAuthorizedForCountry(partnerTenantId, countryId)) reasons.push("partner_country_not_authorized");
+    if (!await this.partners.service.isAuthorizedForProduct(partnerTenantId, productId)) reasons.push("partner_product_not_authorized");
+    if (!await this.partnerLicenses.service.eligible(partnerTenantId, countryId, productId)) reasons.push("license_not_valid_for_scope");
+    return { eligible: reasons.length === 0, reasons };
+  }
+
   runtimeRepositoryModes(): Record<string, string | undefined> {
     return {
       AuditLogRepository: this.auditLogRepository?.mode,
@@ -174,7 +230,8 @@ export class AssurMatchRuntime {
       PartnerLicensesRepository: this.partnerLicensesRepository?.mode,
       CrmActivityRepository: this.leadRepositorySet.crmActivity?.mode,
       NotificationsRepository: this.notificationsRepository?.mode,
-      UsersRepository: this.usersRepository?.mode
+      UsersRepository: this.usersRepository?.mode,
+      PartnerIntegrationsRepository: this.partnerIntegrationsRepository?.mode
     };
   }
 

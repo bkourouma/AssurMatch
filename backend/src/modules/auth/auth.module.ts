@@ -151,7 +151,15 @@ export class AuthService {
   }
 
   private sign(user: UserAccount, mfaVerified: boolean): string {
-    return signActorToken({ actorId: user.id, roles: user.roles, ...(user.partnerTenantId ? { partnerTenantId: user.partnerTenantId } : {}), mfaVerified }, this.jwtTtlSeconds());
+    return signActorToken({
+      actorId: user.id,
+      roles: user.roles,
+      ...(user.partnerTenantId ? { partnerTenantId: user.partnerTenantId } : {}),
+      ...(user.partnerPlan ? { partnerPlan: user.partnerPlan } : {}),
+      countryScopes: user.countryScopes,
+      productScopes: user.productScopes,
+      mfaVerified
+    }, this.jwtTtlSeconds());
   }
 
   private jwtTtlSeconds(): number {

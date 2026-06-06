@@ -60,6 +60,18 @@ export async function readJson<T>(response: Response): Promise<T> {
 
 export async function seedPublicRuntime(runtime: AssurMatchRuntime) {
   const admin: ActorContext = { actorId: "admin-runtime", roles: ["super_admin"], mfaVerified: true };
+  await runtime.featureFlags.service.setFlag({
+    key: "public_comparator_enabled",
+    scopeType: "global",
+    value: true,
+    reason: "runtime public seed"
+  }, admin);
+  await runtime.featureFlags.service.setFlag({
+    key: "quote_request_enabled",
+    scopeType: "global",
+    value: true,
+    reason: "runtime public seed"
+  }, admin);
   const country = await runtime.countries.service.create({
     isoCode: "CI",
     name: "Cote d'Ivoire",

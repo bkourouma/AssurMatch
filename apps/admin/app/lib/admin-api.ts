@@ -177,6 +177,139 @@ export interface ComplianceAlertsData {
   }>;
 }
 
+export interface ActivationChecklistData {
+  generatedAt: string;
+  summary: { passed: number; warning: number; blocked: number };
+  sections: Array<{
+    key: string;
+    title: string;
+    status: "passed" | "warning" | "blocked";
+    scope: {
+      countryId: string | null;
+      countryCode: string | null;
+      productId: string | null;
+      productKey: string | null;
+      partnerId: string | null;
+    };
+    controls: Array<{
+      key: string;
+      label: string;
+      status: "passed" | "warning" | "blocked";
+      evidence: string;
+      blocking: boolean;
+    }>;
+  }>;
+}
+
+export interface BillingFoundationData {
+  generatedAt: string;
+  billingEnabled: boolean;
+  paymentsEnabled: false;
+  collectionEnabled: false;
+  currency: "XOF";
+  period: { from: string; to: string };
+  page: number;
+  pageSize: number;
+  total: number;
+  totals: { partners: number; acceptedLeadCount: number; disputedLeadCount: number };
+  partners: Array<{
+    partnerId: string;
+    partnerName: string;
+    plan: "starter" | "pro" | "enterprise";
+    acceptedLeadCount: number;
+    disputedLeadCount: number;
+    draftNonBillableReference: string;
+    invoiceStatus: "draft_not_billable";
+    paymentStatus: "not_applicable";
+  }>;
+  restrictions: string[];
+}
+
+export interface AIAssistanceData {
+  generatedAt: string;
+  surface: "broker_crm" | "admin_platform";
+  enabled: false;
+  modelCall: false;
+  humanValidationRequired: true;
+  auditPolicy: "metadata_only";
+  availableAssistTypes: string[];
+  flags: Array<{ key: string; value: boolean; required: boolean }>;
+  guardrails: {
+    centralAiModuleOnly: true;
+    piiMinimized: true;
+    outputIsAdvisory: true;
+    noAutomatedDecision: true;
+  };
+  message: string;
+}
+
+export interface PartnerIntegrationsData {
+  apiKeys: {
+    generatedAt: string;
+    total: number;
+    items: Array<{
+      id: string;
+      partnerTenantId: string;
+      name: string;
+      keyPrefix: string;
+      scopes: string[];
+      status: "active" | "revoked";
+      createdAt: string;
+      updatedAt: string;
+      lastUsedAt?: string;
+      revokedAt?: string;
+    }>;
+  };
+  webhookEndpoints: {
+    generatedAt: string;
+    total: number;
+    items: Array<{
+      id: string;
+      partnerTenantId: string;
+      url: string;
+      description?: string;
+      eventTypes: string[];
+      status: "disabled" | "active" | "suspended";
+      secretConfigured: true;
+      createdAt: string;
+      updatedAt: string;
+    }>;
+  };
+  webhookAllowlist: {
+    generatedAt: string;
+    total: number;
+    items: Array<{
+      id: string;
+      partnerTenantId: string;
+      origin: string;
+      path?: string;
+      status: "active" | "revoked";
+      createdAt: string;
+      updatedAt: string;
+      revokedAt?: string;
+    }>;
+  };
+  webhookDeliveries: {
+    generatedAt: string;
+    total: number;
+    items: Array<{
+      id: string;
+      endpointId?: string;
+      partnerTenantId: string;
+      eventId: string;
+      eventType: string;
+      status: "skipped" | "pending" | "retryable" | "delivered" | "failed" | "dead_letter";
+      attemptCount: number;
+      nextAttemptAt?: string;
+      lastResponseClass?: string;
+      idempotencyKey: string;
+      payloadMetadata: Record<string, unknown>;
+      createdAt: string;
+      updatedAt: string;
+    }>;
+  };
+}
+
 const emptyAdminDashboard: AdminDashboardData = {
   window: { from: "", to: "" },
   scope: { countries: [], products: [], partnerId: null, role: "support_admin" },
@@ -192,6 +325,43 @@ const emptyAdminDashboard: AdminDashboardData = {
 };
 
 const emptyComplianceAlerts: ComplianceAlertsData = { page: 1, pageSize: 25, total: 0, items: [] };
+const emptyActivationChecklist: ActivationChecklistData = {
+  generatedAt: "",
+  summary: { passed: 0, warning: 0, blocked: 0 },
+  sections: []
+};
+const emptyBillingFoundation: BillingFoundationData = {
+  generatedAt: "",
+  billingEnabled: false,
+  paymentsEnabled: false,
+  collectionEnabled: false,
+  currency: "XOF",
+  period: { from: "", to: "" },
+  page: 1,
+  pageSize: 25,
+  total: 0,
+  totals: { partners: 0, acceptedLeadCount: 0, disputedLeadCount: 0 },
+  partners: [],
+  restrictions: []
+};
+const emptyAIAssistance: AIAssistanceData = {
+  generatedAt: "",
+  surface: "admin_platform",
+  enabled: false,
+  modelCall: false,
+  humanValidationRequired: true,
+  auditPolicy: "metadata_only",
+  availableAssistTypes: [],
+  flags: [],
+  guardrails: { centralAiModuleOnly: true, piiMinimized: true, outputIsAdvisory: true, noAutomatedDecision: true },
+  message: ""
+};
+const emptyPartnerIntegrations: PartnerIntegrationsData = {
+  apiKeys: { generatedAt: "", total: 0, items: [] },
+  webhookEndpoints: { generatedAt: "", total: 0, items: [] },
+  webhookAllowlist: { generatedAt: "", total: 0, items: [] },
+  webhookDeliveries: { generatedAt: "", total: 0, items: [] }
+};
 
 async function readAdmin<T>(path: string, fallback: T): Promise<AdminApiState<T>> {
   const token = await getBackOfficeToken();
@@ -232,6 +402,48 @@ export function readAdminDashboard() {
 export function readComplianceAlerts(page = 1, pageSize = 25) {
   const params = new URLSearchParams({ page: String(page), pageSize: String(pageSize) });
   return readAdmin<ComplianceAlertsData>(`/admin/dashboard/compliance-alerts?${params.toString()}`, emptyComplianceAlerts);
+}
+
+export function readActivationChecklist(filters: { country?: string; product?: string; partnerId?: string } = {}) {
+  const params = new URLSearchParams();
+  if (filters.country) params.set("country", filters.country);
+  if (filters.product) params.set("product", filters.product);
+  if (filters.partnerId) params.set("partnerId", filters.partnerId);
+  const query = params.toString();
+  return readAdmin<ActivationChecklistData>(`/admin/activation-checklist${query ? `?${query}` : ""}`, emptyActivationChecklist);
+}
+
+export function readBillingFoundation(filters: { partnerId?: string; page?: number; pageSize?: number } = {}) {
+  const params = new URLSearchParams();
+  if (filters.partnerId) params.set("partnerId", filters.partnerId);
+  if (filters.page) params.set("page", String(filters.page));
+  if (filters.pageSize) params.set("pageSize", String(filters.pageSize));
+  const query = params.toString();
+  return readAdmin<BillingFoundationData>(`/admin/billing/foundation${query ? `?${query}` : ""}`, emptyBillingFoundation);
+}
+
+export function readAdminAIAssistance() {
+  return readAdmin<AIAssistanceData>("/admin/ai/assistance", emptyAIAssistance);
+}
+
+export async function readPartnerIntegrations(): Promise<AdminApiState<PartnerIntegrationsData>> {
+  const [apiKeys, webhookEndpoints, webhookAllowlist, webhookDeliveries] = await Promise.all([
+    readAdmin<PartnerIntegrationsData["apiKeys"]>("/admin/partner-integrations/api-keys", emptyPartnerIntegrations.apiKeys),
+    readAdmin<PartnerIntegrationsData["webhookEndpoints"]>("/admin/partner-integrations/webhook-endpoints", emptyPartnerIntegrations.webhookEndpoints),
+    readAdmin<PartnerIntegrationsData["webhookAllowlist"]>("/admin/partner-integrations/webhook-allowlist", emptyPartnerIntegrations.webhookAllowlist),
+    readAdmin<PartnerIntegrationsData["webhookDeliveries"]>("/admin/partner-integrations/webhook-deliveries", emptyPartnerIntegrations.webhookDeliveries)
+  ]);
+  const status = [apiKeys.status, webhookEndpoints.status, webhookAllowlist.status, webhookDeliveries.status].find((item) => item !== "success") ?? "success";
+  const error = apiKeys.error ?? webhookEndpoints.error ?? webhookAllowlist.error ?? webhookDeliveries.error;
+  const unauthenticated = apiKeys.unauthenticated || webhookEndpoints.unauthenticated || webhookAllowlist.unauthenticated || webhookDeliveries.unauthenticated;
+  const forbidden = apiKeys.forbidden || webhookEndpoints.forbidden || webhookAllowlist.forbidden || webhookDeliveries.forbidden;
+  return {
+    status,
+    data: { apiKeys: apiKeys.data, webhookEndpoints: webhookEndpoints.data, webhookAllowlist: webhookAllowlist.data, webhookDeliveries: webhookDeliveries.data },
+    ...(unauthenticated ? { unauthenticated } : {}),
+    ...(forbidden ? { forbidden } : {}),
+    ...(error ? { error } : {})
+  };
 }
 
 export function readAdminUsers(filters: { role?: string; status?: string } = {}) {

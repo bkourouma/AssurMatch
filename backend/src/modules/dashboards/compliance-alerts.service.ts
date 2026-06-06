@@ -70,7 +70,11 @@ export class ComplianceAlertsService {
     };
   }
 
-  private extractRoles(_entry: AuditEntry): string[] {
+  private extractRoles(entry: AuditEntry): string[] {
+    const scopeRoles = entry.scope.roles;
+    if (Array.isArray(scopeRoles)) return scopeRoles.filter((role): role is string => typeof role === "string");
+    const contextRoles = entry.context.roles;
+    if (Array.isArray(contextRoles)) return contextRoles.filter((role): role is string => typeof role === "string");
     return [];
   }
 

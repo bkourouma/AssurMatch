@@ -14,9 +14,13 @@ const authRoutePrefixes = ["/login", "/mfa", "/activate", "/password-change", "/
 const navigationItems = [
   { label: "Dashboard", href: "/", match: ["/", "/dashboard"] },
   { label: "Catalogue", href: "/catalog", match: ["/catalog", "/offers", "/quote-form-definitions"] },
+  { label: "Activation", href: "/activation-checklist", match: ["/activation-checklist"] },
   { label: "Partenaires", href: "/partners", match: ["/partners"] },
+  { label: "Billing", href: "/billing", match: ["/billing"] },
+  { label: "Integrations", href: "/partner-integrations", match: ["/partner-integrations"] },
   { label: "Utilisateurs", href: "/users", match: ["/users"] },
   { label: "Feature flags", href: "/feature-flags", match: ["/feature-flags"] },
+  { label: "IA", href: "/ai-assistance", match: ["/ai-assistance"] },
   { label: "Conformite", href: "/compliance", match: ["/compliance", "/dashboard/compliance-alerts"] },
   { label: "Operations", href: "/operations", match: ["/operations", "/lead-assignments", "/prospects", "/quote-requests"] }
 ];

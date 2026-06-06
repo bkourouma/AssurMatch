@@ -28,6 +28,7 @@ export interface QuoteRequestsModuleDeps {
   routing?: QuoteRoutingService;
   notifications?: QuoteNotificationService;
   aiSummary?: QuoteAISummaryService;
+  isGlobalFlagEnabled?: (key: string) => boolean;
 }
 
 export class QuoteRequestsModule {
@@ -53,6 +54,7 @@ export class QuoteRequestsModule {
       rateLimit: this.rateLimit,
       antiSpam: this.antiSpam,
       duplicate: this.duplicate,
+      ...(deps.isGlobalFlagEnabled ? { isGlobalFlagEnabled: deps.isGlobalFlagEnabled } : {}),
       ...(deps.routing ? { routing: deps.routing } : {}),
       ...(deps.notifications ? { notifications: deps.notifications } : {}),
       ...(deps.aiSummary ? { aiSummary: deps.aiSummary } : {})

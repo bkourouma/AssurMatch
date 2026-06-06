@@ -3,6 +3,7 @@ import { AuditLogWriter } from "../audit-logs/audit-log-writer.service";
 import { InMemoryQueue, type QueueJobRecord, type QueuePort } from "../common/queues/queues.module";
 import type { ActorContext } from "../common/types";
 import { AdminNotificationsController } from "./admin-notifications.controller";
+import { MessagingProviderAccessRefusedError, MessagingProviderService, type MessagingFeatureFlags, type MessagingProviderConfig } from "./messaging-provider.service";
 import { MemoryNotificationsRepository, type NotificationsRepository } from "./notifications.repository";
 import { QuoteNotificationService } from "./quote-notification.service";
 
@@ -73,14 +74,24 @@ export class NotificationsModule {
   readonly queue: QueuePort;
   readonly service: NotificationsService;
   readonly quoteService: QuoteNotificationService;
+  readonly messagingProviders: MessagingProviderService;
   readonly adminController: AdminNotificationsController;
 
-  constructor(audit = new AuditLogWriter(), queue: QueuePort = new InMemoryQueue(), repository?: NotificationsRepository) {
+  constructor(
+    audit = new AuditLogWriter(),
+    queue: QueuePort = new InMemoryQueue(),
+    repository?: NotificationsRepository,
+    messagingProviderConfig: MessagingProviderConfig = {},
+    featureFlags: MessagingFeatureFlags = { isEnabled: () => false }
+  ) {
     this.queue = queue;
     this.service = new NotificationsService(audit, this.queue, repository);
     this.quoteService = new QuoteNotificationService(repository ? this.service : this.service.mutableList(), this.queue, audit);
+    this.messagingProviders = new MessagingProviderService(audit, featureFlags, messagingProviderConfig);
     this.adminController = new AdminNotificationsController(this.service);
   }
 }
 
 export { NOTIFICATIONS_REPOSITORY, MemoryNotificationsRepository, type NotificationsRepository } from "./notifications.repository";
+export { MessagingProviderAuditActions } from "./messaging-provider-audit-actions";
+export { MessagingProviderAccessRefusedError, MessagingProviderService, type MessagingProviderConfig };

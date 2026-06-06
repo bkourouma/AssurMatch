@@ -1,6 +1,15 @@
-import { Body, Controller, Delete, Get, Module, Param, Patch, Post, Query, Req, UseGuards } from "@nestjs/common";
+import { Body, Controller, Delete, ForbiddenException, Get, Module, NotFoundException, Param, Patch, Post, Query, Req, UseGuards } from "@nestjs/common";
 import { z } from "zod";
 import { activateRequestSchema, loginRequestSchema, mfaVerifyRequestSchema, passwordChangeRequestSchema, passwordResetRequestSchema, type ActivateRequest, type LoginRequest, type PasswordChangeRequest, type PasswordResetRequest } from "../../../../packages/shared/contracts/auth.contracts";
+import { activationChecklistQuerySchema } from "../../../../packages/shared/contracts/activation-checklist.contracts";
+import { billingFoundationQuerySchema } from "../../../../packages/shared/contracts/billing.contracts";
+import {
+  partnerApiKeyCreateSchema,
+  partnerApiPaginationQuerySchema,
+  partnerWebhookAllowlistCreateSchema,
+  partnerWebhookEndpointCreateSchema,
+  partnerWebhookEndpointUpdateSchema
+} from "../../../../packages/shared/contracts/partner-integration.contracts";
 import {
   brokerCrmAssignRequestSchema,
   brokerCrmDisputeCreateSchema,
@@ -34,6 +43,7 @@ import { AuthRequiredHttpGuard, MfaRequiredHttpGuard } from "../auth/guards/http
 import { actorFromRequest, protectedActorFromRequest, type AssurMatchHttpRequest } from "../common/http/request-actor";
 import { parseHttpInput } from "../common/http/zod-validation";
 import type { ActorContext } from "../common/types";
+import { PublicJourneyFlagPolicy } from "../feature-flags/public-journey-flag-policy";
 import { AdminUsersController as AdminUsersDomainController } from "../users/admin-users.controller";
 import { AdminUserRolesController as AdminUserRolesDomainController } from "../users/admin-user-roles.controller";
 
@@ -47,6 +57,8 @@ interface ControllerTarget {
 const optionalUuidParamSchema = uuidSchema.or(nonEmptyStringSchema);
 const starterActionWithReasonSchema = brokerStarterLeadActionRequestSchema.extend({ reason: brokerStarterReasonSchema });
 const updateFeatureFlagSchema = z.object({ value: z.boolean(), reason: reasonSchema });
+const localDevReloadHeader = "x-assurmatch-local-dev";
+const localDevReloadToken = "broker-demo-seed";
 const protectedRoute = UseGuards(AuthRequiredHttpGuard, MfaRequiredHttpGuard) as MethodDecoratorFactory & ClassDecorator;
 const authRoute = UseGuards(AuthRequiredHttpGuard) as MethodDecoratorFactory;
 const adminRoleAllowList = {
@@ -79,6 +91,15 @@ function assertPermission(actor: ActorContext, permission: string): void {
 
 function assertAnyRole(actor: ActorContext, allowed: Set<AssurMatchRole>): void {
   if (!actor.roles.some((role) => allowed.has(role))) throw new Error("RBAC denied");
+}
+
+function assertLocalDevReloadAllowed(request: AssurMatchHttpRequest): void {
+  if (process.env.APP_ENV !== "local" || process.env.NODE_ENV === "production") {
+    throw new NotFoundException("Local dev reload unavailable");
+  }
+  if (headerValue(request.headers[localDevReloadHeader]) !== localDevReloadToken) {
+    throw new ForbiddenException("Local dev reload denied");
+  }
 }
 
 export class AuthController {
@@ -185,12 +206,13 @@ export class PublicCountriesController {
   constructor(private readonly runtime: AssurMatchRuntime) {}
 
   list() {
+    if (this.runtime.publicJourneyGlobalFlags().public_comparator_enabled !== true) return [];
     return this.runtime.countries.service.listPublic();
   }
 
   detail(countryCode: string, request: AssurMatchHttpRequest) {
     const parsedCountryCode = parseParam("countryCode", countryCode, isoCountrySchema);
-    return this.runtime.countries.service.getPublicPage(parsedCountryCode, { public_comparator_enabled: true }, actorFromRequest(request));
+    return this.runtime.countries.service.getPublicPage(parsedCountryCode, this.runtime.publicJourneyGlobalFlags(), actorFromRequest(request));
   }
 }
 
@@ -201,7 +223,7 @@ export class PublicProductsController {
     const parsedCountryCode = parseParam("countryCode", countryCode, isoCountrySchema);
     const country = await this.runtime.countries.service.findByIsoCode(parsedCountryCode);
     if (!country) return [];
-    return this.runtime.products.service.listPublicForCountry(country.id, country.flags);
+    return this.runtime.products.service.listPublicForCountry(country.id, country.flags, this.runtime.publicJourneyGlobalFlags());
   }
 
   async detail(countryCode: string, productKey: string, request: AssurMatchHttpRequest) {
@@ -209,7 +231,7 @@ export class PublicProductsController {
     const parsedProductKey = parseParam("productKey", productKey);
     const country = await this.runtime.countries.service.findByIsoCode(parsedCountryCode);
     if (!country) throw new Error("Country is not publicly available");
-    return this.runtime.products.service.getPublicProductPage(country.id, parsedProductKey, country.flags, { public_comparator_enabled: true, quote_request_enabled: true }, actorFromRequest(request));
+    return this.runtime.products.service.getPublicProductPage(country.id, parsedProductKey, country.flags, this.runtime.publicJourneyGlobalFlags(), actorFromRequest(request));
   }
 }
 
@@ -223,11 +245,21 @@ export class PublicOffersController {
     const country = await this.runtime.countries.service.findByIsoCode(parsedCountryCode);
     const product = await this.runtime.products.service.findByKey(parsedProductKey);
     if (!country || !product) return { items: [], total: 0, page: 1, pageSize: 20 };
-    return this.runtime.offers.publicCatalog.list(country.id, product.id, parsedQuery);
+    return this.runtime.offers.publicCatalog.list(country.id, product.id, parsedQuery, undefined, {
+      globalFlags: this.runtime.publicJourneyGlobalFlags(),
+      countryFlags: country.flags,
+      productFlags: product.flags,
+      evaluatePartnerEligibility: (partnerTenantId, offerCountryId, offerProductId) => this.runtime.publicOfferPartnerEligibility(partnerTenantId, offerCountryId, offerProductId)
+    });
   }
 
   detail(offerId: string) {
-    return this.runtime.offers.publicCatalog.detail(parseParam("offerId", offerId, optionalUuidParamSchema));
+    return this.runtime.offers.publicCatalog.detail(parseParam("offerId", offerId, optionalUuidParamSchema), undefined, {
+      globalFlags: this.runtime.publicJourneyGlobalFlags(),
+      resolveCountryFlags: async (countryId) => (await this.runtime.countries.service.require(countryId)).flags,
+      resolveProductFlags: async (productId) => (await this.runtime.products.service.require(productId)).flags,
+      evaluatePartnerEligibility: (partnerTenantId, countryId, productId) => this.runtime.publicOfferPartnerEligibility(partnerTenantId, countryId, productId)
+    });
   }
 }
 
@@ -241,6 +273,13 @@ export class PublicQuoteRequestsController {
     const country = await this.runtime.countries.service.findByIsoCode(parsedCountryCode);
     const product = await this.runtime.products.service.findByKey(parsedProductKey);
     if (!country || !product) throw new Error("Quote form is not publicly available");
+    const state = new PublicJourneyFlagPolicy().resolve({
+      globalFlags: this.runtime.publicJourneyGlobalFlags(),
+      countryFlags: country.flags,
+      productFlags: product.flags,
+      requireProductFlags: true
+    });
+    if (!state.quoteEnabled) throw new Error("Quote form is not publicly available");
     return this.runtime.quoteForms.service.publicForm(country.id, product.id, parsedLanguage);
   }
 
@@ -363,6 +402,12 @@ export class BrokerCrmController {
   aiFoundations(request: AssurMatchHttpRequest) {
     return this.runtime.leads.brokerCrmController.aiFoundations(protectedActorFromRequest(request));
   }
+
+  aiAssistance(request: AssurMatchHttpRequest) {
+    const assistance = this.runtime.ai.assistance;
+    if (!assistance) throw new Error("AI assistance is not configured");
+    return assistance.status(protectedActorFromRequest(request), "broker_crm");
+  }
 }
 
 export class BrokerDashboardController {
@@ -428,6 +473,32 @@ export class AdminHealthController {
   }
 }
 
+export class AdminActivationChecklistController {
+  constructor(private readonly runtime: AssurMatchRuntime) {}
+
+  read(request: AssurMatchHttpRequest, query: Record<string, string>) {
+    return this.runtime.activationChecklist.service.read(protectedActorFromRequest(request), parseHttpInput(activationChecklistQuerySchema, query));
+  }
+}
+
+export class AdminBillingFoundationController {
+  constructor(private readonly runtime: AssurMatchRuntime) {}
+
+  read(request: AssurMatchHttpRequest, query: Record<string, string>) {
+    return this.runtime.billing.foundation.read(protectedActorFromRequest(request), parseHttpInput(billingFoundationQuerySchema, query));
+  }
+}
+
+export class AdminAIAssistanceController {
+  constructor(private readonly runtime: AssurMatchRuntime) {}
+
+  read(request: AssurMatchHttpRequest) {
+    const assistance = this.runtime.ai.assistance;
+    if (!assistance) throw new Error("AI assistance is not configured");
+    return assistance.status(protectedActorFromRequest(request), "admin_platform");
+  }
+}
+
 export class AdminRuntimeSupportController {
   constructor(private readonly runtime: AssurMatchRuntime) {}
 
@@ -444,6 +515,104 @@ export class AdminRuntimeSupportController {
     assertPermission(actor, "lead_assignments:read");
     return this.runtime.leads.assignments.list();
   }
+}
+
+export class LocalDevRuntimeController {
+  constructor(private readonly runtime: AssurMatchRuntime) {}
+
+  async reloadFeatureFlags(request: AssurMatchHttpRequest) {
+    assertLocalDevReloadAllowed(request);
+    await this.runtime.reloadRuntimeFeatureFlags();
+    return { ok: true };
+  }
+}
+
+export class AdminMessagingProvidersController {
+  constructor(private readonly runtime: AssurMatchRuntime) {}
+
+  read(request: AssurMatchHttpRequest) {
+    return this.runtime.notifications.messagingProviders.status(protectedActorFromRequest(request));
+  }
+}
+
+export class AdminPartnerIntegrationsController {
+  constructor(private readonly runtime: AssurMatchRuntime) {}
+
+  apiKeys(request: AssurMatchHttpRequest) {
+    return this.runtime.partnerIntegrations.service.listApiKeys(protectedActorFromRequest(request));
+  }
+
+  createApiKey(request: AssurMatchHttpRequest, input: unknown) {
+    return this.runtime.partnerIntegrations.service.createApiKey(protectedActorFromRequest(request), parseHttpInput(partnerApiKeyCreateSchema, input));
+  }
+
+  revokeApiKey(id: string, input: unknown, request: AssurMatchHttpRequest) {
+    return this.runtime.partnerIntegrations.service.revokeApiKey(protectedActorFromRequest(request), parseParam("id", id, uuidSchema), input);
+  }
+
+  webhookEndpoints(request: AssurMatchHttpRequest) {
+    return this.runtime.partnerIntegrations.service.listWebhookEndpoints(protectedActorFromRequest(request));
+  }
+
+  createWebhookEndpoint(request: AssurMatchHttpRequest, input: unknown) {
+    return this.runtime.partnerIntegrations.service.createWebhookEndpoint(protectedActorFromRequest(request), parseHttpInput(partnerWebhookEndpointCreateSchema, input));
+  }
+
+  updateWebhookEndpoint(id: string, input: unknown, request: AssurMatchHttpRequest) {
+    return this.runtime.partnerIntegrations.service.updateWebhookEndpoint(protectedActorFromRequest(request), parseParam("id", id, uuidSchema), parseHttpInput(partnerWebhookEndpointUpdateSchema, input));
+  }
+
+  webhookDeliveries(request: AssurMatchHttpRequest) {
+    return this.runtime.partnerIntegrations.service.listWebhookDeliveries(protectedActorFromRequest(request));
+  }
+
+  webhookAllowlist(request: AssurMatchHttpRequest) {
+    return this.runtime.partnerIntegrations.service.listWebhookAllowlist(protectedActorFromRequest(request));
+  }
+
+  createWebhookAllowlist(request: AssurMatchHttpRequest, input: unknown) {
+    return this.runtime.partnerIntegrations.service.createWebhookAllowlistEntry(protectedActorFromRequest(request), parseHttpInput(partnerWebhookAllowlistCreateSchema, input));
+  }
+
+  revokeWebhookAllowlist(id: string, input: unknown, request: AssurMatchHttpRequest) {
+    return this.runtime.partnerIntegrations.service.revokeWebhookAllowlistEntry(protectedActorFromRequest(request), parseParam("id", id, uuidSchema), input);
+  }
+}
+
+export class PartnerApiController {
+  constructor(private readonly runtime: AssurMatchRuntime) {}
+
+  leads(request: AssurMatchHttpRequest, query: Record<string, string>) {
+    return this.runtime.partnerIntegrations.service.listAssignedLeads(partnerApiKeyFromRequest(request), parseHttpInput(partnerApiPaginationQuerySchema, query ?? {}));
+  }
+
+  notifications(request: AssurMatchHttpRequest, query: Record<string, string>) {
+    return this.runtime.partnerIntegrations.service.listNotifications(partnerApiKeyFromRequest(request), parseHttpInput(partnerApiPaginationQuerySchema, query ?? {}));
+  }
+
+  webhookEndpoints(request: AssurMatchHttpRequest) {
+    return this.runtime.partnerIntegrations.service.listWebhookEndpointsFromApiKey(partnerApiKeyFromRequest(request));
+  }
+
+  createWebhookEndpoint(request: AssurMatchHttpRequest, input: unknown) {
+    return this.runtime.partnerIntegrations.service.createWebhookEndpointFromApiKey(partnerApiKeyFromRequest(request), parseHttpInput(partnerWebhookEndpointCreateSchema.omit({ partnerTenantId: true }), input));
+  }
+
+  updateWebhookEndpoint(id: string, request: AssurMatchHttpRequest, input: unknown) {
+    return this.runtime.partnerIntegrations.service.updateWebhookEndpointFromApiKey(partnerApiKeyFromRequest(request), parseParam("id", id, uuidSchema), parseHttpInput(partnerWebhookEndpointUpdateSchema, input));
+  }
+}
+
+function partnerApiKeyFromRequest(request: AssurMatchHttpRequest): string {
+  const authorization = headerValue(request.headers.authorization);
+  if (authorization?.startsWith("Bearer ")) return authorization.slice("Bearer ".length).trim();
+  const apiKey = headerValue(request.headers["x-assurmatch-partner-api-key"]);
+  if (apiKey) return apiKey;
+  throw new Error("Partner API authentication required");
+}
+
+function headerValue(value: string | string[] | undefined): string | undefined {
+  return Array.isArray(value) ? value[0] : value;
 }
 
 controller("auth", AuthController);
@@ -502,6 +671,7 @@ decorate(BrokerCrmController, "proposal", [Post("leads/:leadId/proposals") as Me
 decorate(BrokerCrmController, "dispute", [Post("leads/:leadId/disputes") as MethodDecoratorFactory], [[0, Param("leadId") as ParamDecoratorFactory], [1, Body() as ParamDecoratorFactory], [2, Req() as ParamDecoratorFactory]]);
 decorate(BrokerCrmController, "notifications", [Get("notifications") as MethodDecoratorFactory], [[0, Req() as ParamDecoratorFactory]]);
 decorate(BrokerCrmController, "aiFoundations", [Get("ai-foundations") as MethodDecoratorFactory], [[0, Req() as ParamDecoratorFactory]]);
+decorate(BrokerCrmController, "aiAssistance", [Get("ai-assistance") as MethodDecoratorFactory], [[0, Req() as ParamDecoratorFactory]]);
 
 controller("broker/dashboard", BrokerDashboardController, true);
 decorate(BrokerDashboardController, "dashboard", [Get() as MethodDecoratorFactory], [[0, Req() as ParamDecoratorFactory], [1, Query() as ParamDecoratorFactory]]);
@@ -534,9 +704,43 @@ decorate(AdminAuditLogsController, "list", [Get("audit-logs") as MethodDecorator
 controller("admin", AdminHealthController, true);
 decorate(AdminHealthController, "health", [Get("system/health") as MethodDecoratorFactory], [[0, Req() as ParamDecoratorFactory]]);
 
+controller("admin", AdminActivationChecklistController, true);
+decorate(AdminActivationChecklistController, "read", [Get("activation-checklist") as MethodDecoratorFactory], [[0, Req() as ParamDecoratorFactory], [1, Query() as ParamDecoratorFactory]]);
+
+controller("admin", AdminBillingFoundationController, true);
+decorate(AdminBillingFoundationController, "read", [Get("billing/foundation") as MethodDecoratorFactory], [[0, Req() as ParamDecoratorFactory], [1, Query() as ParamDecoratorFactory]]);
+
+controller("admin", AdminAIAssistanceController, true);
+decorate(AdminAIAssistanceController, "read", [Get("ai/assistance") as MethodDecoratorFactory], [[0, Req() as ParamDecoratorFactory]]);
+
 controller("admin", AdminRuntimeSupportController, true);
 decorate(AdminRuntimeSupportController, "quoteRequests", [Get("quote-requests") as MethodDecoratorFactory], [[0, Req() as ParamDecoratorFactory]]);
 decorate(AdminRuntimeSupportController, "leadAssignments", [Get("lead-assignments") as MethodDecoratorFactory], [[0, Req() as ParamDecoratorFactory]]);
+
+controller("local/dev", LocalDevRuntimeController);
+decorate(LocalDevRuntimeController, "reloadFeatureFlags", [Post("reload-feature-flags") as MethodDecoratorFactory], [[0, Req() as ParamDecoratorFactory]]);
+
+controller("admin", AdminMessagingProvidersController, true);
+decorate(AdminMessagingProvidersController, "read", [Get("messaging/providers") as MethodDecoratorFactory], [[0, Req() as ParamDecoratorFactory]]);
+
+controller("admin/partner-integrations", AdminPartnerIntegrationsController, true);
+decorate(AdminPartnerIntegrationsController, "apiKeys", [Get("api-keys") as MethodDecoratorFactory], [[0, Req() as ParamDecoratorFactory]]);
+decorate(AdminPartnerIntegrationsController, "createApiKey", [Post("api-keys") as MethodDecoratorFactory], [[0, Req() as ParamDecoratorFactory], [1, Body() as ParamDecoratorFactory]]);
+decorate(AdminPartnerIntegrationsController, "revokeApiKey", [Post("api-keys/:id/revoke") as MethodDecoratorFactory], [[0, Param("id") as ParamDecoratorFactory], [1, Body() as ParamDecoratorFactory], [2, Req() as ParamDecoratorFactory]]);
+decorate(AdminPartnerIntegrationsController, "webhookEndpoints", [Get("webhook-endpoints") as MethodDecoratorFactory], [[0, Req() as ParamDecoratorFactory]]);
+decorate(AdminPartnerIntegrationsController, "createWebhookEndpoint", [Post("webhook-endpoints") as MethodDecoratorFactory], [[0, Req() as ParamDecoratorFactory], [1, Body() as ParamDecoratorFactory]]);
+decorate(AdminPartnerIntegrationsController, "updateWebhookEndpoint", [Patch("webhook-endpoints/:id") as MethodDecoratorFactory], [[0, Param("id") as ParamDecoratorFactory], [1, Body() as ParamDecoratorFactory], [2, Req() as ParamDecoratorFactory]]);
+decorate(AdminPartnerIntegrationsController, "webhookDeliveries", [Get("webhook-deliveries") as MethodDecoratorFactory], [[0, Req() as ParamDecoratorFactory]]);
+decorate(AdminPartnerIntegrationsController, "webhookAllowlist", [Get("webhook-allowlist") as MethodDecoratorFactory], [[0, Req() as ParamDecoratorFactory]]);
+decorate(AdminPartnerIntegrationsController, "createWebhookAllowlist", [Post("webhook-allowlist") as MethodDecoratorFactory], [[0, Req() as ParamDecoratorFactory], [1, Body() as ParamDecoratorFactory]]);
+decorate(AdminPartnerIntegrationsController, "revokeWebhookAllowlist", [Post("webhook-allowlist/:id/revoke") as MethodDecoratorFactory], [[0, Param("id") as ParamDecoratorFactory], [1, Body() as ParamDecoratorFactory], [2, Req() as ParamDecoratorFactory]]);
+
+controller("partner-api/v1", PartnerApiController);
+decorate(PartnerApiController, "leads", [Get("leads") as MethodDecoratorFactory], [[0, Req() as ParamDecoratorFactory], [1, Query() as ParamDecoratorFactory]]);
+decorate(PartnerApiController, "notifications", [Get("notifications") as MethodDecoratorFactory], [[0, Req() as ParamDecoratorFactory], [1, Query() as ParamDecoratorFactory]]);
+decorate(PartnerApiController, "webhookEndpoints", [Get("webhook-endpoints") as MethodDecoratorFactory], [[0, Req() as ParamDecoratorFactory]]);
+decorate(PartnerApiController, "createWebhookEndpoint", [Post("webhook-endpoints") as MethodDecoratorFactory], [[0, Req() as ParamDecoratorFactory], [1, Body() as ParamDecoratorFactory]]);
+decorate(PartnerApiController, "updateWebhookEndpoint", [Patch("webhook-endpoints/:id") as MethodDecoratorFactory], [[0, Param("id") as ParamDecoratorFactory], [1, Req() as ParamDecoratorFactory], [2, Body() as ParamDecoratorFactory]]);
 
 export class RuntimeHttpWiringModule {}
 
@@ -555,7 +759,14 @@ Module({
     AdminUsersHttpController,
     AdminAuditLogsController,
     AdminHealthController,
-    AdminRuntimeSupportController
+    AdminActivationChecklistController,
+    AdminBillingFoundationController,
+    AdminAIAssistanceController,
+    AdminRuntimeSupportController,
+    LocalDevRuntimeController,
+    AdminMessagingProvidersController,
+    AdminPartnerIntegrationsController,
+    PartnerApiController
   ],
   providers: [AssurMatchRuntime, AuthRequiredHttpGuard, MfaRequiredHttpGuard],
   exports: [AssurMatchRuntime]

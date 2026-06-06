@@ -93,7 +93,7 @@ export class ProductsService {
     return (await this.repository.list(countryId))
       .filter((product) => product.countryIds.includes(countryId) && product.status === "public")
       .map((product) => {
-        const state = policy.resolve({ globalFlags, countryFlags, productFlags: product.flags });
+        const state = policy.resolve({ globalFlags, countryFlags, productFlags: product.flags, requireProductFlags: true });
         return {
           id: product.id,
           key: product.key,
@@ -107,7 +107,7 @@ export class ProductsService {
 
   async getPublicProductPage(countryId: string, productKey: string, countryFlags: Parameters<PublicJourneyFlagPolicy["resolve"]>[0]["countryFlags"], globalFlags: Partial<Record<string, boolean>> = { public_comparator_enabled: true, quote_request_enabled: true }, actor?: ActorContext): Promise<ProductPageResponse> {
     const product = (await this.repository.list(countryId)).find((candidate) => candidate.key === productKey);
-    const state = product ? new PublicJourneyFlagPolicy().resolve({ globalFlags, countryFlags, productFlags: product.flags }) : undefined;
+    const state = product ? new PublicJourneyFlagPolicy().resolve({ globalFlags, countryFlags, productFlags: product.flags, requireProductFlags: true }) : undefined;
     if (!product || product.status !== "public" || !state?.publicEnabled) {
       this.audit.write({
         actor,

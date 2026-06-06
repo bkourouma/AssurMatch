@@ -49,6 +49,7 @@ prisma/dev.db-journal
 playwright-report/
 test-results/
 blob-report/
+.codegraph/
 
 # OS and editor files
 .DS_Store

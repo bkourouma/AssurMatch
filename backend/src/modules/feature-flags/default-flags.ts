@@ -15,7 +15,10 @@ export const GLOBAL_FEATURE_FLAG_DEFAULTS = {
   policy_issuance_enabled: false,
   claims_enabled: false,
   insurer_api_enabled: false,
+  sms_enabled: false,
   whatsapp_enabled: false,
+  partner_api_enabled: false,
+  partner_webhooks_enabled: false,
   sponsored_offers_enabled: false,
   multi_broker_routing_enabled: false
 } as const;

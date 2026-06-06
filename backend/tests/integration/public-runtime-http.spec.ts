@@ -24,4 +24,27 @@ describe("public runtime HTTP catalog", () => {
     expect(await harness.runtime.countries.service.listPublic()).toHaveLength(1);
     expect(await harness.runtime.products.service.listPublic(seed.country.id)).toHaveLength(1);
   });
+
+  it("fails closed when global public comparator flag is disabled", async () => {
+    harness = await createRuntimeHttpHarness();
+    await seedPublicRuntime(harness.runtime);
+    await harness.runtime.featureFlags.service.setFlag({
+      key: "public_comparator_enabled",
+      scopeType: "global",
+      value: false,
+      reason: "runtime fail closed check"
+    }, { actorId: "admin-runtime", roles: ["super_admin"], mfaVerified: true });
+
+    const countries = await readJson<unknown[]>(await harness.request("/countries"));
+    expect(countries).toHaveLength(0);
+
+    const countryDetail = await harness.request("/countries/CI");
+    expect([404, 422]).toContain(countryDetail.status);
+
+    const products = await readJson<unknown[]>(await harness.request("/countries/CI/products"));
+    expect(products).toHaveLength(0);
+
+    const offers = await readJson<unknown[]>(await harness.request("/countries/CI/products/auto/offers"));
+    expect(offers).toHaveLength(0);
+  });
 });

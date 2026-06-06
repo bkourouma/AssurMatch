@@ -4,6 +4,7 @@ export interface PublicJourneyFlagInput {
   globalFlags?: Partial<Record<string, boolean>> | undefined;
   countryFlags?: Partial<CountryFlags> | undefined;
   productFlags?: Partial<ProductFlags> | undefined;
+  requireProductFlags?: boolean | undefined;
 }
 
 export interface PublicJourneyState {
@@ -22,9 +23,10 @@ export class PublicJourneyFlagPolicy {
     const countryPublic = input.countryFlags?.country_public_enabled === true;
     const countryComparison = input.countryFlags?.country_comparison_enabled === true;
     const countryQuote = input.countryFlags?.country_quote_enabled === true;
-    const productPublic = input.productFlags ? input.productFlags.product_public_enabled === true : true;
-    const productComparison = input.productFlags ? input.productFlags.product_comparison_enabled === true : true;
-    const productQuote = input.productFlags ? input.productFlags.product_quote_enabled === true : true;
+    const productFlagsRequired = input.requireProductFlags === true;
+    const productPublic = input.productFlags ? input.productFlags.product_public_enabled === true : !productFlagsRequired;
+    const productComparison = input.productFlags ? input.productFlags.product_comparison_enabled === true : !productFlagsRequired;
+    const productQuote = input.productFlags ? input.productFlags.product_quote_enabled === true : !productFlagsRequired;
 
     if (!globalComparator) reasons.push("public_comparator_disabled");
     if (!countryPublic) reasons.push("country_public_disabled");

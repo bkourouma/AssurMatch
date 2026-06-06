@@ -48,6 +48,36 @@ cmd /c launch-local.bat
 
 The runtime refuses local bootstrap when `APP_ENV=production`.
 
+## Broker Demo Data
+
+The broker back-office can be populated with synthetic local-only broker data
+for UX review. Start the local stack first, then run:
+
+```powershell
+$env:APP_ENV = "local"
+$env:DATABASE_URL = "postgresql://assurmatch:assurmatch@127.0.0.1:55433/assurmatch"
+$env:LOCAL_DEMO_BROKER_PASSWORD = "<local password with 12+ chars>"
+npm run local:seed:broker-demo
+```
+
+Demo broker users:
+
+- `starter.owner@broker.example`
+- `pro.owner@broker.example`
+- `pro.manager@broker.example`
+- `pro.agent@broker.example`
+- `pro.readonly@broker.example`
+- `enterprise.owner@broker.example`
+
+To verify the CRM unavailable state for Pro/Enterprise brokers:
+
+```powershell
+npm run local:seed:broker-demo:crm-off
+```
+
+The seed refuses production/preproduction, uses fake data only, keeps regulated
+modules disabled and does not change the Prisma schema.
+
 ## Data Safety
 
 The launcher runs Prisma migrations and the existing seed. Seeded records are

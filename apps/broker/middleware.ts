@@ -41,7 +41,13 @@ function isBrokerProfile(profile: Profile): boolean {
 }
 
 function isStarterCrmDenied(profile: Profile, pathname: string): boolean {
-  return pathname.startsWith("/crm") && (profile.partnerPlan === "starter" || profile.roles?.includes("broker_owner_starter") === true);
+  const isStarterProfile = profile.partnerPlan === "starter" || profile.roles?.includes("broker_owner_starter") === true;
+  if (!isStarterProfile) return false;
+
+  const normalizedPathname = pathname.replace(/\/+$/, "") || "/";
+  if (normalizedPathname === "/crm") return false;
+
+  return normalizedPathname.startsWith("/crm/");
 }
 
 export async function middleware(request: NextRequest) {

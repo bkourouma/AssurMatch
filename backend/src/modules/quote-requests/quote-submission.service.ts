@@ -59,6 +59,7 @@ export interface QuoteSubmissionDependencies {
   routing?: QuoteRoutingService;
   notifications?: QuoteNotificationService;
   aiSummary?: QuoteAISummaryService;
+  isGlobalFlagEnabled?: (key: string) => boolean;
 }
 
 export class QuoteSubmissionService {
@@ -88,7 +89,8 @@ export class QuoteSubmissionService {
     if (!country || !product || !product.countryIds.includes(country.id)) {
       throw new Error("Country or product is not available");
     }
-    if (!country.flags.country_quote_enabled || !product.flags.product_quote_enabled) {
+    const globalQuoteEnabled = this.deps.isGlobalFlagEnabled ? this.deps.isGlobalFlagEnabled("quote_request_enabled") === true : true;
+    if (!globalQuoteEnabled || !country.flags.country_quote_enabled || !product.flags.product_quote_enabled) {
       this.audit.write({
         actor,
         action: QuoteAuditActions.quoteRequestRefused,
@@ -97,7 +99,7 @@ export class QuoteSubmissionService {
         scope: { countryId: country.id, productId: product.id },
         result: "refused",
         reason: "quote_disabled",
-        context: {}
+        context: { globalQuoteEnabled }
       });
       throw new Error("Quote request is disabled");
     }

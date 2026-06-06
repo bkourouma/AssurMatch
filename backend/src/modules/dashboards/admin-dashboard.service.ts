@@ -47,6 +47,9 @@ export class AdminDashboardService {
     if (query.product) scopeInput.product = query.product;
     if (query.partnerId) scopeInput.partnerId = query.partnerId;
     const scope = this.deps.access.resolveAdminScope(actor, role, scopeInput);
+    if (role === "finance_admin" || role === "content_admin") {
+      this.deps.access.refuseAdmin(actor, "restricted_admin_dashboard_unavailable");
+    }
     const window = resolveDashboardWindow({ from: query.from, to: query.to });
     const countryMap = await this.buildCountryIsoMap();
     const isoToId = new Map<string, string>();
@@ -62,6 +65,8 @@ export class AdminDashboardService {
     const allOffers = await this.deps.offers.repository.list();
     const allFlags = this.deps.featureFlags.list();
     const allAudits = this.deps.audit.all();
+
+    await this.assertAdminPartnerFilterInScope(actor, scope, isoToId, allPartners);
 
     const assignmentsInWindow = allAssignments.filter((assignment) =>
       isWithinWindow(assignment.assignedAt, window) && this.assignmentInScope(assignment, scope, countryMap)
@@ -131,6 +136,27 @@ export class AdminDashboardService {
     if (allowedCountryIds && record.countryId && !allowedCountryIds.has(record.countryId)) return false;
     if (scope.products.length > 0 && record.productKey && !scope.products.includes(record.productKey)) return false;
     return true;
+  }
+
+  private async assertAdminPartnerFilterInScope(
+    actor: ActorContext,
+    scope: ResolvedAdminScope,
+    isoToId: Map<string, string>,
+    partners: Array<{ id: string }>
+  ): Promise<void> {
+    if (!scope.partnerId) return;
+    if (!partners.some((partner) => partner.id === scope.partnerId)) {
+      this.deps.access.refuseAdmin(actor, "out_of_scope_partner");
+    }
+    if (scope.role !== "admin_pays") return;
+    const allowedCountryIds = new Set(
+      scope.countries.map((countryCode) => isoToId.get(countryCode)).filter((id): id is string => Boolean(id))
+    );
+    if (allowedCountryIds.size === 0) this.deps.access.refuseAdmin(actor, "out_of_scope_partner");
+    const licenses = await this.deps.partnerLicenses.listForPartner(scope.partnerId);
+    if (!licenses.some((license) => allowedCountryIds.has(license.countryId))) {
+      this.deps.access.refuseAdmin(actor, "out_of_scope_partner");
+    }
   }
 
   private computeNonRoutedReasons(decisions: RoutingDecisionRecord[]): RoutingRefusalReasonCount[] {

@@ -13,7 +13,9 @@ $portOwnerIds = Get-NetTCPConnection -LocalPort $Ports -State Listen -ErrorActio
 
 function Test-AssurMatchLocalProcess($Process) {
   $commandLine = $Process.CommandLine
-  if ([string]::IsNullOrWhiteSpace($commandLine)) { return $false }
+  if ([string]::IsNullOrWhiteSpace($commandLine)) {
+    return (($portOwnerIds -contains $Process.ProcessId) -and ($Process.Name -eq "node.exe"))
+  }
   $normalized = $commandLine.Replace("/", "\")
 
   if ($normalized -like "*scripts\local-app\api-runner.mjs*") { return $true }
@@ -36,8 +38,18 @@ $launched = Get-CimInstance Win32_Process |
   Select-Object -ExpandProperty ProcessId -Unique
 
 if ($launched) {
+  $failedStops = @()
   foreach ($processId in $launched) {
-    Stop-Process -Id $processId -Force -ErrorAction SilentlyContinue
+    try {
+      Stop-Process -Id $processId -Force -ErrorAction Stop
+    } catch {
+      $failedStops += "  PID $processId`: $($_.Exception.Message)"
+    }
+  }
+  if ($failedStops.Count -gt 0) {
+    Write-Host "Some AssurMatch local app processes could not be stopped:"
+    $failedStops | ForEach-Object { Write-Host $_ }
+    Write-Host "Close those Node processes from the same elevated context that started them, or run stop-local.bat as Administrator."
   }
 } else {
   Write-Host "No AssurMatch local app processes were found; no app process was stopped."

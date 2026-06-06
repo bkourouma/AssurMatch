@@ -19,6 +19,20 @@ export interface RuntimeSmokeSeed {
 }
 
 export async function seedRuntimeSmokeData(runtime: AssurMatchRuntime, run: RuntimeSmokeRun, admin: ActorContext): Promise<RuntimeSmokeSeed> {
+  await runtime.featureFlags.service.setFlag({
+    key: "public_comparator_enabled",
+    scopeType: "global",
+    value: true,
+    reason: "runtime smoke public catalog activation"
+  }, admin);
+  await runtime.featureFlags.service.setFlag({
+    key: "quote_request_enabled",
+    scopeType: "global",
+    value: true,
+    reason: "runtime smoke quote activation"
+  }, admin);
+  await runtime.reloadRuntimeFeatureFlags();
+
   const country = await runtime.countries.service.create({
     isoCode: run.countryCode,
     name: `${run.prefix} Country`,

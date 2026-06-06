@@ -23,7 +23,7 @@ function Test-PortFree([int] $Port) {
   $listener = Get-NetTCPConnection -LocalPort $Port -State Listen -ErrorAction SilentlyContinue
   if ($listener) {
     $owners = ($listener | Select-Object -ExpandProperty OwningProcess -Unique) -join ", "
-    throw "Port $Port is already in use by process id(s): $owners. Run stop-local.bat or free the port before launching."
+    throw "Port $Port is already in use by process id(s): $owners. Run stop-local.bat or free the port before launching. If Windows reports Access denied while stopping those processes, close the elevated Node process or run stop-local.bat as Administrator."
   }
 }
 
