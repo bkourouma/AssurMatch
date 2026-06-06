@@ -9,4 +9,4 @@
 - [x] T005 Add broker CRM AI assistance client/page metadata.
 - [x] T006 Add backend runtime HTTP tests for status and refusal.
 - [x] T007 Add Playwright source tests for read-only no-model-call surfaces.
-- [ ] T008 Run full release validation after the current supervisor backlog settles.
+- [x] T008 Run full release validation after the current supervisor backlog settles.

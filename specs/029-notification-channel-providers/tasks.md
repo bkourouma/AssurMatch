@@ -7,4 +7,4 @@
 - [x] T003 Add provider status service and audit actions.
 - [x] T004 Wire protected `GET /admin/messaging/providers`.
 - [x] T005 Add runtime HTTP tests for disabled defaults, no secrets and refusal.
-- [ ] T006 Run full release validation after the current supervisor backlog settles.
+- [x] T006 Run full release validation after the current supervisor backlog settles.
