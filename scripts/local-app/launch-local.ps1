@@ -100,7 +100,7 @@ Push-Location $Root
 try {
   $env:ASSURMATCH_POSTGRES_PORT = "$PostgresPort"
   $env:ASSURMATCH_REDIS_PORT = "$RedisPort"
-  docker compose up -d --remove-orphans postgres redis mailpit
+  docker compose up -d --wait --remove-orphans postgres redis mailpit
   Assert-NativeSuccess "Docker Compose local infrastructure startup"
   Wait-TcpPort "127.0.0.1" $PostgresPort
   Wait-TcpPort "127.0.0.1" $RedisPort

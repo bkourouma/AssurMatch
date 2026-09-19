@@ -13,7 +13,7 @@ services:
       timeout: 5s
       retries: 20
     volumes:
-      - runtime-smoke-postgres-data:/var/lib/postgresql/data
+      - runtime-smoke-postgres-data:/var/lib/postgresql
 
   runtime-smoke-redis:
     image: redis:8-alpine
