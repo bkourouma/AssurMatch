@@ -1,5 +1,6 @@
 import { consentRecordSchema, consentTextSchema, type ConsentRecordDto, type ConsentTextDto } from "../../../../packages/shared/contracts/compliance.contracts";
 import { AuditLogWriter } from "../audit-logs/audit-log-writer.service";
+import { PUBLIC_SITE_AUDIT_ACTIONS } from "../audit-logs/public-site-audit-actions";
 import { RetentionPolicyService } from "../audit-logs/retention-policy.service";
 import type { ActorContext } from "../common/types";
 import { MemoryConsentRecordsRepository, type ConsentRecordsRepository } from "./consent-records.repository";
@@ -13,6 +14,8 @@ export interface ConsentText extends ConsentTextDto {
 
 export interface ConsentRecord extends ConsentRecordDto {
   id: string;
+  /** Spec 045: stamped when the visitor revokes; the grant itself (text, hash, date) is kept. */
+  withdrawnAt?: Date;
   retentionUntil: Date;
   createdAt: Date;
   updatedAt: Date;
@@ -91,6 +94,30 @@ export class ConsentService {
     return record;
   }
 
+  /**
+   * Spec 045: the visitor revokes a transmission previously authorised. The record is flipped to
+   * `withdrawn` and stamped, never deleted: the proof that the grant existed (consent text, hash,
+   * granted date) has to outlive the revocation. Calling it twice is a no-op, so a retried request
+   * or a double click can never rewrite the withdrawal date or duplicate the audit entry.
+   */
+  async withdraw(recordId: string, actor: ActorContext, reason: string): Promise<ConsentRecord> {
+    const record = await this.repository.findRecord(recordId);
+    if (!record) throw new Error(`Consent record ${recordId} not found`);
+    if (record.status === "withdrawn") return record;
+    const withdrawn = await this.repository.updateRecord(recordId, { status: "withdrawn", withdrawnAt: new Date() });
+    this.audit.write({
+      actor,
+      action: PUBLIC_SITE_AUDIT_ACTIONS.consentWithdrawnByVisitor,
+      targetType: "ConsentRecord",
+      targetId: recordId,
+      scope: { countryId: record.countryId, ...(record.productId ? { productId: record.productId } : {}) },
+      result: "success",
+      reason,
+      context: { purpose: record.purpose, intendedRecipient: record.intendedRecipient, previousStatus: record.status ?? "granted" }
+    });
+    return withdrawn;
+  }
+
   hasValidConsent(recordId: string | undefined, purpose: string, countryId: string, productId?: string): Promise<boolean> {
     return this.repository.hasValidConsent(recordId, purpose, countryId, productId);
   }
@@ -127,4 +154,4 @@ export class ConsentModule {
   }
 }
 
-export { CONSENT_RECORDS_REPOSITORY, MemoryConsentRecordsRepository, type ConsentRecordsRepository } from "./consent-records.repository";
+export { CONSENT_RECORDS_REPOSITORY, MemoryConsentRecordsRepository, type ConsentRecordsRepository, type ConsentRecordUpdate } from "./consent-records.repository";

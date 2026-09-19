@@ -10,7 +10,10 @@ import { PrismaService } from "../modules/common/prisma/prisma.service";
 import { QueuesModule } from "../modules/common/queues/queues.module";
 import { RedisModule } from "../modules/common/redis/redis.module";
 import { ConsentModule } from "../modules/consent/consent.module";
+import { ContactMessagesModule } from "../modules/contact-messages/contact-messages.module";
+import { PrismaContactMessagesRepository } from "../modules/contact-messages/contact-messages.repository";
 import { CountriesModule } from "../modules/countries/countries.module";
+import { PublicCountryDirectoryService } from "../modules/countries/public-country-directory.service";
 import { DocumentsModule } from "../modules/documents/documents.module";
 import { FeatureFlagsModule } from "../modules/feature-flags/feature-flags.module";
 import { FeatureFlagCacheService } from "../modules/feature-flags/feature-flag-cache.service";
@@ -22,9 +25,15 @@ import { BrokerNotificationsService } from "../modules/notifications/broker-noti
 import { EnterpriseService } from "../modules/enterprise/enterprise.service";
 import { PrismaEnterpriseRepository } from "../modules/enterprise/enterprise.repository";
 import { OffersModule } from "../modules/offers/offers.module";
+import { PartnerApplicationsModule } from "../modules/partner-applications/partner-applications.module";
+import { PrismaPartnerApplicationsRepository } from "../modules/partner-applications/partner-applications.repository";
 import { PartnerLicensesModule } from "../modules/partner-licenses/partner-licenses.module";
 import { PartnersModule } from "../modules/partners/partners.module";
+import { PublicPartnerDirectoryService } from "../modules/partners/public-partner-directory.service";
 import { ProductsModule } from "../modules/products/products.module";
+import { PublicStatsModule } from "../modules/public-stats/public-stats.module";
+import { WaitlistModule } from "../modules/waitlist/waitlist.module";
+import { PrismaWaitlistRepository } from "../modules/waitlist/waitlist.repository";
 import { ProspectsModule } from "../modules/prospects/prospects.module";
 import { QuoteFormsModule } from "../modules/quote-forms/quote-forms.module";
 import { QuoteRequestsModule } from "../modules/quote-requests/quote-requests.module";
@@ -52,7 +61,7 @@ import { PartnerIntegrationsModule } from "../modules/partner-integrations/partn
 import { PrismaPartnerIntegrationsRepository } from "../modules/partner-integrations/partner-integrations.repository";
 import { PartnerWebhookEventPublisher } from "../modules/partner-integrations/partner-webhook-event-publisher";
 import { PrismaConsentRecordsRepository } from "../modules/consent/consent-records.repository";
-import { PrismaCountriesRepository } from "../modules/countries/countries.repository";
+import { MemoryCountriesRepository, PrismaCountriesRepository, type CountriesRepository } from "../modules/countries/countries.repository";
 import { PrismaProductsRepository } from "../modules/products/products.repository";
 import { PrismaOffersRepository } from "../modules/offers/offers.repository";
 import type { PublicOfferVisibilityContext } from "../modules/offers/public-offer-catalog.service";
@@ -80,7 +89,14 @@ export class AssurMatchRuntime {
   readonly queues = new QueuesModule();
   private readonly auditLogRepository = this.auditRepository();
   private readonly featureFlagRepository = this.runtimeRepository(new PrismaFeatureFlagRepository(this.prisma));
-  private readonly countriesRepository = this.runtimeRepository(new PrismaCountriesRepository(this.prisma));
+  /**
+   * Spec 045: `PublicCountryDirectoryService` reads the countries repository directly (it needs the
+   * unfiltered `list()`, which `CountriesService` does not expose), so the instance has to be shared
+   * with `CountriesModule`. Under NODE_ENV=test `runtimeRepository()` yields undefined and
+   * `CountriesService` would otherwise build a second, empty memory store.
+   */
+  private readonly countriesRepository: CountriesRepository =
+    this.runtimeRepository(new PrismaCountriesRepository(this.prisma)) ?? new MemoryCountriesRepository();
   private readonly productsRepository = this.runtimeRepository(new PrismaProductsRepository(this.prisma));
   private readonly partnersRepository = this.runtimeRepository(new PrismaPartnersRepository(this.prisma));
   private readonly partnerLicensesRepository = this.runtimeRepository(new PrismaPartnerLicensesRepository(this.prisma));
@@ -95,6 +111,9 @@ export class AssurMatchRuntime {
   private readonly routingRulesRepository = this.runtimeRepository(new PrismaRoutingRulesRepository(this.prisma));
   private readonly scoringRulesRepository = this.runtimeRepository(new PrismaScoringRulesRepository(this.prisma));
   private readonly quoteDocumentsRepository = this.runtimeRepository(new PrismaQuoteDocumentsRepository(this.prisma));
+  private readonly waitlistRepository = this.runtimeRepository(new PrismaWaitlistRepository(this.prisma));
+  private readonly partnerApplicationsRepository = this.runtimeRepository(new PrismaPartnerApplicationsRepository(this.prisma));
+  private readonly contactMessagesRepository = this.runtimeRepository(new PrismaContactMessagesRepository(this.prisma));
   readonly leadRepositorySet = this.leadRepositories();
   private readonly brokerCrmConfig = { brokerCrmEnabled: process.env.ASSURMATCH_BROKER_CRM_ENABLED === "true" };
   readonly audit = new AuditLogsModule(this.auditLogRepository);
@@ -226,6 +245,9 @@ export class AssurMatchRuntime {
     routing: this.leads.routing,
     notifications: this.notifications.quoteService,
     aiSummary: this.quoteAiSummary,
+    // Spec 045 consent withdrawal: closes the lead assignments and warns each partner inbox.
+    assignments: this.leads.assignments,
+    inApp: this.notifications.dispatch,
     isGlobalFlagEnabled: (key) => this.featureFlags.service.isEnabled(key)
   }, this.audit.writer, this.redis.client, this.quoteRequestsRepository);
   /** Spec 044: drains the quote notification backlog into the email delivery service. */
@@ -347,6 +369,37 @@ export class AssurMatchRuntime {
     webhookDeliveryEnabled: process.env.ASSURMATCH_PARTNER_WEBHOOK_DELIVERY_ENABLED === "true",
     ...(this.partnerIntegrationsRepository ? { repository: this.partnerIntegrationsRepository } : {})
   });
+  /** Spec 045: public-site intake (waitlist, partner applications, contact) and public read models. */
+  readonly waitlist = new WaitlistModule({
+    findCountryByCode: (countryCode) => this.countries.service.findByIsoCode(countryCode),
+    findProductByKey: (productKey) => this.products.service.findByKey(productKey),
+    identity: this.prospects.identity,
+    globalFlags: () => this.publicJourneyGlobalFlags()
+  }, this.audit.writer, this.redis.client, this.waitlistRepository);
+  readonly partnerApplications = new PartnerApplicationsModule({
+    findCountryByCode: (countryCode) => this.countries.service.findByIsoCode(countryCode),
+    findProductByKey: (productKey) => this.products.service.findByKey(productKey),
+    identity: this.prospects.identity
+  }, this.audit.writer, this.redis.client, this.partnerApplicationsRepository);
+  readonly contactMessages = new ContactMessagesModule({
+    findCountryByCode: (countryCode) => this.countries.service.findByIsoCode(countryCode)
+  }, this.audit.writer, this.redis.client, this.contactMessagesRepository);
+  readonly publicPartnerDirectory = new PublicPartnerDirectoryService(
+    this.partners.service,
+    this.partnerLicenses.service,
+    this.countries.service,
+    this.products.service,
+    this.redis.client,
+    this.audit.writer
+  );
+  readonly publicStats = new PublicStatsModule(
+    this.countries.service,
+    this.partners.service,
+    this.partnerLicenses.service,
+    this.offers.repository,
+    this.redis.client
+  );
+  readonly publicCountryDirectory = new PublicCountryDirectoryService(this.countriesRepository, this.redis.client);
 
   async onModuleInit(): Promise<void> {
     await this.prisma.onModuleInit();
@@ -429,7 +482,10 @@ export class AssurMatchRuntime {
       CrmActivityRepository: this.leadRepositorySet.crmActivity?.mode,
       NotificationsRepository: this.notificationsRepository?.mode,
       UsersRepository: this.usersRepository?.mode,
-      PartnerIntegrationsRepository: this.partnerIntegrationsRepository?.mode
+      PartnerIntegrationsRepository: this.partnerIntegrationsRepository?.mode,
+      WaitlistRepository: this.waitlistRepository?.mode,
+      PartnerApplicationsRepository: this.partnerApplicationsRepository?.mode,
+      ContactMessagesRepository: this.contactMessagesRepository?.mode
     };
   }
 

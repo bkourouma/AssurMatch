@@ -1,44 +1,52 @@
 import { expect, test } from "@playwright/test";
-import { readFileSync } from "node:fs";
-
-function source(path: string): string {
-  return readFileSync(path, "utf8");
-}
+import { messagesText, publicFile, publicPage, readSources } from "./helpers/public-sources";
 
 test("public comparator exposes criteria filters, explainable score and side-by-side comparison", () => {
-  const api = source("apps/public/app/lib/public-api.ts");
-  const list = source("apps/public/app/countries/[countryCode]/products/[productKey]/offers/page.tsx");
-  const cards = source("apps/public/app/components/offer-cards.tsx");
-  const compare = source("apps/public/app/compare/page.tsx");
-  const detail = source("apps/public/app/offers/[offerId]/page.tsx");
-  const quote = source("apps/public/app/countries/[countryCode]/products/[productKey]/quote/page.tsx");
+  const api = readSources([publicFile("lib/public-api.ts")]);
+  const list = readSources([publicPage("countries/[countryCode]/products/[productKey]/offers/page.tsx")]);
+  const cards = readSources([publicFile("components/offer-cards.tsx")]);
+  const compare = readSources([publicPage("compare/page.tsx")]);
+  const detail = readSources([publicPage("offers/[offerId]/page.tsx")]);
+  const quote = readSources([publicPage("countries/[countryCode]/products/[productKey]/quote/page.tsx")]);
 
+  // Structural: endpoints, filter keys and props still live in the sources.
   expect(api).toContain("/offers/compare");
   expect(api).toContain("minGuaranteeLevel");
-  expect(list).toContain("Niveau de garantie minimum");
-  expect(list).toContain("Franchise maximale");
-  expect(list).toContain("Score indicatif");
-  expect(list).toContain("Comparer la selection");
-  expect(cards).toContain("Courtier partenaire responsable");
-  expect(cards).toContain("Score indicatif");
-  expect(cards).toContain("Demander un devis");
-  expect(compare).toContain("Comparer les offres cote a cote");
-  expect(compare).toContain("entre 2 et 4 offres");
-  expect(detail).toContain("Detail de l'offre indicative");
-  expect(detail).toContain("Exclusions principales");
   expect(quote).toContain("selectedOfferId");
+
+  // Copy: the visible filter labels, actions and headings now live in the French catalogue.
+  const fr = messagesText("fr");
+  expect(fr).toContain("Niveau de garantie minimum");
+  expect(fr).toContain("Franchise maximale");
+  expect(fr).toContain("Score indicatif");
+  expect(fr).toContain("Comparer la sélection");
+  expect(fr).toContain("Courtier partenaire responsable");
+  expect(fr).toContain("Demander un devis");
+  expect(fr).toContain("Comparer les offres côte à côte");
+  expect(fr).toContain("entre 2 et 4 offres");
+  expect(fr).toContain("Détail de l'offre indicative");
+  expect(fr).toContain("Exclusions principales");
+
+  // The list, cards, compare and detail pages must actually read from the catalogue rather than hard-coding copy.
+  expect(list).toContain('getTranslations("Offers")');
+  expect(cards).toContain('useTranslations("OfferCards")');
+  expect(compare).toContain('getTranslations("Compare")');
+  expect(detail).toContain('getTranslations("OfferDetail")');
 });
 
 test("public comparator pages avoid regulated or recommendation wording", () => {
-  const files = [
-    "apps/public/app/countries/[countryCode]/products/[productKey]/offers/page.tsx",
-    "apps/public/app/components/offer-cards.tsx",
-    "apps/public/app/compare/page.tsx",
-    "apps/public/app/offers/[offerId]/page.tsx"
-  ].map(source).join("\n");
+  const sources = readSources([
+    publicPage("countries/[countryCode]/products/[productKey]/offers/page.tsx"),
+    publicFile("components/offer-cards.tsx"),
+    publicPage("compare/page.tsx"),
+    publicPage("offers/[offerId]/page.tsx")
+  ]);
+  const catalogue = [messagesText("fr", "Offers"), messagesText("fr", "OfferCards"), messagesText("fr", "Compare"), messagesText("fr", "OfferDetail")].join("\n");
+  const surface = `${sources}\n${catalogue}`.toLowerCase();
+
   for (const forbidden of ["Acheter", "Souscrire maintenant", "Contrat valide", "Garantie acceptee", "meilleure assurance", "nous vous recommandons"]) {
-    expect(files.toLowerCase()).not.toContain(forbidden.toLowerCase());
+    expect(surface).not.toContain(forbidden.toLowerCase());
   }
-  expect(files).toContain("Sponsorise");
-  expect(files).toContain("indicati");
+  expect(catalogue).toContain("Sponsorisé");
+  expect(catalogue.toLowerCase()).toContain("indicati");
 });

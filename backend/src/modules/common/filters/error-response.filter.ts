@@ -29,9 +29,19 @@ export function toSafeErrorResponse(error: unknown, correlationId: string): Safe
   };
 }
 
+/**
+ * Spec 045: `QuoteSubmissionService.status()` and `.withdrawConsent()` share this exact message for
+ * an unknown public reference and for a wrong token, so the endpoint cannot be used to probe which
+ * references exist. It matches none of the patterns below and used to fall through to 500, which
+ * turned a bad withdrawal token into a server error; an exact-string check answers 404 instead,
+ * without widening any of the regexes that classify other messages.
+ */
+const QUOTE_NOT_AVAILABLE_MESSAGE = "Quote status not available";
+
 function statusForError(error: unknown): number {
   if (error instanceof HttpException) return error.getStatus();
   const message = error instanceof Error ? error.message : "";
+  if (message === QUOTE_NOT_AVAILABLE_MESSAGE) return HttpStatus.NOT_FOUND;
   if (/rate limit/i.test(message)) return HttpStatus.TOO_MANY_REQUESTS;
   if (/auth/i.test(message)) return HttpStatus.UNAUTHORIZED;
   if (/validation|invalid/i.test(message)) return HttpStatus.BAD_REQUEST;

@@ -22,7 +22,8 @@ describe("prisma migration fresh-base readiness", () => {
       "0013_messaging_channels",
       "0014_enterprise_agencies",
       "0015_multi_broker_routing",
-      "0016_broker_crm_history_event_type"
+      "0016_broker_crm_history_event_type",
+      "0017_public_site_forms"
     ]);
     const schema = readFileSync(join(process.cwd(), "backend", "prisma", "schema.prisma"), "utf8");
     for (const model of ["AuditLog", "FeatureFlag", "ConsentRecord", "QuoteRequest", "LeadAssignment", "BrokerCrmLeadState", "PartnerApiKey", "PartnerWebhookEndpoint", "PartnerWebhookDelivery", "PartnerWebhookAllowlistEntry", "RoutingRule", "RoutingRuleHistory"]) {
@@ -98,6 +99,20 @@ describe("prisma migration fresh-base readiness", () => {
     expect(schema).toContain("model BrokerCrmPipelineHistory");
     expect(schema).toMatch(/eventType\s+String\s+@default\("status_changed"\)/);
     expect(schema).toMatch(/nextStatus\s+BrokerCrmPipelineStatus\?/);
+    // Public-site forms (waitlist, broker application, contact message) plus the directory city.
+    const publicSite = readFileSync(join(migrationsDir, "0017_public_site_forms", "migration.sql"), "utf8");
+    expect(publicSite).toContain('CREATE TYPE "WaitlistEntryStatus"');
+    expect(publicSite).toContain('CREATE TYPE "PartnerApplicationStatus"');
+    expect(publicSite).toContain('CREATE TYPE "ContactAudience"');
+    expect(publicSite).toContain('CREATE TYPE "ContactMessageStatus"');
+    expect(publicSite).toContain('CREATE TABLE IF NOT EXISTS "WaitlistEntry"');
+    expect(publicSite).toContain('CREATE TABLE IF NOT EXISTS "PartnerApplication"');
+    expect(publicSite).toContain('CREATE TABLE IF NOT EXISTS "ContactMessage"');
+    expect(publicSite).toContain('ALTER TABLE "PartnerTenant" ADD COLUMN IF NOT EXISTS "city" TEXT');
+    expect(publicSite).not.toContain('"ipAddress"');
+    expect(schema).toContain("model WaitlistEntry");
+    expect(schema).toContain("model PartnerApplication");
+    expect(schema).toContain("model ContactMessage");
     expect(schema).not.toContain("@@unique([quoteRequestId])");
   });
 });

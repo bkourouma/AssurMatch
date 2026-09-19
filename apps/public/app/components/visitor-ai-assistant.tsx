@@ -1,24 +1,35 @@
 "use client";
 
+import { useTranslations } from "next-intl";
 import { useEffect, useState } from "react";
 import { readVisitorAi, readVisitorAiAvailability, requestVisitorAi, type VisitorAiInteraction } from "../lib/public-api";
+import { AiBox } from "./ui/ai-box";
+import { BackendText } from "./ui/backend-text";
+import { Field, fieldControlProps } from "./ui/field";
+import { Notice } from "./ui/notice";
 
 type Mode = "product" | "faq" | "summary" | "consistency";
 
-const MODE_CONFIG: Record<Mode, { assistType: string; title: string; placeholder?: string; button: string }> = {
-  product: { assistType: "visitor_product_assistant", title: "Assistant IA d'aide a la comprehension: quel type d'assurance ?", placeholder: "Decrivez votre besoin (ex: proteger ma voiture utilisee au quotidien)", button: "Demander une orientation indicative" },
-  faq: { assistType: "visitor_faq", title: "Question generale sur l'assurance", placeholder: "Posez une question generale (sans donnees personnelles)", button: "Poser ma question" },
-  summary: { assistType: "visitor_request_summary", title: "Resume IA de mon besoin avant envoi", button: "Resumer mon besoin" },
-  consistency: { assistType: "visitor_consistency_check", title: "Verification IA de coherence", button: "Verifier mes reponses" }
+const MODE_CONFIG: Record<Mode, { assistType: string; hasInput: boolean }> = {
+  product: { assistType: "visitor_product_assistant", hasInput: true },
+  faq: { assistType: "visitor_faq", hasInput: true },
+  summary: { assistType: "visitor_request_summary", hasInput: false },
+  consistency: { assistType: "visitor_consistency_check", hasInput: false }
 };
 
 /**
  * Public AI assistance: hidden entirely when the assist type is disabled for the country/product
- * (Constitution: no AI proposed when flags are off), asynchronous (queue + poll), always labelled
- * as indicative assistance with the fixed disclaimer.
+ * (Constitution: no AI proposed when flags are off), asynchronous (queue + poll), always framed by
+ * the `AiBox` primitive so the "genere par IA" label and the disclaimer are permanently on screen.
+ * It is never required to move forward: nothing here blocks a quote request.
  */
 export function VisitorAiAssistant({ countryCode, productKey, mode, answers = {} }: { countryCode: string; productKey?: string; mode: Mode; answers?: Record<string, unknown> }) {
+  const t = useTranslations("VisitorAi");
+  const common = useTranslations("Common");
   const config = MODE_CONFIG[mode];
+  const title = t(`modes.${mode}.title`);
+  const buttonLabel = t(`modes.${mode}.button`);
+  const placeholder = mode === "product" ? t("modes.product.placeholder") : mode === "faq" ? t("modes.faq.placeholder") : undefined;
   const [available, setAvailable] = useState<boolean | null>(null);
   const [text, setText] = useState("");
   const [state, setState] = useState<{ status: "idle" | "submitting" | "polling" | "done" | "error"; message?: string; interaction?: VisitorAiInteraction }>({ status: "idle" });
@@ -45,11 +56,11 @@ export function VisitorAiAssistant({ countryCode, productKey, mode, answers = {}
         setState({ status: "done", interaction });
       } else if (attempts >= 20) {
         clearInterval(timer);
-        setState({ status: "error", message: "L'assistant IA met trop de temps a repondre. Reessayez plus tard." });
+        setState({ status: "error", message: t("timeout") });
       }
     }, 750);
     return () => clearInterval(timer);
-  }, [state.status, state.interaction]);
+  }, [state.status, state.interaction, t]);
 
   if (available !== true) return null;
 
@@ -64,33 +75,65 @@ export function VisitorAiAssistant({ countryCode, productKey, mode, answers = {}
       setState(result.interaction.status === "queued" ? { status: "polling", interaction: result.interaction } : { status: "done", interaction: result.interaction });
       return;
     }
-    setState({ status: "error", message: result.publicMessage ?? "Assistant indisponible." });
+    setState({ status: "error", message: result.publicMessage ?? t("unavailable") });
   }
 
   const interaction = state.status === "done" ? state.interaction : undefined;
+  const busy = state.status === "submitting" || state.status === "polling";
+  const inputId = `am-visitor-ai-${mode}`;
 
   return (
-    <section className="pub-assistant" aria-label={config.title} data-visitor-ai={mode}>
-      <h3>{config.title}</h3>
-      <p className="pub-assistant__note">{interaction?.assistanceLabel ?? "Assistance IA d'aide a la comprehension"}: reponse indicative, sans conseil personnalise. Ne saisissez pas de donnees personnelles.</p>
-      {config.placeholder ? (
-        <label>
-          Votre question
-          <textarea value={text} onChange={(event) => setText(event.target.value)} maxLength={600} rows={3} placeholder={config.placeholder} />
-        </label>
-      ) : null}
-      <button type="button" onClick={submit} disabled={state.status === "submitting" || state.status === "polling" || (Boolean(config.placeholder) && text.trim().length < 5)}>
-        {state.status === "submitting" || state.status === "polling" ? "Assistance en cours..." : config.button}
-      </button>
-      {state.status === "error" ? <p role="alert">{state.message}</p> : null}
-      {interaction?.status === "completed" && interaction.outputText ? (
-        <div role="status">
-          <p>{interaction.outputText}</p>
-          {interaction.fallback ? <p>Reponse generee par l'assistant de secours (mode simplifie).</p> : null}
+    <div data-visitor-ai={mode}>
+      <AiBox generatedLabel={common("aiGenerated")} disclaimer={common("aiDisclaimer")} title={title} ariaLabel={title}>
+        <p className="am-field__hint">{t("note", { label: interaction?.assistanceLabel ?? t("defaultLabel") })}</p>
+        <p className="am-field__hint">{t("optional")}</p>
+        {config.hasInput ? (
+          <Field id={inputId} label={t("questionLabel")}>
+            <textarea
+              {...fieldControlProps(inputId, {})}
+              value={text}
+              onChange={(event) => setText(event.target.value)}
+              maxLength={600}
+              rows={3}
+              placeholder={placeholder}
+            />
+          </Field>
+        ) : null}
+        <div className="am-cluster">
+          <button
+            className="am-button"
+            data-variant="secondary"
+            type="button"
+            onClick={submit}
+            disabled={busy || (config.hasInput && text.trim().length < 5)}
+          >
+            <span>{busy ? t("pending") : buttonLabel}</span>
+          </button>
         </div>
-      ) : null}
-      {interaction?.status === "refused" ? <p role="alert">L'assistant IA n'a pas pu produire de reponse conforme pour cette demande. Un courtier partenaire pourra vous repondre apres votre demande de devis.</p> : null}
-      {interaction?.status === "failed" ? <p role="alert">Assistant indisponible pour le moment.</p> : null}
-    </section>
+        {state.status === "error" ? (
+          <Notice tone="error" role="alert">
+            {state.message}
+          </Notice>
+        ) : null}
+        {interaction?.status === "completed" && interaction.outputText ? (
+          <div role="status">
+            <p>
+              <BackendText>{interaction.outputText}</BackendText>
+            </p>
+            {interaction.fallback ? <p className="am-field__hint">{t("fallback")}</p> : null}
+          </div>
+        ) : null}
+        {interaction?.status === "refused" ? (
+          <Notice tone="info" role="alert">
+            {t("refused")}
+          </Notice>
+        ) : null}
+        {interaction?.status === "failed" ? (
+          <Notice tone="error" role="alert">
+            {t("failed")}
+          </Notice>
+        ) : null}
+      </AiBox>
+    </div>
   );
 }

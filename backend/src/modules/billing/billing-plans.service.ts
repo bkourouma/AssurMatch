@@ -1,6 +1,8 @@
 import type { BillingPlanPrice, BillingPlanPriceUpsert } from "../../../../packages/shared/contracts/billing.contracts";
 import { billingPlanPriceUpsertSchema } from "../../../../packages/shared/contracts/billing.contracts";
+import type { PublicPlanPrice, PublicPlansResponse } from "../../../../packages/shared/contracts/public-site.contracts";
 import { roleHasPermission } from "../../../../packages/shared/rbac/assurmatch-role-matrix";
+import { PUBLIC_SITE_AUDIT_ACTIONS } from "../audit-logs/public-site-audit-actions";
 import type { AuditLogWriter } from "../audit-logs/audit-log-writer.service";
 import type { ActorContext } from "../common/types";
 import type { CountriesService } from "../countries/countries.module";
@@ -8,6 +10,9 @@ import type { FeatureFlagsService } from "../feature-flags/feature-flags.module"
 import { BillingAuditActions } from "./billing-audit-actions";
 import { BillingAccessRefusedError, BillingDisabledError } from "./billing-foundation.service";
 import type { BillingPlanPriceRecord, BillingRepository } from "./billing.repository";
+
+/** starter, pro, enterprise: the fixed public display order (PUB-plans), independent of insertion order. */
+const PUBLIC_PLAN_ORDER: Record<string, number> = { starter: 0, pro: 1, enterprise: 2 };
 
 export interface BillingPlansDeps {
   audit: AuditLogWriter;
@@ -63,6 +68,43 @@ export class BillingPlansService {
       }
     });
     return this.toDto(saved);
+  }
+
+  /**
+   * Public pricing page: no access assertion (anonymous visitors read this), and deliberately
+   * does NOT gate on the global `billing_enabled` flag — that flag governs invoices and lead
+   * packs (money-adjacent internals), whereas this page only surfaces indicative public prices
+   * and never takes payment. Gating is on the country's own broker-onboarding flag instead.
+   */
+  async listPublicForCountry(countryCode: string, actor?: ActorContext): Promise<PublicPlansResponse> {
+    const country = await this.deps.countries.findByIsoCode(countryCode);
+    if (!country) throw new Error(`Country not found: ${countryCode}`);
+    if (country.flags.country_broker_onboarding_enabled !== true) {
+      throw new Error(`Broker onboarding is disabled for this country: ${countryCode}`);
+    }
+    const rows = (await this.deps.repository.listPlanPrices()).filter((price) => price.countryCode === countryCode);
+    const items: PublicPlanPrice[] = [...rows]
+      .sort((a, b) => (PUBLIC_PLAN_ORDER[a.plan] ?? 99) - (PUBLIC_PLAN_ORDER[b.plan] ?? 99))
+      .map((price) => ({
+        plan: price.plan,
+        monthlySubscription: Number(price.monthlySubscription),
+        perLeadPrice: Number(price.perLeadPrice),
+        setupFee: Number(price.setupFee),
+        currency: price.currency
+      }));
+    this.deps.audit.write({
+      actor,
+      action: PUBLIC_SITE_AUDIT_ACTIONS.publicPlansListed,
+      targetType: "BillingPlanPrice",
+      targetId: countryCode,
+      scope: { countryCode },
+      result: "success",
+      context: { count: items.length }
+    });
+    return {
+      items,
+      notice: "Ces tarifs sont indicatifs, hors taxes, variables selon le pays, et aucun paiement n'est pris en ligne sur ce site."
+    };
   }
 
   private toDto(record: BillingPlanPriceRecord): BillingPlanPrice {

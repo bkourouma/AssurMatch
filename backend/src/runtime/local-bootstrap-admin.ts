@@ -2,12 +2,13 @@ import { AuthAuditActions } from "../modules/audit-logs/auth-audit-actions";
 import type { AuditLogWriter } from "../modules/audit-logs/audit-log-writer.service";
 import type { AuthModule } from "../modules/auth/auth.module";
 import type { UsersService } from "../modules/users/users.module";
+import type { ProcessEnvLike } from "./process-env-like";
 
 export interface BootstrapAdminDependencies {
   users: UsersService;
   auth: AuthModule;
   audit: AuditLogWriter;
-  env?: NodeJS.ProcessEnv;
+  env?: ProcessEnvLike;
   logger?: Pick<Console, "info" | "error">;
 }
 

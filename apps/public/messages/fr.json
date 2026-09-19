@@ -1,0 +1,938 @@
+{
+  "Layout": {
+    "skipToContent": "Aller au contenu principal",
+    "navLabel": "Navigation principale",
+    "homeLink": "Accueil AssurMatch",
+    "nav": {
+      "howItWorks": "Comment ça marche",
+      "countries": "Pays",
+      "guides": "Guides",
+      "brokers": "Courtiers"
+    },
+    "cta": "Comparer les offres",
+    "menu": {
+      "open": "Menu",
+      "close": "Fermer le menu",
+      "label": "Menu mobile"
+    },
+    "languageSwitcher": {
+      "label": "Langue",
+      "fr": "Français",
+      "en": "English"
+    },
+    "countrySelector": {
+      "label": "Pays",
+      "submit": "Changer de pays",
+      "placeholder": "Choisir un pays",
+      "extendedLabel": "Choisir votre pays",
+      "availability": {
+        "open": "Ouvert",
+        "pilot": "Pilote",
+        "waitlist": "Bientôt"
+      }
+    },
+    "entrySelector": {
+      "label": "Trouver une offre indicative",
+      "country": "Pays",
+      "product": "Produit",
+      "submit": "Comparer les offres",
+      "hint": "Le formulaire fonctionne sans JavaScript."
+    },
+    "localContact": {
+      "title": "Un courtier partenaire près de chez vous",
+      "description": "Nos courtiers partenaires autorisés reprennent votre demande et confirment le devis et les conditions.",
+      "whatsapp": "Écrire sur WhatsApp",
+      "callback": "Être rappelé par un courtier partenaire"
+    },
+    "footer": {
+      "label": "Pied de page",
+      "tagline": "Plateforme technique de comparaison indicative.",
+      "columns": {
+        "countries": "Pays",
+        "products": "Produits",
+        "guides": "Guides",
+        "legal": "Légal",
+        "brokers": "Courtiers",
+        "contact": "Contact"
+      },
+      "legal": {
+        "legalNotice": "Mentions légales",
+        "privacy": "Confidentialité",
+        "cookies": "Cookies",
+        "terms": "Conditions générales d'utilisation",
+        "regulatoryStatus": "Statut réglementaire"
+      },
+      "brokers": {
+        "apply": "Devenir partenaire",
+        "pricing": "Tarifs",
+        "login": "Connexion"
+      },
+      "contactLinks": {
+        "contact": "Nous contacter",
+        "faq": "FAQ",
+        "glossary": "Lexique"
+      },
+      "regulatorySentence": "AssurMatch est une plateforme technique de comparaison indicative et de mise en relation avec des courtiers partenaires autorisés. Les offres affichées sont indicatives : chaque prix indicatif reste à confirmer par le courtier partenaire responsable. AssurMatch ne vend pas d'assurance, n'émet ni contrat ni attestation et n'encaisse aucune prime.",
+      "sponsoredSentence": "Les pays, produits et offres visibles dépendent des activations publiques. Une offre sponsorisée est toujours signalée."
+    }
+  },
+  "Common": {
+    "appName": "AssurMatch",
+    "home": "Accueil",
+    "back": "Retour",
+    "loading": "Chargement en cours.",
+    "notProvided": "non renseigné",
+    "yes": "oui",
+    "no": "non",
+    "seeDetail": "Voir le détail",
+    "compareOffers": "Comparer les offres",
+    "requestQuote": "Demander un devis",
+    "callbackRequest": "Être rappelé par un courtier partenaire",
+    "whatsapp": "WhatsApp",
+    "breadcrumbLabel": "Fil d'Ariane",
+    "approved": "Agréé",
+    "sponsored": "Sponsorisé",
+    "new": "Nouveau",
+    "pilot": "Pilote",
+    "soon": "Bientôt",
+    "platformStatus": "AssurMatch est une plateforme technique de comparaison indicative et de mise en relation avec des courtiers partenaires autorisés.",
+    "indicativeNotice": "Offre indicative, prix à confirmer par le courtier partenaire.",
+    "backendContentInFrench": "Certains contenus fournis par les courtiers partenaires et les assureurs restent affichés en français.",
+    "aiGenerated": "généré par IA",
+    "aiDisclaimer": "Assistance indicative d'aide à la compréhension, sans conseil personnalisé. Un courtier partenaire autorisé reste seul responsable du devis et des conditions.",
+    "scoreLabel": "Score indicatif : {score} sur 100",
+    "licenceNumber": "Numéro de licence :",
+    "issuingAuthority": "Autorité de délivrance :",
+    "city": "Ville :",
+    "products": "Produits",
+    "comparisonBar": {
+      "label": "Sélection à comparer",
+      "count": "{count, plural, one {# offre sélectionnée} other {# offres sélectionnées}}",
+      "action": "Comparer"
+    },
+    "progress": {
+      "label": "Progression de la demande",
+      "step": "Étape {current} sur {total}"
+    },
+    "emptyState": {
+      "title": "Rien à afficher pour le moment",
+      "description": "Modifiez vos critères ou revenez plus tard."
+    }
+  },
+  "Metadata": {
+    "siteName": "AssurMatch",
+    "defaultTitle": "AssurMatch, comparaison indicative d'assurance",
+    "defaultDescription": "Plateforme technique de comparaison indicative d'offres d'assurance et de mise en relation avec des courtiers partenaires autorisés."
+  },
+  "NotFound": {
+    "title": "Page introuvable",
+    "description": "Cette page n'existe pas ou n'est plus publiée. Vous pouvez repartir des pays ouverts ou comparer des offres indicatives.",
+    "cta": "Comparer les offres",
+    "countriesTitle": "Pays ouverts",
+    "backHome": "Retour à l'accueil"
+  },
+  "Error": {
+    "title": "Une erreur est survenue",
+    "description": "Le service public est momentanément indisponible. Réessayez dans quelques instants.",
+    "retry": "Réessayer"
+  },
+  "Home": {
+    "breadcrumb": "Accueil",
+    "kicker": "Comparaison indicative",
+    "title": "Comparez les offres d'assurance de votre pays",
+    "lead": "AssurMatch est une plateforme technique de comparaison indicative et de mise en relation avec des courtiers partenaires autorisés. Le courtier partenaire responsable confirme le devis et les conditions.",
+    "metaDescription": "Comparez des offres d'assurance indicatives pays par pays et faites reprendre votre demande par un courtier partenaire autorisé.",
+    "compare": "Comparer les offres",
+    "entryTitle": "Choisissez votre pays et votre produit",
+    "preselected": "Pays pré-sélectionné : {country}. Vous pouvez en changer à tout moment, rien n'est redirigé automatiquement.",
+    "preselectedNone": "Aucun pays n'est pré-sélectionné pour l'instant. Choisissez le vôtre dans la liste, vous pourrez en changer à tout moment.",
+    "entryUnavailable": "Le sélecteur de pays et de produit est momentanément indisponible. Vous pouvez parcourir la liste des pays.",
+    "stats": {
+      "title": "AssurMatch aujourd'hui",
+      "lead": "Chiffres issus des activations publiques de la plateforme.",
+      "countries": "Pays ouverts",
+      "partners": "Courtiers partenaires actifs",
+      "offers": "Offres validées",
+      "updatedAt": "Chiffres arrêtés au {date}.",
+      "indicative": "Ces chiffres sont indicatifs et décrivent l'état des activations publiques, pas une donnée auditée."
+    },
+    "statusTitle": "Notre rôle",
+    "statusLead": "Ce qu'AssurMatch fait, et ce qu'AssurMatch ne fait pas.",
+    "statusDetail": "AssurMatch ne vend pas d'assurance, n'émet ni contrat ni attestation, n'encaisse aucune prime et ne donne aucun conseil personnalisé engageant. Le courtier partenaire autorisé pour votre pays et votre produit reste seul responsable du devis et des conditions.",
+    "stepsTitle": "Comment ça marche",
+    "stepsLead": "Trois étapes, sans engagement, et une transmission uniquement après votre consentement explicite.",
+    "steps": {
+      "compare": {
+        "title": "Comparez",
+        "description": "Vous comparez des offres indicatives par pays et par produit, avec leurs garanties, leur prix indicatif et un score expliqué."
+      },
+      "quote": {
+        "title": "Demandez",
+        "description": "Vous remplissez une demande de devis et vous donnez votre consentement explicite avant toute transmission."
+      },
+      "broker": {
+        "title": "Souscrivez auprès du courtier",
+        "description": "Un courtier partenaire autorisé pour ce pays et ce produit reprend votre demande, confirme le devis et les conditions, puis vous accompagne."
+      }
+    },
+    "stepsLink": "Voir le parcours en détail",
+    "signature": "Le bon courtier, pour un meilleur avenir",
+    "regulatoryTitle": "Statut réglementaire",
+    "regulatoryLead": "AssurMatch est rémunérée par les courtiers partenaires, jamais par le visiteur.",
+    "regulatoryLink": "Consulter notre statut réglementaire",
+    "fineprint": "Les prix affichés sont indicatifs et restent à confirmer par le courtier partenaire. Une offre sponsorisée est toujours signalée."
+  },
+  "Countries": {
+    "breadcrumb": "Pays",
+    "title": "Pays couverts par AssurMatch",
+    "description": "Pays ouverts, pays pilotes et pays bientôt disponibles, avec leur niveau d'ouverture publique.",
+    "lead": "Les pays et produits visibles dépendent des activations publiques. Choisissez votre pays pour voir les produits comparables et les courtiers partenaires autorisés.",
+    "count": "{count, plural, one {# pays référencé} other {# pays référencés}}",
+    "open": {
+      "title": "Pays ouverts",
+      "lead": "La comparaison indicative et la demande de devis sont disponibles."
+    },
+    "pilot": {
+      "title": "Pays pilotes",
+      "lead": "Ouverture progressive avec un nombre limité de courtiers partenaires."
+    },
+    "waitlist": {
+      "title": "Bientôt disponibles",
+      "lead": "Ces pays ne sont pas encore ouverts. Vous pouvez demander à être informé de leur ouverture."
+    },
+    "availability": {
+      "open": "Ouvert",
+      "pilot": "Pilote",
+      "waitlist": "Bientôt"
+    },
+    "view": "Voir ce pays",
+    "join": "Être informé de l'ouverture",
+    "error": {
+      "title": "Liste des pays indisponible",
+      "description": "Le service public est temporairement indisponible. Réessayez dans quelques minutes."
+    },
+    "empty": {
+      "title": "Aucun pays public actif",
+      "description": "Aucun pays n'est publiquement activé pour le moment."
+    },
+    "fineprint": "Une ouverture de pays dépend de la présence de courtiers partenaires autorisés et d'offres validées."
+  },
+  "Country": {
+    "title": "Assurance en {country}",
+    "description": "Produits comparables, courtiers partenaires autorisés et demande de devis pour {country}.",
+    "lead": "Les produits visibles dépendent des activations publiques par pays et par produit. Le prix indicatif reste à confirmer par le courtier partenaire.",
+    "pilotNotice": "Ce pays est en phase pilote : le nombre de courtiers partenaires et d'offres comparables y est encore limité.",
+    "productsTitle": "Produits comparables",
+    "productsLead": "Chaque produit donne accès aux offres indicatives et, lorsque l'activation le permet, à une demande de devis.",
+    "comparisonEnabled": "Comparaison activée",
+    "comparisonDisabled": "Comparaison non activée",
+    "quoteEnabled": "Devis activé",
+    "quoteDisabled": "Devis non activé",
+    "viewProduct": "Voir la fiche produit",
+    "compare": "Comparer les offres",
+    "quote": "Demander un devis",
+    "comparisonHint": "La comparaison publique n'est pas activée pour ce produit dans ce pays.",
+    "quoteHint": "La demande de devis n'est pas disponible pour ce produit dans ce pays.",
+    "productsError": {
+      "title": "Produits indisponibles",
+      "description": "Le catalogue public est temporairement indisponible pour ce pays."
+    },
+    "productsEmpty": {
+      "title": "Aucun produit public actif",
+      "description": "Aucune demande de devis ne peut être transmise tant qu'un produit n'est pas activé publiquement pour ce pays."
+    },
+    "brokersTitle": "Courtiers partenaires",
+    "brokersLead": "Chaque courtier partenaire est identifié par son numéro de licence et son autorité de délivrance.",
+    "brokersAll": "Voir tous les courtiers partenaires",
+    "brokersEmpty": {
+      "title": "Aucun courtier partenaire publié",
+      "description": "Aucun courtier partenaire n'est publiquement référencé pour ce pays pour le moment."
+    },
+    "contactTitle": "Contact local",
+    "contactLead": "Un courtier partenaire autorisé pour ce pays peut reprendre votre demande.",
+    "whatsapp": "Écrire sur WhatsApp",
+    "call": "Appeler {phone}",
+    "fineprint": "Offre indicative, prix indicatif à confirmer par le courtier partenaire. Aucune offre expirée ou non validée n'est affichée comme disponible."
+  },
+  "Waitlist": {
+    "title": "Liste d'attente — {country}",
+    "description": "Soyez informé de l'ouverture publique de ce pays.",
+    "badge": "Bientôt",
+    "heading": "{country} : AssurMatch n'est pas encore ouvert",
+    "lead": "Aucune offre indicative n'est comparable et aucune demande de devis ne peut être transmise pour ce pays tant qu'il n'est pas ouvert.",
+    "explanation": "Un pays n'ouvre qu'une fois des courtiers partenaires autorisés référencés et des offres validées disponibles. Laissez-nous votre adresse e-mail : vous serez informé de l'ouverture publique de {country}.",
+    "noQuote": "Aucun parcours de devis n'est proposé depuis cette page.",
+    "openCountriesTitle": "Pays déjà ouverts",
+    "openCountriesLead": "Vous pouvez comparer des offres indicatives dans ces pays.",
+    "form": {
+      "legend": "Être informé de l'ouverture",
+      "email": "Adresse e-mail",
+      "emailHint": "Utilisée uniquement pour vous prévenir de l'ouverture de ce pays.",
+      "product": "Produit souhaité",
+      "productHint": "Facultatif.",
+      "productNone": "Sans préférence",
+      "consent": "J'accepte d'être informé par e-mail de l'ouverture publique de ce pays.",
+      "consentRequired": "Votre accord est nécessaire avant tout enregistrement.",
+      "emailRequired": "Indiquez une adresse e-mail valide.",
+      "website": "Ne remplissez pas ce champ",
+      "submit": "Être informé de l'ouverture",
+      "submitting": "Enregistrement en cours.",
+      "successTitle": "Inscription enregistrée",
+      "successDescription": "Vous serez informé par e-mail de l'ouverture publique de ce pays. Aucune demande de devis n'a été transmise.",
+      "error": "Inscription impossible pour le moment."
+    }
+  },
+  "Product": {
+    "back": "Retour aux produits {countryCode}",
+    "title": "{product} en {country}",
+    "titleFallback": "Produit {productKey} en {country}",
+    "description": "Garanties, documents à préparer et offres indicatives pour {product} en {country}.",
+    "lead": "Comparez des offres indicatives puis faites reprendre votre demande par un courtier partenaire autorisé.",
+    "summaryTitle": "Ce que couvre ce produit",
+    "guaranteesTitle": "Garanties principales",
+    "exclusionsTitle": "Exclusions principales",
+    "documentsTitle": "Documents à préparer",
+    "documentsLead": "Ces documents sont ceux demandés par les offres publiées pour ce produit.",
+    "documentsFallbackLead": "Liste indicative des pièces généralement demandées pour ce produit.",
+    "documentsUnknown": "Le courtier partenaire responsable de votre demande vous précisera les documents à fournir.",
+    "faqTitle": "Questions fréquentes",
+    "actionsLabel": "Parcours de comparaison",
+    "compare": "Comparer les offres",
+    "quote": "Demander un devis",
+    "contactTitle": "Parler à un courtier partenaire",
+    "whatsapp": "Écrire sur WhatsApp",
+    "call": "Appeler {phone}",
+    "unavailable": {
+      "title": "Fiche produit indisponible",
+      "description": "Le détail de ce produit est temporairement indisponible. Les offres indicatives restent consultables."
+    },
+    "fineprint": "Les offres expirées ou non validées ne sont pas affichées comme disponibles. Le prix indicatif reste à confirmer par le courtier partenaire."
+  },
+  "Offers": {
+    "back": "Retour au produit {productKey}",
+    "breadcrumb": "Offres indicatives",
+    "title": "Comparer les offres",
+    "description": "Offres indicatives comparables pour {productKey} en {countryCode}, avec score expliqué.",
+    "lead": "Chaque offre est indicative : le prix indicatif et les conditions restent à confirmer par le courtier partenaire responsable.",
+    "filtersLabel": "Filtres",
+    "filtersLegend": "Filtres",
+    "minPrice": "Prix indicatif minimum",
+    "maxPrice": "Prix indicatif maximum",
+    "minGuaranteeLevel": "Niveau de garantie minimum",
+    "allMasculine": "Tous",
+    "allFeminine": "Toutes",
+    "guaranteeLevelOption": "{level}/5",
+    "maxDeductible": "Franchise maximale",
+    "maxProcessingDays": "Délai de traitement maximum (jours)",
+    "insurer": "Assureur",
+    "guarantee": "Garantie incluse (clé)",
+    "paymentFlexibility": "Flexibilité de paiement",
+    "broker": "Courtier partenaire",
+    "sortLegend": "Tri et priorité",
+    "sortLabel": "Trier par",
+    "sort": {
+      "updated_desc": "Dernière mise à jour",
+      "price_asc": "Prix indicatif croissant",
+      "price_desc": "Prix indicatif décroissant",
+      "coverage_desc": "Niveau de garantie",
+      "speed_asc": "Rapidité de traitement",
+      "score_desc": "Score indicatif",
+      "popularity_desc": "Popularité (demandes de devis)",
+      "name_asc": "Nom",
+      "sponsored_explicit": "Sponsorisées d'abord (mention visible)"
+    },
+    "priorityLabel": "Ce qui compte le plus pour vous",
+    "priority": {
+      "none": "Aucune priorité",
+      "price": "Le prix",
+      "guarantees": "Le niveau de garantie",
+      "speed": "La rapidité de traitement",
+      "deductible": "La franchise",
+      "flexibility": "La flexibilité de paiement"
+    },
+    "apply": "Appliquer les filtres",
+    "reset": "Réinitialiser",
+    "filtersHint": "Les filtres portent uniquement sur les offres indicatives affichées.",
+    "compareFormLabel": "Comparer côte à côte",
+    "compareHint": "Cochez 2 à 4 offres puis comparez-les côte à côte.",
+    "compareSubmit": "Comparer la sélection",
+    "compareBarLabel": "Sélection à comparer",
+    "compareBarCount": "{count, plural, one {# offre sélectionnée} other {# offres sélectionnées}}",
+    "listLabel": "Offres indicatives",
+    "resultsCount": "{count, plural, one {# offre indicative affichée} other {# offres indicatives affichées}}",
+    "error": {
+      "title": "Offres indisponibles",
+      "description": "Le catalogue public est temporairement indisponible pour ce produit."
+    },
+    "empty": {
+      "title": "Aucune offre indicative pour ces critères",
+      "description": "Modifiez vos filtres ou élargissez votre recherche. Une offre sponsorisée est affichée uniquement avec sa mention."
+    },
+    "fineprint": "Le score est indicatif, calculé selon vos critères par rapport aux offres affichées. Une offre sponsorisée est toujours signalée. Aucune offre expirée ou non validée n'est affichée."
+  },
+  "Compare": {
+    "breadcrumb": "Comparaison",
+    "title": "Comparer les offres côte à côte",
+    "description": "Comparaison indicative de 2 à 4 offres du même pays et du même produit.",
+    "lead": "Les critères sont alignés ligne par ligne. Le prix indicatif reste à confirmer par le courtier partenaire responsable.",
+    "selectionError": {
+      "title": "Sélection incomplète",
+      "description": "Sélectionnez entre 2 et 4 offres indicatives du même pays et du même produit pour les comparer."
+    },
+    "unavailable": {
+      "title": "Comparaison indisponible",
+      "description": "La comparaison de ces offres n'est pas disponible pour le moment."
+    },
+    "tableLabel": "Comparaison des offres",
+    "criterion": "Critère",
+    "scoresTitle": "Scores indicatifs",
+    "scoresLabel": "Scores indicatifs",
+    "journeyLabel": "Parcours public",
+    "backToCountries": "Comparer les offres"
+  },
+  "OfferDetail": {
+    "breadcrumb": "Offre indicative",
+    "title": "Détail de l'offre indicative",
+    "description": "Garanties, limites, validité et courtier partenaire responsable d'une offre indicative.",
+    "unavailable": {
+      "title": "Offre indisponible",
+      "description": "Cette offre n'est pas disponible publiquement (expirée, non validée ou courtier partenaire non éligible)."
+    },
+    "criteriaTitle": "Critères comparés",
+    "exclusionsTitle": "Exclusions principales",
+    "documentsTitle": "Documents requis",
+    "disclaimersTitle": "Mentions de l'offre",
+    "validity": "Validité jusqu'au {date}.",
+    "source": "Source : {source}.",
+    "fineprint": "Validité, garanties principales, limites et responsabilité du courtier partenaire. La sponsorisation est indiquée lorsqu'elle existe.",
+    "actionsLabel": "Actions",
+    "compare": "Comparer les offres",
+    "quote": "Demander un devis",
+    "backToCountries": "Comparer les offres"
+  },
+  "QuoteForm": {
+    "breadcrumb": "Demande de devis",
+    "title": "Demander un devis",
+    "description": "Demande de devis indicative transmise à un courtier partenaire autorisé après consentement explicite.",
+    "lead": "Votre demande n'est transmise qu'après votre consentement explicite, à un courtier partenaire autorisé pour ce pays et ce produit.",
+    "progressLabel": "Progression de la demande",
+    "steps": {
+      "contact": "Vos coordonnées",
+      "need": "Votre besoin",
+      "consent": "Votre consentement",
+      "confirmation": "Confirmation"
+    },
+    "stepStatus": "Étape {current} sur {total}",
+    "preselected": "Offre indicative présélectionnée : le courtier partenaire responsable confirmera le devis et les conditions.",
+    "contactLegend": "Vos coordonnées",
+    "name": "Nom",
+    "nameHint": "Facultatif.",
+    "email": "Adresse e-mail",
+    "emailHint": "Utilisée par le courtier partenaire pour vous répondre.",
+    "phone": "Téléphone",
+    "phoneHint": "Indicatif pays compris.",
+    "needLegend": "Votre besoin",
+    "choose": "Choisir",
+    "consentLegend": "Consentement",
+    "consentLabel": "J'accepte que ma demande soit transmise à un courtier partenaire éligible pour ce pays et ce produit.",
+    "multiBrokerLabel": "Facultatif : j'accepte d'être rappelé par plusieurs courtiers partenaires éligibles (jusqu'à 3). Sans cette case, votre demande n'est transmise qu'à un seul courtier.",
+    "consentRequired": "Le consentement est obligatoire avant toute transmission.",
+    "assistanceTitle": "Assistance facultative",
+    "assistanceLead": "Ces aides sont facultatives : elles n'ajoutent rien à votre demande et ne bloquent jamais l'envoi.",
+    "submitting": "Envoi en cours.",
+    "submit": "Demander un devis",
+    "successTitle": "Demande reçue",
+    "successPrefix": "Demande reçue. Référence publique :",
+    "trackLink": "Suivre ma demande et ajouter des documents (optionnel)",
+    "blocked": {
+      "title": "Demande de devis indisponible",
+      "description": "La demande de devis n'est pas disponible pour ce pays ou ce produit."
+    },
+    "fineprint": "AssurMatch ne vend pas d'assurance et n'émet ni contrat ni attestation. Le courtier partenaire responsable confirme le devis et les conditions."
+  },
+  "QuoteRequest": {
+    "breadcrumb": "Suivi de la demande",
+    "kicker": "Demande de devis",
+    "title": "Demande reçue {reference}",
+    "description": "Confirmation et suivi d'une demande de devis indicative.",
+    "intro": "Votre demande sera traitée par un courtier partenaire identifié lorsque le routage est possible.",
+    "fineprint": "Si aucun courtier partenaire éligible n'est disponible, aucune promesse de rappel n'est faite.",
+    "documentsTitle": "Documents optionnels",
+    "documentsLabel": "Documents optionnels",
+    "noDocuments": "Aucun document ajouté.",
+    "uploadDisabled": "L'ajout de documents n'est pas disponible pour ce produit.",
+    "unavailable": "Le suivi de cette demande n'est pas disponible avec ce lien.",
+    "noToken": "Le lien de suivi transmis à la fin de votre demande permet d'ajouter des documents optionnels.",
+    "documentLine": "{label} ({fileName}, {size} Ko) : {status}",
+    "sharedWithBroker": " - transmis au courtier partenaire",
+    "scan": {
+      "pending": "vérification en cours",
+      "clean": "vérifié",
+      "infected": "refusé (fichier non sain, mis en quarantaine)",
+      "failed": "vérification à relancer"
+    },
+    "withdrawal": {
+      "title": "Retirer mon consentement",
+      "lead": "Vous pouvez retirer à tout moment le consentement donné lors de votre demande.",
+      "explanation": "Retirer votre consentement annule votre demande de devis : le courtier partenaire est informé qu'il ne doit plus vous contacter au sujet de cette demande, et vos réponses ne lui sont plus transmises. Cette action est définitive pour cette demande ; vous pourrez toujours en déposer une nouvelle.",
+      "confirmToggle": "Retirer mon consentement",
+      "confirmQuestion": "Confirmez-vous le retrait de votre consentement pour la demande {reference} ?",
+      "confirm": "Confirmer le retrait",
+      "cancel": "Annuler",
+      "submitting": "Retrait en cours.",
+      "successTitle": "Consentement retiré",
+      "successDescription": "Votre demande de devis est annulée et le courtier partenaire a été informé. Il ne doit plus vous contacter au sujet de cette demande.",
+      "error": "Le retrait de consentement n'a pas pu être enregistré avec ce lien.",
+      "noToken": "Le retrait de consentement nécessite le lien de suivi reçu à la fin de votre demande."
+    },
+    "journeyLabel": "Parcours public",
+    "backToCountries": "Retour aux pays"
+  },
+  "VisitorAi": {
+    "defaultLabel": "Assistance IA d'aide à la compréhension",
+    "note": "{label} : réponse indicative, sans conseil personnalisé. Ne saisissez pas de données personnelles.",
+    "questionLabel": "Votre question",
+    "pending": "Assistance en cours...",
+    "timeout": "L'assistant IA met trop de temps à répondre. Réessayez plus tard.",
+    "unavailable": "Assistant indisponible.",
+    "refused": "L'assistant IA n'a pas pu produire de réponse conforme pour cette demande. Un courtier partenaire pourra vous répondre après votre demande de devis.",
+    "failed": "Assistant indisponible pour le moment.",
+    "fallback": "Réponse générée par l'assistant de secours (mode simplifié).",
+    "optional": "Facultatif : cette assistance ne conditionne jamais l'envoi de votre demande.",
+    "modes": {
+      "product": {
+        "title": "Assistant IA d'aide à la compréhension : quel type d'assurance ?",
+        "placeholder": "Décrivez votre besoin (ex : protéger ma voiture utilisée au quotidien)",
+        "button": "Demander une orientation indicative"
+      },
+      "faq": {
+        "title": "Question générale sur l'assurance",
+        "placeholder": "Posez une question générale (sans données personnelles)",
+        "button": "Poser ma question"
+      },
+      "summary": {
+        "title": "Résumé IA de mon besoin avant envoi",
+        "button": "Résumer mon besoin"
+      },
+      "consistency": {
+        "title": "Vérification IA de cohérence",
+        "button": "Vérifier mes réponses"
+      }
+    }
+  },
+  "DocumentUpload": {
+    "formLabel": "Ajouter un document",
+    "hint": "Documents optionnels : ils sont vérifiés puis transmis uniquement au courtier partenaire responsable de votre demande. Ils n'accélèrent ni ne garantissent aucune décision.",
+    "kindLabel": "Type de document",
+    "kinds": {
+      "identity": "Pièce d'identité",
+      "vehicle_registration": "Carte grise / immatriculation",
+      "driving_license": "Permis de conduire",
+      "proof_of_address": "Justificatif de domicile",
+      "medical_form": "Formulaire médical",
+      "existing_policy": "Contrat ou attestation existante",
+      "other": "Autre document"
+    },
+    "labelLabel": "Libellé",
+    "labelPlaceholder": "Ex. carte grise",
+    "fileLabel": "Fichier (PDF, JPEG ou PNG, 5 Mo maximum)",
+    "fileHint": "Formats acceptés : PDF, JPEG, PNG. 5 Mo maximum.",
+    "selectFile": "Sélectionnez un fichier PDF, JPEG ou PNG (5 Mo maximum).",
+    "submitting": "Envoi en cours.",
+    "submit": "Ajouter le document",
+    "remaining": "Emplacements restants : {count}",
+    "full": "Nombre maximum de documents atteint pour cette demande."
+  },
+  "OfferCards": {
+    "notProvided": "non renseigné",
+    "sponsored": "Sponsorisé",
+    "sponsoredWithLabel": "Sponsorisé ({label})",
+    "sponsoredTitle": "Placement payant du courtier partenaire, signalé et sans effet sur le score indicatif.",
+    "scoreSummary": "Score indicatif : {total}/100",
+    "scoreAria": "Score indicatif : {total} sur 100",
+    "selectLabel": "Sélectionner cette offre pour la comparaison",
+    "criterionLabels": {
+      "guaranteeLevel": "Niveau de garantie",
+      "price": "Prix",
+      "deductible": "Franchise",
+      "processingSpeed": "Rapidité de traitement",
+      "paymentFlexibility": "Flexibilité de paiement",
+      "informationQuality": "Qualité des informations",
+      "userPreferences": "Vos préférences"
+    },
+    "table": {
+      "criterion": "Critère",
+      "weight": "Poids",
+      "points": "Points",
+      "explanation": "Explication"
+    },
+    "criteria": {
+      "price": "Prix indicatif",
+      "partner": "Courtier partenaire responsable",
+      "insurer": "Assureur porteur du risque",
+      "guaranteeLevel": "Niveau de garantie",
+      "deductible": "Franchise",
+      "ceiling": "Plafond de garantie",
+      "processing": "Délai moyen de traitement",
+      "payment": "Flexibilité de paiement",
+      "guarantees": "Garanties",
+      "updatedAt": "Dernière mise à jour"
+    },
+    "fromAmount": "à partir de {amount}",
+    "priceToConfirm": "prix à confirmer",
+    "priceNotice": "prix indicatif, à confirmer par le courtier partenaire",
+    "defaultPartner": "courtier partenaire",
+    "guaranteeLevelValue": "{level}/5",
+    "processingDays": "{days} jour(s)",
+    "included": "Incluse",
+    "notIncluded": "Non incluse",
+    "payment": {
+      "annual": "annuel",
+      "semiannual": "semestriel",
+      "quarterly": "trimestriel",
+      "monthly": "mensuel"
+    },
+    "actionsLabel": "Actions {name}",
+    "detail": "Voir le détail",
+    "quote": "Demander un devis"
+  },
+  "Journey": {
+    "technicalRole": "AssurMatch est une plateforme technique de comparaison indicative et de mise en relation avec des courtiers partenaires autorisés.",
+    "indicative": "Offre indicative, prix indicatif, à confirmer par le courtier partenaire.",
+    "title": "Poursuivre votre parcours",
+    "label": "Parcours public",
+    "compare": "Comparer les offres",
+    "quote": "Demander un devis",
+    "callback": "Être rappelé par un courtier partenaire",
+    "fineprint": "Votre demande n'est transmise qu'après votre consentement explicite, à un courtier partenaire autorisé pour ce pays et ce produit."
+  },
+  "Api": {
+    "serviceUnavailable": "Service public temporairement indisponible.",
+    "apiUnavailable": "API publique temporairement indisponible.",
+    "notFound": "Contenu indisponible pour le moment.",
+    "rateLimited": "Trop de demandes. Réessayez plus tard.",
+    "quoteRejected": "La demande de devis ne peut pas être envoyée avec ces informations.",
+    "confirmationFailed": "La confirmation n'a pas pu être générée.",
+    "quoteTransmitted": "Demande transmise selon votre consentement.",
+    "aiRateLimited": "Trop de demandes d'assistance. Réessayez plus tard.",
+    "aiDisabled": "L'assistant IA n'est pas disponible pour ce pays ou ce produit.",
+    "aiUnavailable": "L'assistant IA est temporairement indisponible.",
+    "documentRateLimited": "Trop d'envois. Réessayez plus tard.",
+    "documentDisabled": "L'ajout de documents n'est pas disponible pour ce produit.",
+    "documentTooLarge": "Fichier trop volumineux (5 Mo maximum).",
+    "documentRejected": "Document refusé : format PDF, JPEG ou PNG, 5 Mo maximum, 5 documents par demande.",
+    "documentReceived": "Document reçu. Il sera vérifié puis transmis au courtier partenaire responsable de votre demande.",
+    "uploadFailed": "Envoi impossible.",
+    "waitlistJoined": "Votre inscription est enregistrée. Vous serez informé de l'ouverture publique de ce pays.",
+    "waitlistFailed": "Inscription impossible pour le moment.",
+    "contactSent": "Message reçu. Notre équipe vous répondra.",
+    "contactFailed": "Envoi du message impossible pour le moment.",
+    "applicationSent": "Candidature reçue. Elle sera étudiée par notre équipe conformité.",
+    "applicationFailed": "Envoi de la candidature impossible pour le moment.",
+    "consentWithdrawn": "Votre retrait de consentement est enregistré.",
+    "consentWithdrawalFailed": "Le retrait de consentement n'a pas pu être enregistré avec ce lien."
+  },
+  "Forms": {
+    "required": "obligatoire",
+    "optional": "facultatif",
+    "requiredMark": "Champ obligatoire",
+    "errorPrefix": "Erreur :",
+    "selectPlaceholder": "Choisir",
+    "submit": "Envoyer",
+    "sending": "Envoi en cours.",
+    "success": "Envoyé.",
+    "fieldRequired": "Ce champ est obligatoire.",
+    "invalidEmail": "Adresse email invalide.",
+    "invalidPhone": "Numéro de téléphone invalide."
+  },
+  "HowItWorks": {
+    "title": "Comment ça marche",
+    "description": "Comparer, demander un devis, être recontacté par un courtier partenaire autorisé.",
+    "breadcrumb": "Comment ça marche",
+    "lead": "Trois étapes simples, sans aucun engagement avant la confirmation du courtier partenaire responsable.",
+    "stepsHeading": "Les trois étapes",
+    "linksHeading": "Pour aller plus loin",
+    "seeRegulatoryStatus": "Voir le statut réglementaire",
+    "compareCountries": "Voir les pays disponibles"
+  },
+  "RegulatoryStatus": {
+    "title": "Statut réglementaire",
+    "description": "Le rôle technique d'AssurMatch et la responsabilité des courtiers partenaires autorisés.",
+    "breadcrumb": "Statut réglementaire",
+    "lead": "Comment AssurMatch est rémunéré, comment les offres sont classées, et ce que signifie un prix indicatif."
+  },
+  "Legal": {
+    "title": "Informations légales",
+    "description": "Mentions légales, confidentialité, cookies et conditions générales d'utilisation.",
+    "lastUpdated": "Dernière mise à jour : {date}",
+    "placeholdersTitle": "À compléter avant mise en ligne",
+    "placeholderNotice": "information à compléter avant mise en ligne",
+    "countryNoticeWithOverride": "Vous consultez la version de cette page applicable en {country}.",
+    "countryNoticeFallback": "Aucune particularité locale n'est encore enregistrée pour {country} : le texte général ci-dessous s'applique.",
+    "backToGlobal": "Voir la version générale"
+  },
+  "Guides": {
+    "title": "Guides",
+    "description": "Guides pratiques pour comprendre l'assurance, sans conseil personnalisé.",
+    "breadcrumb": "Guides",
+    "lead": "Des explications simples pour comparer sereinement, sans conseil personnalisé engageant.",
+    "updated": "Mis à jour le {date}",
+    "backToGuides": "Retour aux guides",
+    "relatedProduct": "Produit concerné"
+  },
+  "Glossary": {
+    "title": "Lexique",
+    "description": "Les termes d'assurance expliqués simplement.",
+    "breadcrumb": "Lexique",
+    "lead": "Le vocabulaire de l'assurance, en langage simple.",
+    "seeAlso": "Voir aussi"
+  },
+  "Faq": {
+    "title": "FAQ",
+    "description": "Les questions fréquentes sur AssurMatch et la comparaison indicative.",
+    "breadcrumb": "FAQ",
+    "lead": "Les réponses aux questions les plus fréquentes sur AssurMatch.",
+    "relatedProduct": "Produit concerné"
+  },
+  "Contact": {
+    "title": "Contact",
+    "description": "Contacter l'équipe AssurMatch.",
+    "breadcrumb": "Contact",
+    "lead": "Une question sur une offre, un partenariat courtier ou assureur, ou la presse : écrivez-nous.",
+    "audienceLegend": "Vous êtes",
+    "audienceVisitor": "Visiteur",
+    "audienceVisitorHint": "Une question sur une offre, un devis ou une demande en cours.",
+    "audienceBroker": "Courtier",
+    "audienceBrokerHint": "Une question sur le réseau de courtiers partenaires AssurMatch.",
+    "audienceInsurer": "Assureur",
+    "audienceInsurerHint": "Une question sur le référencement de vos offres.",
+    "audiencePress": "Presse",
+    "audiencePressHint": "Une demande d'information pour un article ou un reportage.",
+    "nameLabel": "Nom",
+    "emailLabel": "E-mail",
+    "phoneLabel": "Téléphone",
+    "countryLabel": "Pays concerné",
+    "subjectLabel": "Sujet",
+    "messageLabel": "Message",
+    "honeypotLabel": "Site web (ne pas remplir)",
+    "consentLabel": "J'accepte qu'AssurMatch utilise ces informations pour répondre à mon message.",
+    "consentRequired": "Le consentement est nécessaire pour envoyer ce message.",
+    "consentHintPrefix": "Ces informations sont utilisées uniquement pour répondre à votre message. Voir notre",
+    "privacyLinkLabel": "politique de confidentialité",
+    "submit": "Envoyer le message",
+    "sending": "Envoi en cours.",
+    "successTitle": "Message envoyé",
+    "successBody": "Notre équipe vous répondra dès que possible.",
+    "successReference": "Repère de suivi de cet échange : {reference}",
+    "newMessage": "Envoyer un autre message"
+  },
+  "Brokers": {
+    "title": "Courtiers partenaires",
+    "description": "Rejoindre le réseau de courtiers partenaires autorisés d'AssurMatch.",
+    "breadcrumb": "Courtiers partenaires",
+    "hero": {
+      "lead": "AssurMatch transmet des demandes de devis qualifiées aux courtiers partenaires autorisés. Comparez les formules, déposez une candidature ou accédez à votre espace courtier.",
+      "applyCta": "Devenir partenaire",
+      "loginCta": "Accéder à l'espace courtier"
+    },
+    "plans": {
+      "title": "Les formules courtier",
+      "lead": "Trois formules, du démarrage simple à l'intégration technique avancée.",
+      "cornerLabel": "Formule",
+      "positioning": "Positionnement",
+      "audience": "Public visé",
+      "features": "Fonctionnalités",
+      "includesPrefix": "Tout {plan}, plus :"
+    },
+    "lead": {
+      "title": "Ce que reçoit un courtier",
+      "lead": "Voici, à titre illustratif, la fiche d'une demande transmise à un courtier partenaire assigné.",
+      "badgeLabel": "Exemple illustratif",
+      "fields": {
+        "reference": "Référence",
+        "country": "Pays",
+        "product": "Produit",
+        "city": "Ville",
+        "budget": "Budget déclaré",
+        "channel": "Canal de rappel demandé",
+        "consent": "Consentement"
+      },
+      "values": {
+        "reference": "DQ-2026-A1B2C3D4",
+        "country": "Côte d'Ivoire",
+        "product": "Assurance auto",
+        "city": "Abidjan",
+        "budget": "50 000 à 100 000 XOF",
+        "channel": "Rappel WhatsApp",
+        "consent": "Enregistré"
+      }
+    },
+    "portal": {
+      "title": "Le portail courtier",
+      "lead": "Un espace dédié pour accepter un lead, suivre son dossier et, selon la formule, piloter un pipeline commercial.",
+      "caption": "Illustration du portail courtier partenaire (aucune capture d'écran réelle disponible)."
+    },
+    "expectations": {
+      "title": "Ce qu'AssurMatch attend d'un partenaire"
+    },
+    "closing": {
+      "title": "Prêt à rejoindre le réseau ?",
+      "lead": "Déposez une candidature ou accédez directement à votre espace courtier si vous êtes déjà partenaire."
+    }
+  },
+  "BrokerPricing": {
+    "title": "Tarifs courtiers",
+    "description": "Les formules d'abonnement pour les courtiers partenaires.",
+    "breadcrumb": "Tarifs courtiers",
+    "lead": "Tarification à destination des courtiers partenaires : abonnement mensuel et facturation au lead qualifié, propres à chaque pays.",
+    "countrySelector": {
+      "label": "Pays",
+      "submit": "Afficher les tarifs"
+    },
+    "pricing": {
+      "monthlySubscription": "Abonnement mensuel",
+      "perLead": "Prix par lead qualifié",
+      "setupFee": "Frais de mise en place",
+      "onRequest": "Sur devis"
+    },
+    "notice": "Tarifs indicatifs, hors taxes et propres à chaque pays. Aucun paiement en ligne n'est proposé sur ce site.",
+    "empty": {
+      "title": "Tarifs non publiés pour ce pays",
+      "description": "Les tarifs de ce pays ne sont pas encore publiés. Contactez notre équipe pour en savoir plus.",
+      "action": "Contacter AssurMatch"
+    },
+    "criteria": {
+      "title": "Ce qui rend un lead facturable",
+      "lead": "Un lead n'est facturé que si les sept critères suivants sont réunis."
+    }
+  },
+  "BrokerApply": {
+    "title": "Devenir partenaire",
+    "description": "Déposer une candidature de courtier partenaire.",
+    "breadcrumb": "Devenir partenaire",
+    "lead": "Cette candidature est un dossier d'intention étudié par notre équipe conformité. Elle n'active aucun compte courtier.",
+    "form": {
+      "licenceLegend": "Identité et agrément",
+      "legalName": "Raison sociale",
+      "tradeName": "Nom commercial",
+      "tradeNameHint": "Facultatif, si différent de la raison sociale.",
+      "country": "Pays",
+      "countryPlaceholder": "Choisir un pays",
+      "licenseNumber": "Numéro d'agrément",
+      "licenseExpiresAt": "Date d'expiration de l'agrément",
+      "licenseExpiresAtHint": "La date doit être postérieure à aujourd'hui.",
+      "licenseIssuingAuthority": "Autorité émettrice",
+      "licenseIssuingAuthorityHint": "Facultatif : l'organisme qui a délivré l'agrément.",
+      "productsLegend": "Produits souhaités",
+      "productsHint": "Sélectionnez au moins un produit pour le pays choisi.",
+      "productsNone": "Aucun produit disponible pour ce pays pour le moment.",
+      "monthlyCapacity": "Capacité mensuelle de traitement des leads",
+      "monthlyCapacityHint": "Nombre de demandes que vous pouvez traiter par mois.",
+      "contactLegend": "Contact",
+      "contactName": "Nom du contact",
+      "contactEmail": "E-mail du contact",
+      "contactPhone": "Téléphone du contact",
+      "contactPhoneHint": "Format international, par exemple +225XXXXXXXXX.",
+      "whatsapp": "WhatsApp",
+      "whatsappHint": "Facultatif, format international.",
+      "planLegend": "Formule souhaitée",
+      "message": "Message",
+      "messageHint": "Facultatif : toute précision utile à l'étude du dossier.",
+      "consent": "J'accepte que ces informations soient transmises à l'équipe conformité d'AssurMatch pour l'étude de ma candidature.",
+      "website": "Laisser ce champ vide",
+      "submit": "Envoyer la candidature",
+      "submitting": "Envoi en cours.",
+      "errors": {
+        "required": "Ce champ est obligatoire.",
+        "licenseExpiresAtFuture": "La date d'expiration doit être postérieure à aujourd'hui.",
+        "invalidEmail": "Adresse e-mail invalide.",
+        "invalidPhone": "Numéro de téléphone invalide. Utilisez le format international, par exemple +225XXXXXXXXX.",
+        "productsRequired": "Sélectionnez au moins un produit.",
+        "consentRequired": "Le consentement est obligatoire pour envoyer la candidature.",
+        "generic": "Le formulaire contient des erreurs. Corrigez les champs signalés."
+      },
+      "success": {
+        "title": "Candidature reçue",
+        "referencePrefix": "Référence de votre candidature :",
+        "nextStepsTitle": "Prochaines étapes :",
+        "fallbackNextSteps": [
+          "Notre équipe conformité étudie votre dossier.",
+          "Une copie de votre licence vous sera demandée par e-mail.",
+          "Aucun compte partenaire n'est créé tant que votre dossier n'a pas été validé."
+        ]
+      }
+    },
+    "noCountries": {
+      "title": "Candidature momentanément indisponible",
+      "description": "Aucun pays n'accepte de nouvelle candidature de courtier pour le moment."
+    }
+  },
+  "BrokerLogin": {
+    "title": "Connexion courtier",
+    "description": "Accéder à votre espace courtier partenaire.",
+    "breadcrumb": "Connexion courtier",
+    "lead": "L'espace courtier est une application distincte, réservée aux courtiers partenaires authentifiés.",
+    "mfa": {
+      "title": "Authentification à deux facteurs obligatoire",
+      "body": "La connexion à l'espace courtier exige une authentification multifacteur (MFA), en plus de votre identifiant et de votre mot de passe."
+    },
+    "lostAccess": {
+      "title": "Accès perdu ?",
+      "body": "Si vous ne parvenez plus à vous connecter à votre espace courtier, contactez notre équipe.",
+      "cta": "Contacter AssurMatch"
+    },
+    "loginCta": "Se connecter à l'espace courtier"
+  },
+  "Directory": {
+    "title": "Annuaire",
+    "description": "Courtiers partenaires et assureurs référencés par pays.",
+    "brokers": {
+      "title": "Courtiers partenaires {countryCode}",
+      "description": "Courtiers partenaires agréés pour {countryCode} : numéro de licence, autorité de délivrance et produits couverts.",
+      "breadcrumb": "Courtiers partenaires",
+      "heading": "Courtiers partenaires pour {countryCode}",
+      "intro": "Un courtier partenaire détient une licence valide pour ce pays, est responsable de la confirmation du devis et des conditions, et est l'entité à laquelle votre demande est transmise.",
+      "listLabel": "Courtiers partenaires",
+      "viewBroker": "Voir la fiche du courtier",
+      "emptyAction": "Retour au pays {countryCode}",
+      "empty": {
+        "title": "Aucun courtier partenaire publié",
+        "description": "Aucun courtier partenaire n'est publiquement référencé pour ce pays pour le moment."
+      },
+      "error": {
+        "title": "Annuaire des courtiers indisponible",
+        "description": "Le service public est temporairement indisponible. Réessayez dans quelques minutes."
+      }
+    },
+    "broker": {
+      "title": "{displayName} — courtier partenaire {countryCode}",
+      "description": "Fiche du courtier partenaire {displayName} pour {countryCode} : licence, autorité de délivrance et produits couverts.",
+      "back": "Retour aux courtiers de {countryCode}",
+      "productsTitle": "Produits couverts",
+      "viewProduct": "Voir la fiche produit",
+      "licenseExpiresAt": "Licence valable jusqu'au",
+      "disclaimerTitle": "À savoir",
+      "fineprint": "Offre indicative, prix indicatif à confirmer par le courtier partenaire."
+    },
+    "insurers": {
+      "title": "Assureurs référencés {countryCode}",
+      "description": "Assureurs dont les offres indicatives sont visibles pour {countryCode}, avec les produits concernés.",
+      "breadcrumb": "Assureurs référencés",
+      "heading": "Assureurs référencés pour {countryCode}",
+      "intro": "L'assureur porte le risque tandis que le courtier partenaire gère la relation avec vous ; les offres affichées ici restent indicatives.",
+      "listLabel": "Assureurs référencés",
+      "offersCount": "{count, plural, one {# offre publique visible} other {# offres publiques visibles}}",
+      "productsLabel": "Produits concernés",
+      "viewOffers": "Voir les offres",
+      "emptyAction": "Retour au pays {countryCode}",
+      "empty": {
+        "title": "Aucun assureur publié",
+        "description": "Aucun assureur n'est publiquement référencé pour ce pays pour le moment."
+      },
+      "error": {
+        "title": "Annuaire des assureurs indisponible",
+        "description": "Le service public est temporairement indisponible. Réessayez dans quelques minutes."
+      }
+    }
+  }
+}

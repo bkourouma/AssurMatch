@@ -1,7 +1,9 @@
 import type { OfferCompareQuery, OfferCompareResponse, OfferCompareRow, OfferDetail, OfferListQuery, OfferPreference, OfferScore, OfferSummary } from "../../../../packages/shared/contracts/quote.contracts";
 import { offerCompareQuerySchema, offerListQuerySchema } from "../../../../packages/shared/contracts/quote.contracts";
+import type { PublicInsurerSummary } from "../../../../packages/shared/contracts/public-site.contracts";
 import { DEFAULT_SCORING_WEIGHTS, type ScoringWeights } from "../../../../packages/shared/contracts/scoring-rule.contracts";
 import { AuditLogWriter } from "../audit-logs/audit-log-writer.service";
+import { PUBLIC_SITE_AUDIT_ACTIONS } from "../audit-logs/public-site-audit-actions";
 import { QuoteAuditActions } from "../audit-logs/quote-audit-actions";
 import type { ActorContext } from "../common/types";
 import { OfferPublicationPolicy } from "./offer-publication-policy";
@@ -73,6 +75,48 @@ export class PublicOfferCatalogService {
       context: { count: sorted.length, sort: parsed.sort, filters: this.filterSummary(parsed) }
     });
     return sorted.map((entry) => this.toSummary(entry));
+  }
+
+  /**
+   * Distinct insurers carrying at least one publicly visible offer in this country, across every
+   * product. Reuses `contextForList`/`visibilityDecision` (memoised per product) so the notion of
+   * "publicly visible" never drifts from `list()`.
+   */
+  async listInsurers(countryId: string, context?: PublicOfferVisibilityContext): Promise<PublicInsurerSummary[]> {
+    const grouped = new Map<string, { offerCount: number; productKeys: Set<string> }>();
+    const contextByProduct = new Map<string, Promise<PublicOfferVisibilityContext | undefined>>();
+    for (const offer of await this.repository.list()) {
+      if (offer.countryId !== countryId) continue;
+      const insurerName = offer.insurerName?.trim();
+      if (!insurerName) continue;
+      let listContextPromise = contextByProduct.get(offer.productId);
+      if (!listContextPromise) {
+        listContextPromise = this.contextForList(countryId, offer.productId, context);
+        contextByProduct.set(offer.productId, listContextPromise);
+      }
+      const decision = await this.visibilityDecision(offer, await listContextPromise);
+      if (!decision.public) continue;
+      const entry = grouped.get(insurerName) ?? { offerCount: 0, productKeys: new Set<string>() };
+      entry.offerCount += 1;
+      entry.productKeys.add(offer.productId);
+      grouped.set(insurerName, entry);
+    }
+    const items: PublicInsurerSummary[] = [...grouped.entries()]
+      .map(([insurerName, { offerCount, productKeys }]) => ({
+        insurerName,
+        offerCount,
+        productKeys: [...productKeys].sort()
+      }))
+      .sort((a, b) => b.offerCount - a.offerCount || a.insurerName.localeCompare(b.insurerName));
+    this.audit.write({
+      action: PUBLIC_SITE_AUDIT_ACTIONS.publicInsurersListed,
+      targetType: "Offer",
+      targetId: countryId,
+      scope: { countryId },
+      result: "success",
+      context: { count: items.length }
+    });
+    return items;
   }
 
   async detail(offerId: string, actor?: ActorContext, context?: PublicOfferVisibilityContext): Promise<OfferDetail> {

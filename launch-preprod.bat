@@ -57,7 +57,7 @@ echo.
 
 start "AssurMatch Preprod API 3700" cmd /k "cd /d "%ROOT%" && set "PATH=%PATH%" && node --import tsx "%API_RUNNER%""
 
-start "AssurMatch Preprod Public 3701" cmd /k "cd /d "%ROOT%apps\public" && set "PATH=%PATH%" && set "NEXT_PUBLIC_ASSURMATCH_API_URL=http://127.0.0.1:3700" && npx next dev --hostname 127.0.0.1 --port 3701"
+start "AssurMatch Preprod Public 3701" cmd /k "cd /d "%ROOT%apps\public" && set "PATH=%PATH%" && set "NEXT_PUBLIC_ASSURMATCH_API_URL=http://127.0.0.1:3700" && set "NEXT_PUBLIC_ASSURMATCH_PUBLIC_URL=http://127.0.0.1:3701" && set "NEXT_PUBLIC_ASSURMATCH_BROKER_URL=http://127.0.0.1:3703" && npx next dev --hostname 127.0.0.1 --port 3701"
 
 start "AssurMatch Preprod Admin 3702" cmd /k "cd /d "%ROOT%apps\admin" && set "PATH=%PATH%" && set "NEXT_PUBLIC_ASSURMATCH_API_URL=http://127.0.0.1:3700" && npx next dev --hostname 127.0.0.1 --port 3702"
 

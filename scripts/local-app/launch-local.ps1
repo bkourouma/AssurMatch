@@ -120,7 +120,7 @@ try {
   Assert-NativeSuccess "Prisma local seed"
 
   Start-LocalProcess "api-3600" $Root $CommonEnv 'set "PORT=3600" && node --import tsx scripts/local-app/api-runner.mjs'
-  Start-LocalProcess "public-3601" (Join-Path $Root "apps\public") ($CommonEnv + @('set "NEXT_PUBLIC_ASSURMATCH_API_URL=http://127.0.0.1:3600"')) 'npx next dev --hostname 127.0.0.1 --port 3601'
+  Start-LocalProcess "public-3601" (Join-Path $Root "apps\public") ($CommonEnv + @('set "NEXT_PUBLIC_ASSURMATCH_API_URL=http://127.0.0.1:3600"', 'set "NEXT_PUBLIC_ASSURMATCH_PUBLIC_URL=http://127.0.0.1:3601"', 'set "NEXT_PUBLIC_ASSURMATCH_BROKER_URL=http://127.0.0.1:3603"')) 'npx next dev --hostname 127.0.0.1 --port 3601'
   Start-LocalProcess "admin-3602" (Join-Path $Root "apps\admin") ($CommonEnv + @('set "NEXT_PUBLIC_ASSURMATCH_API_URL=http://127.0.0.1:3600"', 'set "NEXT_PUBLIC_ASSURMATCH_ADMIN_API_URL=http://127.0.0.1:3600"')) 'npx next dev --hostname 127.0.0.1 --port 3602'
   Start-LocalProcess "broker-3603" (Join-Path $Root "apps\broker") ($CommonEnv + @('set "NEXT_PUBLIC_ASSURMATCH_API_URL=http://127.0.0.1:3600"', 'set "NEXT_PUBLIC_ASSURMATCH_BROKER_API_URL=http://127.0.0.1:3600"')) 'npx next dev --hostname 127.0.0.1 --port 3603'
 

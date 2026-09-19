@@ -1,9 +1,15 @@
 "use client";
 
+import { useTranslations } from "next-intl";
 import { FormEvent, useState } from "react";
+import { Link } from "../../i18n/navigation";
 import { submitPublicQuoteRequest, type PublicQuoteFormField, type PublicQuoteFormState } from "../lib/public-api";
 import { IndicativeOfferNotice } from "./public-journey";
 import { VisitorAiAssistant } from "./visitor-ai-assistant";
+import { BackendText } from "./ui/backend-text";
+import { EmptyState } from "./ui/empty-state";
+import { Field, fieldControlProps } from "./ui/field";
+import { Notice } from "./ui/notice";
 
 /**
  * Spec 043: answers used to be submitted as an empty object, so a published definition's fields were
@@ -25,37 +31,58 @@ function collectAnswers(formData: FormData, fields: PublicQuoteFormField[]): Rec
   return answers;
 }
 
-function QuoteFormFieldInput({ field }: { field: PublicQuoteFormField }) {
+function QuoteFormFieldInput({ field, chooseLabel, requiredLabel }: { field: PublicQuoteFormField; chooseLabel: string; requiredLabel: string }) {
   const name = `answer_${field.key}`;
+  const id = `am-answer-${field.key}`;
+
+  if (field.type === "checkbox") {
+    // Never pre-ticked: a declarative answer is given, never withdrawn.
+    return (
+      <label htmlFor={id}>
+        <input id={id} name={name} type="checkbox" required={field.required} />
+        <BackendText>{field.label}</BackendText>
+      </label>
+    );
+  }
+
   if (field.type === "select") {
     return (
-      <label>
-        {field.label}
-        <select name={name} required={field.required} defaultValue="">
-          <option value="" disabled={field.required}>Choisir</option>
-          {(field.options ?? []).map((option) => <option key={option} value={option}>{option}</option>)}
+      <Field id={id} label={field.label} required={field.required} requiredLabel={requiredLabel}>
+        <select {...fieldControlProps(id, { required: field.required })} name={name} defaultValue="">
+          <option value="" disabled={field.required}>
+            {chooseLabel}
+          </option>
+          {(field.options ?? []).map((option) => (
+            <option key={option} value={option}>
+              {option}
+            </option>
+          ))}
         </select>
-      </label>
+      </Field>
     );
   }
-  if (field.type === "checkbox") {
-    return (
-      <label>
-        <input name={name} type="checkbox" required={field.required} />
-        {field.label}
-      </label>
-    );
-  }
-  const inputType = field.type === "phone" ? "tel" : field.type === "number" ? "number" : field.type === "date" ? "date" : field.type === "email" ? "email" : "text";
+
+  const inputType =
+    field.type === "phone"
+      ? "tel"
+      : field.type === "number"
+        ? "number"
+        : field.type === "date"
+          ? "date"
+          : field.type === "email"
+            ? "email"
+            : "text";
+
   return (
-    <label>
-      {field.label}
-      <input name={name} type={inputType} required={field.required} />
-    </label>
+    <Field id={id} label={field.label} required={field.required} requiredLabel={requiredLabel}>
+      <input {...fieldControlProps(id, { required: field.required })} name={name} type={inputType} />
+    </Field>
   );
 }
 
 export function QuoteFormShell({ countryCode, productKey, quoteForm, selectedOfferId }: { countryCode: string; productKey: string; quoteForm: PublicQuoteFormState; selectedOfferId?: string | undefined }) {
+  const t = useTranslations("QuoteForm");
+  const forms = useTranslations("Forms");
   const [result, setResult] = useState<{ status: "idle" | "submitting" | "success" | "error"; message?: string; publicReference?: string; verificationToken?: string }>({ status: "idle" });
 
   async function submit(event: FormEvent<HTMLFormElement>) {
@@ -65,10 +92,10 @@ export function QuoteFormShell({ countryCode, productKey, quoteForm, selectedOff
     const formData = new FormData(form);
     const consent = formData.get("consent") === "on";
     if (!consent) {
-      setResult({ status: "error", message: "Le consentement est obligatoire avant toute transmission." });
+      setResult({ status: "error", message: t("consentRequired") });
       return;
     }
-    setResult({ status: "submitting", message: "Envoi en cours." });
+    setResult({ status: "submitting", message: t("submitting") });
     const response = await submitPublicQuoteRequest({
       countryCode,
       productKey,
@@ -99,73 +126,111 @@ export function QuoteFormShell({ countryCode, productKey, quoteForm, selectedOff
 
   return (
     <form className="pub-card pub-form" onSubmit={submit}>
-      {selectedOfferId ? <p className="pub-notice pub-notice--indicative">Offre indicative preselectionnee: le courtier partenaire responsable confirmera le devis et les conditions.</p> : null}
+      {selectedOfferId ? <Notice tone="indicative">{t("preselected")}</Notice> : null}
 
       <fieldset>
-        <legend>Vos coordonnees</legend>
+        <legend>{t("contactLegend")}</legend>
         <div className="pub-form__grid pub-form__grid--two">
-          <label>
-            Nom
-            <input name="displayName" autoComplete="name" />
-          </label>
-          <label>
-            Email
-            <input name="email" type="email" autoComplete="email" required />
-          </label>
-          <label>
-            Telephone
-            <input name="phone" type="tel" autoComplete="tel" required />
-          </label>
+          <Field id="am-quote-name" label={t("name")} hint={t("nameHint")}>
+            <input
+              {...fieldControlProps("am-quote-name", { hint: t("nameHint") })}
+              name="displayName"
+              autoComplete="name"
+            />
+          </Field>
+          <Field id="am-quote-email" label={t("email")} hint={t("emailHint")} required requiredLabel={forms("required")}>
+            <input
+              {...fieldControlProps("am-quote-email", { hint: t("emailHint"), required: true })}
+              name="email"
+              type="email"
+              autoComplete="email"
+            />
+          </Field>
+          <Field id="am-quote-phone" label={t("phone")} hint={t("phoneHint")} required requiredLabel={forms("required")}>
+            <input
+              {...fieldControlProps("am-quote-phone", { hint: t("phoneHint"), required: true })}
+              name="phone"
+              type="tel"
+              autoComplete="tel"
+            />
+          </Field>
         </div>
       </fieldset>
 
       {quoteForm.fields.length > 0 ? (
         <fieldset>
-          <legend>Votre besoin</legend>
+          <legend>{t("needLegend")}</legend>
           <div className="pub-form__grid pub-form__grid--two">
-            {quoteForm.fields.map((field) => <QuoteFormFieldInput key={field.key} field={field} />)}
+            {quoteForm.fields.map((field) => (
+              <QuoteFormFieldInput key={field.key} field={field} chooseLabel={t("choose")} requiredLabel={forms("required")} />
+            ))}
           </div>
         </fieldset>
       ) : null}
 
       <fieldset>
-        <legend>Consentement</legend>
-        <label>
-          <input name="consent" type="checkbox" required />
-          J'accepte que ma demande soit transmise a un courtier partenaire eligible pour ce pays et ce produit.
+        <legend>{t("consentLegend")}</legend>
+        {/* Consent boxes are never pre-ticked: consent is given, never withdrawn. */}
+        <label htmlFor="am-quote-consent">
+          <input id="am-quote-consent" name="consent" type="checkbox" required />
+          {t("consentLabel")}
         </label>
-        <label>
-          <input name="multiBroker" type="checkbox" />
-          Facultatif: j'accepte d'etre rappele par plusieurs courtiers partenaires eligibles (jusqu'a 3). Sans cette case, votre demande n'est transmise qu'a un seul courtier.
+        <label htmlFor="am-quote-multi-broker">
+          <input id="am-quote-multi-broker" name="multiBroker" type="checkbox" />
+          {t("multiBrokerLabel")}
         </label>
       </fieldset>
 
       <IndicativeOfferNotice />
 
-      <VisitorAiAssistant countryCode={countryCode} productKey={productKey} mode="summary" answers={{}} />
-      <VisitorAiAssistant countryCode={countryCode} productKey={productKey} mode="consistency" answers={{}} />
+      <section className="am-stack">
+        <h2 className="pub-card__title">{t("assistanceTitle")}</h2>
+        <p className="am-field__hint">{t("assistanceLead")}</p>
+        <VisitorAiAssistant countryCode={countryCode} productKey={productKey} mode="summary" answers={{}} />
+        <VisitorAiAssistant countryCode={countryCode} productKey={productKey} mode="consistency" answers={{}} />
+      </section>
 
       {result.status === "success" ? (
-        <p role="status">
-          Demande recue. Reference publique: <strong>{result.publicReference}</strong>
+        <Notice tone="success" title={t("successTitle")} role="status">
+          {t("successPrefix")} <strong>{result.publicReference}</strong>
           {result.verificationToken ? (
             <>
               {" "}
-              <a href={`/quote-requests/${encodeURIComponent(result.publicReference ?? "")}?token=${encodeURIComponent(result.verificationToken)}`}>Suivre ma demande et ajouter des documents (optionnel)</a>
+              <Link
+                href={{
+                  pathname: "/quote-requests/[publicReference]",
+                  params: { publicReference: result.publicReference ?? "" },
+                  query: { token: result.verificationToken }
+                }}
+              >
+                {t("trackLink")}
+              </Link>
             </>
           ) : null}
-        </p>
+        </Notice>
       ) : null}
-      {result.status === "error" ? <p role="alert">{result.message}</p> : null}
-      {result.status === "submitting" ? <p role="status">{result.message}</p> : null}
+      {result.status === "error" ? (
+        <Notice tone="error" role="alert">
+          {result.message}
+        </Notice>
+      ) : null}
+      {result.status === "submitting" ? (
+        <Notice tone="info" role="status">
+          {result.message}
+        </Notice>
+      ) : null}
 
-      <div className="pub-form__actions">
-        <button className="pub-button--primary" type="submit" disabled={result.status === "submitting"}>Demander un devis</button>
+      <div className="am-cluster">
+        <button className="am-button" data-variant="primary" type="submit" disabled={result.status === "submitting"}>
+          <span>{t("submit")}</span>
+        </button>
+        <p className="am-field__hint">{t("fineprint")}</p>
       </div>
     </form>
   );
 }
 
 export function QuoteBlockedState() {
-  return <p role="alert">La demande de devis n'est pas disponible pour ce pays ou ce produit.</p>;
+  const t = useTranslations("QuoteForm");
+  return <EmptyState title={t("blocked.title")} description={t("blocked.description")} />;
 }

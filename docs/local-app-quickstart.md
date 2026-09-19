@@ -114,6 +114,55 @@ npm run local:seed:broker-demo:crm-off
 The seed refuses production/preproduction, uses fake data only, keeps regulated
 modules disabled and does not change the Prisma schema.
 
+## Bilingual Public Site (spec 045)
+
+The public visitor app moved every page under `app/[locale]/` and became
+bilingual: French is the default locale and is served unprefixed, English is
+served under `/en`. The route words themselves are localised (not just the
+prefix), for example:
+
+| Page | French (default, unprefixed) | English |
+| --- | --- | --- |
+| Countries directory | `/pays` | `/en/countries` |
+| Country page | `/pays/CI` | `/en/countries/CI` |
+| Product page | `/pays/CI/produits/auto` | `/en/countries/CI/products/auto` |
+| Offers list | `/pays/CI/produits/auto/offres` | `/en/countries/CI/products/auto/offers` |
+| Quote request | `/pays/CI/produits/auto/devis` | `/en/countries/CI/products/auto/quote` |
+| Compare | `/comparer` | `/en/compare` |
+| Offer detail | `/offres/:offerId` | `/en/offers/:offerId` |
+| Quote tracking | `/demandes-de-devis/:publicReference` | `/en/quote-requests/:publicReference` |
+| How it works | `/comment-ca-marche` | `/en/how-it-works` |
+| Regulatory status | `/statut-reglementaire` | `/en/regulatory-status` |
+| Legal notice / privacy / terms | `/mentions-legales`, `/confidentialite`, `/cgu` | `/en/legal-notice`, `/en/privacy`, `/en/terms` |
+| Cookies | `/cookies` (same word both locales) | `/en/cookies` |
+| Brokers | `/courtiers`, `/courtiers/tarifs`, `/courtiers/candidature`, `/courtiers/connexion` | `/en/brokers`, `/en/brokers/pricing`, `/en/brokers/apply`, `/en/brokers/login` |
+| Contact, guides, FAQ | `/contact`, `/guides`, `/faq` (same words both locales) | `/en/contact`, `/en/guides`, `/en/faq` |
+| Glossary | `/lexique` | `/en/glossary` |
+
+The full map is `apps/public/i18n/routing.ts`; every legacy (pre-045) URL
+redirects permanently to its French equivalent via `apps/public/next.config.ts`.
+
+New pages added in this release: the countries directory and its per-country
+waiting-list variant, the country's brokers and insurers directories and broker
+detail page, "how it works", "regulatory status", the four legal pages and
+their per-country overrides, guides index/detail, FAQ, glossary, contact, and
+the broker acquisition pages (landing, pricing, application, login).
+
+New public endpoints consumed by the site (`apps/public/app/lib/public-api.ts`):
+`GET /countries/directory`, `GET /public-stats`, `GET /countries/:code/partners`,
+`GET /countries/:code/partners/:id`, `GET /countries/:code/insurers`,
+`GET /partners/plans`, `POST /waitlist`, `POST /contact`,
+`POST /partners/applications`, and
+`POST /quote-requests/:publicReference/consent-withdrawal` (consent
+withdrawal).
+
+The demo seed (`scripts/local-app/seed-broker-demo.ts`) now depends on
+migration `0017_public_site_forms` (consent withdrawal, contact messages,
+waitlist subscriptions and partner applications): run migrations before
+seeding, which `launch-local.bat` already does, but a manual
+`npm run local:seed:broker-demo` against an older database must apply
+`backend/prisma/migrations/0017_public_site_forms` first.
+
 ## Data Safety
 
 The launcher runs Prisma migrations and the existing seed. Seeded records are

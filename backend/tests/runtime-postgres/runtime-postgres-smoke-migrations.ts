@@ -1,6 +1,7 @@
 import { execFileSync } from "node:child_process";
 import { createConnection } from "node:net";
 import { sanitizedDatabaseTarget } from "./runtime-postgres-smoke-env";
+import type { ProcessEnvLike } from "../../src/runtime/process-env-like";
 
 export async function validateAndApplyRuntimeSmokeMigrations(databaseUrl: string): Promise<void> {
   const env = { ...process.env, DATABASE_URL: databaseUrl };
@@ -10,12 +11,13 @@ export async function validateAndApplyRuntimeSmokeMigrations(databaseUrl: string
   runPrisma(["generate", "--schema", "backend/prisma/schema.prisma"], env, "Prisma client generation");
 }
 
-function runPrisma(args: string[], env: NodeJS.ProcessEnv, label: string): void {
+function runPrisma(args: string[], env: ProcessEnvLike, label: string): void {
   try {
     const command = `npx prisma ${args.join(" ")}`;
     execFileSync(process.platform === "win32" ? process.env.ComSpec ?? "cmd.exe" : "sh", process.platform === "win32" ? ["/d", "/s", "/c", command] : ["-c", command], {
       cwd: process.cwd(),
-      env,
+      // The child process takes the real environment shape; ProcessEnvLike is the mutable view we build.
+      env: env as NodeJS.ProcessEnv,
       stdio: "inherit"
     });
   } catch (error) {

@@ -68,14 +68,14 @@ await check("public app loads", async () => {
 });
 
 await check("quote form loads", async () => {
-  const { response, text } = await fetchText(`${DEFAULTS.publicUrl}/countries/CI/products/auto/quote`);
+  const { response, text } = await fetchText(`${DEFAULTS.publicUrl}/pays/CI/produits/auto/devis`);
   assertStatus("quote form", response, [200]);
   assertIncludes("quote form", text, "Demander un devis");
   // The heading is present on the unavailable page too, so asserting it alone let a dead journey
   // pass as healthy (spec 043). A rendered field is what proves the form is actually usable.
-  if (text.includes("La demande de devis n'est pas disponible")) {
-    throw new Error("quote form rendered its unavailable state: no published form definition for CI/auto");
-  }
+  // Matching the "not available" sentence no longer works: since the site became bilingual that
+  // copy ships in every page's embedded translation payload whether or not it is displayed, so
+  // its presence says nothing. The consent control only exists when the form really rendered.
   assertIncludes("quote form", text, "name=\"multiBroker\"");
 });
 

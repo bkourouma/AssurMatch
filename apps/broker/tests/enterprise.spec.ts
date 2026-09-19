@@ -26,7 +26,8 @@ test("broker enterprise page is plan-gated and covers agencies, roles, SLA and b
 test("branding stays in the broker back-office and keeps the platform mention", () => {
   const page = source("apps/broker/app/enterprise/page.tsx");
   const publicApi = source("apps/public/app/lib/public-api.ts");
-  const publicHome = source("apps/public/app/page.tsx");
+  // The public home page moved under the locale segment when the visitor site became bilingual.
+  const publicHome = source("apps/public/app/[locale]/page.tsx");
 
   expect(page).toContain("Le comparateur public reste presente par AssurMatch, plateforme technique");
   expect(page).toContain("platformMention");

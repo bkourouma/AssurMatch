@@ -153,3 +153,79 @@ export async function seedPublicRuntime(runtime: AssurMatchRuntime) {
   await runtime.offers.adminService.validate(offer.id, { validationStatus: "validated", reason: "runtime validate" }, admin);
   return { admin, country, product, partner, consentText, form, offer };
 }
+
+/**
+ * Spec 045: a country that is NOT open to the public but collects e-mail addresses. That pair of
+ * flags (`country_waitlist_enabled` on, `country_public_enabled` off) is exactly what
+ * `PublicJourneyFlagPolicy` reads as `waitlistOnly`, which is the only state `POST /waitlist` accepts.
+ */
+export async function seedWaitlistCountry(runtime: AssurMatchRuntime) {
+  const admin: ActorContext = { actorId: "admin-runtime", roles: ["super_admin"], mfaVerified: true };
+  const country = await runtime.countries.service.create({
+    isoCode: "SN",
+    name: "Senegal",
+    currency: "XOF",
+    languages: ["fr"],
+    timezone: "Africa/Dakar",
+    regulatoryFamily: "cima",
+    regulatoryRegimeId: "00000000-0000-4000-8000-000000000011"
+  }, admin);
+  await runtime.countries.service.update(country.id, {
+    status: "internal",
+    flags: {
+      country_public_enabled: false,
+      country_waitlist_enabled: true,
+      country_comparison_enabled: false,
+      country_quote_enabled: false
+    },
+    reason: "runtime waitlist seed"
+  }, admin);
+  return { admin, country };
+}
+
+/**
+ * Spec 045: opens broker onboarding on an already-seeded country and gives it the three public plan
+ * prices. `BillingPlansService.upsert` is gated on `billing_enabled` (it is an admin write), so the
+ * flag is flipped on for the seed and back off afterwards - the public plans read deliberately does
+ * not consult it, so leaving it off keeps the rest of the harness in its fail-closed default.
+ */
+export async function seedBrokerOnboarding(runtime: AssurMatchRuntime, isoCode = "CI") {
+  const admin: ActorContext = { actorId: "admin-runtime", roles: ["super_admin"], mfaVerified: true };
+  const country = await runtime.countries.service.findByIsoCode(isoCode);
+  if (!country) throw new Error(`seedBrokerOnboarding requires country ${isoCode} to be seeded first`);
+  // `countryUpdateSchema` keeps zod defaults on `status` and `flags`, so an update that omits them
+  // silently resets the country to draft with the default (all-false) flag set: both are restated.
+  await runtime.countries.service.update(country.id, {
+    status: country.status,
+    flags: { ...country.flags, country_broker_onboarding_enabled: true },
+    reason: "runtime broker onboarding seed"
+  }, admin);
+  // `billing_enabled` is a sensitive flag: `setFlag` refuses it outright, and the compliance-policy
+  // path is the one the module documents for seeds, ops scripts and tests.
+  await runtime.featureFlags.service.applyCompliancePolicy({
+    key: "billing_enabled",
+    scopeType: "global",
+    value: true,
+    reason: "runtime plan price seed"
+  }, admin, { reference: "TEST-SEED-045", approvedBy: "runtime-test-harness" });
+  const prices = [
+    { plan: "starter" as const, monthlySubscription: 25_000, perLeadPrice: 1_500, setupFee: 50_000 },
+    { plan: "pro" as const, monthlySubscription: 75_000, perLeadPrice: 1_200, setupFee: 100_000 },
+    { plan: "enterprise" as const, monthlySubscription: 250_000, perLeadPrice: 900, setupFee: 250_000 }
+  ];
+  for (const price of prices) {
+    await runtime.billing.plans.upsert({
+      ...price,
+      countryCode: isoCode,
+      sharedLeadPriceMultiplier: 0.5,
+      reason: "runtime public plan price seed"
+    }, admin);
+  }
+  await runtime.featureFlags.service.applyCompliancePolicy({
+    key: "billing_enabled",
+    scopeType: "global",
+    value: false,
+    reason: "runtime plan price seed completed"
+  }, admin, { reference: "TEST-SEED-045", approvedBy: "runtime-test-harness" });
+  return { admin, country, prices };
+}

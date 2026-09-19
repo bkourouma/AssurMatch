@@ -5,6 +5,7 @@ export const partnerCreateSchema = z.object({
   id: uuidSchema.optional(),
   legalName: nonEmptyStringSchema,
   tradeName: z.string().optional(),
+  city: z.string().trim().max(120).optional(),
   registrationNumber: z.string().optional(),
   plan: z.enum(["starter", "pro", "enterprise"]).default("starter"),
   status: z.enum(["draft", "pending_compliance", "active", "suspended", "retired"]).default("draft"),

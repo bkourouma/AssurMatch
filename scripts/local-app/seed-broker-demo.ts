@@ -178,6 +178,7 @@ async function main(): Promise<void> {
     await seedPartnerCoverage(prisma, partners, countries.ci, [products.auto, products.voyage]);
     const users = await seedBrokerUsers(prisma, partners, passwordHash);
     const adminUsers = await seedAdminUsers(prisma, passwordHash);
+    await seedBillingPlanPrices(prisma, countries.ci);
     await seedOffers(prisma, partners, countries.ci, products);
     await seedStarterLeads(prisma, partners.starter, countries.ci, products);
     await seedCrmLeads(prisma, partners.pro, partners.enterprise, users, countries.ci, products);
@@ -230,7 +231,7 @@ async function seedCountries(prisma: PrismaClient): Promise<{ ci: CountryRecord;
     where: { isoCode: "CI" },
     create: {
       isoCode: "CI",
-      name: "Cote d'Ivoire",
+      name: "Côte d'Ivoire",
       currency: "XOF",
       languages: ["fr"],
       timezone: "Africa/Abidjan",
@@ -241,19 +242,20 @@ async function seedCountries(prisma: PrismaClient): Promise<{ ci: CountryRecord;
         country_quote_enabled: true,
         country_comparison_enabled: true,
         country_waitlist_enabled: false,
-        country_broker_onboarding_enabled: false,
+        country_broker_onboarding_enabled: true,
         country_ai_enabled: false
       },
       createdById: DEMO_ACTOR_ID
     },
     update: {
+      name: "Côte d'Ivoire",
       status: "public",
       flags: {
         country_public_enabled: true,
         country_quote_enabled: true,
         country_comparison_enabled: true,
         country_waitlist_enabled: false,
-        country_broker_onboarding_enabled: false,
+        country_broker_onboarding_enabled: true,
         country_ai_enabled: false
       }
     }
@@ -262,7 +264,7 @@ async function seedCountries(prisma: PrismaClient): Promise<{ ci: CountryRecord;
     where: { isoCode: "SN" },
     create: {
       isoCode: "SN",
-      name: "Senegal",
+      name: "Sénégal",
       currency: "XOF",
       languages: ["fr"],
       timezone: "Africa/Dakar",
@@ -279,6 +281,7 @@ async function seedCountries(prisma: PrismaClient): Promise<{ ci: CountryRecord;
       createdById: DEMO_ACTOR_ID
     },
     update: {
+      name: "Sénégal",
       status: "internal",
       flags: {
         country_public_enabled: false,
@@ -411,6 +414,36 @@ async function seedConsentAndForms(prisma: PrismaClient, country: CountryRecord,
   }
 }
 
+/**
+ * Indicative public pricing for `GET /partners/plans?country=CI`. These rows only feed a display
+ * page and the draft-invoice arithmetic: `billing_enabled` and `payments_enabled` stay off (see
+ * SAFE_DISABLED_FLAGS), so nothing here charges, invoices or collects anything.
+ */
+async function seedBillingPlanPrices(prisma: PrismaClient, country: CountryRecord): Promise<void> {
+  const prices = [
+    { plan: "starter", monthlySubscription: 25_000, perLeadPrice: 1_500, setupFee: 50_000 },
+    { plan: "pro", monthlySubscription: 75_000, perLeadPrice: 1_200, setupFee: 100_000 },
+    { plan: "enterprise", monthlySubscription: 250_000, perLeadPrice: 900, setupFee: 250_000 }
+  ] as const;
+  for (const price of prices) {
+    const data = {
+      monthlySubscription: price.monthlySubscription,
+      perLeadPrice: price.perLeadPrice,
+      sharedLeadPriceMultiplier: 0.5,
+      setupFee: price.setupFee,
+      currency: "XOF",
+      reason: "local broker demo indicative public pricing - no payment is ever collected",
+      updatedById: DEMO_ACTOR_ID,
+      updatedAt: SEED_NOW
+    };
+    await prisma.billingPlanPrice.upsert({
+      where: { plan_countryCode: { plan: price.plan, countryCode: country.isoCode } },
+      create: { plan: price.plan, countryCode: country.isoCode, ...data },
+      update: data
+    });
+  }
+}
+
 async function seedPartners(prisma: PrismaClient): Promise<{ starter: PartnerRecord; pro: PartnerRecord; enterprise: PartnerRecord; blocked: PartnerRecord }> {
   const starter = await upsertPartner(prisma, {
     registrationNumber: "LOCAL-DEMO-STARTER",
@@ -418,6 +451,7 @@ async function seedPartners(prisma: PrismaClient): Promise<{ starter: PartnerRec
     tradeName: "Starter Demo",
     plan: "starter",
     primaryEmail: "starter.office@broker.example",
+    city: "Abidjan",
     quotaMonthlyLeads: 30,
     capacityStatus: "available"
   });
@@ -427,6 +461,7 @@ async function seedPartners(prisma: PrismaClient): Promise<{ starter: PartnerRec
     tradeName: "Pro Demo",
     plan: "pro",
     primaryEmail: "pro.office@broker.example",
+    city: "Abidjan",
     quotaMonthlyLeads: 120,
     capacityStatus: "available"
   });
@@ -436,6 +471,7 @@ async function seedPartners(prisma: PrismaClient): Promise<{ starter: PartnerRec
     tradeName: "Enterprise Demo",
     plan: "enterprise",
     primaryEmail: "enterprise.office@broker.example",
+    city: "Yamoussoukro",
     quotaMonthlyLeads: 500,
     capacityStatus: "limited"
   });
@@ -457,6 +493,8 @@ async function upsertPartner(prisma: PrismaClient, input: {
   tradeName: string;
   plan: PartnerPlan;
   primaryEmail: string;
+  /** Shown on the public partner directory; the blocked demo tenant deliberately has none. */
+  city?: string;
   quotaMonthlyLeads: number;
   capacityStatus: "available" | "limited" | "blocked";
 }): Promise<PartnerRecord> {
@@ -468,6 +506,7 @@ async function upsertPartner(prisma: PrismaClient, input: {
     plan: input.plan,
     status: "active" as const,
     primaryEmail: input.primaryEmail,
+    city: input.city ?? null,
     primaryWhatsApp: "+2250102030405",
     quotaMonthlyLeads: input.quotaMonthlyLeads,
     capacityStatus: input.capacityStatus,
@@ -689,7 +728,7 @@ async function seedStarterLeads(prisma: PrismaClient, partner: PartnerRecord, co
   const leads: QuoteSeedInput[] = [
     starterLead("starter-001", partner.id, country, products.auto, "Aminata Kone", "assigned", 1, { usage: "personnel", budget: 75000 }),
     starterLead("starter-002", partner.id, country, products.auto, "Jean Kouadio", "broker_notified", 2, { usage: "professionnel", budget: 110000 }),
-    starterLead("starter-003", partner.id, country, products.voyage, "Moussa Traore", "seen", 5, { usage: "personnel", destination: "Senegal" }),
+    starterLead("starter-003", partner.id, country, products.voyage, "Moussa Traore", "seen", 5, { usage: "personnel", destination: "Sénégal" }),
     starterLead("starter-004", partner.id, country, products.auto, "Grace Nguessan", "accepted", 8, { usage: "personnel", budget: 95000 }, "lead_quality"),
     starterLead("starter-005", partner.id, country, products.voyage, "Ibrahim Soro", "rejected", 12, { usage: "personnel", destination: "France" }, "wrong_scope"),
     starterLead("starter-006", partner.id, country, products.auto, "Sarah Bamba", "disputed", 15, { usage: "professionnel", budget: 65000 }, "duplicate", "Doublon local de demonstration")

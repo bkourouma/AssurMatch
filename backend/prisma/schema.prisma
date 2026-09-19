@@ -425,6 +425,32 @@ enum PartnerWebhookEventType {
   notification_failed
 }
 
+enum WaitlistEntryStatus {
+  active
+  unsubscribed
+  notified
+}
+
+enum PartnerApplicationStatus {
+  received
+  under_review
+  accepted
+  rejected
+}
+
+enum ContactAudience {
+  visitor
+  broker
+  insurer
+  press
+}
+
+enum ContactMessageStatus {
+  new
+  handled
+  spam
+}
+
 model User {
   id              String     @id @default(uuid())
   email           String     @unique
@@ -515,6 +541,7 @@ model PartnerTenant {
   id                String         @id @default(uuid())
   legalName         String
   tradeName         String?
+  city              String?
   registrationNumber String?
   plan              PartnerPlan    @default(starter)
   status            PartnerStatus  @default(draft)
@@ -1410,4 +1437,79 @@ model PartnerBranding {
   updatedById              String?
   createdAt                DateTime @default(now())
   updatedAt                DateTime @default(now())
+}
+
+// Public-site forms (waitlist, broker application, contact). All three keep a normalized
+// address plus its fingerprint for deduplication, never a reversible contact hash of the IP,
+// and carry an explicit retention horizon like every other evidence-bearing table.
+model WaitlistEntry {
+  id              String              @id @default(uuid())
+  countryId       String
+  productId       String?
+  emailNormalized String
+  emailFingerprint String
+  consentVersion  String
+  status          WaitlistEntryStatus @default(active)
+  ipHash          String?
+  source          String              @default("public_web")
+  retentionUntil  DateTime
+  createdAt       DateTime            @default(now())
+  updatedAt       DateTime            @updatedAt
+
+  @@unique([countryId, emailFingerprint])
+  @@index([countryId, status, createdAt])
+}
+
+model PartnerApplication {
+  id                      String                   @id @default(uuid())
+  publicReference         String                   @unique
+  countryId               String
+  legalName               String
+  tradeName               String?
+  licenseNumber           String
+  licenseIssuingAuthority String?
+  licenseExpiresAt        DateTime
+  productIds              String[]
+  monthlyCapacity         Int
+  contactName             String
+  contactEmailNormalized  String
+  contactEmailFingerprint String
+  contactPhone            String
+  whatsapp                String?
+  desiredPlan             PartnerPlan              @default(starter)
+  message                 String?
+  consentVersion          String
+  status                  PartnerApplicationStatus @default(received)
+  reviewedById            String?
+  reviewedAt              DateTime?
+  reviewNote              String?
+  partnerTenantId         String?
+  ipHash                  String?
+  retentionUntil          DateTime
+  createdAt               DateTime                 @default(now())
+  updatedAt               DateTime                 @updatedAt
+
+  @@unique([countryId, contactEmailFingerprint, licenseNumber])
+  @@index([status, createdAt])
+}
+
+model ContactMessage {
+  id               String               @id @default(uuid())
+  publicReference  String               @unique
+  audience         ContactAudience      @default(visitor)
+  name             String
+  emailNormalized  String
+  emailFingerprint String
+  phone            String?
+  countryId        String?
+  subject          String
+  message          String
+  consentVersion   String
+  status           ContactMessageStatus @default(new)
+  ipHash           String?
+  retentionUntil   DateTime
+  createdAt        DateTime             @default(now())
+  updatedAt        DateTime             @updatedAt
+
+  @@index([audience, status, createdAt])
 }

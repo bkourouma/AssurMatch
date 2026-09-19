@@ -1,4 +1,5 @@
 import { AuditLogWriter } from "../audit-logs/audit-log-writer.service";
+import { PublicAbuseGuardService } from "../common/abuse/public-abuse-guard.service";
 import { InMemoryRedisClient, type RedisClientPort } from "../common/redis/redis.module";
 import type { ConsentService } from "../consent/consent.module";
 import type { CountriesService } from "../countries/countries.module";
@@ -16,7 +17,7 @@ import { PublicQuoteRequestsController } from "./public-quote-requests.controlle
 import { PublicQuoteStatusController } from "./public-quote-status.controller";
 import { QuoteDuplicateDetectionService } from "./quote-duplicate-detection.service";
 import type { QuoteRequestsRepository } from "./quote-requests.repository";
-import { QuoteSubmissionService } from "./quote-submission.service";
+import { QuoteSubmissionService, type QuoteAssignmentsPort, type QuoteInAppNotifierPort } from "./quote-submission.service";
 
 export interface QuoteRequestsModuleDeps {
   countries: CountriesService;
@@ -28,6 +29,10 @@ export interface QuoteRequestsModuleDeps {
   routing?: QuoteRoutingService;
   notifications?: QuoteNotificationService;
   aiSummary?: QuoteAISummaryService;
+  /** Spec 045: assignments closed when a visitor withdraws consent (`LeadAssignmentService`). */
+  assignments?: QuoteAssignmentsPort;
+  /** Spec 045: partner inbox used to tell a broker the withdrawn lead must not be worked (`MessagingDispatchService`). */
+  inApp?: QuoteInAppNotifierPort;
   isGlobalFlagEnabled?: (key: string) => boolean;
 }
 
@@ -35,6 +40,7 @@ export class QuoteRequestsModule {
   readonly rateLimit: PublicQuoteRateLimitService;
   readonly antiSpam: PublicAntiSpamService;
   readonly duplicate: QuoteDuplicateDetectionService;
+  readonly abuseGuard: PublicAbuseGuardService;
   readonly submissions: QuoteSubmissionService;
   readonly publicController: PublicQuoteRequestsController;
   readonly statusController: PublicQuoteStatusController;
@@ -44,6 +50,7 @@ export class QuoteRequestsModule {
     this.rateLimit = new PublicQuoteRateLimitService(redis);
     this.antiSpam = new PublicAntiSpamService(redis);
     this.duplicate = new QuoteDuplicateDetectionService(redis);
+    this.abuseGuard = new PublicAbuseGuardService(redis);
     this.submissions = new QuoteSubmissionService({
       findCountryByCode: (countryCode) => deps.countries.findByIsoCode(countryCode),
       findProductByKey: (productKey) => deps.products.findByKey(productKey),
@@ -54,6 +61,9 @@ export class QuoteRequestsModule {
       rateLimit: this.rateLimit,
       antiSpam: this.antiSpam,
       duplicate: this.duplicate,
+      abuseGuard: this.abuseGuard,
+      ...(deps.assignments ? { assignments: deps.assignments } : {}),
+      ...(deps.inApp ? { inApp: deps.inApp } : {}),
       ...(deps.isGlobalFlagEnabled ? { isGlobalFlagEnabled: deps.isGlobalFlagEnabled } : {}),
       ...(deps.routing ? { routing: deps.routing } : {}),
       ...(deps.notifications ? { notifications: deps.notifications } : {}),

@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, ForbiddenException, Get, Module, NotFoundException, Param, Patch, Post, Put, Query, Req, UploadedFile, UseGuards, UseInterceptors } from "@nestjs/common";
+import { Body, Controller, Delete, ForbiddenException, Get, HttpCode, Module, NotFoundException, Param, Patch, Post, Put, Query, Req, UploadedFile, UseGuards, UseInterceptors } from "@nestjs/common";
 import { FileInterceptor } from "@nestjs/platform-express";
 import { z } from "zod";
 import { QUOTE_DOCUMENT_MAX_BYTES } from "../../../../packages/shared/contracts/quote-document.contracts";
@@ -6,6 +6,8 @@ import type { UploadedDocumentFile } from "../quote-documents/quote-documents.se
 import { activateRequestSchema, loginRequestSchema, mfaVerifyRequestSchema, passwordChangeRequestSchema, passwordResetRequestSchema, type ActivateRequest, type LoginRequest, type PasswordChangeRequest, type PasswordResetRequest } from "../../../../packages/shared/contracts/auth.contracts";
 import { activationChecklistQuerySchema } from "../../../../packages/shared/contracts/activation-checklist.contracts";
 import { billingFoundationQuerySchema, billingPlanPriceUpsertSchema, draftInvoiceQuerySchema, draftInvoiceRecomputeSchema, leadPackGrantSchema } from "../../../../packages/shared/contracts/billing.contracts";
+import { partnerApplicationStatusSchema } from "../../../../packages/shared/contracts/partner-application.contracts";
+import { contactAudienceSchema } from "../../../../packages/shared/contracts/public-site.contracts";
 import {
   partnerApiKeyCreateSchema,
   partnerApiPaginationQuerySchema,
@@ -53,7 +55,7 @@ import { roleHasPermission, type AssurMatchRole } from "../../../../packages/sha
 import { isoCountrySchema, languageCodeSchema, nonEmptyStringSchema, reasonSchema, uuidSchema } from "../../../../packages/shared/validation/common.schemas";
 import { AssurMatchRuntime } from "../../runtime/assurmatch-runtime";
 import { AuthRequiredHttpGuard, MfaRequiredHttpGuard } from "../auth/guards/http-auth.guard";
-import { actorFromRequest, protectedActorFromRequest, type AssurMatchHttpRequest } from "../common/http/request-actor";
+import { actorFromRequest, clientIp, protectedActorFromRequest, type AssurMatchHttpRequest } from "../common/http/request-actor";
 import { parseHttpInput } from "../common/http/zod-validation";
 import type { ActorContext } from "../common/types";
 import { PublicJourneyFlagPolicy } from "../feature-flags/public-journey-flag-policy";
@@ -70,6 +72,16 @@ interface ControllerTarget {
 const optionalUuidParamSchema = uuidSchema.or(nonEmptyStringSchema);
 const starterActionWithReasonSchema = brokerStarterLeadActionRequestSchema.extend({ reason: brokerStarterReasonSchema });
 const updateFeatureFlagSchema = z.object({ value: z.boolean(), reason: reasonSchema });
+/** Spec 045 back-office reads; both filters are optional and narrow the repository listing only. */
+const adminPartnerApplicationsQuerySchema = z.object({
+  status: partnerApplicationStatusSchema.optional(),
+  countryId: uuidSchema.optional()
+});
+const adminContactMessagesQuerySchema = z.object({
+  audience: contactAudienceSchema.optional(),
+  status: z.enum(["new", "handled", "spam"]).optional(),
+  countryId: uuidSchema.optional()
+});
 const localDevReloadHeader = "x-assurmatch-local-dev";
 const localDevReloadToken = "broker-demo-seed";
 const protectedRoute = UseGuards(AuthRequiredHttpGuard, MfaRequiredHttpGuard) as MethodDecoratorFactory & ClassDecorator;
@@ -223,6 +235,16 @@ export class PublicCountriesController {
     return this.runtime.countries.service.listPublic();
   }
 
+  /**
+   * Spec 045. Declared BEFORE `detail` on purpose: Nest registers a controller's routes in method
+   * declaration order, so `countries/directory` has to be mounted before `countries/:countryCode`
+   * or "directory" would be swallowed as a country code. `runtime-route-inventory.spec.ts` locks
+   * that ordering in place.
+   */
+  directory() {
+    return this.runtime.publicCountryDirectory.list({ globalFlags: this.runtime.publicJourneyGlobalFlags() });
+  }
+
   detail(countryCode: string, request: AssurMatchHttpRequest) {
     const parsedCountryCode = parseParam("countryCode", countryCode, isoCountrySchema);
     return this.runtime.countries.service.getPublicPage(parsedCountryCode, this.runtime.publicJourneyGlobalFlags(), actorFromRequest(request));
@@ -369,12 +391,6 @@ export class AdminScoringRulesController {
   }
 }
 
-function clientIp(request: AssurMatchHttpRequest): string {
-  const forwarded = (request as { headers?: Record<string, string | string[] | undefined> }).headers?.["x-forwarded-for"];
-  const first = Array.isArray(forwarded) ? forwarded[0] : forwarded?.split(",")[0];
-  return first?.trim() || (request as { ip?: string }).ip || "unknown";
-}
-
 export class PublicAiController {
   constructor(private readonly runtime: AssurMatchRuntime) {}
 
@@ -444,6 +460,136 @@ export class PublicQuoteRequestsController {
 
   quoteStatus(publicReference: string, token?: string) {
     return this.runtime.quoteRequests.submissions.status(parseParam("publicReference", publicReference), parseParam("token", token ?? ""));
+  }
+
+  /**
+   * Spec 045. The visitor's own link is the only credential, so an unknown reference and a wrong
+   * token are indistinguishable ("Quote status not available", mapped to 404 by `ErrorResponseFilter`).
+   */
+  withdrawConsent(publicReference: string, token: string | undefined, request: AssurMatchHttpRequest) {
+    return this.runtime.quoteRequests.submissions.withdrawConsent(
+      parseParam("publicReference", publicReference),
+      parseParam("token", token ?? ""),
+      { ipAddress: clientIp(request), actor: actorFromRequest(request) }
+    );
+  }
+}
+
+/**
+ * Spec 045 public-site intake. The raw body is handed to the service untouched: the abuse guard
+ * deliberately reads the honeypot and session id off the unvalidated payload and runs BEFORE the
+ * zod schema, so a filled honeypot is caught and audited instead of vanishing in a schema error.
+ */
+export class PublicWaitlistController {
+  constructor(private readonly runtime: AssurMatchRuntime) {}
+
+  subscribe(input: unknown, request: AssurMatchHttpRequest) {
+    return this.runtime.waitlist.service.subscribe(input, { ipAddress: clientIp(request), actor: actorFromRequest(request) });
+  }
+}
+
+export class PublicContactController {
+  constructor(private readonly runtime: AssurMatchRuntime) {}
+
+  submit(input: unknown, request: AssurMatchHttpRequest) {
+    return this.runtime.contactMessages.service.submit(input, { ipAddress: clientIp(request), actor: actorFromRequest(request) });
+  }
+}
+
+/**
+ * Spec 045. `applications` and `plans` are fixed segments under the fixed `partners` path, so
+ * neither can capture the other and no parameterised route is involved.
+ */
+export class PublicPartnersController {
+  constructor(private readonly runtime: AssurMatchRuntime) {}
+
+  apply(input: unknown, request: AssurMatchHttpRequest) {
+    return this.runtime.partnerApplications.service.submit(input, { ipAddress: clientIp(request), actor: actorFromRequest(request) });
+  }
+
+  plans(country: string | undefined, request: AssurMatchHttpRequest) {
+    return this.runtime.billing.plans.listPublicForCountry(parseParam("country", country ?? "", isoCountrySchema), actorFromRequest(request));
+  }
+}
+
+export class PublicPartnerDirectoryController {
+  constructor(private readonly runtime: AssurMatchRuntime) {}
+
+  list(countryCode: string, request: AssurMatchHttpRequest) {
+    return this.runtime.publicPartnerDirectory.list(parseParam("countryCode", countryCode, isoCountrySchema), {
+      globalFlags: this.runtime.publicJourneyGlobalFlags(),
+      actor: actorFromRequest(request)
+    });
+  }
+
+  detail(countryCode: string, partnerId: string, request: AssurMatchHttpRequest) {
+    return this.runtime.publicPartnerDirectory.detail(
+      parseParam("countryCode", countryCode, isoCountrySchema),
+      parseParam("partnerId", partnerId, optionalUuidParamSchema),
+      { globalFlags: this.runtime.publicJourneyGlobalFlags(), actor: actorFromRequest(request) }
+    );
+  }
+}
+
+export class PublicInsurersController {
+  constructor(private readonly runtime: AssurMatchRuntime) {}
+
+  /**
+   * `listInsurers` takes a country id, so the ISO code is resolved first; the country gate mirrors
+   * `quoteForm` and the partner directory, down to the "not publicly available" message.
+   */
+  async list(countryCode: string, request: AssurMatchHttpRequest) {
+    const parsedCountryCode = parseParam("countryCode", countryCode, isoCountrySchema);
+    const country = await this.runtime.countries.service.findByIsoCode(parsedCountryCode);
+    const globalFlags = this.runtime.publicJourneyGlobalFlags();
+    if (!country) throw new Error("Country is not publicly available");
+    const state = new PublicJourneyFlagPolicy().resolve({ globalFlags, countryFlags: country.flags });
+    if (!state.publicEnabled) throw new Error("Country is not publicly available");
+    void actorFromRequest(request);
+    const insurers = await this.runtime.offers.publicCatalog.listInsurers(country.id, this.runtime.publicOfferContext({ countryFlags: country.flags }));
+    // The catalogue groups by product id because it has no product lookup of its own. The contract
+    // promises product keys, and a raw id on a public page is meaningless to a visitor, so the ids
+    // are resolved here against the country's public products; an id with no public product is
+    // dropped rather than leaked.
+    const products = await this.runtime.products.service.listPublicForCountry(country.id, country.flags, globalFlags);
+    const keyById = new Map(products.map((product) => [product.id, product.key]));
+    return insurers.map((insurer) => ({
+      ...insurer,
+      productKeys: insurer.productKeys.map((productId) => keyById.get(productId)).filter((key): key is string => typeof key === "string").sort()
+    }));
+  }
+}
+
+export class PublicStatsController {
+  constructor(private readonly runtime: AssurMatchRuntime) {}
+
+  read() {
+    return this.runtime.publicStats.service.read({ globalFlags: this.runtime.publicJourneyGlobalFlags() });
+  }
+}
+
+export class AdminPartnerApplicationsController {
+  constructor(private readonly runtime: AssurMatchRuntime) {}
+
+  list(request: AssurMatchHttpRequest, query: Record<string, string>) {
+    const parsed = parseHttpInput(adminPartnerApplicationsQuerySchema, query ?? {});
+    return this.runtime.partnerApplications.service.listForAdmin(protectedActorFromRequest(request), {
+      ...(parsed.status ? { status: parsed.status } : {}),
+      ...(parsed.countryId ? { countryId: parsed.countryId } : {})
+    });
+  }
+}
+
+export class AdminContactMessagesController {
+  constructor(private readonly runtime: AssurMatchRuntime) {}
+
+  list(request: AssurMatchHttpRequest, query: Record<string, string>) {
+    const parsed = parseHttpInput(adminContactMessagesQuerySchema, query ?? {});
+    return this.runtime.contactMessages.service.listForAdmin(protectedActorFromRequest(request), {
+      ...(parsed.audience ? { audience: parsed.audience } : {}),
+      ...(parsed.status ? { status: parsed.status } : {}),
+      ...(parsed.countryId ? { countryId: parsed.countryId } : {})
+    });
   }
 }
 
@@ -996,6 +1142,7 @@ decorate(AuthController, "verifyMfa", [authRoute, Post("mfa/verify") as MethodDe
 
 controller("countries", PublicCountriesController);
 decorate(PublicCountriesController, "list", [Get() as MethodDecoratorFactory]);
+decorate(PublicCountriesController, "directory", [Get("directory") as MethodDecoratorFactory]);
 decorate(PublicCountriesController, "detail", [Get(":countryCode") as MethodDecoratorFactory], [[0, Param("countryCode") as ParamDecoratorFactory], [1, Req() as ParamDecoratorFactory]]);
 
 controller("countries/:countryCode/products", PublicProductsController);
@@ -1011,6 +1158,34 @@ controller(undefined, PublicQuoteRequestsController);
 decorate(PublicQuoteRequestsController, "quoteForm", [Get("countries/:countryCode/products/:productKey/quote-form") as MethodDecoratorFactory], [[0, Param("countryCode") as ParamDecoratorFactory], [1, Param("productKey") as ParamDecoratorFactory], [2, Query("language") as ParamDecoratorFactory]]);
 decorate(PublicQuoteRequestsController, "submitQuote", [Post("quote-requests") as MethodDecoratorFactory], [[0, Body() as ParamDecoratorFactory], [1, Req() as ParamDecoratorFactory]]);
 decorate(PublicQuoteRequestsController, "quoteStatus", [Get("quote-requests/:publicReference") as MethodDecoratorFactory], [[0, Param("publicReference") as ParamDecoratorFactory], [1, Query("token") as ParamDecoratorFactory]]);
+decorate(PublicQuoteRequestsController, "withdrawConsent", [Post("quote-requests/:publicReference/consent-withdrawal") as MethodDecoratorFactory, HttpCode(200) as MethodDecoratorFactory], [[0, Param("publicReference") as ParamDecoratorFactory], [1, Query("token") as ParamDecoratorFactory], [2, Req() as ParamDecoratorFactory]]);
+
+controller("waitlist", PublicWaitlistController);
+decorate(PublicWaitlistController, "subscribe", [Post() as MethodDecoratorFactory, HttpCode(202) as MethodDecoratorFactory], [[0, Body() as ParamDecoratorFactory], [1, Req() as ParamDecoratorFactory]]);
+
+controller("contact", PublicContactController);
+decorate(PublicContactController, "submit", [Post() as MethodDecoratorFactory, HttpCode(202) as MethodDecoratorFactory], [[0, Body() as ParamDecoratorFactory], [1, Req() as ParamDecoratorFactory]]);
+
+controller("partners", PublicPartnersController);
+decorate(PublicPartnersController, "apply", [Post("applications") as MethodDecoratorFactory, HttpCode(202) as MethodDecoratorFactory], [[0, Body() as ParamDecoratorFactory], [1, Req() as ParamDecoratorFactory]]);
+decorate(PublicPartnersController, "plans", [Get("plans") as MethodDecoratorFactory], [[0, Query("country") as ParamDecoratorFactory], [1, Req() as ParamDecoratorFactory]]);
+
+controller("countries/:countryCode/partners", PublicPartnerDirectoryController);
+decorate(PublicPartnerDirectoryController, "list", [Get() as MethodDecoratorFactory], [[0, Param("countryCode") as ParamDecoratorFactory], [1, Req() as ParamDecoratorFactory]]);
+decorate(PublicPartnerDirectoryController, "detail", [Get(":partnerId") as MethodDecoratorFactory], [[0, Param("countryCode") as ParamDecoratorFactory], [1, Param("partnerId") as ParamDecoratorFactory], [2, Req() as ParamDecoratorFactory]]);
+
+controller(undefined, PublicInsurersController);
+decorate(PublicInsurersController, "list", [Get("countries/:countryCode/insurers") as MethodDecoratorFactory], [[0, Param("countryCode") as ParamDecoratorFactory], [1, Req() as ParamDecoratorFactory]]);
+
+controller("public-stats", PublicStatsController);
+decorate(PublicStatsController, "read", [Get() as MethodDecoratorFactory]);
+
+controller("admin", AdminPartnerApplicationsController, true);
+decorate(AdminPartnerApplicationsController, "list", [Get("partners/applications") as MethodDecoratorFactory], [[0, Req() as ParamDecoratorFactory], [1, Query() as ParamDecoratorFactory]]);
+
+controller("admin", AdminContactMessagesController, true);
+decorate(AdminContactMessagesController, "list", [Get("contact-messages") as MethodDecoratorFactory], [[0, Req() as ParamDecoratorFactory], [1, Query() as ParamDecoratorFactory]]);
+
 controller(undefined, PublicAiController);
 decorate(PublicAiController, "availability", [Get("ai/visitor/availability") as MethodDecoratorFactory], [[0, Query() as ParamDecoratorFactory]]);
 decorate(PublicAiController, "read", [Get("ai/visitor/interactions/:id") as MethodDecoratorFactory], [[0, Param("id") as ParamDecoratorFactory], [1, Req() as ParamDecoratorFactory]]);
@@ -1203,6 +1378,14 @@ Module({
     PublicProductsController,
     PublicOffersController,
     PublicQuoteRequestsController,
+    PublicWaitlistController,
+    PublicContactController,
+    PublicPartnersController,
+    PublicPartnerDirectoryController,
+    PublicInsurersController,
+    PublicStatsController,
+    AdminPartnerApplicationsController,
+    AdminContactMessagesController,
     PublicAiController,
     PublicQuoteDocumentsController,
     AdminQuoteDocumentsController,

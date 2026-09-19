@@ -1,28 +1,19 @@
 import { expect, test } from "@playwright/test";
-import { readdirSync, readFileSync, statSync } from "node:fs";
-import { join } from "node:path";
+import { publicAppSourceFiles, readSources } from "./helpers/public-sources";
 
 test.describe("public runtime browser smoke", () => {
   const baseUrl = process.env.ASSURMATCH_E2E_PUBLIC_URL ?? process.env.ASSURMATCH_E2E_BASE_URL;
   test.skip(!baseUrl, "Set ASSURMATCH_E2E_PUBLIC_URL to run real public runtime smoke");
 
-  test("public runtime smoke navigates public catalog when server is provided", async ({ page }) => {
-    await page.goto(`${baseUrl}/catalog`);
-    await expect(page.getByRole("heading", { name: "Catalogue indicatif" })).toBeVisible();
-    await expect(page.getByText(/Aucun pays public actif|pays public actif|Catalogue public temporairement indisponible/)).toBeVisible();
+  test("public runtime smoke navigates the French countries directory when server is provided", async ({ page }) => {
+    await page.goto(`${baseUrl}/pays`);
+    await expect(page.getByRole("heading", { name: "Pays couverts par AssurMatch" })).toBeVisible();
+    await expect(page.getByText(/Aucun pays public actif|Pays ouverts|Liste des pays indisponible/)).toBeVisible();
   });
 });
 
-function filesUnder(directory: string): string[] {
-  return readdirSync(directory).flatMap((entry) => {
-    const path = join(directory, entry);
-    return statSync(path).isDirectory() ? filesUnder(path) : [path];
-  });
-}
-
 test("public app does not import back-office auth session or protected clients", async () => {
-  const publicSources = filesUnder("apps/public/app").filter((path) => /\.(ts|tsx)$/.test(path));
-  const joinedSource = publicSources.map((path) => readFileSync(path, "utf8")).join("\n");
+  const joinedSource = readSources(publicAppSourceFiles());
 
   expect(joinedSource).not.toContain("backoffice-auth");
   expect(joinedSource).not.toContain("backoffice-session-actions");

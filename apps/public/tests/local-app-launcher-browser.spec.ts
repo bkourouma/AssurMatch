@@ -12,9 +12,11 @@ test.describe("local app launcher browser smoke", () => {
 
   test("public app and quote form render", async ({ page }) => {
     await page.goto(publicUrl);
-    await expect(page.getByRole("heading", { name: "AssurMatch" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Comparez les offres d'assurance de votre pays" })).toBeVisible();
 
-    await page.goto(`${publicUrl}/countries/CI/products/auto/quote`);
+    // The public site moved every page under `[locale]` and localised its routes: French is
+    // unprefixed and uses the French route words (spec 045).
+    await page.goto(`${publicUrl}/pays/CI/produits/auto/devis`);
     await expect(page.getByRole("heading", { name: "Demander un devis" })).toBeVisible();
   });
 
@@ -34,5 +36,45 @@ test.describe("local app launcher browser smoke", () => {
 
     await page.goto(mailpitUrl);
     await expect(page.locator("body")).toContainText("Mailpit");
+  });
+
+  test("home page shows the country and product selector", async ({ page }) => {
+    await page.goto(publicUrl);
+    await expect(page.locator("#am-entry-country")).toBeVisible();
+    await expect(page.locator("#am-entry-product")).toBeVisible();
+  });
+
+  test("/pays lists the open country and the waiting-list country", async ({ page }) => {
+    await page.goto(`${publicUrl}/pays`);
+    // The demo seed (scripts/local-app/seed-broker-demo.ts) opens Côte d'Ivoire and puts Sénégal on
+    // the waiting list. Scoped to the main content: the header and footer also link to these
+    // countries, which would otherwise make the locator ambiguous.
+    const main = page.locator("#contenu");
+    await expect(main.getByRole("link", { name: "Côte d'Ivoire" }).first()).toBeVisible();
+    await expect(main.getByRole("link", { name: "Sénégal" }).first()).toBeVisible();
+    await expect(main.getByText("Ouvert", { exact: true }).first()).toBeVisible();
+    await expect(main.getByText("Bientôt", { exact: true }).first()).toBeVisible();
+  });
+
+  test("/comment-ca-marche renders", async ({ page }) => {
+    await page.goto(`${publicUrl}/comment-ca-marche`);
+    await expect(page.getByRole("heading", { name: "Comment ça marche" }).first()).toBeVisible();
+  });
+
+  test("a wrong URL renders the branded 404", async ({ page }) => {
+    await page.goto(`${publicUrl}/cette-page-n-existe-pas`);
+    await expect(page.getByRole("heading", { name: "Page introuvable" })).toBeVisible();
+  });
+
+  test("/en renders in English with lang=\"en\"", async ({ page }) => {
+    await page.goto(`${publicUrl}/en`);
+    await expect(page.locator("html")).toHaveAttribute("lang", "en");
+    await expect(page.getByRole("heading", { name: "Compare insurance offers in your country" })).toBeVisible();
+  });
+
+  test("at a 375 pixel viewport the header still shows the comparison call to action", async ({ page }) => {
+    await page.setViewportSize({ width: 375, height: 800 });
+    await page.goto(publicUrl);
+    await expect(page.locator(".am-header__cta")).toBeVisible();
   });
 });

@@ -1,11 +1,15 @@
 import { expect, test } from "@playwright/test";
-import { readFileSync } from "node:fs";
+import { messagesText, publicPage, readSources } from "./helpers/public-sources";
 
 test("public country and product pages expose technical platform journey", async () => {
-  const country = readFileSync("apps/public/app/countries/[countryCode]/page.tsx", "utf8");
-  const product = readFileSync("apps/public/app/countries/[countryCode]/products/[productKey]/page.tsx", "utf8");
+  const country = readSources([publicPage("countries/[countryCode]/page.tsx")]);
+  const product = readSources([publicPage("countries/[countryCode]/products/[productKey]/page.tsx")]);
 
-  expect(country).toContain("AssurMatch");
-  expect(product).toContain("offres expirees");
+  // Structural: the journey shortcuts component is used on the product page.
   expect(country + product).toContain("PublicJourneyActions");
+
+  // Copy: the brand name and the "expired or unvalidated offer" wording now live in the catalogue.
+  const fr = messagesText("fr");
+  expect(fr).toContain("AssurMatch");
+  expect(fr).toContain("offres expirées ou non validées");
 });

@@ -137,3 +137,4 @@ export class CountriesModule {
 }
 
 export { COUNTRIES_REPOSITORY, MemoryCountriesRepository, type CountriesRepository } from "./countries.repository";
+export { PublicCountryDirectoryService, type PublicCountryDirectoryContext } from "./public-country-directory.service";

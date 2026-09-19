@@ -1,0 +1,358 @@
+/*
+ * Page-specific styles for the broker acquisition pages (SITE-408 to SITE-411), imported once by
+ * `app/[locale]/brokers/layout.tsx`. Every value reuses the `--am-*` tokens: nothing here is a raw
+ * colour, size or spacing value (constitution: "components must not contain raw colour, size or
+ * spacing values"). Green never becomes a page background or a primary button here either.
+ */
+
+/* ---------- Pricing cards (SITE-409: one card per plan) ---------- */
+
+.am-pricing-grid {
+  display: grid;
+  gap: var(--am-space-16);
+  margin: 0 0 var(--am-space-16);
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+@media (max-width: 900px) {
+  .am-pricing-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 680px) {
+  .am-pricing-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+/* ---------- Plan comparison: a real <table>, restyled into cards below 680px ---------- */
+
+.am-plans-table-wrap {
+  overflow-x: auto;
+  border: 1px solid var(--am-neutral-300);
+  border-radius: var(--am-radius-card);
+  background: var(--am-neutral-0);
+}
+
+.am-plans-table {
+  width: 100%;
+  min-width: 640px;
+  border-collapse: collapse;
+}
+
+.am-plans-table th,
+.am-plans-table td {
+  border-bottom: 1px solid var(--am-neutral-300);
+  padding: var(--am-space-16);
+  text-align: left;
+  vertical-align: top;
+}
+
+.am-plans-table thead th {
+  background: var(--am-primary-50);
+  color: var(--am-primary-700);
+  font-family: var(--am-font-heading);
+  font-size: var(--am-h3-size);
+  line-height: var(--am-h3-line);
+}
+
+.am-plans-table tbody th {
+  width: 160px;
+  color: var(--am-neutral-700);
+  font-size: var(--am-small-size);
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.am-plans-table tr:last-child td,
+.am-plans-table tr:last-child th {
+  border-bottom: 0;
+}
+
+.am-plans-table__note {
+  margin: 0 0 var(--am-space-8);
+  color: var(--am-neutral-500);
+  font-size: var(--am-small-size);
+  line-height: var(--am-small-line);
+}
+
+.am-plans-table__features {
+  margin: 0;
+  padding-left: var(--am-space-16);
+  color: var(--am-neutral-700);
+  font-size: var(--am-small-size);
+  line-height: 1.7;
+}
+
+@media (min-width: 681px) {
+  .am-plans-cards {
+    display: none;
+  }
+}
+
+@media (max-width: 680px) {
+  .am-plans-table-wrap {
+    display: none;
+  }
+}
+
+.am-plans-cards {
+  display: grid;
+  gap: var(--am-space-16);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.am-plancard {
+  display: grid;
+  gap: var(--am-space-8);
+  align-content: start;
+  border: 1px solid var(--am-neutral-300);
+  border-radius: var(--am-radius-card);
+  background: var(--am-neutral-0);
+  box-shadow: var(--am-shadow-sm);
+  padding: var(--am-space-16);
+}
+
+.am-plancard__name {
+  margin: 0;
+  color: var(--am-primary-700);
+}
+
+.am-plancard__positioning {
+  margin: 0;
+  color: var(--am-neutral-700);
+  font-size: var(--am-small-size);
+  line-height: var(--am-small-line);
+}
+
+.am-plancard__audience {
+  margin: 0;
+  color: var(--am-neutral-500);
+  font-size: var(--am-small-size);
+  line-height: var(--am-small-line);
+}
+
+.am-plancard__features {
+  margin: var(--am-space-8) 0 0;
+  padding-left: var(--am-space-16);
+  color: var(--am-neutral-700);
+  font-size: var(--am-small-size);
+  line-height: 1.7;
+}
+
+/* ---------- Anonymised example lead card ---------- */
+
+.am-leadexample {
+  display: grid;
+  gap: var(--am-space-12);
+  margin: 0 0 var(--am-space-16);
+  padding: var(--am-space-16);
+  border: 2px dashed var(--am-primary-500);
+  border-radius: var(--am-radius-card);
+  background: var(--am-primary-50);
+}
+
+.am-leadexample__label {
+  display: inline-flex;
+  align-self: start;
+  padding: 2px var(--am-space-12);
+  border-radius: var(--am-radius-pill);
+  background: var(--am-primary-100);
+  color: var(--am-primary-700);
+  font-size: var(--am-small-size);
+  font-weight: 800;
+}
+
+/* ---------- Generic key/value grid (lead example fields, plan prices) ---------- */
+
+.am-kv {
+  display: grid;
+  gap: var(--am-space-8) var(--am-space-16);
+  margin: 0;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.am-kv[data-columns="1"] {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+@media (max-width: 680px) {
+  .am-kv {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.am-kv dt {
+  margin: 0;
+  color: var(--am-neutral-500);
+  font-size: var(--am-small-size);
+  font-weight: 700;
+}
+
+.am-kv dd {
+  margin: 0 0 var(--am-space-8);
+  color: var(--am-neutral-900);
+  font-size: var(--am-body-size);
+  font-weight: 700;
+}
+
+/* ---------- Billable-lead criteria checklist ---------- */
+
+.am-criterialist {
+  display: grid;
+  gap: var(--am-space-12);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+}
+
+.am-criterialist__item {
+  display: flex;
+  gap: var(--am-space-12);
+  align-items: flex-start;
+  padding: var(--am-space-12) var(--am-space-16);
+  border: 1px solid var(--am-neutral-300);
+  border-radius: var(--am-radius-card);
+  background: var(--am-neutral-0);
+}
+
+.am-criterialist__icon {
+  flex: none;
+  color: var(--am-success-600);
+}
+
+.am-criterialist__text {
+  margin: 0;
+  color: var(--am-neutral-900);
+  font-size: var(--am-small-size);
+  font-weight: 700;
+  line-height: var(--am-small-line);
+}
+
+/* ---------- Portal illustration (CSS-drawn, no screenshot asset) ---------- */
+
+.am-portalmock {
+  margin: 0;
+  padding: 0;
+}
+
+.am-portalmock__frame {
+  overflow: hidden;
+  border: 1px solid var(--am-neutral-300);
+  border-radius: var(--am-radius-card);
+  background: var(--am-neutral-0);
+  box-shadow: var(--am-shadow-md);
+}
+
+.am-portalmock__bar {
+  display: flex;
+  gap: var(--am-space-8);
+  align-items: center;
+  padding: var(--am-space-12) var(--am-space-16);
+  background: var(--am-primary-700);
+}
+
+.am-portalmock__dot {
+  width: 10px;
+  height: 10px;
+  border-radius: var(--am-radius-pill);
+  background: var(--am-primary-100);
+  opacity: 0.6;
+}
+
+.am-portalmock__body {
+  display: grid;
+  gap: var(--am-space-12);
+  padding: var(--am-space-16);
+  grid-template-columns: 88px minmax(0, 1fr);
+}
+
+.am-portalmock__nav {
+  display: grid;
+  gap: var(--am-space-8);
+  align-content: start;
+}
+
+.am-portalmock__navitem {
+  height: 10px;
+  border-radius: var(--am-radius-pill);
+  background: var(--am-neutral-100);
+}
+
+.am-portalmock__navitem[data-active="true"] {
+  background: var(--am-primary-100);
+}
+
+.am-portalmock__columns {
+  display: grid;
+  gap: var(--am-space-12);
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.am-portalmock__column {
+  display: grid;
+  gap: var(--am-space-8);
+  align-content: start;
+  padding: var(--am-space-8);
+  border-radius: var(--am-radius-field);
+  background: var(--am-neutral-100);
+}
+
+.am-portalmock__columnhead {
+  height: 8px;
+  width: 60%;
+  border-radius: var(--am-radius-pill);
+  background: var(--am-neutral-300);
+}
+
+.am-portalmock__card {
+  display: grid;
+  gap: 4px;
+  padding: var(--am-space-8);
+  border-radius: var(--am-radius-field);
+  background: var(--am-neutral-0);
+  box-shadow: var(--am-shadow-sm);
+}
+
+.am-portalmock__cardline {
+  height: 6px;
+  border-radius: var(--am-radius-pill);
+  background: var(--am-neutral-300);
+}
+
+.am-portalmock__cardline[data-width="short"] {
+  width: 40%;
+}
+
+.am-portalmock__cardline[data-tone="brand"] {
+  background: var(--am-primary-500);
+  opacity: 0.7;
+}
+
+@media (max-width: 680px) {
+  .am-portalmock__body {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .am-portalmock__nav {
+    grid-auto-flow: column;
+    grid-template-columns: repeat(4, 1fr);
+  }
+
+  .am-portalmock__columns {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.am-portalmock__caption {
+  margin: var(--am-space-12) 0 0;
+  color: var(--am-neutral-500);
+  font-size: var(--am-small-size);
+  line-height: var(--am-small-line);
+  text-align: center;
+}

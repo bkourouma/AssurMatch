@@ -14,7 +14,8 @@ describe("broker CRM constitutional exclusions", () => {
 
   it("does not add CRM routes to the public app", async () => {
     expect(existsSync("apps/public/app/crm")).toBe(false);
-    const publicHome = readFileSync("apps/public/app/page.tsx", "utf8");
+    expect(existsSync("apps/public/app/[locale]/crm")).toBe(false);
+    const publicHome = readFileSync("apps/public/app/[locale]/page.tsx", "utf8");
     expect(publicHome).not.toContain("/broker/crm");
     expect(publicHome).not.toContain("/crm/leads");
   });
