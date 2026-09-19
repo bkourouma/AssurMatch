@@ -10,6 +10,8 @@ const navigationItems = [
   { label: "Dashboard", href: "/", match: ["/"] },
   { label: "Leads", href: "/leads", match: ["/leads"] },
   { label: "CRM", href: "/crm", match: ["/crm"] },
+  { label: "Notifications", href: "/notifications", match: ["/notifications"] },
+  { label: "Enterprise", href: "/enterprise", match: ["/enterprise"] },
   { label: "Equipe", href: "/team", match: ["/team"] },
   { label: "Compte", href: "/account", match: ["/account"] }
 ];

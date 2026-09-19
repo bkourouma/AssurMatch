@@ -1,10 +1,12 @@
 import { redirect } from "next/navigation";
 import { isStarterCrmDenied, loginRedirect, readBackOfficeSession } from "../lib/backoffice-auth";
-import { readBrokerAIAssistance, readBrokerDashboard } from "../lib/broker-api";
+import { readBrokerAIAssistance, readBrokerAdvisors, readBrokerAiOptOut, readBrokerBillingStatement, readBrokerDashboardWithComparison } from "../lib/broker-api";
+import { setAiOptOutAction } from "../lib/crm-ai-actions";
 import { Badge, Card, KpiCard, PageHeader, StateMessage } from "../lib/ui/broker-ui";
 import { crmKpis, dashboardKpis } from "../lib/ui/broker-view-models";
 
-export default async function BrokerCrmPage() {
+export default async function BrokerCrmPage({ searchParams }: { searchParams: Promise<{ ai?: string }> }) {
+  const { ai: aiNotice } = await searchParams;
   const session = await readBackOfficeSession();
   if (session.status !== "authenticated") {
     if (session.status === "unauthenticated" || session.status === "expired") redirect(loginRedirect("/crm", session.error ?? "session_required"));
@@ -39,8 +41,9 @@ export default async function BrokerCrmPage() {
     );
   }
 
-  const dashboard = await readBrokerDashboard();
-  const aiAssistance = await readBrokerAIAssistance();
+  const dashboard = await readBrokerDashboardWithComparison();
+  const advisors = await readBrokerAdvisors();
+  const [aiAssistance, aiOptOut, statement] = await Promise.all([readBrokerAIAssistance(), readBrokerAiOptOut(), readBrokerBillingStatement()]);
   if (dashboard.unauthenticated) redirect(loginRedirect("/crm", dashboard.error ?? "session_required"));
   if (dashboard.forbidden) {
     return (
@@ -114,15 +117,71 @@ export default async function BrokerCrmPage() {
         </StateMessage>
       )}
 
+      {dashboard.data.comparison ? (
+        <Card plain>
+          <h2 className="section-title">Comparaison avec la periode precedente</h2>
+          <div className="broker-grid broker-grid--kpi">
+            <KpiCard label="Leads recus (precedent)" value={dashboard.data.comparison.previous.received} helper={`Ecart: ${dashboard.data.comparison.delta.received >= 0 ? "+" : ""}${dashboard.data.comparison.delta.received}`} />
+            <KpiCard label="Leads acceptes (precedent)" value={dashboard.data.comparison.previous.accepted} helper={`Ecart: ${dashboard.data.comparison.delta.accepted >= 0 ? "+" : ""}${dashboard.data.comparison.delta.accepted}`} />
+            <KpiCard label="Refus/contestations (precedent)" value={dashboard.data.comparison.previous.refused} helper={`Ecart: ${dashboard.data.comparison.delta.refused >= 0 ? "+" : ""}${dashboard.data.comparison.delta.refused}`} />
+          </div>
+          <a className="button button--secondary" href="/reports/export">Exporter le rapport d'activite indicatif (CSV)</a>
+        </Card>
+      ) : null}
+
+      {advisors.status === "success" && advisors.data.length > 0 ? (
+        <Card plain>
+          <h2 className="section-title">Performance par conseiller</h2>
+          <ul className="simple-list">
+            {advisors.data.map((advisor) => (
+              <li key={advisor.advisorId}>
+                {advisor.advisorId}: {advisor.received} lead(s), {advisor.accepted} accepte(s), {advisor.won} gagne(s), {advisor.lost} perdu(s), conversion {Math.round(advisor.conversionRate * 100)}%
+                {advisor.averageFirstActionMinutes === null ? "" : `, premiere action ${advisor.averageFirstActionMinutes} min`}
+              </li>
+            ))}
+          </ul>
+        </Card>
+      ) : null}
+
+      {statement.status === "success" ? (
+        <Card plain>
+          <h2 className="section-title">Consommation et facturation</h2>
+          <div className="broker-grid broker-grid--kpi">
+            <KpiCard label="Leads recus (mois)" value={statement.data.leadsReceived} />
+            <KpiCard label="Leads factures (brouillon)" value={statement.data.billableLeadCount} tone="info" />
+            <KpiCard label="Leads non facturables" value={statement.data.nonBillableLeadCount} />
+            <KpiCard label="Contestations creditees" value={statement.data.disputeCreditCount} tone="warning" />
+            <KpiCard label="Credits pack restants" value={statement.data.packCreditsRemaining} />
+            <KpiCard label="Montant estime" value={`${statement.data.estimatedAmount} ${statement.data.currency}`} helper="Estimation indicative" />
+          </div>
+          <div className="inline-cluster">
+            <Badge tone={statement.data.billingEnabled ? "info" : "disabled"}>billing_enabled: {String(statement.data.billingEnabled)}</Badge>
+            <Badge tone="disabled">paiement: desactive</Badge>
+            {statement.data.draft ? <Badge tone="disabled">{statement.data.draft.status}</Badge> : null}
+          </div>
+          <p className="page-description">{statement.data.notice || "Brouillon non facturable: aucun encaissement, aucune emission de facture."}</p>
+        </Card>
+      ) : null}
+
       {aiAssistance.status === "success" ? (
         <Card plain>
           <h2 className="section-title">Assistance IA</h2>
           <div className="broker-grid">
-            <Badge tone="disabled">enabled: false</Badge>
-            <Badge tone="disabled">modelCall: false</Badge>
+            <Badge tone={aiAssistance.data.enabled ? "success" : "disabled"}>enabled: {String(aiAssistance.data.enabled)}</Badge>
+            <Badge tone={aiAssistance.data.modelCall ? "info" : "disabled"}>modelCall: {String(aiAssistance.data.modelCall)}</Badge>
             <Badge tone="warning">validation humaine obligatoire</Badge>
           </div>
           <p className="page-description">{aiAssistance.data.message}</p>
+          {aiOptOut.status === "success" ? (
+            <form action={setAiOptOutAction} className="inline-cluster">
+              <input type="hidden" name="optOut" value={aiOptOut.data.optedOut ? "false" : "true"} />
+              <input type="hidden" name="reason" value={aiOptOut.data.optedOut ? "Reactivation de l'assistance IA par le cabinet" : "Opt-out de l'assistance IA par le cabinet"} />
+              <Badge tone={aiOptOut.data.optedOut ? "warning" : "neutral"}>{aiOptOut.data.optedOut ? "Cabinet en opt-out IA" : "Assistance IA autorisee pour le cabinet"}</Badge>
+              <button type="submit" className="button button--secondary">{aiOptOut.data.optedOut ? "Reactiver l'assistance IA" : "Refuser l'assistance IA (opt-out cabinet)"}</button>
+            </form>
+          ) : null}
+          {aiNotice === "optout_saved" ? <p role="status">Preference IA du cabinet enregistree et auditee.</p> : null}
+          {aiNotice === "forbidden" ? <p role="alert">Seul le proprietaire du cabinet peut modifier la preference IA.</p> : null}
         </Card>
       ) : null}
 

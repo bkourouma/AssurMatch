@@ -6,8 +6,10 @@ import { MemoryRoutingDecisionsRepository, type RoutingDecisionsRepository } fro
 export interface RoutingDecisionRecord {
   id: string;
   quoteRequestId: string;
-  result: "assigned" | "blocked" | "no_broker_available";
+  result: "assigned" | "blocked" | "no_broker_available" | "pending_manual_assignment";
   selectedPartnerTenantId?: string;
+  /** Spec 042: every partner selected for this request; single-send holds one id. */
+  selectedPartnerTenantIds?: string[];
   candidateCount: number;
   excludedCandidates: Array<{ partnerTenantId: string; reasons: string[] }>;
   reasons: string[];
@@ -25,7 +27,11 @@ export class RoutingDecisionService {
       createdAt: new Date()
     };
     await this.repository.create(decision);
-    const action = decision.result === "assigned" ? QuoteAuditActions.routingAssigned : QuoteAuditActions.routingNoBrokerAvailable;
+    const action = decision.result === "assigned"
+      ? QuoteAuditActions.routingAssigned
+      : decision.result === "pending_manual_assignment"
+        ? QuoteAuditActions.routingEvaluated
+        : QuoteAuditActions.routingNoBrokerAvailable;
     this.audit.write({
       actor,
       action,
@@ -34,7 +40,12 @@ export class RoutingDecisionService {
       scope: { quoteRequestId: decision.quoteRequestId, partnerTenantId: decision.selectedPartnerTenantId },
       result: "success",
       reason: decision.reasons.join(","),
-      context: { candidateCount: decision.candidateCount, excludedCandidates: decision.excludedCandidates }
+      context: {
+        candidateCount: decision.candidateCount,
+        excludedCandidates: decision.excludedCandidates,
+        recipientCount: decision.selectedPartnerTenantIds?.length ?? (decision.selectedPartnerTenantId ? 1 : 0),
+        ...(decision.selectedPartnerTenantIds ? { selectedPartnerTenantIds: decision.selectedPartnerTenantIds } : {})
+      }
     });
     return decision;
   }

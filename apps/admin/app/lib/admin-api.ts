@@ -228,8 +228,9 @@ export interface BillingFoundationData {
 export interface AIAssistanceData {
   generatedAt: string;
   surface: "broker_crm" | "admin_platform";
-  enabled: false;
-  modelCall: false;
+  enabled: boolean;
+  modelCall: boolean;
+  provider?: string;
   humanValidationRequired: true;
   auditPolicy: "metadata_only";
   availableAssistTypes: string[];
@@ -426,6 +427,121 @@ export function readAdminAIAssistance() {
   return readAdmin<AIAssistanceData>("/admin/ai/assistance", emptyAIAssistance);
 }
 
+export interface AdminPartnerSlaRowData {
+  partnerTenantId: string;
+  partnerName: string;
+  plan: "starter" | "pro" | "enterprise";
+  firstActionTargetMinutes: number;
+  leadsMeasured: number;
+  leadsWithinTarget: number;
+  complianceRate: number;
+  averageFirstActionMinutes: number | null;
+}
+
+export function readPartnerSla() {
+  return readAdmin<AdminPartnerSlaRowData[]>("/admin/partners/sla", []);
+}
+
+export interface MessagingProviderStatusData {
+  channel: "sms" | "whatsapp";
+  enabled: boolean;
+  configured: boolean;
+  provider: string;
+  flagKey: string;
+  secretConfigured: boolean;
+  sendCapable: boolean;
+  reason: string;
+}
+
+export interface MessagingDeliveryData {
+  id: string;
+  channel: string;
+  status: "sent" | "refused" | "failed";
+  template: string;
+  recipientMasked: string;
+  provider: string;
+  partnerTenantId: string | null;
+  reason: string | null;
+  createdAt: string;
+}
+
+export function readMessagingProviders() {
+  return readAdmin<{ generatedAt: string; providers: MessagingProviderStatusData[]; restrictions: string[] }>("/admin/messaging/providers", { generatedAt: "", providers: [], restrictions: [] });
+}
+
+export function readMessagingDeliveries() {
+  return readAdmin<MessagingDeliveryData[]>("/admin/messaging/deliveries", []);
+}
+
+export interface BillingPlanPriceData {
+  id: string;
+  plan: "starter" | "pro" | "enterprise";
+  countryCode: string;
+  monthlySubscription: number;
+  perLeadPrice: number;
+  setupFee: number;
+  currency: "XOF";
+  updatedAt: string;
+}
+
+export interface DraftInvoiceData {
+  id: string;
+  partnerId: string;
+  partnerName: string;
+  plan: string;
+  countryCode: string;
+  reference: string;
+  status: "draft_not_billable";
+  paymentStatus: "not_applicable";
+  currency: "XOF";
+  lines: Array<{ kind: string; label: string; quantity: number; unitAmount: number; amount: number }>;
+  billableLeadCount: number;
+  nonBillableLeadCount: number;
+  disputeCreditCount: number;
+  packCreditsUsed: number;
+  totalAmount: number;
+  computedAt: string;
+}
+
+export interface LeadPackData {
+  id: string;
+  partnerId: string;
+  creditsGranted: number;
+  creditsConsumed: number;
+  creditsRemaining: number;
+  reason: string;
+  grantedAt: string;
+}
+
+export function readBillingPlans() {
+  return readAdmin<BillingPlanPriceData[]>("/admin/billing/plans", []);
+}
+
+export function readDraftInvoices() {
+  return readAdmin<{ items: DraftInvoiceData[]; total: number; paymentsEnabled: boolean; notice: string }>("/admin/billing/invoices", { items: [], total: 0, paymentsEnabled: false, notice: "" });
+}
+
+export function readLeadPacks() {
+  return readAdmin<LeadPackData[]>("/admin/billing/packs", []);
+}
+
+export interface AdminAiInsight {
+  id: string;
+  assistType: string;
+  status: "queued" | "completed" | "refused" | "failed";
+  fallback: boolean;
+  outputText: string | null;
+  humanValidationStatus: "not_required" | "pending" | "approved" | "rejected";
+  refusalReason: string | null;
+  disclaimer: string;
+  assistanceLabel: string;
+  createdAt: string;
+}
+
+export function listAdminAiInsights() {
+  return readAdmin<AdminAiInsight[]>("/admin/ai/insights", []);
+}
+
 export async function readPartnerIntegrations(): Promise<AdminApiState<PartnerIntegrationsData>> {
   const [apiKeys, webhookEndpoints, webhookAllowlist, webhookDeliveries] = await Promise.all([
     readAdmin<PartnerIntegrationsData["apiKeys"]>("/admin/partner-integrations/api-keys", emptyPartnerIntegrations.apiKeys),
@@ -444,6 +560,244 @@ export async function readPartnerIntegrations(): Promise<AdminApiState<PartnerIn
     ...(forbidden ? { forbidden } : {}),
     ...(error ? { error } : {})
   };
+}
+
+export type RoutingRuleMode = "first_eligible" | "round_robin" | "priority" | "capacity" | "performance" | "exclusive" | "manual" | "multi_send";
+
+export interface RoutingRuleData {
+  id: string;
+  countryId: string;
+  productId: string | null;
+  mode: RoutingRuleMode;
+  /** Spec 042: recipient cap used by the `multi_send` mode. */
+  maxRecipients: number;
+  status: "active" | "disabled";
+  priorities: Array<{ partnerTenantId: string; priority: number }>;
+  exclusivePartnerTenantId: string | null;
+  description: string | null;
+  version: number;
+  createdAt: string;
+  updatedAt: string;
+  createdById: string | null;
+}
+
+export interface RoutingRulesData {
+  generatedAt: string;
+  items: RoutingRuleData[];
+  total: number;
+}
+
+export interface PendingManualQuoteData {
+  quoteRequestId: string;
+  publicReference: string;
+  countryId: string;
+  countryCode: string;
+  productId: string;
+  productKey: string;
+  createdAt: string;
+  candidates: Array<{ partnerTenantId: string; legalName: string; plan: "starter" | "pro" | "enterprise"; eligible: boolean; reasons: string[] }>;
+}
+
+export interface PendingManualQueueData {
+  generatedAt: string;
+  items: PendingManualQuoteData[];
+  total: number;
+}
+
+const emptyRoutingRules: RoutingRulesData = { generatedAt: new Date(0).toISOString(), items: [], total: 0 };
+const emptyPendingQueue: PendingManualQueueData = { generatedAt: new Date(0).toISOString(), items: [], total: 0 };
+
+export interface QuoteFormDefinitionData {
+  id: string;
+  countryId: string;
+  productId: string;
+  language: string;
+  version: string;
+  status: "draft" | "published" | "suspended" | "retired";
+  consentTextId: string;
+  fieldCount: number;
+  dataMinimizationNotes?: string;
+  publishedAt?: string;
+  retiredAt?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface QuoteFormFieldInput {
+  key: string;
+  label: string;
+  type: "text" | "email" | "phone" | "number" | "select" | "checkbox" | "date";
+  required: boolean;
+  sensitivity: "public" | "personal" | "sensitive";
+  options?: string[];
+}
+
+export function readQuoteFormDefinitions() {
+  return readAdmin<QuoteFormDefinitionData[]>("/admin/quote-form-definitions", []);
+}
+
+export function createQuoteFormDefinition(input: {
+  countryId: string;
+  productId: string;
+  language: string;
+  version: string;
+  fields: QuoteFormFieldInput[];
+  consentTextId: string;
+  dataMinimizationNotes?: string;
+  reason: string;
+}) {
+  return writeAdmin<QuoteFormDefinitionData>("/admin/quote-form-definitions", "POST", { ...input, status: "draft" });
+}
+
+export function publishQuoteFormDefinition(formId: string, reason: string) {
+  return writeAdmin<QuoteFormDefinitionData>(`/admin/quote-form-definitions/${formId}/publish`, "POST", { reason });
+}
+
+export function retireQuoteFormDefinition(formId: string, reason: string) {
+  return writeAdmin<QuoteFormDefinitionData>(`/admin/quote-form-definitions/${formId}/retire`, "POST", { reason });
+}
+
+export function readRoutingRules() {
+  return readAdmin<RoutingRulesData>("/admin/routing-rules", emptyRoutingRules);
+}
+
+export function readRoutingPendingQueue() {
+  return readAdmin<PendingManualQueueData>("/admin/routing/pending", emptyPendingQueue);
+}
+
+export function createRoutingRule(input: {
+  countryId: string;
+  productId?: string | null;
+  mode: RoutingRuleMode;
+  priorities?: Array<{ partnerTenantId: string; priority: number }>;
+  exclusivePartnerTenantId?: string | null;
+  description?: string;
+  reason: string;
+}) {
+  return writeAdmin<RoutingRuleData>("/admin/routing-rules", "POST", input);
+}
+
+export function updateRoutingRule(ruleId: string, input: {
+  mode?: RoutingRuleMode;
+  status?: "active" | "disabled";
+  priorities?: Array<{ partnerTenantId: string; priority: number }>;
+  exclusivePartnerTenantId?: string | null;
+  description?: string | null;
+  reason: string;
+}) {
+  return writeAdmin<RoutingRuleData>(`/admin/routing-rules/${encodeURIComponent(ruleId)}`, "PATCH", input);
+}
+
+export function assignPendingQuote(quoteRequestId: string, input: { partnerTenantId: string; reason: string }) {
+  return writeAdmin<{ quoteRequestId: string; assignmentId: string; partnerTenantId: string; status: "routed" }>(`/admin/routing/pending/${encodeURIComponent(quoteRequestId)}/assign`, "POST", input);
+}
+
+export function reassignLead(assignmentId: string, input: { partnerTenantId: string; reason: string }) {
+  return writeAdmin<{ assignmentId: string; partnerTenantId: string; previousPartnerTenantId: string; status: string }>(`/admin/lead-assignments/${encodeURIComponent(assignmentId)}/reassign`, "POST", input);
+}
+
+export type ScoringCriterionKey = "guaranteeLevel" | "price" | "deductible" | "processingSpeed" | "paymentFlexibility" | "informationQuality" | "userPreferences";
+export type ScoringWeightsData = Record<ScoringCriterionKey, number>;
+
+export interface ScoringRuleData {
+  id: string;
+  countryId: string | null;
+  productId: string | null;
+  weights: ScoringWeightsData;
+  status: "active" | "disabled";
+  description: string | null;
+  version: number;
+  createdAt: string;
+  updatedAt: string;
+  createdById: string | null;
+}
+
+export interface ScoringRulesData {
+  generatedAt: string;
+  defaults: ScoringWeightsData;
+  items: ScoringRuleData[];
+  total: number;
+}
+
+export interface AdminOfferData {
+  id: string;
+  countryId: string;
+  productId: string;
+  partnerTenantId?: string;
+  name: string;
+  status: string;
+  validationStatus: string;
+  isSponsored: boolean;
+  guaranteeLevel?: number;
+  insurerName?: string;
+  validUntil: string;
+  updatedAt: string;
+}
+
+const emptyScoringRules: ScoringRulesData = {
+  generatedAt: new Date(0).toISOString(),
+  defaults: { guaranteeLevel: 30, price: 25, deductible: 15, processingSpeed: 10, paymentFlexibility: 10, informationQuality: 5, userPreferences: 5 },
+  items: [],
+  total: 0
+};
+
+export function readScoringRules() {
+  return readAdmin<ScoringRulesData>("/admin/scoring-rules", emptyScoringRules);
+}
+
+export function readAdminOffers() {
+  return readAdmin<AdminOfferData[]>("/admin/offers", []);
+}
+
+export function createScoringRule(input: { countryId?: string | null; productId?: string | null; weights: ScoringWeightsData; description?: string; reason: string }) {
+  return writeAdmin<ScoringRuleData>("/admin/scoring-rules", "POST", input);
+}
+
+export function updateScoringRule(ruleId: string, input: { weights?: ScoringWeightsData; status?: "active" | "disabled"; description?: string | null; reason: string }) {
+  return writeAdmin<ScoringRuleData>(`/admin/scoring-rules/${encodeURIComponent(ruleId)}`, "PATCH", input);
+}
+
+export function validateAdminOffer(offerId: string, input: { validationStatus: "validated" | "rejected"; reason: string }) {
+  return writeAdmin<AdminOfferData>(`/admin/offers/${encodeURIComponent(offerId)}/validate`, "POST", input);
+}
+
+export function suspendAdminOffer(offerId: string, reason: string) {
+  return writeAdmin<AdminOfferData>(`/admin/offers/${encodeURIComponent(offerId)}/suspend`, "POST", { reason });
+}
+
+export interface AdminQuoteDocumentData {
+  id: string;
+  quoteRequestId: string;
+  label: string;
+  documentKind: string;
+  fileName: string;
+  mimeType: string;
+  sizeBytes: number;
+  checksum: string;
+  scanStatus: "pending" | "clean" | "infected" | "failed";
+  scanEngine: string | null;
+  scanSignature: string | null;
+  status: "uploaded" | "available" | "quarantined" | "removed";
+  sharedWithBroker: boolean;
+  retentionUntil: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface AdminQuoteDocumentsData {
+  generatedAt: string;
+  quoteRequestId: string;
+  items: AdminQuoteDocumentData[];
+  total: number;
+}
+
+export function readAdminQuoteDocuments(quoteRequestId: string) {
+  return readAdmin<AdminQuoteDocumentsData>(`/admin/quote-requests/${encodeURIComponent(quoteRequestId)}/documents`, {
+    generatedAt: new Date(0).toISOString(),
+    quoteRequestId,
+    items: [],
+    total: 0
+  });
 }
 
 export function readAdminUsers(filters: { role?: string; status?: string } = {}) {

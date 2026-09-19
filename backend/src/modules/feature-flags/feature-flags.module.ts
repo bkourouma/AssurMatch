@@ -79,6 +79,36 @@ export class FeatureFlagsService {
       });
       throw new Error(mutationDecision.message);
     }
+    return this.persist(input, actor, existing, "feature_flag.changed", {});
+  }
+
+  /**
+   * Explicit compliance-policy path for sensitive flags (AI, regulated modules, billing, messaging).
+   * Never exposed over HTTP: it is reserved for compliance-approved operations (ops scripts, seeds,
+   * tests) and records the policy reference in the audit trail. Callers without a policy reference
+   * are refused exactly like a regular mutation.
+   */
+  async applyCompliancePolicy(
+    input: Omit<FeatureFlag, "id" | "changedAt" | "cacheVersion">,
+    actor: ActorContext,
+    policy: { reference: string; approvedBy: string }
+  ): Promise<FeatureFlag> {
+    const reference = policy.reference.trim();
+    const approvedBy = policy.approvedBy.trim();
+    if (!reference || !approvedBy) {
+      throw new Error(`Forbidden feature flag mutation: ${input.key} requires explicit compliance policy approval`);
+    }
+    const existing = this.flags.find((flag) => flag.key === input.key && flag.scopeType === input.scopeType && flag.scopeId === input.scopeId);
+    return this.persist(input, actor, existing, "feature_flag.policy_applied", { policyReference: reference, policyApprovedBy: approvedBy });
+  }
+
+  private async persist(
+    input: Omit<FeatureFlag, "id" | "changedAt" | "cacheVersion">,
+    actor: ActorContext,
+    existing: FeatureFlag | undefined,
+    auditAction: string,
+    auditContext: Record<string, unknown>
+  ): Promise<FeatureFlag> {
     const flag: FeatureFlag = existing ?? {
       id: crypto.randomUUID(),
       key: input.key,
@@ -109,13 +139,13 @@ export class FeatureFlagsService {
     await this.cache?.put(flag);
     this.audit.write({
       actor,
-      action: "feature_flag.changed",
+      action: auditAction,
       targetType: "FeatureFlag",
       targetId: flag.id,
       scope: { scopeType: flag.scopeType, scopeId: flag.scopeId },
       result: "success",
       reason: flag.reason,
-      context: { key: flag.key, previousValue, nextValue: flag.value }
+      context: { key: flag.key, previousValue, nextValue: flag.value, ...auditContext }
     });
     return flag;
   }

@@ -51,12 +51,23 @@ export interface LeadAssignmentRecord {
   assignedAdvisorId?: string;
   crmUpdatedAt?: Date;
   tags?: string[];
+  /** Spec 042: how many partners received this same request. 1 = exclusive lead. */
+  recipientCount?: number;
   createdAt: Date;
   updatedAt: Date;
 }
 
+/** Optional observer of assignment events (partner webhooks); never allowed to break the flow. */
+export interface LeadAssignmentEventObserver {
+  publish(eventType: "lead.assigned", partnerTenantId: string, data: Record<string, unknown>): Promise<void>;
+}
+
 export class LeadAssignmentService {
-  constructor(private readonly audit: AuditLogWriter, private readonly repository: LeadAssignmentsRepository = new MemoryLeadAssignmentsRepository()) {}
+  constructor(
+    private readonly audit: AuditLogWriter,
+    private readonly repository: LeadAssignmentsRepository = new MemoryLeadAssignmentsRepository(),
+    private readonly events?: LeadAssignmentEventObserver | undefined
+  ) {}
 
   async create(input: {
     quoteRequestId: string;
@@ -69,6 +80,7 @@ export class LeadAssignmentService {
     answers?: Record<string, unknown>;
     consentRecordId?: string;
     routingDecisionId?: string;
+    recipientCount?: number;
   }, actor: ActorContext): Promise<LeadAssignmentRecord> {
     const now = new Date();
     const assignment: LeadAssignmentRecord = {
@@ -85,6 +97,7 @@ export class LeadAssignmentService {
       answers: input.answers ?? {},
       ...(input.consentRecordId ? { consentRecordId: input.consentRecordId } : {}),
       ...(input.routingDecisionId ? { routingDecisionId: input.routingDecisionId } : {}),
+      recipientCount: input.recipientCount ?? 1,
       createdAt: now,
       updatedAt: now
     };
@@ -96,7 +109,14 @@ export class LeadAssignmentService {
       targetId: assignment.id,
       scope: { quoteRequestId: assignment.quoteRequestId, partnerTenantId: assignment.partnerTenantId },
       result: "success",
-      context: { status: assignment.status }
+      context: { status: assignment.status, recipientCount: assignment.recipientCount ?? 1 }
+    });
+    await this.events?.publish("lead.assigned", assignment.partnerTenantId, {
+      leadAssignmentId: assignment.id,
+      publicReference: assignment.publicReference,
+      countryCode: assignment.countryCode,
+      productKey: assignment.productKey,
+      status: assignment.status
     });
     return assignment;
   }
@@ -154,6 +174,45 @@ export class LeadAssignmentService {
       result: "success",
       reason,
       context: { status }
+    });
+    return assignment;
+  }
+
+  /**
+   * Moves an assignment to another partner (admin reassignment). Broker-side timestamps are reset
+   * so the new partner's SLA and dashboards start from the reassignment, and the previous partner
+   * loses access through the tenant filter. The history event is written under the new tenant.
+   */
+  async reassign(id: string, input: { partnerTenantId: string; routingDecisionId: string; reason: string; previousPartnerTenantId: string }, actor: ActorContext): Promise<LeadAssignmentRecord> {
+    const assignment = await this.require(id);
+    const now = new Date();
+    const previousStatus = assignment.status;
+    const update: Partial<LeadAssignmentRecord> = {
+      partnerTenantId: input.partnerTenantId,
+      status: "assigned",
+      assignedAt: now,
+      assignmentReason: "admin_reassigned",
+      routingDecisionId: input.routingDecisionId,
+      actionReason: input.reason,
+      updatedAt: now,
+      ...(actor.actorId ? { lastBrokerActionById: actor.actorId } : {}),
+      lastBrokerActionAt: now
+    };
+    for (const key of ["brokerNotificationId", "seenAt", "seenById", "acceptedAt", "rejectedAt", "disputedAt", "actionComment", "crmStatus", "assignedAdvisorId", "crmUpdatedAt"] as const) {
+      delete assignment[key];
+    }
+    Object.assign(assignment, update);
+    await this.repository.update(id, assignment);
+    await this.repository.appendHistory({
+      id: crypto.randomUUID(),
+      leadAssignmentId: id,
+      partnerTenantId: input.partnerTenantId,
+      ...(actor.actorId ? { actorId: actor.actorId } : {}),
+      eventType: "reassigned",
+      ...(previousStatus === "assigned" || previousStatus === "seen" || previousStatus === "accepted" || previousStatus === "rejected" || previousStatus === "disputed" ? { previousStatus } : {}),
+      nextStatus: "assigned",
+      comment: `Reassigned from partner ${input.previousPartnerTenantId}: ${input.reason}`.slice(0, 500),
+      occurredAt: now.toISOString()
     });
     return assignment;
   }

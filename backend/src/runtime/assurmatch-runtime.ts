@@ -2,6 +2,7 @@ import { QuoteAISummaryService } from "../modules/ai/quote-summary/quote-ai-summ
 import { ActivationChecklistModule } from "../modules/activation-checklist/activation-checklist.module";
 import { AIModule } from "../modules/ai/ai.module";
 import { BillingModule } from "../modules/billing/billing.module";
+import { PrismaBillingRepository } from "../modules/billing/billing.repository";
 import { AuditLogsModule } from "../modules/audit-logs/audit-logs.module";
 import { PrismaAuditLogRepository } from "../modules/audit-logs/audit-log-repository";
 import { ConfigModule } from "../config/config.module";
@@ -16,6 +17,10 @@ import { FeatureFlagCacheService } from "../modules/feature-flags/feature-flag-c
 import { PrismaFeatureFlagRepository } from "../modules/feature-flags/feature-flag-repository";
 import { LeadsModule } from "../modules/leads/leads.module";
 import { NotificationsModule } from "../modules/notifications/notifications.module";
+import { PrismaMessagingRepository } from "../modules/notifications/messaging.repository";
+import { BrokerNotificationsService } from "../modules/notifications/broker-notifications.service";
+import { EnterpriseService } from "../modules/enterprise/enterprise.service";
+import { PrismaEnterpriseRepository } from "../modules/enterprise/enterprise.repository";
 import { OffersModule } from "../modules/offers/offers.module";
 import { PartnerLicensesModule } from "../modules/partner-licenses/partner-licenses.module";
 import { PartnersModule } from "../modules/partners/partners.module";
@@ -25,21 +30,41 @@ import { QuoteFormsModule } from "../modules/quote-forms/quote-forms.module";
 import { QuoteRequestsModule } from "../modules/quote-requests/quote-requests.module";
 import { RegulatoryRegimesModule } from "../modules/regulatory-regimes/regulatory-regimes.module";
 import { RoutingModule } from "../modules/routing/routing.module";
+import { AiGateway } from "../modules/ai/core/ai-gateway.service";
+import { PrismaAiInteractionsRepository } from "../modules/ai/core/ai-interactions.repository";
+import { resolveAiProvider } from "../modules/ai/core/ai-provider.config";
+import { VisitorAiService } from "../modules/ai/visitor-ai.service";
+import { BrokerAiService } from "../modules/ai/broker-ai.service";
+import { AdminAiService } from "../modules/ai/admin-ai.service";
+import { LeadReassignmentService } from "../modules/routing/lead-reassignment.service";
+import { ManualRoutingService } from "../modules/routing/manual-routing.service";
+import { PrismaRoutingRulesRepository } from "../modules/routing/routing-rules.repository";
+import { RoutingRulesService } from "../modules/routing/routing-rules.service";
 import { SystemHealthModule } from "../modules/admin/system-health.module";
 import { UsersModule } from "../modules/users/users.module";
 import { PrismaUsersRepository } from "../modules/users/users.repository";
 import { AuthModule } from "../modules/auth/auth.module";
 import { RuntimeEmailDeliveryService } from "../modules/notifications/email/email-delivery.service";
+import { QuoteEmailTemplateService } from "../modules/notifications/email/quote-email-template.service";
+import { QuoteNotificationDeliveryService } from "../modules/notifications/quote-notification-delivery.service";
 import { PartnerEligibilityService } from "../modules/partners/partner-eligibility.service";
 import { PartnerIntegrationsModule } from "../modules/partner-integrations/partner-integrations.module";
 import { PrismaPartnerIntegrationsRepository } from "../modules/partner-integrations/partner-integrations.repository";
+import { PartnerWebhookEventPublisher } from "../modules/partner-integrations/partner-webhook-event-publisher";
 import { PrismaConsentRecordsRepository } from "../modules/consent/consent-records.repository";
 import { PrismaCountriesRepository } from "../modules/countries/countries.repository";
 import { PrismaProductsRepository } from "../modules/products/products.repository";
 import { PrismaOffersRepository } from "../modules/offers/offers.repository";
+import type { PublicOfferVisibilityContext } from "../modules/offers/public-offer-catalog.service";
+import { PrismaScoringRulesRepository } from "../modules/offers/scoring-rules.repository";
+import { resolveDocumentStorage, resolveVirusScanner } from "../modules/quote-documents/quote-documents.config";
+import { PrismaQuoteDocumentsRepository } from "../modules/quote-documents/quote-documents.repository";
+import { QuoteDocumentsService } from "../modules/quote-documents/quote-documents.service";
+import { ScoringRulesService } from "../modules/offers/scoring-rules.service";
 import { PrismaPartnersRepository } from "../modules/partners/partners.repository";
 import { PrismaPartnerLicensesRepository } from "../modules/partner-licenses/partner-licenses.repository";
 import { PrismaProspectsRepository } from "../modules/prospects/prospects.repository";
+import { PrismaQuoteFormDefinitionsRepository } from "../modules/quote-forms/quote-form-definitions.repository";
 import { PrismaQuoteRequestsRepository } from "../modules/quote-requests/quote-requests.repository";
 import { PrismaLeadAssignmentsRepository } from "../modules/leads/lead-assignments.repository";
 import { PrismaRoutingDecisionsRepository } from "../modules/leads/routing-decisions.repository";
@@ -65,11 +90,25 @@ export class AssurMatchRuntime {
   private readonly partnerIntegrationsRepository = this.runtimeRepository(new PrismaPartnerIntegrationsRepository(this.prisma));
   private readonly offersRepository = this.runtimeRepository(new PrismaOffersRepository(this.prisma));
   private readonly prospectsRepository = this.runtimeRepository(new PrismaProspectsRepository(this.prisma));
+  private readonly quoteFormDefinitionsRepository = this.runtimeRepository(new PrismaQuoteFormDefinitionsRepository(this.prisma));
   private readonly quoteRequestsRepository = this.runtimeRepository(new PrismaQuoteRequestsRepository(this.prisma));
+  private readonly routingRulesRepository = this.runtimeRepository(new PrismaRoutingRulesRepository(this.prisma));
+  private readonly scoringRulesRepository = this.runtimeRepository(new PrismaScoringRulesRepository(this.prisma));
+  private readonly quoteDocumentsRepository = this.runtimeRepository(new PrismaQuoteDocumentsRepository(this.prisma));
   readonly leadRepositorySet = this.leadRepositories();
   private readonly brokerCrmConfig = { brokerCrmEnabled: process.env.ASSURMATCH_BROKER_CRM_ENABLED === "true" };
   readonly audit = new AuditLogsModule(this.auditLogRepository);
   readonly emailDelivery = new RuntimeEmailDeliveryService(this.config.config.email, this.audit.writer);
+  /**
+   * Partner integrations are constructed later in this runtime, so the preparer is resolved lazily
+   * at publication time. Webhook failures never propagate into the lead or notification flow.
+   */
+  readonly partnerWebhookEvents: PartnerWebhookEventPublisher = new PartnerWebhookEventPublisher({
+    audit: this.audit.writer,
+    integrations: {
+      prepareWebhookDelivery: (input): Promise<unknown> => this.partnerIntegrations.service.prepareWebhookDelivery(input)
+    }
+  });
   readonly regulatoryRegimes = new RegulatoryRegimesModule(this.audit.writer);
   readonly countries = new CountriesModule(this.audit.writer, this.countriesRepository);
   readonly products = new ProductsModule(this.audit.writer, this.productsRepository);
@@ -84,13 +123,36 @@ export class AssurMatchRuntime {
     this.featureFlagRepository
   );
   readonly consent = new ConsentModule(this.audit.writer, this.consentRecordsRepository);
+  private readonly messagingRepository = this.runtimeRepository(new PrismaMessagingRepository(this.prisma));
   readonly notifications = new NotificationsModule(this.audit.writer, this.queues.notifications, this.notificationsRepository, {
     smsProvider: process.env.ASSURMATCH_SMS_PROVIDER,
     smsSecretConfigured: Boolean(process.env.ASSURMATCH_SMS_API_KEY),
     whatsappProvider: process.env.ASSURMATCH_WHATSAPP_PROVIDER,
     whatsappSecretConfigured: Boolean(process.env.ASSURMATCH_WHATSAPP_API_KEY)
-  }, this.featureFlags.service);
-  readonly ai = new AIModule(this.audit.writer, this.featureFlags.service);
+  }, this.featureFlags.service, this.messagingRepository, this.partnerWebhookEvents);
+  readonly brokerNotifications = new BrokerNotificationsService({ audit: this.audit.writer, dispatch: this.notifications.dispatch });
+  private readonly enterpriseRepository = this.runtimeRepository(new PrismaEnterpriseRepository(this.prisma));
+  private readonly aiInteractionsRepository = this.runtimeRepository(new PrismaAiInteractionsRepository(this.prisma));
+  private readonly aiProviders = resolveAiProvider();
+  readonly aiGateway = new AiGateway({
+    audit: this.audit.writer,
+    featureFlags: this.featureFlags.service,
+    provider: this.aiProviders.primary,
+    fallbackProvider: this.aiProviders.fallback,
+    queue: this.queues.notifications,
+    redis: this.redis.client,
+    ...(this.aiInteractionsRepository ? { repository: this.aiInteractionsRepository } : {}),
+    // Tests drive queued visitor interactions explicitly through processPending().
+    autoProcess: process.env.NODE_ENV !== "test"
+  });
+  readonly ai = new AIModule(this.audit.writer, this.featureFlags.service, this.aiGateway);
+  readonly visitorAi = new VisitorAiService({
+    audit: this.audit.writer,
+    gateway: this.aiGateway,
+    redis: this.redis.client,
+    countries: this.countries.service,
+    products: this.products.service
+  });
   readonly quoteAiSummary = new QuoteAISummaryService(this.notifications.queue, this.audit.writer, {
     id: "00000000-0000-4000-8000-000000000002",
     key: "quote_summary",
@@ -106,22 +168,54 @@ export class AssurMatchRuntime {
     productFlags: { product_ai_form_assistant_enabled: false }
   });
   readonly offers = new OffersModule(this.audit.writer, this.redis.client, this.offersRepository);
-  readonly quoteForms = new QuoteFormsModule(this.audit.writer, async () => (await this.consent.service.listTexts()).map((text) => ({
-    id: text.id,
-    version: text.version,
-    contentHash: text.contentHash,
-    purpose: "lead_transmission",
-    recipientCategory: text.recipientCategory,
-    status: text.status ?? "draft"
-  })));
+  readonly scoringRules = new ScoringRulesService({
+    audit: this.audit.writer,
+    countries: this.countries.service,
+    products: this.products.service,
+    ...(this.scoringRulesRepository ? { repository: this.scoringRulesRepository } : {})
+  });
+  readonly quoteForms = new QuoteFormsModule(this.audit.writer, {
+    consentTexts: async () => (await this.consent.service.listTexts()).map((text) => ({
+      id: text.id,
+      version: text.version,
+      contentHash: text.contentHash,
+      purpose: "lead_transmission" as const,
+      recipientCategory: text.recipientCategory,
+      status: text.status ?? "draft"
+    })),
+    // Spec 043 D3: the form is what actually collects the data, so publishing one with sensitive
+    // fields is what the product flag has to gate.
+    sensitiveDataEnabled: (productId: string) => this.featureFlags.service.isEnabled("product_sensitive_data_enabled", "product", productId),
+    ...(this.quoteFormDefinitionsRepository ? { repository: this.quoteFormDefinitionsRepository } : {})
+  });
   readonly prospects = new ProspectsModule(this.audit.writer, this.prospectsRepository);
+  readonly routingRules = new RoutingRulesService({
+    audit: this.audit.writer,
+    countries: this.countries.service,
+    products: this.products.service,
+    partners: this.partners.service,
+    ...(this.routingRulesRepository ? { repository: this.routingRulesRepository } : {})
+  });
   readonly leads = new LeadsModule(
     this.partners.service,
     this.partnerLicenses.service,
     this.audit.writer,
     this.brokerCrmConfig,
-    this.leadRepositorySet
+    this.leadRepositorySet,
+    {
+      rules: this.routingRules,
+      events: this.partnerWebhookEvents,
+      // Spec 042: multi-send needs the flag open AND the visitor's own recorded consent.
+      consent: { findRecord: (id: string) => this.consent.service.findRecord(id) },
+      multiBroker: { isEnabled: () => this.featureFlags.service.isEnabled("multi_broker_routing_enabled") }
+    }
   );
+  readonly enterprise = new EnterpriseService({
+    audit: this.audit.writer,
+    partners: this.partners.service,
+    assignments: this.leads.assignments,
+    ...(this.enterpriseRepository ? { repository: this.enterpriseRepository } : {})
+  });
   readonly quoteRequests = new QuoteRequestsModule({
     countries: this.countries.service,
     products: this.products.service,
@@ -134,6 +228,67 @@ export class AssurMatchRuntime {
     aiSummary: this.quoteAiSummary,
     isGlobalFlagEnabled: (key) => this.featureFlags.service.isEnabled(key)
   }, this.audit.writer, this.redis.client, this.quoteRequestsRepository);
+  /** Spec 044: drains the quote notification backlog into the email delivery service. */
+  readonly quoteNotificationDelivery = new QuoteNotificationDeliveryService({
+    notifications: this.notifications.service,
+    email: this.emailDelivery,
+    templates: new QuoteEmailTemplateService(),
+    audit: this.audit.writer,
+    // The stored row keeps ids only, so the ISO code and product key are resolved from the catalogue.
+    quotes: { findById: (id: string) => this.resolveQuoteScope(id) },
+    prospects: { findById: (id: string) => this.prospects.service.require(id).catch(() => undefined) },
+    partners: { findById: (id: string) => this.partners.service.require(id).catch(() => undefined) }
+  });
+  readonly quoteDocuments = new QuoteDocumentsService({
+    audit: this.audit.writer,
+    storage: resolveDocumentStorage(),
+    scanner: resolveVirusScanner(),
+    queue: this.queues.notifications,
+    redis: this.redis.client,
+    submissions: this.quoteRequests.submissions,
+    countries: this.countries.service,
+    products: this.products.service,
+    assignments: this.leads.assignments,
+    crmDocuments: this.leads.crmActivityRepository,
+    notifications: this.notifications.service,
+    isGlobalFlagEnabled: (key) => this.featureFlags.service.isEnabled(key),
+    ...(this.quoteDocumentsRepository ? { repository: this.quoteDocumentsRepository } : {}),
+    // Tests drive scans explicitly through processPendingScans(); runtime scans right after the response.
+    autoProcess: process.env.NODE_ENV !== "test",
+    requireDurableStorage: process.env.APP_ENV === "production" || process.env.APP_ENV === "preproduction"
+  });
+  readonly brokerAi = new BrokerAiService({
+    audit: this.audit.writer,
+    gateway: this.aiGateway,
+    featureFlags: this.featureFlags.service,
+    crmLeads: this.leads.brokerCrmLeads,
+    assignments: this.leads.assignments,
+    access: this.leads.brokerCrmAccess,
+    countries: this.countries.service,
+    products: this.products.service
+  });
+  readonly manualRouting = new ManualRoutingService({
+    audit: this.audit.writer,
+    submissions: this.quoteRequests.submissions,
+    eligibility: this.leads.eligibility,
+    countries: this.countries.service,
+    afterAssign: async (quoteRequestId, assignmentId) => {
+      await this.quoteDocuments.shareForAssignment(quoteRequestId, await this.leads.assignments.require(assignmentId));
+    }
+  });
+  readonly leadReassignment = new LeadReassignmentService({
+    audit: this.audit.writer,
+    assignments: this.leads.assignments,
+    eligibility: this.leads.eligibility,
+    decisions: this.leads.decisions,
+    countries: this.countries.service,
+    products: this.products.service,
+    notifyBroker: async (assignment, actor) => {
+      const notificationId = await this.quoteRequests.submissions.notifyBrokerForAssignment(assignment, actor);
+      await this.quoteDocuments.shareForAssignment(assignment.quoteRequestId, assignment);
+      return notificationId;
+    }
+  });
   readonly partnerEligibility = new PartnerEligibilityService(this.partners.service, this.partnerLicenses.service, this.documents.service);
   readonly routing = new RoutingModule(this.consent.service, this.partnerEligibility, this.audit.writer);
   readonly systemHealth = new SystemHealthModule(this.prisma, this.redis.client, this.queues.notifications);
@@ -145,6 +300,7 @@ export class AssurMatchRuntime {
     partnerLicenses: this.partnerLicenses.service,
     partners: this.partners.service,
     countries: this.countries.service,
+    products: this.products.service,
     offers: this.offers,
     quoteRequests: this.quoteRequests.submissions,
     crmActivity: this.leadRepositorySet.crmActivity,
@@ -161,11 +317,26 @@ export class AssurMatchRuntime {
     quoteForms: this.quoteForms.service,
     consent: this.consent.service
   });
+  readonly adminAi = new AdminAiService({
+    audit: this.audit.writer,
+    gateway: this.aiGateway,
+    dashboard: this.dashboards.admin,
+    complianceAlerts: this.dashboards.complianceAlerts,
+    activationChecklist: this.activationChecklist.service,
+    offers: this.offers.repository,
+    quoteRequests: this.quoteRequests.submissions
+  });
+  private readonly billingRepository = this.runtimeRepository(new PrismaBillingRepository(this.prisma));
   readonly billing = new BillingModule({
     audit: this.audit.writer,
     featureFlags: this.featureFlags.service,
     partners: this.partners.service,
-    assignments: this.leads.assignments
+    assignments: this.leads.assignments,
+    countries: this.countries.service,
+    products: this.products.service,
+    partnerLicenses: this.partnerLicenses.service,
+    crmActivity: this.leads.crmActivityRepository,
+    ...(this.billingRepository ? { repository: this.billingRepository } : {})
   });
   readonly partnerIntegrations = new PartnerIntegrationsModule({
     audit: this.audit.writer,
@@ -203,6 +374,32 @@ export class AssurMatchRuntime {
     };
   }
 
+  /**
+   * Shared visibility/enrichment context for every public offer read (list, detail, compare) so
+   * both HTTP wiring paths apply identical flags, eligibility, partner naming, popularity and scoring.
+   */
+  publicOfferContext(input: { countryFlags?: Partial<Record<string, boolean>> | undefined; productFlags?: Partial<Record<string, boolean>> | undefined } = {}): PublicOfferVisibilityContext {
+    return {
+      globalFlags: this.publicJourneyGlobalFlags(),
+      ...(input.countryFlags ? { countryFlags: input.countryFlags } : { resolveCountryFlags: async (countryId: string) => (await this.countries.service.require(countryId)).flags }),
+      ...(input.productFlags ? { productFlags: input.productFlags } : { resolveProductFlags: async (productId: string) => (await this.products.service.require(productId)).flags }),
+      evaluatePartnerEligibility: (partnerTenantId, countryId, productId) => this.publicOfferPartnerEligibility(partnerTenantId, countryId, productId),
+      resolvePartnerName: async (partnerTenantId) => {
+        const partner = await this.partners.service.require(partnerTenantId).catch(() => undefined);
+        return (partner as { tradeName?: string } | undefined)?.tradeName ?? partner?.legalName;
+      },
+      resolvePopularity: async (offerIds) => {
+        const wanted = new Set(offerIds);
+        const counts = new Map<string, number>();
+        for (const quote of await this.quoteRequests.submissions.list()) {
+          if (quote.selectedOfferId && wanted.has(quote.selectedOfferId)) counts.set(quote.selectedOfferId, (counts.get(quote.selectedOfferId) ?? 0) + 1);
+        }
+        return counts;
+      },
+      resolveScoringWeights: (countryId, productId) => this.scoringRules.resolveWeights(countryId, productId)
+    };
+  }
+
   async publicOfferPartnerEligibility(partnerTenantId: string, countryId: string, productId: string): Promise<{ eligible: boolean; reasons: string[] }> {
     const reasons: string[] = [];
     const partner = await this.partners.service.require(partnerTenantId);
@@ -222,6 +419,7 @@ export class AssurMatchRuntime {
       ProductsRepository: this.productsRepository?.mode,
       OffersRepository: this.offersRepository?.mode,
       ProspectsRepository: this.prospectsRepository?.mode,
+      QuoteFormDefinitionsRepository: this.quoteFormDefinitionsRepository?.mode,
       ConsentRecordsRepository: this.consentRecordsRepository?.mode,
       QuoteRequestsRepository: this.quoteRequestsRepository?.mode,
       LeadAssignmentsRepository: this.leadRepositorySet.assignments?.mode,
@@ -244,6 +442,27 @@ export class AssurMatchRuntime {
   private auditRepository() {
     if (process.env.NODE_ENV === "test") return undefined;
     return new PrismaAuditLogRepository(this.prisma);
+  }
+
+  /**
+   * Spec 044: the `QuoteRequest` table stores `countryId`/`productId` only - the Prisma repository
+   * strips the codes on write - so a record read back has `countryCode` and `productKey` undefined.
+   * Notification templates need the human-readable scope, so it is resolved from the catalogue here
+   * rather than by widening the repository contract for one consumer.
+   */
+  private async resolveQuoteScope(id: string) {
+    const quote = await this.quoteRequests.submissions.findById(id);
+    if (!quote) return undefined;
+    if (quote.countryCode && quote.productKey) return quote;
+    const [country, product] = await Promise.all([
+      this.countries.service.require(quote.countryId).catch(() => undefined),
+      this.products.service.require(quote.productId).catch(() => undefined)
+    ]);
+    return {
+      ...quote,
+      ...(country?.isoCode ? { countryCode: country.isoCode } : {}),
+      ...(product?.key ? { productKey: product.key } : {})
+    };
   }
 
   private runtimeRepository<T>(repository: T): T | undefined {

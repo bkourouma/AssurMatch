@@ -1,7 +1,9 @@
 import type {
+  AdvisorPerformanceRow,
   BrokerCrmDashboardSection,
   BrokerDashboardResponse,
   BrokerStarterDashboardSection,
+  DashboardComparison,
   DashboardScopeQuery,
   LicenseAlertItem
 } from "../../../../packages/shared/contracts/dashboard.contracts";
@@ -52,9 +54,94 @@ export class BrokerDashboardService {
       window: window.dto,
       starter,
       licenseAlerts,
-      ...(crm ? { crm } : {})
+      ...(crm ? { crm } : {}),
+      ...(query.compare === "previous" ? { comparison: this.buildComparison(assignments, window, query, starter) } : {})
     };
     return response;
+  }
+
+  /** DASH-B-006: same-length window immediately before the current one, with signed deltas. */
+  private buildComparison(
+    assignments: LeadAssignmentRecord[],
+    window: ResolvedDashboardWindow,
+    query: DashboardScopeQuery,
+    current: BrokerStarterDashboardSection
+  ): DashboardComparison {
+    const span = window.to.getTime() - window.from.getTime();
+    const previousWindow = { from: new Date(window.from.getTime() - span), to: new Date(window.from.getTime()) };
+    const previousRecords = this.applyOptionalFilters(
+      assignments.filter((assignment) => assignment.assignedAt >= previousWindow.from && assignment.assignedAt < previousWindow.to),
+      query
+    );
+    const previous = {
+      received: previousRecords.length,
+      accepted: previousRecords.filter((assignment) => assignment.status === "accepted").length,
+      refused: previousRecords.filter((assignment) => assignment.status === "rejected" || assignment.status === "disputed").length
+    };
+    const currentRefused = current.rejected + current.disputed;
+    return {
+      previousWindow: { from: previousWindow.from.toISOString(), to: previousWindow.to.toISOString() },
+      previous,
+      delta: {
+        received: current.received - previous.received,
+        accepted: current.accepted - previous.accepted,
+        refused: currentRefused - previous.refused
+      }
+    };
+  }
+
+  /** DASH-B-007: per-advisor view; an assigned-scope agent only ever sees its own row. */
+  async advisors(actor: ActorContext, query: DashboardScopeQuery): Promise<AdvisorPerformanceRow[]> {
+    const config = this.deps.config();
+    this.deps.access.assertBrokerDashboardAccess(actor, config.brokerDashboardEnabled);
+    const plan = this.resolvePlan(actor);
+    if (plan === "starter") throw new Error("Broker dashboard denied: crm_plan_not_allowed");
+    const assignedOnly = actor.roles.includes("broker_agent") || actor.roles.includes("broker_read_only");
+    const window = resolveDashboardWindow({ from: query.from, to: query.to });
+    const records = (await this.deps.assignments.list())
+      .filter((assignment) => assignment.partnerTenantId === actor.partnerTenantId && isWithinWindow(assignment.assignedAt, window))
+      .filter((assignment) => !assignedOnly || assignment.assignedAdvisorId === actor.actorId)
+      .filter((assignment) => Boolean(assignment.assignedAdvisorId));
+    const byAdvisor = new Map<string, LeadAssignmentRecord[]>();
+    for (const assignment of records) {
+      const advisorId = assignment.assignedAdvisorId as string;
+      byAdvisor.set(advisorId, [...(byAdvisor.get(advisorId) ?? []), assignment]);
+    }
+    const rows = [...byAdvisor.entries()].map(([advisorId, leads]) => {
+      const accepted = leads.filter((lead) => lead.status === "accepted").length;
+      const delays = leads.filter((lead) => lead.seenAt).map((lead) => ((lead.seenAt as Date).getTime() - lead.assignedAt.getTime()) / 60_000);
+      return {
+        advisorId,
+        received: leads.length,
+        accepted,
+        won: leads.filter((lead) => lead.crmStatus === "gagne").length,
+        lost: leads.filter((lead) => lead.crmStatus === "perdu").length,
+        conversionRate: leads.length === 0 ? 0 : accepted / leads.length,
+        averageFirstActionMinutes: delays.length === 0 ? null : Math.round(delays.reduce((sum, value) => sum + value, 0) / delays.length)
+      };
+    }).sort((left, right) => right.received - left.received);
+    this.deps.access.auditBrokerAdvisorRead(actor, rows.length);
+    return rows;
+  }
+
+  /** DASH-B-005: aggregate CSV export; no prospect identity is ever included. */
+  async exportCsv(actor: ActorContext, query: DashboardScopeQuery): Promise<string> {
+    const config = this.deps.config();
+    this.deps.access.assertBrokerDashboardAccess(actor, config.brokerDashboardEnabled);
+    this.deps.access.assertBrokerExport(actor);
+    const dashboard = await this.dashboard(actor, query);
+    const lines = ["section,dimension,valeur"];
+    lines.push(`fenetre,from,${dashboard.window.from}`);
+    lines.push(`fenetre,to,${dashboard.window.to}`);
+    for (const [key, value] of Object.entries(dashboard.starter)) {
+      if (typeof value === "number" || value === null) lines.push(`volumes,${key},${value ?? ""}`);
+    }
+    for (const entry of dashboard.starter.byProduct) lines.push(`produit,${entry.productKey},${entry.total}`);
+    for (const entry of dashboard.starter.byCountry) lines.push(`pays,${entry.countryCode},${entry.total}`);
+    for (const entry of dashboard.crm?.pipeline ?? []) lines.push(`pipeline,${entry.status},${entry.total}`);
+    for (const entry of dashboard.crm?.conversionByProduct ?? []) lines.push(`conversion,${entry.productKey},${Math.round(entry.rate * 100)}%`);
+    this.deps.access.auditBrokerExport(actor, lines.length - 1);
+    return lines.join("\n");
   }
 
   private resolvePlan(actor: ActorContext): "starter" | "pro" | "enterprise" {

@@ -48,31 +48,99 @@ export const productPageResponseSchema = publicProductSchema.extend({
   indicativeNotice: nonEmptyStringSchema
 });
 
+export const offerPaymentFlexibilitySchema = z.enum(["annual", "semiannual", "quarterly", "monthly"]);
+export const offerSortSchema = z.enum(["price_asc", "price_desc", "name_asc", "updated_desc", "sponsored_explicit", "coverage_desc", "speed_asc", "score_desc", "popularity_desc"]);
+/** Visitor preference feeding the `userPreferences` slot of the indicative score (PRD §15). */
+export const offerPreferenceSchema = z.enum(["price", "guarantees", "speed", "deductible", "flexibility"]);
+export const scoringCriteria = ["guaranteeLevel", "price", "deductible", "processingSpeed", "paymentFlexibility", "informationQuality", "userPreferences"] as const;
+export const scoringCriterionSchema = z.enum(scoringCriteria);
+
+export const offerGuaranteeSchema = z.object({
+  key: nonEmptyStringSchema.max(64),
+  label: nonEmptyStringSchema.max(120),
+  included: z.boolean(),
+  detail: z.string().max(300).optional()
+});
+
 export const offerListQuerySchema = z.object({
   minPrice: z.coerce.number().nonnegative().optional(),
   maxPrice: z.coerce.number().nonnegative().optional(),
   broker: z.string().trim().optional(),
-  sort: z.enum(["price_asc", "price_desc", "name_asc", "updated_desc", "sponsored_explicit"]).default("updated_desc")
+  minGuaranteeLevel: z.coerce.number().int().min(1).max(5).optional(),
+  maxDeductible: z.coerce.number().nonnegative().optional(),
+  maxProcessingDays: z.coerce.number().int().nonnegative().optional(),
+  insurer: z.string().trim().max(120).optional(),
+  guarantee: z.string().trim().max(64).optional(),
+  paymentFlexibility: offerPaymentFlexibilitySchema.optional(),
+  priority: offerPreferenceSchema.optional(),
+  sort: offerSortSchema.default("updated_desc")
 }).refine((value) => value.minPrice === undefined || value.maxPrice === undefined || value.minPrice <= value.maxPrice, {
   message: "minPrice must be less than or equal to maxPrice"
+});
+
+export const offerScoreBreakdownSchema = z.object({
+  criterion: scoringCriterionSchema,
+  weight: z.number().int().min(0).max(100),
+  score: z.number().min(0).max(1),
+  points: z.number().min(0).max(100),
+  explanation: nonEmptyStringSchema
+});
+
+export const offerScoreSchema = z.object({
+  total: z.number().int().min(0).max(100),
+  label: nonEmptyStringSchema,
+  breakdown: z.array(offerScoreBreakdownSchema)
 });
 
 export const offerSummarySchema = z.object({
   id: uuidSchema,
   name: nonEmptyStringSchema,
   brokerName: z.string().optional(),
+  partnerName: z.string().optional(),
+  insurerName: z.string().optional(),
   indicativePriceMin: z.number().nonnegative().optional(),
   indicativePriceMax: z.number().nonnegative().optional(),
   indicativePriceLabel: nonEmptyStringSchema,
   guaranteeSummary: z.string().optional(),
+  guaranteeLevel: z.number().int().min(1).max(5).optional(),
+  deductibleAmount: z.number().nonnegative().optional(),
+  coverageCeiling: z.number().nonnegative().optional(),
+  processingDelayDays: z.number().int().nonnegative().optional(),
+  paymentFlexibility: offerPaymentFlexibilitySchema.optional(),
+  guarantees: z.array(offerGuaranteeSchema).default([]),
   isSponsored: z.boolean(),
   sponsorLabel: z.string().optional(),
+  updatedAt: dateTimeStringSchema.optional(),
+  popularity: z.number().int().min(0).optional(),
+  score: offerScoreSchema.optional(),
   disclaimer: nonEmptyStringSchema
 });
 
 export const offerDetailSchema = offerSummarySchema.extend({
   validUntil: dateTimeStringSchema,
-  publicDisclaimers: z.array(nonEmptyStringSchema).min(1)
+  publicDisclaimers: z.array(nonEmptyStringSchema).min(1),
+  shortDescription: z.string().optional(),
+  exclusionsSummary: z.string().optional(),
+  requiredDocuments: z.array(nonEmptyStringSchema).default([]),
+  sourceOfInformation: z.string().optional()
+});
+
+export const offerCompareQuerySchema = z.object({
+  ids: z.string().transform((value) => value.split(",").map((item) => item.trim()).filter(Boolean)).pipe(z.array(uuidSchema).min(2).max(4)),
+  priority: offerPreferenceSchema.optional()
+});
+
+export const offerCompareRowSchema = z.object({
+  key: nonEmptyStringSchema,
+  label: nonEmptyStringSchema,
+  values: z.record(z.string(), z.union([z.string(), z.number(), z.boolean(), z.null()]))
+});
+
+export const offerCompareResponseSchema = z.object({
+  generatedAt: dateTimeStringSchema,
+  disclaimer: nonEmptyStringSchema,
+  items: z.array(offerDetailSchema).min(2).max(4),
+  rows: z.array(offerCompareRowSchema)
 });
 
 export const adminOfferUpsertSchema = z.object({
@@ -93,9 +161,28 @@ export const adminOfferUpsertSchema = z.object({
   isSponsored: z.boolean().default(false),
   sponsorLabel: z.string().optional(),
   publicDisclaimers: z.array(nonEmptyStringSchema).default(["offre indicative", "prix a confirmer par le courtier partenaire"]),
+  insurerName: z.string().trim().max(120).optional(),
+  guaranteeLevel: z.number().int().min(1).max(5).optional(),
+  deductibleAmount: z.number().nonnegative().optional(),
+  coverageCeiling: z.number().nonnegative().optional(),
+  processingDelayDays: z.number().int().nonnegative().max(365).optional(),
+  paymentFlexibility: offerPaymentFlexibilitySchema.optional(),
+  guarantees: z.array(offerGuaranteeSchema).max(50).default([]),
+  exclusionsSummary: z.string().max(1000).optional(),
+  requiredDocuments: z.array(nonEmptyStringSchema.max(120)).max(30).default([]),
+  sourceOfInformation: z.string().trim().max(200).optional(),
   reason: reasonSchema
 }).superRefine((value, ctx) => {
-  const publicText = [value.name, value.shortDescription, value.guaranteeSummary, value.sponsorLabel, ...value.publicDisclaimers]
+  const publicText = [
+    value.name,
+    value.shortDescription,
+    value.guaranteeSummary,
+    value.sponsorLabel,
+    value.insurerName,
+    value.exclusionsSummary,
+    ...value.publicDisclaimers,
+    ...value.guarantees.flatMap((guarantee) => [guarantee.label, guarantee.detail])
+  ]
     .filter((item): item is string => Boolean(item))
     .join(" ");
   const forbidden = findForbiddenWording(publicText);
@@ -142,6 +229,29 @@ export const adminQuoteFormDefinitionSchema = z.object({
   reason: reasonSchema
 });
 
+export const adminQuoteFormDefinitionListQuerySchema = z.object({
+  countryId: uuidSchema.optional(),
+  productId: uuidSchema.optional(),
+  language: nonEmptyStringSchema.optional(),
+  status: z.enum(["draft", "published", "suspended", "retired"]).optional()
+});
+
+export const adminQuoteFormDefinitionViewSchema = z.object({
+  id: uuidSchema,
+  countryId: uuidSchema,
+  productId: uuidSchema,
+  language: nonEmptyStringSchema,
+  version: nonEmptyStringSchema,
+  status: z.enum(["draft", "published", "suspended", "retired"]),
+  consentTextId: uuidSchema,
+  fieldCount: z.number().int().nonnegative(),
+  dataMinimizationNotes: z.string().optional(),
+  publishedAt: z.string().optional(),
+  retiredAt: z.string().optional(),
+  createdAt: z.string(),
+  updatedAt: z.string()
+});
+
 export const publicQuoteFormResponseSchema = z.object({
   formDefinitionId: uuidSchema,
   version: nonEmptyStringSchema,
@@ -166,7 +276,12 @@ export const quoteRequestCreateSchema = z.object({
     accepted: z.literal(true),
     consentTextId: uuidSchema,
     version: nonEmptyStringSchema,
-    contentHash: nonEmptyStringSchema
+    contentHash: nonEmptyStringSchema,
+    /**
+     * Spec 042 D2: the visitor decides whether several brokers may be contacted. Absent or false
+     * means single-broker, which is also what every consent recorded before this feature means.
+     */
+    multiBrokerAccepted: z.boolean().default(false)
   }),
   sessionId: z.string().optional(),
   ipAddress: z.string().optional()
@@ -231,7 +346,7 @@ export const brokerStarterLeadSummarySchema = brokerLeadSummarySchema.extend({
 
 export const brokerStarterLeadHistoryEventSchema = z.object({
   id: z.string(),
-  eventType: z.enum(["assigned", "viewed", "accepted", "rejected", "disputed", "notification_read", "exported", "blocked"]),
+  eventType: z.enum(["assigned", "reassigned", "viewed", "accepted", "rejected", "disputed", "notification_read", "exported", "blocked"]),
   previousStatus: brokerStarterLeadStatusSchema.optional(),
   nextStatus: brokerStarterLeadStatusSchema.optional(),
   reason: brokerStarterReasonSchema.optional(),
@@ -338,7 +453,13 @@ export const brokerCrmLeadSummarySchema = z.object({
   advisorId: z.string().optional(),
   prospectName: z.string().optional(),
   emailMasked: z.string().optional(),
-  phoneMasked: z.string().optional()
+  phoneMasked: z.string().optional(),
+  /**
+   * Spec 042 D1: a partner must know a lead is shared to understand its reduced price. The number
+   * of recipients is exposed; the identity of the co-recipients never is.
+   */
+  isShared: z.boolean().default(false),
+  recipientCount: z.number().int().min(1).default(1)
 });
 
 export const brokerCrmHistoryEventSchema = z.object({
@@ -481,10 +602,22 @@ export type ProductPageResponse = z.output<typeof productPageResponseSchema>;
 export type OfferListQuery = z.output<typeof offerListQuerySchema>;
 export type OfferSummary = z.output<typeof offerSummarySchema>;
 export type OfferDetail = z.output<typeof offerDetailSchema>;
+export type OfferGuarantee = z.output<typeof offerGuaranteeSchema>;
+export type OfferPaymentFlexibility = z.output<typeof offerPaymentFlexibilitySchema>;
+export type OfferPreference = z.output<typeof offerPreferenceSchema>;
+export type OfferSort = z.output<typeof offerSortSchema>;
+export type ScoringCriterion = z.output<typeof scoringCriterionSchema>;
+export type OfferScore = z.output<typeof offerScoreSchema>;
+export type OfferScoreBreakdown = z.output<typeof offerScoreBreakdownSchema>;
+export type OfferCompareQuery = z.output<typeof offerCompareQuerySchema>;
+export type OfferCompareRow = z.output<typeof offerCompareRowSchema>;
+export type OfferCompareResponse = z.output<typeof offerCompareResponseSchema>;
 export type AdminOfferUpsertDto = z.input<typeof adminOfferUpsertSchema>;
 export type OfferValidationDto = z.input<typeof offerValidationSchema>;
 export type QuoteFormFieldDto = z.output<typeof quoteFormFieldSchema>;
 export type AdminQuoteFormDefinitionDto = z.input<typeof adminQuoteFormDefinitionSchema>;
+export type AdminQuoteFormDefinitionListQuery = z.input<typeof adminQuoteFormDefinitionListQuerySchema>;
+export type AdminQuoteFormDefinitionView = z.output<typeof adminQuoteFormDefinitionViewSchema>;
 export type PublicQuoteFormResponse = z.output<typeof publicQuoteFormResponseSchema>;
 export type QuoteRequestCreateDto = z.input<typeof quoteRequestCreateSchema>;
 export type QuoteConfirmation = z.output<typeof quoteConfirmationSchema>;

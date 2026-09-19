@@ -2,13 +2,19 @@ import { z } from "zod";
 import { dateTimeStringSchema, nonEmptyStringSchema } from "../validation/common.schemas";
 
 export const aiAssistanceSurfaceSchema = z.enum(["broker_crm", "admin_platform"]);
-export const aiAssistTypeSchema = z.enum(["lead_summary", "next_action", "relaunch_message", "loss_analysis", "admin_risk_triage", "activation_gap_summary"]);
+export const aiAssistTypeSchema = z.enum([
+  "lead_summary", "lead_score", "next_action", "relaunch_message", "lead_classification", "duplicate_hint", "loss_analysis",
+  "admin_risk_triage", "activation_gap_summary", "offer_consistency_check", "activity_report", "suspicious_leads"
+]);
 
 export const aiAssistanceStatusSchema = z.object({
   generatedAt: dateTimeStringSchema,
   surface: aiAssistanceSurfaceSchema,
-  enabled: z.literal(false),
-  modelCall: z.literal(false),
+  /** True only when at least one assist type of the surface is enabled by flags for the actor's scope. */
+  enabled: z.boolean(),
+  /** True when a model provider (not the deterministic template) is configured. */
+  modelCall: z.boolean(),
+  provider: nonEmptyStringSchema.default("template"),
   humanValidationRequired: z.literal(true),
   auditPolicy: z.literal("metadata_only"),
   availableAssistTypes: z.array(aiAssistTypeSchema),

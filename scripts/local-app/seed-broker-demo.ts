@@ -82,7 +82,13 @@ interface CrmSeedInput extends QuoteSeedInput {
 const DEMO_ACTOR_ID = "local-demo-broker-seed";
 const DEMO_VERSION = "local-demo-v1";
 const RETENTION_UNTIL = new Date("2036-01-01T00:00:00.000Z");
-const DATE_2026 = new Date("2026-05-03T09:00:00.000Z");
+// Anchored to the run date, normalised to 09:00 UTC so repeated runs on the same day stay
+// idempotent, so seeded activity lands inside the dashboards' rolling windows and the
+// licence seeded a few weeks out still reads as expiring soon rather than expired.
+const SEED_NOW = (() => {
+  const now = new Date();
+  return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), 9, 0, 0, 0));
+})();
 
 const GLOBAL_FLAGS = [
   "public_comparator_enabled",
@@ -132,11 +138,11 @@ function assertLocalOnly(options: CliOptions): void {
 }
 
 function daysAgo(days: number): Date {
-  return new Date(DATE_2026.getTime() - days * 24 * 60 * 60 * 1000);
+  return new Date(SEED_NOW.getTime() - days * 24 * 60 * 60 * 1000);
 }
 
 function futureDays(days: number): Date {
-  return new Date(DATE_2026.getTime() + days * 24 * 60 * 60 * 1000);
+  return new Date(SEED_NOW.getTime() + days * 24 * 60 * 60 * 1000);
 }
 
 async function main(): Promise<void> {
@@ -366,13 +372,13 @@ async function seedConsentAndForms(prisma: PrismaClient, country: CountryRecord,
         version: DEMO_VERSION,
         status: "published",
         contentHash: `${product.key}-${DEMO_VERSION}-lead-transmission`,
-        publishedAt: DATE_2026,
+        publishedAt: SEED_NOW,
         createdById: DEMO_ACTOR_ID
       },
       update: {
         status: "published",
         contentHash: `${product.key}-${DEMO_VERSION}-lead-transmission`,
-        publishedAt: DATE_2026
+        publishedAt: SEED_NOW
       }
     });
     const existingForm = await prisma.quoteFormDefinition.findFirst({
@@ -390,7 +396,7 @@ async function seedConsentAndForms(prisma: PrismaClient, country: CountryRecord,
       ],
       consentTextId: consentText.id,
       dataMinimizationNotes: "Donnees synthetiques locales minimales",
-      publishedAt: DATE_2026,
+      publishedAt: SEED_NOW,
       createdById: DEMO_ACTOR_ID
     };
     if (existingForm) await prisma.quoteFormDefinition.update({ where: { id: existingForm.id }, data: formData });
@@ -498,7 +504,7 @@ async function upsertLicense(prisma: PrismaClient, partner: PartnerRecord, count
     effectiveDate: new Date("2026-01-01T00:00:00.000Z"),
     expirationDate,
     validatedById: DEMO_ACTOR_ID,
-    validatedAt: DATE_2026,
+    validatedAt: SEED_NOW,
     createdById: DEMO_ACTOR_ID
   };
   if (existing) await prisma.partnerLicense.update({ where: { id: existing.id }, data });
@@ -524,7 +530,7 @@ async function seedBrokerUsers(prisma: PrismaClient, partners: { starter: Partne
         status: "active",
         mfaStatus: "verified",
         passwordHash,
-        passwordChangedAt: DATE_2026,
+        passwordChangedAt: SEED_NOW,
         passwordChangeRequired: false,
         partnerTenantId: input.partner.id,
         countryScopes: ["CI"],
@@ -536,7 +542,7 @@ async function seedBrokerUsers(prisma: PrismaClient, partners: { starter: Partne
         status: "active",
         mfaStatus: "verified",
         passwordHash,
-        passwordChangedAt: DATE_2026,
+        passwordChangedAt: SEED_NOW,
         passwordChangeRequired: false,
         partnerTenantId: input.partner.id,
         countryScopes: ["CI"],
@@ -578,7 +584,7 @@ async function seedAdminUsers(prisma: PrismaClient, passwordHash: string): Promi
         status: "active",
         mfaStatus: "verified",
         passwordHash,
-        passwordChangedAt: DATE_2026,
+        passwordChangedAt: SEED_NOW,
         passwordChangeRequired: false,
         partnerTenantId: null,
         countryScopes: ["CI"],
@@ -590,7 +596,7 @@ async function seedAdminUsers(prisma: PrismaClient, passwordHash: string): Promi
         status: "active",
         mfaStatus: "verified",
         passwordHash,
-        passwordChangedAt: DATE_2026,
+        passwordChangedAt: SEED_NOW,
         passwordChangeRequired: false,
         partnerTenantId: null,
         countryScopes: ["CI"],
@@ -639,7 +645,7 @@ async function upsertOffer(prisma: PrismaClient, country: CountryRecord, product
       validUntil: new Date("2030-01-01T00:00:00.000Z"),
       publicDisclaimers: ["offre indicative", "prix a confirmer par le courtier partenaire"],
       validatedById: DEMO_ACTOR_ID,
-      validatedAt: DATE_2026,
+      validatedAt: SEED_NOW,
       createdById: DEMO_ACTOR_ID
     },
     update: {
@@ -654,7 +660,7 @@ async function upsertOffer(prisma: PrismaClient, country: CountryRecord, product
       validUntil: new Date("2030-01-01T00:00:00.000Z"),
       publicDisclaimers: ["offre indicative", "prix a confirmer par le courtier partenaire"],
       validatedById: DEMO_ACTOR_ID,
-      validatedAt: DATE_2026
+      validatedAt: SEED_NOW
     }
   });
 }
@@ -966,13 +972,13 @@ async function seedCrmActivity(prisma: PrismaClient, leadAssignmentId: string, i
       dueAt: input.urgency === "urgent" ? daysAgo(1) : futureDays(3),
       createdById: DEMO_ACTOR_ID,
       createdAt: daysAgo(input.assignedDaysAgo),
-      updatedAt: DATE_2026
+      updatedAt: SEED_NOW
     },
     update: {
       assigneeId: input.advisorId,
       title: input.crmStatus === "injoignable" ? "Tenter un nouvel appel" : "Qualifier la demande",
       dueAt: input.urgency === "urgent" ? daysAgo(1) : futureDays(3),
-      updatedAt: DATE_2026
+      updatedAt: SEED_NOW
     }
   });
   await prisma.brokerCrmReminder.upsert({
@@ -1048,13 +1054,13 @@ async function seedCrmActivity(prisma: PrismaClient, leadAssignmentId: string, i
         status: "opened",
         createdById: DEMO_ACTOR_ID,
         createdAt: daysAgo(Math.max(input.assignedDaysAgo - 2, 0)),
-        updatedAt: DATE_2026
+        updatedAt: SEED_NOW
       },
       update: {
         reason: "client_abandoned",
         comment: "Cas local de suivi commercial perdu.",
         status: "opened",
-        updatedAt: DATE_2026
+        updatedAt: SEED_NOW
       }
     });
   }

@@ -2,9 +2,13 @@ import type { BillingFoundationQuery, BillingFoundationResponse } from "../../..
 import type { AuditLogWriter } from "../audit-logs/audit-log-writer.service";
 import type { ActorContext } from "../common/types";
 import type { FeatureFlagsService } from "../feature-flags/feature-flags.module";
+import type { CountriesService } from "../countries/countries.module";
 import type { LeadAssignmentService } from "../leads/lead-assignment.service";
+import type { PartnerLicensesService } from "../partner-licenses/partner-licenses.module";
 import type { PartnersService } from "../partners/partners.module";
+import type { ProductsService } from "../products/products.module";
 import { BillingAuditActions } from "./billing-audit-actions";
+import { countryCatalog, productCatalog, resolveScopeCodes } from "../common/scope/actor-scope-codes";
 import { roleHasPermission } from "../../../../packages/shared/rbac/assurmatch-role-matrix";
 
 const BILLING_RESTRICTIONS = [
@@ -14,6 +18,17 @@ const BILLING_RESTRICTIONS = [
   "no_invoice_issuance",
   "draft_lead_counts_only"
 ] as const;
+
+/**
+ * Raised when a billing mutation is attempted while `billing_enabled` is closed. The wording stays
+ * free of "denied"/"invalid" so the HTTP mapping answers 422 (module disabled), not 403.
+ */
+export class BillingDisabledError extends Error {
+  constructor(public readonly reason: string) {
+    super(`Billing module is disabled by the billing_enabled feature flag: ${reason}`);
+    this.name = "BillingDisabledError";
+  }
+}
 
 export class BillingAccessRefusedError extends Error {
   constructor(public readonly reason: string) {
@@ -27,6 +42,9 @@ export interface BillingFoundationDeps {
   featureFlags: FeatureFlagsService;
   partners: PartnersService;
   assignments: LeadAssignmentService;
+  countries: CountriesService;
+  products: ProductsService;
+  partnerLicenses: PartnerLicensesService;
 }
 
 export class BillingFoundationService {
@@ -34,20 +52,32 @@ export class BillingFoundationService {
 
   async read(actor: ActorContext, query: BillingFoundationQuery): Promise<BillingFoundationResponse> {
     this.assertAccess(actor);
-    const [partners, assignments] = await Promise.all([
+    const [partners, assignments, countries, products] = await Promise.all([
       this.deps.partners.list(),
-      this.deps.assignments.list()
+      this.deps.assignments.list(),
+      this.deps.countries.listAdmin(),
+      this.deps.products.listAdmin()
     ]);
+    // Scopes are stored as catalog ids but assignments carry ISO codes and product keys.
+    const countryScopes = resolveScopeCodes(actor.countryScopes, countryCatalog(countries));
+    const productScopes = resolveScopeCodes(actor.productScopes, productCatalog(products));
     const period = this.currentMonth();
     const scopedAssignments = assignments.filter((assignment) =>
       assignment.assignedAt >= period.from
       && assignment.assignedAt <= period.to
-      && this.assignmentInScope(actor, assignment)
+      && this.assignmentInScope(actor, assignment, countryScopes, productScopes)
     );
     const scopedPartnerIds = new Set(scopedAssignments.map((assignment) => assignment.partnerTenantId));
+    // Partner scope follows the partner's licensed countries, not this month's activity: a partner
+    // that received no lead this month is still in scope and gets a zero-count draft row.
+    const licensedPartnerIds = await this.licensedPartnerIds(partners, countryScopes, countries);
+    const inScope = (partnerId: string): boolean =>
+      actor.roles.includes("super_admin") || scopedPartnerIds.has(partnerId) || licensedPartnerIds.has(partnerId);
+    if (query.partnerId && !(partners.some((partner) => partner.id === query.partnerId) && inScope(query.partnerId))) {
+      this.refuse(actor, "out_of_scope_partner");
+    }
     const scopedPartners = (query.partnerId ? partners.filter((partner) => partner.id === query.partnerId) : partners)
-      .filter((partner) => actor.roles.includes("super_admin") || scopedPartnerIds.has(partner.id));
-    if (query.partnerId && !scopedPartners.some((partner) => partner.id === query.partnerId)) this.refuse(actor, "out_of_scope_partner");
+      .filter((partner) => inScope(partner.id));
     const allPartnerSummaries = scopedPartners.map((partner) => {
       const partnerAssignments = scopedAssignments.filter((assignment) => assignment.partnerTenantId === partner.id);
       const acceptedLeadCount = partnerAssignments.filter((assignment) => assignment.status === "accepted").length;
@@ -103,11 +133,32 @@ export class BillingFoundationService {
     }
   }
 
-  private assignmentInScope(actor: ActorContext, assignment: { countryCode?: string; productKey?: string }): boolean {
+  private assignmentInScope(
+    actor: ActorContext,
+    assignment: { countryCode?: string; productKey?: string },
+    countryScopes: string[],
+    productScopes: string[]
+  ): boolean {
     if (actor.roles.includes("super_admin")) return true;
-    if (actor.countryScopes?.length && (!assignment.countryCode || !actor.countryScopes.includes(assignment.countryCode))) return false;
-    if (actor.productScopes?.length && (!assignment.productKey || !actor.productScopes.includes(assignment.productKey))) return false;
+    if (countryScopes.length && (!assignment.countryCode || !countryScopes.includes(assignment.countryCode))) return false;
+    if (productScopes.length && (!assignment.productKey || !productScopes.includes(assignment.productKey))) return false;
     return true;
+  }
+
+  private async licensedPartnerIds(
+    partners: ReadonlyArray<{ id: string }>,
+    countryScopes: string[],
+    countries: ReadonlyArray<{ id: string; isoCode: string }>
+  ): Promise<Set<string>> {
+    if (countryScopes.length === 0) return new Set(partners.map((partner) => partner.id));
+    const scopedCountryIds = new Set(
+      countries.filter((country) => countryScopes.includes(country.isoCode)).map((country) => country.id)
+    );
+    const licensed = await Promise.all(partners.map(async (partner) => {
+      const licenses = await this.deps.partnerLicenses.listForPartner(partner.id);
+      return licenses.some((license) => scopedCountryIds.has(license.countryId)) ? partner.id : undefined;
+    }));
+    return new Set(licensed.filter((id): id is string => Boolean(id)));
   }
 
   private refuse(actor: ActorContext, reason: string): never {

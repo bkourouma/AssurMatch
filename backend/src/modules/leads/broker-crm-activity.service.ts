@@ -71,7 +71,8 @@ export class BrokerCrmActivityService {
   async addDocument(id: string, input: unknown, actor: ActorContext): Promise<BrokerCrmDocument> {
     const assignment = await this.requireMutable(id, actor);
     const parsed = brokerCrmDocumentCreateSchema.parse(input);
-    const document: BrokerCrmDocument = { id: crypto.randomUUID(), leadAssignmentId: id, label: parsed.label, storageKey: parsed.storageKey, visibility: parsed.visibility, createdAt: new Date().toISOString() };
+    // partnerTenantId is required by the persistence model even though the public DTO omits it.
+    const document: BrokerCrmDocument & { partnerTenantId: string } = { id: crypto.randomUUID(), leadAssignmentId: id, partnerTenantId: assignment.partnerTenantId, label: parsed.label, storageKey: parsed.storageKey, visibility: parsed.visibility, createdAt: new Date().toISOString() };
     await this.repository.addDocument(document);
     await this.track(assignment, actor, "document_added", QuoteAuditActions.brokerCrmDocumentAdded);
     return document;

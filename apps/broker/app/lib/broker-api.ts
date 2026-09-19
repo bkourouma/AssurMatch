@@ -178,8 +178,9 @@ export interface BrokerDashboardData {
 export interface BrokerAIAssistanceData {
   generatedAt: string;
   surface: "broker_crm";
-  enabled: false;
-  modelCall: false;
+  enabled: boolean;
+  modelCall: boolean;
+  provider?: string;
   humanValidationRequired: true;
   auditPolicy: "metadata_only";
   availableAssistTypes: string[];
@@ -209,6 +210,220 @@ export function readBrokerDashboard() {
   return readBroker<BrokerDashboardData>("/broker/dashboard", emptyDashboard);
 }
 
+export interface BrokerCrmLeadDetailData {
+  leadAssignmentId: string;
+  publicReference: string;
+  countryCode: string;
+  productKey: string;
+  status: string;
+  assignedAt: string;
+  /** Spec 042: a shared lead is billed at a reduced price; co-recipient identities stay hidden. */
+  isShared?: boolean;
+  recipientCount?: number;
+  urgency: string;
+  source: string;
+  prospectName?: string;
+  emailMasked?: string;
+  phoneMasked?: string;
+  answers: Record<string, unknown>;
+  history: Array<Record<string, unknown>>;
+  notes: Array<Record<string, unknown>>;
+  tasks: Array<Record<string, unknown>>;
+  documents: Array<Record<string, unknown>>;
+  proposals: Array<Record<string, unknown>>;
+}
+
+export interface BrokerAiInteraction {
+  id: string;
+  assistType: string;
+  status: "queued" | "completed" | "refused" | "failed";
+  fallback: boolean;
+  outputText: string | null;
+  outputData: unknown;
+  humanValidationStatus: "not_required" | "pending" | "approved" | "rejected";
+  refusalReason: string | null;
+  disclaimer: string;
+  assistanceLabel: string;
+  createdAt: string;
+}
+
+export interface BrokerAiOptOutData {
+  partnerTenantId: string;
+  optedOut: boolean;
+  updatedAt: string | null;
+}
+
+const emptyLeadDetail: BrokerCrmLeadDetailData = {
+  leadAssignmentId: "",
+  publicReference: "",
+  countryCode: "",
+  productKey: "",
+  status: "nouveau",
+  assignedAt: "",
+  urgency: "normal",
+  source: "quote_request",
+  answers: {},
+  history: [],
+  notes: [],
+  tasks: [],
+  documents: [],
+  proposals: []
+};
+
+export function readCrmLeadDetail(leadAssignmentId: string) {
+  return readBroker<BrokerCrmLeadDetailData>(`/broker/crm/leads/${encodeURIComponent(leadAssignmentId)}`, emptyLeadDetail);
+}
+
+export function listLeadAiInteractions(leadAssignmentId: string) {
+  return readBroker<BrokerAiInteraction[]>(`/broker/crm/leads/${encodeURIComponent(leadAssignmentId)}/ai`, []);
+}
+
+export interface BrokerBillingStatementData {
+  generatedAt: string;
+  partnerTenantId: string;
+  plan: "starter" | "pro" | "enterprise";
+  billingEnabled: boolean;
+  paymentsEnabled: false;
+  collectionEnabled: false;
+  currency: "XOF";
+  period: { from: string; to: string };
+  leadsReceived: number;
+  billableLeadCount: number;
+  nonBillableLeadCount: number;
+  disputeCreditCount: number;
+  packCreditsRemaining: number;
+  estimatedAmount: number;
+  draft: { reference: string; totalAmount: number; status: string } | null;
+  notice: string;
+}
+
+const emptyStatement: BrokerBillingStatementData = {
+  generatedAt: "",
+  partnerTenantId: "",
+  plan: "starter",
+  billingEnabled: false,
+  paymentsEnabled: false,
+  collectionEnabled: false,
+  currency: "XOF",
+  period: { from: "", to: "" },
+  leadsReceived: 0,
+  billableLeadCount: 0,
+  nonBillableLeadCount: 0,
+  disputeCreditCount: 0,
+  packCreditsRemaining: 0,
+  estimatedAmount: 0,
+  draft: null,
+  notice: ""
+};
+
+export interface BrokerInboxNotification {
+  id: string;
+  type: string;
+  title: string;
+  body: string;
+  targetType: string | null;
+  targetId: string | null;
+  read: boolean;
+  createdAt: string;
+}
+
+export interface BrokerNotificationPreferences {
+  scopeId: string;
+  email: true;
+  inApp: true;
+  sms: boolean;
+  whatsapp: boolean;
+  updatedAt: string | null;
+}
+
+export function readBrokerInbox() {
+  return readBroker<BrokerInboxNotification[]>("/broker/notifications/inbox", []);
+}
+
+export function readBrokerNotificationPreferences() {
+  return readBroker<BrokerNotificationPreferences>("/broker/notifications/preferences", { scopeId: "", email: true, inApp: true, sms: false, whatsapp: false, updatedAt: null });
+}
+
+/** DASH-B-008: consommation de leads et brouillon du cabinet, sans paiement ni facture emise. */
+export function readBrokerBillingStatement() {
+  return readBroker<BrokerBillingStatementData>("/broker/billing/statement", emptyStatement);
+}
+
+export function readBrokerAiOptOut() {
+  return readBroker<BrokerAiOptOutData>("/broker/crm/ai/opt-out", { partnerTenantId: "", optedOut: false, updatedAt: null });
+}
+
 export function readBrokerAIAssistance() {
   return readBroker<BrokerAIAssistanceData>("/broker/crm/ai-assistance", emptyAIAssistance);
+}
+
+export interface BrokerAgency {
+  id: string;
+  name: string;
+  countryCode: string;
+  city: string | null;
+  status: "active" | "suspended";
+  memberCount: number;
+}
+
+export interface BrokerCustomRole {
+  id: string;
+  name: string;
+  permissions: string[];
+  rejectedPermissions: string[];
+}
+
+export interface BrokerSla {
+  partnerTenantId: string;
+  firstActionTargetMinutes: number;
+  windowDays: number;
+  leadsMeasured: number;
+  leadsWithinTarget: number;
+  complianceRate: number;
+  averageFirstActionMinutes: number | null;
+}
+
+export interface BrokerBrandingData {
+  partnerTenantId: string;
+  displayLabel: string;
+  primaryColor: string;
+  platformMention: string;
+}
+
+export function readBrokerAgencies() {
+  return readBroker<BrokerAgency[]>("/broker/enterprise/agencies", []);
+}
+
+export function readBrokerCustomRoles() {
+  return readBroker<BrokerCustomRole[]>("/broker/enterprise/roles", []);
+}
+
+export function readBrokerSla() {
+  return readBroker<BrokerSla>("/broker/enterprise/sla", { partnerTenantId: "", firstActionTargetMinutes: 240, windowDays: 30, leadsMeasured: 0, leadsWithinTarget: 0, complianceRate: 0, averageFirstActionMinutes: null });
+}
+
+export function readBrokerBranding() {
+  return readBroker<BrokerBrandingData>("/broker/enterprise/branding", { partnerTenantId: "", displayLabel: "Espace courtier", primaryColor: "#1f2937", platformMention: "Plateforme technique AssurMatch" });
+}
+
+export interface BrokerAdvisorRow {
+  advisorId: string;
+  received: number;
+  accepted: number;
+  won: number;
+  lost: number;
+  conversionRate: number;
+  averageFirstActionMinutes: number | null;
+}
+
+export function readBrokerAdvisors() {
+  return readBroker<BrokerAdvisorRow[]>("/broker/dashboard/advisors", []);
+}
+
+/** DASH-B-006: dashboard with the previous-period comparison section. */
+export function readBrokerDashboardWithComparison() {
+  return readBroker<BrokerDashboardData & { comparison?: { previous: { received: number; accepted: number; refused: number }; delta: { received: number; accepted: number; refused: number } } }>(
+    "/broker/dashboard?compare=previous",
+    emptyDashboard
+  );
 }

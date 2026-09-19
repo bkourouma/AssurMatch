@@ -200,21 +200,15 @@ export class RuntimeHttpController {
     const country = await this.runtime.countries.service.findByIsoCode(parsedCountryCode);
     const product = await this.runtime.products.service.findByKey(parsedProductKey);
     if (!country || !product) return { items: [], total: 0, page: 1, pageSize: 20 };
-    return this.runtime.offers.publicCatalog.list(country.id, product.id, parsedQuery, undefined, {
-      globalFlags: this.runtime.publicJourneyGlobalFlags(),
-      countryFlags: country.flags,
-      productFlags: product.flags,
-      evaluatePartnerEligibility: (partnerTenantId, offerCountryId, offerProductId) => this.runtime.publicOfferPartnerEligibility(partnerTenantId, offerCountryId, offerProductId)
-    });
+    return this.runtime.offers.publicCatalog.list(country.id, product.id, parsedQuery, undefined, this.runtime.publicOfferContext({ countryFlags: country.flags, productFlags: product.flags }));
+  }
+
+  offersCompare(query: Record<string, string>) {
+    return this.runtime.offers.publicCatalog.compare({ ids: String(query.ids ?? ""), priority: query.priority }, undefined, this.runtime.publicOfferContext());
   }
 
   offerDetail(offerId: string) {
-    return this.runtime.offers.publicCatalog.detail(parseParam("offerId", offerId, optionalUuidParamSchema), undefined, {
-      globalFlags: this.runtime.publicJourneyGlobalFlags(),
-      resolveCountryFlags: async (countryId) => (await this.runtime.countries.service.require(countryId)).flags,
-      resolveProductFlags: async (productId) => (await this.runtime.products.service.require(productId)).flags,
-      evaluatePartnerEligibility: (partnerTenantId, countryId, productId) => this.runtime.publicOfferPartnerEligibility(partnerTenantId, countryId, productId)
-    });
+    return this.runtime.offers.publicCatalog.detail(parseParam("offerId", offerId, optionalUuidParamSchema), undefined, this.runtime.publicOfferContext());
   }
 
   async quoteForm(countryCode: string, productKey: string, language = "fr") {
@@ -405,6 +399,7 @@ decorate("countryDetail", [Get("countries/:countryCode") as MethodDecoratorFacto
 decorate("products", [Get("countries/:countryCode/products") as MethodDecoratorFactory], [[0, Param("countryCode") as ParamDecoratorFactory]]);
 decorate("productDetail", [Get("countries/:countryCode/products/:productKey") as MethodDecoratorFactory], [[0, Param("countryCode") as ParamDecoratorFactory], [1, Param("productKey") as ParamDecoratorFactory], [2, Headers() as ParamDecoratorFactory]]);
 decorate("offers", [Get("countries/:countryCode/products/:productKey/offers") as MethodDecoratorFactory], [[0, Param("countryCode") as ParamDecoratorFactory], [1, Param("productKey") as ParamDecoratorFactory], [2, Query() as ParamDecoratorFactory]]);
+decorate("offersCompare", [Get("offers/compare") as MethodDecoratorFactory], [[0, Query() as ParamDecoratorFactory]]);
 decorate("offerDetail", [Get("offers/:offerId") as MethodDecoratorFactory], [[0, Param("offerId") as ParamDecoratorFactory]]);
 decorate("quoteForm", [Get("countries/:countryCode/products/:productKey/quote-form") as MethodDecoratorFactory], [[0, Param("countryCode") as ParamDecoratorFactory], [1, Param("productKey") as ParamDecoratorFactory], [2, Query("language") as ParamDecoratorFactory]]);
 decorate("submitQuote", [Post("quote-requests") as MethodDecoratorFactory], [[0, Body() as ParamDecoratorFactory], [1, Headers() as ParamDecoratorFactory]]);

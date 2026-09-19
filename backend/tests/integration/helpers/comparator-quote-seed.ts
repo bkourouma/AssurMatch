@@ -51,14 +51,16 @@ export function createComparatorApp(): ComparatorApp {
   const partners = new PartnersModule(audit.writer);
   const partnerLicenses = new PartnerLicensesModule(audit.writer);
   const offers = new OffersModule(audit.writer, redis.client);
-  const quoteForms = new QuoteFormsModule(audit.writer, async () => (await consent.service.listTexts()).map((text) => ({
-    id: text.id,
-    version: text.version,
-    contentHash: text.contentHash,
-    purpose: "lead_transmission",
-    recipientCategory: text.recipientCategory,
-    status: text.status ?? "draft"
-  })));
+  const quoteForms = new QuoteFormsModule(audit.writer, {
+    consentTexts: async () => (await consent.service.listTexts()).map((text) => ({
+      id: text.id,
+      version: text.version,
+      contentHash: text.contentHash,
+      purpose: "lead_transmission" as const,
+      recipientCategory: text.recipientCategory,
+      status: text.status ?? "draft"
+    }))
+  });
   const prospects = new ProspectsModule(audit.writer);
   const leads = new LeadsModule(partners.service, partnerLicenses.service, audit.writer);
   const notifications = new NotificationsModule(audit.writer);

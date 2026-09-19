@@ -39,7 +39,10 @@ function refineWindow(value: { from?: string | undefined; to?: string | undefine
 
 export const dashboardTimeWindowSchema = baseTimeWindowObject.superRefine(refineWindow);
 
+export const dashboardCompareSchema = z.enum(["previous"]);
+
 const baseScopeQueryObject = baseTimeWindowObject.extend({
+  compare: dashboardCompareSchema.optional(),
   country: isoCountrySchema.optional(),
   product: nonEmptyStringSchema.optional(),
   partnerId: uuidSchema.optional(),
@@ -108,7 +111,8 @@ export const brokerDashboardResponseSchema = z.object({
   window: dashboardWindowDtoSchema,
   starter: brokerStarterDashboardSectionSchema,
   crm: brokerCrmDashboardSectionSchema.optional(),
-  licenseAlerts: z.array(licenseAlertItemSchema)
+  licenseAlerts: z.array(licenseAlertItemSchema),
+  comparison: z.lazy(() => dashboardComparisonSchema).optional()
 });
 
 export const adminDashboardScopeSchema = z.object({
@@ -149,7 +153,8 @@ export const adminDashboardResponseSchema = z.object({
     crossTenantAttempt: z.number().int().min(0),
     other: z.number().int().min(0)
   }),
-  sensitiveFeatureFlags: z.array(featureFlagSummarySchema)
+  sensitiveFeatureFlags: z.array(featureFlagSummarySchema),
+  comparison: z.lazy(() => dashboardComparisonSchema).optional()
 });
 
 export const complianceAlertItemSchema = z.object({
@@ -206,3 +211,30 @@ export const SensitiveFeatureFlagKeys = [
   "ai_recommendation_enabled",
   "ai_broker_assistant_enabled"
 ] as const;
+
+export const dashboardComparisonSchema = z.object({
+  previousWindow: dashboardWindowDtoSchema,
+  previous: z.object({
+    received: z.number().int().min(0),
+    accepted: z.number().int().min(0),
+    refused: z.number().int().min(0)
+  }),
+  delta: z.object({
+    received: z.number().int(),
+    accepted: z.number().int(),
+    refused: z.number().int()
+  })
+});
+
+export const advisorPerformanceRowSchema = z.object({
+  advisorId: nonEmptyStringSchema,
+  received: z.number().int().min(0),
+  accepted: z.number().int().min(0),
+  won: z.number().int().min(0),
+  lost: z.number().int().min(0),
+  conversionRate: z.number().min(0).max(1),
+  averageFirstActionMinutes: z.number().nullable()
+});
+
+export type DashboardComparison = z.infer<typeof dashboardComparisonSchema>;
+export type AdvisorPerformanceRow = z.infer<typeof advisorPerformanceRowSchema>;

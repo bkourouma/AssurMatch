@@ -95,6 +95,14 @@ export class ConsentService {
     return this.repository.hasValidConsent(recordId, purpose, countryId, productId);
   }
 
+  /**
+   * Internal lookup used by routing (spec 042) to read which recipients a consent covers. It is
+   * not exposed over HTTP and carries no RBAC of its own: callers are already-authorised services.
+   */
+  findRecord(id: string): Promise<ConsentRecord | undefined> {
+    return this.repository.findRecord(id);
+  }
+
   async searchRecords(actor: ActorContext): Promise<ConsentRecord[]> {
     if (!actor.roles.some((role) => ["super_admin", "compliance_admin", "support_admin"].includes(role))) {
       throw new Error("Consent access denied");

@@ -3,7 +3,8 @@ import type { FlagRecord } from "./feature-flag-precedence.service";
 export const featureFlagMutationRefusedAction = "feature_flag.change_refused";
 export const sensitiveFeatureFlagRefusalReason = "explicit_policy_required_for_sensitive_feature_flag";
 
-const aiFlagsWithExplicitMutationPolicy = new Set(["ai_summary_enabled"]);
+// ai_partner_opt_out restricts AI usage (partner opt-out), so it stays freely mutable.
+const aiFlagsWithExplicitMutationPolicy = new Set(["ai_summary_enabled", "ai_partner_opt_out"]);
 
 const explicitlyProtectedFeatureFlags = new Set([
   "payments_enabled",

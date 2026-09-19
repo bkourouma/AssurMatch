@@ -14,6 +14,7 @@ export const notificationSchema = z.object({
     "visitor_quote_confirmation",
     "visitor_quote_non_routable",
     "broker_lead_assigned",
+    "broker_document_received",
     "quote_notification_failed"
   ]),
   recipientScope: nonEmptyStringSchema,

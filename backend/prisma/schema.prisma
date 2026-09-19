@@ -245,6 +245,83 @@ enum RoutingStatus {
   blocked
   no_broker_available
   manual_review_required
+  pending_manual_assignment
+}
+
+enum RoutingRuleMode {
+  first_eligible
+  round_robin
+  priority
+  capacity
+  performance
+  exclusive
+  manual
+  multi_send
+}
+
+enum RoutingRuleStatus {
+  active
+  disabled
+}
+
+enum ScoringRuleStatus {
+  active
+  disabled
+}
+
+enum QuoteDocumentScanStatus {
+  pending
+  clean
+  infected
+  failed
+}
+
+enum QuoteDocumentStatus {
+  uploaded
+  available
+  quarantined
+  removed
+}
+
+model QuoteRequestDocument {
+  id                     String                  @id @default(uuid())
+  quoteRequestId         String
+  prospectId             String?
+  label                  String
+  documentKind           String
+  fileName               String
+  mimeType               String
+  sizeBytes              Int
+  checksum               String
+  storageKey             String
+  scanStatus             QuoteDocumentScanStatus @default(pending)
+  scanEngine             String?
+  scanSignature          String?
+  scannedAt              DateTime?
+  status                 QuoteDocumentStatus     @default(uploaded)
+  sharedLeadAssignmentId String?
+  sharedAt               DateTime?
+  retentionUntil         DateTime
+  createdAt              DateTime                @default(now())
+  updatedAt              DateTime                @updatedAt
+
+  @@index([quoteRequestId, createdAt])
+  @@index([scanStatus, createdAt])
+}
+
+model ScoringRule {
+  id          String            @id @default(uuid())
+  countryId   String?
+  productId   String?
+  weights     Json
+  status      ScoringRuleStatus @default(active)
+  description String?
+  version     Int               @default(1)
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+  createdById String?
+
+  @@index([countryId, productId, status])
 }
 
 enum DuplicateStatus {
@@ -715,6 +792,33 @@ model AIInteraction {
   humanValidationStatus  HumanValidationStatus @default(not_required)
   occurredAt             DateTime              @default(now())
   createdAt              DateTime              @default(now())
+  assistType             String                @default("unknown")
+  surface                String                @default("admin_platform")
+  status                 String                @default("queued")
+  provider               String                @default("template")
+  model                  String?
+  fallback               Boolean               @default(false)
+  promptHash             String?
+  outputHash             String?
+  outputText             String?
+  outputData             Json?
+  refusalReason          String?
+  minimizationReport     Json?
+  inputTokens            Int?
+  outputTokens           Int?
+  latencyMs              Int?
+  targetType             String?
+  targetId               String?
+  partnerTenantId        String?
+  countryId              String?
+  productId              String?
+  correlationId          String?
+  completedAt            DateTime?
+  updatedAt              DateTime              @default(now()) @updatedAt
+
+  @@index([surface, status, createdAt])
+  @@index([partnerTenantId, assistType, createdAt])
+  @@index([targetType, targetId])
 }
 
 model RoutingPrecheck {
@@ -756,6 +860,16 @@ model Offer {
   sponsorLabel        String?
   displayPriority     Int                   @default(0)
   publicDisclaimers   String[]
+  insurerName         String?
+  guaranteeLevel      Int?
+  deductibleAmount    Decimal?
+  coverageCeiling     Decimal?
+  processingDelayDays Int?
+  paymentFlexibility  String?
+  guarantees          Json                  @default("[]")
+  exclusionsSummary   String?
+  requiredDocuments   String[]              @default([])
+  sourceOfInformation String?
   validatedById       String?
   validatedAt         DateTime?
   createdAt           DateTime              @default(now())
@@ -860,10 +974,13 @@ model LeadAssignment {
   actionComment         String?
   lastBrokerActionById  String?
   lastBrokerActionAt     DateTime?
+  recipientCount         Int                  @default(1)
   createdAt              DateTime             @default(now())
   updatedAt              DateTime             @updatedAt
 
-  @@unique([quoteRequestId])
+  // Multi-broker routing (spec 042) allows several partners per request; a given partner still
+  // receives a request at most once.
+  @@unique([quoteRequestId, partnerTenantId])
   @@index([partnerTenantId, status, assignedAt])
 }
 
@@ -1084,11 +1201,43 @@ model PartnerWebhookDelivery {
   @@index([endpointId, status, nextAttemptAt])
 }
 
+model RoutingRule {
+  id                       String            @id @default(uuid())
+  countryId                String
+  productId                String?
+  mode                     RoutingRuleMode   @default(first_eligible)
+  maxRecipients            Int               @default(3)
+  status                   RoutingRuleStatus @default(active)
+  priorities               Json              @default("[]")
+  exclusivePartnerTenantId String?
+  description              String?
+  version                  Int               @default(1)
+  createdAt                DateTime          @default(now())
+  updatedAt                DateTime          @updatedAt
+  createdById              String?
+
+  @@index([countryId, productId, status])
+}
+
+model RoutingRuleHistory {
+  id            String   @id @default(uuid())
+  routingRuleId String
+  changeType    String
+  previousValue Json?
+  nextValue     Json?
+  reason        String
+  changedById   String?
+  changedAt     DateTime @default(now())
+
+  @@index([routingRuleId, changedAt])
+}
+
 model RoutingDecision {
   id                      String   @id @default(uuid())
   quoteRequestId           String
   result                  String
   selectedPartnerTenantId String?
+  selectedPartnerTenantIds String[]
   candidateCount          Int
   excludedCandidates      Json
   reasons                 String[]
@@ -1124,4 +1273,140 @@ model EnvironmentSetting {
   updatedAt      DateTime @updatedAt
 
   @@unique([environment, key])
+}
+
+model BillingPlanPrice {
+  id                  String   @id @default(uuid())
+  plan                String
+  countryCode         String
+  monthlySubscription Float    @default(0)
+  perLeadPrice        Float    @default(0)
+  sharedLeadPriceMultiplier Float    @default(0.5)
+  setupFee            Float    @default(0)
+  currency            String   @default("XOF")
+  reason              String
+  updatedById         String?
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @default(now())
+
+  @@unique([plan, countryCode])
+}
+
+model LeadPack {
+  id              String   @id @default(uuid())
+  partnerId       String
+  creditsGranted  Int
+  creditsConsumed Int      @default(0)
+  reason          String
+  grantedById     String?
+  grantedAt       DateTime @default(now())
+  updatedAt       DateTime @default(now())
+
+  @@index([partnerId, grantedAt])
+}
+
+model DraftInvoice {
+  id                   String   @id @default(uuid())
+  partnerId            String
+  partnerName          String
+  plan                 String
+  countryCode          String
+  periodFrom           DateTime
+  periodTo             DateTime
+  reference            String
+  status               String   @default("draft_not_billable")
+  currency             String   @default("XOF")
+  lines                Json
+  billableLeadCount    Int      @default(0)
+  nonBillableLeadCount Int      @default(0)
+  disputeCreditCount   Int      @default(0)
+  packCreditsUsed      Int      @default(0)
+  totalAmount          Float    @default(0)
+  computedAt           DateTime @default(now())
+
+  @@unique([partnerId, periodFrom])
+  @@index([periodFrom])
+}
+
+model MessagingDelivery {
+  id              String   @id @default(uuid())
+  channel         String
+  status          String
+  template        String
+  recipientMasked String
+  provider        String
+  partnerTenantId String?
+  scopeId         String
+  reason          String?
+  correlationId   String?
+  createdAt       DateTime @default(now())
+
+  @@index([channel, createdAt])
+  @@index([partnerTenantId, createdAt])
+}
+
+model NotificationPreference {
+  id          String   @id @default(uuid())
+  scopeId     String   @unique
+  sms         Boolean  @default(false)
+  whatsapp    Boolean  @default(false)
+  reason      String
+  updatedById String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @default(now())
+}
+
+model InAppNotification {
+  id               String   @id @default(uuid())
+  recipientScopeId String
+  type             String
+  title            String
+  body             String
+  targetType       String?
+  targetId         String?
+  read             Boolean  @default(false)
+  createdAt        DateTime @default(now())
+
+  @@index([recipientScopeId, createdAt])
+}
+
+model PartnerAgency {
+  id              String   @id @default(uuid())
+  partnerTenantId String
+  name            String
+  countryCode     String
+  city            String?
+  status          String   @default("active")
+  memberIds       Json     @default("[]")
+  reason          String
+  createdById     String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @default(now())
+
+  @@index([partnerTenantId])
+}
+
+model PartnerCustomRole {
+  id              String   @id @default(uuid())
+  partnerTenantId String
+  name            String
+  permissions     Json     @default("[]")
+  reason          String
+  createdById     String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @default(now())
+
+  @@unique([partnerTenantId, name])
+}
+
+model PartnerBranding {
+  id                       String   @id @default(uuid())
+  partnerTenantId          String   @unique
+  displayLabel             String
+  primaryColor             String
+  firstActionTargetMinutes Int      @default(240)
+  reason                   String
+  updatedById              String?
+  createdAt                DateTime @default(now())
+  updatedAt                DateTime @default(now())
 }

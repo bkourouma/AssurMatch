@@ -77,6 +77,7 @@ export interface PartnerIntegrationsRepository extends RuntimeRepository {
   createDelivery(record: PartnerWebhookDeliveryRecord): Promise<PartnerWebhookDeliveryRecord>;
   updateDelivery(id: string, update: Partial<PartnerWebhookDeliveryRecord>): Promise<PartnerWebhookDeliveryRecord>;
   listDeliveries(): Promise<PartnerWebhookDeliveryRecord[]>;
+  listDueDeliveries(input: { now: Date; limit: number }): Promise<PartnerWebhookDeliveryRecord[]>;
   requireDelivery(id: string): Promise<PartnerWebhookDeliveryRecord>;
 }
 
@@ -174,6 +175,17 @@ export class MemoryPartnerIntegrationsRepository implements PartnerIntegrationsR
     return [...this.deliveries];
   }
 
+  async listDueDeliveries({ now, limit }: { now: Date; limit: number }): Promise<PartnerWebhookDeliveryRecord[]> {
+    return this.deliveries
+      .filter((delivery) =>
+        (delivery.status === "pending" || delivery.status === "retryable")
+        && Boolean(delivery.endpointId)
+        && (!delivery.nextAttemptAt || delivery.nextAttemptAt <= now)
+      )
+      .sort((left, right) => left.createdAt.getTime() - right.createdAt.getTime())
+      .slice(0, limit);
+  }
+
   async requireDelivery(id: string): Promise<PartnerWebhookDeliveryRecord> {
     const record = this.deliveries.find((candidate) => candidate.id === id);
     if (!record) throw new Error(`Partner webhook delivery ${id} not found`);
@@ -263,6 +275,19 @@ export class PrismaPartnerIntegrationsRepository implements PartnerIntegrationsR
 
   async listDeliveries(): Promise<PartnerWebhookDeliveryRecord[]> {
     return (await this.deliveries().findMany({ orderBy: { createdAt: "desc" } })).map((row) => this.toDelivery(row));
+  }
+
+  async listDueDeliveries({ now, limit }: { now: Date; limit: number }): Promise<PartnerWebhookDeliveryRecord[]> {
+    const rows = await this.deliveries().findMany({
+      where: {
+        status: { in: ["pending", "retryable"] },
+        endpointId: { not: null },
+        OR: [{ nextAttemptAt: null }, { nextAttemptAt: { lte: now } }]
+      },
+      orderBy: { createdAt: "asc" },
+      take: limit
+    });
+    return rows.map((row) => this.toDelivery(row));
   }
 
   async requireDelivery(id: string): Promise<PartnerWebhookDeliveryRecord> {

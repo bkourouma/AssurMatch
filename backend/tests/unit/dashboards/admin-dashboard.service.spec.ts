@@ -60,7 +60,8 @@ function makeService(audit = new AuditLogWriter()) {
     } as never,
     partners: { list: async () => [{ id: partnerId, status: "active" }, { id: "partner-inactive", status: "suspended" }] } as never,
     offers: { repository: { list: async () => [{ status: "active", validUntil: new Date(now.getTime() - 24 * 60 * 60 * 1000) }] } } as never,
-    countries: { listAdmin: async () => [{ id: countryId, isoCode: "CI" }] } as never
+    countries: { listAdmin: async () => [{ id: countryId, isoCode: "CI" }] } as never,
+    products: { listAdmin: async () => [{ id: "product-auto", key: productKey }] } as never
   });
 }
 

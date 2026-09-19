@@ -31,7 +31,7 @@ export interface RuntimeSmokePrismaClient {
   featureFlagHistory: Delegate<IdRow>;
   leadActionHistory: Delegate<IdRow>;
   leadAssignment: Delegate<{ id: string; brokerNotificationId: string | null }>;
-  notification: Delegate<IdRow>;
+  notification: Delegate<{ id: string; emailStatus: string; payloadReference: string }>;
   offer: Delegate<{ id: string; name: string }>;
   offerHistory: Delegate<IdRow>;
   partnerCountryAuthorization: Delegate<IdRow>;

@@ -30,7 +30,29 @@ export async function runRuntimePostgresSmokeScenarios(harness: RuntimePostgresS
   await smokeStarterTenantIsolation(harness, run, state);
   await smokeBrokerCrmFlagBehavior(harness, run, state);
   await smokePersistedFeatureFlags(harness.prisma);
+  await smokeQuoteNotificationBacklog(harness, state);
   await smokeDurableAudit(harness, run);
+}
+
+/**
+ * Spec 044: the delivery worker's selection runs against PostgreSQL, which is the part that can
+ * silently return nothing. The smoke has no mailer configured, so this asserts the backlog is seen
+ * and - deliberately - left intact: a disabled mailer must never consume the queue.
+ */
+async function smokeQuoteNotificationBacklog(harness: RuntimePostgresSmokeHarness, state: RuntimeSmokeState): Promise<void> {
+  const quoteId = state.consentedQuoteId;
+  assert.ok(quoteId, "consented quote should be known before checking its notifications");
+  const before = await harness.prisma.notification.findMany({ where: { payloadReference: quoteId } });
+  assert.equal(before.length >= 2, true, `visitor and broker notifications should be persisted, got ${before.length}`);
+  assert.equal(before.every((notification) => notification.emailStatus === "queued"), true, "notifications should start queued");
+
+  const run = await harness.runtime.quoteNotificationDelivery.processDueNotifications({ limit: 10 });
+  assert.equal(run.due >= 2, true, `delivery worker should see the queued backlog in PostgreSQL, got due=${run.due}`);
+  assert.equal(run.sent, 0, "no mailer is configured in the smoke runtime, so nothing should be sent");
+  assert.equal(run.notConfigured >= 2, true, `queued rows should be reported as not configured, got ${run.notConfigured}`);
+
+  const after = await harness.prisma.notification.findMany({ where: { payloadReference: quoteId } });
+  assert.equal(after.every((notification) => notification.emailStatus === "queued"), true, "a disabled mailer must leave the backlog intact");
 }
 
 async function smokeHealthAndRepositoryRuntime(harness: RuntimePostgresSmokeHarness, run: RuntimeSmokeRun): Promise<void> {
@@ -42,7 +64,7 @@ async function smokeHealthAndRepositoryRuntime(harness: RuntimePostgresSmokeHarn
 }
 
 async function smokeSeedAndCatalog(harness: RuntimePostgresSmokeHarness, run: RuntimeSmokeRun): Promise<RuntimeSmokeSeed> {
-  const seed = await seedRuntimeSmokeData(harness.runtime, run, adminActor(run));
+  const seed = await seedRuntimeSmokeData(harness.runtime, run, adminActor(run), harness.request);
 
   const countriesResponse = await harness.request("/countries");
   assert.equal(countriesResponse.status, 200, `GET /countries should succeed, got ${countriesResponse.status}`);
@@ -99,7 +121,11 @@ async function smokeQuoteWithConsent(harness: RuntimePostgresSmokeHarness, run: 
   assert.ok(prospect, "Prospect should be persisted");
   const consent = await harness.prisma.consentRecord.findUnique({ where: { id: quote.consentRecordId } });
   assert.ok(consent, "ConsentRecord should be persisted");
-  const assignment = await harness.prisma.leadAssignment.findUnique({ where: { quoteRequestId: quote.id } });
+  // Spec 042 moved uniqueness to (quoteRequestId, partnerTenantId): a request may now carry several
+  // assignments. Multi-broker routing ships closed, so exactly one is expected here.
+  const assignments = await harness.prisma.leadAssignment.findMany({ where: { quoteRequestId: quote.id } });
+  assert.equal(assignments.length, 1, "Exactly one LeadAssignment should be persisted while multi-broker routing is closed");
+  const assignment = assignments[0];
   assert.ok(assignment, "LeadAssignment should be persisted for eligible broker");
   const decision = await harness.prisma.routingDecision.findFirst({ where: { quoteRequestId: quote.id } });
   assert.ok(decision, "RoutingDecision should be persisted for routed quote");

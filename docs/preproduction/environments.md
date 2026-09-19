@@ -17,6 +17,13 @@ PUBLIC_APP_URL, BACKOFFICE_APP_URL, API_BASE_URL, CORS_ORIGINS
 LOCAL_STORAGE_ROOT
 ```
 
+`CORS_ORIGINS` is a comma-separated allowlist of browser origins permitted to call the API
+cross-origin, and it must list the Web Publique Client's origin: the visitor's browser submits the
+quote request itself, so without it the preflight fails and no quote can be sent, while curl and
+every server-side call keep working. The two back-offices call the API from their own server and do
+not need an entry. Outside `APP_ENV=local` an unset value means no cross-origin browser call is
+allowed at all; `*` is never accepted.
+
 ## Email (Gmail SMTP, preview default)
 
 ```

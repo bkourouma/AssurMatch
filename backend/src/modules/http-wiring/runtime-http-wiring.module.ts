@@ -1,8 +1,11 @@
-import { Body, Controller, Delete, ForbiddenException, Get, Module, NotFoundException, Param, Patch, Post, Query, Req, UseGuards } from "@nestjs/common";
+import { Body, Controller, Delete, ForbiddenException, Get, Module, NotFoundException, Param, Patch, Post, Put, Query, Req, UploadedFile, UseGuards, UseInterceptors } from "@nestjs/common";
+import { FileInterceptor } from "@nestjs/platform-express";
 import { z } from "zod";
+import { QUOTE_DOCUMENT_MAX_BYTES } from "../../../../packages/shared/contracts/quote-document.contracts";
+import type { UploadedDocumentFile } from "../quote-documents/quote-documents.service";
 import { activateRequestSchema, loginRequestSchema, mfaVerifyRequestSchema, passwordChangeRequestSchema, passwordResetRequestSchema, type ActivateRequest, type LoginRequest, type PasswordChangeRequest, type PasswordResetRequest } from "../../../../packages/shared/contracts/auth.contracts";
 import { activationChecklistQuerySchema } from "../../../../packages/shared/contracts/activation-checklist.contracts";
-import { billingFoundationQuerySchema } from "../../../../packages/shared/contracts/billing.contracts";
+import { billingFoundationQuerySchema, billingPlanPriceUpsertSchema, draftInvoiceQuerySchema, draftInvoiceRecomputeSchema, leadPackGrantSchema } from "../../../../packages/shared/contracts/billing.contracts";
 import {
   partnerApiKeyCreateSchema,
   partnerApiPaginationQuerySchema,
@@ -11,6 +14,15 @@ import {
   partnerWebhookEndpointUpdateSchema
 } from "../../../../packages/shared/contracts/partner-integration.contracts";
 import {
+  leadReassignRequestSchema,
+  manualAssignRequestSchema,
+  routingRuleCreateSchema,
+  routingRuleUpdateSchema
+} from "../../../../packages/shared/contracts/routing-rule.contracts";
+import { scoringRuleCreateSchema, scoringRuleUpdateSchema } from "../../../../packages/shared/contracts/scoring-rule.contracts";
+import {
+  adminOfferUpsertSchema,
+  offerValidationSchema,
   brokerCrmAssignRequestSchema,
   brokerCrmDisputeCreateSchema,
   brokerCrmDocumentCreateSchema,
@@ -26,6 +38,7 @@ import {
   brokerStarterLeadActionRequestSchema,
   brokerStarterLeadListQuerySchema,
   brokerStarterReasonSchema,
+  adminQuoteFormDefinitionSchema,
   offerListQuerySchema,
   quoteRequestCreateSchema,
   type OfferListQuery,
@@ -245,21 +258,163 @@ export class PublicOffersController {
     const country = await this.runtime.countries.service.findByIsoCode(parsedCountryCode);
     const product = await this.runtime.products.service.findByKey(parsedProductKey);
     if (!country || !product) return { items: [], total: 0, page: 1, pageSize: 20 };
-    return this.runtime.offers.publicCatalog.list(country.id, product.id, parsedQuery, undefined, {
-      globalFlags: this.runtime.publicJourneyGlobalFlags(),
-      countryFlags: country.flags,
-      productFlags: product.flags,
-      evaluatePartnerEligibility: (partnerTenantId, offerCountryId, offerProductId) => this.runtime.publicOfferPartnerEligibility(partnerTenantId, offerCountryId, offerProductId)
-    });
+    return this.runtime.offers.publicCatalog.list(country.id, product.id, parsedQuery, undefined, this.runtime.publicOfferContext({ countryFlags: country.flags, productFlags: product.flags }));
+  }
+
+  compare(query: Record<string, string>) {
+    return this.runtime.offers.publicCatalog.compare({ ids: String(query.ids ?? ""), priority: query.priority }, undefined, this.runtime.publicOfferContext());
   }
 
   detail(offerId: string) {
-    return this.runtime.offers.publicCatalog.detail(parseParam("offerId", offerId, optionalUuidParamSchema), undefined, {
-      globalFlags: this.runtime.publicJourneyGlobalFlags(),
-      resolveCountryFlags: async (countryId) => (await this.runtime.countries.service.require(countryId)).flags,
-      resolveProductFlags: async (productId) => (await this.runtime.products.service.require(productId)).flags,
-      evaluatePartnerEligibility: (partnerTenantId, countryId, productId) => this.runtime.publicOfferPartnerEligibility(partnerTenantId, countryId, productId)
+    return this.runtime.offers.publicCatalog.detail(parseParam("offerId", offerId, optionalUuidParamSchema), undefined, this.runtime.publicOfferContext());
+  }
+}
+
+function assertCountryScope(actor: ActorContext, countryId: string): void {
+  if (actor.roles.includes("super_admin")) return;
+  if (actor.countryScopes?.length && !actor.countryScopes.includes(countryId)) throw new Error("RBAC denied: out_of_scope_country");
+}
+
+export class AdminOffersHttpController {
+  constructor(private readonly runtime: AssurMatchRuntime) {}
+
+  list(request: AssurMatchHttpRequest) {
+    const actor = protectedActorFromRequest(request);
+    assertPermission(actor, "offers:read");
+    return this.runtime.offers.adminService.list();
+  }
+
+  create(request: AssurMatchHttpRequest, input: unknown) {
+    const actor = protectedActorFromRequest(request);
+    assertPermission(actor, "offers:update");
+    const parsed = parseHttpInput(adminOfferUpsertSchema, input);
+    assertCountryScope(actor, parsed.countryId);
+    return this.runtime.offers.adminService.create(parsed, actor);
+  }
+
+  update(id: string, request: AssurMatchHttpRequest, input: unknown) {
+    const actor = protectedActorFromRequest(request);
+    assertPermission(actor, "offers:update");
+    const parsed = parseHttpInput(adminOfferUpsertSchema, input);
+    assertCountryScope(actor, parsed.countryId);
+    return this.runtime.offers.adminService.update(parseParam("id", id, uuidSchema), parsed, actor);
+  }
+
+  async validate(id: string, request: AssurMatchHttpRequest, input: unknown) {
+    const actor = protectedActorFromRequest(request);
+    assertPermission(actor, "offers:update");
+    const offer = await this.runtime.offers.adminService.require(parseParam("id", id, uuidSchema));
+    assertCountryScope(actor, offer.countryId);
+    return this.runtime.offers.adminService.validate(offer.id, parseHttpInput(offerValidationSchema, input), actor);
+  }
+
+  async suspend(id: string, request: AssurMatchHttpRequest, input: unknown) {
+    const actor = protectedActorFromRequest(request);
+    assertPermission(actor, "offers:update");
+    const offer = await this.runtime.offers.adminService.require(parseParam("id", id, uuidSchema));
+    assertCountryScope(actor, offer.countryId);
+    return this.runtime.offers.adminService.suspend(offer.id, parseHttpInput(z.object({ reason: reasonSchema }), input).reason, actor);
+  }
+}
+
+/**
+ * Spec 043: without these routes a quote form definition can only be created in-process, so no
+ * running server could ever publish one and the whole visitor journey was unreachable.
+ */
+export class AdminQuoteFormDefinitionsHttpController {
+  constructor(private readonly runtime: AssurMatchRuntime) {}
+
+  list(request: AssurMatchHttpRequest, countryId?: string, productId?: string, language?: string, status?: string) {
+    const actor = protectedActorFromRequest(request);
+    assertPermission(actor, "quote_form_definitions:read");
+    return this.runtime.quoteForms.adminController.list({
+      ...(countryId ? { countryId } : {}),
+      ...(productId ? { productId } : {}),
+      ...(language ? { language } : {}),
+      ...(status ? { status: status as "draft" | "published" | "suspended" | "retired" } : {})
     });
+  }
+
+  create(request: AssurMatchHttpRequest, input: unknown) {
+    const actor = protectedActorFromRequest(request);
+    return this.runtime.quoteForms.adminController.create(parseHttpInput(adminQuoteFormDefinitionSchema, input), actor);
+  }
+
+  publish(id: string, request: AssurMatchHttpRequest, input: unknown) {
+    const actor = protectedActorFromRequest(request);
+    parseHttpInput(z.object({ reason: reasonSchema }), input);
+    return this.runtime.quoteForms.adminController.publish(parseParam("id", id, uuidSchema), actor);
+  }
+
+  retire(id: string, request: AssurMatchHttpRequest, input: unknown) {
+    const actor = protectedActorFromRequest(request);
+    parseHttpInput(z.object({ reason: reasonSchema }), input);
+    return this.runtime.quoteForms.adminController.retire(parseParam("id", id, uuidSchema), actor);
+  }
+}
+
+export class AdminScoringRulesController {
+  constructor(private readonly runtime: AssurMatchRuntime) {}
+
+  list(request: AssurMatchHttpRequest) {
+    return this.runtime.scoringRules.list(protectedActorFromRequest(request));
+  }
+
+  create(request: AssurMatchHttpRequest, input: unknown) {
+    return this.runtime.scoringRules.create(protectedActorFromRequest(request), parseHttpInput(scoringRuleCreateSchema, input));
+  }
+
+  update(id: string, request: AssurMatchHttpRequest, input: unknown) {
+    return this.runtime.scoringRules.update(protectedActorFromRequest(request), parseParam("id", id, uuidSchema), parseHttpInput(scoringRuleUpdateSchema, input));
+  }
+}
+
+function clientIp(request: AssurMatchHttpRequest): string {
+  const forwarded = (request as { headers?: Record<string, string | string[] | undefined> }).headers?.["x-forwarded-for"];
+  const first = Array.isArray(forwarded) ? forwarded[0] : forwarded?.split(",")[0];
+  return first?.trim() || (request as { ip?: string }).ip || "unknown";
+}
+
+export class PublicAiController {
+  constructor(private readonly runtime: AssurMatchRuntime) {}
+
+  request(assistType: string, input: unknown, request: AssurMatchHttpRequest) {
+    return this.runtime.visitorAi.request(parseParam("assistType", assistType), input, clientIp(request), actorFromRequest(request));
+  }
+
+  read(id: string, request: AssurMatchHttpRequest) {
+    return this.runtime.visitorAi.read(parseParam("id", id, uuidSchema), actorFromRequest(request));
+  }
+
+  availability(query: Record<string, string>) {
+    return this.runtime.visitorAi.listAvailability(parseParam("countryCode", query.countryCode ?? "", isoCountrySchema), query.productKey || undefined);
+  }
+}
+
+export class PublicQuoteDocumentsController {
+  constructor(private readonly runtime: AssurMatchRuntime) {}
+
+  upload(publicReference: string, token: string | undefined, file: UploadedDocumentFile | undefined, body: Record<string, string | undefined>, request: AssurMatchHttpRequest) {
+    return this.runtime.quoteDocuments.upload(
+      parseParam("publicReference", publicReference),
+      token ?? "",
+      file,
+      { label: body?.label ?? "", ...(body?.documentKind ? { documentKind: body.documentKind as "other" } : {}) },
+      actorFromRequest(request),
+      clientIp(request)
+    );
+  }
+
+  list(publicReference: string, token: string | undefined, request: AssurMatchHttpRequest) {
+    return this.runtime.quoteDocuments.list(parseParam("publicReference", publicReference), token ?? "", actorFromRequest(request));
+  }
+}
+
+export class AdminQuoteDocumentsController {
+  constructor(private readonly runtime: AssurMatchRuntime) {}
+
+  list(id: string, request: AssurMatchHttpRequest) {
+    return this.runtime.quoteDocuments.adminList(protectedActorFromRequest(request), parseParam("id", id, uuidSchema));
   }
 }
 
@@ -408,6 +563,34 @@ export class BrokerCrmController {
     if (!assistance) throw new Error("AI assistance is not configured");
     return assistance.status(protectedActorFromRequest(request), "broker_crm");
   }
+
+  aiRequest(leadId: string, assistType: string, input: unknown, request: AssurMatchHttpRequest) {
+    return this.runtime.brokerAi.requestForLead(parseParam("leadId", leadId, uuidSchema), parseParam("assistType", assistType), input, protectedActorFromRequest(request));
+  }
+
+  aiListForLead(leadId: string, request: AssurMatchHttpRequest) {
+    return this.runtime.brokerAi.listForLead(parseParam("leadId", leadId, uuidSchema), protectedActorFromRequest(request));
+  }
+
+  aiRead(id: string, request: AssurMatchHttpRequest) {
+    return this.runtime.brokerAi.read(parseParam("id", id, uuidSchema), protectedActorFromRequest(request));
+  }
+
+  aiValidate(id: string, input: unknown, request: AssurMatchHttpRequest) {
+    return this.runtime.brokerAi.validate(parseParam("id", id, uuidSchema), input, protectedActorFromRequest(request));
+  }
+
+  aiLossAnalysis(input: unknown, request: AssurMatchHttpRequest) {
+    return this.runtime.brokerAi.lossAnalysis(protectedActorFromRequest(request), input);
+  }
+
+  aiOptOutStatus(request: AssurMatchHttpRequest) {
+    return this.runtime.brokerAi.optOutStatus(protectedActorFromRequest(request));
+  }
+
+  aiSetOptOut(input: unknown, request: AssurMatchHttpRequest) {
+    return this.runtime.brokerAi.setOptOut(protectedActorFromRequest(request), input);
+  }
 }
 
 export class BrokerDashboardController {
@@ -416,6 +599,22 @@ export class BrokerDashboardController {
   dashboard(request: AssurMatchHttpRequest, query: Record<string, string>) {
     const actor = protectedActorFromRequest(request);
     return this.runtime.dashboards.broker.dashboard(actor, parseHttpInput(dashboardScopeQuerySchema, query));
+  }
+
+  advisors(request: AssurMatchHttpRequest, query: Record<string, string>) {
+    return this.runtime.dashboards.broker.advisors(protectedActorFromRequest(request), parseHttpInput(dashboardScopeQuerySchema, query));
+  }
+
+  export(request: AssurMatchHttpRequest, query: Record<string, string>) {
+    return this.runtime.dashboards.broker.exportCsv(protectedActorFromRequest(request), parseHttpInput(dashboardScopeQuerySchema, query));
+  }
+}
+
+export class AdminDashboardExportController {
+  constructor(private readonly runtime: AssurMatchRuntime) {}
+
+  export(request: AssurMatchHttpRequest, query: Record<string, string>) {
+    return this.runtime.dashboards.admin.exportCsv(protectedActorFromRequest(request), parseHttpInput(dashboardScopeQuerySchema, query));
   }
 }
 
@@ -487,6 +686,114 @@ export class AdminBillingFoundationController {
   read(request: AssurMatchHttpRequest, query: Record<string, string>) {
     return this.runtime.billing.foundation.read(protectedActorFromRequest(request), parseHttpInput(billingFoundationQuerySchema, query));
   }
+
+  listPlans(request: AssurMatchHttpRequest) {
+    return this.runtime.billing.plans.list(protectedActorFromRequest(request));
+  }
+
+  upsertPlan(input: unknown, request: AssurMatchHttpRequest) {
+    return this.runtime.billing.plans.upsert(parseHttpInput(billingPlanPriceUpsertSchema, input), protectedActorFromRequest(request));
+  }
+
+  listInvoices(request: AssurMatchHttpRequest, query: Record<string, string>) {
+    return this.runtime.billing.drafts.list(protectedActorFromRequest(request), parseHttpInput(draftInvoiceQuerySchema, query));
+  }
+
+  recomputeInvoices(input: unknown, request: AssurMatchHttpRequest) {
+    return this.runtime.billing.drafts.recompute(parseHttpInput(draftInvoiceRecomputeSchema, input), protectedActorFromRequest(request));
+  }
+
+  listPacks(request: AssurMatchHttpRequest, query: Record<string, string>) {
+    return this.runtime.billing.packs.list(protectedActorFromRequest(request), query.partnerId || undefined);
+  }
+
+  grantPack(input: unknown, request: AssurMatchHttpRequest) {
+    return this.runtime.billing.packs.grant(parseHttpInput(leadPackGrantSchema, input), protectedActorFromRequest(request));
+  }
+}
+
+export class AdminPartnerSlaController {
+  constructor(private readonly runtime: AssurMatchRuntime) {}
+
+  sla(request: AssurMatchHttpRequest) {
+    return this.runtime.enterprise.adminSlaOverview(protectedActorFromRequest(request));
+  }
+}
+
+export class BrokerEnterpriseController {
+  constructor(private readonly runtime: AssurMatchRuntime) {}
+
+  agencies(request: AssurMatchHttpRequest) {
+    return this.runtime.enterprise.listAgencies(protectedActorFromRequest(request));
+  }
+
+  createAgency(input: unknown, request: AssurMatchHttpRequest) {
+    return this.runtime.enterprise.createAgency(input, protectedActorFromRequest(request));
+  }
+
+  updateAgency(id: string, input: unknown, request: AssurMatchHttpRequest) {
+    return this.runtime.enterprise.updateAgency(parseParam("id", id, uuidSchema), input, protectedActorFromRequest(request));
+  }
+
+  assignMember(id: string, input: unknown, request: AssurMatchHttpRequest) {
+    return this.runtime.enterprise.assignMember(parseParam("id", id, uuidSchema), input, protectedActorFromRequest(request));
+  }
+
+  roles(request: AssurMatchHttpRequest) {
+    return this.runtime.enterprise.listCustomRoles(protectedActorFromRequest(request));
+  }
+
+  createRole(input: unknown, request: AssurMatchHttpRequest) {
+    return this.runtime.enterprise.createCustomRole(input, protectedActorFromRequest(request));
+  }
+
+  updateRole(id: string, input: unknown, request: AssurMatchHttpRequest) {
+    return this.runtime.enterprise.updateCustomRole(parseParam("id", id, uuidSchema), input, protectedActorFromRequest(request));
+  }
+
+  sla(request: AssurMatchHttpRequest) {
+    return this.runtime.enterprise.sla(protectedActorFromRequest(request));
+  }
+
+  updateSla(input: unknown, request: AssurMatchHttpRequest) {
+    return this.runtime.enterprise.updateSla(input, protectedActorFromRequest(request));
+  }
+
+  branding(request: AssurMatchHttpRequest) {
+    return this.runtime.enterprise.branding(protectedActorFromRequest(request));
+  }
+
+  updateBranding(input: unknown, request: AssurMatchHttpRequest) {
+    return this.runtime.enterprise.updateBranding(input, protectedActorFromRequest(request));
+  }
+}
+
+export class BrokerNotificationsController {
+  constructor(private readonly runtime: AssurMatchRuntime) {}
+
+  inbox(request: AssurMatchHttpRequest) {
+    return this.runtime.brokerNotifications.inbox(protectedActorFromRequest(request));
+  }
+
+  markRead(id: string, request: AssurMatchHttpRequest) {
+    return this.runtime.brokerNotifications.markRead(parseParam("id", id, uuidSchema), protectedActorFromRequest(request));
+  }
+
+  preferences(request: AssurMatchHttpRequest) {
+    return this.runtime.brokerNotifications.preferences(protectedActorFromRequest(request));
+  }
+
+  updatePreferences(input: unknown, request: AssurMatchHttpRequest) {
+    return this.runtime.brokerNotifications.updatePreferences(input, protectedActorFromRequest(request));
+  }
+}
+
+export class BrokerBillingController {
+  constructor(private readonly runtime: AssurMatchRuntime) {}
+
+  statement(request: AssurMatchHttpRequest) {
+    return this.runtime.billing.drafts.statement(protectedActorFromRequest(request));
+  }
 }
 
 export class AdminAIAssistanceController {
@@ -496,6 +803,22 @@ export class AdminAIAssistanceController {
     const assistance = this.runtime.ai.assistance;
     if (!assistance) throw new Error("AI assistance is not configured");
     return assistance.status(protectedActorFromRequest(request), "admin_platform");
+  }
+
+  requestInsight(assistType: string, input: unknown, request: AssurMatchHttpRequest) {
+    return this.runtime.adminAi.request(parseParam("assistType", assistType), input, protectedActorFromRequest(request));
+  }
+
+  listInsights(request: AssurMatchHttpRequest) {
+    return this.runtime.adminAi.list(protectedActorFromRequest(request));
+  }
+
+  readInsight(id: string, request: AssurMatchHttpRequest) {
+    return this.runtime.adminAi.read(parseParam("id", id, uuidSchema), protectedActorFromRequest(request));
+  }
+
+  validateInsight(id: string, input: unknown, request: AssurMatchHttpRequest) {
+    return this.runtime.adminAi.validate(parseParam("id", id, uuidSchema), input, protectedActorFromRequest(request));
   }
 }
 
@@ -530,8 +853,54 @@ export class LocalDevRuntimeController {
 export class AdminMessagingProvidersController {
   constructor(private readonly runtime: AssurMatchRuntime) {}
 
+  deliveries(request: AssurMatchHttpRequest) {
+    const actor = protectedActorFromRequest(request);
+    assertAnyRole(actor, adminRoleAllowList.audit);
+    return this.runtime.notifications.dispatch.listDeliveries();
+  }
+
+  test(input: unknown, request: AssurMatchHttpRequest) {
+    return this.runtime.brokerNotifications.testDispatch(input, protectedActorFromRequest(request));
+  }
+
   read(request: AssurMatchHttpRequest) {
     return this.runtime.notifications.messagingProviders.status(protectedActorFromRequest(request));
+  }
+}
+
+export class AdminRoutingRulesController {
+  constructor(private readonly runtime: AssurMatchRuntime) {}
+
+  list(request: AssurMatchHttpRequest) {
+    return this.runtime.routingRules.list(protectedActorFromRequest(request));
+  }
+
+  create(request: AssurMatchHttpRequest, input: unknown) {
+    return this.runtime.routingRules.create(protectedActorFromRequest(request), parseHttpInput(routingRuleCreateSchema, input));
+  }
+
+  update(id: string, request: AssurMatchHttpRequest, input: unknown) {
+    return this.runtime.routingRules.update(protectedActorFromRequest(request), parseParam("id", id, uuidSchema), parseHttpInput(routingRuleUpdateSchema, input));
+  }
+
+  history(id: string, request: AssurMatchHttpRequest) {
+    return this.runtime.routingRules.history(protectedActorFromRequest(request), parseParam("id", id, uuidSchema));
+  }
+}
+
+export class AdminRoutingOperationsController {
+  constructor(private readonly runtime: AssurMatchRuntime) {}
+
+  pending(request: AssurMatchHttpRequest) {
+    return this.runtime.manualRouting.queue(protectedActorFromRequest(request));
+  }
+
+  assign(quoteRequestId: string, request: AssurMatchHttpRequest, input: unknown) {
+    return this.runtime.manualRouting.assign(protectedActorFromRequest(request), parseParam("quoteRequestId", quoteRequestId, uuidSchema), parseHttpInput(manualAssignRequestSchema, input));
+  }
+
+  reassign(id: string, request: AssurMatchHttpRequest, input: unknown) {
+    return this.runtime.leadReassignment.reassign(protectedActorFromRequest(request), parseParam("id", id, uuidSchema), parseHttpInput(leadReassignRequestSchema, input));
   }
 }
 
@@ -635,12 +1004,27 @@ decorate(PublicProductsController, "detail", [Get(":productKey") as MethodDecora
 
 controller(undefined, PublicOffersController);
 decorate(PublicOffersController, "list", [Get("countries/:countryCode/products/:productKey/offers") as MethodDecoratorFactory], [[0, Param("countryCode") as ParamDecoratorFactory], [1, Param("productKey") as ParamDecoratorFactory], [2, Query() as ParamDecoratorFactory]]);
+decorate(PublicOffersController, "compare", [Get("offers/compare") as MethodDecoratorFactory], [[0, Query() as ParamDecoratorFactory]]);
 decorate(PublicOffersController, "detail", [Get("offers/:offerId") as MethodDecoratorFactory], [[0, Param("offerId") as ParamDecoratorFactory]]);
 
 controller(undefined, PublicQuoteRequestsController);
 decorate(PublicQuoteRequestsController, "quoteForm", [Get("countries/:countryCode/products/:productKey/quote-form") as MethodDecoratorFactory], [[0, Param("countryCode") as ParamDecoratorFactory], [1, Param("productKey") as ParamDecoratorFactory], [2, Query("language") as ParamDecoratorFactory]]);
 decorate(PublicQuoteRequestsController, "submitQuote", [Post("quote-requests") as MethodDecoratorFactory], [[0, Body() as ParamDecoratorFactory], [1, Req() as ParamDecoratorFactory]]);
 decorate(PublicQuoteRequestsController, "quoteStatus", [Get("quote-requests/:publicReference") as MethodDecoratorFactory], [[0, Param("publicReference") as ParamDecoratorFactory], [1, Query("token") as ParamDecoratorFactory]]);
+controller(undefined, PublicAiController);
+decorate(PublicAiController, "availability", [Get("ai/visitor/availability") as MethodDecoratorFactory], [[0, Query() as ParamDecoratorFactory]]);
+decorate(PublicAiController, "read", [Get("ai/visitor/interactions/:id") as MethodDecoratorFactory], [[0, Param("id") as ParamDecoratorFactory], [1, Req() as ParamDecoratorFactory]]);
+decorate(PublicAiController, "request", [Post("ai/visitor/:assistType") as MethodDecoratorFactory], [[0, Param("assistType") as ParamDecoratorFactory], [1, Body() as ParamDecoratorFactory], [2, Req() as ParamDecoratorFactory]]);
+controller(undefined, PublicQuoteDocumentsController);
+decorate(
+  PublicQuoteDocumentsController,
+  "upload",
+  [Post("quote-requests/:publicReference/documents") as MethodDecoratorFactory, UseInterceptors(FileInterceptor("file", { limits: { fileSize: QUOTE_DOCUMENT_MAX_BYTES, files: 1 } })) as MethodDecoratorFactory],
+  [[0, Param("publicReference") as ParamDecoratorFactory], [1, Query("token") as ParamDecoratorFactory], [2, UploadedFile() as ParamDecoratorFactory], [3, Body() as ParamDecoratorFactory], [4, Req() as ParamDecoratorFactory]]
+);
+decorate(PublicQuoteDocumentsController, "list", [Get("quote-requests/:publicReference/documents") as MethodDecoratorFactory], [[0, Param("publicReference") as ParamDecoratorFactory], [1, Query("token") as ParamDecoratorFactory], [2, Req() as ParamDecoratorFactory]]);
+controller("admin", AdminQuoteDocumentsController, true);
+decorate(AdminQuoteDocumentsController, "list", [Get("quote-requests/:id/documents") as MethodDecoratorFactory], [[0, Param("id") as ParamDecoratorFactory], [1, Req() as ParamDecoratorFactory]]);
 
 controller("broker/starter", BrokerStarterController, true);
 decorate(BrokerStarterController, "dashboard", [Get("dashboard") as MethodDecoratorFactory], [[0, Req() as ParamDecoratorFactory], [1, Query() as ParamDecoratorFactory]]);
@@ -672,9 +1056,20 @@ decorate(BrokerCrmController, "dispute", [Post("leads/:leadId/disputes") as Meth
 decorate(BrokerCrmController, "notifications", [Get("notifications") as MethodDecoratorFactory], [[0, Req() as ParamDecoratorFactory]]);
 decorate(BrokerCrmController, "aiFoundations", [Get("ai-foundations") as MethodDecoratorFactory], [[0, Req() as ParamDecoratorFactory]]);
 decorate(BrokerCrmController, "aiAssistance", [Get("ai-assistance") as MethodDecoratorFactory], [[0, Req() as ParamDecoratorFactory]]);
+decorate(BrokerCrmController, "aiRequest", [Post("leads/:leadId/ai/:assistType") as MethodDecoratorFactory], [[0, Param("leadId") as ParamDecoratorFactory], [1, Param("assistType") as ParamDecoratorFactory], [2, Body() as ParamDecoratorFactory], [3, Req() as ParamDecoratorFactory]]);
+decorate(BrokerCrmController, "aiListForLead", [Get("leads/:leadId/ai") as MethodDecoratorFactory], [[0, Param("leadId") as ParamDecoratorFactory], [1, Req() as ParamDecoratorFactory]]);
+decorate(BrokerCrmController, "aiRead", [Get("ai/interactions/:id") as MethodDecoratorFactory], [[0, Param("id") as ParamDecoratorFactory], [1, Req() as ParamDecoratorFactory]]);
+decorate(BrokerCrmController, "aiValidate", [Post("ai/interactions/:id/validation") as MethodDecoratorFactory], [[0, Param("id") as ParamDecoratorFactory], [1, Body() as ParamDecoratorFactory], [2, Req() as ParamDecoratorFactory]]);
+decorate(BrokerCrmController, "aiLossAnalysis", [Post("ai/loss-analysis") as MethodDecoratorFactory], [[0, Body() as ParamDecoratorFactory], [1, Req() as ParamDecoratorFactory]]);
+decorate(BrokerCrmController, "aiOptOutStatus", [Get("ai/opt-out") as MethodDecoratorFactory], [[0, Req() as ParamDecoratorFactory]]);
+decorate(BrokerCrmController, "aiSetOptOut", [Put("ai/opt-out") as MethodDecoratorFactory], [[0, Body() as ParamDecoratorFactory], [1, Req() as ParamDecoratorFactory]]);
 
 controller("broker/dashboard", BrokerDashboardController, true);
 decorate(BrokerDashboardController, "dashboard", [Get() as MethodDecoratorFactory], [[0, Req() as ParamDecoratorFactory], [1, Query() as ParamDecoratorFactory]]);
+decorate(BrokerDashboardController, "advisors", [Get("advisors") as MethodDecoratorFactory], [[0, Req() as ParamDecoratorFactory], [1, Query() as ParamDecoratorFactory]]);
+decorate(BrokerDashboardController, "export", [Get("export.csv") as MethodDecoratorFactory], [[0, Req() as ParamDecoratorFactory], [1, Query() as ParamDecoratorFactory]]);
+controller("admin/dashboard", AdminDashboardExportController, true);
+decorate(AdminDashboardExportController, "export", [Get("export.csv") as MethodDecoratorFactory], [[0, Req() as ParamDecoratorFactory], [1, Query() as ParamDecoratorFactory]]);
 
 controller("admin/dashboard", AdminDashboardController, true);
 decorate(AdminDashboardController, "dashboard", [Get() as MethodDecoratorFactory], [[0, Req() as ParamDecoratorFactory], [1, Query() as ParamDecoratorFactory]]);
@@ -709,9 +1104,40 @@ decorate(AdminActivationChecklistController, "read", [Get("activation-checklist"
 
 controller("admin", AdminBillingFoundationController, true);
 decorate(AdminBillingFoundationController, "read", [Get("billing/foundation") as MethodDecoratorFactory], [[0, Req() as ParamDecoratorFactory], [1, Query() as ParamDecoratorFactory]]);
+decorate(AdminBillingFoundationController, "listPlans", [Get("billing/plans") as MethodDecoratorFactory], [[0, Req() as ParamDecoratorFactory]]);
+decorate(AdminBillingFoundationController, "upsertPlan", [Put("billing/plans") as MethodDecoratorFactory], [[0, Body() as ParamDecoratorFactory], [1, Req() as ParamDecoratorFactory]]);
+decorate(AdminBillingFoundationController, "listInvoices", [Get("billing/invoices") as MethodDecoratorFactory], [[0, Req() as ParamDecoratorFactory], [1, Query() as ParamDecoratorFactory]]);
+decorate(AdminBillingFoundationController, "recomputeInvoices", [Post("billing/invoices/recompute") as MethodDecoratorFactory], [[0, Body() as ParamDecoratorFactory], [1, Req() as ParamDecoratorFactory]]);
+decorate(AdminBillingFoundationController, "listPacks", [Get("billing/packs") as MethodDecoratorFactory], [[0, Req() as ParamDecoratorFactory], [1, Query() as ParamDecoratorFactory]]);
+decorate(AdminBillingFoundationController, "grantPack", [Post("billing/packs") as MethodDecoratorFactory], [[0, Body() as ParamDecoratorFactory], [1, Req() as ParamDecoratorFactory]]);
+controller("admin", AdminPartnerSlaController, true);
+decorate(AdminPartnerSlaController, "sla", [Get("partners/sla") as MethodDecoratorFactory], [[0, Req() as ParamDecoratorFactory]]);
+controller("broker/enterprise", BrokerEnterpriseController, true);
+decorate(BrokerEnterpriseController, "agencies", [Get("agencies") as MethodDecoratorFactory], [[0, Req() as ParamDecoratorFactory]]);
+decorate(BrokerEnterpriseController, "createAgency", [Post("agencies") as MethodDecoratorFactory], [[0, Body() as ParamDecoratorFactory], [1, Req() as ParamDecoratorFactory]]);
+decorate(BrokerEnterpriseController, "updateAgency", [Patch("agencies/:id") as MethodDecoratorFactory], [[0, Param("id") as ParamDecoratorFactory], [1, Body() as ParamDecoratorFactory], [2, Req() as ParamDecoratorFactory]]);
+decorate(BrokerEnterpriseController, "assignMember", [Post("agencies/:id/members") as MethodDecoratorFactory], [[0, Param("id") as ParamDecoratorFactory], [1, Body() as ParamDecoratorFactory], [2, Req() as ParamDecoratorFactory]]);
+decorate(BrokerEnterpriseController, "roles", [Get("roles") as MethodDecoratorFactory], [[0, Req() as ParamDecoratorFactory]]);
+decorate(BrokerEnterpriseController, "createRole", [Post("roles") as MethodDecoratorFactory], [[0, Body() as ParamDecoratorFactory], [1, Req() as ParamDecoratorFactory]]);
+decorate(BrokerEnterpriseController, "updateRole", [Patch("roles/:id") as MethodDecoratorFactory], [[0, Param("id") as ParamDecoratorFactory], [1, Body() as ParamDecoratorFactory], [2, Req() as ParamDecoratorFactory]]);
+decorate(BrokerEnterpriseController, "sla", [Get("sla") as MethodDecoratorFactory], [[0, Req() as ParamDecoratorFactory]]);
+decorate(BrokerEnterpriseController, "updateSla", [Put("sla") as MethodDecoratorFactory], [[0, Body() as ParamDecoratorFactory], [1, Req() as ParamDecoratorFactory]]);
+decorate(BrokerEnterpriseController, "branding", [Get("branding") as MethodDecoratorFactory], [[0, Req() as ParamDecoratorFactory]]);
+decorate(BrokerEnterpriseController, "updateBranding", [Put("branding") as MethodDecoratorFactory], [[0, Body() as ParamDecoratorFactory], [1, Req() as ParamDecoratorFactory]]);
+controller("broker/notifications", BrokerNotificationsController, true);
+decorate(BrokerNotificationsController, "inbox", [Get("inbox") as MethodDecoratorFactory], [[0, Req() as ParamDecoratorFactory]]);
+decorate(BrokerNotificationsController, "markRead", [Post("inbox/:id/read") as MethodDecoratorFactory], [[0, Param("id") as ParamDecoratorFactory], [1, Req() as ParamDecoratorFactory]]);
+decorate(BrokerNotificationsController, "preferences", [Get("preferences") as MethodDecoratorFactory], [[0, Req() as ParamDecoratorFactory]]);
+decorate(BrokerNotificationsController, "updatePreferences", [Put("preferences") as MethodDecoratorFactory], [[0, Body() as ParamDecoratorFactory], [1, Req() as ParamDecoratorFactory]]);
+controller("broker/billing", BrokerBillingController, true);
+decorate(BrokerBillingController, "statement", [Get("statement") as MethodDecoratorFactory], [[0, Req() as ParamDecoratorFactory]]);
 
 controller("admin", AdminAIAssistanceController, true);
 decorate(AdminAIAssistanceController, "read", [Get("ai/assistance") as MethodDecoratorFactory], [[0, Req() as ParamDecoratorFactory]]);
+decorate(AdminAIAssistanceController, "listInsights", [Get("ai/insights") as MethodDecoratorFactory], [[0, Req() as ParamDecoratorFactory]]);
+decorate(AdminAIAssistanceController, "readInsight", [Get("ai/insights/:id") as MethodDecoratorFactory], [[0, Param("id") as ParamDecoratorFactory], [1, Req() as ParamDecoratorFactory]]);
+decorate(AdminAIAssistanceController, "requestInsight", [Post("ai/insights/:assistType") as MethodDecoratorFactory], [[0, Param("assistType") as ParamDecoratorFactory], [1, Body() as ParamDecoratorFactory], [2, Req() as ParamDecoratorFactory]]);
+decorate(AdminAIAssistanceController, "validateInsight", [Post("ai/insights/:id/validation") as MethodDecoratorFactory], [[0, Param("id") as ParamDecoratorFactory], [1, Body() as ParamDecoratorFactory], [2, Req() as ParamDecoratorFactory]]);
 
 controller("admin", AdminRuntimeSupportController, true);
 decorate(AdminRuntimeSupportController, "quoteRequests", [Get("quote-requests") as MethodDecoratorFactory], [[0, Req() as ParamDecoratorFactory]]);
@@ -720,8 +1146,34 @@ decorate(AdminRuntimeSupportController, "leadAssignments", [Get("lead-assignment
 controller("local/dev", LocalDevRuntimeController);
 decorate(LocalDevRuntimeController, "reloadFeatureFlags", [Post("reload-feature-flags") as MethodDecoratorFactory], [[0, Req() as ParamDecoratorFactory]]);
 
+controller("admin", AdminOffersHttpController, true);
+decorate(AdminOffersHttpController, "list", [Get("offers") as MethodDecoratorFactory], [[0, Req() as ParamDecoratorFactory]]);
+decorate(AdminOffersHttpController, "create", [Post("offers") as MethodDecoratorFactory], [[0, Req() as ParamDecoratorFactory], [1, Body() as ParamDecoratorFactory]]);
+decorate(AdminOffersHttpController, "update", [Patch("offers/:id") as MethodDecoratorFactory], [[0, Param("id") as ParamDecoratorFactory], [1, Req() as ParamDecoratorFactory], [2, Body() as ParamDecoratorFactory]]);
+decorate(AdminOffersHttpController, "validate", [Post("offers/:id/validate") as MethodDecoratorFactory], [[0, Param("id") as ParamDecoratorFactory], [1, Req() as ParamDecoratorFactory], [2, Body() as ParamDecoratorFactory]]);
+decorate(AdminOffersHttpController, "suspend", [Post("offers/:id/suspend") as MethodDecoratorFactory], [[0, Param("id") as ParamDecoratorFactory], [1, Req() as ParamDecoratorFactory], [2, Body() as ParamDecoratorFactory]]);
+controller("admin", AdminQuoteFormDefinitionsHttpController, true);
+decorate(AdminQuoteFormDefinitionsHttpController, "list", [Get("quote-form-definitions") as MethodDecoratorFactory], [[0, Req() as ParamDecoratorFactory], [1, Query("countryId") as ParamDecoratorFactory], [2, Query("productId") as ParamDecoratorFactory], [3, Query("language") as ParamDecoratorFactory], [4, Query("status") as ParamDecoratorFactory]]);
+decorate(AdminQuoteFormDefinitionsHttpController, "create", [Post("quote-form-definitions") as MethodDecoratorFactory], [[0, Req() as ParamDecoratorFactory], [1, Body() as ParamDecoratorFactory]]);
+decorate(AdminQuoteFormDefinitionsHttpController, "publish", [Post("quote-form-definitions/:id/publish") as MethodDecoratorFactory], [[0, Param("id") as ParamDecoratorFactory], [1, Req() as ParamDecoratorFactory], [2, Body() as ParamDecoratorFactory]]);
+decorate(AdminQuoteFormDefinitionsHttpController, "retire", [Post("quote-form-definitions/:id/retire") as MethodDecoratorFactory], [[0, Param("id") as ParamDecoratorFactory], [1, Req() as ParamDecoratorFactory], [2, Body() as ParamDecoratorFactory]]);
+controller("admin", AdminScoringRulesController, true);
+decorate(AdminScoringRulesController, "list", [Get("scoring-rules") as MethodDecoratorFactory], [[0, Req() as ParamDecoratorFactory]]);
+decorate(AdminScoringRulesController, "create", [Post("scoring-rules") as MethodDecoratorFactory], [[0, Req() as ParamDecoratorFactory], [1, Body() as ParamDecoratorFactory]]);
+decorate(AdminScoringRulesController, "update", [Patch("scoring-rules/:id") as MethodDecoratorFactory], [[0, Param("id") as ParamDecoratorFactory], [1, Req() as ParamDecoratorFactory], [2, Body() as ParamDecoratorFactory]]);
+controller("admin", AdminRoutingRulesController, true);
+decorate(AdminRoutingRulesController, "list", [Get("routing-rules") as MethodDecoratorFactory], [[0, Req() as ParamDecoratorFactory]]);
+decorate(AdminRoutingRulesController, "create", [Post("routing-rules") as MethodDecoratorFactory], [[0, Req() as ParamDecoratorFactory], [1, Body() as ParamDecoratorFactory]]);
+decorate(AdminRoutingRulesController, "update", [Patch("routing-rules/:id") as MethodDecoratorFactory], [[0, Param("id") as ParamDecoratorFactory], [1, Req() as ParamDecoratorFactory], [2, Body() as ParamDecoratorFactory]]);
+decorate(AdminRoutingRulesController, "history", [Get("routing-rules/:id/history") as MethodDecoratorFactory], [[0, Param("id") as ParamDecoratorFactory], [1, Req() as ParamDecoratorFactory]]);
+controller("admin", AdminRoutingOperationsController, true);
+decorate(AdminRoutingOperationsController, "pending", [Get("routing/pending") as MethodDecoratorFactory], [[0, Req() as ParamDecoratorFactory]]);
+decorate(AdminRoutingOperationsController, "assign", [Post("routing/pending/:quoteRequestId/assign") as MethodDecoratorFactory], [[0, Param("quoteRequestId") as ParamDecoratorFactory], [1, Req() as ParamDecoratorFactory], [2, Body() as ParamDecoratorFactory]]);
+decorate(AdminRoutingOperationsController, "reassign", [Post("lead-assignments/:id/reassign") as MethodDecoratorFactory], [[0, Param("id") as ParamDecoratorFactory], [1, Req() as ParamDecoratorFactory], [2, Body() as ParamDecoratorFactory]]);
 controller("admin", AdminMessagingProvidersController, true);
 decorate(AdminMessagingProvidersController, "read", [Get("messaging/providers") as MethodDecoratorFactory], [[0, Req() as ParamDecoratorFactory]]);
+decorate(AdminMessagingProvidersController, "deliveries", [Get("messaging/deliveries") as MethodDecoratorFactory], [[0, Req() as ParamDecoratorFactory]]);
+decorate(AdminMessagingProvidersController, "test", [Post("messaging/test") as MethodDecoratorFactory], [[0, Body() as ParamDecoratorFactory], [1, Req() as ParamDecoratorFactory]]);
 
 controller("admin/partner-integrations", AdminPartnerIntegrationsController, true);
 decorate(AdminPartnerIntegrationsController, "apiKeys", [Get("api-keys") as MethodDecoratorFactory], [[0, Req() as ParamDecoratorFactory]]);
@@ -751,20 +1203,33 @@ Module({
     PublicProductsController,
     PublicOffersController,
     PublicQuoteRequestsController,
+    PublicAiController,
+    PublicQuoteDocumentsController,
+    AdminQuoteDocumentsController,
     BrokerStarterController,
     BrokerCrmController,
     BrokerDashboardController,
     AdminDashboardController,
+    AdminDashboardExportController,
     AdminFeatureFlagsController,
     AdminUsersHttpController,
     AdminAuditLogsController,
     AdminHealthController,
     AdminActivationChecklistController,
     AdminBillingFoundationController,
+    BrokerBillingController,
+    BrokerNotificationsController,
+    BrokerEnterpriseController,
+    AdminPartnerSlaController,
     AdminAIAssistanceController,
     AdminRuntimeSupportController,
     LocalDevRuntimeController,
     AdminMessagingProvidersController,
+    AdminOffersHttpController,
+    AdminQuoteFormDefinitionsHttpController,
+    AdminScoringRulesController,
+    AdminRoutingRulesController,
+    AdminRoutingOperationsController,
     AdminPartnerIntegrationsController,
     PartnerApiController
   ],

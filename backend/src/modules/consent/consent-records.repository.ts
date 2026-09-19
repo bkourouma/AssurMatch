@@ -11,6 +11,8 @@ export interface ConsentRecordsRepository extends RuntimeRepository {
   listTexts(): Promise<ConsentText[]>;
   createRecord(record: ConsentRecord): Promise<ConsentRecord>;
   hasValidConsent(recordId: string | undefined, purpose: string, countryId: string, productId?: string): Promise<boolean>;
+  /** Spec 042: routing reads the consent actually recorded, to know which recipients it covers. */
+  findRecord(id: string): Promise<ConsentRecord | undefined>;
   searchRecords(): Promise<ConsentRecord[]>;
   requireText(id: string): Promise<ConsentText>;
 }
@@ -53,6 +55,10 @@ export class MemoryConsentRecordsRepository implements ConsentRecordsRepository 
       (productId === undefined || record.productId === productId) &&
       record.status === "granted"
     );
+  }
+
+  async findRecord(id: string): Promise<ConsentRecord | undefined> {
+    return this.records.find((record) => record.id === id);
   }
 
   async searchRecords(): Promise<ConsentRecord[]> {
@@ -116,6 +122,11 @@ export class PrismaConsentRecordsRepository implements ConsentRecordsRepository 
       }
     });
     return Boolean(record);
+  }
+
+  async findRecord(id: string): Promise<ConsentRecord | undefined> {
+    const row = await this.records().findFirst({ where: { id } });
+    return row ? this.toRecord(row) : undefined;
   }
 
   async searchRecords(): Promise<ConsentRecord[]> {

@@ -1,6 +1,7 @@
 export * from "./auth.contracts";
 export * from "./activation-checklist.contracts";
 export * from "./ai-assistance.contracts";
+export * from "./ai.contracts";
 export * from "./billing.contracts";
 export * from "./catalog.contracts";
 export * from "./compliance.contracts";
@@ -13,4 +14,8 @@ export * from "./ops.contracts";
 export * from "./partner.contracts";
 export * from "./partner-integration.contracts";
 export * from "./quote.contracts";
+export * from "./quote-document.contracts";
+export * from "./routing-rule.contracts";
+export * from "./scoring-rule.contracts";
 export * from "./user.contracts";
+export * from "./enterprise.contracts";

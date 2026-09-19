@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from "vitest";
-import { partnerApiKeyCreateResponseSchema, partnerApiKeysResponseSchema, partnerApiLeadsResponseSchema, partnerWebhookDeliveriesResponseSchema, partnerWebhookEndpointCreateResponseSchema, partnerWebhookEndpointsResponseSchema } from "../../../../packages/shared/contracts";
+import { partnerApiKeyCreateResponseSchema, partnerApiKeysResponseSchema, partnerApiLeadsResponseSchema, partnerApiNotificationsResponseSchema, partnerWebhookDeliveriesResponseSchema, partnerWebhookEndpointCreateResponseSchema, partnerWebhookEndpointsResponseSchema } from "../../../../packages/shared/contracts";
 import { PartnerIntegrationAuditActions } from "../../../src/modules/partner-integrations/partner-integrations.module";
 import { MemoryPartnerIntegrationsRepository } from "../../../src/modules/partner-integrations/partner-integrations.repository";
 import { PartnerIntegrationsService } from "../../../src/modules/partner-integrations/partner-integrations.service";
@@ -322,6 +322,108 @@ describe("partner API and webhooks runtime HTTP", () => {
     const redirected = await redirectService.processDueWebhookDeliveries();
     expect(redirected).toMatchObject({ attempted: 1, retryable: 1 });
     expect(fetchCount).toBe(1);
+  });
+  it("returns the tenant's notifications, which are stored under the partner: recipient scope", async () => {
+    harness = await createRuntimeHttpHarness();
+    enableFlag(harness, "partner_api_enabled");
+    const admin = { actorId: "super", roles: ["super_admin" as const], mfaVerified: true };
+    const partner = await harness.runtime.partners.service.create({
+      legalName: "Notified Broker",
+      plan: "pro",
+      primaryEmail: "notified@broker.example",
+      primaryWhatsApp: "+2250102030405",
+      status: "active",
+      quotaMonthlyLeads: 10
+    }, admin);
+    const other = await harness.runtime.partners.service.create({
+      legalName: "Other Broker",
+      plan: "pro",
+      primaryEmail: "other@broker.example",
+      primaryWhatsApp: "+2250102030406",
+      status: "active",
+      quotaMonthlyLeads: 10
+    }, admin);
+    await harness.runtime.notifications.service.queuePaired({
+      type: "broker_lead_assigned",
+      recipientScope: `partner:${partner.id}`,
+      payloadReference: "NOTIF-MINE"
+    }, admin);
+    await harness.runtime.notifications.service.queuePaired({
+      type: "broker_lead_assigned",
+      recipientScope: `partner:${other.id}`,
+      payloadReference: "NOTIF-OTHER"
+    }, admin);
+
+    const key = await createApiKey(harness, admin, partner.id, ["notifications:read"]);
+    const response = await harness.request("/partner-api/v1/notifications?page=1&pageSize=10", { headers: { Authorization: `Bearer ${key}` } });
+    expect(response.status).toBe(200);
+    const notifications = partnerApiNotificationsResponseSchema.parse(await readJson(response));
+    expect(notifications.total).toBe(1);
+    expect(notifications.items[0]).toMatchObject({ type: "broker_lead_assigned", payloadReference: "NOTIF-MINE" });
+    expect(JSON.stringify(notifications)).not.toContain("NOTIF-OTHER");
+  });
+
+  it("delivers the documented event envelope while persistence stays free of readable values", async () => {
+    harness = await createRuntimeHttpHarness();
+    enableFlag(harness, "partner_webhooks_enabled");
+    const admin = { actorId: "super", roles: ["super_admin" as const], mfaVerified: true };
+    const partner = await harness.runtime.partners.service.create({
+      legalName: "Envelope Broker",
+      plan: "enterprise",
+      primaryEmail: "envelope@broker.example",
+      primaryWhatsApp: "+2250102030405",
+      status: "active",
+      quotaMonthlyLeads: 10
+    }, admin);
+    const repository = new MemoryPartnerIntegrationsRepository();
+    let deliveredBody = "";
+    const service = new PartnerIntegrationsService({
+      audit: harness.runtime.audit.writer,
+      featureFlags: harness.runtime.featureFlags.service,
+      partners: harness.runtime.partners.service,
+      assignments: harness.runtime.leads.assignments,
+      notifications: harness.runtime.notifications.service,
+      repository,
+      webhookDeliveryEnabled: true,
+      fetch: async (_url, init) => {
+        deliveredBody = String(init?.body ?? "");
+        return { status: 204 } as Response;
+      }
+    });
+    await service.createWebhookAllowlistEntry(admin, { partnerTenantId: partner.id, origin: "https://hooks.partner.example", path: "/assurmatch", reason: "Partner webhook envelope allow-list" });
+    const endpoint = await service.createWebhookEndpoint(admin, { partnerTenantId: partner.id, url: "https://hooks.partner.example/assurmatch", eventTypes: ["lead.assigned"], reason: "Partner webhook envelope endpoint" });
+    await service.updateWebhookEndpoint(admin, endpoint.endpoint.id, { status: "active", reason: "Activate envelope test" });
+    await service.prepareWebhookDelivery({
+      partnerTenantId: partner.id,
+      eventType: "lead.assigned",
+      data: {
+        leadAssignmentId: "00000000-0000-4000-8000-000000000778",
+        publicReference: "HOOK-3",
+        countryCode: "CI",
+        productKey: "auto",
+        status: "assigned",
+        email: "visitor@example.test"
+      }
+    });
+
+    expect(await service.processDueWebhookDeliveries()).toMatchObject({ attempted: 1, delivered: 1 });
+    const envelope = JSON.parse(deliveredBody) as { type: string; partnerTenantId: string; idempotencyKey: string; data: Record<string, unknown> };
+    expect(envelope).toMatchObject({ type: "lead.assigned", partnerTenantId: partner.id });
+    expect(envelope.idempotencyKey).toBeTruthy();
+    // The partner receives the allow-listed values, never the PII the event carried.
+    expect(envelope.data).toEqual({
+      leadAssignmentId: "00000000-0000-4000-8000-000000000778",
+      publicReference: "HOOK-3",
+      countryCode: "CI",
+      productKey: "auto",
+      status: "assigned"
+    });
+    expect(deliveredBody).not.toContain("visitor@example.test");
+
+    const persisted = JSON.stringify(await repository.listDeliveries());
+    expect(persisted).not.toContain("HOOK-3");
+    expect(persisted).not.toContain("00000000-0000-4000-8000-000000000778");
+    expect(persisted).not.toContain("visitor@example.test");
   });
 });
 

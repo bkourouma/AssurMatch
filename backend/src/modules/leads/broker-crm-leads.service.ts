@@ -172,6 +172,9 @@ export class BrokerCrmLeadsService {
       assignedAt: assignment.assignedAt.toISOString(),
       urgency: assignment.urgency ?? "normal",
       source: assignment.source ?? "quote_request",
+      // Spec 042 D1: the partner sees that the lead is shared and with how many others, never who.
+      isShared: (assignment.recipientCount ?? 1) > 1,
+      recipientCount: assignment.recipientCount ?? 1,
       ...(assignment.assignedAdvisorId ? { advisorId: assignment.assignedAdvisorId } : {}),
       ...(typeof contact.displayName === "string" ? { prospectName: contact.displayName } : {}),
       ...(email ? { emailMasked: this.maskEmail(email) } : {}),

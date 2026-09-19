@@ -59,15 +59,22 @@ export class MessagingProviderService {
   private provider(channel: "sms" | "whatsapp", flagKey: string, provider: string | undefined, secretConfigured: boolean) {
     const flagEnabled = this.featureFlags.isEnabled(flagKey);
     const configured = Boolean(provider) && secretConfigured;
+    // A channel can only send when its sensitive flag is on AND a provider with a secret exists;
+    // recipients must additionally have opted in, which the dispatch service enforces per message.
+    const sendCapable = flagEnabled && configured;
     return {
       channel,
-      enabled: false as const,
+      enabled: flagEnabled,
       configured,
       provider: provider ?? "not_configured",
       flagKey,
       secretConfigured,
-      sendCapable: false as const,
-      reason: flagEnabled && configured ? "provider_abstraction_only_disabled_for_v1" : "disabled_by_default"
+      sendCapable,
+      reason: sendCapable
+        ? "flag_enabled_provider_configured_recipient_opt_in_required"
+        : flagEnabled
+          ? "provider_not_configured"
+          : "disabled_by_default"
     };
   }
 

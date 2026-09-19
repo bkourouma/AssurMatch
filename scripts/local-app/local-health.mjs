@@ -67,6 +67,12 @@ await check("quote form loads", async () => {
   const { response, text } = await fetchText(`${DEFAULTS.publicUrl}/countries/CI/products/auto/quote`);
   assertStatus("quote form", response, [200]);
   assertIncludes("quote form", text, "Demander un devis");
+  // The heading is present on the unavailable page too, so asserting it alone let a dead journey
+  // pass as healthy (spec 043). A rendered field is what proves the form is actually usable.
+  if (text.includes("La demande de devis n'est pas disponible")) {
+    throw new Error("quote form rendered its unavailable state: no published form definition for CI/auto");
+  }
+  assertIncludes("quote form", text, "name=\"multiBroker\"");
 });
 
 await check("admin login loads", async () => {

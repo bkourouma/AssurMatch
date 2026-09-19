@@ -4,11 +4,13 @@ import { AuditLogWriter } from "../audit-logs/audit-log-writer.service";
 import { QuoteAuditActions } from "../audit-logs/quote-audit-actions";
 import type { ActorContext } from "../common/types";
 import { ConsentService } from "../consent/consent.module";
+import { MULTI_BROKER_CONSENT, SINGLE_BROKER_CONSENT } from "../leads/quote-routing.service";
 import type { Country } from "../countries/countries.module";
 import type { Product } from "../products/products.module";
 import type { ProspectIdentityService } from "../prospects/prospect-identity.service";
 import type { ProspectsService } from "../prospects/prospects.service";
 import type { QuoteFormDefinitionService } from "../quote-forms/quote-form-definition.service";
+import type { LeadAssignmentRecord } from "../leads/lead-assignment.service";
 import type { QuoteRoutingService } from "../leads/quote-routing.service";
 import type { QuoteNotificationService } from "../notifications/quote-notification.service";
 import type { QuoteAISummaryService } from "../ai/quote-summary/quote-ai-summary.service";
@@ -18,7 +20,7 @@ import type { QuoteDuplicateDetectionService } from "./quote-duplicate-detection
 import { MemoryQuoteRequestsRepository, type QuoteRequestsRepository } from "./quote-requests.repository";
 
 export type QuoteRequestStatus = "created" | "manual_review" | "routed" | "non_routable" | "duplicate" | "spam_blocked" | "cancelled";
-export type RoutingStatus = "not_started" | "assigned" | "no_broker_available" | "manual_review_required" | "blocked";
+export type RoutingStatus = "not_started" | "assigned" | "no_broker_available" | "manual_review_required" | "blocked" | "pending_manual_assignment";
 export type DuplicateStatus = "not_checked" | "unique" | "possible_duplicate" | "blocked_duplicate";
 
 export interface QuoteRequestRecord {
@@ -150,7 +152,9 @@ export class QuoteSubmissionService {
       countryId: country.id,
       productId: product.id,
       channel: "public_web",
-      intendedRecipient: "courtier_partenaire_eligible",
+      // Spec 042 D2: the visitor decides. The category recorded here is what routing will honour,
+      // so a request submitted without the opt-in can never be fanned out later.
+      intendedRecipient: parsed.consent.multiBrokerAccepted ? MULTI_BROKER_CONSENT : SINGLE_BROKER_CONSENT,
       status: "granted",
       grantedAt: new Date().toISOString()
     }, actor);
@@ -206,13 +210,17 @@ export class QuoteSubmissionService {
       quote.status = "non_routable";
       quote.routingStatus = "no_broker_available";
       quote.refusalReason = "no_eligible_broker";
+    } else if (routingResult?.routingStatus === "pending_manual_assignment") {
+      // A `manual` routing rule parks the quote for an admin; the visitor only sees "recue".
+      quote.routingStatus = "pending_manual_assignment";
     }
     quote.updatedAt = new Date();
     await this.repository.update(quote.id, quote);
     await this.deps.notifications?.queueVisitor(quote, actor);
-    if (routingResult?.assignment) {
-      const brokerNotification = await this.deps.notifications?.queueBroker(quote, routingResult.assignment, actor);
-      if (brokerNotification) routingResult.assignment.brokerNotificationId = brokerNotification.notification.id;
+    // Spec 042: every recipient of a fanned-out request is notified, not just the first one.
+    for (const assignment of routingResult?.assignments ?? []) {
+      const brokerNotification = await this.deps.notifications?.queueBroker(quote, assignment, actor);
+      if (brokerNotification) assignment.brokerNotificationId = brokerNotification.notification.id;
     }
     await this.deps.aiSummary?.enqueueIfAllowed(quote, actor);
     return {
@@ -221,10 +229,53 @@ export class QuoteSubmissionService {
       routed: quote.status === "routed",
       ...(routingResult?.assignment ? { brokerName: "courtier partenaire" } : {}),
       message: quote.status === "routed"
-        ? "Votre demande indicative a ete transmise au courtier partenaire identifie."
+        ? (routingResult?.assignments.length ?? 0) > 1
+          ? `Votre demande indicative a ete transmise a ${routingResult?.assignments.length} courtiers partenaires eligibles, comme vous l'avez accepte.`
+          : "Votre demande indicative a ete transmise au courtier partenaire identifie."
         : "Votre demande a ete recue et reste a confirmer par un courtier partenaire.",
       verificationToken: token
     };
+  }
+
+  findById(id: string): Promise<QuoteRequestRecord | undefined> {
+    return this.repository.findById(id);
+  }
+
+  async listPendingManual(): Promise<QuoteRequestRecord[]> {
+    return (await this.repository.list()).filter((quote) => quote.routingStatus === "pending_manual_assignment");
+  }
+
+  /** Completes a quote parked by a `manual` routing rule; eligibility is enforced by the routing service. */
+  async assignManually(quoteRequestId: string, partnerTenantId: string, actor: ActorContext, reason: string): Promise<{ quoteRequestId: string; assignmentId: string; partnerTenantId: string; status: "routed" }> {
+    const quote = await this.repository.findById(quoteRequestId);
+    if (!quote) throw new Error(`Quote request ${quoteRequestId} not found`);
+    if (quote.routingStatus !== "pending_manual_assignment") throw new Error("Manual routing conflict: quote_not_pending");
+    if (!this.deps.routing) throw new Error("Manual routing conflict: routing_not_configured");
+    const assignment = await this.deps.routing.assignManually(quote, partnerTenantId, actor, reason);
+    quote.status = "routed";
+    quote.routingStatus = "assigned";
+    quote.updatedAt = new Date();
+    await this.repository.update(quote.id, quote);
+    const brokerNotification = await this.deps.notifications?.queueBroker(quote, assignment, actor);
+    if (brokerNotification) assignment.brokerNotificationId = brokerNotification.notification.id;
+    await this.deps.aiSummary?.enqueueIfAllowed(quote, actor);
+    return { quoteRequestId: quote.id, assignmentId: assignment.id, partnerTenantId, status: "routed" };
+  }
+
+  /** Re-notifies a partner after an admin reassignment; returns the notification id when queued. */
+  async notifyBrokerForAssignment(assignment: LeadAssignmentRecord, actor: ActorContext): Promise<string | undefined> {
+    const quote = await this.repository.findById(assignment.quoteRequestId);
+    if (!quote) return undefined;
+    const queued = await this.deps.notifications?.queueBroker(quote, assignment, actor, { allowRepeat: true });
+    return queued?.notification.id;
+  }
+
+  /** Visitor-side authentication: the public reference plus the verification token issued at submission. */
+  async authenticateVisitor(publicReference: string, token: string): Promise<QuoteRequestRecord | undefined> {
+    if (!token) return undefined;
+    const quote = await this.repository.findByPublicReference(publicReference);
+    if (!quote || quote.verificationTokenHash !== this.hash(token)) return undefined;
+    return quote;
   }
 
   async status(publicReference: string, token: string) {

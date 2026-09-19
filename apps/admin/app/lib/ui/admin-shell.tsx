@@ -13,11 +13,16 @@ const authRoutePrefixes = ["/login", "/mfa", "/activate", "/password-change", "/
 
 const navigationItems = [
   { label: "Dashboard", href: "/", match: ["/", "/dashboard"] },
-  { label: "Catalogue", href: "/catalog", match: ["/catalog", "/offers", "/quote-form-definitions"] },
+  { label: "Catalogue", href: "/catalog", match: ["/catalog", "/offers"] },
+  // Spec 043: the screen existed but nothing linked to it, so no operator could reach it.
+  { label: "Formulaires devis", href: "/quote-form-definitions", match: ["/quote-form-definitions"] },
+  { label: "Scoring", href: "/scoring", match: ["/scoring"] },
   { label: "Activation", href: "/activation-checklist", match: ["/activation-checklist"] },
   { label: "Partenaires", href: "/partners", match: ["/partners"] },
+  { label: "Routage", href: "/routing", match: ["/routing"] },
   { label: "Billing", href: "/billing", match: ["/billing"] },
   { label: "Integrations", href: "/partner-integrations", match: ["/partner-integrations"] },
+  { label: "Messaging", href: "/messaging", match: ["/messaging"] },
   { label: "Utilisateurs", href: "/users", match: ["/users"] },
   { label: "Feature flags", href: "/feature-flags", match: ["/feature-flags"] },
   { label: "IA", href: "/ai-assistance", match: ["/ai-assistance"] },

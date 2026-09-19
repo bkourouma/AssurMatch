@@ -32,6 +32,7 @@ export function toSafeErrorResponse(error: unknown, correlationId: string): Safe
 function statusForError(error: unknown): number {
   if (error instanceof HttpException) return error.getStatus();
   const message = error instanceof Error ? error.message : "";
+  if (/rate limit/i.test(message)) return HttpStatus.TOO_MANY_REQUESTS;
   if (/auth/i.test(message)) return HttpStatus.UNAUTHORIZED;
   if (/validation|invalid/i.test(message)) return HttpStatus.BAD_REQUEST;
   if (/mfa|rbac|denied|forbidden|read_only|tenant|crm/i.test(message)) return HttpStatus.FORBIDDEN;

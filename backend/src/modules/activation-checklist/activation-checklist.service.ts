@@ -16,6 +16,7 @@ import type { PartnerTenant, PartnersService } from "../partners/partners.module
 import type { Product, ProductsService } from "../products/products.module";
 import type { QuoteFormDefinitionService } from "../quote-forms/quote-form-definition.service";
 import { OfferPublicationPolicy } from "../offers/offer-publication-policy";
+import { countryCatalog, productCatalog, resolveScopeCodes } from "../common/scope/actor-scope-codes";
 import { ActivationChecklistAuditActions } from "./activation-checklist-audit-actions";
 
 type ActivationChecklistRole = "super_admin" | "admin_pays" | "compliance_admin";
@@ -66,7 +67,7 @@ export class ActivationChecklistService {
       this.deps.offers.repository.list(),
       this.deps.consent.listTexts()
     ]);
-    const forms = this.deps.quoteForms.list();
+    const forms = await this.deps.quoteForms.list();
     const sections: ActivationChecklistSection[] = [
       this.globalSection(),
       ...countries.map((country) => this.countrySection(country)),
@@ -104,14 +105,16 @@ export class ActivationChecklistService {
     if (role === "admin_pays" && !actor.countryScopes?.length) {
       this.refuse(actor, "missing_country_scope");
     }
+    // Scopes are stored as country ids; this checklist compares them to ISO codes.
+    const countryScopes = resolveScopeCodes(actor.countryScopes, countryCatalog(all));
     if (query.country) {
-      if (role === "admin_pays" && actor.countryScopes?.length && !actor.countryScopes.includes(query.country)) {
+      if (role === "admin_pays" && countryScopes.length && !countryScopes.includes(query.country)) {
         this.refuse(actor, "out_of_scope_country");
       }
       return all.filter((country) => country.isoCode === query.country);
     }
-    if (role === "admin_pays" && actor.countryScopes?.length) {
-      return all.filter((country) => actor.countryScopes?.includes(country.isoCode));
+    if (role === "admin_pays" && countryScopes.length) {
+      return all.filter((country) => countryScopes.includes(country.isoCode));
     }
     return all;
   }
@@ -120,14 +123,16 @@ export class ActivationChecklistService {
     const countryIds = new Set(countries.map((country) => country.id));
     const scopedProducts = (await Promise.all(countries.map((country) => this.deps.products.listAdmin(country.id)))).flat();
     const unique = [...new Map(scopedProducts.map((product) => [product.id, product])).values()];
+    // Scopes are stored as product ids; this checklist compares them to product keys.
+    const productScopes = resolveScopeCodes(actor.productScopes, productCatalog(await this.deps.products.listAdmin()));
     if (query.product) {
-      if (role !== "super_admin" && actor.productScopes?.length && !actor.productScopes.includes(query.product)) {
+      if (role !== "super_admin" && productScopes.length && !productScopes.includes(query.product)) {
         this.refuse(actor, "out_of_scope_product");
       }
       return unique.filter((product) => product.key === query.product && product.countryIds.some((countryId) => countryIds.has(countryId)));
     }
-    if (role !== "super_admin" && actor.productScopes?.length) {
-      return unique.filter((product) => actor.productScopes?.includes(product.key));
+    if (role !== "super_admin" && productScopes.length) {
+      return unique.filter((product) => productScopes.includes(product.key));
     }
     return unique;
   }
@@ -170,7 +175,7 @@ export class ActivationChecklistService {
     ]);
   }
 
-  private quoteReadinessSections(countries: Country[], products: Product[], forms: ReturnType<QuoteFormDefinitionService["list"]>, consentTexts: Awaited<ReturnType<ConsentService["listTexts"]>>): ActivationChecklistSection[] {
+  private quoteReadinessSections(countries: Country[], products: Product[], forms: Awaited<ReturnType<QuoteFormDefinitionService["list"]>>, consentTexts: Awaited<ReturnType<ConsentService["listTexts"]>>): ActivationChecklistSection[] {
     const sections: ActivationChecklistSection[] = [];
     for (const country of countries) {
       for (const product of products.filter((candidate) => candidate.countryIds.includes(country.id))) {
@@ -230,7 +235,8 @@ export class ActivationChecklistService {
     const publicationResults = await Promise.all(scopedOffers.map(async (offer) => {
       const publication = policy.evaluate(offer);
       const sponsoredAllowed = !offer.isSponsored || this.deps.featureFlags.isEnabled("sponsored_offers_enabled");
-      const partnerEligible = offer.partnerTenantId ? await this.partnerEligibility(offer.partnerTenantId, offer.countryId, offer.productId) : { eligible: false };
+      // Platform-owned offers carry no partner, and the public catalog skips partner eligibility for them.
+      const partnerEligible = offer.partnerTenantId ? await this.partnerEligibility(offer.partnerTenantId, offer.countryId, offer.productId) : { eligible: true };
       return {
         offer,
         public: publication.public && sponsoredAllowed && partnerEligible.eligible,

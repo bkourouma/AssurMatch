@@ -75,7 +75,7 @@ export function leadSummary(lead: Record<string, unknown>): LeadSummaryViewModel
     statusTone: statusTone(status),
     assignedAt: formatDate(String(lead.assignedAt ?? "")),
     seen: lead.seenAt ? "Oui" : "Non",
-    advisor: lead.assignedAdvisorId ? String(lead.assignedAdvisorId) : undefined,
+    advisor: lead.advisorId ? String(lead.advisorId) : lead.assignedAdvisorId ? String(lead.assignedAdvisorId) : undefined,
     urgency: lead.urgency ? String(lead.urgency) : undefined,
     source: lead.source ? String(lead.source) : undefined
   };

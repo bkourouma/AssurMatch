@@ -37,7 +37,6 @@ const API_KEY_PREFIX = "am_pk_";
 const WEBHOOK_SECRET_PREFIX = "whsec_";
 const MAX_DELIVERY_ATTEMPTS = 5;
 const RETRY_DELAYS_MS = [5, 15, 60, 360, 1440].map((minutes) => minutes * 60 * 1000);
-const ADMIN_ROLES = new Set(["super_admin", "compliance_admin", "support_admin"]);
 const RATE_LIMIT_WINDOW_MS = 60_000;
 const RATE_LIMIT_MAX_REQUESTS = 60;
 
@@ -226,7 +225,11 @@ export class PartnerIntegrationsService {
     const existing = await this.repository.requireEndpoint(id);
     if (existing.partnerTenantId !== auth.record.partnerTenantId) this.refuseApiRead("cross_tenant_endpoint", "webhooks:manage", auth.record);
     await this.updateWebhookEndpoint(auth.actor, id, input, false);
-    return this.listWebhookEndpointsFromApiKey(apiKey);
+    const items = (await this.repository.listEndpoints())
+      .filter((record) => record.partnerTenantId === auth.record.partnerTenantId)
+      .map((record) => this.toEndpointSummary(record));
+    this.auditApiRead(auth, "webhook-endpoints");
+    return { generatedAt: new Date().toISOString(), items, total: items.length };
   }
 
   private async createWebhookEndpointRecord(actor: ActorContext, parsed: PartnerWebhookEndpointCreate): Promise<PartnerWebhookEndpointCreateResponse> {
@@ -326,7 +329,7 @@ export class PartnerIntegrationsService {
     const auth = await this.authenticate(apiKey, "notifications:read");
     const parsed = partnerApiPaginationQuerySchema.parse(query ?? {});
     const allItems = (await this.deps.notifications.list())
-      .filter((notification) => notification.recipientScope === auth.record.partnerTenantId)
+      .filter((notification) => notification.recipientScope === `partner:${auth.record.partnerTenantId}`)
       .sort((left, right) => right.createdAt.getTime() - left.createdAt.getTime())
       .map((notification) => this.toNotificationSummary(notification));
     const start = (parsed.page - 1) * parsed.pageSize;
@@ -425,17 +428,12 @@ export class PartnerIntegrationsService {
       return { attempted: 0, delivered: 0, retryable: 0, deadLetter: 0, refused: 0 };
     }
     const now = input.now ?? new Date();
-    const due = (await this.repository.listDeliveries())
-      .filter((delivery) =>
-        (delivery.status === "pending" || delivery.status === "retryable")
-        && Boolean(delivery.endpointId)
-        && (!delivery.nextAttemptAt || delivery.nextAttemptAt <= now)
-      )
-      .sort((left, right) => left.createdAt.getTime() - right.createdAt.getTime())
-      .slice(0, input.limit ?? 25);
+    const due = await this.repository.listDueDeliveries({ now, limit: input.limit ?? 25 });
     const summary = { attempted: 0, delivered: 0, retryable: 0, deadLetter: 0, refused: 0 };
+    if (due.length === 0) return summary;
+    const allowlist = await this.repository.listAllowlistEntries();
     for (const delivery of due) {
-      const result = await this.deliverWebhook(delivery);
+      const result = await this.deliverWebhook(delivery, allowlist);
       summary.attempted += 1;
       if (result.status === "delivered") summary.delivered += 1;
       else if (result.status === "dead_letter") summary.deadLetter += 1;
@@ -451,8 +449,11 @@ export class PartnerIntegrationsService {
     const parsedKey = this.parseApiKey(rawKey);
     if (!parsedKey) this.refuseApiRead("invalid_key_format", requiredScope);
     const record = await this.repository.requireApiKey(parsedKey.keyId).catch(() => undefined);
-    if (!record || !await argon2.verify(record.keyHash, parsedKey.secret).catch(() => false)) this.refuseApiRead("invalid_api_key", requiredScope);
+    if (!record) this.refuseApiRead("invalid_api_key", requiredScope);
+    // Metered before the memory-hard verify so a flood of invalid secrets cannot burn unbounded
+    // CPU, and keyed on an existing record so unknown ids cannot grow the bucket map.
     this.consumeRateLimit(record.keyPrefix, requiredScope);
+    if (!await argon2.verify(record.keyHash, parsedKey.secret).catch(() => false)) this.refuseApiRead("invalid_api_key", requiredScope);
     if (record.status !== "active") this.refuseApiRead("api_key_revoked", requiredScope, record);
     if (!record.scopes.includes(requiredScope)) this.refuseApiRead("missing_scope", requiredScope, record);
     await this.repository.updateApiKey(record.id, { lastUsedAt: new Date(), updatedAt: new Date() });
@@ -506,7 +507,7 @@ export class PartnerIntegrationsService {
 
   private assertAdminAccess(actor: ActorContext): void {
     if (actor.mfaVerified !== true) this.refuseAdmin(actor, "mfa_required");
-    if (!actor.roles.some((role) => ADMIN_ROLES.has(role) || roleHasPermission(role, "partners:update"))) {
+    if (!actor.roles.some((role) => roleHasPermission(role, "partners:update"))) {
       this.refuseAdmin(actor, "forbidden_role");
     }
   }
@@ -553,7 +554,11 @@ export class PartnerIntegrationsService {
       partnerTenantId: endpoint.partnerTenantId,
       eventId,
       eventType,
-      payload: this.redactedWebhookPayload(signedPayload),
+      // Values stay unreadable at rest; the deliverable envelope is encrypted for the worker.
+      payload: {
+        ...this.redactedWebhookPayload(signedPayload),
+        encryptedBody: this.encryption.encrypt(JSON.stringify(signedPayload))
+      },
       payloadMetadata: {
         ...this.payloadMetadata(signedPayload, "pending"),
         headers: {
@@ -585,15 +590,15 @@ export class PartnerIntegrationsService {
     });
   }
 
-  private async deliverWebhook(delivery: PartnerWebhookDeliveryRecord): Promise<PartnerWebhookDeliveryRecord> {
+  private async deliverWebhook(delivery: PartnerWebhookDeliveryRecord, allowlist?: PartnerWebhookAllowlistRecord[]): Promise<PartnerWebhookDeliveryRecord> {
     if (!delivery.endpointId) return this.repository.updateDelivery(delivery.id, { status: "failed", updatedAt: new Date() });
     const endpoint = await this.repository.requireEndpoint(delivery.endpointId);
     if (endpoint.status !== "active") return this.recordWebhookAttempt(delivery.id, "endpoint_inactive");
     try {
-      await this.assertWebhookEndpointApproved(endpoint.partnerTenantId, endpoint.url);
+      await this.assertWebhookEndpointApproved(endpoint.partnerTenantId, endpoint.url, allowlist);
       const url = assertWebhookUrlShape(endpoint.url);
       if (this.shouldEnforceDnsValidation()) await assertWebhookDnsPublic(url, this.dnsResolver);
-      const body = JSON.stringify(delivery.payload);
+      const body = this.deliverableBody(delivery);
       if (Buffer.byteLength(body, "utf8") > 64 * 1024) return this.recordWebhookAttempt(delivery.id, "payload_too_large");
       const response = await this.fetcher(endpoint.url, {
         method: "POST",
@@ -640,6 +645,19 @@ export class PartnerIntegrationsService {
       containsPii: false,
       payloadBytes: JSON.stringify(payload).length
     };
+  }
+
+  private deliverableBody(delivery: PartnerWebhookDeliveryRecord): string {
+    const encrypted = delivery.payload?.["encryptedBody"];
+    if (typeof encrypted !== "string") {
+      // Deliveries persisted before encrypted bodies existed only carry the redacted envelope.
+      return JSON.stringify(delivery.payload);
+    }
+    try {
+      return this.encryption.decrypt(encrypted);
+    } catch {
+      return JSON.stringify(this.redactedWebhookPayload(delivery.payload));
+    }
   }
 
   private redactedWebhookPayload(payload: Record<string, unknown>): Record<string, unknown> {
@@ -757,10 +775,10 @@ export class PartnerIntegrationsService {
     return { keyId, secret };
   }
 
-  private async assertWebhookEndpointApproved(partnerTenantId: string, value: string): Promise<void> {
+  private async assertWebhookEndpointApproved(partnerTenantId: string, value: string, allowlist?: PartnerWebhookAllowlistRecord[]): Promise<void> {
     const url = assertWebhookUrlShape(value);
     if (this.shouldEnforceDnsValidation()) await assertWebhookDnsPublic(url, this.dnsResolver);
-    const allowed = (await this.repository.listAllowlistEntries())
+    const allowed = (allowlist ?? await this.repository.listAllowlistEntries())
       .filter((entry) => entry.partnerTenantId === partnerTenantId && entry.status === "active")
       .some((entry) => entry.origin === url.origin && (!entry.path || entry.path === url.pathname));
     if (!allowed) throw new Error("Invalid webhook endpoint URL is not allow-listed for this partner");

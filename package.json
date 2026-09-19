@@ -33,11 +33,13 @@
     "test:web:local": "node scripts/local-app/local-browser-smoke.mjs",
     "test:web": "playwright test",
     "partner-webhooks:deliver-due": "node --import tsx scripts/partner-webhook-delivery-worker.ts",
+    "quote-notifications:deliver-due": "node --import tsx scripts/quote-notification-delivery-worker.ts",
     "seed:reference": "node --import tsx scripts/preprod/seed-reference.ts",
     "import:partners": "node --import tsx scripts/preprod/import-partners.ts",
     "validate": "npm run typecheck && npm run lint && npm run test"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.124.0",
     "@nestjs/common": "11.1.19",
     "@nestjs/core": "11.1.19",
     "@nestjs/platform-express": "11.1.19",

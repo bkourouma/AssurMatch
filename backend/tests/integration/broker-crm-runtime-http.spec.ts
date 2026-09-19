@@ -29,6 +29,7 @@ describe("broker CRM runtime HTTP", () => {
     const response = await harness.request("/broker/crm/leads", { headers: actorHeaders(pro) });
     expect(response.status).toBe(200);
     const page = await readJson<{ items: Array<{ leadAssignmentId: string; publicReference: string }> }>(response);
-    expect(page.items).toEqual([{ leadAssignmentId: lead.id, publicReference: "CRM-A", countryCode: "CI", productKey: "unknown", status: "nouveau", assignedAt: lead.assignedAt.toISOString(), urgency: "normal", source: "quote_request" }]);
+    // Spec 042: an exclusive lead is explicitly reported as not shared.
+    expect(page.items).toEqual([{ leadAssignmentId: lead.id, publicReference: "CRM-A", countryCode: "CI", productKey: "unknown", status: "nouveau", assignedAt: lead.assignedAt.toISOString(), urgency: "normal", source: "quote_request", isShared: false, recipientCount: 1 }]);
   });
 });

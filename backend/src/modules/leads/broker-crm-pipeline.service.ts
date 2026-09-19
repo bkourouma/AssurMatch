@@ -11,7 +11,9 @@ export class BrokerCrmPipelineService {
     private readonly assignments: LeadAssignmentService,
     private readonly access: BrokerCrmAccessPolicy,
     private readonly history: BrokerCrmHistoryService,
-    private readonly audit: AuditLogWriter
+    private readonly audit: AuditLogWriter,
+    /** Optional partner webhook observer; a failure here never blocks the status change. */
+    private readonly events?: { publish(eventType: "lead.status_changed", partnerTenantId: string, data: Record<string, unknown>): Promise<void> } | undefined
   ) {}
 
   async changeStatus(id: string, input: BrokerCrmStatusUpdate, actor: ActorContext): Promise<LeadAssignmentRecord> {
@@ -38,6 +40,14 @@ export class BrokerCrmPipelineService {
       result: "success",
       ...(parsed.reason ? { reason: parsed.reason } : {}),
       context: { previousStatus, nextStatus: parsed.status }
+    });
+    await this.events?.publish("lead.status_changed", assignment.partnerTenantId, {
+      leadAssignmentId: id,
+      publicReference: assignment.publicReference,
+      countryCode: assignment.countryCode,
+      productKey: assignment.productKey,
+      previousStatus,
+      status: parsed.status
     });
     return updated;
   }

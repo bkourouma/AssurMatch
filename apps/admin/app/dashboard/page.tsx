@@ -22,6 +22,7 @@ export default async function AdminDashboardPage() {
         kicker="Back-office plateforme"
         title="Dashboard plateforme"
         description="Indicateurs internes operationnels et conformite. Les chiffres restent des signaux de pilotage et ne modifient aucune regle de routage."
+        actions={<a className="button button--secondary" href="/reports/export">Exporter le rapport plateforme (CSV)</a>}
       />
       <section aria-label="Volumes de leads" className="admin-grid admin-grid--kpi">
         {dashboardKpis(data).map((kpi) => <KpiCard key={kpi.label} label={kpi.label} value={kpi.value} helper={kpi.helper} tone={kpi.tone} />)}

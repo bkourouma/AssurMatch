@@ -66,6 +66,37 @@ export class DashboardsAccessPolicy {
     }
   }
 
+  /** Exporting a report needs an explicit export permission (DASH-B-005). */
+  assertBrokerExport(actor: ActorContext): void {
+    if (!actor.roles.some((role) => roleHasPermission(role, "broker_leads:export") || roleHasPermission(role, "broker_crm:export") || roleHasPermission(role, "broker_crm:*"))) {
+      this.refuseBroker(actor, "missing_export_permission");
+    }
+  }
+
+  auditBrokerExport(actor: ActorContext, rowCount: number): void {
+    this.audit.write({
+      actor,
+      action: DashboardAuditActions.brokerExported,
+      targetType: "BrokerDashboardExport",
+      targetId: "export",
+      scope: { partnerTenantId: actor.partnerTenantId },
+      result: "success",
+      context: { rowCount, containsProspectIdentity: false }
+    });
+  }
+
+  auditBrokerAdvisorRead(actor: ActorContext, rowCount: number): void {
+    this.audit.write({
+      actor,
+      action: DashboardAuditActions.brokerAdvisorsRead,
+      targetType: "BrokerDashboardAdvisors",
+      targetId: "advisors",
+      scope: { partnerTenantId: actor.partnerTenantId },
+      result: "success",
+      context: { rowCount }
+    });
+  }
+
   crmSectionAllowed(actor: ActorContext, brokerCrmEnabled: boolean): boolean {
     if (!brokerCrmEnabled) {
       this.audit.write({
