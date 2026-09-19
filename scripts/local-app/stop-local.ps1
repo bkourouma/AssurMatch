@@ -2,6 +2,8 @@ $ErrorActionPreference = "Stop"
 
 $Root = Resolve-Path (Join-Path $PSScriptRoot "..\..")
 $Ports = @(3600, 3601, 3602, 3603)
+$LogDir = Join-Path $Root ".local\logs"
+$WorkerPidFile = Join-Path $LogDir "worker-notifications.pid"
 
 Write-Host "Stopping AssurMatch local app listeners on ports $($Ports -join ', ')..."
 
@@ -19,9 +21,12 @@ function Test-AssurMatchLocalProcess($Process) {
   $normalized = $commandLine.Replace("/", "\")
 
   if ($normalized -like "*scripts\local-app\api-runner.mjs*") { return $true }
+  # The notification loop listens on no port, so it is only ever identified by its script path.
+  if ($normalized -like "*scripts\local-app\notification-worker-loop.mjs*") { return $true }
   if ($commandLine -notlike "*$escapedRoot*") { return $false }
 
   return $normalized -like "*\.local\logs\api-3600.cmd*" -or
+    $normalized -like "*\.local\logs\worker-notifications.cmd*" -or
     $normalized -like "*\.local\logs\public-3601.cmd*" -or
     $normalized -like "*\.local\logs\admin-3602.cmd*" -or
     $normalized -like "*\.local\logs\broker-3603.cmd*" -or
@@ -33,9 +38,24 @@ function Test-AssurMatchLocalProcess($Process) {
         $normalized -like "*--port 3603*"))
 }
 
-$launched = Get-CimInstance Win32_Process |
+$launched = @(Get-CimInstance Win32_Process |
   Where-Object { $_.ProcessId -ne $PID -and (Test-AssurMatchLocalProcess $_) } |
-  Select-Object -ExpandProperty ProcessId -Unique
+  Select-Object -ExpandProperty ProcessId -Unique)
+
+# Belt and braces for the port-less notification loop: if its command line could not be read
+# (WMI returns an empty CommandLine for processes another account owns), the pid file it writes
+# in the log directory still identifies it. Only a live node.exe with that pid is touched.
+if (Test-Path $WorkerPidFile) {
+  $workerPidText = (Get-Content -Path $WorkerPidFile -Raw -ErrorAction SilentlyContinue)
+  $workerPid = 0
+  if ([int]::TryParse(($workerPidText | Out-String).Trim(), [ref] $workerPid) -and $workerPid -gt 0 -and $workerPid -ne $PID) {
+    $workerProcess = Get-CimInstance Win32_Process -Filter "ProcessId = $workerPid" -ErrorAction SilentlyContinue
+    if ($workerProcess -and $workerProcess.Name -eq "node.exe" -and ($launched -notcontains $workerPid)) {
+      $launched += $workerPid
+    }
+  }
+  Remove-Item -Path $WorkerPidFile -Force -ErrorAction SilentlyContinue
+}
 
 if ($launched) {
   $failedStops = @()

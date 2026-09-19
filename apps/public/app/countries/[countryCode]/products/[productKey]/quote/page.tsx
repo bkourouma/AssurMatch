@@ -12,9 +12,16 @@ export default async function PublicQuotePage({ params, searchParams }: { params
   const quoteForm = await getPublicQuoteForm(countryCode, productKey);
 
   return (
-    <main>
-      <h1>Demander un devis</h1>
-      <TechnicalRoleNotice />
+    <main className="pub-page">
+      <section className="pub-section">
+        <p className="pub-back">
+          <a href={`/countries/${encodeURIComponent(countryCode)}/products/${encodeURIComponent(productKey)}`}>
+            Retour au produit {productKey}
+          </a>
+        </p>
+        <h1>Demander un devis</h1>
+        <TechnicalRoleNotice />
+      </section>
       {quoteForm.status === "success" && quoteForm.data ? (
         <QuoteFormShell countryCode={countryCode} productKey={productKey} quoteForm={quoteForm.data} selectedOfferId={selectedOfferId} />
       ) : (

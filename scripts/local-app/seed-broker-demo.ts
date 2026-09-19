@@ -4,6 +4,13 @@ import { PrismaClient } from "@prisma/client";
 import type { Prisma } from "@prisma/client";
 import type { AssurMatchRole } from "../../packages/shared/rbac/assurmatch-role-matrix";
 import { PasswordHashingService } from "../../backend/src/modules/auth/password-hashing.service";
+import {
+  DEMO_OFFER_CURRENCY,
+  DEMO_OFFER_DISCLAIMERS,
+  DEMO_OFFER_PRICING_UNIT,
+  DEMO_OFFER_SPECS,
+  type DemoOfferSpec
+} from "./demo-offer-catalog";
 
 type PartnerPlan = "starter" | "pro" | "enterprise";
 type LeadStatus = "assigned" | "broker_notified" | "seen" | "accepted" | "rejected" | "closed" | "disputed";
@@ -618,49 +625,62 @@ async function seedAdminUsers(prisma: PrismaClient, passwordHash: string): Promi
   return seeded;
 }
 
+/**
+ * Seeds one validated, active offer per (product, partner) entry of DEMO_OFFER_SPECS.
+ * Only partners holding a valid licence receive offers: the "licence expiree" partner is
+ * deliberately excluded (Constitution II/VII).
+ */
 async function seedOffers(prisma: PrismaClient, partners: { starter: PartnerRecord; pro: PartnerRecord; enterprise: PartnerRecord }, country: CountryRecord, products: { auto: ProductRecord; voyage: ProductRecord }): Promise<void> {
-  await upsertOffer(prisma, country, products.auto, partners.starter, "local-demo-auto-essentiel", "Auto Essentiel Local", 45000, 75000);
-  await upsertOffer(prisma, country, products.auto, partners.pro, "local-demo-auto-pro", "Auto Pro Local", 85000, 140000);
-  await upsertOffer(prisma, country, products.voyage, partners.enterprise, "local-demo-voyage-enterprise", "Voyage Assistance Local", 18000, 45000);
+  for (const spec of DEMO_OFFER_SPECS) {
+    await upsertOffer(prisma, country, products[spec.productKey], partners[spec.partnerSlot], spec);
+  }
 }
 
-async function upsertOffer(prisma: PrismaClient, country: CountryRecord, product: ProductRecord, partner: PartnerRecord, publicKey: string, name: string, min: number, max: number): Promise<void> {
+async function upsertOffer(prisma: PrismaClient, country: CountryRecord, product: ProductRecord, partner: PartnerRecord, spec: DemoOfferSpec): Promise<void> {
+  // Comparator columns are all populated so the public comparator never falls back to
+  // "non renseigne"; the values are fictitious and stay explicitly indicative.
+  const comparatorFields = {
+    name: spec.name,
+    shortDescription: spec.shortDescription,
+    guaranteeSummary: spec.guaranteeSummary,
+    insurerName: spec.insurerName,
+    indicativePriceMin: spec.indicativePriceMin,
+    indicativePriceMax: spec.indicativePriceMax,
+    currency: DEMO_OFFER_CURRENCY,
+    pricingUnit: DEMO_OFFER_PRICING_UNIT,
+    guaranteeLevel: spec.guaranteeLevel,
+    deductibleAmount: spec.deductibleAmount,
+    coverageCeiling: spec.coverageCeiling,
+    processingDelayDays: spec.processingDelayDays,
+    paymentFlexibility: spec.paymentFlexibility,
+    guarantees: jsonArray(spec.guarantees),
+    exclusionsSummary: spec.exclusionsSummary,
+    requiredDocuments: spec.requiredDocuments,
+    sourceOfInformation: spec.sourceOfInformation,
+    displayPriority: spec.displayPriority,
+    isSponsored: false,
+    sponsorLabel: null,
+    status: "active" as const,
+    validationStatus: "validated" as const,
+    validUntil: new Date("2030-01-01T00:00:00.000Z"),
+    publicDisclaimers: [...DEMO_OFFER_DISCLAIMERS],
+    validatedById: DEMO_ACTOR_ID,
+    validatedAt: SEED_NOW
+  };
   await prisma.offer.upsert({
-    where: { countryId_productId_publicKey: { countryId: country.id, productId: product.id, publicKey } },
+    where: { countryId_productId_publicKey: { countryId: country.id, productId: product.id, publicKey: spec.publicKey } },
     create: {
       countryId: country.id,
       productId: product.id,
       partnerTenantId: partner.id,
-      publicKey,
-      name,
-      shortDescription: "Offre indicative locale pour demonstration",
-      guaranteeSummary: "Garanties principales a confirmer par le courtier partenaire",
-      indicativePriceMin: min,
-      indicativePriceMax: max,
-      currency: "XOF",
-      pricingUnit: "an",
-      status: "active",
-      validationStatus: "validated",
+      publicKey: spec.publicKey,
       validFrom: new Date("2026-01-01T00:00:00.000Z"),
-      validUntil: new Date("2030-01-01T00:00:00.000Z"),
-      publicDisclaimers: ["offre indicative", "prix a confirmer par le courtier partenaire"],
-      validatedById: DEMO_ACTOR_ID,
-      validatedAt: SEED_NOW,
-      createdById: DEMO_ACTOR_ID
+      createdById: DEMO_ACTOR_ID,
+      ...comparatorFields
     },
     update: {
       partnerTenantId: partner.id,
-      name,
-      shortDescription: "Offre indicative locale pour demonstration",
-      guaranteeSummary: "Garanties principales a confirmer par le courtier partenaire",
-      indicativePriceMin: min,
-      indicativePriceMax: max,
-      status: "active",
-      validationStatus: "validated",
-      validUntil: new Date("2030-01-01T00:00:00.000Z"),
-      publicDisclaimers: ["offre indicative", "prix a confirmer par le courtier partenaire"],
-      validatedById: DEMO_ACTOR_ID,
-      validatedAt: SEED_NOW
+      ...comparatorFields
     }
   });
 }
@@ -1097,6 +1117,10 @@ async function audit(prisma: PrismaClient, action: string, targetType: string, t
 }
 
 function jsonObject(value: Record<string, unknown>): Prisma.InputJsonValue {
+  return value as unknown as Prisma.InputJsonValue;
+}
+
+function jsonArray(value: readonly unknown[]): Prisma.InputJsonValue {
   return value as unknown as Prisma.InputJsonValue;
 }
 

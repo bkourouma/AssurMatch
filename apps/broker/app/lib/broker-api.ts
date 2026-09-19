@@ -231,6 +231,11 @@ export interface BrokerCrmLeadDetailData {
   tasks: Array<Record<string, unknown>>;
   documents: Array<Record<string, unknown>>;
   proposals: Array<Record<string, unknown>>;
+  /** Champs egalement exposes par brokerCrmLeadDetailSchema, optionnels cote UI. */
+  contact?: Record<string, unknown>;
+  reminders?: Array<Record<string, unknown>>;
+  disputes?: Array<Record<string, unknown>>;
+  advisorId?: string;
 }
 
 export interface BrokerAiInteraction {
@@ -426,4 +431,57 @@ export function readBrokerDashboardWithComparison() {
     "/broker/dashboard?compare=previous",
     emptyDashboard
   );
+}
+
+/** Spec 022: detail minimal d'un lead Starter, limite aux informations consenties. */
+export interface BrokerStarterLeadHistoryEventData {
+  id: string;
+  eventType: string;
+  previousStatus?: string;
+  nextStatus?: string;
+  reason?: string;
+  comment?: string;
+  occurredAt: string;
+}
+
+export interface BrokerStarterLeadDetailData {
+  leadAssignmentId: string;
+  publicReference: string;
+  countryCode: string;
+  productKey: string;
+  status: string;
+  assignedAt: string;
+  seen: boolean;
+  seenAt?: string;
+  contact: Record<string, unknown>;
+  answers: Record<string, unknown>;
+  history: BrokerStarterLeadHistoryEventData[];
+}
+
+const emptyStarterLeadDetail: BrokerStarterLeadDetailData = {
+  leadAssignmentId: "",
+  publicReference: "",
+  countryCode: "",
+  productKey: "",
+  status: "assigned",
+  assignedAt: "",
+  seen: false,
+  contact: {},
+  answers: {},
+  history: []
+};
+
+/** GET /broker/starter/leads/:leadId - marque le lead vu lors du premier acces autorise. */
+export function readStarterLeadDetail(leadAssignmentId: string) {
+  return readBroker<BrokerStarterLeadDetailData>(`/broker/starter/leads/${encodeURIComponent(leadAssignmentId)}`, emptyStarterLeadDetail);
+}
+
+/** GET /broker/starter/leads/:leadId/history - historique minimal audite. */
+export function readStarterLeadHistory(leadAssignmentId: string) {
+  return readBroker<BrokerStarterLeadHistoryEventData[]>(`/broker/starter/leads/${encodeURIComponent(leadAssignmentId)}/history`, []);
+}
+
+/** Distingue un lead inexistant d'une indisponibilite d'API, sans exposer d'information sensible. */
+export function isNotFoundState(state: BrokerApiState<unknown>): boolean {
+  return state.status === "error" && state.error === "api_404";
 }

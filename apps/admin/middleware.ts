@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 
-const TOKEN_COOKIE = "assurmatch_backoffice_token";
+// Doit rester identique a BACKOFFICE_TOKEN_COOKIE de app/lib/backoffice-auth.ts.
+// Le nom est distinct de celui du back-office courtier: les cookies navigateur ne
+// sont pas isoles par port, donc un nom partage ecraserait la session de l'autre app.
+const TOKEN_COOKIE = "assurmatch_admin_token";
 const ADMIN_API_BASE_URL = process.env.NEXT_PUBLIC_ASSURMATCH_ADMIN_API_URL ?? process.env.NEXT_PUBLIC_ASSURMATCH_API_URL ?? "http://127.0.0.1:3000";
 const ADMIN_ROLES = new Set(["super_admin", "admin_pays", "compliance_admin", "support_admin", "finance_admin", "content_admin", "ai_admin"]);
 

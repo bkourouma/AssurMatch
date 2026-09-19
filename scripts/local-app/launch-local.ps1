@@ -126,6 +126,11 @@ try {
 
   Write-Host "Waiting for local app URLs..."
   Wait-Http "http://127.0.0.1:3600/countries" @(200)
+
+  # The API only queues quote notifications; this loop is what actually delivers them locally,
+  # so a demo submission reaches Mailpit within seconds instead of waiting for a manual run.
+  Start-LocalProcess "worker-notifications" $Root $CommonEnv 'node scripts/local-app/notification-worker-loop.mjs'
+
   Wait-Http "http://127.0.0.1:3601" @(200)
   Wait-Http "http://127.0.0.1:3602/login" @(200)
   Wait-Http "http://127.0.0.1:3603/login" @(200)
@@ -137,6 +142,9 @@ try {
   Write-Host "  Back-office:  http://localhost:3602"
   Write-Host "  Broker aux:   http://localhost:3603"
   Write-Host "  Mailpit:      http://localhost:8025"
+  Write-Host ""
+  Write-Host "Queued quote notifications are delivered automatically every 10s by worker-notifications."
+  Write-Host "  Worker log:   $(Join-Path $LogDir 'worker-notifications.out.log')"
   Write-Host ""
   Write-Host "Logs are in $LogDir"
   Write-Host "Run npm run local:health or npm run test:web:local for validation."

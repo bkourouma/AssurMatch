@@ -133,12 +133,30 @@ async function readPublic<T>(path: string, emptyValue: T): Promise<PublicApiStat
   }
 }
 
+/** Public country exposed by GET /countries (only publicly activated countries are returned). */
+export interface PublicCountrySummary {
+  id: string;
+  isoCode: string;
+  name: string;
+  currency?: string;
+  status?: string;
+}
+
+/** Public product exposed by GET /countries/:code/products, with its per-product activations. */
+export interface PublicProductSummary {
+  id: string;
+  key: string;
+  name: string;
+  comparisonEnabled: boolean;
+  quoteEnabled: boolean;
+}
+
 export function listPublicCountries() {
-  return readPublic<unknown[]>("/countries", []);
+  return readPublic<PublicCountrySummary[]>("/countries", []);
 }
 
 export function listPublicProducts(countryCode: string) {
-  return readPublic<unknown[]>(`/countries/${countryCode}/products`, []);
+  return readPublic<PublicProductSummary[]>(`/countries/${encodeURIComponent(countryCode)}/products`, []);
 }
 
 /** Query parameters accepted by the public offers list (filters, sort, visitor priority). */

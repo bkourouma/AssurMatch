@@ -22,50 +22,58 @@ export default async function PublicComparePage({ searchParams }: { searchParams
   const comparison = ids.length >= 2 && ids.length <= 4 ? await comparePublicOffers(ids, priority) : null;
 
   return (
-    <main>
-      <h1>Comparer les offres cote a cote</h1>
-      <TechnicalRoleNotice />
-      <IndicativeOfferNotice />
+    <main className="pub-page">
+      <section className="pub-section">
+        <h1>Comparer les offres cote a cote</h1>
+        <TechnicalRoleNotice />
+        <IndicativeOfferNotice />
+      </section>
       {ids.length < 2 || ids.length > 4 ? (
         <p role="alert">Selectionnez entre 2 et 4 offres indicatives du meme pays et du meme produit pour les comparer.</p>
       ) : null}
       {comparison?.status === "error" ? <p role="alert">{comparison.publicMessage ?? "Comparaison indisponible."}</p> : null}
       {comparison?.status === "success" && comparison.data ? (
         <>
-          <p>{comparison.data.disclaimer}</p>
-          <table aria-label="Comparaison des offres">
-            <thead>
-              <tr>
-                <th>Critere</th>
-                {comparison.data.items.map((offer) => (
-                  <th key={offer.id}>
-                    {offer.name}{offer.isSponsored ? " (Sponsorise)" : ""}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {comparison.data.rows.map((row) => (
-                <tr key={row.key}>
-                  <th scope="row">{row.label}</th>
-                  {comparison.data!.items.map((offer) => <td key={offer.id}>{cell(row.values[offer.id] ?? null)}</td>)}
+          <p className="pub-notice pub-notice--indicative">{comparison.data.disclaimer}</p>
+          <div className="pub-table-wrap">
+            <table className="pub-table" aria-label="Comparaison des offres">
+              <thead>
+                <tr>
+                  <th>Critere</th>
+                  {comparison.data.items.map((offer) => (
+                    <th key={offer.id}>
+                      {offer.name}
+                      {offer.isSponsored ? <><br /><span className="pub-badge" data-tone="sponsored">Sponsorise</span></> : null}
+                    </th>
+                  ))}
                 </tr>
+              </thead>
+              <tbody>
+                {comparison.data.rows.map((row) => (
+                  <tr key={row.key}>
+                    <th scope="row">{row.label}</th>
+                    {comparison.data!.items.map((offer) => <td key={offer.id}>{cell(row.values[offer.id] ?? null)}</td>)}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <section className="pub-section" aria-label="Scores indicatifs">
+            <h2>Scores indicatifs</h2>
+            <ul className="pub-cards pub-cards--two">
+              {comparison.data.items.map((offer) => (
+                <li className="pub-card" key={offer.id}>
+                  <h3 className="pub-card__title">{offer.name}</h3>
+                  {offer.score ? <ScoreBreakdown score={offer.score} /> : null}
+                  <p><a className="pub-button" href={`/offers/${offer.id}`}>Voir le detail</a></p>
+                </li>
               ))}
-            </tbody>
-          </table>
-          <section aria-label="Scores indicatifs">
-            {comparison.data.items.map((offer) => (
-              <article key={offer.id}>
-                <h2>{offer.name}</h2>
-                {offer.score ? <ScoreBreakdown score={offer.score} /> : null}
-                <a href={`/offers/${offer.id}`}>Voir le detail</a>
-              </article>
-            ))}
+            </ul>
           </section>
         </>
       ) : null}
-      <nav aria-label="Parcours public">
-        <a href="/countries/CI">Comparer les offres</a>
+      <nav className="pub-actions" aria-label="Parcours public">
+        <a className="pub-button" href="/catalog">Comparer les offres</a>
       </nav>
     </main>
   );

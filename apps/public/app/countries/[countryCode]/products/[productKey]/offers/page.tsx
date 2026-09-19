@@ -36,69 +36,86 @@ export default async function PublicOffersPage({ params, searchParams }: { param
   const priority = first(filters.priority);
 
   return (
-    <main>
-      <h1>Comparer les offres</h1>
-      <TechnicalRoleNotice />
-      <IndicativeOfferNotice />
+    <main className="pub-page">
+      <section className="pub-section">
+        <p className="pub-back">
+          <a href={`/countries/${encodeURIComponent(countryCode)}/products/${encodeURIComponent(productKey)}`}>
+            Retour au produit {productKey}
+          </a>
+        </p>
+        <h1>Comparer les offres</h1>
+        <TechnicalRoleNotice />
+        <IndicativeOfferNotice />
+      </section>
 
-      <form method="get" aria-label="Filtres">
+      <form className="pub-card pub-form" method="get" aria-label="Filtres">
         <fieldset>
           <legend>Filtres</legend>
-          <label>Prix indicatif minimum<input name="minPrice" type="number" min="0" defaultValue={first(filters.minPrice)} /></label>
-          <label>Prix indicatif maximum<input name="maxPrice" type="number" min="0" defaultValue={first(filters.maxPrice)} /></label>
-          <label>
-            Niveau de garantie minimum
-            <select name="minGuaranteeLevel" defaultValue={first(filters.minGuaranteeLevel)}>
-              <option value="">Tous</option>
-              {[1, 2, 3, 4, 5].map((level) => <option key={level} value={level}>{level}/5</option>)}
-            </select>
-          </label>
-          <label>Franchise maximale<input name="maxDeductible" type="number" min="0" defaultValue={first(filters.maxDeductible)} /></label>
-          <label>Delai de traitement maximum (jours)<input name="maxProcessingDays" type="number" min="0" defaultValue={first(filters.maxProcessingDays)} /></label>
-          <label>Assureur<input name="insurer" defaultValue={first(filters.insurer)} /></label>
-          <label>Garantie incluse (cle)<input name="guarantee" defaultValue={first(filters.guarantee)} /></label>
-          <label>
-            Flexibilite de paiement
-            <select name="paymentFlexibility" defaultValue={first(filters.paymentFlexibility)}>
-              <option value="">Toutes</option>
-              <option value="monthly">mensuel</option>
-              <option value="quarterly">trimestriel</option>
-              <option value="semiannual">semestriel</option>
-              <option value="annual">annuel</option>
-            </select>
-          </label>
-          <label>Courtier partenaire<input name="broker" defaultValue={first(filters.broker)} /></label>
+          <div className="pub-form__grid">
+            <label>Prix indicatif minimum<input name="minPrice" type="number" min="0" defaultValue={first(filters.minPrice)} /></label>
+            <label>Prix indicatif maximum<input name="maxPrice" type="number" min="0" defaultValue={first(filters.maxPrice)} /></label>
+            <label>
+              Niveau de garantie minimum
+              <select name="minGuaranteeLevel" defaultValue={first(filters.minGuaranteeLevel)}>
+                <option value="">Tous</option>
+                {[1, 2, 3, 4, 5].map((level) => <option key={level} value={level}>{level}/5</option>)}
+              </select>
+            </label>
+            <label>Franchise maximale<input name="maxDeductible" type="number" min="0" defaultValue={first(filters.maxDeductible)} /></label>
+            <label>Delai de traitement maximum (jours)<input name="maxProcessingDays" type="number" min="0" defaultValue={first(filters.maxProcessingDays)} /></label>
+            <label>Assureur<input name="insurer" defaultValue={first(filters.insurer)} /></label>
+            <label>Garantie incluse (cle)<input name="guarantee" defaultValue={first(filters.guarantee)} /></label>
+            <label>
+              Flexibilite de paiement
+              <select name="paymentFlexibility" defaultValue={first(filters.paymentFlexibility)}>
+                <option value="">Toutes</option>
+                <option value="monthly">mensuel</option>
+                <option value="quarterly">trimestriel</option>
+                <option value="semiannual">semestriel</option>
+                <option value="annual">annuel</option>
+              </select>
+            </label>
+            <label>Courtier partenaire<input name="broker" defaultValue={first(filters.broker)} /></label>
+          </div>
         </fieldset>
         <fieldset>
           <legend>Tri et priorite</legend>
-          <label>
-            Trier par
-            <select name="sort" defaultValue={first(filters.sort) || "updated_desc"}>
-              {sortOptions.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
-            </select>
-          </label>
-          <label>
-            Ce qui compte le plus pour vous
-            <select name="priority" defaultValue={priority}>
-              {priorityOptions.map(([value, label]) => <option key={value || "none"} value={value}>{label}</option>)}
-            </select>
-          </label>
+          <div className="pub-form__grid pub-form__grid--two">
+            <label>
+              Trier par
+              <select name="sort" defaultValue={first(filters.sort) || "updated_desc"}>
+                {sortOptions.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+              </select>
+            </label>
+            <label>
+              Ce qui compte le plus pour vous
+              <select name="priority" defaultValue={priority}>
+                {priorityOptions.map(([value, label]) => <option key={value || "none"} value={value}>{label}</option>)}
+              </select>
+            </label>
+          </div>
         </fieldset>
-        <button type="submit">Appliquer</button>
+        <div className="pub-form__actions">
+          <button className="pub-button--primary" type="submit">Appliquer</button>
+          <p className="pub-form__hint">Les filtres portent uniquement sur les offres indicatives affichees.</p>
+        </div>
       </form>
 
-      <form id="compare-form" method="get" action="/compare" aria-label="Comparer cote a cote">
+      <form className="pub-card pub-card--plain pub-form" id="compare-form" method="get" action="/compare" aria-label="Comparer cote a cote">
         {priority ? <input type="hidden" name="priority" value={priority} /> : null}
-        <p>Cochez 2 a 4 offres puis comparez-les cote a cote.</p>
-        <button type="submit">Comparer la selection</button>
+        <div className="pub-form__actions">
+          <p className="pub-form__hint">Cochez 2 a 4 offres puis comparez-les cote a cote.</p>
+          <button type="submit">Comparer la selection</button>
+        </div>
       </form>
 
-      <section aria-label="Offres indicatives">
+      <section className="pub-section" aria-label="Offres indicatives">
         {offers.status === "error" ? <p role="alert">{offers.publicMessage}</p> : null}
-        {offers.status === "empty" ? <p>Aucune offre indicative disponible pour ces criteres. Offre sponsorisee affichee uniquement avec mention.</p> : null}
+        {offers.status === "empty" ? <p role="status">Aucune offre indicative disponible pour ces criteres. Offre sponsorisee affichee uniquement avec mention.</p> : null}
         {offers.data.map((offer) => <OfferCard key={offer.id} offer={offer} countryCode={countryCode} productKey={productKey} />)}
       </section>
-      <p>Le score est indicatif, calcule selon vos criteres par rapport aux offres affichees. Une offre sponsorisee est toujours signalee. Aucune offre expiree ou non validee n'est affichee.</p>
+
+      <p className="pub-fineprint">Le score est indicatif, calcule selon vos criteres par rapport aux offres affichees. Une offre sponsorisee est toujours signalee. Aucune offre expiree ou non validee n'est affichee.</p>
     </main>
   );
 }

@@ -19,30 +19,36 @@ export default async function PublicQuoteConfirmationPage({ params, searchParams
   const documents = token ? await listQuoteDocuments(publicReference, token) : undefined;
 
   return (
-    <main>
-      <h1>Demande recue {publicReference}</h1>
-      <IndicativeOfferNotice />
-      <p>Votre demande sera traitee par un courtier partenaire identifie lorsque le routage est possible.</p>
-      <p>Si aucun courtier partenaire eligible n'est disponible, aucune promesse de rappel n'est faite.</p>
+    <main className="pub-page">
+      <section className="pub-hero">
+        <p className="pub-kicker">Demande de devis</p>
+        <h1>Demande recue {publicReference}</h1>
+        <IndicativeOfferNotice />
+        <p>Votre demande sera traitee par un courtier partenaire identifie lorsque le routage est possible.</p>
+        <p className="pub-fineprint">Si aucun courtier partenaire eligible n'est disponible, aucune promesse de rappel n'est faite.</p>
+      </section>
 
       {token ? (
-        <section aria-label="Documents optionnels">
+        <section className="pub-section" aria-label="Documents optionnels">
           <h2>Documents optionnels</h2>
           {documents?.status === "success" && documents.data ? (
             <>
-              <ul>
-                {documents.data.items.map((document) => (
-                  <li key={document.id}>
-                    {document.label} ({document.fileName}, {Math.ceil(document.sizeBytes / 1024)} Ko): {scanLabels[document.scanStatus] ?? document.scanStatus}
-                    {document.sharedWithBroker ? " - transmis au courtier partenaire" : ""}
-                  </li>
-                ))}
-              </ul>
-              {documents.data.items.length === 0 ? <p>Aucun document ajoute.</p> : null}
+              {documents.data.items.length > 0 ? (
+                <ul className="pub-list">
+                  {documents.data.items.map((document) => (
+                    <li key={document.id}>
+                      {document.label} ({document.fileName}, {Math.ceil(document.sizeBytes / 1024)} Ko): {scanLabels[document.scanStatus] ?? document.scanStatus}
+                      {document.sharedWithBroker ? " - transmis au courtier partenaire" : ""}
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="pub-meta">Aucun document ajoute.</p>
+              )}
               {documents.data.uploadEnabled ? (
                 <QuoteDocumentUpload publicReference={publicReference} token={token} remainingSlots={documents.data.remainingSlots} />
               ) : (
-                <p>L'ajout de documents n'est pas disponible pour ce produit.</p>
+                <p role="status">L'ajout de documents n'est pas disponible pour ce produit.</p>
               )}
             </>
           ) : (
@@ -50,8 +56,12 @@ export default async function PublicQuoteConfirmationPage({ params, searchParams
           )}
         </section>
       ) : (
-        <p>Le lien de suivi transmis a la fin de votre demande permet d'ajouter des documents optionnels.</p>
+        <p className="pub-meta">Le lien de suivi transmis a la fin de votre demande permet d'ajouter des documents optionnels.</p>
       )}
+
+      <nav className="pub-actions" aria-label="Parcours public">
+        <a className="pub-button" href="/catalog">Retour au catalogue indicatif</a>
+      </nav>
     </main>
   );
 }

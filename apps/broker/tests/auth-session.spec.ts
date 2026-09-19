@@ -90,7 +90,7 @@ test("broker middleware allows Starter CRM landing and blocks active CRM subrout
     });
 
     const request = (pathname) => new NextRequest(\`http://broker.local\${pathname}\`, {
-      headers: { cookie: "assurmatch_backoffice_token=test-token" }
+      headers: { cookie: "assurmatch_broker_token=test-token" }
     });
     const paths = ["/crm", "/crm/", "/crm/leads", "/crm/leads/demo-lead"];
     const outcomes = [];
@@ -129,4 +129,16 @@ test("broker pages render access denied states instead of protected fallback dat
   expect(crmPage).not.toContain("fallbackLeads");
   expect(detailPage).toContain("Acces refuse");
   expect(crmDetailPage).toContain("Acces CRM refuse");
+});
+
+test("broker session cookie name is distinct from the admin back-office cookie", async () => {
+  const authSource = source("apps/broker/app/lib/backoffice-auth.ts");
+  const middlewareSource = source("apps/broker/middleware.ts");
+
+  expect(authSource).toContain('BACKOFFICE_TOKEN_COOKIE = "assurmatch_broker_token"');
+  expect(middlewareSource).toContain('TOKEN_COOKIE = "assurmatch_broker_token"');
+  expect(authSource).not.toContain("assurmatch_admin_token");
+  expect(middlewareSource).not.toContain("assurmatch_admin_token");
+  expect(authSource).not.toContain("assurmatch_backoffice_token");
+  expect(middlewareSource).not.toContain("assurmatch_backoffice_token");
 });

@@ -20,33 +20,45 @@ export function paymentLabel(value: string | undefined): string {
   return value ? paymentLabels[value] ?? value : "non renseigne";
 }
 
+/** Sponsorship must always be visible next to the offer name (Constitution VIII). */
+export function SponsoredBadge({ offer }: { offer: Pick<OfferSummary, "isSponsored" | "sponsorLabel"> }) {
+  if (!offer.isSponsored) return null;
+  return (
+    <span className="pub-badge" data-tone="sponsored">
+      Sponsorise{offer.sponsorLabel ? ` (${offer.sponsorLabel})` : ""}
+    </span>
+  );
+}
+
 export function ScoreBreakdown({ score }: { score: NonNullable<OfferSummary["score"]> }) {
   return (
-    <details>
+    <details className="pub-score">
       <summary>Score indicatif: {score.total}/100</summary>
-      <p>{score.label}</p>
-      <table>
-        <thead>
-          <tr><th>Critere</th><th>Poids</th><th>Points</th><th>Explication</th></tr>
-        </thead>
-        <tbody>
-          {score.breakdown.map((line) => (
-            <tr key={line.criterion}>
-              <td>{criterionLabels[line.criterion] ?? line.criterion}</td>
-              <td>{line.weight}%</td>
-              <td>{line.points}</td>
-              <td>{line.explanation}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
+      <p className="pub-score__label">{score.label}</p>
+      <div className="pub-table-wrap">
+        <table className="pub-table">
+          <thead>
+            <tr><th>Critere</th><th>Poids</th><th>Points</th><th>Explication</th></tr>
+          </thead>
+          <tbody>
+            {score.breakdown.map((line) => (
+              <tr key={line.criterion}>
+                <td>{criterionLabels[line.criterion] ?? line.criterion}</td>
+                <td>{line.weight}%</td>
+                <td>{line.points}</td>
+                <td>{line.explanation}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
     </details>
   );
 }
 
 export function OfferCriteria({ offer }: { offer: OfferSummary | OfferDetail }) {
   return (
-    <dl>
+    <dl className="pub-criteria">
       <dt>Prix indicatif</dt>
       <dd>{offer.indicativePriceMin !== undefined ? `a partir de ${formatAmount(offer.indicativePriceMin)}` : "prix a confirmer"} ({offer.indicativePriceLabel})</dd>
       <dt>Courtier partenaire responsable</dt>
@@ -67,7 +79,7 @@ export function OfferCriteria({ offer }: { offer: OfferSummary | OfferDetail }) 
         <>
           <dt>Garanties</dt>
           <dd>
-            <ul>
+            <ul className="pub-list">
               {offer.guarantees.map((guarantee) => (
                 <li key={guarantee.key}>{guarantee.included ? "Incluse" : "Non incluse"}: {guarantee.label}{guarantee.detail ? ` (${guarantee.detail})` : ""}</li>
               ))}
@@ -89,20 +101,22 @@ export function OfferCard({ offer, countryCode, productKey }: { offer: OfferSumm
   const detailHref = `/offers/${offer.id}?country=${encodeURIComponent(countryCode)}&product=${encodeURIComponent(productKey)}`;
   const quoteHref = `/countries/${encodeURIComponent(countryCode)}/products/${encodeURIComponent(productKey)}/quote?offerId=${offer.id}`;
   return (
-    <article aria-label={offer.name}>
-      <h2>
-        <label>
-          <input type="checkbox" name="ids" value={offer.id} form="compare-form" /> {offer.name}
-        </label>
-        {offer.isSponsored ? <span> - Sponsorise{offer.sponsorLabel ? ` (${offer.sponsorLabel})` : ""}</span> : null}
-      </h2>
-      {offer.guaranteeSummary ? <p>{offer.guaranteeSummary}</p> : null}
+    <article className="pub-card pub-offer" aria-label={offer.name}>
+      <div className="pub-offer__header">
+        <h2 className="pub-offer__title">
+          <label className="pub-offer__pick">
+            <input type="checkbox" name="ids" value={offer.id} form="compare-form" /> {offer.name}
+          </label>
+        </h2>
+        <SponsoredBadge offer={offer} />
+      </div>
+      {offer.guaranteeSummary ? <p className="pub-offer__summary">{offer.guaranteeSummary}</p> : null}
       <OfferCriteria offer={offer} />
       {offer.score ? <ScoreBreakdown score={offer.score} /> : null}
-      <p>{offer.disclaimer}</p>
-      <nav aria-label={`Actions ${offer.name}`}>
-        <a href={detailHref}>Voir le detail</a>
-        <a href={quoteHref}>Demander un devis</a>
+      <p className="pub-offer__disclaimer">{offer.disclaimer}</p>
+      <nav className="pub-actions" aria-label={`Actions ${offer.name}`}>
+        <a className="pub-button" href={detailHref}>Voir le detail</a>
+        <a className="pub-button pub-button--primary" href={quoteHref}>Demander un devis</a>
       </nav>
     </article>
   );

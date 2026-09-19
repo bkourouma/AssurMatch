@@ -1024,8 +1024,9 @@ model BrokerCrmPipelineHistory {
   leadAssignmentId String
   partnerTenantId  String
   actorId          String?
+  eventType        String                  @default("status_changed")
   previousStatus   BrokerCrmPipelineStatus?
-  nextStatus       BrokerCrmPipelineStatus
+  nextStatus       BrokerCrmPipelineStatus?
   reason           String?
   occurredAt       DateTime                @default(now())
   createdAt        DateTime                @default(now())

@@ -70,9 +70,9 @@ export function VisitorAiAssistant({ countryCode, productKey, mode, answers = {}
   const interaction = state.status === "done" ? state.interaction : undefined;
 
   return (
-    <section aria-label={config.title} data-visitor-ai={mode}>
+    <section className="pub-assistant" aria-label={config.title} data-visitor-ai={mode}>
       <h3>{config.title}</h3>
-      <p>{interaction?.assistanceLabel ?? "Assistance IA d'aide a la comprehension"}: reponse indicative, sans conseil personnalise. Ne saisissez pas de donnees personnelles.</p>
+      <p className="pub-assistant__note">{interaction?.assistanceLabel ?? "Assistance IA d'aide a la comprehension"}: reponse indicative, sans conseil personnalise. Ne saisissez pas de donnees personnelles.</p>
       {config.placeholder ? (
         <label>
           Votre question

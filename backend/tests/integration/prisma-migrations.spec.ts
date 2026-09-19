@@ -21,7 +21,8 @@ describe("prisma migration fresh-base readiness", () => {
       "0012_billing_plans",
       "0013_messaging_channels",
       "0014_enterprise_agencies",
-      "0015_multi_broker_routing"
+      "0015_multi_broker_routing",
+      "0016_broker_crm_history_event_type"
     ]);
     const schema = readFileSync(join(process.cwd(), "backend", "prisma", "schema.prisma"), "utf8");
     for (const model of ["AuditLog", "FeatureFlag", "ConsentRecord", "QuoteRequest", "LeadAssignment", "BrokerCrmLeadState", "PartnerApiKey", "PartnerWebhookEndpoint", "PartnerWebhookDelivery", "PartnerWebhookAllowlistEntry", "RoutingRule", "RoutingRuleHistory"]) {
@@ -90,6 +91,13 @@ describe("prisma migration fresh-base readiness", () => {
     expect(multiBroker).toContain('DROP INDEX IF EXISTS "LeadAssignment_quoteRequestId_key"');
     expect(multiBroker).toContain('"LeadAssignment_quoteRequestId_partnerTenantId_key"');
     expect(schema).toContain("@@unique([quoteRequestId, partnerTenantId])");
+    // CRM history rows exist for every CRM activity, not only status changes.
+    const crmHistory = readFileSync(join(migrationsDir, "0016_broker_crm_history_event_type", "migration.sql"), "utf8");
+    expect(crmHistory).toContain('ADD COLUMN IF NOT EXISTS "eventType"');
+    expect(crmHistory).toContain('ALTER COLUMN "nextStatus" DROP NOT NULL');
+    expect(schema).toContain("model BrokerCrmPipelineHistory");
+    expect(schema).toMatch(/eventType\s+String\s+@default\("status_changed"\)/);
+    expect(schema).toMatch(/nextStatus\s+BrokerCrmPipelineStatus\?/);
     expect(schema).not.toContain("@@unique([quoteRequestId])");
   });
 });

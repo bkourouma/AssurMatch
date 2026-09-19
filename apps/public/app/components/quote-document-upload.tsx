@@ -36,30 +36,34 @@ export function QuoteDocumentUpload({ publicReference, token, remainingSlots }: 
     }
   }
 
-  if (remainingSlots <= 0) return <p>Nombre maximum de documents atteint pour cette demande.</p>;
+  if (remainingSlots <= 0) return <p role="status">Nombre maximum de documents atteint pour cette demande.</p>;
 
   return (
-    <form onSubmit={submit} aria-label="Ajouter un document">
-      <p>Documents optionnels: ils sont verifies puis transmis uniquement au courtier partenaire responsable de votre demande. Ils n'accelerent ni ne garantissent aucune decision.</p>
-      <label>
-        Type de document
-        <select name="documentKind" defaultValue="other">
-          {kindOptions.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
-        </select>
-      </label>
-      <label>
-        Libelle
-        <input name="label" required maxLength={120} placeholder="Ex. carte grise" />
-      </label>
-      <label>
-        Fichier (PDF, JPEG ou PNG, 5 Mo maximum)
-        <input name="file" type="file" accept="application/pdf,image/jpeg,image/png" required />
-      </label>
+    <form className="pub-card pub-card--plain pub-form" onSubmit={submit} aria-label="Ajouter un document">
+      <p className="pub-form__hint">Documents optionnels: ils sont verifies puis transmis uniquement au courtier partenaire responsable de votre demande. Ils n'accelerent ni ne garantissent aucune decision.</p>
+      <div className="pub-form__grid pub-form__grid--two">
+        <label>
+          Type de document
+          <select name="documentKind" defaultValue="other">
+            {kindOptions.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+          </select>
+        </label>
+        <label>
+          Libelle
+          <input name="label" required maxLength={120} placeholder="Ex. carte grise" />
+        </label>
+        <label>
+          Fichier (PDF, JPEG ou PNG, 5 Mo maximum)
+          <input name="file" type="file" accept="application/pdf,image/jpeg,image/png" required />
+        </label>
+      </div>
       {state.status === "success" || state.status === "disabled" ? <p role="status">{state.publicMessage}</p> : null}
       {state.status === "error" || state.status === "rate_limited" ? <p role="alert">{state.publicMessage}</p> : null}
       {state.status === "submitting" ? <p role="status">{state.publicMessage}</p> : null}
-      <button type="submit" disabled={state.status === "submitting"}>Ajouter le document</button>
-      <p>Emplacements restants: {remainingSlots}</p>
+      <div className="pub-form__actions">
+        <button className="pub-button--primary" type="submit" disabled={state.status === "submitting"}>Ajouter le document</button>
+        <p className="pub-form__hint">Emplacements restants: {remainingSlots}</p>
+      </div>
     </form>
   );
 }

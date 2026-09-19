@@ -1,3 +1,7 @@
+import { statSync } from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+
 const DEFAULTS = {
   apiUrl: process.env.ASSURMATCH_LOCAL_API_URL ?? "http://127.0.0.1:3600",
   publicUrl: process.env.ASSURMATCH_LOCAL_PUBLIC_URL ?? "http://127.0.0.1:3601",
@@ -102,3 +106,26 @@ await check("Mailpit reachable", async () => {
   assertStatus("Mailpit", response, [200]);
   assertIncludes("Mailpit", text, "Mailpit");
 });
+
+// Advisory only: the notification loop is a local convenience, not a stack requirement, so a
+// stale or missing log warns instead of failing the health run. The stack is still usable; queued
+// emails just need `npm run quote-notifications:deliver-due` by hand until the loop is back.
+reportNotificationWorker();
+
+function reportNotificationWorker() {
+  const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
+  const logPath = path.join(root, ".local", "logs", "worker-notifications.out.log");
+  const maxAgeSeconds = Number(process.env.ASSURMATCH_LOCAL_WORKER_MAX_LOG_AGE_SECONDS ?? "120");
+  let ageSeconds;
+  try {
+    ageSeconds = Math.round((Date.now() - statSync(logPath).mtimeMs) / 1000);
+  } catch {
+    console.warn(`warn notification worker log missing (${logPath}); relaunch the local stack to deliver queued emails automatically`);
+    return;
+  }
+  if (!Number.isFinite(maxAgeSeconds) || ageSeconds <= maxAgeSeconds) {
+    console.log(`ok notification worker log is fresh (${ageSeconds}s old)`);
+    return;
+  }
+  console.warn(`warn notification worker log is ${ageSeconds}s old (max ${maxAgeSeconds}s); queued emails may not be delivered`);
+}

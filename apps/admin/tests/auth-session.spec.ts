@@ -77,3 +77,15 @@ test("admin home handles 401 and 403 states without exposing partial success", a
   expect(pageSource).toContain("Acces sante systeme refuse");
   expect(pageSource).toContain("logoutAction");
 });
+
+test("admin session cookie name is distinct from the broker back-office cookie", async () => {
+  const authSource = source("apps/admin/app/lib/backoffice-auth.ts");
+  const middlewareSource = source("apps/admin/middleware.ts");
+
+  expect(authSource).toContain('BACKOFFICE_TOKEN_COOKIE = "assurmatch_admin_token"');
+  expect(middlewareSource).toContain('TOKEN_COOKIE = "assurmatch_admin_token"');
+  expect(authSource).not.toContain("assurmatch_broker_token");
+  expect(middlewareSource).not.toContain("assurmatch_broker_token");
+  expect(authSource).not.toContain("assurmatch_backoffice_token");
+  expect(middlewareSource).not.toContain("assurmatch_backoffice_token");
+});

@@ -29,6 +29,42 @@ npm run local:health
 npm run test:web:local
 ```
 
+## Queued Email Delivery
+
+The API never sends email itself: a quote submission writes notification rows at
+`queued` and a worker drains them. The launcher therefore starts a fifth
+process, `worker-notifications`, alongside the API and the three web apps. It
+runs `scripts/quote-notification-delivery-worker.ts` every 10 seconds with the
+launcher environment, so the visitor confirmation and the broker "nouveau lead"
+email reach Mailpit within seconds of a demo submission. No manual command is
+needed locally.
+
+- Log: `.local\logs\worker-notifications.out.log`, one counter line per run
+  (`due/processed/sent/retryable/failed/notConfigured`). Recipients and lead
+  content are never logged.
+- Interval: `ASSURMATCH_LOCAL_WORKER_INTERVAL_SECONDS` (default 10).
+- Partner webhook deliveries are not polled by default because the webhook
+  worker audits a refusal on every run while `partner_webhooks_enabled` is off.
+  Set `ASSURMATCH_LOCAL_WORKER_PARTNER_WEBHOOKS=true` to include them.
+- `npm run local:health` reports the loop advisorily: it warns when the log is
+  missing or stale and never fails the run for it.
+- `cmd /c stop-local.bat` stops the loop with the rest of the stack.
+- The loop refuses to start when `APP_ENV` is `production` or `preproduction`.
+  On those environments the operator still schedules
+  `npm run quote-notifications:deliver-due` — see
+  [the runbook](runbooks/quote-notification-delivery.md).
+
+To run it by hand outside the launcher:
+
+```powershell
+node scripts/local-app/notification-worker-loop.mjs
+```
+
+It needs the same environment as the launcher (`APP_ENV=local`,
+`DATABASE_URL`, `REDIS_URL`, `EMAIL_SERVICE_TYPE=mailpit`, `EMAIL_FROM`,
+`EMAIL_SMTP_HOST`, `EMAIL_SMTP_PORT`, `ASSURMATCH_AUTH_TOKEN_SECRET`); Ctrl+C
+stops it.
+
 Stop local processes and Docker services without deleting local volumes:
 
 ```powershell

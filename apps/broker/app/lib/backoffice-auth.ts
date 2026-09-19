@@ -1,6 +1,9 @@
 import { cookies } from "next/headers";
 
-export const BACKOFFICE_TOKEN_COOKIE = "assurmatch_backoffice_token";
+// Nom de cookie propre a l'application courtier: les cookies navigateur ne sont pas
+// isoles par port, donc un nom partage avec le back-office admin ecraserait sa
+// session sur localhost. A garder synchronise avec apps/broker/middleware.ts.
+export const BACKOFFICE_TOKEN_COOKIE = "assurmatch_broker_token";
 
 const BROKER_API_BASE_URL = process.env.NEXT_PUBLIC_ASSURMATCH_BROKER_API_URL ?? process.env.NEXT_PUBLIC_ASSURMATCH_API_URL ?? "http://127.0.0.1:3000";
 

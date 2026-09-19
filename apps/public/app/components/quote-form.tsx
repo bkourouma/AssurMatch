@@ -60,7 +60,9 @@ export function QuoteFormShell({ countryCode, productKey, quoteForm, selectedOff
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    const formData = new FormData(event.currentTarget);
+    // currentTarget is null once the event has been through an await, so the element is captured first.
+    const form = event.currentTarget;
+    const formData = new FormData(form);
     const consent = formData.get("consent") === "on";
     if (!consent) {
       setResult({ status: "error", message: "Le consentement est obligatoire avant toute transmission." });
@@ -89,39 +91,60 @@ export function QuoteFormShell({ countryCode, productKey, quoteForm, selectedOff
     });
     if (response.status === "success") {
       setResult({ status: "success", message: response.publicMessage, publicReference: response.publicReference ?? "", ...(response.verificationToken ? { verificationToken: response.verificationToken } : {}) });
-      event.currentTarget.reset();
+      form.reset();
       return;
     }
     setResult({ status: "error", message: response.publicMessage });
   }
 
   return (
-    <form onSubmit={submit}>
-      {selectedOfferId ? <p>Offre indicative preselectionnee: le courtier partenaire responsable confirmera le devis et les conditions.</p> : null}
-      <label>
-        Nom
-        <input name="displayName" autoComplete="name" />
-      </label>
-      <label>
-        Email
-        <input name="email" type="email" autoComplete="email" required />
-      </label>
-      <label>
-        Telephone
-        <input name="phone" type="tel" autoComplete="tel" required />
-      </label>
-      {quoteForm.fields.map((field) => <QuoteFormFieldInput key={field.key} field={field} />)}
-      <label>
-        <input name="consent" type="checkbox" required />
-        J'accepte que ma demande soit transmise a un courtier partenaire eligible pour ce pays et ce produit.
-      </label>
-      <label>
-        <input name="multiBroker" type="checkbox" />
-        Facultatif: j'accepte d'etre rappele par plusieurs courtiers partenaires eligibles (jusqu'a 3). Sans cette case, votre demande n'est transmise qu'a un seul courtier.
-      </label>
+    <form className="pub-card pub-form" onSubmit={submit}>
+      {selectedOfferId ? <p className="pub-notice pub-notice--indicative">Offre indicative preselectionnee: le courtier partenaire responsable confirmera le devis et les conditions.</p> : null}
+
+      <fieldset>
+        <legend>Vos coordonnees</legend>
+        <div className="pub-form__grid pub-form__grid--two">
+          <label>
+            Nom
+            <input name="displayName" autoComplete="name" />
+          </label>
+          <label>
+            Email
+            <input name="email" type="email" autoComplete="email" required />
+          </label>
+          <label>
+            Telephone
+            <input name="phone" type="tel" autoComplete="tel" required />
+          </label>
+        </div>
+      </fieldset>
+
+      {quoteForm.fields.length > 0 ? (
+        <fieldset>
+          <legend>Votre besoin</legend>
+          <div className="pub-form__grid pub-form__grid--two">
+            {quoteForm.fields.map((field) => <QuoteFormFieldInput key={field.key} field={field} />)}
+          </div>
+        </fieldset>
+      ) : null}
+
+      <fieldset>
+        <legend>Consentement</legend>
+        <label>
+          <input name="consent" type="checkbox" required />
+          J'accepte que ma demande soit transmise a un courtier partenaire eligible pour ce pays et ce produit.
+        </label>
+        <label>
+          <input name="multiBroker" type="checkbox" />
+          Facultatif: j'accepte d'etre rappele par plusieurs courtiers partenaires eligibles (jusqu'a 3). Sans cette case, votre demande n'est transmise qu'a un seul courtier.
+        </label>
+      </fieldset>
+
       <IndicativeOfferNotice />
+
       <VisitorAiAssistant countryCode={countryCode} productKey={productKey} mode="summary" answers={{}} />
       <VisitorAiAssistant countryCode={countryCode} productKey={productKey} mode="consistency" answers={{}} />
+
       {result.status === "success" ? (
         <p role="status">
           Demande recue. Reference publique: <strong>{result.publicReference}</strong>
@@ -135,11 +158,14 @@ export function QuoteFormShell({ countryCode, productKey, quoteForm, selectedOff
       ) : null}
       {result.status === "error" ? <p role="alert">{result.message}</p> : null}
       {result.status === "submitting" ? <p role="status">{result.message}</p> : null}
-      <button type="submit" disabled={result.status === "submitting"}>Demander un devis</button>
+
+      <div className="pub-form__actions">
+        <button className="pub-button--primary" type="submit" disabled={result.status === "submitting"}>Demander un devis</button>
+      </div>
     </form>
   );
 }
 
 export function QuoteBlockedState() {
-  return <p>La demande de devis n'est pas disponible pour ce pays ou ce produit.</p>;
+  return <p role="alert">La demande de devis n'est pas disponible pour ce pays ou ce produit.</p>;
 }
