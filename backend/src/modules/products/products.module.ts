@@ -1,5 +1,6 @@
-import { productCreateSchema, productUpdateSchema, PRODUCT_FEATURE_FLAG_DEFAULTS, type ProductDto, type ProductFlags, type ProductRecord } from "../../../../packages/shared/contracts/catalog.contracts";
+import { productCreateSchema, productUpdateSchema, PRODUCT_FEATURE_FLAG_DEFAULTS, type ProductDto, type ProductFlags, type ProductRecord, type ProductUpdateDto } from "../../../../packages/shared/contracts/catalog.contracts";
 import type { ProductPageResponse, PublicProductDto } from "../../../../packages/shared/contracts/quote.contracts";
+import { pickDefined } from "../../../../packages/shared/validation/patch.schemas";
 import { AuditLogWriter } from "../audit-logs/audit-log-writer.service";
 import { QuoteAuditActions } from "../audit-logs/quote-audit-actions";
 import type { ActorContext } from "../common/types";
@@ -56,14 +57,18 @@ export class ProductsService {
     return product;
   }
 
-  async update(id: string, input: Partial<ProductDto> & { reason: string }, actor: ActorContext): Promise<Product> {
-    const parsed = productUpdateSchema.parse(input);
+  async update(id: string, input: ProductUpdateDto, actor: ActorContext): Promise<Product> {
+    const { reason, flags, ...changes } = productUpdateSchema.parse(input);
     const product = await this.require(id);
-    if (parsed.status === "public" && (!product.countryIds.length || parsed.flags?.product_public_enabled !== true)) {
+    const nextFlags: ProductFlags = { ...product.flags, ...pickDefined(flags) };
+    if (changes.status === "public" && (!product.countryIds.length || !nextFlags.product_public_enabled)) {
       throw new Error("Product public activation requires country association and product_public_enabled");
     }
-    Object.assign(product, parsed, {
-      flags: { ...product.flags, ...(parsed.flags ?? {}) },
+    const nextSensitivity = changes.sensitivity ?? product.sensitivity;
+    Object.assign(product, pickDefined(changes), {
+      flags: nextFlags,
+      // Same invariant as create: anything above `standard` stays under manual review.
+      requiresManualReview: nextSensitivity === "standard" ? changes.requiresManualReview ?? product.requiresManualReview : true,
       updatedAt: new Date()
     });
     await this.repository.update(id, product);
@@ -74,7 +79,7 @@ export class ProductsService {
       targetId: product.id,
       scope: { productId: product.id },
       result: "success",
-      reason: parsed.reason,
+      reason,
       context: { status: product.status, flags: product.flags }
     });
     return product;

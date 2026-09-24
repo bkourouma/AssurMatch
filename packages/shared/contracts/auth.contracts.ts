@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { e164PhoneSchema, emailSchema, nonEmptyStringSchema, reasonSchema, scopeSchema, uuidSchema } from "../validation/common.schemas";
+import { toPatchSchema } from "../validation/patch.schemas";
 
 export const passwordSchema = z.string().min(12).max(512);
 
@@ -45,7 +46,8 @@ export const userCreateSchema = z.object({
   scopes: scopeSchema
 });
 
-export const userUpdateSchema = userCreateSchema.partial().extend({
+export const userUpdateSchema = toPatchSchema(userCreateSchema).omit({ id: true }).extend({
+  scopes: toPatchSchema(scopeSchema.unwrap()).optional(),
   status: z.enum(["invited", "active", "suspended", "locked", "deleted"]).optional(),
   reason: reasonSchema
 });

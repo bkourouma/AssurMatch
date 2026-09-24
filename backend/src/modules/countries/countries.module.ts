@@ -1,5 +1,6 @@
-import { countryCreateSchema, countryUpdateSchema, COUNTRY_FEATURE_FLAG_DEFAULTS, type CountryDto, type CountryFlags, type CountryRecord } from "../../../../packages/shared/contracts/catalog.contracts";
+import { countryCreateSchema, countryUpdateSchema, COUNTRY_FEATURE_FLAG_DEFAULTS, type CountryDto, type CountryFlags, type CountryRecord, type CountryUpdateDto } from "../../../../packages/shared/contracts/catalog.contracts";
 import type { CountryPageResponse } from "../../../../packages/shared/contracts/quote.contracts";
+import { pickDefined } from "../../../../packages/shared/validation/patch.schemas";
 import { AuditLogWriter } from "../audit-logs/audit-log-writer.service";
 import { QuoteAuditActions } from "../audit-logs/quote-audit-actions";
 import type { ActorContext } from "../common/types";
@@ -40,14 +41,16 @@ export class CountriesService {
     return country;
   }
 
-  async update(id: string, input: Partial<CountryDto> & { reason: string }, actor: ActorContext): Promise<Country> {
-    const parsed = countryUpdateSchema.parse(input);
+  async update(id: string, input: CountryUpdateDto, actor: ActorContext): Promise<Country> {
+    const { reason, flags, ...changes } = countryUpdateSchema.parse(input);
     const country = await this.require(id);
-    if (parsed.status === "public" && (!country.regulatoryRegimeId || parsed.flags?.country_public_enabled !== true)) {
+    const nextFlags: CountryFlags = { ...country.flags, ...pickDefined(flags) };
+    const nextRegimeId = changes.regulatoryRegimeId ?? country.regulatoryRegimeId;
+    if (changes.status === "public" && (!nextRegimeId || !nextFlags.country_public_enabled)) {
       throw new Error("Country public activation requires regime and country_public_enabled");
     }
-    Object.assign(country, parsed, {
-      flags: { ...country.flags, ...(parsed.flags ?? {}) },
+    Object.assign(country, pickDefined(changes), {
+      flags: nextFlags,
       updatedAt: new Date()
     });
     await this.repository.update(id, country);
@@ -58,7 +61,7 @@ export class CountriesService {
       targetId: country.id,
       scope: { countryId: country.id },
       result: "success",
-      reason: parsed.reason,
+      reason,
       context: { status: country.status, flags: country.flags }
     });
     return country;

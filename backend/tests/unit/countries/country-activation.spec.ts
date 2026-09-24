@@ -31,4 +31,28 @@ describe("country activation rules", () => {
 
     await expect(service.update(country.id, { status: "public", reason: "activation test" }, superAdminActor)).rejects.toThrow();
   });
+
+  it("accepts a repeated public status once the regime and flag are already stored", async () => {
+    const service = new CountriesService(new AuditLogWriter());
+    const country = await service.create({
+      isoCode: "SN",
+      name: "Senegal",
+      currency: "XOF",
+      languages: ["fr"],
+      timezone: "Africa/Dakar",
+      regulatoryFamily: "cima",
+      regulatoryRegimeId: "00000000-0000-4000-8000-000000000010"
+    }, superAdminActor);
+    await service.update(country.id, {
+      status: "public",
+      flags: { country_public_enabled: true },
+      reason: "first activation"
+    }, superAdminActor);
+
+    const renamed = await service.update(country.id, { status: "public", name: "Republique du Senegal", reason: "rename while public" }, superAdminActor);
+
+    expect(renamed.status).toBe("public");
+    expect(renamed.flags.country_public_enabled).toBe(true);
+    expect(await service.listPublic()).toHaveLength(1);
+  });
 });
