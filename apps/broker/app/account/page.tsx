@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import { MfaPanel, PasswordChangeForm } from "../auth-flow-form";
 import { isBrokerProfile, loginRedirect, readBackOfficeSession } from "../lib/backoffice-auth";
-import { Badge, Card, PageHeader } from "../lib/ui/broker-ui";
+import { Badge, Button, Card, DescriptionList, Grid, PageHeader, PageStack } from "../lib/ui/broker-ui";
 
 export default async function BrokerAccountPage() {
   const session = await readBackOfficeSession();
@@ -10,32 +10,32 @@ export default async function BrokerAccountPage() {
   if (session.status !== "authenticated" || !isBrokerProfile(session.profile)) redirect("/login?error=access_denied&returnTo=%2Faccount");
 
   return (
-    <div className="page-stack">
+    <PageStack>
       <PageHeader
+        breadcrumb={[{ label: "Compte" }, { label: "Compte" }]}
         kicker="Compte courtier"
         title="Securite du compte"
         description="Gestion du mot de passe, de la MFA et des informations du profil connecte."
-        actions={<a className="button button--secondary" href="/">Retour portail</a>}
+        actions={<Button href="/" variant="secondary">Retour portail</Button>}
       />
 
-      <section className="broker-grid broker-grid--two">
-        <Card plain>
-          <h2 className="section-title">Profil</h2>
-          <dl className="definition-list">
-            <dt>Acteur</dt><dd>{session.profile.actorId ?? "-"}</dd>
-            <dt>Tenant</dt><dd>{session.profile.partnerTenantId ?? "-"}</dd>
-            <dt>Plan</dt><dd><Badge tone="info">{session.profile.partnerPlan ?? "-"}</Badge></dd>
-            <dt>Roles</dt><dd>{session.profile.roles.join(", ")}</dd>
-          </dl>
+      <Grid columns="two">
+        <Card title="Profil">
+          <DescriptionList
+            items={[
+              { term: "Acteur", value: session.profile.actorId ?? "-" },
+              { term: "Tenant", value: session.profile.partnerTenantId ?? "-" },
+              { term: "Plan", value: <Badge tone="info">{session.profile.partnerPlan ?? "-"}</Badge> },
+              { term: "Roles", value: session.profile.roles.join(", ") }
+            ]}
+          />
         </Card>
-        <Card plain>
+        <Card title="Mot de passe">
           <PasswordChangeForm />
         </Card>
-      </section>
+      </Grid>
 
-      <Card plain>
-        <MfaPanel returnTo="/account" />
-      </Card>
-    </div>
+      <MfaPanel returnTo="/account" />
+    </PageStack>
   );
 }

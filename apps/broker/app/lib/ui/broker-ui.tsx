@@ -1,76 +1,17 @@
-import type { ReactNode } from "react";
+/**
+ * Point d'entree UI du back-office courtier.
+ *
+ * Le design system vit dans `@assurmatch/ui/backoffice` et ne porte ni route, ni regle d'acces, ni
+ * vocabulaire metier. Ce module ne fait que le reexporter et y ajouter les tables de libelles
+ * courtier passees a `StatusBadge`, pour que le vocabulaire des statuts reste celui du contrat.
+ */
 
-export type Tone = "neutral" | "success" | "warning" | "danger" | "info" | "disabled";
+import { CRM_STATUS_LABELS, STARTER_STATUS_LABELS } from "../lead-vocabulary";
 
-export function PageHeader({ kicker, title, description, actions }: { kicker?: string; title: string; description?: string; actions?: ReactNode }) {
-  return (
-    <header className="page-header">
-      <div>
-        {kicker ? <p className="page-kicker">{kicker}</p> : null}
-        <h1 className="page-title">{title}</h1>
-        {description ? <p className="page-description">{description}</p> : null}
-      </div>
-      {actions ? <div>{actions}</div> : null}
-    </header>
-  );
-}
+export * from "@assurmatch/ui/backoffice";
 
-export function Card({ children, plain = false }: { children: ReactNode; plain?: boolean }) {
-  return <section className={`broker-card${plain ? " broker-card--plain" : ""}`}><div className="broker-card__body">{children}</div></section>;
-}
+/** Libelles Starter (assigne, vu, accepte, rejete, conteste, cloture) pour `StatusBadge`. */
+export const starterStatusLabels: Record<string, string> = STARTER_STATUS_LABELS;
 
-export function KpiCard({ label, value, helper, tone = "neutral" }: { label: string; value: ReactNode; helper?: string | undefined; tone?: Tone | undefined }) {
-  return (
-    <article className="kpi-card" data-tone={tone} aria-label={label}>
-      <div>
-        <p className="kpi-card__label">{label}</p>
-        <p className="kpi-card__value">{value}</p>
-      </div>
-      {helper ? <p className="kpi-card__helper">{helper}</p> : null}
-    </article>
-  );
-}
-
-export function Badge({ children, tone = "neutral" }: { children: ReactNode; tone?: Tone }) {
-  return <span className="badge" data-tone={tone}>{children}</span>;
-}
-
-export function StateMessage({ title, children, tone = "neutral" }: { title?: string; children: ReactNode; tone?: Tone }) {
-  return (
-    <div className="state-message" data-tone={tone} role={tone === "danger" ? "alert" : "status"}>
-      {title ? <strong>{title}</strong> : null}
-      <div>{children}</div>
-    </div>
-  );
-}
-
-export interface TableColumn<T> {
-  header: string;
-  render: (item: T) => ReactNode;
-}
-
-export function DataTable<T>({ columns, items, getKey, emptyLabel }: { columns: Array<TableColumn<T>>; items: T[]; getKey: (item: T) => string; emptyLabel: string }) {
-  return (
-    <div className="broker-table-wrap">
-      <table className="broker-table">
-        <thead>
-          <tr>
-            {columns.map((column) => <th key={column.header} scope="col">{column.header}</th>)}
-          </tr>
-        </thead>
-        <tbody>
-          {items.map((item) => (
-            <tr key={getKey(item)}>
-              {columns.map((column) => <td key={column.header}>{column.render(item)}</td>)}
-            </tr>
-          ))}
-          {items.length === 0 ? (
-            <tr>
-              <td colSpan={columns.length}>{emptyLabel}</td>
-            </tr>
-          ) : null}
-        </tbody>
-      </table>
-    </div>
-  );
-}
+/** Libelles des 15 statuts de pipeline CRM pour `StatusBadge`. */
+export const crmStatusLabels: Record<string, string> = CRM_STATUS_LABELS;

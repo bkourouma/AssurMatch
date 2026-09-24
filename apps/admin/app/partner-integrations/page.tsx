@@ -1,19 +1,25 @@
 import { readPartnerIntegrations } from "../lib/admin-api";
-import { Badge, Card, DataTable, KpiCard, PageHeader, StateMessage } from "../lib/ui/admin-ui";
-
-function statusTone(status: string) {
-  if (status === "active" || status === "delivered") return "success";
-  if (status === "pending" || status === "retryable") return "warning";
-  if (status === "dead_letter" || status === "failed") return "danger";
-  return "disabled";
-}
+import {
+  Badge,
+  Card,
+  Cluster,
+  DataTable,
+  Grid,
+  KpiCard,
+  PageHeader,
+  PageStack,
+  StateMessage,
+  StatusBadge,
+  integrationStatusTones
+} from "../lib/ui/admin-ui";
 
 export default async function PartnerIntegrationsPage() {
   const integrations = await readPartnerIntegrations();
 
   return (
-    <div className="page-stack">
+    <PageStack>
       <PageHeader
+        breadcrumb={[{ label: "Partenaires" }, { label: "Integrations" }]}
         kicker="Integrations partenaires"
         title="Partner API et webhooks"
         description="Surface admin lecture seule des cles API hachees, endpoints webhook desactives par defaut et journaux de livraison metadata-only."
@@ -25,99 +31,97 @@ export default async function PartnerIntegrationsPage() {
 
       {integrations.status === "success" ? (
         <>
-          <section className="admin-grid admin-grid--kpi" aria-label="Synthese integrations partenaires">
+          <Grid columns="kpi" as="section" aria-label="Synthese integrations partenaires">
             <KpiCard label="Cles API" value={integrations.data.apiKeys.total} />
             <KpiCard label="Endpoints webhook" value={integrations.data.webhookEndpoints.total} tone="info" />
             <KpiCard label="Origines autorisees" value={integrations.data.webhookAllowlist.total} tone="success" />
             <KpiCard label="Livraisons journalisees" value={integrations.data.webhookDeliveries.total} tone="warning" />
-          </section>
+          </Grid>
 
-          <section className="admin-grid admin-grid--two">
-            <Card>
-              <h2 className="section-title">Garde-fous actifs</h2>
-              <div className="admin-grid">
+          <Grid columns="two">
+            <Card title="Garde-fous actifs">
+              <Cluster>
                 <Badge tone="disabled">partner_api_enabled: desactive par defaut</Badge>
                 <Badge tone="disabled">partner_webhooks_enabled: desactive par defaut</Badge>
                 <Badge tone="success">cles hachees Argon2</Badge>
                 <Badge tone="success">secrets webhook chiffres</Badge>
                 <Badge tone="success">allow-list tenant obligatoire</Badge>
                 <Badge tone="disabled">redirects HTTP bloques</Badge>
-              </div>
+              </Cluster>
             </Card>
-            <Card>
-              <h2 className="section-title">Evenements autorises</h2>
-              <ul className="simple-list">
+            <Card title="Evenements autorises">
+              <ul className="bo-list">
                 <li>lead.assigned</li>
                 <li>lead.status_changed</li>
                 <li>notification.failed</li>
               </ul>
             </Card>
-          </section>
+          </Grid>
 
-          <Card>
-            <h2 className="section-title">Cles API</h2>
+          <Card title="Cles API">
             <DataTable
               columns={[
-                { header: "Nom", render: (key) => <strong>{key.name}</strong> },
-                { header: "Partenaire", render: (key) => <code>{key.partnerTenantId}</code> },
-                { header: "Prefixe", render: (key) => <code>{key.keyPrefix}</code> },
-                { header: "Scopes", render: (key) => key.scopes.join(", ") },
-                { header: "Statut", render: (key) => <Badge tone={statusTone(key.status)}>{key.status}</Badge> }
+                { key: "name", header: "Nom", render: (key) => <strong>{key.name}</strong> },
+                { key: "partner", header: "Partenaire", render: (key) => <code>{key.partnerTenantId}</code> },
+                { key: "prefix", header: "Prefixe", render: (key) => <code>{key.keyPrefix}</code> },
+                { key: "scopes", header: "Scopes", render: (key) => key.scopes.join(", ") },
+                { key: "status", header: "Statut", render: (key) => <StatusBadge status={key.status} tones={integrationStatusTones} /> }
               ]}
               items={integrations.data.apiKeys.items}
               getKey={(key) => key.id}
               emptyLabel="Aucune cle API partenaire configuree."
+              aria-label="Cles API partenaires"
             />
           </Card>
 
-          <Card>
-            <h2 className="section-title">Allow-list webhook</h2>
+          <Card title="Allow-list webhook">
             <DataTable
               columns={[
-                { header: "Origine", render: (entry) => <code>{entry.origin}</code> },
-                { header: "Chemin", render: (entry) => entry.path ? <code>{entry.path}</code> : "tous chemins" },
-                { header: "Partenaire", render: (entry) => <code>{entry.partnerTenantId}</code> },
-                { header: "Statut", render: (entry) => <Badge tone={statusTone(entry.status)}>{entry.status}</Badge> }
+                { key: "origin", header: "Origine", render: (entry) => <code>{entry.origin}</code> },
+                { key: "path", header: "Chemin", render: (entry) => entry.path ? <code>{entry.path}</code> : "tous chemins" },
+                { key: "partner", header: "Partenaire", render: (entry) => <code>{entry.partnerTenantId}</code> },
+                { key: "status", header: "Statut", render: (entry) => <StatusBadge status={entry.status} tones={integrationStatusTones} /> }
               ]}
               items={integrations.data.webhookAllowlist.items}
               getKey={(entry) => entry.id}
               emptyLabel="Aucune origine webhook autorisee."
+              aria-label="Allow-list webhook"
             />
           </Card>
 
-          <Card>
-            <h2 className="section-title">Endpoints webhook</h2>
+          <Card title="Endpoints webhook">
             <DataTable
               columns={[
-                { header: "URL", render: (endpoint) => <code>{endpoint.url}</code> },
-                { header: "Partenaire", render: (endpoint) => <code>{endpoint.partnerTenantId}</code> },
-                { header: "Evenements", render: (endpoint) => endpoint.eventTypes.join(", ") },
-                { header: "Secret", render: () => <Badge tone="success">configure</Badge> },
-                { header: "Statut", render: (endpoint) => <Badge tone={statusTone(endpoint.status)}>{endpoint.status}</Badge> }
+                { key: "url", header: "URL", render: (endpoint) => <code>{endpoint.url}</code> },
+                { key: "partner", header: "Partenaire", render: (endpoint) => <code>{endpoint.partnerTenantId}</code> },
+                { key: "events", header: "Evenements", render: (endpoint) => endpoint.eventTypes.join(", ") },
+                { key: "secret", header: "Secret", render: () => <Badge tone="success">configure</Badge> },
+                { key: "status", header: "Statut", render: (endpoint) => <StatusBadge status={endpoint.status} tones={integrationStatusTones} /> }
               ]}
               items={integrations.data.webhookEndpoints.items}
               getKey={(endpoint) => endpoint.id}
               emptyLabel="Aucun endpoint webhook configure."
+              aria-label="Endpoints webhook"
             />
           </Card>
 
-          <Card>
-            <h2 className="section-title">Livraisons webhook</h2>
+          <Card title="Livraisons webhook">
             <DataTable
               columns={[
-                { header: "Evenement", render: (delivery) => <code>{delivery.eventType}</code> },
-                { header: "Partenaire", render: (delivery) => <code>{delivery.partnerTenantId}</code> },
-                { header: "Statut", render: (delivery) => <Badge tone={statusTone(delivery.status)}>{delivery.status}</Badge> },
-                { header: "Tentatives", render: (delivery) => delivery.attemptCount },
-                { header: "Idempotence", render: (delivery) => <code>{delivery.idempotencyKey}</code> }
+                { key: "event", header: "Evenement", render: (delivery) => <code>{delivery.eventType}</code> },
+                { key: "partner", header: "Partenaire", render: (delivery) => <code>{delivery.partnerTenantId}</code> },
+                { key: "status", header: "Statut", render: (delivery) => <StatusBadge status={delivery.status} tones={integrationStatusTones} /> },
+                { key: "attempts", header: "Tentatives", render: (delivery) => delivery.attemptCount, numeric: true, align: "right" },
+                { key: "idempotency", header: "Idempotence", render: (delivery) => <code>{delivery.idempotencyKey}</code> }
               ]}
               items={integrations.data.webhookDeliveries.items}
               getKey={(delivery) => delivery.id}
               emptyLabel="Aucune livraison webhook journalisee."
+              aria-label="Livraisons webhook"
             />
           </Card>
         </>
       ) : null}
-    </div>
+    </PageStack>
   );
 }

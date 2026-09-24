@@ -17,10 +17,10 @@ export default async function MfaPage({ searchParams }: PageProps) {
   if (session.status === "unauthenticated" || session.status === "expired") redirect(loginRedirect(returnTo, session.status));
   if (session.status === "authenticated") redirect(returnTo);
   return (
-    <main style={{ maxWidth: 640, margin: "0 auto", padding: "42px 20px", fontFamily: "system-ui, sans-serif", color: "#172033" }}>
-      <p style={{ margin: "0 0 8px", color: "#516070", fontSize: 14 }}>Verification forte</p>
-      <h1 style={{ margin: "0 0 16px", fontSize: 30 }}>MFA requise</h1>
+    <>
+      <p>Verification forte</p>
+      <h1 className="bo-auth__title">MFA requise</h1>
       <MfaPanel returnTo={returnTo} />
-    </main>
+    </>
   );
 }

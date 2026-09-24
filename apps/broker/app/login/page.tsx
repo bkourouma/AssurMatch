@@ -1,5 +1,6 @@
 import { loginAction } from "../lib/backoffice-session-actions";
 import { isLocalBrokerDemoLoginEnabled } from "../lib/dev-demo-accounts";
+import { Button, Field, Form, FormActions, Input, Notice } from "../lib/ui/broker-ui";
 import { DevAccountPicker } from "./dev-account-picker";
 
 interface LoginPageProps {
@@ -10,6 +11,18 @@ function firstParam(value: string | string[] | undefined): string | undefined {
   return Array.isArray(value) ? value[0] : value;
 }
 
+const KNOWN_ERRORS = [
+  "activation_required",
+  "mfa_required",
+  "locked",
+  "suspended",
+  "validation_error",
+  "dev_login_missing_seed",
+  "dev_login_database",
+  "dev_login_disabled",
+  "dev_login_invalid"
+];
+
 export default async function BrokerLoginPage({ searchParams }: LoginPageProps) {
   const params = searchParams ? await searchParams : {};
   const returnTo = firstParam(params.returnTo) ?? "/";
@@ -18,38 +31,46 @@ export default async function BrokerLoginPage({ searchParams }: LoginPageProps) 
   const mfa = firstParam(params.mfa);
 
   return (
-    <main style={{ maxWidth: 420, margin: "0 auto", padding: "48px 20px", fontFamily: "system-ui, sans-serif", color: "#172033" }}>
-      <p style={{ margin: "0 0 8px", color: "#516070", fontSize: 14 }}>Back-office courtier</p>
-      <h1 style={{ margin: "0 0 18px", fontSize: 30 }}>Connexion</h1>
-      {reason === "session_expired" ? <p role="status">Votre session a expire. Connectez-vous a nouveau.</p> : null}
-      {reason === "session_required" ? <p role="status">Connectez-vous pour acceder au back-office.</p> : null}
-      {mfa === "required" ? <p role="alert">MFA requise. Votre profil est reconnu, mais l'acces protege reste bloque tant que la verification MFA n'est pas terminee.</p> : null}
-      {error === "activation_required" ? <p role="alert">Activation requise. Ouvrez l'ecran d'activation avec le jeton fourni par votre administrateur.</p> : null}
-      {error === "mfa_required" ? <p role="alert">MFA requise. Terminez la verification MFA avant d'ouvrir le back-office courtier.</p> : null}
-      {error === "locked" ? <p role="alert">Compte verrouille. Contactez votre administrateur plateforme.</p> : null}
-      {error === "suspended" ? <p role="alert">Compte suspendu. Contactez votre responsable habilite.</p> : null}
-      {error === "validation_error" ? <p role="alert">Verifiez le format de l'email et du mot de passe.</p> : null}
-      {error === "dev_login_missing_seed" ? <p role="alert">Donnees demo locales absentes. Relancez le seed broker demo.</p> : null}
-      {error === "dev_login_database" ? <p role="alert">Base locale indisponible pour le selecteur demo.</p> : null}
-      {error && !["activation_required", "mfa_required", "locked", "suspended", "validation_error", "dev_login_missing_seed", "dev_login_database", "dev_login_disabled", "dev_login_invalid"].includes(error) ? <p role="alert">Acces refuse ou identifiants invalides.</p> : null}
+    <>
+      <h1 className="bo-auth__title">Connexion</h1>
+      {reason === "session_expired" ? <Notice tone="info">Votre session a expire. Connectez-vous a nouveau.</Notice> : null}
+      {reason === "session_required" ? <Notice tone="info">Connectez-vous pour acceder au back-office.</Notice> : null}
+      {mfa === "required" ? (
+        <Notice tone="danger">MFA requise. Votre profil est reconnu, mais l'acces protege reste bloque tant que la verification MFA n'est pas terminee.</Notice>
+      ) : null}
+      {error === "activation_required" ? (
+        <Notice tone="danger">Activation requise. Ouvrez l'ecran d'activation avec le jeton fourni par votre administrateur.</Notice>
+      ) : null}
+      {error === "mfa_required" ? (
+        <Notice tone="danger">MFA requise. Terminez la verification MFA avant d'ouvrir le back-office courtier.</Notice>
+      ) : null}
+      {error === "locked" ? <Notice tone="danger">Compte verrouille. Contactez votre administrateur plateforme.</Notice> : null}
+      {error === "suspended" ? <Notice tone="danger">Compte suspendu. Contactez votre responsable habilite.</Notice> : null}
+      {error === "validation_error" ? <Notice tone="danger">Verifiez le format de l'email et du mot de passe.</Notice> : null}
+      {error === "dev_login_missing_seed" ? <Notice tone="danger">Donnees demo locales absentes. Relancez le seed broker demo.</Notice> : null}
+      {error === "dev_login_database" ? <Notice tone="danger">Base locale indisponible pour le selecteur demo.</Notice> : null}
+      {error && !KNOWN_ERRORS.includes(error) ? <Notice tone="danger">Acces refuse ou identifiants invalides.</Notice> : null}
 
       {isLocalBrokerDemoLoginEnabled() ? <DevAccountPicker returnTo={returnTo} /> : null}
 
-      <form action={loginAction} style={{ display: "grid", gap: 12 }}>
+      <Form action={loginAction}>
         <input type="hidden" name="returnTo" value={returnTo} />
-        <label style={{ display: "grid", gap: 6 }}>
-          Email
-          <input name="email" type="email" autoComplete="email" required style={{ minHeight: 38, border: "1px solid #b9c3cf", borderRadius: 6, padding: "0 10px" }} />
-        </label>
-        <label style={{ display: "grid", gap: 6 }}>
-          Mot de passe
-          <input name="password" type="password" autoComplete="current-password" required minLength={12} style={{ minHeight: 38, border: "1px solid #b9c3cf", borderRadius: 6, padding: "0 10px" }} />
-        </label>
-        <button type="submit" style={{ minHeight: 40, border: "1px solid #245f73", background: "#245f73", color: "#fff", borderRadius: 6 }}>
-          Se connecter
-        </button>
-      </form>
-      <p style={{ marginTop: 14 }}><a href={`/activate?returnTo=${encodeURIComponent(returnTo)}`}>Activer un compte</a> · <a href="/password-reset">Consommer un jeton de reinitialisation</a></p>
-    </main>
+        <Field id="login-email" label="Email" required requiredLabel="obligatoire">
+          <Input id="login-email" name="email" type="email" autoComplete="email" required />
+        </Field>
+        <Field id="login-password" label="Mot de passe" required requiredLabel="obligatoire">
+          <Input id="login-password" name="password" type="password" autoComplete="current-password" required minLength={12} />
+        </Field>
+        <FormActions>
+          <Button type="submit" fullWidth>Se connecter</Button>
+        </FormActions>
+      </Form>
+
+      <p>
+        <a href={`/activate?returnTo=${encodeURIComponent(returnTo)}`}>Activer un compte</a>
+        {" · "}
+        <a href="/password-reset">Consommer un jeton de reinitialisation</a>
+      </p>
+    </>
   );
 }
