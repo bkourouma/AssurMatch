@@ -13,10 +13,11 @@ import {
   type StoreOutcome,
   runPartnerImport
 } from "./import-partners-core";
+import { withoutUndefined } from "./lib/without-undefined";
 
 interface CliArgs {
-  file?: string;
-  checksum?: string;
+  file?: string | undefined;
+  checksum?: string | undefined;
   apply: boolean;
   actorId: string;
 }
@@ -41,7 +42,7 @@ class PrismaPartnerImportStore implements ImportStore {
 
   async upsertPartner(input: PartnerInput): Promise<{ outcome: StoreOutcome; id: string }> {
     const existing = await this.prisma.partnerTenant.findFirst({ where: { registrationNumber: input.registrationNumber } });
-    const data = { ...input };
+    const data = withoutUndefined({ ...input });
     if (existing) {
       const updated = await this.prisma.partnerTenant.update({ where: { id: existing.id }, data });
       return { outcome: "updated", id: updated.id };
@@ -127,7 +128,7 @@ class PrismaPartnerImportStore implements ImportStore {
     const country = await this.ensureCountry(input.countryIsoCode);
     const product = await this.ensureProduct(input.productKey);
     const partner = input.partnerRegistrationNumber ? await this.requirePartner(input.partnerRegistrationNumber) : undefined;
-    const data = {
+    const data = withoutUndefined({
       countryId: country.id,
       productId: product.id,
       partnerTenantId: partner?.id,
@@ -147,7 +148,7 @@ class PrismaPartnerImportStore implements ImportStore {
       sponsorLabel: input.sponsorLabel,
       displayPriority: input.displayPriority,
       publicDisclaimers: input.publicDisclaimers
-    };
+    });
     const existing = await this.prisma.offer.findUnique({
       where: { countryId_productId_publicKey: { countryId: country.id, productId: product.id, publicKey: input.publicKey } }
     });
