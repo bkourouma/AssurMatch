@@ -19,6 +19,11 @@ export default function ComplianceEvidencePage() {
           <p className="page-description">Les alertes conformite visibles restent issues des traces existantes.</p>
           <a className="button button--secondary" href="/dashboard/compliance-alerts">Voir les alertes</a>
         </Card>
+        <Card>
+          <h2 className="section-title">Conservation et anonymisation</h2>
+          <p className="page-description">Durees de conservation par categorie, lots d&apos;anonymisation previsualises puis approuves, effacement sur demande.</p>
+          <a className="button button--secondary" href="/compliance/retention">Gerer la retention</a>
+        </Card>
       </section>
       <StateMessage>Aucune preuve n'est creee ou modifiee par cette page de polish UX.</StateMessage>
     </div>

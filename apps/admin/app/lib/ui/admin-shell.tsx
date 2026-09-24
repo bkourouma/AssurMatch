@@ -26,7 +26,7 @@ const navigationItems = [
   { label: "Utilisateurs", href: "/users", match: ["/users"] },
   { label: "Feature flags", href: "/feature-flags", match: ["/feature-flags"] },
   { label: "IA", href: "/ai-assistance", match: ["/ai-assistance"] },
-  { label: "Conformite", href: "/compliance", match: ["/compliance", "/dashboard/compliance-alerts"] },
+  { label: "Conformite", href: "/compliance", match: ["/compliance", "/compliance/retention", "/dashboard/compliance-alerts"] },
   { label: "Operations", href: "/operations", match: ["/operations", "/lead-assignments", "/prospects", "/quote-requests"] }
 ];
 
