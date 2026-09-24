@@ -1,4 +1,4 @@
-import { ArgumentsHost, Catch, ExceptionFilter, HttpException, HttpStatus } from "@nestjs/common";
+import { ArgumentsHost, Catch, ExceptionFilter, HttpException, HttpStatus, NotFoundException } from "@nestjs/common";
 import { ErrorCodes, type ErrorCode } from "../../../../../packages/shared/contracts/error-codes";
 
 export interface SafeErrorResponse {
@@ -17,16 +17,36 @@ const PUBLIC_BLOCKERS: Array<[RegExp, ErrorCode]> = [
   [/feature|disabled/i, ErrorCodes.FEATURE_DISABLED]
 ];
 
-export function toSafeErrorResponse(error: unknown, correlationId: string): SafeErrorResponse {
+/**
+ * Nest answers an unmatched route with a `NotFoundException` whose message is "Cannot GET /path".
+ * It is checked before the blockers, whose patterns would otherwise read the path: "/rates" gave
+ * RATE_LIMITED and "/feature-flags" FEATURE_DISABLED.
+ */
+const UNMATCHED_ROUTE_MESSAGE = /^Cannot [A-Z]+ \//;
+
+export function toSafeErrorResponse(
+  error: unknown,
+  correlationId: string,
+  status: number = statusForError(error)
+): SafeErrorResponse {
   const message = error instanceof Error ? error.message : "Unexpected error";
   const safeMessage = SENSITIVE_PATTERNS.some((pattern) => pattern.test(message))
     ? "The request could not be processed safely"
     : message;
   return {
-    code: PUBLIC_BLOCKERS.find(([pattern]) => pattern.test(message))?.[1] ?? ErrorCodes.VALIDATION_FAILED,
+    code: codeForError(error, message, status),
     message: safeMessage,
     correlationId
   };
+}
+
+function codeForError(error: unknown, message: string, status: number): ErrorCode {
+  if (error instanceof NotFoundException && UNMATCHED_ROUTE_MESSAGE.test(message)) return ErrorCodes.NOT_FOUND;
+  const blocker = PUBLIC_BLOCKERS.find(([pattern]) => pattern.test(message))?.[1];
+  if (blocker) return blocker;
+  if (status === HttpStatus.NOT_FOUND) return ErrorCodes.NOT_FOUND;
+  if (status >= HttpStatus.INTERNAL_SERVER_ERROR) return ErrorCodes.INTERNAL_ERROR;
+  return ErrorCodes.VALIDATION_FAILED;
 }
 
 /**
@@ -61,7 +81,8 @@ export class ErrorResponseFilter implements ExceptionFilter {
     const correlationId = Array.isArray(correlationIdHeader)
       ? correlationIdHeader[0] ?? crypto.randomUUID()
       : correlationIdHeader ?? crypto.randomUUID();
-    response.status(statusForError(exception)).json(toSafeErrorResponse(exception, correlationId));
+    const status = statusForError(exception);
+    response.status(status).json(toSafeErrorResponse(exception, correlationId, status));
   }
 }
 
