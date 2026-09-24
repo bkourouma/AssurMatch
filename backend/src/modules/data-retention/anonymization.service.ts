@@ -52,15 +52,19 @@ interface TenantNotice {
 export class AnonymizationService {
   constructor(private readonly deps: AnonymizationDeps) {}
 
-  async execute(batch: AnonymizationBatchRecord, eligible: EligibleTargets, actor: ActorContext, now = new Date()): Promise<RetentionCounts> {
+  /**
+   * `counts` is filled as the execution progresses (one entry per subject kind, updated per row), so
+   * the caller still knows what was done if the execution stops midway.
+   */
+  async execute(batch: AnonymizationBatchRecord, eligible: EligibleTargets, actor: ActorContext, now = new Date(), counts: RetentionCounts = {}): Promise<RetentionCounts> {
     const stamp: AnonymizationStamp = { batchId: batch.id, now };
-    const counts: RetentionCounts = {};
     const notices = new Map<string, TenantNotice>();
     for (const kind of EXECUTION_ORDER) {
       const ids = batch.targets[kind];
       if (!ids) continue;
       const previous = batch.counts[kind];
       const count: RetentionSubjectCount = { selected: ids.length, anonymized: 0, skipped: 0, failed: 0, moreRemaining: previous?.moreRemaining ?? false };
+      counts[kind] = count;
       const stillEligible = eligible[kind];
       for (const id of ids) {
         if (stillEligible && !stillEligible.has(id)) {
@@ -85,7 +89,6 @@ export class AnonymizationService {
           });
         }
       }
-      counts[kind] = count;
       this.deps.audit.write({
         actor,
         action: DataRetentionAuditActions.categoryAnonymized,
@@ -113,6 +116,9 @@ export class AnonymizationService {
       case "quote_requests":
         return this.anonymizeQuoteRequest(id, stamp, notices);
       case "prospects":
+        // Security review M3: a prospect frozen as an orphan that has since received a request
+        // (not part of this batch) is still in use: it is skipped, not anonymized.
+        if (await subjects.prospectHasLiveQuotes(id)) return false;
         return subjects.anonymizeProspect(id, stamp);
       case "contact_messages":
         return subjects.anonymizeContactMessage(id, stamp);

@@ -13,6 +13,7 @@ export interface DataRetentionModuleDeps {
   identity: EmailFingerprintPort;
   storage: DocumentStoragePort;
   requireCountry(countryId: string): Promise<unknown>;
+  listCountries(): Promise<Array<{ id: string; isoCode: string; name: string; status: string }>>;
   inApp?: RetentionInAppPort | undefined;
   repository?: DataRetentionRepository | undefined;
   subjects?: RetentionSubjectsRepository | undefined;
@@ -44,6 +45,7 @@ export class DataRetentionModule {
       anonymization: this.anonymization,
       featureFlags: deps.featureFlags,
       requireCountry: deps.requireCountry,
+      listCountries: deps.listCountries,
       ...(deps.clock ? { clock: deps.clock } : {})
     });
   }

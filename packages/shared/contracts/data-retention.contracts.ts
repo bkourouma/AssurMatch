@@ -30,18 +30,30 @@ export const retentionSubjectKindSchema = z.enum([...RETENTION_CATEGORIES, "pros
 export const retentionPolicySourceSchema = z.enum(["default", "global", "country"]);
 export const retentionAnchorSchema = z.enum(["last_activity", "created_at", "reviewed_at", "country_public_since", "occurred_at"]);
 export const anonymizationBatchKindSchema = z.enum(["retention", "erasure"]);
-export const anonymizationBatchStatusSchema = z.enum(["previewed", "executed", "refused", "expired"]);
+/**
+ * `interrupted`: the batch was approved and its execution started but did not complete; the counts
+ * record what was done. It is terminal: the remaining rows stay eligible for a new preview.
+ */
+export const anonymizationBatchStatusSchema = z.enum(["previewed", "executed", "refused", "expired", "interrupted"]);
 export const erasureLookupSchema = z.enum(["public_reference", "email"]);
 
 const EMAIL_IN_TEXT = /[^\s@]+@[^\s@]+\.[^\s@]+/;
+/** 8 digits or more, optionally separated by spaces, dots, dashes or a leading/inner `+`. */
+const PHONE_IN_TEXT = /\+?\d(?:[\s.+-]?\d){7,}/;
+/** ISO dates (2026-09-24) have 8 digits but are legitimate in a reason, so they are removed first. */
+const ISO_DATE = /\b\d{4}-\d{2}-\d{2}\b/g;
+
+export function reasonCarriesContact(value: string): boolean {
+  return EMAIL_IN_TEXT.test(value) || PHONE_IN_TEXT.test(value.replace(ISO_DATE, " "));
+}
 
 /**
  * The batch is the durable proof of an anonymization, so its reasons are stored for years: they
- * must never carry the e-mail address the erasure was asked for.
+ * must never carry the e-mail address or the phone number the erasure was asked for.
  */
 export const retentionReasonSchema = reasonSchema
   .max(500)
-  .refine((value) => !EMAIL_IN_TEXT.test(value), { message: "Le motif ne doit pas contenir d'adresse e-mail" });
+  .refine((value) => !reasonCarriesContact(value), { message: "Le motif ne doit pas contenir d'adresse e-mail ni de numero de telephone" });
 
 export const retentionPoliciesQuerySchema = z.object({
   countryId: uuidSchema.optional()
@@ -67,10 +79,19 @@ export const retentionPolicyItemSchema = z.object({
   overrideUpdatedAt: dateTimeStringSchema.nullable()
 });
 
+/** For the admin country selector: every country, sorted by ISO code, these four fields only. */
+export const retentionCountryOptionSchema = z.object({
+  id: uuidSchema,
+  isoCode: z.string(),
+  name: z.string(),
+  status: z.string()
+});
+
 export const retentionPoliciesResponseSchema = z.object({
   countryId: uuidSchema.nullable(),
   purgeEnabled: z.boolean(),
-  items: z.array(retentionPolicyItemSchema)
+  items: z.array(retentionPolicyItemSchema),
+  countries: z.array(retentionCountryOptionSchema)
 });
 
 export const retentionPreviewRequestSchema = z.object({
@@ -136,6 +157,7 @@ export type ErasureLookup = z.infer<typeof erasureLookupSchema>;
 export type RetentionPoliciesQuery = z.infer<typeof retentionPoliciesQuerySchema>;
 export type RetentionPolicyUpsert = z.infer<typeof retentionPolicyUpsertSchema>;
 export type RetentionPolicyItem = z.infer<typeof retentionPolicyItemSchema>;
+export type RetentionCountryOption = z.infer<typeof retentionCountryOptionSchema>;
 export type RetentionPoliciesResponse = z.infer<typeof retentionPoliciesResponseSchema>;
 export type RetentionPreviewRequest = z.infer<typeof retentionPreviewRequestSchema>;
 export type RetentionErasurePreviewRequest = z.infer<typeof retentionErasurePreviewRequestSchema>;

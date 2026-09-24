@@ -185,6 +185,12 @@ describe("data retention service (spec 046)", () => {
 
     const policies = await world.service.upsertPolicy({ countryId: CI, category: "quote_requests", retentionDays: 365, reason: "Avis juridique Cote d'Ivoire" }, compliance);
     expect(policies.items.find((item) => item.category === "quote_requests")).toMatchObject({ retentionDays: 365, source: "country", defaultRetentionDays: 730, countryRetentionDays: 365 });
+    // The country selector: every country, sorted by ISO code, four fields only (no publicSince).
+    expect(policies.countries).toEqual([
+      { id: CI, isoCode: "CI", name: "Cote d'Ivoire", status: "public" },
+      { id: SN, isoCode: "SN", name: "Senegal", status: "internal" }
+    ]);
+    expect((await world.service.getPolicies(compliance)).countries.map((country) => country.isoCode)).toEqual(["CI", "SN"]);
     expect(world.audit.search({ action: DataRetentionAuditActions.policyChanged })[0]?.context).toMatchObject({
       previous: { override: null, effective: 730, source: "default" },
       next: { override: 365, effective: 365, source: "country" }

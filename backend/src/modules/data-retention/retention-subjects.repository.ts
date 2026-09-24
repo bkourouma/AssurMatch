@@ -41,6 +41,8 @@ export function anonymizedFingerprint(rowId: string): string {
 const FINAL_WEBHOOK_STATUSES = ["delivered", "failed", "dead_letter", "skipped"] as const;
 /** The e-mail channel is the one delivered (spec 044); WhatsApp is never attempted for these rows. */
 const FINAL_EMAIL_STATUSES = ["sent", "delivered", "failed"] as const;
+/** Every messaging delivery status is final today; listed explicitly so a future non-final status is excluded. */
+const FINAL_MESSAGING_DELIVERY_STATUSES = ["sent", "refused", "failed"] as const;
 const NOTIFICATION_ID_PREFIX = "notification:";
 const MESSAGING_DELIVERY_ID_PREFIX = "messaging-delivery:";
 
@@ -51,6 +53,16 @@ export interface RetentionCandidate {
   anchor: Date | null;
   /** Waiting-list entry of a country never opened whose own `retentionUntil` has passed. */
   expired: boolean;
+}
+
+/**
+ * One page of candidates. `scanned` is the number of database rows the page read before any
+ * in-memory filtering: callers page on it, never on `candidates.length`, so a filter applied after
+ * the fetch can never end the scan early.
+ */
+export interface RetentionCandidatePage {
+  candidates: RetentionCandidate[];
+  scanned: number;
 }
 
 export interface RetentionCandidateQuery {
@@ -89,7 +101,7 @@ export interface AnonymizationStamp {
 }
 
 export interface RetentionSubjectsRepository extends RuntimeRepository {
-  listCandidates(category: RetentionCategory, query: RetentionCandidateQuery): Promise<RetentionCandidate[]>;
+  listCandidates(category: RetentionCategory, query: RetentionCandidateQuery): Promise<RetentionCandidatePage>;
   /** The row a public reference designates (quote request, contact message or partner application) and its e-mail fingerprint. */
   findByPublicReference(publicReference: string): Promise<{ subjects: ErasureSubjectIds; emailFingerprint: string | undefined }>;
   findByEmailFingerprint(emailFingerprint: string): Promise<ErasureSubjectIds>;
@@ -137,6 +149,7 @@ export interface MemoryCrmActivitySource {
   documentsForLead(leadAssignmentId: string): Promise<BrokerCrmDocument[]>;
   proposalsForLead(leadAssignmentId: string): Promise<BrokerCrmProposal[]>;
   disputesForLead(leadAssignmentId: string): Promise<BrokerCrmDispute[]>;
+  pipelineHistoryForLead(leadAssignmentId: string): Promise<Array<{ reason?: string | undefined }>>;
 }
 
 export interface MemoryRetentionSources {
@@ -171,13 +184,14 @@ export class MemoryRetentionSubjectsRepository implements RetentionSubjectsRepos
     assertRuntimeRepository(this.mode, "RetentionSubjectsRepository");
   }
 
-  async listCandidates(category: RetentionCategory, query: RetentionCandidateQuery): Promise<RetentionCandidate[]> {
+  async listCandidates(category: RetentionCategory, query: RetentionCandidateQuery): Promise<RetentionCandidatePage> {
     const candidates = await this.allCandidates(category, query);
     const only = query.onlyIds ? new Set(query.onlyIds) : undefined;
-    return candidates
+    const page = candidates
       .filter((candidate) => !only || only.has(candidate.id))
       .filter((candidate) => !query.countryId || candidate.countryId === query.countryId)
       .slice(query.skip, query.skip + query.take);
+    return { candidates: page, scanned: page.length };
   }
 
   async findByPublicReference(publicReference: string): Promise<{ subjects: ErasureSubjectIds; emailFingerprint: string | undefined }> {
@@ -232,7 +246,8 @@ export class MemoryRetentionSubjectsRepository implements RetentionSubjectsRepos
     const ids = new Set(assignmentIds);
     for (const assignment of await this.list(this.sources.leadAssignments)) {
       // The memory assignment carries a copy of the visitor contact and answers; the Prisma row does not.
-      if (ids.has(assignment.id)) scrub(assignment, { contact: {}, answers: {} }, ["actionComment"]);
+      // The memory assignment also carries the CRM lead state tags (BrokerCrmLeadState.tags in Prisma).
+      if (ids.has(assignment.id)) scrub(assignment, { contact: {}, answers: {}, ...(assignment.tags ? { tags: [] } : {}) }, ["actionComment"]);
     }
     const crm = this.sources.crmActivity;
     for (const id of assignmentIds) {
@@ -244,6 +259,7 @@ export class MemoryRetentionSubjectsRepository implements RetentionSubjectsRepos
       for (const proposal of await crm.proposalsForLead(id)) scrub(proposal, {}, ["notes"]);
       for (const dispute of await crm.disputesForLead(id)) scrub(dispute, {}, ["comment"]);
       for (const document of await crm.documentsForLead(id)) scrub(document, { label: ANONYMIZED_MARKER, storageKey: ANONYMIZED_MARKER });
+      for (const event of await crm.pipelineHistoryForLead(id)) scrub(event, {}, ["reason"]);
     }
   }
 
@@ -447,7 +463,7 @@ export class MemoryRetentionSubjectsRepository implements RetentionSubjectsRepos
           .map((notification) => ({ id: `${NOTIFICATION_ID_PREFIX}${notification.id}`, countryId: null, anchor: notification.createdAt, expired: false }))
           .sort(byAnchor);
         const deliveries = (await this.list(this.sources.messagingDeliveries))
-          .filter((delivery) => delivery.recipientMasked !== ANONYMIZED_MARKER && before(delivery.createdAt))
+          .filter((delivery) => delivery.recipientMasked !== ANONYMIZED_MARKER && (!retention || (FINAL_MESSAGING_DELIVERY_STATUSES as readonly string[]).includes(delivery.status)) && before(delivery.createdAt))
           .map((delivery) => ({ id: `${MESSAGING_DELIVERY_ID_PREFIX}${delivery.id}`, countryId: null, anchor: delivery.createdAt, expired: false }))
           .sort(byAnchor);
         return [...notifications, ...deliveries];
@@ -490,6 +506,8 @@ type DelegateName =
   | "brokerCrmDocument"
   | "brokerCrmProposal"
   | "brokerCrmDispute"
+  | "brokerCrmPipelineHistory"
+  | "brokerCrmLeadState"
   | "quoteAISummary"
   | "aIInteraction"
   | "contactMessage"
@@ -506,7 +524,13 @@ export class PrismaRetentionSubjectsRepository implements RetentionSubjectsRepos
 
   constructor(private readonly prisma: PrismaService) {}
 
-  async listCandidates(category: RetentionCategory, query: RetentionCandidateQuery): Promise<RetentionCandidate[]> {
+  async listCandidates(category: RetentionCategory, query: RetentionCandidateQuery): Promise<RetentionCandidatePage> {
+    const page = await this.fetchCandidates(category, query);
+    return Array.isArray(page) ? { candidates: page, scanned: page.length } : page;
+  }
+
+  /** Returns a bare array when no row is filtered after the fetch, a page with its scanned count otherwise. */
+  private async fetchCandidates(category: RetentionCategory, query: RetentionCandidateQuery): Promise<RetentionCandidate[] | RetentionCandidatePage> {
     const retention = query.mode === "retention";
     const ids = query.onlyIds ? { id: { in: [...query.onlyIds] } } : {};
     const page = { skip: query.skip, take: query.take };
@@ -539,9 +563,11 @@ export class PrismaRetentionSubjectsRepository implements RetentionSubjectsRepos
           ...page
         });
         const countries = await this.quoteCountries(rows.map((row) => row.quoteRequestId));
-        return rows
+        const candidates = rows
           .map((row) => ({ id: row.id, countryId: countries.get(row.quoteRequestId) ?? null, anchor: row.createdAt, expired: false }))
           .filter((candidate) => !query.countryId || candidate.countryId === query.countryId);
+        // Security review M1: the country filter runs after the page, so the scan must go on the raw row count.
+        return { candidates, scanned: rows.length };
       }
       case "contact_messages": {
         const rows = await this.rows<{ id: string; countryId: string | null; createdAt: Date }>("contactMessage", {
@@ -676,6 +702,9 @@ export class PrismaRetentionSubjectsRepository implements RetentionSubjectsRepos
     await this.delegate("brokerCrmProposal").updateMany({ ...byAssignment, data: { notes: null } });
     await this.delegate("brokerCrmDispute").updateMany({ ...byAssignment, data: { comment: null } });
     await this.delegate("brokerCrmDocument").updateMany({ ...byAssignment, data: { label: ANONYMIZED_MARKER, storageKey: ANONYMIZED_MARKER } });
+    // Security review L6: the outcome reason a broker typed and the free tags of the CRM lead state.
+    await this.delegate("brokerCrmPipelineHistory").updateMany({ ...byAssignment, data: { reason: null } });
+    await this.delegate("brokerCrmLeadState").updateMany({ ...byAssignment, data: { tags: [] } });
   }
 
   async anonymizeQuoteAi(quoteRequestId: string, assignmentIds: readonly string[]): Promise<void> {
@@ -790,7 +819,7 @@ export class PrismaRetentionSubjectsRepository implements RetentionSubjectsRepos
     const deliveryWhere = {
       recipientMasked: { not: ANONYMIZED_MARKER },
       ...(deliveryIds ? { id: { in: deliveryIds } } : {}),
-      ...(retention ? { createdAt: { lt: query.anchorBefore } } : {})
+      ...(retention ? { status: { in: [...FINAL_MESSAGING_DELIVERY_STATUSES] }, createdAt: { lt: query.anchorBefore } } : {})
     };
     const notificationTotal = await this.delegate("notification").count({ where: notificationWhere });
     const candidates: RetentionCandidate[] = [];

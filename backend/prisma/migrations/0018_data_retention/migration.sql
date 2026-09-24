@@ -8,7 +8,7 @@
 CREATE TYPE "AnonymizationBatchKind" AS ENUM ('retention', 'erasure');
 
 -- CreateEnum
-CREATE TYPE "AnonymizationBatchStatus" AS ENUM ('previewed', 'executed', 'refused', 'expired');
+CREATE TYPE "AnonymizationBatchStatus" AS ENUM ('previewed', 'executed', 'refused', 'expired', 'interrupted');
 
 -- AlterTable
 ALTER TABLE "Country" ADD COLUMN IF NOT EXISTS "publicSince" TIMESTAMP(3);

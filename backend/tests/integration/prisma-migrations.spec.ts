@@ -126,6 +126,11 @@ describe("prisma migration fresh-base readiness", () => {
     }
     expect(retention).not.toMatch(/ALTER TABLE "(ConsentRecord|AuditLog)"/);
     expect(retention).not.toMatch(/"(email|emailFingerprint|phone)" TEXT/);
+    // Security review L5: the global-override uniqueness lives in SQL only; no later migration may drop it.
+    for (const later of migrations.filter((name) => name > "0018_data_retention")) {
+      expect(readFileSync(join(migrationsDir, later, "migration.sql"), "utf8"), later).not.toContain("RetentionPolicy_global_category_key");
+    }
+    expect(schema).toContain("RetentionPolicy_global_category_key");
     expect(schema).toContain("model RetentionPolicy");
     expect(schema).toContain("model AnonymizationBatch");
   });

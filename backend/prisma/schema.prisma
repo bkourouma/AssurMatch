@@ -1538,10 +1538,13 @@ enum AnonymizationBatchStatus {
   executed
   refused
   expired
+  interrupted
 }
 
 /// Spec 046 D1: an override of a code default retention duration, global (countryId null) or per country.
-/// The partial unique index on (category) WHERE countryId IS NULL lives in migration 0018.
+/// The partial unique index "RetentionPolicy_global_category_key" on (category) WHERE countryId IS NULL is
+/// managed in SQL (migration 0018): Prisma cannot express it, so `prisma migrate diff` will not show it
+/// and a regenerated migration must never drop it (guarded by prisma-migrations.spec.ts).
 model RetentionPolicy {
   id            String   @id @default(uuid())
   countryId     String?

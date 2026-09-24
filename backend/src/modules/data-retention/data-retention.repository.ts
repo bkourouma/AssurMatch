@@ -58,6 +58,11 @@ export interface DataRetentionRepository extends RuntimeRepository {
    * cannot both execute it. Returns false when another approval (or a refusal) got there first.
    */
   claimForApproval(id: string, approvedById: string | null, approvalReason: string, approvedAt: Date): Promise<boolean>;
+  /**
+   * Conditional write for the `expired` and `refused` outcomes: it only applies while the batch is
+   * still `previewed` and unclaimed, so it can never overwrite a batch that is being executed.
+   */
+  transitionFromPreview(id: string, update: AnonymizationBatchUpdate): Promise<boolean>;
 }
 
 export class MemoryDataRetentionRepository implements DataRetentionRepository {
@@ -120,6 +125,13 @@ export class MemoryDataRetentionRepository implements DataRetentionRepository {
     Object.assign(batch, { approvedById, approvalReason, approvedAt, updatedAt: new Date() });
     return true;
   }
+
+  async transitionFromPreview(id: string, update: AnonymizationBatchUpdate): Promise<boolean> {
+    const batch = this.batches.find((candidate) => candidate.id === id);
+    if (!batch || batch.status !== "previewed" || batch.approvedAt !== null) return false;
+    Object.assign(batch, structuredClone(update), { updatedAt: new Date() });
+    return true;
+  }
 }
 
 type Delegate = {
@@ -178,6 +190,15 @@ export class PrismaDataRetentionRepository implements DataRetentionRepository {
     const result = await this.delegate("anonymizationBatch").updateMany({
       where: { id, status: "previewed", approvedAt: null },
       data: { approvedById, approvalReason, approvedAt, updatedAt: new Date() }
+    });
+    return result.count === 1;
+  }
+
+  async transitionFromPreview(id: string, update: AnonymizationBatchUpdate): Promise<boolean> {
+    const data = Object.fromEntries(Object.entries(update).filter(([, value]) => value !== undefined));
+    const result = await this.delegate("anonymizationBatch").updateMany({
+      where: { id, status: "previewed", approvedAt: null },
+      data: { ...data, updatedAt: new Date() }
     });
     return result.count === 1;
   }

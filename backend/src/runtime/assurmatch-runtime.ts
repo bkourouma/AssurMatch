@@ -420,6 +420,7 @@ export class AssurMatchRuntime {
     identity: this.prospects.identity,
     storage: this.documentStorage,
     requireCountry: (countryId) => this.countries.service.require(countryId),
+    listCountries: () => this.countries.service.listAdmin(),
     inApp: this.notifications.dispatch,
     repository: this.dataRetentionRepository,
     subjects: this.retentionSubjectsRepository,

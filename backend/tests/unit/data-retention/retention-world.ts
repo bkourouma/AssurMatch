@@ -57,8 +57,8 @@ export function createRetentionWorld() {
   const notices: Array<{ scopeId: string; template: string; title?: string; body: string; targetType?: string; targetId?: string }> = [];
   const data = {
     countries: [
-      { id: CI, publicSince: daysAgo(900) as Date | null },
-      { id: SN, publicSince: null as Date | null }
+      { id: SN, isoCode: "SN", name: "Senegal", status: "internal", publicSince: null as Date | null },
+      { id: CI, isoCode: "CI", name: "Cote d'Ivoire", status: "public", publicSince: daysAgo(900) as Date | null }
     ],
     prospects: [] as Array<Anonymizable<ProspectRecord>>,
     quoteRequests: [] as Array<Anonymizable<QuoteRequestRecord>>,
@@ -86,6 +86,7 @@ export function createRetentionWorld() {
       if (!country) throw new Error(`Country ${countryId} not found`);
       return country;
     },
+    listCountries: async () => data.countries,
     inApp: {
       publishInApp: async (request) => {
         notices.push(request);
@@ -173,6 +174,7 @@ export function createRetentionWorld() {
         answers: { vehicle_use: "prive" },
         actionComment: "Client rappele a 18h, prefere WhatsApp",
         lastBrokerActionAt: daysAgo(options.ageDays),
+        tags: ["client VIP Ama"],
         createdAt: daysAgo(options.ageDays),
         updatedAt: daysAgo(options.ageDays)
       } as LeadAssignmentRecord;
@@ -186,6 +188,7 @@ export function createRetentionWorld() {
       await crm.addProposal({ id: crypto.randomUUID(), leadAssignmentId: assignment.id, reference: "PROP-1", amountIndicative: 120_000, currency: "XOF", notes: "Pour Ama", nonContractual: true, createdAt });
       await crm.addDispute({ id: crypto.randomUUID(), leadAssignmentId: assignment.id, reason: "duplicate", comment: "Ama deja cliente", status: "opened", createdAt });
       await crm.addDocument({ id: crypto.randomUUID(), leadAssignmentId: assignment.id, label: "Carte grise Ama", storageKey: "crm-key-1", visibility: "internal", createdAt });
+      await crm.appendPipelineHistory({ id: crypto.randomUUID(), leadAssignmentId: assignment.id, partnerTenantId, eventType: "status_changed", nextStatus: "perdu", reason: "price", occurredAt: createdAt });
     }
 
     let document: Anonymizable<QuoteDocumentRecord> | undefined;

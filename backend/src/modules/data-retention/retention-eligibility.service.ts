@@ -3,7 +3,9 @@ import type { RetentionSubjectCount, RetentionTargets } from "./data-retention.r
 import { COUNTRY_LESS_CATEGORIES, cutoffResolver, latestCutoff, type RetentionPolicyRecord } from "./retention-policies";
 import type { RetentionCandidate, RetentionSubjectsRepository } from "./retention-subjects.repository";
 
-const PAGE_SIZE = 200;
+/** Rows read per database page while scanning a category. */
+export const RETENTION_SCAN_PAGE_SIZE = 200;
+const PAGE_SIZE = RETENTION_SCAN_PAGE_SIZE;
 
 export interface EligibilityInput {
   categories: readonly RetentionCategory[];
@@ -50,7 +52,7 @@ export class RetentionEligibilityService {
   async stillEligible(category: RetentionCategory, ids: readonly string[], input: Omit<EligibilityInput, "categories" | "cap">): Promise<Set<string>> {
     if (ids.length === 0) return new Set();
     const isEligible = this.predicate(category, input);
-    const candidates = await this.subjects.listCandidates(category, {
+    const { candidates } = await this.subjects.listCandidates(category, {
       mode: "retention",
       now: input.now,
       anchorBefore: latestCutoff(category, input.now, input.policies, input.countryId),
@@ -65,7 +67,7 @@ export class RetentionEligibilityService {
   /** Erasure re-check: retention durations do not apply, only "not anonymized since the preview". */
   async stillPresent(category: RetentionCategory, ids: readonly string[], now: Date): Promise<Set<string>> {
     if (ids.length === 0) return new Set();
-    const candidates = await this.subjects.listCandidates(category, { mode: "erasure", now, anchorBefore: now, onlyIds: ids, skip: 0, take: ids.length });
+    const { candidates } = await this.subjects.listCandidates(category, { mode: "erasure", now, anchorBefore: now, onlyIds: ids, skip: 0, take: ids.length });
     return new Set(candidates.map((candidate) => candidate.id));
   }
 
@@ -75,11 +77,12 @@ export class RetentionEligibilityService {
     const collected: string[] = [];
     for (let skip = 0; collected.length < limit; skip += PAGE_SIZE) {
       const page = await this.subjects.listCandidates(category, { mode: "retention", now: input.now, anchorBefore, countryId: input.countryId, skip, take: PAGE_SIZE });
-      for (const candidate of page) {
+      for (const candidate of page.candidates) {
         if (isEligible(candidate)) collected.push(candidate.id);
         if (collected.length >= limit) break;
       }
-      if (page.length < PAGE_SIZE) break;
+      // Paging runs on the rows the adapter read, not on what survived its filters (security review M1).
+      if (page.scanned < PAGE_SIZE) break;
     }
     return collected;
   }

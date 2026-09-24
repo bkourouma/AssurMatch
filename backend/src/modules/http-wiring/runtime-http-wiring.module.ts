@@ -963,32 +963,43 @@ export class AdminDataRetentionController {
   constructor(private readonly runtime: AssurMatchRuntime) {}
 
   policies(request: AssurMatchHttpRequest, query: Record<string, string>) {
-    const { countryId } = parseHttpInput(retentionPoliciesQuerySchema, { ...(query.countryId ? { countryId: query.countryId } : {}) });
-    return retentionCall(() => this.runtime.dataRetention.service.getPolicies(protectedActorFromRequest(request), countryId));
+    return this.authorized(request, "read", (actor) => {
+      const { countryId } = parseHttpInput(retentionPoliciesQuerySchema, { ...(query.countryId ? { countryId: query.countryId } : {}) });
+      return this.runtime.dataRetention.service.getPolicies(actor, countryId);
+    });
   }
 
   upsertPolicy(input: unknown, request: AssurMatchHttpRequest) {
-    return retentionCall(() => this.runtime.dataRetention.service.upsertPolicy(parseHttpInput(retentionPolicyUpsertSchema, input), protectedActorFromRequest(request)));
+    return this.authorized(request, "write", (actor) => this.runtime.dataRetention.service.upsertPolicy(parseHttpInput(retentionPolicyUpsertSchema, input), actor));
   }
 
   batches(request: AssurMatchHttpRequest) {
-    return retentionCall(() => this.runtime.dataRetention.service.listBatches(protectedActorFromRequest(request)));
+    return this.authorized(request, "read", (actor) => this.runtime.dataRetention.service.listBatches(actor));
   }
 
   batch(id: string, request: AssurMatchHttpRequest) {
-    return retentionCall(() => this.runtime.dataRetention.service.getBatch(parseParam("id", id, uuidSchema), protectedActorFromRequest(request)));
+    return this.authorized(request, "read", (actor) => this.runtime.dataRetention.service.getBatch(parseParam("id", id, uuidSchema), actor));
   }
 
   preview(input: unknown, request: AssurMatchHttpRequest) {
-    return retentionCall(() => this.runtime.dataRetention.service.previewRetention(parseHttpInput(retentionPreviewRequestSchema, input), protectedActorFromRequest(request)));
+    return this.authorized(request, "write", (actor) => this.runtime.dataRetention.service.previewRetention(parseHttpInput(retentionPreviewRequestSchema, input), actor));
   }
 
   erasurePreview(input: unknown, request: AssurMatchHttpRequest) {
-    return retentionCall(() => this.runtime.dataRetention.service.previewErasure(parseHttpInput(retentionErasurePreviewRequestSchema, input), protectedActorFromRequest(request)));
+    return this.authorized(request, "write", (actor) => this.runtime.dataRetention.service.previewErasure(parseHttpInput(retentionErasurePreviewRequestSchema, input), actor));
   }
 
   approve(id: string, input: unknown, request: AssurMatchHttpRequest) {
-    return retentionCall(() => this.runtime.dataRetention.service.approve(parseParam("id", id, uuidSchema), parseHttpInput(retentionBatchApproveRequestSchema, input), protectedActorFromRequest(request)));
+    return this.authorized(request, "write", (actor) => this.runtime.dataRetention.service.approve(parseParam("id", id, uuidSchema), parseHttpInput(retentionBatchApproveRequestSchema, input), actor));
+  }
+
+  /** Security review L2: the audited access check runs before any body or parameter parsing. */
+  private authorized<T>(request: AssurMatchHttpRequest, mode: "read" | "write", call: (actor: ActorContext) => Promise<T>): Promise<T> {
+    return retentionCall(async () => {
+      const actor = protectedActorFromRequest(request);
+      this.runtime.dataRetention.service.authorize(actor, mode);
+      return call(actor);
+    });
   }
 }
 

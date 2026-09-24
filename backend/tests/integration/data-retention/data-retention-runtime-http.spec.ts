@@ -126,6 +126,11 @@ describe("data retention runtime HTTP (spec 046)", () => {
       expect((await active.request("/admin/retention/policies", { headers: actorHeaders(actor) })).status).toBe(403);
       expect((await post(active, "/admin/retention/batches/preview", actor, { reason: "Revue de conservation" })).status).toBe(403);
     }
+    // L2: the audited access check runs before parsing, so a malformed body still answers an audited 403.
+    const pays: ActorContext = { actorId: "pays-malformed", roles: ["admin_pays"], mfaVerified: true };
+    expect((await post(active, "/admin/retention/batches/erasure-preview", pays, { email: "not-an-email", publicReference: 42 })).status).toBe(403);
+    expect((await post(active, "/admin/retention/batches/not-a-uuid/approve", pays, {})).status).toBe(403);
+    expect(active.runtime.audit.writer.search({ action: DataRetentionAuditActions.accessRefused }).filter((entry) => entry.actorId === "pays-malformed")).toHaveLength(2);
     expect(active.runtime.audit.writer.search({ action: DataRetentionAuditActions.accessRefused }).length).toBeGreaterThanOrEqual(6);
     expect((await active.request("/admin/retention/policies", { headers: actorHeaders({ actorId: "no-mfa", roles: ["compliance_admin"], mfaVerified: false }) })).status).toBe(403);
   });

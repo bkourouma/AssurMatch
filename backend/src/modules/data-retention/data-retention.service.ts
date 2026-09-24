@@ -9,6 +9,7 @@ import {
   type RetentionBatchCount,
   type RetentionBatchListResponse,
   type RetentionCategory,
+  type RetentionCountryOption,
   type RetentionErasurePreviewRequest,
   type RetentionPoliciesResponse,
   type RetentionPolicyUpsert,
@@ -70,6 +71,8 @@ export interface DataRetentionServiceDeps {
   featureFlags: { isEnabled(key: string): boolean };
   /** Throws when the country does not exist (`CountriesService.require`). */
   requireCountry(countryId: string): Promise<unknown>;
+  /** Every country (`CountriesService.listAdmin`), for the admin country selector. */
+  listCountries(): Promise<Array<{ id: string; isoCode: string; name: string; status: string }>>;
   clock?: () => Date;
 }
 
@@ -84,7 +87,7 @@ export class DataRetentionService {
   async getPolicies(actor: ActorContext, countryId?: string): Promise<RetentionPoliciesResponse> {
     this.assertAccess(actor, "read", "RetentionPolicy");
     if (countryId) await this.deps.requireCountry(countryId);
-    return this.policiesResponse(await this.deps.repository.listPolicies(), countryId);
+    return this.policiesResponse(await this.deps.repository.listPolicies(), countryId, await this.countryOptions());
   }
 
   async upsertPolicy(input: RetentionPolicyUpsert, actor: ActorContext): Promise<RetentionPoliciesResponse> {
@@ -128,7 +131,7 @@ export class DataRetentionService {
         next: { override: parsed.retentionDays, effective: next.retentionDays, source: next.source }
       }
     });
-    return this.policiesResponse(after, countryId ?? undefined);
+    return this.policiesResponse(after, countryId ?? undefined, await this.countryOptions());
   }
 
   async previewRetention(input: RetentionPreviewRequest, actor: ActorContext): Promise<RetentionBatch> {
@@ -173,14 +176,20 @@ export class DataRetentionService {
     if (!batch) throw new RetentionBatchNotFoundError();
     const now = this.now();
     if (batch.status !== "previewed") this.refuseBatch(batch, actor, `batch_${batch.status}`, new RetentionBatchConflictError(`batch_${batch.status}`));
+    if (batch.approvedAt) this.refuseBatch(batch, actor, "batch_already_approved", new RetentionBatchConflictError("batch_already_approved"));
+    // L1: both outcome writes are conditional on "still previewed and unclaimed".
     if (batch.previewExpiresAt <= now) {
-      await this.deps.repository.updateBatch(batch.id, { status: "expired" });
+      await this.deps.repository.transitionFromPreview(batch.id, { status: "expired" });
       this.refuseBatch(batch, actor, "batch_expired", new RetentionBatchConflictError("batch_expired"));
     }
     if (!this.deps.featureFlags.isEnabled(PURGE_FLAG)) {
-      await this.deps.repository.updateBatch(batch.id, { status: "refused", approvedById: actor.actorId ?? null, approvalReason: parsed.reason });
+      if (!await this.deps.repository.transitionFromPreview(batch.id, { status: "refused", approvedById: actor.actorId ?? null, approvalReason: parsed.reason })) {
+        this.refuseBatch(batch, actor, "batch_already_approved", new RetentionBatchConflictError("batch_already_approved"));
+      }
       this.refuseBatch(batch, actor, "retention_purge_disabled", new RetentionPurgeDisabledError());
     }
+    // M2: the re-check runs before the claim, so a failure here leaves the batch approvable.
+    const eligible = await this.stillEligible(batch, now);
     if (!await this.deps.repository.claimForApproval(batch.id, actor.actorId ?? null, parsed.reason, now)) {
       this.refuseBatch(batch, actor, "batch_already_approved", new RetentionBatchConflictError("batch_already_approved"));
     }
@@ -195,18 +204,48 @@ export class DataRetentionService {
       context: { requestedById: batch.requestedById, sameActorAsRequester: batch.requestedById !== null && batch.requestedById === (actor.actorId ?? null) }
     });
 
-    const counts = await this.deps.anonymization.execute(batch, await this.stillEligible(batch, now), actor, now);
-    const executed = await this.deps.repository.updateBatch(batch.id, { status: "executed", counts, executedAt: this.now() });
+    // Filled as the execution progresses, so an interruption still records what was done.
+    const progress: RetentionCounts = {};
+    try {
+      await this.deps.anonymization.execute(batch, eligible, actor, now, progress);
+      const executed = await this.deps.repository.updateBatch(batch.id, { status: "executed", counts: progress, executedAt: this.now() });
+      this.deps.audit.write({
+        actor,
+        action: DataRetentionAuditActions.batchExecuted,
+        targetType: "AnonymizationBatch",
+        targetId: batch.id,
+        scope: { kind: batch.kind, countryId: batch.countryId },
+        result: "success",
+        context: { counts: this.auditCounts(progress) }
+      });
+      return this.toDto(executed, now);
+    } catch (error) {
+      return this.interrupt(batch, progress, actor, error, now);
+    }
+  }
+
+  /**
+   * M2: an execution that stops after the claim ends in the terminal `interrupted` state with the
+   * counts of what was done. Rows not reached stay un-anonymized and eligible for a new preview.
+   */
+  private async interrupt(batch: AnonymizationBatchRecord, progress: RetentionCounts, actor: ActorContext, error: unknown, now: Date): Promise<RetentionBatch> {
     this.deps.audit.write({
       actor,
       action: DataRetentionAuditActions.batchExecuted,
       targetType: "AnonymizationBatch",
       targetId: batch.id,
       scope: { kind: batch.kind, countryId: batch.countryId },
-      result: "success",
-      context: { counts: this.auditCounts(counts) }
+      result: "failed",
+      reason: "batch_interrupted",
+      context: { counts: this.auditCounts(progress), error: error instanceof Error ? error.name : "unknown" }
     });
-    return this.toDto(executed, now);
+    try {
+      return this.toDto(await this.deps.repository.updateBatch(batch.id, { status: "interrupted", counts: progress }), now);
+    } catch {
+      // Even unpersisted, the batch reads as interrupted: it is claimed (approvedAt) but not executed.
+      const current = await this.deps.repository.findBatch(batch.id).catch(() => undefined);
+      return this.toDto(current ?? { ...batch, status: "interrupted", counts: progress, approvedAt: now }, now);
+    }
   }
 
   async listBatches(actor: ActorContext): Promise<RetentionBatchListResponse> {
@@ -285,9 +324,16 @@ export class DataRetentionService {
     return eligible;
   }
 
-  private policiesResponse(policies: readonly RetentionPolicyRecord[], countryId?: string): RetentionPoliciesResponse {
+  private async countryOptions(): Promise<RetentionCountryOption[]> {
+    return (await this.deps.listCountries())
+      .map((country) => ({ id: country.id, isoCode: country.isoCode, name: country.name, status: country.status }))
+      .sort((left, right) => left.isoCode.localeCompare(right.isoCode));
+  }
+
+  private policiesResponse(policies: readonly RetentionPolicyRecord[], countryId: string | undefined, countries: RetentionCountryOption[]): RetentionPoliciesResponse {
     return {
       countryId: countryId ?? null,
+      countries,
       purgeEnabled: this.deps.featureFlags.isEnabled(PURGE_FLAG),
       items: RETENTION_CATEGORIES.map((category) => {
         const effective = resolveRetentionPolicy(category, countryId ?? null, policies);
@@ -313,8 +359,7 @@ export class DataRetentionService {
     return {
       id: batch.id,
       kind: batch.kind,
-      // A preview past its 24 h window reads as expired even before an approval attempt persists it.
-      status: batch.status === "previewed" && batch.previewExpiresAt <= now ? "expired" : batch.status,
+      status: this.effectiveStatus(batch, now),
       countryId: batch.countryId,
       categories: batch.categories,
       erasureLookup: batch.erasureLookup,
@@ -330,6 +375,21 @@ export class DataRetentionService {
       executedAt: batch.executedAt?.toISOString() ?? null,
       createdAt: batch.createdAt.toISOString()
     };
+  }
+
+  /**
+   * A claimed batch that never reached `executed` is interrupted (M2), never previewed nor expired;
+   * an unclaimed preview past its 24 h window reads as expired before an approval attempt persists it.
+   */
+  private effectiveStatus(batch: AnonymizationBatchRecord, now: Date): RetentionBatch["status"] {
+    if (batch.approvedAt && !batch.executedAt && batch.status !== "refused") return "interrupted";
+    if (batch.status === "previewed" && batch.previewExpiresAt <= now) return "expired";
+    return batch.status;
+  }
+
+  /** L2: lets the HTTP layer run the audited access check before it parses a body or a path parameter. */
+  authorize(actor: ActorContext, mode: "read" | "write"): void {
+    this.assertAccess(actor, mode, mode === "write" ? "AnonymizationBatch" : "RetentionPolicy");
   }
 
   private auditCounts(counts: RetentionCounts): Record<string, unknown> {
