@@ -1,7 +1,11 @@
+import { Icon, type IconName } from "./icons";
+
 export interface RadioCardOption {
   value: string;
   label: string;
   description?: string;
+  /** Optional glyph shown in a soft tile on the left of the card. */
+  icon?: IconName;
 }
 
 export interface RadioCardsProps {
@@ -22,6 +26,11 @@ export function RadioCards({ name, legend, options, defaultValue, required }: Ra
         {visible.map((option) => (
           <label className="am-radiocard" key={option.value}>
             <input type="radio" name={name} value={option.value} defaultChecked={defaultValue === option.value} required={required} />
+            {option.icon ? (
+              <span className="am-radiocard__icon" aria-hidden="true">
+                <Icon name={option.icon} size={20} />
+              </span>
+            ) : null}
             <span className="am-radiocard__body">
               <span className="am-radiocard__label">{option.label}</span>
               {option.description ? <span className="am-radiocard__description">{option.description}</span> : null}

@@ -1,6 +1,6 @@
 import type { BrokerAiInteraction } from "../../../lib/broker-api";
 import { requestLeadAiAction, validateLeadAiAction } from "../../../lib/crm-ai-actions";
-import { Badge, Card } from "../../../lib/ui/broker-ui";
+import { Badge, Button, Card, Cluster, Notice, Stack } from "../../../lib/ui/broker-ui";
 
 const ASSIST_LABELS: Record<string, string> = {
   lead_summary: "Resume du lead",
@@ -36,51 +36,50 @@ export function LeadAiPanel({ leadAssignmentId, enabled, availableAssistTypes, i
   if (assistTypes.length === 0) return null;
 
   return (
-    <Card plain>
-      <h2 className="section-title">Assistance IA d'aide a la comprehension</h2>
-      <p className="page-description">
+    <Card title="Assistance IA d'aide a la comprehension">
+      <p>
         Suggestions IA a valider: le courtier decide, aucune decision automatique sur le lead, donnees de contact jamais transmises au modele.
       </p>
-      {notice && NOTICES[notice] ? <p role="status">{NOTICES[notice]}</p> : null}
-      <div className="inline-cluster">
+      {notice && NOTICES[notice] ? <Notice tone={notice === "error" ? "danger" : "info"}>{NOTICES[notice]}</Notice> : null}
+      <Cluster>
         {assistTypes.map((assistType) => (
           <form key={assistType} action={requestLeadAiAction}>
             <input type="hidden" name="leadAssignmentId" value={leadAssignmentId} />
             <input type="hidden" name="assistType" value={assistType} />
-            <button type="submit" className="button button--secondary">{ASSIST_LABELS[assistType]}</button>
+            <Button type="submit" variant="secondary" size="sm">{ASSIST_LABELS[assistType]}</Button>
           </form>
         ))}
-      </div>
+      </Cluster>
       {interactions.length === 0 ? (
-        <p className="page-description">Aucune suggestion IA pour ce lead.</p>
+        <p>Aucune suggestion IA pour ce lead.</p>
       ) : (
-        <ul className="simple-list">
+        <Stack>
           {interactions.map((interaction) => (
-            <li key={interaction.id}>
-              <div className="inline-cluster">
+            <Card key={interaction.id} muted>
+              <Cluster>
                 <strong>{ASSIST_LABELS[interaction.assistType] ?? interaction.assistType}</strong>
                 <Badge tone={statusTone(interaction.status)}>{interaction.status}</Badge>
                 {interaction.fallback ? <Badge tone="neutral">mode simplifie</Badge> : null}
                 {interaction.humanValidationStatus !== "not_required" ? <Badge tone={interaction.humanValidationStatus === "pending" ? "warning" : "info"}>validation: {interaction.humanValidationStatus}</Badge> : null}
-              </div>
+              </Cluster>
               {interaction.status === "completed" && interaction.outputText ? <p>{interaction.outputText}</p> : null}
-              {interaction.status === "refused" ? <p className="page-description">Suggestion retenue par les garde-fous ou assistance desactivee ({interaction.refusalReason ?? "refus"}).</p> : null}
-              {interaction.status === "queued" ? <p className="page-description">Suggestion en cours de preparation.</p> : null}
+              {interaction.status === "refused" ? <p>Suggestion retenue par les garde-fous ou assistance desactivee ({interaction.refusalReason ?? "refus"}).</p> : null}
+              {interaction.status === "queued" ? <p>Suggestion en cours de preparation.</p> : null}
               {interaction.status === "completed" && interaction.humanValidationStatus === "pending" ? (
-                <div className="inline-cluster">
+                <Cluster>
                   {(["approved", "rejected"] as const).map((decision) => (
                     <form key={decision} action={validateLeadAiAction}>
                       <input type="hidden" name="leadAssignmentId" value={leadAssignmentId} />
                       <input type="hidden" name="interactionId" value={interaction.id} />
                       <input type="hidden" name="decision" value={decision} />
-                      <button type="submit" className="button button--secondary">{decision === "approved" ? "Valider la suggestion" : "Ecarter la suggestion"}</button>
+                      <Button type="submit" variant="secondary" size="sm">{decision === "approved" ? "Valider la suggestion" : "Ecarter la suggestion"}</Button>
                     </form>
                   ))}
-                </div>
+                </Cluster>
               ) : null}
-            </li>
+            </Card>
           ))}
-        </ul>
+        </Stack>
       )}
     </Card>
   );

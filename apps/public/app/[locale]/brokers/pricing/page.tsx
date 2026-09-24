@@ -9,6 +9,7 @@ import { EmptyState } from "../../../components/ui/empty-state";
 import { Hero } from "../../../components/ui/hero";
 import { Notice } from "../../../components/ui/notice";
 import { Section } from "../../../components/ui/section";
+import { Reveal } from "../../../components/motion/reveal";
 import { billableLeadCriteria, brokerPlan, type BrokerPlanKey } from "../../../content/brokers";
 import { formatMoney } from "../../../lib/country-format";
 import { listPartnerPlans } from "../../../lib/public-api";
@@ -69,44 +70,47 @@ export default async function BrokerPricingPage({
 
   return (
     <>
-      <div className="am-container">
-        <Breadcrumb
-          label={common("breadcrumbLabel")}
-          items={[
-            { name: common("home"), url: localeUrl(locale, "/") },
-            { name: t("breadcrumb"), url: localeUrl(locale, "/brokers/pricing") }
-          ]}
-        />
-      </div>
-
-      <Hero title={t("title")} lead={t("lead")} />
+      <Hero
+        title={t("title")}
+        lead={t("lead")}
+        breadcrumb={
+          <Breadcrumb
+            label={common("breadcrumbLabel")}
+            items={[
+              { name: common("home"), url: localeUrl(locale, "/") },
+              { name: t("breadcrumb"), url: localeUrl(locale, "/brokers/pricing") }
+            ]}
+          />
+        }
+      />
 
       {eligibleCountries.length > 0 ? (
-        <Section>
+        <Section spacing="compact">
           {/* A plain GET form posting back to this same page with ?pays=XX: no client JavaScript needed. */}
-          <form className="am-countryselect" method="get">
-            <label className="am-countryselect__label" htmlFor="am-pricing-country">
+          <form className="am-pricepill" method="get">
+            <label className="am-pricepill__label" htmlFor="am-pricing-country">
               {t("countrySelector.label")}
             </label>
-            <select id="am-pricing-country" name="pays" defaultValue={selected}>
+            <select id="am-pricing-country" className="am-field__control" name="pays" defaultValue={selected}>
               {eligibleCountries.map((country) => (
                 <option key={country.isoCode} value={country.isoCode}>
                   {country.name}
                 </option>
               ))}
             </select>
-            <Button type="submit" variant="secondary">
+            <Button type="submit" variant="secondary" size="sm">
               {t("countrySelector.submit")}
             </Button>
           </form>
         </Section>
       ) : null}
 
-      <Section>
+      {/* The title is what stops the page skipping from the hero's h1 straight to the plan cards' h3. */}
+      <Section title={t("plansTitle")}>
         {eligibleCountries.length === 0 || noPrices ? (
           <EmptyState title={t("empty.title")} description={t("empty.description")} action={contactAction} />
         ) : (
-          <div className="am-pricing-grid">
+          <Reveal as="ul" stagger className="am-pricing-grid">
             {PLAN_ORDER.map((key) => {
               const planContent = brokerPlan(locale, key);
               if (!planContent) return null;
@@ -116,6 +120,7 @@ export default async function BrokerPricingPage({
                   key={key}
                   planName={planContent.name}
                   positioning={planContent.positioning}
+                  highlighted={key === "pro"}
                   labels={{
                     monthlySubscription: t("pricing.monthlySubscription"),
                     perLead: t("pricing.perLead"),
@@ -132,7 +137,7 @@ export default async function BrokerPricingPage({
                 />
               );
             })}
-          </div>
+          </Reveal>
         )}
 
         <Notice tone="indicative">{t("notice")}</Notice>
@@ -143,9 +148,11 @@ export default async function BrokerPricingPage({
         ) : null}
       </Section>
 
-      <Section title={t("criteria.title")} lead={t("criteria.lead")} tone="muted">
-        <BillableCriteriaList criteria={billableLeadCriteria(locale)} label={t("criteria.title")} />
-      </Section>
+      <Reveal as="div">
+        <Section title={t("criteria.title")} lead={t("criteria.lead")} tone="muted">
+          <BillableCriteriaList criteria={billableLeadCriteria(locale)} />
+        </Section>
+      </Reveal>
     </>
   );
 }

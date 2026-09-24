@@ -1,13 +1,16 @@
 import type { ComponentProps, ReactNode } from "react";
 import { Link } from "../../../i18n/navigation";
+import { Icon } from "./icons";
 
-export type ButtonVariant = "primary" | "secondary" | "tertiary" | "whatsapp";
+export type ButtonVariant = "primary" | "secondary" | "tertiary" | "ghost" | "whatsapp";
+export type ButtonSize = "sm" | "md" | "lg";
 
 type LinkHref = ComponentProps<typeof Link>["href"];
 
 export interface ButtonProps {
   children: ReactNode;
   variant?: ButtonVariant;
+  size?: ButtonSize;
   /** Internal route (typed href of the i18n Link) or an absolute external URL. */
   href?: LinkHref;
   externalHref?: string;
@@ -16,6 +19,15 @@ export interface ButtonProps {
   iconAfter?: ReactNode;
   fullWidth?: boolean;
   disabled?: boolean;
+  /** Square button; `children` stays as the accessible name and is hidden visually. */
+  iconOnly?: boolean;
+  /** Swaps the leading icon for a spinner and blocks the click. */
+  loading?: boolean;
+  /**
+   * Only honoured on the `<button>` rendering (no `href`/`externalHref`): a link navigates, it does
+   * not run a handler. Lets a client form use the primitive instead of hand-rolling `.am-button`.
+   */
+  onClick?: ComponentProps<"button">["onClick"];
   name?: string;
   value?: string;
   form?: string;
@@ -34,6 +46,7 @@ export function Button(props: ButtonProps) {
   const {
     children,
     variant = "primary",
+    size = "md",
     href,
     externalHref,
     type = "button",
@@ -41,15 +54,34 @@ export function Button(props: ButtonProps) {
     iconAfter,
     fullWidth,
     disabled,
+    iconOnly,
+    loading,
+    onClick,
     className,
     ...rest
   } = props;
 
   const classes = className ? `am-button ${className}` : "am-button";
+  const flags = {
+    "data-variant": variant,
+    ...(size !== "md" ? { "data-size": size } : {}),
+    ...(fullWidth ? { "data-full": "true" as const } : {}),
+    ...(iconOnly ? { "data-icon-only": "true" as const } : {}),
+    ...(loading ? { "data-loading": "true" as const } : {})
+  };
+
+  const leading = loading ? (
+    <span className="am-button__spinner">
+      <Icon name="loader" size={size === "sm" ? 16 : 20} />
+    </span>
+  ) : (
+    icon
+  );
+
   const body = (
     <>
-      {icon}
-      <span>{children}</span>
+      {leading}
+      <span className={iconOnly ? "am-visually-hidden" : undefined}>{children}</span>
       {iconAfter}
     </>
   );
@@ -58,8 +90,7 @@ export function Button(props: ButtonProps) {
     return (
       <a
         className={classes}
-        data-variant={variant}
-        data-full={fullWidth ? "true" : undefined}
+        {...flags}
         href={externalHref}
         rel={rest.rel ?? (rest.target === "_blank" ? "noreferrer noopener" : undefined)}
         target={rest.target}
@@ -73,14 +104,7 @@ export function Button(props: ButtonProps) {
 
   if (href) {
     return (
-      <Link
-        className={classes}
-        data-variant={variant}
-        data-full={fullWidth ? "true" : undefined}
-        href={href}
-        title={rest.title}
-        aria-label={rest["aria-label"]}
-      >
+      <Link className={classes} {...flags} href={href} title={rest.title} aria-label={rest["aria-label"]}>
         {body}
       </Link>
     );
@@ -89,10 +113,11 @@ export function Button(props: ButtonProps) {
   return (
     <button
       className={classes}
-      data-variant={variant}
-      data-full={fullWidth ? "true" : undefined}
+      {...flags}
       type={type}
-      disabled={disabled}
+      onClick={onClick}
+      disabled={disabled || loading}
+      aria-busy={loading ? true : undefined}
       name={rest.name}
       value={rest.value}
       form={rest.form}

@@ -1,4 +1,15 @@
+/*
+ * Import order matters:
+ *  1. tokens  - the shared socle plus the public extensions.
+ *  2. base    - reset, typography, focus, layout utilities.
+ *  3. motion  - keyframes and the [data-reveal] contract.
+ *  4. components - the .am-* primitives (the legacy .pub-* layer has been deleted: unused).
+ *  5. chrome  - header, mobile menu, footer, local contact band.
+ * Page-specific sheets (styles/pages/*.css, styles/brokers.css) are imported by their own
+ * page/layout module, which puts them after this file in the cascade.
+ */
 @import "./styles/tokens.css";
 @import "./styles/base.css";
+@import "./styles/motion.css";
 @import "./styles/components.css";
-@import "./styles/pages.css";
+@import "./styles/chrome.css";

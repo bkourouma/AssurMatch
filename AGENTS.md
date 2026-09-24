@@ -164,6 +164,17 @@ Stop local services without deleting volumes:
 cmd /c stop-local.bat
 ```
 
+When the default ports are taken or a second, isolated stack is needed, use the `run-all-apps`
+skill (`.claude/skills/run-all-apps`): it runs the same launcher on 47600-47603 (infrastructure on
+47632 / 47679 / 47025 / 47825) in its own Compose project `assurmatch-alt` and log directory
+`.local/logs-alt`. Next allows one `next dev` per app directory (`apps/<app>/.next/dev/lock`), so the
+default stack and the alternate one cannot run from the same checkout at the same time; use a git
+worktree for a true second stack. Every port, the Compose project and the log directory of `launch-local.ps1` /
+`stop-local.ps1` can be overridden through `ASSURMATCH_LOCAL_*_PORT`, `ASSURMATCH_POSTGRES_PORT`,
+`ASSURMATCH_REDIS_PORT`, `ASSURMATCH_MAILPIT_*_PORT`, `ASSURMATCH_COMPOSE_PROJECT` and
+`ASSURMATCH_LOCAL_LOG_DIR`; `ASSURMATCH_LOCAL_DEMO_SEED=1` makes the launcher apply the broker demo
+seed before the servers start (the base seed alone leaves the comparator and quote journey empty).
+
 The broker back-office remains a separate authenticated app and must not be merged with the public web app.
 
 ## Validation expectations

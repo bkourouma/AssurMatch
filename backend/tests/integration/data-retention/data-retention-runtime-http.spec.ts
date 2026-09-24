@@ -73,6 +73,8 @@ describe("data retention runtime HTTP (spec 046)", () => {
     expect(refusedBatch.totalSelected).toBe(1);
     const flagOff = await post(active, `/admin/retention/batches/${refusedBatch.id}/approve`, compliance, { reason: "Validation conformite" });
     expect(flagOff.status).toBe(422);
+    // Error codes come from the shared ErrorResponseFilter: the flag-off refusal reads as a disabled feature.
+    expect(await readJson(flagOff)).toMatchObject({ code: "FEATURE_DISABLED" });
     expect(quote.payload).not.toEqual({ anonymized: true });
 
     await active.runtime.featureFlags.service.applyCompliancePolicy({ key: "retention_purge_enabled", scopeType: "global", value: true, reason: "retention runtime test" }, superAdmin, { reference: "TEST-RETENTION-046", approvedBy: "compliance" });
@@ -99,7 +101,9 @@ describe("data retention runtime HTTP (spec 046)", () => {
     expect(list).toMatchObject({ purgeEnabled: true });
     expect(list.items.map((batch) => batch.status)).toEqual(["executed", "refused"]);
     expect((await active.request(`/admin/retention/batches/${preview.id}`, { headers: actorHeaders(compliance) })).status).toBe(200);
-    expect((await active.request(`/admin/retention/batches/${crypto.randomUUID()}`, { headers: actorHeaders(compliance) })).status).toBe(404);
+    const missing = await active.request(`/admin/retention/batches/${crypto.randomUUID()}`, { headers: actorHeaders(compliance) });
+    expect(missing.status).toBe(404);
+    expect(await readJson(missing)).toMatchObject({ code: "NOT_FOUND" });
     expect(active.runtime.audit.writer.search({ action: DataRetentionAuditActions.batchExecuted })).toHaveLength(1);
   });
 
@@ -115,7 +119,9 @@ describe("data retention runtime HTTP (spec 046)", () => {
     expect(text).not.toContain(VISITOR_EMAIL);
     expect(retentionBatchSchema.parse(JSON.parse(text))).toMatchObject({ kind: "erasure", erasureLookup: "email", totalSelected: 1 });
 
-    expect((await post(active, "/admin/retention/batches/erasure-preview", compliance, { email: VISITOR_EMAIL, publicReference: "AM-1", reason: "Demande d'effacement par courrier" })).status).toBe(400);
+    const ambiguous = await post(active, "/admin/retention/batches/erasure-preview", compliance, { email: VISITOR_EMAIL, publicReference: "AM-1", reason: "Demande d'effacement par courrier" });
+    expect(ambiguous.status).toBe(400);
+    expect(await readJson(ambiguous)).toMatchObject({ code: "VALIDATION_FAILED" });
     expect((await post(active, "/admin/retention/batches/preview", compliance, { reason: "Motif avec contact@example.com" })).status).toBe(400);
 
     for (const actor of [

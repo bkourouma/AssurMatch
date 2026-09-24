@@ -31,7 +31,7 @@ test("retention page shows the flag-off notice and the two-step workflow", () =>
   expect(page).toContain("Durees de conservation");
   expect(page).toContain("Previsualiser un lot de retention");
   expect(page).toContain("Previsualiser un effacement sur demande");
-  expect(page).toContain("Lots d&apos;anonymisation");
+  expect(page).toContain(`title="Lots d'anonymisation"`);
   expect(page).toContain("action={approveBatch}");
   expect(page).toContain("n'est ni enregistree sur le lot ni affichee");
 });

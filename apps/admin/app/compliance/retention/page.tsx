@@ -7,7 +7,30 @@ import {
   type RetentionSubjectKey
 } from "../../lib/admin-api";
 import { approveBatch, previewErasure, previewRetention, removePolicyOverride, savePolicyOverride } from "../../lib/retention-actions";
-import { Badge, Card, DataTable, KpiCard, PageHeader, StateMessage, type Tone } from "../../lib/ui/admin-ui";
+import {
+  Badge,
+  Button,
+  Card,
+  CheckboxGroup,
+  DataTable,
+  Field,
+  FilterBar,
+  Form,
+  FormActions,
+  Grid,
+  Input,
+  KpiCard,
+  PageHeader,
+  PageStack,
+  RadioGroup,
+  Select,
+  Stack,
+  StateMessage,
+  fieldControlProps,
+  type DataTableColumn,
+  type NoticeTone,
+  type Tone
+} from "../../lib/ui/admin-ui";
 
 /**
  * Spec 046 (FR-012, D2, D3): retention policies, previews and approvals. The API returns
@@ -16,7 +39,7 @@ import { Badge, Card, DataTable, KpiCard, PageHeader, StateMessage, type Tone } 
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-const RETENTION_NOTICES: Record<string, { tone: Tone; text: string }> = {
+const RETENTION_NOTICES: Record<string, { tone: NoticeTone; text: string }> = {
   policy_saved: { tone: "info", text: "Duree de conservation enregistree et auditee." },
   policy_removed: { tone: "info", text: "Surcharge retiree: le niveau suivant (pays, global puis defaut) s'applique de nouveau." },
   preview_created: { tone: "info", text: "Previsualisation creee: aucune donnee n'a ete modifiee. Verifiez les comptes puis approuvez le lot avant son expiration." },
@@ -101,201 +124,286 @@ export default async function DataRetentionPage({ searchParams }: { searchParams
   const countryOptions = policies.data.countries ?? [];
   const countries = new Map(countryOptions.map((country) => [country.id, country.isoCode]));
   const countryLabel = (id: string | null) => (id ? countries.get(id) ?? id.slice(0, 8) : "Global");
-  const countrySelectOptions = countryOptions.map((country) => (
-    <option key={country.id} value={country.id}>{`${country.isoCode} - ${country.name}`}</option>
-  ));
+  const countrySelectOptions = countryOptions.map((country) => ({ value: country.id, label: `${country.isoCode} - ${country.name}` }));
   const purgeEnabled = policies.status === "success" ? policies.data.purgeEnabled : batches.data.purgeEnabled;
   const loaded = policies.status === "success" || batches.status === "success";
   const batchItems = batches.status === "success" ? batches.data.items : [];
   const openBatches = batchItems.filter((batch) => isApprovable(batch, now)).length;
 
+  const policyColumns: Array<DataTableColumn<RetentionPolicyItemData>> = [
+    { key: "category", header: "Categorie", render: (item) => <strong>{CATEGORY_LABELS[item.category]}</strong> },
+    { key: "duration", header: "Duree", render: (item) => `${item.retentionDays} jours`, numeric: true },
+    { key: "source", header: "Source", render: (item) => <Badge tone={SOURCE_LABELS[item.source].tone}>{SOURCE_LABELS[item.source].label}</Badge> },
+    { key: "anchor", header: "Point de depart", render: (item) => ANCHOR_LABELS[item.anchor] },
+    {
+      key: "levels",
+      header: "Niveaux",
+      render: (item) => `defaut ${item.defaultRetentionDays} / global ${item.globalRetentionDays ?? "-"} / pays ${item.countryRetentionDays ?? "-"}`
+    },
+    {
+      key: "lastOverride",
+      header: "Derniere surcharge",
+      render: (item) =>
+        item.overrideUpdatedAt ? <span className="bo-break">{`${formatDate(item.overrideUpdatedAt)} - ${item.overrideReason ?? ""}`}</span> : "-"
+    },
+    {
+      key: "override",
+      header: countryId ? "Surcharge pays" : "Surcharge globale",
+      render: (item) => {
+        const current = countryId ? item.countryRetentionDays : item.globalRetentionDays;
+        const daysId = `retention-days-${item.category}`;
+        const reasonId = `retention-reason-${item.category}`;
+        return (
+          <Form action={savePolicyOverride}>
+            <input type="hidden" name="category" value={item.category} />
+            {countryId ? <input type="hidden" name="countryId" value={countryId} /> : null}
+            <Field id={daysId} label="Jours" required>
+              <Input
+                {...fieldControlProps(daysId, { required: true })}
+                name="retentionDays"
+                type="number"
+                min={30}
+                max={3650}
+                step={1}
+                defaultValue={current ?? item.retentionDays}
+              />
+            </Field>
+            <Field id={reasonId} label="Motif" required>
+              <Input {...fieldControlProps(reasonId, { required: true })} name="reason" minLength={8} maxLength={500} placeholder="Motif de la modification" />
+            </Field>
+            <FormActions align="start">
+              <Button type="submit" variant="secondary" size="sm">Enregistrer</Button>
+              {current !== null ? (
+                <Button type="submit" formAction={removePolicyOverride} variant="tertiary" size="sm">Retirer la surcharge</Button>
+              ) : null}
+            </FormActions>
+          </Form>
+        );
+      }
+    }
+  ];
+
+  const batchColumns: Array<DataTableColumn<RetentionBatchData>> = [
+    {
+      key: "kind",
+      header: "Type",
+      render: (batch) => (batch.kind === "erasure" ? `Effacement (${batch.erasureLookup === "email" ? "par e-mail" : "par reference"})` : "Retention")
+    },
+    {
+      key: "status",
+      header: "Statut",
+      render: (batch) => (
+        <Stack>
+          {statusBadge(batch.status)}
+          {PARTIAL_STATUSES.has(batch.status) ? (
+            <span>Execution arretee: les comptes montrent ce qui a ete fait; une nouvelle previsualisation est necessaire pour le reste.</span>
+          ) : null}
+        </Stack>
+      )
+    },
+    { key: "scope", header: "Portee", render: (batch) => (batch.kind === "erasure" ? "Personne" : countryLabel(batch.countryId)) },
+    {
+      key: "counts",
+      header: "Comptes par categorie",
+      render: (batch) =>
+        batch.counts.length === 0 ? (
+          "Aucune donnee"
+        ) : (
+          <ul className="bo-list">
+            {batch.counts.map((count) => (
+              <li key={count.subject}>
+                {CATEGORY_LABELS[count.subject]}: {count.selected} selectionnes
+                {batch.status === "executed" || PARTIAL_STATUSES.has(batch.status)
+                  ? `, ${count.anonymized} anonymises, ${count.skipped} ignores, ${count.failed} en echec`
+                  : ""}
+                {count.moreRemaining ? " (reste a traiter)" : ""}
+              </li>
+            ))}
+          </ul>
+        )
+    },
+    { key: "total", header: "Total", render: (batch) => batch.totalSelected, numeric: true },
+    { key: "remaining", header: "Reste", render: (batch) => (batch.moreRemaining ? <Badge tone="warning">Nouveau lot necessaire</Badge> : "Non") },
+    { key: "createdAt", header: "Cree", render: (batch) => formatDate(batch.createdAt) },
+    {
+      key: "deadline",
+      header: "Expiration / execution",
+      render: (batch) => (batch.status === "previewed" ? formatDate(batch.previewExpiresAt) : formatDate(batch.executedAt ?? batch.approvedAt))
+    },
+    { key: "reason", header: "Motif", render: (batch) => <span className="bo-break">{batch.approvalReason ?? batch.reason}</span> },
+    {
+      key: "approval",
+      header: "Approbation",
+      render: (batch) => {
+        if (isApprovable(batch, now)) {
+          const reasonId = `retention-approve-${batch.id}`;
+          return (
+            <Form action={approveBatch}>
+              <input type="hidden" name="batchId" value={batch.id} />
+              <Field id={reasonId} label="Motif" required>
+                <Input {...fieldControlProps(reasonId, { required: true })} name="reason" minLength={8} maxLength={500} placeholder="Motif de l'approbation" />
+              </Field>
+              <FormActions align="start">
+                <Button type="submit" variant="danger" size="sm">Approuver et anonymiser</Button>
+              </FormActions>
+            </Form>
+          );
+        }
+        return batch.status === "previewed" ? "Expire: nouvelle previsualisation necessaire" : "-";
+      }
+    }
+  ];
+
   return (
-    <div className="page-stack">
+    <PageStack>
       <PageHeader
+        breadcrumb={[{ label: "Pilotage" }, { label: "Conformite", href: "/compliance" }, { label: "Conservation des donnees" }]}
         kicker="Conformite"
         title="Conservation et anonymisation"
         description="Durees de conservation par categorie, previsualisation des lots d'anonymisation et effacement sur demande. Chaque lot est d'abord previsualise, puis approuve manuellement avec un motif: aucune purge automatique."
-        actions={<a className="button button--secondary" href="/compliance">Retour conformite</a>}
+        actions={<Button href="/compliance" variant="secondary">Retour conformite</Button>}
       />
 
       {policies.unauthenticated || batches.unauthenticated ? <StateMessage tone="danger">Session admin requise.</StateMessage> : null}
-      {policies.forbidden || batches.forbidden ? <StateMessage tone="danger">Acces refuse: MFA verifiee et role de conformite requis pour la retention.</StateMessage> : null}
-      {policies.status === "error" || batches.status === "error" ? <StateMessage tone="danger">Retention indisponible: {policies.error ?? batches.error}</StateMessage> : null}
+      {policies.forbidden || batches.forbidden ? (
+        <StateMessage tone="danger">Acces refuse: MFA verifiee et role de conformite requis pour la retention.</StateMessage>
+      ) : null}
+      {policies.status === "error" || batches.status === "error" ? (
+        <StateMessage tone="danger">Retention indisponible: {policies.error ?? batches.error}</StateMessage>
+      ) : null}
       {notice ? <StateMessage tone={notice.tone}>{notice.text}</StateMessage> : null}
 
       {loaded && !purgeEnabled ? (
         <div data-retention-marker="purge-disabled-notice">
           <StateMessage tone="warning" title="Purge desactivee (retention_purge_enabled)">
             Mode previsualisation uniquement: les durees se reglent et les lots se previsualisent, mais toute approbation est refusee et le lot est
-            alors marque refuse. Une fois le flag active par la procedure de conformite, lancez une nouvelle previsualisation avant d'approuver.
+            alors marque refuse. Une fois le flag active par la procedure de conformite, lancez une nouvelle previsualisation avant d&apos;approuver.
           </StateMessage>
         </div>
       ) : null}
 
       {loaded ? (
         <>
-          <section className="admin-grid admin-grid--kpi" aria-label="Synthese retention">
+          <Grid columns="kpi" as="section" aria-label="Synthese retention">
             <KpiCard label="Purge" value={purgeEnabled ? "Active" : "Desactivee"} tone={purgeEnabled ? "warning" : "disabled"} helper="retention_purge_enabled" />
             <KpiCard label="Lots a approuver" value={openBatches} tone={openBatches > 0 ? "info" : "neutral"} helper="Previsualises, non expires" />
             <KpiCard label="Lots recents" value={batchItems.length} helper="50 derniers lots" />
-          </section>
+          </Grid>
 
-          <Card>
-            <h2 className="section-title">Durees de conservation</h2>
-            <form method="get" className="admin-grid">
-              <label>Portee
-                <select name="countryId" defaultValue={countryId ?? ""}>
-                  <option value="">Global</option>
-                  {countrySelectOptions}
-                </select>
-              </label>
-              <button type="submit" className="button button--secondary">Afficher</button>
-            </form>
-            <p className="page-description">
-              Portee affichee: <strong>{countryId ? `pays ${countryLabel(countryId)}` : "global"}</strong>. Priorite: surcharge pays, puis surcharge globale, puis
-              defaut. Bornes: 30 a 3650 jours.
-            </p>
-            <DataTable
-              columns={[
-                { header: "Categorie", render: (item) => <strong>{CATEGORY_LABELS[item.category]}</strong> },
-                { header: "Duree", render: (item) => `${item.retentionDays} jours` },
-                { header: "Source", render: (item) => <Badge tone={SOURCE_LABELS[item.source].tone}>{SOURCE_LABELS[item.source].label}</Badge> },
-                { header: "Point de depart", render: (item) => ANCHOR_LABELS[item.anchor] },
-                {
-                  header: "Niveaux",
-                  render: (item) => `defaut ${item.defaultRetentionDays} / global ${item.globalRetentionDays ?? "-"} / pays ${item.countryRetentionDays ?? "-"}`
-                },
-                { header: "Derniere surcharge", render: (item) => (item.overrideUpdatedAt ? `${formatDate(item.overrideUpdatedAt)} - ${item.overrideReason ?? ""}` : "-") },
-                {
-                  header: countryId ? "Surcharge pays" : "Surcharge globale",
-                  render: (item) => {
-                    const current = countryId ? item.countryRetentionDays : item.globalRetentionDays;
-                    return (
-                      <form action={savePolicyOverride} className="admin-grid">
-                        <input type="hidden" name="category" value={item.category} />
-                        {countryId ? <input type="hidden" name="countryId" value={countryId} /> : null}
-                        <label>Jours<input name="retentionDays" type="number" min={30} max={3650} step={1} defaultValue={current ?? item.retentionDays} required /></label>
-                        <label>Motif<input name="reason" minLength={8} maxLength={500} placeholder="Motif de la modification" required /></label>
-                        <button type="submit" className="button button--secondary">Enregistrer</button>
-                        {current !== null ? <button type="submit" formAction={removePolicyOverride} className="button button--secondary">Retirer la surcharge</button> : null}
-                      </form>
-                    );
-                  }
-                }
-              ]}
-              items={policies.data.items}
-              getKey={(item) => item.category}
-              emptyLabel="Aucune politique disponible."
-            />
+          <Card title="Durees de conservation" description="Priorite: surcharge pays, puis surcharge globale, puis defaut. Bornes: 30 a 3650 jours.">
+            <Stack>
+              <FilterBar
+                action="/compliance/retention"
+                label="Portee des durees de conservation"
+                submitLabel="Afficher"
+                resetLabel="Global"
+                resetHref="/compliance/retention"
+                activeCount={countryId ? 1 : 0}
+                autoSubmit
+              >
+                <Field id="retention-scope" label="Portee">
+                  <Select
+                    {...fieldControlProps("retention-scope")}
+                    name="countryId"
+                    defaultValue={countryId ?? ""}
+                    options={[{ value: "", label: "Global" }, ...countrySelectOptions]}
+                  />
+                </Field>
+              </FilterBar>
+              <p>
+                Portee affichee: <strong>{countryId ? `pays ${countryLabel(countryId)}` : "global"}</strong>.
+              </p>
+              <DataTable
+                columns={policyColumns}
+                items={policies.data.items}
+                getKey={(item) => item.category}
+                emptyLabel="Aucune politique disponible."
+                aria-label="Durees de conservation par categorie"
+              />
+            </Stack>
           </Card>
 
-          <section className="admin-grid admin-grid--two">
-            <Card>
-              <h2 className="section-title">Previsualiser un lot de retention</h2>
-              <p className="page-description">
-                Selectionne les donnees arrivees a echeance (500 au plus par categorie). Aucune donnee n'est modifiee a cette etape; le lot expire apres 24 heures.
-                Les webhooks et references de messagerie ne sont selectionnes que par une previsualisation globale.
-              </p>
-              <form action={previewRetention} className="admin-grid">
-                <label>Pays (optionnel)
-                  <select name="countryId" defaultValue="">
-                    <option value="">Tous les pays</option>
-                    {countrySelectOptions}
-                  </select>
-                </label>
-                <fieldset className="admin-grid">
-                  <legend>Categories (aucune cochee = toutes)</legend>
-                  {RETENTION_CATEGORY_KEYS.map((category) => (
-                    <label key={category}>
-                      <input type="checkbox" name="categories" value={category} /> {CATEGORY_LABELS[category]}
-                    </label>
-                  ))}
-                </fieldset>
-                <label>Motif<input name="reason" minLength={8} maxLength={500} placeholder="Motif de la previsualisation" required /></label>
-                <button type="submit" className="button button--secondary">Previsualiser</button>
-              </form>
+          <Grid columns="two">
+            <Card
+              title="Previsualiser un lot de retention"
+              description="Selectionne les donnees arrivees a echeance (500 au plus par categorie). Aucune donnee n'est modifiee a cette etape; le lot expire apres 24 heures. Les webhooks et references de messagerie ne sont selectionnes que par une previsualisation globale."
+            >
+              <Form action={previewRetention}>
+                <Field id="retention-preview-country" label="Pays (optionnel)">
+                  <Select
+                    {...fieldControlProps("retention-preview-country")}
+                    name="countryId"
+                    defaultValue=""
+                    options={[{ value: "", label: "Tous les pays" }, ...countrySelectOptions]}
+                  />
+                </Field>
+                <CheckboxGroup
+                  legend="Categories (aucune cochee = toutes)"
+                  name="categories"
+                  options={RETENTION_CATEGORY_KEYS.map((category) => ({ value: category, label: CATEGORY_LABELS[category] }))}
+                />
+                <Field id="retention-preview-reason" label="Motif" required>
+                  <Input
+                    {...fieldControlProps("retention-preview-reason", { required: true })}
+                    name="reason"
+                    minLength={8}
+                    maxLength={500}
+                    placeholder="Motif de la previsualisation"
+                  />
+                </Field>
+                <FormActions>
+                  <Button type="submit" variant="secondary">Previsualiser</Button>
+                </FormActions>
+              </Form>
             </Card>
 
-            <Card>
-              <h2 className="section-title">Previsualiser un effacement sur demande</h2>
-              <p className="page-description">
-                Pour une demande d'effacement recue par e-mail, telephone ou courrier. Les durees de conservation ne s'appliquent pas. L'adresse e-mail sert
-                uniquement a la recherche: elle n'est ni enregistree sur le lot ni affichee sur cette page. Ne recopiez ni e-mail ni telephone dans le motif.
-              </p>
-              <form action={previewErasure} className="admin-grid">
-                <fieldset className="admin-grid">
-                  <legend>Identifier la personne par</legend>
-                  <label><input type="radio" name="lookup" value="public_reference" defaultChecked /> Reference publique de la demande</label>
-                  <label><input type="radio" name="lookup" value="email" /> Adresse e-mail</label>
-                </fieldset>
-                <label>Reference ou e-mail<input name="identifier" autoComplete="off" maxLength={254} required /></label>
-                <label>Motif<input name="reason" minLength={8} maxLength={500} placeholder="Motif (sans e-mail ni telephone)" required /></label>
-                <button type="submit" className="button button--secondary">Previsualiser l&apos;effacement</button>
-              </form>
+            <Card
+              title="Previsualiser un effacement sur demande"
+              description="Pour une demande d'effacement recue par e-mail, telephone ou courrier. Les durees de conservation ne s'appliquent pas. L'adresse e-mail sert uniquement a la recherche: elle n'est ni enregistree sur le lot ni affichee sur cette page. Ne recopiez ni e-mail ni telephone dans le motif."
+            >
+              <Form action={previewErasure}>
+                <RadioGroup
+                  legend="Identifier la personne par"
+                  name="lookup"
+                  defaultValue="public_reference"
+                  options={[
+                    { value: "public_reference", label: "Reference publique de la demande" },
+                    { value: "email", label: "Adresse e-mail" }
+                  ]}
+                />
+                <Field id="retention-erasure-identifier" label="Reference ou e-mail" required>
+                  <Input {...fieldControlProps("retention-erasure-identifier", { required: true })} name="identifier" autoComplete="off" maxLength={254} />
+                </Field>
+                <Field id="retention-erasure-reason" label="Motif" required>
+                  <Input
+                    {...fieldControlProps("retention-erasure-reason", { required: true })}
+                    name="reason"
+                    minLength={8}
+                    maxLength={500}
+                    placeholder="Motif (sans e-mail ni telephone)"
+                  />
+                </Field>
+                <FormActions>
+                  <Button type="submit" variant="secondary">Previsualiser l&apos;effacement</Button>
+                </FormActions>
+              </Form>
             </Card>
-          </section>
+          </Grid>
 
-          <Card>
-            <h2 className="section-title">Lots d&apos;anonymisation</h2>
-            <p className="page-description">Comptes et metadonnees uniquement: aucun identifiant de personne n&apos;est affiche. Approuver un lot anonymise definitivement les donnees selectionnees.</p>
+          <Card
+            title="Lots d'anonymisation"
+            description="Comptes et metadonnees uniquement: aucun identifiant de personne n'est affiche. Approuver un lot anonymise definitivement les donnees selectionnees."
+          >
             <DataTable
-              columns={[
-                { header: "Type", render: (batch) => (batch.kind === "erasure" ? `Effacement (${batch.erasureLookup === "email" ? "par e-mail" : "par reference"})` : "Retention") },
-                {
-                  header: "Statut",
-                  render: (batch) => (
-                    <>
-                      {statusBadge(batch.status)}
-                      {PARTIAL_STATUSES.has(batch.status) ? <p className="page-description">Execution arretee: les comptes montrent ce qui a ete fait; une nouvelle previsualisation est necessaire pour le reste.</p> : null}
-                    </>
-                  )
-                },
-                { header: "Portee", render: (batch) => (batch.kind === "erasure" ? "Personne" : countryLabel(batch.countryId)) },
-                {
-                  header: "Comptes par categorie",
-                  render: (batch) =>
-                    batch.counts.length === 0 ? (
-                      "Aucune donnee"
-                    ) : (
-                      <ul className="simple-list">
-                        {batch.counts.map((count) => (
-                          <li key={count.subject}>
-                            {CATEGORY_LABELS[count.subject]}: {count.selected} selectionnes
-                            {batch.status === "executed" || PARTIAL_STATUSES.has(batch.status) ? `, ${count.anonymized} anonymises, ${count.skipped} ignores, ${count.failed} en echec` : ""}
-                            {count.moreRemaining ? " (reste a traiter)" : ""}
-                          </li>
-                        ))}
-                      </ul>
-                    )
-                },
-                { header: "Total", render: (batch) => batch.totalSelected },
-                { header: "Reste", render: (batch) => (batch.moreRemaining ? <Badge tone="warning">Nouveau lot necessaire</Badge> : "Non") },
-                { header: "Cree", render: (batch) => formatDate(batch.createdAt) },
-                { header: "Expiration / execution", render: (batch) => (batch.status === "previewed" ? formatDate(batch.previewExpiresAt) : formatDate(batch.executedAt ?? batch.approvedAt)) },
-                { header: "Motif", render: (batch) => batch.approvalReason ?? batch.reason },
-                {
-                  header: "Approbation",
-                  render: (batch) =>
-                    isApprovable(batch, now) ? (
-                      <form action={approveBatch} className="admin-grid">
-                        <input type="hidden" name="batchId" value={batch.id} />
-                        <label>Motif<input name="reason" minLength={8} maxLength={500} placeholder="Motif de l'approbation" required /></label>
-                        <button type="submit" className="button button--secondary">Approuver et anonymiser</button>
-                      </form>
-                    ) : batch.status === "previewed" ? (
-                      "Expire: nouvelle previsualisation necessaire"
-                    ) : (
-                      "-"
-                    )
-                }
-              ]}
+              columns={batchColumns}
               items={batchItems}
               getKey={(batch) => batch.id}
               emptyLabel="Aucun lot previsualise."
+              aria-label="Lots d'anonymisation"
             />
           </Card>
         </>
       ) : null}
-    </div>
+    </PageStack>
   );
 }

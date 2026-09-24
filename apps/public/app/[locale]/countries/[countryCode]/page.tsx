@@ -3,6 +3,8 @@ import { getTranslations, setRequestLocale } from "next-intl/server";
 import { Link } from "../../../../i18n/navigation";
 import { toLocale, type AppLocale } from "../../../../i18n/routing";
 import { WaitlistForm, type WaitlistProductOption } from "../../../components/forms/waitlist-form";
+import { CountryFlag } from "../../../components/journey/country-flag";
+import { productIcon } from "../../../components/journey/product-icon";
 import { PlatformStatusNotice } from "../../../components/site/platform-status-notice";
 import { BackendText } from "../../../components/ui/backend-text";
 import { Badge } from "../../../components/ui/badge";
@@ -12,7 +14,9 @@ import { Button } from "../../../components/ui/button";
 import { EmptyState } from "../../../components/ui/empty-state";
 import { Hero } from "../../../components/ui/hero";
 import { Icon } from "../../../components/ui/icons";
+import { IconTile } from "../../../components/ui/icon-tile";
 import { Notice } from "../../../components/ui/notice";
+import { Reveal } from "../../../components/motion/reveal";
 import { Section } from "../../../components/ui/section";
 import { WhatsAppButton } from "../../../components/ui/whatsapp-button";
 import {
@@ -91,19 +95,58 @@ interface VariantProps {
   countryCode: string;
 }
 
+/** Rendered through the hero's `breadcrumb` slot, so the trail sits inside the opening band. */
 async function CountryBreadcrumb({ locale, country, countryCode }: VariantProps) {
   const common = await getTranslations({ locale, namespace: "Common" });
   const countries = await getTranslations({ locale, namespace: "Countries" });
   return (
-    <div className="am-container">
-      <Breadcrumb
-        label={common("breadcrumbLabel")}
-        items={[
-          { name: common("home"), url: localeUrl(locale, "/") },
-          { name: countries("breadcrumb"), url: localeUrl(locale, "/countries") },
-          { name: country.name, url: localeUrl(locale, "/countries/[countryCode]", { countryCode }) }
-        ]}
-      />
+    <Breadcrumb
+      label={common("breadcrumbLabel")}
+      items={[
+        { name: common("home"), url: localeUrl(locale, "/") },
+        { name: countries("breadcrumb"), url: localeUrl(locale, "/countries") },
+        { name: country.name, url: localeUrl(locale, "/countries/[countryCode]", { countryCode }) }
+      ]}
+    />
+  );
+}
+
+/** Flag, name, availability and what the country is open for: the hero's second column. */
+async function CountryIdentityCard({ locale, country }: { locale: AppLocale; country: PublicCountryDirectoryItem }) {
+  const countries = await getTranslations({ locale, namespace: "Countries" });
+  const tone = country.availability === "pilot" ? "pilot" : country.availability === "waitlist" ? "soon" : "new";
+
+  return (
+    <div className="am-j-countrycard">
+      <div className="am-j-countrycard__head">
+        <CountryFlag isoCode={country.isoCode} size="lg" />
+        <div>
+          <p className="am-j-countrycard__name">
+            <BackendText>{country.name}</BackendText>
+          </p>
+          <Badge tone={tone}>{countries(`availability.${country.availability}`)}</Badge>
+        </div>
+      </div>
+      <ul className="am-pill-list">
+        {country.comparisonEnabled ? (
+          <li className="am-pill">
+            <Icon name="scale" size={16} />
+            {countries("capability.comparison")}
+          </li>
+        ) : null}
+        {country.quoteEnabled ? (
+          <li className="am-pill">
+            <Icon name="file-text" size={16} />
+            {countries("capability.quote")}
+          </li>
+        ) : null}
+        {country.currency ? (
+          <li className="am-pill">
+            <Icon name="coins" size={16} />
+            <BackendText>{country.currency}</BackendText>
+          </li>
+        ) : null}
+      </ul>
     </div>
   );
 }
@@ -118,76 +161,97 @@ async function OpenCountry({ locale, country, countryCode }: VariantProps) {
 
   return (
     <>
-      <CountryBreadcrumb locale={locale} country={country} countryCode={countryCode} />
-
-      <Hero title={t("title", { country: country.name })} lead={t("lead")}>
+      <Hero
+        kicker={t("kicker")}
+        title={t("title", { country: country.name })}
+        lead={t("lead")}
+        breadcrumb={<CountryBreadcrumb locale={locale} country={country} countryCode={countryCode} />}
+        aside={<CountryIdentityCard locale={locale} country={country} />}
+      >
         {country.availability === "pilot" ? <Notice tone="info">{t("pilotNotice")}</Notice> : null}
       </Hero>
 
       <Section title={t("productsTitle")} lead={t("productsLead")}>
         {products.status === "error" ? (
-          <EmptyState title={t("productsError.title")} description={t("productsError.description")} />
+          <EmptyState icon="wifi-off" tone="muted" title={t("productsError.title")} description={t("productsError.description")} />
         ) : null}
         {products.status !== "error" && products.data.length === 0 ? (
-          <EmptyState title={t("productsEmpty.title")} description={t("productsEmpty.description")} />
+          <EmptyState icon="package" tone="muted" title={t("productsEmpty.title")} description={t("productsEmpty.description")} />
         ) : null}
         {products.data.length > 0 ? (
-          <ul className="pub-cards pub-cards--two">
+          <Reveal as="ul" stagger className="am-j-products">
             {products.data.map((product) => {
               const productParams = { countryCode, productKey: product.key };
               return (
-                <li className="pub-card" key={product.id}>
-                  <h3 className="pub-card__title">
-                    <Link href={{ pathname: "/countries/[countryCode]/products/[productKey]", params: productParams }}>
-                      <BackendText>{product.name}</BackendText>
-                    </Link>
-                  </h3>
-                  <p className="am-cluster">
+                <li className="am-j-product" key={product.id}>
+                  <div className="am-j-product__head">
+                    <IconTile name={productIcon(product.key)} size="lg" />
+                    <h3 className="am-j-product__title">
+                      <Link href={{ pathname: "/countries/[countryCode]/products/[productKey]", params: productParams }}>
+                        <BackendText>{product.name}</BackendText>
+                      </Link>
+                    </h3>
+                  </div>
+                  <div className="am-cluster">
                     <Badge tone={product.comparisonEnabled ? "new" : "soon"}>
                       {product.comparisonEnabled ? t("comparisonEnabled") : t("comparisonDisabled")}
                     </Badge>
                     <Badge tone={product.quoteEnabled ? "new" : "soon"}>
                       {product.quoteEnabled ? t("quoteEnabled") : t("quoteDisabled")}
                     </Badge>
-                  </p>
-                  <div className="am-cluster">
-                    <Button
-                      variant="secondary"
-                      href={{ pathname: "/countries/[countryCode]/products/[productKey]", params: productParams }}
-                    >
-                      {t("viewProduct")}
-                    </Button>
+                  </div>
+                  {!product.comparisonEnabled ? <p className="am-j-product__hint">{t("comparisonHint")}</p> : null}
+                  {!product.quoteEnabled ? <p className="am-j-product__hint">{t("quoteHint")}</p> : null}
+                  <div className="am-j-product__actions">
                     {product.comparisonEnabled ? (
                       <Button
                         href={{
                           pathname: "/countries/[countryCode]/products/[productKey]/offers",
                           params: productParams
                         }}
+                        icon={<Icon name="scale" size={18} />}
                       >
                         {t("compare")}
                       </Button>
                     ) : null}
+                    <Button
+                      variant="secondary"
+                      href={{ pathname: "/countries/[countryCode]/products/[productKey]", params: productParams }}
+                    >
+                      {t("viewProduct")}
+                    </Button>
                     {product.quoteEnabled ? (
                       <Button
-                        variant="secondary"
+                        variant="tertiary"
                         href={{ pathname: "/countries/[countryCode]/products/[productKey]/quote", params: productParams }}
                       >
                         {t("quote")}
                       </Button>
                     ) : null}
                   </div>
-                  {!product.comparisonEnabled ? <p className="am-field__hint">{t("comparisonHint")}</p> : null}
-                  {!product.quoteEnabled ? <p className="am-field__hint">{t("quoteHint")}</p> : null}
                 </li>
               );
             })}
-          </ul>
+          </Reveal>
         ) : null}
       </Section>
 
-      <Section title={t("brokersTitle")} lead={t("brokersLead")} tone="muted">
+      <Section
+        title={t("brokersTitle")}
+        lead={t("brokersLead")}
+        tone="muted"
+        actions={
+          <Button
+            variant="secondary"
+            href={{ pathname: "/countries/[countryCode]/brokers", params: { countryCode } }}
+            iconAfter={<Icon name="arrow-right" size={20} />}
+          >
+            {t("brokersAll")}
+          </Button>
+        }
+      >
         {visible.length > 0 ? (
-          <ul className="am-countrygrid">
+          <Reveal as="ul" stagger className="am-j-cardgrid">
             {visible.map((partner) => {
               const productLabels = partner.productKeys.map((key) => {
                 const match = products.data.find((candidate) => candidate.key.toLowerCase() === key.toLowerCase());
@@ -199,6 +263,7 @@ async function OpenCountry({ locale, country, countryCode }: VariantProps) {
                     displayName={partner.displayName}
                     licenceNumber={partner.licenseNumber}
                     issuingAuthority={partner.issuingAuthority}
+                    approved
                     labels={{
                       licenceNumber: common("licenceNumber"),
                       issuingAuthority: common("issuingAuthority"),
@@ -212,25 +277,18 @@ async function OpenCountry({ locale, country, countryCode }: VariantProps) {
                 </li>
               );
             })}
-          </ul>
+          </Reveal>
         ) : (
-          <EmptyState title={t("brokersEmpty.title")} description={t("brokersEmpty.description")} />
+          <EmptyState icon="users" tone="muted" title={t("brokersEmpty.title")} description={t("brokersEmpty.description")} />
         )}
-        <div className="am-cluster">
-          <Button
-            variant="secondary"
-            href={{ pathname: "/countries/[countryCode]/brokers", params: { countryCode } }}
-            iconAfter={<Icon name="arrow-right" size={20} />}
-          >
-            {t("brokersAll")}
-          </Button>
-        </div>
       </Section>
 
       <Section title={t("contactTitle")} lead={t("contactLead")}>
-        <PlatformStatusNotice />
-        <CountryContact country={country} whatsappLabel={t("whatsapp")} callLabel={(phone) => t("call", { phone })} />
-        <Notice tone="indicative">{t("fineprint")}</Notice>
+        <div className="am-stack am-stack--lg">
+          <PlatformStatusNotice />
+          <CountryContact country={country} whatsappLabel={t("whatsapp")} callLabel={(phone) => t("call", { phone })} />
+          <Notice tone="indicative">{t("fineprint")}</Notice>
+        </div>
       </Section>
     </>
   );
@@ -287,58 +345,71 @@ async function WaitingCountry({ locale, country, countryCode }: VariantProps) {
 
   return (
     <>
-      <CountryBreadcrumb locale={locale} country={country} countryCode={countryCode} />
+      <Hero
+        kicker={t("badge")}
+        title={t("heading", { country: country.name })}
+        lead={t("lead")}
+        breadcrumb={<CountryBreadcrumb locale={locale} country={country} countryCode={countryCode} />}
+        aside={<CountryIdentityCard locale={locale} country={country} />}
+      />
 
-      <Hero kicker={t("badge")} title={t("heading", { country: country.name })} lead={t("lead")} />
-
-      <Section>
-        <p>{t("explanation", { country: country.name })}</p>
-        <Notice tone="info">{t("noQuote")}</Notice>
-        <PlatformStatusNotice />
-      </Section>
-
-      <Section title={t("form.legend")} tone="brand">
-        <WaitlistForm
-          countryIso={country.isoCode}
-          products={productOptions}
-          labels={{
-            legend: t("form.legend"),
-            email: t("form.email"),
-            emailHint: t("form.emailHint"),
-            emailRequired: t("form.emailRequired"),
-            product: t("form.product"),
-            productHint: t("form.productHint"),
-            productNone: t("form.productNone"),
-            consent: t("form.consent"),
-            consentRequired: t("form.consentRequired"),
-            website: t("form.website"),
-            submit: t("form.submit"),
-            submitting: t("form.submitting"),
-            successTitle: t("form.successTitle"),
-            successDescription: t("form.successDescription"),
-            error: t("form.error")
-          }}
-        />
+      <Section title={t("form.legend")}>
+        <div className="am-j-waitlist">
+          <div className="am-stack am-stack--lg">
+            <p className="am-lead">{t("explanation", { country: country.name })}</p>
+            <Notice tone="info">{t("noQuote")}</Notice>
+            <PlatformStatusNotice />
+          </div>
+          <div className="am-j-waitlist__form">
+            <WaitlistForm
+              countryIso={country.isoCode}
+              products={productOptions}
+              labels={{
+                legend: t("form.legend"),
+                email: t("form.email"),
+                emailHint: t("form.emailHint"),
+                emailRequired: t("form.emailRequired"),
+                product: t("form.product"),
+                productHint: t("form.productHint"),
+                productNone: t("form.productNone"),
+                consent: t("form.consent"),
+                consentRequired: t("form.consentRequired"),
+                website: t("form.website"),
+                submit: t("form.submit"),
+                submitting: t("form.submitting"),
+                successTitle: t("form.successTitle"),
+                successDescription: t("form.successDescription"),
+                error: t("form.error")
+              }}
+            />
+          </div>
+        </div>
       </Section>
 
       {open.length > 0 ? (
         <Section title={t("openCountriesTitle")} lead={t("openCountriesLead")} tone="muted">
-          <ul className="am-countrygrid">
+          <Reveal as="ul" stagger className="am-j-countries">
             {open.map((entry) => (
-              <li className="am-countrycard" key={entry.isoCode}>
-                <h3 className="pub-card__title">
-                  <Link href={{ pathname: "/countries/[countryCode]", params: { countryCode: entry.isoCode } }}>
-                    <BackendText>{entry.name}</BackendText>
-                  </Link>
-                </h3>
-                <p>
+              <li className="am-j-country" key={entry.isoCode}>
+                <div className="am-j-country__head">
+                  <CountryFlag isoCode={entry.isoCode} />
+                  <h3 className="am-j-country__name">
+                    <Link href={{ pathname: "/countries/[countryCode]", params: { countryCode: entry.isoCode } }}>
+                      <BackendText>{entry.name}</BackendText>
+                    </Link>
+                  </h3>
+                  <span className="am-j-country__arrow">
+                    <Icon name="arrow-right" size={20} />
+                  </span>
+                </div>
+                <div className="am-cluster">
                   <Badge tone={entry.availability === "pilot" ? "pilot" : "new"}>
                     {countries(`availability.${entry.availability}`)}
                   </Badge>
-                </p>
+                </div>
               </li>
             ))}
-          </ul>
+          </Reveal>
         </Section>
       ) : null}
     </>

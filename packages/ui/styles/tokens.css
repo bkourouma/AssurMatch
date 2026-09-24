@@ -1,0 +1,132 @@
+/*
+ * AssurMatch brand tokens (PRD sections 9 to 11).
+ *
+ * Green is a validation colour only: it is never a page background and never a primary button.
+ * The sponsored badge is warning-600 on warning-100. Nothing is ever rendered below 14px.
+ */
+
+:root {
+  /* Brand blue */
+  --am-primary-700: #12377f;
+  --am-primary-600: #1b4fbf;
+  --am-primary-500: #2e6bd6;
+  --am-primary-100: #e4ecfb;
+  --am-primary-50: #f3f6fd;
+
+  /* Validation green: ticks, "Agree" badge, score >= 75 */
+  --am-success-700: #2e7d1f;
+  --am-success-600: #43a82a;
+  --am-success-100: #e6f4e1;
+
+  /* Sponsored / caution */
+  --am-warning-600: #d97706;
+  --am-warning-100: #fef3e2;
+
+  /* Errors */
+  --am-danger-600: #c62828;
+  --am-danger-100: #fde8e8;
+
+  /* Neutrals */
+  --am-neutral-900: #101828;
+  --am-neutral-700: #344054;
+  --am-neutral-500: #667085;
+  --am-neutral-300: #d0d5dd;
+  --am-neutral-100: #f2f4f7;
+  --am-neutral-0: #ffffff;
+
+  /* Channels */
+  --am-whatsapp: #25d366;
+
+  /* Typography */
+  --am-font-heading: var(--font-am-heading), "Nunito", system-ui, "Segoe UI", Arial, sans-serif;
+  --am-font-body: var(--font-am-body), "Inter", system-ui, "Segoe UI", Arial, sans-serif;
+
+  --am-h1-size: 32px;
+  --am-h1-line: 44px;
+  --am-h2-size: 26px;
+  --am-h2-line: 32px;
+  --am-h3-size: 20px;
+  --am-h3-line: 24px;
+  --am-body-size: 16px;
+  --am-body-line: 26px;
+  --am-small-size: 14px;
+  --am-small-line: 22px;
+
+  /* Spacing scale */
+  --am-space-4: 4px;
+  --am-space-8: 8px;
+  --am-space-12: 12px;
+  --am-space-16: 16px;
+  --am-space-24: 24px;
+  --am-space-32: 32px;
+  --am-space-48: 48px;
+  --am-space-64: 64px;
+  --am-space-96: 96px;
+
+  /* Radii */
+  --am-radius-field: 8px;
+  --am-radius-card: 12px;
+  --am-radius-pill: 999px;
+
+  /* Elevation */
+  --am-shadow-sm: 0 1px 2px rgba(16, 24, 40, 0.06);
+  --am-shadow-md: 0 4px 12px rgba(16, 24, 40, 0.1);
+
+  /* Layout */
+  --am-content: 1200px;
+  --am-gutter: 16px;
+  --am-section: 48px;
+  --am-header: 64px;
+
+  /* ---------- Legacy aliases ----------
+   * The pages moved from the pre-brand shell still reference --pub-*; each alias now points at a
+   * brand token so untouched markup keeps rendering on the new palette.
+   */
+  --pub-primary: var(--am-primary-700);
+  --pub-primary-soft: var(--am-primary-100);
+  --pub-accent: var(--am-primary-600);
+  --pub-bg: var(--am-neutral-0);
+  --pub-surface: var(--am-neutral-0);
+  --pub-surface-muted: var(--am-neutral-100);
+  --pub-border: var(--am-neutral-300);
+  --pub-border-strong: var(--am-neutral-300);
+  --pub-text: var(--am-neutral-900);
+  --pub-strong: var(--am-neutral-900);
+  --pub-muted: var(--am-neutral-500);
+  --pub-success: var(--am-success-700);
+  --pub-warning: var(--am-warning-600);
+  --pub-danger: var(--am-danger-600);
+  --pub-disabled: var(--am-neutral-500);
+  --pub-focus: var(--am-primary-500);
+  --pub-radius: var(--am-radius-card);
+  --pub-shadow: var(--am-shadow-md);
+  --pub-gutter: var(--am-gutter);
+  --pub-content: var(--am-content);
+}
+
+@media (min-width: 900px) {
+  :root {
+    --am-h1-size: 44px;
+    --am-h1-line: 54px;
+    --am-h2-size: 32px;
+    --am-h2-line: 40px;
+    --am-h3-size: 22px;
+    --am-h3-line: 28px;
+    --am-body-size: 17px;
+    --am-body-line: 28px;
+    --am-gutter: 24px;
+    --am-section: 96px;
+  }
+}
+
+/* ---------- Back-office layout tokens ----------
+ * Only the back-office shell uses these; the public site never imports backoffice.css.
+ * They live here so the sidebar/topbar geometry stays a single source of truth.
+ */
+:root {
+  --am-sidebar-width: 272px;
+  --am-sidebar-collapsed: 72px;
+  --am-topbar: 60px;
+  --am-bo-bg: var(--am-neutral-100);
+  --am-bo-surface: var(--am-neutral-0);
+}

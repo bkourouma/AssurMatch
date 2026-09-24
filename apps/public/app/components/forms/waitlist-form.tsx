@@ -5,6 +5,7 @@ import { track } from "../../lib/analytics";
 import { submitWaitlist, type WaitlistSubmission } from "../../lib/public-api";
 import { Button } from "../ui/button";
 import { Field, fieldControlProps } from "../ui/field";
+import { Icon } from "../ui/icons";
 import { Notice } from "../ui/notice";
 
 export interface WaitlistProductOption {
@@ -123,6 +124,7 @@ export function WaitlistForm({ countryIso, labels, products = [] }: WaitlistForm
         label={labels.email}
         hint={labels.emailHint}
         required
+        leading="mail"
         {...(emailError ? { error: emailError } : {})}
       >
         <input
@@ -157,7 +159,8 @@ export function WaitlistForm({ countryIso, labels, products = [] }: WaitlistForm
         <input id="am-waitlist-website" name="website" type="text" tabIndex={-1} autoComplete="off" defaultValue="" />
       </div>
 
-      <label htmlFor="am-waitlist-consent">
+      {/* Never pre-ticked: consent is given, never withdrawn. */}
+      <label className="am-j-consent" htmlFor="am-waitlist-consent">
         <input
           id="am-waitlist-consent"
           name="consent"
@@ -165,7 +168,7 @@ export function WaitlistForm({ countryIso, labels, products = [] }: WaitlistForm
           aria-invalid={consentError ? true : undefined}
           aria-describedby={consentError ? "am-waitlist-consent-error" : undefined}
         />
-        {labels.consent}
+        <span>{labels.consent}</span>
       </label>
       {consentError ? (
         <p className="am-field__error" id="am-waitlist-consent-error" role="alert">
@@ -179,7 +182,7 @@ export function WaitlistForm({ countryIso, labels, products = [] }: WaitlistForm
       ) : null}
 
       <div className="am-cluster">
-        <Button type="submit" disabled={submitting}>
+        <Button type="submit" loading={submitting} fullWidth icon={<Icon name="mail" size={18} />}>
           {submitting ? labels.submitting : labels.submit}
         </Button>
       </div>

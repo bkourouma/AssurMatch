@@ -6,6 +6,7 @@ import { Breadcrumb } from "../../../../../components/ui/breadcrumb";
 import { BrokerBlock } from "../../../../../components/ui/broker-block";
 import { Button } from "../../../../../components/ui/button";
 import { Hero } from "../../../../../components/ui/hero";
+import { Icon } from "../../../../../components/ui/icons";
 import { JsonLd } from "../../../../../components/ui/json-ld";
 import { Notice } from "../../../../../components/ui/notice";
 import { Section } from "../../../../../components/ui/section";
@@ -86,64 +87,83 @@ export default async function CountryBrokerDetailPage({ params }: { params: Prom
 
   return (
     <>
-      <div className="am-container">
-        <Breadcrumb
-          label={common("breadcrumbLabel")}
-          items={[
-            { name: common("home"), url: localeUrl(locale, "/") },
-            { name: countries("breadcrumb"), url: localeUrl(locale, "/countries") },
-            { name: countryName, url: localeUrl(locale, "/countries/[countryCode]", { countryCode }) },
-            { name: brokers("breadcrumb"), url: localeUrl(locale, "/countries/[countryCode]/brokers", { countryCode }) },
-            { name: displayName, url: canonical }
-          ]}
-        />
-      </div>
+      <Hero
+        kicker={brokers("breadcrumb")}
+        title={displayName}
+        lead={t("fineprint")}
+        size="sm"
+        breadcrumb={
+          <Breadcrumb
+            label={common("breadcrumbLabel")}
+            items={[
+              { name: common("home"), url: localeUrl(locale, "/") },
+              { name: countries("breadcrumb"), url: localeUrl(locale, "/countries") },
+              { name: countryName, url: localeUrl(locale, "/countries/[countryCode]", { countryCode }) },
+              { name: brokers("breadcrumb"), url: localeUrl(locale, "/countries/[countryCode]/brokers", { countryCode }) },
+              { name: displayName, url: canonical }
+            ]}
+          />
+        }
+      />
 
-      <Hero title={displayName} lead={t("fineprint")} />
+      <Section ariaLabel={displayName}>
+        <div className="am-j-detail">
+          <div className="am-j-detail__main">
+            <div className="am-j-block">
+              <BrokerBlock
+                variant="full"
+                displayName={displayName}
+                licenceNumber={licenseNumber}
+                issuingAuthority={issuingAuthority}
+                labels={brokerLabels}
+                approved
+                {...(city ? { city } : {})}
+              />
+              <p className="am-j-meta">
+                <span>
+                  <Icon name="calendar" size={16} />
+                  {t("licenseExpiresAt")} : {formatDate(licenseExpiresAt, { locale, countryIso: countryCode })}
+                </span>
+              </p>
+            </div>
 
-      <Section>
-        <BrokerBlock
-          variant="full"
-          displayName={displayName}
-          licenceNumber={licenseNumber}
-          issuingAuthority={issuingAuthority}
-          labels={brokerLabels}
-          {...(city ? { city } : {})}
-          {...(products.length > 0 ? { products: products.map((product) => product.name) } : {})}
-        />
-        <p className="am-broker__meta">
-          {t("licenseExpiresAt")} : {formatDate(licenseExpiresAt, { locale, countryIso: countryCode })}
-        </p>
-      </Section>
-
-      {products.length > 0 ? (
-        <Section title={t("productsTitle")}>
-          <div className="am-cluster">
-            {products.map((product) => (
-              <Button
-                key={product.key}
-                variant="secondary"
-                href={{ pathname: "/countries/[countryCode]/products/[productKey]", params: { countryCode, productKey: product.key } }}
-              >
-                <BackendText>{product.name}</BackendText>
-              </Button>
-            ))}
+            <div className="am-j-block">
+              <h2 className="am-j-block__title">{t("disclaimerTitle")}</h2>
+              <p>
+                <BackendText>{disclaimer}</BackendText>
+              </p>
+              <Notice tone="indicative">{t("fineprint")}</Notice>
+            </div>
           </div>
-        </Section>
-      ) : null}
 
-      <Section title={t("disclaimerTitle")}>
-        <p>
-          <BackendText>{disclaimer}</BackendText>
-        </p>
-      </Section>
-
-      <Section>
-        <Notice tone="indicative">{t("fineprint")}</Notice>
-        <div className="am-cluster">
-          <Button variant="secondary" href={{ pathname: "/countries/[countryCode]/brokers", params: { countryCode } }}>
-            {t("back", { countryCode: countryName })}
-          </Button>
+          <aside className="am-j-detail__aside" aria-label={t("productsTitle")}>
+            {products.length > 0 ? (
+              <div className="am-j-block">
+                <h2 className="am-j-block__title">{t("productsTitle")}</h2>
+                <div className="am-j-detail__actions">
+                  {products.map((product) => (
+                    <Button
+                      key={product.key}
+                      variant="secondary"
+                      href={{ pathname: "/countries/[countryCode]/products/[productKey]", params: { countryCode, productKey: product.key } }}
+                      iconAfter={<Icon name="arrow-right" size={18} />}
+                    >
+                      <BackendText>{product.name}</BackendText>
+                    </Button>
+                  ))}
+                </div>
+              </div>
+            ) : null}
+            <div className="am-cluster">
+              <Button
+                variant="tertiary"
+                href={{ pathname: "/countries/[countryCode]/brokers", params: { countryCode } }}
+                icon={<Icon name="arrow-left" size={18} />}
+              >
+                {t("back", { countryCode: countryName })}
+              </Button>
+            </div>
+          </aside>
         </div>
       </Section>
 

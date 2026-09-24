@@ -1,0 +1,1766 @@
+/*
+ * Visitor comparison journey: countries, country, product, offers, offer detail, comparator,
+ * quote request and request tracking.
+ *
+ * Loaded by `app/[locale]/countries/layout.tsx` and by the three journey pages that live outside
+ * that route group (`offers/[offerId]`, `compare`, `quote-requests/[publicReference]`), which puts
+ * it after tokens/base/motion/pages/components/chrome in the cascade.
+ *
+ * House rules: green is validation only (an included guarantee, a done step), sponsored is orange,
+ * nothing renders below 14px, notices are never closable, and no primitive of `components.css` is
+ * duplicated here - only journey-specific composition.
+ */
+
+/* ==========================================================================
+   1. Shared journey pieces
+   ========================================================================== */
+
+/**
+ * The `.am-notice` primitive still carries `margin-bottom: 16px` for the legacy flow layouts. Inside
+ * a grid stack that margin is added to the grid gap, so two notices ended up 32px apart. Every
+ * journey container lays its children out with `gap`, so the notice contributes none of its own.
+ */
+.am-stack > .am-notice,
+.am-hero__inner > .am-notice,
+.am-hero__aside > .am-notice,
+[class^="am-j-"] > .am-notice,
+[class*=" am-j-"] > .am-notice {
+  margin: 0;
+}
+
+/**
+ * Combined regulatory notice of a journey hero: both sentences stay visible, as two lines of one
+ * compact notice rather than two stacked boxes.
+ */
+.am-j-heronotice .am-notice__body {
+  display: grid;
+  gap: var(--am-space-6);
+}
+
+.am-j-heronotice .am-notice__body > p {
+  margin: 0;
+}
+
+/*
+ * Entry selector of the comparator landing. Same reason as the home hero: the panel is one hero
+ * column, not the page width, so the primitive's three-column row from 900px would squeeze both
+ * selects down to a few characters. The selects keep a column each and the button spans underneath.
+ */
+@media (min-width: 560px) {
+  .am-j-entry .am-entry__row {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    align-items: end;
+  }
+
+  .am-j-entry .am-entry__row > .am-button {
+    grid-column: 1 / -1;
+  }
+}
+
+/** Panel with a heading and a soft surface: score explainer, assistance, next steps. */
+.am-j-panel {
+  display: grid;
+  gap: var(--am-space-12);
+  padding: var(--am-space-24);
+  border: 1px solid var(--am-border);
+  border-radius: var(--am-radius-panel);
+  background: var(--am-surface);
+  box-shadow: var(--am-shadow-sm);
+}
+
+.am-j-panel--muted {
+  border-color: var(--am-border-strong);
+  background: var(--am-neutral-50);
+  box-shadow: none;
+}
+
+.am-j-panel--brand {
+  border-color: var(--am-border-brand);
+  background: var(--am-surface-brand);
+  box-shadow: none;
+}
+
+.am-j-panel__head {
+  display: flex;
+  gap: var(--am-space-12);
+  align-items: center;
+}
+
+.am-j-panel__title {
+  margin: 0;
+  font-family: var(--am-font-heading);
+  font-size: var(--am-h3-size);
+  font-weight: 700;
+  letter-spacing: var(--am-tracking-snug);
+  line-height: var(--am-h3-line);
+}
+
+.am-j-panel__lead {
+  max-width: 68ch;
+  margin: 0;
+  color: var(--am-text-muted);
+}
+
+/** Icon + text row used for short factual lists (next steps, what the score weighs). */
+.am-j-points {
+  display: grid;
+  gap: var(--am-space-12);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.am-j-points > li {
+  display: grid;
+  gap: var(--am-space-12);
+  align-items: start;
+  grid-template-columns: auto minmax(0, 1fr);
+  color: var(--am-text-muted);
+  font-size: var(--am-small-size);
+  line-height: var(--am-small-line);
+}
+
+.am-j-points > li > .am-icon {
+  margin-top: 2px;
+  color: var(--am-primary-600);
+}
+
+/** Meta row: small icon + label pairs under a title. */
+.am-j-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--am-space-8) var(--am-space-16);
+  margin: 0;
+  color: var(--am-text-subtle);
+  font-size: var(--am-caption-size);
+  line-height: var(--am-caption-line);
+}
+
+.am-j-meta > span {
+  display: inline-flex;
+  gap: var(--am-space-6);
+  align-items: center;
+  min-width: 0;
+}
+
+.am-j-meta .am-icon {
+  flex: none;
+  color: var(--am-neutral-400);
+}
+
+/** Guarantee pill: green tick when included, neutral minus when not. */
+.am-j-guarantee[data-included="true"] {
+  border-color: var(--am-success-100);
+  background: var(--am-success-50);
+  color: var(--am-success-700);
+}
+
+.am-j-guarantee[data-included="true"] .am-icon {
+  color: var(--am-success-600);
+}
+
+.am-j-guarantee[data-included="false"] {
+  background: var(--am-neutral-50);
+  color: var(--am-text-subtle);
+}
+
+/** Icon grid of guarantees, criteria or steps. */
+.am-j-features {
+  display: grid;
+  gap: var(--am-space-16);
+  margin: 0;
+  padding: 0;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 260px), 1fr));
+  list-style: none;
+}
+
+.am-j-feature {
+  display: grid;
+  gap: var(--am-space-12);
+  align-items: start;
+  grid-template-columns: auto minmax(0, 1fr);
+  padding: var(--am-space-16);
+  border: 1px solid var(--am-border);
+  border-radius: var(--am-radius-md);
+  background: var(--am-surface);
+  box-shadow: var(--am-shadow-xs);
+  transition:
+    border-color var(--am-transition),
+    box-shadow var(--am-transition);
+}
+
+.am-j-feature:hover {
+  border-color: var(--am-primary-200);
+  box-shadow: var(--am-shadow-sm);
+}
+
+.am-j-feature__title {
+  margin: 0;
+  color: var(--am-text);
+  font-size: var(--am-small-size);
+  font-weight: 700;
+  line-height: var(--am-small-line);
+}
+
+.am-j-feature__detail {
+  margin: var(--am-space-4) 0 0;
+  color: var(--am-text-muted);
+  font-size: var(--am-caption-size);
+  line-height: var(--am-caption-line);
+}
+
+/** Collapsible "everything else" disclosure inside a card. */
+.am-j-more {
+  border: 1px solid var(--am-border);
+  border-radius: var(--am-radius-md);
+  background: var(--am-neutral-50);
+  transition:
+    border-color var(--am-transition),
+    background-color var(--am-transition);
+}
+
+.am-j-more[open] {
+  border-color: var(--am-border-strong);
+  background: var(--am-surface);
+}
+
+.am-j-more > summary {
+  display: flex;
+  min-height: 48px;
+  gap: var(--am-space-12);
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--am-space-10) var(--am-space-16);
+  border-radius: var(--am-radius-md);
+  color: var(--am-text);
+  cursor: pointer;
+  font-size: var(--am-small-size);
+  font-weight: 700;
+  list-style: none;
+}
+
+.am-j-more > summary::-webkit-details-marker {
+  display: none;
+}
+
+.am-j-more > summary::after {
+  width: 20px;
+  height: 20px;
+  flex: none;
+  background: currentColor;
+  color: var(--am-primary-600);
+  content: "";
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E") center / contain no-repeat;
+  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E") center / contain no-repeat;
+  transition: transform var(--am-transition);
+}
+
+.am-j-more[open] > summary::after {
+  transform: rotate(180deg);
+}
+
+.am-j-more__body {
+  display: grid;
+  gap: var(--am-space-16);
+  padding: 0 var(--am-space-16) var(--am-space-16);
+}
+
+/** Key/value list with dividers: the criteria of an offer. Replaces the legacy `.pub-criteria`. */
+.am-j-criteria {
+  display: grid;
+  gap: 0;
+  margin: 0;
+  grid-template-columns: minmax(180px, 32%) minmax(0, 1fr);
+}
+
+.am-j-criteria dt {
+  padding: var(--am-space-12) var(--am-space-16) var(--am-space-12) 0;
+  border-top: 1px solid var(--am-border);
+  color: var(--am-text-subtle);
+  font-size: var(--am-small-size);
+  font-weight: 700;
+}
+
+.am-j-criteria dd {
+  margin: 0;
+  padding: var(--am-space-12) 0;
+  border-top: 1px solid var(--am-border);
+  color: var(--am-text);
+  font-size: var(--am-small-size);
+}
+
+/* One column under 520px: the label sits above its value instead of squeezing both side by side. */
+@media (max-width: 519px) {
+  .am-j-criteria {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .am-j-criteria dt {
+    padding-bottom: var(--am-space-4);
+  }
+
+  .am-j-criteria dd {
+    padding-top: 0;
+    border-top: 0;
+  }
+}
+
+/** Plain bullet list inside a criteria value. Replaces the legacy `.pub-list`. */
+.am-j-bullets {
+  margin: 0;
+  padding-left: var(--am-space-16);
+  display: grid;
+  gap: var(--am-space-4);
+}
+
+/** Score disclosure. Replaces the legacy `.pub-score`. */
+.am-j-score {
+  padding: var(--am-space-16);
+  border: 1px solid var(--am-border);
+  border-radius: var(--am-radius-md);
+  background: var(--am-neutral-50);
+}
+
+.am-j-score > summary {
+  display: flex;
+  min-height: 44px;
+  gap: var(--am-space-8);
+  align-items: center;
+  justify-content: space-between;
+  color: var(--am-text);
+  cursor: pointer;
+  font-size: var(--am-small-size);
+  font-weight: 700;
+  list-style: none;
+}
+
+.am-j-score > summary::-webkit-details-marker {
+  display: none;
+}
+
+.am-j-score > summary::after {
+  width: 20px;
+  height: 20px;
+  flex: none;
+  background: var(--am-primary-600);
+  content: "";
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E") center / contain no-repeat;
+  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E") center / contain no-repeat;
+  transition: transform var(--am-transition);
+}
+
+.am-j-score[open] > summary::after {
+  transform: rotate(180deg);
+}
+
+.am-j-score__label {
+  margin: var(--am-space-12) 0;
+  color: var(--am-text-muted);
+  font-size: var(--am-small-size);
+  line-height: var(--am-small-line);
+}
+
+/**
+ * Score breakdown. The shared `.am-table` carries `min-width: 560px`, which forces a sideways
+ * scroll inside an offer card on a phone. Here the same four columns stack into one labelled block
+ * per criterion under 680px; the explicit ARIA roles keep the table semantics that `display: block`
+ * would otherwise strip away.
+ */
+.am-j-scoretable {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--am-small-size);
+}
+
+.am-j-scoretable th,
+.am-j-scoretable td {
+  padding: var(--am-space-12) var(--am-space-16);
+  border-bottom: 1px solid var(--am-border);
+  text-align: left;
+  vertical-align: top;
+}
+
+.am-j-scoretable thead th {
+  background: var(--am-neutral-50);
+  color: var(--am-text-muted);
+  font-size: var(--am-caption-size);
+  font-weight: 800;
+  letter-spacing: var(--am-tracking-wide);
+  line-height: var(--am-caption-line);
+  text-transform: uppercase;
+}
+
+.am-j-scoretable tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+@media (min-width: 680px) {
+  .am-j-scoretable {
+    border: 1px solid var(--am-border);
+    border-radius: var(--am-radius-md);
+    overflow: hidden;
+  }
+}
+
+@media (max-width: 679px) {
+  .am-j-scoretable,
+  .am-j-scoretable thead,
+  .am-j-scoretable tbody,
+  .am-j-scoretable tr,
+  .am-j-scoretable td {
+    display: block;
+  }
+
+  /* Kept in the accessibility tree, just off screen: the per-cell labels carry it visually. */
+  .am-j-scoretable thead {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+
+  .am-j-scoretable tbody tr {
+    margin-bottom: var(--am-space-12);
+    padding: var(--am-space-12);
+    border: 1px solid var(--am-border);
+    border-radius: var(--am-radius-md);
+    background: var(--am-surface);
+  }
+
+  .am-j-scoretable tbody tr:last-child {
+    margin-bottom: 0;
+  }
+
+  .am-j-scoretable td {
+    padding: var(--am-space-4) 0;
+    border-bottom: 0;
+  }
+
+  .am-j-scoretable td::before {
+    display: block;
+    color: var(--am-text-subtle);
+    content: attr(data-label);
+    font-size: var(--am-caption-size);
+    font-weight: 700;
+    line-height: var(--am-caption-line);
+  }
+}
+
+/** Progressive enhancement: hidden as soon as a client boundary has mounted. */
+html[data-js="true"] .am-j-nojs {
+  display: none;
+}
+
+/**
+ * Optional AI assistance. The assistant renders nothing at all when the assist type is disabled for
+ * the country and the product, so its heading and lead must disappear with it rather than leave an
+ * empty panel behind. The server HTML never contains an `.am-aibox`, so the block starts hidden and
+ * only appears once the availability check has answered yes.
+ */
+.am-j-optional:not(:has(.am-aibox)) {
+  display: none;
+}
+
+/* ==========================================================================
+   2. Country directory and country page
+   ========================================================================== */
+
+.am-j-countries {
+  display: grid;
+  gap: var(--am-space-20);
+  margin: 0;
+  padding: 0;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 280px), 1fr));
+  list-style: none;
+}
+
+.am-j-country {
+  position: relative;
+  display: grid;
+  gap: var(--am-space-12);
+  align-content: start;
+  padding: var(--am-space-20);
+  border: 1px solid var(--am-border);
+  border-radius: var(--am-radius-card);
+  background: var(--am-surface);
+  box-shadow: var(--am-shadow-sm);
+  transition:
+    transform var(--am-transition),
+    box-shadow var(--am-transition),
+    border-color var(--am-transition);
+}
+
+.am-j-country:hover,
+.am-j-country:focus-within {
+  border-color: var(--am-primary-300);
+  box-shadow: var(--am-shadow-lg);
+  transform: translateY(-2px);
+}
+
+.am-j-country__head {
+  display: grid;
+  gap: var(--am-space-12);
+  align-items: center;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+}
+
+.am-j-flag {
+  display: inline-flex;
+  width: 48px;
+  height: 48px;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--am-radius-md);
+  background: var(--am-surface-brand);
+  font-size: 26px;
+  line-height: 1;
+}
+
+.am-j-flag[data-size="lg"] {
+  width: 72px;
+  height: 72px;
+  border-radius: var(--am-radius-lg);
+  font-size: 40px;
+}
+
+.am-j-country__name {
+  margin: 0;
+  font-family: var(--am-font-heading);
+  font-size: var(--am-h4-size);
+  font-weight: 700;
+  letter-spacing: var(--am-tracking-snug);
+  line-height: var(--am-h4-line);
+}
+
+/* The whole card is the link target; the arrow is the affordance. */
+.am-j-country__name a {
+  color: inherit;
+  text-decoration: none;
+}
+
+.am-j-country__name a::after {
+  position: absolute;
+  inset: 0;
+  border-radius: var(--am-radius-card);
+  content: "";
+}
+
+.am-j-country__name a:hover {
+  color: var(--am-link-hover);
+}
+
+.am-j-country__name a:focus-visible {
+  outline: none;
+}
+
+.am-j-country:has(a:focus-visible) {
+  box-shadow: var(--am-ring);
+}
+
+.am-j-country__arrow {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  color: var(--am-primary-600);
+  transition: transform var(--am-transition);
+}
+
+.am-j-country:hover .am-j-country__arrow {
+  transform: translateX(3px);
+}
+
+/** Hero aside of a country page: flag, name, availability, currency. */
+.am-j-countrycard {
+  display: grid;
+  gap: var(--am-space-16);
+  padding: var(--am-space-24);
+  border: 1px solid var(--am-border);
+  border-radius: var(--am-radius-panel);
+  background: var(--am-surface);
+  box-shadow: var(--am-shadow-xl);
+}
+
+.am-j-countrycard__head {
+  display: grid;
+  gap: var(--am-space-16);
+  align-items: center;
+  grid-template-columns: auto minmax(0, 1fr);
+}
+
+.am-j-countrycard__name {
+  margin: 0;
+  font-family: var(--am-font-heading);
+  font-size: var(--am-h3-size);
+  font-weight: 800;
+  letter-spacing: var(--am-tracking-tight);
+  line-height: var(--am-h3-line);
+}
+
+/* ==========================================================================
+   3. Product cards of a country
+   ========================================================================== */
+
+.am-j-products {
+  display: grid;
+  gap: var(--am-space-20);
+  margin: 0;
+  padding: 0;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 320px), 1fr));
+  list-style: none;
+}
+
+.am-j-product {
+  display: grid;
+  gap: var(--am-space-16);
+  align-content: start;
+  padding: var(--am-space-24);
+  border: 1px solid var(--am-border);
+  border-radius: var(--am-radius-card);
+  background: var(--am-surface);
+  box-shadow: var(--am-shadow-sm);
+  transition:
+    transform var(--am-transition),
+    box-shadow var(--am-transition),
+    border-color var(--am-transition);
+}
+
+.am-j-product:hover,
+.am-j-product:focus-within {
+  border-color: var(--am-primary-200);
+  box-shadow: var(--am-shadow-lg);
+  transform: translateY(-2px);
+}
+
+.am-j-product__head {
+  display: grid;
+  gap: var(--am-space-16);
+  align-items: center;
+  grid-template-columns: auto minmax(0, 1fr);
+}
+
+.am-j-product__title {
+  margin: 0;
+  font-family: var(--am-font-heading);
+  font-size: var(--am-h3-size);
+  font-weight: 700;
+  letter-spacing: var(--am-tracking-snug);
+  line-height: var(--am-h3-line);
+}
+
+.am-j-product__title a {
+  color: inherit;
+  text-decoration: none;
+}
+
+.am-j-product__title a:hover {
+  color: var(--am-link-hover);
+  text-decoration: underline;
+}
+
+.am-j-product__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--am-space-12);
+  align-items: center;
+  margin-top: auto;
+}
+
+.am-j-product__hint {
+  margin: 0;
+  color: var(--am-text-subtle);
+  font-size: var(--am-caption-size);
+  line-height: var(--am-caption-line);
+}
+
+/* ==========================================================================
+   4. Broker and insurer cards of a country
+   ========================================================================== */
+
+.am-j-cardgrid {
+  display: grid;
+  gap: var(--am-space-20);
+  margin: 0;
+  padding: 0;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 300px), 1fr));
+  list-style: none;
+}
+
+.am-j-cardgrid > li {
+  display: grid;
+  gap: var(--am-space-16);
+  align-content: start;
+  padding: var(--am-space-20);
+  border: 1px solid var(--am-border);
+  border-radius: var(--am-radius-card);
+  background: var(--am-surface);
+  box-shadow: var(--am-shadow-sm);
+  transition:
+    transform var(--am-transition),
+    box-shadow var(--am-transition),
+    border-color var(--am-transition);
+}
+
+.am-j-cardgrid > li:hover,
+.am-j-cardgrid > li:focus-within {
+  border-color: var(--am-primary-200);
+  box-shadow: var(--am-shadow-lg);
+  transform: translateY(-2px);
+}
+
+/* The broker block carries its own frame: flatten it whenever it already sits inside a card. */
+.am-j-cardgrid .am-broker[data-variant="card"],
+.am-j-block > .am-broker,
+.am-j-detail__card .am-broker {
+  padding: 0;
+  border: 0;
+  background: none;
+  box-shadow: none;
+}
+
+.am-j-cardgrid__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--am-space-12);
+  margin-top: auto;
+}
+
+.am-j-insurer__name {
+  margin: 0;
+  font-family: var(--am-font-heading);
+  font-size: var(--am-h4-size);
+  font-weight: 700;
+  letter-spacing: var(--am-tracking-snug);
+  line-height: var(--am-h4-line);
+}
+
+.am-j-initials {
+  display: inline-flex;
+  width: 44px;
+  height: 44px;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--am-radius-md);
+  background: var(--am-surface-brand);
+  color: var(--am-primary-700);
+  font-family: var(--am-font-heading);
+  font-size: var(--am-caption-size);
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.am-j-insurer__head {
+  display: grid;
+  gap: var(--am-space-12);
+  align-items: center;
+  grid-template-columns: auto minmax(0, 1fr);
+}
+
+/* ==========================================================================
+   5. Offers list: filters, results header, offer card
+   ========================================================================== */
+
+.am-j-filters {
+  border: 1px solid var(--am-border);
+  border-radius: var(--am-radius-panel);
+  background: var(--am-surface);
+  box-shadow: var(--am-shadow-sm);
+  transition: box-shadow var(--am-transition);
+}
+
+.am-j-filters[open] {
+  box-shadow: var(--am-shadow-md);
+}
+
+.am-j-filters > summary {
+  display: flex;
+  min-height: 60px;
+  gap: var(--am-space-12);
+  align-items: center;
+  padding: var(--am-space-16) var(--am-space-24);
+  border-radius: var(--am-radius-panel);
+  color: var(--am-text);
+  cursor: pointer;
+  font-family: var(--am-font-heading);
+  font-size: var(--am-h4-size);
+  font-weight: 700;
+  list-style: none;
+}
+
+.am-j-filters > summary::-webkit-details-marker {
+  display: none;
+}
+
+.am-j-filters__chevron {
+  margin-left: auto;
+  color: var(--am-primary-600);
+  transition: transform var(--am-transition);
+}
+
+.am-j-filters[open] .am-j-filters__chevron {
+  transform: rotate(180deg);
+}
+
+.am-j-filters__form {
+  display: grid;
+  gap: var(--am-space-24);
+  padding: 0 var(--am-space-24) var(--am-space-24);
+}
+
+.am-j-filters__form fieldset {
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.am-j-filters__legend {
+  margin: 0 0 var(--am-space-12);
+  padding: 0;
+  color: var(--am-primary-600);
+  font-size: var(--am-caption-size);
+  font-weight: 800;
+  letter-spacing: var(--am-tracking-wide);
+  line-height: var(--am-caption-line);
+  text-transform: uppercase;
+}
+
+.am-j-fieldgrid {
+  display: grid;
+  gap: var(--am-space-16);
+  grid-template-columns: minmax(0, 1fr);
+}
+
+@media (min-width: 620px) {
+  .am-j-fieldgrid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (min-width: 960px) {
+  .am-j-fieldgrid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .am-j-fieldgrid[data-columns="2"] {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+.am-j-filters__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--am-space-12);
+  align-items: center;
+  padding-top: var(--am-space-8);
+  border-top: 1px solid var(--am-border);
+}
+
+.am-j-results {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--am-space-8) var(--am-space-20);
+  align-items: baseline;
+  justify-content: space-between;
+  margin-bottom: var(--am-space-20);
+  padding-bottom: var(--am-space-12);
+  border-bottom: 1px solid var(--am-border);
+}
+
+.am-j-results__count {
+  margin: 0;
+  font-family: var(--am-font-heading);
+  font-size: var(--am-h4-size);
+  font-weight: 700;
+}
+
+.am-j-results__sort {
+  margin: 0;
+  color: var(--am-text-subtle);
+  font-size: var(--am-caption-size);
+  line-height: var(--am-caption-line);
+}
+
+/**
+ * Sorting sits in the results header, not inside the collapsed filter panel: it answers "in which
+ * order am I reading these offers", which only makes sense next to the count. It is a plain GET
+ * form carrying the active filters as hidden inputs, so it works with JavaScript switched off.
+ */
+.am-j-results:has(.am-j-sortform) {
+  align-items: end;
+}
+
+.am-j-sortform {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--am-space-12);
+  align-items: end;
+  margin-left: auto;
+}
+
+.am-j-sortform .am-field {
+  min-width: 180px;
+  margin: 0;
+}
+
+.am-j-sortform .am-field__label {
+  font-size: var(--am-caption-size);
+}
+
+.am-j-sortform .am-field__control {
+  min-height: 44px;
+  padding-top: var(--am-space-8);
+  padding-bottom: var(--am-space-8);
+  font-size: var(--am-caption-size);
+}
+
+@media (max-width: 599px) {
+  .am-j-sortform {
+    width: 100%;
+    margin-left: 0;
+  }
+
+  .am-j-sortform .am-field {
+    flex: 1 1 100%;
+    min-width: 0;
+  }
+}
+
+.am-j-offers {
+  display: grid;
+  gap: var(--am-space-20);
+}
+
+.am-j-offer {
+  display: grid;
+  gap: var(--am-space-16);
+  padding: var(--am-space-20);
+  border: 1px solid var(--am-border);
+  border-radius: var(--am-radius-card);
+  background: var(--am-surface);
+  box-shadow: var(--am-shadow-sm);
+  transition:
+    box-shadow var(--am-transition),
+    border-color var(--am-transition);
+}
+
+.am-j-offer:hover,
+.am-j-offer:focus-within {
+  border-color: var(--am-primary-200);
+  box-shadow: var(--am-shadow-md);
+}
+
+.am-j-offer:has(input[name="ids"]:checked) {
+  border-color: var(--am-primary-500);
+  box-shadow: var(--am-shadow-glow-soft);
+}
+
+@media (min-width: 768px) {
+  .am-j-offer {
+    padding: var(--am-space-24);
+  }
+}
+
+.am-j-offer__top {
+  display: grid;
+  gap: var(--am-space-12) var(--am-space-20);
+  align-items: start;
+  grid-template-columns: minmax(0, 1fr);
+}
+
+@media (min-width: 680px) {
+  .am-j-offer__top {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+}
+
+.am-j-offer__ident {
+  display: grid;
+  gap: var(--am-space-8);
+  min-width: 0;
+}
+
+.am-j-offer__titlerow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--am-space-8) var(--am-space-12);
+  align-items: center;
+}
+
+.am-j-offer__name {
+  margin: 0;
+  font-family: var(--am-font-heading);
+  font-size: var(--am-h3-size);
+  font-weight: 700;
+  letter-spacing: var(--am-tracking-snug);
+  line-height: var(--am-h3-line);
+}
+
+.am-j-offer__side {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--am-space-12);
+  align-items: center;
+}
+
+@media (min-width: 680px) {
+  .am-j-offer__side {
+    justify-content: flex-end;
+  }
+}
+
+/** Checkbox dressed as a selection chip; it stays a real checkbox for keyboard and no-JS use. */
+.am-j-pick {
+  display: inline-flex;
+  min-height: 44px;
+  gap: var(--am-space-8);
+  align-items: center;
+  padding: var(--am-space-8) var(--am-space-16);
+  border: 1px solid var(--am-border-strong);
+  border-radius: var(--am-radius-pill);
+  background: var(--am-surface);
+  color: var(--am-text-muted);
+  cursor: pointer;
+  font-size: var(--am-caption-size);
+  font-weight: 700;
+  line-height: var(--am-caption-line);
+  transition:
+    border-color var(--am-transition),
+    background-color var(--am-transition),
+    color var(--am-transition);
+}
+
+.am-j-pick:hover {
+  border-color: var(--am-primary-300);
+  background: var(--am-primary-50);
+  color: var(--am-primary-700);
+}
+
+.am-j-pick:has(input:checked) {
+  border-color: var(--am-primary-600);
+  background: var(--am-primary-50);
+  color: var(--am-primary-700);
+}
+
+.am-j-pick:has(input:focus-visible) {
+  box-shadow: var(--am-ring);
+}
+
+.am-j-pick > input {
+  width: 18px;
+  height: 18px;
+  flex: none;
+  margin: 0;
+  accent-color: var(--am-primary-600);
+}
+
+/**
+ * One chip, two words: "Ajouter a la comparaison" while it is free, "Selectionnee" once it is
+ * ticked. Both labels are rendered so a browser without `:has()` still shows a usable chip.
+ */
+.am-j-pick__on {
+  display: none;
+}
+
+.am-j-pick:has(input:checked) .am-j-pick__off {
+  display: none;
+}
+
+.am-j-pick:has(input:checked) .am-j-pick__on {
+  display: inline;
+}
+
+@media (max-width: 479px) {
+  .am-j-pick {
+    width: 100%;
+  }
+}
+
+.am-j-offer__summary {
+  max-width: 76ch;
+  margin: 0;
+  color: var(--am-text-muted);
+}
+
+.am-j-offer__body {
+  display: grid;
+  gap: var(--am-space-16);
+  grid-template-columns: minmax(0, 1fr);
+}
+
+@media (min-width: 768px) {
+  .am-j-offer__body {
+    /* Both columns stretch: the four fact tiles fill the height of the price panel. */
+    align-items: stretch;
+    grid-template-columns: minmax(220px, 280px) minmax(0, 1fr);
+  }
+}
+
+.am-j-price {
+  display: grid;
+  gap: var(--am-space-8);
+  align-content: start;
+  padding: var(--am-space-16);
+  border: 1px solid var(--am-border-brand);
+  border-radius: var(--am-radius-md);
+  background: var(--am-surface-brand);
+}
+
+.am-j-price__label {
+  margin: 0;
+  color: var(--am-primary-700);
+  font-size: var(--am-caption-size);
+  font-weight: 700;
+  letter-spacing: var(--am-tracking-wide);
+  line-height: var(--am-caption-line);
+  text-transform: uppercase;
+}
+
+.am-j-price__amount {
+  margin: 0;
+  color: var(--am-primary-800);
+  font-family: var(--am-font-heading);
+  font-size: clamp(22px, 1.1rem + 1vw, 28px);
+  font-weight: 800;
+  letter-spacing: var(--am-tracking-tight);
+  line-height: 1.15;
+  overflow-wrap: anywhere;
+}
+
+.am-j-price__note {
+  margin: 0;
+  color: var(--am-text-muted);
+  font-size: var(--am-caption-size);
+  line-height: var(--am-caption-line);
+}
+
+/**
+ * Two by two at every width, so the block lines up with the price panel beside it. The rows stretch
+ * rather than sit at the top: next to a taller price panel the four tiles fill the same height
+ * instead of leaving a gap underneath.
+ */
+.am-j-facts {
+  display: grid;
+  gap: var(--am-space-12);
+  align-content: stretch;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+/* Under 400px two columns leave about 110px per tile: an amount no longer fits on one line. */
+@media (max-width: 399px) {
+  .am-j-facts {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.am-j-fact {
+  display: grid;
+  gap: var(--am-space-4);
+  align-content: center;
+  padding: var(--am-space-12);
+  border: 1px solid var(--am-border);
+  border-radius: var(--am-radius-md);
+  background: var(--am-neutral-50);
+}
+
+.am-j-fact__label {
+  display: flex;
+  gap: var(--am-space-6);
+  align-items: center;
+  margin: 0;
+  color: var(--am-text-subtle);
+  font-size: var(--am-caption-size);
+  line-height: var(--am-caption-line);
+}
+
+.am-j-fact__label .am-icon {
+  flex: none;
+  color: var(--am-neutral-400);
+}
+
+.am-j-fact__value {
+  margin: 0;
+  color: var(--am-text);
+  font-size: var(--am-small-size);
+  font-weight: 700;
+  line-height: var(--am-small-line);
+  /*
+   * An amount breaks at a space or not at all: "1 500 000" split mid-number ("1 500 0" / "00")
+   * reads as a different figure. The tile stacks to one column under 400px instead.
+   */
+  overflow-wrap: normal;
+  word-break: normal;
+  hyphens: none;
+}
+
+.am-j-offer__disclaimer {
+  margin: 0;
+  color: var(--am-text-subtle);
+  font-size: var(--am-caption-size);
+  line-height: var(--am-caption-line);
+}
+
+.am-j-offer__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--am-space-12);
+  align-items: center;
+  padding-top: var(--am-space-16);
+  border-top: 1px solid var(--am-border);
+}
+
+@media (min-width: 680px) {
+  .am-j-offer__actions {
+    justify-content: flex-end;
+  }
+}
+
+/**
+ * Floating comparison bar.
+ *
+ * The primitive is `position: sticky`, and a sticky box can only float inside its own parent. The
+ * bar is wrapped in a container so it lines up with the page grid, so the container carries the
+ * stickiness - its parent is `main`, which spans the whole list - and the bar itself goes back to
+ * the normal flow inside it. `am-j-pad-bottom` on the last section reserves the room underneath so
+ * the bar never covers the last card's actions.
+ */
+.am-j-barwrap {
+  position: sticky;
+  bottom: var(--am-space-16);
+  z-index: var(--am-z-sticky);
+}
+
+.am-j-barwrap > .am-comparebar {
+  position: static;
+}
+
+.am-j-pad-bottom {
+  padding-bottom: var(--am-space-80);
+}
+
+.am-j-tail {
+  display: grid;
+  gap: var(--am-space-16);
+  margin-top: var(--am-space-32);
+}
+
+/** Reading column for the form-driven pages: wider than `--narrow`, far from full bleed. */
+.am-j-column {
+  width: 100%;
+  max-width: 880px;
+  margin-inline: auto;
+}
+
+/* ==========================================================================
+   6. Offer detail
+   ========================================================================== */
+
+.am-j-detail {
+  display: grid;
+  gap: var(--am-space-24);
+  align-items: start;
+  grid-template-columns: minmax(0, 1fr);
+}
+
+@media (min-width: 980px) {
+  .am-j-detail {
+    gap: var(--am-space-32);
+    grid-template-columns: minmax(0, 1fr) minmax(300px, 360px);
+  }
+}
+
+.am-j-detail__main {
+  display: grid;
+  gap: var(--am-space-24);
+  min-width: 0;
+}
+
+.am-j-detail__aside {
+  display: grid;
+  gap: var(--am-space-16);
+  align-content: start;
+}
+
+@media (min-width: 980px) {
+  .am-j-detail__aside {
+    position: sticky;
+    top: calc(var(--am-header) + var(--am-space-20));
+  }
+}
+
+.am-j-detail__card {
+  display: grid;
+  gap: var(--am-space-16);
+  padding: var(--am-space-24);
+  border: 1px solid var(--am-border);
+  border-radius: var(--am-radius-panel);
+  background: var(--am-surface);
+  box-shadow: var(--am-shadow-lg);
+}
+
+.am-j-detail__actions {
+  display: grid;
+  gap: var(--am-space-12);
+}
+
+.am-j-detail__actions .am-button {
+  width: 100%;
+}
+
+.am-j-block {
+  display: grid;
+  gap: var(--am-space-12);
+  padding: var(--am-space-20);
+  border: 1px solid var(--am-border);
+  border-radius: var(--am-radius-card);
+  background: var(--am-surface);
+  box-shadow: var(--am-shadow-xs);
+}
+
+.am-j-block__title {
+  margin: 0;
+  font-family: var(--am-font-heading);
+  font-size: var(--am-h4-size);
+  font-weight: 700;
+  letter-spacing: var(--am-tracking-snug);
+  line-height: var(--am-h4-line);
+}
+
+.am-j-list {
+  display: grid;
+  gap: var(--am-space-8);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.am-j-list > li {
+  display: grid;
+  gap: var(--am-space-10);
+  align-items: start;
+  grid-template-columns: auto minmax(0, 1fr);
+  color: var(--am-text-muted);
+  font-size: var(--am-small-size);
+  line-height: var(--am-small-line);
+}
+
+.am-j-list > li > .am-icon {
+  margin-top: 2px;
+  flex: none;
+  color: var(--am-primary-600);
+}
+
+/* ==========================================================================
+   7. Comparator table
+   ========================================================================== */
+
+.am-j-compare {
+  border-collapse: separate;
+  border-spacing: 0;
+  min-width: 720px;
+}
+
+.am-j-compare th,
+.am-j-compare td {
+  vertical-align: top;
+}
+
+.am-j-compare thead th {
+  white-space: normal;
+  text-transform: none;
+  letter-spacing: var(--am-tracking-snug);
+  font-size: var(--am-small-size);
+  color: var(--am-text);
+  vertical-align: bottom;
+}
+
+/* First column stays visible while the offer columns scroll sideways. */
+.am-j-compare thead th:first-child,
+.am-j-compare tbody th {
+  position: sticky;
+  left: 0;
+  z-index: var(--am-z-raised);
+  min-width: 190px;
+  background: var(--am-neutral-50);
+  box-shadow: 1px 0 0 var(--am-border);
+}
+
+.am-j-compare thead th:first-child {
+  z-index: calc(var(--am-z-raised) + 1);
+}
+
+.am-j-compare__head {
+  display: grid;
+  gap: var(--am-space-8);
+  justify-items: start;
+}
+
+.am-j-compare__name {
+  margin: 0;
+  font-family: var(--am-font-heading);
+  font-size: var(--am-body-size);
+  font-weight: 700;
+  line-height: 1.3;
+}
+
+.am-j-scroll-hint {
+  margin: 0 0 var(--am-space-12);
+  color: var(--am-text-subtle);
+  font-size: var(--am-caption-size);
+  line-height: var(--am-caption-line);
+}
+
+@media (min-width: 900px) {
+  .am-j-scroll-hint {
+    display: none;
+  }
+}
+
+.am-j-scorecards {
+  display: grid;
+  gap: var(--am-space-20);
+  margin: 0;
+  padding: 0;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 320px), 1fr));
+  list-style: none;
+}
+
+.am-j-scorecard {
+  display: grid;
+  gap: var(--am-space-16);
+  align-content: start;
+  padding: var(--am-space-20);
+  border: 1px solid var(--am-border);
+  border-radius: var(--am-radius-card);
+  background: var(--am-surface);
+  box-shadow: var(--am-shadow-sm);
+}
+
+.am-j-scorecard__head {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--am-space-12);
+  align-items: center;
+  justify-content: space-between;
+}
+
+.am-j-scorecard__title {
+  margin: 0;
+  font-family: var(--am-font-heading);
+  font-size: var(--am-h4-size);
+  font-weight: 700;
+  line-height: var(--am-h4-line);
+}
+
+/* ==========================================================================
+   8. Quote form
+   ========================================================================== */
+
+.am-j-form {
+  display: grid;
+  gap: var(--am-space-32);
+  padding: var(--am-space-24);
+  border: 1px solid var(--am-border);
+  border-radius: var(--am-radius-panel);
+  background: var(--am-surface);
+  box-shadow: var(--am-shadow-md);
+}
+
+@media (min-width: 768px) {
+  .am-j-form {
+    padding: var(--am-space-32);
+  }
+}
+
+.am-j-form fieldset {
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.am-j-form__legend {
+  display: flex;
+  gap: var(--am-space-12);
+  align-items: center;
+  width: 100%;
+  margin: 0 0 var(--am-space-16);
+  padding: 0;
+  font-family: var(--am-font-heading);
+  font-size: var(--am-h4-size);
+  font-weight: 700;
+  letter-spacing: var(--am-tracking-snug);
+}
+
+.am-j-form__step {
+  display: inline-flex;
+  width: 32px;
+  height: 32px;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--am-radius-pill);
+  background: var(--am-surface-brand);
+  color: var(--am-primary-700);
+  font-size: var(--am-caption-size);
+  font-weight: 800;
+}
+
+.am-j-form__grid {
+  display: grid;
+  gap: var(--am-space-16);
+  grid-template-columns: minmax(0, 1fr);
+}
+
+@media (min-width: 768px) {
+  .am-j-form__grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+.am-j-consents {
+  display: grid;
+  gap: var(--am-space-12);
+}
+
+/** Consent row as a card: a 44px tap target, never pre-ticked. */
+.am-j-consent {
+  display: grid;
+  gap: var(--am-space-12);
+  align-items: start;
+  grid-template-columns: auto minmax(0, 1fr);
+  padding: var(--am-space-16);
+  border: 1px solid var(--am-border-strong);
+  border-radius: var(--am-radius-md);
+  background: var(--am-neutral-50);
+  color: var(--am-text-muted);
+  cursor: pointer;
+  font-size: var(--am-small-size);
+  line-height: var(--am-small-line);
+  transition:
+    border-color var(--am-transition),
+    background-color var(--am-transition);
+}
+
+.am-j-consent:hover {
+  border-color: var(--am-primary-300);
+  background: var(--am-primary-50);
+}
+
+.am-j-consent:has(input:checked) {
+  border-color: var(--am-primary-500);
+  background: var(--am-surface-brand);
+  color: var(--am-text);
+}
+
+.am-j-consent:has(input:focus-visible) {
+  box-shadow: var(--am-ring);
+}
+
+.am-j-consent > input {
+  width: 20px;
+  height: 20px;
+  margin: 2px 0 0;
+  accent-color: var(--am-primary-600);
+}
+
+.am-j-form__footer {
+  display: grid;
+  gap: var(--am-space-12);
+  padding-top: var(--am-space-20);
+  border-top: 1px solid var(--am-border);
+}
+
+.am-j-form__footer .am-button {
+  justify-self: start;
+}
+
+@media (max-width: 520px) {
+  .am-j-form__footer .am-button {
+    width: 100%;
+  }
+}
+
+.am-j-fineprint {
+  max-width: 76ch;
+  margin: 0;
+  color: var(--am-text-subtle);
+  font-size: var(--am-caption-size);
+  line-height: var(--am-caption-line);
+}
+
+.am-j-assist {
+  display: grid;
+  gap: var(--am-space-16);
+}
+
+/**
+ * Confirmation panel of a sent quote request. It replaces the form rather than sitting under it:
+ * a form left on screen next to "demande recue" invites a second, identical request.
+ */
+.am-j-sent {
+  display: grid;
+  gap: var(--am-space-16);
+  justify-items: start;
+  padding: var(--am-space-24);
+  border: 1px solid var(--am-border);
+  border-radius: var(--am-radius-panel);
+  background: var(--am-surface);
+  box-shadow: var(--am-shadow-md);
+}
+
+@media (min-width: 768px) {
+  .am-j-sent {
+    padding: var(--am-space-32);
+  }
+}
+
+.am-j-sent__title {
+  margin: 0;
+  font-family: var(--am-font-heading);
+  font-size: var(--am-h3-size);
+  font-weight: 800;
+  letter-spacing: var(--am-tracking-tight);
+  line-height: var(--am-h3-line);
+}
+
+.am-j-sent > .am-j-reference {
+  width: 100%;
+}
+
+.am-j-sent__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--am-space-12);
+  align-items: center;
+}
+
+/* ==========================================================================
+   9. Request tracking and consent withdrawal
+   ========================================================================== */
+
+.am-j-reference {
+  display: grid;
+  gap: var(--am-space-12);
+  padding: var(--am-space-24);
+  border: 1px solid var(--am-border-brand);
+  border-radius: var(--am-radius-panel);
+  background: var(--am-surface-brand);
+}
+
+.am-j-reference__label {
+  margin: 0;
+  color: var(--am-primary-700);
+  font-size: var(--am-caption-size);
+  font-weight: 800;
+  letter-spacing: var(--am-tracking-wide);
+  line-height: var(--am-caption-line);
+  text-transform: uppercase;
+}
+
+.am-j-reference__row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--am-space-12);
+  align-items: center;
+}
+
+.am-j-reference__value {
+  margin: 0;
+  color: var(--am-primary-900);
+  font-family: var(--am-font-heading);
+  font-size: clamp(22px, 1.1rem + 1vw, 28px);
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  word-break: break-all;
+}
+
+.am-j-documents {
+  display: grid;
+  gap: var(--am-space-12);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.am-j-document {
+  display: grid;
+  gap: var(--am-space-12);
+  align-items: start;
+  grid-template-columns: auto minmax(0, 1fr);
+  padding: var(--am-space-16);
+  border: 1px solid var(--am-border);
+  border-radius: var(--am-radius-md);
+  background: var(--am-surface);
+  box-shadow: var(--am-shadow-xs);
+}
+
+.am-j-document__text {
+  margin: 0;
+  font-size: var(--am-small-size);
+  line-height: var(--am-small-line);
+}
+
+.am-j-copy {
+  display: inline-flex;
+  min-height: 40px;
+  gap: var(--am-space-8);
+  align-items: center;
+  padding: var(--am-space-8) var(--am-space-16);
+  border: 1px solid var(--am-border-strong);
+  border-radius: var(--am-radius-pill);
+  background: var(--am-surface);
+  color: var(--am-primary-700);
+  cursor: pointer;
+  font-family: inherit;
+  font-size: var(--am-caption-size);
+  font-weight: 700;
+  transition:
+    border-color var(--am-transition),
+    background-color var(--am-transition);
+}
+
+.am-j-copy:hover {
+  border-color: var(--am-primary-300);
+  background: var(--am-primary-50);
+}
+
+.am-j-copy[data-copied="true"] {
+  border-color: var(--am-success-500);
+  background: var(--am-success-50);
+  color: var(--am-success-700);
+}
+
+/* ==========================================================================
+   10. Waiting-list country
+   ========================================================================== */
+
+.am-j-waitlist {
+  display: grid;
+  gap: var(--am-space-24);
+  align-items: start;
+  grid-template-columns: minmax(0, 1fr);
+}
+
+@media (min-width: 900px) {
+  .am-j-waitlist {
+    gap: var(--am-space-32);
+    grid-template-columns: minmax(0, 1fr) minmax(320px, 420px);
+  }
+}
+
+.am-j-waitlist__form {
+  display: grid;
+  gap: var(--am-space-16);
+  padding: var(--am-space-24);
+  border: 1px solid var(--am-border);
+  border-radius: var(--am-radius-panel);
+  background: var(--am-surface);
+  box-shadow: var(--am-shadow-lg);
+}

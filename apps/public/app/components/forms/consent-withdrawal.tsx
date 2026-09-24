@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { withdrawQuoteConsent } from "../../lib/public-api";
+import { Icon } from "../ui/icons";
 import { Notice } from "../ui/notice";
 
 /**
@@ -65,7 +66,7 @@ export function ConsentWithdrawal({ publicReference, token, labels }: ConsentWit
 
   return (
     <div className="am-stack">
-      <p>{labels.explanation}</p>
+      <p className="am-j-panel__lead">{labels.explanation}</p>
       {state.status === "error" ? (
         <Notice tone="error" role="alert">
           {state.message}
@@ -73,9 +74,9 @@ export function ConsentWithdrawal({ publicReference, token, labels }: ConsentWit
       ) : null}
       {confirming ? (
         <>
-          <p>
+          <Notice tone="indicative" role="status">
             <strong>{labels.confirmQuestion}</strong>
-          </p>
+          </Notice>
           <div className="am-cluster">
             <button
               className="am-button"
@@ -83,7 +84,10 @@ export function ConsentWithdrawal({ publicReference, token, labels }: ConsentWit
               type="button"
               onClick={withdraw}
               disabled={state.status === "submitting"}
+              data-loading={state.status === "submitting" ? "true" : undefined}
+              aria-busy={state.status === "submitting" ? true : undefined}
             >
+              <Icon name="check" size={18} />
               <span>{state.status === "submitting" ? labels.submitting : labels.confirm}</span>
             </button>
             <button
@@ -104,6 +108,7 @@ export function ConsentWithdrawal({ publicReference, token, labels }: ConsentWit
             type="button"
             onClick={() => setState({ status: "confirming" })}
           >
+            <Icon name="x-circle" size={18} />
             <span>{labels.confirmToggle}</span>
           </button>
         </div>

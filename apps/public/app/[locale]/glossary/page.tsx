@@ -2,12 +2,15 @@ import { getTranslations, setRequestLocale } from "next-intl/server";
 import { toLocale, type AppLocale } from "../../../i18n/routing";
 import { EntrySelector } from "../../components/site/entry-selector";
 import { Breadcrumb } from "../../components/ui/breadcrumb";
+import { Hero } from "../../components/ui/hero";
 import { Section } from "../../components/ui/section";
+import { Reveal } from "../../components/motion/reveal";
 import { getEntrySelectorData } from "../../content/entry-selector-data";
 import { listGlossary } from "../../content/glossary";
 import type { GlossaryEntry } from "../../content/types";
 import { buildMetadata, localeUrl } from "../../lib/seo";
 import type { PageMetadata } from "../../lib/seo";
+import "../../styles/pages/institutional.css";
 
 export async function generateMetadata({ params }: { params: Promise<{ locale: string }> }): Promise<PageMetadata> {
   const locale = toLocale((await params).locale);
@@ -47,36 +50,50 @@ export default async function GlossaryPage({ params }: { params: Promise<{ local
 
   return (
     <>
-      <div className="am-container">
-        <Breadcrumb
-          label={common("breadcrumbLabel")}
-          items={[
-            { name: common("home"), url: localeUrl(locale, "/") },
-            { name: t("breadcrumb"), url: localeUrl(locale, "/glossary") }
-          ]}
-        />
-      </div>
+      <Hero
+        kicker={t("kicker")}
+        title={t("title")}
+        lead={t("lead")}
+        breadcrumb={
+          <Breadcrumb
+            label={common("breadcrumbLabel")}
+            items={[
+              { name: common("home"), url: localeUrl(locale, "/") },
+              { name: t("breadcrumb"), url: localeUrl(locale, "/glossary") }
+            ]}
+          />
+        }
+      />
 
-      <Section headingLevel={1} title={t("title")} lead={t("lead")}>
-        <nav aria-label={t("title")} className="am-cluster">
-          {groups.map(([letter]) => (
-            <a key={letter} href={`#lettre-${letter}`}>
+      {/* Alphabet rail: it stays under the header while the visitor scrolls the definitions. */}
+      <nav className="am-glossary-index" aria-label={t("indexLabel")}>
+        <div className="am-container">
+          <ul className="am-glossary-index__list">
+            {groups.map(([letter]) => (
+              <li key={letter}>
+                <a className="am-glossary-index__link" href={`#lettre-${letter}`}>
+                  {letter}
+                </a>
+              </li>
+            ))}
+          </ul>
+        </div>
+      </nav>
+
+      <Section>
+        <p className="am-faq-meta">{t("termCount", { count: entries.length })}</p>
+        {groups.map(([letter, letterEntries]) => (
+          <section className="am-glossary-group am-inst-anchor" key={letter} id={`lettre-${letter}`} aria-labelledby={`lettre-${letter}-titre`}>
+            <h2 className="am-glossary-group__letter" id={`lettre-${letter}-titre`}>
               {letter}
-            </a>
-          ))}
-        </nav>
-      </Section>
-
-      {groups.map(([letter, letterEntries]) => (
-        <Section key={letter} title={letter} id={`lettre-${letter}`}>
-          <dl className="pub-criteria">
-            {letterEntries.map((entry) => (
-              <div key={entry.term}>
-                <dt id={termId(entry.term)}>{entry.term}</dt>
-                <dd>
-                  <p>{entry.definition}</p>
+            </h2>
+            <Reveal stagger className="am-glossary-list">
+              {letterEntries.map((entry) => (
+                <article className="am-glossary-entry" key={entry.term} id={termId(entry.term)}>
+                  <h3 className="am-glossary-entry__term">{entry.term}</h3>
+                  <p className="am-glossary-entry__definition">{entry.definition}</p>
                   {entry.seeAlso && entry.seeAlso.length > 0 ? (
-                    <p className="pub-meta">
+                    <p className="am-glossary-entry__see">
                       {t("seeAlso")} :{" "}
                       {entry.seeAlso.map((related, index) => (
                         <span key={related}>
@@ -86,15 +103,15 @@ export default async function GlossaryPage({ params }: { params: Promise<{ local
                       ))}
                     </p>
                   ) : null}
-                </dd>
-              </div>
-            ))}
-          </dl>
-        </Section>
-      ))}
+                </article>
+              ))}
+            </Reveal>
+          </section>
+        ))}
+      </Section>
 
       {selector.countries.length > 0 ? (
-        <Section title={common("compareOffers")} tone="brand">
+        <Section tone="muted" title={common("compareOffers")} lead={t("selectorLead")} width="narrow">
           <EntrySelector countries={selector.countries} products={selector.products} defaultCountry={selector.defaultCountry} />
         </Section>
       ) : null}

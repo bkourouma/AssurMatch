@@ -36,7 +36,12 @@ function isPublicPath(pathname: string): boolean {
     pathname.startsWith("/mfa") ||
     pathname.startsWith("/_next") ||
     pathname === "/favicon.ico" ||
-    pathname === "/robots.txt";
+    pathname === "/robots.txt" ||
+    // Brand assets rendered on the auth screens (and fetched by the Next image optimizer).
+    pathname === "/icon.png" ||
+    pathname === "/logo-assurmatch.png" ||
+    pathname === "/logo-assurmatch-white.png" ||
+    pathname === "/logo-assurmatch-symbol.png";
 }
 
 function isAdminProfile(profile: Profile): boolean {

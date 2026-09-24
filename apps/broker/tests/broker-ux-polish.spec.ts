@@ -18,19 +18,24 @@ function files(dir: string): string[] {
 test("broker shell exposes broker-only navigation and keeps auth routes simple", () => {
   const layout = source("apps/broker/app/layout.tsx");
   const shell = source("apps/broker/app/lib/ui/broker-shell.tsx");
-  const css = source("apps/broker/app/globals.css");
+  // Le shell back-office est desormais le design system partage: la feuille de style vit la-bas.
+  const css = source("packages/ui/styles/backoffice.css");
 
   expect(layout).toContain("BrokerShell");
-  expect(layout).toContain("./globals.css");
+  expect(layout).toContain("@assurmatch/ui/backoffice.css");
   expect(shell).toContain("Back-office Courtier");
   for (const label of ["Dashboard", "Leads", "CRM", "Equipe", "Compte"]) {
     expect(shell).toContain(`label: "${label}"`);
   }
-  expect(shell).toContain("data-broker-auth-shell=\"simple\"");
+  // Les ecrans d'authentification restent hors du shell applicatif.
+  expect(shell).toContain("AuthShell");
+  expect(shell).toContain("data-broker-auth-shell\": \"simple\"");
+  expect(shell).toContain("data-broker-shell\": \"true\"");
   expect(shell).toContain("Navigation courtier principale");
   expect(shell).not.toContain("/admin");
   expect(shell).not.toContain("Navigation admin principale");
-  expect(css).toContain(".broker-shell");
+  expect(shell).not.toContain("admin-shell");
+  expect(css).toContain(".bo-shell");
   expect(css).toContain("@media (max-width: 780px)");
   expect(css).toContain(":focus-visible");
 });
@@ -44,7 +49,7 @@ test("broker dashboard and account surfaces use polished primitives", () => {
   expect(home).toContain("dashboardKpis");
   expect(home).toContain("Notifications");
   expect(account).toContain("Securite du compte");
-  expect(account).toContain("definition-list");
+  expect(account).toContain("DescriptionList");
   expect(team).toContain("Module indisponible");
   expect(team).toContain("Permissions conservees");
 });

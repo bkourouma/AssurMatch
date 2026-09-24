@@ -5,6 +5,8 @@ import { BrokerBlock } from "../../../../components/ui/broker-block";
 import { Button } from "../../../../components/ui/button";
 import { EmptyState } from "../../../../components/ui/empty-state";
 import { Hero } from "../../../../components/ui/hero";
+import { Icon } from "../../../../components/ui/icons";
+import { Reveal } from "../../../../components/motion/reveal";
 import { Section } from "../../../../components/ui/section";
 import { listCountryDirectory, listCountryPartners, listPublicProducts } from "../../../../lib/public-api";
 import { buildMetadata, localeUrl } from "../../../../lib/seo";
@@ -61,23 +63,32 @@ export default async function CountryBrokersPage({ params }: { params: Promise<P
 
   return (
     <>
-      <div className="am-container">
-        <Breadcrumb
-          label={common("breadcrumbLabel")}
-          items={[
-            { name: common("home"), url: localeUrl(locale, "/") },
-            { name: countries("breadcrumb"), url: localeUrl(locale, "/countries") },
-            { name: countryName, url: localeUrl(locale, "/countries/[countryCode]", { countryCode }) },
-            { name: t("breadcrumb"), url: localeUrl(locale, "/countries/[countryCode]/brokers", { countryCode }) }
-          ]}
-        />
-      </div>
+      <Hero
+        kicker={countries("breadcrumb")}
+        title={t("heading", { countryCode: countryName })}
+        lead={t("intro")}
+        size="sm"
+        breadcrumb={
+          <Breadcrumb
+            label={common("breadcrumbLabel")}
+            items={[
+              { name: common("home"), url: localeUrl(locale, "/") },
+              { name: countries("breadcrumb"), url: localeUrl(locale, "/countries") },
+              { name: countryName, url: localeUrl(locale, "/countries/[countryCode]", { countryCode }) },
+              { name: t("breadcrumb"), url: localeUrl(locale, "/countries/[countryCode]/brokers", { countryCode }) }
+            ]}
+          />
+        }
+      />
 
-      <Hero title={t("heading", { countryCode: countryName })} lead={t("intro")} />
-
+      {/* No section heading: the hero's H1 already names this list, and the cards carry no heading
+          of their own, so there is no level to skip over. */}
       <Section ariaLabel={t("listLabel")}>
         {partners.status === "error" ? (
           <EmptyState
+            icon="wifi-off"
+            tone="muted"
+            align="center"
             title={t("error.title")}
             description={t("error.description")}
             action={
@@ -90,6 +101,9 @@ export default async function CountryBrokersPage({ params }: { params: Promise<P
 
         {partners.status !== "error" && partners.data.length === 0 ? (
           <EmptyState
+            icon="users"
+            tone="muted"
+            align="center"
             title={t("empty.title")}
             description={t("empty.description")}
             action={
@@ -101,7 +115,7 @@ export default async function CountryBrokersPage({ params }: { params: Promise<P
         ) : null}
 
         {partners.status !== "error" && partners.data.length > 0 ? (
-          <ul className="am-countrygrid">
+          <Reveal as="ul" stagger className="am-j-cardgrid">
             {partners.data.map((partner) => {
               const productLabels = partner.productKeys.map((key) => {
                 const match = countryProducts.data.find((candidate) => candidate.key.toLowerCase() === key.toLowerCase());
@@ -114,13 +128,15 @@ export default async function CountryBrokersPage({ params }: { params: Promise<P
                     licenceNumber={partner.licenseNumber}
                     issuingAuthority={partner.issuingAuthority}
                     labels={brokerLabels}
+                    approved
                     {...(partner.city ? { city: partner.city } : {})}
                     {...(productLabels.length > 0 ? { products: productLabels } : {})}
                   />
-                  <div className="am-cluster">
+                  <div className="am-j-cardgrid__actions">
                     <Button
                       variant="secondary"
                       href={{ pathname: "/countries/[countryCode]/brokers/[partnerId]", params: { countryCode, partnerId: partner.id } }}
+                      iconAfter={<Icon name="arrow-right" size={18} />}
                     >
                       {t("viewBroker")}
                     </Button>
@@ -128,7 +144,7 @@ export default async function CountryBrokersPage({ params }: { params: Promise<P
                 </li>
               );
             })}
-          </ul>
+          </Reveal>
         ) : null}
       </Section>
     </>

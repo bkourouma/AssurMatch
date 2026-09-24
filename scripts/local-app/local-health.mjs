@@ -114,7 +114,8 @@ reportNotificationWorker();
 
 function reportNotificationWorker() {
   const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
-  const logPath = path.join(root, ".local", "logs", "worker-notifications.out.log");
+  const logDir = process.env.ASSURMATCH_LOCAL_LOG_DIR || path.join(root, ".local", "logs");
+  const logPath = path.resolve(root, logDir, "worker-notifications.out.log");
   const maxAgeSeconds = Number(process.env.ASSURMATCH_LOCAL_WORKER_MAX_LOG_AGE_SECONDS ?? "120");
   let ageSeconds;
   try {

@@ -1,18 +1,23 @@
 import { readActivationChecklist } from "../lib/admin-api";
-import { Badge, Card, DataTable, KpiCard, PageHeader, StateMessage } from "../lib/ui/admin-ui";
-
-function tone(status: "passed" | "warning" | "blocked") {
-  if (status === "passed") return "success";
-  if (status === "warning") return "warning";
-  return "danger";
-}
+import {
+  Card,
+  DataTable,
+  Grid,
+  KpiCard,
+  PageHeader,
+  PageStack,
+  StateMessage,
+  StatusBadge,
+  checklistStatusTones
+} from "../lib/ui/admin-ui";
 
 export default async function ActivationChecklistPage() {
   const checklist = await readActivationChecklist();
 
   return (
-    <div className="page-stack">
+    <PageStack>
       <PageHeader
+        breadcrumb={[{ label: "Plateforme" }, { label: "Activation" }]}
         kicker="Activation controlee"
         title="Checklist technique d'activation"
         description="Verification lecture seule des preconditions techniques pays, produit, consentement, formulaire, partenaire, licence, offre et flags avant exposition publique."
@@ -24,18 +29,19 @@ export default async function ActivationChecklistPage() {
 
       {checklist.status === "success" ? (
         <>
-          <section className="admin-grid admin-grid--kpi" aria-label="Synthese checklist activation">
+          <Grid columns="kpi" as="section" aria-label="Synthese checklist activation">
             <KpiCard label="Prets techniquement" value={checklist.data.summary.passed} tone="success" />
             <KpiCard label="A surveiller" value={checklist.data.summary.warning} tone="warning" />
             <KpiCard label="Bloquants" value={checklist.data.summary.blocked} tone="danger" />
-          </section>
+          </Grid>
 
           <Card>
             <DataTable
               columns={[
-                { header: "Section", render: (section) => <strong>{section.title}</strong> },
-                { header: "Statut", render: (section) => <Badge tone={tone(section.status)}>{section.status}</Badge> },
+                { key: "section", header: "Section", render: (section) => <strong>{section.title}</strong> },
+                { key: "status", header: "Statut", render: (section) => <StatusBadge status={section.status} tones={checklistStatusTones} /> },
                 {
+                  key: "scope",
                   header: "Scope",
                   render: (section) => [
                     section.scope.countryCode,
@@ -44,12 +50,13 @@ export default async function ActivationChecklistPage() {
                   ].filter(Boolean).join(" / ") || "global"
                 },
                 {
+                  key: "controls",
                   header: "Controles",
                   render: (section) => (
-                    <ul className="simple-list">
+                    <ul className="bo-list">
                       {section.controls.map((control) => (
                         <li key={control.key}>
-                          <Badge tone={tone(control.status)}>{control.status}</Badge> {control.label}: {control.evidence}
+                          <StatusBadge status={control.status} tones={checklistStatusTones} /> {control.label}: {control.evidence}
                         </li>
                       ))}
                     </ul>
@@ -59,6 +66,7 @@ export default async function ActivationChecklistPage() {
               items={checklist.data.sections}
               getKey={(section) => section.key}
               emptyLabel="Aucune precondition d'activation disponible."
+              aria-label="Preconditions techniques d'activation"
             />
           </Card>
 
@@ -67,6 +75,6 @@ export default async function ActivationChecklistPage() {
           </StateMessage>
         </>
       ) : null}
-    </div>
+    </PageStack>
   );
 }

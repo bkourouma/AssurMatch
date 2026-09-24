@@ -1,21 +1,26 @@
-import { Icon } from "../ui/icons";
+import { Card } from "../ui/card";
+import { IconTile } from "../ui/icon-tile";
+import { Reveal } from "../motion/reveal";
 import type { BillableLeadCriterion } from "../../content/brokers";
 
 export interface BillableCriteriaListProps {
   criteria: readonly BillableLeadCriterion[];
-  label: string;
 }
 
-/** The seven criteria that make a lead billable (PRD section 24), so a broker sees exactly what is charged. */
-export function BillableCriteriaList({ criteria, label }: BillableCriteriaListProps) {
+/**
+ * The seven criteria that make a lead billable (PRD section 24), so a broker sees exactly what is
+ * charged. Green is used here exactly as the design system allows it: a validation tick, never a
+ * background or a button.
+ */
+export function BillableCriteriaList({ criteria }: BillableCriteriaListProps) {
   return (
-    <ul className="am-criterialist" aria-label={label}>
+    <Reveal as="ul" stagger className="am-criterialist">
       {criteria.map((criterion) => (
-        <li className="am-criterialist__item" key={criterion.id}>
-          <Icon name="check" size={20} className="am-criterialist__icon" />
+        <Card as="li" key={criterion.id} padding="sm" className="am-criterialist__item">
+          <IconTile name="check" tone="success" size="sm" />
           <p className="am-criterialist__text">{criterion.label}</p>
-        </li>
+        </Card>
       ))}
-    </ul>
+    </Reveal>
   );
 }

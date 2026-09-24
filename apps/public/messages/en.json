@@ -13,7 +13,8 @@
     "menu": {
       "open": "Menu",
       "close": "Close menu",
-      "label": "Mobile menu"
+      "label": "Mobile menu",
+      "brokerSpace": "Broker area"
     },
     "languageSwitcher": {
       "label": "Language",
@@ -73,7 +74,10 @@
         "glossary": "Glossary"
       },
       "regulatorySentence": "AssurMatch is a technical platform for indicative insurance comparison and introduction to authorised partner brokers. Displayed offers are indicative: every indicative price remains to be confirmed by the responsible partner broker. AssurMatch does not sell insurance, does not issue any contract or certificate and does not collect any premium.",
-      "sponsoredSentence": "The countries, products and offers on display depend on public activations. A sponsored offer is always labelled as such."
+      "sponsoredSentence": "The countries, products and offers on display depend on public activations. A sponsored offer is always labelled as such.",
+      "allGuides": "All guides",
+      "rights": "All rights reserved.",
+      "backToTop": "Back to top"
     }
   },
   "Common": {
@@ -108,7 +112,7 @@
     "comparisonBar": {
       "label": "Selection to compare",
       "count": "{count, plural, one {# offer selected} other {# offers selected}}",
-      "action": "Compare"
+      "action": "Compare the selection"
     },
     "progress": {
       "label": "Request progress",
@@ -180,9 +184,54 @@
     "regulatoryTitle": "Regulatory status",
     "regulatoryLead": "AssurMatch is paid by the partner brokers, never by the visitor.",
     "regulatoryLink": "Read our regulatory status",
+    "statsKicker": "In figures",
+    "stepsKicker": "The journey",
+    "roleKicker": "Transparency",
+    "signatureKicker": "AssurMatch",
+    "signatureLead": "Compare indicative offers, then let an authorised partner broker confirm the quote and the conditions.",
+    "preview": {
+      "product": "Car insurance",
+      "partner": "Authorised partner broker",
+      "badge": "Indicative offer",
+      "scoreLabel": "Indicative score",
+      "priceLabel": "Indicative price",
+      "priceValue": "To be confirmed",
+      "guaranteeCivil": "Third-party liability",
+      "guaranteeTheft": "Theft and fire",
+      "guaranteeAssistance": "Assistance"
+    },
+    "role": {
+      "does": {
+        "title": "What AssurMatch does",
+        "compare": "Compares indicative offers, country by country and product by product.",
+        "explain": "Explains the guarantees, the indicative price and the score displayed.",
+        "transmit": "Sends your request to an authorised partner broker, after your explicit consent.",
+        "flag": "Flags every sponsored offer with a visible orange badge."
+      },
+      "doesNot": {
+        "title": "What AssurMatch does not do",
+        "sell": "Does not sell insurance.",
+        "issue": "Issues neither a policy nor a certificate.",
+        "collect": "Collects no premium.",
+        "advise": "Gives no binding personal advice."
+      }
+    },
+    "guides": {
+      "kicker": "Guides",
+      "title": "Understand before you compare",
+      "lead": "Plain explanations of guarantees and indicative prices, with no binding personal advice.",
+      "read": "Read",
+      "all": "See every guide",
+      "updated": "Updated on {date}"
+    },
     "fineprint": "Displayed prices are indicative and remain to be confirmed by the partner broker. A sponsored offer is always flagged."
   },
   "Countries": {
+    "kicker": "Countries covered",
+    "capability": {
+      "comparison": "Indicative comparison",
+      "quote": "Quote request"
+    },
     "breadcrumb": "Countries",
     "title": "Countries covered by AssurMatch",
     "description": "Open countries, pilot countries and countries coming soon, with their level of public opening.",
@@ -218,6 +267,7 @@
     "fineprint": "Opening a country depends on authorised partner brokers being listed and validated offers being available."
   },
   "Country": {
+    "kicker": "Country page",
     "title": "Insurance in {country}",
     "description": "Comparable products, authorised partner brokers and quote requests for {country}.",
     "lead": "The visible products depend on the public activations per country and per product. The indicative price remains to be confirmed by the partner broker.",
@@ -283,6 +333,13 @@
     }
   },
   "Product": {
+    "kicker": "Product page",
+    "offersCount": "{count, plural, one {# indicative offer published} other {# indicative offers published}}",
+    "scoreTitle": "How the indicative score is calculated",
+    "scoreLead": "The score only compares the offers displayed here with one another, on objective criteria and according to the priority you choose.",
+    "scoreFineprint": "The score stays indicative: it is neither personalised advice nor an official ranking, and sponsorship has no effect on how it is calculated.",
+    "assistantTitle": "Optional assistance",
+    "assistantLead": "Help with understanding, without personalised advice. It never conditions the rest of your journey.",
     "back": "Back to the {countryCode} products",
     "title": "{product} in {country}",
     "titleFallback": "Product {productKey} in {country}",
@@ -309,10 +366,13 @@
     "fineprint": "Expired or unvalidated offers are not shown as available. The indicative price remains to be confirmed by the partner broker."
   },
   "Offers": {
+    "kicker": "{product} · {country}",
+    "filtersActive": "{count, plural, one {# active filter} other {# active filters}}",
+    "sortedBy": "Sorted by: {sort}",
     "back": "Back to the {productKey} product",
     "breadcrumb": "Indicative offers",
     "title": "Compare the offers",
-    "description": "Comparable indicative offers for {productKey} in {countryCode}, with an explained score.",
+    "description": "Comparable indicative offers for {productName} in {countryName}, with an explained score.",
     "lead": "Every offer is indicative: the indicative price and the conditions remain to be confirmed by the responsible partner broker.",
     "filtersLabel": "Filters",
     "filtersLegend": "Filters",
@@ -325,11 +385,13 @@
     "maxDeductible": "Maximum deductible",
     "maxProcessingDays": "Maximum processing time (days)",
     "insurer": "Insurer",
-    "guarantee": "Included guarantee (key)",
+    "guarantee": "Included guarantee",
+    "guaranteeEmpty": "No guarantee is published on the offers displayed.",
     "paymentFlexibility": "Payment flexibility",
     "broker": "Partner broker",
     "sortLegend": "Sorting and priority",
     "sortLabel": "Sort by",
+    "sortApply": "Update",
     "sort": {
       "updated_desc": "Last update",
       "price_asc": "Indicative price, ascending",
@@ -371,10 +433,33 @@
     "fineprint": "The score is indicative, computed from your criteria against the offers displayed. A sponsored offer is always flagged. No expired or unvalidated offer is displayed."
   },
   "Compare": {
+    "kicker": "Indicative comparison",
+    "scrollHint": "Scroll the table sideways to see every offer.",
     "breadcrumb": "Comparison",
     "title": "Compare the offers side by side",
     "description": "Indicative comparison of 2 to 4 offers of the same country and the same product.",
     "lead": "The criteria are aligned row by row. The indicative price remains to be confirmed by the responsible partner broker.",
+    "start": {
+      "title": "Choose the offers to compare",
+      "lead": "Choose a country and a product, then tick 2 to 4 indicative offers: their criteria are then aligned row by row.",
+      "selectorTitle": "Where to start"
+    },
+    "how": {
+      "title": "How to compare",
+      "lead": "Three steps, with no account to create.",
+      "country": {
+        "title": "1. Choose the country and the product",
+        "description": "A comparison covers one country and one product at a time."
+      },
+      "offers": {
+        "title": "2. Tick 2 to 4 indicative offers",
+        "description": "Every offer shows its indicative price, its guarantees and its explained score."
+      },
+      "compare": {
+        "title": "3. Read the side-by-side table",
+        "description": "The criteria are aligned row by row and the sponsorship mentions stay visible."
+      }
+    },
     "selectionError": {
       "title": "Incomplete selection",
       "description": "Select between 2 and 4 indicative offers of the same country and the same product to compare them."
@@ -388,9 +473,13 @@
     "scoresTitle": "Indicative scores",
     "scoresLabel": "Indicative scores",
     "journeyLabel": "Public journey",
-    "backToCountries": "Compare the offers"
+    "seeCountries": "See the open countries"
   },
   "OfferDetail": {
+    "kicker": "Indicative offer",
+    "allCriteria": "All criteria and the score breakdown",
+    "brokerTitle": "Responsible partner broker",
+    "brokerDirectory": "See the partner brokers",
     "breadcrumb": "Indicative offer",
     "title": "Indicative offer detail",
     "description": "Guarantees, limits, validity and responsible partner broker of an indicative offer.",
@@ -408,9 +497,10 @@
     "actionsLabel": "Actions",
     "compare": "Compare the offers",
     "quote": "Request a quote",
-    "backToCountries": "Compare the offers"
+    "backToCountries": "See the open countries"
   },
   "QuoteForm": {
+    "kicker": "{product} · {country}",
     "breadcrumb": "Quote request",
     "title": "Request a quote",
     "description": "Indicative quote request transmitted to an authorised partner broker after explicit consent.",
@@ -442,8 +532,9 @@
     "submitting": "Sending in progress.",
     "submit": "Request a quote",
     "successTitle": "Request received",
-    "successPrefix": "Request received. Public reference:",
+    "successPrefix": "Public reference:",
     "trackLink": "Follow my request and add documents (optional)",
+    "backToOffers": "Back to the offers",
     "blocked": {
       "title": "Quote request unavailable",
       "description": "Quote requests are not available for this country or this product."
@@ -451,6 +542,15 @@
     "fineprint": "AssurMatch does not sell insurance and issues neither a policy nor a certificate. The responsible partner broker confirms the quote and the conditions."
   },
   "QuoteRequest": {
+    "referenceLabel": "Public reference",
+    "copy": "Copy the reference",
+    "copied": "Reference copied",
+    "nextSteps": {
+      "title": "Next steps",
+      "one": "Your request is saved under the reference above: keep it for any exchange.",
+      "two": "An authorised partner broker picks up your request when routing is possible for this country and this product.",
+      "three": "You can add optional documents or withdraw your consent from this page."
+    },
     "breadcrumb": "Request tracking",
     "kicker": "Quote request",
     "title": "Request received {reference}",
@@ -544,6 +644,10 @@
     "full": "Maximum number of documents reached for this request."
   },
   "OfferCards": {
+    "pick": "Add to the comparison",
+    "picked": "Selected",
+    "detailsSummary": "Detailed guarantees and score breakdown",
+    "moreGuarantees": "{count, plural, one {+ # guarantee} other {+ # guarantees}}",
     "notProvided": "not provided",
     "sponsored": "Sponsored",
     "sponsoredWithLabel": "Sponsored ({label})",
@@ -651,14 +755,24 @@
     "breadcrumb": "How it works",
     "lead": "Three simple steps, with no commitment before the responsible partner broker confirms.",
     "stepsHeading": "The three steps",
+    "kicker": "The journey",
+    "stepsLead": "From the indicative comparison to your request being taken over by an authorised partner broker.",
+    "notDoneKicker": "Scope",
+    "linksKicker": "Go further",
     "linksHeading": "Go further",
+    "linksLead": "The regulatory framework of AssurMatch and the countries already open.",
     "seeRegulatoryStatus": "See the regulatory status",
-    "compareCountries": "See the available countries"
+    "seeRegulatoryStatusHint": "Remuneration, ranking of offers, sponsored offers and indicative prices.",
+    "compareCountries": "See the available countries",
+    "compareCountriesHint": "The open countries and the products offered by authorised partner brokers.",
+    "openLink": "Open"
   },
   "RegulatoryStatus": {
     "title": "Regulatory status",
     "description": "The technical role of AssurMatch and the responsibility of authorised partner brokers.",
     "breadcrumb": "Regulatory status",
+    "kicker": "Transparency",
+    "navLabel": "Sections of this page",
     "lead": "How AssurMatch is paid, how offers are ranked, and what an indicative price means."
   },
   "Legal": {
@@ -669,14 +783,21 @@
     "placeholderNotice": "information to be completed before launch",
     "countryNoticeWithOverride": "You are viewing the version of this page applicable in {country}.",
     "countryNoticeFallback": "No local specifics are recorded yet for {country}: the general text below applies.",
-    "backToGlobal": "See the general version"
+    "backToGlobal": "See the general version",
+    "kicker": "Legal information",
+    "tocTitle": "Contents"
   },
   "Guides": {
     "title": "Guides",
     "description": "Practical guides to understand insurance, without personalised advice.",
     "breadcrumb": "Guides",
+    "kicker": "Guides",
     "lead": "Simple explanations to compare with confidence, without binding personal advice.",
     "updated": "Updated on {date}",
+    "read": "Read",
+    "contents": "Contents",
+    "moreTitle": "More guides",
+    "selectorLead": "Pick a country and a product to display the matching indicative offers.",
     "backToGuides": "Back to guides",
     "relatedProduct": "Related product"
   },
@@ -684,14 +805,21 @@
     "title": "Glossary",
     "description": "Insurance terms explained simply.",
     "breadcrumb": "Glossary",
+    "kicker": "Glossary",
     "lead": "Insurance vocabulary, in plain language.",
+    "indexLabel": "Alphabetical index",
+    "termCount": "{count, plural, one {# term explained} other {# terms explained}}",
+    "selectorLead": "Pick a country and a product to display the matching indicative offers.",
     "seeAlso": "See also"
   },
   "Faq": {
     "title": "FAQ",
     "description": "Frequently asked questions about AssurMatch and indicative comparison.",
     "breadcrumb": "FAQ",
+    "kicker": "Frequent questions",
     "lead": "Answers to the most frequent questions about AssurMatch.",
+    "questionCount": "{count, plural, one {# question} other {# questions}}",
+    "selectorLead": "Pick a country and a product to display the matching indicative offers.",
     "relatedProduct": "Related product"
   },
   "Contact": {
@@ -699,6 +827,14 @@
     "description": "Contact the AssurMatch team.",
     "breadcrumb": "Contact",
     "lead": "A question about an offer, a broker or insurer partnership, or the press: write to us.",
+    "kicker": "Write to us",
+    "formTitle": "Your message",
+    "asideTitle": "Before you write",
+    "asideResponse": "Our team answers by e-mail, Monday to Friday.",
+    "asideNoAdvice": "AssurMatch gives no binding personal advice: the quote and the conditions are still confirmed by an authorised partner broker.",
+    "asidePrivacy": "Your details are used only to answer your message.",
+    "asideFaq": "Many questions are already answered in the FAQ.",
+    "asideFaqLink": "Read the FAQ",
     "audienceLegend": "You are",
     "audienceVisitor": "Visitor",
     "audienceVisitorHint": "A question about an offer, a quote or a request in progress.",
@@ -712,6 +848,8 @@
     "emailLabel": "E-mail",
     "phoneLabel": "Phone",
     "countryLabel": "Country concerned",
+    "countryUnspecified": "Not specified",
+    "errorSummary": "Several fields need to be corrected before sending.",
     "subjectLabel": "Subject",
     "messageLabel": "Message",
     "honeypotLabel": "Website (leave blank)",
@@ -731,6 +869,7 @@
     "description": "Join the network of authorised AssurMatch partner brokers.",
     "breadcrumb": "Partner brokers",
     "hero": {
+      "kicker": "Partner broker network",
       "lead": "AssurMatch forwards qualified quote requests to authorised partner brokers. Compare plans, submit an application or access your broker workspace.",
       "applyCta": "Become a partner",
       "loginCta": "Access the broker workspace"
@@ -742,12 +881,14 @@
       "positioning": "Positioning",
       "audience": "Audience",
       "features": "Features",
+      "compareDetails": "Compare plans in detail",
       "includesPrefix": "Everything in {plan}, plus:"
     },
     "lead": {
       "title": "What a broker receives",
       "lead": "Here is, for illustration, the record of a request transmitted to an assigned partner broker.",
       "badgeLabel": "Illustrative example",
+      "disclaimer": "No real personal data: purely illustrative example.",
       "fields": {
         "reference": "Reference",
         "country": "Country",
@@ -785,6 +926,7 @@
     "description": "Subscription plans for partner brokers.",
     "breadcrumb": "Broker pricing",
     "lead": "Pricing for partner brokers: monthly subscription and per-qualified-lead billing, specific to each country.",
+    "plansTitle": "Plans and prices",
     "countrySelector": {
       "label": "Country",
       "submit": "Show pricing"
@@ -812,7 +954,8 @@
     "breadcrumb": "Become a partner",
     "lead": "This application is a statement of intent reviewed by our compliance team. It does not activate any broker account.",
     "form": {
-      "licenceLegend": "Identity and licence",
+      "identityLegend": "Company",
+      "licenceLegend": "Licence and capacity",
       "legalName": "Legal name",
       "tradeName": "Trade name",
       "tradeNameHint": "Optional, if different from the legal name.",
@@ -836,6 +979,7 @@
       "whatsapp": "WhatsApp",
       "whatsappHint": "Optional, international format.",
       "planLegend": "Desired plan",
+      "messageLegend": "Message and consent",
       "message": "Message",
       "messageHint": "Optional: any detail useful to review your application.",
       "consent": "I agree that this information is shared with the AssurMatch compliance team to review my application.",

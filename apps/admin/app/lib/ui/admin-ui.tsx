@@ -1,76 +1,74 @@
-import type { ReactNode } from "react";
+/**
+ * Admin re-export of the shared back-office design system.
+ *
+ * Every page keeps importing `../lib/ui/admin-ui`, but the components now come from
+ * `@assurmatch/ui/backoffice`. Only admin-specific mappings live here: the shared package holds no
+ * surface vocabulary, so the status wording and the status colours of this back-office are decided
+ * in this file and nowhere else.
+ */
 
-export type Tone = "neutral" | "success" | "warning" | "danger" | "info" | "disabled";
+export * from "@assurmatch/ui/backoffice";
 
-export function PageHeader({ kicker, title, description, actions }: { kicker?: string; title: string; description?: string; actions?: ReactNode }) {
-  return (
-    <header className="page-header">
-      <div>
-        {kicker ? <p className="page-kicker">{kicker}</p> : null}
-        <h1 className="page-title">{title}</h1>
-        {description ? <p className="page-description">{description}</p> : null}
-      </div>
-      {actions ? <div>{actions}</div> : null}
-    </header>
-  );
-}
+import type { Tone } from "@assurmatch/ui/backoffice";
 
-export function Card({ children, plain = false }: { children: ReactNode; plain?: boolean }) {
-  return <section className={`admin-card${plain ? " admin-card--plain" : ""}`}><div className="admin-card__body">{children}</div></section>;
-}
+/**
+ * Status colours of the admin surface. The keys are the raw API statuses and the displayed text
+ * stays the raw status: `StatusBadge` is used without a `labels` map so the operational vocabulary
+ * of the back-office is unchanged.
+ */
+export const userStatusTones: Record<string, Tone> = {
+  active: "success",
+  suspended: "danger",
+  locked: "danger",
+  invited: "warning",
+  deleted: "warning"
+};
 
-export function KpiCard({ label, value, helper, tone = "neutral" }: { label: string; value: ReactNode; helper?: string; tone?: Tone }) {
-  return (
-    <article className="kpi-card" data-tone={tone} aria-label={label}>
-      <div>
-        <p className="kpi-card__label">{label}</p>
-        <p className="kpi-card__value">{value}</p>
-      </div>
-      {helper ? <p className="kpi-card__helper">{helper}</p> : null}
-    </article>
-  );
-}
+export const mfaStatusTones: Record<string, Tone> = {
+  verified: "success",
+  enrolled: "success",
+  not_enrolled: "warning",
+  pending: "warning"
+};
 
-export function Badge({ children, tone = "neutral" }: { children: ReactNode; tone?: Tone }) {
-  return <span className="badge" data-tone={tone}>{children}</span>;
-}
+export const quoteFormStatusTones: Record<string, Tone> = {
+  published: "success",
+  draft: "neutral",
+  suspended: "warning",
+  retired: "disabled"
+};
 
-export function StateMessage({ title, children, tone = "neutral" }: { title?: string; children: ReactNode; tone?: Tone }) {
-  return (
-    <div className="state-message" data-tone={tone} role={tone === "danger" ? "alert" : "status"}>
-      {title ? <strong>{title}</strong> : null}
-      <div>{children}</div>
-    </div>
-  );
-}
+export const offerStatusTones: Record<string, Tone> = {
+  active: "success",
+  suspended: "danger",
+  draft: "warning",
+  expired: "warning",
+  pending: "warning"
+};
 
-export interface TableColumn<T> {
-  header: string;
-  render: (item: T) => ReactNode;
-}
+export const ruleStatusTones: Record<string, Tone> = {
+  active: "success",
+  disabled: "disabled"
+};
 
-export function DataTable<T>({ columns, items, getKey, emptyLabel }: { columns: Array<TableColumn<T>>; items: T[]; getKey: (item: T) => string; emptyLabel: string }) {
-  return (
-    <div className="admin-table-wrap">
-      <table className="admin-table">
-        <thead>
-          <tr>
-            {columns.map((column) => <th key={column.header} scope="col">{column.header}</th>)}
-          </tr>
-        </thead>
-        <tbody>
-          {items.map((item) => (
-            <tr key={getKey(item)}>
-              {columns.map((column) => <td key={column.header}>{column.render(item)}</td>)}
-            </tr>
-          ))}
-          {items.length === 0 ? (
-            <tr>
-              <td colSpan={columns.length}>{emptyLabel}</td>
-            </tr>
-          ) : null}
-        </tbody>
-      </table>
-    </div>
-  );
-}
+export const documentScanTones: Record<string, Tone> = {
+  clean: "success",
+  infected: "danger",
+  failed: "warning",
+  pending: "disabled"
+};
+
+export const integrationStatusTones: Record<string, Tone> = {
+  active: "success",
+  delivered: "success",
+  pending: "warning",
+  retryable: "warning",
+  dead_letter: "danger",
+  failed: "danger"
+};
+
+export const checklistStatusTones: Record<string, Tone> = {
+  passed: "success",
+  warning: "warning",
+  blocked: "danger"
+};

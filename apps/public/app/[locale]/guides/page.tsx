@@ -1,11 +1,15 @@
 import { getTranslations, setRequestLocale } from "next-intl/server";
-import { Link } from "../../../i18n/navigation";
 import { toLocale, type AppLocale } from "../../../i18n/routing";
 import { listGuides } from "../../content/guides";
+import { GuideCard } from "../../components/institutional/guide-card";
 import { Breadcrumb } from "../../components/ui/breadcrumb";
+import { Hero } from "../../components/ui/hero";
 import { Section } from "../../components/ui/section";
+import { Reveal } from "../../components/motion/reveal";
+import { formatDate } from "../../lib/country-format";
 import { buildMetadata, localeUrl } from "../../lib/seo";
 import type { PageMetadata } from "../../lib/seo";
+import "../../styles/pages/institutional.css";
 
 export async function generateMetadata({ params }: { params: Promise<{ locale: string }> }): Promise<PageMetadata> {
   const locale = toLocale((await params).locale);
@@ -22,28 +26,35 @@ export default async function GuidesIndexPage({ params }: { params: Promise<{ lo
 
   return (
     <>
-      <div className="am-container">
-        <Breadcrumb
-          label={common("breadcrumbLabel")}
-          items={[
-            { name: common("home"), url: localeUrl(locale, "/") },
-            { name: t("breadcrumb"), url: localeUrl(locale, "/guides") }
-          ]}
-        />
-      </div>
+      <Hero
+        kicker={t("kicker")}
+        title={t("title")}
+        lead={t("lead")}
+        breadcrumb={
+          <Breadcrumb
+            label={common("breadcrumbLabel")}
+            items={[
+              { name: common("home"), url: localeUrl(locale, "/") },
+              { name: t("breadcrumb"), url: localeUrl(locale, "/guides") }
+            ]}
+          />
+        }
+      />
 
-      <Section headingLevel={1} title={t("title")} lead={t("lead")}>
-        <ul className="pub-cards pub-cards--two">
+      <Section>
+        <Reveal as="ul" stagger className="am-guidecards">
           {guides.map((guide) => (
-            <li className="pub-card" key={guide.slug}>
-              <h2 className="pub-card__title">
-                <Link href={{ pathname: "/guides/[slug]", params: { slug: guide.slug } }}>{guide.title}</Link>
-              </h2>
-              <p>{guide.description}</p>
-              <p className="pub-meta">{t("updated", { date: guide.updatedAt })}</p>
-            </li>
+            <GuideCard
+              key={guide.slug}
+              slug={guide.slug}
+              title={guide.title}
+              description={guide.description}
+              meta={t("updated", { date: formatDate(guide.updatedAt, { locale }) })}
+              readLabel={t("read")}
+              titleAs="h2"
+            />
           ))}
-        </ul>
+        </Reveal>
       </Section>
     </>
   );

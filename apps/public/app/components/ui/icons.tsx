@@ -1,10 +1,134 @@
-import type { ReactNode, SVGProps } from "react";
+import type { ComponentType, SVGProps } from "react";
+import {
+  ArrowLeft,
+  ArrowRight,
+  ArrowUpRight,
+  Award,
+  BadgeCheck,
+  Banknote,
+  BookOpen,
+  Bot,
+  Box,
+  Briefcase,
+  Building,
+  BuildingComplex,
+  Calculator,
+  Calendar,
+  Car,
+  ChartColumn,
+  ChartPie,
+  Check,
+  ChevronDown,
+  ChevronLeft,
+  ChevronRight,
+  ChevronUp,
+  CircleAlert,
+  CircleCheck,
+  CircleQuestionMark,
+  CircleX,
+  Clock,
+  Coins,
+  Compass,
+  Copy,
+  Cpu,
+  Database,
+  Download,
+  Ellipsis,
+  ExternalLink,
+  Eye,
+  FaceSlightlySmiling,
+  File as FileGlyph,
+  FileCheck,
+  FileText,
+  FingerprintPattern,
+  Flag,
+  Funnel,
+  GitBranch,
+  Globe,
+  GraduationCap,
+  Handshake,
+  Headphones,
+  HeartPulse,
+  House,
+  Info,
+  Key,
+  Landmark,
+  Layers,
+  LayoutGrid,
+  Leaf,
+  Lightbulb,
+  Link as LinkGlyph,
+  List,
+  LifeBuoy,
+  LoaderCircle,
+  Lock,
+  Mail,
+  MapPin,
+  Menu,
+  MessageCircle,
+  Minus,
+  Moon,
+  Newspaper,
+  Package,
+  Paperclip,
+  Percent,
+  Phone,
+  Plane,
+  Plus,
+  Quote,
+  Receipt,
+  RefreshCw,
+  Scale,
+  Search,
+  Send,
+  Server,
+  Settings,
+  Share,
+  Shield,
+  ShieldCheck,
+  Siren,
+  SlidersHorizontal,
+  Sparkles,
+  Star,
+  Stethoscope,
+  Sun,
+  Table,
+  Target,
+  ThumbsUp,
+  TrendingUp,
+  TriangleAlert,
+  Umbrella,
+  Upload,
+  User,
+  UserCheck,
+  Users,
+  Wallet,
+  WifiOff,
+  Workflow,
+  X,
+  Zap
+} from "lucide-react";
 
 /**
- * Inline 24px icon set drawn with `currentColor`. No icon dependency is added to the public app:
- * every glyph lives here, is decorative (`aria-hidden`) and inherits the colour of its container.
+ * Icon set of the public site: a thin wrapper over `lucide-react`, so every glyph shares one grid,
+ * one stroke and one optical weight. Icons are decorative (`aria-hidden`) and inherit `currentColor`;
+ * the meaning always lives in the text next to them.
+ *
+ * `whatsapp` has no lucide glyph and keeps the hand-drawn path of the original set.
  */
+
+function WhatsAppGlyph(props: SVGProps<SVGSVGElement>) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" {...props}>
+      <path d="M3.8 20.2 5 16.4A8.2 8.2 0 1 1 8.2 19.5l-4.4.7Z" />
+      <path d="M9 9c.3 2.5 3.5 5.7 6 6 .8.1 1.5-.6 1.5-1.4l-2-.9-1 1c-1.2-.5-2.7-2-3.2-3.2l1-1-.9-2C9.6 7.5 8.9 8.2 9 9Z" />
+    </svg>
+  );
+}
+
+/** Every icon the public site may use. The first 21 are the historical set and must keep working. */
 export const iconNames = [
+  // Historical set
   "check",
   "chevron-down",
   "chevron-right",
@@ -25,129 +149,242 @@ export const iconNames = [
   "arrow-right",
   "menu",
   "close",
-  "external"
+  "external",
+  // Navigation and direction
+  "arrow-left",
+  "arrow-up-right",
+  "chevron-left",
+  "chevron-up",
+  "minus",
+  "plus",
+  "x",
+  "more-horizontal",
+  // Insurance products
+  "car",
+  "plane",
+  "heart-pulse",
+  "home",
+  "briefcase",
+  "stethoscope",
+  "life-buoy",
+  "siren",
+  // Trust and compliance
+  "shield-check",
+  "badge-check",
+  "lock",
+  "eye",
+  "key",
+  "fingerprint",
+  "scale",
+  "landmark",
+  "flag",
+  // Intelligence
+  "sparkles",
+  "bot",
+  "lightbulb",
+  "target",
+  "compass",
+  "zap",
+  // Time and place
+  "clock",
+  "calendar",
+  "map-pin",
+  // Lists, filters and data
+  "filter",
+  "sliders",
+  "list",
+  "layout-grid",
+  "table",
+  "trending-up",
+  "bar-chart",
+  "pie-chart",
+  "layers",
+  "box",
+  "package",
+  "database",
+  "server",
+  "cpu",
+  "git-branch",
+  "workflow",
+  // Money
+  "calculator",
+  "coins",
+  "wallet",
+  "receipt",
+  "percent",
+  "banknote",
+  // People
+  "users",
+  "user-check",
+  "handshake",
+  "headphones",
+  "building-2",
+  // Messages and files
+  "message-circle",
+  "send",
+  "paperclip",
+  "upload",
+  "download",
+  "file-text",
+  "file-check",
+  // Status
+  "check-circle",
+  "x-circle",
+  "alert-triangle",
+  "help-circle",
+  "loader",
+  "refresh",
+  "wifi-off",
+  // Editorial
+  "book-open",
+  "graduation-cap",
+  "newspaper",
+  "quote",
+  "link",
+  "share",
+  "copy",
+  "settings",
+  // Sentiment and rewards
+  "award",
+  "thumbs-up",
+  "smile",
+  "sun",
+  "moon"
 ] as const;
 
 export type IconName = (typeof iconNames)[number];
 
-const paths: Record<IconName, ReactNode> = {
-  check: <path d="M4 12.5 9.5 18 20 6.5" />,
-  "chevron-down": <path d="m6 9.5 6 6 6-6" />,
-  "chevron-right": <path d="m9.5 6 6 6-6 6" />,
-  shield: <path d="M12 3 5 6v5.5c0 4.2 2.9 7.6 7 9.5 4.1-1.9 7-5.3 7-9.5V6l-7-3Z" />,
-  umbrella: (
-    <>
-      <path d="M12 3.5v1.2" />
-      <path d="M3 13a9 9 0 0 1 18 0c-1.6-1.2-3.2-1.2-4.8 0-1.6-1.2-3.2-1.2-4.8 0-1.6-1.2-3.2-1.2-4.8 0Z" />
-      <path d="M12 13v6a2 2 0 0 0 4 0" />
-    </>
-  ),
-  leaf: (
-    <>
-      <path d="M4 20c0-8 5-14 16-15 0 10-5 15-11 15a5 5 0 0 1-5 0Z" />
-      <path d="M9 15c2.5-2.5 5-4 9-5" />
-    </>
-  ),
-  phone: <path d="M6.5 3.5h3l1.5 4-2 1.5a12 12 0 0 0 6 6L16.5 13l4 1.5v3a2 2 0 0 1-2.2 2C10.4 19 5 13.6 4.5 5.7a2 2 0 0 1 2-2.2Z" />,
-  whatsapp: (
-    <>
-      <path d="M3.8 20.2 5 16.4A8.2 8.2 0 1 1 8.2 19.5l-4.4.7Z" />
-      <path d="M9 9c.3 2.5 3.5 5.7 6 6 .8.1 1.5-.6 1.5-1.4l-2-.9-1 1c-1.2-.5-2.7-2-3.2-3.2l1-1-.9-2C9.6 7.5 8.9 8.2 9 9Z" />
-    </>
-  ),
-  mail: (
-    <>
-      <path d="M3.5 6.5h17v11h-17z" />
-      <path d="m3.5 7 8.5 6 8.5-6" />
-    </>
-  ),
-  globe: (
-    <>
-      <circle cx="12" cy="12" r="8.5" />
-      <path d="M3.5 12h17" />
-      <path d="M12 3.5c2.2 2.4 3.3 5.3 3.3 8.5S14.2 18.1 12 20.5c-2.2-2.4-3.3-5.3-3.3-8.5S9.8 5.9 12 3.5Z" />
-    </>
-  ),
-  search: (
-    <>
-      <circle cx="11" cy="11" r="6.5" />
-      <path d="m16 16 4.5 4.5" />
-    </>
-  ),
-  alert: (
-    <>
-      <path d="M12 3.5 21 19.5H3L12 3.5Z" />
-      <path d="M12 9.5v4" />
-      <path d="M12 16.5h.01" />
-    </>
-  ),
-  info: (
-    <>
-      <circle cx="12" cy="12" r="8.5" />
-      <path d="M12 11v5.5" />
-      <path d="M12 7.8h.01" />
-    </>
-  ),
-  file: (
-    <>
-      <path d="M14 3.5H7a1.5 1.5 0 0 0-1.5 1.5v14A1.5 1.5 0 0 0 7 20.5h10a1.5 1.5 0 0 0 1.5-1.5V8L14 3.5Z" />
-      <path d="M13.8 3.7V8.2h4.5" />
-    </>
-  ),
-  user: (
-    <>
-      <circle cx="12" cy="8" r="3.8" />
-      <path d="M4.8 20.2a7.2 7.2 0 0 1 14.4 0" />
-    </>
-  ),
-  building: (
-    <>
-      <path d="M5 20.5V5.2A1.7 1.7 0 0 1 6.7 3.5h7.6A1.7 1.7 0 0 1 16 5.2v15.3" />
-      <path d="M16 10.5h2.3a1.7 1.7 0 0 1 1.7 1.7v8.3" />
-      <path d="M3.5 20.5h17" />
-      <path d="M8.3 7.5h4.4M8.3 11.5h4.4M8.3 15.5h4.4" />
-    </>
-  ),
-  star: <path d="m12 3.8 2.6 5.3 5.9.9-4.3 4.1 1 5.8-5.2-2.7-5.2 2.7 1-5.8L3.5 10l5.9-.9L12 3.8Z" />,
-  "arrow-right": (
-    <>
-      <path d="M4 12h15.5" />
-      <path d="m13.5 6 6 6-6 6" />
-    </>
-  ),
-  menu: <path d="M4 7h16M4 12h16M4 17h16" />,
-  close: <path d="m6 6 12 12M18 6 6 18" />,
-  external: (
-    <>
-      <path d="M13.5 4.5H19.5V10.5" />
-      <path d="m19.5 4.5-8 8" />
-      <path d="M18 14v4.5a1.5 1.5 0 0 1-1.5 1.5h-11A1.5 1.5 0 0 1 4 18.5v-11A1.5 1.5 0 0 1 5.5 6H10" />
-    </>
-  )
+type GlyphProps = SVGProps<SVGSVGElement> & { size?: number | string };
+
+const glyphs: Record<IconName, ComponentType<GlyphProps>> = {
+  check: Check,
+  "chevron-down": ChevronDown,
+  "chevron-right": ChevronRight,
+  shield: Shield,
+  umbrella: Umbrella,
+  leaf: Leaf,
+  phone: Phone,
+  whatsapp: WhatsAppGlyph,
+  mail: Mail,
+  globe: Globe,
+  search: Search,
+  alert: CircleAlert,
+  info: Info,
+  file: FileGlyph,
+  user: User,
+  building: Building,
+  star: Star,
+  "arrow-right": ArrowRight,
+  menu: Menu,
+  close: X,
+  external: ExternalLink,
+  "arrow-left": ArrowLeft,
+  "arrow-up-right": ArrowUpRight,
+  "chevron-left": ChevronLeft,
+  "chevron-up": ChevronUp,
+  minus: Minus,
+  plus: Plus,
+  x: X,
+  "more-horizontal": Ellipsis,
+  car: Car,
+  plane: Plane,
+  "heart-pulse": HeartPulse,
+  home: House,
+  briefcase: Briefcase,
+  stethoscope: Stethoscope,
+  "life-buoy": LifeBuoy,
+  siren: Siren,
+  "shield-check": ShieldCheck,
+  "badge-check": BadgeCheck,
+  lock: Lock,
+  eye: Eye,
+  key: Key,
+  fingerprint: FingerprintPattern,
+  scale: Scale,
+  landmark: Landmark,
+  flag: Flag,
+  sparkles: Sparkles,
+  bot: Bot,
+  lightbulb: Lightbulb,
+  target: Target,
+  compass: Compass,
+  zap: Zap,
+  clock: Clock,
+  calendar: Calendar,
+  "map-pin": MapPin,
+  filter: Funnel,
+  sliders: SlidersHorizontal,
+  list: List,
+  "layout-grid": LayoutGrid,
+  table: Table,
+  "trending-up": TrendingUp,
+  "bar-chart": ChartColumn,
+  "pie-chart": ChartPie,
+  layers: Layers,
+  box: Box,
+  package: Package,
+  database: Database,
+  server: Server,
+  cpu: Cpu,
+  "git-branch": GitBranch,
+  workflow: Workflow,
+  calculator: Calculator,
+  coins: Coins,
+  wallet: Wallet,
+  receipt: Receipt,
+  percent: Percent,
+  banknote: Banknote,
+  users: Users,
+  "user-check": UserCheck,
+  handshake: Handshake,
+  headphones: Headphones,
+  "building-2": BuildingComplex,
+  "message-circle": MessageCircle,
+  send: Send,
+  paperclip: Paperclip,
+  upload: Upload,
+  download: Download,
+  "file-text": FileText,
+  "file-check": FileCheck,
+  "check-circle": CircleCheck,
+  "x-circle": CircleX,
+  "alert-triangle": TriangleAlert,
+  "help-circle": CircleQuestionMark,
+  loader: LoaderCircle,
+  refresh: RefreshCw,
+  "wifi-off": WifiOff,
+  "book-open": BookOpen,
+  "graduation-cap": GraduationCap,
+  newspaper: Newspaper,
+  quote: Quote,
+  link: LinkGlyph,
+  share: Share,
+  copy: Copy,
+  settings: Settings,
+  award: Award,
+  "thumbs-up": ThumbsUp,
+  smile: FaceSlightlySmiling,
+  sun: Sun,
+  moon: Moon
 };
 
 export interface IconProps extends Omit<SVGProps<SVGSVGElement>, "name" | "children"> {
   name: IconName;
+  /** Rendered square size in pixels. 20 in body copy, 24 in a tile, 32+ in an empty state. */
   size?: number;
 }
 
-export function Icon({ name, size = 24, className, ...rest }: IconProps) {
+export function Icon({ name, size = 20, className, ...rest }: IconProps) {
+  const Glyph = glyphs[name];
   return (
-    <svg
+    <Glyph
       aria-hidden="true"
       focusable="false"
       className={className ? `am-icon ${className}` : "am-icon"}
       width={size}
       height={size}
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth={1.8}
-      strokeLinecap="round"
-      strokeLinejoin="round"
+      strokeWidth={size >= 32 ? 1.75 : 2}
       {...rest}
-    >
-      {paths[name]}
-    </svg>
+    />
   );
 }
