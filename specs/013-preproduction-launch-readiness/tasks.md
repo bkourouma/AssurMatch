@@ -30,7 +30,7 @@ description: "Task list for Preproduction Launch Readiness"
 - [x] T005 Create `backend/Dockerfile` (multi-stage Node 24 alpine + npm). Stages: deps → build (npx prisma generate + npm run build) → runtime. Non-root `app` user. `EXPOSE 3600`. HEALTHCHECK on `/admin/system/health`. CMD runs the Nest API only.
 - [x] T006 Create `apps/public/Dockerfile` (multi-stage Node 24 alpine + npm). Builds the Next public app. `EXPOSE 3601`. CMD runs `next start -p 3601`.
 - [x] T007 Create `apps/admin/Dockerfile` (multi-stage Node 24 alpine + npm). Packages BOTH `apps/admin` and `apps/broker` as the back-office surface. `EXPOSE 3602`. CMD runs the back-office.
-- [ ] T008 Verify each image builds locally (`docker build -f <path> .`) — manual operator check (not automated in CI yet; no CI runtime here). Note: validation T034 covers CI's docker build via Buildx.
+- [x] T008 Verify each image builds locally (`docker build -f <path> .`) — manual operator check (not automated in CI yet; no CI runtime here). Note: validation T034 covers CI's docker build via Buildx. Verified 2026-09-24: backend, public and admin images all build locally. The admin image first failed (`@prisma/client` imported by the local demo login picker was never generated); fixed by running `prisma generate` in its build stage.
 
 ## Phase 3: CI/CD — GitHub Actions workflow
 
@@ -104,7 +104,7 @@ description: "Task list for Preproduction Launch Readiness"
 - [x] T053 `git diff --check`
 - [x] T054 Manual secret scan: grep for `EMAIL_SMTP_PASS=` in tracked files; no result other than `REDACTED`.
 - [x] T055 Verify sensitive flags remain `false` in `backend/src/modules/feature-flags/default-flags.ts` (no change).
-- [ ] T056 Optional: `npm run test:runtime:postgres` if any Prisma path is touched (this implementation does not touch Prisma; skip with justification).
+- [x] T056 Optional: `npm run test:runtime:postgres` if any Prisma path is touched (this implementation does not touch Prisma; skip with justification). Run anyway 2026-09-24: `test:runtime:postgres:docker` passed (ports overridden to 55442/56389 because 55432 was taken by another project).
 
 ## Dependencies & order
 
