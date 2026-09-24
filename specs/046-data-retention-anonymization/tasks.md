@@ -1,7 +1,7 @@
 # Tasks: Data Retention and Anonymization
 
 **Impacted surfaces**: Backend API, database (migration `0018_data_retention`), shared packages, Back-office Plateforme.
-**Status**: in progress.
+**Status**: implemented and validated on 2026-09-24.
 
 ## Wave A - Foundations (backend owner)
 
@@ -29,13 +29,13 @@
 
 ## Wave B - Back-office Plateforme
 
-- [ ] T016 `admin-api.ts` readers (`readRetentionPolicies`, `readRetentionBatches`) and `apps/admin/app/lib/retention-actions.ts` server actions (policy override, retention preview, erasure preview, approve) with notices.
-- [ ] T017 Page `apps/admin/app/compliance/retention/page.tsx`: policies table + override form, preview forms, batches table with counts and approve form, flag-off notice, forbidden/unauthenticated states.
-- [ ] T018 Link from `/compliance`; `/compliance/retention` under the "Conformite" navigation match.
-- [ ] T019 Playwright source-marker test `apps/admin/tests/data-retention.spec.ts` (endpoints, "use server", no personal data rendered, forbidden wording).
+- [x] T016 `admin-api.ts` readers (`readRetentionPolicies`, `readRetentionBatches`) and `apps/admin/app/lib/retention-actions.ts` server actions (policy override, retention preview, erasure preview, approve) with notices.
+- [x] T017 Page `apps/admin/app/compliance/retention/page.tsx`: policies table + override form, preview forms, batches table with counts and approve form, flag-off notice, forbidden/unauthenticated states.
+- [x] T018 Link from `/compliance`; `/compliance/retention` under the "Conformite" navigation match.
+- [x] T019 Playwright source-marker test `apps/admin/tests/data-retention.spec.ts` (endpoints, "use server", no personal data rendered, forbidden wording).
 
 ## Closing
 
-- [ ] T020 Security/constitution review of the diff; fixes applied.
-- [ ] T021 `docs/prd_coverage_map.md` row updated; `AGENTS.md` plan pointer to this spec.
-- [ ] T022 `npm run validate`, `npx playwright test`, `npm run test:runtime:postgres:docker`, `git diff --check`.
+- [x] T020 Security/constitution review of the diff; fixes applied. Security review fixes (wave A): M1 candidate paging runs on the rows the adapter read (`scanned`), not on what survived the post-fetch country filter; M2 the re-check runs before the claim, a failure after the claim ends in the new terminal status `interrupted` with partial counts, and a claimed but unexecuted batch always reads `interrupted`; M3 an orphan prospect of an erasure batch that has since received a request is skipped; L1 the `expired`/`refused` writes are conditional on "previewed and unclaimed"; L2 the audited access check runs before body/param parsing; L3 reasons also refuse phone-like sequences (ISO dates allowed); L4 messaging deliveries are selected on final statuses; L5 guard test for the SQL-only partial unique index; L6 D4 extended to pipeline history reasons and lead state tags. Also: the policies response carries `countries` for the admin selector.
+- [x] T021 `docs/prd_coverage_map.md` row updated; `AGENTS.md` plan pointer to this spec. Done: coverage map row now cites spec 046; AGENTS.md plan pointer moved to spec 046.
+- [x] T022 `npm run validate`, `npx playwright test`, `npm run test:runtime:postgres:docker`, `git diff --check`. Done 2026-09-24: validate (251 files, 640 tests), Playwright 135 passed / 11 env-gated skipped, admin next build lists /compliance/retention, prisma validate, runtime Postgres smoke, git diff --check.

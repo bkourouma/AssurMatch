@@ -2,7 +2,7 @@
 
 **Feature Branch**: `046-data-retention-anonymization`
 **Created**: 2026-09-24
-**Status**: Specified 2026-09-24
+**Status**: Implemented and validated 2026-09-24
 **Validation State**: Validated. The four product decisions (default durations, execution mode, erasure on request, broker CRM coverage) were taken by the product owner on 2026-09-24 and are recorded as D1 to D4. No `[NEEDS CLARIFICATION]`.
 **Continuous Workflow Eligible**: Yes.
 
@@ -53,7 +53,7 @@ the admin. Bounds: 30 to 3650 days.
 | `quote_requests` | QuoteRequest answers, Prospect identity, lead comments, broker CRM content (D4), AI summaries of the request | 730 days | last activity: the latest of the quote `updatedAt` and any assignment `lastBrokerActionAt` |
 | `quote_documents` | Uploaded files and their names | 180 days | document `createdAt` |
 | `contact_messages` | ContactMessage | 365 days | `createdAt` |
-| `partner_applications` | PartnerApplication **with a rejected or withdrawn review status only** | 365 days | `reviewedAt` (else `updatedAt`) |
+| `partner_applications` | PartnerApplication **with a rejected review status only** (the status enum has no withdrawn value) | 365 days | `reviewedAt` (else `updatedAt`) |
 | `waitlist` | WaitlistEntry | 365 days | the country `publicSince` (new column) once the country opened; an entry of a country that never opened stays until its existing `retentionUntil` (3 years) |
 | `ai_traces` | AIInteraction outputs and minimization reports | 365 days | `occurredAt` |
 | `webhook_payloads` | PartnerWebhookDelivery payload, final statuses only | 90 days | `createdAt` |
@@ -88,8 +88,10 @@ applications with that email. Retention durations do not apply. Approval works e
 ### D4 - Broker CRM content is anonymized with the lead (product owner, 2026-09-24)
 
 Anonymizing a quote request extends to what brokers wrote on its lead assignments: CRM notes, task
-titles, reminder messages, proposal notes, dispute comments, lead action comments, and CRM document
-labels and storage keys. Rows keep their ids, dates, statuses and amounts so pipeline history and
+titles, reminder messages, proposal notes, dispute comments, lead action comments, CRM pipeline
+history reasons, CRM lead state tags (emptied), and CRM document labels and storage keys (security
+review, 2026-09-24). Coded fields such as `QuoteRequest.refusalReason` / `manualReviewReason` and the
+`AIInteraction.scope` stay as they are. Rows keep their ids, dates, statuses and amounts so pipeline history and
 billing stay consistent. Each partner tenant concerned receives **one** in-app notice per batch
 (`lead_data_anonymized`) with the count and the public references, through the existing
 `MessagingDispatchService.publishInApp`.
