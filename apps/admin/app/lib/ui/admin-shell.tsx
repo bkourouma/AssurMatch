@@ -35,7 +35,17 @@ export const adminNavigation: NavGroup[] = [
           { label: "Revue devis", href: "/operations/quote-review" }
         ]
       },
-      { label: "Conformite", href: "/compliance", icon: "shield", match: ["/compliance", "/dashboard/compliance-alerts"] }
+      {
+        label: "Conformite",
+        href: "/compliance",
+        icon: "shield",
+        match: ["/compliance", "/dashboard/compliance-alerts"],
+        children: [
+          { label: "Alertes", href: "/dashboard/compliance-alerts" },
+          // Spec 046: retention policies, anonymization batches and erasure requests.
+          { label: "Conservation des donnees", href: "/compliance/retention" }
+        ]
+      }
     ]
   },
   {

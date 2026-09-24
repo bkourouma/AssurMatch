@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, ForbiddenException, Get, HttpCode, Module, NotFoundException, Param, Patch, Post, Put, Query, Req, UploadedFile, UseGuards, UseInterceptors } from "@nestjs/common";
+import { Body, ConflictException, Controller, Delete, ForbiddenException, Get, HttpCode, Module, NotFoundException, Param, Patch, Post, Put, Query, Req, UnprocessableEntityException, UploadedFile, UseGuards, UseInterceptors } from "@nestjs/common";
 import { FileInterceptor } from "@nestjs/platform-express";
 import { z } from "zod";
 import { QUOTE_DOCUMENT_MAX_BYTES } from "../../../../packages/shared/contracts/quote-document.contracts";
@@ -7,6 +7,13 @@ import { activateRequestSchema, loginRequestSchema, mfaVerifyRequestSchema, pass
 import { activationChecklistQuerySchema } from "../../../../packages/shared/contracts/activation-checklist.contracts";
 import { billingFoundationQuerySchema, billingPlanPriceUpsertSchema, draftInvoiceQuerySchema, draftInvoiceRecomputeSchema, leadPackGrantSchema } from "../../../../packages/shared/contracts/billing.contracts";
 import { partnerApplicationStatusSchema } from "../../../../packages/shared/contracts/partner-application.contracts";
+import {
+  retentionBatchApproveRequestSchema,
+  retentionErasurePreviewRequestSchema,
+  retentionPoliciesQuerySchema,
+  retentionPolicyUpsertSchema,
+  retentionPreviewRequestSchema
+} from "../../../../packages/shared/contracts/data-retention.contracts";
 import { contactAudienceSchema } from "../../../../packages/shared/contracts/public-site.contracts";
 import {
   partnerApiKeyCreateSchema,
@@ -58,6 +65,7 @@ import { AuthRequiredHttpGuard, MfaRequiredHttpGuard } from "../auth/guards/http
 import { actorFromRequest, clientIp, protectedActorFromRequest, type AssurMatchHttpRequest } from "../common/http/request-actor";
 import { parseHttpInput } from "../common/http/zod-validation";
 import type { ActorContext } from "../common/types";
+import { RetentionAccessRefusedError, RetentionBatchConflictError, RetentionBatchNotFoundError, RetentionPurgeDisabledError } from "../data-retention/data-retention.service";
 import { PublicJourneyFlagPolicy } from "../feature-flags/public-journey-flag-policy";
 import { AdminUsersController as AdminUsersDomainController } from "../users/admin-users.controller";
 import { AdminUserRolesController as AdminUserRolesDomainController } from "../users/admin-user-roles.controller";
@@ -934,6 +942,67 @@ export class BrokerNotificationsController {
   }
 }
 
+/**
+ * Spec 046: retention policies and anonymization batches. The domain errors are mapped explicitly
+ * so the admin UI can rely on 403 (MFA or permission), 404, 409 (expired, executed or refused batch)
+ * and 422 (`retention_purge_enabled` off) whatever their wording.
+ */
+async function retentionCall<T>(call: () => Promise<T>): Promise<T> {
+  try {
+    return await call();
+  } catch (error) {
+    if (error instanceof RetentionAccessRefusedError) throw new ForbiddenException(error.message);
+    if (error instanceof RetentionBatchNotFoundError) throw new NotFoundException(error.message);
+    if (error instanceof RetentionBatchConflictError) throw new ConflictException(error.message);
+    if (error instanceof RetentionPurgeDisabledError) throw new UnprocessableEntityException(error.message);
+    throw error;
+  }
+}
+
+export class AdminDataRetentionController {
+  constructor(private readonly runtime: AssurMatchRuntime) {}
+
+  policies(request: AssurMatchHttpRequest, query: Record<string, string>) {
+    return this.authorized(request, "read", (actor) => {
+      const { countryId } = parseHttpInput(retentionPoliciesQuerySchema, { ...(query.countryId ? { countryId: query.countryId } : {}) });
+      return this.runtime.dataRetention.service.getPolicies(actor, countryId);
+    });
+  }
+
+  upsertPolicy(input: unknown, request: AssurMatchHttpRequest) {
+    return this.authorized(request, "write", (actor) => this.runtime.dataRetention.service.upsertPolicy(parseHttpInput(retentionPolicyUpsertSchema, input), actor));
+  }
+
+  batches(request: AssurMatchHttpRequest) {
+    return this.authorized(request, "read", (actor) => this.runtime.dataRetention.service.listBatches(actor));
+  }
+
+  batch(id: string, request: AssurMatchHttpRequest) {
+    return this.authorized(request, "read", (actor) => this.runtime.dataRetention.service.getBatch(parseParam("id", id, uuidSchema), actor));
+  }
+
+  preview(input: unknown, request: AssurMatchHttpRequest) {
+    return this.authorized(request, "write", (actor) => this.runtime.dataRetention.service.previewRetention(parseHttpInput(retentionPreviewRequestSchema, input), actor));
+  }
+
+  erasurePreview(input: unknown, request: AssurMatchHttpRequest) {
+    return this.authorized(request, "write", (actor) => this.runtime.dataRetention.service.previewErasure(parseHttpInput(retentionErasurePreviewRequestSchema, input), actor));
+  }
+
+  approve(id: string, input: unknown, request: AssurMatchHttpRequest) {
+    return this.authorized(request, "write", (actor) => this.runtime.dataRetention.service.approve(parseParam("id", id, uuidSchema), parseHttpInput(retentionBatchApproveRequestSchema, input), actor));
+  }
+
+  /** Security review L2: the audited access check runs before any body or parameter parsing. */
+  private authorized<T>(request: AssurMatchHttpRequest, mode: "read" | "write", call: (actor: ActorContext) => Promise<T>): Promise<T> {
+    return retentionCall(async () => {
+      const actor = protectedActorFromRequest(request);
+      this.runtime.dataRetention.service.authorize(actor, mode);
+      return call(actor);
+    });
+  }
+}
+
 export class BrokerBillingController {
   constructor(private readonly runtime: AssurMatchRuntime) {}
 
@@ -1285,6 +1354,14 @@ decorate(AdminBillingFoundationController, "listInvoices", [Get("billing/invoice
 decorate(AdminBillingFoundationController, "recomputeInvoices", [Post("billing/invoices/recompute") as MethodDecoratorFactory], [[0, Body() as ParamDecoratorFactory], [1, Req() as ParamDecoratorFactory]]);
 decorate(AdminBillingFoundationController, "listPacks", [Get("billing/packs") as MethodDecoratorFactory], [[0, Req() as ParamDecoratorFactory], [1, Query() as ParamDecoratorFactory]]);
 decorate(AdminBillingFoundationController, "grantPack", [Post("billing/packs") as MethodDecoratorFactory], [[0, Body() as ParamDecoratorFactory], [1, Req() as ParamDecoratorFactory]]);
+controller("admin/retention", AdminDataRetentionController, true);
+decorate(AdminDataRetentionController, "policies", [Get("policies") as MethodDecoratorFactory], [[0, Req() as ParamDecoratorFactory], [1, Query() as ParamDecoratorFactory]]);
+decorate(AdminDataRetentionController, "upsertPolicy", [Put("policies") as MethodDecoratorFactory], [[0, Body() as ParamDecoratorFactory], [1, Req() as ParamDecoratorFactory]]);
+decorate(AdminDataRetentionController, "batches", [Get("batches") as MethodDecoratorFactory], [[0, Req() as ParamDecoratorFactory]]);
+decorate(AdminDataRetentionController, "batch", [Get("batches/:id") as MethodDecoratorFactory], [[0, Param("id") as ParamDecoratorFactory], [1, Req() as ParamDecoratorFactory]]);
+decorate(AdminDataRetentionController, "preview", [Post("batches/preview") as MethodDecoratorFactory], [[0, Body() as ParamDecoratorFactory], [1, Req() as ParamDecoratorFactory]]);
+decorate(AdminDataRetentionController, "erasurePreview", [Post("batches/erasure-preview") as MethodDecoratorFactory], [[0, Body() as ParamDecoratorFactory], [1, Req() as ParamDecoratorFactory]]);
+decorate(AdminDataRetentionController, "approve", [Post("batches/:id/approve") as MethodDecoratorFactory, HttpCode(200) as MethodDecoratorFactory], [[0, Param("id") as ParamDecoratorFactory], [1, Body() as ParamDecoratorFactory], [2, Req() as ParamDecoratorFactory]]);
 controller("admin", AdminPartnerSlaController, true);
 decorate(AdminPartnerSlaController, "sla", [Get("partners/sla") as MethodDecoratorFactory], [[0, Req() as ParamDecoratorFactory]]);
 controller("broker/enterprise", BrokerEnterpriseController, true);
@@ -1400,6 +1477,7 @@ Module({
     AdminHealthController,
     AdminActivationChecklistController,
     AdminBillingFoundationController,
+    AdminDataRetentionController,
     BrokerBillingController,
     BrokerNotificationsController,
     BrokerEnterpriseController,

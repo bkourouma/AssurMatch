@@ -24,7 +24,11 @@ const extractedDomainFiles = [
   "backend/src/modules/contact-messages/contact-messages.module.ts",
   "backend/src/modules/public-stats/public-stats.module.ts",
   "backend/src/modules/partners/public-partner-directory.service.ts",
-  "backend/src/modules/countries/public-country-directory.service.ts"
+  "backend/src/modules/countries/public-country-directory.service.ts",
+  "backend/src/modules/data-retention/data-retention.service.ts",
+  "backend/src/modules/data-retention/retention-eligibility.service.ts",
+  "backend/src/modules/data-retention/erasure-lookup.service.ts",
+  "backend/src/modules/data-retention/anonymization.service.ts"
 ];
 
 describe("domain repository memory guardrails", () => {

@@ -1,11 +1,13 @@
 import { createHash, createHmac } from "node:crypto";
-import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
 export interface DocumentStoragePort {
   readonly mode: "memory" | "disk" | "s3";
   put(storageKey: string, bytes: Buffer, mimeType: string): Promise<void>;
   get(storageKey: string): Promise<Buffer | undefined>;
+  /** Spec 046: removes the stored bytes. A missing object is not an error (anonymization is idempotent). */
+  delete(storageKey: string): Promise<void>;
   reference(storageKey: string): string;
 }
 
@@ -19,6 +21,10 @@ export class MemoryDocumentStorage implements DocumentStoragePort {
 
   async get(storageKey: string): Promise<Buffer | undefined> {
     return this.files.get(storageKey);
+  }
+
+  async delete(storageKey: string): Promise<void> {
+    this.files.delete(storageKey);
   }
 
   reference(storageKey: string): string {
@@ -39,6 +45,10 @@ export class LocalDiskDocumentStorage implements DocumentStoragePort {
 
   async get(storageKey: string): Promise<Buffer | undefined> {
     return readFile(join(this.rootDir, this.safeName(storageKey))).catch(() => undefined);
+  }
+
+  async delete(storageKey: string): Promise<void> {
+    await rm(join(this.rootDir, this.safeName(storageKey)), { force: true });
   }
 
   reference(storageKey: string): string {
@@ -83,6 +93,13 @@ export class S3CompatibleDocumentStorage implements DocumentStoragePort {
     if (response.status === 404) return undefined;
     if (!response.ok) throw new Error(`Document storage read failed with status ${response.status}`);
     return Buffer.from(await response.arrayBuffer());
+  }
+
+  async delete(storageKey: string): Promise<void> {
+    const response = await this.fetcher(this.objectUrl(storageKey), { method: "DELETE", headers: this.signedHeaders("DELETE", storageKey, Buffer.alloc(0), {}) });
+    // S3 answers 204 for a deleted or already absent key; some compatible stores answer 404 instead.
+    if (response.status === 404) return;
+    if (!response.ok) throw new Error(`Document storage delete failed with status ${response.status}`);
   }
 
   reference(storageKey: string): string {

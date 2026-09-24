@@ -55,4 +55,29 @@ describe("country activation rules", () => {
     expect(renamed.flags.country_public_enabled).toBe(true);
     expect(await service.listPublic()).toHaveLength(1);
   });
+
+  it("stamps publicSince on the first opening only and keeps it across a suspension (spec 046 FR-009)", async () => {
+    const service = new CountriesService(new AuditLogWriter());
+    const country = await service.create({
+      isoCode: "BJ",
+      name: "Benin",
+      currency: "XOF",
+      languages: ["fr"],
+      timezone: "Africa/Porto-Novo",
+      regulatoryFamily: "cima",
+      regulatoryRegimeId: "00000000-0000-4000-8000-000000000010"
+    }, superAdminActor);
+    expect(country.publicSince).toBeUndefined();
+
+    const internal = await service.update(country.id, { status: "internal", reason: "internal testing" }, superAdminActor);
+    expect(internal.publicSince).toBeUndefined();
+
+    const opened = await service.update(country.id, { status: "public", flags: { country_public_enabled: true }, reason: "first opening" }, superAdminActor);
+    const firstOpening = opened.publicSince;
+    expect(firstOpening).toBeInstanceOf(Date);
+
+    await service.update(country.id, { status: "suspended", flags: { country_public_enabled: true }, reason: "temporary suspension" }, superAdminActor);
+    const reopened = await service.update(country.id, { status: "public", flags: { country_public_enabled: true }, reason: "reopening" }, superAdminActor);
+    expect(reopened.publicSince).toBe(firstOpening);
+  });
 });

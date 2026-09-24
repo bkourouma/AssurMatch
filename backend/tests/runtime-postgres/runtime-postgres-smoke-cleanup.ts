@@ -48,6 +48,9 @@ export async function cleanupRuntimeSmokeData(prisma: RuntimeSmokePrismaClient, 
   await prisma.brokerCrmPipelineHistory.deleteMany({ where: { leadAssignmentId: { in: leadIds } } });
   await prisma.brokerCrmLeadState.deleteMany({ where: { leadAssignmentId: { in: leadIds } } });
   await prisma.leadActionHistory.deleteMany({ where: { leadAssignmentId: { in: leadIds } } });
+  await prisma.inAppNotification.deleteMany({ where: { recipientScopeId: { in: partnerIds }, type: "lead_data_anonymized" } });
+  await prisma.anonymizationBatch.deleteMany({ where: { reason: { contains: "runtime smoke" } } });
+  await prisma.retentionPolicy.deleteMany({ where: { countryId: { in: countryIds } } });
   await prisma.notification.deleteMany({ where: { OR: [{ id: { in: notificationIds } }, { payloadReference: { contains: run.id } }] } });
   await prisma.queueJobRecord.deleteMany({ where: { correlationId: run.correlationId } });
   await prisma.leadAssignment.deleteMany({ where: { id: { in: leadIds } } });

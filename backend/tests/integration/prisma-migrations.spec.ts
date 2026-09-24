@@ -23,7 +23,8 @@ describe("prisma migration fresh-base readiness", () => {
       "0014_enterprise_agencies",
       "0015_multi_broker_routing",
       "0016_broker_crm_history_event_type",
-      "0017_public_site_forms"
+      "0017_public_site_forms",
+      "0018_data_retention"
     ]);
     const schema = readFileSync(join(process.cwd(), "backend", "prisma", "schema.prisma"), "utf8");
     for (const model of ["AuditLog", "FeatureFlag", "ConsentRecord", "QuoteRequest", "LeadAssignment", "BrokerCrmLeadState", "PartnerApiKey", "PartnerWebhookEndpoint", "PartnerWebhookDelivery", "PartnerWebhookAllowlistEntry", "RoutingRule", "RoutingRuleHistory"]) {
@@ -114,5 +115,23 @@ describe("prisma migration fresh-base readiness", () => {
     expect(schema).toContain("model PartnerApplication");
     expect(schema).toContain("model ContactMessage");
     expect(schema).not.toContain("@@unique([quoteRequestId])");
+    // Spec 046: retention overrides, anonymization batches (ids only) and the anonymization markers.
+    const retention = readFileSync(join(migrationsDir, "0018_data_retention", "migration.sql"), "utf8");
+    expect(retention).toContain('CREATE TABLE IF NOT EXISTS "RetentionPolicy"');
+    expect(retention).toContain('CREATE TABLE IF NOT EXISTS "AnonymizationBatch"');
+    expect(retention).toContain('CREATE UNIQUE INDEX IF NOT EXISTS "RetentionPolicy_global_category_key" ON "RetentionPolicy"("category") WHERE "countryId" IS NULL');
+    expect(retention).toContain(`UPDATE "Country" SET "publicSince" = "updatedAt" WHERE "status" = 'public'`);
+    for (const table of ["Prospect", "QuoteRequest", "QuoteRequestDocument", "ContactMessage", "PartnerApplication", "WaitlistEntry"]) {
+      expect(retention).toContain(`ALTER TABLE "${table}" ADD COLUMN IF NOT EXISTS "anonymizedAt" TIMESTAMP(3)`);
+    }
+    expect(retention).not.toMatch(/ALTER TABLE "(ConsentRecord|AuditLog)"/);
+    expect(retention).not.toMatch(/"(email|emailFingerprint|phone)" TEXT/);
+    // Security review L5: the global-override uniqueness lives in SQL only; no later migration may drop it.
+    for (const later of migrations.filter((name) => name > "0018_data_retention")) {
+      expect(readFileSync(join(migrationsDir, later, "migration.sql"), "utf8"), later).not.toContain("RetentionPolicy_global_category_key");
+    }
+    expect(schema).toContain("RetentionPolicy_global_category_key");
+    expect(schema).toContain("model RetentionPolicy");
+    expect(schema).toContain("model AnonymizationBatch");
   });
 });

@@ -13,6 +13,7 @@ interface IdRow {
 export interface RuntimeSmokePrismaClient {
   $connect(): Promise<void>;
   $disconnect(): Promise<void>;
+  anonymizationBatch: Delegate<IdRow>;
   auditLog: Delegate<{ id: string; correlationId: string | null }>;
   brokerCrmAiAssistRequest: Delegate<IdRow>;
   brokerCrmDispute: Delegate<IdRow>;
@@ -29,8 +30,9 @@ export interface RuntimeSmokePrismaClient {
   countryProduct: Delegate<IdRow>;
   featureFlag: Delegate<{ id: string; key: string; value: boolean }>;
   featureFlagHistory: Delegate<IdRow>;
+  inAppNotification: Delegate<IdRow>;
   leadActionHistory: Delegate<IdRow>;
-  leadAssignment: Delegate<{ id: string; brokerNotificationId: string | null }>;
+  leadAssignment: Delegate<{ id: string; brokerNotificationId: string | null; partnerTenantId: string }>;
   notification: Delegate<{ id: string; emailStatus: string; payloadReference: string }>;
   offer: Delegate<{ id: string; name: string }>;
   offerHistory: Delegate<IdRow>;
@@ -39,10 +41,11 @@ export interface RuntimeSmokePrismaClient {
   partnerProductAuthorization: Delegate<IdRow>;
   partnerTenant: Delegate<IdRow>;
   product: Delegate<IdRow>;
-  prospect: Delegate<IdRow>;
+  prospect: Delegate<{ id: string; emailNormalized: string | null; emailFingerprint: string | null }>;
   queueJobRecord: Delegate<IdRow>;
   quoteFormDefinition: Delegate<IdRow>;
-  quoteRequest: Delegate<{ id: string; prospectId: string; consentRecordId: string }>;
+  quoteRequest: Delegate<{ id: string; prospectId: string; consentRecordId: string; payload: unknown; anonymizedAt: Date | null }>;
+  retentionPolicy: Delegate<IdRow>;
   routingDecision: Delegate<IdRow>;
 }
 

@@ -16,7 +16,9 @@ const REQUIRED_REPOSITORIES = [
   "PartnersRepository",
   "PartnerLicensesRepository",
   "CrmActivityRepository",
-  "NotificationsRepository"
+  "NotificationsRepository",
+  "DataRetentionRepository",
+  "RetentionSubjectsRepository"
 ];
 
 export function assertPrismaRuntimeRepositories(modes: Record<string, string | undefined>): void {
@@ -36,7 +38,8 @@ export async function assertSensitiveFlagsFailClosed(prisma: RuntimeSmokePrismaC
     "ai_summary_enabled",
     "ai_duplicate_detection_enabled",
     "ai_recommendation_enabled",
-    "ai_broker_assistant_enabled"
+    "ai_broker_assistant_enabled",
+    "retention_purge_enabled"
   ];
   const flags = await prisma.featureFlag.findMany({ where: { key: { in: prohibitedFlags }, value: true } });
   assert.equal(flags.length, 0, `Sensitive flags must remain fail-closed: ${flags.map((flag) => flag.key).join(", ")}`);

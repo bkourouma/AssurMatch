@@ -18,7 +18,8 @@
     "insurer_api_enabled": false,
     "whatsapp_enabled": false,
     "sponsored_offers_enabled": false,
-    "multi_broker_routing_enabled": false
+    "multi_broker_routing_enabled": false,
+    "retention_purge_enabled": false
   },
   "country": {
     "country_public_enabled": false,

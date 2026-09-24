@@ -11,7 +11,10 @@ import { QueuesModule } from "../modules/common/queues/queues.module";
 import { RedisModule } from "../modules/common/redis/redis.module";
 import { ConsentModule } from "../modules/consent/consent.module";
 import { ContactMessagesModule } from "../modules/contact-messages/contact-messages.module";
-import { PrismaContactMessagesRepository } from "../modules/contact-messages/contact-messages.repository";
+import { MemoryContactMessagesRepository, PrismaContactMessagesRepository } from "../modules/contact-messages/contact-messages.repository";
+import { DataRetentionModule } from "../modules/data-retention/data-retention.module";
+import { PrismaDataRetentionRepository } from "../modules/data-retention/data-retention.repository";
+import { PrismaRetentionSubjectsRepository, type MemoryRetentionSources } from "../modules/data-retention/retention-subjects.repository";
 import { CountriesModule } from "../modules/countries/countries.module";
 import { PublicCountryDirectoryService } from "../modules/countries/public-country-directory.service";
 import { DocumentsModule } from "../modules/documents/documents.module";
@@ -20,27 +23,27 @@ import { FeatureFlagCacheService } from "../modules/feature-flags/feature-flag-c
 import { PrismaFeatureFlagRepository } from "../modules/feature-flags/feature-flag-repository";
 import { LeadsModule } from "../modules/leads/leads.module";
 import { NotificationsModule } from "../modules/notifications/notifications.module";
-import { PrismaMessagingRepository } from "../modules/notifications/messaging.repository";
+import { MemoryMessagingRepository, PrismaMessagingRepository } from "../modules/notifications/messaging.repository";
 import { BrokerNotificationsService } from "../modules/notifications/broker-notifications.service";
 import { EnterpriseService } from "../modules/enterprise/enterprise.service";
 import { PrismaEnterpriseRepository } from "../modules/enterprise/enterprise.repository";
 import { OffersModule } from "../modules/offers/offers.module";
 import { PartnerApplicationsModule } from "../modules/partner-applications/partner-applications.module";
-import { PrismaPartnerApplicationsRepository } from "../modules/partner-applications/partner-applications.repository";
+import { MemoryPartnerApplicationsRepository, PrismaPartnerApplicationsRepository } from "../modules/partner-applications/partner-applications.repository";
 import { PartnerLicensesModule } from "../modules/partner-licenses/partner-licenses.module";
 import { PartnersModule } from "../modules/partners/partners.module";
 import { PublicPartnerDirectoryService } from "../modules/partners/public-partner-directory.service";
 import { ProductsModule } from "../modules/products/products.module";
 import { PublicStatsModule } from "../modules/public-stats/public-stats.module";
 import { WaitlistModule } from "../modules/waitlist/waitlist.module";
-import { PrismaWaitlistRepository } from "../modules/waitlist/waitlist.repository";
+import { MemoryWaitlistRepository, PrismaWaitlistRepository } from "../modules/waitlist/waitlist.repository";
 import { ProspectsModule } from "../modules/prospects/prospects.module";
 import { QuoteFormsModule } from "../modules/quote-forms/quote-forms.module";
 import { QuoteRequestsModule } from "../modules/quote-requests/quote-requests.module";
 import { RegulatoryRegimesModule } from "../modules/regulatory-regimes/regulatory-regimes.module";
 import { RoutingModule } from "../modules/routing/routing.module";
 import { AiGateway } from "../modules/ai/core/ai-gateway.service";
-import { PrismaAiInteractionsRepository } from "../modules/ai/core/ai-interactions.repository";
+import { MemoryAiInteractionsRepository, PrismaAiInteractionsRepository } from "../modules/ai/core/ai-interactions.repository";
 import { resolveAiProvider } from "../modules/ai/core/ai-provider.config";
 import { VisitorAiService } from "../modules/ai/visitor-ai.service";
 import { BrokerAiService } from "../modules/ai/broker-ai.service";
@@ -58,7 +61,7 @@ import { QuoteEmailTemplateService } from "../modules/notifications/email/quote-
 import { QuoteNotificationDeliveryService } from "../modules/notifications/quote-notification-delivery.service";
 import { PartnerEligibilityService } from "../modules/partners/partner-eligibility.service";
 import { PartnerIntegrationsModule } from "../modules/partner-integrations/partner-integrations.module";
-import { PrismaPartnerIntegrationsRepository } from "../modules/partner-integrations/partner-integrations.repository";
+import { MemoryPartnerIntegrationsRepository, PrismaPartnerIntegrationsRepository } from "../modules/partner-integrations/partner-integrations.repository";
 import { PartnerWebhookEventPublisher } from "../modules/partner-integrations/partner-webhook-event-publisher";
 import { PrismaConsentRecordsRepository } from "../modules/consent/consent-records.repository";
 import { MemoryCountriesRepository, PrismaCountriesRepository, type CountriesRepository } from "../modules/countries/countries.repository";
@@ -67,7 +70,7 @@ import { PrismaOffersRepository } from "../modules/offers/offers.repository";
 import type { PublicOfferVisibilityContext } from "../modules/offers/public-offer-catalog.service";
 import { PrismaScoringRulesRepository } from "../modules/offers/scoring-rules.repository";
 import { resolveDocumentStorage, resolveVirusScanner } from "../modules/quote-documents/quote-documents.config";
-import { PrismaQuoteDocumentsRepository } from "../modules/quote-documents/quote-documents.repository";
+import { MemoryQuoteDocumentsRepository, PrismaQuoteDocumentsRepository } from "../modules/quote-documents/quote-documents.repository";
 import { QuoteDocumentsService } from "../modules/quote-documents/quote-documents.service";
 import { ScoringRulesService } from "../modules/offers/scoring-rules.service";
 import { PrismaPartnersRepository } from "../modules/partners/partners.repository";
@@ -80,6 +83,7 @@ import { PrismaRoutingDecisionsRepository } from "../modules/leads/routing-decis
 import { PrismaCrmActivityRepository } from "../modules/leads/crm-activity.repository";
 import { PrismaNotificationsRepository } from "../modules/notifications/notifications.repository";
 import { DashboardsModule } from "../modules/dashboards/dashboards.module";
+import { aiSurfaceSchema } from "../../../packages/shared/contracts/ai.contracts";
 import { maybeBootstrapAdmin } from "./local-bootstrap-admin";
 
 export class AssurMatchRuntime {
@@ -103,17 +107,22 @@ export class AssurMatchRuntime {
   private readonly consentRecordsRepository = this.runtimeRepository(new PrismaConsentRecordsRepository(this.prisma));
   private readonly notificationsRepository = this.runtimeRepository(new PrismaNotificationsRepository(this.prisma));
   private readonly usersRepository = this.runtimeRepository(new PrismaUsersRepository(this.prisma));
-  private readonly partnerIntegrationsRepository = this.runtimeRepository(new PrismaPartnerIntegrationsRepository(this.prisma));
+  private readonly partnerIntegrationsRepository = this.runtimeRepository(new PrismaPartnerIntegrationsRepository(this.prisma)) ?? new MemoryPartnerIntegrationsRepository();
   private readonly offersRepository = this.runtimeRepository(new PrismaOffersRepository(this.prisma));
   private readonly prospectsRepository = this.runtimeRepository(new PrismaProspectsRepository(this.prisma));
   private readonly quoteFormDefinitionsRepository = this.runtimeRepository(new PrismaQuoteFormDefinitionsRepository(this.prisma));
   private readonly quoteRequestsRepository = this.runtimeRepository(new PrismaQuoteRequestsRepository(this.prisma));
   private readonly routingRulesRepository = this.runtimeRepository(new PrismaRoutingRulesRepository(this.prisma));
   private readonly scoringRulesRepository = this.runtimeRepository(new PrismaScoringRulesRepository(this.prisma));
-  private readonly quoteDocumentsRepository = this.runtimeRepository(new PrismaQuoteDocumentsRepository(this.prisma));
-  private readonly waitlistRepository = this.runtimeRepository(new PrismaWaitlistRepository(this.prisma));
-  private readonly partnerApplicationsRepository = this.runtimeRepository(new PrismaPartnerApplicationsRepository(this.prisma));
-  private readonly contactMessagesRepository = this.runtimeRepository(new PrismaContactMessagesRepository(this.prisma));
+  private readonly quoteDocumentsRepository = this.runtimeRepository(new PrismaQuoteDocumentsRepository(this.prisma)) ?? new MemoryQuoteDocumentsRepository();
+  private readonly waitlistRepository = this.runtimeRepository(new PrismaWaitlistRepository(this.prisma)) ?? new MemoryWaitlistRepository();
+  private readonly partnerApplicationsRepository = this.runtimeRepository(new PrismaPartnerApplicationsRepository(this.prisma)) ?? new MemoryPartnerApplicationsRepository();
+  /**
+   * Spec 046: under NODE_ENV=test the repositories below that end in `?? new Memory...()` are
+   * memory instances owned here rather than inside their modules, so the retention anonymizer reads
+   * and scrubs the very records the modules hold.
+   */
+  private readonly contactMessagesRepository = this.runtimeRepository(new PrismaContactMessagesRepository(this.prisma)) ?? new MemoryContactMessagesRepository();
   readonly leadRepositorySet = this.leadRepositories();
   private readonly brokerCrmConfig = { brokerCrmEnabled: process.env.ASSURMATCH_BROKER_CRM_ENABLED === "true" };
   readonly audit = new AuditLogsModule(this.auditLogRepository);
@@ -142,7 +151,7 @@ export class AssurMatchRuntime {
     this.featureFlagRepository
   );
   readonly consent = new ConsentModule(this.audit.writer, this.consentRecordsRepository);
-  private readonly messagingRepository = this.runtimeRepository(new PrismaMessagingRepository(this.prisma));
+  private readonly messagingRepository = this.runtimeRepository(new PrismaMessagingRepository(this.prisma)) ?? new MemoryMessagingRepository();
   readonly notifications = new NotificationsModule(this.audit.writer, this.queues.notifications, this.notificationsRepository, {
     smsProvider: process.env.ASSURMATCH_SMS_PROVIDER,
     smsSecretConfigured: Boolean(process.env.ASSURMATCH_SMS_API_KEY),
@@ -151,7 +160,7 @@ export class AssurMatchRuntime {
   }, this.featureFlags.service, this.messagingRepository, this.partnerWebhookEvents);
   readonly brokerNotifications = new BrokerNotificationsService({ audit: this.audit.writer, dispatch: this.notifications.dispatch });
   private readonly enterpriseRepository = this.runtimeRepository(new PrismaEnterpriseRepository(this.prisma));
-  private readonly aiInteractionsRepository = this.runtimeRepository(new PrismaAiInteractionsRepository(this.prisma));
+  private readonly aiInteractionsRepository = this.runtimeRepository(new PrismaAiInteractionsRepository(this.prisma)) ?? new MemoryAiInteractionsRepository();
   private readonly aiProviders = resolveAiProvider();
   readonly aiGateway = new AiGateway({
     audit: this.audit.writer,
@@ -261,9 +270,11 @@ export class AssurMatchRuntime {
     prospects: { findById: (id: string) => this.prospects.service.require(id).catch(() => undefined) },
     partners: { findById: (id: string) => this.partners.service.require(id).catch(() => undefined) }
   });
+  /** Shared by uploads and by the retention anonymizer, which deletes the files (spec 046). */
+  readonly documentStorage = resolveDocumentStorage();
   readonly quoteDocuments = new QuoteDocumentsService({
     audit: this.audit.writer,
-    storage: resolveDocumentStorage(),
+    storage: this.documentStorage,
     scanner: resolveVirusScanner(),
     queue: this.queues.notifications,
     redis: this.redis.client,
@@ -400,6 +411,21 @@ export class AssurMatchRuntime {
     this.redis.client
   );
   readonly publicCountryDirectory = new PublicCountryDirectoryService(this.countriesRepository, this.redis.client);
+  private readonly dataRetentionRepository = this.runtimeRepository(new PrismaDataRetentionRepository(this.prisma));
+  private readonly retentionSubjectsRepository = this.runtimeRepository(new PrismaRetentionSubjectsRepository(this.prisma));
+  /** Spec 046: retention policies, retention and erasure batches, anonymization. */
+  readonly dataRetention = new DataRetentionModule({
+    audit: this.audit.writer,
+    featureFlags: this.featureFlags.service,
+    identity: this.prospects.identity,
+    storage: this.documentStorage,
+    requireCountry: (countryId) => this.countries.service.require(countryId),
+    listCountries: () => this.countries.service.listAdmin(),
+    inApp: this.notifications.dispatch,
+    repository: this.dataRetentionRepository,
+    subjects: this.retentionSubjectsRepository,
+    memorySources: this.retentionSubjectsRepository ? undefined : this.memoryRetentionSources()
+  });
 
   async onModuleInit(): Promise<void> {
     await this.prisma.onModuleInit();
@@ -485,7 +511,9 @@ export class AssurMatchRuntime {
       PartnerIntegrationsRepository: this.partnerIntegrationsRepository?.mode,
       WaitlistRepository: this.waitlistRepository?.mode,
       PartnerApplicationsRepository: this.partnerApplicationsRepository?.mode,
-      ContactMessagesRepository: this.contactMessagesRepository?.mode
+      ContactMessagesRepository: this.contactMessagesRepository?.mode,
+      DataRetentionRepository: this.dataRetentionRepository?.mode,
+      RetentionSubjectsRepository: this.retentionSubjectsRepository?.mode
     };
   }
 
@@ -518,6 +546,29 @@ export class AssurMatchRuntime {
       ...quote,
       ...(country?.isoCode ? { countryCode: country.isoCode } : {}),
       ...(product?.key ? { productKey: product.key } : {})
+    };
+  }
+
+  /** Test runtime only: the live memory records behind each data category of spec 046. */
+  private memoryRetentionSources(): MemoryRetentionSources {
+    const quoteDocuments = this.quoteDocumentsRepository;
+    const aiInteractions = this.aiInteractionsRepository;
+    return {
+      countries: () => this.countries.service.listAdmin(),
+      prospects: () => this.prospects.service.list(),
+      quoteRequests: () => this.quoteRequests.submissions.list(),
+      quoteDocuments: async () => (await Promise.all((await this.quoteRequests.submissions.list()).map((quote) => quoteDocuments.listForQuote(quote.id)))).flat(),
+      leadAssignments: () => this.leads.assignments.list(),
+      leadHistory: (leadAssignmentId) => this.leads.assignmentsRepository.historyForLead(leadAssignmentId),
+      crmActivity: this.leads.crmActivityRepository,
+      quoteAiSummaries: async () => this.quoteAiSummary.list(),
+      aiInteractions: async () => (await Promise.all(aiSurfaceSchema.options.map((surface) => aiInteractions.listForSurface(surface, Number.MAX_SAFE_INTEGER)))).flat(),
+      contactMessages: () => this.contactMessagesRepository.list({}),
+      partnerApplications: () => this.partnerApplicationsRepository.list(),
+      waitlistEntries: () => this.waitlistRepository.list(),
+      webhookDeliveries: () => this.partnerIntegrationsRepository.listDeliveries(),
+      notifications: () => this.notifications.service.list(),
+      messagingDeliveries: () => this.messagingRepository.listDeliveries(Number.MAX_SAFE_INTEGER)
     };
   }
 

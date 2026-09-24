@@ -525,6 +525,90 @@ export function readLeadPacks() {
   return readAdmin<LeadPackData[]>("/admin/billing/packs", []);
 }
 
+/** Spec 046: mirrors `packages/shared/contracts/data-retention.contracts.ts` (metadata and counts only, no personal data). */
+export const RETENTION_CATEGORY_KEYS = [
+  "quote_requests",
+  "quote_documents",
+  "contact_messages",
+  "partner_applications",
+  "waitlist",
+  "ai_traces",
+  "webhook_payloads",
+  "messaging_references"
+] as const;
+export type RetentionCategoryKey = (typeof RETENTION_CATEGORY_KEYS)[number];
+export type RetentionSubjectKey = RetentionCategoryKey | "prospects";
+
+export interface RetentionPolicyItemData {
+  category: RetentionCategoryKey;
+  retentionDays: number;
+  source: "default" | "global" | "country";
+  anchor: "last_activity" | "created_at" | "reviewed_at" | "country_public_since" | "occurred_at";
+  defaultRetentionDays: number;
+  globalRetentionDays: number | null;
+  countryRetentionDays: number | null;
+  overrideReason: string | null;
+  overrideUpdatedAt: string | null;
+}
+
+export interface RetentionCountryOptionData {
+  id: string;
+  isoCode: string;
+  name: string;
+  status: string;
+}
+
+export interface RetentionPoliciesData {
+  countryId: string | null;
+  purgeEnabled: boolean;
+  items: RetentionPolicyItemData[];
+  countries: RetentionCountryOptionData[];
+}
+
+export interface RetentionBatchCountData {
+  subject: RetentionSubjectKey;
+  selected: number;
+  anonymized: number;
+  skipped: number;
+  failed: number;
+  moreRemaining: boolean;
+}
+
+export interface RetentionBatchData {
+  id: string;
+  kind: "retention" | "erasure";
+  /** `interrupted`: an approval stopped mid-execution. Unknown future values render generically. */
+  status: "previewed" | "executed" | "refused" | "expired" | "interrupted" | (string & {});
+  countryId: string | null;
+  categories: RetentionCategoryKey[];
+  erasureLookup: "public_reference" | "email" | null;
+  reason: string;
+  requestedById: string | null;
+  approvedById: string | null;
+  approvalReason: string | null;
+  counts: RetentionBatchCountData[];
+  totalSelected: number;
+  moreRemaining: boolean;
+  previewExpiresAt: string;
+  approvedAt: string | null;
+  executedAt: string | null;
+  createdAt: string;
+}
+
+export interface RetentionBatchesData {
+  purgeEnabled: boolean;
+  items: RetentionBatchData[];
+}
+
+export function readRetentionPolicies(countryId?: string) {
+  const query = countryId ? `?${new URLSearchParams({ countryId }).toString()}` : "";
+  return readAdmin<RetentionPoliciesData>(`/admin/retention/policies${query}`, { countryId: countryId ?? null, purgeEnabled: false, items: [], countries: [] });
+}
+
+export function readRetentionBatches() {
+  return readAdmin<RetentionBatchesData>("/admin/retention/batches", { purgeEnabled: false, items: [] });
+}
+
 export interface AdminAiInsight {
   id: string;
   assistType: string;

@@ -22,6 +22,12 @@ export default function ComplianceEvidencePage() {
         >
           <Button href="/dashboard/compliance-alerts" variant="secondary">Voir les alertes</Button>
         </Card>
+        <Card
+          title="Conservation et anonymisation"
+          description="Durees de conservation par categorie, lots d'anonymisation previsualises puis approuves, effacement sur demande."
+        >
+          <Button href="/compliance/retention" variant="secondary">Gerer la retention</Button>
+        </Card>
       </Grid>
       <StateMessage>Aucune preuve n'est creee ou modifiee par cette page de polish UX.</StateMessage>
     </PageStack>

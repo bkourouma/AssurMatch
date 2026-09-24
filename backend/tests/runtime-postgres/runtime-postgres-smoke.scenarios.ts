@@ -31,7 +31,86 @@ export async function runRuntimePostgresSmokeScenarios(harness: RuntimePostgresS
   await smokeBrokerCrmFlagBehavior(harness, run, state);
   await smokePersistedFeatureFlags(harness.prisma);
   await smokeQuoteNotificationBacklog(harness, state);
+  await smokeDataRetention(harness, run, state);
+  await smokePersistedRetentionFlagClosed(harness.prisma);
   await smokeDurableAudit(harness, run);
+}
+
+/**
+ * Spec 046: the retention eligibility queries, the erasure lookup and the anonymization writes run
+ * against PostgreSQL through the Prisma repositories. The erasure targets the smoke visitor only;
+ * the consent record it leaves behind must be untouched.
+ */
+async function smokeDataRetention(harness: RuntimePostgresSmokeHarness, run: RuntimeSmokeRun, state: RuntimeSmokeState): Promise<void> {
+  const seed = requireSeed(state);
+  const quoteId = state.consentedQuoteId;
+  assert.ok(quoteId, "consented quote should be known before the retention scenario");
+  const admin = adminActor(run);
+  const json = { ...authHeaders(admin), "content-type": "application/json" };
+  const quote = await harness.prisma.quoteRequest.findUnique({ where: { id: quoteId } });
+  assert.ok(quote, "consented quote should exist before anonymization");
+  const consentBefore = JSON.stringify(await harness.prisma.consentRecord.findUnique({ where: { id: quote.consentRecordId } }));
+
+  const policy = await harness.request("/admin/retention/policies", {
+    method: "PUT",
+    headers: json,
+    body: JSON.stringify({ countryId: seed.countryId, category: "quote_requests", retentionDays: 30, reason: "runtime smoke retention policy" })
+  });
+  assert.equal(policy.status, 200, `retention policy override should succeed, got ${policy.status}`);
+
+  // Every category query runs against PostgreSQL; the smoke rows are fresh, so nothing is due.
+  const retentionPreview = await harness.request("/admin/retention/batches/preview", { method: "POST", headers: json, body: JSON.stringify({ countryId: seed.countryId, reason: "runtime smoke retention preview" }) });
+  assert.equal(retentionPreview.status, 201, `retention preview should succeed, got ${retentionPreview.status}`);
+  assert.equal((await readJson<{ totalSelected: number }>(retentionPreview)).totalSelected, 0, "fresh smoke rows must not be due for retention");
+
+  const erasurePreview = await harness.request("/admin/retention/batches/erasure-preview", { method: "POST", headers: json, body: JSON.stringify({ email: run.email, reason: "runtime smoke erasure request" }) });
+  assert.equal(erasurePreview.status, 201, `erasure preview should succeed, got ${erasurePreview.status}`);
+  const erasure = await readJson<{ id: string; counts: Array<{ subject: string; selected: number }> }>(erasurePreview);
+  assert.equal(erasure.counts.find((count) => count.subject === "quote_requests")?.selected, 1, "erasure should find the smoke visitor request");
+  const storedBatch = await harness.prisma.anonymizationBatch.findUnique({ where: { id: erasure.id } });
+  assert.ok(storedBatch, "anonymization batch should be persisted");
+  assert.equal(JSON.stringify(storedBatch).includes(run.email), false, "the batch must never store the e-mail address");
+
+  const refused = await harness.request(`/admin/retention/batches/${erasure.id}/approve`, { method: "POST", headers: json, body: JSON.stringify({ reason: "runtime smoke approval" }) });
+  assert.equal(refused.status, 422, `approval with retention_purge_enabled off should answer 422, got ${refused.status}`);
+
+  await setRetentionPurgeFlag(harness.runtime, true, run);
+  try {
+    const secondPreview = await harness.request("/admin/retention/batches/erasure-preview", { method: "POST", headers: json, body: JSON.stringify({ email: run.email, reason: "runtime smoke erasure request" }) });
+    const batch = await readJson<{ id: string }>(secondPreview);
+    const approved = await harness.request(`/admin/retention/batches/${batch.id}/approve`, { method: "POST", headers: json, body: JSON.stringify({ reason: "runtime smoke approval" }) });
+    assert.equal(approved.status, 200, `approval with the flag on should succeed, got ${approved.status}`);
+    assert.equal((await readJson<{ status: string }>(approved)).status, "executed", "batch should be executed");
+  } finally {
+    await setRetentionPurgeFlag(harness.runtime, false, run);
+  }
+
+  const anonymized = await harness.prisma.quoteRequest.findUnique({ where: { id: quoteId } });
+  assert.deepEqual(anonymized?.payload, { anonymized: true }, "quote answers should be anonymized in PostgreSQL");
+  assert.ok(anonymized?.anonymizedAt, "quote request should carry anonymizedAt");
+  const prospect = await harness.prisma.prospect.findUnique({ where: { id: quote.prospectId } });
+  assert.equal(prospect?.emailNormalized, null, "prospect e-mail should be cleared");
+  assert.equal(prospect?.emailFingerprint, null, "prospect fingerprint should be cleared");
+  assert.equal(JSON.stringify(await harness.prisma.consentRecord.findUnique({ where: { id: quote.consentRecordId } })), consentBefore, "the consent record must be untouched");
+  const [assignment] = await harness.prisma.leadAssignment.findMany({ where: { quoteRequestId: quoteId } });
+  assert.ok(assignment, "the lead assignment is kept");
+  const notices = await harness.prisma.inAppNotification.findMany({ where: { recipientScopeId: assignment.partnerTenantId, type: "lead_data_anonymized" } });
+  assert.equal(notices.length, 1, `the partner should receive exactly one notice, got ${notices.length}`);
+}
+
+async function smokePersistedRetentionFlagClosed(prisma: RuntimeSmokePrismaClient): Promise<void> {
+  const flag = await prisma.featureFlag.findFirst({ where: { key: "retention_purge_enabled", scopeType: "global" } });
+  assert.ok(flag, "retention_purge_enabled should be persisted by the retention scenario");
+  assert.equal(flag.value, false, "retention_purge_enabled should finish fail-closed");
+}
+
+async function setRetentionPurgeFlag(runtime: AssurMatchRuntime, value: boolean, run: RuntimeSmokeRun): Promise<void> {
+  await runtime.featureFlags.service.applyCompliancePolicy({
+    key: "retention_purge_enabled",
+    scopeType: "global",
+    value,
+    reason: `runtime smoke retention_purge_enabled ${value ? "enabled" : "disabled"}`
+  }, adminActor(run), { reference: "RUNTIME-SMOKE-046", approvedBy: "runtime-smoke" });
 }
 
 /**

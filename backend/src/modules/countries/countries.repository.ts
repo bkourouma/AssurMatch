@@ -116,6 +116,7 @@ export class PrismaCountriesRepository implements CountriesRepository {
       regulatoryRegimeId: country.regulatoryRegimeId,
       status: country.status,
       flags: country.flags,
+      publicSince: country.publicSince,
       createdAt: country.createdAt,
       updatedAt: country.updatedAt,
       createdById: country.createdById

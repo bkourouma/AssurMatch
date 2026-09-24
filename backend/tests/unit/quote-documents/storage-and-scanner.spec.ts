@@ -47,6 +47,45 @@ describe("document scanner and storage ports", () => {
     expect(storage.reference("qd-3")).toBe("s3://assurmatch-docs/qd-3");
   });
 
+  it("deletes stored bytes on every adapter and treats a missing object as already deleted (spec 046)", async () => {
+    const memory = new MemoryDocumentStorage();
+    await memory.put("qd-del-1", Buffer.from("abc"), "application/pdf");
+    await memory.delete("qd-del-1");
+    expect(await memory.get("qd-del-1")).toBeUndefined();
+    await expect(memory.delete("qd-del-1")).resolves.toBeUndefined();
+
+    const disk = new LocalDiskDocumentStorage(mkdtempSync(join(tmpdir(), "assurmatch-docs-")));
+    await disk.put("qd-del-2", Buffer.from("xyz"), "image/png");
+    await disk.delete("qd-del-2");
+    expect(await disk.get("qd-del-2")).toBeUndefined();
+    await expect(disk.delete("qd-del-2")).resolves.toBeUndefined();
+    await expect(disk.delete("../escape")).rejects.toThrow(/Invalid storage key/);
+  });
+
+  it("signs S3 DELETE requests and accepts 204 and 404, but not a server error", async () => {
+    const calls: Array<{ url: string; method: string; headers: Record<string, string> }> = [];
+    const statuses = [204, 404, 500];
+    const storage = new S3CompatibleDocumentStorage({
+      endpoint: "https://s3.example.test/",
+      bucket: "assurmatch-docs",
+      region: "eu-west-3",
+      accessKeyId: "AKIA_TEST",
+      secretAccessKey: "secret",
+      fetchImpl: (async (url: string | URL | Request, init?: RequestInit) => {
+        calls.push({ url: String(url), method: init?.method ?? "GET", headers: init?.headers as Record<string, string> });
+        const status = statuses.shift() ?? 500;
+        return { ok: status >= 200 && status < 300, status } as Response;
+      }) as typeof fetch
+    });
+    await storage.delete("qd-4");
+    await storage.delete("qd-4");
+    await expect(storage.delete("qd-4")).rejects.toThrow(/delete failed with status 500/);
+    expect(calls[0]?.url).toBe("https://s3.example.test/assurmatch-docs/qd-4");
+    expect(calls.every((call) => call.method === "DELETE")).toBe(true);
+    expect(calls[0]?.headers.authorization).toMatch(/^AWS4-HMAC-SHA256 Credential=AKIA_TEST\/\d{8}\/eu-west-3\/s3\/aws4_request, SignedHeaders=host;x-amz-content-sha256;x-amz-date, Signature=[0-9a-f]{64}$/);
+    expect(calls[0]?.headers["x-amz-content-sha256"]).toBe("e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855");
+  });
+
   it("resolves adapters from the environment and fails closed in production without S3", () => {
     expect(resolveDocumentStorage({ NODE_ENV: "test" }).mode).toBe("memory");
     expect(resolveDocumentStorage({ APP_ENV: "local" }).mode).toBe("disk");

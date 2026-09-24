@@ -48,6 +48,8 @@ export class LeadsModule {
   readonly assignments: LeadAssignmentService;
   /** Exposed so other modules (visitor documents) can attach prospect-provided CRM documents. */
   readonly crmActivityRepository: CrmActivityRepository;
+  /** Spec 046: the retention anonymizer scrubs the lead action comments stored here. */
+  readonly assignmentsRepository: LeadAssignmentsRepository;
   readonly decisions: RoutingDecisionService;
   readonly eligibility: BrokerEligibilityPolicy;
   readonly routing: QuoteRoutingService;
@@ -73,6 +75,7 @@ export class LeadsModule {
     const assignmentRepository = repositories.assignments ?? new MemoryLeadAssignmentsRepository();
     const crmActivityRepository = repositories.crmActivity ?? new MemoryCrmActivityRepository();
     this.crmActivityRepository = crmActivityRepository;
+    this.assignmentsRepository = assignmentRepository;
     this.assignments = new LeadAssignmentService(audit, assignmentRepository, routingOptions.events);
     this.decisions = new RoutingDecisionService(audit, repositories.decisions);
     this.eligibility = new BrokerEligibilityPolicy(partners, licenses, (partnerTenantId) => assignmentRepository.monthlyCountForPartner(partnerTenantId, new Date()));

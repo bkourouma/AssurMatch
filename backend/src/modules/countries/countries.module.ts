@@ -13,6 +13,8 @@ export interface Country extends Omit<CountryRecord, "id" | "flags"> {
   createdAt: Date;
   updatedAt: Date;
   createdById?: string;
+  /** Spec 046: set once, on the first transition to `public`; anchors the waiting-list retention. */
+  publicSince?: Date | null;
 }
 
 export class CountriesService {
@@ -25,6 +27,7 @@ export class CountriesService {
       ...parsed,
       id: parsed.id ?? crypto.randomUUID(),
       flags: { ...COUNTRY_FEATURE_FLAG_DEFAULTS, ...parsed.flags },
+      ...(parsed.status === "public" ? { publicSince: now } : {}),
       createdAt: now,
       updatedAt: now
     };
@@ -49,9 +52,13 @@ export class CountriesService {
     if (changes.status === "public" && (!nextRegimeId || !nextFlags.country_public_enabled)) {
       throw new Error("Country public activation requires regime and country_public_enabled");
     }
+    const now = new Date();
+    // Spec 046 FR-009: only the first opening is recorded; a later suspension and reopening keeps it.
+    const firstOpening = changes.status === "public" && !country.publicSince;
     Object.assign(country, pickDefined(changes), {
       flags: nextFlags,
-      updatedAt: new Date()
+      ...(firstOpening ? { publicSince: now } : {}),
+      updatedAt: now
     });
     await this.repository.update(id, country);
     this.audit.write({
