@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { isoCountrySchema, languageCodeSchema, nonEmptyStringSchema, reasonSchema, uuidSchema } from "../validation/common.schemas";
+import { toPatchSchema } from "../validation/patch.schemas";
 
 export const COUNTRY_FEATURE_FLAG_DEFAULTS = {
   country_public_enabled: false,
@@ -64,7 +65,10 @@ export const countryCreateSchema = z.object({
   flags: countryFlagsSchema.default(COUNTRY_FEATURE_FLAG_DEFAULTS)
 });
 
-export const countryUpdateSchema = countryCreateSchema.partial().extend({
+export const countryFlagsPatchSchema = toPatchSchema(countryFlagsSchema);
+
+export const countryUpdateSchema = toPatchSchema(countryCreateSchema).omit({ id: true }).extend({
+  flags: countryFlagsPatchSchema.optional(),
   reason: reasonSchema
 });
 
@@ -81,7 +85,10 @@ export const productCreateSchema = z.object({
   flags: productFlagsSchema.default(PRODUCT_FEATURE_FLAG_DEFAULTS)
 });
 
-export const productUpdateSchema = productCreateSchema.partial().extend({
+export const productFlagsPatchSchema = toPatchSchema(productFlagsSchema);
+
+export const productUpdateSchema = toPatchSchema(productCreateSchema).omit({ id: true }).extend({
+  flags: productFlagsPatchSchema.optional(),
   reason: reasonSchema
 });
 
@@ -89,7 +96,11 @@ export type CountryFlags = z.output<typeof countryFlagsSchema>;
 export type ProductFlags = z.output<typeof productFlagsSchema>;
 export type RegulatoryRegimeDto = z.input<typeof regulatoryRegimeSchema>;
 export type RegulatoryRegimeRecord = z.output<typeof regulatoryRegimeSchema>;
+export type CountryFlagsPatch = z.output<typeof countryFlagsPatchSchema>;
+export type ProductFlagsPatch = z.output<typeof productFlagsPatchSchema>;
 export type CountryDto = z.input<typeof countryCreateSchema>;
 export type CountryRecord = z.output<typeof countryCreateSchema>;
+export type CountryUpdateDto = z.input<typeof countryUpdateSchema>;
 export type ProductDto = z.input<typeof productCreateSchema>;
 export type ProductRecord = z.output<typeof productCreateSchema>;
+export type ProductUpdateDto = z.input<typeof productUpdateSchema>;

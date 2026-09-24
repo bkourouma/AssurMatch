@@ -27,6 +27,7 @@
     "packages/**/*.ts",
     "packages/**/*.tsx",
     "scripts/**/*.mjs",
+    "scripts/**/*.ts",
     "eslint.config.js",
     "prisma.config.ts",
     "vitest.config.ts",

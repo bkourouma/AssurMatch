@@ -11,6 +11,7 @@ import {
   DEMO_OFFER_SPECS,
   type DemoOfferSpec
 } from "./demo-offer-catalog";
+import { withoutUndefined } from "../lib/without-undefined";
 
 type PartnerPlan = "starter" | "pro" | "enterprise";
 type LeadStatus = "assigned" | "broker_notified" | "seen" | "accepted" | "rejected" | "closed" | "disputed";
@@ -75,14 +76,14 @@ interface QuoteSeedInput {
   status: LeadStatus;
   assignedDaysAgo: number;
   answers: Record<string, unknown>;
-  actionReason?: string;
-  actionComment?: string;
+  actionReason?: string | undefined;
+  actionComment?: string | undefined;
 }
 
 interface CrmSeedInput extends QuoteSeedInput {
   crmStatus: CrmStatus;
   urgency: CrmUrgency;
-  advisorId?: string;
+  advisorId?: string | undefined;
   tags: string[];
 }
 
@@ -518,7 +519,7 @@ async function upsertPartner(prisma: PrismaClient, input: {
   return { id: partner.id, legalName: partner.legalName, plan: partner.plan };
 }
 
-async function seedPartnerCoverage(prisma: PrismaClient, partners: Record<string, PartnerRecord>, country: CountryRecord, products: ProductRecord[]): Promise<void> {
+async function seedPartnerCoverage(prisma: PrismaClient, partners: { starter: PartnerRecord; pro: PartnerRecord; enterprise: PartnerRecord; blocked: PartnerRecord }, country: CountryRecord, products: ProductRecord[]): Promise<void> {
   for (const partner of [partners.starter, partners.pro, partners.enterprise]) {
     await prisma.partnerCountryAuthorization.upsert({
       where: { partnerTenantId_countryId: { partnerTenantId: partner.id, countryId: country.id } },
@@ -845,7 +846,7 @@ async function seedLead(prisma: PrismaClient, input: QuoteSeedInput): Promise<{ 
   const existing = await prisma.leadAssignment.findFirst({ where: { quoteRequestId: quoteRequest.id } });
   const assignedAt = daysAgo(input.assignedDaysAgo);
   const actionAt = input.status === "assigned" || input.status === "broker_notified" ? undefined : futureFrom(assignedAt, 4);
-  const assignmentData = {
+  const assignmentData = withoutUndefined({
     quoteRequestId: quoteRequest.id,
     partnerTenantId: input.partnerTenantId,
     status: input.status,
@@ -863,7 +864,7 @@ async function seedLead(prisma: PrismaClient, input: QuoteSeedInput): Promise<{ 
     lastBrokerActionAt: actionAt,
     createdAt: assignedAt,
     updatedAt: actionAt ?? assignedAt
-  };
+  });
   const assignment = existing
     ? await prisma.leadAssignment.update({ where: { id: existing.id }, data: assignmentData })
     : await prisma.leadAssignment.create({ data: assignmentData });
@@ -936,8 +937,8 @@ async function upsertLeadHistory(prisma: PrismaClient, leadAssignmentId: string,
 async function upsertHistoryEvent(prisma: PrismaClient, leadAssignmentId: string, partnerTenantId: string, id: string, eventType: string, previousStatus: string | undefined, nextStatus: string | undefined, occurredAt: Date, reason?: string, comment?: string): Promise<void> {
   await prisma.leadActionHistory.upsert({
     where: { id },
-    create: { id, leadAssignmentId, partnerTenantId, actorId: DEMO_ACTOR_ID, eventType, previousStatus, nextStatus, reason, comment, context: { source: "local_demo_seed" }, occurredAt },
-    update: { eventType, previousStatus, nextStatus, reason, comment, context: { source: "local_demo_seed" }, occurredAt }
+    create: withoutUndefined({ id, leadAssignmentId, partnerTenantId, actorId: DEMO_ACTOR_ID, eventType, previousStatus, nextStatus, reason, comment, context: { source: "local_demo_seed" }, occurredAt }),
+    update: withoutUndefined({ eventType, previousStatus, nextStatus, reason, comment, context: { source: "local_demo_seed" }, occurredAt })
   });
 }
 
@@ -966,7 +967,7 @@ async function upsertBrokerNotification(prisma: PrismaClient, leadAssignmentId: 
 async function seedCrmState(prisma: PrismaClient, leadAssignmentId: string, input: CrmSeedInput): Promise<void> {
   await prisma.brokerCrmLeadState.upsert({
     where: { leadAssignmentId },
-    create: {
+    create: withoutUndefined({
       leadAssignmentId,
       partnerTenantId: input.partnerTenantId,
       status: input.crmStatus,
@@ -975,15 +976,15 @@ async function seedCrmState(prisma: PrismaClient, leadAssignmentId: string, inpu
       assignedAdvisorId: input.advisorId,
       tags: input.tags,
       createdById: DEMO_ACTOR_ID
-    },
-    update: {
+    }),
+    update: withoutUndefined({
       partnerTenantId: input.partnerTenantId,
       status: input.crmStatus,
       urgency: input.urgency,
       source: "quote_request",
       assignedAdvisorId: input.advisorId,
       tags: input.tags
-    }
+    })
   });
   await prisma.brokerCrmPipelineHistory.upsert({
     where: { id: `${leadAssignmentId}:pipeline` },
@@ -1007,22 +1008,22 @@ async function seedCrmState(prisma: PrismaClient, leadAssignmentId: string, inpu
 async function seedCrmActivity(prisma: PrismaClient, leadAssignmentId: string, input: CrmSeedInput): Promise<void> {
   await prisma.brokerCrmNote.upsert({
     where: { id: `${leadAssignmentId}:note` },
-    create: {
+    create: withoutUndefined({
       id: `${leadAssignmentId}:note`,
       leadAssignmentId,
       partnerTenantId: input.partnerTenantId,
       authorId: input.advisorId,
       body: "Note locale: prospect a rappeler et informations a confirmer par le courtier partenaire.",
       createdAt: daysAgo(Math.max(input.assignedDaysAgo - 1, 0))
-    },
-    update: {
+    }),
+    update: withoutUndefined({
       authorId: input.advisorId,
       body: "Note locale: prospect a rappeler et informations a confirmer par le courtier partenaire."
-    }
+    })
   });
   await prisma.brokerCrmTask.upsert({
     where: { id: `${leadAssignmentId}:task` },
-    create: {
+    create: withoutUndefined({
       id: `${leadAssignmentId}:task`,
       leadAssignmentId,
       partnerTenantId: input.partnerTenantId,
@@ -1032,17 +1033,17 @@ async function seedCrmActivity(prisma: PrismaClient, leadAssignmentId: string, i
       createdById: DEMO_ACTOR_ID,
       createdAt: daysAgo(input.assignedDaysAgo),
       updatedAt: SEED_NOW
-    },
-    update: {
+    }),
+    update: withoutUndefined({
       assigneeId: input.advisorId,
       title: input.crmStatus === "injoignable" ? "Tenter un nouvel appel" : "Qualifier la demande",
       dueAt: input.urgency === "urgent" ? daysAgo(1) : futureDays(3),
       updatedAt: SEED_NOW
-    }
+    })
   });
   await prisma.brokerCrmReminder.upsert({
     where: { id: `${leadAssignmentId}:reminder` },
-    create: {
+    create: withoutUndefined({
       id: `${leadAssignmentId}:reminder`,
       leadAssignmentId,
       partnerTenantId: input.partnerTenantId,
@@ -1051,17 +1052,17 @@ async function seedCrmActivity(prisma: PrismaClient, leadAssignmentId: string, i
       message: "Relance locale a valider humainement.",
       createdById: DEMO_ACTOR_ID,
       createdAt: daysAgo(input.assignedDaysAgo)
-    },
-    update: {
+    }),
+    update: withoutUndefined({
       assigneeId: input.advisorId,
       remindAt: futureDays(2),
       message: "Relance locale a valider humainement."
-    }
+    })
   });
   if (["documents_demandes", "devis_en_preparation", "devis_envoye", "negociation", "gagne"].includes(input.crmStatus)) {
     await prisma.brokerCrmDocument.upsert({
       where: { id: `${leadAssignmentId}:document` },
-      create: {
+      create: withoutUndefined({
         id: `${leadAssignmentId}:document`,
         leadAssignmentId,
         partnerTenantId: input.partnerTenantId,
@@ -1070,13 +1071,13 @@ async function seedCrmActivity(prisma: PrismaClient, leadAssignmentId: string, i
         visibility: "internal",
         uploadedById: input.advisorId,
         createdAt: daysAgo(Math.max(input.assignedDaysAgo - 2, 0))
-      },
-      update: {
+      }),
+      update: withoutUndefined({
         label: "Piece locale recue",
         storageKey: `local-demo/${leadAssignmentId}/document.pdf`,
         visibility: "internal",
         uploadedById: input.advisorId
-      }
+      })
     });
   }
   if (["devis_envoye", "negociation", "gagne"].includes(input.crmStatus)) {

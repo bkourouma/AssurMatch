@@ -115,11 +115,11 @@ description: "Task list for Dashboards courtier et admin plateforme"
 ## Phase N: Polish & Cross-Cutting
 
 - [x] T040 Run quickstart steps and verify endpoints, page rendering and audit emission.
-- [ ] T041 [P] Documentation: `AGENTS.md` updated to point at `specs/012-dashboard-courtier-admin/plan.md`.
+- [x] T041 [P] Documentation: `AGENTS.md` updated to point at `specs/012-dashboard-courtier-admin/plan.md`. Superseded 2026-09-24: the pointer moved on to later specs and now targets spec 045.
 - [x] T042 Re-run Constitution Check evidence in plan and confirm Pass on all gates.
-- [ ] T043 Final validations: `npm run typecheck`, `npm run lint`, `npm run test`, `npm run test:web`, `npm run build`, `npx prisma validate --schema backend/prisma/schema.prisma`, `npm audit --audit-level=high`, `git diff --check`. Run `npm run test:runtime:postgres` only if Prisma path is touched (this plan does not touch it).
+- [x] T043 Final validations: `npm run typecheck`, `npm run lint`, `npm run test`, `npm run test:web`, `npm run build`, `npx prisma validate --schema backend/prisma/schema.prisma`, `npm audit --audit-level=high`, `git diff --check`. Run `npm run test:runtime:postgres` only if Prisma path is touched (this plan does not touch it). Done 2026-09-24 on `fix/patch-semantics-scripts-typecheck`: typecheck, lint, 612 vitest tests, `next build` of the three apps, Prisma validate, audit (no high/critical), `git diff --check` pass; `test:web` 131 passed on the main checkout.
 - [x] T044 Check off every completed task in this file.
-- [ ] T045 Produce final report (plan created, tasks total/done, files changed, endpoints, DTOs, components, tests added, validation results, residual risks, recommended commit).
+- [x] T045 Produce final report (plan created, tasks total/done, files changed, endpoints, DTOs, components, tests added, validation results, residual risks, recommended commit). Superseded: the spec shipped inside the PRD backlog delivery (PR 10); its closure is recorded in PR 11.
 
 ## Dependencies & Order
 

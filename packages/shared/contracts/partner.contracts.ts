@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { dateStringSchema, e164PhoneSchema, emailSchema, nonEmptyStringSchema, reasonSchema, uuidSchema } from "../validation/common.schemas";
+import { toPatchSchema } from "../validation/patch.schemas";
 
 export const partnerCreateSchema = z.object({
   id: uuidSchema.optional(),
@@ -16,7 +17,7 @@ export const partnerCreateSchema = z.object({
   capacityStatus: z.enum(["available", "limited", "full", "blocked"]).default("available")
 });
 
-export const partnerUpdateSchema = partnerCreateSchema.partial().extend({
+export const partnerUpdateSchema = toPatchSchema(partnerCreateSchema).omit({ id: true }).extend({
   reason: reasonSchema
 });
 

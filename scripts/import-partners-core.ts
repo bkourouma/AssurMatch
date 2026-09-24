@@ -93,14 +93,14 @@ export type LicenseInput = z.infer<typeof licenseSchema>;
 export type CoverageInput = z.infer<typeof coverageSchema>;
 export type OfferInput = z.infer<typeof offerSchema>;
 
-export interface ImportReport {
+export type ImportReport = {
   dryRun: boolean;
   checksum: string;
   created: number;
   updated: number;
   skipped: number;
   errors: Array<{ path: string; message: string }>;
-}
+};
 
 export type StoreOutcome = "created" | "updated" | "skipped";
 
@@ -119,7 +119,7 @@ export interface ImportAuditInput {
   batchId: string;
   checksum: string;
   result: "success" | "failed" | "refused";
-  report?: ImportReport;
+  report?: ImportReport | undefined;
 }
 
 export interface RunImportOptions {
@@ -127,7 +127,7 @@ export interface RunImportOptions {
   expectedChecksum: string;
   apply: boolean;
   actorId?: string;
-  store?: ImportStore;
+  store?: ImportStore | undefined;
 }
 
 export function computeSha256(input: string | Buffer): string {

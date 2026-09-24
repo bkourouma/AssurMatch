@@ -13,7 +13,7 @@
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { PrismaPg } from "@prisma/adapter-pg";
-import { PrismaClient } from "@prisma/client";
+import { PrismaClient, type RegulatoryFamily } from "@prisma/client";
 
 interface CountrySeed {
   isoCode: string;
@@ -72,7 +72,7 @@ async function main(): Promise<void> {
     console.error("[seed-reference] DATABASE_URL is required");
     process.exit(2);
   }
-  const adapter = new PrismaPg(databaseUrl) as unknown as ConstructorParameters<typeof PrismaClient>[0]["adapter"];
+  const adapter = new PrismaPg(databaseUrl);
   const prisma = new PrismaClient({ adapter });
   try {
     const countries = readJson<CountrySeed[]>("countries.json");
@@ -103,7 +103,7 @@ async function main(): Promise<void> {
 
     const cimaRegime = await prisma.regulatoryRegime.findUnique({ where: { key: "cima" } });
     for (const country of countries) {
-      const regulatoryFamily = country.regulatoryFamily as "cima" | "fanaf" | "domestic";
+      const regulatoryFamily = country.regulatoryFamily as RegulatoryFamily;
       await prisma.country.upsert({
         where: { isoCode: country.isoCode },
         update: {
