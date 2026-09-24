@@ -5,6 +5,7 @@ import { Breadcrumb } from "../../../components/ui/breadcrumb";
 import { EmptyState } from "../../../components/ui/empty-state";
 import { Hero } from "../../../components/ui/hero";
 import { Section } from "../../../components/ui/section";
+import { Reveal } from "../../../components/motion/reveal";
 import { brokerPlans } from "../../../content/brokers";
 import { listCountryDirectory, listPublicProducts } from "../../../lib/public-api";
 import { buildMetadata, localeUrl } from "../../../lib/seo";
@@ -57,6 +58,7 @@ export default async function BrokerApplyPage({ params }: { params: Promise<{ lo
     tradeNameHint: t("form.tradeNameHint"),
     country: t("form.country"),
     countryPlaceholder: t("form.countryPlaceholder"),
+    identityLegend: t("form.identityLegend"),
     licenceLegend: t("form.licenceLegend"),
     licenseNumber: t("form.licenseNumber"),
     licenseExpiresAt: t("form.licenseExpiresAt"),
@@ -76,6 +78,7 @@ export default async function BrokerApplyPage({ params }: { params: Promise<{ lo
     whatsapp: t("form.whatsapp"),
     whatsappHint: t("form.whatsappHint"),
     planLegend: t("form.planLegend"),
+    messageLegend: t("form.messageLegend"),
     message: t("form.message"),
     messageHint: t("form.messageHint"),
     consent: t("form.consent"),
@@ -101,29 +104,33 @@ export default async function BrokerApplyPage({ params }: { params: Promise<{ lo
 
   return (
     <>
-      <div className="am-container">
-        <Breadcrumb
-          label={common("breadcrumbLabel")}
-          items={[
-            { name: common("home"), url: localeUrl(locale, "/") },
-            { name: t("breadcrumb"), url: localeUrl(locale, "/brokers/apply") }
-          ]}
-        />
-      </div>
+      <Hero
+        title={t("title")}
+        lead={t("lead")}
+        breadcrumb={
+          <Breadcrumb
+            label={common("breadcrumbLabel")}
+            items={[
+              { name: common("home"), url: localeUrl(locale, "/") },
+              { name: t("breadcrumb"), url: localeUrl(locale, "/brokers/apply") }
+            ]}
+          />
+        }
+      />
 
-      <Hero title={t("title")} lead={t("lead")} />
-
-      <Section>
+      <Section width="narrow">
         {eligibleCountries.length === 0 ? (
           <EmptyState title={t("noCountries.title")} description={t("noCountries.description")} />
         ) : (
-          <PartnerApplicationForm
-            countries={eligibleCountries.map((country) => ({ isoCode: country.isoCode, name: country.name }))}
-            productsByCountry={productsByCountry}
-            plans={planOptions}
-            labels={labels}
-            {...(defaultCountry ? { defaultCountry } : {})}
-          />
+          <Reveal as="div">
+            <PartnerApplicationForm
+              countries={eligibleCountries.map((country) => ({ isoCode: country.isoCode, name: country.name }))}
+              productsByCountry={productsByCountry}
+              plans={planOptions}
+              labels={labels}
+              {...(defaultCountry ? { defaultCountry } : {})}
+            />
+          </Reveal>
         )}
       </Section>
     </>

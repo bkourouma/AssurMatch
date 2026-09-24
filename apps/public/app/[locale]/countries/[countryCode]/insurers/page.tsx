@@ -6,6 +6,8 @@ import { Breadcrumb } from "../../../../components/ui/breadcrumb";
 import { Button } from "../../../../components/ui/button";
 import { EmptyState } from "../../../../components/ui/empty-state";
 import { Hero } from "../../../../components/ui/hero";
+import { Icon } from "../../../../components/ui/icons";
+import { Reveal } from "../../../../components/motion/reveal";
 import { Section } from "../../../../components/ui/section";
 import { listCountryDirectory, listCountryInsurers, listPublicProducts } from "../../../../lib/public-api";
 import { buildMetadata, localeUrl } from "../../../../lib/seo";
@@ -19,6 +21,14 @@ import type { PageMetadata } from "../../../../lib/seo";
  */
 
 type PageParams = { locale: string; countryCode: string };
+
+/** Two letters standing in for an insurer logo, e.g. "Assureur Demo Atlantique" -> "AA". */
+function initials(name: string): string {
+  const words = name.split(/\s+/).map((word) => word.trim()).filter(Boolean);
+  const firstWord = words[0] ?? "";
+  const lastWord = words.length > 1 ? words[words.length - 1] ?? "" : firstWord;
+  return `${firstWord.charAt(0)}${words.length > 1 ? lastWord.charAt(0) : firstWord.charAt(1)}`;
+}
 
 async function resolveCountryName(countryCode: string): Promise<string> {
   const directory = await listCountryDirectory();
@@ -55,23 +65,30 @@ export default async function CountryInsurersPage({ params }: { params: Promise<
 
   return (
     <>
-      <div className="am-container">
-        <Breadcrumb
-          label={common("breadcrumbLabel")}
-          items={[
-            { name: common("home"), url: localeUrl(locale, "/") },
-            { name: countries("breadcrumb"), url: localeUrl(locale, "/countries") },
-            { name: countryName, url: localeUrl(locale, "/countries/[countryCode]", { countryCode }) },
-            { name: t("breadcrumb"), url: localeUrl(locale, "/countries/[countryCode]/insurers", { countryCode }) }
-          ]}
-        />
-      </div>
-
-      <Hero title={t("heading", { countryCode: countryName })} lead={t("intro")} />
+      <Hero
+        kicker={countries("breadcrumb")}
+        title={t("heading", { countryCode: countryName })}
+        lead={t("intro")}
+        size="sm"
+        breadcrumb={
+          <Breadcrumb
+            label={common("breadcrumbLabel")}
+            items={[
+              { name: common("home"), url: localeUrl(locale, "/") },
+              { name: countries("breadcrumb"), url: localeUrl(locale, "/countries") },
+              { name: countryName, url: localeUrl(locale, "/countries/[countryCode]", { countryCode }) },
+              { name: t("breadcrumb"), url: localeUrl(locale, "/countries/[countryCode]/insurers", { countryCode }) }
+            ]}
+          />
+        }
+      />
 
       <Section ariaLabel={t("listLabel")}>
         {state.status === "error" ? (
           <EmptyState
+            icon="wifi-off"
+            tone="muted"
+            align="center"
             title={t("error.title")}
             description={t("error.description")}
             action={
@@ -84,6 +101,9 @@ export default async function CountryInsurersPage({ params }: { params: Promise<
 
         {state.status !== "error" && state.data.length === 0 ? (
           <EmptyState
+            icon="landmark"
+            tone="muted"
+            align="center"
             title={t("empty.title")}
             description={t("empty.description")}
             action={
@@ -95,32 +115,46 @@ export default async function CountryInsurersPage({ params }: { params: Promise<
         ) : null}
 
         {state.status !== "error" && state.data.length > 0 ? (
-          <ul className="am-countrygrid">
+          <Reveal as="ul" stagger className="am-j-cardgrid">
             {state.data.map((insurer) => {
               const productLinks = insurer.productKeys.map((key) => ({
                 raw: key,
                 match: countryProducts.data.find((candidate) => candidate.key.toLowerCase() === key.toLowerCase())
               }));
               return (
-                <li className="am-countrycard" key={insurer.insurerName}>
-                  <h2 className="pub-card__title">
-                    <BackendText>{insurer.insurerName}</BackendText>
-                  </h2>
-                  <p className="am-field__hint">{t("offersCount", { count: insurer.offerCount })}</p>
+                <li key={insurer.insurerName}>
+                  <div className="am-j-insurer__head">
+                    <span className="am-j-initials" aria-hidden="true">
+                      {initials(insurer.insurerName)}
+                    </span>
+                    <div>
+                      <h2 className="am-j-insurer__name">
+                        <BackendText>{insurer.insurerName}</BackendText>
+                      </h2>
+                      <p className="am-j-meta">
+                        <span>
+                          <Icon name="list" size={16} />
+                          {t("offersCount", { count: insurer.offerCount })}
+                        </span>
+                      </p>
+                    </div>
+                  </div>
                   {productLinks.length > 0 ? (
                     <>
-                      <p className="am-field__hint">{t("productsLabel")}</p>
-                      <div className="am-cluster">
+                      <p className="am-j-meta">{t("productsLabel")}</p>
+                      <div className="am-j-cardgrid__actions">
                         {productLinks.map(({ raw, match }) =>
                           match ? (
                             <Button
                               key={raw}
                               variant="secondary"
+                              size="sm"
                               href={{
                                 pathname: "/countries/[countryCode]/products/[productKey]/offers",
                                 params: { countryCode, productKey: match.key },
                                 query: { insurer: insurer.insurerName }
                               }}
+                              iconAfter={<Icon name="arrow-right" size={16} />}
                             >
                               {t("viewOffers")} <BackendText>{match.name}</BackendText>
                             </Button>
@@ -136,7 +170,7 @@ export default async function CountryInsurersPage({ params }: { params: Promise<
                 </li>
               );
             })}
-          </ul>
+          </Reveal>
         ) : null}
       </Section>
     </>

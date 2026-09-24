@@ -4,7 +4,9 @@ import { FormEvent, useMemo, useState } from "react";
 import { track } from "../../lib/analytics";
 import { submitPartnerApplication, type PartnerApplicationSubmission } from "../../lib/public-api";
 import { Button } from "../ui/button";
+import { Divider } from "../ui/divider";
 import { Field, fieldControlProps } from "../ui/field";
+import { Icon } from "../ui/icons";
 import { Notice } from "../ui/notice";
 import { RadioCards, type RadioCardOption } from "../ui/radio-cards";
 
@@ -30,6 +32,9 @@ export interface PartnerApplicationFormLabels {
   tradeNameHint: string;
   country: string;
   countryPlaceholder: string;
+  /** Section 1: "Société" - the company's identity. */
+  identityLegend: string;
+  /** Section 3: "Licence" - the licence, the products and the monthly capacity. */
   licenceLegend: string;
   licenseNumber: string;
   licenseExpiresAt: string;
@@ -41,6 +46,7 @@ export interface PartnerApplicationFormLabels {
   productsNone: string;
   monthlyCapacity: string;
   monthlyCapacityHint: string;
+  /** Section 2: "Contact". */
   contactLegend: string;
   contactName: string;
   contactEmail: string;
@@ -49,6 +55,8 @@ export interface PartnerApplicationFormLabels {
   whatsapp: string;
   whatsappHint: string;
   planLegend: string;
+  /** Section 4: "Message et consentement" - the desired plan, the message and the consent line. */
+  messageLegend: string;
   message: string;
   messageHint: string;
   consent: string;
@@ -222,7 +230,7 @@ export function PartnerApplicationForm({ countries, productsByCountry, plans, la
           {labels.success.referencePrefix} <strong>{state.publicReference}</strong>
         </p>
         <p>{labels.success.nextStepsTitle}</p>
-        <ul className="pub-list">
+        <ul className="am-steplist">
           {state.nextSteps.map((step) => (
             <li key={step}>{step}</li>
           ))}
@@ -234,10 +242,15 @@ export function PartnerApplicationForm({ countries, productsByCountry, plans, la
   const submitting = state.status === "submitting";
 
   return (
-    <form className="am-stack" onSubmit={submit} noValidate>
+    <form className="am-formcard" onSubmit={submit} noValidate>
       <fieldset>
-        <legend>{labels.licenceLegend}</legend>
-        <div className="pub-form__grid pub-form__grid--two">
+        <legend className="am-formsection__legend">
+          <span className="am-formsection__index" aria-hidden="true">
+            1
+          </span>
+          {labels.identityLegend}
+        </legend>
+        <div className="am-formcard__grid">
           <Field id="am-apply-legalname" label={labels.legalName} required {...(fieldErrors.legalName ? { error: fieldErrors.legalName } : {})}>
             <input
               {...fieldControlProps("am-apply-legalname", { error: fieldErrors.legalName, required: true })}
@@ -266,84 +279,19 @@ export function PartnerApplicationForm({ countries, productsByCountry, plans, la
               ))}
             </select>
           </Field>
-          <Field id="am-apply-licensenumber" label={labels.licenseNumber} required {...(fieldErrors.licenseNumber ? { error: fieldErrors.licenseNumber } : {})}>
-            <input
-              {...fieldControlProps("am-apply-licensenumber", { error: fieldErrors.licenseNumber, required: true })}
-              name="licenseNumber"
-              maxLength={64}
-            />
-          </Field>
-          <Field
-            id="am-apply-licenseexpires"
-            label={labels.licenseExpiresAt}
-            hint={labels.licenseExpiresAtHint}
-            required
-            {...(fieldErrors.licenseExpiresAt ? { error: fieldErrors.licenseExpiresAt } : {})}
-          >
-            <input
-              {...fieldControlProps("am-apply-licenseexpires", {
-                hint: labels.licenseExpiresAtHint,
-                error: fieldErrors.licenseExpiresAt,
-                required: true
-              })}
-              name="licenseExpiresAt"
-              type="date"
-            />
-          </Field>
-          <Field
-            id="am-apply-issuingauthority"
-            label={labels.licenseIssuingAuthority}
-            hint={labels.licenseIssuingAuthorityHint}
-          >
-            <input
-              {...fieldControlProps("am-apply-issuingauthority", { hint: labels.licenseIssuingAuthorityHint })}
-              name="licenseIssuingAuthority"
-              maxLength={160}
-            />
-          </Field>
         </div>
       </fieldset>
 
-      <fieldset>
-        <legend>{labels.productsLegend}</legend>
-        <p className="pub-form__hint">{labels.productsHint}</p>
-        {products.length > 0 ? (
-          <div className="pub-form__grid pub-form__grid--two">
-            {products.map((product) => (
-              <label key={product.key} htmlFor={`am-apply-product-${product.key}`}>
-                <input id={`am-apply-product-${product.key}`} name="productKeys" type="checkbox" value={product.key} />
-                {product.name}
-              </label>
-            ))}
-          </div>
-        ) : (
-          <p role="status">{labels.productsNone}</p>
-        )}
-        {fieldErrors.productKeys ? (
-          <p className="am-field__error" role="alert">
-            {fieldErrors.productKeys}
-          </p>
-        ) : null}
-      </fieldset>
-
-      <Field id="am-apply-capacity" label={labels.monthlyCapacity} hint={labels.monthlyCapacityHint} required {...(fieldErrors.monthlyCapacity ? { error: fieldErrors.monthlyCapacity } : {})}>
-        <input
-          {...fieldControlProps("am-apply-capacity", {
-            hint: labels.monthlyCapacityHint,
-            error: fieldErrors.monthlyCapacity,
-            required: true
-          })}
-          name="monthlyCapacity"
-          type="number"
-          min={1}
-          max={10000}
-          step={1}
-        />
-      </Field>
+      <Divider />
 
       <fieldset>
-        <legend>{labels.contactLegend}</legend>
-        <div className="pub-form__grid pub-form__grid--two">
+        <legend className="am-formsection__legend">
+          <span className="am-formsection__index" aria-hidden="true">
+            2
+          </span>
+          {labels.contactLegend}
+        </legend>
+        <div className="am-formcard__grid">
           <Field id="am-apply-contactname" label={labels.contactName} required {...(fieldErrors.contactName ? { error: fieldErrors.contactName } : {})}>
             <input
               {...fieldControlProps("am-apply-contactname", { error: fieldErrors.contactName, required: true })}
@@ -388,43 +336,145 @@ export function PartnerApplicationForm({ countries, productsByCountry, plans, la
         </div>
       </fieldset>
 
-      <RadioCards name="desiredPlan" legend={labels.planLegend} options={plans} required />
-      {fieldErrors.desiredPlan ? (
-        <p className="am-field__error" role="alert">
-          {fieldErrors.desiredPlan}
-        </p>
+      <Divider />
+
+      <fieldset>
+        <legend className="am-formsection__legend">
+          <span className="am-formsection__index" aria-hidden="true">
+            3
+          </span>
+          {labels.licenceLegend}
+        </legend>
+        <div className="am-formcard__grid">
+          <Field id="am-apply-licensenumber" label={labels.licenseNumber} required {...(fieldErrors.licenseNumber ? { error: fieldErrors.licenseNumber } : {})}>
+            <input
+              {...fieldControlProps("am-apply-licensenumber", { error: fieldErrors.licenseNumber, required: true })}
+              name="licenseNumber"
+              maxLength={64}
+            />
+          </Field>
+          <Field
+            id="am-apply-licenseexpires"
+            label={labels.licenseExpiresAt}
+            hint={labels.licenseExpiresAtHint}
+            required
+            {...(fieldErrors.licenseExpiresAt ? { error: fieldErrors.licenseExpiresAt } : {})}
+          >
+            <input
+              {...fieldControlProps("am-apply-licenseexpires", {
+                hint: labels.licenseExpiresAtHint,
+                error: fieldErrors.licenseExpiresAt,
+                required: true
+              })}
+              name="licenseExpiresAt"
+              type="date"
+            />
+          </Field>
+          <Field
+            id="am-apply-issuingauthority"
+            label={labels.licenseIssuingAuthority}
+            hint={labels.licenseIssuingAuthorityHint}
+          >
+            <input
+              {...fieldControlProps("am-apply-issuingauthority", { hint: labels.licenseIssuingAuthorityHint })}
+              name="licenseIssuingAuthority"
+              maxLength={160}
+            />
+          </Field>
+          <Field id="am-apply-capacity" label={labels.monthlyCapacity} hint={labels.monthlyCapacityHint} required {...(fieldErrors.monthlyCapacity ? { error: fieldErrors.monthlyCapacity } : {})}>
+            <input
+              {...fieldControlProps("am-apply-capacity", {
+                hint: labels.monthlyCapacityHint,
+                error: fieldErrors.monthlyCapacity,
+                required: true
+              })}
+              name="monthlyCapacity"
+              type="number"
+              min={1}
+              max={10000}
+              step={1}
+            />
+          </Field>
+        </div>
+
+        <div className="am-field">
+          <span className="am-field__label">{labels.productsLegend}</span>
+          <p className="am-field__hint">{labels.productsHint}</p>
+          {products.length > 0 ? (
+            <div className="am-formcard__products">
+              {products.map((product) => (
+                <label className="am-checkline" key={product.key} htmlFor={`am-apply-product-${product.key}`}>
+                  <input id={`am-apply-product-${product.key}`} name="productKeys" type="checkbox" value={product.key} />
+                  {product.name}
+                </label>
+              ))}
+            </div>
+          ) : (
+            <p role="status">{labels.productsNone}</p>
+          )}
+          {fieldErrors.productKeys ? (
+            <p className="am-field__error" role="alert">
+              <Icon name="alert" size={16} />
+              {fieldErrors.productKeys}
+            </p>
+          ) : null}
+        </div>
+      </fieldset>
+
+      <Divider />
+
+      <fieldset>
+        <legend className="am-formsection__legend">
+          <span className="am-formsection__index" aria-hidden="true">
+            4
+          </span>
+          {labels.messageLegend}
+        </legend>
+
+        <RadioCards name="desiredPlan" legend={labels.planLegend} options={plans} required />
+        {fieldErrors.desiredPlan ? (
+          <p className="am-field__error" role="alert">
+            <Icon name="alert" size={16} />
+            {fieldErrors.desiredPlan}
+          </p>
+        ) : null}
+
+        <Field id="am-apply-message" label={labels.message} hint={labels.messageHint}>
+          <textarea {...fieldControlProps("am-apply-message", { hint: labels.messageHint })} name="message" maxLength={2000} />
+        </Field>
+
+        {/* Honeypot: hidden from people and from assistive technology, filled only by robots. */}
+        <div className="am-visually-hidden" aria-hidden="true">
+          <label htmlFor="am-apply-website">{labels.website}</label>
+          <input id="am-apply-website" name="website" type="text" tabIndex={-1} autoComplete="off" defaultValue="" />
+        </div>
+
+        <label className="am-checkline" htmlFor="am-apply-consent">
+          <input
+            id="am-apply-consent"
+            name="consent"
+            type="checkbox"
+            aria-invalid={fieldErrors.consent ? true : undefined}
+            aria-describedby={fieldErrors.consent ? "am-apply-consent-error" : undefined}
+          />
+          {labels.consent}
+        </label>
+        {fieldErrors.consent ? (
+          <p className="am-field__error" id="am-apply-consent-error" role="alert">
+            <Icon name="alert" size={16} />
+            {fieldErrors.consent}
+          </p>
+        ) : null}
+      </fieldset>
+
+      {state.status === "error" ? (
+        <Notice tone="error" role="alert">
+          {state.message}
+        </Notice>
       ) : null}
-
-      <Field id="am-apply-message" label={labels.message} hint={labels.messageHint}>
-        <textarea {...fieldControlProps("am-apply-message", { hint: labels.messageHint })} name="message" maxLength={2000} />
-      </Field>
-
-      {/* Honeypot: hidden from people and from assistive technology, filled only by robots. */}
-      <div className="am-visually-hidden" aria-hidden="true">
-        <label htmlFor="am-apply-website">{labels.website}</label>
-        <input id="am-apply-website" name="website" type="text" tabIndex={-1} autoComplete="off" defaultValue="" />
-      </div>
-
-      <label htmlFor="am-apply-consent">
-        <input
-          id="am-apply-consent"
-          name="consent"
-          type="checkbox"
-          aria-invalid={fieldErrors.consent ? true : undefined}
-          aria-describedby={fieldErrors.consent ? "am-apply-consent-error" : undefined}
-        />
-        {labels.consent}
-      </label>
-      {fieldErrors.consent ? (
-        <p className="am-field__error" id="am-apply-consent-error" role="alert">
-          {fieldErrors.consent}
-        </p>
-      ) : null}
-
-      {state.status === "error" ? <p role="alert">{state.message}</p> : null}
 
       <div className="am-cluster">
-        <Button type="submit" disabled={submitting}>
+        <Button type="submit" disabled={submitting} loading={submitting}>
           {submitting ? labels.submitting : labels.submit}
         </Button>
       </div>

@@ -1,15 +1,19 @@
 "use client";
 
 import { useTranslations } from "next-intl";
-import { FormEvent, useState } from "react";
+import { useState, type FormEvent, type ReactNode } from "react";
 import { Link } from "../../i18n/navigation";
 import { submitPublicQuoteRequest, type PublicQuoteFormField, type PublicQuoteFormState } from "../lib/public-api";
 import { IndicativeOfferNotice } from "./public-journey";
 import { VisitorAiAssistant } from "./visitor-ai-assistant";
 import { BackendText } from "./ui/backend-text";
+import { Button } from "./ui/button";
 import { EmptyState } from "./ui/empty-state";
 import { Field, fieldControlProps } from "./ui/field";
+import { Icon } from "./ui/icons";
+import { IconTile } from "./ui/icon-tile";
 import { Notice } from "./ui/notice";
+import { ProgressBar } from "./ui/progress-bar";
 
 /**
  * Spec 043: answers used to be submitted as an empty object, so a published definition's fields were
@@ -38,9 +42,11 @@ function QuoteFormFieldInput({ field, chooseLabel, requiredLabel }: { field: Pub
   if (field.type === "checkbox") {
     // Never pre-ticked: a declarative answer is given, never withdrawn.
     return (
-      <label htmlFor={id}>
+      <label className="am-j-consent" htmlFor={id}>
         <input id={id} name={name} type="checkbox" required={field.required} />
-        <BackendText>{field.label}</BackendText>
+        <span>
+          <BackendText>{field.label}</BackendText>
+        </span>
       </label>
     );
   }
@@ -77,6 +83,21 @@ function QuoteFormFieldInput({ field, chooseLabel, requiredLabel }: { field: Pub
     <Field id={id} label={field.label} required={field.required} requiredLabel={requiredLabel}>
       <input {...fieldControlProps(id, { required: field.required })} name={name} type={inputType} />
     </Field>
+  );
+}
+
+/** Numbered section of the form: the visitor sees where each answer belongs. */
+function QuoteSection({ index, legend, children }: { index: number; legend: string; children: ReactNode }) {
+  return (
+    <fieldset>
+      <legend className="am-j-form__legend">
+        <span className="am-j-form__step am-tabular" aria-hidden="true">
+          {index}
+        </span>
+        {legend}
+      </legend>
+      {children}
+    </fieldset>
   );
 }
 
@@ -117,85 +138,48 @@ export function QuoteFormShell({ countryCode, productKey, quoteForm, selectedOff
       }
     });
     if (response.status === "success") {
+      // No `form.reset()`: the form is replaced by the confirmation panel below, and emptying a form
+      // that stays on screen next to "demande recue" reads as an invitation to send it again.
       setResult({ status: "success", message: response.publicMessage, publicReference: response.publicReference ?? "", ...(response.verificationToken ? { verificationToken: response.verificationToken } : {}) });
-      form.reset();
       return;
     }
     setResult({ status: "error", message: response.publicMessage });
   }
 
-  return (
-    <form className="pub-card pub-form" onSubmit={submit}>
-      {selectedOfferId ? <Notice tone="indicative">{t("preselected")}</Notice> : null}
+  const pending = result.status === "submitting";
+  const sent = result.status === "success";
 
-      <fieldset>
-        <legend>{t("contactLegend")}</legend>
-        <div className="pub-form__grid pub-form__grid--two">
-          <Field id="am-quote-name" label={t("name")} hint={t("nameHint")}>
-            <input
-              {...fieldControlProps("am-quote-name", { hint: t("nameHint") })}
-              name="displayName"
-              autoComplete="name"
-            />
-          </Field>
-          <Field id="am-quote-email" label={t("email")} hint={t("emailHint")} required requiredLabel={forms("required")}>
-            <input
-              {...fieldControlProps("am-quote-email", { hint: t("emailHint"), required: true })}
-              name="email"
-              type="email"
-              autoComplete="email"
-            />
-          </Field>
-          <Field id="am-quote-phone" label={t("phone")} hint={t("phoneHint")} required requiredLabel={forms("required")}>
-            <input
-              {...fieldControlProps("am-quote-phone", { hint: t("phoneHint"), required: true })}
-              name="phone"
-              type="tel"
-              autoComplete="tel"
-            />
-          </Field>
-        </div>
-      </fieldset>
+  // The stepper lives here rather than on the page: only this boundary knows the request went
+  // through, and the journey is only at step 4 once it has.
+  const steps = [
+    { label: t("steps.contact") },
+    { label: t("steps.need") },
+    { label: t("steps.consent") },
+    { label: t("steps.confirmation") }
+  ];
+  const current = sent ? steps.length : 1;
+  const stepper = (
+    <ProgressBar
+      steps={steps}
+      current={current}
+      label={t("progressLabel")}
+      stepLabel={t("stepStatus", { current, total: steps.length })}
+    />
+  );
 
-      {quoteForm.fields.length > 0 ? (
-        <fieldset>
-          <legend>{t("needLegend")}</legend>
-          <div className="pub-form__grid pub-form__grid--two">
-            {quoteForm.fields.map((field) => (
-              <QuoteFormFieldInput key={field.key} field={field} chooseLabel={t("choose")} requiredLabel={forms("required")} />
-            ))}
+  if (sent) {
+    return (
+      <div className="am-stack am-stack--xl">
+        {stepper}
+        <section className="am-j-sent" aria-label={t("successTitle")}>
+          <IconTile name="check-circle" tone="success" size="lg" />
+          <h2 className="am-j-sent__title">{t("successTitle")}</h2>
+          <div className="am-j-reference">
+            <p className="am-j-reference__label">{t("successPrefix")}</p>
+            <p className="am-j-reference__value am-tabular">{result.publicReference}</p>
           </div>
-        </fieldset>
-      ) : null}
-
-      <fieldset>
-        <legend>{t("consentLegend")}</legend>
-        {/* Consent boxes are never pre-ticked: consent is given, never withdrawn. */}
-        <label htmlFor="am-quote-consent">
-          <input id="am-quote-consent" name="consent" type="checkbox" required />
-          {t("consentLabel")}
-        </label>
-        <label htmlFor="am-quote-multi-broker">
-          <input id="am-quote-multi-broker" name="multiBroker" type="checkbox" />
-          {t("multiBrokerLabel")}
-        </label>
-      </fieldset>
-
-      <IndicativeOfferNotice />
-
-      <section className="am-stack">
-        <h2 className="pub-card__title">{t("assistanceTitle")}</h2>
-        <p className="am-field__hint">{t("assistanceLead")}</p>
-        <VisitorAiAssistant countryCode={countryCode} productKey={productKey} mode="summary" answers={{}} />
-        <VisitorAiAssistant countryCode={countryCode} productKey={productKey} mode="consistency" answers={{}} />
-      </section>
-
-      {result.status === "success" ? (
-        <Notice tone="success" title={t("successTitle")} role="status">
-          {t("successPrefix")} <strong>{result.publicReference}</strong>
           {result.verificationToken ? (
-            <>
-              {" "}
+            <p>
               <Link
                 href={{
                   pathname: "/quote-requests/[publicReference]",
@@ -205,32 +189,122 @@ export function QuoteFormShell({ countryCode, productKey, quoteForm, selectedOff
               >
                 {t("trackLink")}
               </Link>
-            </>
+            </p>
           ) : null}
-        </Notice>
-      ) : null}
-      {result.status === "error" ? (
-        <Notice tone="error" role="alert">
-          {result.message}
-        </Notice>
-      ) : null}
-      {result.status === "submitting" ? (
-        <Notice tone="info" role="status">
-          {result.message}
-        </Notice>
-      ) : null}
-
-      <div className="am-cluster">
-        <button className="am-button" data-variant="primary" type="submit" disabled={result.status === "submitting"}>
-          <span>{t("submit")}</span>
-        </button>
-        <p className="am-field__hint">{t("fineprint")}</p>
+          <div className="am-j-sent__actions">
+            <Button
+              variant="secondary"
+              href={{ pathname: "/countries/[countryCode]/products/[productKey]/offers", params: { countryCode, productKey } }}
+              icon={<Icon name="arrow-left" size={18} />}
+            >
+              {t("backToOffers")}
+            </Button>
+          </div>
+          <p className="am-j-fineprint">{t("fineprint")}</p>
+        </section>
       </div>
-    </form>
+    );
+  }
+
+  return (
+    <div className="am-stack am-stack--xl">
+      {stepper}
+      <form className="am-j-form" onSubmit={submit}>
+        {selectedOfferId ? <Notice tone="indicative">{t("preselected")}</Notice> : null}
+
+        <QuoteSection index={1} legend={t("contactLegend")}>
+          <div className="am-j-form__grid">
+            <Field id="am-quote-name" label={t("name")} hint={t("nameHint")} leading="user">
+              <input
+                {...fieldControlProps("am-quote-name", { hint: t("nameHint") })}
+                name="displayName"
+                autoComplete="name"
+              />
+            </Field>
+            <Field id="am-quote-email" label={t("email")} hint={t("emailHint")} required requiredLabel={forms("required")} leading="mail">
+              <input
+                {...fieldControlProps("am-quote-email", { hint: t("emailHint"), required: true })}
+                name="email"
+                type="email"
+                autoComplete="email"
+              />
+            </Field>
+            <Field id="am-quote-phone" label={t("phone")} hint={t("phoneHint")} required requiredLabel={forms("required")} leading="phone">
+              <input
+                {...fieldControlProps("am-quote-phone", { hint: t("phoneHint"), required: true })}
+                name="phone"
+                type="tel"
+                autoComplete="tel"
+              />
+            </Field>
+          </div>
+        </QuoteSection>
+
+        {quoteForm.fields.length > 0 ? (
+          <QuoteSection index={2} legend={t("needLegend")}>
+            <div className="am-j-form__grid">
+              {quoteForm.fields.map((field) => (
+                <QuoteFormFieldInput key={field.key} field={field} chooseLabel={t("choose")} requiredLabel={forms("required")} />
+              ))}
+            </div>
+          </QuoteSection>
+        ) : null}
+
+        <QuoteSection index={quoteForm.fields.length > 0 ? 3 : 2} legend={t("consentLegend")}>
+          {/* Consent boxes are never pre-ticked: consent is given, never withdrawn. */}
+          <div className="am-j-consents">
+            <label className="am-j-consent" htmlFor="am-quote-consent">
+              <input id="am-quote-consent" name="consent" type="checkbox" required />
+              <span>{t("consentLabel")}</span>
+            </label>
+            <label className="am-j-consent" htmlFor="am-quote-multi-broker">
+              <input id="am-quote-multi-broker" name="multiBroker" type="checkbox" />
+              <span>{t("multiBrokerLabel")}</span>
+            </label>
+          </div>
+          <div className="am-j-tail">
+            <IndicativeOfferNotice />
+          </div>
+        </QuoteSection>
+
+        {result.status === "error" ? (
+          <Notice tone="error" role="alert">
+            {result.message}
+          </Notice>
+        ) : null}
+        {result.status === "submitting" ? (
+          <Notice tone="info" role="status">
+            {result.message}
+          </Notice>
+        ) : null}
+
+        <div className="am-j-form__footer">
+          <Button type="submit" size="lg" loading={pending} disabled={pending} icon={<Icon name="send" size={18} />}>
+            {t("submit")}
+          </Button>
+          <p className="am-j-fineprint">{t("fineprint")}</p>
+        </div>
+      </form>
+
+      {/* Optional assistance, deliberately outside the form: it never blocks or gates the request.
+          `am-j-optional` folds the whole panel away while no assistant is available for this
+          country and product, so the heading never sits above an empty box. */}
+      <section className="am-j-panel am-j-optional" aria-label={t("assistanceTitle")}>
+        <div className="am-j-panel__head">
+          <IconTile name="bot" size="lg" />
+          <h2 className="am-j-panel__title">{t("assistanceTitle")}</h2>
+        </div>
+        <p className="am-j-panel__lead">{t("assistanceLead")}</p>
+        <div className="am-j-assist">
+          <VisitorAiAssistant countryCode={countryCode} productKey={productKey} mode="summary" answers={{}} />
+          <VisitorAiAssistant countryCode={countryCode} productKey={productKey} mode="consistency" answers={{}} />
+        </div>
+      </section>
+    </div>
   );
 }
 
 export function QuoteBlockedState() {
   const t = useTranslations("QuoteForm");
-  return <EmptyState title={t("blocked.title")} description={t("blocked.description")} />;
+  return <EmptyState icon="lock" tone="muted" align="center" title={t("blocked.title")} description={t("blocked.description")} />;
 }

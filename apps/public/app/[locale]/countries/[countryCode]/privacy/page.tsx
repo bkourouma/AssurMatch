@@ -4,6 +4,7 @@ import { toLocale, type AppLocale } from "../../../../../i18n/routing";
 import { Button } from "../../../../components/ui/button";
 import { getLegalPage, hasCountryLegalOverride } from "../../../../content/legal";
 import { LegalPageView } from "../../../../content/legal-page-view";
+import { formatDate } from "../../../../lib/country-format";
 import { listPublicCountries } from "../../../../lib/public-api";
 import { buildMetadata, localeUrl } from "../../../../lib/seo";
 import type { PageMetadata } from "../../../../lib/seo";
@@ -46,7 +47,9 @@ export default async function CountryPrivacyPage({ params }: { params: Promise<P
         { name: page.title, url: localeUrl(locale, HREF, { countryCode: iso }) }
       ]}
       page={page}
-      lastUpdatedLabel={t("lastUpdated", { date: page.updatedAt })}
+      kicker={t("kicker")}
+      lastUpdatedLabel={t("lastUpdated", { date: formatDate(page.updatedAt, { locale }) })}
+      tocTitle={t("tocTitle")}
       placeholdersTitle={t("placeholdersTitle")}
       placeholderNotice={t("placeholderNotice")}
       countryNotice={{

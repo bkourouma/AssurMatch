@@ -2,7 +2,9 @@
 
 import { useTranslations } from "next-intl";
 import { useEffect, useState } from "react";
+import { Button } from "../ui/button";
 import { ComparisonBar } from "../ui/comparison-bar";
+import { Icon } from "../ui/icons";
 
 export interface OfferComparisonBarProps {
   /** Id of the GET form the offer checkboxes are attached to. */
@@ -21,6 +23,10 @@ export function OfferComparisonBar({ formId }: OfferComparisonBarProps) {
   const [count, setCount] = useState(0);
 
   useEffect(() => {
+    // Same contract as `Reveal`: the attribute marks the document as enhanced, which lets the page
+    // hide the plain submit button it renders for browsers without JavaScript.
+    document.documentElement.dataset["js"] = "true";
+
     function update() {
       setCount(document.querySelectorAll<HTMLInputElement>('input[name="ids"]:checked').length);
     }
@@ -35,9 +41,11 @@ export function OfferComparisonBar({ formId }: OfferComparisonBarProps) {
       label={t("comparisonBar.label")}
       countLabel={t("comparisonBar.count", { count })}
       action={
-        <button className="am-button" data-variant="primary" type="submit" form={formId}>
-          <span>{t("comparisonBar.action")}</span>
-        </button>
+        // No disabled state here: the bar only appears from two selections, and a selection larger
+        // than four is answered by the comparator page with the reason rather than by a dead button.
+        <Button type="submit" form={formId} icon={<Icon name="scale" size={18} />}>
+          {t("comparisonBar.action")}
+        </Button>
       }
     />
   );

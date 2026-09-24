@@ -6,7 +6,9 @@ import { readVisitorAi, readVisitorAiAvailability, requestVisitorAi, type Visito
 import { AiBox } from "./ui/ai-box";
 import { BackendText } from "./ui/backend-text";
 import { Field, fieldControlProps } from "./ui/field";
+import { Icon } from "./ui/icons";
 import { Notice } from "./ui/notice";
+import { Skeleton } from "./ui/skeleton";
 
 type Mode = "product" | "faq" | "summary" | "consistency";
 
@@ -106,10 +108,25 @@ export function VisitorAiAssistant({ countryCode, productKey, mode, answers = {}
             type="button"
             onClick={submit}
             disabled={busy || (config.hasInput && text.trim().length < 5)}
+            data-loading={busy ? "true" : undefined}
+            aria-busy={busy ? true : undefined}
           >
+            {busy ? (
+              <span className="am-button__spinner">
+                <Icon name="loader" size={18} />
+              </span>
+            ) : (
+              <Icon name="sparkles" size={18} />
+            )}
             <span>{busy ? t("pending") : buttonLabel}</span>
           </button>
         </div>
+        {/* The queue is polled: a placeholder stands in for the answer rather than a frozen panel. */}
+        {busy ? (
+          <div aria-hidden="true">
+            <Skeleton lines={3} />
+          </div>
+        ) : null}
         {state.status === "error" ? (
           <Notice tone="error" role="alert">
             {state.message}

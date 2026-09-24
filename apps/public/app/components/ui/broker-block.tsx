@@ -22,6 +22,17 @@ export interface BrokerBlockProps {
   description?: string;
 }
 
+/** Two letters standing in for a partner logo, e.g. "Assur Plus" -> "AP". */
+function initials(name: string): string {
+  const words = name
+    .split(/\s+/)
+    .map((word) => word.trim())
+    .filter(Boolean);
+  const first = words[0]?.charAt(0) ?? "";
+  const second = words.length > 1 ? (words[words.length - 1]?.charAt(0) ?? "") : (words[0]?.charAt(1) ?? "");
+  return `${first}${second}`;
+}
+
 /**
  * The responsible broker is always identified with its licence and its issuing authority
  * (Constitution I and II). The "Agree" badge is the validation green of the design system.
@@ -39,26 +50,36 @@ export function BrokerBlock({
 }: BrokerBlockProps) {
   return (
     <div className="am-broker" data-variant={variant}>
-      <div>
-        <p className="am-broker__name">
-          <BackendText>{displayName}</BackendText>
-        </p>
-        {approved ? (
-          <Badge tone="approved" icon={<Icon name="check" size={16} />}>
-            {labels.approved}
-          </Badge>
+      <div className="am-broker__head">
+        {variant !== "line" ? (
+          <span className="am-broker__avatar" aria-hidden="true">
+            {initials(displayName)}
+          </span>
         ) : null}
+        <div>
+          <p className="am-broker__name">
+            <BackendText>{displayName}</BackendText>
+          </p>
+          {approved ? (
+            <Badge tone="approved" icon={<Icon name="badge-check" size={16} />}>
+              {labels.approved}
+            </Badge>
+          ) : null}
+        </div>
       </div>
       <p className="am-broker__meta">
-        {labels.licenceNumber} <BackendText>{licenceNumber}</BackendText>
-        {" - "}
-        {labels.issuingAuthority} <BackendText>{issuingAuthority}</BackendText>
-        {city ? (
-          <>
-            {" - "}
-            {labels.city} <BackendText>{city}</BackendText>
-          </>
-        ) : null}
+        <Icon name="shield-check" size={16} />
+        <span>
+          {labels.licenceNumber} <BackendText>{licenceNumber}</BackendText>
+          {" - "}
+          {labels.issuingAuthority} <BackendText>{issuingAuthority}</BackendText>
+          {city ? (
+            <>
+              {" - "}
+              {labels.city} <BackendText>{city}</BackendText>
+            </>
+          ) : null}
+        </span>
       </p>
       {variant !== "line" && products && products.length > 0 ? (
         <>

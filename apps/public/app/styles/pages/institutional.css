@@ -1,0 +1,827 @@
+/*
+ * Institutional pages: how it works, regulatory status, FAQ, glossary, guides, contact, the four
+ * legal pages (and their country variants) and the localised 404. Imported by each of those page
+ * modules, so it lands after globals.css in the cascade. Every rule composes the design-system
+ * primitives; none of them is redefined here.
+ */
+
+/* ==========================================================================
+   1. Vertical timeline (how it works)
+   ========================================================================== */
+
+.am-timeline {
+  position: relative;
+  display: grid;
+  gap: var(--am-space-24);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+/* The rail the nodes sit on: left of the cards on a phone, centred from 900px. */
+.am-timeline::before {
+  position: absolute;
+  top: 12px;
+  bottom: 12px;
+  left: 21px;
+  width: 2px;
+  border-radius: var(--am-radius-pill);
+  background: linear-gradient(180deg, var(--am-primary-200) 0%, var(--am-primary-100) 100%);
+  content: "";
+}
+
+.am-timeline__item {
+  position: relative;
+  display: grid;
+  gap: var(--am-space-16);
+  align-items: start;
+  grid-template-columns: 44px minmax(0, 1fr);
+}
+
+.am-timeline__marker {
+  position: relative;
+  z-index: var(--am-z-base);
+  display: inline-flex;
+  width: 44px;
+  height: 44px;
+  align-items: center;
+  justify-content: center;
+  border: 2px solid var(--am-surface);
+  border-radius: var(--am-radius-pill);
+  background: var(--am-gradient-brand);
+  box-shadow: var(--am-shadow-glow-soft);
+  color: var(--am-text-invert);
+  font-family: var(--am-font-heading);
+  font-size: var(--am-small-size);
+  font-variant-numeric: tabular-nums;
+  font-weight: 800;
+}
+
+.am-timeline__card {
+  min-width: 0;
+}
+
+.am-timeline__head {
+  display: flex;
+  gap: var(--am-space-12);
+  align-items: center;
+}
+
+.am-timeline__title {
+  margin: 0;
+}
+
+@media (min-width: 900px) {
+  .am-timeline {
+    gap: var(--am-space-32);
+  }
+
+  .am-timeline::before {
+    left: calc(50% - 1px);
+  }
+
+  .am-timeline__item {
+    gap: 0;
+    grid-template-columns: minmax(0, 1fr) 88px minmax(0, 1fr);
+  }
+
+  .am-timeline__marker {
+    grid-column: 2;
+    grid-row: 1;
+    justify-self: center;
+    margin-top: var(--am-space-16);
+  }
+
+  .am-timeline__item:nth-child(odd) .am-timeline__card {
+    grid-column: 1;
+    grid-row: 1;
+  }
+
+  .am-timeline__item:nth-child(even) .am-timeline__card {
+    grid-column: 3;
+    grid-row: 1;
+  }
+}
+
+/* ==========================================================================
+   2. "Ne fait pas" checklist and link cards
+   ========================================================================== */
+
+.am-xlist {
+  display: grid;
+  gap: var(--am-space-12);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.am-xlist li {
+  display: grid;
+  gap: var(--am-space-12);
+  align-items: start;
+  grid-template-columns: 20px minmax(0, 1fr);
+  color: var(--am-text-muted);
+}
+
+.am-xlist li .am-icon {
+  margin-top: 3px;
+  color: var(--am-neutral-500);
+}
+
+.am-linkcards {
+  display: grid;
+  gap: var(--am-space-20);
+  margin: 0;
+  padding: 0;
+  grid-template-columns: minmax(0, 1fr);
+  list-style: none;
+}
+
+@media (min-width: 768px) {
+  .am-linkcards {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+/* ==========================================================================
+   3. Sticky in-page navigation (regulatory status, legal pages)
+   ========================================================================== */
+
+.am-inpagenav {
+  position: sticky;
+  z-index: var(--am-z-sticky);
+  top: var(--am-header);
+  border-bottom: 1px solid var(--am-border);
+  background: rgba(255, 255, 255, 0.86);
+  backdrop-filter: blur(10px);
+}
+
+.am-inpagenav__list {
+  display: flex;
+  gap: var(--am-space-8);
+  margin: 0;
+  padding: var(--am-space-12) 0;
+  overflow-x: auto;
+  list-style: none;
+  scrollbar-width: thin;
+}
+
+/* Wide enough for the chips to sit on one or two lines: no hidden horizontal scroll. */
+@media (min-width: 900px) {
+  .am-inpagenav__list {
+    flex-wrap: wrap;
+    overflow-x: visible;
+  }
+}
+
+.am-inpagenav__link {
+  display: inline-flex;
+  min-height: 40px;
+  gap: var(--am-space-8);
+  align-items: center;
+  padding: var(--am-space-6) var(--am-space-16);
+  border: 1px solid var(--am-border);
+  border-radius: var(--am-radius-pill);
+  background: var(--am-surface);
+  color: var(--am-text-muted);
+  font-size: var(--am-caption-size);
+  font-weight: 700;
+  text-decoration: none;
+  white-space: nowrap;
+  transition:
+    border-color var(--am-transition),
+    background-color var(--am-transition),
+    color var(--am-transition);
+}
+
+.am-inpagenav__link:hover {
+  border-color: var(--am-primary-300);
+  background: var(--am-primary-50);
+  color: var(--am-primary-700);
+}
+
+.am-inpagenav__link .am-icon {
+  color: var(--am-primary-600);
+}
+
+/* ==========================================================================
+   4. Regulatory sections as cards
+   ========================================================================== */
+
+/* A band the sticky in-page nav links to: it must not land under that nav when the browser jumps. */
+.am-inst-anchor {
+  scroll-margin-top: calc(var(--am-header) + var(--am-space-64));
+}
+
+.am-inst-card__head {
+  display: flex;
+  gap: var(--am-space-16);
+  align-items: center;
+  margin-bottom: var(--am-space-4);
+}
+
+.am-inst-card__title {
+  margin: 0;
+}
+
+.am-inst-card p {
+  margin: 0;
+}
+
+.am-inst-card .am-card__body {
+  gap: var(--am-space-16);
+}
+
+.am-bullets {
+  display: grid;
+  gap: var(--am-space-10);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.am-bullets li {
+  display: grid;
+  gap: var(--am-space-12);
+  align-items: start;
+  grid-template-columns: 20px minmax(0, 1fr);
+  color: var(--am-text-muted);
+}
+
+.am-bullets li .am-icon {
+  margin-top: 3px;
+  color: var(--am-primary-500);
+}
+
+/* ==========================================================================
+   5. Glossary
+   ========================================================================== */
+
+.am-glossary-index {
+  position: sticky;
+  z-index: var(--am-z-sticky);
+  top: var(--am-header);
+  padding: var(--am-space-12) 0;
+  border-bottom: 1px solid var(--am-border);
+  background: rgba(255, 255, 255, 0.88);
+  backdrop-filter: blur(10px);
+}
+
+.am-glossary-index__list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--am-space-6);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.am-glossary-index__link {
+  display: inline-flex;
+  width: 40px;
+  height: 40px;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--am-border);
+  border-radius: var(--am-radius-sm);
+  background: var(--am-surface);
+  color: var(--am-primary-700);
+  font-family: var(--am-font-heading);
+  font-size: var(--am-small-size);
+  font-weight: 800;
+  text-decoration: none;
+  transition:
+    border-color var(--am-transition),
+    background-color var(--am-transition),
+    transform var(--am-transition);
+}
+
+.am-glossary-index__link:hover {
+  border-color: var(--am-primary-300);
+  background: var(--am-primary-50);
+  transform: translateY(-1px);
+}
+
+.am-glossary-group {
+  display: grid;
+  gap: var(--am-space-16);
+}
+
+.am-glossary-group + .am-glossary-group {
+  margin-top: var(--am-space-40);
+}
+
+.am-glossary-group__letter {
+  display: flex;
+  gap: var(--am-space-16);
+  align-items: center;
+  margin: 0;
+  color: var(--am-primary-700);
+  font-family: var(--am-font-heading);
+  font-size: var(--am-h2-size);
+  font-weight: 800;
+  line-height: 1;
+}
+
+.am-glossary-group__letter::after {
+  height: 1px;
+  flex: 1;
+  background: var(--am-border);
+  content: "";
+}
+
+.am-glossary-list {
+  display: grid;
+  gap: var(--am-space-16);
+  margin: 0;
+  grid-template-columns: minmax(0, 1fr);
+}
+
+@media (min-width: 900px) {
+  .am-glossary-list {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+.am-glossary-entry {
+  display: grid;
+  gap: var(--am-space-8);
+  align-content: start;
+  padding: var(--am-space-20);
+  border: 1px solid var(--am-border);
+  border-radius: var(--am-radius-card);
+  background: var(--am-surface);
+  box-shadow: var(--am-shadow-xs);
+  transition:
+    border-color var(--am-transition),
+    box-shadow var(--am-transition);
+}
+
+.am-glossary-entry:hover,
+.am-glossary-entry:target {
+  border-color: var(--am-primary-300);
+  box-shadow: var(--am-shadow-md);
+}
+
+.am-glossary-entry__term {
+  margin: 0;
+  color: var(--am-text);
+  font-family: var(--am-font-heading);
+  font-size: var(--am-h4-size);
+  font-weight: 800;
+  letter-spacing: var(--am-tracking-snug);
+  line-height: var(--am-h4-line);
+  scroll-margin-top: calc(var(--am-header) + var(--am-space-64));
+}
+
+.am-glossary-entry__definition {
+  margin: 0;
+  color: var(--am-text-muted);
+  font-size: var(--am-small-size);
+  line-height: 1.6;
+}
+
+.am-glossary-entry__see {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--am-space-6);
+  align-items: center;
+  margin: 0;
+  color: var(--am-text-subtle);
+  font-size: var(--am-caption-size);
+  line-height: var(--am-caption-line);
+}
+
+/* ==========================================================================
+   6. Guides
+   ========================================================================== */
+
+.am-guidecards {
+  display: grid;
+  gap: var(--am-space-20);
+  margin: 0;
+  padding: 0;
+  grid-template-columns: minmax(0, 1fr);
+  list-style: none;
+}
+
+@media (min-width: 680px) {
+  .am-guidecards {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (min-width: 900px) {
+  .am-guidecards--three {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+/*
+ * Card whose title is the link: the pseudo-element stretches the hit area to the whole card, so the
+ * visitor can click anywhere while the accessible name stays the title alone.
+ */
+.am-guidecard .am-card__title a,
+.am-linkcard .am-card__title a {
+  color: inherit;
+  text-decoration: none;
+}
+
+.am-guidecard .am-card__title a::after,
+.am-linkcard .am-card__title a::after {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  content: "";
+}
+
+.am-guidecard:hover .am-card__title a,
+.am-linkcard:hover .am-card__title a {
+  color: var(--am-primary-700);
+}
+
+/** The "go there" affordance of a linked card: label plus arrow, pinned to the right. */
+.am-cardgo {
+  display: inline-flex;
+  gap: var(--am-space-6);
+  align-items: center;
+  margin-left: auto;
+  color: var(--am-primary-600);
+  font-size: var(--am-caption-size);
+  font-weight: 700;
+}
+
+.am-cardgo .am-icon {
+  transition: transform var(--am-transition);
+}
+
+.am-guidecard:hover .am-cardgo .am-icon,
+.am-linkcard:hover .am-cardgo .am-icon {
+  transform: translateX(3px);
+}
+
+/* ---------- Guide detail: a reading column ---------- */
+
+.am-reading {
+  display: grid;
+  gap: var(--am-space-32);
+}
+
+.am-reading__section {
+  display: grid;
+  gap: var(--am-space-12);
+  scroll-margin-top: calc(var(--am-header) + var(--am-space-32));
+}
+
+.am-reading__section h2 {
+  margin: 0;
+  font-size: var(--am-h3-size);
+  line-height: var(--am-h3-line);
+}
+
+.am-reading__section p {
+  margin: 0;
+  color: var(--am-text-muted);
+  line-height: 1.7;
+}
+
+.am-reading__meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--am-space-8);
+  align-items: center;
+  margin: 0 0 var(--am-space-24);
+  color: var(--am-text-subtle);
+  font-size: var(--am-caption-size);
+  line-height: var(--am-caption-line);
+}
+
+.am-reading__meta .am-icon {
+  color: var(--am-primary-600);
+}
+
+/* ==========================================================================
+   7. FAQ
+   ========================================================================== */
+
+.am-faq-meta {
+  margin: 0 0 var(--am-space-16);
+  color: var(--am-text-subtle);
+  font-size: var(--am-caption-size);
+  line-height: var(--am-caption-line);
+}
+
+/* The answer holds a paragraph and, when the question is product-specific, a caption under it. */
+.am-faq__answer {
+  display: grid;
+  gap: var(--am-space-8);
+}
+
+.am-faq__answer p {
+  margin: 0;
+}
+
+/* ==========================================================================
+   8. Contact
+   ========================================================================== */
+
+.am-contact-layout {
+  display: grid;
+  gap: var(--am-space-24);
+  align-items: start;
+  grid-template-columns: minmax(0, 1fr);
+}
+
+@media (min-width: 1024px) {
+  .am-contact-layout {
+    gap: var(--am-space-32);
+    grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr);
+  }
+}
+
+.am-contact-aside {
+  display: grid;
+  gap: var(--am-space-16);
+  align-content: start;
+}
+
+@media (min-width: 1024px) {
+  .am-contact-aside {
+    position: sticky;
+    top: calc(var(--am-header) + var(--am-space-24));
+  }
+}
+
+.am-contact-aside__list {
+  display: grid;
+  gap: var(--am-space-12);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.am-contact-aside__list li {
+  display: grid;
+  gap: var(--am-space-12);
+  align-items: start;
+  grid-template-columns: 20px minmax(0, 1fr);
+  color: var(--am-text-muted);
+  font-size: var(--am-small-size);
+  line-height: var(--am-small-line);
+}
+
+.am-contact-aside__list li .am-icon {
+  margin-top: 2px;
+  color: var(--am-primary-600);
+}
+
+/** Two columns of short fields from 768px; the subject and the message always span the row. */
+.am-form-grid {
+  display: grid;
+  gap: 0 var(--am-space-20);
+  grid-template-columns: minmax(0, 1fr);
+}
+
+@media (min-width: 768px) {
+  .am-form-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .am-form-grid__full {
+    grid-column: 1 / -1;
+  }
+}
+
+.am-form-consent {
+  display: grid;
+  gap: var(--am-space-8);
+  padding: var(--am-space-16) var(--am-space-20);
+  border: 1px solid var(--am-border);
+  border-radius: var(--am-radius-card);
+  background: var(--am-neutral-50);
+}
+
+.am-form-consent .am-checkline {
+  margin: 0;
+}
+
+/* ==========================================================================
+   8b. Entry selector inside a reading column
+   ========================================================================== */
+
+/*
+ * The primitive puts the two selects and the button on one row from 900px. In the 760px reading
+ * column of these pages that leaves each select about 170px, which truncates a country name. The
+ * selects keep a column each and the button spans the panel underneath.
+ */
+@media (min-width: 560px) {
+  .am-entry__row {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    align-items: end;
+  }
+
+  .am-entry__row > .am-button {
+    grid-column: 1 / -1;
+  }
+}
+
+/* ==========================================================================
+   9. Legal pages
+   ========================================================================== */
+
+.am-legal-toc {
+  display: grid;
+  gap: var(--am-space-12);
+  margin-bottom: var(--am-space-32);
+  padding: var(--am-space-20) var(--am-space-24);
+  border: 1px solid var(--am-border);
+  border-radius: var(--am-radius-card);
+  background: var(--am-surface);
+  box-shadow: var(--am-shadow-xs);
+}
+
+.am-legal-toc__title {
+  display: flex;
+  gap: var(--am-space-8);
+  align-items: center;
+  margin: 0;
+  color: var(--am-text);
+  font-family: var(--am-font-heading);
+  font-size: var(--am-small-size);
+  font-weight: 800;
+  letter-spacing: var(--am-tracking-wide);
+  text-transform: uppercase;
+}
+
+.am-legal-toc__title .am-icon {
+  color: var(--am-primary-600);
+}
+
+.am-legal-toc__list {
+  display: grid;
+  gap: var(--am-space-8);
+  margin: 0;
+  padding: 0;
+  counter-reset: am-toc;
+  list-style: none;
+}
+
+.am-legal-toc__list li {
+  counter-increment: am-toc;
+}
+
+.am-legal-toc__list a {
+  display: inline-flex;
+  gap: var(--am-space-10);
+  align-items: baseline;
+  color: var(--am-link);
+  font-size: var(--am-small-size);
+  text-decoration: none;
+}
+
+.am-legal-toc__list a::before {
+  color: var(--am-text-subtle);
+  content: counter(am-toc, decimal-leading-zero);
+  font-family: var(--am-font-heading);
+  font-size: var(--am-caption-size);
+  font-variant-numeric: tabular-nums;
+  font-weight: 800;
+}
+
+.am-legal-toc__list a:hover {
+  color: var(--am-link-hover);
+  text-decoration: underline;
+}
+
+.am-legal-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--am-space-8);
+  align-items: center;
+  margin: 0 0 var(--am-space-24);
+  color: var(--am-text-subtle);
+  font-size: var(--am-caption-size);
+  line-height: var(--am-caption-line);
+}
+
+.am-legal-meta + .am-notice {
+  margin-bottom: var(--am-space-32);
+}
+
+.am-legal-meta .am-icon {
+  color: var(--am-primary-600);
+}
+
+.am-legal-section {
+  display: grid;
+  gap: var(--am-space-12);
+  scroll-margin-top: calc(var(--am-header) + var(--am-space-32));
+}
+
+.am-legal-section p {
+  margin: 0;
+  color: var(--am-text-muted);
+  line-height: 1.7;
+}
+
+.am-legal-body {
+  display: grid;
+  gap: var(--am-space-32);
+}
+
+.am-legal-notice__action {
+  margin-top: var(--am-space-12);
+}
+
+.am-legal-placeholders {
+  display: grid;
+  gap: var(--am-space-8);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+/* ==========================================================================
+   10. 404 and error pages
+   ========================================================================== */
+
+.am-errorpage {
+  display: grid;
+  gap: var(--am-space-16);
+  justify-items: center;
+  max-width: 56ch;
+  margin: 0 auto;
+  padding: var(--am-space-40) 0;
+  text-align: center;
+}
+
+.am-errorpage__icon {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: var(--am-space-4);
+  /* Own stacking context, so the glow below sits behind the tile but above the page background. */
+  isolation: isolate;
+}
+
+.am-errorpage__icon::before {
+  position: absolute;
+  z-index: -1;
+  width: 128px;
+  height: 128px;
+  border-radius: 50%;
+  background: radial-gradient(50% 50% at 50% 50%, rgba(46, 107, 214, 0.22), rgba(46, 107, 214, 0) 70%);
+  content: "";
+}
+
+.am-errorpage__title {
+  margin: 0;
+}
+
+.am-errorpage__lead {
+  margin: 0;
+  color: var(--am-text-muted);
+  font-size: var(--am-lead-size);
+  line-height: var(--am-lead-line);
+}
+
+.am-errorpage__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--am-space-12);
+  justify-content: center;
+  margin-top: var(--am-space-8);
+}
+
+.am-errorpage-countries {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--am-space-8);
+  justify-content: center;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.am-errorpage-countries a {
+  display: inline-flex;
+  min-height: 40px;
+  align-items: center;
+  padding: var(--am-space-6) var(--am-space-16);
+  border: 1px solid var(--am-border);
+  border-radius: var(--am-radius-pill);
+  background: var(--am-surface);
+  color: var(--am-text-muted);
+  font-size: var(--am-caption-size);
+  font-weight: 700;
+  text-decoration: none;
+  transition:
+    border-color var(--am-transition),
+    color var(--am-transition);
+}
+
+.am-errorpage-countries a:hover {
+  border-color: var(--am-primary-300);
+  color: var(--am-primary-700);
+}
