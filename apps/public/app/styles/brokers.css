@@ -1,0 +1,677 @@
+/*
+ * Page-specific styles for the broker acquisition pages (SITE-408 to SITE-411), imported once by
+ * `app/[locale]/brokers/layout.tsx`. Every value reuses the `--am-*` tokens: nothing here is a raw
+ * colour, size or spacing value. Green never becomes a page background or a primary button here
+ * either; the only green is the validation tick on the billable-criteria list and the consent badge.
+ *
+ * Bug fixed here (desktop /courtiers showed both the plans table and the stacked cards at once):
+ * the previous file declared, in this order, (1) `@media (min-width: 681px) { .am-plans-cards {
+ * display: none } }` and only afterwards (2) the unconditional `.am-plans-cards { display: grid; … }`
+ * block that also set `display`. Both rules share the same specificity (one class selector), so CSS
+ * cascade resolves the conflict by source order, not by how narrow a media query is - the later,
+ * *unconditional* rule (2) always won, at every viewport, silently cancelling the desktop-only
+ * `display: none` from (1). The redesign below no longer needs the bug to exist at all: the plan
+ * grid (`.am-pricing-grid`) is now the only always-visible rendering, and the full `<table>` moves
+ * inside a collapsible `.am-faq__item` `<details>` ("Comparer les formules en détail"), so there is
+ * exactly one element controlling visibility at any width - nothing to fight over in the cascade.
+ */
+
+/* ==========================================================================
+   1. Hero (navy) — secondary CTA legible on a dark gradient
+   ========================================================================== */
+
+/*
+ * `Button variant="secondary"` is a white-surface / primary-700-text pill: correct on every light or
+ * brand hero, invisible on navy (white on white). Rather than adding a new Button variant, this
+ * scopes an inverse style to the one place it is needed, matching the pattern already used for
+ * `.am-hero[data-tone="navy"] .am-hero__lead` above it.
+ */
+.am-hero[data-tone="navy"] .am-button[data-variant="secondary"] {
+  border-color: rgba(255, 255, 255, 0.42);
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--am-neutral-0);
+  box-shadow: none;
+}
+
+.am-hero[data-tone="navy"] .am-button[data-variant="secondary"]:hover {
+  border-color: var(--am-neutral-0);
+  background: rgba(255, 255, 255, 0.16);
+  color: var(--am-neutral-0);
+  box-shadow: none;
+}
+
+/* ==========================================================================
+   2. Plan grid (SITE-408 vitrine, SITE-409 tarifs): 3 cards → 2 → 1
+   ========================================================================== */
+
+.am-pricing-grid {
+  display: grid;
+  gap: var(--am-space-16);
+  margin: 0 0 var(--am-space-16);
+  padding: 0;
+  list-style: none;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+@media (max-width: 900px) {
+  .am-pricing-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 680px) {
+  .am-pricing-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+/* The "Pro" card is emphasised with `Card featured` alone (stronger border + glow) — no claim text. */
+.am-plancard__positioning {
+  margin: 0;
+  color: var(--am-text-muted);
+  font-size: var(--am-small-size);
+  line-height: var(--am-small-line);
+}
+
+.am-plancard__audience {
+  margin: 0;
+  color: var(--am-text-subtle);
+  font-size: var(--am-small-size);
+  line-height: var(--am-small-line);
+}
+
+.am-plan-note {
+  margin: var(--am-space-4) 0 0;
+  color: var(--am-text-subtle);
+  font-size: var(--am-caption-size);
+  font-weight: 700;
+}
+
+.am-plancard__features {
+  margin: var(--am-space-4) 0 0;
+  padding-left: var(--am-space-20);
+  color: var(--am-text);
+  font-size: var(--am-small-size);
+  line-height: 1.7;
+}
+
+/* ---------- The exhaustive table, collapsed by default (reuses `.am-faq` for free) ---------- */
+
+.am-comparetable__note {
+  margin: 0 0 var(--am-space-8);
+  color: var(--am-text-subtle);
+  font-size: var(--am-caption-size);
+  font-weight: 700;
+}
+
+.am-comparetable__features {
+  margin: 0;
+  padding-left: var(--am-space-16);
+  color: var(--am-text);
+  font-size: var(--am-small-size);
+  line-height: 1.7;
+}
+
+.am-closingcta {
+  justify-content: center;
+}
+
+/* ==========================================================================
+   3. Broker pricing (SITE-409): country pill form + price hierarchy
+   ========================================================================== */
+
+/* Compact inline pill: the plain-GET `.am-countryselect` (chrome-owned) tightened to a single pill row. */
+.am-pricepill {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: var(--am-space-8);
+  align-items: center;
+  padding: var(--am-space-8);
+  border: 1px solid var(--am-border);
+  border-radius: var(--am-radius-pill);
+  background: var(--am-surface);
+  box-shadow: var(--am-shadow-xs);
+}
+
+.am-pricepill__label {
+  margin: 0 0 0 var(--am-space-8);
+  color: var(--am-text-subtle);
+  font-size: var(--am-caption-size);
+  font-weight: 800;
+  letter-spacing: var(--am-tracking-wide);
+  text-transform: uppercase;
+}
+
+.am-pricepill select {
+  width: auto;
+  min-width: 160px;
+  min-height: 40px;
+  padding-top: var(--am-space-8);
+  padding-bottom: var(--am-space-8);
+  border-color: transparent;
+  background-color: var(--am-neutral-50);
+}
+
+.am-pricepill .am-button {
+  border-radius: var(--am-radius-pill);
+}
+
+@media (max-width: 480px) {
+  .am-pricepill {
+    width: 100%;
+    border-radius: var(--am-radius-card);
+  }
+
+  .am-pricepill select {
+    width: 100%;
+  }
+}
+
+/* ---------- Price hierarchy inside a plan pricing card ---------- */
+
+/*
+ * The three plan cards line their price blocks up whatever the positioning sentence wraps to
+ * ("Enterprise" takes three lines where "Starter" takes two). The card body becomes a flex column and
+ * the price block claims the leftover space above it, so every price sits on the same baseline
+ * instead of floating at a different height per card.
+ */
+.am-pricing-grid .am-card__body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--am-space-12);
+}
+
+.am-pricing-grid .am-priceplan__price,
+.am-pricing-grid .am-priceplan__onrequest {
+  margin-top: auto;
+}
+
+.am-priceplan__positioning {
+  margin: 0;
+  color: var(--am-text-muted);
+  font-size: var(--am-small-size);
+  line-height: var(--am-small-line);
+}
+
+.am-priceplan__price {
+  display: grid;
+  gap: 2px;
+  margin: var(--am-space-4) 0 0;
+  padding: var(--am-space-12) 0;
+  border-top: 1px solid var(--am-border);
+  border-bottom: 1px solid var(--am-border);
+}
+
+.am-priceplan__amount {
+  color: var(--am-primary-700);
+  font-family: var(--am-font-heading);
+  font-size: var(--am-h2-size);
+  font-variant-numeric: tabular-nums;
+  font-weight: 800;
+  letter-spacing: var(--am-tracking-tight);
+  line-height: 1.05;
+}
+
+.am-priceplan__caption {
+  margin: 0;
+  color: var(--am-text-subtle);
+  font-size: var(--am-caption-size);
+  font-weight: 700;
+}
+
+.am-priceplan__onrequest {
+  display: inline-flex;
+  gap: var(--am-space-8);
+  align-items: center;
+  align-self: start;
+  margin: var(--am-space-4) 0 0;
+  padding: var(--am-space-6) var(--am-space-12);
+  border: 1px dashed var(--am-border-strong);
+  border-radius: var(--am-radius-pill);
+  color: var(--am-text-muted);
+  font-size: var(--am-small-size);
+  font-weight: 700;
+}
+
+/* Generic key/value grid: lead ticket fields, plan setup/per-lead prices. */
+.am-kv {
+  display: grid;
+  gap: var(--am-space-8) var(--am-space-16);
+  margin: 0;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.am-kv[data-columns="1"] {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+@media (max-width: 680px) {
+  .am-kv {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.am-kv dt {
+  margin: 0;
+  color: var(--am-text-subtle);
+  font-size: var(--am-caption-size);
+  font-weight: 700;
+}
+
+.am-kv dd {
+  margin: 0 0 var(--am-space-8);
+  color: var(--am-text);
+  font-size: var(--am-small-size);
+  font-weight: 700;
+}
+
+/* ---------- Billable-lead criteria: checklist grid of icon-tile cards ---------- */
+
+.am-criterialist {
+  display: grid;
+  gap: var(--am-space-12);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+}
+
+.am-criterialist__item {
+  flex-direction: row;
+  align-items: center;
+  gap: var(--am-space-12);
+}
+
+.am-criterialist__text {
+  margin: 0;
+  color: var(--am-text);
+  font-size: var(--am-small-size);
+  font-weight: 700;
+  line-height: var(--am-small-line);
+}
+
+/* ==========================================================================
+   4. Anonymised example lead ticket (SITE-408)
+   ========================================================================== */
+
+/*
+ * Centred rather than flush left: at >= 1024px a 480px card pinned to the left of a 1200px section
+ * read as a half-finished row. There is no second column of copy to pair it with (every existing
+ * `Brokers.lead.*` string is already on the page), so the ticket is centred and slightly wider.
+ */
+.am-leadticket {
+  position: relative;
+  overflow: hidden;
+  display: grid;
+  gap: var(--am-space-16);
+  max-width: 560px;
+  margin-inline: auto;
+  padding: var(--am-space-24);
+  border: 1px dashed var(--am-primary-300);
+  border-radius: var(--am-radius-panel);
+  background: linear-gradient(180deg, var(--am-primary-50) 0%, var(--am-surface) 55%);
+  box-shadow: var(--am-shadow-md);
+}
+
+.am-leadticket__ribbon {
+  position: absolute;
+  top: var(--am-space-16);
+  right: calc(-1 * var(--am-space-32));
+  transform: rotate(38deg);
+  width: 176px;
+  padding: 4px 0;
+  border-block: 1px dashed var(--am-primary-400);
+  background: var(--am-primary-600);
+  color: var(--am-neutral-0);
+  font-size: var(--am-caption-size);
+  font-weight: 800;
+  letter-spacing: var(--am-tracking-wide);
+  text-align: center;
+  text-transform: uppercase;
+}
+
+.am-leadticket__head {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  gap: var(--am-space-12);
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  padding-right: var(--am-space-48);
+}
+
+.am-leadticket__product {
+  margin: 0;
+  color: var(--am-text);
+  font-family: var(--am-font-heading);
+  font-size: var(--am-body-size);
+  font-weight: 800;
+  letter-spacing: var(--am-tracking-snug);
+}
+
+.am-leadticket__reference {
+  margin: 0;
+  color: var(--am-text-subtle);
+  font-size: var(--am-caption-size);
+  font-weight: 700;
+}
+
+.am-leadticket__flag {
+  font-size: 28px;
+  line-height: 1;
+}
+
+.am-leadticket__meta {
+  margin: 0;
+  padding-top: var(--am-space-16);
+  border-top: 1px dashed var(--am-border-strong);
+}
+
+/*
+ * Neutral row, not a green one: "Canal de rappel demandé" states a preference, it validates nothing,
+ * and green on this site means validation only. The WhatsApp glyph below keeps the channel's own
+ * brand colour - that is the single documented exception.
+ */
+.am-leadticket__channel {
+  display: flex;
+  gap: var(--am-space-8);
+  align-items: center;
+  padding: var(--am-space-10) var(--am-space-12);
+  border: 1px solid var(--am-border);
+  border-radius: var(--am-radius-field);
+  background: var(--am-neutral-50);
+  color: var(--am-text);
+  font-size: var(--am-small-size);
+  font-weight: 700;
+}
+
+.am-leadticket__channel .am-icon {
+  color: var(--am-whatsapp-dark);
+}
+
+.am-leadticket__foot {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--am-space-8);
+  align-items: center;
+  justify-content: space-between;
+}
+
+.am-leadticket__disclaimer {
+  margin: 0;
+  color: var(--am-text-subtle);
+  font-size: var(--am-caption-size);
+}
+
+/* ==========================================================================
+   5. Portal mock illustration — animated (SITE-408)
+   ========================================================================== */
+
+.am-portalmock {
+  margin: 0;
+  padding: 0;
+}
+
+.am-portalmock__frame {
+  overflow: hidden;
+  border: 1px solid var(--am-border);
+  border-radius: var(--am-radius-panel);
+  background: var(--am-surface);
+  box-shadow: var(--am-shadow-lg);
+}
+
+.am-portalmock__bar {
+  display: flex;
+  gap: var(--am-space-8);
+  align-items: center;
+  padding: var(--am-space-12) var(--am-space-16);
+  background: var(--am-gradient-navy);
+}
+
+.am-portalmock__dot {
+  width: 10px;
+  height: 10px;
+  border-radius: var(--am-radius-pill);
+  background: var(--am-primary-100);
+  opacity: 0.6;
+}
+
+.am-portalmock__body {
+  display: grid;
+  gap: var(--am-space-12);
+  padding: var(--am-space-16);
+  grid-template-columns: 88px minmax(0, 1fr);
+}
+
+.am-portalmock__nav {
+  display: grid;
+  gap: var(--am-space-8);
+  align-content: start;
+}
+
+.am-portalmock__navitem {
+  height: 10px;
+  border-radius: var(--am-radius-pill);
+  background: var(--am-neutral-100);
+}
+
+.am-portalmock__navitem[data-active="true"] {
+  background: var(--am-primary-200);
+}
+
+.am-portalmock__columns {
+  display: grid;
+  gap: var(--am-space-12);
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.am-portalmock__column {
+  display: grid;
+  gap: var(--am-space-8);
+  align-content: start;
+  padding: var(--am-space-8);
+  border-radius: var(--am-radius-field);
+  background: var(--am-neutral-50);
+}
+
+.am-portalmock__columnhead {
+  height: 8px;
+  width: 60%;
+  border-radius: var(--am-radius-pill);
+  background: var(--am-neutral-300);
+}
+
+.am-portalmock__columnhead[data-shimmer="true"] {
+  background: linear-gradient(90deg, var(--am-neutral-300) 25%, var(--am-neutral-200) 50%, var(--am-neutral-300) 75%);
+  background-size: 200% 100%;
+  animation: am-shimmer 2.4s linear infinite;
+}
+
+.am-portalmock__card {
+  display: grid;
+  gap: 4px;
+  padding: var(--am-space-8);
+  border-radius: var(--am-radius-field);
+  background: var(--am-neutral-0);
+  box-shadow: var(--am-shadow-sm);
+}
+
+/*
+ * Placeholder line. The shimmer sweep is opt-in (`data-shimmer`): only the first column's head and
+ * its first card loop, so the illustration runs three infinite animations instead of twelve.
+ */
+.am-portalmock__cardline {
+  height: 6px;
+  border-radius: var(--am-radius-pill);
+  background: linear-gradient(90deg, var(--am-neutral-200) 25%, var(--am-neutral-100) 50%, var(--am-neutral-200) 75%);
+  background-size: 200% 100%;
+}
+
+.am-portalmock__cardline[data-shimmer="true"] {
+  animation: am-shimmer 2.4s linear infinite;
+}
+
+.am-portalmock__cardline[data-width="short"] {
+  width: 40%;
+}
+
+.am-portalmock__cardline[data-tone="brand"] {
+  background: linear-gradient(90deg, var(--am-primary-200) 25%, var(--am-primary-100) 50%, var(--am-primary-200) 75%);
+  background-size: 200% 100%;
+}
+
+@media (max-width: 680px) {
+  .am-portalmock__body {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .am-portalmock__nav {
+    grid-auto-flow: column;
+    grid-template-columns: repeat(4, 1fr);
+  }
+
+  .am-portalmock__columns {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.am-portalmock__caption {
+  margin: var(--am-space-12) 0 0;
+  color: var(--am-text-subtle);
+  font-size: var(--am-small-size);
+  line-height: var(--am-small-line);
+  text-align: center;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .am-portalmock__cardline[data-shimmer="true"],
+  .am-portalmock__columnhead[data-shimmer="true"] {
+    animation: none;
+  }
+}
+
+/* ==========================================================================
+   6. Application form (SITE-410): card with numbered sections
+   ========================================================================== */
+
+.am-formcard {
+  display: grid;
+  gap: var(--am-space-24);
+  padding: var(--am-space-32);
+  border: 1px solid var(--am-border);
+  border-radius: var(--am-radius-panel);
+  background: var(--am-surface);
+  box-shadow: var(--am-shadow-md);
+}
+
+@media (max-width: 680px) {
+  .am-formcard {
+    padding: var(--am-space-20);
+  }
+}
+
+.am-formcard fieldset {
+  display: grid;
+  gap: var(--am-space-16);
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.am-formsection__legend {
+  display: flex;
+  gap: var(--am-space-12);
+  align-items: center;
+  padding: 0;
+  color: var(--am-text);
+  font-family: var(--am-font-heading);
+  font-size: var(--am-h4-size);
+  font-weight: 800;
+  letter-spacing: var(--am-tracking-snug);
+}
+
+.am-formsection__index {
+  display: inline-flex;
+  width: 28px;
+  height: 28px;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--am-radius-pill);
+  background: var(--am-gradient-brand);
+  color: var(--am-neutral-0);
+  font-family: var(--am-font-body);
+  font-size: var(--am-caption-size);
+  font-weight: 800;
+}
+
+/* Two columns of short fields from 768px. Replaces the legacy `.pub-form__grid--two`. */
+.am-formcard__grid {
+  display: grid;
+  gap: var(--am-space-16) var(--am-space-20);
+  grid-template-columns: minmax(0, 1fr);
+}
+
+@media (min-width: 768px) {
+  .am-formcard__grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+/* The "next steps" list of the application confirmation notice. Replaces the legacy `.pub-list`. */
+.am-steplist {
+  margin: 0;
+  padding-left: var(--am-space-20);
+  color: var(--am-text-muted);
+  line-height: 1.75;
+}
+
+.am-formcard__products {
+  display: grid;
+  gap: var(--am-space-8) var(--am-space-20);
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+}
+
+/* ==========================================================================
+   7. Broker sign-in (SITE-411): centred card
+   ========================================================================== */
+
+.am-logincard {
+  display: grid;
+  gap: var(--am-space-16);
+  max-width: 480px;
+  margin: 0 auto;
+  padding: var(--am-space-32);
+  border: 1px solid var(--am-border);
+  border-radius: var(--am-radius-panel);
+  background: var(--am-surface);
+  box-shadow: var(--am-shadow-lg);
+  text-align: center;
+}
+
+.am-logincard__icon {
+  justify-self: center;
+}
+
+.am-logincard__title {
+  margin: 0;
+  font-family: var(--am-font-heading);
+  font-size: var(--am-h3-size);
+  font-weight: 800;
+  letter-spacing: var(--am-tracking-tight);
+}
+
+.am-logincard__lead {
+  margin: 0;
+  color: var(--am-text-muted);
+}
+
+.am-logincard .am-notice {
+  text-align: left;
+}
+
+.am-logincard__actions {
+  display: grid;
+  gap: var(--am-space-8);
+  justify-items: center;
+}

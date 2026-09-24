@@ -175,28 +175,313 @@ export interface BrokerDashboardData {
   licenseAlerts: BrokerDashboardLicenseAlert[];
 }
 
+export interface BrokerAIAssistanceData {
+  generatedAt: string;
+  surface: "broker_crm";
+  enabled: boolean;
+  modelCall: boolean;
+  provider?: string;
+  humanValidationRequired: true;
+  auditPolicy: "metadata_only";
+  availableAssistTypes: string[];
+  flags: Array<{ key: string; value: boolean; required: boolean }>;
+  message: string;
+}
+
 const emptyDashboard: BrokerDashboardData = {
   plan: "starter",
   window: { from: "", to: "" },
   starter: { received: 0, accepted: 0, rejected: 0, disputed: 0, pendingAction: 0, averageFirstActionMinutes: null, byProduct: [], byCountry: [] },
   licenseAlerts: []
 };
+const emptyAIAssistance: BrokerAIAssistanceData = {
+  generatedAt: "",
+  surface: "broker_crm",
+  enabled: false,
+  modelCall: false,
+  humanValidationRequired: true,
+  auditPolicy: "metadata_only",
+  availableAssistTypes: [],
+  flags: [],
+  message: ""
+};
 
 export function readBrokerDashboard() {
   return readBroker<BrokerDashboardData>("/broker/dashboard", emptyDashboard);
 }
 
-export interface BrokerTeamUser {
-  id: string;
-  email: string;
-  displayName: string;
-  roles: string[];
-  partnerTenantId?: string | null;
-  status: "invited" | "active" | "suspended" | "locked" | "deleted";
-  mfaStatus: "not_enrolled" | "required" | "enrolled" | "verified";
-  lastLoginAt?: string | null;
+export interface BrokerCrmLeadDetailData {
+  leadAssignmentId: string;
+  publicReference: string;
+  countryCode: string;
+  productKey: string;
+  status: string;
+  assignedAt: string;
+  /** Spec 042: a shared lead is billed at a reduced price; co-recipient identities stay hidden. */
+  isShared?: boolean;
+  recipientCount?: number;
+  urgency: string;
+  source: string;
+  prospectName?: string;
+  emailMasked?: string;
+  phoneMasked?: string;
+  answers: Record<string, unknown>;
+  history: Array<Record<string, unknown>>;
+  notes: Array<Record<string, unknown>>;
+  tasks: Array<Record<string, unknown>>;
+  documents: Array<Record<string, unknown>>;
+  proposals: Array<Record<string, unknown>>;
+  /** Champs egalement exposes par brokerCrmLeadDetailSchema, optionnels cote UI. */
+  contact?: Record<string, unknown>;
+  reminders?: Array<Record<string, unknown>>;
+  disputes?: Array<Record<string, unknown>>;
+  advisorId?: string;
 }
 
-export function readBrokerTeamUsers() {
-  return readBroker<BrokerTeamUser[]>("/admin/users?page=1&pageSize=100", []);
+export interface BrokerAiInteraction {
+  id: string;
+  assistType: string;
+  status: "queued" | "completed" | "refused" | "failed";
+  fallback: boolean;
+  outputText: string | null;
+  outputData: unknown;
+  humanValidationStatus: "not_required" | "pending" | "approved" | "rejected";
+  refusalReason: string | null;
+  disclaimer: string;
+  assistanceLabel: string;
+  createdAt: string;
+}
+
+export interface BrokerAiOptOutData {
+  partnerTenantId: string;
+  optedOut: boolean;
+  updatedAt: string | null;
+}
+
+const emptyLeadDetail: BrokerCrmLeadDetailData = {
+  leadAssignmentId: "",
+  publicReference: "",
+  countryCode: "",
+  productKey: "",
+  status: "nouveau",
+  assignedAt: "",
+  urgency: "normal",
+  source: "quote_request",
+  answers: {},
+  history: [],
+  notes: [],
+  tasks: [],
+  documents: [],
+  proposals: []
+};
+
+export function readCrmLeadDetail(leadAssignmentId: string) {
+  return readBroker<BrokerCrmLeadDetailData>(`/broker/crm/leads/${encodeURIComponent(leadAssignmentId)}`, emptyLeadDetail);
+}
+
+export function listLeadAiInteractions(leadAssignmentId: string) {
+  return readBroker<BrokerAiInteraction[]>(`/broker/crm/leads/${encodeURIComponent(leadAssignmentId)}/ai`, []);
+}
+
+export interface BrokerBillingStatementData {
+  generatedAt: string;
+  partnerTenantId: string;
+  plan: "starter" | "pro" | "enterprise";
+  billingEnabled: boolean;
+  paymentsEnabled: false;
+  collectionEnabled: false;
+  currency: "XOF";
+  period: { from: string; to: string };
+  leadsReceived: number;
+  billableLeadCount: number;
+  nonBillableLeadCount: number;
+  disputeCreditCount: number;
+  packCreditsRemaining: number;
+  estimatedAmount: number;
+  draft: { reference: string; totalAmount: number; status: string } | null;
+  notice: string;
+}
+
+const emptyStatement: BrokerBillingStatementData = {
+  generatedAt: "",
+  partnerTenantId: "",
+  plan: "starter",
+  billingEnabled: false,
+  paymentsEnabled: false,
+  collectionEnabled: false,
+  currency: "XOF",
+  period: { from: "", to: "" },
+  leadsReceived: 0,
+  billableLeadCount: 0,
+  nonBillableLeadCount: 0,
+  disputeCreditCount: 0,
+  packCreditsRemaining: 0,
+  estimatedAmount: 0,
+  draft: null,
+  notice: ""
+};
+
+export interface BrokerInboxNotification {
+  id: string;
+  type: string;
+  title: string;
+  body: string;
+  targetType: string | null;
+  targetId: string | null;
+  read: boolean;
+  createdAt: string;
+}
+
+export interface BrokerNotificationPreferences {
+  scopeId: string;
+  email: true;
+  inApp: true;
+  sms: boolean;
+  whatsapp: boolean;
+  updatedAt: string | null;
+}
+
+export function readBrokerInbox() {
+  return readBroker<BrokerInboxNotification[]>("/broker/notifications/inbox", []);
+}
+
+export function readBrokerNotificationPreferences() {
+  return readBroker<BrokerNotificationPreferences>("/broker/notifications/preferences", { scopeId: "", email: true, inApp: true, sms: false, whatsapp: false, updatedAt: null });
+}
+
+/** DASH-B-008: consommation de leads et brouillon du cabinet, sans paiement ni facture emise. */
+export function readBrokerBillingStatement() {
+  return readBroker<BrokerBillingStatementData>("/broker/billing/statement", emptyStatement);
+}
+
+export function readBrokerAiOptOut() {
+  return readBroker<BrokerAiOptOutData>("/broker/crm/ai/opt-out", { partnerTenantId: "", optedOut: false, updatedAt: null });
+}
+
+export function readBrokerAIAssistance() {
+  return readBroker<BrokerAIAssistanceData>("/broker/crm/ai-assistance", emptyAIAssistance);
+}
+
+export interface BrokerAgency {
+  id: string;
+  name: string;
+  countryCode: string;
+  city: string | null;
+  status: "active" | "suspended";
+  memberCount: number;
+}
+
+export interface BrokerCustomRole {
+  id: string;
+  name: string;
+  permissions: string[];
+  rejectedPermissions: string[];
+}
+
+export interface BrokerSla {
+  partnerTenantId: string;
+  firstActionTargetMinutes: number;
+  windowDays: number;
+  leadsMeasured: number;
+  leadsWithinTarget: number;
+  complianceRate: number;
+  averageFirstActionMinutes: number | null;
+}
+
+export interface BrokerBrandingData {
+  partnerTenantId: string;
+  displayLabel: string;
+  primaryColor: string;
+  platformMention: string;
+}
+
+export function readBrokerAgencies() {
+  return readBroker<BrokerAgency[]>("/broker/enterprise/agencies", []);
+}
+
+export function readBrokerCustomRoles() {
+  return readBroker<BrokerCustomRole[]>("/broker/enterprise/roles", []);
+}
+
+export function readBrokerSla() {
+  return readBroker<BrokerSla>("/broker/enterprise/sla", { partnerTenantId: "", firstActionTargetMinutes: 240, windowDays: 30, leadsMeasured: 0, leadsWithinTarget: 0, complianceRate: 0, averageFirstActionMinutes: null });
+}
+
+export function readBrokerBranding() {
+  return readBroker<BrokerBrandingData>("/broker/enterprise/branding", { partnerTenantId: "", displayLabel: "Espace courtier", primaryColor: "#1f2937", platformMention: "Plateforme technique AssurMatch" });
+}
+
+export interface BrokerAdvisorRow {
+  advisorId: string;
+  received: number;
+  accepted: number;
+  won: number;
+  lost: number;
+  conversionRate: number;
+  averageFirstActionMinutes: number | null;
+}
+
+export function readBrokerAdvisors() {
+  return readBroker<BrokerAdvisorRow[]>("/broker/dashboard/advisors", []);
+}
+
+/** DASH-B-006: dashboard with the previous-period comparison section. */
+export function readBrokerDashboardWithComparison() {
+  return readBroker<BrokerDashboardData & { comparison?: { previous: { received: number; accepted: number; refused: number }; delta: { received: number; accepted: number; refused: number } } }>(
+    "/broker/dashboard?compare=previous",
+    emptyDashboard
+  );
+}
+
+/** Spec 022: detail minimal d'un lead Starter, limite aux informations consenties. */
+export interface BrokerStarterLeadHistoryEventData {
+  id: string;
+  eventType: string;
+  previousStatus?: string;
+  nextStatus?: string;
+  reason?: string;
+  comment?: string;
+  occurredAt: string;
+}
+
+export interface BrokerStarterLeadDetailData {
+  leadAssignmentId: string;
+  publicReference: string;
+  countryCode: string;
+  productKey: string;
+  status: string;
+  assignedAt: string;
+  seen: boolean;
+  seenAt?: string;
+  contact: Record<string, unknown>;
+  answers: Record<string, unknown>;
+  history: BrokerStarterLeadHistoryEventData[];
+}
+
+const emptyStarterLeadDetail: BrokerStarterLeadDetailData = {
+  leadAssignmentId: "",
+  publicReference: "",
+  countryCode: "",
+  productKey: "",
+  status: "assigned",
+  assignedAt: "",
+  seen: false,
+  contact: {},
+  answers: {},
+  history: []
+};
+
+/** GET /broker/starter/leads/:leadId - marque le lead vu lors du premier acces autorise. */
+export function readStarterLeadDetail(leadAssignmentId: string) {
+  return readBroker<BrokerStarterLeadDetailData>(`/broker/starter/leads/${encodeURIComponent(leadAssignmentId)}`, emptyStarterLeadDetail);
+}
+
+/** GET /broker/starter/leads/:leadId/history - historique minimal audite. */
+export function readStarterLeadHistory(leadAssignmentId: string) {
+  return readBroker<BrokerStarterLeadHistoryEventData[]>(`/broker/starter/leads/${encodeURIComponent(leadAssignmentId)}/history`, []);
+}
+
+/** Distingue un lead inexistant d'une indisponibilite d'API, sans exposer d'information sensible. */
+export function isNotFoundState(state: BrokerApiState<unknown>): boolean {
+  return state.status === "error" && state.error === "api_404";
 }

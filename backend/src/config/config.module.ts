@@ -1,5 +1,7 @@
 import type { EmailRuntimeConfig } from "../modules/notifications/email/email-config";
 import { resolveEmailRuntimeConfig, validateEmailRuntimeEnvironment } from "../modules/notifications/email/email-config";
+import { validateDocumentEnvironment } from "../modules/quote-documents/quote-documents.config";
+import { validateAiEnvironment } from "../modules/ai/core/ai-provider.config";
 
 export interface AppConfig {
   appEnv: "local" | "test" | "runtime-smoke" | "staging" | "preproduction" | "production";
@@ -34,6 +36,31 @@ export function isProductionLike(env: Record<string, string | undefined> = proce
 
 function bool(value: string | undefined): boolean {
   return value === "true";
+}
+
+const localPublicOrigins = [
+  "http://127.0.0.1:3601",
+  "http://localhost:3601"
+];
+
+/**
+ * Browser origins allowed to call the API cross-origin. Only the Web Publique Client needs this:
+ * the two back-offices call the API from their own server with the session token, never from the
+ * browser. Without it the public quote submission fails its CORS preflight in any real browser
+ * while working perfectly from curl and from every test - which is how it went unnoticed.
+ *
+ * Never "*": the allowlist is explicit, and outside local it must be configured deliberately.
+ */
+export function corsAllowedOrigins(env: Record<string, string | undefined> = process.env): string[] {
+  // `CORS_ORIGINS` is the name the preproduction environment reference already declares as
+  // mandatory; it was documented and provisioned but never read by the runtime.
+  const configured = (env.CORS_ORIGINS ?? "")
+    .split(",")
+    .map((origin) => origin.trim())
+    .filter(Boolean);
+  if (configured.length > 0) return configured;
+  const appEnv = env.APP_ENV ?? env.NODE_ENV ?? "local";
+  return appEnv === "local" ? [...localPublicOrigins] : [];
 }
 
 function positiveInt(env: Record<string, string | undefined>, key: string, defaultValue: number): number {
@@ -71,6 +98,8 @@ export function validateRuntimeEnvironment(env: Record<string, string | undefine
   positiveInt(env, "AUTH_LOCKOUT_WINDOW_MINUTES", 15);
   positiveInt(env, "AUTH_LOCKOUT_COOLDOWN_MINUTES", 30);
   validateEmailRuntimeEnvironment(env);
+  validateDocumentEnvironment(env);
+  validateAiEnvironment(env);
 }
 
 export class ConfigModule {

@@ -13,7 +13,8 @@ export class QuoteNotificationService {
   constructor(
     private readonly notifications: NotificationRecord[] | NotificationsService,
     private readonly queue: QueuePort,
-    private readonly audit: AuditLogWriter
+    private readonly audit: AuditLogWriter,
+    private readonly inApp?: { publishInApp(input: { scopeId: string; template: string; title: string; body: string; targetType?: string; targetId?: string }): Promise<unknown> }
   ) {}
 
   async queueVisitor(quote: QuoteRequestRecord, actor: ActorContext): Promise<{ notification: NotificationRecord; job: QueueJobRecord } | undefined> {
@@ -46,8 +47,9 @@ export class QuoteNotificationService {
     return { notification, job };
   }
 
-  async queueBroker(quote: QuoteRequestRecord, assignment: LeadAssignmentRecord, actor: ActorContext): Promise<{ notification: NotificationRecord; job: QueueJobRecord } | undefined> {
-    if (this.queuedBroker.has(assignment.id)) return undefined;
+  async queueBroker(quote: QuoteRequestRecord, assignment: LeadAssignmentRecord, actor: ActorContext, options: { allowRepeat?: boolean } = {}): Promise<{ notification: NotificationRecord; job: QueueJobRecord } | undefined> {
+    // A reassigned lead keeps its assignment id but must reach the new partner.
+    if (!options.allowRepeat && this.queuedBroker.has(assignment.id)) return undefined;
     this.queuedBroker.add(assignment.id);
     const now = new Date();
     const job = this.queue.add("broker-lead-notifications", "broker_lead_notification", assignment.id, actor.correlationId);
@@ -64,6 +66,15 @@ export class QuoteNotificationService {
       updatedAt: now
     };
     await this.persist(notification);
+    // In-app is part of the operational baseline: the assigned tenant always sees the lead in its inbox.
+    await this.inApp?.publishInApp({
+      scopeId: assignment.partnerTenantId,
+      template: "broker_lead_assigned",
+      title: "Nouveau lead assigne",
+      body: `Un lead ${assignment.productKey ?? "assurance"} (${assignment.countryCode ?? "-"}) vous a ete assigne. Notification operationnelle, aucun engagement contractuel.`,
+      targetType: "LeadAssignment",
+      targetId: assignment.id
+    });
     this.audit.write({
       actor,
       action: QuoteAuditActions.notificationBrokerQueued,

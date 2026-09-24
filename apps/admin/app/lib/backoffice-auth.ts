@@ -1,6 +1,9 @@
 import { cookies } from "next/headers";
 
-export const BACKOFFICE_TOKEN_COOKIE = "assurmatch_backoffice_token";
+// Nom de cookie propre a l'application admin: les cookies navigateur ne sont pas
+// isoles par port, donc un nom partage avec le back-office courtier ecraserait sa
+// session sur localhost. A garder synchronise avec apps/admin/middleware.ts.
+export const BACKOFFICE_TOKEN_COOKIE = "assurmatch_admin_token";
 
 const ADMIN_API_BASE_URL = process.env.NEXT_PUBLIC_ASSURMATCH_ADMIN_API_URL ?? process.env.NEXT_PUBLIC_ASSURMATCH_API_URL ?? "http://127.0.0.1:3000";
 

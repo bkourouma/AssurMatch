@@ -30,6 +30,7 @@ import { AuthRequiredHttpGuard, MfaRequiredHttpGuard } from "../modules/auth/gua
 import { actorFromHeaders, requireActor } from "../modules/common/http/actor-context";
 import { parseHttpInput } from "../modules/common/http/zod-validation";
 import type { ActorContext } from "../modules/common/types";
+import { PublicJourneyFlagPolicy } from "../modules/feature-flags/public-journey-flag-policy";
 import { AdminUsersController as AdminUsersDomainController } from "../modules/users/admin-users.controller";
 import { AdminUserRolesController as AdminUserRolesDomainController } from "../modules/users/admin-user-roles.controller";
 import { AssurMatchRuntime } from "./assurmatch-runtime";
@@ -168,19 +169,20 @@ export class RuntimeHttpController {
   }
 
   countries() {
+    if (this.runtime.publicJourneyGlobalFlags().public_comparator_enabled !== true) return [];
     return this.runtime.countries.service.listPublic();
   }
 
   countryDetail(countryCode: string, headers: IncomingHttpHeaders) {
     const parsedCountryCode = parseParam("countryCode", countryCode, isoCountrySchema);
-    return this.runtime.countries.service.getPublicPage(parsedCountryCode, { public_comparator_enabled: true }, actorFromHeaders(headers));
+    return this.runtime.countries.service.getPublicPage(parsedCountryCode, this.runtime.publicJourneyGlobalFlags(), actorFromHeaders(headers));
   }
 
   async products(countryCode: string) {
     const parsedCountryCode = parseParam("countryCode", countryCode, isoCountrySchema);
     const country = await this.runtime.countries.service.findByIsoCode(parsedCountryCode);
     if (!country) return [];
-    return this.runtime.products.service.listPublicForCountry(country.id, country.flags);
+    return this.runtime.products.service.listPublicForCountry(country.id, country.flags, this.runtime.publicJourneyGlobalFlags());
   }
 
   async productDetail(countryCode: string, productKey: string, headers: IncomingHttpHeaders) {
@@ -188,7 +190,7 @@ export class RuntimeHttpController {
     const parsedProductKey = parseParam("productKey", productKey);
     const country = await this.runtime.countries.service.findByIsoCode(parsedCountryCode);
     if (!country) throw new Error("Country is not publicly available");
-    return this.runtime.products.service.getPublicProductPage(country.id, parsedProductKey, country.flags, { public_comparator_enabled: true, quote_request_enabled: true }, actorFromHeaders(headers));
+    return this.runtime.products.service.getPublicProductPage(country.id, parsedProductKey, country.flags, this.runtime.publicJourneyGlobalFlags(), actorFromHeaders(headers));
   }
 
   async offers(countryCode: string, productKey: string, query: Partial<OfferListQuery>) {
@@ -198,11 +200,15 @@ export class RuntimeHttpController {
     const country = await this.runtime.countries.service.findByIsoCode(parsedCountryCode);
     const product = await this.runtime.products.service.findByKey(parsedProductKey);
     if (!country || !product) return { items: [], total: 0, page: 1, pageSize: 20 };
-    return this.runtime.offers.publicCatalog.list(country.id, product.id, parsedQuery);
+    return this.runtime.offers.publicCatalog.list(country.id, product.id, parsedQuery, undefined, this.runtime.publicOfferContext({ countryFlags: country.flags, productFlags: product.flags }));
+  }
+
+  offersCompare(query: Record<string, string>) {
+    return this.runtime.offers.publicCatalog.compare({ ids: String(query.ids ?? ""), priority: query.priority }, undefined, this.runtime.publicOfferContext());
   }
 
   offerDetail(offerId: string) {
-    return this.runtime.offers.publicCatalog.detail(parseParam("offerId", offerId, optionalUuidParamSchema));
+    return this.runtime.offers.publicCatalog.detail(parseParam("offerId", offerId, optionalUuidParamSchema), undefined, this.runtime.publicOfferContext());
   }
 
   async quoteForm(countryCode: string, productKey: string, language = "fr") {
@@ -212,6 +218,13 @@ export class RuntimeHttpController {
     const country = await this.runtime.countries.service.findByIsoCode(parsedCountryCode);
     const product = await this.runtime.products.service.findByKey(parsedProductKey);
     if (!country || !product) throw new Error("Quote form is not publicly available");
+    const state = new PublicJourneyFlagPolicy().resolve({
+      globalFlags: this.runtime.publicJourneyGlobalFlags(),
+      countryFlags: country.flags,
+      productFlags: product.flags,
+      requireProductFlags: true
+    });
+    if (!state.quoteEnabled) throw new Error("Quote form is not publicly available");
     return this.runtime.quoteForms.service.publicForm(country.id, product.id, parsedLanguage);
   }
 
@@ -386,6 +399,7 @@ decorate("countryDetail", [Get("countries/:countryCode") as MethodDecoratorFacto
 decorate("products", [Get("countries/:countryCode/products") as MethodDecoratorFactory], [[0, Param("countryCode") as ParamDecoratorFactory]]);
 decorate("productDetail", [Get("countries/:countryCode/products/:productKey") as MethodDecoratorFactory], [[0, Param("countryCode") as ParamDecoratorFactory], [1, Param("productKey") as ParamDecoratorFactory], [2, Headers() as ParamDecoratorFactory]]);
 decorate("offers", [Get("countries/:countryCode/products/:productKey/offers") as MethodDecoratorFactory], [[0, Param("countryCode") as ParamDecoratorFactory], [1, Param("productKey") as ParamDecoratorFactory], [2, Query() as ParamDecoratorFactory]]);
+decorate("offersCompare", [Get("offers/compare") as MethodDecoratorFactory], [[0, Query() as ParamDecoratorFactory]]);
 decorate("offerDetail", [Get("offers/:offerId") as MethodDecoratorFactory], [[0, Param("offerId") as ParamDecoratorFactory]]);
 decorate("quoteForm", [Get("countries/:countryCode/products/:productKey/quote-form") as MethodDecoratorFactory], [[0, Param("countryCode") as ParamDecoratorFactory], [1, Param("productKey") as ParamDecoratorFactory], [2, Query("language") as ParamDecoratorFactory]]);
 decorate("submitQuote", [Post("quote-requests") as MethodDecoratorFactory], [[0, Body() as ParamDecoratorFactory], [1, Headers() as ParamDecoratorFactory]]);

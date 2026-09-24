@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 
-const TOKEN_COOKIE = "assurmatch_backoffice_token";
+// Doit rester identique a BACKOFFICE_TOKEN_COOKIE de app/lib/backoffice-auth.ts.
+// Le nom est distinct de celui du back-office admin: les cookies navigateur ne
+// sont pas isoles par port, donc un nom partage ecraserait la session de l'autre app.
+const TOKEN_COOKIE = "assurmatch_broker_token";
 const BROKER_API_BASE_URL = process.env.NEXT_PUBLIC_ASSURMATCH_BROKER_API_URL ?? process.env.NEXT_PUBLIC_ASSURMATCH_API_URL ?? "http://127.0.0.1:3000";
 
 interface Profile {
@@ -33,7 +36,12 @@ function isPublicPath(pathname: string): boolean {
     pathname.startsWith("/mfa") ||
     pathname.startsWith("/_next") ||
     pathname === "/favicon.ico" ||
-    pathname === "/robots.txt";
+    pathname === "/robots.txt" ||
+    // Brand assets rendered on the auth screens (and fetched by the Next image optimizer).
+    pathname === "/icon.png" ||
+    pathname === "/logo-assurmatch.png" ||
+    pathname === "/logo-assurmatch-white.png" ||
+    pathname === "/logo-assurmatch-symbol.png";
 }
 
 function isBrokerProfile(profile: Profile): boolean {
@@ -41,7 +49,13 @@ function isBrokerProfile(profile: Profile): boolean {
 }
 
 function isStarterCrmDenied(profile: Profile, pathname: string): boolean {
-  return pathname.startsWith("/crm") && (profile.partnerPlan === "starter" || profile.roles?.includes("broker_owner_starter") === true);
+  const isStarterProfile = profile.partnerPlan === "starter" || profile.roles?.includes("broker_owner_starter") === true;
+  if (!isStarterProfile) return false;
+
+  const normalizedPathname = pathname.replace(/\/+$/, "") || "/";
+  if (normalizedPathname === "/crm") return false;
+
+  return normalizedPathname.startsWith("/crm/");
 }
 
 export async function middleware(request: NextRequest) {

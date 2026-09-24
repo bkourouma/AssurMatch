@@ -14,7 +14,10 @@ const extractedRepositoryFiles = [
   "backend/src/modules/leads/crm-activity.repository.ts",
   "backend/src/modules/partners/partners.repository.ts",
   "backend/src/modules/partner-licenses/partner-licenses.repository.ts",
-  "backend/src/modules/notifications/notifications.repository.ts"
+  "backend/src/modules/notifications/notifications.repository.ts",
+  "backend/src/modules/waitlist/waitlist.repository.ts",
+  "backend/src/modules/partner-applications/partner-applications.repository.ts",
+  "backend/src/modules/contact-messages/contact-messages.repository.ts"
 ];
 
 describe("runtime memory boundaries", () => {
@@ -47,7 +50,10 @@ describe("runtime memory boundaries", () => {
       "PrismaPartnerLicensesRepository",
       "PrismaCrmActivityRepository",
       "PrismaNotificationsRepository",
-      "PrismaRoutingDecisionsRepository"
+      "PrismaRoutingDecisionsRepository",
+      "PrismaWaitlistRepository",
+      "PrismaPartnerApplicationsRepository",
+      "PrismaContactMessagesRepository"
     ]) {
       expect(runtime).toContain(repositoryName);
     }

@@ -1,6 +1,37 @@
+import assert from "node:assert/strict";
 import type { AssurMatchRuntime } from "../../src/runtime/assurmatch-runtime";
 import type { ActorContext } from "../../src/modules/common/types";
-import type { RuntimeSmokeRun } from "./runtime-postgres-smoke-data";
+import type { QuoteFormFieldDto } from "../../../packages/shared/contracts/quote.contracts";
+import { authHeaders, type RuntimeSmokeRun } from "./runtime-postgres-smoke-data";
+
+type SmokeRequest = (path: string, init?: RequestInit) => Promise<Response>;
+
+interface QuoteFormSeedInput {
+  countryId: string;
+  productId: string;
+  language: string;
+  version: string;
+  fields: QuoteFormFieldDto[];
+  consentTextId: string;
+}
+
+async function publishQuoteFormOverHttp(request: SmokeRequest, admin: ActorContext, input: QuoteFormSeedInput): Promise<{ id: string }> {
+  const headers = { "content-type": "application/json", ...authHeaders(admin) };
+  const created = await request("/admin/quote-form-definitions", {
+    method: "POST",
+    headers,
+    body: JSON.stringify({ ...input, status: "draft", reason: "runtime smoke quote form seed" })
+  });
+  assert.equal(created.status, 201, `admin quote form creation should succeed, got ${created.status}`);
+  const draft = await created.json() as { id: string };
+  const published = await request(`/admin/quote-form-definitions/${draft.id}/publish`, {
+    method: "POST",
+    headers,
+    body: JSON.stringify({ reason: "runtime smoke quote form publication" })
+  });
+  assert.equal(published.status, 201, `admin quote form publication should succeed, got ${published.status}`);
+  return draft;
+}
 
 export interface RuntimeSmokeSeed {
   countryId: string;
@@ -18,7 +49,21 @@ export interface RuntimeSmokeSeed {
   proLeadId: string;
 }
 
-export async function seedRuntimeSmokeData(runtime: AssurMatchRuntime, run: RuntimeSmokeRun, admin: ActorContext): Promise<RuntimeSmokeSeed> {
+export async function seedRuntimeSmokeData(runtime: AssurMatchRuntime, run: RuntimeSmokeRun, admin: ActorContext, request: SmokeRequest): Promise<RuntimeSmokeSeed> {
+  await runtime.featureFlags.service.setFlag({
+    key: "public_comparator_enabled",
+    scopeType: "global",
+    value: true,
+    reason: "runtime smoke public catalog activation"
+  }, admin);
+  await runtime.featureFlags.service.setFlag({
+    key: "quote_request_enabled",
+    scopeType: "global",
+    value: true,
+    reason: "runtime smoke quote activation"
+  }, admin);
+  await runtime.reloadRuntimeFeatureFlags();
+
   const country = await runtime.countries.service.create({
     isoCode: run.countryCode,
     name: `${run.prefix} Country`,
@@ -81,16 +126,17 @@ export async function seedRuntimeSmokeData(runtime: AssurMatchRuntime, run: Runt
     contentHash: `${run.id}-consent-hash`
   }, admin);
   await runtime.consent.service.publishText(consentText.id, admin);
-  const form = runtime.quoteForms.service.create({
+  // Spec 043 T008: the form is created and published through the real admin routes. Seeding it
+  // in-process would exercise a path no operator can use, which is exactly how the missing HTTP
+  // wiring stayed invisible while the whole suite was green.
+  const form = await publishQuoteFormOverHttp(request, admin, {
     countryId: country.id,
     productId: product.id,
     language: "fr",
     version: `v-${run.id}`,
-    status: "published",
     fields: [{ key: "vehicle_use", label: "Usage", type: "select", required: true, sensitivity: "public", options: ["prive"] }],
-    consentTextId: consentText.id,
-    reason: "runtime smoke quote form seed"
-  }, admin);
+    consentTextId: consentText.id
+  });
 
   const starterA = await createBroker(runtime, run, admin, "Starter A", "starter");
   const starterB = await createBroker(runtime, run, admin, "Starter B", "starter");

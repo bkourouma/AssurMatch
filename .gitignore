@@ -49,6 +49,7 @@ prisma/dev.db-journal
 playwright-report/
 test-results/
 blob-report/
+.codegraph/
 
 # OS and editor files
 .DS_Store
@@ -65,3 +66,7 @@ backups/
 *.gpg
 *.app-password
 secrets/
+
+# Claude Code: local session state (skills under .claude/skills are versioned)
+.claude/worktrees/
+.claude/settings.local.json

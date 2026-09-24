@@ -1,11 +1,17 @@
 import { expect, test } from "@playwright/test";
-import { readFileSync } from "node:fs";
+import { messagesText, publicPage, readSources } from "./helpers/public-sources";
 
 test("public offers page includes filters, sponsorship and indicative wording", async () => {
-  const list = readFileSync("apps/public/app/countries/[countryCode]/products/[productKey]/offers/page.tsx", "utf8");
-  const detail = readFileSync("apps/public/app/offers/[offerId]/page.tsx", "utf8");
+  const list = readSources([publicPage("countries/[countryCode]/products/[productKey]/offers/page.tsx")]);
+  const detail = readSources([publicPage("offers/[offerId]/page.tsx")]);
 
-  expect(list).toContain("Prix indicatif minimum");
-  expect(list).toContain("Offre sponsorisee");
-  expect(detail).toContain("Detail de l'offre indicative");
+  // Structural: both pages still read their own namespace.
+  expect(list).toContain('getTranslations("Offers")');
+  expect(detail).toContain('getTranslations("OfferDetail")');
+
+  // Copy: the filter label, the sponsorship notice and the detail heading now live in the catalogue.
+  const fr = messagesText("fr");
+  expect(fr).toContain("Prix indicatif minimum");
+  expect(fr).toContain("offre sponsorisée est toujours signalée");
+  expect(fr).toContain("Détail de l'offre indicative");
 });

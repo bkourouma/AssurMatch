@@ -1,3 +1,4 @@
+import type { OfferGuarantee, OfferPaymentFlexibility } from "../../../../packages/shared/contracts/quote.contracts";
 import { AuditLogWriter } from "../audit-logs/audit-log-writer.service";
 import { InMemoryRedisClient, type RedisClientPort } from "../common/redis/redis.module";
 import { AdminOffersController } from "./admin-offers.controller";
@@ -31,6 +32,16 @@ export interface OfferRecord {
   sponsorLabel?: string;
   displayPriority: number;
   publicDisclaimers: string[];
+  insurerName?: string;
+  guaranteeLevel?: number;
+  deductibleAmount?: number;
+  coverageCeiling?: number;
+  processingDelayDays?: number;
+  paymentFlexibility?: OfferPaymentFlexibility;
+  guarantees?: OfferGuarantee[];
+  exclusionsSummary?: string;
+  requiredDocuments?: string[];
+  sourceOfInformation?: string;
   validatedById?: string;
   validatedAt?: Date;
   createdAt: Date;

@@ -7,6 +7,7 @@ import type { RoutingDecisionService } from "../leads/routing-decision.service";
 import type { OffersModule } from "../offers/offers.module";
 import type { PartnerLicensesService } from "../partner-licenses/partner-licenses.module";
 import type { PartnersService } from "../partners/partners.module";
+import type { ProductsService } from "../products/products.module";
 import type { QuoteSubmissionService } from "../quote-requests/quote-submission.service";
 import { AdminDashboardService } from "./admin-dashboard.service";
 import { BrokerDashboardService } from "./broker-dashboard.service";
@@ -25,6 +26,7 @@ export interface DashboardsModuleDeps {
   partnerLicenses: PartnerLicensesService;
   partners: PartnersService;
   countries: CountriesService;
+  products: ProductsService;
   offers: OffersModule;
   quoteRequests: QuoteSubmissionService;
   crmActivity?: CrmActivityRepository | undefined;
@@ -60,7 +62,8 @@ export class DashboardsModule {
       partnerLicenses: deps.partnerLicenses,
       partners: deps.partners,
       offers: deps.offers,
-      countries: deps.countries
+      countries: deps.countries,
+      products: deps.products
     });
     this.complianceAlerts = new ComplianceAlertsService({ access: this.access, audit: deps.audit });
   }

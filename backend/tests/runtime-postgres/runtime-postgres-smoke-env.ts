@@ -1,4 +1,5 @@
 const PRODUCTION_MARKERS = ["prod", "production", "staging", "preprod", "live"];
+import type { ProcessEnvLike } from "../../src/runtime/process-env-like";
 const LOCALHOST_NAMES = new Set(["localhost", "127.0.0.1"]);
 
 export interface RuntimePostgresSmokeEnv {
@@ -8,7 +9,7 @@ export interface RuntimePostgresSmokeEnv {
   runId?: string;
 }
 
-export function prepareRuntimePostgresSmokeEnv(env: NodeJS.ProcessEnv = process.env): RuntimePostgresSmokeEnv {
+export function prepareRuntimePostgresSmokeEnv(env: ProcessEnvLike = process.env as ProcessEnvLike): RuntimePostgresSmokeEnv {
   if (env.NODE_ENV === "test") {
     throw new Error("Runtime PostgreSQL smoke tests must not run with NODE_ENV=test");
   }

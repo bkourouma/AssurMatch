@@ -18,7 +18,13 @@ const extractedDomainFiles = [
   "backend/src/modules/leads/broker-crm-activity.service.ts",
   "backend/src/modules/partners/partners.module.ts",
   "backend/src/modules/partner-licenses/partner-licenses.module.ts",
-  "backend/src/modules/notifications/notifications.module.ts"
+  "backend/src/modules/notifications/notifications.module.ts",
+  "backend/src/modules/waitlist/waitlist.module.ts",
+  "backend/src/modules/partner-applications/partner-applications.module.ts",
+  "backend/src/modules/contact-messages/contact-messages.module.ts",
+  "backend/src/modules/public-stats/public-stats.module.ts",
+  "backend/src/modules/partners/public-partner-directory.service.ts",
+  "backend/src/modules/countries/public-country-directory.service.ts"
 ];
 
 describe("domain repository memory guardrails", () => {

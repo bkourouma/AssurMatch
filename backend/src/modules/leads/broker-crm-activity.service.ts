@@ -33,7 +33,7 @@ export class BrokerCrmActivityService {
   async addNote(id: string, input: unknown, actor: ActorContext): Promise<BrokerCrmNote> {
     const assignment = await this.requireMutable(id, actor);
     const parsed = brokerCrmNoteCreateSchema.parse(input);
-    const note: BrokerCrmNote = { id: crypto.randomUUID(), leadAssignmentId: id, body: parsed.body, ...(actor.actorId ? { authorId: actor.actorId } : {}), createdAt: new Date().toISOString() };
+    const note: BrokerCrmNote & { partnerTenantId: string } = { id: crypto.randomUUID(), leadAssignmentId: id, partnerTenantId: assignment.partnerTenantId, body: parsed.body, ...(actor.actorId ? { authorId: actor.actorId } : {}), createdAt: new Date().toISOString() };
     await this.repository.addNote(note);
     await this.track(assignment, actor, "note_created", QuoteAuditActions.brokerCrmNoteCreated);
     return note;
@@ -43,7 +43,7 @@ export class BrokerCrmActivityService {
     const assignment = await this.requireMutable(id, actor);
     const parsed = brokerCrmTaskCreateSchema.parse(input);
     if (parsed.assigneeId) this.access.assertSameTenantAssignee(actor, assignment, parsed.assigneeId);
-    const task: BrokerCrmTask = { id: crypto.randomUUID(), leadAssignmentId: id, title: parsed.title, ...(parsed.assigneeId ? { assigneeId: parsed.assigneeId } : {}), ...(parsed.dueAt ? { dueAt: parsed.dueAt } : {}), createdAt: new Date().toISOString() };
+    const task: BrokerCrmTask & { partnerTenantId: string } = { id: crypto.randomUUID(), leadAssignmentId: id, partnerTenantId: assignment.partnerTenantId, title: parsed.title, ...(parsed.assigneeId ? { assigneeId: parsed.assigneeId } : {}), ...(parsed.dueAt ? { dueAt: parsed.dueAt } : {}), createdAt: new Date().toISOString() };
     await this.repository.addTask(task);
     await this.track(assignment, actor, "task_created", QuoteAuditActions.brokerCrmTaskCreated);
     return task;
@@ -53,7 +53,7 @@ export class BrokerCrmActivityService {
     const assignment = await this.requireMutable(id, actor);
     const parsed = brokerCrmReminderCreateSchema.parse(input);
     if (parsed.assigneeId) this.access.assertSameTenantAssignee(actor, assignment, parsed.assigneeId);
-    const reminder: BrokerCrmReminder = { id: crypto.randomUUID(), leadAssignmentId: id, ...(parsed.assigneeId ? { assigneeId: parsed.assigneeId } : {}), remindAt: parsed.remindAt, ...(parsed.message ? { message: parsed.message } : {}), createdAt: new Date().toISOString() };
+    const reminder: BrokerCrmReminder & { partnerTenantId: string } = { id: crypto.randomUUID(), leadAssignmentId: id, partnerTenantId: assignment.partnerTenantId, ...(parsed.assigneeId ? { assigneeId: parsed.assigneeId } : {}), remindAt: parsed.remindAt, ...(parsed.message ? { message: parsed.message } : {}), createdAt: new Date().toISOString() };
     await this.repository.addReminder(reminder);
     await this.track(assignment, actor, "reminder_created", QuoteAuditActions.brokerCrmReminderCreated);
     return reminder;
@@ -71,7 +71,8 @@ export class BrokerCrmActivityService {
   async addDocument(id: string, input: unknown, actor: ActorContext): Promise<BrokerCrmDocument> {
     const assignment = await this.requireMutable(id, actor);
     const parsed = brokerCrmDocumentCreateSchema.parse(input);
-    const document: BrokerCrmDocument = { id: crypto.randomUUID(), leadAssignmentId: id, label: parsed.label, storageKey: parsed.storageKey, visibility: parsed.visibility, createdAt: new Date().toISOString() };
+    // partnerTenantId is required by the persistence model even though the public DTO omits it.
+    const document: BrokerCrmDocument & { partnerTenantId: string } = { id: crypto.randomUUID(), leadAssignmentId: id, partnerTenantId: assignment.partnerTenantId, label: parsed.label, storageKey: parsed.storageKey, visibility: parsed.visibility, createdAt: new Date().toISOString() };
     await this.repository.addDocument(document);
     await this.track(assignment, actor, "document_added", QuoteAuditActions.brokerCrmDocumentAdded);
     return document;
@@ -80,7 +81,7 @@ export class BrokerCrmActivityService {
   async addProposal(id: string, input: unknown, actor: ActorContext): Promise<BrokerCrmProposal> {
     const assignment = await this.requireMutable(id, actor);
     const parsed = brokerCrmProposalCreateSchema.parse(input);
-    const proposal: BrokerCrmProposal = { id: crypto.randomUUID(), leadAssignmentId: id, reference: parsed.reference, ...(parsed.amountIndicative !== undefined ? { amountIndicative: parsed.amountIndicative } : {}), currency: parsed.currency ?? "XOF", ...(parsed.notes ? { notes: parsed.notes } : {}), nonContractual: true, createdAt: new Date().toISOString() };
+    const proposal: BrokerCrmProposal & { partnerTenantId: string } = { id: crypto.randomUUID(), leadAssignmentId: id, partnerTenantId: assignment.partnerTenantId, reference: parsed.reference, ...(parsed.amountIndicative !== undefined ? { amountIndicative: parsed.amountIndicative } : {}), currency: parsed.currency ?? "XOF", ...(parsed.notes ? { notes: parsed.notes } : {}), nonContractual: true, createdAt: new Date().toISOString() };
     await this.repository.addProposal(proposal);
     await this.track(assignment, actor, "proposal_added", QuoteAuditActions.brokerCrmProposalAdded);
     return proposal;
@@ -89,7 +90,7 @@ export class BrokerCrmActivityService {
   async addDispute(id: string, input: unknown, actor: ActorContext): Promise<BrokerCrmDispute> {
     const assignment = await this.requireMutable(id, actor);
     const parsed = brokerCrmDisputeCreateSchema.parse(input);
-    const dispute: BrokerCrmDispute = { id: crypto.randomUUID(), leadAssignmentId: id, reason: parsed.reason, ...(parsed.comment ? { comment: parsed.comment } : {}), status: "opened", createdAt: new Date().toISOString() };
+    const dispute: BrokerCrmDispute & { partnerTenantId: string } = { id: crypto.randomUUID(), leadAssignmentId: id, partnerTenantId: assignment.partnerTenantId, reason: parsed.reason, ...(parsed.comment ? { comment: parsed.comment } : {}), status: "opened", createdAt: new Date().toISOString() };
     await this.repository.addDispute(dispute);
     await this.track(assignment, actor, "disputed", QuoteAuditActions.brokerCrmLeadDisputed, parsed.reason);
     return dispute;

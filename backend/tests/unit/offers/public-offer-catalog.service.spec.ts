@@ -41,4 +41,32 @@ describe("PublicOfferCatalogService", () => {
     expect(items.map((item) => item.name)).toEqual(["Auto A", "Auto B"]);
     expect(items.map((item) => item.disclaimer).join(" ")).not.toContain("meilleure");
   });
+
+  it("requires activation flags, sponsor flag and partner eligibility when context is provided", async () => {
+    const countryId = "00000000-0000-4000-8000-000000000030";
+    const productId = "00000000-0000-4000-8000-000000000040";
+    const partnerTenantId = "00000000-0000-4000-8000-000000000050";
+    const service = new PublicOfferCatalogService([
+      offer("Eligible", 10000, { countryId, productId, partnerTenantId }),
+      offer("Sponsored", 12000, { countryId, productId, partnerTenantId, isSponsored: true }),
+      offer("Unlicensed", 13000, { countryId, productId, partnerTenantId: "00000000-0000-4000-8000-000000000051" })
+    ], new AuditLogWriter());
+    const context = {
+      globalFlags: { public_comparator_enabled: true, sponsored_offers_enabled: false },
+      countryFlags: { country_public_enabled: true, country_comparison_enabled: true },
+      productFlags: { product_public_enabled: true, product_comparison_enabled: true },
+      evaluatePartnerEligibility: async (tenantId: string) => ({
+        eligible: tenantId === partnerTenantId,
+        reasons: tenantId === partnerTenantId ? [] : ["license_not_valid_for_scope"]
+      })
+    };
+
+    const items = await service.list(countryId, productId, {}, undefined, context);
+
+    expect(items.map((item) => item.name)).toEqual(["Eligible"]);
+    await expect(service.detail(items[0]?.id ?? "", undefined, {
+      ...context,
+      globalFlags: { public_comparator_enabled: false, sponsored_offers_enabled: false }
+    })).rejects.toThrow("Offer is not publicly available");
+  });
 });

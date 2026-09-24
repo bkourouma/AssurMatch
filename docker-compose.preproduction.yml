@@ -34,7 +34,7 @@ services:
     # Add `ports: ["127.0.0.1:55432:5432"]` if you want to inspect from the host (avoid 5432/5433
     # which may already be taken by the existing docker-compose.yml).
     volumes:
-      - postgres-preprod-data:/var/lib/postgresql/data
+      - postgres-preprod-data:/var/lib/postgresql
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U assurmatch -d assurmatch_preproduction"]
       interval: 5s

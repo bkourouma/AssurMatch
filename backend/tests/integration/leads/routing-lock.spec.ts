@@ -6,12 +6,28 @@ import { LeadAssignmentService } from "../../../src/modules/leads/lead-assignmen
 import { superAdminActor } from "../helpers/enterprise-seed";
 
 describe("lead assignment lock", () => {
-  it("prevents multiple active assignments for one quote request", async () => {
+  /**
+   * Spec 042 changed this invariant: a request may now reach several partners (multi-send), but a
+   * given partner must still never receive the same request twice.
+   */
+  it("prevents assigning the same quote request to the same partner twice", async () => {
     const service = new LeadAssignmentService(new AuditLogWriter());
     const quoteRequestId = crypto.randomUUID();
-    await service.create({ quoteRequestId, partnerTenantId: crypto.randomUUID(), assignmentReason: "first" }, superAdminActor);
+    const partnerTenantId = crypto.randomUUID();
+    await service.create({ quoteRequestId, partnerTenantId, assignmentReason: "first" }, superAdminActor);
 
-    await expect(service.create({ quoteRequestId, partnerTenantId: crypto.randomUUID(), assignmentReason: "second" }, superAdminActor)).rejects.toThrow("already has an active lead assignment");
+    await expect(service.create({ quoteRequestId, partnerTenantId, assignmentReason: "duplicate" }, superAdminActor))
+      .rejects.toThrow("already has an active lead assignment for this partner");
+  });
+
+  it("allows one quote request to reach several distinct partners", async () => {
+    const service = new LeadAssignmentService(new AuditLogWriter());
+    const quoteRequestId = crypto.randomUUID();
+    await service.create({ quoteRequestId, partnerTenantId: crypto.randomUUID(), assignmentReason: "first", recipientCount: 2 }, superAdminActor);
+    const second = await service.create({ quoteRequestId, partnerTenantId: crypto.randomUUID(), assignmentReason: "second", recipientCount: 2 }, superAdminActor);
+
+    expect(second.recipientCount).toBe(2);
+    expect((await service.list()).filter((assignment) => assignment.quoteRequestId === quoteRequestId)).toHaveLength(2);
   });
 
   it("uses a routing lock key scoped by quote request id", async () => {

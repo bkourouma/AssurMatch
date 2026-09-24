@@ -95,6 +95,16 @@ export class PartnersService {
   isAuthorizedForProduct(partnerTenantId: string, productId: string): Promise<boolean> {
     return this.repository.isAuthorizedForProduct(partnerTenantId, productId);
   }
+
+  /** Tenants with an active country authorization for `countryId` (public partner directory scope). */
+  listActivePartnerIdsForCountry(countryId: string): Promise<string[]> {
+    return this.repository.listActivePartnerIdsForCountry(countryId);
+  }
+
+  /** Products the tenant holds an active authorization for (public partner directory scope). */
+  listActiveProductIdsForPartner(partnerTenantId: string): Promise<string[]> {
+    return this.repository.listActiveProductIdsForPartner(partnerTenantId);
+  }
 }
 
 export class PartnersModule {

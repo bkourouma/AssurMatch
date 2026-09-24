@@ -1,80 +1,172 @@
-import { listCrmLeads } from "../../lib/broker-api";
 import { redirect } from "next/navigation";
 import { loginRedirect } from "../../lib/backoffice-auth";
+import { listCrmLeads } from "../../lib/broker-api";
+import { crmStatusLabel } from "../../lib/lead-vocabulary";
+import {
+  Badge,
+  DataTable,
+  Field,
+  FilterBar,
+  Input,
+  Notice,
+  PageHeader,
+  PageStack,
+  Select,
+  StatusBadge,
+  crmStatusLabels,
+  paginateItems,
+  readTableParams,
+  sortItems
+} from "../../lib/ui/broker-ui";
+import type { DataTableColumn } from "../../lib/ui/broker-ui";
+import { leadSummary } from "../../lib/ui/broker-view-models";
+import type { LeadSummaryViewModel } from "../../lib/ui/broker-view-models";
 
-export default async function BrokerCrmLeadsPage() {
+type QueryParams = Record<string, string | string[] | undefined>;
+
+function firstParam(value: string | string[] | undefined): string {
+  return Array.isArray(value) ? value[0] ?? "" : value ?? "";
+}
+
+/** Options d'un filtre: l'entree neutre d'abord, puis les valeurs reellement presentes. */
+function optionsOf(
+  leads: LeadSummaryViewModel[],
+  pick: (lead: LeadSummaryViewModel) => string,
+  allLabel: string,
+  label?: (value: string) => string
+) {
+  const values = [...new Set(leads.map(pick))].filter((value) => value && value !== "-").sort();
+  return [{ value: "", label: allLabel }, ...values.map((value) => ({ value, label: label ? label(value) : value }))];
+}
+
+const columns: Array<DataTableColumn<LeadSummaryViewModel>> = [
+  { key: "reference", header: "Reference", render: (lead) => lead.reference, sortable: true, sortValue: (lead) => lead.reference },
+  { key: "country", header: "Pays", render: (lead) => lead.country },
+  { key: "product", header: "Produit", render: (lead) => lead.product, sortable: true, sortValue: (lead) => lead.product },
+  {
+    key: "status",
+    header: "Statut",
+    render: (lead) => <StatusBadge status={lead.status} labels={crmStatusLabels} tones={{ [lead.status]: lead.statusTone }} />,
+    sortable: true,
+    sortValue: (lead) => crmStatusLabel(lead.status)
+  },
+  { key: "date", header: "Date", render: (lead) => lead.assignedAt, sortable: true, sortValue: (lead) => lead.assignedAt },
+  { key: "advisor", header: "Conseiller", render: (lead) => lead.advisor ?? "-" },
+  { key: "urgency", header: "Urgence", render: (lead) => lead.urgency ?? "-" },
+  { key: "source", header: "Source", render: (lead) => lead.source ?? "-" }
+];
+
+export default async function BrokerCrmLeadsPage({ searchParams }: { searchParams?: Promise<QueryParams> }) {
+  const params = searchParams ? await searchParams : {};
   const apiLeads = await listCrmLeads();
   if (apiLeads.unauthenticated) redirect(loginRedirect("/crm/leads", apiLeads.error ?? "session_required"));
-  const leads = apiLeads.data.items.map((lead) => ({
-    reference: String(lead.publicReference ?? lead.id ?? "lead"),
-    pays: String(lead.countryCode ?? "-"),
-    produit: String(lead.productKey ?? "-"),
-    statut: String(lead.status ?? "-"),
-    conseiller: String(lead.assignedAdvisorId ?? "-"),
-    urgence: String(lead.urgency ?? "-"),
-    source: String(lead.source ?? "-")
-  }));
+  if (apiLeads.forbidden) {
+    return (
+      <PageStack>
+        <Notice tone="danger" title="Acces CRM refuse">
+          Acces CRM refuse, verifiez le plan, la MFA et le flag broker_crm_enabled. Aucune donnee CRM n'est affichee.
+        </Notice>
+      </PageStack>
+    );
+  }
+
+  const leads = apiLeads.data.items.map(leadSummary);
+
+  const status = firstParam(params.status);
+  const product = firstParam(params.product);
+  const country = firstParam(params.country);
+  const date = firstParam(params.date);
+  const advisor = firstParam(params.advisor);
+  const urgency = firstParam(params.urgency);
+  const source = firstParam(params.source);
+  const query = firstParam(params.q).trim().toLowerCase();
+  const activeCount = [status, product, country, date, advisor, urgency, source, query].filter(Boolean).length;
+
+  const filtered = leads.filter(
+    (lead) =>
+      (!status || lead.status === status) &&
+      (!product || lead.product === product) &&
+      (!country || lead.country === country) &&
+      (!date || lead.assignedAt === date) &&
+      (!advisor || lead.advisor === advisor) &&
+      (!urgency || lead.urgency === urgency) &&
+      (!source || lead.source === source) &&
+      (!query || lead.reference.toLowerCase().includes(query))
+  );
+
+  const table = readTableParams(params, { pathname: "/crm/leads", defaultSort: { key: "date", direction: "desc" }, pageSize: 25 });
+  const visible = paginateItems(sortItems(filtered, columns, table.sort), table.page, table.pageSize);
 
   return (
-    <main style={{ maxWidth: 1180, margin: "0 auto", padding: "28px 20px", fontFamily: "system-ui, sans-serif", color: "#172033" }}>
-      <header style={{ display: "flex", justifyContent: "space-between", gap: 16, alignItems: "flex-start", marginBottom: 20 }}>
-        <div>
-          <p style={{ margin: "0 0 6px", color: "#52616f", fontSize: 13 }}>CRM Pro/Enterprise</p>
-          <h1 style={{ margin: 0, fontSize: 28 }}>Leads CRM</h1>
-          <p style={{ maxWidth: 760, lineHeight: 1.55 }}>
-            Vue tableau des leads autorises selon role, tenant, conseiller et permissions PII.
-          </p>
-        </div>
-        <button type="button" style={{ padding: "10px 14px", border: "1px solid #24695c", color: "#24695c", background: "#fff", borderRadius: 6 }}>
-          Export CSV controle
-        </button>
-      </header>
+    <PageStack>
+      <PageHeader
+        breadcrumb={[{ label: "CRM", href: "/crm" }, { label: "Vue tableau" }]}
+        kicker="CRM Pro/Enterprise"
+        title="Leads CRM"
+        description="Vue tableau des leads autorises selon role, tenant, conseiller et permissions PII."
+        actions={<Badge tone="info">Export controle par permission et audit</Badge>}
+      />
 
-      <form aria-label="Filtres CRM" style={{ display: "grid", gridTemplateColumns: "repeat(6, minmax(120px, 1fr))", gap: 10, marginBottom: 16 }}>
-        {["Statut", "Produit", "Pays", "Conseiller", "Urgence", "Source"].map((label) => (
-          <label key={label} style={{ display: "grid", gap: 6, fontSize: 13, color: "#52616f" }}>
-            {label}
-            <select style={{ minHeight: 38, border: "1px solid #bac4cf", borderRadius: 6, padding: "0 10px", background: "#fff" }}>
-              <option>Tous</option>
-            </select>
-          </label>
-        ))}
-      </form>
+      <FilterBar
+        action="/crm/leads"
+        label="Filtres CRM"
+        submitLabel="Filtrer"
+        resetLabel="Reinitialiser"
+        resetHref="/crm/leads"
+        activeCount={activeCount}
+        autoSubmit
+      >
+        <Field id="crm-status" label="Statut">
+          <Select id="crm-status" name="status" defaultValue={status} options={optionsOf(leads, (lead) => lead.status, "Tous", crmStatusLabel)} />
+        </Field>
+        <Field id="crm-product" label="Produit">
+          <Select id="crm-product" name="product" defaultValue={product} options={optionsOf(leads, (lead) => lead.product, "Tous")} />
+        </Field>
+        <Field id="crm-country" label="Pays">
+          <Select id="crm-country" name="country" defaultValue={country} options={optionsOf(leads, (lead) => lead.country, "Tous")} />
+        </Field>
+        <Field id="crm-date" label="Date">
+          <Select id="crm-date" name="date" defaultValue={date} options={optionsOf(leads, (lead) => lead.assignedAt, "Toutes")} />
+        </Field>
+        <Field id="crm-advisor" label="Conseiller">
+          <Select id="crm-advisor" name="advisor" defaultValue={advisor} options={optionsOf(leads, (lead) => lead.advisor ?? "", "Tous")} />
+        </Field>
+        <Field id="crm-urgency" label="Urgence">
+          <Select id="crm-urgency" name="urgency" defaultValue={urgency} options={optionsOf(leads, (lead) => lead.urgency ?? "", "Toutes")} />
+        </Field>
+        <Field id="crm-source" label="Source">
+          <Select id="crm-source" name="source" defaultValue={source} options={optionsOf(leads, (lead) => lead.source ?? "", "Toutes")} />
+        </Field>
+        <Field id="crm-search" label="Recherche autorisee">
+          <Input
+            id="crm-search"
+            name="q"
+            type="search"
+            defaultValue={query}
+            placeholder="Nom, reference, telephone ou email selon permission"
+          />
+        </Field>
+      </FilterBar>
 
-      <label style={{ display: "grid", gap: 6, marginBottom: 14, color: "#52616f", fontSize: 13 }}>
-        Recherche autorisee
-        <input placeholder="Nom, reference, telephone ou email selon permission" style={{ minHeight: 38, border: "1px solid #bac4cf", borderRadius: 6, padding: "0 10px" }} />
-      </label>
+      {apiLeads.error ? <Notice tone="warning">API CRM indisponible. Aucune donnee protegee n'est affichee en mode erreur.</Notice> : null}
 
-      {apiLeads.forbidden ? <p role="alert">Acces CRM refuse, verifiez le plan, la MFA et le flag broker_crm_enabled. Aucune donnee CRM n'est affichee.</p> : null}
-      {apiLeads.error && !apiLeads.forbidden ? <p role="status">API CRM indisponible. Aucune donnee protegee n'est affichee en mode erreur.</p> : null}
-
-      {!apiLeads.forbidden && leads.length === 0 ? <p>Aucun lead CRM autorise a afficher.</p> : null}
-
-      {!apiLeads.forbidden && leads.length > 0 ? <table style={{ width: "100%", borderCollapse: "collapse", borderTop: "1px solid #d8dde3" }}>
-        <thead>
-          <tr>
-            {["Reference", "Pays", "Produit", "Statut", "Conseiller", "Urgence", "Source"].map((header) => (
-              <th key={header} style={{ textAlign: "left", padding: "12px 10px", borderBottom: "1px solid #d8dde3", color: "#52616f", fontSize: 13 }}>{header}</th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-          {leads.map((lead) => (
-            <tr key={lead.reference}>
-              <td style={{ padding: "12px 10px", borderBottom: "1px solid #edf0f3" }}>
-                <a href="/crm/leads/demo-lead" style={{ color: "#24695c" }}>{lead.reference}</a>
-              </td>
-              <td style={{ padding: "12px 10px", borderBottom: "1px solid #edf0f3" }}>{lead.pays}</td>
-              <td style={{ padding: "12px 10px", borderBottom: "1px solid #edf0f3" }}>{lead.produit}</td>
-              <td style={{ padding: "12px 10px", borderBottom: "1px solid #edf0f3" }}>{lead.statut}</td>
-              <td style={{ padding: "12px 10px", borderBottom: "1px solid #edf0f3" }}>{lead.conseiller}</td>
-              <td style={{ padding: "12px 10px", borderBottom: "1px solid #edf0f3" }}>{lead.urgence}</td>
-              <td style={{ padding: "12px 10px", borderBottom: "1px solid #edf0f3" }}>{lead.source}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table> : null}
-    </main>
+      <DataTable
+        columns={columns}
+        items={visible}
+        getKey={(lead) => lead.id}
+        aria-label="Leads CRM"
+        emptyLabel="Aucun lead CRM autorise a afficher."
+        getRowHref={(lead) => `/crm/leads/${lead.id}`}
+        sort={table.sort}
+        sortHref={table.sortHref}
+        pagination={{
+          page: table.page,
+          pageSize: table.pageSize,
+          total: filtered.length,
+          hrefFor: table.pageHref,
+          label: (from, to, total) => `${from}-${to} sur ${total} lead(s)`
+        }}
+      />
+    </PageStack>
   );
 }

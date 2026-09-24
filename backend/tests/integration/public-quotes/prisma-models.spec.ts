@@ -19,7 +19,8 @@ describe("spec 002 Prisma model shape", () => {
 
   it("keeps public visibility and routing constraints explicit", async () => {
     expect(schema).toContain("@@unique([countryId, productId, publicKey])");
-    expect(schema).toContain("@@unique([quoteRequestId])");
+    // Spec 042: one request may reach several partners, at most once each.
+    expect(schema).toContain("@@unique([quoteRequestId, partnerTenantId])");
     expect(schema).toContain("publicReference       String             @unique");
     expect(schema).toContain("@@index([partnerTenantId, status, assignedAt])");
   });

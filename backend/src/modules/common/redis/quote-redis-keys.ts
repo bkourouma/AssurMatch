@@ -29,6 +29,14 @@ export const QuoteRedisKeys = {
   quoteRateLimit(ipAddress: string, countryId: string, productId: string): string {
     return `rl:quote:${hash(ipAddress)}:${countryId}:${productId}`;
   },
+  /** Per-IP counter for one public submission scope (waitlist, contact, partner application). */
+  publicScopeRateLimit(scope: string, ipAddress: string): string {
+    return `rl:public:${scope}:${hash(ipAddress)}`;
+  },
+  /** Per-session burst counter for the same scope; a session is a client-supplied opaque id. */
+  publicScopeSession(scope: string, sessionId: string): string {
+    return `spam:public:${scope}:${hash(sessionId)}`;
+  },
   spamSession(sessionId: string): string {
     return `spam:quote:${hash(sessionId)}`;
   },

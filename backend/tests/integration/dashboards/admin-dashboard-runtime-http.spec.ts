@@ -43,6 +43,15 @@ describe("admin dashboard runtime HTTP", () => {
     expect(audits[0]?.reason).toBe("out_of_scope_country");
   });
 
+  it("fails closed for Finance Admin until restricted dashboard sections have a dedicated DTO", async () => {
+    harness = await createRuntimeHttpHarness();
+    const financeAdmin = { actorId: "finance", roles: ["finance_admin" as const], mfaVerified: true };
+    const response = await harness.request("/admin/dashboard", { headers: actorHeaders(financeAdmin) });
+    expect(response.status).toBe(403);
+    const audits = harness.runtime.audit.writer.search({ action: DashboardAuditActions.adminDashboardRefused });
+    expect(audits[0]?.reason).toBe("restricted_admin_dashboard_unavailable");
+  });
+
   it("returns paginated compliance alerts and audits the read", async () => {
     harness = await createRuntimeHttpHarness();
     const admin = { actorId: "compliance", roles: ["compliance_admin" as const], mfaVerified: true };

@@ -1,96 +1,109 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useId } from "react";
 import { createAdminUserAction, passwordResetAction, type UserActionState } from "./actions";
 import { adminRoleOptions } from "./user-options";
+import {
+  ActionNotice,
+  Button,
+  Card,
+  CheckboxGroup,
+  ConfirmDialog,
+  Field,
+  Form,
+  FormActions,
+  Input,
+  Textarea,
+  fieldControlProps
+} from "../lib/ui/admin-ui";
 
 const initialState: UserActionState = { status: "idle" };
 
-const fieldStyle = { minHeight: 38, border: "1px solid #b9c3cf", borderRadius: 6, padding: "0 10px" };
+const TOKEN_LABEL = "Jeton temporaire a transmettre par canal interne securise:";
 
-function ActionStateNotice({ state }: { state: UserActionState }) {
-  if (state.status === "idle") return null;
-  return (
-    <div role={state.status === "error" ? "alert" : "status"} style={{ border: "1px solid #d7dde4", borderRadius: 6, padding: 12, background: state.status === "error" ? "#fff4f2" : "#f2fbf7" }}>
-      <p style={{ margin: "0 0 6px" }}>{state.message}</p>
-      {state.token ? (
-        <p style={{ margin: 0 }}>
-          Jeton temporaire a transmettre par canal interne securise: <code>{state.token}</code>
-          {state.expiresAt ? ` (expire ${new Date(state.expiresAt).toISOString()})` : ""}
-        </p>
-      ) : null}
-    </div>
-  );
+function noticeState(state: UserActionState) {
+  return {
+    status: state.status,
+    message: state.message,
+    token: state.token,
+    expiresAt: state.expiresAt ? new Date(state.expiresAt).toISOString() : undefined
+  };
 }
 
 export function CreateUserForm() {
   const [state, formAction, pending] = useActionState(createAdminUserAction, initialState);
+  const base = useId();
+  const ids = {
+    email: `${base}-email`,
+    displayName: `${base}-display-name`,
+    phone: `${base}-phone`,
+    partnerTenantId: `${base}-tenant`,
+    countryScopes: `${base}-country-scopes`,
+    productScopes: `${base}-product-scopes`,
+    reason: `${base}-reason`
+  };
 
   return (
-    <form action={formAction} style={{ display: "grid", gap: 12, border: "1px solid #d7dde4", borderRadius: 6, padding: 16 }}>
-      <h2 style={{ margin: 0, fontSize: 20 }}>Creer un utilisateur</h2>
-      <ActionStateNotice state={state} />
-      <label style={{ display: "grid", gap: 6 }}>
-        Email
-        <input name="email" type="email" required style={fieldStyle} />
-      </label>
-      <label style={{ display: "grid", gap: 6 }}>
-        Nom affiche
-        <input name="displayName" required style={fieldStyle} />
-      </label>
-      <label style={{ display: "grid", gap: 6 }}>
-        Telephone E.164
-        <input name="phone" placeholder="+2250000000000" style={fieldStyle} />
-      </label>
-      <fieldset style={{ border: "1px solid #d7dde4", borderRadius: 6, padding: 12 }}>
-        <legend>Roles</legend>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 8 }}>
-          {adminRoleOptions.map((role) => (
-            <label key={role} style={{ display: "flex", gap: 8, alignItems: "center" }}>
-              <input name="roles" type="checkbox" value={role} />
-              {role}
-            </label>
-          ))}
-        </div>
-      </fieldset>
-      <label style={{ display: "grid", gap: 6 }}>
-        Tenant partenaire
-        <input name="partnerTenantId" placeholder="UUID tenant pour utilisateurs courtier" style={fieldStyle} />
-      </label>
-      <label style={{ display: "grid", gap: 6 }}>
-        Scopes pays
-        <input name="countryScopes" placeholder="UUID, UUID" style={fieldStyle} />
-      </label>
-      <label style={{ display: "grid", gap: 6 }}>
-        Scopes produits
-        <input name="productScopes" placeholder="UUID, UUID" style={fieldStyle} />
-      </label>
-      <label style={{ display: "grid", gap: 6 }}>
-        Raison auditable
-        <textarea name="reason" required minLength={5} style={{ ...fieldStyle, minHeight: 72, padding: 10 }} />
-      </label>
-      <button type="submit" disabled={pending} style={{ minHeight: 40, border: "1px solid #245f73", background: "#245f73", color: "#fff", borderRadius: 6 }}>
-        {pending ? "Creation..." : "Creer et emettre activation"}
-      </button>
-    </form>
+    <Card title="Creer un utilisateur">
+      <Form action={formAction}>
+        <ActionNotice state={noticeState(state)} tokenLabel={TOKEN_LABEL} expiresLabel="expire" />
+        <Field id={ids.email} label="Email" required>
+          <Input {...fieldControlProps(ids.email, { required: true })} name="email" type="email" />
+        </Field>
+        <Field id={ids.displayName} label="Nom affiche" required>
+          <Input {...fieldControlProps(ids.displayName, { required: true })} name="displayName" />
+        </Field>
+        <Field id={ids.phone} label="Telephone E.164">
+          <Input {...fieldControlProps(ids.phone)} name="phone" placeholder="+2250000000000" />
+        </Field>
+        <CheckboxGroup legend="Roles" name="roles" options={adminRoleOptions.map((role) => ({ value: role, label: role }))} />
+        <Field id={ids.partnerTenantId} label="Tenant partenaire">
+          <Input {...fieldControlProps(ids.partnerTenantId)} name="partnerTenantId" placeholder="UUID tenant pour utilisateurs courtier" />
+        </Field>
+        <Field id={ids.countryScopes} label="Scopes pays">
+          <Input {...fieldControlProps(ids.countryScopes)} name="countryScopes" placeholder="UUID, UUID" />
+        </Field>
+        <Field id={ids.productScopes} label="Scopes produits">
+          <Input {...fieldControlProps(ids.productScopes)} name="productScopes" placeholder="UUID, UUID" />
+        </Field>
+        <Field id={ids.reason} label="Raison auditable" required>
+          <Textarea {...fieldControlProps(ids.reason, { required: true })} name="reason" minLength={5} />
+        </Field>
+        <FormActions>
+          <Button type="submit" pending={pending} pendingLabel="Creation...">Creer et emettre activation</Button>
+        </FormActions>
+      </Form>
+    </Card>
   );
 }
 
 export function PasswordResetForm({ userId }: { userId: string }) {
-  const [state, formAction, pending] = useActionState(passwordResetAction, initialState);
+  const [state, formAction] = useActionState(passwordResetAction, initialState);
+  const base = useId();
+  const reasonId = `${base}-reason`;
 
   return (
-    <form action={formAction} style={{ display: "grid", gap: 10, border: "1px solid #d7dde4", borderRadius: 6, padding: 14 }}>
-      <input type="hidden" name="userId" value={userId} />
-      <h2 style={{ margin: 0, fontSize: 18 }}>Reinitialisation mot de passe</h2>
-      <ActionStateNotice state={state} />
-      <label style={{ display: "grid", gap: 6 }}>
-        Raison auditable
-        <textarea name="reason" required minLength={5} style={{ ...fieldStyle, minHeight: 64, padding: 10 }} />
-      </label>
-      <button type="submit" disabled={pending} style={{ minHeight: 38, border: "1px solid #245f73", background: "#245f73", color: "#fff", borderRadius: 6 }}>
-        {pending ? "Emission..." : "Emettre un jeton"}
-      </button>
-    </form>
+    <Card
+      title="Reinitialisation mot de passe"
+      description="Le jeton emis est a usage unique et doit etre transmis par un canal interne securise."
+    >
+      <ConfirmDialog
+        triggerLabel="Emettre un jeton"
+        triggerVariant="secondary"
+        title="Reinitialisation mot de passe"
+        description="Emettre un jeton invalide le mot de passe courant de l'utilisateur. La raison est auditee."
+        confirmLabel="Emettre un jeton"
+        cancelLabel="Annuler"
+        tone="danger"
+        formAction={formAction}
+        dataAttributes={{ "data-user-action": "password-reset" }}
+      >
+        <input type="hidden" name="userId" value={userId} />
+        <ActionNotice state={noticeState(state)} tokenLabel={TOKEN_LABEL} expiresLabel="expire" />
+        <Field id={reasonId} label="Raison auditable" required>
+          <Textarea {...fieldControlProps(reasonId, { required: true })} name="reason" minLength={5} />
+        </Field>
+      </ConfirmDialog>
+    </Card>
   );
 }

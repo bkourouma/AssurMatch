@@ -14,7 +14,7 @@ async function main(): Promise<void> {
   const run = createSmokeRun(env.runId);
   console.warn(`[runtime-postgres-smoke] target=${sanitizedDatabaseTarget(env.databaseUrl)} runId=${run.id}`);
   console.warn("[runtime-postgres-smoke] validating schema and migrations");
-  validateAndApplyRuntimeSmokeMigrations(env.databaseUrl);
+  await validateAndApplyRuntimeSmokeMigrations(env.databaseUrl);
   console.warn("[runtime-postgres-smoke] starting NestJS runtime");
   const harness = await createRuntimePostgresSmokeHarness(env.databaseUrl);
   try {

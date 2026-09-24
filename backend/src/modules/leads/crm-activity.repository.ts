@@ -135,6 +135,7 @@ export class PrismaCrmActivityRepository implements CrmActivityRepository {
       leadAssignmentId: history.leadAssignmentId,
       partnerTenantId: history.partnerTenantId,
       actorId: history.actorId,
+      eventType: history.eventType,
       previousStatus: history.previousStatus,
       nextStatus: history.nextStatus,
       reason: history.reason,
@@ -206,8 +207,19 @@ export class PrismaCrmActivityRepository implements CrmActivityRepository {
   }
 
   private toPipelineHistory(row: unknown): BrokerCrmPipelineHistoryRecord {
-    const item = row as BrokerCrmPipelineHistoryRecord;
-    return { ...item, occurredAt: this.dateString(item.occurredAt) };
+    const item = row as Omit<BrokerCrmPipelineHistoryRecord, "eventType" | "nextStatus" | "previousStatus" | "reason" | "actorId"> & { eventType?: BrokerCrmPipelineHistoryRecord["eventType"] | null; nextStatus?: BrokerCrmPipelineStatus | null; previousStatus?: BrokerCrmPipelineStatus | null; reason?: BrokerCrmOutcomeReason | null; actorId?: string | null };
+    // Rows written before the eventType column existed were all status changes.
+    return {
+      id: item.id,
+      leadAssignmentId: item.leadAssignmentId,
+      partnerTenantId: item.partnerTenantId,
+      eventType: item.eventType ?? "status_changed",
+      ...(item.actorId ? { actorId: item.actorId } : {}),
+      ...(item.previousStatus ? { previousStatus: item.previousStatus } : {}),
+      ...(item.nextStatus ? { nextStatus: item.nextStatus } : {}),
+      ...(item.reason ? { reason: item.reason } : {}),
+      occurredAt: this.dateString(item.occurredAt)
+    };
   }
 
   private toNote(row: unknown): BrokerCrmNote {

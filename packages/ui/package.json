@@ -1,0 +1,11 @@
+{
+  "name": "@assurmatch/ui",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./tokens.css": "./styles/tokens.css",
+    "./backoffice.css": "./styles/backoffice.css",
+    "./backoffice": "./backoffice/index.ts",
+    "./fonts": "./fonts.ts"
+  }
+}

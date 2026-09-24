@@ -7,7 +7,7 @@ export const NOTIFICATIONS_REPOSITORY = Symbol("NOTIFICATIONS_REPOSITORY");
 
 export interface NotificationsRepository extends RuntimeRepository {
   create(notification: NotificationRecord): Promise<NotificationRecord>;
-  updateDelivery(id: string, update: Pick<NotificationRecord, "whatsAppStatus" | "emailStatus" | "updatedAt">): Promise<NotificationRecord>;
+  updateDelivery(id: string, update: Pick<NotificationRecord, "whatsAppStatus" | "emailStatus" | "updatedAt"> & Partial<Pick<NotificationRecord, "retryCount">>): Promise<NotificationRecord>;
   list(): Promise<NotificationRecord[]>;
   mutableList(): NotificationRecord[];
 }
@@ -25,7 +25,7 @@ export class MemoryNotificationsRepository implements NotificationsRepository {
     return notification;
   }
 
-  async updateDelivery(id: string, update: Pick<NotificationRecord, "whatsAppStatus" | "emailStatus" | "updatedAt">): Promise<NotificationRecord> {
+  async updateDelivery(id: string, update: Pick<NotificationRecord, "whatsAppStatus" | "emailStatus" | "updatedAt"> & Partial<Pick<NotificationRecord, "retryCount">>): Promise<NotificationRecord> {
     const notification = this.notifications.find((candidate) => candidate.id === id);
     if (!notification) throw new Error(`Notification ${id} not found`);
     Object.assign(notification, update);
@@ -56,7 +56,7 @@ export class PrismaNotificationsRepository implements NotificationsRepository {
     return this.toDomain(await this.client().create({ data: { ...notification } }));
   }
 
-  async updateDelivery(id: string, update: Pick<NotificationRecord, "whatsAppStatus" | "emailStatus" | "updatedAt">): Promise<NotificationRecord> {
+  async updateDelivery(id: string, update: Pick<NotificationRecord, "whatsAppStatus" | "emailStatus" | "updatedAt"> & Partial<Pick<NotificationRecord, "retryCount">>): Promise<NotificationRecord> {
     return this.toDomain(await this.client().update({ where: { id }, data: update }));
   }
 

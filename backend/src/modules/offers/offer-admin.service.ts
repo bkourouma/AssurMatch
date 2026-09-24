@@ -40,6 +40,7 @@ export class OfferAdminService {
       ...(parsed.sponsorLabel ? { sponsorLabel: parsed.sponsorLabel } : {}),
       displayPriority: 0,
       publicDisclaimers: parsed.publicDisclaimers,
+      ...this.criteriaFields(parsed),
       createdAt: now,
       updatedAt: now,
       ...(actor.actorId ? { createdById: actor.actorId } : {})
@@ -79,11 +80,28 @@ export class OfferAdminService {
       isSponsored: parsed.isSponsored,
       sponsorLabel: parsed.sponsorLabel,
       publicDisclaimers: parsed.publicDisclaimers,
+      ...this.criteriaFields(parsed),
       updatedAt: new Date()
     });
     await this.repository.update(id, offer);
     await this.recordHistory(offer.id, "updated", previous, offer, parsed.reason, actor);
     return offer;
+  }
+
+  /** Comparison criteria (PRD §13); undefined keys are dropped so partial upserts keep prior values out of history noise. */
+  private criteriaFields(parsed: ReturnType<typeof adminOfferUpsertSchema.parse>): Partial<OfferRecord> {
+    return {
+      ...(parsed.insurerName ? { insurerName: parsed.insurerName } : {}),
+      ...(parsed.guaranteeLevel !== undefined ? { guaranteeLevel: parsed.guaranteeLevel } : {}),
+      ...(parsed.deductibleAmount !== undefined ? { deductibleAmount: parsed.deductibleAmount } : {}),
+      ...(parsed.coverageCeiling !== undefined ? { coverageCeiling: parsed.coverageCeiling } : {}),
+      ...(parsed.processingDelayDays !== undefined ? { processingDelayDays: parsed.processingDelayDays } : {}),
+      ...(parsed.paymentFlexibility ? { paymentFlexibility: parsed.paymentFlexibility } : {}),
+      guarantees: parsed.guarantees,
+      ...(parsed.exclusionsSummary ? { exclusionsSummary: parsed.exclusionsSummary } : {}),
+      requiredDocuments: parsed.requiredDocuments,
+      ...(parsed.sourceOfInformation ? { sourceOfInformation: parsed.sourceOfInformation } : {})
+    };
   }
 
   async validate(id: string, input: OfferValidationDto, actor: ActorContext): Promise<OfferRecord> {

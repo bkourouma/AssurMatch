@@ -1,0 +1,27 @@
+ALTER TABLE "AIInteraction" ADD COLUMN IF NOT EXISTS "assistType" TEXT NOT NULL DEFAULT 'unknown';
+ALTER TABLE "AIInteraction" ADD COLUMN IF NOT EXISTS "surface" TEXT NOT NULL DEFAULT 'admin_platform';
+ALTER TABLE "AIInteraction" ADD COLUMN IF NOT EXISTS "status" TEXT NOT NULL DEFAULT 'queued';
+ALTER TABLE "AIInteraction" ADD COLUMN IF NOT EXISTS "provider" TEXT NOT NULL DEFAULT 'template';
+ALTER TABLE "AIInteraction" ADD COLUMN IF NOT EXISTS "model" TEXT;
+ALTER TABLE "AIInteraction" ADD COLUMN IF NOT EXISTS "fallback" BOOLEAN NOT NULL DEFAULT FALSE;
+ALTER TABLE "AIInteraction" ADD COLUMN IF NOT EXISTS "promptHash" TEXT;
+ALTER TABLE "AIInteraction" ADD COLUMN IF NOT EXISTS "outputHash" TEXT;
+ALTER TABLE "AIInteraction" ADD COLUMN IF NOT EXISTS "outputText" TEXT;
+ALTER TABLE "AIInteraction" ADD COLUMN IF NOT EXISTS "outputData" JSONB;
+ALTER TABLE "AIInteraction" ADD COLUMN IF NOT EXISTS "refusalReason" TEXT;
+ALTER TABLE "AIInteraction" ADD COLUMN IF NOT EXISTS "minimizationReport" JSONB;
+ALTER TABLE "AIInteraction" ADD COLUMN IF NOT EXISTS "inputTokens" INTEGER;
+ALTER TABLE "AIInteraction" ADD COLUMN IF NOT EXISTS "outputTokens" INTEGER;
+ALTER TABLE "AIInteraction" ADD COLUMN IF NOT EXISTS "latencyMs" INTEGER;
+ALTER TABLE "AIInteraction" ADD COLUMN IF NOT EXISTS "targetType" TEXT;
+ALTER TABLE "AIInteraction" ADD COLUMN IF NOT EXISTS "targetId" TEXT;
+ALTER TABLE "AIInteraction" ADD COLUMN IF NOT EXISTS "partnerTenantId" TEXT;
+ALTER TABLE "AIInteraction" ADD COLUMN IF NOT EXISTS "countryId" TEXT;
+ALTER TABLE "AIInteraction" ADD COLUMN IF NOT EXISTS "productId" TEXT;
+ALTER TABLE "AIInteraction" ADD COLUMN IF NOT EXISTS "correlationId" TEXT;
+ALTER TABLE "AIInteraction" ADD COLUMN IF NOT EXISTS "completedAt" TIMESTAMP(3);
+ALTER TABLE "AIInteraction" ADD COLUMN IF NOT EXISTS "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP;
+
+CREATE INDEX IF NOT EXISTS "AIInteraction_surface_status_createdAt_idx" ON "AIInteraction"("surface", "status", "createdAt");
+CREATE INDEX IF NOT EXISTS "AIInteraction_partnerTenantId_assistType_createdAt_idx" ON "AIInteraction"("partnerTenantId", "assistType", "createdAt");
+CREATE INDEX IF NOT EXISTS "AIInteraction_targetType_targetId_idx" ON "AIInteraction"("targetType", "targetId");

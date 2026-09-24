@@ -1,6 +1,9 @@
 import { aiModuleConfigSchema, type AIModuleConfigDto, type AIModuleConfigRecord } from "../../../../packages/shared/contracts/ops.contracts";
 import { AuditLogWriter } from "../audit-logs/audit-log-writer.service";
+import type { FeatureFlagsService } from "../feature-flags/feature-flags.module";
 import type { ActorContext } from "../common/types";
+import { AIAssistanceAccessRefusedError, AIAssistanceService } from "./ai-assistance.service";
+import type { AiGateway } from "./core/ai-gateway.service";
 
 export interface AIModuleConfig extends AIModuleConfigRecord {
   id: string;
@@ -83,8 +86,13 @@ export class AIService {
 
 export class AIModule {
   readonly service: AIService;
+  readonly assistance: AIAssistanceService | undefined;
 
-  constructor(audit = new AuditLogWriter()) {
+  constructor(audit = new AuditLogWriter(), featureFlags?: FeatureFlagsService, gateway?: AiGateway) {
     this.service = new AIService(audit);
+    this.assistance = featureFlags ? new AIAssistanceService({ audit, featureFlags, gateway }) : undefined;
   }
 }
+
+export { AIAssistanceAuditActions } from "./ai-assistance-audit-actions";
+export { AIAssistanceAccessRefusedError, AIAssistanceService };

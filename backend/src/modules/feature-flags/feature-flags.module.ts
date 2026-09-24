@@ -4,6 +4,7 @@ import type { ActorContext } from "../common/types";
 import { FeatureFlagCacheService } from "./feature-flag-cache.service";
 import { MemoryFeatureFlagRepository, type FeatureFlagRepository } from "./feature-flag-repository";
 import type { FlagRecord } from "./feature-flag-precedence.service";
+import { evaluateFeatureFlagMutation, featureFlagMutationRefusedAction } from "./sensitive-feature-flag-policy";
 
 export interface FeatureFlag extends FlagRecord {
   id: string;
@@ -20,6 +21,10 @@ export interface FeatureFlagHistory {
   nextValue: boolean;
   reason: string;
   changedAt: Date;
+}
+
+export interface FeatureFlagMutationOptions {
+  allowSensitiveDisable?: boolean;
 }
 
 export class FeatureFlagsService {
@@ -47,8 +52,63 @@ export class FeatureFlagsService {
     return this.flags.find((flag) => flag.key === key && flag.scopeType === scopeType && flag.scopeId === scopeId)?.value ?? false;
   }
 
-  async setFlag(input: Omit<FeatureFlag, "id" | "changedAt" | "cacheVersion">, actor: ActorContext): Promise<FeatureFlag> {
+  async setFlag(input: Omit<FeatureFlag, "id" | "changedAt" | "cacheVersion">, actor: ActorContext, options: FeatureFlagMutationOptions = {}): Promise<FeatureFlag> {
     const existing = this.flags.find((flag) => flag.key === input.key && flag.scopeType === input.scopeType && flag.scopeId === input.scopeId);
+    const mutationDecision = evaluateFeatureFlagMutation({
+      key: input.key,
+      scopeType: input.scopeType,
+      ...(input.scopeId ? { scopeId: input.scopeId } : {}),
+      value: input.value,
+      ...(options.allowSensitiveDisable ? { allowSensitiveDisable: true } : {})
+    });
+    if (!mutationDecision.allowed) {
+      this.audit.write({
+        actor,
+        action: featureFlagMutationRefusedAction,
+        targetType: "FeatureFlag",
+        targetId: existing?.id ?? `${input.scopeType}:${input.scopeId ?? "global"}:${input.key}`,
+        scope: { scopeType: input.scopeType, scopeId: input.scopeId },
+        result: "refused",
+        reason: mutationDecision.reason,
+        context: {
+          key: input.key,
+          previousValue: existing?.value ?? false,
+          requestedValue: input.value,
+          policy: mutationDecision.policy
+        }
+      });
+      throw new Error(mutationDecision.message);
+    }
+    return this.persist(input, actor, existing, "feature_flag.changed", {});
+  }
+
+  /**
+   * Explicit compliance-policy path for sensitive flags (AI, regulated modules, billing, messaging).
+   * Never exposed over HTTP: it is reserved for compliance-approved operations (ops scripts, seeds,
+   * tests) and records the policy reference in the audit trail. Callers without a policy reference
+   * are refused exactly like a regular mutation.
+   */
+  async applyCompliancePolicy(
+    input: Omit<FeatureFlag, "id" | "changedAt" | "cacheVersion">,
+    actor: ActorContext,
+    policy: { reference: string; approvedBy: string }
+  ): Promise<FeatureFlag> {
+    const reference = policy.reference.trim();
+    const approvedBy = policy.approvedBy.trim();
+    if (!reference || !approvedBy) {
+      throw new Error(`Forbidden feature flag mutation: ${input.key} requires explicit compliance policy approval`);
+    }
+    const existing = this.flags.find((flag) => flag.key === input.key && flag.scopeType === input.scopeType && flag.scopeId === input.scopeId);
+    return this.persist(input, actor, existing, "feature_flag.policy_applied", { policyReference: reference, policyApprovedBy: approvedBy });
+  }
+
+  private async persist(
+    input: Omit<FeatureFlag, "id" | "changedAt" | "cacheVersion">,
+    actor: ActorContext,
+    existing: FeatureFlag | undefined,
+    auditAction: string,
+    auditContext: Record<string, unknown>
+  ): Promise<FeatureFlag> {
     const flag: FeatureFlag = existing ?? {
       id: crypto.randomUUID(),
       key: input.key,
@@ -79,13 +139,13 @@ export class FeatureFlagsService {
     await this.cache?.put(flag);
     this.audit.write({
       actor,
-      action: "feature_flag.changed",
+      action: auditAction,
       targetType: "FeatureFlag",
       targetId: flag.id,
       scope: { scopeType: flag.scopeType, scopeId: flag.scopeId },
       result: "success",
       reason: flag.reason,
-      context: { key: flag.key, previousValue, nextValue: flag.value }
+      context: { key: flag.key, previousValue, nextValue: flag.value, ...auditContext }
     });
     return flag;
   }

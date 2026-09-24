@@ -5,12 +5,25 @@ import type { ConsentRecord, ConsentText } from "./consent.module";
 
 export const CONSENT_RECORDS_REPOSITORY = Symbol("CONSENT_RECORDS_REPOSITORY");
 
+/** The only mutation a consent record accepts: the visitor's withdrawal. */
+export interface ConsentRecordUpdate {
+  status?: ConsentRecord["status"];
+  withdrawnAt?: Date;
+}
+
 export interface ConsentRecordsRepository extends RuntimeRepository {
   createText(text: ConsentText): Promise<ConsentText>;
   updateText(id: string, update: Partial<ConsentText>): Promise<ConsentText>;
   listTexts(): Promise<ConsentText[]>;
   createRecord(record: ConsentRecord): Promise<ConsentRecord>;
+  /**
+   * Spec 045: a withdrawal flips the status in place and stamps `withdrawnAt`. The record is never
+   * deleted, so the evidence of the original grant (text, hash, granted date) survives the revocation.
+   */
+  updateRecord(id: string, update: ConsentRecordUpdate): Promise<ConsentRecord>;
   hasValidConsent(recordId: string | undefined, purpose: string, countryId: string, productId?: string): Promise<boolean>;
+  /** Spec 042: routing reads the consent actually recorded, to know which recipients it covers. */
+  findRecord(id: string): Promise<ConsentRecord | undefined>;
   searchRecords(): Promise<ConsentRecord[]>;
   requireText(id: string): Promise<ConsentText>;
 }
@@ -44,6 +57,13 @@ export class MemoryConsentRecordsRepository implements ConsentRecordsRepository 
     return record;
   }
 
+  async updateRecord(id: string, update: ConsentRecordUpdate): Promise<ConsentRecord> {
+    const record = this.records.find((candidate) => candidate.id === id);
+    if (!record) throw new Error(`Consent record ${id} not found`);
+    Object.assign(record, update, { updatedAt: new Date() });
+    return record;
+  }
+
   async hasValidConsent(recordId: string | undefined, purpose: string, countryId: string, productId?: string): Promise<boolean> {
     if (!recordId) return false;
     return this.records.some((record) =>
@@ -53,6 +73,10 @@ export class MemoryConsentRecordsRepository implements ConsentRecordsRepository 
       (productId === undefined || record.productId === productId) &&
       record.status === "granted"
     );
+  }
+
+  async findRecord(id: string): Promise<ConsentRecord | undefined> {
+    return this.records.find((record) => record.id === id);
   }
 
   async searchRecords(): Promise<ConsentRecord[]> {
@@ -75,6 +99,7 @@ type ConsentTextDelegate = {
 
 type ConsentRecordDelegate = {
   create(input: unknown): Promise<unknown>;
+  update(input: unknown): Promise<unknown>;
   findMany(input?: unknown): Promise<unknown[]>;
   findFirst(input: unknown): Promise<unknown | null>;
 };
@@ -103,6 +128,13 @@ export class PrismaConsentRecordsRepository implements ConsentRecordsRepository 
     return this.toRecord(await this.records().create({ data: { ...record } }));
   }
 
+  async updateRecord(id: string, update: ConsentRecordUpdate): Promise<ConsentRecord> {
+    const data: Record<string, unknown> = {};
+    if (update.status) data.status = update.status;
+    if (update.withdrawnAt) data.withdrawnAt = update.withdrawnAt;
+    return this.toRecord(await this.records().update({ where: { id }, data }));
+  }
+
   async hasValidConsent(recordId: string | undefined, purpose: string, countryId: string, productId?: string): Promise<boolean> {
     if (!recordId) return false;
     const record = await this.records().findFirst({
@@ -116,6 +148,11 @@ export class PrismaConsentRecordsRepository implements ConsentRecordsRepository 
       }
     });
     return Boolean(record);
+  }
+
+  async findRecord(id: string): Promise<ConsentRecord | undefined> {
+    const row = await this.records().findFirst({ where: { id } });
+    return row ? this.toRecord(row) : undefined;
   }
 
   async searchRecords(): Promise<ConsentRecord[]> {

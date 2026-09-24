@@ -24,5 +24,12 @@ describe("AISummaryFlagPolicy", () => {
     })).toBe(true);
     expect(policy.canRun({ globalFlags: { ai_summary_enabled: false }, countryFlags: { country_ai_enabled: true }, moduleConfig })).toBe(false);
     expect(policy.canRun({ globalFlags: { ai_summary_enabled: true }, countryFlags: { country_ai_enabled: false }, moduleConfig })).toBe(false);
+    expect(policy.canRun({ globalFlags: { ai_summary_enabled: true }, countryFlags: { country_ai_enabled: true }, moduleConfig })).toBe(false);
+    expect(policy.canRun({
+      globalFlags: { ai_summary_enabled: true },
+      countryFlags: { country_ai_enabled: true },
+      productFlags: { product_ai_form_assistant_enabled: false },
+      moduleConfig
+    })).toBe(false);
   });
 });

@@ -14,6 +14,10 @@ export interface PartnersRepository extends RuntimeRepository {
   authorizeProduct(partnerTenantId: string, productId: string): Promise<void>;
   isAuthorizedForCountry(partnerTenantId: string, countryId: string): Promise<boolean>;
   isAuthorizedForProduct(partnerTenantId: string, productId: string): Promise<boolean>;
+  /** Partner tenant ids holding an active country authorization for `countryId` (public directory scope). */
+  listActivePartnerIdsForCountry(countryId: string): Promise<string[]>;
+  /** Product ids the tenant holds an active authorization for (public directory scope). */
+  listActiveProductIdsForPartner(partnerTenantId: string): Promise<string[]>;
 }
 
 export class MemoryPartnersRepository implements PartnersRepository {
@@ -68,6 +72,18 @@ export class MemoryPartnersRepository implements PartnersRepository {
   async isAuthorizedForProduct(partnerTenantId: string, productId: string): Promise<boolean> {
     return this.productAuthorizations.get(partnerTenantId)?.has(productId) === true;
   }
+
+  async listActivePartnerIdsForCountry(countryId: string): Promise<string[]> {
+    const partnerIds: string[] = [];
+    for (const [partnerTenantId, scopes] of this.countryAuthorizations.entries()) {
+      if (scopes.has(countryId)) partnerIds.push(partnerTenantId);
+    }
+    return partnerIds;
+  }
+
+  async listActiveProductIdsForPartner(partnerTenantId: string): Promise<string[]> {
+    return [...(this.productAuthorizations.get(partnerTenantId) ?? new Set<string>())];
+  }
 }
 
 type PartnerDelegate = {
@@ -80,6 +96,7 @@ type PartnerDelegate = {
 type AuthorizationDelegate = {
   upsert(input: unknown): Promise<unknown>;
   findFirst(input: unknown): Promise<unknown | null>;
+  findMany(input: unknown): Promise<unknown[]>;
 };
 
 export class PrismaPartnersRepository implements PartnersRepository {
@@ -132,6 +149,16 @@ export class PrismaPartnersRepository implements PartnersRepository {
 
   async isAuthorizedForProduct(partnerTenantId: string, productId: string): Promise<boolean> {
     return Boolean(await this.productAuthorizations().findFirst({ where: { partnerTenantId, productId, status: "active" } }));
+  }
+
+  async listActivePartnerIdsForCountry(countryId: string): Promise<string[]> {
+    const rows = (await this.countryAuthorizations().findMany({ where: { countryId, status: "active" } })) as Array<{ partnerTenantId: string }>;
+    return rows.map((row) => row.partnerTenantId);
+  }
+
+  async listActiveProductIdsForPartner(partnerTenantId: string): Promise<string[]> {
+    const rows = (await this.productAuthorizations().findMany({ where: { partnerTenantId, status: "active" } })) as Array<{ productId: string }>;
+    return rows.map((row) => row.productId);
   }
 
   private partners(): PartnerDelegate {

@@ -106,14 +106,20 @@ export class PrismaOffersRepository implements OffersRepository {
   }
 
   private toDomain(row: unknown): OfferRecord {
-    const item = row as OfferRecord & { indicativePriceMin?: { toNumber(): number }; indicativePriceMax?: { toNumber(): number } };
-    const indicativePriceMin = typeof item.indicativePriceMin?.toNumber === "function" ? item.indicativePriceMin.toNumber() : item.indicativePriceMin as number | undefined;
-    const indicativePriceMax = typeof item.indicativePriceMax?.toNumber === "function" ? item.indicativePriceMax.toNumber() : item.indicativePriceMax as number | undefined;
-    const result: OfferRecord = { ...item };
-    delete (result as unknown as Record<string, unknown>).indicativePriceMin;
-    delete (result as unknown as Record<string, unknown>).indicativePriceMax;
-    if (indicativePriceMin !== undefined) result.indicativePriceMin = indicativePriceMin;
-    if (indicativePriceMax !== undefined) result.indicativePriceMax = indicativePriceMax;
+    const item = row as Record<string, unknown>;
+    const result = { ...item } as unknown as OfferRecord;
+    // Prisma returns Decimal instances and null for optional columns; the domain uses numbers and undefined.
+    for (const key of ["indicativePriceMin", "indicativePriceMax", "deductibleAmount", "coverageCeiling"] as const) {
+      const value = item[key] as { toNumber?: () => number } | number | null | undefined;
+      delete (result as unknown as Record<string, unknown>)[key];
+      if (value === null || value === undefined) continue;
+      result[key] = typeof value === "number" ? value : typeof value.toNumber === "function" ? value.toNumber() : Number(value);
+    }
+    for (const key of ["insurerName", "guaranteeLevel", "processingDelayDays", "paymentFlexibility", "exclusionsSummary", "sourceOfInformation"] as const) {
+      if (item[key] === null) delete (result as unknown as Record<string, unknown>)[key];
+    }
+    result.guarantees = Array.isArray(item.guarantees) ? item.guarantees as NonNullable<OfferRecord["guarantees"]> : [];
+    result.requiredDocuments = Array.isArray(item.requiredDocuments) ? item.requiredDocuments as string[] : [];
     return result;
   }
 

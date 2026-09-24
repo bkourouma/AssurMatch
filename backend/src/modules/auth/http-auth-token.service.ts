@@ -20,6 +20,7 @@ interface AuthTokenClaims {
 const TOKEN_HEADER = { alg: "HS256", typ: "JWT" };
 const DEFAULT_TEST_SECRET = "assurmatch-runtime-test-secret-that-is-not-used-in-production";
 const roleSet = new Set<string>(AssurMatchRoles);
+const partnerPlanSet = new Set<string>(["starter", "pro", "enterprise"]);
 
 function secret(): string {
   const configured = process.env.ASSURMATCH_AUTH_TOKEN_SECRET;
@@ -51,7 +52,25 @@ function parseJsonSegment<T>(segment: string): T {
 function assertValidClaims(claims: AuthTokenClaims): void {
   if (!claims.sub || !Array.isArray(claims.roles) || claims.roles.length === 0) throw new Error("Authentication invalid");
   if (!claims.roles.every((role) => roleSet.has(role))) throw new Error("Authentication invalid");
+  if (typeof claims.mfaVerified !== "boolean") throw new Error("Authentication invalid");
+  if (claims.partnerTenantId !== undefined && typeof claims.partnerTenantId !== "string") throw new Error("Authentication invalid");
+  if (claims.partnerPlan !== undefined && !partnerPlanSet.has(claims.partnerPlan)) throw new Error("Authentication invalid");
+  assertOptionalStringRecord(claims.brokerUserTenantIds);
+  assertOptionalStringArray(claims.countryScopes);
+  assertOptionalStringArray(claims.productScopes);
+  if (claims.correlationId !== undefined && typeof claims.correlationId !== "string") throw new Error("Authentication invalid");
   if (!Number.isInteger(claims.exp) || claims.exp <= Math.floor(Date.now() / 1000)) throw new Error("Authentication token expired");
+}
+
+function assertOptionalStringArray(value: string[] | undefined): void {
+  if (value === undefined) return;
+  if (!Array.isArray(value) || !value.every((item) => typeof item === "string")) throw new Error("Authentication invalid");
+}
+
+function assertOptionalStringRecord(value: Record<string, string> | undefined): void {
+  if (value === undefined) return;
+  if (!value || Array.isArray(value) || typeof value !== "object") throw new Error("Authentication invalid");
+  if (!Object.values(value).every((item) => typeof item === "string")) throw new Error("Authentication invalid");
 }
 
 export function signActorToken(actor: ActorContext, ttlSeconds = 900): string {

@@ -1,5 +1,6 @@
 import type {
   AdminDashboardResponse,
+  DashboardComparison,
   DashboardScopeQuery,
   FeatureFlagSummary,
   RoutingRefusalReasonCount
@@ -15,8 +16,10 @@ import type { RoutingDecisionService } from "../leads/routing-decision.service";
 import type { OffersModule } from "../offers/offers.module";
 import type { PartnerLicensesService } from "../partner-licenses/partner-licenses.module";
 import type { PartnersService } from "../partners/partners.module";
+import type { ProductsService } from "../products/products.module";
 import type { QuoteSubmissionService } from "../quote-requests/quote-submission.service";
 import type { AuditLogWriter } from "../audit-logs/audit-log-writer.service";
+import { countryCatalog, productCatalog, resolveScopeCodes } from "../common/scope/actor-scope-codes";
 import { DashboardsAccessPolicy, type ResolvedAdminScope } from "./dashboards-access-policy";
 import { DashboardAuditActions } from "./dashboard-audit-actions";
 import { isWithinWindow, resolveDashboardWindow, type ResolvedDashboardWindow } from "./dashboard-time-window";
@@ -35,6 +38,7 @@ export interface AdminDashboardServiceDeps {
   partners: PartnersService;
   offers: OffersModule;
   countries: CountriesService;
+  products: ProductsService;
 }
 
 export class AdminDashboardService {
@@ -46,7 +50,11 @@ export class AdminDashboardService {
     if (query.country) scopeInput.country = query.country;
     if (query.product) scopeInput.product = query.product;
     if (query.partnerId) scopeInput.partnerId = query.partnerId;
-    const scope = this.deps.access.resolveAdminScope(actor, role, scopeInput);
+    const scopedActor = await this.actorWithScopeCodes(actor);
+    const scope = this.deps.access.resolveAdminScope(scopedActor, role, scopeInput);
+    if (role === "finance_admin" || role === "content_admin") {
+      this.deps.access.refuseAdmin(actor, "restricted_admin_dashboard_unavailable");
+    }
     const window = resolveDashboardWindow({ from: query.from, to: query.to });
     const countryMap = await this.buildCountryIsoMap();
     const isoToId = new Map<string, string>();
@@ -62,6 +70,8 @@ export class AdminDashboardService {
     const allOffers = await this.deps.offers.repository.list();
     const allFlags = this.deps.featureFlags.list();
     const allAudits = this.deps.audit.all();
+
+    await this.assertAdminPartnerFilterInScope(actor, scope, isoToId, allPartners);
 
     const assignmentsInWindow = allAssignments.filter((assignment) =>
       isWithinWindow(assignment.assignedAt, window) && this.assignmentInScope(assignment, scope, countryMap)
@@ -107,9 +117,75 @@ export class AdminDashboardService {
       expiredOffersStillReferenced,
       licenseAlerts: licenseAlertCounts,
       complianceAlertCounts: complianceCounts,
-      sensitiveFeatureFlags
+      sensitiveFeatureFlags,
+      ...(query.compare === "previous"
+        ? { comparison: this.buildComparison(allAssignments, window, (assignment) => this.assignmentInScope(assignment, scope, countryMap), { received, transmitted, refused }) }
+        : {})
     };
     return response;
+  }
+
+  /** Same-length window immediately before the current one, restricted to the admin's scope. */
+  private buildComparison(
+    assignments: LeadAssignmentRecord[],
+    window: ResolvedDashboardWindow,
+    inScope: (assignment: LeadAssignmentRecord) => boolean,
+    current: { received: number; transmitted: number; refused: number }
+  ): DashboardComparison {
+    const span = window.to.getTime() - window.from.getTime();
+    const from = new Date(window.from.getTime() - span);
+    const previousRecords = assignments.filter((assignment) => assignment.assignedAt >= from && assignment.assignedAt < window.from && inScope(assignment));
+    const previous = {
+      received: previousRecords.length,
+      accepted: previousRecords.filter((assignment) => assignment.status === "accepted").length,
+      refused: previousRecords.filter((assignment) => assignment.status === "rejected" || assignment.status === "disputed").length
+    };
+    return {
+      previousWindow: { from: from.toISOString(), to: window.from.toISOString() },
+      previous,
+      delta: {
+        received: current.received - previous.received,
+        accepted: current.transmitted - previous.accepted,
+        refused: current.refused - previous.refused
+      }
+    };
+  }
+
+  /** Aggregate CSV export for administrators; scope and audit reuse the dashboard policy. */
+  async exportCsv(actor: ActorContext, query: DashboardScopeQuery): Promise<string> {
+    const dashboard = await this.dashboard(actor, query);
+    const lines = ["section,dimension,valeur"];
+    lines.push(`fenetre,from,${dashboard.window.from}`);
+    lines.push(`fenetre,to,${dashboard.window.to}`);
+    for (const [key, value] of Object.entries(dashboard.leadVolumes)) lines.push(`volumes,${key},${value}`);
+    for (const entry of dashboard.byCountry) lines.push(`pays,${entry.countryCode},${entry.total}`);
+    for (const entry of dashboard.byProduct) lines.push(`produit,${entry.productKey},${entry.total}`);
+    for (const entry of dashboard.nonRoutedReasons) lines.push(`non_route,${entry.reason},${entry.total}`);
+    lines.push(`partenaires,actifs,${dashboard.partners.active}`);
+    lines.push(`partenaires,inactifs,${dashboard.partners.inactive}`);
+    this.deps.audit.write({
+      actor,
+      action: DashboardAuditActions.adminExported,
+      targetType: "AdminDashboardExport",
+      targetId: "export",
+      scope: { countries: dashboard.scope.countries, products: dashboard.scope.products },
+      result: "success",
+      context: { rowCount: lines.length - 1, containsProspectIdentity: false }
+    });
+    return lines.join("\n");
+  }
+
+  private async actorWithScopeCodes(actor: ActorContext): Promise<ActorContext> {
+    if (!actor.countryScopes?.length && !actor.productScopes?.length) return actor;
+    const [countries, products] = await Promise.all([
+      this.deps.countries.listAdmin(),
+      this.deps.products.listAdmin()
+    ]);
+    return {
+      ...actor,
+      countryScopes: resolveScopeCodes(actor.countryScopes, countryCatalog(countries)),
+      productScopes: resolveScopeCodes(actor.productScopes, productCatalog(products))
+    };
   }
 
   private async buildCountryIsoMap(): Promise<Map<string, string>> {
@@ -131,6 +207,27 @@ export class AdminDashboardService {
     if (allowedCountryIds && record.countryId && !allowedCountryIds.has(record.countryId)) return false;
     if (scope.products.length > 0 && record.productKey && !scope.products.includes(record.productKey)) return false;
     return true;
+  }
+
+  private async assertAdminPartnerFilterInScope(
+    actor: ActorContext,
+    scope: ResolvedAdminScope,
+    isoToId: Map<string, string>,
+    partners: Array<{ id: string }>
+  ): Promise<void> {
+    if (!scope.partnerId) return;
+    if (!partners.some((partner) => partner.id === scope.partnerId)) {
+      this.deps.access.refuseAdmin(actor, "out_of_scope_partner");
+    }
+    if (scope.role !== "admin_pays") return;
+    const allowedCountryIds = new Set(
+      scope.countries.map((countryCode) => isoToId.get(countryCode)).filter((id): id is string => Boolean(id))
+    );
+    if (allowedCountryIds.size === 0) this.deps.access.refuseAdmin(actor, "out_of_scope_partner");
+    const licenses = await this.deps.partnerLicenses.listForPartner(scope.partnerId);
+    if (!licenses.some((license) => allowedCountryIds.has(license.countryId))) {
+      this.deps.access.refuseAdmin(actor, "out_of_scope_partner");
+    }
   }
 
   private computeNonRoutedReasons(decisions: RoutingDecisionRecord[]): RoutingRefusalReasonCount[] {

@@ -2,10 +2,10 @@
 
 **Feature Branch**: `012-dashboard-courtier-admin`
 **Created**: 2026-04-26
-**Status**: Draft
+**Status**: Implemented - task/status ledger reconciled 2026-05-03
 **Input**: User description: "Creer la specification fonctionnelle 012-dashboard-courtier-admin pour AssurMatch. Dashboards operationnels lus depuis la persistance PostgreSQL existante (leads, quote requests, lead assignments, CRM activity, partenaires, licences, offres, audit logs, feature flags). Donner aux courtiers et aux admins une vision agregee de leur activite, sans introduire de nouvelle logique metier de souscription, paiement, signature, sinistres ou IA avancee. Ne genere pas le plan, ne genere pas tasks.md, n'implemente rien."
-**Validation State**: Draft
-**Continuous Workflow Eligible**: No - cette invocation est limitee a la specification; l'utilisateur a explicitement demande de ne pas generer le plan, les taches ni l'implementation.
+**Validation State**: Implemented with focused dashboard validations passing; remaining full-suite validation is tracked in `tasks.md` for release-level verification.
+**Continuous Workflow Eligible**: Completed. The original drafting-only invocation was superseded by the validated plan/tasks implementation chain; the current repository agent pointer now targets the later active spec 025 and must not be rewound to spec 012.
 
 ## Constitutional Scope & Compliance *(mandatory)*
 

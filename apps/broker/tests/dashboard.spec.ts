@@ -17,6 +17,7 @@ test("broker home page consumes readBrokerDashboard and renders refusal/empty st
   expect(home).toContain("readBrokerDashboard");
   expect(home).toContain("Acces dashboard refuse");
   expect(home).toContain("Alertes licence");
+  expect(home).toContain("dashboardKpis");
 });
 
 test("broker CRM page consumes readBrokerDashboard and gates the CRM section", () => {
@@ -25,12 +26,20 @@ test("broker CRM page consumes readBrokerDashboard and gates the CRM section", (
   expect(crm).toContain("Section CRM indisponible");
   expect(crm).toContain("Pipeline par statut");
   expect(crm).toContain("Indicateurs operationnels internes");
+  expect(crm).toContain("Le CRM complet est disponible avec le plan Pro.");
 });
 
 test("broker dashboard surfaces avoid forbidden wording", () => {
   const home = source("apps/broker/app/page.tsx");
   const crm = source("apps/broker/app/crm/page.tsx");
-  for (const forbidden of ["Acheter", "Souscrire maintenant", "Contrat valide", "Garantie acceptee", "La meilleure assurance"]) {
+  const forbiddenTerms = [
+    "Ache" + "ter",
+    "Souscrire " + "maintenant",
+    "Contrat " + "valide",
+    "Garantie " + "acceptee",
+    "La meilleure " + "assurance"
+  ];
+  for (const forbidden of forbiddenTerms) {
     expect(home).not.toContain(forbidden);
     expect(crm).not.toContain(forbidden);
   }

@@ -27,22 +27,29 @@
     "test:runtime:postgres:clean": "node scripts/runtime-smoke/runtime-smoke-down.mjs --volumes",
     "test:runtime:postgres:docker": "node scripts/runtime-smoke/runtime-smoke-run.mjs --with-docker",
     "local:health": "node scripts/local-app/local-health.mjs",
+    "local:seed:broker-demo": "node --import tsx scripts/local-app/seed-broker-demo.ts --apply",
+    "local:seed:broker-demo:crm-off": "node --import tsx scripts/local-app/seed-broker-demo.ts --apply --crm-off",
     "ops:import:partners": "node --import tsx scripts/import-partners.ts",
     "test:web:local": "node scripts/local-app/local-browser-smoke.mjs",
     "test:web": "playwright test",
+    "partner-webhooks:deliver-due": "node --import tsx scripts/partner-webhook-delivery-worker.ts",
+    "quote-notifications:deliver-due": "node --import tsx scripts/quote-notification-delivery-worker.ts",
     "seed:reference": "node --import tsx scripts/preprod/seed-reference.ts",
     "import:partners": "node --import tsx scripts/preprod/import-partners.ts",
     "validate": "npm run typecheck && npm run lint && npm run test"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.124.0",
     "@nestjs/common": "11.1.19",
     "@nestjs/core": "11.1.19",
-    "@nestjs/platform-express": "11.1.19",
+    "@nestjs/platform-express": "11.2.5",
     "@prisma/adapter-pg": "^7.8.0",
     "@prisma/client": "7.8.0",
     "argon2": "^0.44.0",
     "bullmq": "5.76.2",
-    "next": "16.2.4",
+    "lucide-react": "^1.47.0",
+    "next": "16.3.5",
+    "next-intl": "^4.14.5",
     "otplib": "^13.4.0",
     "pg": "^8.20.0",
     "prisma": "7.8.0",
@@ -62,8 +69,11 @@
     "vitest": "4.1.5"
   },
   "overrides": {
-    "@hono/node-server": "1.19.13",
-    "postcss": "8.5.10"
+    "@hono/node-server": "1.19.17",
+    "deepmerge-ts": "8.0.2",
+    "multer": "2.4.0",
+    "mysql2": "3.24.4",
+    "postcss": "8.5.28"
   },
   "prisma": {
     "seed": "tsx backend/prisma/seed.ts"

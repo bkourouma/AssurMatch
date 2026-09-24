@@ -13,10 +13,10 @@ export default async function ActivationPage({ searchParams }: PageProps) {
   const token = firstParam(params.token);
   const returnTo = firstParam(params.returnTo) || "/";
   return (
-    <main style={{ maxWidth: 520, margin: "0 auto", padding: "42px 20px", fontFamily: "system-ui, sans-serif", color: "#172033" }}>
-      <p style={{ margin: "0 0 8px", color: "#516070", fontSize: 14 }}>Activation admin</p>
-      <h1 style={{ margin: "0 0 16px", fontSize: 30 }}>Activer le compte</h1>
+    <>
+      <p className="bo-kicker">Activation admin</p>
+      <h1 className="bo-auth__title">Activer le compte</h1>
       <ActivationForm token={token} returnTo={returnTo} />
-    </main>
+    </>
   );
 }

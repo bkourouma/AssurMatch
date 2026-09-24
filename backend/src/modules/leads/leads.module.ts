@@ -22,7 +22,7 @@ import { BrokerStarterNotificationsService } from "./broker-starter-notification
 import { MemoryCrmActivityRepository, type CrmActivityRepository } from "./crm-activity.repository";
 import { LeadAssignmentService } from "./lead-assignment.service";
 import { MemoryLeadAssignmentsRepository, type LeadAssignmentsRepository } from "./lead-assignments.repository";
-import { QuoteRoutingService } from "./quote-routing.service";
+import { QuoteRoutingService, type ConsentRecordResolver, type MultiBrokerPolicy, type RoutingRuleResolver } from "./quote-routing.service";
 import { RoutingDecisionService } from "./routing-decision.service";
 import type { RoutingDecisionsRepository } from "./routing-decisions.repository";
 
@@ -32,8 +32,22 @@ export interface LeadsModuleRepositories {
   crmActivity?: CrmActivityRepository;
 }
 
+export interface LeadsModuleRoutingOptions {
+  /** Admin-authored routing rules; without it the legacy first-eligible strategy applies. */
+  rules?: RoutingRuleResolver | undefined;
+  /** Partner webhook observer for `lead.assigned` and `lead.status_changed`; failures are swallowed. */
+  events?: {
+    publish(eventType: "lead.assigned" | "lead.status_changed", partnerTenantId: string, data: Record<string, unknown>): Promise<void>;
+  } | undefined;
+  /** Spec 042: consent resolver and `multi_broker_routing_enabled` gate for multi-send. */
+  consent?: ConsentRecordResolver | undefined;
+  multiBroker?: MultiBrokerPolicy | undefined;
+}
+
 export class LeadsModule {
   readonly assignments: LeadAssignmentService;
+  /** Exposed so other modules (visitor documents) can attach prospect-provided CRM documents. */
+  readonly crmActivityRepository: CrmActivityRepository;
   readonly decisions: RoutingDecisionService;
   readonly eligibility: BrokerEligibilityPolicy;
   readonly routing: QuoteRoutingService;
@@ -55,13 +69,19 @@ export class LeadsModule {
   readonly brokerCrmController: BrokerCrmController;
   readonly adminController: AdminLeadAssignmentsController;
 
-  constructor(partners: PartnersService, licenses: PartnerLicensesService, audit = new AuditLogWriter(), brokerCrmConfig?: ConstructorParameters<typeof BrokerCrmAccessPolicy>[1], repositories: LeadsModuleRepositories = {}) {
+  constructor(partners: PartnersService, licenses: PartnerLicensesService, audit = new AuditLogWriter(), brokerCrmConfig?: ConstructorParameters<typeof BrokerCrmAccessPolicy>[1], repositories: LeadsModuleRepositories = {}, routingOptions: LeadsModuleRoutingOptions = {}) {
     const assignmentRepository = repositories.assignments ?? new MemoryLeadAssignmentsRepository();
     const crmActivityRepository = repositories.crmActivity ?? new MemoryCrmActivityRepository();
-    this.assignments = new LeadAssignmentService(audit, assignmentRepository);
+    this.crmActivityRepository = crmActivityRepository;
+    this.assignments = new LeadAssignmentService(audit, assignmentRepository, routingOptions.events);
     this.decisions = new RoutingDecisionService(audit, repositories.decisions);
-    this.eligibility = new BrokerEligibilityPolicy(partners, licenses, (partnerTenantId) => this.assignments.activeCountForPartner(partnerTenantId));
-    this.routing = new QuoteRoutingService(this.eligibility, this.decisions, this.assignments, audit);
+    this.eligibility = new BrokerEligibilityPolicy(partners, licenses, (partnerTenantId) => assignmentRepository.monthlyCountForPartner(partnerTenantId, new Date()));
+    this.routing = new QuoteRoutingService(this.eligibility, this.decisions, this.assignments, audit, {
+      rules: routingOptions.rules,
+      consent: routingOptions.consent,
+      multiBroker: routingOptions.multiBroker,
+      stats: (partnerTenantIds, now) => assignmentRepository.routingStatsForPartners(partnerTenantIds, now)
+    });
     this.brokerController = new BrokerLeadsController(this.assignments, audit);
     this.brokerStarterAccess = new BrokerStarterAccessPolicy(audit);
     this.brokerStarterHistory = new BrokerStarterHistoryService(assignmentRepository);
@@ -75,7 +95,7 @@ export class LeadsModule {
     this.brokerCrmExportPolicy = new BrokerCrmExportPolicy(this.brokerCrmAccess, audit);
     this.brokerCrmActivity = new BrokerCrmActivityService(this.assignments, this.brokerCrmAccess, this.brokerCrmHistory, audit, crmActivityRepository);
     this.brokerCrmLeads = new BrokerCrmLeadsService(this.assignments, this.brokerCrmAccess, this.brokerCrmHistory, audit, this.brokerCrmExportPolicy, this.brokerCrmActivity);
-    this.brokerCrmPipeline = new BrokerCrmPipelineService(this.assignments, this.brokerCrmAccess, this.brokerCrmHistory, audit);
+    this.brokerCrmPipeline = new BrokerCrmPipelineService(this.assignments, this.brokerCrmAccess, this.brokerCrmHistory, audit, routingOptions.events);
     this.brokerCrmNotifications = new BrokerCrmNotificationsService(this.assignments, this.brokerCrmAccess, audit);
     this.brokerCrmController = new BrokerCrmController(this.brokerCrmLeads, this.brokerCrmPipeline, this.brokerCrmActivity, this.brokerCrmNotifications);
     this.adminController = new AdminLeadAssignmentsController(this.assignments);

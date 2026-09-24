@@ -15,6 +15,7 @@ import { MemoryProspectsRepository } from "../../../src/modules/prospects/prospe
 import { MemoryQuoteRequestsRepository } from "../../../src/modules/quote-requests/quote-requests.repository";
 import type { PrismaService } from "../../../src/modules/common/prisma/prisma.service";
 import { assertRuntimeRepository } from "../../../src/modules/common/repositories/runtime-repository";
+import type { ProcessEnvLike } from "../../../src/runtime/process-env-like";
 
 describe("domain repository contracts", () => {
   it("declares memory adapters as explicit test-only repositories", async () => {
@@ -39,13 +40,14 @@ describe("domain repository contracts", () => {
   });
 
   it("rejects memory repositories outside test runtime", async () => {
-    const previous = process.env.NODE_ENV;
-    process.env.NODE_ENV = "production";
+    const env = process.env as ProcessEnvLike;
+    const previous = env.NODE_ENV;
+    env.NODE_ENV = "production";
     try {
       expect(() => assertRuntimeRepository("memory-test", "CountriesRepository")).toThrow(/memory repository is test-only/);
       expect(() => assertRuntimeRepository("prisma-runtime", "CountriesRepository")).not.toThrow();
     } finally {
-      process.env.NODE_ENV = previous;
+      env.NODE_ENV = previous;
     }
   });
 

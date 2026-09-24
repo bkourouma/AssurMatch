@@ -13,7 +13,7 @@ describe("prisma schema validation", () => {
       encoding: "utf8"
     });
     expect(output).toContain("The schema at");
-  }, 20_000);
+  }, 60_000); // spawns `prisma validate`, which competes with the other worker threads for CPU
 
   it("defines auth persistence fields without plain IP storage", () => {
     const schema = readFileSync("backend/prisma/schema.prisma", "utf8");

@@ -1,0 +1,237 @@
+/*
+ * Motion layer: keyframes, scroll reveal and entrance utilities.
+ *
+ * Safety rule: content is VISIBLE by default. The hidden pre-state of `[data-reveal]` only applies
+ * under `html[data-js="true"]`, an attribute the `<Reveal>` client component sets on mount - so with
+ * JavaScript off, or before hydration, nothing is ever invisible. `<Reveal>` also flips every node to
+ * `data-reveal="in"` after a 1200ms fallback timeout even if IntersectionObserver never fires.
+ */
+
+/* ---------- Keyframes ---------- */
+
+@keyframes am-fade-up {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 16px, 0);
+  }
+
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes am-fade-in {
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes am-scale-in {
+  from {
+    opacity: 0;
+    transform: scale(0.96);
+  }
+
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes am-slide-in-right {
+  from {
+    opacity: 0;
+    transform: translate3d(24px, 0, 0);
+  }
+
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes am-slide-up {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 100%, 0);
+  }
+
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes am-shimmer {
+  from {
+    background-position: -180% 0;
+  }
+
+  to {
+    background-position: 180% 0;
+  }
+}
+
+@keyframes am-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes am-float {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0);
+  }
+
+  50% {
+    transform: translate3d(0, -8px, 0);
+  }
+}
+
+@keyframes am-pulse-soft {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgba(27, 79, 191, 0.28);
+  }
+
+  70% {
+    box-shadow: 0 0 0 10px rgba(27, 79, 191, 0);
+  }
+}
+
+/* ---------- Scroll reveal ---------- */
+
+[data-reveal] {
+  transition:
+    opacity var(--am-duration-slow) var(--am-ease-out),
+    transform var(--am-duration-slow) var(--am-ease-out);
+}
+
+html[data-js="true"] [data-reveal="pending"] {
+  opacity: 0;
+  transform: translate3d(0, 16px, 0);
+}
+
+/*
+ * 16px, not 24px: the horizontal pre-state is the one offset that can push a full-bleed card past the
+ * viewport and flash a scrollbar before the observer fires. `base.css` clips the root as well, so the
+ * two together make the pending state invisible to the layout.
+ */
+html[data-js="true"] [data-reveal="pending"][data-reveal-from="right"] {
+  transform: translate3d(16px, 0, 0);
+}
+
+html[data-js="true"] [data-reveal="pending"][data-reveal-from="left"] {
+  transform: translate3d(-16px, 0, 0);
+}
+
+html[data-js="true"] [data-reveal="pending"][data-reveal-from="scale"] {
+  transform: scale(0.97);
+}
+
+[data-reveal="in"] {
+  opacity: 1;
+  transform: none;
+}
+
+/**
+ * Stagger: children of a revealed container arrive one after the other. `--i` is set by the component
+ * when it knows the index; the `:nth-child` fallback covers plain markup up to 12 children.
+ */
+html[data-js="true"] [data-reveal-stagger] > * {
+  transition:
+    opacity var(--am-duration-slow) var(--am-ease-out),
+    transform var(--am-duration-slow) var(--am-ease-out);
+  transition-delay: calc(var(--i, 0) * var(--am-stagger));
+}
+
+html[data-js="true"] [data-reveal-stagger][data-reveal="pending"] > * {
+  opacity: 0;
+  transform: translate3d(0, 14px, 0);
+}
+
+html[data-js="true"] [data-reveal-stagger][data-reveal="in"] > * {
+  opacity: 1;
+  transform: none;
+}
+
+html[data-js="true"] [data-reveal-stagger] > *:nth-child(1) {
+  --i: 0;
+}
+html[data-js="true"] [data-reveal-stagger] > *:nth-child(2) {
+  --i: 1;
+}
+html[data-js="true"] [data-reveal-stagger] > *:nth-child(3) {
+  --i: 2;
+}
+html[data-js="true"] [data-reveal-stagger] > *:nth-child(4) {
+  --i: 3;
+}
+html[data-js="true"] [data-reveal-stagger] > *:nth-child(5) {
+  --i: 4;
+}
+html[data-js="true"] [data-reveal-stagger] > *:nth-child(6) {
+  --i: 5;
+}
+html[data-js="true"] [data-reveal-stagger] > *:nth-child(7) {
+  --i: 6;
+}
+html[data-js="true"] [data-reveal-stagger] > *:nth-child(8) {
+  --i: 7;
+}
+html[data-js="true"] [data-reveal-stagger] > *:nth-child(9) {
+  --i: 8;
+}
+html[data-js="true"] [data-reveal-stagger] > *:nth-child(10) {
+  --i: 9;
+}
+html[data-js="true"] [data-reveal-stagger] > *:nth-child(11) {
+  --i: 10;
+}
+html[data-js="true"] [data-reveal-stagger] > *:nth-child(12) {
+  --i: 11;
+}
+
+/* ---------- Entrance utilities (page load, above the fold: no observer needed) ---------- */
+
+.am-animate-in {
+  animation: am-fade-up var(--am-duration-slow) var(--am-ease-out) both;
+  animation-delay: calc(var(--i, 0) * var(--am-stagger));
+}
+
+.am-animate-fade {
+  animation: am-fade-in var(--am-duration-base) var(--am-ease-out) both;
+  animation-delay: calc(var(--i, 0) * var(--am-stagger));
+}
+
+.am-animate-scale {
+  animation: am-scale-in var(--am-duration-base) var(--am-ease-out) both;
+  animation-delay: calc(var(--i, 0) * var(--am-stagger));
+}
+
+.am-animate-float {
+  animation: am-float 6s var(--am-ease-in-out) infinite;
+}
+
+/* ---------- Reduced motion: no reveal pre-state, no animation ---------- */
+
+@media (prefers-reduced-motion: reduce) {
+  html[data-js="true"] [data-reveal="pending"],
+  html[data-js="true"] [data-reveal-stagger][data-reveal="pending"] > * {
+    opacity: 1 !important;
+    transform: none !important;
+  }
+
+  .am-animate-in,
+  .am-animate-fade,
+  .am-animate-scale,
+  .am-animate-float {
+    animation: none !important;
+  }
+}

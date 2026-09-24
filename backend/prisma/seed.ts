@@ -59,7 +59,7 @@ async function main(): Promise<void> {
     where: { isoCode: "CI" },
     create: {
       isoCode: "CI",
-      name: "Cote d'Ivoire",
+      name: "Côte d'Ivoire",
       currency: "XOF",
       languages: ["fr"],
       timezone: "Africa/Abidjan",

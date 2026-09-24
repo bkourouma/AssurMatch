@@ -9,6 +9,7 @@ export interface QuoteRequestsRepository extends RuntimeRepository {
   create(quote: QuoteRequestRecord): Promise<QuoteRequestRecord>;
   update(id: string, update: Partial<QuoteRequestRecord>): Promise<QuoteRequestRecord>;
   findByPublicReference(publicReference: string): Promise<QuoteRequestRecord | undefined>;
+  findById(id: string): Promise<QuoteRequestRecord | undefined>;
   list(): Promise<QuoteRequestRecord[]>;
 }
 
@@ -34,6 +35,10 @@ export class MemoryQuoteRequestsRepository implements QuoteRequestsRepository {
 
   async findByPublicReference(publicReference: string): Promise<QuoteRequestRecord | undefined> {
     return this.requests.find((candidate) => candidate.publicReference === publicReference);
+  }
+
+  async findById(id: string): Promise<QuoteRequestRecord | undefined> {
+    return this.requests.find((candidate) => candidate.id === id);
   }
 
   async list(): Promise<QuoteRequestRecord[]> {
@@ -64,6 +69,11 @@ export class PrismaQuoteRequestsRepository implements QuoteRequestsRepository {
 
   async findByPublicReference(publicReference: string): Promise<QuoteRequestRecord | undefined> {
     const row = await this.client().findUnique({ where: { publicReference } });
+    return row ? this.toDomain(row) : undefined;
+  }
+
+  async findById(id: string): Promise<QuoteRequestRecord | undefined> {
+    const row = await this.client().findUnique({ where: { id } });
     return row ? this.toDomain(row) : undefined;
   }
 

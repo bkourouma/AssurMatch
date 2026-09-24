@@ -2,7 +2,14 @@ import { AuditLogWriter } from "../../audit-logs/audit-log-writer.service";
 import type { EmailRuntimeConfig } from "./email-config";
 import { classifySmtpError, SmtpEmailSender } from "./smtp-email-sender";
 
-export type EmailPurpose = "auth_activation" | "auth_password_reset";
+export type EmailPurpose =
+  | "auth_activation"
+  | "auth_password_reset"
+  // Spec 044: quote notifications reuse the auth delivery path, so they need their own purposes to
+  // stay distinguishable in the `email.delivery.*` audit trail.
+  | "quote_visitor_confirmation"
+  | "quote_visitor_non_routable"
+  | "quote_broker_lead";
 export type EmailDeliveryStatus = "not_configured" | "previewed" | "sent" | "failed";
 export type EmailProvider = "disabled" | "mailpit" | "smtp";
 
