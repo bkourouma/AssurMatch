@@ -19,8 +19,12 @@ RUN npm ci
 
 FROM node:24-alpine AS build
 WORKDIR /app
+# The local demo login picker imports @prisma/client, so the client must be generated before
+# `next build` type-checks it. Placeholder DATABASE_URL satisfies prisma.config.ts at build time.
+ENV DATABASE_URL=postgresql://placeholder:placeholder@localhost:5432/placeholder
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
+RUN npx prisma generate --schema backend/prisma/schema.prisma
 WORKDIR /app/apps/admin
 RUN npx next build
 WORKDIR /app/apps/broker
