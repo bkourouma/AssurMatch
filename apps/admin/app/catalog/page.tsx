@@ -1,11 +1,12 @@
-import { Badge, Card, DataTable, PageHeader, StateMessage } from "../lib/ui/admin-ui";
+import { Badge, Card, DataTable, PageHeader, PageStack, StateMessage } from "../lib/ui/admin-ui";
 
 const catalogSections = ["Pays", "Regimes reglementaires", "Produits"];
 
 export default function CatalogFoundationPage() {
   return (
-    <div className="page-stack">
+    <PageStack>
       <PageHeader
+        breadcrumb={[{ label: "Catalogue" }, { label: "Catalogue" }]}
         kicker="Configuration"
         title="Catalogue socle"
         description="Pilotage interne des pays, regimes et produits avec exposition publique desactivee par defaut et controlee par les flags existants."
@@ -13,16 +14,17 @@ export default function CatalogFoundationPage() {
       <Card>
         <DataTable
           columns={[
-            { header: "Section", render: (section) => <strong>{section}</strong> },
-            { header: "Statut", render: () => <Badge tone="disabled">Exposition publique controlee</Badge> },
-            { header: "Garde-fou", render: () => "Actions sensibles auditees cote API" }
+            { key: "section", header: "Section", render: (section) => <strong>{section}</strong> },
+            { key: "status", header: "Statut", render: () => <Badge tone="disabled">Exposition publique controlee</Badge> },
+            { key: "guardrail", header: "Garde-fou", render: () => "Actions sensibles auditees cote API" }
           ]}
           items={catalogSections}
           getKey={(section) => section}
           emptyLabel="Aucune section catalogue disponible."
+          aria-label="Sections du catalogue socle"
         />
       </Card>
       <StateMessage>Les changements de catalogue ne sont pas effectues par cette page de polish UX.</StateMessage>
-    </div>
+    </PageStack>
   );
 }

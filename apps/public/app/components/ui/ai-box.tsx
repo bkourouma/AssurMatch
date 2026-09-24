@@ -16,7 +16,7 @@ export function AiBox({ children, generatedLabel, disclaimer, title, ariaLabel }
   return (
     <section className="am-aibox" aria-label={ariaLabel ?? title ?? generatedLabel}>
       <span className="am-aibox__label">
-        <Icon name="info" size={16} />
+        <Icon name="sparkles" size={16} />
         {generatedLabel}
       </span>
       {title ? <h3 className="am-aibox__title">{title}</h3> : null}

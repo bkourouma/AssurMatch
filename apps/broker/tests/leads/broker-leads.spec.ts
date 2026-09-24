@@ -63,8 +63,10 @@ test("starter lead detail exposes accept, reject and dispute forms with allow-li
   const vocabulary = readFileSync("apps/broker/app/lib/lead-vocabulary.ts", "utf8");
 
   expect(detail).toContain("action={acceptStarterLeadAction}");
-  expect(detail).toContain("action={rejectStarterLeadAction}");
-  expect(detail).toContain("action={disputeStarterLeadAction}");
+  // L'acceptation reste un bouton direct; rejet et contestation passent par une boite de dialogue
+  // de confirmation dont le formulaire interne appelle la meme server action.
+  expect(detail).toContain("formAction={rejectStarterLeadAction}");
+  expect(detail).toContain("formAction={disputeStarterLeadAction}");
   expect(detail).toContain("STARTER_ACTION_REASONS.map");
   expect(detail).toContain('name="reason" required');
 
@@ -87,7 +89,7 @@ test("starter lead detail degrades safely on forbidden, not found and API errors
   expect(detail).toContain("isNotFoundState(detail)");
   expect(detail).toContain("Lead introuvable");
   expect(detail).toContain("Lead indisponible");
-  expect(detail).toContain("StateMessage");
+  expect(detail).toContain("<Notice tone=");
   expect(detail).toContain("Aucune donnee protegee n'est affichee");
   expect(detail).toContain("loginRedirect");
 });

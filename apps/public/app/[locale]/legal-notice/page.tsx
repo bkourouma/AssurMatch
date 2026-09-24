@@ -3,6 +3,7 @@ import { getTranslations, setRequestLocale } from "next-intl/server";
 import { toLocale, type AppLocale } from "../../../i18n/routing";
 import { getLegalPage } from "../../content/legal";
 import { LegalPageView } from "../../content/legal-page-view";
+import { formatDate } from "../../lib/country-format";
 import { buildMetadata, localeUrl } from "../../lib/seo";
 import type { PageMetadata } from "../../lib/seo";
 
@@ -32,7 +33,9 @@ export default async function LegalNoticePage({ params }: { params: Promise<{ lo
         { name: page.title, url: localeUrl(locale, HREF) }
       ]}
       page={page}
-      lastUpdatedLabel={t("lastUpdated", { date: page.updatedAt })}
+      kicker={t("kicker")}
+      lastUpdatedLabel={t("lastUpdated", { date: formatDate(page.updatedAt, { locale }) })}
+      tocTitle={t("tocTitle")}
       placeholdersTitle={t("placeholdersTitle")}
       placeholderNotice={t("placeholderNotice")}
     />

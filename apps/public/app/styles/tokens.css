@@ -1,120 +1,223 @@
 /*
- * AssurMatch brand tokens (PRD sections 9 to 11).
+ * Public site design tokens.
  *
- * Green is a validation colour only: it is never a page background and never a primary button.
- * The sponsored badge is warning-600 on warning-100. Nothing is ever rendered below 14px.
+ * The shared back-office socle (`@assurmatch/ui/tokens.css`, used by apps/admin and apps/broker) is
+ * imported as-is and NEVER edited. Everything below extends it for the public site only: new steps of
+ * each scale, semantic aliases, gradients, elevation, motion and layout. Every historical variable
+ * name keeps working; the ones re-declared here only change their value for `apps/public`.
+ *
+ * Invariants: green (`--am-success-*`) is a validation colour only - never a page background, never a
+ * primary button. The sponsored badge stays orange (warning-800 text on warning-50, warning-600
+ * border and icon: 6.95:1). Nothing renders below 14px.
  */
 
+@import "@assurmatch/ui/tokens.css";
+
 :root {
-  /* Brand blue */
-  --am-primary-700: #12377f;
-  --am-primary-600: #1b4fbf;
+  /* ---------- Brand blue, full scale ---------- */
+  --am-primary-50: #f2f6fe;
+  --am-primary-100: #e2ebfc;
+  --am-primary-200: #c6d8f8;
+  --am-primary-300: #9bbcf2;
+  --am-primary-400: #6497e6;
   --am-primary-500: #2e6bd6;
-  --am-primary-100: #e4ecfb;
-  --am-primary-50: #f3f6fd;
+  --am-primary-600: #1b4fbf;
+  --am-primary-700: #12377f;
+  /* Intermediate step used as the last stop of `--am-gradient-navy` (it must not be a raw hex). */
+  --am-primary-750: #10336f;
+  --am-primary-800: #0d2a63;
+  --am-primary-900: #081b45;
 
-  /* Validation green: ticks, "Agree" badge, score >= 75 */
-  --am-success-700: #2e7d1f;
-  --am-success-600: #43a82a;
-  --am-success-100: #e6f4e1;
-
-  /* Sponsored / caution */
-  --am-warning-600: #d97706;
-  --am-warning-100: #fef3e2;
-
-  /* Errors */
-  --am-danger-600: #c62828;
-  --am-danger-100: #fde8e8;
-
-  /* Neutrals */
-  --am-neutral-900: #101828;
-  --am-neutral-700: #344054;
-  --am-neutral-500: #667085;
-  --am-neutral-300: #d0d5dd;
-  --am-neutral-100: #f2f4f7;
+  /* ---------- Neutrals ---------- */
   --am-neutral-0: #ffffff;
+  --am-neutral-50: #fafbfd;
+  --am-neutral-100: #f2f5fa;
+  --am-neutral-200: #e3e8f0;
+  --am-neutral-300: #cfd7e3;
+  --am-neutral-400: #9aa6bb;
+  --am-neutral-500: #667085;
+  --am-neutral-600: #4d5a70;
+  --am-neutral-700: #344054;
+  --am-neutral-800: #1f2a3c;
+  --am-neutral-900: #101828;
 
-  /* Channels */
+  /* ---------- Validation green (never a background of a page or a primary button) ---------- */
+  --am-success-50: #f1f9ee;
+  --am-success-100: #e2f2db;
+  --am-success-500: #4fb832;
+  --am-success-600: #3d9a26;
+  --am-success-700: #2e7d1f;
+  /* Text step: 6.44:1 on success-50, 5.92:1 on success-100 (WCAG AA for any size). */
+  --am-success-800: #256718;
+
+  /* ---------- Sponsored / caution orange ---------- */
+  --am-warning-50: #fff9f0;
+  --am-warning-100: #fdeed8;
+  --am-warning-500: #ef8f1c;
+  --am-warning-600: #d97706;
+  --am-warning-700: #a75a04;
+  /* Text step: 6.95:1 on warning-50, 6.38:1 on warning-100 (WCAG AA for any size). */
+  --am-warning-800: #8a4303;
+
+  /* ---------- Errors ---------- */
+  --am-danger-50: #fef5f5;
+  --am-danger-100: #fbe2e2;
+  --am-danger-500: #e14242;
+  --am-danger-600: #c62828;
+  --am-danger-700: #9a1f1f;
+
+  /* ---------- Neutral information (distinct from the brand blue) ---------- */
+  --am-info-50: #f0f8fd;
+  --am-info-100: #ddeefa;
+  --am-info-500: #2b9ad6;
+  --am-info-600: #1b7cb0;
+  --am-info-700: #14608a;
+
+  /* ---------- Semantic aliases: prefer these in components ---------- */
+  --am-canvas: #f6f8fc;
+  --am-bg: var(--am-canvas);
+  --am-surface: var(--am-neutral-0);
+  --am-surface-raised: var(--am-neutral-0);
+  --am-surface-muted: var(--am-neutral-100);
+  --am-surface-brand: var(--am-primary-50);
+  --am-surface-navy: var(--am-primary-900);
+  --am-border: #e3e8f0;
+  --am-border-strong: #cfd7e3;
+  --am-border-brand: var(--am-primary-200);
+  --am-text: var(--am-neutral-900);
+  --am-text-muted: var(--am-neutral-700);
+  --am-text-subtle: var(--am-neutral-500);
+  --am-text-invert: var(--am-neutral-0);
+  --am-link: var(--am-primary-600);
+  --am-link-hover: var(--am-primary-700);
+
+  /* ---------- Channels ----------
+   * Brand exception: WhatsApp owns this green. It is a channel colour, never the validation green,
+   * and it is only ever used on the WhatsApp button and on the WhatsApp glyph. */
   --am-whatsapp: #25d366;
+  --am-whatsapp-dark: #1da851;
+  /* Ink on the WhatsApp green: 7.08:1 on --am-whatsapp, 4.53:1 on --am-whatsapp-dark. */
+  --am-whatsapp-ink: #06331a;
 
-  /* Typography */
-  --am-font-heading: var(--font-am-heading), "Nunito", system-ui, "Segoe UI", Arial, sans-serif;
-  --am-font-body: var(--font-am-body), "Inter", system-ui, "Segoe UI", Arial, sans-serif;
+  /* ---------- Gradients ---------- */
+  --am-gradient-brand: linear-gradient(135deg, var(--am-primary-600) 0%, var(--am-primary-500) 100%);
+  --am-gradient-brand-strong: linear-gradient(135deg, var(--am-primary-700) 0%, var(--am-primary-500) 100%);
+  --am-gradient-navy: linear-gradient(160deg, var(--am-primary-900) 0%, var(--am-primary-800) 55%, var(--am-primary-750) 100%);
+  --am-gradient-hero: linear-gradient(180deg, #eef3fd 0%, #f6f8fc 62%, var(--am-canvas) 100%);
+  --am-gradient-mesh:
+    radial-gradient(52rem 32rem at 12% -10%, rgba(46, 107, 214, 0.16), transparent 62%),
+    radial-gradient(44rem 28rem at 92% 4%, rgba(100, 151, 230, 0.18), transparent 60%),
+    radial-gradient(38rem 26rem at 58% 108%, rgba(18, 55, 127, 0.1), transparent 66%);
+  --am-gradient-mesh-navy:
+    radial-gradient(48rem 30rem at 8% -14%, rgba(46, 107, 214, 0.42), transparent 62%),
+    radial-gradient(40rem 26rem at 96% 8%, rgba(100, 151, 230, 0.26), transparent 60%);
+  --am-gradient-sheen: linear-gradient(120deg, rgba(255, 255, 255, 0) 12%, rgba(255, 255, 255, 0.24) 48%, rgba(255, 255, 255, 0) 84%);
 
-  --am-h1-size: 32px;
-  --am-h1-line: 44px;
-  --am-h2-size: 26px;
-  --am-h2-line: 32px;
-  --am-h3-size: 20px;
-  --am-h3-line: 24px;
-  --am-body-size: 16px;
-  --am-body-line: 26px;
-  --am-small-size: 14px;
-  --am-small-line: 22px;
+  /* ---------- Elevation (soft navy-tinted layers) ---------- */
+  --am-shadow-xs: 0 1px 2px rgba(16, 24, 40, 0.05);
+  --am-shadow-sm: 0 1px 2px rgba(16, 24, 40, 0.05), 0 2px 6px rgba(16, 24, 40, 0.05);
+  --am-shadow-md: 0 2px 4px rgba(16, 24, 40, 0.04), 0 8px 20px rgba(16, 24, 40, 0.08);
+  --am-shadow-lg: 0 4px 8px rgba(16, 24, 40, 0.04), 0 16px 36px rgba(16, 24, 40, 0.1);
+  --am-shadow-xl: 0 8px 16px rgba(16, 24, 40, 0.05), 0 28px 64px rgba(13, 42, 99, 0.16);
+  --am-shadow-glow: 0 6px 20px rgba(27, 79, 191, 0.28);
+  --am-shadow-glow-soft: 0 4px 14px rgba(27, 79, 191, 0.16);
+  --am-shadow-inset: inset 0 1px 0 rgba(255, 255, 255, 0.12);
 
-  /* Spacing scale */
-  --am-space-4: 4px;
-  --am-space-8: 8px;
-  --am-space-12: 12px;
-  --am-space-16: 16px;
-  --am-space-24: 24px;
-  --am-space-32: 32px;
-  --am-space-48: 48px;
-  --am-space-64: 64px;
-  --am-space-96: 96px;
+  /* ---------- Focus ring ---------- */
+  --am-ring-color: var(--am-primary-500);
+  --am-ring: 0 0 0 2px var(--am-neutral-0), 0 0 0 4px var(--am-primary-500);
+  --am-ring-invert: 0 0 0 2px var(--am-primary-900), 0 0 0 4px var(--am-primary-200);
 
-  /* Radii */
-  --am-radius-field: 8px;
-  --am-radius-card: 12px;
+  /* ---------- Radii ---------- */
+  --am-radius-xs: 4px;
+  --am-radius-sm: 8px;
+  --am-radius-md: 12px;
+  --am-radius-lg: 16px;
+  --am-radius-xl: 24px;
+  --am-radius-field: 10px;
+  --am-radius-card: 16px;
+  --am-radius-panel: 24px;
   --am-radius-pill: 999px;
 
-  /* Elevation */
-  --am-shadow-sm: 0 1px 2px rgba(16, 24, 40, 0.06);
-  --am-shadow-md: 0 4px 12px rgba(16, 24, 40, 0.1);
+  /* ---------- Spacing ---------- */
+  --am-space-2: 2px;
+  --am-space-4: 4px;
+  --am-space-6: 6px;
+  --am-space-8: 8px;
+  --am-space-10: 10px;
+  --am-space-12: 12px;
+  --am-space-16: 16px;
+  --am-space-20: 20px;
+  --am-space-24: 24px;
+  --am-space-28: 28px;
+  --am-space-32: 32px;
+  --am-space-40: 40px;
+  --am-space-48: 48px;
+  --am-space-56: 56px;
+  --am-space-64: 64px;
+  --am-space-80: 80px;
+  --am-space-96: 96px;
+  --am-space-112: 112px;
+  --am-space-128: 128px;
 
-  /* Layout */
+  /* ---------- Fluid typography (caption is the 14px floor) ---------- */
+  --am-display-size: clamp(40px, 1.9rem + 2.6vw, 60px);
+  --am-display-line: 1.05;
+  --am-h1-size: clamp(32px, 1.7rem + 1.9vw, 48px);
+  --am-h1-line: 1.1;
+  --am-h2-size: clamp(26px, 1.45rem + 1.2vw, 36px);
+  --am-h2-line: 1.18;
+  --am-h3-size: clamp(20px, 1.2rem + 0.25vw, 22px);
+  --am-h3-line: 1.3;
+  --am-h4-size: clamp(17px, 1.05rem + 0.1vw, 18px);
+  --am-h4-line: 1.4;
+  --am-lead-size: clamp(17px, 1rem + 0.45vw, 20px);
+  --am-lead-line: 1.6;
+  --am-body-size: clamp(16px, 0.98rem + 0.12vw, 17px);
+  --am-body-line: 1.65;
+  --am-small-size: 15px;
+  --am-small-line: 1.55;
+  --am-caption-size: 14px;
+  --am-caption-line: 1.5;
+  --am-stat-size: clamp(34px, 1.6rem + 2vw, 44px);
+
+  --am-tracking-tight: -0.02em;
+  --am-tracking-snug: -0.01em;
+  --am-tracking-wide: 0.08em;
+
+  /* ---------- Motion ---------- */
+  --am-duration-instant: 120ms;
+  --am-duration-fast: 200ms;
+  --am-duration-base: 320ms;
+  --am-duration-slow: 520ms;
+  --am-ease-out: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --am-ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
+  --am-ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+  --am-transition: var(--am-duration-fast) var(--am-ease-out);
+  --am-stagger: 70ms;
+
+  /* ---------- z-index scale ---------- */
+  --am-z-base: 1;
+  --am-z-raised: 10;
+  --am-z-sticky: 20;
+  --am-z-header: 40;
+  --am-z-overlay: 50;
+  --am-z-modal: 60;
+  --am-z-toast: 70;
+  --am-z-skip: 100;
+
+  /* ---------- Layout ---------- */
   --am-content: 1200px;
-  --am-gutter: 16px;
-  --am-section: 48px;
-  --am-header: 64px;
-
-  /* ---------- Legacy aliases ----------
-   * The pages moved from the pre-brand shell still reference --pub-*; each alias now points at a
-   * brand token so untouched markup keeps rendering on the new palette.
-   */
-  --pub-primary: var(--am-primary-700);
-  --pub-primary-soft: var(--am-primary-100);
-  --pub-accent: var(--am-primary-600);
-  --pub-bg: var(--am-neutral-0);
-  --pub-surface: var(--am-neutral-0);
-  --pub-surface-muted: var(--am-neutral-100);
-  --pub-border: var(--am-neutral-300);
-  --pub-border-strong: var(--am-neutral-300);
-  --pub-text: var(--am-neutral-900);
-  --pub-strong: var(--am-neutral-900);
-  --pub-muted: var(--am-neutral-500);
-  --pub-success: var(--am-success-700);
-  --pub-warning: var(--am-warning-600);
-  --pub-danger: var(--am-danger-600);
-  --pub-disabled: var(--am-neutral-500);
-  --pub-focus: var(--am-primary-500);
-  --pub-radius: var(--am-radius-card);
-  --pub-shadow: var(--am-shadow-md);
-  --pub-gutter: var(--am-gutter);
-  --pub-content: var(--am-content);
+  --am-content-wide: 1320px;
+  --am-content-narrow: 760px;
+  --am-gutter: 20px;
+  --am-header: 72px;
+  --am-section: clamp(56px, 5vw, 112px);
+  --am-section-compact: clamp(40px, 3.4vw, 64px);
 }
 
 @media (min-width: 900px) {
   :root {
-    --am-h1-size: 44px;
-    --am-h1-line: 54px;
-    --am-h2-size: 32px;
-    --am-h2-line: 40px;
-    --am-h3-size: 22px;
-    --am-h3-line: 28px;
-    --am-body-size: 17px;
-    --am-body-line: 28px;
-    --am-gutter: 24px;
-    --am-section: 96px;
+    --am-gutter: 32px;
   }
 }

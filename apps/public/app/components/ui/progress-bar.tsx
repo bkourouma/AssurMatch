@@ -1,3 +1,5 @@
+import { Icon } from "./icons";
+
 export interface ProgressStep {
   label: string;
 }
@@ -12,6 +14,7 @@ export interface ProgressBarProps {
   stepLabel: string;
 }
 
+/** Numbered circles joined by a connector: done is a green tick, current is the brand gradient. */
 export function ProgressBar({ steps, current, label, stepLabel }: ProgressBarProps) {
   return (
     <nav className="am-progress" aria-label={label}>
@@ -26,8 +29,10 @@ export function ProgressBar({ steps, current, label, stepLabel }: ProgressBarPro
               data-state={state}
               aria-current={state === "current" ? "step" : undefined}
             >
-              <span className="am-progress__index">{position}</span>
-              <span>{step.label}</span>
+              <span className="am-progress__index" aria-hidden="true">
+                {state === "done" ? <Icon name="check" size={18} /> : position}
+              </span>
+              <span className="am-progress__label">{step.label}</span>
               {state === "current" ? <span className="am-visually-hidden">{stepLabel}</span> : null}
             </li>
           );

@@ -1,0 +1,555 @@
+/*
+ * Home page only (`app/[locale]/page.tsx`), imported from that page module so it lands after
+ * globals.css in the cascade. Nothing here re-declares a design-system primitive: every rule either
+ * composes `.am-*` classes or styles markup that exists on this page alone.
+ */
+
+/* ==========================================================================
+   1. Hero: text column, entry panel, decorative offer preview
+   ========================================================================== */
+
+/*
+ * Staggered entrance of the hero. `.am-animate-in` cannot be put on the kicker, the title or the
+ * lead (the `Hero` primitive renders them), so the same keyframe is applied here, in one place,
+ * with the same reduced-motion kill switch.
+ */
+.am-home-hero .am-hero__kicker,
+.am-home-hero .am-hero__title,
+.am-home-hero .am-hero__lead,
+.am-home-hero .am-home-hero__place,
+.am-home-hero .am-entry {
+  animation: am-fade-up var(--am-duration-slow) var(--am-ease-out) both;
+}
+
+.am-home-hero .am-hero__kicker {
+  animation-delay: 0ms;
+}
+
+.am-home-hero .am-hero__title {
+  animation-delay: 70ms;
+}
+
+.am-home-hero .am-hero__lead {
+  animation-delay: 140ms;
+}
+
+.am-home-hero .am-home-hero__place {
+  animation-delay: 210ms;
+}
+
+.am-home-hero .am-entry {
+  animation-delay: 280ms;
+}
+
+.am-home-hero .am-hero__inner {
+  gap: var(--am-space-20);
+}
+
+/** "Pays pre-selectionne : ..." — a quiet line, not a notice. */
+.am-home-hero__place {
+  display: flex;
+  gap: var(--am-space-8);
+  align-items: flex-start;
+  margin: 0;
+  color: var(--am-text-muted);
+  font-size: var(--am-small-size);
+  line-height: var(--am-small-line);
+}
+
+.am-home-hero__place .am-icon {
+  flex: none;
+  margin-top: 2px;
+  color: var(--am-primary-600);
+}
+
+/** The entry panel is the primary action of the page: it floats above the mesh gradient. */
+.am-home-hero .am-entry {
+  margin-top: var(--am-space-4);
+}
+
+/*
+ * In the hero the panel is only half the content width, so the three-column row of the primitive
+ * would squeeze both selects to a few characters. The selects keep a column each and the button
+ * takes the whole width underneath, which also makes the action unmistakable.
+ */
+@media (min-width: 560px) {
+  .am-home-hero .am-entry__row {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    align-items: end;
+  }
+
+  .am-home-hero .am-entry__row > .am-button {
+    grid-column: 1 / -1;
+  }
+}
+
+/** Heading of the entry panel; only the home page passes a title to `EntrySelector`. */
+.am-entry__title {
+  margin: 0;
+  color: var(--am-text);
+  font-family: var(--am-font-heading);
+  font-size: var(--am-h4-size);
+  font-weight: 800;
+  letter-spacing: var(--am-tracking-snug);
+  line-height: var(--am-h4-line);
+}
+
+/*
+ * Under 1024px the decorative column is dropped entirely, so the hero must go back to a single
+ * column (the primitive switches to two at 980px).
+ */
+@media (max-width: 1023.98px) {
+  .am-home-hero .am-hero__layout[data-columns="2"] {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .am-home-hero .am-hero__aside {
+    display: none;
+  }
+}
+
+@media (min-width: 1024px) {
+  .am-home-hero .am-hero__layout[data-columns="2"] {
+    grid-template-columns: minmax(0, 1.08fr) minmax(0, 0.92fr);
+  }
+}
+
+/* ---------- Decorative "offer preview" composition (CSS only, aria-hidden) ---------- */
+
+.am-preview {
+  position: relative;
+  display: grid;
+  padding: var(--am-space-24) var(--am-space-16) var(--am-space-32);
+  isolation: isolate;
+}
+
+.am-preview::before {
+  position: absolute;
+  z-index: -1;
+  inset: 8% -6% 4% -2%;
+  border-radius: 50%;
+  background: radial-gradient(60% 60% at 50% 50%, rgba(46, 107, 214, 0.22), rgba(46, 107, 214, 0) 70%);
+  content: "";
+  filter: blur(6px);
+}
+
+.am-preview__stack {
+  position: relative;
+  display: block;
+}
+
+.am-preview__card {
+  display: grid;
+  gap: var(--am-space-12);
+  padding: var(--am-space-20);
+  border: 1px solid var(--am-border);
+  border-radius: var(--am-radius-panel);
+  background: var(--am-surface);
+  box-shadow: var(--am-shadow-lg);
+}
+
+/* The two cards behind are partially visible, tilted and dimmed: a stack, not a list. */
+.am-preview__card--behind {
+  position: absolute;
+  right: 0;
+  left: 0;
+  padding: var(--am-space-16) var(--am-space-20);
+  opacity: 0.72;
+}
+
+.am-preview__card--behind:first-child {
+  top: 0;
+  transform: scale(0.88) translateY(-18px) rotate(-2.4deg);
+  opacity: 0.5;
+}
+
+.am-preview__card--behind:nth-child(2) {
+  top: 34px;
+  transform: scale(0.94) translateY(-6px) rotate(-1.2deg);
+}
+
+.am-preview__card--front {
+  position: relative;
+  z-index: 1;
+  margin-top: 84px;
+  border-color: var(--am-primary-200);
+  box-shadow: var(--am-shadow-xl);
+}
+
+.am-preview__head {
+  display: grid;
+  gap: var(--am-space-4) var(--am-space-12);
+  align-items: center;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+}
+
+.am-preview__head > .am-icontile {
+  grid-column: 1;
+  grid-row: 1 / span 2;
+}
+
+.am-preview__head .am-badge {
+  grid-column: 3;
+  grid-row: 1 / span 2;
+  align-self: center;
+}
+
+.am-preview__title {
+  grid-column: 2;
+  margin: 0;
+  color: var(--am-text);
+  font-family: var(--am-font-heading);
+  font-size: var(--am-h4-size);
+  font-weight: 800;
+  letter-spacing: var(--am-tracking-snug);
+  line-height: 1.2;
+}
+
+.am-preview__partner {
+  grid-column: 2;
+  display: flex;
+  gap: var(--am-space-6);
+  align-items: center;
+  margin: 0;
+  color: var(--am-text-subtle);
+  font-size: var(--am-caption-size);
+  line-height: var(--am-caption-line);
+}
+
+.am-preview__row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--am-space-8);
+  align-items: baseline;
+  justify-content: space-between;
+  padding-top: var(--am-space-12);
+  border-top: 1px solid var(--am-border);
+}
+
+.am-preview__label {
+  margin: 0;
+  color: var(--am-text-subtle);
+  font-size: var(--am-caption-size);
+  font-weight: 600;
+  line-height: var(--am-caption-line);
+}
+
+.am-preview__value {
+  margin: 0;
+  color: var(--am-primary-700);
+  font-family: var(--am-font-heading);
+  font-size: var(--am-h4-size);
+  font-weight: 800;
+}
+
+.am-preview__score {
+  display: grid;
+  gap: var(--am-space-6);
+}
+
+.am-preview__gauge {
+  display: block;
+  height: 8px;
+  border-radius: var(--am-radius-pill);
+  background: var(--am-neutral-100);
+}
+
+.am-preview__gauge::after {
+  display: block;
+  width: 72%;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--am-gradient-brand);
+  content: "";
+}
+
+/* Grey bars standing in for the copy of the two background cards. */
+.am-preview__ghost {
+  display: block;
+  height: 10px;
+  border-radius: var(--am-radius-pill);
+  background: var(--am-neutral-100);
+}
+
+.am-preview__ghost--short {
+  width: 52%;
+}
+
+.am-preview__ghostrow {
+  display: grid;
+  gap: var(--am-space-8);
+}
+
+/* ==========================================================================
+   2. Trust band: the three public counters
+   ========================================================================== */
+
+.am-home-stats {
+  display: grid;
+  gap: var(--am-space-20);
+  margin: 0;
+  padding: 0;
+  grid-template-columns: minmax(0, 1fr);
+  list-style: none;
+}
+
+@media (min-width: 768px) {
+  .am-home-stats {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+.am-home-stats > li {
+  display: grid;
+}
+
+.am-home-stats .am-card {
+  height: 100%;
+}
+
+.am-home-stats__notes {
+  display: grid;
+  gap: var(--am-space-4);
+  margin: var(--am-space-24) 0 0;
+}
+
+.am-home-stats__notes p {
+  margin: 0;
+  color: var(--am-text-subtle);
+  font-size: var(--am-caption-size);
+  line-height: var(--am-caption-line);
+}
+
+/* ==========================================================================
+   3. "Comment ca marche": three numbered steps with connectors
+   ========================================================================== */
+
+.am-home-steps {
+  display: grid;
+  gap: var(--am-space-20);
+  margin: 0;
+  padding: 0;
+  grid-template-columns: minmax(0, 1fr);
+  list-style: none;
+}
+
+@media (min-width: 900px) {
+  .am-home-steps {
+    gap: var(--am-space-32);
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+.am-home-step {
+  position: relative;
+  display: grid;
+  gap: var(--am-space-12);
+  align-content: start;
+  height: 100%;
+}
+
+/* The connector between two steps: a dotted rule with a soft dot at its end. */
+@media (min-width: 900px) {
+  .am-home-step:not(:last-child)::after {
+    position: absolute;
+    top: 28px;
+    right: calc(var(--am-space-32) * -1);
+    width: var(--am-space-32);
+    height: 2px;
+    background-image: linear-gradient(90deg, var(--am-primary-300) 0 6px, transparent 6px 12px);
+    background-size: 12px 2px;
+    content: "";
+  }
+}
+
+.am-home-steps + .am-cluster,
+.am-home-guides + .am-cluster {
+  margin-top: var(--am-space-32);
+}
+
+.am-home-step__head {
+  display: flex;
+  gap: var(--am-space-12);
+  align-items: center;
+  justify-content: space-between;
+}
+
+.am-home-step__index {
+  display: inline-flex;
+  width: 28px;
+  height: 28px;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--am-radius-pill);
+  background: var(--am-primary-50);
+  color: var(--am-primary-700);
+  font-family: var(--am-font-heading);
+  font-size: var(--am-caption-size);
+  font-variant-numeric: tabular-nums;
+  font-weight: 800;
+}
+
+.am-home-step__title {
+  margin: 0;
+}
+
+.am-home-step__body {
+  margin: 0;
+  color: var(--am-text-muted);
+}
+
+/* ==========================================================================
+   4. "Notre role": split panel, fait / ne fait pas
+   ========================================================================== */
+
+.am-home-role {
+  display: grid;
+  gap: var(--am-space-24);
+  align-items: start;
+  grid-template-columns: minmax(0, 1fr);
+}
+
+@media (min-width: 1024px) {
+  .am-home-role {
+    gap: var(--am-space-32);
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  }
+}
+
+.am-home-role__intro {
+  display: grid;
+  gap: var(--am-space-16);
+  align-content: start;
+}
+
+.am-home-role__intro p {
+  margin: 0;
+}
+
+.am-home-role__detail {
+  color: var(--am-text-muted);
+}
+
+.am-home-role__note {
+  color: var(--am-text-subtle);
+  font-size: var(--am-caption-size);
+  line-height: var(--am-caption-line);
+}
+
+.am-home-role__lists {
+  display: grid;
+  gap: var(--am-space-24);
+}
+
+.am-home-role__group {
+  display: grid;
+  gap: var(--am-space-12);
+}
+
+.am-home-role__grouptitle {
+  display: flex;
+  gap: var(--am-space-8);
+  align-items: center;
+  margin: 0;
+  font-size: var(--am-h4-size);
+  line-height: var(--am-h4-line);
+}
+
+/* Green is a validation colour: it marks the ticks of the "does" list and nothing else. */
+.am-home-role__group[data-tone="does"] .am-home-role__grouptitle .am-icon {
+  color: var(--am-success-600);
+}
+
+.am-home-role__group[data-tone="doesnot"] .am-home-role__grouptitle .am-icon {
+  color: var(--am-neutral-500);
+}
+
+.am-home-role__group + .am-home-role__group {
+  padding-top: var(--am-space-24);
+  border-top: 1px solid var(--am-border);
+}
+
+.am-checklist {
+  display: grid;
+  gap: var(--am-space-10);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.am-checklist li {
+  display: grid;
+  gap: var(--am-space-10);
+  align-items: start;
+  grid-template-columns: 20px minmax(0, 1fr);
+  color: var(--am-text-muted);
+  font-size: var(--am-small-size);
+  line-height: var(--am-small-line);
+}
+
+.am-checklist li .am-icon {
+  margin-top: 2px;
+}
+
+.am-checklist[data-tone="does"] li .am-icon {
+  color: var(--am-success-600);
+}
+
+.am-checklist[data-tone="doesnot"] li .am-icon {
+  color: var(--am-neutral-500);
+}
+
+/* ==========================================================================
+   5. Guides preview
+   ========================================================================== */
+
+.am-home-guides {
+  display: grid;
+  gap: var(--am-space-20);
+  margin: 0;
+  padding: 0;
+  grid-template-columns: minmax(0, 1fr);
+  list-style: none;
+}
+
+@media (min-width: 680px) {
+  .am-home-guides {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (min-width: 900px) {
+  .am-home-guides {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+/* ==========================================================================
+   6. Signature band (navy)
+   ========================================================================== */
+
+.am-home-signature .am-section__header {
+  max-width: 44rem;
+  margin-bottom: var(--am-space-24);
+}
+
+.am-home-signature .am-section__title {
+  font-size: var(--am-display-size);
+  line-height: var(--am-display-line);
+}
+
+.am-home-signature__notice {
+  max-width: 68ch;
+  margin: 0 auto;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .am-home-hero .am-hero__kicker,
+  .am-home-hero .am-hero__title,
+  .am-home-hero .am-hero__lead,
+  .am-home-hero .am-home-hero__place,
+  .am-home-hero .am-entry {
+    animation: none !important;
+  }
+}

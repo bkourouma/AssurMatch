@@ -1,9 +1,12 @@
 import type { ReactNode } from "react";
 import { Breadcrumb, type BreadcrumbEntry } from "../components/ui/breadcrumb";
+import { Hero } from "../components/ui/hero";
+import { Icon } from "../components/ui/icons";
 import { Notice } from "../components/ui/notice";
 import { Section } from "../components/ui/section";
 import { LegalPlaceholder } from "./legal-placeholder";
 import type { LegalPage } from "./types";
+import "../styles/pages/institutional.css";
 
 export interface LegalPageCountryNotice {
   text: string;
@@ -15,55 +18,101 @@ export interface LegalPageViewProps {
   breadcrumbLabel: string;
   breadcrumbItems: readonly BreadcrumbEntry[];
   page: LegalPage;
+  /** Uppercase line above the title, e.g. "Informations légales". */
+  kicker: string;
   /** Already interpolated, e.g. "Dernière mise à jour : 19/09/2026". */
   lastUpdatedLabel: string;
+  /** Heading of the in-page table of contents, e.g. "Sommaire". */
+  tocTitle: string;
   placeholdersTitle: string;
   placeholderNotice: string;
   countryNotice?: LegalPageCountryNotice;
 }
 
 /**
- * Shared renderer for the four legal pages and their four per-country variants: one `h1` (the page
- * title), then one `Section` per `ContentSection`, then a visibly separated "à compléter" notice when
- * the page carries placeholders. Kept under `app/content` (not `app/components`) because it is tied
- * to the `LegalPage` shape this folder owns, not a general-purpose UI primitive.
+ * Shared renderer for the four legal pages and their four per-country variants: a compact hero, a
+ * reading column (760px) with a table of contents when the page has more than one section, then a
+ * visibly separated "à compléter" notice when the page carries placeholders.
+ *
+ * Kept under `app/content` (not `app/components`) because it is tied to the `LegalPage` shape this
+ * folder owns, not a general-purpose UI primitive.
  */
-export function LegalPageView({ breadcrumbLabel, breadcrumbItems, page, lastUpdatedLabel, placeholdersTitle, placeholderNotice, countryNotice }: LegalPageViewProps) {
+export function LegalPageView({
+  breadcrumbLabel,
+  breadcrumbItems,
+  page,
+  kicker,
+  lastUpdatedLabel,
+  tocTitle,
+  placeholdersTitle,
+  placeholderNotice,
+  countryNotice
+}: LegalPageViewProps) {
   return (
     <>
-      <div className="am-container">
-        <Breadcrumb label={breadcrumbLabel} items={breadcrumbItems} />
-      </div>
+      <Hero
+        size="sm"
+        kicker={kicker}
+        title={page.title}
+        lead={page.description}
+        breadcrumb={<Breadcrumb label={breadcrumbLabel} items={breadcrumbItems} />}
+      />
 
-      <Section headingLevel={1} title={page.title} lead={page.description}>
-        <p className="pub-meta">{lastUpdatedLabel}</p>
+      <Section width="narrow">
+        <p className="am-legal-meta">
+          <Icon name="calendar" size={16} />
+          {lastUpdatedLabel}
+        </p>
+
         {countryNotice ? (
           <Notice tone="info" role="note">
             <p>{countryNotice.text}</p>
-            {countryNotice.action}
+            {countryNotice.action ? <div className="am-legal-notice__action">{countryNotice.action}</div> : null}
           </Notice>
         ) : null}
+
+        {page.sections.length > 1 ? (
+          <nav className="am-legal-toc" aria-label={tocTitle}>
+            <p className="am-legal-toc__title">
+              <Icon name="list" size={16} />
+              {tocTitle}
+            </p>
+            <ol className="am-legal-toc__list">
+              {page.sections.map((section) => (
+                <li key={section.id}>
+                  <a href={`#${section.id}`}>{section.heading}</a>
+                </li>
+              ))}
+            </ol>
+          </nav>
+        ) : null}
+
+        <div className="am-legal-body">
+          {page.sections.map((section) => (
+            <section className="am-legal-section" key={section.id} id={section.id}>
+              <h2>{section.heading}</h2>
+              {section.body.map((paragraph, index) => (
+                <p key={index}>{paragraph}</p>
+              ))}
+              {section.bullets ? (
+                <ul className="am-bullets">
+                  {section.bullets.map((bullet) => (
+                    <li key={bullet}>
+                      <Icon name="check" size={18} />
+                      <span>{bullet}</span>
+                    </li>
+                  ))}
+                </ul>
+              ) : null}
+            </section>
+          ))}
+        </div>
       </Section>
 
-      {page.sections.map((section) => (
-        <Section key={section.id} id={section.id} title={section.heading}>
-          {section.body.map((paragraph, index) => (
-            <p key={index}>{paragraph}</p>
-          ))}
-          {section.bullets ? (
-            <ul className="pub-list">
-              {section.bullets.map((bullet) => (
-                <li key={bullet}>{bullet}</li>
-              ))}
-            </ul>
-          ) : null}
-        </Section>
-      ))}
-
       {page.placeholders && page.placeholders.length > 0 ? (
-        <Section title={placeholdersTitle} tone="muted" id="a-completer">
+        <Section tone="muted" width="narrow" title={placeholdersTitle} id="a-completer" spacing="compact">
           <Notice tone="indicative" role="note">
-            <ul className="pub-list">
+            <ul className="am-legal-placeholders">
               {page.placeholders.map((label) => (
                 <li key={label}>
                   <LegalPlaceholder label={label} notice={placeholderNotice} />

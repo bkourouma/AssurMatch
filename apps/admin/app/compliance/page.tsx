@@ -1,26 +1,29 @@
-import { Badge, Card, PageHeader, StateMessage } from "../lib/ui/admin-ui";
+import { Badge, Button, Card, Grid, PageHeader, PageStack, StateMessage } from "../lib/ui/admin-ui";
 
 export default function ComplianceEvidencePage() {
   return (
-    <div className="page-stack">
+    <PageStack>
       <PageHeader
+        breadcrumb={[{ label: "Pilotage" }, { label: "Conformite" }]}
         kicker="Conformite"
         title="Preuves de conformite"
         description="Vue structuree des exigences de preuve: consentements, audits, licences et documents."
       />
-      <section className="admin-grid admin-grid--two">
-        <Card>
-          <h2 className="section-title">Consentements et audits</h2>
-          <p className="page-description">Les preuves critiques sont conservees selon la retention applicable et masquees dans les logs.</p>
+      <Grid columns="two">
+        <Card
+          title="Consentements et audits"
+          description="Les preuves critiques sont conservees selon la retention applicable et masquees dans les logs."
+        >
           <Badge tone="success">Historique opposable</Badge>
         </Card>
-        <Card>
-          <h2 className="section-title">Alertes</h2>
-          <p className="page-description">Les alertes conformite visibles restent issues des traces existantes.</p>
-          <a className="button button--secondary" href="/dashboard/compliance-alerts">Voir les alertes</a>
+        <Card
+          title="Alertes"
+          description="Les alertes conformite visibles restent issues des traces existantes."
+        >
+          <Button href="/dashboard/compliance-alerts" variant="secondary">Voir les alertes</Button>
         </Card>
-      </section>
+      </Grid>
       <StateMessage>Aucune preuve n'est creee ou modifiee par cette page de polish UX.</StateMessage>
-    </div>
+    </PageStack>
   );
 }

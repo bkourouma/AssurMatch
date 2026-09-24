@@ -24,7 +24,7 @@ export function Breadcrumb({ items, label }: BreadcrumbProps) {
             const last = index === items.length - 1;
             return (
               <li className="am-breadcrumb__item" key={item.url}>
-                {index > 0 ? <Icon name="chevron-right" size={16} /> : null}
+                {index > 0 ? <Icon name="chevron-right" size={14} /> : null}
                 {last ? <span aria-current="page">{item.name}</span> : <a href={item.url}>{item.name}</a>}
               </li>
             );

@@ -1,4 +1,11 @@
-/* Reset, typography and accessibility defaults for the AssurMatch public site. */
+/*
+ * Reset, fluid typography, focus and layout utilities for the AssurMatch public site.
+ *
+ * No global `button {}`, `label {}` or `[role="alert"] {}` box lives here: those rules used to style
+ * every element that merely carried the role or the tag. Unclassed `button`/`label`/`input` keep a
+ * sane appearance through `:not([class])` safety nets at the end of components.css, which pages are
+ * free to opt out of simply by adding a class.
+ */
 
 *,
 *::before,
@@ -6,36 +13,55 @@
   box-sizing: border-box;
 }
 
+/*
+ * `overflow-x: clip` (not `hidden`): `hidden` would turn the root into a scroll container and break
+ * `position: sticky` / `scroll-padding-top`. `clip` only trims the overflow. It absorbs the few
+ * pixels a `Reveal from="left|right"` pre-state pushes past the viewport before it animates in,
+ * which otherwise flashed a horizontal scrollbar on every page load below 1024px.
+ */
+html,
+body {
+  overflow-x: clip;
+}
+
 html {
-  background: var(--am-neutral-0);
-  color: var(--am-neutral-900);
+  background: var(--am-canvas);
+  color: var(--am-text);
   font-family: var(--am-font-body);
   font-size: 16px;
   -webkit-text-size-adjust: 100%;
   scroll-behavior: smooth;
+  scroll-padding-top: calc(var(--am-header) + var(--am-space-16));
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
 body {
   margin: 0;
   min-height: 100vh;
-  background: var(--am-neutral-0);
-  color: var(--am-neutral-900);
+  background: var(--am-canvas);
+  color: var(--am-text);
   font-family: var(--am-font-body);
   font-size: var(--am-body-size);
   line-height: var(--am-body-line);
+  text-rendering: optimizeLegibility;
 }
 
 img,
 svg,
 video,
+canvas,
 table {
   max-width: 100%;
 }
 
 img,
-svg {
+svg,
+video {
   height: auto;
 }
+
+/* ---------- Headings ---------- */
 
 h1,
 h2,
@@ -44,61 +70,91 @@ h4,
 h5,
 h6 {
   margin: 0 0 var(--am-space-12);
-  color: var(--am-neutral-900);
+  color: var(--am-text);
   font-family: var(--am-font-heading);
+  font-weight: 800;
+  letter-spacing: var(--am-tracking-tight);
   text-wrap: balance;
 }
 
 h1 {
   font-size: var(--am-h1-size);
-  font-weight: 800;
   line-height: var(--am-h1-line);
 }
 
 h2 {
   font-size: var(--am-h2-size);
-  font-weight: 800;
   line-height: var(--am-h2-line);
 }
 
 h3 {
   font-size: var(--am-h3-size);
   font-weight: 700;
+  letter-spacing: var(--am-tracking-snug);
   line-height: var(--am-h3-line);
 }
 
 h4,
 h5,
 h6 {
-  font-size: var(--am-body-size);
+  font-size: var(--am-h4-size);
   font-weight: 700;
-  line-height: var(--am-body-line);
+  letter-spacing: var(--am-tracking-snug);
+  line-height: var(--am-h4-line);
 }
 
 p {
   margin: 0 0 var(--am-space-12);
+  text-wrap: pretty;
 }
 
-small,
-.am-small {
+small {
   font-size: var(--am-small-size);
   line-height: var(--am-small-line);
 }
 
+strong,
+b {
+  font-weight: 700;
+}
+
+/* ---------- Links ---------- */
+
 a {
-  color: var(--am-primary-600);
+  color: var(--am-link);
   text-decoration: underline;
-  text-underline-offset: 2px;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 3px;
+  transition: color var(--am-transition), text-decoration-color var(--am-transition);
 }
 
 a:hover {
-  color: var(--am-primary-700);
+  color: var(--am-link-hover);
+  text-decoration-color: currentColor;
 }
 
-:focus-visible {
-  outline: 3px solid var(--am-primary-500);
-  outline-offset: 2px;
+/* ---------- Lists ---------- */
+
+ul,
+ol {
+  margin: 0 0 var(--am-space-12);
 }
+
+li::marker {
+  color: var(--am-primary-500);
+}
+
+ol li::marker {
+  color: var(--am-neutral-500);
+  font-weight: 700;
+}
+
+dl,
+dd {
+  margin: 0;
+}
+
+/* ---------- Forms inherit the page type ---------- */
 
 button,
 input,
@@ -108,27 +164,170 @@ textarea {
   color: inherit;
 }
 
-/* Tap targets stay reachable on a phone. */
-button,
-select,
-a.am-button,
-input:not([type="checkbox"]):not([type="radio"]):not([type="hidden"]) {
-  min-height: 44px;
+/* ---------- Focus ---------- */
+
+:focus-visible {
+  outline: 2px solid var(--am-ring-color);
+  outline-offset: 2px;
+  border-radius: var(--am-radius-xs);
 }
 
-ul,
-ol {
-  margin: 0 0 var(--am-space-12);
+a:focus-visible,
+button:focus-visible,
+summary:focus-visible,
+[tabindex]:focus-visible {
+  outline: 2px solid var(--am-ring-color);
+  outline-offset: 3px;
 }
+
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible {
+  outline: 2px solid var(--am-ring-color);
+  outline-offset: 1px;
+}
+
+::selection {
+  background: var(--am-primary-200);
+  color: var(--am-primary-900);
+}
+
+/* ---------- Misc elements ---------- */
 
 hr {
   border: 0;
-  border-top: 1px solid var(--am-neutral-300);
+  border-top: 1px solid var(--am-border);
   margin: var(--am-space-24) 0;
 }
 
 [hidden] {
   display: none !important;
+}
+
+/* neutral-400 was 2.46:1 on a white control; neutral-500 reaches 4.97:1. */
+::placeholder {
+  color: var(--am-neutral-500);
+  opacity: 1;
+}
+
+/* ---------- Layout utilities ---------- */
+
+.am-container {
+  width: 100%;
+  max-width: var(--am-content);
+  margin: 0 auto;
+  padding-left: var(--am-gutter);
+  padding-right: var(--am-gutter);
+}
+
+.am-container--wide {
+  max-width: var(--am-content-wide);
+}
+
+.am-container--narrow {
+  max-width: var(--am-content-narrow);
+}
+
+/** Vertical rhythm; override the gap with `--gap` inline or in a page sheet. */
+.am-stack {
+  display: grid;
+  gap: var(--gap, var(--am-space-16));
+  align-content: start;
+}
+
+.am-stack--lg {
+  --gap: var(--am-space-24);
+}
+
+.am-stack--xl {
+  --gap: var(--am-space-32);
+}
+
+/** Horizontal group that wraps; the canonical row of buttons. */
+.am-cluster {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--gap, var(--am-space-12));
+  align-items: center;
+}
+
+.am-cluster--between {
+  justify-content: space-between;
+}
+
+.am-cluster--end {
+  justify-content: flex-end;
+}
+
+/** Responsive grid: set `--min` (default 260px) for the smallest acceptable column. */
+.am-grid {
+  display: grid;
+  gap: var(--gap, var(--am-space-20));
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, var(--min, 260px)), 1fr));
+}
+
+.am-grid--2 {
+  --min: 320px;
+}
+
+.am-grid--3 {
+  --min: 260px;
+}
+
+.am-grid--4 {
+  --min: 200px;
+}
+
+/* ---------- Text utilities ---------- */
+
+/** Uppercase brand kicker above a title. Never below 14px. */
+.am-eyebrow {
+  display: block;
+  margin: 0 0 var(--am-space-8);
+  color: var(--am-primary-600);
+  font-family: var(--am-font-body);
+  font-size: var(--am-caption-size);
+  font-weight: 800;
+  letter-spacing: var(--am-tracking-wide);
+  line-height: var(--am-caption-line);
+  text-transform: uppercase;
+}
+
+.am-lead {
+  max-width: 68ch;
+  color: var(--am-text-muted);
+  font-size: var(--am-lead-size);
+  line-height: var(--am-lead-line);
+  text-wrap: pretty;
+}
+
+.am-muted {
+  color: var(--am-text-muted);
+}
+
+.am-subtle {
+  color: var(--am-text-subtle);
+}
+
+.am-small {
+  font-size: var(--am-small-size);
+  line-height: var(--am-small-line);
+}
+
+.am-caption {
+  font-size: var(--am-caption-size);
+  line-height: var(--am-caption-line);
+  color: var(--am-text-subtle);
+}
+
+/** Figures line up column by column: every number the site shows uses it. */
+.am-tabular {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum" 1;
+}
+
+.am-balance {
+  text-wrap: balance;
 }
 
 .am-visually-hidden {
@@ -143,6 +342,8 @@ hr {
   border: 0;
 }
 
+/* ---------- Reduced motion: the single kill switch for the whole site ---------- */
+
 @media (prefers-reduced-motion: reduce) {
   html {
     scroll-behavior: auto;
@@ -154,5 +355,8 @@ hr {
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
+    transition-delay: 0ms !important;
+    animation-delay: 0ms !important;
+    scroll-behavior: auto !important;
   }
 }

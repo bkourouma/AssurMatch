@@ -12,7 +12,7 @@ describe("local stop script safety", () => {
   it("filters stopped processes through AssurMatch launcher markers first", () => {
     expect(script).toContain("function Test-AssurMatchLocalProcess");
     expect(script).toContain("scripts\\local-app\\api-runner.mjs");
-    expect(script).toContain(".local\\logs\\public-3601.cmd");
+    expect(script).toContain("$escapedLogDir\\public-$PublicPort.cmd");
     expect(script).toContain("$portOwnerIds -contains $Process.ProcessId");
     expect(script).toContain("node_modules\\next\\dist\\server\\lib\\start-server.js");
     expect(script).toContain("node_modules\\next\\dist\\bin\\next");

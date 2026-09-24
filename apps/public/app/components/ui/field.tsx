@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { Icon, type IconName } from "./icons";
 
 export interface FieldProps {
   /** Id of the control rendered inside; label, hint and error are wired to it. */
@@ -14,18 +15,21 @@ export interface FieldProps {
   error?: string | undefined;
   required?: boolean | undefined;
   requiredLabel?: string | undefined;
+  /** Decorative glyph inside the control, on the left (search, phone, mail). */
+  leading?: IconName | undefined;
+  className?: string | undefined;
 }
 
 /**
  * Label always above the control, hint below it, error in danger-600. The hint and the error ids are
- * always exposed through `aria-describedby` on the control rendered by `renderControl`.
+ * always exposed through `aria-describedby` on the control rendered by `fieldControlProps`.
  */
-export function Field({ id, label, children, hint, error, required, requiredLabel }: FieldProps) {
+export function Field({ id, label, children, hint, error, required, requiredLabel, leading, className }: FieldProps) {
   const hintId = hint ? `${id}-hint` : undefined;
   const errorId = error ? `${id}-error` : undefined;
 
   return (
-    <div className="am-field">
+    <div className={className ? `am-field ${className}` : "am-field"}>
       <label className="am-field__label" htmlFor={id}>
         {label}
         {required ? (
@@ -35,7 +39,14 @@ export function Field({ id, label, children, hint, error, required, requiredLabe
         ) : null}
         {required && requiredLabel ? <span className="am-visually-hidden">{` (${requiredLabel})`}</span> : null}
       </label>
-      {children}
+      {leading ? (
+        <span className="am-field__wrap">
+          <Icon name={leading} size={20} className="am-field__leading" />
+          {children}
+        </span>
+      ) : (
+        children
+      )}
       {hint ? (
         <p className="am-field__hint" id={hintId}>
           {hint}
@@ -43,6 +54,7 @@ export function Field({ id, label, children, hint, error, required, requiredLabe
       ) : null}
       {error ? (
         <p className="am-field__error" id={errorId} role="alert">
+          <Icon name="alert" size={16} />
           {error}
         </p>
       ) : null}

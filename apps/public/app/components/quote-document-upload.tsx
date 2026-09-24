@@ -4,7 +4,10 @@ import { useTranslations } from "next-intl";
 import { useRouter } from "next/navigation";
 import { FormEvent, useState } from "react";
 import { uploadQuoteDocument, type PublicQuoteDocumentUploadState } from "../lib/public-api";
+import { Button } from "./ui/button";
 import { Field, fieldControlProps } from "./ui/field";
+import { Icon } from "./ui/icons";
+import { IconTile } from "./ui/icon-tile";
 import { Notice } from "./ui/notice";
 
 const kindKeys = [
@@ -49,9 +52,13 @@ export function QuoteDocumentUpload({ publicReference, token, remainingSlots }: 
   }
 
   return (
-    <form className="pub-card pub-card--plain pub-form" onSubmit={submit} aria-label={t("formLabel")}>
+    <form className="am-j-panel" onSubmit={submit} aria-label={t("formLabel")}>
+      <div className="am-j-panel__head">
+        <IconTile name="upload" size="lg" />
+        <h3 className="am-j-panel__title">{t("formLabel")}</h3>
+      </div>
       <Notice tone="info">{t("hint")}</Notice>
-      <div className="pub-form__grid pub-form__grid--two">
+      <div className="am-j-form__grid">
         <Field id="am-document-kind" label={t("kindLabel")}>
           <select {...fieldControlProps("am-document-kind", {})} name="documentKind" defaultValue="other">
             {kindKeys.map((value) => (
@@ -94,10 +101,10 @@ export function QuoteDocumentUpload({ publicReference, token, remainingSlots }: 
         </Notice>
       ) : null}
       <div className="am-cluster">
-        <button className="am-button" data-variant="primary" type="submit" disabled={state.status === "submitting"}>
-          <span>{t("submit")}</span>
-        </button>
-        <p className="am-field__hint">{t("remaining", { count: remainingSlots })}</p>
+        <Button type="submit" loading={state.status === "submitting"} icon={<Icon name="paperclip" size={18} />}>
+          {t("submit")}
+        </Button>
+        <p className="am-j-fineprint">{t("remaining", { count: remainingSlots })}</p>
       </div>
     </form>
   );

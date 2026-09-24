@@ -4,7 +4,6 @@ import { QuoteBlockedState, QuoteFormShell } from "../../../../../../components/
 import { TechnicalRoleNotice } from "../../../../../../components/public-journey";
 import { Breadcrumb } from "../../../../../../components/ui/breadcrumb";
 import { Hero } from "../../../../../../components/ui/hero";
-import { ProgressBar } from "../../../../../../components/ui/progress-bar";
 import { Section } from "../../../../../../components/ui/section";
 import { getPublicQuoteForm, listCountryDirectory, listPublicProducts } from "../../../../../../lib/public-api";
 import { buildMetadata, localeUrl } from "../../../../../../lib/seo";
@@ -57,55 +56,50 @@ export default async function PublicQuotePage({
   const products = await listPublicProducts(countryCode);
   const productName = products.data.find((item) => item.key === productKey)?.name ?? productKey;
 
-  const steps = [
-    { label: t("steps.contact") },
-    { label: t("steps.need") },
-    { label: t("steps.consent") },
-    { label: t("steps.confirmation") }
-  ];
-
   return (
     <>
-      <div className="am-container">
-        <Breadcrumb
-          label={common("breadcrumbLabel")}
-          items={[
-            { name: common("home"), url: localeUrl(locale, "/") },
-            { name: countries("breadcrumb"), url: localeUrl(locale, "/countries") },
-            { name: countryName, url: localeUrl(locale, "/countries/[countryCode]", { countryCode }) },
-            {
-              name: productName,
-              url: localeUrl(locale, "/countries/[countryCode]/products/[productKey]", { countryCode, productKey })
-            },
-            {
-              name: t("breadcrumb"),
-              url: localeUrl(locale, "/countries/[countryCode]/products/[productKey]/quote", { countryCode, productKey })
-            }
-          ]}
-        />
-      </div>
-
-      <Hero title={t("title")} lead={t("lead")}>
+      <Hero
+        kicker={t("kicker", { product: productName, country: countryName })}
+        title={t("title")}
+        lead={t("lead")}
+        size="sm"
+        breadcrumb={
+          <Breadcrumb
+            label={common("breadcrumbLabel")}
+            items={[
+              { name: common("home"), url: localeUrl(locale, "/") },
+              { name: countries("breadcrumb"), url: localeUrl(locale, "/countries") },
+              { name: countryName, url: localeUrl(locale, "/countries/[countryCode]", { countryCode }) },
+              {
+                name: productName,
+                url: localeUrl(locale, "/countries/[countryCode]/products/[productKey]", { countryCode, productKey })
+              },
+              {
+                name: t("breadcrumb"),
+                url: localeUrl(locale, "/countries/[countryCode]/products/[productKey]/quote", { countryCode, productKey })
+              }
+            ]}
+          />
+        }
+      >
         <TechnicalRoleNotice />
       </Hero>
 
       <Section>
-        <ProgressBar
-          steps={steps}
-          current={1}
-          label={t("progressLabel")}
-          stepLabel={t("stepStatus", { current: 1, total: steps.length })}
-        />
-        {quoteForm.status === "success" && quoteForm.data ? (
-          <QuoteFormShell
-            countryCode={countryCode}
-            productKey={productKey}
-            quoteForm={quoteForm.data}
-            selectedOfferId={selectedOfferId}
-          />
-        ) : (
-          <QuoteBlockedState />
-        )}
+        <div className="am-stack am-stack--xl am-j-column">
+          {/* The stepper travels with the form: only the client boundary knows the request went
+              through, and it moves to step 4 the moment it does. */}
+          {quoteForm.status === "success" && quoteForm.data ? (
+            <QuoteFormShell
+              countryCode={countryCode}
+              productKey={productKey}
+              quoteForm={quoteForm.data}
+              selectedOfferId={selectedOfferId}
+            />
+          ) : (
+            <QuoteBlockedState />
+          )}
+        </div>
       </Section>
     </>
   );
