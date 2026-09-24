@@ -21,6 +21,7 @@ const disabledFlags = [
   "whatsapp_enabled",
   "sponsored_offers_enabled",
   "multi_broker_routing_enabled",
+  "retention_purge_enabled",
   "ai_lead_scoring_enabled",
   "ai_summary_enabled",
   "ai_duplicate_detection_enabled",

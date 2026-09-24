@@ -20,7 +20,9 @@ export const GLOBAL_FEATURE_FLAG_DEFAULTS = {
   partner_api_enabled: false,
   partner_webhooks_enabled: false,
   sponsored_offers_enabled: false,
-  multi_broker_routing_enabled: false
+  multi_broker_routing_enabled: false,
+  /** Spec 046: executing an anonymization batch. Previews and policy edits work while it is off. */
+  retention_purge_enabled: false
 } as const;
 
 export const COUNTRY_FEATURE_FLAG_DEFAULTS = {

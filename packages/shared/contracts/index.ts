@@ -7,6 +7,7 @@ export * from "./catalog.contracts";
 export * from "./compliance.contracts";
 export * from "./content-safety";
 export * from "./dashboard.contracts";
+export * from "./data-retention.contracts";
 export * from "./error-codes";
 export * from "./feature-flag.contracts";
 export * from "./messaging-provider.contracts";

@@ -21,7 +21,8 @@ const explicitlyProtectedFeatureFlags = new Set([
   "sms_enabled",
   "whatsapp_enabled",
   "partner_api_enabled",
-  "partner_webhooks_enabled"
+  "partner_webhooks_enabled",
+  "retention_purge_enabled"
 ]);
 
 const regulatedFlagKeyFragments = [

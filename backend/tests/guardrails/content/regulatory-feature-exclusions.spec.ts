@@ -9,5 +9,7 @@ describe("regulated feature exclusions", () => {
     expect(GLOBAL_FEATURE_FLAG_DEFAULTS.claims_enabled).toBe(false);
     expect(GLOBAL_FEATURE_FLAG_DEFAULTS.insurer_api_enabled).toBe(false);
     expect(GLOBAL_FEATURE_FLAG_DEFAULTS.ai_recommendation_enabled).toBe(false);
+    // Spec 046: anonymization is irreversible, so executing a batch ships closed.
+    expect(GLOBAL_FEATURE_FLAG_DEFAULTS.retention_purge_enabled).toBe(false);
   });
 });

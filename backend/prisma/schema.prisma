@@ -302,6 +302,8 @@ model QuoteRequestDocument {
   sharedLeadAssignmentId String?
   sharedAt               DateTime?
   retentionUntil         DateTime
+  anonymizedAt           DateTime?
+  anonymizationBatchId   String?
   createdAt              DateTime                @default(now())
   updatedAt              DateTime                @updatedAt
 
@@ -603,6 +605,8 @@ model Country {
   regulatoryRegimeId String?
   status             CountryStatus    @default(draft)
   flags              Json
+  /// Spec 046: first transition to `public`; anchors the waiting-list retention.
+  publicSince        DateTime?
   createdAt          DateTime         @default(now())
   updatedAt          DateTime         @updatedAt
   createdById        String?
@@ -952,6 +956,8 @@ model Prospect {
   preferredContactChannel String?
   consentRecordIds        String[]
   retentionUntil          DateTime
+  anonymizedAt            DateTime?
+  anonymizationBatchId    String?
   createdAt               DateTime @default(now())
   updatedAt               DateTime @updatedAt
 
@@ -977,6 +983,8 @@ model QuoteRequest {
   manualReviewReason    String?
   correlationId         String?
   retentionUntil        DateTime
+  anonymizedAt          DateTime?
+  anonymizationBatchId  String?
   createdAt             DateTime           @default(now())
   updatedAt             DateTime           @updatedAt
 
@@ -1453,6 +1461,8 @@ model WaitlistEntry {
   ipHash          String?
   source          String              @default("public_web")
   retentionUntil  DateTime
+  anonymizedAt    DateTime?
+  anonymizationBatchId String?
   createdAt       DateTime            @default(now())
   updatedAt       DateTime            @updatedAt
 
@@ -1486,6 +1496,8 @@ model PartnerApplication {
   partnerTenantId         String?
   ipHash                  String?
   retentionUntil          DateTime
+  anonymizedAt            DateTime?
+  anonymizationBatchId    String?
   createdAt               DateTime                 @default(now())
   updatedAt               DateTime                 @updatedAt
 
@@ -1508,8 +1520,61 @@ model ContactMessage {
   status           ContactMessageStatus @default(new)
   ipHash           String?
   retentionUntil   DateTime
+  anonymizedAt     DateTime?
+  anonymizationBatchId String?
   createdAt        DateTime             @default(now())
   updatedAt        DateTime             @updatedAt
 
   @@index([audience, status, createdAt])
+}
+
+enum AnonymizationBatchKind {
+  retention
+  erasure
+}
+
+enum AnonymizationBatchStatus {
+  previewed
+  executed
+  refused
+  expired
+}
+
+/// Spec 046 D1: an override of a code default retention duration, global (countryId null) or per country.
+/// The partial unique index on (category) WHERE countryId IS NULL lives in migration 0018.
+model RetentionPolicy {
+  id            String   @id @default(uuid())
+  countryId     String?
+  category      String
+  retentionDays Int
+  reason        String
+  updatedById   String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@unique([countryId, category])
+}
+
+/// Spec 046 D2/D3: the durable proof of an anonymization. Stores target row ids only, never an
+/// e-mail address, a phone number or a fingerprint.
+model AnonymizationBatch {
+  id               String                   @id @default(uuid())
+  kind             AnonymizationBatchKind
+  status           AnonymizationBatchStatus @default(previewed)
+  countryId        String?
+  categories       String[]
+  erasureLookup    String?
+  reason           String
+  requestedById    String?
+  approvedById     String?
+  approvalReason   String?
+  targets          Json
+  counts           Json
+  previewExpiresAt DateTime
+  approvedAt       DateTime?
+  executedAt       DateTime?
+  createdAt        DateTime                 @default(now())
+  updatedAt        DateTime                 @updatedAt
+
+  @@index([status, createdAt])
 }

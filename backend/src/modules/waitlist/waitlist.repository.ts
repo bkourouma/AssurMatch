@@ -24,6 +24,7 @@ export interface WaitlistEntryRecord {
 export interface WaitlistRepository extends RuntimeRepository {
   create(entry: WaitlistEntryRecord): Promise<WaitlistEntryRecord>;
   findByCountryAndFingerprint(countryId: string, fingerprint: string): Promise<WaitlistEntryRecord | null>;
+  list(): Promise<WaitlistEntryRecord[]>;
 }
 
 export class MemoryWaitlistRepository implements WaitlistRepository {
@@ -46,11 +47,16 @@ export class MemoryWaitlistRepository implements WaitlistRepository {
       ) ?? null
     );
   }
+
+  async list(): Promise<WaitlistEntryRecord[]> {
+    return [...this.entries];
+  }
 }
 
 type WaitlistEntryDelegate = {
   create(input: unknown): Promise<unknown>;
   findUnique(input: unknown): Promise<unknown | null>;
+  findMany(input?: unknown): Promise<unknown[]>;
 };
 
 export class PrismaWaitlistRepository implements WaitlistRepository {
@@ -67,6 +73,10 @@ export class PrismaWaitlistRepository implements WaitlistRepository {
       where: { countryId_emailFingerprint: { countryId, emailFingerprint: fingerprint } }
     });
     return row ? this.toDomain(row) : null;
+  }
+
+  async list(): Promise<WaitlistEntryRecord[]> {
+    return (await this.client().findMany({ orderBy: { createdAt: "desc" } })).map((row) => this.toDomain(row));
   }
 
   private client(): WaitlistEntryDelegate {
