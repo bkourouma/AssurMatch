@@ -44,7 +44,7 @@ The PRD backlog through spec 046 is implemented and validated. End-to-end testin
 5. P2 - External CRM connectors for Enterprise partners, on top of the existing partner API and webhooks.
 6. P2 - Document extraction and manager assistant AI assists (PRD Enterprise-only rows) once the current AI surfaces have production feedback.
 7. P2 - Outbound confirmation e-mail for the waitlist, contact and broker-application public forms (spec 045 left this out; the quote-notification worker only drains quote-request notifications).
-8. Ops - The preproduction deployment chain is stalled. `deploy-preproduction` targets the self-hosted runner `assurmatch-preprod`, which has been offline since at least 2026-09-24: the job waits in queue for GitHub's 24 h maximum and is then cancelled, so every push to `main` leaves a cancelled CI run (`verify`, `secret-scan` and `build-images` all pass; run `36066431554` is the reference). The GHCR images are published, only the preproduction containers are stale. `timeout-minutes` does not help - it covers execution, not queue time. Restarting the runner on the VPS is a human operation; a deployment still requires explicit approval.
+8. Ops - Preproduction still runs the 2026-09-24 build. Deploying it is now blocked on the runner alone, no longer on CI. The queueing half was fixed on 2026-09-28 by PR #14: `deploy-preproduction` no longer runs on a plain push to `main`, so a merge stops waiting for GitHub's 24 h maximum and ending `cancelled` (before, run `36066431554`: `deploy-preproduction` cancelled after 24 h 07 while `verify`, `secret-scan` and `build-images` all passed; after, runs `36428092047` and `36430285640`: both green in about 8 min with the deploy job `skipped`). What remains is the runner itself: on 2026-09-28 `GET /repos/bkourouma/AssurMatch/actions/runners` returns `total_count: 0`, so `assurmatch-preprod` is not merely offline, it is no longer registered on the repository and has to be reinstalled on the VPS - a human operation. Once it is back, a deploy is opted into explicitly, either by running the workflow manually with `deploy_preproduction` ticked, or by setting the repository variable `PREPROD_AUTO_DEPLOY` to `true` while the runner stays up. The GHCR images keep being published on every merge to `main` under `sha-<commit>`, so a past commit can still be deployed once the runner returns; a deployment still requires explicit approval.
 
 ## Current Safe Slice
 
@@ -94,3 +94,7 @@ Two environment prerequisites, learned the hard way and not obvious from the scr
 - `npm run test` inherits the ambient `NODE_ENV`. Under `production`, 398 tests fail on
   `memory repository is test-only` (`backend/src/modules/common/repositories/runtime-repository.ts`),
   which is the guard doing its job, not a regression. Run the suite with `NODE_ENV=test`.
+
+Since that run `main` has advanced to `4e6cb20`, through PR #14 (CI workflow) and PR #13 (this
+document). Neither touched application code, and the CI `verify` job passed on both merge commits,
+so the baseline above still describes `main`.
