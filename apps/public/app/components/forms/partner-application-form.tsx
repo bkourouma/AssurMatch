@@ -1,6 +1,8 @@
 "use client";
 
 import { FormEvent, useMemo, useState } from "react";
+import { useLocale } from "next-intl";
+import { toLocale } from "../../../i18n/routing";
 import { track } from "../../lib/analytics";
 import { submitPartnerApplication, type PartnerApplicationSubmission } from "../../lib/public-api";
 import { Button } from "../ui/button";
@@ -129,6 +131,8 @@ export function PartnerApplicationForm({ countries, productsByCountry, plans, la
   const [countryCode, setCountryCode] = useState(initialCountry);
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
   const [state, setState] = useState<FormState>({ status: "idle" });
+  /** Spec 047: the language of the page, not of the browser, decides the confirmation e-mail. */
+  const locale = toLocale(useLocale());
 
   const products = useMemo(() => productsByCountry[countryCode] ?? [], [productsByCountry, countryCode]);
 
@@ -203,6 +207,7 @@ export function PartnerApplicationForm({ countries, productsByCountry, plans, la
       consent: true,
       website,
       sessionId,
+      locale,
       ...(tradeName ? { tradeName } : {}),
       ...(licenseIssuingAuthority ? { licenseIssuingAuthority } : {}),
       ...(whatsapp ? { whatsapp } : {}),

@@ -7,6 +7,8 @@ import {
   ContactMessagesService,
   type ContactMessagesDependencies
 } from "../../../src/modules/contact-messages/contact-messages.module";
+import type { ContactConfirmationContext } from "../../../src/modules/notifications/email/public-form-email-template.service";
+import type { PublicFormNotificationPort } from "../../../src/modules/notifications/public-form-notification.service";
 
 const KNOWN_COUNTRY_ID = "country-civ";
 const KNOWN_COUNTRY_CODE = "CI";
@@ -42,6 +44,25 @@ function validPayload(overrides: Record<string, unknown> = {}): Record<string, u
 function makeService(audit = new AuditLogWriter()): { service: ContactMessagesService; audit: AuditLogWriter } {
   const service = new ContactMessagesService(deps(), audit, new InMemoryRedisClient());
   return { service, audit };
+}
+
+/** Spec 047: records the confirmations the service asks for, without rendering or sending anything. */
+function makeServiceWithConfirmations(): { service: ContactMessagesService; confirmations: ContactConfirmationContext[] } {
+  const confirmations: ContactConfirmationContext[] = [];
+  const notifications: PublicFormNotificationPort = {
+    async confirmWaitlist() {
+      return "sent";
+    },
+    async confirmContact(context) {
+      confirmations.push(context);
+      return "sent";
+    },
+    async confirmPartnerApplication() {
+      return "sent";
+    }
+  };
+  const service = new ContactMessagesService({ ...deps(), notifications }, new AuditLogWriter(), new InMemoryRedisClient());
+  return { service, confirmations };
 }
 
 describe("ContactMessagesService", () => {
@@ -115,6 +136,42 @@ describe("ContactMessagesService", () => {
     expect(entry.context.countryId).toBe(KNOWN_COUNTRY_ID);
     expect(entry.context.subjectLength).toBe("Question sur mon devis".length);
     expect(typeof entry.context.emailFingerprint).toBe("string");
+  });
+
+  it("confirms an accepted message with its own reference, in the submitted locale (spec 047)", async () => {
+    const { service, confirmations } = makeServiceWithConfirmations();
+
+    const response = await service.submit(validPayload({ locale: "en" }), {
+      ipAddress: "203.0.113.90",
+      actor: anonymousActor
+    });
+
+    expect(confirmations).toEqual([
+      {
+        to: "jean.kouassi@example.com",
+        name: "Jean Kouassi",
+        publicReference: response.publicReference,
+        locale: "en"
+      }
+    ]);
+  });
+
+  it("never hands the submitted subject or body to the confirmation", async () => {
+    const { service, confirmations } = makeServiceWithConfirmations();
+
+    await service.submit(validPayload(), { ipAddress: "203.0.113.91", actor: anonymousActor });
+
+    const serialized = JSON.stringify(confirmations);
+    expect(serialized).not.toContain("Question sur mon devis");
+    expect(serialized).not.toContain("Bonjour, je voudrais");
+  });
+
+  it("refuses a locale outside the two supported ones", async () => {
+    const { service } = makeService();
+
+    await expect(
+      service.submit(validPayload({ locale: "es" }), { ipAddress: "203.0.113.92", actor: anonymousActor })
+    ).rejects.toThrow(/validation failed/i);
   });
 
   it("refuses an unauthorised actor from listing the admin inbox", async () => {

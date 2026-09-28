@@ -9,7 +9,12 @@ export type EmailPurpose =
   // stay distinguishable in the `email.delivery.*` audit trail.
   | "quote_visitor_confirmation"
   | "quote_visitor_non_routable"
-  | "quote_broker_lead";
+  | "quote_broker_lead"
+  // Spec 047: the three public-site forms confirm their own submission, so each one needs a
+  // distinct purpose in the `email.delivery.*` audit trail rather than a shared "public form" value.
+  | "public_waitlist_confirmation"
+  | "public_contact_confirmation"
+  | "public_partner_application_confirmation";
 export type EmailDeliveryStatus = "not_configured" | "previewed" | "sent" | "failed";
 export type EmailProvider = "disabled" | "mailpit" | "smtp";
 

@@ -13,6 +13,7 @@ interface WaitlistBody {
   website?: string;
   sessionId?: string;
   productKey?: string;
+  locale?: "fr" | "en";
 }
 
 /** Each case uses its own forwarded IP so the five-per-window counter never leaks between tests. */
@@ -56,6 +57,44 @@ describe("public waitlist runtime HTTP", () => {
     expect(await second.json()).toEqual(await first.json());
     expect(harness.runtime.audit.writer.search({ action: "waitlist.subscribed" })).toHaveLength(1);
     expect(harness.runtime.audit.writer.search({ action: "waitlist.duplicate_ignored" })).toHaveLength(1);
+  });
+
+  /**
+   * Spec 047. The test suite runs with no SMTP configured, so the confirmation lands on
+   * `not_configured`: enough to prove the runtime wired a sender into the waitlist module and that
+   * the endpoint accepts `locale`, without depending on a transport.
+   */
+  it("attempts a confirmation e-mail for an accepted subscription and audits it", async () => {
+    harness = await createRuntimeHttpHarness();
+    await seedWaitlistCountry(harness.runtime);
+
+    const response = await post(
+      harness,
+      { countryCode: "SN", email: "Confirme@Example.com", consent: true, locale: "en" },
+      "203.0.113.25"
+    );
+
+    expect(response.status).toBe(202);
+    const deliveries = harness.runtime.audit.writer
+      .search({ action: "email.delivery.not_configured" })
+      .filter((row) => row.targetId === "public_waitlist_confirmation");
+    expect(deliveries).toHaveLength(1);
+    expect(deliveries[0]?.context).toMatchObject({ recipientMasked: "c***@example.com" });
+  });
+
+  it("refuses an unsupported locale before writing anything", async () => {
+    harness = await createRuntimeHttpHarness();
+    await seedWaitlistCountry(harness.runtime);
+
+    const response = await post(
+      harness,
+      { countryCode: "SN", email: "espagnol@example.com", consent: true, locale: "es" as "fr" },
+      "203.0.113.26"
+    );
+
+    // A schema failure is a bad request; 422 is reserved for a submission the country refuses.
+    expect(response.status).toBe(400);
+    expect(harness.runtime.audit.writer.search({ action: "waitlist.subscribed" })).toHaveLength(0);
   });
 
   it("refuses a country that is already open to the public", async () => {

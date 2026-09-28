@@ -1,6 +1,8 @@
 "use client";
 
 import { FormEvent, useState } from "react";
+import { useLocale } from "next-intl";
+import { toLocale } from "../../../i18n/routing";
 import { track } from "../../lib/analytics";
 import { submitWaitlist, type WaitlistSubmission } from "../../lib/public-api";
 import { Button } from "../ui/button";
@@ -65,6 +67,12 @@ export function WaitlistForm({ countryIso, labels, products = [] }: WaitlistForm
   // Generated once per mounted form, so a reload is a new session for the abuse guard.
   const [sessionId] = useState(() => (typeof crypto !== "undefined" ? crypto.randomUUID() : ""));
   const [state, setState] = useState<FormState>({ status: "idle" });
+  /**
+   * Spec 047: the language of the page decides the language of the confirmation e-mail. Read from
+   * the locale the layout's `NextIntlClientProvider` publishes, not from the browser, so a visitor
+   * reading the French site is answered in French whatever their `Accept-Language` says.
+   */
+  const locale = toLocale(useLocale());
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -93,6 +101,7 @@ export function WaitlistForm({ countryIso, labels, products = [] }: WaitlistForm
       consent: true,
       website,
       sessionId,
+      locale,
       ...(productKey ? { productKey } : {})
     };
     const result = await submitWaitlist(payload);

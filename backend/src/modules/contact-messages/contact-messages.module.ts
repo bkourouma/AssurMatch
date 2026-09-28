@@ -1,7 +1,8 @@
 import {
   contactMessageCreateSchema,
   type ContactAudience,
-  type ContactMessageResponse
+  type ContactMessageResponse,
+  type PublicLocale
 } from "../../../../packages/shared/contracts/public-site.contracts";
 import type { AssurMatchRole } from "../../../../packages/shared/rbac/assurmatch-role-matrix";
 import { AuditLogWriter } from "../audit-logs/audit-log-writer.service";
@@ -12,6 +13,7 @@ import { InMemoryRedisClient, type RedisClientPort } from "../common/redis/redis
 import { QuoteRedisKeys } from "../common/redis/quote-redis-keys";
 import type { ActorContext } from "../common/types";
 import type { Country } from "../countries/countries.module";
+import type { PublicFormNotificationPort } from "../notifications/public-form-notification.service";
 import { ProspectIdentityService } from "../prospects/prospect-identity.service";
 import {
   MemoryContactMessagesRepository,
@@ -36,6 +38,8 @@ export interface ContactMessagesDependencies {
   /** Resolves an ISO country code to its record; only `id` is used. Left undefined when the
    *  submission carries no `countryCode` at all. */
   findCountryByCode: (countryCode: string) => Country | undefined | Promise<Country | undefined>;
+  /** Spec 047. Left out and no confirmation is sent; a submission still succeeds. */
+  notifications?: PublicFormNotificationPort;
 }
 
 export class ContactMessagesService {
@@ -143,16 +147,37 @@ export class ContactMessagesService {
       }
     });
 
-    // Outbound delivery (a confirmation e-mail or an in-app notification) is deliberately out of
-    // scope for this module: notifications are typed by `NotificationType` in the Prisma schema,
-    // and contact messages have no value in that enum yet. Wiring one up would need a new enum
-    // member plus its migration, which belongs to a separate change.
+    // Spec 047: the confirmation goes out through the audited e-mail delivery path used by the
+    // activation and password-reset messages, not through `Notification`: that table is typed by
+    // the `NotificationType` enum, which has no value for a contact message, and adding one would
+    // mean a migration for a row nothing reads. The rendered message carries the reference and
+    // never the submitted body.
+    await this.sendConfirmation(record, parsed.locale);
 
     return {
       status: "received",
       publicReference: record.publicReference,
       message: "Votre message a bien ete recu et sera lu par notre equipe."
     };
+  }
+
+  /**
+   * Runs after the message is stored and audited, and never changes the caller's outcome. The port
+   * reports its own outcome and `RuntimeEmailDeliveryService` audits it under `email.delivery.*`;
+   * the catch here only covers an unexpected throw, which must not undo a recorded message.
+   */
+  private async sendConfirmation(record: ContactMessageRecord, locale: PublicLocale | undefined): Promise<void> {
+    if (!this.deps.notifications) return;
+    try {
+      await this.deps.notifications.confirmContact({
+        to: record.emailNormalized,
+        name: record.name,
+        publicReference: record.publicReference,
+        ...(locale ? { locale } : {})
+      });
+    } catch {
+      // Intentionally ignored: see above.
+    }
   }
 
   async listForAdmin(actor: ActorContext, filter: ContactMessagesFilter = {}): Promise<ContactMessageAdminRow[]> {
