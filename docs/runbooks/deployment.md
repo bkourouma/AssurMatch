@@ -13,14 +13,50 @@ Why it is opt-in: when `assurmatch-preprod` is offline, GitHub does not fail the
 
 ## Before deploying
 
-Check that the runner is online: Settings > Actions > Runners, or
+Check the runner state: Settings > Actions > Runners, or
 
 ```bash
 gh api repos/bkourouma/AssurMatch/actions/runners \
-  -q '.runners[] | "\(.name)\t\(.status)\t\(.busy)"'
+  -q '.total_count, (.runners[] | "\(.name)\t\(.status)\t\(.busy)")'
 ```
 
-`offline` means the deploy will hang for 24 h. Bring the runner back up first.
+Three states, three different fixes:
+
+| Output | Meaning | Fix |
+| --- | --- | --- |
+| an `assurmatch-preprod` row, `online` | ready | deploy |
+| an `assurmatch-preprod` row, `offline` | registered, agent stopped | start the service on the host: `sudo ./svc.sh start` |
+| no `assurmatch-preprod` row (`total_count: 0`) | not registered at all | re-register it, see below |
+
+Either of the last two means the deploy job sits in the queue for 24 h, then gets cancelled and turns the whole run red.
+
+### Re-registering the runner
+
+The registration token is short-lived and belongs to a repository admin: generate it from Settings > Actions > Runners > "New self-hosted runner", use it directly on the host, never commit or paste it elsewhere.
+
+On the preproduction host, in the runner directory:
+
+```bash
+./config.sh --url https://github.com/bkourouma/AssurMatch \
+  --token <REGISTRATION_TOKEN> \
+  --name assurmatch-preprod \
+  --labels assurmatch-preprod \
+  --unattended
+sudo ./svc.sh install
+sudo ./svc.sh start
+```
+
+- **The `assurmatch-preprod` label is mandatory.** The deploy job declares `runs-on: [self-hosted, assurmatch-preprod]`; without that exact label GitHub never assigns it the job, whatever the runner is named.
+- Install it as a service (`svc.sh install`), not `./run.sh`: a foreground runner does not survive a host reboot and you land back on the 24 h queue.
+
+Then verify before deploying:
+
+```bash
+gh api repos/bkourouma/AssurMatch/actions/runners \
+  -q '.runners[] | "\(.name)\t\(.status)\t\([.labels[].name] | join(","))"'
+```
+
+Expect one `assurmatch-preprod` row, `online`, carrying both `self-hosted` and `assurmatch-preprod` in its labels.
 
 ## Steps
 
