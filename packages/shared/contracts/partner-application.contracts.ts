@@ -9,7 +9,7 @@ import {
   uuidSchema
 } from "../validation/common.schemas";
 import { billingPlanKeySchema } from "./billing.contracts";
-import { publicSubmissionGuardFieldsSchema } from "./public-site.contracts";
+import { publicLocaleSchema, publicSubmissionGuardFieldsSchema } from "./public-site.contracts";
 
 export const partnerApplicationStatusSchema = z.enum(["received", "under_review", "accepted", "rejected"]);
 
@@ -35,7 +35,8 @@ export const partnerApplicationCreateSchema = z.object({
   whatsapp: e164PhoneSchema.optional(),
   desiredPlan: billingPlanKeySchema,
   message: z.string().trim().max(2000).optional(),
-  consent: z.literal(true)
+  consent: z.literal(true),
+  locale: publicLocaleSchema.optional()
 }).extend(publicSubmissionGuardFieldsSchema.shape);
 
 export const partnerApplicationResponseSchema = z.object({

@@ -15,6 +15,17 @@ import { billingPlanKeySchema } from "./billing.contracts";
 export const contactAudienceSchema = z.enum(["visitor", "broker", "insurer", "press"]);
 
 /**
+ * Spec 047: the language the submitter was reading when they sent the form, used to pick the
+ * confirmation e-mail template. Mirrors the two locales the public site serves under
+ * `app/[locale]` (`apps/public/i18n/routing.ts`); it is deliberately narrower than
+ * `languageCodeSchema`, because an unsupported value has no template to render. Optional
+ * everywhere: an older client that does not send it still submits successfully and is answered
+ * in the default locale.
+ */
+export const publicLocaleSchema = z.enum(["fr", "en"]);
+export const PUBLIC_DEFAULT_LOCALE = "fr" as const;
+
+/**
  * Fields every public POST carries for abuse control. `website` is a honeypot: a real visitor
  * never fills it, so a non-empty value is refused by `PublicAbuseGuardService`. The `max(0)`
  * keeps the inferred type `string | undefined` for the front-end form state.
@@ -28,7 +39,8 @@ export const waitlistSubscribeSchema = z.object({
   countryCode: isoCountrySchema,
   email: emailSchema,
   productKey: nonEmptyStringSchema.optional(),
-  consent: z.literal(true)
+  consent: z.literal(true),
+  locale: publicLocaleSchema.optional()
 }).extend(publicSubmissionGuardFieldsSchema.shape);
 
 export const waitlistSubscribeResponseSchema = z.object({
@@ -45,7 +57,8 @@ export const contactMessageCreateSchema = z.object({
   countryCode: isoCountrySchema.optional(),
   subject: z.string().trim().min(3).max(160),
   message: z.string().trim().min(10).max(4000),
-  consent: z.literal(true)
+  consent: z.literal(true),
+  locale: publicLocaleSchema.optional()
 }).extend(publicSubmissionGuardFieldsSchema.shape);
 
 export const contactMessageResponseSchema = z.object({
@@ -126,6 +139,7 @@ export const consentWithdrawalResponseSchema = z.object({
 });
 
 export type ContactAudience = z.output<typeof contactAudienceSchema>;
+export type PublicLocale = z.output<typeof publicLocaleSchema>;
 export type PublicSubmissionGuardFields = z.output<typeof publicSubmissionGuardFieldsSchema>;
 export type WaitlistSubscribeDto = z.input<typeof waitlistSubscribeSchema>;
 export type WaitlistSubscribeInput = z.output<typeof waitlistSubscribeSchema>;

@@ -1,7 +1,9 @@
 "use client";
 
 import { FormEvent, useState } from "react";
+import { useLocale } from "next-intl";
 import { Link } from "../../../i18n/navigation";
+import { toLocale } from "../../../i18n/routing";
 import { track } from "../../lib/analytics";
 import { submitContact, type ContactSubmission } from "../../lib/public-api";
 import { Button } from "../ui/button";
@@ -102,6 +104,8 @@ export function ContactForm({ labels, countries }: ContactFormProps) {
   const [consentError, setConsentError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
   const [reference, setReference] = useState<string | null>(null);
+  /** Spec 047: the language of the page, not of the browser, decides the confirmation e-mail. */
+  const locale = toLocale(useLocale());
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -158,6 +162,7 @@ export function ContactForm({ labels, countries }: ContactFormProps) {
       message,
       consent: true,
       sessionId,
+      locale,
       ...(phone ? { phone } : {}),
       ...(countryCodePattern.test(countryCodeRaw) ? { countryCode: countryCodeRaw.toUpperCase() } : {})
     });

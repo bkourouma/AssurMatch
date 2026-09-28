@@ -5,6 +5,8 @@ import { InMemoryRedisClient } from "../../../src/modules/common/redis/redis.mod
 import type { ActorContext } from "../../../src/modules/common/types";
 import { CountriesModule, type Country } from "../../../src/modules/countries/countries.module";
 import { ProductsModule, type Product } from "../../../src/modules/products/products.module";
+import type { WaitlistConfirmationContext } from "../../../src/modules/notifications/email/public-form-email-template.service";
+import type { PublicFormNotificationPort } from "../../../src/modules/notifications/public-form-notification.service";
 import { ProspectIdentityService } from "../../../src/modules/prospects/prospect-identity.service";
 import { WaitlistModule } from "../../../src/modules/waitlist/waitlist.module";
 
@@ -22,9 +24,26 @@ interface Harness {
   countries: CountriesModule;
   products: ProductsModule;
   waitlist: WaitlistModule;
+  confirmations: WaitlistConfirmationContext[];
 }
 
-function buildHarness(): Harness {
+/** Spec 047: records the confirmations the service asks for, without rendering or sending anything. */
+function recordingNotifications(confirmations: WaitlistConfirmationContext[]): PublicFormNotificationPort {
+  return {
+    async confirmWaitlist(context) {
+      confirmations.push(context);
+      return "sent";
+    },
+    async confirmContact() {
+      return "sent";
+    },
+    async confirmPartnerApplication() {
+      return "sent";
+    }
+  };
+}
+
+function buildHarness(notifications?: PublicFormNotificationPort, confirmations: WaitlistConfirmationContext[] = []): Harness {
   const audit = new AuditLogsModule();
   const countries = new CountriesModule(audit.writer);
   const products = new ProductsModule(audit.writer);
@@ -33,12 +52,18 @@ function buildHarness(): Harness {
     {
       findCountryByCode: (countryCode) => countries.service.findByIsoCode(countryCode),
       findProductByKey: (productKey) => products.service.findByKey(productKey),
-      identity
+      identity,
+      ...(notifications ? { notifications } : {})
     },
     audit.writer,
     new InMemoryRedisClient()
   );
-  return { audit, countries, products, waitlist };
+  return { audit, countries, products, waitlist, confirmations };
+}
+
+function buildHarnessWithConfirmations(): Harness {
+  const confirmations: WaitlistConfirmationContext[] = [];
+  return buildHarness(recordingNotifications(confirmations), confirmations);
 }
 
 async function createWaitlistOnlyCountry(harness: Harness, isoCode = "SN"): Promise<Country> {
@@ -217,6 +242,84 @@ describe("WaitlistService.subscribe", () => {
     const subscribedRows = harness.audit.writer.search({ action: PUBLIC_SITE_AUDIT_ACTIONS.waitlistSubscribed });
     expect(subscribedRows).toHaveLength(1);
     expect(subscribedRows[0]?.scope).toMatchObject({ countryId: country.id, productId: product.id });
+  });
+
+  it("confirms an accepted subscription to the normalised address, in the submitted locale (spec 047)", async () => {
+    harness = buildHarnessWithConfirmations();
+    const country = await createWaitlistOnlyCountry(harness);
+
+    await harness.waitlist.service.subscribe(
+      { countryCode: country.isoCode, email: RAW_EMAIL, consent: true, locale: "en" },
+      { ipAddress: "203.0.113.30", actor }
+    );
+
+    expect(harness.confirmations).toEqual([
+      { to: RAW_EMAIL.toLowerCase(), countryCode: country.isoCode, locale: "en" }
+    ]);
+  });
+
+  it("omits the locale when the submission carries none, leaving the default to the template", async () => {
+    harness = buildHarnessWithConfirmations();
+    const country = await createWaitlistOnlyCountry(harness);
+
+    await harness.waitlist.service.subscribe(
+      { countryCode: country.isoCode, email: RAW_EMAIL, consent: true },
+      { ipAddress: "203.0.113.31", actor }
+    );
+
+    expect(harness.confirmations[0]).toEqual({ to: RAW_EMAIL.toLowerCase(), countryCode: country.isoCode });
+  });
+
+  /**
+   * Spec 047: the response already hides that the address was known. Skipping the confirmation on a
+   * duplicate would hand that same fact back to whoever owns the address.
+   */
+  it("confirms a duplicate subscription exactly like a first one", async () => {
+    harness = buildHarnessWithConfirmations();
+    const country = await createWaitlistOnlyCountry(harness);
+    const input = { countryCode: country.isoCode, email: RAW_EMAIL, consent: true };
+
+    await harness.waitlist.service.subscribe(input, { ipAddress: "203.0.113.32", actor });
+    await harness.waitlist.service.subscribe(input, { ipAddress: "203.0.113.32", actor });
+
+    expect(harness.confirmations).toHaveLength(2);
+    expect(harness.confirmations[1]).toEqual(harness.confirmations[0]);
+  });
+
+  it("refuses a locale outside the two supported ones", async () => {
+    const country = await createWaitlistOnlyCountry(harness);
+
+    await expect(
+      harness.waitlist.service.subscribe(
+        { countryCode: country.isoCode, email: RAW_EMAIL, consent: true, locale: "es" },
+        { ipAddress: "203.0.113.33", actor }
+      )
+    ).rejects.toThrow(/validation/i);
+  });
+
+  it("still accepts the subscription when the confirmation sender throws", async () => {
+    const failing: PublicFormNotificationPort = {
+      async confirmWaitlist() {
+        throw new Error("sender exploded");
+      },
+      async confirmContact() {
+        return "sent";
+      },
+      async confirmPartnerApplication() {
+        return "sent";
+      }
+    };
+    harness = buildHarness(failing);
+    const country = await createWaitlistOnlyCountry(harness);
+
+    // The entry is stored before the confirmation is attempted, so a throwing sender must not be
+    // able to turn a recorded subscription into an error for the visitor.
+    await expect(
+      harness.waitlist.service.subscribe(
+        { countryCode: country.isoCode, email: RAW_EMAIL, consent: true },
+        { ipAddress: "203.0.113.34", actor }
+      )
+    ).resolves.toMatchObject({ status: "accepted" });
   });
 
   it("never writes the raw e-mail address into any audit context", async () => {

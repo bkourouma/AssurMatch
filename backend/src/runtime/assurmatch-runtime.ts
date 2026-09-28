@@ -59,6 +59,7 @@ import { AuthModule } from "../modules/auth/auth.module";
 import { RuntimeEmailDeliveryService } from "../modules/notifications/email/email-delivery.service";
 import { QuoteEmailTemplateService } from "../modules/notifications/email/quote-email-template.service";
 import { QuoteNotificationDeliveryService } from "../modules/notifications/quote-notification-delivery.service";
+import { PublicFormNotificationService } from "../modules/notifications/public-form-notification.service";
 import { PartnerEligibilityService } from "../modules/partners/partner-eligibility.service";
 import { PartnerIntegrationsModule } from "../modules/partner-integrations/partner-integrations.module";
 import { MemoryPartnerIntegrationsRepository, PrismaPartnerIntegrationsRepository } from "../modules/partner-integrations/partner-integrations.repository";
@@ -380,20 +381,29 @@ export class AssurMatchRuntime {
     webhookDeliveryEnabled: process.env.ASSURMATCH_PARTNER_WEBHOOK_DELIVERY_ENABLED === "true",
     ...(this.partnerIntegrationsRepository ? { repository: this.partnerIntegrationsRepository } : {})
   });
+  /**
+   * Spec 047: the confirmation sender for the three public forms. It shares `emailDelivery` with
+   * the auth messages, so a deployment that has no SMTP configured keeps answering
+   * `not_configured` instead of failing a submission.
+   */
+  readonly publicFormNotifications = new PublicFormNotificationService(this.emailDelivery);
   /** Spec 045: public-site intake (waitlist, partner applications, contact) and public read models. */
   readonly waitlist = new WaitlistModule({
     findCountryByCode: (countryCode) => this.countries.service.findByIsoCode(countryCode),
     findProductByKey: (productKey) => this.products.service.findByKey(productKey),
     identity: this.prospects.identity,
-    globalFlags: () => this.publicJourneyGlobalFlags()
+    globalFlags: () => this.publicJourneyGlobalFlags(),
+    notifications: this.publicFormNotifications
   }, this.audit.writer, this.redis.client, this.waitlistRepository);
   readonly partnerApplications = new PartnerApplicationsModule({
     findCountryByCode: (countryCode) => this.countries.service.findByIsoCode(countryCode),
     findProductByKey: (productKey) => this.products.service.findByKey(productKey),
-    identity: this.prospects.identity
+    identity: this.prospects.identity,
+    notifications: this.publicFormNotifications
   }, this.audit.writer, this.redis.client, this.partnerApplicationsRepository);
   readonly contactMessages = new ContactMessagesModule({
-    findCountryByCode: (countryCode) => this.countries.service.findByIsoCode(countryCode)
+    findCountryByCode: (countryCode) => this.countries.service.findByIsoCode(countryCode),
+    notifications: this.publicFormNotifications
   }, this.audit.writer, this.redis.client, this.contactMessagesRepository);
   readonly publicPartnerDirectory = new PublicPartnerDirectoryService(
     this.partners.service,

@@ -6,6 +6,7 @@ import {
   type PartnerApplicationResponse,
   type PartnerApplicationStatus
 } from "../../../../packages/shared/contracts/partner-application.contracts";
+import type { PublicLocale } from "../../../../packages/shared/contracts/public-site.contracts";
 import type { AssurMatchRole } from "../../../../packages/shared/rbac/assurmatch-role-matrix";
 import { AuditLogWriter } from "../audit-logs/audit-log-writer.service";
 import { PUBLIC_SITE_AUDIT_ACTIONS } from "../audit-logs/public-site-audit-actions";
@@ -15,6 +16,7 @@ import { QuoteRedisKeys } from "../common/redis/quote-redis-keys";
 import { InMemoryRedisClient, type RedisClientPort } from "../common/redis/redis.module";
 import type { ActorContext } from "../common/types";
 import type { Country } from "../countries/countries.module";
+import type { PublicFormNotificationPort } from "../notifications/public-form-notification.service";
 import type { Product } from "../products/products.module";
 import type { ProspectIdentityService } from "../prospects/prospect-identity.service";
 import {
@@ -35,6 +37,8 @@ export interface PartnerApplicationsDependencies {
   findCountryByCode: (countryCode: string) => Country | undefined | Promise<Country | undefined>;
   findProductByKey: (productKey: string) => Product | undefined | Promise<Product | undefined>;
   identity: ProspectIdentityService;
+  /** Spec 047. Left out and no confirmation is sent; a submission still succeeds. */
+  notifications?: PublicFormNotificationPort;
 }
 
 export interface PartnerApplicationSubmitContext {
@@ -115,6 +119,9 @@ export class PartnerApplicationsService {
         reason: "duplicate_application",
         context: { countryId: country.id, desiredPlan: parsed.desiredPlan, contactEmailFingerprint }
       });
+      // Spec 047: a duplicate is confirmed like a first application, with the reference of the
+      // application already on file - the same reference the response returns.
+      await this.sendConfirmation(contactEmailNormalized, parsed.contactName, duplicate.publicReference, parsed.locale);
       return this.toResponse(duplicate.publicReference);
     }
 
@@ -157,7 +164,34 @@ export class PartnerApplicationsService {
       context: { countryId: country.id, desiredPlan: parsed.desiredPlan, productIds, contactEmailFingerprint }
     });
 
+    await this.sendConfirmation(contactEmailNormalized, record.contactName, record.publicReference, parsed.locale);
+
     return this.toResponse(record.publicReference);
+  }
+
+  /**
+   * Runs after the application is stored and audited, and never changes the caller's outcome. The
+   * message states that compliance will review the file and request a licence copy; it creates no
+   * expectation of acceptance and no partner account exists at this point (spec decision D4).
+   */
+  private async sendConfirmation(
+    to: string,
+    contactName: string,
+    publicReference: string,
+    locale: PublicLocale | undefined
+  ): Promise<void> {
+    if (!this.deps.notifications) return;
+    try {
+      await this.deps.notifications.confirmPartnerApplication({
+        to,
+        contactName,
+        publicReference,
+        ...(locale ? { locale } : {})
+      });
+    } catch {
+      // The port reports its own outcome and the delivery path audits it under `email.delivery.*`;
+      // an unexpected throw must not undo a recorded application.
+    }
   }
 
   async listForAdmin(actor: ActorContext, filter: PartnerApplicationsListFilter = {}): Promise<AdminPartnerApplication[]> {

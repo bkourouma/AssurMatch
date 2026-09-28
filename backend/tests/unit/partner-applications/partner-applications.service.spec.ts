@@ -3,6 +3,8 @@ import { AuditLogWriter } from "../../../src/modules/audit-logs/audit-log-writer
 import { InMemoryRedisClient } from "../../../src/modules/common/redis/redis.module";
 import type { ActorContext } from "../../../src/modules/common/types";
 import { CountriesService, type Country } from "../../../src/modules/countries/countries.module";
+import type { PartnerApplicationConfirmationContext } from "../../../src/modules/notifications/email/public-form-email-template.service";
+import type { PublicFormNotificationPort } from "../../../src/modules/notifications/public-form-notification.service";
 import { PartnerApplicationsModule, type PartnerApplicationsService } from "../../../src/modules/partner-applications/partner-applications.module";
 import { ProductsService } from "../../../src/modules/products/products.module";
 import { ProspectIdentityService } from "../../../src/modules/prospects/prospect-identity.service";
@@ -25,6 +27,8 @@ interface Harness {
   products: ProductsService;
   service: PartnerApplicationsService;
   country: Country;
+  /** Spec 047: the confirmations the service asked for, in order. */
+  confirmations: PartnerApplicationConfirmationContext[];
 }
 
 async function harness(options: { onboardingEnabled?: boolean; countryStatus?: "draft" | "internal" | "partner_test" | "pilot" | "public" | "suspended" | "retired" } = {}): Promise<Harness> {
@@ -50,17 +54,32 @@ async function harness(options: { onboardingEnabled?: boolean; countryStatus?: "
   const product = await products.create({ key: "auto", name: "Assurance auto", sensitivity: "standard" }, superAdminActor);
   await products.associateCountry(product.id, country.id, superAdminActor);
 
+  const confirmations: PartnerApplicationConfirmationContext[] = [];
+  const notifications: PublicFormNotificationPort = {
+    async confirmWaitlist() {
+      return "sent";
+    },
+    async confirmContact() {
+      return "sent";
+    },
+    async confirmPartnerApplication(context) {
+      confirmations.push(context);
+      return "sent";
+    }
+  };
+
   const module = new PartnerApplicationsModule(
     {
       findCountryByCode: (code) => countries.findByIsoCode(code),
       findProductByKey: (key) => products.findByKey(key),
-      identity
+      identity,
+      notifications
     },
     audit,
     new InMemoryRedisClient()
   );
 
-  return { audit, countries, products, service: module.service, country };
+  return { audit, countries, products, service: module.service, country, confirmations };
 }
 
 function payload(overrides: Record<string, unknown> = {}): Record<string, unknown> {
@@ -130,6 +149,55 @@ describe("PartnerApplicationsService.submit", () => {
 
     expect(second.publicReference).toBe(first.publicReference);
     expect(await service.listForAdmin(superAdminActor)).toHaveLength(1);
+  });
+
+  it("confirms an accepted application with its own reference, in the submitted locale (spec 047)", async () => {
+    const { service, confirmations } = await harness();
+
+    const response = await service.submit(payload({ locale: "en" }), { ipAddress: "203.0.113.30" });
+
+    expect(confirmations).toEqual([
+      {
+        to: "awa.kone@example.com",
+        contactName: "Awa Kone",
+        publicReference: response.publicReference,
+        locale: "en"
+      }
+    ]);
+  });
+
+  it("confirms a duplicate application with the reference already on file", async () => {
+    const { service, confirmations } = await harness();
+
+    const first = await service.submit(payload(), { ipAddress: "203.0.113.31" });
+    await service.submit(payload(), { ipAddress: "203.0.113.32" });
+
+    expect(confirmations).toHaveLength(2);
+    expect(confirmations[1]?.publicReference).toBe(first.publicReference);
+  });
+
+  it("never hands the licence number or the free-text message to the confirmation", async () => {
+    const { service, confirmations } = await harness();
+
+    await service.submit(payload({ message: "Nous couvrons Abidjan et Bouake." }), { ipAddress: "203.0.113.33" });
+
+    const serialized = JSON.stringify(confirmations);
+    expect(serialized).not.toContain("LIC-0001");
+    expect(serialized).not.toContain("Abidjan");
+  });
+
+  it("sends no confirmation when the country refuses the application", async () => {
+    const { service, confirmations } = await harness({ onboardingEnabled: false });
+
+    await expect(service.submit(payload(), { ipAddress: "203.0.113.34" })).rejects.toThrow(/disabled/i);
+
+    expect(confirmations).toHaveLength(0);
+  });
+
+  it("refuses a locale outside the two supported ones", async () => {
+    const { service } = await harness();
+
+    await expect(service.submit(payload({ locale: "es" }), { ipAddress: "203.0.113.35" })).rejects.toThrow(/validation failed/i);
   });
 
   it("rejects a honeypot-filled submission", async () => {

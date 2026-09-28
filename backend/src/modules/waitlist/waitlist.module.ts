@@ -1,5 +1,6 @@
 import {
   waitlistSubscribeSchema,
+  type PublicLocale,
   type WaitlistSubscribeResponse
 } from "../../../../packages/shared/contracts/public-site.contracts";
 import { AuditLogWriter } from "../audit-logs/audit-log-writer.service";
@@ -11,6 +12,7 @@ import { InMemoryRedisClient, type RedisClientPort } from "../common/redis/redis
 import type { ActorContext } from "../common/types";
 import type { Country } from "../countries/countries.module";
 import { PublicJourneyFlagPolicy } from "../feature-flags/public-journey-flag-policy";
+import type { PublicFormNotificationPort } from "../notifications/public-form-notification.service";
 import type { Product } from "../products/products.module";
 import type { ProspectIdentityService } from "../prospects/prospect-identity.service";
 import { MemoryWaitlistRepository, type WaitlistEntryRecord, type WaitlistRepository } from "./waitlist.repository";
@@ -33,6 +35,8 @@ export interface WaitlistServiceDependencies {
   abuseGuard: PublicAbuseGuardService;
   retention: RetentionPolicyService;
   globalFlags?: () => Partial<Record<string, boolean>>;
+  /** Spec 047. Left out and no confirmation is sent; a submission still succeeds. */
+  notifications?: PublicFormNotificationPort;
 }
 
 export class WaitlistService {
@@ -109,6 +113,10 @@ export class WaitlistService {
         result: "success",
         context: { fingerprint }
       });
+      // Spec 047: a duplicate is confirmed exactly like a first subscription. Staying silent here
+      // would make "already on the list" observable to whoever owns the address, which is precisely
+      // what the identical response above avoids.
+      await this.sendConfirmation(parsed.email, parsed.countryCode, parsed.locale);
       return this.successResponse(parsed.countryCode);
     }
 
@@ -137,7 +145,26 @@ export class WaitlistService {
       result: "success",
       context: { fingerprint }
     });
+    await this.sendConfirmation(parsed.email, parsed.countryCode, parsed.locale);
     return this.successResponse(parsed.countryCode);
+  }
+
+  /**
+   * Runs after the entry is stored and audited, and never changes the caller's outcome. The port
+   * reports its own outcome and `RuntimeEmailDeliveryService` audits it under `email.delivery.*`;
+   * the catch here only covers an unexpected throw, which must not undo a recorded subscription.
+   */
+  private async sendConfirmation(email: string, countryCode: string, locale: PublicLocale | undefined): Promise<void> {
+    if (!this.deps.notifications) return;
+    try {
+      await this.deps.notifications.confirmWaitlist({
+        to: email,
+        countryCode,
+        ...(locale ? { locale } : {})
+      });
+    } catch {
+      // Intentionally ignored: see above.
+    }
   }
 
   private successResponse(countryCode: string): WaitlistSubscribeResponse {
@@ -155,6 +182,7 @@ export interface WaitlistModuleDeps {
   findProductByKey: (productKey: string) => Product | undefined | Promise<Product | undefined>;
   identity: ProspectIdentityService;
   globalFlags?: () => Partial<Record<string, boolean>>;
+  notifications?: PublicFormNotificationPort;
 }
 
 export class WaitlistModule {
@@ -177,7 +205,8 @@ export class WaitlistModule {
         identity: deps.identity,
         abuseGuard: this.abuseGuard,
         retention: this.retention,
-        ...(deps.globalFlags ? { globalFlags: deps.globalFlags } : {})
+        ...(deps.globalFlags ? { globalFlags: deps.globalFlags } : {}),
+        ...(deps.notifications ? { notifications: deps.notifications } : {})
       },
       audit,
       repository
