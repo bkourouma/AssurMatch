@@ -1,9 +1,25 @@
 # AssurMatch CI/CD
-# - verify: PR + push main (typecheck, lint, test, build, prisma validate, audit, playwright source-marker)
+# - verify: PR + push main + manual run (typecheck, lint, test, build, prisma validate, audit, playwright source-marker)
 # - secret-scan: ensure no real EMAIL_SMTP_PASS / private key shipped
-# - build-images: push main only - three GHCR images (assurmatch, assurmatch-public, assurmatch-backoffice)
-# - deploy-preproduction: push main only - self-hosted runner deploys three containers behind Nginx.
+# - build-images: push main + manual run - three GHCR images (assurmatch, assurmatch-public, assurmatch-backoffice)
+# - deploy-preproduction: self-hosted runner deploys three containers behind Nginx.
 #   Health checks cover the three surfaces.
+#
+# Deploying is opt-in, because the deploy job is the only one that needs the self-hosted runner
+# `assurmatch-preprod`. When that runner is offline, GitHub does not fail the job: it leaves it
+# queued for the 24 h maximum and then cancels it, so every merge to main ends on a cancelled run
+# even though verify, secret-scan and build-images all passed. `timeout-minutes` does not help - it
+# bounds execution, not queue time. Two ways to deploy, both explicit:
+#
+# 1. Manual: "Run workflow" on this workflow with `deploy_preproduction` ticked. Deploys the SHA of
+#    the ref you select. Use this while the runner is brought back up.
+# 2. Automatic on merge: set the repository variable `PREPROD_AUTO_DEPLOY` to `true`
+#    (Settings > Secrets and variables > Actions > Variables). Only turn it on while the runner is
+#    online, and turn it off again before taking the runner down.
+#
+# With the variable unset or not `true` and no manual request, a push to main builds and publishes
+# the images as before and simply does not deploy. The images stay available under `sha-<commit>`,
+# so a later manual run can deploy them.
 
 name: CI
 
@@ -11,6 +27,12 @@ on:
   pull_request:
   push:
     branches: [main]
+  workflow_dispatch:
+    inputs:
+      deploy_preproduction:
+        description: "Deploy the built images to preproduction (needs the assurmatch-preprod runner online)"
+        type: boolean
+        default: false
 
 jobs:
   verify:
@@ -59,7 +81,9 @@ jobs:
 
   build-images:
     needs: [verify, secret-scan]
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    if: >-
+      (github.event_name == 'push' && github.ref == 'refs/heads/main')
+      || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     timeout-minutes: 40
     permissions:
@@ -109,7 +133,11 @@ jobs:
 
   deploy-preproduction:
     needs: build-images
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    # Never queue for a runner nobody asked for: an offline assurmatch-preprod would hold this job
+    # for 24 h and then cancel the whole run. See the header comment for the two ways to opt in.
+    if: >-
+      (github.event_name == 'workflow_dispatch' && inputs.deploy_preproduction)
+      || (github.event_name == 'push' && github.ref == 'refs/heads/main' && vars.PREPROD_AUTO_DEPLOY == 'true')
     runs-on: [self-hosted, assurmatch-preprod]
     timeout-minutes: 20
     permissions:
@@ -184,3 +212,17 @@ jobs:
           done
 
           docker image prune -f
+
+  # A skipped job is easy to miss in the run graph. Say out loud that the images exist but that
+  # preproduction was not updated, and how to update it.
+  preproduction-deploy-skipped:
+    needs: build-images
+    if: >-
+      github.event_name == 'push' && github.ref == 'refs/heads/main'
+      && vars.PREPROD_AUTO_DEPLOY != 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Report that preproduction was not deployed
+        run: |
+          echo "::notice::Images sha-${{ github.sha }} published to GHCR, preproduction NOT deployed (PREPROD_AUTO_DEPLOY is not 'true'). To deploy, run this workflow manually with deploy_preproduction ticked, once the assurmatch-preprod runner is online."
