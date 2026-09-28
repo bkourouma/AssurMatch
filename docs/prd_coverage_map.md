@@ -1,7 +1,7 @@
 # AssurMatch PRD Coverage Map
 
 Source: `docs/prd_plateforme_comparaison_assurances.md`
-Updated: 2026-09-19
+Updated: 2026-09-28
 
 ## Coverage Summary
 
@@ -31,11 +31,12 @@ Updated: 2026-09-19
 
 ## Execution Backlog
 
-The PRD backlog through spec 045 is implemented and validated. End-to-end testing on 2026-09-19 found two P0 blockers in the visitor journey (specs 043 and 044); both are now delivered, and the public site's bilingual/institutional rebuild (spec 045) followed the same day. What remains is deliberately out of scope or operational:
+The PRD backlog through spec 046 is implemented and validated. End-to-end testing on 2026-09-19 found two P0 blockers in the visitor journey (specs 043 and 044); both are now delivered, the public site's bilingual/institutional rebuild (spec 045) followed the same day, and retention/anonymization (spec 046) closed the last P0 compliance gap on 2026-09-24. Every `tasks.md` under `specs/` is complete, no issue and no pull request is open. What remains is deliberately out of scope or operational:
 
 0. Done - Spec 043 `043-quote-form-persistence` (implemented and validated 2026-09-19). Quote form definitions are persisted and administered over HTTP, the public form renders the published fields and submits them as answers, the answers travel to every lead assignment, and CORS finally allows the visitor's browser to submit. No migration was needed.
 0b. Done - Spec 044 `044-quote-notification-delivery` (implemented and validated 2026-09-19). `npm run quote-notifications:deliver-due` drains the backlog; emails carry a pointer, never the lead. Operational procedure in `docs/runbooks/quote-notification-delivery.md`.
 0c. Done - Spec 045 `045-public-site-bilingual-institutional` (implemented 2026-09-19; test suite repaired and re-verified against a live local stack the same day). French/English bilingual site under `app/[locale]/`, consent withdrawal, broker acquisition pages, and the institutional/legal/guides/FAQ/glossary/contact content, all against migration `0017_public_site_forms`. Deliberately out of scope: a content management system (the legal and institutional copy is static TypeScript, not editable without a deploy), licence upload on the broker application (a copy is requested by e-mail instead), and outbound e-mail for the new forms (waitlist, contact and partner application submit successfully but send no confirmation e-mail to the visitor or applicant).
+0d. Done - Spec 046 `046-data-retention-anonymization` (implemented and validated 2026-09-24, merged through PR #12). Retention policies per country and data category, audited two-step anonymization batches, admin-side erasure on request, and the `/compliance/retention` back-office page, against migration `0018_data_retention`. Execution stays gated by the protected `retention_purge_enabled` flag, off by default. Deliberately out of scope: no public erasure form and no scheduled purge - a batch is always started by a compliance officer. The default durations still await legal validation per country.
 1. Blocked - Payments, e-signature, policy issuance, claims and insurer API stay disabled: each needs explicit legal and product approval before any spec is written.
 2. Ops - Multi-broker routing is implemented (spec 042) but ships closed. Opening `multi_broker_routing_enabled` requires the audited compliance policy path, a published multi-recipient consent text, and - because it puts partners in competition on every lead - a review of the partner contracts and of the shared-lead price (`sharedLeadPriceMultiplier`, default 0.5, total capped at 2x the exclusive price).
 3. Ops - Enabling any sensitive flag (AI, billing, SMS/WhatsApp, partner webhooks) requires the audited compliance policy path; no HTTP route can turn them on.
@@ -43,23 +44,53 @@ The PRD backlog through spec 045 is implemented and validated. End-to-end testin
 5. P2 - External CRM connectors for Enterprise partners, on top of the existing partner API and webhooks.
 6. P2 - Document extraction and manager assistant AI assists (PRD Enterprise-only rows) once the current AI surfaces have production feedback.
 7. P2 - Outbound confirmation e-mail for the waitlist, contact and broker-application public forms (spec 045 left this out; the quote-notification worker only drains quote-request notifications).
+8. Ops - The preproduction deployment chain is stalled. `deploy-preproduction` targets the self-hosted runner `assurmatch-preprod`, which has been offline since at least 2026-09-24: the job waits in queue for GitHub's 24 h maximum and is then cancelled, so every push to `main` leaves a cancelled CI run (`verify`, `secret-scan` and `build-images` all pass; run `36066431554` is the reference). The GHCR images are published, only the preproduction containers are stale. `timeout-minutes` does not help - it covers execution, not queue time. Restarting the runner on the VPS is a human operation; a deployment still requires explicit approval.
 
 ## Current Safe Slice
 
-Target spec: `045-public-site-bilingual-institutional` (completed)
+Target spec: `046-data-retention-anonymization` (completed, merged 2026-09-24 through PR #12)
 
 Impacted surfaces:
-- Web Publique Client (routing, pages, content, messages)
-- Backend API (waitlist, contact, partner applications, consent withdrawal, countries directory, insurers, partner plans)
-- database (migration `0017_public_site_forms`)
-- docs / test suite
+- Backend API (`data-retention` module, countries, quote document storage, feature flags, RBAC)
+- Back-office Plateforme (`/compliance/retention`)
+- database (migration `0018_data_retention`)
+- shared packages (contracts, RBAC matrix)
+- The Web Publique Client is not touched; the Broker Back-office only receives an inbox notice, with no code change.
 
 Rationale:
-- The public site now matches the PRD's bilingual, institutional requirements instead of a single-language, thinly-covered comparator shell: every visible string is reviewed, properly accented French (and its English translation), not machine-stripped ASCII.
-- Consent withdrawal closes a compliance gap: a visitor can revoke consent from the same tracking page that shows their optional documents, and the broker is informed not to contact them again for that request.
-- Broker acquisition (pricing, application, login) gives partner brokers a real, working funnel into the platform without granting them any account until compliance reviews the application.
-- No new regulated capability is enabled: waitlist, contact and partner applications are all evidence-collecting forms reviewed by staff, never an automated activation.
+- Twelve tables carried a `retentionUntil` date that nothing ever read. Retention was the last P0 gap in the coverage map, and the only one that could be closed without legal approval or a commercial decision.
+- Every sensitive step is audited and permissioned: `retention:read` / `retention:*` go to `compliance_admin` and `super_admin` only, MFA is required on every call, and refusals are audited before being thrown.
+- Execution stays closed by default behind the protected `retention_purge_enabled` flag: policies can be read, edited and previewed with the flag off, but no row is ever touched until compliance turns it on through the policy path.
+- `ConsentRecord` and `AuditLog` rows are never anonymized, so the proof of consent and the audit trail survive the purge.
 
-Known limitation: a permanently failed partner notification is audited but does **not** reach the partner's webhook - `notification.failed` fires only when every channel failed, and WhatsApp ships disabled so its status never leaves `queued`. Widening that condition would change spec 039's semantics for every notification type and is a decision of its own.
+Known limitations carried forward:
+- A permanently failed partner notification is audited but does **not** reach the partner's webhook - `notification.failed` fires only when every channel failed, and WhatsApp ships disabled so its status never leaves `queued`. Widening that condition would change spec 039's semantics for every notification type and is a decision of its own.
+- The default retention durations are engineering placeholders until legal validates them per country.
 
-Next safe slice: none pending. Everything that remains either needs legal approval (the five regulated modules), is a commercial decision before opening multi-broker routing, or is environment/operational configuration (real AI and messaging providers, confirmation e-mail for the new public forms).
+Next safe slice: none pending on the product backlog. Everything that remains either needs legal approval (the five regulated modules), is a commercial decision before opening multi-broker routing, or is environment/operational configuration (real AI and messaging providers, confirmation e-mail for the new public forms, and the stalled preproduction deployment in backlog item 8).
+
+## Verified Baseline
+
+Full local validation run on 2026-09-28 from `main` at `06c4baa`, on Node 24, with a placeholder
+`DATABASE_URL` and `NODE_ENV=test`, mirroring the CI `verify` job:
+
+| Check | Command | Result |
+|---|---|---|
+| Prisma client | `npx prisma generate --schema backend/prisma/schema.prisma` | Generated (v7.8.0) |
+| Typecheck | `npm run typecheck` | Pass |
+| Lint | `npm run lint` | Pass |
+| Unit/integration tests | `npm run test` | 252 files, 645 tests, all pass |
+| Prisma schema | `npx prisma validate --schema backend/prisma/schema.prisma` | Valid |
+| Audit | `npm audit --audit-level=high` | Pass (3 moderate, none high) |
+| Secret scan | `node scripts/ci/secret-scan.mjs` | Pass |
+| Web source markers | `npm run test:web` | 136 passed, 11 skipped (the skipped ones need a live stack) |
+
+Two environment prerequisites, learned the hard way and not obvious from the scripts:
+
+- `npm ci` must not run under `NODE_ENV=production`, or npm silently omits the dev dependencies and
+  `npm run typecheck` then fails with hundreds of `Cannot find module 'vitest'` errors that have
+  nothing to do with the code. Use `NODE_ENV=development npm ci --include=dev` on any host that
+  exports `NODE_ENV=production`.
+- `npm run test` inherits the ambient `NODE_ENV`. Under `production`, 398 tests fail on
+  `memory repository is test-only` (`backend/src/modules/common/repositories/runtime-repository.ts`),
+  which is the guard doing its job, not a regression. Run the suite with `NODE_ENV=test`.
