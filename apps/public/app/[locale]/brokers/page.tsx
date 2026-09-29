@@ -45,8 +45,9 @@ export default async function BrokersPage({ params }: { params: Promise<{ locale
       <Hero
         tone="navy"
         size="lg"
+        className="am-hero--spotlight"
         kicker={t("hero.kicker")}
-        title={t("title")}
+        title={t.rich("heroTitle", { accent: (chunks) => <span className="am-hero__accent">{chunks}</span> })}
         lead={t("hero.lead")}
         breadcrumb={
           <Breadcrumb
@@ -103,23 +104,26 @@ export default async function BrokersPage({ params }: { params: Promise<{ locale
       </Reveal>
 
       <Reveal as="div">
-        <Section title={t("portal.title")} lead={t("portal.lead")}>
+        <Section title={t("portal.title")} lead={t("portal.lead")} tone="navy" className="am-portalstage">
           <PortalMock caption={t("portal.caption")} />
         </Section>
       </Reveal>
 
       <Reveal as="div">
         <Section title={t("expectations.title")} tone="muted">
-          <Reveal as="ul" stagger className="am-grid am-grid--3">
+          {/* The hover lift lives on the inner card: the stagger reveal owns the transform of the `li`. */}
+          <Reveal as="ul" stagger className="am-grid am-grid--3 am-expect">
             {content.partnerExpectations.map((expectation, index) => (
-              <Card as="li" key={expectation}>
-                <CardHeader>
-                  <IconTile name={EXPECTATION_ICONS[index] ?? "badge-check"} />
-                </CardHeader>
-                <CardBody>
-                  <p>{expectation}</p>
-                </CardBody>
-              </Card>
+              <li key={expectation} className="am-expect__item">
+                <Card className="am-expect__card">
+                  <CardHeader>
+                    <IconTile name={EXPECTATION_ICONS[index] ?? "badge-check"} />
+                  </CardHeader>
+                  <CardBody>
+                    <p>{expectation}</p>
+                  </CardBody>
+                </Card>
+              </li>
             ))}
           </Reveal>
         </Section>

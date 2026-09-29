@@ -29,8 +29,9 @@ export default async function FaqPage({ params }: { params: Promise<{ locale: st
   return (
     <>
       <Hero
+        className="am-hero--spotlight"
         kicker={t("kicker")}
-        title={t("title")}
+        title={t.rich("heroTitle", { accent: (chunks) => <span className="am-hero__accent">{chunks}</span> })}
         lead={t("lead")}
         breadcrumb={
           <Breadcrumb
@@ -45,16 +46,18 @@ export default async function FaqPage({ params }: { params: Promise<{ locale: st
 
       <Section width="narrow">
         <p className="am-faq-meta">{t("questionCount", { count: items.length })}</p>
-        <Reveal stagger className="am-faq">
-          {items.map((item) => (
-            <details className="am-faq__item" key={item.question}>
-              <summary>{item.question}</summary>
-              <div className="am-faq__answer">
-                <p>{item.answer}</p>
-                {item.productKey ? <p className="am-caption">{t("relatedProduct")}</p> : null}
-              </div>
-            </details>
-          ))}
+        <Reveal>
+          <div className="am-faq am-faq--glass">
+            {items.map((item) => (
+              <details className="am-faq__item" key={item.question}>
+                <summary>{item.question}</summary>
+                <div className="am-faq__answer">
+                  <p>{item.answer}</p>
+                  {item.productKey ? <p className="am-caption">{t("relatedProduct")}</p> : null}
+                </div>
+              </details>
+            ))}
+          </div>
         </Reveal>
       </Section>
 

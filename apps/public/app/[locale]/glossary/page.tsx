@@ -51,8 +51,9 @@ export default async function GlossaryPage({ params }: { params: Promise<{ local
   return (
     <>
       <Hero
+        className="am-hero--spotlight"
         kicker={t("kicker")}
-        title={t("title")}
+        title={t.rich("heroTitle", { accent: (chunks) => <span className="am-hero__accent">{chunks}</span> })}
         lead={t("lead")}
         breadcrumb={
           <Breadcrumb
@@ -89,21 +90,22 @@ export default async function GlossaryPage({ params }: { params: Promise<{ local
             </h2>
             <Reveal stagger className="am-glossary-list">
               {letterEntries.map((entry) => (
-                <article className="am-glossary-entry" key={entry.term} id={termId(entry.term)}>
-                  <h3 className="am-glossary-entry__term">{entry.term}</h3>
-                  <p className="am-glossary-entry__definition">{entry.definition}</p>
-                  {entry.seeAlso && entry.seeAlso.length > 0 ? (
-                    <p className="am-glossary-entry__see">
-                      {t("seeAlso")} :{" "}
-                      {entry.seeAlso.map((related, index) => (
-                        <span key={related}>
-                          {index > 0 ? ", " : null}
-                          <a href={`#${termId(related)}`}>{related}</a>
-                        </span>
-                      ))}
-                    </p>
-                  ) : null}
-                </article>
+                <div className="am-glossary-cell" key={entry.term}>
+                  <article className="am-glossary-entry" id={termId(entry.term)}>
+                    <h3 className="am-glossary-entry__term">{entry.term}</h3>
+                    <p className="am-glossary-entry__definition">{entry.definition}</p>
+                    {entry.seeAlso && entry.seeAlso.length > 0 ? (
+                      <p className="am-glossary-entry__see">
+                        <span>{t("seeAlso")} :</span>
+                        {entry.seeAlso.map((related) => (
+                          <a className="am-glossary-entry__link" href={`#${termId(related)}`} key={related}>
+                            {related}
+                          </a>
+                        ))}
+                      </p>
+                    ) : null}
+                  </article>
+                </div>
               ))}
             </Reveal>
           </section>

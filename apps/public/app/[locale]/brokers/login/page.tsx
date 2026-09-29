@@ -46,11 +46,13 @@ export default async function BrokerLoginPage({ params }: { params: Promise<{ lo
         />
       </div>
 
-      <Section spacing="default">
+      <Section spacing="default" className="am-loginstage">
         <Reveal as="div" from="scale">
           <div className="am-logincard">
             <IconTile name="lock" size="lg" className="am-logincard__icon" />
-            <h1 className="am-logincard__title">{t("title")}</h1>
+            <h1 className="am-logincard__title">
+              {t.rich("heroTitle", { accent: (chunks) => <span className="am-hero__accent">{chunks}</span> })}
+            </h1>
             <p className="am-logincard__lead">{t("lead")}</p>
 
             <Notice tone="info" title={t("mfa.title")}>

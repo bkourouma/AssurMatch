@@ -27,8 +27,9 @@ export default async function GuidesIndexPage({ params }: { params: Promise<{ lo
   return (
     <>
       <Hero
+        className="am-hero--spotlight"
         kicker={t("kicker")}
-        title={t("title")}
+        title={t.rich("heroTitle", { accent: (chunks) => <span className="am-hero__accent">{chunks}</span> })}
         lead={t("lead")}
         breadcrumb={
           <Breadcrumb

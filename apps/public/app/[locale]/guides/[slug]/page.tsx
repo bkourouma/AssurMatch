@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import { getTranslations, setRequestLocale } from "next-intl/server";
 import { routing, toLocale, type AppLocale } from "../../../../i18n/routing";
 import { EntrySelector } from "../../../components/site/entry-selector";
+import { accentTitle } from "../../../components/institutional/accent-title";
 import { GuideCard } from "../../../components/institutional/guide-card";
 import { Breadcrumb } from "../../../components/ui/breadcrumb";
 import { Button } from "../../../components/ui/button";
@@ -53,8 +54,9 @@ export default async function GuidePage({ params }: { params: Promise<PageParams
   return (
     <>
       <Hero
+        className="am-hero--spotlight"
         kicker={t("kicker")}
-        title={guide.title}
+        title={accentTitle(guide.title)}
         lead={guide.description}
         breadcrumb={
           <Breadcrumb

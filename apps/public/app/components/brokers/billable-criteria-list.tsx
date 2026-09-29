@@ -16,10 +16,12 @@ export function BillableCriteriaList({ criteria }: BillableCriteriaListProps) {
   return (
     <Reveal as="ul" stagger className="am-criterialist">
       {criteria.map((criterion) => (
-        <Card as="li" key={criterion.id} padding="sm" className="am-criterialist__item">
-          <IconTile name="check" tone="success" size="sm" />
-          <p className="am-criterialist__text">{criterion.label}</p>
-        </Card>
+        <li key={criterion.id} className="am-criterialist__cell">
+          <Card padding="sm" className="am-criterialist__item">
+            <IconTile name="check" tone="success" size="sm" />
+            <p className="am-criterialist__text">{criterion.label}</p>
+          </Card>
+        </li>
       ))}
     </Reveal>
   );

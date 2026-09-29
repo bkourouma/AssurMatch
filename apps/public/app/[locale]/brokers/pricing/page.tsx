@@ -71,7 +71,8 @@ export default async function BrokerPricingPage({
   return (
     <>
       <Hero
-        title={t("title")}
+        className="am-hero--spotlight"
+        title={t.rich("heroTitle", { accent: (chunks) => <span className="am-hero__accent">{chunks}</span> })}
         lead={t("lead")}
         breadcrumb={
           <Breadcrumb

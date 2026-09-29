@@ -33,8 +33,9 @@ export default async function HowItWorksPage({ params }: { params: Promise<{ loc
   return (
     <>
       <Hero
+        className="am-hero--spotlight"
         kicker={t("kicker")}
-        title={t("title")}
+        title={t.rich("heroTitle", { accent: (chunks) => <span className="am-hero__accent">{chunks}</span> })}
         lead={t("lead")}
         breadcrumb={
           <Breadcrumb
@@ -60,8 +61,11 @@ export default async function HowItWorksPage({ params }: { params: Promise<{ loc
                 {index + 1}
               </span>
               <Card className="am-timeline__card" padding="lg">
+                <span className="am-timeline__index" aria-hidden="true">
+                  {String(index + 1).padStart(2, "0")}
+                </span>
                 <div className="am-timeline__head">
-                  <IconTile name={STEP_ICONS[index] ?? "check-circle"} size="lg" />
+                  <IconTile className="am-inst-icon" name={STEP_ICONS[index] ?? "check-circle"} size="lg" />
                   <CardTitle className="am-timeline__title">{step.heading}</CardTitle>
                 </div>
                 <CardBody>
@@ -77,7 +81,7 @@ export default async function HowItWorksPage({ params }: { params: Promise<{ loc
 
       <Section tone="muted" kicker={t("notDoneKicker")} title={content.notDone.heading} id={content.notDone.id}>
         <Reveal>
-          <Card padding="lg">
+          <Card padding="lg" className="am-notdone">
             <CardBody>
               {content.notDone.body.map((paragraph, index) => (
                 <p key={index}>{paragraph}</p>
@@ -99,36 +103,40 @@ export default async function HowItWorksPage({ params }: { params: Promise<{ loc
 
       <Section kicker={t("linksKicker")} title={t("linksHeading")} lead={t("linksLead")}>
         <Reveal as="ul" stagger className="am-linkcards">
-          <Card as="li" interactive padding="lg" className="am-linkcard">
-            <IconTile name="scale" size="lg" />
-            <CardTitle as="h3">
-              <Link href="/regulatory-status">{t("seeRegulatoryStatus")}</Link>
-            </CardTitle>
-            <CardBody>
-              <p>{t("seeRegulatoryStatusHint")}</p>
-            </CardBody>
-            <CardFooter>
-              <span className="am-cardgo" aria-hidden="true">
-                {t("openLink")}
-                <Icon name="arrow-right" size={18} />
-              </span>
-            </CardFooter>
-          </Card>
-          <Card as="li" interactive padding="lg" className="am-linkcard">
-            <IconTile name="globe" size="lg" />
-            <CardTitle as="h3">
-              <Link href="/countries">{t("compareCountries")}</Link>
-            </CardTitle>
-            <CardBody>
-              <p>{t("compareCountriesHint")}</p>
-            </CardBody>
-            <CardFooter>
-              <span className="am-cardgo" aria-hidden="true">
-                {t("openLink")}
-                <Icon name="arrow-right" size={18} />
-              </span>
-            </CardFooter>
-          </Card>
+          <li className="am-linkcard-item">
+            <Card interactive padding="lg" className="am-linkcard">
+              <IconTile className="am-inst-icon" name="scale" size="lg" />
+              <CardTitle as="h3">
+                <Link href="/regulatory-status">{t("seeRegulatoryStatus")}</Link>
+              </CardTitle>
+              <CardBody>
+                <p>{t("seeRegulatoryStatusHint")}</p>
+              </CardBody>
+              <CardFooter>
+                <span className="am-cardgo" aria-hidden="true">
+                  {t("openLink")}
+                  <Icon name="arrow-right" size={18} />
+                </span>
+              </CardFooter>
+            </Card>
+          </li>
+          <li className="am-linkcard-item">
+            <Card interactive padding="lg" className="am-linkcard">
+              <IconTile className="am-inst-icon" name="globe" size="lg" />
+              <CardTitle as="h3">
+                <Link href="/countries">{t("compareCountries")}</Link>
+              </CardTitle>
+              <CardBody>
+                <p>{t("compareCountriesHint")}</p>
+              </CardBody>
+              <CardFooter>
+                <span className="am-cardgo" aria-hidden="true">
+                  {t("openLink")}
+                  <Icon name="arrow-right" size={18} />
+                </span>
+              </CardFooter>
+            </Card>
+          </li>
         </Reveal>
       </Section>
     </>

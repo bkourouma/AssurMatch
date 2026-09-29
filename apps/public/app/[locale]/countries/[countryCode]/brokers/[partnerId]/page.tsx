@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import { getTranslations, setRequestLocale } from "next-intl/server";
 import { toLocale } from "../../../../../../i18n/routing";
+import { DirectoryAside } from "../../../../../components/brokers/directory-aside";
 import { BackendText } from "../../../../../components/ui/backend-text";
 import { Breadcrumb } from "../../../../../components/ui/breadcrumb";
 import { BrokerBlock } from "../../../../../components/ui/broker-block";
@@ -14,6 +15,7 @@ import { getCountryPartner, listCountryDirectory, type PublicPartnerDetail, type
 import { formatDate } from "../../../../../lib/country-format";
 import { buildMetadata, localBusinessJsonLd, localeUrl } from "../../../../../lib/seo";
 import type { PageMetadata } from "../../../../../lib/seo";
+import "../../../../../styles/pages/directory.css";
 
 /**
  * Broker profile page. `getCountryPartner` is read with only the fields the visitor is allowed to
@@ -88,10 +90,19 @@ export default async function CountryBrokerDetailPage({ params }: { params: Prom
   return (
     <>
       <Hero
+        className="am-hero--spotlight"
         kicker={brokers("breadcrumb")}
-        title={displayName}
+        title={t.rich("heroTitle", { displayName, accent: (chunks) => <span className="am-hero__accent">{chunks}</span> })}
         lead={t("fineprint")}
         size="sm"
+        aside={
+          <DirectoryAside
+            countryIso={countryCode}
+            countryName={countryName}
+            stats={products.length > 0 ? [{ key: "products", icon: "layers", value: products.length, label: t("stats.products", { count: products.length }) }] : []}
+            footnote={`${t("licenseExpiresAt")} ${formatDate(licenseExpiresAt, { locale, countryIso: countryCode })}`}
+          />
+        }
         breadcrumb={
           <Breadcrumb
             label={common("breadcrumbLabel")}
@@ -109,7 +120,7 @@ export default async function CountryBrokerDetailPage({ params }: { params: Prom
       <Section ariaLabel={displayName}>
         <div className="am-j-detail">
           <div className="am-j-detail__main">
-            <div className="am-j-block">
+            <div className="am-j-block am-dir-profile">
               <BrokerBlock
                 variant="full"
                 displayName={displayName}
@@ -127,7 +138,7 @@ export default async function CountryBrokerDetailPage({ params }: { params: Prom
               </p>
             </div>
 
-            <div className="am-j-block">
+            <div className="am-j-block am-dir-profile__note">
               <h2 className="am-j-block__title">{t("disclaimerTitle")}</h2>
               <p>
                 <BackendText>{disclaimer}</BackendText>

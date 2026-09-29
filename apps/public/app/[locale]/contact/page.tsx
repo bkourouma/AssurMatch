@@ -69,8 +69,9 @@ export default async function ContactPage({ params }: { params: Promise<{ locale
   return (
     <>
       <Hero
+        className="am-hero--spotlight"
         kicker={t("kicker")}
-        title={t("title")}
+        title={t.rich("heroTitle", { accent: (chunks) => <span className="am-hero__accent">{chunks}</span> })}
         lead={t("lead")}
         breadcrumb={
           <Breadcrumb
@@ -85,13 +86,13 @@ export default async function ContactPage({ params }: { params: Promise<{ locale
 
       <Section>
         <div className="am-contact-layout">
-          <Card padding="lg">
+          <Card padding="lg" raised className="am-contact-card">
             <CardTitle as="h2">{t("formTitle")}</CardTitle>
             <ContactForm labels={labels} countries={countries} />
           </Card>
 
           <aside className="am-contact-aside" aria-label={t("asideTitle")}>
-            <Card tone="muted" padding="lg">
+            <Card tone="muted" padding="lg" className="am-contact-card am-contact-card--aside">
               <CardTitle as="h2">{t("asideTitle")}</CardTitle>
               <ul className="am-contact-aside__list">
                 <li>

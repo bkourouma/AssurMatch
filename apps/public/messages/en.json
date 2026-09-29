@@ -132,6 +132,8 @@
   },
   "NotFound": {
     "title": "Page not found",
+    "heroTitle": "Page <accent>not found</accent>",
+    "kicker": "Error 404",
     "description": "This page does not exist or is no longer published. You can start again from the open countries or compare indicative offers.",
     "cta": "Compare offers",
     "countriesTitle": "Open countries",
@@ -807,6 +809,7 @@
   },
   "HowItWorks": {
     "title": "How it works",
+    "heroTitle": "How it <accent>works</accent>",
     "description": "Compare, request a quote, be contacted by an authorised partner broker.",
     "breadcrumb": "How it works",
     "lead": "Three simple steps, with no commitment before the responsible partner broker confirms.",
@@ -825,6 +828,7 @@
   },
   "RegulatoryStatus": {
     "title": "Regulatory status",
+    "heroTitle": "<accent>Regulatory</accent> status",
     "description": "The technical role of AssurMatch and the responsibility of authorised partner brokers.",
     "breadcrumb": "Regulatory status",
     "kicker": "Transparency",
@@ -845,6 +849,7 @@
   },
   "Guides": {
     "title": "Guides",
+    "heroTitle": "<accent>Guides</accent> to understand insurance",
     "description": "Practical guides to understand insurance, without personalised advice.",
     "breadcrumb": "Guides",
     "kicker": "Guides",
@@ -859,6 +864,7 @@
   },
   "Glossary": {
     "title": "Glossary",
+    "heroTitle": "The <accent>insurance</accent> glossary",
     "description": "Insurance terms explained simply.",
     "breadcrumb": "Glossary",
     "kicker": "Glossary",
@@ -870,6 +876,7 @@
   },
   "Faq": {
     "title": "FAQ",
+    "heroTitle": "Your questions, <accent>our answers</accent>",
     "description": "Frequently asked questions about AssurMatch and indicative comparison.",
     "breadcrumb": "FAQ",
     "kicker": "Frequent questions",
@@ -880,6 +887,7 @@
   },
   "Contact": {
     "title": "Contact",
+    "heroTitle": "A question? <accent>Write to us</accent>",
     "description": "Contact the AssurMatch team.",
     "breadcrumb": "Contact",
     "lead": "A question about an offer, a broker or insurer partnership, or the press: write to us.",
@@ -922,6 +930,7 @@
   },
   "Brokers": {
     "title": "Partner brokers",
+    "heroTitle": "Partner <accent>brokers</accent>",
     "description": "Join the network of authorised AssurMatch partner brokers.",
     "breadcrumb": "Partner brokers",
     "hero": {
@@ -979,6 +988,7 @@
   },
   "BrokerPricing": {
     "title": "Broker pricing",
+    "heroTitle": "<accent>Broker</accent> pricing",
     "description": "Subscription plans for partner brokers.",
     "breadcrumb": "Broker pricing",
     "lead": "Pricing for partner brokers: monthly subscription and per-qualified-lead billing, specific to each country.",
@@ -1006,6 +1016,7 @@
   },
   "BrokerApply": {
     "title": "Become a partner",
+    "heroTitle": "Become a <accent>partner</accent>",
     "description": "Submit a partner broker application.",
     "breadcrumb": "Become a partner",
     "lead": "This application is a statement of intent reviewed by our compliance team. It does not activate any broker account.",
@@ -1069,6 +1080,7 @@
   },
   "BrokerLogin": {
     "title": "Broker sign in",
+    "heroTitle": "Broker <accent>sign in</accent>",
     "description": "Access your partner broker workspace.",
     "breadcrumb": "Broker sign in",
     "lead": "The broker workspace is a separate application, reserved for authenticated partner brokers.",
@@ -1091,6 +1103,12 @@
       "description": "Licensed partner brokers for {countryCode}: licence number, issuing authority and covered products.",
       "breadcrumb": "Partner brokers",
       "heading": "Partner brokers for {countryCode}",
+      "heroTitle": "Partner brokers <accent>{countryCode}</accent>",
+      "stats": {
+        "brokers": "{count, plural, one {partner broker} other {partner brokers}}",
+        "products": "{count, plural, one {covered product} other {covered products}}"
+      },
+      "asideLicensed": "Valid licence, number and issuing authority displayed",
       "intro": "A partner broker holds a valid licence for this country, is responsible for confirming the quote and the conditions, and is the entity your request is transmitted to.",
       "listLabel": "Partner brokers",
       "viewBroker": "View broker profile",
@@ -1106,6 +1124,10 @@
     },
     "broker": {
       "title": "{displayName} — partner broker {countryCode}",
+      "heroTitle": "<accent>{displayName}</accent>",
+      "stats": {
+        "products": "{count, plural, one {covered product} other {covered products}}"
+      },
       "description": "Profile of partner broker {displayName} for {countryCode}: licence, issuing authority and covered products.",
       "back": "Back to brokers in {countryCode}",
       "productsTitle": "Covered products",
@@ -1119,6 +1141,11 @@
       "description": "Insurers whose indicative offers are visible for {countryCode}, with the products concerned.",
       "breadcrumb": "Listed insurers",
       "heading": "Listed insurers for {countryCode}",
+      "heroTitle": "Listed insurers <accent>{countryCode}</accent>",
+      "stats": {
+        "insurers": "{count, plural, one {listed insurer} other {listed insurers}}",
+        "offers": "{count, plural, one {visible public offer} other {visible public offers}}"
+      },
       "intro": "The insurer carries the risk while the partner broker handles the relationship with you; the offers shown here remain indicative.",
       "listLabel": "Listed insurers",
       "offersCount": "{count, plural, one {# visible public offer} other {# visible public offers}}",

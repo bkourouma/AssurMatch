@@ -26,41 +26,44 @@ export interface PlanPricingCardProps {
  * price: it is what the broker itself pays AssurMatch, so it carries no "prix indicatif, à confirmer
  * par le courtier partenaire" mention. The monthly subscription leads with a large tabular figure
  * (the one number a broker scans for first); the per-lead price and the setup fee sit below it as a
- * small key/value list.
+ * small key/value list. The hover lift lives on the inner card: the stagger reveal owns the transform
+ * of the `li`.
  */
 export function PlanPricingCard({ planName, positioning, labels, monthlySubscription, perLead, setupFee, highlighted }: PlanPricingCardProps) {
   const hasPrice = monthlySubscription !== undefined;
   return (
-    <Card as="li" {...(highlighted ? { featured: true } : {})}>
-      <CardHeader>
-        <CardTitle>{planName}</CardTitle>
-      </CardHeader>
-      <CardBody>
-        <p className="am-priceplan__positioning">{positioning}</p>
-        {hasPrice ? (
-          <>
-            <p className="am-priceplan__price">
-              <span className="am-priceplan__amount am-tabular">{monthlySubscription}</span>
-              <span className="am-priceplan__caption">{labels.monthlySubscription}</span>
+    <li className="am-plan">
+      <Card className="am-plan__card" {...(highlighted ? { featured: true } : {})}>
+        <CardHeader>
+          <CardTitle>{planName}</CardTitle>
+        </CardHeader>
+        <CardBody>
+          <p className="am-priceplan__positioning">{positioning}</p>
+          {hasPrice ? (
+            <>
+              <p className="am-priceplan__price">
+                <span className="am-priceplan__amount am-tabular">{monthlySubscription}</span>
+                <span className="am-priceplan__caption">{labels.monthlySubscription}</span>
+              </p>
+              <dl className="am-kv" data-columns="1">
+                <div>
+                  <dt>{labels.perLead}</dt>
+                  <dd className="am-tabular">{perLead}</dd>
+                </div>
+                <div>
+                  <dt>{labels.setupFee}</dt>
+                  <dd className="am-tabular">{setupFee}</dd>
+                </div>
+              </dl>
+            </>
+          ) : (
+            <p className="am-priceplan__onrequest">
+              <Icon name="clock" size={16} />
+              {labels.onRequest}
             </p>
-            <dl className="am-kv" data-columns="1">
-              <div>
-                <dt>{labels.perLead}</dt>
-                <dd className="am-tabular">{perLead}</dd>
-              </div>
-              <div>
-                <dt>{labels.setupFee}</dt>
-                <dd className="am-tabular">{setupFee}</dd>
-              </div>
-            </dl>
-          </>
-        ) : (
-          <p className="am-priceplan__onrequest">
-            <Icon name="clock" size={16} />
-            {labels.onRequest}
-          </p>
-        )}
-      </CardBody>
-    </Card>
+          )}
+        </CardBody>
+      </Card>
+    </li>
   );
 }

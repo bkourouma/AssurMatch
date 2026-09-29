@@ -1,5 +1,6 @@
 import { getTranslations, setRequestLocale } from "next-intl/server";
 import { toLocale } from "../../../../../i18n/routing";
+import { DirectoryAside } from "../../../../components/brokers/directory-aside";
 import { Breadcrumb } from "../../../../components/ui/breadcrumb";
 import { BrokerBlock } from "../../../../components/ui/broker-block";
 import { Button } from "../../../../components/ui/button";
@@ -11,6 +12,7 @@ import { Section } from "../../../../components/ui/section";
 import { listCountryDirectory, listCountryPartners, listPublicProducts } from "../../../../lib/public-api";
 import { buildMetadata, localeUrl } from "../../../../lib/seo";
 import type { PageMetadata } from "../../../../lib/seo";
+import "../../../../styles/pages/directory.css";
 
 /**
  * Broker directory of a country (SITE-404). Every partner shown here holds a valid licence: the
@@ -53,6 +55,15 @@ export default async function CountryBrokersPage({ params }: { params: Promise<P
   const countryName = await resolveCountryName(countryCode);
   const partners = await listCountryPartners(countryCode);
   const countryProducts = await listPublicProducts(countryCode);
+
+  // Counters are lengths of lists this page already fetched: nothing is computed or invented.
+  const partnerCount = partners.status !== "error" ? partners.data.length : 0;
+  const productCount = partners.status !== "error" ? new Set(partners.data.flatMap((partner) => partner.productKeys.map((key) => key.toLowerCase()))).size : 0;
+  const asideStats = [
+    ...(partnerCount > 0 ? [{ key: "brokers", icon: "handshake" as const, value: partnerCount, label: t("stats.brokers", { count: partnerCount }) }] : []),
+    ...(productCount > 0 ? [{ key: "products", icon: "layers" as const, value: productCount, label: t("stats.products", { count: productCount }) }] : [])
+  ];
+
   const brokerLabels = {
     licenceNumber: common("licenceNumber"),
     issuingAuthority: common("issuingAuthority"),
@@ -64,10 +75,14 @@ export default async function CountryBrokersPage({ params }: { params: Promise<P
   return (
     <>
       <Hero
+        className="am-hero--spotlight"
         kicker={countries("breadcrumb")}
-        title={t("heading", { countryCode: countryName })}
+        title={t.rich("heroTitle", { countryCode: countryName, accent: (chunks) => <span className="am-hero__accent">{chunks}</span> })}
         lead={t("intro")}
         size="sm"
+        {...(asideStats.length > 0
+          ? { aside: <DirectoryAside countryIso={countryCode} countryName={countryName} stats={asideStats} footnote={t("asideLicensed")} /> }
+          : {})}
         breadcrumb={
           <Breadcrumb
             label={common("breadcrumbLabel")}
@@ -115,7 +130,7 @@ export default async function CountryBrokersPage({ params }: { params: Promise<P
         ) : null}
 
         {partners.status !== "error" && partners.data.length > 0 ? (
-          <Reveal as="ul" stagger className="am-j-cardgrid">
+          <Reveal as="ul" stagger className="am-dir-grid">
             {partners.data.map((partner) => {
               const productLabels = partner.productKeys.map((key) => {
                 const match = countryProducts.data.find((candidate) => candidate.key.toLowerCase() === key.toLowerCase());
@@ -123,24 +138,26 @@ export default async function CountryBrokersPage({ params }: { params: Promise<P
               });
               return (
                 <li key={partner.id}>
-                  <BrokerBlock
-                    displayName={partner.displayName}
-                    licenceNumber={partner.licenseNumber}
-                    issuingAuthority={partner.issuingAuthority}
-                    labels={brokerLabels}
-                    approved
-                    {...(partner.city ? { city: partner.city } : {})}
-                    {...(productLabels.length > 0 ? { products: productLabels } : {})}
-                  />
-                  <div className="am-j-cardgrid__actions">
-                    <Button
-                      variant="secondary"
-                      href={{ pathname: "/countries/[countryCode]/brokers/[partnerId]", params: { countryCode, partnerId: partner.id } }}
-                      iconAfter={<Icon name="arrow-right" size={18} />}
-                    >
-                      {t("viewBroker")}
-                    </Button>
-                  </div>
+                  <article className="am-dir-card">
+                    <BrokerBlock
+                      displayName={partner.displayName}
+                      licenceNumber={partner.licenseNumber}
+                      issuingAuthority={partner.issuingAuthority}
+                      labels={brokerLabels}
+                      approved
+                      {...(partner.city ? { city: partner.city } : {})}
+                      {...(productLabels.length > 0 ? { products: productLabels } : {})}
+                    />
+                    <div className="am-dir-card__actions">
+                      <Button
+                        variant="secondary"
+                        href={{ pathname: "/countries/[countryCode]/brokers/[partnerId]", params: { countryCode, partnerId: partner.id } }}
+                        iconAfter={<Icon name="arrow-right" size={18} />}
+                      >
+                        {t("viewBroker")}
+                      </Button>
+                    </div>
+                  </article>
                 </li>
               );
             })}

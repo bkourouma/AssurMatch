@@ -1,5 +1,6 @@
 import { getTranslations, setRequestLocale } from "next-intl/server";
 import { toLocale } from "../../../../../i18n/routing";
+import { DirectoryAside } from "../../../../components/brokers/directory-aside";
 import { BackendText } from "../../../../components/ui/backend-text";
 import { Badge } from "../../../../components/ui/badge";
 import { Breadcrumb } from "../../../../components/ui/breadcrumb";
@@ -12,6 +13,7 @@ import { Section } from "../../../../components/ui/section";
 import { listCountryDirectory, listCountryInsurers, listPublicProducts } from "../../../../lib/public-api";
 import { buildMetadata, localeUrl } from "../../../../lib/seo";
 import type { PageMetadata } from "../../../../lib/seo";
+import "../../../../styles/pages/directory.css";
 
 /**
  * Insurer directory of a country (SITE-404). The insurer carries the risk, the partner broker
@@ -63,13 +65,25 @@ export default async function CountryInsurersPage({ params }: { params: Promise<
   const state = await listCountryInsurers(countryCode);
   const countryProducts = await listPublicProducts(countryCode);
 
+  // Counters are lengths and sums of counts of the list this page already fetched: nothing is invented.
+  const insurerCount = state.status !== "error" ? state.data.length : 0;
+  const offerTotal = state.status !== "error" ? state.data.reduce((total, insurer) => total + insurer.offerCount, 0) : 0;
+  const asideStats = [
+    ...(insurerCount > 0 ? [{ key: "insurers", icon: "landmark" as const, value: insurerCount, label: t("stats.insurers", { count: insurerCount }) }] : []),
+    ...(offerTotal > 0 ? [{ key: "offers", icon: "list" as const, value: offerTotal, label: t("stats.offers", { count: offerTotal }) }] : [])
+  ];
+
   return (
     <>
       <Hero
+        className="am-hero--spotlight"
         kicker={countries("breadcrumb")}
-        title={t("heading", { countryCode: countryName })}
+        title={t.rich("heroTitle", { countryCode: countryName, accent: (chunks) => <span className="am-hero__accent">{chunks}</span> })}
         lead={t("intro")}
         size="sm"
+        {...(asideStats.length > 0
+          ? { aside: <DirectoryAside countryIso={countryCode} countryName={countryName} stats={asideStats} footnote={common("indicativeNotice")} /> }
+          : {})}
         breadcrumb={
           <Breadcrumb
             label={common("breadcrumbLabel")}
@@ -115,7 +129,7 @@ export default async function CountryInsurersPage({ params }: { params: Promise<
         ) : null}
 
         {state.status !== "error" && state.data.length > 0 ? (
-          <Reveal as="ul" stagger className="am-j-cardgrid">
+          <Reveal as="ul" stagger className="am-dir-grid">
             {state.data.map((insurer) => {
               const productLinks = insurer.productKeys.map((key) => ({
                 raw: key,
@@ -123,50 +137,52 @@ export default async function CountryInsurersPage({ params }: { params: Promise<
               }));
               return (
                 <li key={insurer.insurerName}>
-                  <div className="am-j-insurer__head">
-                    <span className="am-j-initials" aria-hidden="true">
-                      {initials(insurer.insurerName)}
-                    </span>
-                    <div>
-                      <h2 className="am-j-insurer__name">
-                        <BackendText>{insurer.insurerName}</BackendText>
-                      </h2>
-                      <p className="am-j-meta">
-                        <span>
-                          <Icon name="list" size={16} />
-                          {t("offersCount", { count: insurer.offerCount })}
-                        </span>
-                      </p>
-                    </div>
-                  </div>
-                  {productLinks.length > 0 ? (
-                    <>
-                      <p className="am-j-meta">{t("productsLabel")}</p>
-                      <div className="am-j-cardgrid__actions">
-                        {productLinks.map(({ raw, match }) =>
-                          match ? (
-                            <Button
-                              key={raw}
-                              variant="secondary"
-                              size="sm"
-                              href={{
-                                pathname: "/countries/[countryCode]/products/[productKey]/offers",
-                                params: { countryCode, productKey: match.key },
-                                query: { insurer: insurer.insurerName }
-                              }}
-                              iconAfter={<Icon name="arrow-right" size={16} />}
-                            >
-                              {t("viewOffers")} <BackendText>{match.name}</BackendText>
-                            </Button>
-                          ) : (
-                            <Badge key={raw} tone="neutral">
-                              <BackendText>{raw}</BackendText>
-                            </Badge>
-                          )
-                        )}
+                  <article className="am-dir-card">
+                    <div className="am-dir-card__head">
+                      <span className="am-dir-avatar" aria-hidden="true">
+                        {initials(insurer.insurerName)}
+                      </span>
+                      <div>
+                        <h2 className="am-dir-card__name">
+                          <BackendText>{insurer.insurerName}</BackendText>
+                        </h2>
+                        <p className="am-j-meta">
+                          <span>
+                            <Icon name="list" size={16} />
+                            {t("offersCount", { count: insurer.offerCount })}
+                          </span>
+                        </p>
                       </div>
-                    </>
-                  ) : null}
+                    </div>
+                    {productLinks.length > 0 ? (
+                      <>
+                        <p className="am-j-meta">{t("productsLabel")}</p>
+                        <div className="am-dir-card__actions">
+                          {productLinks.map(({ raw, match }) =>
+                            match ? (
+                              <Button
+                                key={raw}
+                                variant="secondary"
+                                size="sm"
+                                href={{
+                                  pathname: "/countries/[countryCode]/products/[productKey]/offers",
+                                  params: { countryCode, productKey: match.key },
+                                  query: { insurer: insurer.insurerName }
+                                }}
+                                iconAfter={<Icon name="arrow-right" size={16} />}
+                              >
+                                {t("viewOffers")} <BackendText>{match.name}</BackendText>
+                              </Button>
+                            ) : (
+                              <Badge key={raw} tone="neutral">
+                                <BackendText>{raw}</BackendText>
+                              </Badge>
+                            )
+                          )}
+                        </div>
+                      </>
+                    ) : null}
+                  </article>
                 </li>
               );
             })}

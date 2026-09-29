@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import { Breadcrumb, type BreadcrumbEntry } from "../components/ui/breadcrumb";
+import { accentTitle } from "../components/institutional/accent-title";
 import { Hero } from "../components/ui/hero";
 import { Icon } from "../components/ui/icons";
 import { Notice } from "../components/ui/notice";
@@ -51,9 +52,10 @@ export function LegalPageView({
   return (
     <>
       <Hero
+        className="am-hero--spotlight"
         size="sm"
         kicker={kicker}
-        title={page.title}
+        title={accentTitle(page.title)}
         lead={page.description}
         breadcrumb={<Breadcrumb label={breadcrumbLabel} items={breadcrumbItems} />}
       />

@@ -132,6 +132,8 @@
   },
   "NotFound": {
     "title": "Page introuvable",
+    "heroTitle": "Page <accent>introuvable</accent>",
+    "kicker": "Erreur 404",
     "description": "Cette page n'existe pas ou n'est plus publiée. Vous pouvez repartir des pays ouverts ou comparer des offres indicatives.",
     "cta": "Comparer les offres",
     "countriesTitle": "Pays ouverts",
@@ -807,6 +809,7 @@
   },
   "HowItWorks": {
     "title": "Comment ça marche",
+    "heroTitle": "Comment ça <accent>marche</accent>",
     "description": "Comparer, demander un devis, être recontacté par un courtier partenaire autorisé.",
     "breadcrumb": "Comment ça marche",
     "lead": "Trois étapes simples, sans aucun engagement avant la confirmation du courtier partenaire responsable.",
@@ -825,6 +828,7 @@
   },
   "RegulatoryStatus": {
     "title": "Statut réglementaire",
+    "heroTitle": "Statut <accent>réglementaire</accent>",
     "description": "Le rôle technique d'AssurMatch et la responsabilité des courtiers partenaires autorisés.",
     "breadcrumb": "Statut réglementaire",
     "kicker": "Transparence",
@@ -845,6 +849,7 @@
   },
   "Guides": {
     "title": "Guides",
+    "heroTitle": "Des <accent>guides</accent> pour comprendre l'assurance",
     "description": "Guides pratiques pour comprendre l'assurance, sans conseil personnalisé.",
     "breadcrumb": "Guides",
     "kicker": "Guides",
@@ -859,6 +864,7 @@
   },
   "Glossary": {
     "title": "Lexique",
+    "heroTitle": "Le lexique de <accent>l'assurance</accent>",
     "description": "Les termes d'assurance expliqués simplement.",
     "breadcrumb": "Lexique",
     "kicker": "Lexique",
@@ -870,6 +876,7 @@
   },
   "Faq": {
     "title": "FAQ",
+    "heroTitle": "Vos questions, <accent>nos réponses</accent>",
     "description": "Les questions fréquentes sur AssurMatch et la comparaison indicative.",
     "breadcrumb": "FAQ",
     "kicker": "Questions fréquentes",
@@ -880,6 +887,7 @@
   },
   "Contact": {
     "title": "Contact",
+    "heroTitle": "Une question ? <accent>Écrivez-nous</accent>",
     "description": "Contacter l'équipe AssurMatch.",
     "breadcrumb": "Contact",
     "lead": "Une question sur une offre, un partenariat courtier ou assureur, ou la presse : écrivez-nous.",
@@ -922,6 +930,7 @@
   },
   "Brokers": {
     "title": "Courtiers partenaires",
+    "heroTitle": "Courtiers <accent>partenaires</accent>",
     "description": "Rejoindre le réseau de courtiers partenaires autorisés d'AssurMatch.",
     "breadcrumb": "Courtiers partenaires",
     "hero": {
@@ -979,6 +988,7 @@
   },
   "BrokerPricing": {
     "title": "Tarifs courtiers",
+    "heroTitle": "Tarifs <accent>courtiers</accent>",
     "description": "Les formules d'abonnement pour les courtiers partenaires.",
     "breadcrumb": "Tarifs courtiers",
     "lead": "Tarification à destination des courtiers partenaires : abonnement mensuel et facturation au lead qualifié, propres à chaque pays.",
@@ -1006,6 +1016,7 @@
   },
   "BrokerApply": {
     "title": "Devenir partenaire",
+    "heroTitle": "Devenir <accent>partenaire</accent>",
     "description": "Déposer une candidature de courtier partenaire.",
     "breadcrumb": "Devenir partenaire",
     "lead": "Cette candidature est un dossier d'intention étudié par notre équipe conformité. Elle n'active aucun compte courtier.",
@@ -1069,6 +1080,7 @@
   },
   "BrokerLogin": {
     "title": "Connexion courtier",
+    "heroTitle": "Connexion <accent>courtier</accent>",
     "description": "Accéder à votre espace courtier partenaire.",
     "breadcrumb": "Connexion courtier",
     "lead": "L'espace courtier est une application distincte, réservée aux courtiers partenaires authentifiés.",
@@ -1091,6 +1103,12 @@
       "description": "Courtiers partenaires agréés pour {countryCode} : numéro de licence, autorité de délivrance et produits couverts.",
       "breadcrumb": "Courtiers partenaires",
       "heading": "Courtiers partenaires pour {countryCode}",
+      "heroTitle": "Courtiers partenaires <accent>{countryCode}</accent>",
+      "stats": {
+        "brokers": "{count, plural, one {courtier partenaire} other {courtiers partenaires}}",
+        "products": "{count, plural, one {produit couvert} other {produits couverts}}"
+      },
+      "asideLicensed": "Licence valide, numéro et autorité de délivrance affichés",
       "intro": "Un courtier partenaire détient une licence valide pour ce pays, est responsable de la confirmation du devis et des conditions, et est l'entité à laquelle votre demande est transmise.",
       "listLabel": "Courtiers partenaires",
       "viewBroker": "Voir la fiche du courtier",
@@ -1106,6 +1124,10 @@
     },
     "broker": {
       "title": "{displayName} — courtier partenaire {countryCode}",
+      "heroTitle": "<accent>{displayName}</accent>",
+      "stats": {
+        "products": "{count, plural, one {produit couvert} other {produits couverts}}"
+      },
       "description": "Fiche du courtier partenaire {displayName} pour {countryCode} : licence, autorité de délivrance et produits couverts.",
       "back": "Retour aux courtiers de {countryCode}",
       "productsTitle": "Produits couverts",
@@ -1119,6 +1141,11 @@
       "description": "Assureurs dont les offres indicatives sont visibles pour {countryCode}, avec les produits concernés.",
       "breadcrumb": "Assureurs référencés",
       "heading": "Assureurs référencés pour {countryCode}",
+      "heroTitle": "Assureurs référencés <accent>{countryCode}</accent>",
+      "stats": {
+        "insurers": "{count, plural, one {assureur référencé} other {assureurs référencés}}",
+        "offers": "{count, plural, one {offre publique visible} other {offres publiques visibles}}"
+      },
       "intro": "L'assureur porte le risque tandis que le courtier partenaire gère la relation avec vous ; les offres affichées ici restent indicatives.",
       "listLabel": "Assureurs référencés",
       "offersCount": "{count, plural, one {# offre publique visible} other {# offres publiques visibles}}",

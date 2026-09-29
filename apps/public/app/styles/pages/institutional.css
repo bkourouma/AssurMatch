@@ -1,9 +1,135 @@
 /*
  * Institutional pages: how it works, regulatory status, FAQ, glossary, guides, contact, the four
  * legal pages (and their country variants) and the localised 404. Imported by each of those page
- * modules, so it lands after globals.css in the cascade. Every rule composes the design-system
- * primitives; none of them is redefined here.
+ * modules (and by the guide card, which the home page reuses), so it lands after globals.css in the
+ * cascade. Every rule composes the design-system primitives; none of them is redefined here.
+ *
+ * Visual language, shared with the home, country and product pages: 16px cards on layered navy
+ * shadows, a 4px lift on hover, a 3px gradient hairline drawn along the top edge, gradient icon
+ * circles, giant faint step numbers for sequences, glass surfaces for the sticky rails.
  */
+
+/* ==========================================================================
+   0. Shared primitives
+   ========================================================================== */
+
+/* Gradient icon circle with a soft ring (the same construction as the home steps). */
+.am-icontile.am-inst-icon {
+  border-radius: var(--am-radius-pill);
+  background: var(--am-gradient-brand);
+  box-shadow:
+    0 0 0 5px var(--am-primary-50),
+    var(--am-shadow-glow-soft);
+  color: var(--am-neutral-0);
+  transition: transform var(--am-duration-base) var(--am-ease-spring);
+}
+
+/* Cards that lift: 16px radius, navy shadow, hairline drawn on hover or keyboard focus. */
+.am-card.am-guidecard,
+.am-card.am-linkcard,
+.am-card.am-timeline__card,
+.am-card.am-inst-card {
+  overflow: hidden;
+  border-radius: var(--am-radius-card);
+  box-shadow: var(--am-shadow-md);
+  transition:
+    transform var(--am-duration-base) var(--am-ease-out),
+    box-shadow var(--am-duration-base) var(--am-ease-out),
+    border-color var(--am-duration-base) var(--am-ease-out);
+}
+
+.am-card.am-guidecard::before,
+.am-card.am-linkcard::before,
+.am-card.am-timeline__card::before,
+.am-card.am-inst-card::before,
+.am-card.am-contact-card::before,
+.am-glossary-entry::before,
+.am-legal-toc::before {
+  position: absolute;
+  z-index: 2;
+  inset: 0 0 auto;
+  height: 3px;
+  background: var(--am-gradient-gauge);
+  content: "";
+  pointer-events: none;
+  transform: scaleX(0);
+  transform-origin: left center;
+  transition: transform var(--am-duration-slow) var(--am-ease-out);
+}
+
+.am-card.am-guidecard:hover,
+.am-card.am-guidecard:focus-within,
+.am-card.am-linkcard:hover,
+.am-card.am-linkcard:focus-within,
+.am-card.am-timeline__card:hover,
+.am-card.am-timeline__card:focus-within {
+  border-color: var(--am-primary-200);
+  box-shadow: var(--am-shadow-xl);
+  transform: translateY(-4px);
+}
+
+.am-card.am-inst-card:hover,
+.am-card.am-inst-card:focus-within {
+  border-color: var(--am-primary-200);
+  box-shadow: var(--am-shadow-xl);
+}
+
+.am-card.am-guidecard:hover::before,
+.am-card.am-guidecard:focus-within::before,
+.am-card.am-linkcard:hover::before,
+.am-card.am-linkcard:focus-within::before,
+.am-card.am-timeline__card:hover::before,
+.am-card.am-timeline__card:focus-within::before,
+.am-card.am-inst-card:hover::before,
+.am-card.am-inst-card:focus-within::before,
+.am-glossary-entry:hover::before,
+.am-glossary-entry:target::before {
+  transform: scaleX(1);
+}
+
+.am-guidecard:hover .am-inst-icon,
+.am-guidecard:focus-within .am-inst-icon,
+.am-linkcard:hover .am-inst-icon,
+.am-linkcard:focus-within .am-inst-icon,
+.am-timeline__card:hover .am-inst-icon,
+.am-inst-card:hover .am-inst-icon {
+  transform: scale(1.06) rotate(-4deg);
+}
+
+/* Giant, faint sequence number, anchored in the top-right corner behind the content. */
+.am-timeline__index,
+.am-inst-card__index {
+  position: absolute;
+  z-index: 0;
+  top: -4px;
+  right: 16px;
+  background: linear-gradient(180deg, rgba(37, 99, 235, 0.2) 0%, rgba(37, 99, 235, 0) 90%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  font-family: var(--am-font-heading);
+  font-size: 96px;
+  font-variant-numeric: tabular-nums;
+  font-weight: 900;
+  letter-spacing: -0.06em;
+  line-height: 1;
+  pointer-events: none;
+  user-select: none;
+}
+
+@media (min-width: 640px) {
+  .am-timeline__index,
+  .am-inst-card__index {
+    font-size: 120px;
+  }
+}
+
+/* Anything that carries content stays above the faint number. */
+.am-timeline__card > :not(.am-timeline__index),
+.am-inst-card > :not(.am-inst-card__index) {
+  position: relative;
+  z-index: 1;
+}
 
 /* ==========================================================================
    1. Vertical timeline (how it works)
@@ -26,7 +152,7 @@
   left: 21px;
   width: 2px;
   border-radius: var(--am-radius-pill);
-  background: linear-gradient(180deg, var(--am-primary-200) 0%, var(--am-primary-100) 100%);
+  background: linear-gradient(180deg, var(--am-primary-300) 0%, var(--am-primary-100) 100%);
   content: "";
 }
 
@@ -49,7 +175,9 @@
   border: 2px solid var(--am-surface);
   border-radius: var(--am-radius-pill);
   background: var(--am-gradient-brand);
-  box-shadow: var(--am-shadow-glow-soft);
+  box-shadow:
+    0 0 0 5px var(--am-primary-50),
+    var(--am-shadow-glow-soft);
   color: var(--am-text-invert);
   font-family: var(--am-font-heading);
   font-size: var(--am-small-size);
@@ -69,6 +197,8 @@
 
 .am-timeline__title {
   margin: 0;
+  font-weight: 800;
+  letter-spacing: var(--am-tracking-snug);
 }
 
 @media (min-width: 900px) {
@@ -104,8 +234,15 @@
 }
 
 /* ==========================================================================
-   2. "Ne fait pas" checklist and link cards
+   2. "Ne fait pas" panel and link cards
    ========================================================================== */
+
+/* Quiet slate panel: what AssurMatch never does. No green, nothing that reads as a validation. */
+.am-card.am-notdone {
+  border-radius: var(--am-radius-card);
+  background: linear-gradient(180deg, var(--am-neutral-50) 0%, var(--am-surface) 42%);
+  box-shadow: var(--am-shadow-md);
+}
 
 .am-xlist {
   display: grid;
@@ -115,17 +252,28 @@
   list-style: none;
 }
 
+@media (min-width: 768px) {
+  .am-xlist {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--am-space-12) var(--am-space-32);
+  }
+}
+
 .am-xlist li {
   display: grid;
   gap: var(--am-space-12);
   align-items: start;
-  grid-template-columns: 20px minmax(0, 1fr);
+  grid-template-columns: 28px minmax(0, 1fr);
   color: var(--am-text-muted);
 }
 
 .am-xlist li .am-icon {
-  margin-top: 3px;
-  color: var(--am-neutral-500);
+  box-sizing: content-box;
+  padding: 5px;
+  border-radius: var(--am-radius-pill);
+  background: var(--am-neutral-100);
+  color: var(--am-neutral-600);
+  margin-top: -1px;
 }
 
 .am-linkcards {
@@ -143,6 +291,12 @@
   }
 }
 
+.am-linkcard-item,
+.am-guidecard-item {
+  display: grid;
+  min-width: 0;
+}
+
 /* ==========================================================================
    3. Sticky in-page navigation (regulatory status, legal pages)
    ========================================================================== */
@@ -152,8 +306,10 @@
   z-index: var(--am-z-sticky);
   top: var(--am-header);
   border-bottom: 1px solid var(--am-border);
-  background: rgba(255, 255, 255, 0.86);
-  backdrop-filter: blur(10px);
+  background: var(--am-glass);
+  -webkit-backdrop-filter: var(--am-glass-blur);
+  backdrop-filter: var(--am-glass-blur);
+  box-shadow: var(--am-shadow-sm);
 }
 
 .am-inpagenav__list {
@@ -180,7 +336,7 @@
   gap: var(--am-space-8);
   align-items: center;
   padding: var(--am-space-6) var(--am-space-16);
-  border: 1px solid var(--am-border);
+  border: 1px solid var(--am-border-solid);
   border-radius: var(--am-radius-pill);
   background: var(--am-surface);
   color: var(--am-text-muted);
@@ -191,13 +347,17 @@
   transition:
     border-color var(--am-transition),
     background-color var(--am-transition),
-    color var(--am-transition);
+    color var(--am-transition),
+    box-shadow var(--am-transition),
+    transform var(--am-transition);
 }
 
 .am-inpagenav__link:hover {
   border-color: var(--am-primary-300);
   background: var(--am-primary-50);
+  box-shadow: var(--am-shadow-glow-soft);
   color: var(--am-primary-700);
+  transform: translateY(-1px);
 }
 
 .am-inpagenav__link .am-icon {
@@ -222,6 +382,11 @@
 
 .am-inst-card__title {
   margin: 0;
+  font-family: var(--am-font-heading);
+  font-size: var(--am-h3-size);
+  font-weight: 800;
+  letter-spacing: var(--am-tracking-snug);
+  line-height: var(--am-h3-line);
 }
 
 .am-inst-card p {
@@ -230,6 +395,23 @@
 
 .am-inst-card .am-card__body {
   gap: var(--am-space-16);
+  line-height: 1.7;
+}
+
+/* Title and glyph on the left, the statements on the right: a reading rhythm, not a wall of text. */
+@media (min-width: 900px) {
+  .am-card.am-inst-card {
+    display: grid;
+    gap: var(--am-space-48);
+    align-items: start;
+    grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.35fr);
+  }
+
+  .am-inst-card__head {
+    flex-direction: column;
+    align-items: flex-start;
+    margin-bottom: 0;
+  }
 }
 
 .am-bullets {
@@ -244,13 +426,17 @@
   display: grid;
   gap: var(--am-space-12);
   align-items: start;
-  grid-template-columns: 20px minmax(0, 1fr);
+  grid-template-columns: 28px minmax(0, 1fr);
   color: var(--am-text-muted);
 }
 
 .am-bullets li .am-icon {
-  margin-top: 3px;
-  color: var(--am-primary-500);
+  box-sizing: content-box;
+  padding: 5px;
+  border-radius: var(--am-radius-pill);
+  background: var(--am-primary-50);
+  color: var(--am-primary-600);
+  margin-top: -1px;
 }
 
 /* ==========================================================================
@@ -263,8 +449,10 @@
   top: var(--am-header);
   padding: var(--am-space-12) 0;
   border-bottom: 1px solid var(--am-border);
-  background: rgba(255, 255, 255, 0.88);
-  backdrop-filter: blur(10px);
+  background: var(--am-glass);
+  -webkit-backdrop-filter: var(--am-glass-blur);
+  backdrop-filter: var(--am-glass-blur);
+  box-shadow: var(--am-shadow-sm);
 }
 
 .am-glossary-index__list {
@@ -282,8 +470,8 @@
   height: 40px;
   align-items: center;
   justify-content: center;
-  border: 1px solid var(--am-border);
-  border-radius: var(--am-radius-sm);
+  border: 1px solid var(--am-border-solid);
+  border-radius: var(--am-radius-md);
   background: var(--am-surface);
   color: var(--am-primary-700);
   font-family: var(--am-font-heading);
@@ -293,13 +481,17 @@
   transition:
     border-color var(--am-transition),
     background-color var(--am-transition),
+    box-shadow var(--am-transition),
+    color var(--am-transition),
     transform var(--am-transition);
 }
 
 .am-glossary-index__link:hover {
-  border-color: var(--am-primary-300);
-  background: var(--am-primary-50);
-  transform: translateY(-1px);
+  border-color: transparent;
+  background: var(--am-gradient-brand-strong);
+  box-shadow: var(--am-shadow-glow-soft);
+  color: var(--am-neutral-0);
+  transform: translateY(-2px);
 }
 
 .am-glossary-group {
@@ -308,7 +500,7 @@
 }
 
 .am-glossary-group + .am-glossary-group {
-  margin-top: var(--am-space-40);
+  margin-top: var(--am-space-48);
 }
 
 .am-glossary-group__letter {
@@ -316,17 +508,26 @@
   gap: var(--am-space-16);
   align-items: center;
   margin: 0;
-  color: var(--am-primary-700);
   font-family: var(--am-font-heading);
   font-size: var(--am-h2-size);
-  font-weight: 800;
+  font-weight: 900;
   line-height: 1;
+}
+
+.am-glossary-group__letter::before {
+  display: inline-flex;
+  width: 8px;
+  height: 8px;
+  flex: none;
+  border-radius: var(--am-radius-pill);
+  background: var(--am-gradient-brand);
+  content: "";
 }
 
 .am-glossary-group__letter::after {
   height: 1px;
   flex: 1;
-  background: var(--am-border);
+  background: linear-gradient(90deg, var(--am-primary-200), transparent);
   content: "";
 }
 
@@ -343,24 +544,40 @@
   }
 }
 
+.am-glossary-cell {
+  display: grid;
+  min-width: 0;
+}
+
 .am-glossary-entry {
+  position: relative;
   display: grid;
   gap: var(--am-space-8);
   align-content: start;
-  padding: var(--am-space-20);
+  overflow: hidden;
+  padding: var(--am-space-24);
   border: 1px solid var(--am-border);
   border-radius: var(--am-radius-card);
   background: var(--am-surface);
-  box-shadow: var(--am-shadow-xs);
+  box-shadow: var(--am-shadow-md);
   transition:
-    border-color var(--am-transition),
-    box-shadow var(--am-transition);
+    transform var(--am-duration-base) var(--am-ease-out),
+    border-color var(--am-duration-base) var(--am-ease-out),
+    box-shadow var(--am-duration-base) var(--am-ease-out);
 }
 
-.am-glossary-entry:hover,
+.am-glossary-entry:hover {
+  border-color: var(--am-primary-200);
+  box-shadow: var(--am-shadow-xl);
+  transform: translateY(-4px);
+}
+
+/* Arriving from a "see also" link or a shared URL: the entry wears the brand halo. */
 .am-glossary-entry:target {
-  border-color: var(--am-primary-300);
-  box-shadow: var(--am-shadow-md);
+  border-color: var(--am-primary-400);
+  box-shadow:
+    var(--am-halo),
+    var(--am-shadow-lg);
 }
 
 .am-glossary-entry__term {
@@ -378,7 +595,7 @@
   margin: 0;
   color: var(--am-text-muted);
   font-size: var(--am-small-size);
-  line-height: 1.6;
+  line-height: 1.65;
 }
 
 .am-glossary-entry__see {
@@ -386,10 +603,30 @@
   flex-wrap: wrap;
   gap: var(--am-space-6);
   align-items: center;
-  margin: 0;
+  margin: var(--am-space-4) 0 0;
   color: var(--am-text-subtle);
   font-size: var(--am-caption-size);
   line-height: var(--am-caption-line);
+}
+
+.am-glossary-entry__link {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px var(--am-space-10);
+  border: 1px solid var(--am-primary-100);
+  border-radius: var(--am-radius-pill);
+  background: var(--am-primary-50);
+  color: var(--am-primary-700);
+  font-weight: 700;
+  text-decoration: none;
+  transition:
+    background-color var(--am-transition),
+    border-color var(--am-transition);
+}
+
+.am-glossary-entry__link:hover {
+  border-color: var(--am-primary-300);
+  background: var(--am-primary-100);
 }
 
 /* ==========================================================================
@@ -427,6 +664,12 @@
   text-decoration: none;
 }
 
+.am-guidecard .am-card__title,
+.am-linkcard .am-card__title {
+  margin-top: var(--am-space-4);
+  font-weight: 800;
+}
+
 .am-guidecard .am-card__title a::after,
 .am-linkcard .am-card__title a::after {
   position: absolute;
@@ -446,7 +689,7 @@
   gap: var(--am-space-6);
   align-items: center;
   margin-left: auto;
-  color: var(--am-primary-600);
+  color: var(--am-primary-700);
   font-size: var(--am-caption-size);
   font-weight: 700;
 }
@@ -456,15 +699,17 @@
 }
 
 .am-guidecard:hover .am-cardgo .am-icon,
-.am-linkcard:hover .am-cardgo .am-icon {
-  transform: translateX(3px);
+.am-guidecard:focus-within .am-cardgo .am-icon,
+.am-linkcard:hover .am-cardgo .am-icon,
+.am-linkcard:focus-within .am-cardgo .am-icon {
+  transform: translateX(4px);
 }
 
 /* ---------- Guide detail: a reading column ---------- */
 
 .am-reading {
   display: grid;
-  gap: var(--am-space-32);
+  gap: var(--am-space-40);
 }
 
 .am-reading__section {
@@ -473,24 +718,44 @@
   scroll-margin-top: calc(var(--am-header) + var(--am-space-32));
 }
 
+/* A short gauge-coloured rule above each heading gives the column its rhythm. */
+.am-reading__section > h2::before,
+.am-legal-section > h2::before {
+  display: block;
+  width: 36px;
+  height: 3px;
+  margin-bottom: var(--am-space-12);
+  border-radius: var(--am-radius-pill);
+  background: var(--am-gradient-gauge);
+  content: "";
+}
+
 .am-reading__section h2 {
   margin: 0;
   font-size: var(--am-h3-size);
+  font-weight: 800;
+  letter-spacing: var(--am-tracking-snug);
   line-height: var(--am-h3-line);
 }
 
 .am-reading__section p {
   margin: 0;
   color: var(--am-text-muted);
-  line-height: 1.7;
+  font-size: var(--am-body-size);
+  line-height: 1.75;
 }
 
 .am-reading__meta {
-  display: flex;
+  display: inline-flex;
   flex-wrap: wrap;
   gap: var(--am-space-8);
   align-items: center;
   margin: 0 0 var(--am-space-24);
+  padding: var(--am-space-6) var(--am-space-16);
+  border: 1px solid var(--am-border-solid);
+  border-radius: var(--am-radius-pill);
+  background: var(--am-glass);
+  box-shadow: var(--am-shadow-xs);
   color: var(--am-text-subtle);
   font-size: var(--am-caption-size);
   line-height: var(--am-caption-line);
@@ -505,10 +770,79 @@
    ========================================================================== */
 
 .am-faq-meta {
+  display: inline-flex;
   margin: 0 0 var(--am-space-16);
-  color: var(--am-text-subtle);
+  padding: var(--am-space-4) var(--am-space-12);
+  border: 1px solid var(--am-primary-100);
+  border-radius: var(--am-radius-pill);
+  background: var(--am-primary-50);
+  color: var(--am-primary-800);
   font-size: var(--am-caption-size);
+  font-weight: 700;
   line-height: var(--am-caption-line);
+}
+
+/* Polished glass accordion on top of the native <details> primitive. */
+.am-faq--glass {
+  gap: var(--am-space-12);
+}
+
+.am-faq--glass .am-faq__item {
+  position: relative;
+  border-color: var(--am-border-solid);
+  border-radius: var(--am-radius-card);
+  background: var(--am-glass);
+  -webkit-backdrop-filter: var(--am-glass-blur);
+  backdrop-filter: var(--am-glass-blur);
+  box-shadow: var(--am-shadow-sm);
+  transition:
+    transform var(--am-duration-base) var(--am-ease-out),
+    box-shadow var(--am-duration-base) var(--am-ease-out),
+    border-color var(--am-duration-base) var(--am-ease-out),
+    background-color var(--am-duration-base) var(--am-ease-out);
+}
+
+.am-faq--glass .am-faq__item:hover {
+  border-color: var(--am-primary-200);
+  box-shadow: var(--am-shadow-md);
+  transform: translateY(-2px);
+}
+
+/* Open state: brand tint, a gradient bar on the leading edge, the chevron turned and inked in blue. */
+.am-faq--glass .am-faq__item[open] {
+  border-color: var(--am-primary-300);
+  background: linear-gradient(180deg, var(--am-primary-50) 0%, var(--am-surface) 96px);
+  box-shadow: var(--am-shadow-lg);
+}
+
+.am-faq--glass .am-faq__item[open]::before {
+  position: absolute;
+  top: var(--am-space-12);
+  bottom: var(--am-space-12);
+  left: 0;
+  width: 3px;
+  border-radius: var(--am-radius-pill);
+  background: linear-gradient(180deg, var(--am-primary-600), var(--am-primary-400));
+  content: "";
+}
+
+.am-faq--glass .am-faq__item > summary {
+  font-weight: 800;
+  letter-spacing: var(--am-tracking-snug);
+  transition: color var(--am-transition);
+}
+
+.am-faq--glass .am-faq__item[open] > summary {
+  color: var(--am-primary-800);
+}
+
+.am-faq--glass .am-faq__item > summary::after {
+  color: var(--am-primary-600);
+  transition: transform var(--am-duration-base) var(--am-ease-spring);
+}
+
+.am-faq--glass .am-faq__item[open] > summary::after {
+  color: var(--am-primary-700);
 }
 
 /* The answer holds a paragraph and, when the question is product-specific, a caption under it. */
@@ -539,6 +873,26 @@
   }
 }
 
+.am-card.am-contact-card {
+  overflow: hidden;
+  border-radius: var(--am-radius-card);
+}
+
+/* The form card wears its hairline permanently: it is the page's main action. */
+.am-card.am-contact-card:not(.am-contact-card--aside) {
+  box-shadow: var(--am-shadow-xl);
+}
+
+.am-card.am-contact-card:not(.am-contact-card--aside)::before {
+  transform: scaleX(1);
+}
+
+.am-card.am-contact-card--aside {
+  border-color: var(--am-primary-100);
+  background: linear-gradient(180deg, var(--am-primary-50) 0%, var(--am-surface) 55%);
+  box-shadow: var(--am-shadow-md);
+}
+
 .am-contact-aside {
   display: grid;
   gap: var(--am-space-16);
@@ -554,7 +908,7 @@
 
 .am-contact-aside__list {
   display: grid;
-  gap: var(--am-space-12);
+  gap: var(--am-space-16);
   margin: 0;
   padding: 0;
   list-style: none;
@@ -564,15 +918,24 @@
   display: grid;
   gap: var(--am-space-12);
   align-items: start;
-  grid-template-columns: 20px minmax(0, 1fr);
+  grid-template-columns: 32px minmax(0, 1fr);
   color: var(--am-text-muted);
   font-size: var(--am-small-size);
   line-height: var(--am-small-line);
 }
 
 .am-contact-aside__list li .am-icon {
-  margin-top: 2px;
-  color: var(--am-primary-600);
+  box-sizing: content-box;
+  padding: 7px;
+  border-radius: var(--am-radius-pill);
+  background: var(--am-gradient-brand);
+  box-shadow: var(--am-shadow-glow-soft);
+  color: var(--am-neutral-0);
+  margin: -2px 0 0 -7px;
+}
+
+.am-contact-aside__list li {
+  padding-left: var(--am-space-4);
 }
 
 /** Two columns of short fields from 768px; the subject and the message always span the row. */
@@ -596,7 +959,7 @@
   display: grid;
   gap: var(--am-space-8);
   padding: var(--am-space-16) var(--am-space-20);
-  border: 1px solid var(--am-border);
+  border: 1px solid var(--am-border-solid);
   border-radius: var(--am-radius-card);
   background: var(--am-neutral-50);
 }
@@ -629,15 +992,24 @@
    9. Legal pages
    ========================================================================== */
 
+/* Table of contents (legal pages, guide detail): a glass card, numbered rows, hairline on top. */
 .am-legal-toc {
+  position: relative;
   display: grid;
   gap: var(--am-space-12);
-  margin-bottom: var(--am-space-32);
-  padding: var(--am-space-20) var(--am-space-24);
-  border: 1px solid var(--am-border);
+  margin-bottom: var(--am-space-40);
+  overflow: hidden;
+  padding: var(--am-space-24);
+  border: 1px solid var(--am-border-solid);
   border-radius: var(--am-radius-card);
-  background: var(--am-surface);
-  box-shadow: var(--am-shadow-xs);
+  background: var(--am-glass);
+  -webkit-backdrop-filter: var(--am-glass-blur);
+  backdrop-filter: var(--am-glass-blur);
+  box-shadow: var(--am-shadow-md);
+}
+
+.am-legal-toc::before {
+  transform: scaleX(1);
 }
 
 .am-legal-toc__title {
@@ -659,11 +1031,18 @@
 
 .am-legal-toc__list {
   display: grid;
-  gap: var(--am-space-8);
+  gap: var(--am-space-4);
   margin: 0;
   padding: 0;
   counter-reset: am-toc;
   list-style: none;
+}
+
+@media (min-width: 640px) {
+  .am-legal-toc__list {
+    gap: var(--am-space-4) var(--am-space-16);
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 
 .am-legal-toc__list li {
@@ -671,34 +1050,61 @@
 }
 
 .am-legal-toc__list a {
-  display: inline-flex;
-  gap: var(--am-space-10);
-  align-items: baseline;
-  color: var(--am-link);
+  display: flex;
+  gap: var(--am-space-12);
+  align-items: center;
+  padding: var(--am-space-6) var(--am-space-8);
+  border-radius: var(--am-radius-md);
+  color: var(--am-text);
   font-size: var(--am-small-size);
+  font-weight: 600;
   text-decoration: none;
+  transition:
+    background-color var(--am-transition),
+    color var(--am-transition);
 }
 
 .am-legal-toc__list a::before {
-  color: var(--am-text-subtle);
+  display: inline-flex;
+  width: 28px;
+  height: 28px;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--am-radius-sm);
+  background: var(--am-primary-50);
+  color: var(--am-primary-700);
   content: counter(am-toc, decimal-leading-zero);
   font-family: var(--am-font-heading);
   font-size: var(--am-caption-size);
   font-variant-numeric: tabular-nums;
   font-weight: 800;
+  transition:
+    background-color var(--am-transition),
+    color var(--am-transition);
 }
 
 .am-legal-toc__list a:hover {
-  color: var(--am-link-hover);
-  text-decoration: underline;
+  background: var(--am-primary-50);
+  color: var(--am-primary-700);
+}
+
+.am-legal-toc__list a:hover::before {
+  background: var(--am-primary-600);
+  color: var(--am-neutral-0);
 }
 
 .am-legal-meta {
-  display: flex;
+  display: inline-flex;
   flex-wrap: wrap;
   gap: var(--am-space-8);
   align-items: center;
   margin: 0 0 var(--am-space-24);
+  padding: var(--am-space-6) var(--am-space-16);
+  border: 1px solid var(--am-border-solid);
+  border-radius: var(--am-radius-pill);
+  background: var(--am-glass);
+  box-shadow: var(--am-shadow-xs);
   color: var(--am-text-subtle);
   font-size: var(--am-caption-size);
   line-height: var(--am-caption-line);
@@ -712,21 +1118,42 @@
   color: var(--am-primary-600);
 }
 
+/* A comfortable reading column: generous leading, sections told apart by a hairline. */
+.am-legal-body {
+  display: grid;
+  gap: 0;
+}
+
 .am-legal-section {
   display: grid;
   gap: var(--am-space-12);
+  padding-block: var(--am-space-32);
+  border-top: 1px solid var(--am-border-solid);
   scroll-margin-top: calc(var(--am-header) + var(--am-space-32));
+}
+
+.am-legal-section:first-child {
+  padding-top: 0;
+  border-top: 0;
+}
+
+.am-legal-section h2 {
+  margin: 0;
+  font-size: var(--am-h3-size);
+  font-weight: 800;
+  letter-spacing: var(--am-tracking-snug);
+  line-height: var(--am-h3-line);
+}
+
+.am-legal-section:target h2 {
+  color: var(--am-primary-700);
 }
 
 .am-legal-section p {
   margin: 0;
   color: var(--am-text-muted);
-  line-height: 1.7;
-}
-
-.am-legal-body {
-  display: grid;
-  gap: var(--am-space-32);
+  font-size: var(--am-body-size);
+  line-height: 1.75;
 }
 
 .am-legal-notice__action {
@@ -744,6 +1171,59 @@
 /* ==========================================================================
    10. 404 and error pages
    ========================================================================== */
+
+/* 404 hero: the text column on the left, a floating glass panel with a faint "404" on the right. */
+.am-errorhero__art {
+  position: relative;
+  display: none;
+  min-height: 280px;
+  align-items: center;
+  justify-content: center;
+  padding: var(--am-space-32);
+  border: 1px solid rgba(255, 255, 255, 0.9);
+  border-radius: var(--am-radius-panel);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.96) 0%, rgba(255, 255, 255, 0.82) 100%);
+  box-shadow:
+    var(--am-shadow-xl),
+    var(--am-shadow-inset);
+  animation: am-float 5s var(--am-ease-in-out) infinite;
+}
+
+@media (min-width: 980px) {
+  .am-errorhero__art {
+    display: flex;
+  }
+}
+
+.am-errorhero__num {
+  background: linear-gradient(180deg, rgba(37, 99, 235, 0.3) 0%, rgba(37, 99, 235, 0.04) 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  font-family: var(--am-font-heading);
+  font-size: clamp(120px, 14vw, 200px);
+  font-variant-numeric: tabular-nums;
+  font-weight: 900;
+  letter-spacing: -0.06em;
+  line-height: 1;
+  user-select: none;
+}
+
+.am-errorhero__art .am-icontile {
+  position: absolute;
+  width: 84px;
+  height: 84px;
+  animation: am-float-alt 4s var(--am-ease-in-out) infinite;
+}
+
+.am-errorhero__art .am-icontile .am-icon {
+  width: 40px;
+  height: 40px;
+}
+
+.am-errorhero + .am-section .am-errorpage {
+  padding: 0;
+}
 
 .am-errorpage {
   display: grid;
@@ -797,7 +1277,7 @@
 .am-errorpage-countries {
   display: flex;
   flex-wrap: wrap;
-  gap: var(--am-space-8);
+  gap: var(--am-space-10);
   justify-content: center;
   margin: 0;
   padding: 0;
@@ -806,22 +1286,117 @@
 
 .am-errorpage-countries a {
   display: inline-flex;
-  min-height: 40px;
+  min-height: 44px;
+  gap: var(--am-space-8);
   align-items: center;
   padding: var(--am-space-6) var(--am-space-16);
-  border: 1px solid var(--am-border);
+  border: 1px solid var(--am-border-solid);
   border-radius: var(--am-radius-pill);
-  background: var(--am-surface);
+  background: var(--am-glass);
+  -webkit-backdrop-filter: var(--am-glass-blur);
+  backdrop-filter: var(--am-glass-blur);
+  box-shadow: var(--am-shadow-sm);
   color: var(--am-text-muted);
-  font-size: var(--am-caption-size);
+  font-size: var(--am-small-size);
   font-weight: 700;
   text-decoration: none;
   transition:
     border-color var(--am-transition),
-    color var(--am-transition);
+    box-shadow var(--am-transition),
+    color var(--am-transition),
+    transform var(--am-transition);
+}
+
+.am-errorpage-countries a .am-icon {
+  color: var(--am-primary-600);
+  transition: transform var(--am-transition);
 }
 
 .am-errorpage-countries a:hover {
   border-color: var(--am-primary-300);
+  box-shadow: var(--am-shadow-md);
   color: var(--am-primary-700);
+  transform: translateY(-2px);
+}
+
+.am-errorpage-countries a:hover .am-icon {
+  transform: translateX(3px);
+}
+
+/* ==========================================================================
+   11. Accessibility: forced colours and reduced motion
+   ========================================================================== */
+
+@media (forced-colors: active) {
+  .am-timeline__index,
+  .am-inst-card__index,
+  .am-errorhero__num {
+    background: none;
+    color: GrayText;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .am-card.am-guidecard,
+  .am-card.am-linkcard,
+  .am-card.am-timeline__card,
+  .am-card.am-inst-card,
+  .am-glossary-entry,
+  .am-faq--glass .am-faq__item,
+  .am-inpagenav__link,
+  .am-glossary-index__link,
+  .am-errorpage-countries a,
+  .am-icontile.am-inst-icon,
+  .am-cardgo .am-icon,
+  .am-errorpage-countries a .am-icon,
+  .am-faq--glass .am-faq__item > summary::after {
+    transition-duration: 0.01ms;
+  }
+
+  .am-card.am-guidecard:hover,
+  .am-card.am-guidecard:focus-within,
+  .am-card.am-linkcard:hover,
+  .am-card.am-linkcard:focus-within,
+  .am-card.am-timeline__card:hover,
+  .am-card.am-timeline__card:focus-within,
+  .am-glossary-entry:hover,
+  .am-faq--glass .am-faq__item:hover,
+  .am-inpagenav__link:hover,
+  .am-glossary-index__link:hover,
+  .am-errorpage-countries a:hover,
+  .am-guidecard:hover .am-inst-icon,
+  .am-guidecard:focus-within .am-inst-icon,
+  .am-linkcard:hover .am-inst-icon,
+  .am-linkcard:focus-within .am-inst-icon,
+  .am-timeline__card:hover .am-inst-icon,
+  .am-inst-card:hover .am-inst-icon,
+  .am-guidecard:hover .am-cardgo .am-icon,
+  .am-guidecard:focus-within .am-cardgo .am-icon,
+  .am-linkcard:hover .am-cardgo .am-icon,
+  .am-linkcard:focus-within .am-cardgo .am-icon,
+  .am-errorpage-countries a:hover .am-icon {
+    transform: none;
+  }
+
+  .am-card.am-guidecard::before,
+  .am-card.am-linkcard::before,
+  .am-card.am-timeline__card::before,
+  .am-card.am-inst-card::before,
+  .am-card.am-contact-card::before,
+  .am-glossary-entry::before,
+  .am-legal-toc::before {
+    transition: none;
+  }
+
+  .am-errorhero__art,
+  .am-errorhero__art .am-icontile {
+    animation: none;
+  }
+}
+
+/* Root 404 (outside the locale segment, no header): the spotlight band fills the viewport. */
+.am-errorhero-root {
+  display: grid;
+  min-height: 100vh;
+  align-items: center;
 }

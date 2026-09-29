@@ -15,7 +15,7 @@ export default function RootNotFound() {
     <html lang="fr" className={`${headingFont.variable} ${bodyFont.variable}`}>
       <body>
         <main className="am-main" id="contenu">
-          <section className="am-section">
+          <section className="am-hero am-hero--spotlight am-errorhero-root">
             <div className="am-container">
               <div className="am-errorpage">
                 <span className="am-errorpage__icon">
@@ -23,7 +23,7 @@ export default function RootNotFound() {
                 </span>
                 <h1 className="am-errorpage__title">Page introuvable</h1>
                 <p className="am-errorpage__lead">
-                  Cette page n&apos;existe pas ou n&apos;est plus publiee. Vous pouvez repartir des pays ouverts ou comparer
+                  Cette page n&apos;existe pas ou n&apos;est plus publiée. Vous pouvez repartir des pays ouverts ou comparer
                   des offres indicatives.
                 </p>
                 <p className="am-errorpage__actions">
@@ -31,7 +31,7 @@ export default function RootNotFound() {
                     <span>Comparer les offres</span>
                   </Link>
                   <Link className="am-button" data-variant="secondary" href="/">
-                    <span>Retour a l&apos;accueil</span>
+                    <span>Retour à l&apos;accueil</span>
                   </Link>
                 </p>
               </div>

@@ -1,4 +1,5 @@
 import { Card, CardBody, CardHeader, CardTitle } from "../ui/card";
+import { Icon } from "../ui/icons";
 import { Reveal } from "../motion/reveal";
 import type { BrokerPlanContent, BrokerPlanKey } from "../../content/brokers";
 
@@ -34,25 +35,33 @@ function findPlan(plans: readonly BrokerPlanContent[], key: BrokerPlanKey | unde
 export function PlanComparison({ plans, labels }: PlanComparisonProps) {
   return (
     <>
+      {/* The hover lift lives on the inner card: the stagger reveal owns the transform of the `li`. */}
       <Reveal as="ul" stagger className="am-pricing-grid">
         {plans.map((plan) => {
           const base = findPlan(plans, plan.includesPlan);
           return (
-            <Card as="li" key={plan.key} featured={plan.key === "pro"}>
-              <CardHeader>
-                <CardTitle>{plan.name}</CardTitle>
-              </CardHeader>
-              <CardBody>
-                <p className="am-plancard__positioning">{plan.positioning}</p>
-                <p className="am-plancard__audience">{plan.audience}</p>
-                {base ? <p className="am-plan-note">{labels.includesPrefix(base.name)}</p> : null}
-                <ul className="am-plancard__features">
-                  {plan.features.map((feature) => (
-                    <li key={feature}>{feature}</li>
-                  ))}
-                </ul>
-              </CardBody>
-            </Card>
+            <li key={plan.key} className="am-plan">
+              <Card className="am-plan__card" featured={plan.key === "pro"}>
+                <CardHeader>
+                  <CardTitle>{plan.name}</CardTitle>
+                </CardHeader>
+                <CardBody>
+                  <p className="am-plancard__positioning">{plan.positioning}</p>
+                  <p className="am-plancard__audience">{plan.audience}</p>
+                  {base ? <p className="am-plan-note">{labels.includesPrefix(base.name)}</p> : null}
+                  <ul className="am-plancard__features">
+                    {plan.features.map((feature) => (
+                      <li key={feature}>
+                        <span className="am-plancard__tick" aria-hidden="true">
+                          <Icon name="check" size={12} />
+                        </span>
+                        <span>{feature}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </CardBody>
+              </Card>
+            </li>
           );
         })}
       </Reveal>

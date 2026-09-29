@@ -2,6 +2,7 @@ import { Link } from "../../../i18n/navigation";
 import { Card, CardBody, CardFooter, CardMeta, CardTitle } from "../ui/card";
 import { Icon, type IconName } from "../ui/icons";
 import { IconTile } from "../ui/icon-tile";
+import "../../styles/pages/institutional.css";
 
 /**
  * Editorial guide card, shared by the guides index and the home page preview.
@@ -29,21 +30,23 @@ export interface GuideCardProps {
 
 export function GuideCard({ slug, title, description, meta, readLabel, titleAs = "h3" }: GuideCardProps) {
   return (
-    <Card as="li" interactive className="am-guidecard">
-      <IconTile name={GUIDE_ICONS[slug] ?? "book-open"} size="lg" />
-      <CardTitle as={titleAs}>
-        <Link href={{ pathname: "/guides/[slug]", params: { slug } }}>{title}</Link>
-      </CardTitle>
-      <CardBody>
-        <p>{description}</p>
-      </CardBody>
-      <CardFooter>
-        <CardMeta>{meta}</CardMeta>
-        <span className="am-cardgo" aria-hidden="true">
-          {readLabel}
-          <Icon name="arrow-right" size={16} />
-        </span>
-      </CardFooter>
-    </Card>
+    <li className="am-guidecard-item">
+      <Card interactive className="am-guidecard">
+        <IconTile className="am-inst-icon" name={GUIDE_ICONS[slug] ?? "book-open"} size="lg" />
+        <CardTitle as={titleAs}>
+          <Link href={{ pathname: "/guides/[slug]", params: { slug } }}>{title}</Link>
+        </CardTitle>
+        <CardBody>
+          <p>{description}</p>
+        </CardBody>
+        <CardFooter>
+          <CardMeta>{meta}</CardMeta>
+          <span className="am-cardgo" aria-hidden="true">
+            {readLabel}
+            <Icon name="arrow-right" size={16} />
+          </span>
+        </CardFooter>
+      </Card>
+    </li>
   );
 }

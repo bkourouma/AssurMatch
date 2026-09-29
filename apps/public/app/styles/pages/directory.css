@@ -1,0 +1,180 @@
+/*
+ * Per-country broker and insurer directories (`/countries/[code]/brokers`, `/insurers`) and the broker
+ * profile. Imported by those page modules; the countries route group already loads `journey.css`, whose
+ * `am-j-countrycard--live` hero aside and `am-j-meta` rows are reused as-is (never edited from here).
+ *
+ * Structure: each entry is `ul.am-dir-grid > li > article.am-dir-card`. The `li` is the child the
+ * scroll-reveal stagger animates (it owns its transform and transition), so every hover effect lives on
+ * the inner `article`. Nothing here invents content: the "Agréé" badge, licence number and issuing
+ * authority stay exactly as `BrokerBlock` renders them, only their frame and the avatar change.
+ */
+
+.am-dir-grid {
+  display: grid;
+  gap: var(--am-space-20);
+  margin: 0;
+  padding: 0;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 300px), 1fr));
+  list-style: none;
+}
+
+.am-dir-grid > li {
+  display: grid;
+  min-width: 0;
+}
+
+.am-dir-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: var(--am-space-16);
+  min-width: 0;
+  overflow: hidden;
+  padding: var(--am-space-24);
+  border: 1px solid var(--am-border);
+  border-radius: var(--am-radius-card);
+  background:
+    radial-gradient(120% 70% at 100% 0%, rgba(59, 130, 246, 0.06), transparent 55%),
+    var(--am-surface);
+  box-shadow: var(--am-shadow-md);
+  transition:
+    transform var(--am-duration-base) var(--am-ease-out),
+    box-shadow var(--am-duration-base) var(--am-ease-out),
+    border-color var(--am-duration-base) var(--am-ease-out);
+}
+
+/* Gauge hairline along the top edge, drawn in on hover / keyboard focus. */
+.am-dir-card::before,
+.am-dir-profile::before {
+  position: absolute;
+  top: 0;
+  right: 0;
+  left: 0;
+  height: 3px;
+  background: var(--am-gradient-gauge);
+  content: "";
+}
+
+.am-dir-card::before {
+  opacity: 0;
+  transform: scaleX(0.4);
+  transform-origin: left center;
+  transition:
+    opacity var(--am-duration-base) var(--am-ease-out),
+    transform var(--am-duration-slow) var(--am-ease-out);
+}
+
+.am-dir-card:hover,
+.am-dir-card:focus-within {
+  border-color: var(--am-primary-200);
+  box-shadow: var(--am-shadow-xl);
+  transform: translateY(-4px);
+}
+
+.am-dir-card:hover::before,
+.am-dir-card:focus-within::before {
+  opacity: 1;
+  transform: none;
+}
+
+/* The broker block carries its own frame: flatten it whenever it already sits inside a card. */
+.am-dir-card .am-broker[data-variant="card"],
+.am-dir-profile > .am-broker {
+  padding: 0;
+  border: 0;
+  background: none;
+  box-shadow: none;
+}
+
+/* Initials tile -> gradient circle with a soft ring (broker block avatar and insurer initials alike). */
+.am-dir-card .am-broker__avatar,
+.am-dir-profile .am-broker__avatar,
+.am-dir-avatar {
+  display: inline-flex;
+  width: 48px;
+  height: 48px;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--am-radius-pill);
+  background: var(--am-gradient-brand);
+  box-shadow: 0 0 0 5px var(--am-primary-50), var(--am-shadow-glow-soft);
+  color: var(--am-neutral-0);
+  font-family: var(--am-font-heading);
+  font-size: var(--am-small-size);
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  transition: transform var(--am-duration-base) var(--am-ease-spring);
+}
+
+.am-dir-card:hover .am-broker__avatar,
+.am-dir-card:hover .am-dir-avatar {
+  transform: scale(1.06) rotate(-4deg);
+}
+
+.am-dir-card__head {
+  display: grid;
+  gap: var(--am-space-16);
+  align-items: center;
+  grid-template-columns: auto minmax(0, 1fr);
+}
+
+.am-dir-card__name {
+  margin: 0 0 var(--am-space-4);
+  font-family: var(--am-font-heading);
+  font-size: var(--am-h4-size);
+  font-weight: 700;
+  letter-spacing: var(--am-tracking-snug);
+  line-height: var(--am-h4-line);
+  overflow-wrap: anywhere;
+}
+
+.am-dir-card__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--am-space-12);
+  margin-top: auto;
+}
+
+/* ---------- Broker profile (detail page) ---------- */
+
+.am-dir-profile {
+  position: relative;
+  overflow: hidden;
+  border: 1px solid transparent;
+  background:
+    linear-gradient(var(--am-surface), var(--am-surface)) padding-box,
+    linear-gradient(160deg, var(--am-primary-200), var(--am-border-solid) 42%, var(--am-border-glass)) border-box;
+  box-shadow: var(--am-shadow-xl);
+}
+
+.am-dir-profile .am-broker__avatar {
+  width: 56px;
+  height: 56px;
+  font-size: var(--am-body-size);
+}
+
+.am-dir-profile .am-broker__name {
+  overflow-wrap: anywhere;
+}
+
+/* ---------- Hero aside ---------- */
+
+.am-dir-aside .am-j-countrycard__name {
+  overflow-wrap: anywhere;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .am-dir-card:hover,
+  .am-dir-card:focus-within,
+  .am-dir-card:hover .am-broker__avatar,
+  .am-dir-card:hover .am-dir-avatar {
+    transform: none;
+  }
+
+  .am-dir-card::before {
+    transform: none;
+    transition: none;
+  }
+}

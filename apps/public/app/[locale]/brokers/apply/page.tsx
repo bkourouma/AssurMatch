@@ -105,7 +105,8 @@ export default async function BrokerApplyPage({ params }: { params: Promise<{ lo
   return (
     <>
       <Hero
-        title={t("title")}
+        className="am-hero--spotlight"
+        title={t.rich("heroTitle", { accent: (chunks) => <span className="am-hero__accent">{chunks}</span> })}
         lead={t("lead")}
         breadcrumb={
           <Breadcrumb
@@ -118,7 +119,7 @@ export default async function BrokerApplyPage({ params }: { params: Promise<{ lo
         }
       />
 
-      <Section width="narrow">
+      <Section width="narrow" className="am-applystage">
         {eligibleCountries.length === 0 ? (
           <EmptyState title={t("noCountries.title")} description={t("noCountries.description")} />
         ) : (

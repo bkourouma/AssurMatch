@@ -24,13 +24,16 @@ export async function generateMetadata({ params }: { params: Promise<{ locale: s
  * kept on the band: `#remuneration`, `#classement`, `#offres-sponsorisees` and `#prix-indicatif` are
  * stable anchors that the footer, the FAQ and external links point at.
  */
-function RegulatorySection({ section, icon, tone }: { section: ContentSection; icon: IconName; tone?: "muted" }) {
+function RegulatorySection({ section, icon, index, tone }: { section: ContentSection; icon: IconName; index: number; tone?: "muted" }) {
   return (
     <Section id={section.id} className="am-inst-anchor" {...(tone ? { tone } : {})}>
       <Reveal>
         <Card padding="lg" className="am-inst-card">
+          <span className="am-inst-card__index" aria-hidden="true">
+            {String(index + 1).padStart(2, "0")}
+          </span>
           <div className="am-inst-card__head">
-            <IconTile name={icon} size="lg" />
+            <IconTile className="am-inst-icon" name={icon} size="lg" />
             <h2 className="am-inst-card__title">{section.heading}</h2>
           </div>
           <CardBody>
@@ -71,8 +74,9 @@ export default async function RegulatoryStatusPage({ params }: { params: Promise
   return (
     <>
       <Hero
+        className="am-hero--spotlight"
         kicker={t("kicker")}
-        title={t("title")}
+        title={t.rich("heroTitle", { accent: (chunks) => <span className="am-hero__accent">{chunks}</span> })}
         lead={t("lead")}
         breadcrumb={
           <Breadcrumb
@@ -105,6 +109,7 @@ export default async function RegulatoryStatusPage({ params }: { params: Promise
           key={entry.section.id}
           section={entry.section}
           icon={entry.icon}
+          index={index}
           {...(index % 2 === 1 ? { tone: "muted" as const } : {})}
         />
       ))}
