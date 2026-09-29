@@ -38,6 +38,7 @@ export interface QuoteRequestRecord {
   quoteFormDefinitionId: string;
   prospectId: string;
   consentRecordId: string;
+  surveyConsentRecordId?: string;
   source: "public_web";
   payload: Record<string, unknown>;
   status: QuoteRequestStatus;
@@ -47,6 +48,7 @@ export interface QuoteRequestRecord {
   manualReviewReason?: string;
   correlationId?: string;
   retentionUntil: Date;
+  anonymizedAt?: Date;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -84,6 +86,7 @@ export interface QuoteSubmissionDependencies {
   aiSummary?: QuoteAISummaryService;
   /** Spec 045 consent withdrawal: closes the assignments a revoked request had produced. */
   assignments?: QuoteAssignmentsPort;
+  satisfactionSurveys?: { onConsentWithdrawn(quoteRequestId: string): Promise<void> };
   /** Spec 045 consent withdrawal: tells each partner tenant, in its inbox, to stop working the lead. */
   inApp?: QuoteInAppNotifierPort;
   /** Spec 045 consent withdrawal: per-IP rate limit on the unauthenticated withdrawal endpoint. */
@@ -194,6 +197,27 @@ export class QuoteSubmissionService {
       result: "success",
       context: { intendedRecipient: consentRecord.intendedRecipient }
     });
+
+    const surveyConsentRecord = await this.deps.consent.record({
+      consentTextId: parsed.consent.consentTextId,
+      subjectReference: contact.emailFingerprint,
+      purpose: "service_quality_survey",
+      countryId: country.id,
+      productId: product.id,
+      channel: "public_web",
+      intendedRecipient: "AssurMatch",
+      status: "granted",
+      grantedAt: new Date().toISOString()
+    }, actor);
+    this.audit.write({
+      actor,
+      action: QuoteAuditActions.consentServiceQualitySurveyGranted,
+      targetType: "ConsentRecord",
+      targetId: surveyConsentRecord.id,
+      scope: { countryId: country.id, productId: product.id },
+      result: "success",
+      context: { intendedRecipient: "AssurMatch" }
+    });
     const prospect = await this.deps.prospects.createOrLink(country.id, product.id, contact, consentRecord.id, actor);
     const token = crypto.randomUUID();
     const now = new Date();
@@ -209,6 +233,7 @@ export class QuoteSubmissionService {
       quoteFormDefinitionId: parsed.formDefinitionId,
       prospectId: prospect.id,
       consentRecordId: consentRecord.id,
+      surveyConsentRecordId: surveyConsentRecord.id,
       source: "public_web",
       payload: parsed.answers,
       status: product.flags.product_manual_review_required ? "manual_review" : "created",
@@ -344,6 +369,10 @@ export class QuoteSubmissionService {
     }
 
     await this.deps.consent.withdraw(quote.consentRecordId, actor, "visitor_withdrawal");
+    if (quote.surveyConsentRecordId) {
+      await this.deps.consent.withdraw(quote.surveyConsentRecordId, actor, "visitor_withdrawal");
+    }
+    await this.deps.satisfactionSurveys?.onConsentWithdrawn(quote.id).catch(() => {});
 
     quote.status = "cancelled";
     quote.refusalReason = "consent_withdrawn";

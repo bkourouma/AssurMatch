@@ -52,7 +52,7 @@ describe("visitor consent withdrawal runtime HTTP", () => {
 
     const quotes = await harness.runtime.quoteRequests.submissions.list();
     expect(quotes.map((quote) => quote.status)).toEqual(["cancelled"]);
-    expect(harness.runtime.audit.writer.search({ action: "consent.withdrawn_by_visitor" })).toHaveLength(1);
+    expect(harness.runtime.audit.writer.search({ action: "consent.withdrawn_by_visitor" })).toHaveLength(2);
     expect(harness.runtime.audit.writer.search({ action: "quote_request.cancelled_by_visitor" })).toHaveLength(1);
   });
 

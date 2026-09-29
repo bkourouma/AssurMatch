@@ -82,7 +82,7 @@ describe("visitor consent withdrawal", () => {
     expect(withdrawalNotice?.targetId).toBe(assignments[0]?.id);
     expect(withdrawalNotice?.body).toContain(confirmation.publicReference);
 
-    expect(actionCount(seed, "consent.withdrawn_by_visitor")).toBe(1);
+    expect(actionCount(seed, "consent.withdrawn_by_visitor")).toBe(2);
     expect(actionCount(seed, "quote_request.cancelled_by_visitor")).toBe(1);
     expect(actionCount(seed, "lead_assignment.closed_consent_withdrawn")).toBe(1);
   });
@@ -100,7 +100,7 @@ describe("visitor consent withdrawal", () => {
     expect(second).toMatchObject({ status: "cancelled", publicReference: confirmation.publicReference, alreadyWithdrawn: true });
     const secondRecord = await seed.app.consent.service.findRecord(quote.consentRecordId);
     expect(secondRecord?.withdrawnAt).toBe(firstWithdrawnAt);
-    expect(actionCount(seed, "consent.withdrawn_by_visitor")).toBe(1);
+    expect(actionCount(seed, "consent.withdrawn_by_visitor")).toBe(2);
     expect(actionCount(seed, "quote_request.cancelled_by_visitor")).toBe(1);
     expect(actionCount(seed, "lead_assignment.closed_consent_withdrawn")).toBe(1);
     expect((await seed.app.notifications.dispatch.listInApp(seed.partnerTenantId)).length).toBe(inboxBefore);

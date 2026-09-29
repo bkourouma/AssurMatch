@@ -57,11 +57,12 @@ function codeForError(error: unknown, message: string, status: number): ErrorCod
  * without widening any of the regexes that classify other messages.
  */
 const QUOTE_NOT_AVAILABLE_MESSAGE = "Quote status not available";
+const SATISFACTION_NOT_AVAILABLE_MESSAGE = "Ce questionnaire n'est plus disponible.";
 
 function statusForError(error: unknown): number {
   if (error instanceof HttpException) return error.getStatus();
   const message = error instanceof Error ? error.message : "";
-  if (message === QUOTE_NOT_AVAILABLE_MESSAGE) return HttpStatus.NOT_FOUND;
+  if (message === QUOTE_NOT_AVAILABLE_MESSAGE || message === SATISFACTION_NOT_AVAILABLE_MESSAGE) return HttpStatus.NOT_FOUND;
   if (/rate limit/i.test(message)) return HttpStatus.TOO_MANY_REQUESTS;
   if (/auth/i.test(message)) return HttpStatus.UNAUTHORIZED;
   if (/validation|invalid/i.test(message)) return HttpStatus.BAD_REQUEST;

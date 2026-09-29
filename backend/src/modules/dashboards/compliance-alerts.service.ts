@@ -22,6 +22,7 @@ export function categorizeAuditEntry(entry: AuditEntry): ComplianceAlertCategory
   if (CRM_FLAG_CLOSED_MARKERS.some((marker) => reason.includes(marker))) return "crm_flag_closed";
   if (CROSS_TENANT_MARKERS.some((marker) => reason.includes(marker) || action.includes(marker))) return "cross_tenant_attempt";
   if (RBAC_DENIED_MARKERS.some((marker) => reason.includes(marker) || action.includes(marker))) return "rbac_denied";
+  if (reason.includes("broker_satisfaction_concern") || action.includes("broker_satisfaction_concern") || action.includes("satisfaction_survey.concern_flagged")) return "broker_satisfaction_concern";
   return "other";
 }
 

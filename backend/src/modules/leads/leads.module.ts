@@ -90,7 +90,7 @@ export class LeadsModule {
     this.brokerStarterHistory = new BrokerStarterHistoryService(assignmentRepository);
     this.brokerStarterExportPolicy = new BrokerStarterExportPolicy(this.brokerStarterAccess, audit);
     this.brokerStarterLeads = new BrokerStarterLeadsService(this.assignments, this.brokerStarterAccess, this.brokerStarterHistory, audit, this.brokerStarterExportPolicy);
-    this.brokerStarterActions = new BrokerStarterLeadActionsService(this.assignments, this.brokerStarterAccess, this.brokerStarterHistory, audit);
+    this.brokerStarterActions = new BrokerStarterLeadActionsService(this.assignments, this.brokerStarterAccess, this.brokerStarterHistory, audit, routingOptions.events);
     this.brokerStarterNotifications = new BrokerStarterNotificationsService(this.assignments, this.brokerStarterAccess, this.brokerStarterHistory, audit);
     this.brokerStarterController = new BrokerStarterController(this.brokerStarterLeads, this.brokerStarterActions, this.brokerStarterNotifications, this.brokerStarterAccess, audit);
     this.brokerCrmAccess = new BrokerCrmAccessPolicy(audit, brokerCrmConfig);

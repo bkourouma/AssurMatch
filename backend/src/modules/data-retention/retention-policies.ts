@@ -23,7 +23,8 @@ export const DEFAULT_RETENTION_POLICIES: Readonly<Record<RetentionCategory, { re
   waitlist: { retentionDays: 365, anchor: "country_public_since" },
   ai_traces: { retentionDays: 365, anchor: "occurred_at" },
   webhook_payloads: { retentionDays: 90, anchor: "created_at" },
-  messaging_references: { retentionDays: 90, anchor: "created_at" }
+  messaging_references: { retentionDays: 90, anchor: "created_at" },
+  satisfaction_feedback: { retentionDays: 730, anchor: "submitted_at" }
 };
 
 /**

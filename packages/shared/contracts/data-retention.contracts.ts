@@ -14,7 +14,8 @@ export const RETENTION_CATEGORIES = [
   "waitlist",
   "ai_traces",
   "webhook_payloads",
-  "messaging_references"
+  "messaging_references",
+  "satisfaction_feedback"
 ] as const;
 
 export const RETENTION_DAYS_MIN = 30;
@@ -28,7 +29,7 @@ export const retentionCategorySchema = z.enum(RETENTION_CATEGORIES);
 /** Batch subjects: the categories plus orphan prospects, which an erasure (D3) can reach directly. */
 export const retentionSubjectKindSchema = z.enum([...RETENTION_CATEGORIES, "prospects"]);
 export const retentionPolicySourceSchema = z.enum(["default", "global", "country"]);
-export const retentionAnchorSchema = z.enum(["last_activity", "created_at", "reviewed_at", "country_public_since", "occurred_at"]);
+export const retentionAnchorSchema = z.enum(["last_activity", "created_at", "reviewed_at", "country_public_since", "occurred_at", "submitted_at"]);
 export const anonymizationBatchKindSchema = z.enum(["retention", "erasure"]);
 /**
  * `interrupted`: the batch was approved and its execution started but did not complete; the counts

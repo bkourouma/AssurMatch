@@ -1,3 +1,4 @@
+import type { SurveySubmissionInput } from "../satisfaction-surveys/satisfaction-surveys.service";
 import { Body, ConflictException, Controller, Delete, ForbiddenException, Get, HttpCode, Module, NotFoundException, Param, Patch, Post, Put, Query, Req, UnprocessableEntityException, UploadedFile, UseGuards, UseInterceptors } from "@nestjs/common";
 import { FileInterceptor } from "@nestjs/platform-express";
 import { z } from "zod";
@@ -488,6 +489,26 @@ export class PublicQuoteRequestsController {
  * deliberately reads the honeypot and session id off the unvalidated payload and runs BEFORE the
  * zod schema, so a filled honeypot is caught and audited instead of vanishing in a schema error.
  */
+export class PublicSatisfactionSurveysController {
+  constructor(private readonly runtime: AssurMatchRuntime) {}
+
+  status(publicReference: string, token: string | undefined) {
+    return this.runtime.satisfactionSurveys.controller.checkStatus(
+      parseParam("publicReference", publicReference),
+      token
+    );
+  }
+
+  submit(publicReference: string, token: string | undefined, body: unknown, request: AssurMatchHttpRequest) {
+    return this.runtime.satisfactionSurveys.controller.submit(
+      parseParam("publicReference", publicReference),
+      token,
+      body as SurveySubmissionInput,
+      clientIp(request)
+    );
+  }
+}
+
 export class PublicWaitlistController {
   constructor(private readonly runtime: AssurMatchRuntime) {}
 
@@ -1229,6 +1250,10 @@ decorate(PublicQuoteRequestsController, "submitQuote", [Post("quote-requests") a
 decorate(PublicQuoteRequestsController, "quoteStatus", [Get("quote-requests/:publicReference") as MethodDecoratorFactory], [[0, Param("publicReference") as ParamDecoratorFactory], [1, Query("token") as ParamDecoratorFactory]]);
 decorate(PublicQuoteRequestsController, "withdrawConsent", [Post("quote-requests/:publicReference/consent-withdrawal") as MethodDecoratorFactory, HttpCode(200) as MethodDecoratorFactory], [[0, Param("publicReference") as ParamDecoratorFactory], [1, Query("token") as ParamDecoratorFactory], [2, Req() as ParamDecoratorFactory]]);
 
+controller("satisfaction-surveys", PublicSatisfactionSurveysController);
+decorate(PublicSatisfactionSurveysController, "status", [Get(":publicReference") as MethodDecoratorFactory], [[0, Param("publicReference") as ParamDecoratorFactory], [1, Query("token") as ParamDecoratorFactory]]);
+decorate(PublicSatisfactionSurveysController, "submit", [Post(":publicReference") as MethodDecoratorFactory, HttpCode(200) as MethodDecoratorFactory], [[0, Param("publicReference") as ParamDecoratorFactory], [1, Query("token") as ParamDecoratorFactory], [2, Body() as ParamDecoratorFactory], [3, Req() as ParamDecoratorFactory]]);
+
 controller("waitlist", PublicWaitlistController);
 decorate(PublicWaitlistController, "subscribe", [Post() as MethodDecoratorFactory, HttpCode(202) as MethodDecoratorFactory], [[0, Body() as ParamDecoratorFactory], [1, Req() as ParamDecoratorFactory]]);
 
@@ -1455,6 +1480,7 @@ Module({
     PublicProductsController,
     PublicOffersController,
     PublicQuoteRequestsController,
+    PublicSatisfactionSurveysController,
     PublicWaitlistController,
     PublicContactController,
     PublicPartnersController,

@@ -108,6 +108,7 @@ export interface RetentionSubjectsRepository extends RuntimeRepository {
   loadQuoteCascade(quoteRequestId: string): Promise<QuoteCascade | undefined>;
   anonymizeLeadContent(assignmentIds: readonly string[]): Promise<void>;
   anonymizeQuoteAi(quoteRequestId: string, assignmentIds: readonly string[]): Promise<void>;
+  anonymizeSatisfactionSurvey?(quoteRequestId: string): Promise<void>;
   anonymizeQuoteRequestRow(id: string, stamp: AnonymizationStamp): Promise<boolean>;
   prospectHasLiveQuotes(prospectId: string): Promise<boolean>;
   anonymizeProspect(id: string, stamp: AnonymizationStamp): Promise<boolean>;
@@ -263,6 +264,8 @@ export class MemoryRetentionSubjectsRepository implements RetentionSubjectsRepos
     }
   }
 
+  async anonymizeSatisfactionSurvey(_quoteRequestId: string): Promise<void> {}
+
   async anonymizeQuoteAi(quoteRequestId: string, assignmentIds: readonly string[]): Promise<void> {
     const summaries = (await this.list(this.sources.quoteAiSummaries)).filter((summary) => summary.quoteRequestId === quoteRequestId);
     for (const summary of summaries) scrub(summary, {}, ["summaryReference"]);
@@ -402,6 +405,8 @@ export class MemoryRetentionSubjectsRepository implements RetentionSubjectsRepos
     const before = (date: Date | null | undefined) => !retention || (date !== null && date !== undefined && date < query.anchorBefore);
     const byAnchor = (left: RetentionCandidate, right: RetentionCandidate) => (left.anchor?.getTime() ?? 0) - (right.anchor?.getTime() ?? 0) || left.id.localeCompare(right.id);
     switch (category) {
+      case "satisfaction_feedback":
+        return [];
       case "quote_requests": {
         const assignments = await this.list(this.sources.leadAssignments);
         return (await this.list(this.sources.quoteRequests))
@@ -515,7 +520,8 @@ type DelegateName =
   | "waitlistEntry"
   | "partnerWebhookDelivery"
   | "notification"
-  | "messagingDelivery";
+  | "messagingDelivery"
+  | "satisfactionSurveyRequest";
 
 interface IdRow { id: string }
 
@@ -638,6 +644,8 @@ export class PrismaRetentionSubjectsRepository implements RetentionSubjectsRepos
         });
         return rows.map((row) => ({ id: row.id, countryId: null, anchor: row.createdAt, expired: false }));
       }
+      case "satisfaction_feedback":
+        return [];
       case "messaging_references":
         return query.countryId ? [] : this.messagingCandidates(query);
     }
@@ -864,6 +872,13 @@ export class PrismaRetentionSubjectsRepository implements RetentionSubjectsRepos
 
   private aiInteractionScrub(): Record<string, unknown> {
     return { outputReference: ANONYMIZED_MARKER, outputText: null, outputData: ANONYMIZED_JSON, minimizationReport: ANONYMIZED_JSON, updatedAt: new Date() };
+  }
+
+  async anonymizeSatisfactionSurvey(quoteRequestId: string): Promise<void> {
+    await this.delegate("satisfactionSurveyRequest").updateMany({
+      where: { quoteRequestId, comment: { not: null } },
+      data: { comment: null, anonymizedAt: new Date(), updatedAt: new Date() }
+    });
   }
 
   private async rows<T>(name: DelegateName, input: unknown): Promise<T[]> {

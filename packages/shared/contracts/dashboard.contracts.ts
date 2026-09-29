@@ -56,6 +56,7 @@ export const complianceAlertCategorySchema = z.enum([
   "crm_flag_closed",
   "rbac_denied",
   "cross_tenant_attempt",
+  "broker_satisfaction_concern",
   "other"
 ]);
 
@@ -81,6 +82,14 @@ export const licenseAlertItemSchema = z.object({
   expiresAt: dateTimeStringSchema
 });
 
+export const brokerSatisfactionSummarySchema = z.object({
+  averageRating: z.number().nullable(),
+  responseCount: z.number().int().min(0),
+  flaggedCount: z.number().int().min(0)
+});
+
+export type BrokerSatisfactionSummary = z.infer<typeof brokerSatisfactionSummarySchema>;
+
 export const brokerStarterDashboardSectionSchema = z.object({
   received: z.number().int().min(0),
   accepted: z.number().int().min(0),
@@ -89,7 +98,8 @@ export const brokerStarterDashboardSectionSchema = z.object({
   pendingAction: z.number().int().min(0),
   averageFirstActionMinutes: z.number().nullable(),
   byProduct: z.array(z.object({ productKey: nonEmptyStringSchema, total: z.number().int().min(0) })),
-  byCountry: z.array(z.object({ countryCode: isoCountrySchema, total: z.number().int().min(0) }))
+  byCountry: z.array(z.object({ countryCode: isoCountrySchema, total: z.number().int().min(0) })),
+  satisfaction: brokerSatisfactionSummarySchema.optional()
 });
 
 export const brokerCrmDashboardSectionSchema = z.object({
@@ -103,7 +113,8 @@ export const brokerCrmDashboardSectionSchema = z.object({
   })),
   averageReceptionToFirstActivityMinutes: z.number().nullable(),
   upcomingTasks: z.number().int().min(0),
-  upcomingReminders: z.number().int().min(0)
+  upcomingReminders: z.number().int().min(0),
+  satisfaction: brokerSatisfactionSummarySchema.optional()
 });
 
 export const brokerDashboardResponseSchema = z.object({
@@ -151,6 +162,7 @@ export const adminDashboardResponseSchema = z.object({
     crmFlagClosed: z.number().int().min(0),
     rbacDenied: z.number().int().min(0),
     crossTenantAttempt: z.number().int().min(0),
+    brokerSatisfactionConcern: z.number().int().min(0).optional(),
     other: z.number().int().min(0)
   }),
   sensitiveFeatureFlags: z.array(featureFlagSummarySchema),

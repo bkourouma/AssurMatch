@@ -12,7 +12,7 @@ describe("quote form and consent", () => {
 
     const confirmation = await seed.app.quoteRequests.publicController.submit(validQuotePayload(seed) as QuoteRequestCreateDto, superAdminActor);
     expect(confirmation.routed).toBe(true);
-    expect(await seed.app.consent.service.searchRecords(superAdminActor)).toHaveLength(1);
+    expect(await seed.app.consent.service.searchRecords(superAdminActor)).toHaveLength(2);
     expect(await seed.app.leads.assignments.list()).toHaveLength(1);
   });
 

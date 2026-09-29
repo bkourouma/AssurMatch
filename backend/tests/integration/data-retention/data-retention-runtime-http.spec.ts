@@ -57,7 +57,7 @@ describe("data retention runtime HTTP (spec 046)", () => {
 
     const policies = retentionPoliciesResponseSchema.parse(await readJson(await active.request(`/admin/retention/policies?countryId=${seed.country.id}`, { headers: actorHeaders(compliance) })));
     expect(policies).toMatchObject({ countryId: seed.country.id, purgeEnabled: false });
-    expect(policies.items).toHaveLength(8);
+    expect(policies.items).toHaveLength(9);
     const updated = await active.request("/admin/retention/policies", {
       method: "PUT",
       headers: { ...actorHeaders(compliance), ...json },

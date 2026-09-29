@@ -14,6 +14,7 @@ export interface PartnerWebhookPreparer {
 export interface PartnerWebhookEventPublisherDeps {
   audit: AuditLogWriter;
   integrations?: PartnerWebhookPreparer | undefined;
+  onEvent?: (eventType: PartnerWebhookEventType, partnerTenantId: string, data: Record<string, unknown>) => Promise<void>;
 }
 
 /**
@@ -25,6 +26,9 @@ export class PartnerWebhookEventPublisher {
   constructor(private readonly deps: PartnerWebhookEventPublisherDeps) {}
 
   async publish(eventType: PartnerWebhookEventType, partnerTenantId: string, data: Record<string, unknown>): Promise<void> {
+    if (this.deps.onEvent) {
+      await this.deps.onEvent(eventType, partnerTenantId, data).catch(() => {});
+    }
     if (!this.deps.integrations || !partnerTenantId) return;
     try {
       await this.deps.integrations.prepareWebhookDelivery({ partnerTenantId, eventType, data });
