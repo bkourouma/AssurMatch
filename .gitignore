@@ -70,3 +70,6 @@ secrets/
 # Claude Code: local session state (skills under .claude/skills are versioned)
 .claude/worktrees/
 .claude/settings.local.json
+
+# TypeScript incremental build output
+*.tsbuildinfo
