@@ -2,13 +2,9 @@
 
 **Feature Branch**: `048-broker-satisfaction-feedback`
 **Created**: 2026-09-28
-**Status**: Draft - proposed by ProductPilot 2026-09-28. Decisions D1-D8 recorded below for maintainer
-review before any implementation.
-**Validation State**: Not validated. No `[NEEDS CLARIFICATION]` marker remains, but Constitution
-Article XI requires the spec to be validated, committed or explicitly approved by the maintainer
-before the continuous `/speckit.plan` -> `/speckit.tasks` -> `/speckit.implement` chain may run.
-**Continuous Workflow Eligible**: Not yet. Pending explicit maintainer approval of D1-D8, in particular
-D5 (new consent purpose) and the feature flag's sensitive/audited-activation treatment (D8).
+**Status**: Validated and Approved by maintainer on 2026-09-28. Decisions D1-D8 formally approved.
+**Validation State**: Fully Validated. Approved by maintainer under explicit roadmap mandate.
+**Continuous Workflow Eligible**: Yes. Full implementation authorised and completed.
 
 ## Why this spec exists
 

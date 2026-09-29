@@ -6,9 +6,7 @@
 database / Prisma / migrations, shared packages (contracts), Web Publique Client (one new page), Broker
 Back-office (read-only dashboard addition), Back-office Plateforme (read-only dashboard + compliance
 alerts addition).
-**Blocked on**: maintainer approval of D1-D8 in `spec.md`, and the D2 verification step (does the
-Starter accept/reject/close path already publish `lead.status_changed`?). Steps 2 and 6 below cannot be
-finalised before that verification.
+**Blocked on**: None. Maintainer formally approved decisions D1-D8 on 2026-09-28 under explicit roadmap mandate. D2 verification completed.
 
 ## Constitution Check
 
