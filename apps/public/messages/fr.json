@@ -403,8 +403,18 @@
     "back": "Retour au produit {productKey}",
     "breadcrumb": "Offres indicatives",
     "title": "Comparer les offres",
+    "heroTitle": "<accent>{product}</accent> : comparez les offres",
     "description": "Offres indicatives comparables pour {productName} en {countryName}, avec score expliqué.",
     "lead": "Chaque offre est indicative : le prix indicatif et les conditions restent à confirmer par le courtier partenaire responsable.",
+    "summary": {
+      "label": "Synthèse des offres affichées",
+      "offers": "{count, plural, one {offre indicative} other {offres indicatives}}",
+      "partners": "{count, plural, one {courtier partenaire} other {courtiers partenaires}}",
+      "insurers": "{count, plural, one {assureur} other {assureurs}}",
+      "lowest": "Prix indicatif le plus bas affiché",
+      "lowestNote": "à confirmer par le courtier partenaire",
+      "sponsored": "{count, plural, one {# offre sponsorisée, toujours signalée} other {# offres sponsorisées, toujours signalées}}"
+    },
     "filtersLabel": "Filtres",
     "filtersLegend": "Filtres",
     "minPrice": "Prix indicatif minimum",
@@ -468,10 +478,12 @@
     "scrollHint": "Faites défiler le tableau horizontalement pour voir toutes les offres.",
     "breadcrumb": "Comparaison",
     "title": "Comparer les offres côte à côte",
+    "heroTitle": "Comparer les offres <accent>côte à côte</accent>",
     "description": "Comparaison indicative de 2 à 4 offres du même pays et du même produit.",
     "lead": "Les critères sont alignés ligne par ligne. Le prix indicatif reste à confirmer par le courtier partenaire responsable.",
     "start": {
       "title": "Choisissez les offres à comparer",
+      "heroTitle": "Choisissez les <accent>offres à comparer</accent>",
       "lead": "Choisissez un pays et un produit, puis cochez 2 à 4 offres indicatives : leurs critères s'alignent ensuite ligne par ligne.",
       "selectorTitle": "Par où commencer"
     },

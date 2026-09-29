@@ -14,7 +14,9 @@ import { Hero } from "../../../../../../components/ui/hero";
 import { Icon } from "../../../../../../components/ui/icons";
 import { Notice } from "../../../../../../components/ui/notice";
 import { Section } from "../../../../../../components/ui/section";
+import { formatMoney } from "../../../../../../lib/country-format";
 import { listCountryDirectory, listPublicOffers, listPublicProducts } from "../../../../../../lib/public-api";
+import type { OfferSummary } from "../../../../../../../../../packages/shared/contracts/quote.contracts";
 import { buildMetadata, localeUrl } from "../../../../../../lib/seo";
 import type { PageMetadata } from "../../../../../../lib/seo";
 
@@ -67,6 +69,23 @@ const panelFilterKeys = [
   "paymentFlexibility",
   "broker"
 ] as const;
+
+/**
+ * Figures of the hero summary card, all derived from the offers the API returned for this very
+ * request (filters included): nothing is estimated, and a figure the list cannot support is omitted.
+ */
+function offersSummary(offers: readonly OfferSummary[]) {
+  const prices = offers.map((offer) => offer.indicativePriceMin).filter((price): price is number => typeof price === "number" && Number.isFinite(price));
+  const partners = new Set(offers.map((offer) => (offer.partnerName ?? offer.brokerName ?? "").trim().toLowerCase()).filter(Boolean));
+  const insurers = new Set(offers.map((offer) => (offer.insurerName ?? "").trim().toLowerCase()).filter(Boolean));
+  return {
+    count: offers.length,
+    partners: partners.size,
+    insurers: insurers.size,
+    sponsored: offers.filter((offer) => offer.isSponsored).length,
+    ...(prices.length > 0 ? { lowest: Math.min(...prices) } : {})
+  };
+}
 
 function sortOptionOf(value: string): SortOption {
   return (sortOptions as readonly string[]).includes(value) ? (value as SortOption) : "updated_desc";
@@ -142,6 +161,12 @@ export default async function PublicOffersPage({
   const guarantees = [...guaranteeOptions.entries()].sort((a, b) => a[1].localeCompare(b[1], locale));
 
   /** The two GET forms are siblings, so each carries the other's values as hidden inputs. */
+  const summary = offersSummary(offers.data);
+  const lowestPrice =
+    summary.lowest !== undefined
+      ? formatMoney(summary.lowest, { locale, iso: countryCode, ...(currency ? { currency } : {}) })
+      : undefined;
+
   const panelValues = panelFilterKeys
     .map((key) => ({ key, value: first(filters[key]) }))
     .filter((entry) => entry.value.trim() !== "");
@@ -149,10 +174,64 @@ export default async function PublicOffersPage({
   return (
     <>
       <Hero
-        kicker={t("kicker", { product: productName, country: countryName })}
-        title={t("title")}
+        className="am-hero--spotlight"
+        kicker={
+          <>
+            <span className="am-status-ping" aria-hidden="true" />
+            {t("kicker", { product: productName, country: countryName })}
+          </>
+        }
+        title={t.rich("heroTitle", { product: productName, accent: (chunks) => <span className="am-hero__accent">{chunks}</span> })}
         lead={t("lead")}
         size="sm"
+        {...(summary.count > 0
+          ? {
+              aside: (
+                <section className="am-j-countrycard am-j-countrycard--live am-j-summary" aria-label={t("summary.label")}>
+                  <dl className="am-j-countrycard__stats">
+                    <div className="am-j-countrycard__stat">
+                      <dt>
+                        <Icon name="list" size={16} />
+                        {t("summary.offers", { count: summary.count })}
+                      </dt>
+                      <dd className="am-tabular">{summary.count}</dd>
+                    </div>
+                    {summary.partners > 0 ? (
+                      <div className="am-j-countrycard__stat">
+                        <dt>
+                          <Icon name="handshake" size={16} />
+                          {t("summary.partners", { count: summary.partners })}
+                        </dt>
+                        <dd className="am-tabular">{summary.partners}</dd>
+                      </div>
+                    ) : null}
+                    {summary.insurers > 0 ? (
+                      <div className="am-j-countrycard__stat">
+                        <dt>
+                          <Icon name="building-2" size={16} />
+                          {t("summary.insurers", { count: summary.insurers })}
+                        </dt>
+                        <dd className="am-tabular">{summary.insurers}</dd>
+                      </div>
+                    ) : null}
+                  </dl>
+                  {lowestPrice ? (
+                    <div className="am-j-productcard__price">
+                      <p className="am-j-productcard__label">{t("summary.lowest")}</p>
+                      <p className="am-j-productcard__value am-tabular">{lowestPrice}</p>
+                      <p className="am-j-productcard__note">{t("summary.lowestNote")}</p>
+                    </div>
+                  ) : null}
+                  {summary.sponsored > 0 ? (
+                    <p className="am-j-summary__sponsored">
+                      <Icon name="star" size={14} />
+                      {t("summary.sponsored", { count: summary.sponsored })}
+                    </p>
+                  ) : null}
+                </section>
+              )
+            }
+          : {})}
         breadcrumb={
           <Breadcrumb
             label={common("breadcrumbLabel")}

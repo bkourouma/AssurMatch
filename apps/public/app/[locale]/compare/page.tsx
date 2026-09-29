@@ -102,8 +102,16 @@ export default async function PublicComparePage({
   return (
     <>
       <Hero
-        kicker={t("kicker")}
-        title={entryState ? t("start.title") : t("title")}
+        className="am-hero--spotlight"
+        kicker={
+          <>
+            <span className="am-status-ping" aria-hidden="true" />
+            {t("kicker")}
+          </>
+        }
+        title={t.rich(entryState ? "start.heroTitle" : "heroTitle", {
+          accent: (chunks) => <span className="am-hero__accent">{chunks}</span>
+        })}
         lead={entryState ? t("start.lead") : t("lead")}
         size="sm"
         breadcrumb={breadcrumb}
@@ -127,7 +135,7 @@ export default async function PublicComparePage({
 
       {entryState ? (
         <Section title={t("how.title")} lead={t("how.lead")} tone="muted">
-          <ol className="am-j-features">
+          <ol className="am-j-features am-j-features--steps">
             {HOW_STEPS.map((step) => (
               <li className="am-j-feature" key={step}>
                 <IconTile name={HOW_ICONS[step]} size="sm" />
@@ -193,7 +201,7 @@ export default async function PublicComparePage({
               <div>
                 <p className="am-j-scroll-hint">{t("scrollHint")}</p>
                 <div className="am-table-wrap">
-                  <table className="am-table am-table--striped am-j-compare" aria-label={t("tableLabel")}>
+                  <table className="am-table am-j-compare" aria-label={t("tableLabel")}>
                     <thead>
                       <tr>
                         <th scope="col">{t("criterion")}</th>

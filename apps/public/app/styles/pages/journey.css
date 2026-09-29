@@ -57,6 +57,10 @@
   }
 }
 
+.am-hero--spotlight .am-j-entry .am-entry {
+  padding: var(--am-space-28);
+}
+
 /** Panel with a heading and a soft surface: score explainer, assistance, next steps. */
 .am-j-panel {
   display: grid;
@@ -252,6 +256,52 @@
   border-color: var(--am-emerald-100);
   box-shadow: var(--am-shadow-md);
   transform: translateY(-2px);
+}
+
+/* Numbered variant (comparator landing): a giant faint step number, a gradient icon circle. */
+.am-j-features--steps {
+  counter-reset: am-step;
+}
+
+.am-j-features--steps > .am-j-feature {
+  position: relative;
+  overflow: hidden;
+  padding: var(--am-space-24);
+  counter-increment: am-step;
+}
+
+.am-j-features--steps > .am-j-feature::after {
+  position: absolute;
+  right: 12px;
+  bottom: -22px;
+  background: linear-gradient(180deg, rgba(37, 99, 235, 0.16) 0%, rgba(37, 99, 235, 0) 90%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  content: counter(am-step, decimal-leading-zero);
+  z-index: 0;
+  font-family: var(--am-font-heading);
+  font-size: 96px;
+  font-weight: 900;
+  letter-spacing: -0.06em;
+  line-height: 1;
+  pointer-events: none;
+}
+
+.am-j-features--steps > .am-j-feature > * {
+  position: relative;
+  z-index: 1;
+}
+
+.am-j-features--steps > .am-j-feature > .am-icontile {
+  border-radius: var(--am-radius-pill);
+  background: var(--am-gradient-brand);
+  box-shadow: 0 0 0 5px var(--am-primary-50), var(--am-shadow-glow-soft);
+  color: var(--am-neutral-0);
+}
+
+.am-j-features--steps > .am-j-feature:hover {
+  border-color: var(--am-primary-200);
 }
 
 .am-j-feature__title {
@@ -767,6 +817,8 @@ html[data-js="true"] .am-j-nojs {
 .am-j-countrycard__stat {
   display: flex;
   flex-direction: column-reverse;
+  /* In a reversed column the main start is the bottom: pack to the top so every figure lines up. */
+  justify-content: flex-end;
   gap: var(--am-space-2);
   padding: var(--am-space-12) var(--am-space-16);
   border: 1px solid var(--am-primary-100);
@@ -1101,13 +1153,35 @@ html[data-js="true"] .am-j-nojs {
 .am-j-filters {
   border: 1px solid var(--am-border);
   border-radius: var(--am-radius-panel);
-  background: var(--am-surface);
-  box-shadow: var(--am-shadow-sm);
-  transition: box-shadow var(--am-transition);
+  background: var(--am-glass);
+  -webkit-backdrop-filter: var(--am-glass-blur);
+  backdrop-filter: var(--am-glass-blur);
+  box-shadow: var(--am-shadow-md);
+  transition:
+    box-shadow var(--am-duration-base) var(--am-ease-out),
+    border-color var(--am-duration-base) var(--am-ease-out);
+}
+
+.am-j-filters:hover {
+  border-color: var(--am-primary-200);
 }
 
 .am-j-filters[open] {
-  box-shadow: var(--am-shadow-md);
+  border-color: var(--am-primary-200);
+  box-shadow: var(--am-shadow-xl);
+}
+
+/* The sliders glyph sits in a gradient circle, like every other section icon of the journey. */
+.am-j-filters > summary > .am-icon:first-child {
+  box-sizing: content-box;
+  width: 20px;
+  height: 20px;
+  flex: none;
+  padding: 9px;
+  border-radius: var(--am-radius-pill);
+  background: var(--am-gradient-brand);
+  box-shadow: var(--am-shadow-glow-soft);
+  color: var(--am-neutral-0);
 }
 
 .am-j-filters > summary {
@@ -1206,10 +1280,25 @@ html[data-js="true"] .am-j-nojs {
 }
 
 .am-j-results__count {
+  display: inline-flex;
+  gap: var(--am-space-10);
+  align-items: center;
   margin: 0;
   font-family: var(--am-font-heading);
   font-size: var(--am-h4-size);
-  font-weight: 700;
+  font-weight: 800;
+  letter-spacing: var(--am-tracking-snug);
+}
+
+/* Live marker in front of the count: the list reflects the current filters. */
+.am-j-results__count::before {
+  width: 8px;
+  height: 8px;
+  flex: none;
+  border-radius: var(--am-radius-pill);
+  background: var(--am-emerald-500);
+  box-shadow: var(--am-shadow-glow-emerald);
+  content: "";
 }
 
 .am-j-results__sort {
@@ -1270,27 +1359,59 @@ html[data-js="true"] .am-j-nojs {
 }
 
 .am-j-offer {
+  position: relative;
   display: grid;
   gap: var(--am-space-16);
+  overflow: hidden;
   padding: var(--am-space-20);
   border: 1px solid var(--am-border);
-  border-radius: var(--am-radius-card);
-  background: var(--am-surface);
-  box-shadow: var(--am-shadow-sm);
+  border-radius: var(--am-radius-lg);
+  background:
+    radial-gradient(90% 60% at 100% 0%, rgba(59, 130, 246, 0.06), transparent 55%),
+    var(--am-surface);
+  box-shadow: var(--am-shadow-md);
   transition:
-    box-shadow var(--am-transition),
-    border-color var(--am-transition);
+    transform var(--am-duration-base) var(--am-ease-out),
+    box-shadow var(--am-duration-base) var(--am-ease-out),
+    border-color var(--am-duration-base) var(--am-ease-out);
+}
+
+/* Brand hairline along the top edge: drawn on hover, kept while the offer is selected. */
+.am-j-offer::before {
+  position: absolute;
+  top: 0;
+  right: 0;
+  left: 0;
+  height: 3px;
+  background: var(--am-gradient-gauge);
+  content: "";
+  transform: scaleX(0);
+  transform-origin: left center;
+  transition: transform var(--am-duration-slow) var(--am-ease-out);
 }
 
 .am-j-offer:hover,
 .am-j-offer:focus-within {
   border-color: var(--am-primary-200);
-  box-shadow: var(--am-shadow-md);
+  box-shadow: var(--am-shadow-lg);
+  transform: translateY(-2px);
+}
+
+.am-j-offer:hover::before,
+.am-j-offer:focus-within::before,
+.am-j-offer:has(input[name="ids"]:checked)::before {
+  transform: scaleX(1);
 }
 
 .am-j-offer:has(input[name="ids"]:checked) {
   border-color: var(--am-primary-500);
-  box-shadow: var(--am-shadow-glow-soft);
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.14), var(--am-shadow-lg);
+}
+
+/* A sponsored offer keeps its orange badge; its hairline is orange too, and always visible. */
+.am-j-offer[data-sponsored="true"]::before {
+  background: linear-gradient(90deg, var(--am-warning-600), var(--am-amber-400));
+  transform: scaleX(1);
 }
 
 @media (min-width: 768px) {
@@ -1327,9 +1448,10 @@ html[data-js="true"] .am-j-nojs {
 
 .am-j-offer__name {
   margin: 0;
+  color: var(--am-primary-900);
   font-family: var(--am-font-heading);
   font-size: var(--am-h3-size);
-  font-weight: 700;
+  font-weight: 800;
   letter-spacing: var(--am-tracking-snug);
   line-height: var(--am-h3-line);
 }
@@ -1375,9 +1497,14 @@ html[data-js="true"] .am-j-nojs {
 }
 
 .am-j-pick:has(input:checked) {
-  border-color: var(--am-primary-600);
-  background: var(--am-primary-50);
-  color: var(--am-primary-700);
+  border-color: transparent;
+  background: var(--am-gradient-brand);
+  box-shadow: var(--am-shadow-glow-soft);
+  color: var(--am-neutral-0);
+}
+
+.am-j-pick:has(input:checked) > input {
+  accent-color: var(--am-neutral-0);
 }
 
 .am-j-pick:has(input:focus-visible) {
@@ -1438,10 +1565,10 @@ html[data-js="true"] .am-j-nojs {
   display: grid;
   gap: var(--am-space-8);
   align-content: start;
-  padding: var(--am-space-16);
-  border: 1px solid var(--am-border-brand);
-  border-radius: var(--am-radius-md);
-  background: var(--am-surface-brand);
+  padding: var(--am-space-16) var(--am-space-20);
+  border: 1px solid var(--am-primary-100);
+  border-radius: var(--am-radius-lg);
+  background: linear-gradient(145deg, var(--am-primary-50) 0%, rgba(255, 255, 255, 0.92) 78%);
 }
 
 .am-j-price__label {
@@ -1456,7 +1583,11 @@ html[data-js="true"] .am-j-nojs {
 
 .am-j-price__amount {
   margin: 0;
+  background: linear-gradient(120deg, var(--am-primary-900) 0%, var(--am-primary-700) 60%, var(--am-primary-600) 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
   color: var(--am-primary-800);
+  -webkit-text-fill-color: transparent;
   font-family: var(--am-font-heading);
   font-size: clamp(22px, 1.1rem + 1vw, 28px);
   font-weight: 800;
@@ -1493,12 +1624,20 @@ html[data-js="true"] .am-j-nojs {
 
 .am-j-fact {
   display: grid;
-  gap: var(--am-space-4);
+  gap: var(--am-space-6);
   align-content: center;
-  padding: var(--am-space-12);
+  padding: var(--am-space-12) var(--am-space-16);
   border: 1px solid var(--am-border);
   border-radius: var(--am-radius-md);
   background: var(--am-neutral-50);
+  transition:
+    border-color var(--am-transition),
+    background-color var(--am-transition);
+}
+
+.am-j-offer:hover .am-j-fact,
+.am-j-block .am-j-fact {
+  background: var(--am-surface);
 }
 
 .am-j-fact__label {
@@ -1512,8 +1651,14 @@ html[data-js="true"] .am-j-nojs {
 }
 
 .am-j-fact__label .am-icon {
+  box-sizing: content-box;
+  width: 14px;
+  height: 14px;
   flex: none;
-  color: var(--am-neutral-400);
+  padding: 5px;
+  border-radius: var(--am-radius-pill);
+  background: var(--am-primary-50);
+  color: var(--am-primary-600);
 }
 
 .am-j-fact__value {
@@ -1544,7 +1689,7 @@ html[data-js="true"] .am-j-nojs {
   gap: var(--am-space-12);
   align-items: center;
   padding-top: var(--am-space-16);
-  border-top: 1px solid var(--am-border);
+  border-top: 1px dashed var(--am-border-strong);
 }
 
 @media (min-width: 680px) {
@@ -1562,6 +1707,39 @@ html[data-js="true"] .am-j-nojs {
  * the normal flow inside it. `am-j-pad-bottom` on the last section reserves the room underneath so
  * the bar never covers the last card's actions.
  */
+/* Hero summary of the offers list: three counters in a row, the lowest indicative price below. */
+.am-j-summary .am-j-countrycard__stats {
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 112px), 1fr));
+}
+
+.am-j-summary .am-j-countrycard__stat {
+  padding: var(--am-space-12);
+}
+
+.am-j-summary .am-j-productcard__note {
+  text-align: left;
+}
+
+.am-j-summary__sponsored {
+  display: flex;
+  gap: var(--am-space-8);
+  align-items: center;
+  margin: 0;
+  padding: var(--am-space-8) var(--am-space-12);
+  border: 1px solid var(--am-warning-100);
+  border-radius: var(--am-radius-md);
+  background: var(--am-warning-50);
+  color: var(--am-warning-800);
+  font-size: var(--am-caption-size);
+  font-weight: 700;
+  line-height: var(--am-caption-line);
+}
+
+.am-j-summary__sponsored .am-icon {
+  flex: none;
+  color: var(--am-warning-600);
+}
+
 .am-j-barwrap {
   position: sticky;
   bottom: var(--am-space-16);
@@ -1636,6 +1814,27 @@ html[data-js="true"] .am-j-nojs {
   box-shadow: var(--am-shadow-lg);
 }
 
+/* Price and actions of the detail page: the same raised "cockpit" frame as the entry selector. */
+.am-j-detail__card--live {
+  position: relative;
+  overflow: hidden;
+  border: 1px solid transparent;
+  background:
+    linear-gradient(var(--am-surface), var(--am-surface)) padding-box,
+    linear-gradient(160deg, var(--am-primary-200), var(--am-border-solid) 42%, var(--am-border-glass)) border-box;
+  box-shadow: var(--am-shadow-xl);
+}
+
+.am-j-detail__card--live::before {
+  position: absolute;
+  top: 0;
+  right: 0;
+  left: 0;
+  height: 3px;
+  background: var(--am-gradient-gauge);
+  content: "";
+}
+
 .am-j-detail__actions {
   display: grid;
   gap: var(--am-space-12);
@@ -1648,14 +1847,18 @@ html[data-js="true"] .am-j-nojs {
 .am-j-block {
   display: grid;
   gap: var(--am-space-12);
-  padding: var(--am-space-20);
+  padding: var(--am-space-24);
   border: 1px solid var(--am-border);
-  border-radius: var(--am-radius-card);
+  border-radius: var(--am-radius-lg);
   background: var(--am-surface);
-  box-shadow: var(--am-shadow-xs);
+  box-shadow: var(--am-shadow-md);
 }
 
+/* Section title with a short gradient bar in front: a quiet anchor for the eye. */
 .am-j-block__title {
+  display: flex;
+  gap: var(--am-space-10);
+  align-items: center;
   margin: 0;
   font-family: var(--am-font-heading);
   font-size: var(--am-h4-size);
@@ -1715,14 +1918,47 @@ html[data-js="true"] .am-j-nojs {
   background: var(--am-primary-50);
 }
 
+.am-j-block__title::before {
+  width: 4px;
+  height: 1.1em;
+  flex: none;
+  border-radius: var(--am-radius-pill);
+  background: var(--am-gradient-brand);
+  content: "";
+}
+
 /* ==========================================================================
    7. Comparator table
    ========================================================================== */
+
+.am-table-wrap:has(> .am-j-compare) {
+  border-radius: var(--am-radius-lg);
+  box-shadow: var(--am-shadow-lg);
+}
 
 .am-j-compare {
   border-collapse: separate;
   border-spacing: 0;
   min-width: 720px;
+}
+
+/* Offer columns: a soft brand wash with a 3px gradient cap, the name in navy. */
+.am-j-compare thead th:not(:first-child) {
+  padding-top: var(--am-space-20);
+  background: linear-gradient(180deg, var(--am-primary-50) 0%, var(--am-surface) 100%);
+  box-shadow: inset 0 3px 0 var(--am-primary-500);
+}
+
+.am-j-compare tbody tr:nth-child(even) td {
+  background: rgba(248, 250, 252, 0.8);
+}
+
+.am-j-compare tbody tr:hover td {
+  background: var(--am-primary-50);
+}
+
+.am-j-compare tbody tr:hover th {
+  color: var(--am-primary-700);
 }
 
 .am-j-compare th,
@@ -1762,9 +1998,10 @@ html[data-js="true"] .am-j-nojs {
 
 .am-j-compare__name {
   margin: 0;
+  color: var(--am-primary-900);
   font-family: var(--am-font-heading);
   font-size: var(--am-body-size);
-  font-weight: 700;
+  font-weight: 800;
   line-height: 1.3;
 }
 
@@ -1791,14 +2028,38 @@ html[data-js="true"] .am-j-nojs {
 }
 
 .am-j-scorecard {
+  position: relative;
   display: grid;
   gap: var(--am-space-16);
   align-content: start;
-  padding: var(--am-space-20);
+  overflow: hidden;
+  padding: var(--am-space-24);
   border: 1px solid var(--am-border);
-  border-radius: var(--am-radius-card);
-  background: var(--am-surface);
-  box-shadow: var(--am-shadow-sm);
+  border-radius: var(--am-radius-lg);
+  background:
+    radial-gradient(120% 80% at 100% 0%, rgba(59, 130, 246, 0.07), transparent 55%),
+    var(--am-surface);
+  box-shadow: var(--am-shadow-md);
+  transition:
+    transform var(--am-duration-base) var(--am-ease-out),
+    box-shadow var(--am-duration-base) var(--am-ease-out),
+    border-color var(--am-duration-base) var(--am-ease-out);
+}
+
+.am-j-scorecard::before {
+  position: absolute;
+  top: 0;
+  right: 0;
+  left: 0;
+  height: 3px;
+  background: var(--am-gradient-gauge);
+  content: "";
+}
+
+.am-j-scorecard:hover {
+  border-color: var(--am-primary-200);
+  box-shadow: var(--am-shadow-xl);
+  transform: translateY(-4px);
 }
 
 .am-j-scorecard__head {
@@ -2133,6 +2394,14 @@ html[data-js="true"] .am-j-nojs {
   .am-j-cardgrid > li:focus-within,
   .am-j-feature:hover,
   .am-j-product:hover .am-j-product__icon.am-icontile {
+    transform: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .am-j-offer:hover,
+  .am-j-offer:focus-within,
+  .am-j-scorecard:hover {
     transform: none;
   }
 }

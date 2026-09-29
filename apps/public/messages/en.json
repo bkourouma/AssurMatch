@@ -403,8 +403,18 @@
     "back": "Back to the {productKey} product",
     "breadcrumb": "Indicative offers",
     "title": "Compare the offers",
+    "heroTitle": "<accent>{product}</accent>: compare the offers",
     "description": "Comparable indicative offers for {productName} in {countryName}, with an explained score.",
     "lead": "Every offer is indicative: the indicative price and the conditions remain to be confirmed by the responsible partner broker.",
+    "summary": {
+      "label": "Summary of the offers displayed",
+      "offers": "{count, plural, one {indicative offer} other {indicative offers}}",
+      "partners": "{count, plural, one {partner broker} other {partner brokers}}",
+      "insurers": "{count, plural, one {insurer} other {insurers}}",
+      "lowest": "Lowest indicative price displayed",
+      "lowestNote": "to be confirmed by the partner broker",
+      "sponsored": "{count, plural, one {# sponsored offer, always flagged} other {# sponsored offers, always flagged}}"
+    },
     "filtersLabel": "Filters",
     "filtersLegend": "Filters",
     "minPrice": "Minimum indicative price",
@@ -468,10 +478,12 @@
     "scrollHint": "Scroll the table sideways to see every offer.",
     "breadcrumb": "Comparison",
     "title": "Compare the offers side by side",
+    "heroTitle": "Compare the offers <accent>side by side</accent>",
     "description": "Indicative comparison of 2 to 4 offers of the same country and the same product.",
     "lead": "The criteria are aligned row by row. The indicative price remains to be confirmed by the responsible partner broker.",
     "start": {
       "title": "Choose the offers to compare",
+      "heroTitle": "Choose the <accent>offers to compare</accent>",
       "lead": "Choose a country and a product, then tick 2 to 4 indicative offers: their criteria are then aligned row by row.",
       "selectorTitle": "Where to start"
     },

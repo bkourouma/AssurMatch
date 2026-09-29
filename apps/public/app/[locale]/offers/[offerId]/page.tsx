@@ -91,7 +91,13 @@ export default async function PublicOfferDetailPage({
   return (
     <>
       <Hero
-        kicker={t("kicker")}
+        className="am-hero--spotlight"
+        kicker={
+          <>
+            <span className="am-status-ping" aria-hidden="true" />
+            {t("kicker")}
+          </>
+        }
         title={detail ? detail.name : t("title")}
         lead={t("description")}
         size="sm"
@@ -204,7 +210,7 @@ export default async function PublicOfferDetailPage({
               </div>
 
               <aside className="am-j-detail__aside" aria-label={t("actionsLabel")}>
-                <div className="am-j-detail__card">
+                <div className="am-j-detail__card am-j-detail__card--live">
                   {/* The price block carries its own indicative notice: the full-width one lives in
                       the hero so the same sentence is not printed twice next to each other. */}
                   <OfferPrice offer={detail} countryCode={countryCode} />

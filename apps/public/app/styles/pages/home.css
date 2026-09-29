@@ -107,33 +107,6 @@
   }
 }
 
-/** Heading of the entry panel; only the home page passes a title to `EntrySelector`. */
-.am-entry__title {
-  display: flex;
-  gap: var(--am-space-10);
-  align-items: center;
-  margin: 0;
-  color: var(--am-text);
-  font-family: var(--am-font-heading);
-  font-size: var(--am-h4-size);
-  font-weight: 800;
-  letter-spacing: var(--am-tracking-snug);
-  line-height: var(--am-h4-line);
-}
-
-.am-entry__titleglyph {
-  display: inline-flex;
-  width: 30px;
-  height: 30px;
-  flex: none;
-  align-items: center;
-  justify-content: center;
-  border-radius: var(--am-radius-sm);
-  background: var(--am-gradient-brand);
-  box-shadow: var(--am-shadow-glow-soft);
-  color: var(--am-neutral-0);
-}
-
 /*
  * Under 1024px the decorative column is dropped entirely, so the hero must go back to a single
  * column (the primitive switches to two at 980px).

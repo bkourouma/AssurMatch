@@ -601,6 +601,7 @@
   padding: 3px var(--am-space-12);
   border-radius: var(--am-radius-pill);
   background: var(--am-neutral-100);
+  box-shadow: inset 0 0 0 1px rgba(15, 23, 42, 0.06);
   color: var(--am-neutral-600);
   font-family: var(--am-font-heading);
   font-size: var(--am-small-size);
@@ -616,12 +617,14 @@
 
 /* The green band stays (PRD: a score >= 75 is green); the ink darkens to 5.92:1 on success-100. */
 .am-score[data-band="high"] {
-  background: var(--am-success-100);
+  background: linear-gradient(135deg, var(--am-success-50), var(--am-success-100));
+  box-shadow: inset 0 0 0 1px rgba(61, 154, 38, 0.2), 0 4px 12px -6px rgba(61, 154, 38, 0.45);
   color: var(--am-success-800);
 }
 
 .am-score[data-band="mid"] {
-  background: var(--am-primary-100);
+  background: linear-gradient(135deg, var(--am-primary-50), var(--am-primary-100));
+  box-shadow: inset 0 0 0 1px rgba(37, 99, 235, 0.16), 0 4px 12px -6px rgba(37, 99, 235, 0.4);
   color: var(--am-primary-700);
 }
 
@@ -1652,22 +1655,36 @@ label:has(> input[type="radio"]):not([class]) > input {
   align-items: center;
   justify-content: space-between;
   margin-top: var(--am-space-24);
-  padding: var(--am-space-12) var(--am-space-20);
-  border: 1px solid var(--am-border);
+  padding: var(--am-space-10) var(--am-space-10) var(--am-space-10) var(--am-space-24);
+  border: 1px solid rgba(255, 255, 255, 0.12);
   border-radius: var(--am-radius-pill);
-  background: rgba(255, 255, 255, 0.86);
-  box-shadow: var(--am-shadow-xl);
-  -webkit-backdrop-filter: blur(12px);
-  backdrop-filter: blur(12px);
+  background: rgba(15, 23, 42, 0.9);
+  box-shadow: 0 24px 48px -16px rgba(15, 23, 42, 0.5), var(--am-shadow-inset);
+  color: var(--am-neutral-0);
+  -webkit-backdrop-filter: var(--am-glass-blur);
+  backdrop-filter: var(--am-glass-blur);
   animation: am-slide-up var(--am-duration-base) var(--am-ease-out) both;
 }
 
 .am-comparebar__count {
   display: flex;
-  gap: var(--am-space-8);
+  gap: var(--am-space-10);
   align-items: center;
   margin: 0;
+  color: var(--am-neutral-0);
   font-weight: 700;
+}
+
+.am-comparebar__count .am-icon {
+  box-sizing: content-box;
+  padding: 6px;
+  border-radius: var(--am-radius-pill);
+  background: rgba(59, 130, 246, 0.3);
+  color: var(--am-primary-200);
+}
+
+.am-comparebar .am-button {
+  border-radius: var(--am-radius-pill);
 }
 
 @media (max-width: 680px) {
@@ -2097,6 +2114,33 @@ label:has(> input[type="radio"]):not([class]) > input {
 
 .am-entry:focus-within {
   box-shadow: var(--am-shadow-xl), 0 0 0 6px rgba(37, 99, 235, 0.08);
+}
+
+/** Heading of the entry panel (home page and comparator landing both pass a title). */
+.am-entry__title {
+  display: flex;
+  gap: var(--am-space-10);
+  align-items: center;
+  margin: 0;
+  color: var(--am-text);
+  font-family: var(--am-font-heading);
+  font-size: var(--am-h4-size);
+  font-weight: 800;
+  letter-spacing: var(--am-tracking-snug);
+  line-height: var(--am-h4-line);
+}
+
+.am-entry__titleglyph {
+  display: inline-flex;
+  width: 30px;
+  height: 30px;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--am-radius-sm);
+  background: var(--am-gradient-brand);
+  box-shadow: var(--am-shadow-glow-soft);
+  color: var(--am-neutral-0);
 }
 
 .am-entry__submit .am-entry__arrow {
