@@ -53,6 +53,8 @@ import { LeadReassignmentService } from "../modules/routing/lead-reassignment.se
 import { ManualRoutingService } from "../modules/routing/manual-routing.service";
 import { PrismaRoutingRulesRepository } from "../modules/routing/routing-rules.repository";
 import { RoutingRulesService } from "../modules/routing/routing-rules.service";
+import { RoutingAnomalyDetectorService } from "../modules/routing/routing-anomaly-detector.service";
+import { AdminRoutingAnomaliesController } from "../modules/routing/admin-routing-anomalies.controller";
 import { SystemHealthModule } from "../modules/admin/system-health.module";
 import { UsersModule } from "../modules/users/users.module";
 import { PrismaUsersRepository } from "../modules/users/users.repository";
@@ -404,6 +406,23 @@ readonly enterprise = new EnterpriseService({
     quoteForms: this.quoteForms.service,
     consent: this.consent.service
   });
+  readonly routingAnomalies = new RoutingAnomalyDetectorService({
+    quoteRequests: {
+      list: () => this.quoteRequests.submissions.list()
+    },
+    leadAssignments: {
+      list: () => this.leads.assignments.list()
+    },
+    ...(this.routingRulesRepository ? { routingRules: { listRules: () => this.routingRulesRepository!.list() } } : {}),
+    routingDecisions: {
+      list: () => this.leads.decisions.list()
+    },
+    countries: {
+      listAdmin: () => this.countries.service.listAdmin()
+    },
+    featureFlags: this.featureFlags.service,
+    audit: this.audit.writer
+  });
   readonly adminAi = new AdminAiService({
     audit: this.audit.writer,
     gateway: this.aiGateway,
@@ -411,8 +430,10 @@ readonly enterprise = new EnterpriseService({
     complianceAlerts: this.dashboards.complianceAlerts,
     activationChecklist: this.activationChecklist.service,
     offers: this.offers.repository,
-    quoteRequests: this.quoteRequests.submissions
+    quoteRequests: this.quoteRequests.submissions,
+    routingAnomalyDetector: this.routingAnomalies
   });
+  readonly adminRoutingAnomalies = new AdminRoutingAnomaliesController(this.routingAnomalies, this.adminAi);
   private readonly billingRepository = this.runtimeRepository(new PrismaBillingRepository(this.prisma));
   readonly billing = new BillingModule({
     audit: this.audit.writer,

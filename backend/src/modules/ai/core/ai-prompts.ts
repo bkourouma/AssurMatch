@@ -35,7 +35,8 @@ const TASKS: Record<AiAssistTypeCatalog, { task: string; json?: boolean; maxOutp
   activation_gap_summary: { task: "Resume les ecarts d'activation d'un pays ou d'un produit a partir de la checklist fournie." },
   offer_consistency_check: { task: "Verifie la coherence indicative d'une offre (prix, garanties, dates, exclusions, mentions obligatoires) et liste les points a corriger avant validation admin." },
   activity_report: { task: "Redige un rapport d'activite synthetique a partir des indicateurs fournis (volumes, routage, partenaires), sans interpretation reglementaire." },
-  suspicious_leads: { task: "Identifie des signaux de demandes suspectes (rafales, coordonnees incoherentes, doublons) a partir des statistiques fournies, pour revue humaine." }
+  suspicious_leads: { task: "Identifie des signaux de demandes suspectes (rafales, coordonnees incoherentes, doublons) a partir des statistiques fournies, pour revue humaine." },
+  routing_anomaly_analysis: { task: "Analyse les anomalies de routage detectees (leads orphelins, retards SLA, saturation des quotas) de facon indicative; propose des pistes d'optimisation de configuration pour l'administrateur sans aucune decision automatique." }
 };
 
 export class AiPromptLibrary {

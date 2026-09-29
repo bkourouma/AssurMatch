@@ -80,7 +80,8 @@ const GLOBAL_FLAG_BY_ASSIST: Record<AiAssistTypeCatalog, string> = {
   activation_gap_summary: "ai_summary_enabled",
   offer_consistency_check: "ai_summary_enabled",
   activity_report: "ai_summary_enabled",
-  suspicious_leads: "ai_summary_enabled"
+  suspicious_leads: "ai_summary_enabled",
+  routing_anomaly_analysis: "ai_routing_anomaly_detection_enabled"
 };
 
 const ENTERPRISE_ONLY: ReadonlySet<AiAssistTypeCatalog> = new Set(["loss_analysis"]);

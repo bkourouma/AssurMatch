@@ -8,6 +8,7 @@ import type { ComplianceAlertsService } from "../dashboards/compliance-alerts.se
 import type { ActivationChecklistService } from "../activation-checklist/activation-checklist.service";
 import type { OffersRepository } from "../offers/offers.repository";
 import type { QuoteSubmissionService } from "../quote-requests/quote-submission.service";
+import type { RoutingAnomalyDetectorService } from "../routing/routing-anomaly-detector.service";
 import { AiAuditActions } from "./core/ai-audit-actions";
 import type { AiGateway } from "./core/ai-gateway.service";
 import type { AiInteractionRecord } from "./core/ai-interactions.repository";
@@ -20,6 +21,7 @@ export interface AdminAiDeps {
   activationChecklist: ActivationChecklistService;
   offers: OffersRepository;
   quoteRequests: QuoteSubmissionService;
+  routingAnomalyDetector?: RoutingAnomalyDetectorService;
 }
 
 export class AdminAiAccessRefusedError extends Error {
@@ -108,6 +110,25 @@ export class AdminAiService {
       if (actor.countryScopes?.length && !actor.countryScopes.includes(offer.countryId)) this.refuse(actor, "offer_consistency_check", "out_of_scope_country");
       if (actor.productScopes?.length && !actor.productScopes.includes(offer.productId)) this.refuse(actor, "offer_consistency_check", "out_of_scope_product");
       return { input: { name: offer.publicKey, issues: this.offerIssues(offer), status: offer.status, validationStatus: offer.validationStatus }, target: { type: "Offer", id: offer.id } };
+    }
+    if (assistType === "routing_anomaly_analysis") {
+      const report = this.deps.routingAnomalyDetector
+        ? await this.deps.routingAnomalyDetector.detectAnomalies(actor, window)
+        : { totalAnomalies: 0, criticalCount: 0, warningCount: 0, anomalies: [] };
+      return {
+        input: {
+          totalAnomalies: report.totalAnomalies,
+          criticalCount: report.criticalCount,
+          warningCount: report.warningCount,
+          anomaliesSummary: report.anomalies.map((a) => ({
+            type: a.type,
+            severity: a.severity,
+            country: a.country ?? "N/A",
+            product: a.product ?? "N/A",
+            details: a.details
+          })).slice(0, 20)
+        }
+      };
     }
     if (assistType === "activity_report") {
       const dashboard = await this.deps.dashboard.dashboard(actor, window);

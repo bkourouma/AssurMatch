@@ -6,5 +6,8 @@ export const RoutingAuditActions = {
   manualAssigned: "routing.manual_assigned",
   manualAssignmentRefused: "routing.manual_assignment_refused",
   reassigned: "routing.reassigned",
-  reassignmentRefused: "routing.reassignment_refused"
+  reassignmentRefused: "routing.reassignment_refused",
+  anomalyDetected: "routing.anomaly.detected",
+  anomalyAnalysisRequested: "routing.anomaly.analysis_requested",
+  anomalyAlertRaised: "routing.anomaly.alert_raised"
 } as const;

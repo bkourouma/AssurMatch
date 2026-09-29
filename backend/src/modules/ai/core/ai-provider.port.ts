@@ -109,6 +109,8 @@ export class TemplateAiProvider implements AiProviderPort {
         return `Rapport d'activite (${describe(input.window)}): ${describe(input.received)} demandes recues, ${describe(input.transmitted)} transmises, ${describe(input.refused)} refusees, ${describe(input.nonRouted)} non routees. Partenaires actifs: ${describe(input.activePartners)}.`;
       case "suspicious_leads":
         return `Leads suspects (indicatif): ${describe(input.flaggedCount)} demande(s) presentant des signaux (doublons, coordonnees incoherentes, rafales). A revoir manuellement.`;
+      case "routing_anomaly_analysis":
+        return `Analyse indicative du routage: ${describe(input.totalAnomalies)} anomalie(s) detectee(s) dont ${describe(input.criticalCount)} critique(s). Piste: verifier la capacite des courtiers et les quotas configures.`;
       default:
         return `Assistance indicative generee pour ${request.assistType}.`;
     }

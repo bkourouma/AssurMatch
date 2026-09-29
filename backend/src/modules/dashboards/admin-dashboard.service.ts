@@ -304,7 +304,7 @@ export class AdminDashboardService {
   }
 
   private aggregateComplianceCounts(auditEntries: AuditEntry[]) {
-    const counts = { consentMissing: 0, crmFlagClosed: 0, rbacDenied: 0, crossTenantAttempt: 0, brokerSatisfactionConcern: 0, other: 0 };
+    const counts = { consentMissing: 0, crmFlagClosed: 0, rbacDenied: 0, crossTenantAttempt: 0, brokerSatisfactionConcern: 0, routingAnomaly: 0, other: 0 };
     for (const entry of auditEntries) {
       if (entry.result !== "refused") continue;
       const category = categorizeAuditEntry(entry);
@@ -313,6 +313,7 @@ export class AdminDashboardService {
       else if (category === "rbac_denied") counts.rbacDenied += 1;
       else if (category === "cross_tenant_attempt") counts.crossTenantAttempt += 1;
       else if (category === "broker_satisfaction_concern") counts.brokerSatisfactionConcern += 1;
+      else if (category === "routing_anomaly") counts.routingAnomaly += 1;
       else counts.other += 1;
     }
     return counts;
