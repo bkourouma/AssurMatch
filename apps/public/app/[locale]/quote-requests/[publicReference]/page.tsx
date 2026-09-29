@@ -85,8 +85,17 @@ export default async function PublicQuoteConfirmationPage({
   return (
     <>
       <Hero
-        kicker={t("kicker")}
-        title={t("title", { reference: publicReference })}
+        className="am-hero--spotlight"
+        kicker={
+          <>
+            <span className="am-status-ping" aria-hidden="true" />
+            {t("kicker")}
+          </>
+        }
+        title={t.rich("heroTitle", {
+          reference: publicReference,
+          accent: (chunks) => <span className="am-hero__accent">{chunks}</span>
+        })}
         lead={t("intro")}
         size="sm"
         breadcrumb={

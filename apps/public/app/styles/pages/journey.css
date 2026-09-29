@@ -183,7 +183,13 @@
 }
 
 .am-j-points > li > .am-icon {
-  margin-top: 2px;
+  box-sizing: content-box;
+  width: 18px;
+  height: 18px;
+  margin-top: -3px;
+  padding: 6px;
+  border-radius: var(--am-radius-pill);
+  background: var(--am-primary-50);
   color: var(--am-primary-600);
 }
 
@@ -888,6 +894,70 @@ html[data-js="true"] .am-j-nojs {
 .am-j-countrycard__licensed--brand .am-j-countrycard__shield {
   background: var(--am-gradient-brand);
   box-shadow: var(--am-shadow-glow-soft);
+}
+
+/* Quote page aside: how the request is handled, in three facts. */
+.am-j-journeycard__title {
+  margin: 0;
+  color: var(--am-primary-900);
+  font-family: var(--am-font-heading);
+  font-size: var(--am-h4-size);
+  font-weight: 800;
+  letter-spacing: var(--am-tracking-snug);
+}
+
+.am-j-journeycard__steps {
+  position: relative;
+  display: grid;
+  gap: var(--am-space-16);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+/* Vertical rail joining the three icons. */
+.am-j-journeycard__steps::before {
+  position: absolute;
+  top: 18px;
+  bottom: 18px;
+  left: 17px;
+  width: 2px;
+  background: linear-gradient(180deg, var(--am-primary-300), var(--am-emerald-400));
+  content: "";
+}
+
+.am-j-journeycard__steps > li {
+  position: relative;
+  display: grid;
+  gap: var(--am-space-12);
+  align-items: start;
+  grid-template-columns: auto minmax(0, 1fr);
+}
+
+.am-j-journeycard__steps > li > span:last-child {
+  display: grid;
+  gap: var(--am-space-2);
+  color: var(--am-text-muted);
+  font-size: var(--am-caption-size);
+  line-height: var(--am-caption-line);
+}
+
+.am-j-journeycard__steps strong {
+  color: var(--am-text);
+  font-size: var(--am-small-size);
+  font-weight: 700;
+}
+
+.am-j-journeycard__icon {
+  display: inline-flex;
+  width: 36px;
+  height: 36px;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--am-radius-pill);
+  background: var(--am-gradient-brand);
+  box-shadow: 0 0 0 4px var(--am-surface), var(--am-shadow-glow-soft);
+  color: var(--am-neutral-0);
 }
 
 /* Product variant: glass product glyph and the indicative price block. */
@@ -2082,14 +2152,30 @@ html[data-js="true"] .am-j-nojs {
    8. Quote form
    ========================================================================== */
 
+/* The quote form is the same raised "cockpit" as the entry selector: gradient frame, focus halo. */
 .am-j-form {
+  position: relative;
   display: grid;
   gap: var(--am-space-32);
   padding: var(--am-space-24);
-  border: 1px solid var(--am-border);
+  border: 1px solid transparent;
   border-radius: var(--am-radius-panel);
-  background: var(--am-surface);
-  box-shadow: var(--am-shadow-md);
+  background:
+    linear-gradient(var(--am-surface), var(--am-surface)) padding-box,
+    linear-gradient(160deg, var(--am-primary-200), var(--am-border-solid) 42%, var(--am-border-glass)) border-box;
+  box-shadow: var(--am-shadow-xl);
+  transition: box-shadow var(--am-duration-base) var(--am-ease-out);
+}
+
+.am-j-form:focus-within {
+  box-shadow: var(--am-shadow-xl), 0 0 0 6px rgba(37, 99, 235, 0.07);
+}
+
+/* Sections are separated by a quiet dashed rule rather than boxes inside the box. */
+.am-j-form fieldset + fieldset,
+.am-j-form fieldset:not([class]) + fieldset:not([class]) {
+  padding-top: var(--am-space-28);
+  border-top: 1px dashed var(--am-border-strong);
 }
 
 @media (min-width: 768px) {
@@ -2098,11 +2184,16 @@ html[data-js="true"] .am-j-nojs {
   }
 }
 
-.am-j-form fieldset {
+/* `:not([class])` matches the legacy `form fieldset:not([class])` frame of components.css, so the
+   quote form's sections really lose that box instead of being outranked by it. */
+.am-j-form fieldset,
+.am-j-form fieldset:not([class]) {
   min-width: 0;
   margin: 0;
   padding: 0;
   border: 0;
+  border-radius: 0;
+  background: none;
 }
 
 .am-j-form__legend {
@@ -2120,14 +2211,15 @@ html[data-js="true"] .am-j-nojs {
 
 .am-j-form__step {
   display: inline-flex;
-  width: 32px;
-  height: 32px;
+  width: 34px;
+  height: 34px;
   flex: none;
   align-items: center;
   justify-content: center;
   border-radius: var(--am-radius-pill);
-  background: var(--am-surface-brand);
-  color: var(--am-primary-700);
+  background: var(--am-gradient-brand);
+  box-shadow: 0 0 0 5px var(--am-primary-50), var(--am-shadow-glow-soft);
+  color: var(--am-neutral-0);
   font-size: var(--am-caption-size);
   font-weight: 800;
 }
@@ -2151,13 +2243,14 @@ html[data-js="true"] .am-j-nojs {
 
 /** Consent row as a card: a 44px tap target, never pre-ticked. */
 .am-j-consent {
+  position: relative;
   display: grid;
   gap: var(--am-space-12);
   align-items: start;
   grid-template-columns: auto minmax(0, 1fr);
-  padding: var(--am-space-16);
+  padding: var(--am-space-16) var(--am-space-20);
   border: 1px solid var(--am-border-strong);
-  border-radius: var(--am-radius-md);
+  border-radius: var(--am-radius-lg);
   background: var(--am-neutral-50);
   color: var(--am-text-muted);
   cursor: pointer;
@@ -2173,9 +2266,11 @@ html[data-js="true"] .am-j-nojs {
   background: var(--am-primary-50);
 }
 
+/* A given consent is a choice, not a validation: it stays brand blue, never green. */
 .am-j-consent:has(input:checked) {
   border-color: var(--am-primary-500);
-  background: var(--am-surface-brand);
+  background: linear-gradient(135deg, var(--am-primary-50) 0%, var(--am-surface) 80%);
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1), var(--am-shadow-sm);
   color: var(--am-text);
 }
 
@@ -2193,8 +2288,8 @@ html[data-js="true"] .am-j-nojs {
 .am-j-form__footer {
   display: grid;
   gap: var(--am-space-12);
-  padding-top: var(--am-space-20);
-  border-top: 1px solid var(--am-border);
+  padding-top: var(--am-space-24);
+  border-top: 1px dashed var(--am-border-strong);
 }
 
 .am-j-form__footer .am-button {
@@ -2225,14 +2320,41 @@ html[data-js="true"] .am-j-nojs {
  * a form left on screen next to "demande recue" invites a second, identical request.
  */
 .am-j-sent {
+  position: relative;
   display: grid;
   gap: var(--am-space-16);
   justify-items: start;
+  overflow: hidden;
   padding: var(--am-space-24);
-  border: 1px solid var(--am-border);
+  border: 1px solid var(--am-emerald-100);
   border-radius: var(--am-radius-panel);
-  background: var(--am-surface);
-  box-shadow: var(--am-shadow-md);
+  background:
+    radial-gradient(60% 70% at 0% 0%, rgba(16, 185, 129, 0.12), transparent 60%),
+    radial-gradient(50% 60% at 100% 0%, rgba(59, 130, 246, 0.08), transparent 60%),
+    var(--am-surface);
+  box-shadow: var(--am-shadow-xl);
+  animation: am-scale-in var(--am-duration-slow) var(--am-ease-out) both;
+}
+
+.am-j-sent::before {
+  position: absolute;
+  top: 0;
+  right: 0;
+  left: 0;
+  height: 3px;
+  background: var(--am-gradient-emerald);
+  content: "";
+}
+
+/* The success tile gets a soft emerald halo. */
+.am-j-sent > .am-icontile {
+  box-shadow: 0 0 0 8px rgba(16, 185, 129, 0.1), var(--am-shadow-glow-emerald);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .am-j-sent {
+    animation: none;
+  }
 }
 
 @media (min-width: 768px) {
@@ -2265,13 +2387,39 @@ html[data-js="true"] .am-j-nojs {
    9. Request tracking and consent withdrawal
    ========================================================================== */
 
+/* Public reference as a "ticket": dashed brand frame, notches on both sides, gradient figure. */
 .am-j-reference {
+  position: relative;
   display: grid;
   gap: var(--am-space-12);
-  padding: var(--am-space-24);
-  border: 1px solid var(--am-border-brand);
-  border-radius: var(--am-radius-panel);
-  background: var(--am-surface-brand);
+  padding: var(--am-space-24) var(--am-space-28);
+  border: 1.5px dashed var(--am-primary-300);
+  border-radius: var(--am-radius-lg);
+  background: linear-gradient(135deg, var(--am-primary-50) 0%, var(--am-surface) 70%);
+  box-shadow: var(--am-shadow-md);
+}
+
+.am-j-reference::before,
+.am-j-reference::after {
+  position: absolute;
+  top: 50%;
+  width: 18px;
+  height: 18px;
+  border: 1.5px dashed var(--am-primary-300);
+  border-radius: 50%;
+  background: var(--am-canvas);
+  content: "";
+  transform: translateY(-50%);
+}
+
+.am-j-reference::before {
+  left: -10px;
+  clip-path: inset(0 0 0 50%);
+}
+
+.am-j-reference::after {
+  right: -10px;
+  clip-path: inset(0 50% 0 0);
 }
 
 .am-j-reference__label {
@@ -2293,7 +2441,11 @@ html[data-js="true"] .am-j-nojs {
 
 .am-j-reference__value {
   margin: 0;
+  background: linear-gradient(120deg, var(--am-primary-900) 0%, var(--am-primary-700) 60%, var(--am-primary-600) 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
   color: var(--am-primary-900);
+  -webkit-text-fill-color: transparent;
   font-family: var(--am-font-heading);
   font-size: clamp(22px, 1.1rem + 1vw, 28px);
   font-weight: 800;
@@ -2312,13 +2464,21 @@ html[data-js="true"] .am-j-nojs {
 .am-j-document {
   display: grid;
   gap: var(--am-space-12);
-  align-items: start;
+  align-items: center;
   grid-template-columns: auto minmax(0, 1fr);
   padding: var(--am-space-16);
   border: 1px solid var(--am-border);
-  border-radius: var(--am-radius-md);
+  border-radius: var(--am-radius-lg);
   background: var(--am-surface);
-  box-shadow: var(--am-shadow-xs);
+  box-shadow: var(--am-shadow-sm);
+  transition:
+    transform var(--am-duration-base) var(--am-ease-out),
+    box-shadow var(--am-duration-base) var(--am-ease-out);
+}
+
+.am-j-document:hover {
+  box-shadow: var(--am-shadow-md);
+  transform: translateY(-2px);
 }
 
 .am-j-document__text {
@@ -2404,4 +2564,10 @@ html[data-js="true"] .am-j-nojs {
   .am-j-scorecard:hover {
     transform: none;
   }
+}
+
+/* Inside the white confirmation panel the ticket notches take the panel's colour, not the page's. */
+.am-j-sent > .am-j-reference::before,
+.am-j-sent > .am-j-reference::after {
+  background: var(--am-surface);
 }

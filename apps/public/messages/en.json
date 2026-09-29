@@ -546,8 +546,20 @@
     "kicker": "{product} · {country}",
     "breadcrumb": "Quote request",
     "title": "Request a quote",
+    "heroTitle": "Request a <accent>quote</accent>",
     "description": "Indicative quote request transmitted to an authorised partner broker after explicit consent.",
     "lead": "Your request is only transmitted after your explicit consent, to a partner broker authorised for this country and this product.",
+    "journey": {
+      "label": "How your request is handled",
+      "title": "Your request, step by step",
+      "contactTitle": "Your details and your need",
+      "contactBody": "Only the information this form asks for is transmitted.",
+      "consentTitle": "Your explicit consent",
+      "consentBody": "Nothing is transmitted without your agreement: the boxes are never pre-ticked.",
+      "brokerTitle": "An authorised partner broker",
+      "brokerBody": "They pick up your request when routing is possible, then confirm the quote and the conditions.",
+      "noAccount": "No account needed for this form"
+    },
     "progressLabel": "Request progress",
     "steps": {
       "contact": "Your details",
@@ -597,6 +609,7 @@
     "breadcrumb": "Request tracking",
     "kicker": "Quote request",
     "title": "Request received {reference}",
+    "heroTitle": "Request received <accent>{reference}</accent>",
     "description": "Confirmation and tracking of an indicative quote request.",
     "intro": "Your request will be handled by an identified partner broker when routing is possible.",
     "fineprint": "If no eligible partner broker is available, no callback is promised.",

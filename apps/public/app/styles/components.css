@@ -1349,8 +1349,16 @@ label:has(> input[type="radio"]):not([class]) > input {
    16. ProgressBar / stepper
    ========================================================================== */
 
+/* The stepper sits on a glass strip so it reads as one instrument rather than loose circles. */
 .am-progress {
   margin: 0 0 var(--am-space-32);
+  padding: var(--am-space-16) var(--am-space-20);
+  border: 1px solid var(--am-border);
+  border-radius: var(--am-radius-lg);
+  background: var(--am-glass);
+  -webkit-backdrop-filter: var(--am-glass-blur);
+  backdrop-filter: var(--am-glass-blur);
+  box-shadow: var(--am-shadow-sm);
 }
 
 .am-progress__list {
@@ -1386,9 +1394,12 @@ label:has(> input[type="radio"]):not([class]) > input {
   content: "";
 }
 
-.am-progress__step[data-state="done"]::before,
+.am-progress__step[data-state="done"]::before {
+  background: var(--am-gradient-emerald);
+}
+
 .am-progress__step[data-state="current"]::before {
-  background: var(--am-primary-400);
+  background: linear-gradient(90deg, var(--am-emerald-400), var(--am-primary-500));
 }
 
 .am-progress__index {
@@ -1412,10 +1423,12 @@ label:has(> input[type="radio"]):not([class]) > input {
   color: var(--am-text-muted);
 }
 
+/* A done step is a validation: emerald, the one place green belongs in the stepper. */
 .am-progress__step[data-state="done"] .am-progress__index {
-  border-color: var(--am-success-500);
-  background: var(--am-success-100);
-  color: var(--am-success-700);
+  border-color: transparent;
+  background: var(--am-gradient-emerald);
+  box-shadow: var(--am-shadow-glow-emerald);
+  color: var(--am-neutral-0);
 }
 
 .am-progress__step[data-state="current"] {
@@ -1424,10 +1437,17 @@ label:has(> input[type="radio"]):not([class]) > input {
 }
 
 .am-progress__step[data-state="current"] .am-progress__index {
-  border-color: var(--am-primary-600);
+  border-color: transparent;
   background: var(--am-gradient-brand);
   color: var(--am-neutral-0);
   box-shadow: var(--am-shadow-glow-soft);
+  animation: am-pulse-soft 2.4s var(--am-ease-out) infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .am-progress__step[data-state="current"] .am-progress__index {
+    animation: none;
+  }
 }
 
 .am-progress__label {

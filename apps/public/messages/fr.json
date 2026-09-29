@@ -546,8 +546,20 @@
     "kicker": "{product} · {country}",
     "breadcrumb": "Demande de devis",
     "title": "Demander un devis",
+    "heroTitle": "Demander un <accent>devis</accent>",
     "description": "Demande de devis indicative transmise à un courtier partenaire autorisé après consentement explicite.",
     "lead": "Votre demande n'est transmise qu'après votre consentement explicite, à un courtier partenaire autorisé pour ce pays et ce produit.",
+    "journey": {
+      "label": "Comment votre demande est traitée",
+      "title": "Votre demande, étape par étape",
+      "contactTitle": "Vos coordonnées et votre besoin",
+      "contactBody": "Seules les informations demandées par ce formulaire sont transmises.",
+      "consentTitle": "Votre consentement explicite",
+      "consentBody": "Rien n'est transmis sans votre accord : les cases ne sont jamais pré-cochées.",
+      "brokerTitle": "Un courtier partenaire autorisé",
+      "brokerBody": "Il reprend votre demande lorsque le routage est possible, puis confirme le devis et les conditions.",
+      "noAccount": "Formulaire sans création de compte"
+    },
     "progressLabel": "Progression de la demande",
     "steps": {
       "contact": "Vos coordonnées",
@@ -597,6 +609,7 @@
     "breadcrumb": "Suivi de la demande",
     "kicker": "Demande de devis",
     "title": "Demande reçue {reference}",
+    "heroTitle": "Demande reçue <accent>{reference}</accent>",
     "description": "Confirmation et suivi d'une demande de devis indicative.",
     "intro": "Votre demande sera traitée par un courtier partenaire identifié lorsque le routage est possible.",
     "fineprint": "Si aucun courtier partenaire éligible n'est disponible, aucune promesse de rappel n'est faite.",

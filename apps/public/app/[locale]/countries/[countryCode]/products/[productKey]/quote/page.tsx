@@ -4,6 +4,7 @@ import { QuoteBlockedState, QuoteFormShell } from "../../../../../../components/
 import { TechnicalRoleNotice } from "../../../../../../components/public-journey";
 import { Breadcrumb } from "../../../../../../components/ui/breadcrumb";
 import { Hero } from "../../../../../../components/ui/hero";
+import { Icon } from "../../../../../../components/ui/icons";
 import { Section } from "../../../../../../components/ui/section";
 import { getPublicQuoteForm, listCountryDirectory, listPublicProducts } from "../../../../../../lib/public-api";
 import { buildMetadata, localeUrl } from "../../../../../../lib/seo";
@@ -59,10 +60,56 @@ export default async function PublicQuotePage({
   return (
     <>
       <Hero
-        kicker={t("kicker", { product: productName, country: countryName })}
-        title={t("title")}
+        className="am-hero--spotlight"
+        kicker={
+          <>
+            <span className="am-status-ping" aria-hidden="true" />
+            {t("kicker", { product: productName, country: countryName })}
+          </>
+        }
+        title={t.rich("heroTitle", { accent: (chunks) => <span className="am-hero__accent">{chunks}</span> })}
         lead={t("lead")}
         size="sm"
+        aside={
+          <section className="am-j-countrycard am-j-countrycard--live am-j-journeycard" aria-label={t("journey.label")}>
+            <p className="am-j-journeycard__title">{t("journey.title")}</p>
+            <ol className="am-j-journeycard__steps">
+              <li>
+                <span className="am-j-journeycard__icon" aria-hidden="true">
+                  <Icon name="user" size={16} />
+                </span>
+                <span>
+                  <strong>{t("journey.contactTitle")}</strong>
+                  <span>{t("journey.contactBody")}</span>
+                </span>
+              </li>
+              <li>
+                <span className="am-j-journeycard__icon" aria-hidden="true">
+                  <Icon name="lock" size={16} />
+                </span>
+                <span>
+                  <strong>{t("journey.consentTitle")}</strong>
+                  <span>{t("journey.consentBody")}</span>
+                </span>
+              </li>
+              <li>
+                <span className="am-j-journeycard__icon" aria-hidden="true">
+                  <Icon name="handshake" size={16} />
+                </span>
+                <span>
+                  <strong>{t("journey.brokerTitle")}</strong>
+                  <span>{t("journey.brokerBody")}</span>
+                </span>
+              </li>
+            </ol>
+            <p className="am-j-countrycard__licensed">
+              <span className="am-j-countrycard__shield" aria-hidden="true">
+                <Icon name="check" size={12} />
+              </span>
+              {t("journey.noAccount")}
+            </p>
+          </section>
+        }
         breadcrumb={
           <Breadcrumb
             label={common("breadcrumbLabel")}
