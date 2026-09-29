@@ -10,6 +10,8 @@
       "brokers": "Brokers"
     },
     "cta": "Compare offers",
+    "headerBadge": "Licensed partner brokers",
+    "headerBadgeLabel": "Regulatory status: AssurMatch only passes requests to licensed partner brokers",
     "menu": {
       "open": "Menu",
       "close": "Close menu",
@@ -142,8 +144,12 @@
   },
   "Home": {
     "breadcrumb": "Home",
-    "kicker": "Indicative comparison",
+    "kicker": "Independent, indicative comparison",
     "title": "Compare insurance offers in your country",
+    "heroTitle": {
+      "lead": "Compare first.",
+      "accent": "Get guided next."
+    },
     "lead": "AssurMatch is a technical platform for indicative comparison and introduction to authorised partner brokers. The responsible partner broker confirms the quote and the conditions.",
     "metaDescription": "Compare indicative insurance offers country by country and let an authorised partner broker take over your request.",
     "compare": "Compare the offers",
@@ -191,14 +197,21 @@
     "signatureLead": "Compare indicative offers, then let an authorised partner broker confirm the quote and the conditions.",
     "preview": {
       "product": "Car insurance",
-      "partner": "Authorised partner broker",
+      "partner": "Licensed partner broker",
       "badge": "Indicative offer",
-      "scoreLabel": "Indicative score",
+      "scoreLabel": "Indicative fit score",
       "priceLabel": "Indicative price",
       "priceValue": "To be confirmed",
       "guaranteeCivil": "Third-party liability",
       "guaranteeTheft": "Theft and fire",
-      "guaranteeAssistance": "Assistance"
+      "guaranteeAssistance": "Assistance",
+      "priceNote": "to be confirmed by the partner broker",
+      "previewTag": "Indicative preview",
+      "offersTitle": "{count, plural, one {# validated offer} other {# validated offers}}",
+      "offersFallback": "Indicative offers",
+      "offersCaption": "compared country by country",
+      "relationTitle": "Put in touch",
+      "relationCaption": "with a licensed broker"
     },
     "role": {
       "does": {

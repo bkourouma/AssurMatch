@@ -91,6 +91,45 @@
   box-shadow: var(--am-shadow-xs);
 }
 
+/*
+ * Primary only: a 1px inner highlight on the top edge and, on hover, one diagonal sweep of light. The
+ * sheen is clipped by the button's own radius and never intercepts the pointer.
+ */
+.am-button[data-variant="primary"] {
+  overflow: hidden;
+  box-shadow: var(--am-shadow-inset), var(--am-shadow-glow-soft);
+}
+
+.am-button[data-variant="primary"]::after {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: 40%;
+  background: var(--am-gradient-sheen);
+  content: "";
+  pointer-events: none;
+  transform: translateX(-120%) skewX(-18deg);
+}
+
+.am-button[data-variant="primary"]:hover {
+  box-shadow: var(--am-shadow-inset), var(--am-shadow-glow);
+}
+
+.am-button[data-variant="primary"]:active {
+  box-shadow: var(--am-shadow-inset), var(--am-shadow-xs);
+}
+
+.am-button[data-variant="primary"]:hover::after {
+  animation: am-sheen 900ms var(--am-ease-out) 1;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .am-button[data-variant="primary"]:hover::after {
+    animation: none;
+  }
+}
+
 .am-button .am-icon {
   flex: none;
 }
@@ -744,6 +783,7 @@
   border: 1px solid var(--am-border);
   border-radius: var(--am-radius-pill);
   background: var(--am-surface);
+  box-shadow: var(--am-shadow-xs);
   color: var(--am-text-muted);
   font-size: var(--am-caption-size);
   font-weight: 600;
@@ -796,7 +836,7 @@
   padding: var(--am-space-12) var(--am-space-16);
   border: 1px solid var(--am-border-strong);
   border-radius: var(--am-radius-field);
-  background: var(--am-surface);
+  background-color: var(--am-neutral-50);
   color: var(--am-text);
   font-family: var(--am-font-body);
   font-size: var(--am-body-size);
@@ -808,11 +848,13 @@
 
 .am-field__control:hover:not(:disabled) {
   border-color: var(--am-primary-300);
+  background-color: var(--am-surface);
 }
 
 .am-field__control:focus {
   border-color: var(--am-primary-500);
-  box-shadow: 0 0 0 3px var(--am-primary-100);
+  background-color: var(--am-surface);
+  box-shadow: var(--am-halo);
 }
 
 .am-field__control:disabled {
@@ -855,11 +897,17 @@ select.am-field__control {
 
 .am-field__leading {
   position: absolute;
+  z-index: 1;
   top: 50%;
   left: var(--am-space-16);
   transform: translateY(-50%);
   color: var(--am-text-subtle);
   pointer-events: none;
+  transition: color var(--am-transition);
+}
+
+.am-field__wrap:focus-within > .am-field__leading {
+  color: var(--am-primary-600);
 }
 
 .am-field__wrap:has(> .am-field__leading) > .am-field__control {
@@ -1918,14 +1966,36 @@ label:has(> input[type="radio"]):not([class]) > input {
   line-height: 1;
 }
 
+/*
+ * The "cockpit": a raised white panel whose 1px frame is a soft blue-to-glass gradient (a padding-box
+ * white fill over a border-box gradient), and which lights up with a blue halo while one of its
+ * controls has focus.
+ */
 .am-entry {
+  position: relative;
   display: grid;
   gap: var(--am-space-16);
   padding: var(--am-space-24);
-  border: 1px solid var(--am-border);
+  border: 1px solid transparent;
   border-radius: var(--am-radius-panel);
-  background: var(--am-surface);
+  background:
+    linear-gradient(var(--am-surface), var(--am-surface)) padding-box,
+    linear-gradient(160deg, var(--am-primary-200), var(--am-border-solid) 42%, var(--am-border-glass)) border-box;
   box-shadow: var(--am-shadow-xl);
+  transition: box-shadow var(--am-duration-base) var(--am-ease-out);
+}
+
+.am-entry:focus-within {
+  box-shadow: var(--am-shadow-xl), 0 0 0 6px rgba(37, 99, 235, 0.08);
+}
+
+.am-entry__submit .am-entry__arrow {
+  transition: transform var(--am-duration-base) var(--am-ease-spring);
+}
+
+.am-entry__submit:hover .am-entry__arrow,
+.am-entry__submit:focus-visible .am-entry__arrow {
+  transform: translateX(4px);
 }
 
 .am-entry .am-field {

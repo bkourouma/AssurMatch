@@ -16,9 +16,11 @@ const MENU_ID = "am-site-menu";
 
 /**
  * Sticky 72px header: logo | centred navigation | utilities and the comparator call to action, which
- * stays visible at every viewport (icon-only under 480px, with its label repeated in the menu). Once
- * the page is scrolled the bar turns into frosted glass - a `data-scrolled` attribute set by the one
- * small client component below; everything else here is server-rendered.
+ * stays visible at every viewport (icon-only under 480px, with its label repeated in the menu). The bar
+ * is frosted glass from the start; once the page is scrolled it gains a shadow - a `data-scrolled`
+ * attribute set by the one small client component below; everything else here is server-rendered.
+ * Next to the utilities, a discreet trust indicator (licensed partner brokers only) links to the
+ * regulatory status page.
  */
 export async function SiteHeader({ locale }: { locale: AppLocale }) {
   const t = await getTranslations("Layout");
@@ -53,6 +55,14 @@ export async function SiteHeader({ locale }: { locale: AppLocale }) {
         </nav>
 
         <div className="am-header__actions">
+          <Link className="am-header__badge" href="/regulatory-status" aria-label={t("headerBadgeLabel")}>
+            <span className="am-header__badgeicon" aria-hidden="true">
+              <Icon name="shield-check" size={14} />
+            </span>
+            <span className="am-header__badgetext" aria-hidden="true">
+              {t("headerBadge")}
+            </span>
+          </Link>
           <div className="am-header__utilities">
             <CountrySelector countries={visitor.directory} variant="compact" selected={selectedCountry} dense idPrefix="am-country-select-header" />
             <LanguageSwitcher currentLocale={locale} label={t("languageSwitcher.label")} names={languageNames} />

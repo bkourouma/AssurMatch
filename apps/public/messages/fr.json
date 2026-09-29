@@ -10,6 +10,8 @@
       "brokers": "Courtiers"
     },
     "cta": "Comparer les offres",
+    "headerBadge": "Courtiers partenaires agréés",
+    "headerBadgeLabel": "Statut réglementaire : AssurMatch ne transmet les demandes qu'à des courtiers partenaires agréés",
     "menu": {
       "open": "Menu",
       "close": "Fermer le menu",
@@ -142,8 +144,12 @@
   },
   "Home": {
     "breadcrumb": "Accueil",
-    "kicker": "Comparaison indicative",
+    "kicker": "Comparaison indépendante et indicative",
     "title": "Comparez les offres d'assurance de votre pays",
+    "heroTitle": {
+      "lead": "Comparez d'abord.",
+      "accent": "Soyez accompagné ensuite."
+    },
     "lead": "AssurMatch est une plateforme technique de comparaison indicative et de mise en relation avec des courtiers partenaires autorisés. Le courtier partenaire responsable confirme le devis et les conditions.",
     "metaDescription": "Comparez des offres d'assurance indicatives pays par pays et faites reprendre votre demande par un courtier partenaire autorisé.",
     "compare": "Comparer les offres",
@@ -191,14 +197,21 @@
     "signatureLead": "Comparez des offres indicatives, puis laissez un courtier partenaire autorisé confirmer le devis et les conditions.",
     "preview": {
       "product": "Assurance auto",
-      "partner": "Courtier partenaire autorisé",
+      "partner": "Courtier partenaire agréé",
       "badge": "Offre indicative",
-      "scoreLabel": "Score indicatif",
+      "scoreLabel": "Score d'adéquation indicatif",
       "priceLabel": "Prix indicatif",
       "priceValue": "À confirmer",
       "guaranteeCivil": "Responsabilité civile",
       "guaranteeTheft": "Vol et incendie",
-      "guaranteeAssistance": "Assistance"
+      "guaranteeAssistance": "Assistance",
+      "priceNote": "à confirmer par le courtier partenaire",
+      "previewTag": "Aperçu indicatif",
+      "offersTitle": "{count, plural, one {# offre validée} other {# offres validées}}",
+      "offersFallback": "Offres indicatives",
+      "offersCaption": "comparées pays par pays",
+      "relationTitle": "Mise en relation",
+      "relationCaption": "avec un courtier agréé"
     },
     "role": {
       "does": {

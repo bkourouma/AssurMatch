@@ -78,6 +78,7 @@ export default async function PublicHomePage({ params }: { params: Promise<{ loc
         ].filter((counter): counter is { key: string; icon: IconName; label: string; value: number } => counter.value !== undefined)
       : [];
   const computedAt = stats.status === "success" ? statDate(stats.data) : undefined;
+  const validatedOffers = stats.status === "success" ? statValue(stats.data, "validatedOffers") : undefined;
 
   const steps = [
     { key: "compare", icon: "search" as IconName, title: t("steps.compare.title"), body: t("steps.compare.description") },
@@ -95,10 +96,19 @@ export default async function PublicHomePage({ params }: { params: Promise<{ loc
       <Hero
         className="am-home-hero"
         size="lg"
-        kicker={t("kicker")}
-        title={t("title")}
+        kicker={
+          <>
+            <span className="am-status-ping" aria-hidden="true" />
+            {t("kicker")}
+          </>
+        }
+        title={
+          <>
+            {t("heroTitle.lead")} <span className="am-home-hero__accent">{t("heroTitle.accent")}</span>
+          </>
+        }
         lead={t("lead")}
-        aside={<OfferPreview />}
+        aside={<OfferPreview {...(validatedOffers !== undefined ? { validatedOffers } : {})} />}
       >
         <p className="am-home-hero__place">
           <Icon name="map-pin" size={18} />
@@ -121,7 +131,7 @@ export default async function PublicHomePage({ params }: { params: Promise<{ loc
           <Reveal as="ul" stagger className="am-home-stats">
             {counters.map((counter) => (
               <li key={counter.key}>
-                <Card tone="muted" padding="lg">
+                <Card padding="lg" className="am-home-stat">
                   <Stat icon={counter.icon} label={counter.label} value={counter.value} locale={locale} />
                 </Card>
               </li>
@@ -138,11 +148,11 @@ export default async function PublicHomePage({ params }: { params: Promise<{ loc
         <Reveal as="ol" stagger className="am-home-steps">
           {steps.map((step, index) => (
             <Card as="li" key={step.key} className="am-home-step" padding="lg">
+              <span className="am-home-step__index am-tabular" aria-hidden="true">
+                {String(index + 1).padStart(2, "0")}
+              </span>
               <div className="am-home-step__head">
-                <IconTile name={step.icon} size="lg" />
-                <span className="am-home-step__index am-tabular" aria-hidden="true">
-                  {index + 1}
-                </span>
+                <IconTile name={step.icon} size="lg" className="am-home-step__icon" />
               </div>
               <h3 className="am-home-step__title">{step.title}</h3>
               <p className="am-home-step__body">{step.body}</p>
@@ -160,45 +170,49 @@ export default async function PublicHomePage({ params }: { params: Promise<{ loc
         <div className="am-home-role">
           <Reveal className="am-home-role__intro" from="left">
             <PlatformStatusNotice />
-            <p className="am-home-role__detail">{t("statusDetail")}</p>
-            <div className="am-cluster">
-              <Button href="/regulatory-status" variant="secondary" iconAfter={<Icon name="arrow-right" size={18} />}>
-                {t("regulatoryLink")}
-              </Button>
+            <div className="am-home-role__aside">
+              <p className="am-home-role__detail">{t("statusDetail")}</p>
+              <div className="am-cluster">
+                <Button href="/regulatory-status" variant="secondary" iconAfter={<Icon name="arrow-right" size={18} />}>
+                  {t("regulatoryLink")}
+                </Button>
+              </div>
+              <p className="am-home-role__note">{t("regulatoryLead")}</p>
             </div>
-            <p className="am-home-role__note">{t("regulatoryLead")}</p>
           </Reveal>
 
-          <Reveal from="right">
-            <Card padding="lg" className="am-home-role__lists">
-              <div className="am-home-role__group" data-tone="does">
-                <h3 className="am-home-role__grouptitle">
+          <Reveal stagger className="am-home-role__lists">
+            <Card padding="lg" className="am-home-role__group am-home-role__group--does">
+              <h3 className="am-home-role__grouptitle">
+                <span className="am-home-role__groupicon" aria-hidden="true">
                   <Icon name="check-circle" size={20} />
-                  {t("role.does.title")}
-                </h3>
-                <ul className="am-checklist" data-tone="does">
-                  {does.map((line) => (
-                    <li key={line}>
-                      <Icon name="check-circle" size={18} />
-                      <span>{line}</span>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-              <div className="am-home-role__group" data-tone="doesnot">
-                <h3 className="am-home-role__grouptitle">
-                  <Icon name="x-circle" size={20} />
-                  {t("role.doesNot.title")}
-                </h3>
-                <ul className="am-checklist" data-tone="doesnot">
-                  {doesNot.map((line) => (
-                    <li key={line}>
-                      <Icon name="x-circle" size={18} />
-                      <span>{line}</span>
-                    </li>
-                  ))}
-                </ul>
-              </div>
+                </span>
+                {t("role.does.title")}
+              </h3>
+              <ul className="am-checklist" data-tone="does">
+                {does.map((line) => (
+                  <li key={line}>
+                    <Icon name="check" size={14} />
+                    <span>{line}</span>
+                  </li>
+                ))}
+              </ul>
+            </Card>
+            <Card padding="lg" className="am-home-role__group am-home-role__group--doesnot">
+              <h3 className="am-home-role__grouptitle">
+                <span className="am-home-role__groupicon" aria-hidden="true">
+                  <Icon name="minus" size={20} />
+                </span>
+                {t("role.doesNot.title")}
+              </h3>
+              <ul className="am-checklist" data-tone="doesnot">
+                {doesNot.map((line) => (
+                  <li key={line}>
+                    <Icon name="x" size={14} />
+                    <span>{line}</span>
+                  </li>
+                ))}
+              </ul>
             </Card>
           </Reveal>
         </div>

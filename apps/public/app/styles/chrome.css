@@ -75,7 +75,7 @@
   position: sticky;
   top: 0;
   z-index: var(--am-z-header);
-  border-bottom: 1px solid var(--am-border);
+  border-bottom: 1px solid rgba(226, 232, 240, 0.6);
   transition:
     border-color var(--am-duration-fast) var(--am-ease-out),
     box-shadow var(--am-duration-fast) var(--am-ease-out);
@@ -92,19 +92,40 @@
   position: absolute;
   z-index: -1;
   inset: 0;
-  background: var(--am-surface);
+  background: var(--am-glass);
+  -webkit-backdrop-filter: var(--am-glass-blur);
+  backdrop-filter: var(--am-glass-blur);
   transition: background-color var(--am-duration-fast) var(--am-ease-out);
 }
 
-.am-header[data-scrolled="true"] {
-  border-bottom-color: rgba(227, 232, 240, 0.7);
-  box-shadow: var(--am-shadow-sm);
+/* A hairline of light under the glass: brand blue in the middle, fading out on both sides. */
+.am-header::after {
+  content: "";
+  position: absolute;
+  right: 0;
+  bottom: -1px;
+  left: 0;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(37, 99, 235, 0.22) 50%, transparent);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--am-duration-base) var(--am-ease-out);
 }
 
-.am-header[data-scrolled="true"]::before {
-  background: rgba(255, 255, 255, 0.82);
-  -webkit-backdrop-filter: blur(14px) saturate(160%);
-  backdrop-filter: blur(14px) saturate(160%);
+.am-header[data-scrolled="true"] {
+  border-bottom-color: rgba(226, 232, 240, 0.8);
+  box-shadow: 0 10px 30px -18px rgba(15, 23, 42, 0.25);
+}
+
+.am-header[data-scrolled="true"]::after {
+  opacity: 1;
+}
+
+/* Browsers without backdrop-filter get an opaque bar rather than an unreadable translucent one. */
+@supports not ((-webkit-backdrop-filter: blur(1px)) or (backdrop-filter: blur(1px))) {
+  .am-header::before {
+    background: var(--am-surface);
+  }
 }
 
 /*
@@ -149,7 +170,86 @@
 .am-header__cta.am-button {
   min-height: 44px;
   padding: var(--am-space-10) var(--am-space-20);
+  border-radius: var(--am-radius-pill);
   font-size: var(--am-small-size);
+}
+
+.am-header__cta.am-button .am-icon {
+  transition: transform var(--am-duration-base) var(--am-ease-spring);
+}
+
+.am-header__cta.am-button:hover .am-icon {
+  transform: scale(1.12) rotate(-8deg);
+}
+
+/*
+ * Trust indicator: "licensed partner brokers only", linking to the regulatory status page. The
+ * header row has no room for a text badge next to the navigation, the country pill, the language
+ * switcher and the call to action, so it is a discreet emerald shield whose label slides out on hover
+ * and on keyboard focus (the link's accessible name carries the full sentence).
+ */
+.am-header__badge {
+  position: relative;
+  display: none;
+  flex: none;
+  width: 36px;
+  height: 36px;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--am-emerald-100);
+  border-radius: var(--am-radius-pill);
+  background: var(--am-emerald-50);
+  color: var(--am-emerald-700);
+  text-decoration: none;
+  transition:
+    border-color var(--am-transition),
+    box-shadow var(--am-transition);
+}
+
+.am-header__badge:hover,
+.am-header__badge:focus-visible {
+  border-color: var(--am-emerald-400);
+  box-shadow: var(--am-shadow-glow-emerald);
+  text-decoration: none;
+}
+
+.am-header__badgeicon {
+  display: inline-flex;
+  width: 24px;
+  height: 24px;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--am-radius-pill);
+  background: var(--am-emerald-500);
+  color: var(--am-neutral-0);
+}
+
+.am-header__badgetext {
+  position: absolute;
+  top: calc(100% + 10px);
+  right: 50%;
+  padding: var(--am-space-6) var(--am-space-12);
+  border: 1px solid var(--am-emerald-100);
+  border-radius: var(--am-radius-pill);
+  background: var(--am-surface);
+  box-shadow: var(--am-shadow-md);
+  color: var(--am-emerald-700);
+  font-size: var(--am-caption-size);
+  font-weight: 700;
+  line-height: 1.2;
+  white-space: nowrap;
+  opacity: 0;
+  pointer-events: none;
+  transform: translate(50%, -4px);
+  transition:
+    opacity var(--am-duration-fast) var(--am-ease-out),
+    transform var(--am-duration-fast) var(--am-ease-out);
+}
+
+.am-header__badge:hover .am-header__badgetext,
+.am-header__badge:focus-visible .am-header__badgetext {
+  opacity: 1;
+  transform: translate(50%, 0);
 }
 
 /*
@@ -207,7 +307,7 @@
 }
 
 .am-header__link:hover {
-  background: var(--am-primary-50);
+  background: rgba(37, 99, 235, 0.07);
   color: var(--am-primary-700);
 }
 
@@ -259,22 +359,26 @@
   gap: var(--am-space-6);
   min-height: 40px;
   padding: 0 var(--am-space-4) 0 var(--am-space-12);
-  border: 1px solid var(--am-border-strong);
+  border: 1px solid var(--am-border);
   border-radius: var(--am-radius-pill);
-  background: var(--am-surface);
+  background: var(--am-glass-soft);
   box-shadow: var(--am-shadow-xs);
   transition:
     border-color var(--am-transition),
+    background-color var(--am-transition),
     box-shadow var(--am-transition);
 }
 
 .am-countryselect__control:hover {
-  border-color: var(--am-primary-300);
+  border-color: var(--am-primary-200);
+  background: var(--am-surface);
+  box-shadow: var(--am-shadow-sm);
 }
 
 .am-countryselect__control:focus-within {
   border-color: var(--am-primary-500);
-  box-shadow: 0 0 0 3px var(--am-primary-100);
+  background: var(--am-surface);
+  box-shadow: var(--am-halo);
 }
 
 .am-countryselect__globe {
@@ -454,7 +558,13 @@
   padding: 3px;
   border: 1px solid var(--am-border);
   border-radius: var(--am-radius-pill);
-  background: var(--am-neutral-100);
+  background: var(--am-glass-soft);
+  box-shadow: var(--am-shadow-xs);
+  transition: border-color var(--am-transition);
+}
+
+.am-langswitch:hover {
+  border-color: var(--am-primary-200);
 }
 
 .am-langswitch__indicator {
@@ -464,8 +574,8 @@
   left: 3px;
   width: calc((100% - 6px) / var(--am-langswitch-count, 2));
   border-radius: var(--am-radius-pill);
-  background: var(--am-primary-600);
-  box-shadow: var(--am-shadow-xs);
+  background: var(--am-gradient-brand);
+  box-shadow: var(--am-shadow-glow-soft);
   pointer-events: none;
   transform: translateX(calc(var(--am-langswitch-index, 0) * 100%));
   transition: transform var(--am-duration-base) var(--am-ease-out);
@@ -1105,5 +1215,12 @@ html[data-js="true"] .am-menu__close {
 
   .am-header__menu.am-menu {
     display: none;
+  }
+}
+
+/* The trust indicator needs 48px the row only has from 1280px. */
+@media (min-width: 1280px) {
+  .am-header__badge {
+    display: inline-flex;
   }
 }

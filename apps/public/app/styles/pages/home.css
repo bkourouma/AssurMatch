@@ -26,23 +26,101 @@
 }
 
 .am-home-hero .am-hero__title {
-  animation-delay: 70ms;
+  animation-delay: 80ms;
 }
 
 .am-home-hero .am-hero__lead {
-  animation-delay: 140ms;
+  animation-delay: 160ms;
 }
 
 .am-home-hero .am-home-hero__place {
-  animation-delay: 210ms;
+  animation-delay: 240ms;
 }
 
 .am-home-hero .am-entry {
-  animation-delay: 280ms;
+  animation-delay: 320ms;
+}
+
+/* The preview arrives last, from slightly smaller, once the text column is in place. */
+.am-home-hero .am-hero__aside {
+  animation: am-scale-in 700ms var(--am-ease-out) 260ms both;
 }
 
 .am-home-hero .am-hero__inner {
   gap: var(--am-space-20);
+}
+
+/*
+ * Ambient glows: two blurred orbs (electric blue, violet) layered over the mesh of the primitive. They
+ * live on the hero's `::after`, behind the content (the hero isolates its own stacking context).
+ */
+.am-home-hero::after {
+  position: absolute;
+  z-index: -1;
+  inset: 0;
+  background:
+    radial-gradient(22rem 22rem at 78% 34%, rgba(59, 130, 246, 0.22), transparent 70%),
+    radial-gradient(18rem 18rem at 94% 78%, rgba(124, 58, 237, 0.14), transparent 70%),
+    radial-gradient(16rem 16rem at 4% 88%, rgba(6, 182, 212, 0.1), transparent 70%);
+  content: "";
+  filter: blur(80px);
+  pointer-events: none;
+}
+
+/* A faint dotted grid that fades out towards the bottom: texture, not pattern. */
+.am-home-hero::before {
+  background:
+    var(--am-gradient-mesh),
+    radial-gradient(circle at 1px 1px, rgba(15, 23, 42, 0.06) 1px, transparent 0) 0 0 / 28px 28px;
+  -webkit-mask-image: linear-gradient(180deg, #000 0%, #000 55%, transparent 100%);
+  mask-image: linear-gradient(180deg, #000 0%, #000 55%, transparent 100%);
+}
+
+/* Kicker as a status pill: live emerald dot, then the positioning in plain words. */
+.am-home-hero .am-hero__kicker {
+  display: inline-flex;
+  gap: var(--am-space-10);
+  align-items: center;
+  justify-self: start;
+  padding: var(--am-space-6) var(--am-space-16) var(--am-space-6) var(--am-space-12);
+  border: 1px solid var(--am-border);
+  border-radius: var(--am-radius-pill);
+  background: var(--am-glass);
+  -webkit-backdrop-filter: var(--am-glass-blur);
+  backdrop-filter: var(--am-glass-blur);
+  box-shadow: var(--am-shadow-sm);
+  color: var(--am-primary-800);
+  font-size: var(--am-caption-size);
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  text-transform: none;
+}
+
+.am-home-hero .am-hero__title {
+  color: var(--am-primary-900);
+  letter-spacing: -0.03em;
+}
+
+/* The second sentence of the title carries the brand gradient, clipped to the glyphs. */
+.am-home-hero__accent {
+  background: var(--am-gradient-text);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: var(--am-primary-700);
+  -webkit-text-fill-color: transparent;
+  -webkit-box-decoration-break: clone;
+  box-decoration-break: clone;
+}
+
+@media (forced-colors: active) {
+  .am-home-hero__accent {
+    background: none;
+    -webkit-text-fill-color: currentColor;
+  }
+}
+
+.am-home-hero .am-hero__lead {
+  color: var(--am-neutral-600);
 }
 
 /** "Pays pre-selectionne : ..." — a quiet line, not a notice. */
@@ -65,6 +143,7 @@
 /** The entry panel is the primary action of the page: it floats above the mesh gradient. */
 .am-home-hero .am-entry {
   margin-top: var(--am-space-4);
+  padding: var(--am-space-28);
 }
 
 /*
@@ -83,8 +162,29 @@
   }
 }
 
+.am-home-hero .am-entry .am-field__control {
+  min-height: 56px;
+  border-radius: var(--am-radius-md);
+  font-weight: 600;
+}
+
+.am-home-hero .am-entry__submit.am-button {
+  min-height: 56px;
+  margin-top: var(--am-space-4);
+  border-radius: var(--am-radius-md);
+}
+
+@media (max-width: 559.98px) {
+  .am-home-hero .am-entry {
+    padding: var(--am-space-20);
+  }
+}
+
 /** Heading of the entry panel; only the home page passes a title to `EntrySelector`. */
 .am-entry__title {
+  display: flex;
+  gap: var(--am-space-10);
+  align-items: center;
   margin: 0;
   color: var(--am-text);
   font-family: var(--am-font-heading);
@@ -92,6 +192,19 @@
   font-weight: 800;
   letter-spacing: var(--am-tracking-snug);
   line-height: var(--am-h4-line);
+}
+
+.am-entry__titleglyph {
+  display: inline-flex;
+  width: 30px;
+  height: 30px;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--am-radius-sm);
+  background: var(--am-gradient-brand);
+  box-shadow: var(--am-shadow-glow-soft);
+  color: var(--am-neutral-0);
 }
 
 /*
@@ -110,7 +223,7 @@
 
 @media (min-width: 1024px) {
   .am-home-hero .am-hero__layout[data-columns="2"] {
-    grid-template-columns: minmax(0, 1.08fr) minmax(0, 0.92fr);
+    grid-template-columns: minmax(0, 1.05fr) minmax(0, 0.95fr);
   }
 }
 
@@ -119,63 +232,43 @@
 .am-preview {
   position: relative;
   display: grid;
-  padding: var(--am-space-24) var(--am-space-16) var(--am-space-32);
+  padding: var(--am-space-56) var(--am-space-24) var(--am-space-64);
   isolation: isolate;
 }
 
+/* Halo behind the card: a blue-violet glow blurred into the page. */
 .am-preview::before {
   position: absolute;
   z-index: -1;
-  inset: 8% -6% 4% -2%;
-  border-radius: 50%;
-  background: radial-gradient(60% 60% at 50% 50%, rgba(46, 107, 214, 0.22), rgba(46, 107, 214, 0) 70%);
+  inset: 12% 4% 10% 8%;
+  border-radius: 40%;
+  background:
+    radial-gradient(60% 60% at 40% 45%, rgba(37, 99, 235, 0.34), transparent 70%),
+    radial-gradient(50% 50% at 70% 70%, rgba(124, 58, 237, 0.2), transparent 70%);
   content: "";
-  filter: blur(6px);
+  filter: blur(48px);
 }
 
-.am-preview__stack {
+.am-preview__orbit {
   position: relative;
-  display: block;
+  max-width: 440px;
+  margin-left: auto;
 }
 
 .am-preview__card {
-  display: grid;
-  gap: var(--am-space-12);
-  padding: var(--am-space-20);
-  border: 1px solid var(--am-border);
-  border-radius: var(--am-radius-panel);
-  background: var(--am-surface);
-  box-shadow: var(--am-shadow-lg);
-}
-
-/* The two cards behind are partially visible, tilted and dimmed: a stack, not a list. */
-.am-preview__card--behind {
-  position: absolute;
-  right: 0;
-  left: 0;
-  padding: var(--am-space-16) var(--am-space-20);
-  opacity: 0.72;
-}
-
-.am-preview__card--behind:first-child {
-  top: 0;
-  transform: scale(0.88) translateY(-18px) rotate(-2.4deg);
-  opacity: 0.5;
-}
-
-.am-preview__card--behind:nth-child(2) {
-  top: 34px;
-  transform: scale(0.94) translateY(-6px) rotate(-1.2deg);
-}
-
-.am-preview__card--front {
   position: relative;
-  z-index: 1;
-  margin-top: 84px;
-  border-color: var(--am-primary-200);
-  box-shadow: var(--am-shadow-xl);
+  display: grid;
+  gap: var(--am-space-16);
+  padding: var(--am-space-24);
+  border: 1px solid rgba(255, 255, 255, 0.9);
+  border-radius: var(--am-radius-panel);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.98) 0%, rgba(255, 255, 255, 0.92) 100%);
+  box-shadow: var(--am-shadow-xl), var(--am-shadow-inset);
+  animation: am-float 4s var(--am-ease-in-out) infinite;
 }
 
+/* Glyph on two rows; title and indicative badge on the first; the partner line spans the second. */
 .am-preview__head {
   display: grid;
   gap: var(--am-space-4) var(--am-space-12);
@@ -183,19 +276,49 @@
   grid-template-columns: auto minmax(0, 1fr) auto;
 }
 
-.am-preview__head > .am-icontile {
+.am-preview__head > .am-preview__glyph {
   grid-column: 1;
   grid-row: 1 / span 2;
 }
 
-.am-preview__head .am-badge {
+.am-preview__heading {
+  display: contents;
+}
+
+.am-preview__head .am-preview__title {
+  grid-column: 2;
+  grid-row: 1;
+}
+
+.am-preview__head .am-preview__partner {
+  grid-column: 2 / -1;
+  grid-row: 2;
+}
+
+.am-preview__head > .am-preview__badge {
   grid-column: 3;
-  grid-row: 1 / span 2;
-  align-self: center;
+  grid-row: 1;
+}
+
+/* Car glyph on a frosted, blue-tinted glass tile. */
+.am-preview__glyph {
+  display: inline-flex;
+  width: 52px;
+  height: 52px;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid rgba(255, 255, 255, 0.7);
+  border-radius: var(--am-radius-lg);
+  background:
+    linear-gradient(145deg, rgba(59, 130, 246, 0.22), rgba(37, 99, 235, 0.08)),
+    var(--am-glass);
+  -webkit-backdrop-filter: var(--am-glass-blur);
+  backdrop-filter: var(--am-glass-blur);
+  box-shadow: 0 8px 18px -8px rgba(37, 99, 235, 0.45), var(--am-shadow-inset);
+  color: var(--am-primary-700);
 }
 
 .am-preview__title {
-  grid-column: 2;
   margin: 0;
   color: var(--am-text);
   font-family: var(--am-font-heading);
@@ -206,27 +329,81 @@
 }
 
 .am-preview__partner {
-  grid-column: 2;
   display: flex;
   gap: var(--am-space-6);
   align-items: center;
   margin: 0;
-  color: var(--am-text-subtle);
+  color: var(--am-emerald-700);
   font-size: var(--am-caption-size);
+  font-weight: 700;
   line-height: var(--am-caption-line);
 }
 
-.am-preview__row {
+.am-preview__verified {
+  display: inline-flex;
+  width: 18px;
+  height: 18px;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--am-radius-pill);
+  background: var(--am-emerald-500);
+  box-shadow: var(--am-shadow-glow-emerald);
+  color: var(--am-neutral-0);
+}
+
+.am-preview__badge {
+  align-self: center;
+  padding: var(--am-space-4) var(--am-space-10);
+  border: 1px solid var(--am-primary-100);
+  border-radius: var(--am-radius-pill);
+  background: var(--am-primary-50);
+  color: var(--am-primary-700);
+  font-size: var(--am-caption-size);
+  font-weight: 700;
+  line-height: var(--am-caption-line);
+  white-space: nowrap;
+}
+
+.am-preview__guarantees {
   display: flex;
   flex-wrap: wrap;
   gap: var(--am-space-8);
-  align-items: baseline;
-  justify-content: space-between;
-  padding-top: var(--am-space-12);
-  border-top: 1px solid var(--am-border);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.am-preview__guarantee {
+  display: inline-flex;
+  gap: var(--am-space-6);
+  align-items: center;
+  padding: var(--am-space-4) var(--am-space-12) var(--am-space-4) var(--am-space-4);
+  border: 1px solid var(--am-border);
+  border-radius: var(--am-radius-pill);
+  background: var(--am-neutral-50);
+  color: var(--am-neutral-700);
+  font-size: var(--am-caption-size);
+  font-weight: 600;
+  line-height: var(--am-caption-line);
+}
+
+.am-preview__tick {
+  display: inline-flex;
+  width: 20px;
+  height: 20px;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--am-radius-pill);
+  background: var(--am-emerald-100);
+  color: var(--am-emerald-700);
 }
 
 .am-preview__label {
+  display: inline-flex;
+  gap: var(--am-space-6);
+  align-items: center;
   margin: 0;
   color: var(--am-text-subtle);
   font-size: var(--am-caption-size);
@@ -234,50 +411,158 @@
   line-height: var(--am-caption-line);
 }
 
+.am-preview__score {
+  display: grid;
+  gap: var(--am-space-8);
+}
+
+.am-preview__label .am-icon {
+  color: var(--am-primary-600);
+}
+
+/* Two-tone gauge (blue into emerald) with a soft glow: no value, no number, only a shape. */
+.am-preview__gauge {
+  position: relative;
+  display: block;
+  height: 10px;
+  overflow: hidden;
+  border-radius: var(--am-radius-pill);
+  background:
+    repeating-linear-gradient(90deg, transparent 0 calc(20% - 2px), var(--am-surface) calc(20% - 2px) 20%),
+    var(--am-neutral-100);
+}
+
+.am-preview__gaugefill {
+  display: block;
+  width: 78%;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--am-gradient-gauge);
+  box-shadow: 0 0 12px rgba(52, 211, 153, 0.55);
+  transform-origin: left center;
+  animation: am-gauge-fill 1400ms var(--am-ease-out) 600ms both;
+}
+
+.am-preview__price {
+  display: grid;
+  gap: var(--am-space-6);
+  padding: var(--am-space-16);
+  border: 1px solid var(--am-primary-100);
+  border-radius: var(--am-radius-lg);
+  background: linear-gradient(135deg, var(--am-primary-50) 0%, rgba(255, 255, 255, 0.9) 70%);
+}
+
+.am-preview__tag {
+  display: inline-flex;
+  gap: var(--am-space-4);
+  align-items: center;
+  justify-self: start;
+  padding: 2px var(--am-space-8);
+  border-radius: var(--am-radius-pill);
+  background: var(--am-amber-100);
+  color: var(--am-amber-800);
+  font-size: var(--am-caption-size);
+  font-weight: 700;
+  line-height: var(--am-caption-line);
+}
+
+.am-preview__pricerow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--am-space-8);
+  align-items: baseline;
+  justify-content: space-between;
+}
+
 .am-preview__value {
   margin: 0;
-  color: var(--am-primary-700);
+  color: var(--am-primary-800);
   font-family: var(--am-font-heading);
-  font-size: var(--am-h4-size);
+  font-size: var(--am-h3-size);
+  font-weight: 800;
+  letter-spacing: var(--am-tracking-tight);
+  line-height: 1.1;
+}
+
+.am-preview__pricenote {
+  margin: 0;
+  color: var(--am-text-subtle);
+  font-size: var(--am-caption-size);
+  line-height: var(--am-caption-line);
+  text-align: right;
+}
+
+/* Floating glass satellites orbiting the card, drifting out of phase with it. */
+.am-preview__satellite {
+  position: absolute;
+  z-index: 2;
+  display: inline-flex;
+  gap: var(--am-space-10);
+  align-items: center;
+  padding: var(--am-space-10) var(--am-space-16) var(--am-space-10) var(--am-space-12);
+  border: 1px solid var(--am-border-glass);
+  border-radius: var(--am-radius-lg);
+  background: var(--am-glass);
+  -webkit-backdrop-filter: var(--am-glass-blur);
+  backdrop-filter: var(--am-glass-blur);
+  box-shadow: var(--am-shadow-lg);
+  white-space: nowrap;
+  animation: am-float-alt 5s var(--am-ease-in-out) infinite;
+}
+
+.am-preview__satellite--top {
+  top: -58px;
+  right: -20px;
+}
+
+.am-preview__satellite--bottom {
+  bottom: -40px;
+  left: -44px;
+  animation-delay: -2.5s;
+}
+
+.am-preview__satellite .am-status-ping {
+  margin: 0 var(--am-space-4);
+}
+
+.am-preview__satglyph {
+  display: inline-flex;
+  width: 32px;
+  height: 32px;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--am-radius-sm);
+  background: var(--am-gradient-brand);
+  box-shadow: var(--am-shadow-glow-soft);
+  color: var(--am-neutral-0);
+}
+
+.am-preview__satbody {
+  display: grid;
+  line-height: 1.25;
+}
+
+.am-preview__satbody strong {
+  color: var(--am-text);
+  font-size: var(--am-caption-size);
   font-weight: 800;
 }
 
-.am-preview__score {
-  display: grid;
-  gap: var(--am-space-6);
+.am-preview__satbody span {
+  color: var(--am-text-subtle);
+  font-size: var(--am-caption-size);
 }
 
-.am-preview__gauge {
-  display: block;
-  height: 8px;
-  border-radius: var(--am-radius-pill);
-  background: var(--am-neutral-100);
-}
+/* Between 1024 and 1279px the column is narrow: the satellites tuck in instead of overflowing. */
+@media (max-width: 1279.98px) {
+  .am-preview__satellite--top {
+    right: -4px;
+  }
 
-.am-preview__gauge::after {
-  display: block;
-  width: 72%;
-  height: 100%;
-  border-radius: inherit;
-  background: var(--am-gradient-brand);
-  content: "";
-}
-
-/* Grey bars standing in for the copy of the two background cards. */
-.am-preview__ghost {
-  display: block;
-  height: 10px;
-  border-radius: var(--am-radius-pill);
-  background: var(--am-neutral-100);
-}
-
-.am-preview__ghost--short {
-  width: 52%;
-}
-
-.am-preview__ghostrow {
-  display: grid;
-  gap: var(--am-space-8);
+  .am-preview__satellite--bottom {
+    left: -8px;
+  }
 }
 
 /* ==========================================================================
@@ -303,8 +588,49 @@
   display: grid;
 }
 
-.am-home-stats .am-card {
+/* Counter cards: generous radius, a gradient figure and a light rule of brand colour on top. */
+.am-home-stat.am-card {
   height: 100%;
+  overflow: hidden;
+  border-color: var(--am-border);
+  border-radius: var(--am-radius-lg);
+  background:
+    radial-gradient(120% 90% at 100% 0%, rgba(59, 130, 246, 0.08), transparent 55%),
+    var(--am-surface);
+  box-shadow: var(--am-shadow-md);
+}
+
+.am-home-stat.am-card::before {
+  position: absolute;
+  top: 0;
+  right: 0;
+  left: 0;
+  height: 3px;
+  background: var(--am-gradient-gauge);
+  content: "";
+  opacity: 0.85;
+}
+
+.am-home-stat.am-card:hover {
+  box-shadow: var(--am-shadow-lg);
+  transform: translateY(-4px);
+}
+
+.am-home-stat .am-stat__value {
+  background: linear-gradient(120deg, var(--am-primary-900) 0%, var(--am-primary-700) 55%, var(--am-primary-600) 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: var(--am-primary-800);
+  font-size: clamp(40px, 1.9rem + 2.4vw, 56px);
+  -webkit-text-fill-color: transparent;
+}
+
+.am-home-stat .am-stat__label {
+  color: var(--am-neutral-600);
+  font-size: var(--am-caption-size);
+  font-weight: 700;
+  letter-spacing: var(--am-tracking-wide);
+  text-transform: uppercase;
 }
 
 .am-home-stats__notes {
@@ -346,19 +672,41 @@
   gap: var(--am-space-12);
   align-content: start;
   height: 100%;
+  overflow: hidden;
+  border-radius: var(--am-radius-lg);
+  box-shadow: var(--am-shadow-md);
+  transition:
+    transform var(--am-duration-base) var(--am-ease-out),
+    box-shadow var(--am-duration-base) var(--am-ease-out),
+    border-color var(--am-duration-base) var(--am-ease-out);
 }
 
-/* The connector between two steps: a dotted rule with a soft dot at its end. */
+.am-home-step:hover {
+  border-color: var(--am-primary-200);
+  box-shadow: var(--am-shadow-xl);
+  transform: translateY(-4px);
+}
+
+/* The connector between two steps: a dotted rule, drawn outside the (clipped) card by the list. */
 @media (min-width: 900px) {
-  .am-home-step:not(:last-child)::after {
+  .am-home-steps {
+    position: relative;
+  }
+
+  .am-home-steps::before {
     position: absolute;
-    top: 28px;
-    right: calc(var(--am-space-32) * -1);
-    width: var(--am-space-32);
+    z-index: 0;
+    top: 60px;
+    right: 16%;
+    left: 16%;
     height: 2px;
     background-image: linear-gradient(90deg, var(--am-primary-300) 0 6px, transparent 6px 12px);
     background-size: 12px 2px;
     content: "";
+  }
+
+  .am-home-step {
+    z-index: 1;
   }
 }
 
@@ -368,30 +716,52 @@
 }
 
 .am-home-step__head {
+  position: relative;
   display: flex;
   gap: var(--am-space-12);
   align-items: center;
-  justify-content: space-between;
 }
 
-.am-home-step__index {
-  display: inline-flex;
-  width: 28px;
-  height: 28px;
-  flex: none;
-  align-items: center;
-  justify-content: center;
+/* Icon in a coloured circle with a soft ring. */
+.am-home-step__icon.am-icontile {
   border-radius: var(--am-radius-pill);
-  background: var(--am-primary-50);
-  color: var(--am-primary-700);
+  background: var(--am-gradient-brand);
+  box-shadow: 0 0 0 6px var(--am-primary-50), var(--am-shadow-glow-soft);
+  color: var(--am-neutral-0);
+  transition: transform var(--am-duration-base) var(--am-ease-spring);
+}
+
+.am-home-step:hover .am-home-step__icon.am-icontile {
+  transform: scale(1.06) rotate(-4deg);
+}
+
+/* Giant, semi-transparent step number anchored in the top-right corner, behind the content. */
+.am-home-step__index {
+  position: absolute;
+  z-index: 0;
+  top: -6px;
+  right: 12px;
+  background: linear-gradient(180deg, rgba(37, 99, 235, 0.2) 0%, rgba(37, 99, 235, 0) 90%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
   font-family: var(--am-font-heading);
-  font-size: var(--am-caption-size);
+  font-size: 128px;
   font-variant-numeric: tabular-nums;
-  font-weight: 800;
+  font-weight: 900;
+  letter-spacing: -0.06em;
+  line-height: 1;
+  pointer-events: none;
+  user-select: none;
+}
+
+.am-home-step__title,
+.am-home-step__body {
+  position: relative;
 }
 
 .am-home-step__title {
-  margin: 0;
+  margin: var(--am-space-8) 0 0;
 }
 
 .am-home-step__body {
@@ -406,24 +776,34 @@
 .am-home-role {
   display: grid;
   gap: var(--am-space-24);
-  align-items: start;
   grid-template-columns: minmax(0, 1fr);
 }
 
+/* Status notice on one side, the detail and the regulatory link on the other. */
+.am-home-role__intro {
+  display: grid;
+  gap: var(--am-space-16);
+  align-items: start;
+}
+
 @media (min-width: 1024px) {
-  .am-home-role {
+  .am-home-role__intro {
     gap: var(--am-space-32);
     grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   }
 }
 
-.am-home-role__intro {
+.am-home-role__intro .am-notice {
+  margin: 0;
+}
+
+.am-home-role__aside {
   display: grid;
   gap: var(--am-space-16);
   align-content: start;
 }
 
-.am-home-role__intro p {
+.am-home-role__aside p {
   margin: 0;
 }
 
@@ -437,42 +817,71 @@
   line-height: var(--am-caption-line);
 }
 
+/* Two elegant columns: what AssurMatch does (emerald), what it never does (quiet slate). */
 .am-home-role__lists {
   display: grid;
-  gap: var(--am-space-24);
+  gap: var(--am-space-20);
+  grid-template-columns: minmax(0, 1fr);
 }
 
-.am-home-role__group {
+@media (min-width: 768px) {
+  .am-home-role__lists {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+.am-home-role__group.am-card {
   display: grid;
-  gap: var(--am-space-12);
+  gap: var(--am-space-20);
+  align-content: start;
+  height: 100%;
+  border-radius: var(--am-radius-lg);
+  box-shadow: var(--am-shadow-md);
+}
+
+.am-home-role__group--does.am-card {
+  border-color: var(--am-emerald-100);
+  background: linear-gradient(180deg, var(--am-emerald-50) 0%, var(--am-surface) 42%);
+}
+
+.am-home-role__group--doesnot.am-card {
+  background: linear-gradient(180deg, var(--am-neutral-50) 0%, var(--am-surface) 42%);
 }
 
 .am-home-role__grouptitle {
   display: flex;
-  gap: var(--am-space-8);
+  gap: var(--am-space-12);
   align-items: center;
   margin: 0;
   font-size: var(--am-h4-size);
   line-height: var(--am-h4-line);
 }
 
-/* Green is a validation colour: it marks the ticks of the "does" list and nothing else. */
-.am-home-role__group[data-tone="does"] .am-home-role__grouptitle .am-icon {
-  color: var(--am-success-600);
+.am-home-role__groupicon {
+  display: inline-flex;
+  width: 40px;
+  height: 40px;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--am-radius-pill);
 }
 
-.am-home-role__group[data-tone="doesnot"] .am-home-role__grouptitle .am-icon {
-  color: var(--am-neutral-500);
+/* Green is a validation colour: it marks the "does" column and nothing else. */
+.am-home-role__group--does .am-home-role__groupicon {
+  background: var(--am-emerald-500);
+  box-shadow: var(--am-shadow-glow-emerald);
+  color: var(--am-neutral-0);
 }
 
-.am-home-role__group + .am-home-role__group {
-  padding-top: var(--am-space-24);
-  border-top: 1px solid var(--am-border);
+.am-home-role__group--doesnot .am-home-role__groupicon {
+  background: var(--am-neutral-100);
+  color: var(--am-neutral-600);
 }
 
 .am-checklist {
   display: grid;
-  gap: var(--am-space-10);
+  gap: var(--am-space-12);
   margin: 0;
   padding: 0;
   list-style: none;
@@ -480,23 +889,31 @@
 
 .am-checklist li {
   display: grid;
-  gap: var(--am-space-10);
+  gap: var(--am-space-12);
   align-items: start;
-  grid-template-columns: 20px minmax(0, 1fr);
+  grid-template-columns: 24px minmax(0, 1fr);
   color: var(--am-text-muted);
   font-size: var(--am-small-size);
   line-height: var(--am-small-line);
 }
 
+/* Each tick sits in a small round badge. */
 .am-checklist li .am-icon {
-  margin-top: 2px;
+  box-sizing: content-box;
+  width: 14px;
+  height: 14px;
+  margin-top: 1px;
+  padding: 5px;
+  border-radius: var(--am-radius-pill);
 }
 
 .am-checklist[data-tone="does"] li .am-icon {
-  color: var(--am-success-600);
+  background: var(--am-emerald-100);
+  color: var(--am-emerald-700);
 }
 
 .am-checklist[data-tone="doesnot"] li .am-icon {
+  background: var(--am-neutral-100);
   color: var(--am-neutral-500);
 }
 
@@ -549,7 +966,17 @@
   .am-home-hero .am-hero__title,
   .am-home-hero .am-hero__lead,
   .am-home-hero .am-home-hero__place,
-  .am-home-hero .am-entry {
+  .am-home-hero .am-entry,
+  .am-home-hero .am-hero__aside,
+  .am-preview__card,
+  .am-preview__satellite,
+  .am-preview__gaugefill {
     animation: none !important;
+  }
+
+  .am-home-stat.am-card:hover,
+  .am-home-step:hover,
+  .am-home-step:hover .am-home-step__icon.am-icontile {
+    transform: none;
   }
 }

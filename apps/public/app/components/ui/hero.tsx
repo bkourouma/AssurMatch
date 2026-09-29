@@ -3,8 +3,10 @@ import type { ReactNode } from "react";
 export type HeroTone = "light" | "brand" | "navy";
 
 export interface HeroProps {
-  title: string;
-  kicker?: string;
+  /** A string, or a node when part of the title carries an accent (the home page). */
+  title: ReactNode;
+  /** A string, or a node when the kicker carries a status dot (the home page). */
+  kicker?: ReactNode;
   lead?: string;
   /** Row of buttons under the lead. */
   actions?: ReactNode;

@@ -24,8 +24,8 @@ export interface EntrySelectorProps {
 }
 
 /**
- * Country then product entry point, and the primary action of the home page: an elevated white panel
- * carrying two selects and one button.
+ * Country then product entry point, and the primary action of the home page: a raised "cockpit" panel
+ * carrying two selects and one button (the arrow slides and a sheen sweeps across it on hover).
  *
  * It is still a plain GET form targeting /aller, which resolves the pair server-side and redirects to
  * the localised product page, so it works without JavaScript.
@@ -36,7 +36,14 @@ export function EntrySelector({ countries, products, defaultCountry, title }: En
 
   return (
     <form className="am-entry" method="get" action="/aller" aria-label={t("label")}>
-      {title ? <p className="am-entry__title">{title}</p> : null}
+      {title ? (
+        <p className="am-entry__title">
+          <span className="am-entry__titleglyph" aria-hidden="true">
+            <Icon name="sparkles" size={16} />
+          </span>
+          {title}
+        </p>
+      ) : null}
       <div className="am-entry__row">
         <Field id="am-entry-country" label={t("country")} leading="map-pin">
           <select className="am-field__control" id="am-entry-country" name="pays" defaultValue={defaultCountry ?? ""} required>
@@ -56,7 +63,14 @@ export function EntrySelector({ countries, products, defaultCountry, title }: En
             ))}
           </select>
         </Field>
-        <Button type="submit" size="lg" fullWidth icon={<Icon name="search" size={20} />}>
+        <Button
+          type="submit"
+          size="lg"
+          fullWidth
+          className="am-entry__submit"
+          icon={<Icon name="search" size={20} />}
+          iconAfter={<Icon name="arrow-right" size={20} className="am-entry__arrow" />}
+        >
           {t("submit")}
         </Button>
       </div>

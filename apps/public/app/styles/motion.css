@@ -94,6 +94,54 @@
   }
 }
 
+/* Offset twin of `am-float` for the hero satellites: they drift against the card, not with it. */
+@keyframes am-float-alt {
+  0%,
+  100% {
+    transform: translate3d(0, -4px, 0);
+  }
+
+  50% {
+    transform: translate3d(0, 6px, 0);
+  }
+}
+
+/* Live status dot: a ring that expands and fades out of the solid emerald dot. */
+@keyframes am-ping {
+  0% {
+    opacity: 0.7;
+    transform: scale(1);
+  }
+
+  80%,
+  100% {
+    opacity: 0;
+    transform: scale(2.6);
+  }
+}
+
+/* One diagonal sweep of light across a primary button, on hover. */
+@keyframes am-sheen {
+  from {
+    transform: translateX(-120%) skewX(-18deg);
+  }
+
+  to {
+    transform: translateX(220%) skewX(-18deg);
+  }
+}
+
+/* The gauge of the hero card fills once, on load. */
+@keyframes am-gauge-fill {
+  from {
+    transform: scaleX(0.08);
+  }
+
+  to {
+    transform: scaleX(1);
+  }
+}
+
 @keyframes am-pulse-soft {
   0%,
   100% {
@@ -115,7 +163,7 @@
 
 html[data-js="true"] [data-reveal="pending"] {
   opacity: 0;
-  transform: translate3d(0, 16px, 0);
+  transform: translate3d(0, 20px, 0);
 }
 
 /*
@@ -153,7 +201,7 @@ html[data-js="true"] [data-reveal-stagger] > * {
 
 html[data-js="true"] [data-reveal-stagger][data-reveal="pending"] > * {
   opacity: 0;
-  transform: translate3d(0, 14px, 0);
+  transform: translate3d(0, 20px, 0) scale(0.985);
 }
 
 html[data-js="true"] [data-reveal-stagger][data-reveal="in"] > * {
@@ -216,7 +264,29 @@ html[data-js="true"] [data-reveal-stagger] > *:nth-child(12) {
 }
 
 .am-animate-float {
-  animation: am-float 6s var(--am-ease-in-out) infinite;
+  animation: am-float 4s var(--am-ease-in-out) infinite;
+}
+
+/* ---------- Status ping: a solid emerald dot with an expanding ring (a "live" marker) ---------- */
+
+.am-status-ping {
+  position: relative;
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  flex: none;
+  border-radius: var(--am-radius-pill);
+  background: var(--am-emerald-500);
+  box-shadow: var(--am-shadow-glow-emerald);
+}
+
+.am-status-ping::after {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: var(--am-emerald-400);
+  content: "";
+  animation: am-ping 1.8s var(--am-ease-out) infinite;
 }
 
 /* ---------- Reduced motion: no reveal pre-state, no animation ---------- */
@@ -231,7 +301,8 @@ html[data-js="true"] [data-reveal-stagger] > *:nth-child(12) {
   .am-animate-in,
   .am-animate-fade,
   .am-animate-scale,
-  .am-animate-float {
+  .am-animate-float,
+  .am-status-ping::after {
     animation: none !important;
   }
 }

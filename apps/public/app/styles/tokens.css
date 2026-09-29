@@ -6,40 +6,65 @@
  * each scale, semantic aliases, gradients, elevation, motion and layout. Every historical variable
  * name keeps working; the ones re-declared here only change their value for `apps/public`.
  *
- * Invariants: green (`--am-success-*`) is a validation colour only - never a page background, never a
- * primary button. The sponsored badge stays orange (warning-800 text on warning-50, warning-600
+ * Invariants: green (`--am-success-*`, and the brighter `--am-emerald-*` accent) is a validation
+ * colour only - guarantees, licensed partners, a live status dot - never a page background, never a
+ * primary button. Amber marks a highlight badge, never an action. The sponsored badge stays orange (warning-800 text on warning-50, warning-600
  * border and icon: 6.95:1). Nothing renders below 14px.
  */
 
 @import "@assurmatch/ui/tokens.css";
 
 :root {
-  /* ---------- Brand blue, full scale ---------- */
-  --am-primary-50: #f2f6fe;
-  --am-primary-100: #e2ebfc;
-  --am-primary-200: #c6d8f8;
-  --am-primary-300: #9bbcf2;
-  --am-primary-400: #6497e6;
-  --am-primary-500: #2e6bd6;
-  --am-primary-600: #1b4fbf;
-  --am-primary-700: #12377f;
+  /* ---------- Brand blue, full scale: electric sapphire over a deep indigo navy ----------
+   * White text: 5.17:1 on 600, 8.72:1 on 700, 17.85:1 on 900. 500 is a light/accent step only
+   * (3.68:1): it never carries body-size white text on its own, only as the last stop of a gradient. */
+  --am-primary-50: #eff5ff;
+  --am-primary-100: #dbe8fe;
+  --am-primary-200: #bfd5fe;
+  --am-primary-300: #93b8fd;
+  --am-primary-400: #6096fa;
+  --am-primary-500: #3b82f6;
+  --am-primary-600: #2563eb;
+  --am-primary-700: #1e40af;
   /* Intermediate step used as the last stop of `--am-gradient-navy` (it must not be a raw hex). */
-  --am-primary-750: #10336f;
-  --am-primary-800: #0d2a63;
-  --am-primary-900: #081b45;
+  --am-primary-750: #1b3285;
+  --am-primary-800: #16235c;
+  --am-primary-900: #0f172a;
+  /* Deepest navy: the signature band and the darkest stop of the navy mesh. */
+  --am-primary-950: #0b132b;
+
+  /* ---------- Accents (energy, never a primary action) ---------- */
+  /* Emerald tech: ticks of guarantees, licensed-partner marks, the live status dot. */
+  --am-emerald-50: #ecfdf5;
+  --am-emerald-100: #d1fae5;
+  --am-emerald-400: #34d399;
+  --am-emerald-500: #10b981;
+  --am-emerald-600: #059669;
+  /* Text step: 5.5:1 on emerald-50. */
+  --am-emerald-700: #047857;
+  /* Solar amber: exclusive / highlighted badges only (the sponsored badge keeps its warning orange). */
+  --am-amber-50: #fffbeb;
+  --am-amber-100: #fef3c7;
+  --am-amber-400: #fbbf24;
+  --am-amber-500: #f59e0b;
+  /* Text step: 7.1:1 on amber-50. */
+  --am-amber-800: #92400e;
+  /* Electric violet / cyan: ambient glows of the hero mesh only, never text. */
+  --am-violet-glow: rgba(124, 58, 237, 0.16);
+  --am-cyan-glow: rgba(6, 182, 212, 0.14);
 
   /* ---------- Neutrals ---------- */
   --am-neutral-0: #ffffff;
-  --am-neutral-50: #fafbfd;
-  --am-neutral-100: #f2f5fa;
-  --am-neutral-200: #e3e8f0;
-  --am-neutral-300: #cfd7e3;
-  --am-neutral-400: #9aa6bb;
-  --am-neutral-500: #667085;
-  --am-neutral-600: #4d5a70;
-  --am-neutral-700: #344054;
-  --am-neutral-800: #1f2a3c;
-  --am-neutral-900: #101828;
+  --am-neutral-50: #f8fafc;
+  --am-neutral-100: #f1f5f9;
+  --am-neutral-200: #e2e8f0;
+  --am-neutral-300: #cbd5e1;
+  --am-neutral-400: #94a3b8;
+  --am-neutral-500: #64748b;
+  --am-neutral-600: #475569;
+  --am-neutral-700: #334155;
+  --am-neutral-800: #1e293b;
+  --am-neutral-900: #0f172a;
 
   /* ---------- Validation green (never a background of a page or a primary button) ---------- */
   --am-success-50: #f1f9ee;
@@ -74,15 +99,18 @@
   --am-info-700: #14608a;
 
   /* ---------- Semantic aliases: prefer these in components ---------- */
-  --am-canvas: #f6f8fc;
+  --am-canvas: #f7f9fd;
   --am-bg: var(--am-canvas);
   --am-surface: var(--am-neutral-0);
   --am-surface-raised: var(--am-neutral-0);
   --am-surface-muted: var(--am-neutral-100);
   --am-surface-brand: var(--am-primary-50);
   --am-surface-navy: var(--am-primary-900);
-  --am-border: #e3e8f0;
-  --am-border-strong: #cfd7e3;
+  /* Translucent hairlines: they pick up the tint of whatever surface they sit on. */
+  --am-border: rgba(226, 232, 240, 0.8);
+  --am-border-solid: #e2e8f0;
+  --am-border-strong: #cbd5e1;
+  --am-border-glass: rgba(255, 255, 255, 0.6);
   --am-border-brand: var(--am-primary-200);
   --am-text: var(--am-neutral-900);
   --am-text-muted: var(--am-neutral-700);
@@ -100,28 +128,45 @@
   --am-whatsapp-ink: #06331a;
 
   /* ---------- Gradients ---------- */
-  --am-gradient-brand: linear-gradient(135deg, var(--am-primary-600) 0%, var(--am-primary-500) 100%);
-  --am-gradient-brand-strong: linear-gradient(135deg, var(--am-primary-700) 0%, var(--am-primary-500) 100%);
-  --am-gradient-navy: linear-gradient(160deg, var(--am-primary-900) 0%, var(--am-primary-800) 55%, var(--am-primary-750) 100%);
-  --am-gradient-hero: linear-gradient(180deg, #eef3fd 0%, #f6f8fc 62%, var(--am-canvas) 100%);
+  /* White label stays centred on the 700 -> 600 run of the button (>= 5.17:1); 500 only lights the far edge. */
+  --am-gradient-brand: linear-gradient(135deg, var(--am-primary-700) 0%, var(--am-primary-600) 55%, var(--am-primary-500) 100%);
+  --am-gradient-brand-strong: linear-gradient(135deg, var(--am-primary-800) 0%, var(--am-primary-700) 45%, var(--am-primary-600) 100%);
+  --am-gradient-navy: linear-gradient(160deg, var(--am-primary-950) 0%, var(--am-primary-800) 55%, var(--am-primary-750) 100%);
+  /* Title accent: indigo to electric blue to a cyan hint, clipped to the text. */
+  --am-gradient-text: linear-gradient(100deg, var(--am-primary-700) 0%, var(--am-primary-600) 45%, #0891b2 100%);
+  --am-gradient-emerald: linear-gradient(90deg, var(--am-emerald-500) 0%, var(--am-emerald-400) 100%);
+  --am-gradient-gauge: linear-gradient(90deg, var(--am-primary-600) 0%, var(--am-primary-400) 62%, var(--am-emerald-400) 100%);
+  --am-gradient-hero: linear-gradient(180deg, #eef4ff 0%, #f5f8fe 58%, var(--am-canvas) 100%);
   --am-gradient-mesh:
-    radial-gradient(52rem 32rem at 12% -10%, rgba(46, 107, 214, 0.16), transparent 62%),
-    radial-gradient(44rem 28rem at 92% 4%, rgba(100, 151, 230, 0.18), transparent 60%),
-    radial-gradient(38rem 26rem at 58% 108%, rgba(18, 55, 127, 0.1), transparent 66%);
+    radial-gradient(46rem 30rem at 8% -12%, rgba(37, 99, 235, 0.2), transparent 64%),
+    radial-gradient(38rem 26rem at 96% 2%, var(--am-violet-glow), transparent 62%),
+    radial-gradient(34rem 24rem at 74% 62%, var(--am-cyan-glow), transparent 66%),
+    radial-gradient(40rem 26rem at 38% 110%, rgba(30, 64, 175, 0.1), transparent 68%);
   --am-gradient-mesh-navy:
-    radial-gradient(48rem 30rem at 8% -14%, rgba(46, 107, 214, 0.42), transparent 62%),
-    radial-gradient(40rem 26rem at 96% 8%, rgba(100, 151, 230, 0.26), transparent 60%);
-  --am-gradient-sheen: linear-gradient(120deg, rgba(255, 255, 255, 0) 12%, rgba(255, 255, 255, 0.24) 48%, rgba(255, 255, 255, 0) 84%);
+    radial-gradient(48rem 30rem at 8% -14%, rgba(37, 99, 235, 0.45), transparent 62%),
+    radial-gradient(40rem 26rem at 96% 8%, rgba(124, 58, 237, 0.28), transparent 60%),
+    radial-gradient(36rem 22rem at 60% 120%, rgba(6, 182, 212, 0.18), transparent 64%);
+  --am-gradient-sheen: linear-gradient(120deg, rgba(255, 255, 255, 0) 12%, rgba(255, 255, 255, 0.28) 48%, rgba(255, 255, 255, 0) 84%);
+  /* Frosted glass: header bar, floating satellites, the icon badge of the preview card. */
+  --am-glass: rgba(255, 255, 255, 0.85);
+  --am-glass-soft: rgba(255, 255, 255, 0.66);
+  --am-glass-blur: blur(16px) saturate(170%);
 
-  /* ---------- Elevation (soft navy-tinted layers) ---------- */
-  --am-shadow-xs: 0 1px 2px rgba(16, 24, 40, 0.05);
-  --am-shadow-sm: 0 1px 2px rgba(16, 24, 40, 0.05), 0 2px 6px rgba(16, 24, 40, 0.05);
-  --am-shadow-md: 0 2px 4px rgba(16, 24, 40, 0.04), 0 8px 20px rgba(16, 24, 40, 0.08);
-  --am-shadow-lg: 0 4px 8px rgba(16, 24, 40, 0.04), 0 16px 36px rgba(16, 24, 40, 0.1);
-  --am-shadow-xl: 0 8px 16px rgba(16, 24, 40, 0.05), 0 28px 64px rgba(13, 42, 99, 0.16);
-  --am-shadow-glow: 0 6px 20px rgba(27, 79, 191, 0.28);
-  --am-shadow-glow-soft: 0 4px 14px rgba(27, 79, 191, 0.16);
-  --am-shadow-inset: inset 0 1px 0 rgba(255, 255, 255, 0.12);
+  /* ---------- Elevation (diffuse multi-layer shadows tinted with navy) ---------- */
+  --am-shadow-xs: 0 1px 2px rgba(15, 23, 42, 0.05);
+  --am-shadow-sm: 0 1px 2px rgba(15, 23, 42, 0.04), 0 4px 12px -4px rgba(15, 23, 42, 0.06);
+  --am-shadow-md: 0 12px 28px -12px rgba(15, 23, 42, 0.1), 0 0 1px 1px rgba(15, 23, 42, 0.04);
+  --am-shadow-lg: 0 20px 40px -15px rgba(15, 23, 42, 0.12), 0 4px 10px -4px rgba(15, 23, 42, 0.05), 0 0 1px 1px rgba(15, 23, 42, 0.04);
+  --am-shadow-xl:
+    0 32px 64px -24px rgba(15, 23, 42, 0.2),
+    0 12px 24px -12px rgba(30, 64, 175, 0.12),
+    0 0 1px 1px rgba(15, 23, 42, 0.04);
+  --am-shadow-glow: 0 10px 28px -8px rgba(37, 99, 235, 0.5), 0 0 0 1px rgba(37, 99, 235, 0.08);
+  --am-shadow-glow-soft: 0 8px 22px -10px rgba(37, 99, 235, 0.36);
+  --am-shadow-glow-emerald: 0 0 0 4px rgba(16, 185, 129, 0.16);
+  --am-shadow-inset: inset 0 1px 0 rgba(255, 255, 255, 0.16);
+  /* Focus halo of the fields (on top of the border colour change). */
+  --am-halo: 0 0 0 3px rgba(37, 99, 235, 0.15);
 
   /* ---------- Focus ring ---------- */
   --am-ring-color: var(--am-primary-500);
