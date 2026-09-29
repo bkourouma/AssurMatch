@@ -22,7 +22,9 @@ export const GLOBAL_FEATURE_FLAG_DEFAULTS = {
   sponsored_offers_enabled: false,
   multi_broker_routing_enabled: false,
   /** Spec 046: executing an anonymization batch. Previews and policy edits work while it is off. */
-  retention_purge_enabled: false
+  retention_purge_enabled: false,
+  /** Spec 048: sending broker satisfaction survey requests post-lead completion. */
+  satisfaction_survey_enabled: false
 } as const;
 
 export const COUNTRY_FEATURE_FLAG_DEFAULTS = {

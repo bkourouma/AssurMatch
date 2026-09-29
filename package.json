@@ -36,7 +36,8 @@
     "quote-notifications:deliver-due": "node --import tsx scripts/quote-notification-delivery-worker.ts",
     "seed:reference": "node --import tsx scripts/preprod/seed-reference.ts",
     "import:partners": "node --import tsx scripts/preprod/import-partners.ts",
-    "validate": "npm run typecheck && npm run lint && npm run test"
+    "validate": "npm run typecheck && npm run lint && npm run test",
+    "satisfaction-surveys:deliver-due": "node --import tsx scripts/satisfaction-survey-delivery-worker.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.124.0",

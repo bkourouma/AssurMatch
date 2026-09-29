@@ -272,7 +272,7 @@ describe("data retention service (spec 046)", () => {
 
     const preview = await world.service.previewRetention({ reason }, compliance);
     const selected = Object.fromEntries(preview.counts.map((count) => [count.subject, count.selected]));
-    expect(selected).toEqual({ quote_requests: 0, quote_documents: 0, contact_messages: 1, partner_applications: 1, waitlist: 2, ai_traces: 1, webhook_payloads: 1, messaging_references: 2 });
+    expect(selected).toEqual({ quote_requests: 0, quote_documents: 0, contact_messages: 1, partner_applications: 1, waitlist: 2, ai_traces: 1, webhook_payloads: 1, messaging_references: 2, satisfaction_feedback: 0 });
     await world.service.approve(preview.id, { reason: "Validation conformite" }, compliance);
 
     expect(oldMessage.anonymizedAt).toEqual(NOW);

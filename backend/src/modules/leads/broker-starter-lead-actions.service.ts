@@ -14,10 +14,15 @@ export class BrokerStarterLeadActionsService {
     private readonly assignments: LeadAssignmentService,
     private readonly access: BrokerStarterAccessPolicy,
     private readonly history: BrokerStarterHistoryService,
-    private readonly audit: AuditLogWriter
+    private readonly audit: AuditLogWriter,
+    private readonly events?: { publish(eventType: "lead.status_changed", partnerTenantId: string, data: Record<string, unknown>): Promise<void> } | undefined
   ) {}
 
-  accept(id: string, actor: ActorContext): Promise<LeadAssignmentRecord> {
+    close(id: string, actor: ActorContext): Promise<LeadAssignmentRecord> {
+    return this.transition(id, actor, "closed", QuoteAuditActions.brokerStarterLeadClosed, {});
+  }
+
+accept(id: string, actor: ActorContext): Promise<LeadAssignmentRecord> {
     return this.transition(id, actor, "accepted", QuoteAuditActions.brokerStarterLeadAccepted, {});
   }
 
@@ -68,6 +73,16 @@ export class BrokerStarterLeadActionsService {
       ...(input.reason ? { reason: input.reason } : {}),
       context: { previousStatus, nextStatus: status }
     });
+        if (status === "closed") {
+      await this.events?.publish("lead.status_changed", updated.partnerTenantId, {
+        leadAssignmentId: updated.id,
+        publicReference: updated.publicReference,
+        countryCode: updated.countryCode,
+        productKey: updated.productKey,
+        previousStatus: this.toStarterStatus(previousStatus),
+        status: "closed"
+      }).catch(() => {});
+    }
     return updated;
   }
 

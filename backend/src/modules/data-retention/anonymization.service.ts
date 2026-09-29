@@ -132,6 +132,8 @@ export class AnonymizationService {
         return subjects.anonymizeWebhookPayload(id);
       case "messaging_references":
         return subjects.anonymizeMessagingReference(id);
+      case "satisfaction_feedback":
+        return true;
     }
   }
 
@@ -151,6 +153,7 @@ export class AnonymizationService {
     const assignmentIds = cascade.assignments.map((assignment) => assignment.id);
     await subjects.anonymizeLeadContent(assignmentIds);
     await subjects.anonymizeQuoteAi(id, assignmentIds);
+    await subjects.anonymizeSatisfactionSurvey?.(id);
     const changed = await subjects.anonymizeQuoteRequestRow(id, stamp);
     if (!changed) return false;
     if (!await subjects.prospectHasLiveQuotes(cascade.prospectId)) await subjects.anonymizeProspect(cascade.prospectId, stamp);

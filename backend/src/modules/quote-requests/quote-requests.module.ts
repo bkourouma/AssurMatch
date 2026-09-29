@@ -31,6 +31,7 @@ export interface QuoteRequestsModuleDeps {
   aiSummary?: QuoteAISummaryService;
   /** Spec 045: assignments closed when a visitor withdraws consent (`LeadAssignmentService`). */
   assignments?: QuoteAssignmentsPort;
+  satisfactionSurveys?: { onConsentWithdrawn(quoteRequestId: string): Promise<void> };
   /** Spec 045: partner inbox used to tell a broker the withdrawn lead must not be worked (`MessagingDispatchService`). */
   inApp?: QuoteInAppNotifierPort;
   isGlobalFlagEnabled?: (key: string) => boolean;
@@ -63,6 +64,7 @@ export class QuoteRequestsModule {
       duplicate: this.duplicate,
       abuseGuard: this.abuseGuard,
       ...(deps.assignments ? { assignments: deps.assignments } : {}),
+      ...(deps.satisfactionSurveys ? { satisfactionSurveys: deps.satisfactionSurveys } : {}),
       ...(deps.inApp ? { inApp: deps.inApp } : {}),
       ...(deps.isGlobalFlagEnabled ? { isGlobalFlagEnabled: deps.isGlobalFlagEnabled } : {}),
       ...(deps.routing ? { routing: deps.routing } : {}),

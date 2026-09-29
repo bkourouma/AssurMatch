@@ -14,7 +14,8 @@ export type EmailPurpose =
   // distinct purpose in the `email.delivery.*` audit trail rather than a shared "public form" value.
   | "public_waitlist_confirmation"
   | "public_contact_confirmation"
-  | "public_partner_application_confirmation";
+  | "public_partner_application_confirmation"
+  | "satisfaction_survey_requested";
 export type EmailDeliveryStatus = "not_configured" | "previewed" | "sent" | "failed";
 export type EmailProvider = "disabled" | "mailpit" | "smtp";
 

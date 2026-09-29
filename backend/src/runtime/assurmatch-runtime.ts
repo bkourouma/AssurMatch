@@ -1,3 +1,4 @@
+import { SatisfactionSurveysModule, PrismaSatisfactionSurveyRepository } from "../modules/satisfaction-surveys/satisfaction-surveys.module";
 import { QuoteAISummaryService } from "../modules/ai/quote-summary/quote-ai-summary.service";
 import { ActivationChecklistModule } from "../modules/activation-checklist/activation-checklist.module";
 import { AIModule } from "../modules/ai/ai.module";
@@ -136,6 +137,16 @@ export class AssurMatchRuntime {
     audit: this.audit.writer,
     integrations: {
       prepareWebhookDelivery: (input): Promise<unknown> => this.partnerIntegrations.service.prepareWebhookDelivery(input)
+    },
+    onEvent: async (eventType, partnerTenantId, data) => {
+      if (eventType === "lead.status_changed") {
+        await this.satisfactionSurveys?.trigger.onLeadStatusChanged({
+          leadAssignmentId: String(data.leadAssignmentId),
+          status: String(data.status),
+          ...(typeof data.previousStatus === "string" ? { previousStatus: data.previousStatus } : {}),
+          ...(partnerTenantId ? { partnerTenantId } : {})
+        });
+      }
     }
   });
   readonly regulatoryRegimes = new RegulatoryRegimesModule(this.audit.writer);
@@ -239,13 +250,54 @@ export class AssurMatchRuntime {
       multiBroker: { isEnabled: () => this.featureFlags.service.isEnabled("multi_broker_routing_enabled") }
     }
   );
-  readonly enterprise = new EnterpriseService({
+    readonly satisfactionSurveys: SatisfactionSurveysModule = new SatisfactionSurveysModule(
+    {
+      assignments: {
+        find: (id: string) => this.leads.assignments.require(id).catch(() => undefined)
+      },
+      quotes: {
+        findById: (id: string) => this.quoteRequestsRepository ? this.quoteRequestsRepository.findById(id) : this.quoteRequests.submissions.findById(id)
+      },
+      prospects: {
+        find: (id: string) => this.prospects.service.require(id).catch(() => undefined)
+      },
+      consent: this.consent.service,
+      countries: {
+        findById: (id: string) => this.countries.service.require(id).catch(() => undefined)
+      },
+      products: {
+        findById: (id: string) => this.products.service.require(id).catch(() => undefined)
+      },
+      emailDelivery: {
+        sendAuthEmail: (payload) => this.emailDelivery.send(payload)
+      },
+      isFlagEnabled: (flag: string) => this.featureFlags.service.isEnabled(flag),
+      complianceAlerts: {
+        raise: async (alert) => {
+          this.audit.writer.write({
+            action: "satisfaction_survey.concern_flagged",
+            targetType: "SatisfactionSurveyRequest",
+            targetId: alert.publicReference,
+            scope: { partnerTenantId: alert.partnerTenantId },
+            result: "refused",
+            reason: "broker_satisfaction_concern",
+            context: alert
+          });
+        }
+      }
+    },
+    this.audit.writer,
+    this.redis.client,
+    this.runtimeRepository(new PrismaSatisfactionSurveyRepository(this.prisma))
+  );
+
+readonly enterprise = new EnterpriseService({
     audit: this.audit.writer,
     partners: this.partners.service,
     assignments: this.leads.assignments,
     ...(this.enterpriseRepository ? { repository: this.enterpriseRepository } : {})
   });
-  readonly quoteRequests = new QuoteRequestsModule({
+  readonly quoteRequests: QuoteRequestsModule = new QuoteRequestsModule({
     countries: this.countries.service,
     products: this.products.service,
     forms: this.quoteForms.service,
@@ -258,7 +310,8 @@ export class AssurMatchRuntime {
     // Spec 045 consent withdrawal: closes the lead assignments and warns each partner inbox.
     assignments: this.leads.assignments,
     inApp: this.notifications.dispatch,
-    isGlobalFlagEnabled: (key) => this.featureFlags.service.isEnabled(key)
+    isGlobalFlagEnabled: (key) => this.featureFlags.service.isEnabled(key),
+    satisfactionSurveys: { onConsentWithdrawn: (id: string) => this.satisfactionSurveys.service.onConsentWithdrawn(id) }
   }, this.audit.writer, this.redis.client, this.quoteRequestsRepository);
   /** Spec 044: drains the quote notification backlog into the email delivery service. */
   readonly quoteNotificationDelivery = new QuoteNotificationDeliveryService({

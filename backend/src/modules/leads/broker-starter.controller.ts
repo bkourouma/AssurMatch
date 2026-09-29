@@ -40,6 +40,10 @@ export class BrokerStarterController {
     return this.actions.accept(id, actor);
   }
 
+  close(id: string, actor: ActorContext) {
+    return this.actions.close(id, actor);
+  }
+
   reject(id: string, input: BrokerStarterLeadActionRequest, actor: ActorContext) {
     return this.actions.reject(id, input, actor);
   }

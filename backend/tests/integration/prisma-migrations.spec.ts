@@ -24,7 +24,8 @@ describe("prisma migration fresh-base readiness", () => {
       "0015_multi_broker_routing",
       "0016_broker_crm_history_event_type",
       "0017_public_site_forms",
-      "0018_data_retention"
+      "0018_data_retention",
+      "0019_satisfaction_surveys"
     ]);
     const schema = readFileSync(join(process.cwd(), "backend", "prisma", "schema.prisma"), "utf8");
     for (const model of ["AuditLog", "FeatureFlag", "ConsentRecord", "QuoteRequest", "LeadAssignment", "BrokerCrmLeadState", "PartnerApiKey", "PartnerWebhookEndpoint", "PartnerWebhookDelivery", "PartnerWebhookAllowlistEntry", "RoutingRule", "RoutingRuleHistory"]) {

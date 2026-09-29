@@ -131,6 +131,7 @@ enum ConsentPurpose {
   technical_notification
   ai_processing
   marketing_optional
+  service_quality_survey
 }
 
 enum ConsentChannel {
@@ -974,6 +975,7 @@ model QuoteRequest {
   quoteFormDefinitionId String
   prospectId            String
   consentRecordId       String
+  surveyConsentRecordId String?
   source                String
   payload               Json
   status                QuoteRequestStatus @default(created)
@@ -1580,4 +1582,41 @@ model AnonymizationBatch {
   updatedAt        DateTime                 @updatedAt
 
   @@index([status, createdAt])
+}
+
+
+enum SatisfactionSurveyStatus {
+  queued
+  sent
+  submitted
+  skipped
+  expired
+}
+
+model SatisfactionSurveyRequest {
+  id               String                   @id @default(uuid())
+  publicReference  String                   @unique
+  tokenHash        String
+  leadAssignmentId String                   @unique
+  quoteRequestId   String
+  partnerTenantId  String
+  consentRecordId  String
+  triggerStatus    String
+  status           SatisfactionSurveyStatus @default(queued)
+  skippedReason    String?
+  dueAt            DateTime
+  sentAt           DateTime?
+  expiresAt        DateTime?
+  submittedAt      DateTime?
+  rating           Int?
+  comment          String?
+  flaggedConcern   Boolean                  @default(false)
+  anonymizedAt     DateTime?
+  retentionUntil   DateTime?
+  locale           String                   @default("fr")
+  createdAt        DateTime                 @default(now())
+  updatedAt        DateTime                 @updatedAt
+
+  @@index([partnerTenantId, status])
+  @@index([status, dueAt])
 }
