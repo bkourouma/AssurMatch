@@ -5,7 +5,7 @@ import type { RoutingAnomalyReport } from "../../../../packages/shared/contracts
 import type { AiInteraction } from "../../../../packages/shared/contracts/ai.contracts";
 
 const superAdmin: ActorContext = { actorId: "super", roles: ["super_admin"], mfaVerified: true };
-const unauthorizedBroker: ActorContext = { actorId: "broker-agent-1", roles: ["broker_agent" as any], mfaVerified: true, partnerTenantId: "partner-1" };
+const unauthorizedBroker: ActorContext = { actorId: "broker-agent-1", roles: ["broker_agent"], mfaVerified: true, partnerTenantId: "partner-1" };
 
 describe("Admin Routing Anomalies HTTP Endpoints", () => {
   let harness: RuntimeHttpHarness;

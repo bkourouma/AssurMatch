@@ -8,6 +8,11 @@ import { InMemoryQueue } from "../../../src/modules/common/queues/queues.module"
 import { InMemoryRedisClient } from "../../../src/modules/common/redis/redis.module";
 import { FeatureFlagsService } from "../../../src/modules/feature-flags/feature-flags.module";
 import type { RoutingAnomalyDetectorService } from "../../../src/modules/routing/routing-anomaly-detector.service";
+import type { AdminDashboardService } from "../../../src/modules/dashboards/admin-dashboard.service";
+import type { ComplianceAlertsService } from "../../../src/modules/dashboards/compliance-alerts.service";
+import type { ActivationChecklistService } from "../../../src/modules/activation-checklist/activation-checklist.service";
+import type { OffersRepository } from "../../../src/modules/offers/offers.repository";
+import type { QuoteSubmissionService } from "../../../src/modules/quote-requests/quote-submission.service";
 import type { ActorContext } from "../../../src/modules/common/types";
 
 const superAdmin: ActorContext = { actorId: "admin-super", roles: ["super_admin"], mfaVerified: true };
@@ -74,11 +79,11 @@ describe("Routing Anomaly AI Insight (admin_platform)", () => {
     const adminAi = new AdminAiService({
       audit,
       gateway,
-      dashboard: {} as any,
-      complianceAlerts: {} as any,
-      activationChecklist: {} as any,
-      offers: {} as any,
-      quoteRequests: {} as any,
+      dashboard: {} as unknown as AdminDashboardService,
+      complianceAlerts: {} as unknown as ComplianceAlertsService,
+      activationChecklist: {} as unknown as ActivationChecklistService,
+      offers: {} as unknown as OffersRepository,
+      quoteRequests: {} as unknown as QuoteSubmissionService,
       routingAnomalyDetector: mockDetector as RoutingAnomalyDetectorService
     });
 

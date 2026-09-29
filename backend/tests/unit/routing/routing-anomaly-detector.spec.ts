@@ -16,7 +16,7 @@ const countryAdminCI: ActorContext = {
   mfaVerified: true,
   countryScopes: ["country-ci", "CI"]
 };
-const unauthorizedUser: ActorContext = { actorId: "user-1", roles: ["broker_agent" as any], mfaVerified: true };
+const unauthorizedUser: ActorContext = { actorId: "user-1", roles: ["broker_agent"], mfaVerified: true };
 
 describe("RoutingAnomalyDetectorService", () => {
   const baseTime = new Date("2026-09-29T12:00:00.000Z");
