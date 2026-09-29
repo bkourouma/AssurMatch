@@ -1835,6 +1835,116 @@ label:has(> input[type="radio"]):not([class]) > input {
   margin-bottom: var(--am-space-8);
 }
 
+/*
+ * Spotlight hero (`className="am-hero--spotlight"`): the opening band of the home, country and
+ * product pages. Blurred ambient orbs (electric blue, violet, cyan) over the mesh, a faint dotted
+ * texture fading out towards the bottom, the kicker as a glass status pill and an optional gradient
+ * accent inside the title (`.am-hero__accent`).
+ */
+.am-hero--spotlight::after {
+  position: absolute;
+  z-index: -1;
+  inset: 0;
+  background:
+    radial-gradient(22rem 22rem at 78% 34%, rgba(59, 130, 246, 0.22), transparent 70%),
+    radial-gradient(18rem 18rem at 94% 78%, rgba(124, 58, 237, 0.14), transparent 70%),
+    radial-gradient(16rem 16rem at 4% 88%, rgba(6, 182, 212, 0.1), transparent 70%);
+  content: "";
+  filter: blur(80px);
+  pointer-events: none;
+}
+
+.am-hero--spotlight::before {
+  background:
+    var(--am-gradient-mesh),
+    radial-gradient(circle at 1px 1px, rgba(15, 23, 42, 0.06) 1px, transparent 0) 0 0 / 28px 28px;
+  -webkit-mask-image: linear-gradient(180deg, #000 0%, #000 55%, transparent 100%);
+  mask-image: linear-gradient(180deg, #000 0%, #000 55%, transparent 100%);
+}
+
+.am-hero--spotlight .am-hero__kicker {
+  display: inline-flex;
+  gap: var(--am-space-10);
+  align-items: center;
+  justify-self: start;
+  padding: var(--am-space-6) var(--am-space-16) var(--am-space-6) var(--am-space-12);
+  border: 1px solid var(--am-border);
+  border-radius: var(--am-radius-pill);
+  background: var(--am-glass);
+  -webkit-backdrop-filter: var(--am-glass-blur);
+  backdrop-filter: var(--am-glass-blur);
+  box-shadow: var(--am-shadow-sm);
+  color: var(--am-primary-800);
+  font-size: var(--am-caption-size);
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  text-transform: none;
+}
+
+/* A kicker without a status dot keeps the same pill with a small brand-blue bullet. */
+.am-hero--spotlight .am-hero__kicker:not(:has(.am-status-ping))::before {
+  width: 8px;
+  height: 8px;
+  flex: none;
+  border-radius: var(--am-radius-pill);
+  background: var(--am-gradient-brand);
+  content: "";
+}
+
+.am-hero--spotlight .am-hero__title {
+  color: var(--am-primary-900);
+  letter-spacing: -0.03em;
+}
+
+.am-hero--spotlight .am-hero__lead {
+  color: var(--am-neutral-600);
+}
+
+.am-hero__accent {
+  background: var(--am-gradient-text);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: var(--am-primary-700);
+  -webkit-text-fill-color: transparent;
+  -webkit-box-decoration-break: clone;
+  box-decoration-break: clone;
+}
+
+@media (forced-colors: active) {
+  .am-hero__accent {
+    background: none;
+    -webkit-text-fill-color: currentColor;
+  }
+}
+
+/* Staggered entrance of the spotlight hero (the home page sets its own, finer sequence). */
+.am-hero--spotlight .am-hero__inner > * {
+  animation: am-fade-up var(--am-duration-slow) var(--am-ease-out) both;
+}
+
+.am-hero--spotlight .am-hero__inner > :nth-child(2) {
+  animation-delay: 80ms;
+}
+
+.am-hero--spotlight .am-hero__inner > :nth-child(3) {
+  animation-delay: 160ms;
+}
+
+.am-hero--spotlight .am-hero__inner > :nth-child(n + 4) {
+  animation-delay: 240ms;
+}
+
+.am-hero--spotlight .am-hero__aside {
+  animation: am-scale-in 700ms var(--am-ease-out) 200ms both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .am-hero--spotlight .am-hero__inner > *,
+  .am-hero--spotlight .am-hero__aside {
+    animation: none !important;
+  }
+}
+
 /* ==========================================================================
    22. Section
    ========================================================================== */

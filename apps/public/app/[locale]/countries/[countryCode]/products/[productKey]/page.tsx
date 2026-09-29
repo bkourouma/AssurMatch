@@ -111,7 +111,13 @@ export default async function PublicProductPage({ params }: { params: Promise<Pa
   const summaries = product ? null : await listPublicProducts(countryCode);
   const summary = summaries?.data.find((item) => item.key === productKey);
   const productName = product?.name ?? summary?.name;
-  const heading = productName ? t("title", { product: productName, country: countryName }) : t("titleFallback", { productKey, country: countryName });
+  const heading = productName
+    ? t.rich("heroTitle", {
+        product: productName,
+        country: countryName,
+        accent: (chunks) => <span className="am-hero__accent">{chunks}</span>
+      })
+    : t("titleFallback", { productKey, country: countryName });
 
   // Documents actually required by the published offers of this product, then the editorial list.
   const offers = await listPublicOffers(countryCode, productKey);
@@ -141,7 +147,13 @@ export default async function PublicProductPage({ params }: { params: Promise<Pa
   return (
     <>
       <Hero
-        kicker={t("kicker")}
+        className="am-hero--spotlight"
+        kicker={
+          <>
+            <span className="am-status-ping" aria-hidden="true" />
+            {t("kicker")}
+          </>
+        }
         title={heading}
         lead={t("lead")}
         breadcrumb={
@@ -174,9 +186,11 @@ export default async function PublicProductPage({ params }: { params: Promise<Pa
           </>
         }
         aside={
-          <div className="am-j-countrycard">
+          <div className="am-j-countrycard am-j-countrycard--live am-j-productcard">
             <div className="am-j-countrycard__head">
-              <IconTile name={productIcon(productKey)} size="lg" />
+              <span className="am-j-productcard__glyph" aria-hidden="true">
+                <Icon name={productIcon(productKey)} size={28} />
+              </span>
               <div>
                 <p className="am-j-countrycard__name">
                   <BackendText>{productName ?? productKey}</BackendText>
@@ -189,12 +203,38 @@ export default async function PublicProductPage({ params }: { params: Promise<Pa
                 </p>
               </div>
             </div>
-            <ul className="am-pill-list">
-              <li className="am-pill">
-                <Icon name="list" size={16} />
-                {t("offersCount", { count: offers.data.length })}
-              </li>
-            </ul>
+            {offers.data.length > 0 ? (
+              <dl className="am-j-countrycard__stats">
+                <div className="am-j-countrycard__stat">
+                  <dt>
+                    <Icon name="list" size={16} />
+                    {t("card.offers", { count: offers.data.length })}
+                  </dt>
+                  <dd className="am-tabular">{offers.data.length}</dd>
+                </div>
+              </dl>
+            ) : (
+              <ul className="am-pill-list">
+                <li className="am-pill">
+                  <Icon name="list" size={16} />
+                  {t("offersCount", { count: offers.data.length })}
+                </li>
+              </ul>
+            )}
+            <div className="am-j-productcard__price">
+              <span className="am-j-productcard__badge">{t("card.badge")}</span>
+              <div className="am-j-productcard__pricerow">
+                <p className="am-j-productcard__label">{t("card.priceLabel")}</p>
+                <p className="am-j-productcard__value">{t("card.priceValue")}</p>
+              </div>
+              <p className="am-j-productcard__note">{t("card.priceNote")}</p>
+            </div>
+            <p className="am-j-countrycard__licensed am-j-countrycard__licensed--brand">
+              <span className="am-j-countrycard__shield" aria-hidden="true">
+                <Icon name="target" size={12} />
+              </span>
+              {t("card.criteria", { count: SCORE_CRITERIA.length })}
+            </p>
           </div>
         }
       >
@@ -263,7 +303,7 @@ export default async function PublicProductPage({ params }: { params: Promise<Pa
         {...(documents.length > 0 ? { lead: documentsFromApi ? t("documentsLead") : t("documentsFallbackLead") } : {})}
       >
         {documents.length > 0 ? (
-          <ul className="am-j-list">
+          <ul className="am-j-list am-j-docs">
             {documents.map((document) => (
               <li key={document}>
                 <Icon name="file-check" size={18} />
@@ -277,9 +317,9 @@ export default async function PublicProductPage({ params }: { params: Promise<Pa
       </Section>
 
       <Section spacing="compact">
-        <div className="am-j-panel">
+        <div className="am-j-panel am-j-panel--score">
           <div className="am-j-panel__head">
-            <IconTile name="calculator" size="lg" />
+            <IconTile name="calculator" size="lg" tone="invert" />
             <h2 className="am-j-panel__title">{t("scoreTitle")}</h2>
           </div>
           <p className="am-j-panel__lead">{t("scoreLead")}</p>

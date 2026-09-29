@@ -94,7 +94,7 @@ export default async function PublicHomePage({ params }: { params: Promise<{ loc
   return (
     <>
       <Hero
-        className="am-home-hero"
+        className="am-home-hero am-hero--spotlight"
         size="lg"
         kicker={
           <>
@@ -104,7 +104,7 @@ export default async function PublicHomePage({ params }: { params: Promise<{ loc
         }
         title={
           <>
-            {t("heroTitle.lead")} <span className="am-home-hero__accent">{t("heroTitle.accent")}</span>
+            {t("heroTitle.lead")} <span className="am-hero__accent">{t("heroTitle.accent")}</span>
           </>
         }
         lead={t("lead")}

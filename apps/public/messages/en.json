@@ -247,6 +247,7 @@
     },
     "breadcrumb": "Countries",
     "title": "Countries covered by AssurMatch",
+    "heroTitle": "Countries covered by <accent>AssurMatch</accent>",
     "description": "Open countries, pilot countries and countries coming soon, with their level of public opening.",
     "lead": "The visible countries and products depend on the public activations. Choose your country to see the comparable products and the authorised partner brokers.",
     "count": "{count, plural, one {# country listed} other {# countries listed}}",
@@ -282,8 +283,15 @@
   "Country": {
     "kicker": "Country page",
     "title": "Insurance in {country}",
+    "heroTitle": "Insurance in <accent>{country}</accent>",
     "description": "Comparable products, authorised partner brokers and quote requests for {country}.",
     "lead": "The visible products depend on the public activations per country and per product. The indicative price remains to be confirmed by the partner broker.",
+    "card": {
+      "products": "{count, plural, one {comparable product} other {comparable products}}",
+      "partners": "{count, plural, one {partner broker} other {partner brokers}}",
+      "live": "Comparison journey open",
+      "licensed": "Licensed partner brokers only"
+    },
     "pilotNotice": "This country is in its pilot phase: the number of partner brokers and comparable offers is still limited.",
     "productsTitle": "Comparable products",
     "productsLead": "Each product gives access to the indicative offers and, when the activation allows it, to a quote request.",
@@ -322,6 +330,7 @@
     "description": "Be told when this country opens publicly.",
     "badge": "Soon",
     "heading": "{country}: AssurMatch is not open yet",
+    "heroHeading": "<accent>{country}</accent>: AssurMatch is not open yet",
     "lead": "No indicative offer can be compared and no quote request can be transmitted for this country until it opens.",
     "explanation": "A country only opens once authorised partner brokers are listed and validated offers are available. Leave us your e-mail address: you will be told when {country} opens publicly.",
     "noQuote": "No quote journey is offered from this page.",
@@ -348,6 +357,14 @@
   "Product": {
     "kicker": "Product page",
     "offersCount": "{count, plural, one {# indicative offer published} other {# indicative offers published}}",
+    "card": {
+      "offers": "{count, plural, one {indicative offer published} other {indicative offers published}}",
+      "badge": "Indicative offer",
+      "priceLabel": "Indicative price",
+      "priceValue": "To be confirmed",
+      "priceNote": "by the partner broker",
+      "criteria": "Score explained on {count} criteria"
+    },
     "scoreTitle": "How the indicative score is calculated",
     "scoreLead": "The score only compares the offers displayed here with one another, on objective criteria and according to the priority you choose.",
     "scoreFineprint": "The score stays indicative: it is neither personalised advice nor an official ranking, and sponsorship has no effect on how it is calculated.",
@@ -355,6 +372,7 @@
     "assistantLead": "Help with understanding, without personalised advice. It never conditions the rest of your journey.",
     "back": "Back to the {countryCode} products",
     "title": "{product} in {country}",
+    "heroTitle": "<accent>{product}</accent> in {country}",
     "titleFallback": "Product {productKey} in {country}",
     "description": "Guarantees, documents to prepare and indicative offers for {product} in {country}.",
     "lead": "Compare indicative offers then let an authorised partner broker take over your request.",

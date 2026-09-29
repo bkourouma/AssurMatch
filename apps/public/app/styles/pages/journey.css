@@ -65,7 +65,65 @@
   border: 1px solid var(--am-border);
   border-radius: var(--am-radius-panel);
   background: var(--am-surface);
-  box-shadow: var(--am-shadow-sm);
+  box-shadow: var(--am-shadow-md);
+}
+
+/*
+ * Score explainer of a product page: a navy band with the mesh glows, the criteria as glass chips.
+ * Text contrast on the navy: white 17:1, primary-100 13:1.
+ */
+.am-j-panel--score {
+  position: relative;
+  overflow: hidden;
+  gap: var(--am-space-16);
+  padding: var(--am-space-32);
+  border-color: rgba(255, 255, 255, 0.08);
+  background: var(--am-gradient-mesh-navy), var(--am-gradient-navy);
+  box-shadow: var(--am-shadow-xl);
+  color: var(--am-primary-100);
+}
+
+.am-j-panel--score .am-j-panel__title {
+  color: var(--am-neutral-0);
+}
+
+.am-j-panel--score .am-j-panel__lead,
+.am-j-panel--score .am-j-fineprint {
+  color: var(--am-primary-100);
+}
+
+.am-j-panel--score .am-j-points {
+  gap: var(--am-space-10);
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 220px), 1fr));
+}
+
+.am-j-panel--score .am-j-points > li {
+  align-items: center;
+  padding: var(--am-space-10) var(--am-space-12);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: var(--am-radius-md);
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--am-neutral-0);
+  font-weight: 600;
+  transition:
+    background-color var(--am-transition),
+    border-color var(--am-transition);
+}
+
+.am-j-panel--score .am-j-points > li:hover {
+  border-color: rgba(147, 184, 253, 0.4);
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.am-j-panel--score .am-j-points > li > .am-icon {
+  box-sizing: content-box;
+  width: 18px;
+  height: 18px;
+  margin: 0;
+  padding: 6px;
+  border-radius: var(--am-radius-pill);
+  background: rgba(59, 130, 246, 0.28);
+  color: var(--am-primary-200);
 }
 
 .am-j-panel--muted {
@@ -181,17 +239,19 @@
   grid-template-columns: auto minmax(0, 1fr);
   padding: var(--am-space-16);
   border: 1px solid var(--am-border);
-  border-radius: var(--am-radius-md);
+  border-radius: var(--am-radius-lg);
   background: var(--am-surface);
-  box-shadow: var(--am-shadow-xs);
+  box-shadow: var(--am-shadow-sm);
   transition:
+    transform var(--am-duration-base) var(--am-ease-out),
     border-color var(--am-transition),
     box-shadow var(--am-transition);
 }
 
 .am-j-feature:hover {
-  border-color: var(--am-primary-200);
-  box-shadow: var(--am-shadow-sm);
+  border-color: var(--am-emerald-100);
+  box-shadow: var(--am-shadow-md);
+  transform: translateY(-2px);
 }
 
 .am-j-feature__title {
@@ -482,22 +542,47 @@ html[data-js="true"] .am-j-nojs {
   display: grid;
   gap: var(--am-space-12);
   align-content: start;
-  padding: var(--am-space-20);
+  overflow: hidden;
+  padding: var(--am-space-24);
   border: 1px solid var(--am-border);
-  border-radius: var(--am-radius-card);
-  background: var(--am-surface);
-  box-shadow: var(--am-shadow-sm);
+  border-radius: var(--am-radius-lg);
+  background:
+    radial-gradient(120% 80% at 100% 0%, rgba(59, 130, 246, 0.07), transparent 55%),
+    var(--am-surface);
+  box-shadow: var(--am-shadow-md);
   transition:
-    transform var(--am-transition),
-    box-shadow var(--am-transition),
-    border-color var(--am-transition);
+    transform var(--am-duration-base) var(--am-ease-out),
+    box-shadow var(--am-duration-base) var(--am-ease-out),
+    border-color var(--am-duration-base) var(--am-ease-out);
+}
+
+/* Brand hairline that draws itself along the top edge on hover. */
+.am-j-country::before,
+.am-j-product::before {
+  position: absolute;
+  top: 0;
+  right: 0;
+  left: 0;
+  height: 3px;
+  background: var(--am-gradient-gauge);
+  content: "";
+  transform: scaleX(0);
+  transform-origin: left center;
+  transition: transform var(--am-duration-slow) var(--am-ease-out);
+}
+
+.am-j-country:hover::before,
+.am-j-country:focus-within::before,
+.am-j-product:hover::before,
+.am-j-product:focus-within::before {
+  transform: scaleX(1);
 }
 
 .am-j-country:hover,
 .am-j-country:focus-within {
-  border-color: var(--am-primary-300);
-  box-shadow: var(--am-shadow-lg);
-  transform: translateY(-2px);
+  border-color: var(--am-primary-200);
+  box-shadow: var(--am-shadow-xl);
+  transform: translateY(-4px);
 }
 
 .am-j-country__head {
@@ -507,6 +592,7 @@ html[data-js="true"] .am-j-nojs {
   grid-template-columns: auto minmax(0, 1fr) auto;
 }
 
+/* Flag on a frosted, blue-tinted glass tile. */
 .am-j-flag {
   display: inline-flex;
   width: 48px;
@@ -514,8 +600,10 @@ html[data-js="true"] .am-j-nojs {
   flex: none;
   align-items: center;
   justify-content: center;
+  border: 1px solid rgba(255, 255, 255, 0.8);
   border-radius: var(--am-radius-md);
-  background: var(--am-surface-brand);
+  background: linear-gradient(145deg, var(--am-primary-100), var(--am-primary-50));
+  box-shadow: 0 6px 14px -8px rgba(37, 99, 235, 0.45), var(--am-shadow-inset);
   font-size: 26px;
   line-height: 1;
 }
@@ -563,14 +651,23 @@ html[data-js="true"] .am-j-nojs {
 
 .am-j-country__arrow {
   display: inline-flex;
+  width: 36px;
+  height: 36px;
   flex: none;
   align-items: center;
   justify-content: center;
+  border-radius: var(--am-radius-pill);
+  background: var(--am-primary-50);
   color: var(--am-primary-600);
-  transition: transform var(--am-transition);
+  transition:
+    transform var(--am-duration-base) var(--am-ease-spring),
+    background-color var(--am-transition),
+    color var(--am-transition);
 }
 
 .am-j-country:hover .am-j-country__arrow {
+  background: var(--am-gradient-brand);
+  color: var(--am-neutral-0);
   transform: translateX(3px);
 }
 
@@ -592,6 +689,12 @@ html[data-js="true"] .am-j-nojs {
   grid-template-columns: auto minmax(0, 1fr);
 }
 
+.am-j-countrycard__head > div {
+  display: grid;
+  gap: var(--am-space-6);
+  justify-items: start;
+}
+
 .am-j-countrycard__name {
   margin: 0;
   font-family: var(--am-font-heading);
@@ -599,6 +702,218 @@ html[data-js="true"] .am-j-nojs {
   font-weight: 800;
   letter-spacing: var(--am-tracking-tight);
   line-height: var(--am-h3-line);
+}
+
+/*
+ * Live variant (country and product heroes): a floating glass card over a blue-violet halo. The
+ * halo hangs off the aside, not the card, so the card's float transform never lifts it above the
+ * card's own background.
+ */
+.am-hero__aside:has(> .am-j-countrycard--live) {
+  position: relative;
+  padding: var(--am-space-16) 0;
+}
+
+.am-hero__aside:has(> .am-j-countrycard--live)::before {
+  position: absolute;
+  z-index: -1;
+  inset: 4% 2% 0 10%;
+  border-radius: 40%;
+  background:
+    radial-gradient(60% 60% at 40% 45%, rgba(37, 99, 235, 0.3), transparent 70%),
+    radial-gradient(50% 50% at 70% 70%, rgba(124, 58, 237, 0.18), transparent 70%);
+  content: "";
+  filter: blur(48px);
+}
+
+.am-j-countrycard--live {
+  width: 100%;
+  max-width: 440px;
+  justify-self: end;
+  border-color: rgba(255, 255, 255, 0.9);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.98) 0%, rgba(255, 255, 255, 0.92) 100%);
+  box-shadow: var(--am-shadow-xl), var(--am-shadow-inset);
+  animation: am-float 5s var(--am-ease-in-out) infinite;
+}
+
+.am-j-countrycard--live .am-j-flag[data-size="lg"] {
+  border-radius: var(--am-radius-lg);
+}
+
+.am-j-countrycard__live {
+  display: inline-flex;
+  gap: var(--am-space-10);
+  align-items: center;
+  justify-self: start;
+  margin: 0;
+  padding: var(--am-space-4) var(--am-space-12) var(--am-space-4) var(--am-space-10);
+  border: 1px solid var(--am-emerald-100);
+  border-radius: var(--am-radius-pill);
+  background: var(--am-emerald-50);
+  color: var(--am-emerald-700);
+  font-size: var(--am-caption-size);
+  font-weight: 700;
+  line-height: var(--am-caption-line);
+}
+
+/* Counters read from the public lists: big gradient figure over a caption. */
+.am-j-countrycard__stats {
+  display: grid;
+  gap: var(--am-space-10);
+  margin: 0;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 150px), 1fr));
+}
+
+.am-j-countrycard__stat {
+  display: flex;
+  flex-direction: column-reverse;
+  gap: var(--am-space-2);
+  padding: var(--am-space-12) var(--am-space-16);
+  border: 1px solid var(--am-primary-100);
+  border-radius: var(--am-radius-lg);
+  background: linear-gradient(135deg, var(--am-primary-50) 0%, rgba(255, 255, 255, 0.9) 75%);
+}
+
+.am-j-countrycard__stat dt {
+  display: inline-flex;
+  gap: var(--am-space-6);
+  align-items: center;
+  color: var(--am-text-muted);
+  font-size: var(--am-caption-size);
+  font-weight: 600;
+  line-height: var(--am-caption-line);
+}
+
+.am-j-countrycard__stat dt .am-icon {
+  flex: none;
+  color: var(--am-primary-600);
+}
+
+.am-j-countrycard__stat dd {
+  margin: 0;
+  background: linear-gradient(120deg, var(--am-primary-900) 0%, var(--am-primary-700) 55%, var(--am-primary-600) 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: var(--am-primary-800);
+  font-family: var(--am-font-heading);
+  font-size: clamp(30px, 1.4rem + 1.2vw, 38px);
+  font-weight: 800;
+  letter-spacing: var(--am-tracking-tight);
+  line-height: 1.05;
+  -webkit-text-fill-color: transparent;
+}
+
+.am-j-countrycard__licensed {
+  display: flex;
+  gap: var(--am-space-8);
+  align-items: center;
+  margin: 0;
+  padding-top: var(--am-space-12);
+  border-top: 1px solid var(--am-border);
+  color: var(--am-emerald-700);
+  font-size: var(--am-caption-size);
+  font-weight: 700;
+  line-height: var(--am-caption-line);
+}
+
+.am-j-countrycard__shield {
+  display: inline-flex;
+  width: 20px;
+  height: 20px;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--am-radius-pill);
+  background: var(--am-emerald-500);
+  box-shadow: var(--am-shadow-glow-emerald);
+  color: var(--am-neutral-0);
+}
+
+.am-j-countrycard__licensed--brand {
+  color: var(--am-primary-700);
+}
+
+.am-j-countrycard__licensed--brand .am-j-countrycard__shield {
+  background: var(--am-gradient-brand);
+  box-shadow: var(--am-shadow-glow-soft);
+}
+
+/* Product variant: glass product glyph and the indicative price block. */
+.am-j-productcard__glyph {
+  display: inline-flex;
+  width: 64px;
+  height: 64px;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid rgba(255, 255, 255, 0.7);
+  border-radius: var(--am-radius-lg);
+  background:
+    linear-gradient(145deg, rgba(59, 130, 246, 0.22), rgba(37, 99, 235, 0.08)),
+    var(--am-glass);
+  box-shadow: 0 8px 18px -8px rgba(37, 99, 235, 0.45), var(--am-shadow-inset);
+  color: var(--am-primary-700);
+}
+
+.am-j-productcard__price {
+  display: grid;
+  gap: var(--am-space-6);
+  padding: var(--am-space-16);
+  border: 1px solid var(--am-border);
+  border-radius: var(--am-radius-lg);
+  background: var(--am-neutral-50);
+}
+
+.am-j-productcard__badge {
+  justify-self: start;
+  padding: 2px var(--am-space-10);
+  border: 1px solid var(--am-primary-100);
+  border-radius: var(--am-radius-pill);
+  background: var(--am-primary-50);
+  color: var(--am-primary-700);
+  font-size: var(--am-caption-size);
+  font-weight: 700;
+  line-height: var(--am-caption-line);
+}
+
+.am-j-productcard__pricerow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--am-space-8);
+  align-items: baseline;
+  justify-content: space-between;
+}
+
+.am-j-productcard__label,
+.am-j-productcard__note {
+  margin: 0;
+  color: var(--am-text-subtle);
+  font-size: var(--am-caption-size);
+  line-height: var(--am-caption-line);
+}
+
+.am-j-productcard__label {
+  font-weight: 600;
+}
+
+.am-j-productcard__note {
+  text-align: right;
+}
+
+.am-j-productcard__value {
+  margin: 0;
+  color: var(--am-primary-800);
+  font-family: var(--am-font-heading);
+  font-size: var(--am-h3-size);
+  font-weight: 800;
+  letter-spacing: var(--am-tracking-tight);
+  line-height: 1.1;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .am-j-countrycard--live {
+    animation: none !important;
+  }
 }
 
 /* ==========================================================================
@@ -615,25 +930,42 @@ html[data-js="true"] .am-j-nojs {
 }
 
 .am-j-product {
+  position: relative;
   display: grid;
   gap: var(--am-space-16);
   align-content: start;
-  padding: var(--am-space-24);
+  overflow: hidden;
+  padding: var(--am-space-28);
   border: 1px solid var(--am-border);
-  border-radius: var(--am-radius-card);
-  background: var(--am-surface);
-  box-shadow: var(--am-shadow-sm);
+  border-radius: var(--am-radius-lg);
+  background:
+    radial-gradient(120% 80% at 100% 0%, rgba(59, 130, 246, 0.07), transparent 55%),
+    var(--am-surface);
+  box-shadow: var(--am-shadow-md);
   transition:
-    transform var(--am-transition),
-    box-shadow var(--am-transition),
-    border-color var(--am-transition);
+    transform var(--am-duration-base) var(--am-ease-out),
+    box-shadow var(--am-duration-base) var(--am-ease-out),
+    border-color var(--am-duration-base) var(--am-ease-out);
 }
 
 .am-j-product:hover,
 .am-j-product:focus-within {
   border-color: var(--am-primary-200);
-  box-shadow: var(--am-shadow-lg);
-  transform: translateY(-2px);
+  box-shadow: var(--am-shadow-xl);
+  transform: translateY(-4px);
+}
+
+/* Product glyph in a gradient circle with a soft ring, like the steps of the home page. */
+.am-j-product__icon.am-icontile {
+  border-radius: var(--am-radius-pill);
+  background: var(--am-gradient-brand);
+  box-shadow: 0 0 0 6px var(--am-primary-50), var(--am-shadow-glow-soft);
+  color: var(--am-neutral-0);
+  transition: transform var(--am-duration-base) var(--am-ease-spring);
+}
+
+.am-j-product:hover .am-j-product__icon.am-icontile {
+  transform: scale(1.06) rotate(-4deg);
 }
 
 .am-j-product__head {
@@ -696,20 +1028,20 @@ html[data-js="true"] .am-j-nojs {
   align-content: start;
   padding: var(--am-space-20);
   border: 1px solid var(--am-border);
-  border-radius: var(--am-radius-card);
+  border-radius: var(--am-radius-lg);
   background: var(--am-surface);
-  box-shadow: var(--am-shadow-sm);
+  box-shadow: var(--am-shadow-md);
   transition:
-    transform var(--am-transition),
-    box-shadow var(--am-transition),
-    border-color var(--am-transition);
+    transform var(--am-duration-base) var(--am-ease-out),
+    box-shadow var(--am-duration-base) var(--am-ease-out),
+    border-color var(--am-duration-base) var(--am-ease-out);
 }
 
 .am-j-cardgrid > li:hover,
 .am-j-cardgrid > li:focus-within {
   border-color: var(--am-primary-200);
-  box-shadow: var(--am-shadow-lg);
-  transform: translateY(-2px);
+  box-shadow: var(--am-shadow-xl);
+  transform: translateY(-4px);
 }
 
 /* The broker block carries its own frame: flatten it whenever it already sits inside a card. */
@@ -1356,6 +1688,33 @@ html[data-js="true"] .am-j-nojs {
   color: var(--am-primary-600);
 }
 
+/* Documents to prepare: a grid of tiles, each glyph in a round badge. */
+.am-j-docs {
+  gap: var(--am-space-12);
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 280px), 1fr));
+}
+
+.am-j-docs > li {
+  align-items: center;
+  padding: var(--am-space-12) var(--am-space-16);
+  border: 1px solid var(--am-border);
+  border-radius: var(--am-radius-md);
+  background: var(--am-surface);
+  box-shadow: var(--am-shadow-sm);
+  color: var(--am-text);
+  font-weight: 600;
+}
+
+.am-j-docs > li > .am-icon {
+  box-sizing: content-box;
+  width: 18px;
+  height: 18px;
+  margin: 0;
+  padding: 7px;
+  border-radius: var(--am-radius-pill);
+  background: var(--am-primary-50);
+}
+
 /* ==========================================================================
    7. Comparator table
    ========================================================================== */
@@ -1763,4 +2122,17 @@ html[data-js="true"] .am-j-nojs {
   border-radius: var(--am-radius-panel);
   background: var(--am-surface);
   box-shadow: var(--am-shadow-lg);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .am-j-country:hover,
+  .am-j-country:focus-within,
+  .am-j-product:hover,
+  .am-j-product:focus-within,
+  .am-j-cardgrid > li:hover,
+  .am-j-cardgrid > li:focus-within,
+  .am-j-feature:hover,
+  .am-j-product:hover .am-j-product__icon.am-icontile {
+    transform: none;
+  }
 }

@@ -247,6 +247,7 @@
     },
     "breadcrumb": "Pays",
     "title": "Pays couverts par AssurMatch",
+    "heroTitle": "Pays couverts par <accent>AssurMatch</accent>",
     "description": "Pays ouverts, pays pilotes et pays bientôt disponibles, avec leur niveau d'ouverture publique.",
     "lead": "Les pays et produits visibles dépendent des activations publiques. Choisissez votre pays pour voir les produits comparables et les courtiers partenaires autorisés.",
     "count": "{count, plural, one {# pays référencé} other {# pays référencés}}",
@@ -282,8 +283,15 @@
   "Country": {
     "kicker": "Fiche pays",
     "title": "Assurance en {country}",
+    "heroTitle": "Assurance en <accent>{country}</accent>",
     "description": "Produits comparables, courtiers partenaires autorisés et demande de devis pour {country}.",
     "lead": "Les produits visibles dépendent des activations publiques par pays et par produit. Le prix indicatif reste à confirmer par le courtier partenaire.",
+    "card": {
+      "products": "{count, plural, one {produit comparable} other {produits comparables}}",
+      "partners": "{count, plural, one {courtier partenaire} other {courtiers partenaires}}",
+      "live": "Parcours de comparaison ouvert",
+      "licensed": "Uniquement des courtiers partenaires agréés"
+    },
     "pilotNotice": "Ce pays est en phase pilote : le nombre de courtiers partenaires et d'offres comparables y est encore limité.",
     "productsTitle": "Produits comparables",
     "productsLead": "Chaque produit donne accès aux offres indicatives et, lorsque l'activation le permet, à une demande de devis.",
@@ -322,6 +330,7 @@
     "description": "Soyez informé de l'ouverture publique de ce pays.",
     "badge": "Bientôt",
     "heading": "{country} : AssurMatch n'est pas encore ouvert",
+    "heroHeading": "<accent>{country}</accent> : AssurMatch n'est pas encore ouvert",
     "lead": "Aucune offre indicative n'est comparable et aucune demande de devis ne peut être transmise pour ce pays tant qu'il n'est pas ouvert.",
     "explanation": "Un pays n'ouvre qu'une fois des courtiers partenaires autorisés référencés et des offres validées disponibles. Laissez-nous votre adresse e-mail : vous serez informé de l'ouverture publique de {country}.",
     "noQuote": "Aucun parcours de devis n'est proposé depuis cette page.",
@@ -348,6 +357,14 @@
   "Product": {
     "kicker": "Fiche produit",
     "offersCount": "{count, plural, one {# offre indicative publiée} other {# offres indicatives publiées}}",
+    "card": {
+      "offers": "{count, plural, one {offre indicative publiée} other {offres indicatives publiées}}",
+      "badge": "Offre indicative",
+      "priceLabel": "Prix indicatif",
+      "priceValue": "À confirmer",
+      "priceNote": "par le courtier partenaire",
+      "criteria": "Score expliqué sur {count} critères"
+    },
     "scoreTitle": "Comment le score indicatif est calculé",
     "scoreLead": "Le score compare uniquement les offres affichées entre elles, sur des critères objectifs et selon la priorité que vous choisissez.",
     "scoreFineprint": "Le score reste indicatif : il n'est ni un conseil personnalisé ni un classement officiel, et la sponsorisation n'a aucun effet sur son calcul.",
@@ -355,6 +372,7 @@
     "assistantLead": "Une aide à la compréhension, sans conseil personnalisé. Elle ne conditionne jamais la suite de votre parcours.",
     "back": "Retour aux produits {countryCode}",
     "title": "{product} en {country}",
+    "heroTitle": "<accent>{product}</accent> en {country}",
     "titleFallback": "Produit {productKey} en {country}",
     "description": "Garanties, documents à préparer et offres indicatives pour {product} en {country}.",
     "lead": "Comparez des offres indicatives puis faites reprendre votre demande par un courtier partenaire autorisé.",

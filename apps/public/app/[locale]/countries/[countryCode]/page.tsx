@@ -111,13 +111,33 @@ async function CountryBreadcrumb({ locale, country, countryCode }: VariantProps)
   );
 }
 
-/** Flag, name, availability and what the country is open for: the hero's second column. */
-async function CountryIdentityCard({ locale, country }: { locale: AppLocale; country: PublicCountryDirectoryItem }) {
+/**
+ * Flag, name, availability and what the country is open for: the hero's second column, drawn as a
+ * floating glass card. The two counters are the lengths of the public product and partner lists the
+ * page already reads; a counter the API did not return (error, empty list) is simply not shown.
+ */
+async function CountryIdentityCard({
+  locale,
+  country,
+  productCount,
+  partnerCount
+}: {
+  locale: AppLocale;
+  country: PublicCountryDirectoryItem;
+  productCount?: number;
+  partnerCount?: number;
+}) {
   const countries = await getTranslations({ locale, namespace: "Countries" });
+  const t = await getTranslations({ locale, namespace: "Country" });
   const tone = country.availability === "pilot" ? "pilot" : country.availability === "waitlist" ? "soon" : "new";
+  const isOpen = country.availability !== "waitlist";
+  const stats = [
+    ...(productCount ? [{ key: "products", icon: "layers" as const, value: productCount, label: t("card.products", { count: productCount }) }] : []),
+    ...(partnerCount ? [{ key: "partners", icon: "handshake" as const, value: partnerCount, label: t("card.partners", { count: partnerCount }) }] : [])
+  ];
 
   return (
-    <div className="am-j-countrycard">
+    <div className="am-j-countrycard am-j-countrycard--live">
       <div className="am-j-countrycard__head">
         <CountryFlag isoCode={country.isoCode} size="lg" />
         <div>
@@ -127,6 +147,25 @@ async function CountryIdentityCard({ locale, country }: { locale: AppLocale; cou
           <Badge tone={tone}>{countries(`availability.${country.availability}`)}</Badge>
         </div>
       </div>
+      {isOpen && country.comparisonEnabled ? (
+        <p className="am-j-countrycard__live">
+          <span className="am-status-ping" aria-hidden="true" />
+          {t("card.live")}
+        </p>
+      ) : null}
+      {stats.length > 0 ? (
+        <dl className="am-j-countrycard__stats">
+          {stats.map((stat) => (
+            <div className="am-j-countrycard__stat" key={stat.key}>
+              <dt>
+                <Icon name={stat.icon} size={16} />
+                {stat.label}
+              </dt>
+              <dd className="am-tabular">{stat.value}</dd>
+            </div>
+          ))}
+        </dl>
+      ) : null}
       <ul className="am-pill-list">
         {country.comparisonEnabled ? (
           <li className="am-pill">
@@ -147,6 +186,14 @@ async function CountryIdentityCard({ locale, country }: { locale: AppLocale; cou
           </li>
         ) : null}
       </ul>
+      {isOpen ? (
+        <p className="am-j-countrycard__licensed">
+          <span className="am-j-countrycard__shield" aria-hidden="true">
+            <Icon name="shield-check" size={12} />
+          </span>
+          {t("card.licensed")}
+        </p>
+      ) : null}
     </div>
   );
 }
@@ -162,11 +209,24 @@ async function OpenCountry({ locale, country, countryCode }: VariantProps) {
   return (
     <>
       <Hero
-        kicker={t("kicker")}
-        title={t("title", { country: country.name })}
+        className="am-hero--spotlight"
+        kicker={
+          <>
+            <span className="am-status-ping" aria-hidden="true" />
+            {t("kicker")}
+          </>
+        }
+        title={t.rich("heroTitle", { country: country.name, accent: (chunks) => <span className="am-hero__accent">{chunks}</span> })}
         lead={t("lead")}
         breadcrumb={<CountryBreadcrumb locale={locale} country={country} countryCode={countryCode} />}
-        aside={<CountryIdentityCard locale={locale} country={country} />}
+        aside={
+          <CountryIdentityCard
+            locale={locale}
+            country={country}
+            {...(products.status === "success" ? { productCount: products.data.length } : {})}
+            {...(partners.status === "success" ? { partnerCount: partners.data.length } : {})}
+          />
+        }
       >
         {country.availability === "pilot" ? <Notice tone="info">{t("pilotNotice")}</Notice> : null}
       </Hero>
@@ -185,7 +245,7 @@ async function OpenCountry({ locale, country, countryCode }: VariantProps) {
               return (
                 <li className="am-j-product" key={product.id}>
                   <div className="am-j-product__head">
-                    <IconTile name={productIcon(product.key)} size="lg" />
+                    <IconTile name={productIcon(product.key)} size="lg" className="am-j-product__icon" />
                     <h3 className="am-j-product__title">
                       <Link href={{ pathname: "/countries/[countryCode]/products/[productKey]", params: productParams }}>
                         <BackendText>{product.name}</BackendText>
@@ -346,8 +406,9 @@ async function WaitingCountry({ locale, country, countryCode }: VariantProps) {
   return (
     <>
       <Hero
+        className="am-hero--spotlight"
         kicker={t("badge")}
-        title={t("heading", { country: country.name })}
+        title={t.rich("heroHeading", { country: country.name, accent: (chunks) => <span className="am-hero__accent">{chunks}</span> })}
         lead={t("lead")}
         breadcrumb={<CountryBreadcrumb locale={locale} country={country} countryCode={countryCode} />}
         aside={<CountryIdentityCard locale={locale} country={country} />}
