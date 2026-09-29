@@ -51,3 +51,6 @@ export class RoutingModule {
     this.service = new RoutingPrecheckService(consent, partnerEligibility, audit);
   }
 }
+
+export * from "./routing-anomaly-detector.service";
+export * from "./admin-routing-anomalies.controller";

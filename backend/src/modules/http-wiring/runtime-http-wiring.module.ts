@@ -1124,6 +1124,22 @@ export class AdminRoutingRulesController {
   }
 }
 
+export class AdminRoutingAnomaliesHttpController {
+  constructor(private readonly runtime: AssurMatchRuntime) {}
+
+  anomalies(request: AssurMatchHttpRequest, query: unknown) {
+    const actor = protectedActorFromRequest(request);
+    assertPermission(actor, "routing_rules:read");
+    return this.runtime.routingAnomalies.detectAnomalies(actor, query as { from?: string; to?: string });
+  }
+
+  analyze(request: AssurMatchHttpRequest, body: unknown) {
+    const actor = protectedActorFromRequest(request);
+    assertPermission(actor, "routing_rules:read");
+    return this.runtime.adminAi.request("routing_anomaly_analysis", body ?? {}, actor);
+  }
+}
+
 export class AdminRoutingOperationsController {
   constructor(private readonly runtime: AssurMatchRuntime) {}
 
@@ -1443,6 +1459,10 @@ decorate(AdminRoutingRulesController, "list", [Get("routing-rules") as MethodDec
 decorate(AdminRoutingRulesController, "create", [Post("routing-rules") as MethodDecoratorFactory], [[0, Req() as ParamDecoratorFactory], [1, Body() as ParamDecoratorFactory]]);
 decorate(AdminRoutingRulesController, "update", [Patch("routing-rules/:id") as MethodDecoratorFactory], [[0, Param("id") as ParamDecoratorFactory], [1, Req() as ParamDecoratorFactory], [2, Body() as ParamDecoratorFactory]]);
 decorate(AdminRoutingRulesController, "history", [Get("routing-rules/:id/history") as MethodDecoratorFactory], [[0, Param("id") as ParamDecoratorFactory], [1, Req() as ParamDecoratorFactory]]);
+controller("admin", AdminRoutingAnomaliesHttpController, true);
+decorate(AdminRoutingAnomaliesHttpController, "anomalies", [Get("routing/anomalies") as MethodDecoratorFactory], [[0, Req() as ParamDecoratorFactory], [1, Query() as ParamDecoratorFactory]]);
+decorate(AdminRoutingAnomaliesHttpController, "analyze", [Post("routing/anomalies/analyze") as MethodDecoratorFactory], [[0, Req() as ParamDecoratorFactory], [1, Body() as ParamDecoratorFactory]]);
+
 controller("admin", AdminRoutingOperationsController, true);
 decorate(AdminRoutingOperationsController, "pending", [Get("routing/pending") as MethodDecoratorFactory], [[0, Req() as ParamDecoratorFactory]]);
 decorate(AdminRoutingOperationsController, "assign", [Post("routing/pending/:quoteRequestId/assign") as MethodDecoratorFactory], [[0, Param("quoteRequestId") as ParamDecoratorFactory], [1, Req() as ParamDecoratorFactory], [2, Body() as ParamDecoratorFactory]]);
@@ -1516,6 +1536,7 @@ Module({
     AdminQuoteFormDefinitionsHttpController,
     AdminScoringRulesController,
     AdminRoutingRulesController,
+    AdminRoutingAnomaliesHttpController,
     AdminRoutingOperationsController,
     AdminPartnerIntegrationsController,
     PartnerApiController

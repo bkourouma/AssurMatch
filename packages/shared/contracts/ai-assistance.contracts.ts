@@ -4,7 +4,8 @@ import { dateTimeStringSchema, nonEmptyStringSchema } from "../validation/common
 export const aiAssistanceSurfaceSchema = z.enum(["broker_crm", "admin_platform"]);
 export const aiAssistTypeSchema = z.enum([
   "lead_summary", "lead_score", "next_action", "relaunch_message", "lead_classification", "duplicate_hint", "loss_analysis",
-  "admin_risk_triage", "activation_gap_summary", "offer_consistency_check", "activity_report", "suspicious_leads"
+  "admin_risk_triage", "activation_gap_summary", "offer_consistency_check", "activity_report", "suspicious_leads",
+  "routing_anomaly_analysis"
 ]);
 
 export const aiAssistanceStatusSchema = z.object({

@@ -14,6 +14,7 @@ const CONSENT_MISSING_MARKERS = ["consent_missing", "consent_invalid", "missing_
 const CRM_FLAG_CLOSED_MARKERS = ["broker_crm_disabled", "crm_flag_closed", "broker_crm_flag_disabled"];
 const CROSS_TENANT_MARKERS = ["cross_tenant", "cross_tenant_access", "advisor_cross_tenant", "assignee_cross_tenant_or_unresolved"];
 const RBAC_DENIED_MARKERS = ["forbidden_role", "rbac_denied", "missing_broker_read_permission", "missing_crm_read_permission", "missing_crm_update_permission", "missing_assigned_update_permission", "missing_assign_permission", "missing_export_permission", "starter_plan_blocks_crm_feature", "out_of_scope_country", "out_of_scope_product", "out_of_scope"];
+const ROUTING_ANOMALY_MARKERS = ["routing_anomaly", "routing.anomaly", "sla_breach_risk", "quota_saturation", "unassigned_leads", "distribution_skew"];
 
 export function categorizeAuditEntry(entry: AuditEntry): ComplianceAlertCategory {
   const reason = (entry.reason ?? "").toLowerCase();
@@ -23,6 +24,7 @@ export function categorizeAuditEntry(entry: AuditEntry): ComplianceAlertCategory
   if (CROSS_TENANT_MARKERS.some((marker) => reason.includes(marker) || action.includes(marker))) return "cross_tenant_attempt";
   if (RBAC_DENIED_MARKERS.some((marker) => reason.includes(marker) || action.includes(marker))) return "rbac_denied";
   if (reason.includes("broker_satisfaction_concern") || action.includes("broker_satisfaction_concern") || action.includes("satisfaction_survey.concern_flagged")) return "broker_satisfaction_concern";
+  if (ROUTING_ANOMALY_MARKERS.some((marker) => reason.includes(marker) || action.includes(marker))) return "routing_anomaly";
   return "other";
 }
 

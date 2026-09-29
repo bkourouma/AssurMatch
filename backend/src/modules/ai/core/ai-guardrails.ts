@@ -19,7 +19,7 @@ const MAX_OUTPUT_CHARS = 4000;
 /** Assist types whose output influences score, priority, relaunch or risk analysis: human validation is mandatory. */
 const HUMAN_VALIDATION_REQUIRED: ReadonlySet<AiAssistTypeCatalog> = new Set([
   "lead_score", "next_action", "relaunch_message", "lead_classification", "duplicate_hint", "loss_analysis",
-  "admin_risk_triage", "offer_consistency_check", "suspicious_leads"
+  "admin_risk_triage", "offer_consistency_check", "suspicious_leads", "routing_anomaly_analysis"
 ]);
 
 export interface GuardrailVerdict {

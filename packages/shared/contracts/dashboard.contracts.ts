@@ -57,6 +57,7 @@ export const complianceAlertCategorySchema = z.enum([
   "rbac_denied",
   "cross_tenant_attempt",
   "broker_satisfaction_concern",
+  "routing_anomaly",
   "other"
 ]);
 
@@ -163,6 +164,7 @@ export const adminDashboardResponseSchema = z.object({
     rbacDenied: z.number().int().min(0),
     crossTenantAttempt: z.number().int().min(0),
     brokerSatisfactionConcern: z.number().int().min(0).optional(),
+    routingAnomaly: z.number().int().min(0).optional(),
     other: z.number().int().min(0)
   }),
   sensitiveFeatureFlags: z.array(featureFlagSummarySchema),
@@ -221,7 +223,8 @@ export const SensitiveFeatureFlagKeys = [
   "ai_lead_scoring_enabled",
   "ai_summary_enabled",
   "ai_recommendation_enabled",
-  "ai_broker_assistant_enabled"
+  "ai_broker_assistant_enabled",
+  "ai_routing_anomaly_detection_enabled"
 ] as const;
 
 export const dashboardComparisonSchema = z.object({
@@ -250,3 +253,39 @@ export const advisorPerformanceRowSchema = z.object({
 
 export type DashboardComparison = z.infer<typeof dashboardComparisonSchema>;
 export type AdvisorPerformanceRow = z.infer<typeof advisorPerformanceRowSchema>;
+
+
+export const routingAnomalyTypeSchema = z.enum([
+  "unassigned_leads",
+  "sla_breach_risk",
+  "quota_saturation",
+  "distribution_skew"
+]);
+export type RoutingAnomalyType = z.infer<typeof routingAnomalyTypeSchema>;
+
+export const routingAnomalySeveritySchema = z.enum(["warning", "critical"]);
+export type RoutingAnomalySeverity = z.infer<typeof routingAnomalySeveritySchema>;
+
+export const routingAnomalyItemSchema = z.object({
+  id: nonEmptyStringSchema,
+  type: routingAnomalyTypeSchema,
+  severity: routingAnomalySeveritySchema,
+  detectedAt: dateTimeStringSchema,
+  country: isoCountrySchema.optional(),
+  product: nonEmptyStringSchema.optional(),
+  targetId: nonEmptyStringSchema.optional(),
+  details: z.string(),
+  metricValue: z.number().optional(),
+  metricThreshold: z.number().optional()
+});
+export type RoutingAnomalyItem = z.infer<typeof routingAnomalyItemSchema>;
+
+export const routingAnomalyReportSchema = z.object({
+  generatedAt: dateTimeStringSchema,
+  totalAnomalies: z.number().int().min(0),
+  criticalCount: z.number().int().min(0),
+  warningCount: z.number().int().min(0),
+  anomalies: z.array(routingAnomalyItemSchema),
+  recommendations: z.array(z.string()).optional()
+});
+export type RoutingAnomalyReport = z.infer<typeof routingAnomalyReportSchema>;
