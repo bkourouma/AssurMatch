@@ -261,40 +261,48 @@ async function seedCountries(prisma: PrismaClient): Promise<{ ci: CountryRecord;
       }
     }
   });
-  const sn = await prisma.country.upsert({
-    where: { isoCode: "SN" },
-    create: {
-      isoCode: "SN",
-      name: "Sénégal",
-      currency: "XOF",
-      languages: ["fr"],
-      timezone: "Africa/Dakar",
-      regulatoryFamily: "cima",
-      status: "internal",
-      flags: {
-        country_public_enabled: false,
-        country_quote_enabled: false,
-        country_comparison_enabled: false,
-        country_waitlist_enabled: true,
-        country_broker_onboarding_enabled: false,
-        country_ai_enabled: false
-      },
-      createdById: DEMO_ACTOR_ID
-    },
-    update: {
-      name: "Sénégal",
-      status: "internal",
-      flags: {
-        country_public_enabled: false,
-        country_quote_enabled: false,
-        country_comparison_enabled: false,
-        country_waitlist_enabled: true,
-        country_broker_onboarding_enabled: false,
-        country_ai_enabled: false
-      }
-    }
+  const sn = await upsertWaitlistCountry(prisma, {
+    isoCode: "SN",
+    name: "Sénégal",
+    currency: "XOF",
+    timezone: "Africa/Dakar",
+    regulatoryFamily: "cima"
+  });
+  await upsertWaitlistCountry(prisma, {
+    isoCode: "ML",
+    name: "Mali",
+    currency: "XOF",
+    timezone: "Africa/Bamako",
+    regulatoryFamily: "cima"
+  });
+  await upsertWaitlistCountry(prisma, {
+    isoCode: "GN",
+    name: "Guinée",
+    currency: "GNF",
+    timezone: "Africa/Conakry",
+    regulatoryFamily: "fanaf"
   });
   return { ci, sn };
+}
+
+/** Countries announced on the public site with a waiting list only: no quote, comparison, broker or AI. */
+async function upsertWaitlistCountry(
+  prisma: PrismaClient,
+  country: { isoCode: string; name: string; currency: string; timezone: string; regulatoryFamily: "cima" | "fanaf" }
+): Promise<CountryRecord> {
+  const flags = {
+    country_public_enabled: false,
+    country_quote_enabled: false,
+    country_comparison_enabled: false,
+    country_waitlist_enabled: true,
+    country_broker_onboarding_enabled: false,
+    country_ai_enabled: false
+  };
+  return prisma.country.upsert({
+    where: { isoCode: country.isoCode },
+    create: { ...country, languages: ["fr"], status: "internal", flags, createdById: DEMO_ACTOR_ID },
+    update: { name: country.name, status: "internal", flags }
+  });
 }
 
 async function seedProducts(prisma: PrismaClient): Promise<{ auto: ProductRecord; voyage: ProductRecord }> {
