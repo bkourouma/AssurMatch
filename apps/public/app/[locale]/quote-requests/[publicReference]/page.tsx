@@ -219,6 +219,7 @@ export default async function PublicQuoteConfirmationPage({
                   cancel: t("withdrawal.cancel"),
                   submitting: t("withdrawal.submitting"),
                   successTitle: t("withdrawal.successTitle"),
+                  successTitleAlready: t("withdrawal.successTitleAlready"),
                   successDescription: t("withdrawal.successDescription"),
                   error: t("withdrawal.error")
                 }}

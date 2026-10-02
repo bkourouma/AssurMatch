@@ -1,0 +1,104 @@
+/* ==========================================================================
+   Quote form - progressive 4-step journey (spec 050, decisions D4 and D6)
+   Owned by the quote form / quote confirmation slice. Reuses the tokens and
+   the `.am-j-*` primitives already defined in `journey.css`; only the new
+   review-summary and step-navigation pieces get their own `.am-quote-*`
+   classes, kept in this file so ownership stays unambiguous.
+   ========================================================================== */
+
+/* Focus outline on the heading and the "Modifier" buttons comes from the global
+   `[tabindex]:focus-visible` / `button:focus-visible` rules in base.css. */
+.am-quote-step__title {
+  margin: 0;
+  font: inherit;
+  color: inherit;
+}
+
+.am-quote-nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--am-space-12);
+  margin-top: var(--am-space-8);
+}
+
+.am-quote-nav--send {
+  flex-wrap: wrap-reverse;
+  justify-content: flex-end;
+}
+
+.am-quote-broker__title {
+  margin: 0 0 var(--am-space-8);
+  font-family: var(--am-font-heading);
+  font-size: var(--am-body-size);
+  font-weight: 700;
+}
+
+.am-quote-review {
+  display: grid;
+  gap: var(--am-space-20);
+  padding: var(--am-space-20);
+  border: 1px solid var(--am-border);
+  border-radius: var(--am-radius-card);
+  background: var(--am-surface-muted, var(--am-surface));
+}
+
+.am-quote-review__section {
+  display: grid;
+  gap: var(--am-space-8);
+}
+
+.am-quote-review__head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--am-space-12);
+}
+
+.am-quote-review__head h3 {
+  margin: 0;
+  font-family: var(--am-font-heading);
+  font-size: var(--am-body-size);
+  font-weight: 700;
+}
+
+.am-quote-review__edit {
+  border: 0;
+  background: none;
+  padding: 0;
+  color: var(--am-primary-700);
+  font-weight: 600;
+  text-decoration: underline;
+  cursor: pointer;
+  min-height: 44px;
+  min-width: 44px;
+}
+
+.am-quote-review__list {
+  display: grid;
+  gap: var(--am-space-8);
+  margin: 0;
+}
+
+.am-quote-review__row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--am-space-2, 2px);
+}
+
+.am-quote-review__row dt {
+  margin: 0;
+  color: var(--am-text-muted, var(--am-neutral-500));
+  font-size: var(--am-caption-size);
+}
+
+.am-quote-review__row dd {
+  margin: 0;
+  font-weight: 600;
+}
+
+@media (min-width: 560px) {
+  .am-quote-review__row {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr);
+    align-items: baseline;
+  }
+}

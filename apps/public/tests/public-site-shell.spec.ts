@@ -33,6 +33,7 @@ test("the footer links to the regulatory status page, the four legal pages, the 
   expect(footer).toContain('href="/brokers/pricing"');
   expect(footer).toContain("brokerLoginUrl");
   expect(footer).toContain('href="/contact"');
+  expect(footer).toContain('href="/our-commitment"');
 });
 
 test("next.config.ts declares every legacy redirect from the pre-bilingual site", () => {

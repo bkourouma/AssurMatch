@@ -1,4 +1,5 @@
 import { Link } from "../../../i18n/navigation";
+import { Badge } from "../ui/badge";
 import { Card, CardBody, CardFooter, CardMeta, CardTitle } from "../ui/card";
 import { Icon, type IconName } from "../ui/icons";
 import { IconTile } from "../ui/icon-tile";
@@ -13,7 +14,10 @@ const GUIDE_ICONS: Record<string, IconName> = {
   "assurance-auto": "car",
   "assurance-voyage": "plane",
   "lire-un-prix-indicatif": "receipt",
-  "choisir-un-courtier": "handshake"
+  "choisir-un-courtier": "handshake",
+  "comprendre-la-franchise": "percent",
+  "responsabilite-civile": "scale",
+  "declarer-un-sinistre": "siren"
 };
 
 export interface GuideCardProps {
@@ -23,14 +27,28 @@ export interface GuideCardProps {
   /** Already formatted, e.g. "Mis a jour le 19 septembre 2026". */
   meta: string;
   readLabel: string;
+  /** Already formatted, e.g. "3 min de lecture", appended next to `meta`. */
+  readingTimeLabel?: string;
+  /** Product name shown as a small badge above the footer, when the guide relates to one product. */
+  productLabel?: string | undefined;
   /** `h2` on the guides index, where the cards are the page's main headings. */
   titleAs?: "h2" | "h3";
 }
 
-export function GuideCard({ slug, title, description, meta, readLabel, titleAs = "h3" }: GuideCardProps) {
+export function GuideCard({
+  slug,
+  title,
+  description,
+  meta,
+  readLabel,
+  readingTimeLabel,
+  productLabel,
+  titleAs = "h3"
+}: GuideCardProps) {
   return (
     <Card as="li" interactive className="am-guidecard">
       <IconTile name={GUIDE_ICONS[slug] ?? "book-open"} size="lg" />
+      {productLabel ? <Badge tone="neutral">{productLabel}</Badge> : null}
       <CardTitle as={titleAs}>
         <Link href={{ pathname: "/guides/[slug]", params: { slug } }}>{title}</Link>
       </CardTitle>
@@ -38,7 +56,7 @@ export function GuideCard({ slug, title, description, meta, readLabel, titleAs =
         <p>{description}</p>
       </CardBody>
       <CardFooter>
-        <CardMeta>{meta}</CardMeta>
+        <CardMeta>{readingTimeLabel ? `${meta} · ${readingTimeLabel}` : meta}</CardMeta>
         <span className="am-cardgo" aria-hidden="true">
           {readLabel}
           <Icon name="arrow-right" size={16} />

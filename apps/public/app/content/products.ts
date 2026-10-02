@@ -41,11 +41,12 @@ const aliases: Record<string, string> = {
 const fr: Record<string, ProductContent> = {
   auto: {
     documents: [
-      "Une pièce d'identité en cours de validité",
+      "Une pièce d'identité en cours de validité (CNI ou passeport)",
       "Le permis de conduire du conducteur principal",
       "La carte grise ou le certificat d'immatriculation du véhicule",
       "Un justificatif de domicile de moins de trois mois",
-      "Le relevé d'information de votre assureur précédent, si vous en avez un"
+      "Le relevé d'information ou l'attestation d'assurance précédente, si le véhicule était déjà assuré",
+      "La carte brune CEDEAO en cours de validité, si le véhicule doit circuler dans un autre pays de la sous-région"
     ],
     faq: [
       {
@@ -62,6 +63,21 @@ const fr: Record<string, ProductContent> = {
         question: "Le prix affiché est-il celui que je paierai ?",
         answer:
           "Non. Le prix affiché est un prix indicatif, à confirmer par le courtier partenaire après examen de votre situation, de votre véhicule et de votre historique."
+      },
+      {
+        question: "La responsabilité civile est-elle obligatoire ?",
+        answer:
+          "Oui, la couverture des dommages causés à autrui est une obligation légale pour circuler ; le détail exact de l'obligation dépend de la réglementation de chaque pays."
+      },
+      {
+        question: "Que se passe-t-il si je change de véhicule en cours de contrat ?",
+        answer:
+          "Le courtier partenaire met à jour le contrat en fonction du nouveau véhicule déclaré ; le prix et les garanties peuvent changer en conséquence."
+      },
+      {
+        question: "Puis-je comparer une offre au tiers et une offre tous risques dans le même tableau ?",
+        answer:
+          "Oui, le comparateur affiche les deux types de formules côte à côte ; le niveau de garantie fait partie des critères du score."
       }
     ]
   },
@@ -133,9 +149,11 @@ const fr: Record<string, ProductContent> = {
   voyage: {
     documents: [
       "Une pièce d'identité ou un passeport en cours de validité",
-      "Les dates et la destination du voyage",
-      "Le justificatif de réservation, lorsqu'il existe",
-      "La liste des personnes à couvrir"
+      "Le billet ou l'itinéraire de voyage",
+      "Le justificatif de réservation (hébergement, séjour), lorsqu'il existe",
+      "La liste des personnes à couvrir",
+      "Les dates précises du séjour",
+      "Le visa de destination (par exemple un visa Schengen), lorsque le pays de destination l'exige"
     ],
     faq: [
       {
@@ -147,6 +165,26 @@ const fr: Record<string, ProductContent> = {
         question: "Puis-je souscrire une fois parti ?",
         answer:
           "La plupart des offres demandent une prise d'effet avant le départ. Le courtier partenaire confirme les conditions applicables à votre situation."
+      },
+      {
+        question: "Le visa de destination est-il vérifié par AssurMatch ?",
+        answer:
+          "Non. AssurMatch ne vérifie aucun document de voyage ; c'est le courtier partenaire qui vous précise les pièces nécessaires à la souscription."
+      },
+      {
+        question: "Un séjour prolongé au-delà de la date prévue reste-t-il couvert ?",
+        answer:
+          "Cela dépend des conditions de l'offre choisie ; le courtier partenaire confirme si une prolongation est possible et à quelles conditions."
+      },
+      {
+        question: "Les sports à risque (plongée, ski) sont-ils couverts ?",
+        answer:
+          "Certaines offres excluent ou limitent ces activités ; la liste des exclusions de chaque offre indicative le précise."
+      },
+      {
+        question: "Que couvre l'assistance rapatriement ?",
+        answer:
+          "Lorsqu'elle est incluse, elle couvre en général le retour organisé en cas d'accident ou de maladie grave pendant le séjour ; le détail exact reste à confirmer par le courtier partenaire."
       }
     ]
   }
@@ -155,11 +193,12 @@ const fr: Record<string, ProductContent> = {
 const en: Record<string, ProductContent> = {
   auto: {
     documents: [
-      "A valid identity document",
+      "A valid identity document (ID card or passport)",
       "The driving licence of the main driver",
       "The vehicle registration certificate",
       "A proof of address less than three months old",
-      "The claims record from your previous insurer, if you have one"
+      "The claims record or the previous insurance certificate, if the vehicle was already insured",
+      "A valid ECOWAS brown card, if the vehicle will travel to another country in the sub-region"
     ],
     faq: [
       {
@@ -176,6 +215,21 @@ const en: Record<string, ProductContent> = {
         question: "Is the displayed price the one I will pay?",
         answer:
           "No. The displayed price is an indicative price, to be confirmed by the partner broker after reviewing your situation, your vehicle and your history."
+      },
+      {
+        question: "Is third-party liability cover compulsory?",
+        answer:
+          "Yes, cover for damage caused to others is a legal requirement to drive; the exact requirement depends on each country's regulation."
+      },
+      {
+        question: "What happens if I change vehicle during the contract?",
+        answer:
+          "The partner broker updates the contract based on the newly declared vehicle; the price and the guarantees may change accordingly."
+      },
+      {
+        question: "Can I compare a third-party offer and a comprehensive offer in the same table?",
+        answer:
+          "Yes, the comparator displays both types of formulas side by side; the guarantee level is one of the score criteria."
       }
     ]
   },
@@ -247,9 +301,11 @@ const en: Record<string, ProductContent> = {
   voyage: {
     documents: [
       "A valid identity document or passport",
-      "The dates and the destination of the trip",
-      "The booking confirmation, when there is one",
-      "The list of the people to cover"
+      "The ticket or the travel itinerary",
+      "The booking confirmation (accommodation, stay), when there is one",
+      "The list of the people to cover",
+      "The precise dates of the stay",
+      "The destination visa (for example a Schengen visa), when the destination country requires it"
     ],
     faq: [
       {
@@ -261,6 +317,26 @@ const en: Record<string, ProductContent> = {
         question: "Can I take out cover once I have left?",
         answer:
           "Most offers require the cover to start before departure. The partner broker confirms the conditions applying to your situation."
+      },
+      {
+        question: "Is the destination visa checked by AssurMatch?",
+        answer:
+          "No. AssurMatch does not check any travel document; the partner broker tells you which documents are required to take out cover."
+      },
+      {
+        question: "Is an extended stay beyond the planned date still covered?",
+        answer:
+          "It depends on the conditions of the chosen offer; the partner broker confirms whether an extension is possible and under which conditions."
+      },
+      {
+        question: "Are risk sports (diving, skiing) covered?",
+        answer:
+          "Some offers exclude or limit these activities; the exclusion list of each indicative offer states this."
+      },
+      {
+        question: "What does repatriation assistance cover?",
+        answer:
+          "When included, it generally covers the organised return in the event of an accident or serious illness during the stay; the exact detail remains to be confirmed by the partner broker."
       }
     ]
   }

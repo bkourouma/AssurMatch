@@ -1,12 +1,13 @@
 import { getTranslations, setRequestLocale } from "next-intl/server";
 import { toLocale, type AppLocale } from "../../../i18n/routing";
-import { getRegulatoryStatusContent } from "../../content/institutional";
-import type { ContentSection } from "../../content/types";
+import { getRegulatoryStatusContent, type RegulatoryStatusSection } from "../../content/institutional";
 import { Breadcrumb } from "../../components/ui/breadcrumb";
+import { Button } from "../../components/ui/button";
 import { Card, CardBody } from "../../components/ui/card";
 import { Hero } from "../../components/ui/hero";
 import { Icon, type IconName } from "../../components/ui/icons";
 import { IconTile } from "../../components/ui/icon-tile";
+import { Notice } from "../../components/ui/notice";
 import { Section } from "../../components/ui/section";
 import { Reveal } from "../../components/motion/reveal";
 import { buildMetadata, localeUrl } from "../../lib/seo";
@@ -24,7 +25,17 @@ export async function generateMetadata({ params }: { params: Promise<{ locale: s
  * kept on the band: `#remuneration`, `#classement`, `#offres-sponsorisees` and `#prix-indicatif` are
  * stable anchors that the footer, the FAQ and external links point at.
  */
-function RegulatorySection({ section, icon, tone }: { section: ContentSection; icon: IconName; tone?: "muted" }) {
+function RegulatorySection({
+  section,
+  icon,
+  tone,
+  verifyLabel
+}: {
+  section: RegulatoryStatusSection;
+  icon: IconName;
+  tone?: "muted";
+  verifyLabel: string;
+}) {
   return (
     <Section id={section.id} className="am-inst-anchor" {...(tone ? { tone } : {})}>
       <Reveal>
@@ -34,6 +45,9 @@ function RegulatorySection({ section, icon, tone }: { section: ContentSection; i
             <h2 className="am-inst-card__title">{section.heading}</h2>
           </div>
           <CardBody>
+            <p>
+              <strong>{section.summary}</strong>
+            </p>
             {section.body.map((paragraph, index) => (
               <p key={index}>{paragraph}</p>
             ))}
@@ -47,6 +61,11 @@ function RegulatorySection({ section, icon, tone }: { section: ContentSection; i
                 ))}
               </ul>
             ) : null}
+            <p>
+              <em>
+                {verifyLabel} {section.howToVerify}
+              </em>
+            </p>
           </CardBody>
         </Card>
       </Reveal>
@@ -61,7 +80,7 @@ export default async function RegulatoryStatusPage({ params }: { params: Promise
   const common = await getTranslations("Common");
   const content = getRegulatoryStatusContent(locale);
 
-  const sections: Array<{ section: ContentSection; icon: IconName }> = [
+  const sections: Array<{ section: RegulatoryStatusSection; icon: IconName }> = [
     { section: content.remuneration, icon: "coins" },
     { section: content.ranking, icon: "bar-chart" },
     { section: content.sponsoredOffers, icon: "star" },
@@ -105,9 +124,31 @@ export default async function RegulatoryStatusPage({ params }: { params: Promise
           key={entry.section.id}
           section={entry.section}
           icon={entry.icon}
+          verifyLabel={t("verifyLabel")}
           {...(index % 2 === 1 ? { tone: "muted" as const } : {})}
         />
       ))}
+
+      <Section id={content.regionalFramework.id} className="am-inst-anchor">
+        <Reveal>
+          <Notice tone="info" title={content.regionalFramework.heading}>
+            {content.regionalFramework.body.map((paragraph, index) => (
+              <p key={index}>{paragraph}</p>
+            ))}
+          </Notice>
+        </Reveal>
+      </Section>
+
+      <Section tone="muted" lead={t("footerLead")}>
+        <div className="am-cluster">
+          <Button href="/countries" icon={<Icon name="search" size={20} />}>
+            {common("compareOffers")}
+          </Button>
+          <Button href="/contact" variant="secondary">
+            {t("writeToUs")}
+          </Button>
+        </div>
+      </Section>
     </>
   );
 }

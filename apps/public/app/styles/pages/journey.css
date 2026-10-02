@@ -831,6 +831,45 @@ html[data-js="true"] .am-j-nojs {
   text-transform: uppercase;
 }
 
+/**
+ * D-Filtres: the 4 primary filters are no longer folded behind a `<details>` - the panel itself is a
+ * plain card around the form. `.am-j-filters__form` still supplies the grid/gap/fieldset rules above
+ * (its selectors are written as descendants of that class); this rule only adds the card's own
+ * padding and surface, later in the cascade so it wins over the asymmetric padding meant for the
+ * former collapsed layout.
+ */
+.am-j-filterspanel {
+  padding: var(--am-space-24);
+  border: 1px solid var(--am-border);
+  border-radius: var(--am-radius-panel);
+  background: var(--am-surface);
+  box-shadow: var(--am-shadow-sm);
+}
+
+.am-j-filters__hint {
+  margin: 0 0 var(--am-space-16);
+  color: var(--am-text-subtle);
+  font-size: var(--am-caption-size);
+  line-height: var(--am-caption-line);
+}
+
+/**
+ * "Plus de filtres" / "Moins de filtres" toggle text (charte 5): both spans render so the label still
+ * makes sense without `:has()` support, and only the one matching the disclosure's own `[open]`
+ * state is shown, the same technique as the "Ajouter/Retirer de la comparaison" chip below.
+ */
+.am-j-filters-more__open {
+  display: none;
+}
+
+.am-j-more[open] .am-j-filters-more__closed {
+  display: none;
+}
+
+.am-j-more[open] .am-j-filters-more__open {
+  display: inline;
+}
+
 .am-j-fieldgrid {
   display: grid;
   gap: var(--am-space-16);
@@ -873,11 +912,25 @@ html[data-js="true"] .am-j-nojs {
   border-bottom: 1px solid var(--am-border);
 }
 
+.am-j-results__lead {
+  display: grid;
+  gap: var(--am-space-6);
+}
+
 .am-j-results__count {
   margin: 0;
   font-family: var(--am-font-heading);
   font-size: var(--am-h4-size);
   font-weight: 700;
+}
+
+/** 1-selection helper text next to the results count (D-Comparaison); an `aria-live` region. */
+.am-j-selection-assist {
+  margin: 0;
+  color: var(--am-primary-700);
+  font-size: var(--am-caption-size);
+  font-weight: 700;
+  line-height: var(--am-caption-line);
 }
 
 .am-j-results__sort {
@@ -1052,6 +1105,18 @@ html[data-js="true"] .am-j-nojs {
   box-shadow: var(--am-ring);
 }
 
+/** 4-offer cap (D-Comparaison): the remaining, unchecked chips grey out rather than disappear. */
+.am-j-pick:has(input:disabled) {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.am-j-pick:has(input:disabled):hover {
+  border-color: var(--am-border-strong);
+  background: var(--am-surface);
+  color: var(--am-text-muted);
+}
+
 .am-j-pick > input {
   width: 18px;
   height: 18px;
@@ -1086,6 +1151,22 @@ html[data-js="true"] .am-j-nojs {
   max-width: 76ch;
   margin: 0;
   color: var(--am-text-muted);
+}
+
+/** Last-update line at the card's first level (FR-011), outside the "Voir plus" drawer. */
+.am-j-updated {
+  display: flex;
+  gap: var(--am-space-6);
+  align-items: center;
+  margin: 0;
+  color: var(--am-text-subtle);
+  font-size: var(--am-caption-size);
+  line-height: var(--am-caption-line);
+}
+
+.am-j-updated .am-icon {
+  flex: none;
+  color: var(--am-neutral-400);
 }
 
 .am-j-offer__body {
@@ -1409,6 +1490,27 @@ html[data-js="true"] .am-j-nojs {
   line-height: 1.3;
 }
 
+.am-j-compare__rowhint {
+  max-width: 32ch;
+  margin: var(--am-space-4) 0 0;
+  color: var(--am-text-subtle);
+  font-size: var(--am-caption-size);
+  font-weight: 400;
+  line-height: var(--am-caption-line);
+  text-transform: none;
+  letter-spacing: normal;
+}
+
+/**
+ * The most favourable value of a numeric row (lowest price/deductible, highest ceiling, shortest
+ * delay) is highlighted (`content/02`): the brand tint, never the success/green reserved for
+ * validation, since this is a factual comparison, not an approval.
+ */
+.am-j-compare td[data-highlight="true"] {
+  background: var(--am-surface-brand);
+  font-weight: 700;
+}
+
 .am-j-scroll-hint {
   margin: 0 0 var(--am-space-12);
   color: var(--am-text-subtle);
@@ -1420,6 +1522,99 @@ html[data-js="true"] .am-j-nojs {
   .am-j-scroll-hint {
     display: none;
   }
+}
+
+/**
+ * FR-013: below 768px the table is replaced by one card per criterion, offers stacked inside with no
+ * horizontal scroll at all; both structures are rendered, only one is ever visible.
+ */
+.am-j-compare-mobile {
+  display: none;
+}
+
+@media (max-width: 767px) {
+  .am-j-compare-desktop {
+    display: none;
+  }
+
+  .am-j-compare-mobile {
+    display: grid;
+    gap: var(--am-space-16);
+  }
+}
+
+.am-j-comparecard {
+  display: grid;
+  gap: var(--am-space-12);
+  padding: var(--am-space-16);
+  border: 1px solid var(--am-border);
+  border-radius: var(--am-radius-card);
+  background: var(--am-surface);
+  box-shadow: var(--am-shadow-xs);
+}
+
+.am-j-comparecard__title {
+  margin: 0;
+  font-family: var(--am-font-heading);
+  font-size: var(--am-h4-size);
+  font-weight: 700;
+  line-height: var(--am-h4-line);
+}
+
+.am-j-comparecard__hint {
+  margin: 0;
+  color: var(--am-text-subtle);
+  font-size: var(--am-caption-size);
+  line-height: var(--am-caption-line);
+}
+
+.am-j-comparecard__rows {
+  display: grid;
+  gap: 0;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.am-j-comparecard__row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--am-space-8) var(--am-space-12);
+  align-items: baseline;
+  justify-content: space-between;
+  padding: var(--am-space-10) 0;
+  border-top: 1px solid var(--am-border);
+}
+
+.am-j-comparecard__row:first-child {
+  border-top: 0;
+}
+
+.am-j-comparecard__row[data-highlight="true"] {
+  padding-inline: var(--am-space-12);
+  border-radius: var(--am-radius-sm);
+  background: var(--am-surface-brand);
+}
+
+.am-j-comparecard__name {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: var(--am-space-8);
+  align-items: center;
+  min-width: 0;
+  color: var(--am-text-muted);
+  font-size: var(--am-small-size);
+}
+
+.am-j-comparecard__value {
+  color: var(--am-text);
+  font-weight: 700;
+  font-size: var(--am-small-size);
+  text-align: right;
+}
+
+.am-j-comparecard__row[data-highlight="true"] .am-j-comparecard__value {
+  color: var(--am-primary-800);
 }
 
 .am-j-scorecards {

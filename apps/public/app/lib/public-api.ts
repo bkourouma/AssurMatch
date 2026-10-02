@@ -237,11 +237,16 @@ export function getPublicQuoteForm(countryCode: string, productKey: string) {
   return readPublic<PublicQuoteFormState | null>(`/countries/${countryCode}/products/${productKey}/quote-form`, null);
 }
 
-export async function submitPublicQuoteRequest(input: QuoteRequestCreateDto): Promise<PublicQuoteSubmitState> {
+/**
+ * `forwardedFor` is set only by the no-JavaScript server action (spec 050, D6): that request leaves
+ * the Next server, so the visitor's address must be forwarded or every such submission would share
+ * the server's rate-limit bucket in the API's public abuse guard, which reads `x-forwarded-for`.
+ */
+export async function submitPublicQuoteRequest(input: QuoteRequestCreateDto, options: { forwardedFor?: string | undefined } = {}): Promise<PublicQuoteSubmitState> {
   try {
     const response = await fetch(`${PUBLIC_API_BASE_URL}/quote-requests`, {
       method: "POST",
-      headers: { "content-type": "application/json" },
+      headers: { "content-type": "application/json", ...(options.forwardedFor ? { "x-forwarded-for": options.forwardedFor } : {}) },
       body: JSON.stringify(input)
     });
     if (response.status === 429) {
@@ -354,11 +359,19 @@ export interface PublicSubmitState {
   nextSteps?: string[];
 }
 
-async function submitPublic(path: string, body: unknown, successKey: ApiMessageKey, failureKey: ApiMessageKey, successText: string, failureText: string): Promise<PublicSubmitState> {
+async function submitPublic(
+  path: string,
+  body: unknown,
+  successKey: ApiMessageKey,
+  failureKey: ApiMessageKey,
+  successText: string,
+  failureText: string,
+  options: { forwardedFor?: string | undefined } = {}
+): Promise<PublicSubmitState> {
   try {
     const response = await fetch(`${PUBLIC_API_BASE_URL}${path}`, {
       method: "POST",
-      headers: { "content-type": "application/json" },
+      headers: { "content-type": "application/json", ...(options.forwardedFor ? { "x-forwarded-for": options.forwardedFor } : {}) },
       body: JSON.stringify(body)
     });
     if (response.status === 429) {
@@ -446,25 +459,32 @@ export function getPublicProduct(countryCode: string, productKey: string): Promi
   return readPublicCached<PublicProductDetail | null>(`/countries/${encodeURIComponent(countryCode)}/products/${encodeURIComponent(productKey)}`, null);
 }
 
-export function submitWaitlist(body: WaitlistSubmission): Promise<PublicSubmitState> {
+/**
+ * `options.forwardedFor` is set only by the no-JavaScript server actions (spec 050, D6), the same way
+ * `submitPublicQuoteRequest` above forwards the visitor's address: without it every such submission
+ * would share the server's rate-limit bucket in the API's public abuse guard.
+ */
+export function submitWaitlist(body: WaitlistSubmission, options: { forwardedFor?: string | undefined } = {}): Promise<PublicSubmitState> {
   return submitPublic(
     "/waitlist",
     body,
     "waitlistJoined",
     "waitlistFailed",
     "Votre inscription est enregistree. Vous serez informe de l'ouverture publique de ce pays.",
-    "Inscription impossible pour le moment."
+    "Inscription impossible pour le moment.",
+    options
   );
 }
 
-export function submitContact(body: ContactSubmission): Promise<PublicSubmitState> {
+export function submitContact(body: ContactSubmission, options: { forwardedFor?: string | undefined } = {}): Promise<PublicSubmitState> {
   return submitPublic(
     "/contact",
     body,
     "contactSent",
     "contactFailed",
     "Message recu. Notre equipe vous repondra.",
-    "Envoi du message impossible pour le moment."
+    "Envoi du message impossible pour le moment.",
+    options
   );
 }
 
@@ -480,11 +500,14 @@ export interface PartnerApplicationSubmitState extends PublicSubmitState {
   nextSteps?: string[];
 }
 
-export async function submitPartnerApplication(body: PartnerApplicationSubmission): Promise<PartnerApplicationSubmitState> {
+export async function submitPartnerApplication(
+  body: PartnerApplicationSubmission,
+  options: { forwardedFor?: string | undefined } = {}
+): Promise<PartnerApplicationSubmitState> {
   try {
     const response = await fetch(`${PUBLIC_API_BASE_URL}/partners/applications`, {
       method: "POST",
-      headers: { "content-type": "application/json" },
+      headers: { "content-type": "application/json", ...(options.forwardedFor ? { "x-forwarded-for": options.forwardedFor } : {}) },
       body: JSON.stringify(body)
     });
     if (response.status === 429) {

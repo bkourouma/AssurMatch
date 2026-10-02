@@ -53,6 +53,17 @@ function statDate(source: PublicStats | null): string | undefined {
   return typeof source?.computedAt === "string" ? source.computedAt : undefined;
 }
 
+/**
+ * D-Chiffres: a successful call whose three retained counters are all zero hides the whole block,
+ * rather than showing a triplet of zeros as if it were a real state of the platform.
+ */
+function allCountersZero(source: PublicStats | null): boolean {
+  const countries = statValue(source, "openCountries");
+  const partners = statValue(source, "activeBrokers");
+  const offers = statValue(source, "validatedOffers");
+  return countries === 0 && partners === 0 && offers === 0;
+}
+
 export default async function PublicHomePage({ params }: { params: Promise<{ locale: string }> }) {
   const locale = toLocale((await params).locale);
   setRequestLocale(locale);
@@ -70,7 +81,7 @@ export default async function PublicHomePage({ params }: { params: Promise<{ loc
 
   const stats = await getPublicStats();
   const counters =
-    stats.status === "success"
+    stats.status === "success" && !allCountersZero(stats.data)
       ? [
           { key: "countries", icon: "globe" as IconName, label: t("stats.countries"), value: statValue(stats.data, "openCountries") },
           { key: "partners", icon: "handshake" as IconName, label: t("stats.partners"), value: statValue(stats.data, "activeBrokers") },
@@ -164,6 +175,9 @@ export default async function PublicHomePage({ params }: { params: Promise<{ loc
             <div className="am-cluster">
               <Button href="/regulatory-status" variant="secondary" iconAfter={<Icon name="arrow-right" size={18} />}>
                 {t("regulatoryLink")}
+              </Button>
+              <Button href="/our-commitment" variant="tertiary" iconAfter={<Icon name="arrow-right" size={18} />}>
+                {t("commitmentLink")}
               </Button>
             </div>
             <p className="am-home-role__note">{t("regulatoryLead")}</p>

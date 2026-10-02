@@ -1,11 +1,18 @@
-import { Card, CardBody, CardHeader, CardTitle } from "../ui/card";
+import { Button } from "../ui/button";
+import { Card, CardBody, CardFooter, CardHeader, CardTitle } from "../ui/card";
 import { Icon } from "../ui/icons";
+import type { ComponentProps } from "react";
+import type { Link } from "../../../i18n/navigation";
 
 export interface PlanPricingLabels {
   monthlySubscription: string;
   perLead: string;
   setupFee: string;
   onRequest: string;
+  /** "Non inclus dans cette formule" heading above `notIncluded`. */
+  notIncludedTitle: string;
+  /** "Envoyer ma candidature" button label. */
+  applyCta: string;
 }
 
 export interface PlanPricingCardProps {
@@ -18,6 +25,10 @@ export interface PlanPricingCardProps {
   perLead?: string;
   setupFee?: string;
   highlighted?: boolean;
+  /** What this plan does not include (charter content/05: state the limit, not only the promise). */
+  notIncluded: readonly string[];
+  /** `/brokers/apply?formule=<key>` - preselects the plan on the application form. */
+  applyHref: ComponentProps<typeof Link>["href"];
 }
 
 /**
@@ -28,7 +39,17 @@ export interface PlanPricingCardProps {
  * (the one number a broker scans for first); the per-lead price and the setup fee sit below it as a
  * small key/value list.
  */
-export function PlanPricingCard({ planName, positioning, labels, monthlySubscription, perLead, setupFee, highlighted }: PlanPricingCardProps) {
+export function PlanPricingCard({
+  planName,
+  positioning,
+  labels,
+  monthlySubscription,
+  perLead,
+  setupFee,
+  highlighted,
+  notIncluded,
+  applyHref
+}: PlanPricingCardProps) {
   const hasPrice = monthlySubscription !== undefined;
   return (
     <Card as="li" {...(highlighted ? { featured: true } : {})}>
@@ -60,7 +81,22 @@ export function PlanPricingCard({ planName, positioning, labels, monthlySubscrip
             {labels.onRequest}
           </p>
         )}
+        {notIncluded.length > 0 ? (
+          <div className="am-priceplan__notincluded">
+            <p className="am-priceplan__notincludedtitle">{labels.notIncludedTitle}</p>
+            <ul>
+              {notIncluded.map((item) => (
+                <li key={item}>{item}</li>
+              ))}
+            </ul>
+          </div>
+        ) : null}
       </CardBody>
+      <CardFooter>
+        <Button href={applyHref} size="sm" fullWidth>
+          {labels.applyCta}
+        </Button>
+      </CardFooter>
     </Card>
   );
 }

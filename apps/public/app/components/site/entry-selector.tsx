@@ -60,7 +60,6 @@ export function EntrySelector({ countries, products, defaultCountry, title }: En
           {t("submit")}
         </Button>
       </div>
-      <p className="am-field__hint">{t("hint")}</p>
     </form>
   );
 }

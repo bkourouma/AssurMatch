@@ -36,6 +36,7 @@ export default async function TermsPage({ params }: { params: Promise<{ locale: 
       kicker={t("kicker")}
       lastUpdatedLabel={t("lastUpdated", { date: formatDate(page.updatedAt, { locale }) })}
       tocTitle={t("tocTitle")}
+      summaryTitle={t("summaryTitle")}
       placeholdersTitle={t("placeholdersTitle")}
       placeholderNotice={t("placeholderNotice")}
     />

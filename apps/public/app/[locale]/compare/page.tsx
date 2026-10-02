@@ -12,6 +12,7 @@ import { Icon, type IconName } from "../../components/ui/icons";
 import { IconTile } from "../../components/ui/icon-tile";
 import { Notice } from "../../components/ui/notice";
 import { Section } from "../../components/ui/section";
+import { formatDate, formatMoney } from "../../lib/country-format";
 import { comparePublicOffers, listPublicProducts } from "../../lib/public-api";
 import { buildMetadata, localeUrl } from "../../lib/seo";
 import type { PageMetadata } from "../../lib/seo";
@@ -41,6 +42,58 @@ function idsFrom(value: string | string[] | undefined): string[] {
   return [...new Set(raw.flatMap((item) => item.split(",")).map((item) => item.trim()).filter(Boolean))];
 }
 
+type CompareRowValue = string | number | boolean | null;
+type CompareRow = { key: string; label: string; values: Record<string, CompareRowValue> };
+
+/**
+ * Row keys with a short explanation in the `Compare.rowExplanations` catalogue (`content/02`): every
+ * `guarantee:{key}` row shares the same generic explanation, the rest map one to one. A row the
+ * backend adds later without an entry here simply renders without an explanation underneath. The
+ * literal union (rather than plain `string`) is what lets `t(`rowExplanations.${key}`)` type-check
+ * against the generated catalogue keys.
+ */
+const ROW_EXPLANATION_KEYS = [
+  "partner",
+  "insurer",
+  "price",
+  "deductible",
+  "ceiling",
+  "processingDelay",
+  "paymentFlexibility",
+  "score",
+  "validUntil",
+  "guarantee"
+] as const;
+type RowExplanationKey = (typeof ROW_EXPLANATION_KEYS)[number];
+
+const MONEY_ROWS = new Set(["price", "priceMax", "deductible", "ceiling"]);
+
+function rowExplanationKey(key: string): RowExplanationKey | null {
+  if (key.startsWith("guarantee:")) return "guarantee";
+  return (ROW_EXPLANATION_KEYS as readonly string[]).includes(key) ? (key as RowExplanationKey) : null;
+}
+
+/** The four numeric rows that get a "most favourable value" highlight (`content/02`), and its direction. */
+const HIGHLIGHT_DIRECTION = {
+  price: "min",
+  deductible: "min",
+  ceiling: "max",
+  processingDelay: "min"
+} as const;
+type HighlightKey = keyof typeof HIGHLIGHT_DIRECTION;
+
+function highlightKeyOf(key: string): HighlightKey | null {
+  return (Object.keys(HIGHLIGHT_DIRECTION) as string[]).includes(key) ? (key as HighlightKey) : null;
+}
+
+/** Offer ids carrying the most favourable numeric value of a row, never a subjective "best" (Constitution VIII). */
+function highlightedOfferIds(row: CompareRow, direction: "min" | "max"): Set<string> {
+  const numeric = Object.entries(row.values).filter((entry): entry is [string, number] => typeof entry[1] === "number");
+  if (numeric.length === 0) return new Set();
+  const target = direction === "min" ? Math.min(...numeric.map(([, value]) => value)) : Math.max(...numeric.map(([, value]) => value));
+  return new Set(numeric.filter(([, value]) => value === target).map(([id]) => id));
+}
+
 export async function generateMetadata({ params }: { params: Promise<{ locale: string }> }): Promise<PageMetadata> {
   const locale = toLocale((await params).locale);
   const t = await getTranslations({ locale, namespace: "Compare" });
@@ -58,6 +111,7 @@ export default async function PublicComparePage({
   setRequestLocale(locale);
   const t = await getTranslations("Compare");
   const common = await getTranslations("Common");
+  const cards = await getTranslations("OfferCards");
   const query = searchParams ? await searchParams : {};
   const ids = idsFrom(query.ids);
   const priority = Array.isArray(query.priority) ? query.priority[0] : query.priority;
@@ -80,9 +134,13 @@ export default async function PublicComparePage({
         }))
       : [];
 
-  function cell(value: string | number | boolean | null): string {
+  /** Amounts, dates and delays arrive raw from the comparison rows; they are formatted like the offer cards. */
+  function cell(value: string | number | boolean | null, rowKey: string): string {
     if (value === null) return common("notProvided");
     if (typeof value === "boolean") return value ? common("yes") : common("no");
+    if (typeof value === "number" && MONEY_ROWS.has(rowKey)) return formatMoney(value, { locale }) ?? String(value);
+    if (typeof value === "number" && rowKey === "processingDelay") return cards("processingDays", { days: value });
+    if (typeof value === "string" && rowKey === "validUntil") return formatDate(value, { locale });
     return String(value);
   }
 
@@ -190,7 +248,11 @@ export default async function PublicComparePage({
               <Notice tone="indicative">
                 <BackendText>{compared.disclaimer}</BackendText>
               </Notice>
-              <div>
+
+              {/* Two structures, one visible at a time (CSS media query, FR-013): the desktop table
+                  keeps its horizontal scroll for a wide row count, the mobile block below 768px never
+                  scrolls sideways - one card per criterion, every offer's value stacked inside it. */}
+              <div className="am-j-compare-desktop">
                 <p className="am-j-scroll-hint">{t("scrollHint")}</p>
                 <div className="am-table-wrap">
                   <table className="am-table am-table--striped am-j-compare" aria-label={t("tableLabel")}>
@@ -211,21 +273,62 @@ export default async function PublicComparePage({
                       </tr>
                     </thead>
                     <tbody>
-                      {compared.rows.map((row) => (
-                        <tr key={row.key}>
-                          <th scope="row">
-                            <BackendText>{row.label}</BackendText>
-                          </th>
-                          {items.map((offer) => (
-                            <td key={offer.id}>
-                              <BackendText>{cell(row.values[offer.id] ?? null)}</BackendText>
-                            </td>
-                          ))}
-                        </tr>
-                      ))}
+                      {compared.rows.map((row) => {
+                        const explanationKey = rowExplanationKey(row.key);
+                        const highlightKey = highlightKeyOf(row.key);
+                        const bestIds = highlightKey ? highlightedOfferIds(row, HIGHLIGHT_DIRECTION[highlightKey]) : new Set<string>();
+                        return (
+                          <tr key={row.key}>
+                            <th scope="row">
+                              <BackendText>{row.label}</BackendText>
+                              {explanationKey ? <p className="am-j-compare__rowhint">{t(`rowExplanations.${explanationKey}`)}</p> : null}
+                            </th>
+                            {items.map((offer) => (
+                              <td key={offer.id} data-highlight={bestIds.has(offer.id) ? "true" : undefined}>
+                                <BackendText>{cell(row.values[offer.id] ?? null, row.key)}</BackendText>
+                                {highlightKey && bestIds.has(offer.id) ? (
+                                  <span className="am-visually-hidden">{` (${t(`highlight.${highlightKey}`)})`}</span>
+                                ) : null}
+                              </td>
+                            ))}
+                          </tr>
+                        );
+                      })}
                     </tbody>
                   </table>
                 </div>
+              </div>
+
+              <div className="am-j-compare-mobile">
+                {compared.rows.map((row) => {
+                  const explanationKey = rowExplanationKey(row.key);
+                  const highlightKey = highlightKeyOf(row.key);
+                  const bestIds = highlightKey ? highlightedOfferIds(row, HIGHLIGHT_DIRECTION[highlightKey]) : new Set<string>();
+                  return (
+                    <div className="am-j-comparecard" key={row.key}>
+                      <p className="am-j-comparecard__title">
+                        <BackendText>{row.label}</BackendText>
+                      </p>
+                      {explanationKey ? <p className="am-j-comparecard__hint">{t(`rowExplanations.${explanationKey}`)}</p> : null}
+                      <ul className="am-j-comparecard__rows">
+                        {items.map((offer) => (
+                          <li className="am-j-comparecard__row" key={offer.id} data-highlight={bestIds.has(offer.id) ? "true" : undefined}>
+                            <span className="am-j-comparecard__name">
+                              <BackendText>{offer.name}</BackendText>
+                              <SponsoredBadge offer={offer} />
+                            </span>
+                            <span className="am-j-comparecard__value">
+                              <BackendText>{cell(row.values[offer.id] ?? null, row.key)}</BackendText>
+                              {highlightKey && bestIds.has(offer.id) ? (
+                                <span className="am-visually-hidden">{` (${t(`highlight.${highlightKey}`)})`}</span>
+                              ) : null}
+                            </span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  );
+                })}
               </div>
             </div>
           </Section>
