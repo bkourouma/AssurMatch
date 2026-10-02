@@ -51,23 +51,6 @@
     }
   },
   {
-    "isoCode": "CF",
-    "name": "République centrafricaine",
-    "currency": "XAF",
-    "languages": ["fr"],
-    "timezone": "Africa/Bangui",
-    "regulatoryFamily": "cima",
-    "status": "draft",
-    "flags": {
-      "country_public_enabled": false,
-      "country_quote_enabled": false,
-      "country_comparison_enabled": false,
-      "country_broker_onboarding_enabled": false,
-      "country_ai_enabled": false,
-      "country_waitlist_enabled": false
-    }
-  },
-  {
     "isoCode": "CI",
     "name": "Côte d'Ivoire",
     "currency": "XOF",
@@ -102,6 +85,23 @@
     }
   },
   {
+    "isoCode": "GN",
+    "name": "Guinée",
+    "currency": "GNF",
+    "languages": ["fr"],
+    "timezone": "Africa/Conakry",
+    "regulatoryFamily": "fanaf",
+    "status": "draft",
+    "flags": {
+      "country_public_enabled": false,
+      "country_quote_enabled": false,
+      "country_comparison_enabled": false,
+      "country_broker_onboarding_enabled": false,
+      "country_ai_enabled": false,
+      "country_waitlist_enabled": true
+    }
+  },
+  {
     "isoCode": "ML",
     "name": "Mali",
     "currency": "XOF",
@@ -115,7 +115,7 @@
       "country_comparison_enabled": false,
       "country_broker_onboarding_enabled": false,
       "country_ai_enabled": false,
-      "country_waitlist_enabled": false
+      "country_waitlist_enabled": true
     }
   },
   {
@@ -124,6 +124,23 @@
     "currency": "XOF",
     "languages": ["fr"],
     "timezone": "Africa/Niamey",
+    "regulatoryFamily": "cima",
+    "status": "draft",
+    "flags": {
+      "country_public_enabled": false,
+      "country_quote_enabled": false,
+      "country_comparison_enabled": false,
+      "country_broker_onboarding_enabled": false,
+      "country_ai_enabled": false,
+      "country_waitlist_enabled": false
+    }
+  },
+  {
+    "isoCode": "CF",
+    "name": "République centrafricaine",
+    "currency": "XAF",
+    "languages": ["fr"],
+    "timezone": "Africa/Bangui",
     "regulatoryFamily": "cima",
     "status": "draft",
     "flags": {
@@ -149,7 +166,7 @@
       "country_comparison_enabled": false,
       "country_broker_onboarding_enabled": false,
       "country_ai_enabled": false,
-      "country_waitlist_enabled": false
+      "country_waitlist_enabled": true
     }
   }
 ]

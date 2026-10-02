@@ -101,9 +101,10 @@ async function main(): Promise<void> {
       });
     }
 
-    const cimaRegime = await prisma.regulatoryRegime.findUnique({ where: { key: "cima" } });
+    const regimeByKey = new Map((await prisma.regulatoryRegime.findMany()).map((regime) => [regime.key, regime.id]));
     for (const country of countries) {
       const regulatoryFamily = country.regulatoryFamily as RegulatoryFamily;
+      const regimeId = regimeByKey.get(country.regulatoryFamily);
       await prisma.country.upsert({
         where: { isoCode: country.isoCode },
         update: {
@@ -113,7 +114,7 @@ async function main(): Promise<void> {
           timezone: country.timezone,
           regulatoryFamily,
           flags: country.flags as object,
-          ...(country.regulatoryFamily === "cima" && cimaRegime ? { regulatoryRegimeId: cimaRegime.id } : {})
+          ...(regimeId ? { regulatoryRegimeId: regimeId } : {})
         },
         create: {
           isoCode: country.isoCode,
@@ -123,7 +124,7 @@ async function main(): Promise<void> {
           timezone: country.timezone,
           regulatoryFamily,
           flags: country.flags as object,
-          ...(country.regulatoryFamily === "cima" && cimaRegime ? { regulatoryRegimeId: cimaRegime.id } : {})
+          ...(regimeId ? { regulatoryRegimeId: regimeId } : {})
         }
       });
     }

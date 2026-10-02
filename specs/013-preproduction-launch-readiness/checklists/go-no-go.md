@@ -13,7 +13,7 @@ This checklist gates **public activation** of a scope. There is no global "go" b
 - [ ] `.env.production` on the VPS is `0600`, owned by `deployer`, contains all mandatory vars including `EMAIL_*`.
 - [ ] `EMAIL_SMTP_PASS` is a Gmail **app password** (not the regular account password); 2FA is enabled on the Gmail account.
 - [ ] `EMAIL_PREVIEW_MODE=true` confirmed for the initial activation phase.
-- [ ] Reference seed applied (9 countries, 15 products); PG/Redis/queues healthy.
+- [ ] Reference seed applied (10 countries, 15 products); PG/Redis/queues healthy.
 - [ ] Sensitive flags fail-closed in DB (payments, e_signature, policy_issuance, claims, insurer_api, ai_recommendation, ai_lead_scoring, ai_summary, ai_broker_assistant, whatsapp, sponsored_offers, multi_broker_routing, billing).
 - [ ] At least one Super Admin account created with MFA enrolled.
 - [ ] Backup cron in place (PostgreSQL daily 02:00 UTC, uploads daily 02:30 UTC, retention 14 days, encrypted if `BACKUP_PASSPHRASE` set); one restore test executed and documented.
