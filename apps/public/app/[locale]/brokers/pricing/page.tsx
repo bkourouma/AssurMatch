@@ -10,7 +10,7 @@ import { Hero } from "../../../components/ui/hero";
 import { Notice } from "../../../components/ui/notice";
 import { Section } from "../../../components/ui/section";
 import { Reveal } from "../../../components/motion/reveal";
-import { billableLeadCriteria, brokerPlan, type BrokerPlanKey } from "../../../content/brokers";
+import { billableLeadCriteria, billingFaq, brokerPlan, neverIncludedFeatures, type BrokerPlanKey } from "../../../content/brokers";
 import { formatMoney } from "../../../lib/country-format";
 import { listPartnerPlans } from "../../../lib/public-api";
 import { buildMetadata, localeUrl } from "../../../lib/seo";
@@ -121,11 +121,15 @@ export default async function BrokerPricingPage({
                   planName={planContent.name}
                   positioning={planContent.positioning}
                   highlighted={key === "pro"}
+                  notIncluded={planContent.notIncluded}
+                  applyHref={{ pathname: "/brokers/apply", query: { formule: key } }}
                   labels={{
                     monthlySubscription: t("pricing.monthlySubscription"),
                     perLead: t("pricing.perLead"),
                     setupFee: t("pricing.setupFee"),
-                    onRequest: t("pricing.onRequest")
+                    onRequest: t("pricing.onRequest"),
+                    notIncludedTitle: t("pricing.notIncludedTitle"),
+                    applyCta: t("pricing.applyCta")
                   }}
                   {...(price
                     ? {
@@ -149,8 +153,32 @@ export default async function BrokerPricingPage({
       </Section>
 
       <Reveal as="div">
-        <Section title={t("criteria.title")} lead={t("criteria.lead")} tone="muted">
+        <Section title={t("criteria.title")} lead={t("criteria.lead")}>
           <BillableCriteriaList criteria={billableLeadCriteria(locale)} />
+          <p className="am-small">{t("criteria.neverBillable")}</p>
+        </Section>
+      </Reveal>
+
+      <Reveal as="div">
+        <Section title={t("neverIncluded.title")} tone="muted">
+          <ul className="am-neverincluded">
+            {neverIncludedFeatures(locale).map((item) => (
+              <li key={item}>{item}</li>
+            ))}
+          </ul>
+        </Section>
+      </Reveal>
+
+      <Reveal as="div">
+        <Section title={t("billingFaq.title")}>
+          <div className="am-faq">
+            {billingFaq(locale).map((item) => (
+              <details className="am-faq__item" key={item.id}>
+                <summary>{item.question}</summary>
+                <p className="am-faq__answer">{item.answer}</p>
+              </details>
+            ))}
+          </div>
         </Section>
       </Reveal>
     </>

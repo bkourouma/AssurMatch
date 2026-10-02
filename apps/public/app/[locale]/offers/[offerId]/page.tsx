@@ -120,16 +120,42 @@ export default async function PublicOfferDetailPage({
 
       {!detail ? (
         <Section>
+          {/*
+           * FR-014: a single message names the three possible causes (expired, not yet validated,
+           * partner no longer eligible) without claiming which one applies - the public endpoint
+           * returns one generic error today (`public-offer-catalog.service.ts`), so telling them
+           * apart on screen would either guess or leak a partner-specific reason (Constitution VIII).
+           * "Comparer les offres" targets the very list the visitor came from when its country and
+           * product are known from the query string; otherwise the generic country picker is kept.
+           */}
           <EmptyState
             icon="search"
             tone="muted"
             align="center"
             title={t("unavailable.title")}
-            description={offer.publicMessage ?? t("unavailable.description")}
+            description={
+              // A 404 is exactly the "no longer public" case this message explains; only a real
+              // service failure keeps the API wrapper's own message.
+              offer.status === "error" && offer.messageKey !== "notFound" && offer.publicMessage
+                ? offer.publicMessage
+                : t("unavailable.description")
+            }
             action={
-              <Button href="/countries" icon={<Icon name="globe" size={18} />}>
-                {t("backToCountries")}
-              </Button>
+              countryCode && productKey ? (
+                <Button
+                  href={{
+                    pathname: "/countries/[countryCode]/products/[productKey]/offers",
+                    params: { countryCode, productKey }
+                  }}
+                  icon={<Icon name="scale" size={18} />}
+                >
+                  {t("compare")}
+                </Button>
+              ) : (
+                <Button href="/countries" icon={<Icon name="globe" size={18} />}>
+                  {t("backToCountries")}
+                </Button>
+              )
             }
           />
         </Section>

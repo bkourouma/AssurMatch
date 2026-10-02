@@ -1,6 +1,6 @@
 import { getTranslations, setRequestLocale } from "next-intl/server";
 import { toLocale, type AppLocale } from "../../../i18n/routing";
-import { listGuides } from "../../content/guides";
+import { guideReadingTimeMinutes, listGuides } from "../../content/guides";
 import { GuideCard } from "../../components/institutional/guide-card";
 import { Breadcrumb } from "../../components/ui/breadcrumb";
 import { Hero } from "../../components/ui/hero";
@@ -50,6 +50,8 @@ export default async function GuidesIndexPage({ params }: { params: Promise<{ lo
               title={guide.title}
               description={guide.description}
               meta={t("updated", { date: formatDate(guide.updatedAt, { locale }) })}
+              readingTimeLabel={t("readingTime", { minutes: guideReadingTimeMinutes(guide) })}
+              productLabel={guide.productKey === "auto" ? t("productAuto") : guide.productKey === "voyage" ? t("productVoyage") : undefined}
               readLabel={t("read")}
               titleAs="h2"
             />

@@ -47,8 +47,20 @@ const SCORE_CRITERIA = [
   { key: "deductible", icon: "wallet" },
   { key: "processingSpeed", icon: "clock" },
   { key: "paymentFlexibility", icon: "calendar" },
-  { key: "informationQuality", icon: "file-check" }
+  { key: "informationQuality", icon: "file-check" },
+  { key: "userPreferences", icon: "sliders" }
 ] as const;
+
+/**
+ * Grammatical preposition preceding the country name ("Assurance auto en Côte d'Ivoire", "Assurance
+ * auto au Sénégal"). Defaults to "en" for every country not listed here; kept in sync with the same
+ * map on the country page.
+ */
+const COUNTRY_PREPOSITIONS: Record<string, string> = { SN: "au" };
+
+function countryPreposition(isoCode: string): string {
+  return COUNTRY_PREPOSITIONS[isoCode.trim().toUpperCase()] ?? "en";
+}
 
 /**
  * The public country directory exposes no WhatsApp or phone number today, so both the section and
@@ -81,10 +93,13 @@ export async function generateMetadata({ params }: { params: Promise<PageParams>
   const locale = toLocale(rawLocale);
   const t = await getTranslations({ locale, namespace: "Product" });
   const { country, product } = await resolveNames(countryCode, productKey);
-  const title = product ? t("title", { product, country }) : t("titleFallback", { productKey, country });
+  const preposition = countryPreposition(countryCode);
+  const title = product
+    ? t("title", { product, country, preposition })
+    : t("titleFallback", { productKey, country, preposition });
   return buildMetadata({
     title,
-    description: t("description", { product: product ?? productKey, country }),
+    description: t("description", { product: product ?? productKey, country, preposition }),
     href: "/countries/[countryCode]/products/[productKey]",
     params: { countryCode, productKey },
     locale
@@ -111,7 +126,10 @@ export default async function PublicProductPage({ params }: { params: Promise<Pa
   const summaries = product ? null : await listPublicProducts(countryCode);
   const summary = summaries?.data.find((item) => item.key === productKey);
   const productName = product?.name ?? summary?.name;
-  const heading = productName ? t("title", { product: productName, country: countryName }) : t("titleFallback", { productKey, country: countryName });
+  const preposition = countryPreposition(countryCode);
+  const heading = productName
+    ? t("title", { product: productName, country: countryName, preposition })
+    : t("titleFallback", { productKey, country: countryName, preposition });
 
   // Documents actually required by the published offers of this product, then the editorial list.
   const offers = await listPublicOffers(countryCode, productKey);
@@ -325,6 +343,8 @@ export default async function PublicProductPage({ params }: { params: Promise<Pa
 
       <Section spacing="compact">
         <div className="am-stack am-stack--lg">
+          {/* D-Cookies: a permanent information strip, not a cookie banner - it never closes. */}
+          <Notice tone="indicative">{t("consentNotice")}</Notice>
           <PublicJourneyActions countryCode={countryCode} productKey={productKey} />
           <Notice tone="indicative">{t("fineprint")}</Notice>
         </div>

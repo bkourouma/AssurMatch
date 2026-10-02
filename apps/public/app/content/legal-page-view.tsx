@@ -24,6 +24,8 @@ export interface LegalPageViewProps {
   lastUpdatedLabel: string;
   /** Heading of the in-page table of contents, e.g. "Sommaire". */
   tocTitle: string;
+  /** Title of the "L'essentiel en 5 lignes" notice, shown only when `page.summary` is present. */
+  summaryTitle: string;
   placeholdersTitle: string;
   placeholderNotice: string;
   countryNotice?: LegalPageCountryNotice;
@@ -44,6 +46,7 @@ export function LegalPageView({
   kicker,
   lastUpdatedLabel,
   tocTitle,
+  summaryTitle,
   placeholdersTitle,
   placeholderNotice,
   countryNotice
@@ -63,6 +66,16 @@ export function LegalPageView({
           <Icon name="calendar" size={16} />
           {lastUpdatedLabel}
         </p>
+
+        {page.summary && page.summary.length > 0 ? (
+          <Notice tone="info" title={summaryTitle}>
+            <ol className="am-legal-summary">
+              {page.summary.map((line, index) => (
+                <li key={index}>{line}</li>
+              ))}
+            </ol>
+          </Notice>
+        ) : null}
 
         {countryNotice ? (
           <Notice tone="info" role="note">

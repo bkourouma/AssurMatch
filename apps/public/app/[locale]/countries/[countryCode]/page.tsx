@@ -1,4 +1,5 @@
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
+import { headers } from "next/headers";
 import { getTranslations, setRequestLocale } from "next-intl/server";
 import { Link } from "../../../../i18n/navigation";
 import { toLocale, type AppLocale } from "../../../../i18n/routing";
@@ -23,9 +24,10 @@ import {
   listCountryDirectory,
   listCountryPartners,
   listPublicProducts,
+  submitWaitlist,
   type PublicCountryDirectoryItem
 } from "../../../lib/public-api";
-import { buildMetadata, localeUrl } from "../../../lib/seo";
+import { buildMetadata, localePath, localeUrl } from "../../../lib/seo";
 import type { PageMetadata } from "../../../lib/seo";
 
 /**
@@ -37,8 +39,39 @@ import type { PageMetadata } from "../../../lib/seo";
  */
 
 type PageParams = { locale: string; countryCode: string };
+type SearchParams = Record<string, string | string[] | undefined>;
 
 const BROKERS_ON_COUNTRY_PAGE = 3;
+const KNOWN_WAITLIST_ERROR_KEYS = ["waitlistFailed", "rateLimited", "apiUnavailable"] as const;
+type KnownWaitlistErrorKey = (typeof KNOWN_WAITLIST_ERROR_KEYS)[number];
+
+function first(value: string | string[] | undefined): string | undefined {
+  return Array.isArray(value) ? value[0] : value;
+}
+
+/**
+ * Grammatical preposition preceding the country name ("Assurance en Côte d'Ivoire", "Assurance au
+ * Sénégal"). Defaults to "en" for every country not listed here; add an entry only when a country
+ * genuinely takes "au" (or another preposition) in French.
+ */
+const COUNTRY_PREPOSITIONS: Record<string, string> = { SN: "au" };
+
+function countryPreposition(isoCode: string): string {
+  return COUNTRY_PREPOSITIONS[isoCode.trim().toUpperCase()] ?? "en";
+}
+
+/**
+ * The hero subtitle of the open country page: CI and SN carry a subtitle written specifically for
+ * them (content/01, page pays); every other country falls back to the generic `Country.lead`. The
+ * two literal keys below (rather than a template built from `isoCode`, which is a plain `string`)
+ * are what let this stay checked against the generated message types.
+ */
+function countryHeroLead(t: (key: "lead" | "variants.CI.lead" | "variants.SN.lead") => string, isoCode: string): string {
+  const code = isoCode.trim().toUpperCase();
+  if (code === "CI") return t("variants.CI.lead");
+  if (code === "SN") return t("variants.SN.lead");
+  return t("lead");
+}
 
 async function resolveCountry(countryCode: string): Promise<PublicCountryDirectoryItem | undefined> {
   const directory = await listCountryDirectory();
@@ -65,8 +98,9 @@ export async function generateMetadata({ params }: { params: Promise<PageParams>
   }
 
   const t = await getTranslations({ locale, namespace: "Country" });
+  const iso = country?.isoCode ?? countryCode;
   return buildMetadata({
-    title: t("title", { country: name }),
+    title: t("title", { country: name, preposition: countryPreposition(iso) }),
     description: t("description", { country: name }),
     href: "/countries/[countryCode]",
     params: { countryCode },
@@ -74,7 +108,13 @@ export async function generateMetadata({ params }: { params: Promise<PageParams>
   });
 }
 
-export default async function PublicCountryPage({ params }: { params: Promise<PageParams> }) {
+export default async function PublicCountryPage({
+  params,
+  searchParams
+}: {
+  params: Promise<PageParams>;
+  searchParams?: Promise<SearchParams>;
+}) {
   const { locale: rawLocale, countryCode } = await params;
   const locale = toLocale(rawLocale);
   setRequestLocale(locale);
@@ -82,8 +122,10 @@ export default async function PublicCountryPage({ params }: { params: Promise<Pa
   const country = await resolveCountry(countryCode);
   if (!country) notFound();
 
+  const query = searchParams ? await searchParams : {};
+
   return country.availability === "waitlist" ? (
-    <WaitingCountry locale={locale} country={country} countryCode={countryCode} />
+    <WaitingCountry locale={locale} country={country} countryCode={countryCode} query={query} />
   ) : (
     <OpenCountry locale={locale} country={country} countryCode={countryCode} />
   );
@@ -163,8 +205,8 @@ async function OpenCountry({ locale, country, countryCode }: VariantProps) {
     <>
       <Hero
         kicker={t("kicker")}
-        title={t("title", { country: country.name })}
-        lead={t("lead")}
+        title={t("title", { country: country.name, preposition: countryPreposition(country.isoCode) })}
+        lead={countryHeroLead(t, country.isoCode)}
         breadcrumb={<CountryBreadcrumb locale={locale} country={country} countryCode={countryCode} />}
         aside={<CountryIdentityCard locale={locale} country={country} />}
       >
@@ -331,10 +373,67 @@ function CountryContact({
   );
 }
 
+/**
+ * D6: the browser's native submission of the waiting-list form (no JavaScript) posts here directly.
+ * With JavaScript, `WaitlistForm` calls `preventDefault()` in its own submit handler and this action is
+ * never reached. On success it redirects back to this same country page with `?sent=1` (never any
+ * personal data); on failure with `?formError=<key>` mapped to the same localized copy the client shows.
+ */
+async function submitWaitlistAction(
+  boundLocale: AppLocale,
+  boundCountryCode: string,
+  boundCountryIso: string,
+  formData: FormData
+): Promise<void> {
+  "use server";
+  const countryPathname = "/countries/[countryCode]" as const;
+  const backToCountry = (errorKey: string): never => {
+    redirect(`${localePath(boundLocale, countryPathname, { countryCode: boundCountryCode })}?formError=${encodeURIComponent(errorKey)}`);
+  };
+
+  if (formData.get("consent") !== "on") {
+    backToCountry("consent");
+  }
+
+  const email = String(formData.get("email") ?? "").trim();
+  const productKey = String(formData.get("productKey") ?? "").trim();
+  // Honeypot: a real visitor never fills this field. It is forwarded as-is so the public API's abuse
+  // guard rejects the submission exactly as it does for a JavaScript-driven one.
+  const website = String(formData.get("website") ?? "").trim();
+
+  if (!email) {
+    backToCountry("emailRequired");
+  }
+
+  const incoming = await headers();
+  const forwardedFor = incoming.get("x-forwarded-for")?.split(",")[0]?.trim() || incoming.get("x-real-ip")?.trim() || undefined;
+
+  const response = await submitWaitlist(
+    {
+      countryCode: boundCountryIso,
+      email,
+      consent: true,
+      // The no-JavaScript path must pick the confirmation e-mail language like the client form does.
+      locale: boundLocale,
+      ...(website ? { website } : {}),
+      ...(productKey ? { productKey } : {})
+    },
+    { forwardedFor }
+  );
+
+  if (response.status !== "success") {
+    backToCountry(response.messageKey ?? "waitlistFailed");
+    return;
+  }
+
+  redirect(`${localePath(boundLocale, countryPathname, { countryCode: boundCountryCode })}?sent=1`);
+}
+
 /** Waiting-list variant: no offer, no quote, only a subscription to the opening of the country. */
-async function WaitingCountry({ locale, country, countryCode }: VariantProps) {
+async function WaitingCountry({ locale, country, countryCode, query }: VariantProps & { query: SearchParams }) {
   const t = await getTranslations({ locale, namespace: "Waitlist" });
   const countries = await getTranslations({ locale, namespace: "Countries" });
+  const api = await getTranslations({ locale, namespace: "Api" });
   const products = await listPublicProducts(countryCode);
   const productOptions: WaitlistProductOption[] = products.data.map((product) => ({
     key: product.key,
@@ -342,6 +441,19 @@ async function WaitingCountry({ locale, country, countryCode }: VariantProps) {
   }));
   const directory = await listCountryDirectory();
   const open = directory.data.filter((entry) => entry.availability !== "waitlist").slice(0, 8);
+
+  const sent = first(query.sent) === "1";
+  const formErrorParam = first(query.formError);
+  const formErrorText =
+    formErrorParam === "consent"
+      ? t("form.consentRequired")
+      : formErrorParam === "emailRequired"
+        ? t("form.emailRequired")
+        : formErrorParam && (KNOWN_WAITLIST_ERROR_KEYS as readonly string[]).includes(formErrorParam)
+          ? api(formErrorParam as KnownWaitlistErrorKey)
+          : undefined;
+
+  const boundSubmitWaitlistAction = submitWaitlistAction.bind(null, locale, countryCode, country.isoCode);
 
   return (
     <>
@@ -361,27 +473,41 @@ async function WaitingCountry({ locale, country, countryCode }: VariantProps) {
             <PlatformStatusNotice />
           </div>
           <div className="am-j-waitlist__form">
-            <WaitlistForm
-              countryIso={country.isoCode}
-              products={productOptions}
-              labels={{
-                legend: t("form.legend"),
-                email: t("form.email"),
-                emailHint: t("form.emailHint"),
-                emailRequired: t("form.emailRequired"),
-                product: t("form.product"),
-                productHint: t("form.productHint"),
-                productNone: t("form.productNone"),
-                consent: t("form.consent"),
-                consentRequired: t("form.consentRequired"),
-                website: t("form.website"),
-                submit: t("form.submit"),
-                submitting: t("form.submitting"),
-                successTitle: t("form.successTitle"),
-                successDescription: t("form.successDescription"),
-                error: t("form.error")
-              }}
-            />
+            {sent ? (
+              <Notice tone="success" title={t("form.successTitle")} role="status">
+                {t("form.successDescription")}
+              </Notice>
+            ) : (
+              <>
+                {formErrorText ? (
+                  <Notice tone="error" role="alert">
+                    {formErrorText}
+                  </Notice>
+                ) : null}
+                <WaitlistForm
+                  countryIso={country.isoCode}
+                  products={productOptions}
+                  formAction={boundSubmitWaitlistAction}
+                  labels={{
+                    legend: t("form.legend"),
+                    email: t("form.email"),
+                    emailHint: t("form.emailHint"),
+                    emailRequired: t("form.emailRequired"),
+                    product: t("form.product"),
+                    productHint: t("form.productHint"),
+                    productNone: t("form.productNone"),
+                    consent: t("form.consent"),
+                    consentRequired: t("form.consentRequired"),
+                    website: t("form.website"),
+                    submit: t("form.submit"),
+                    submitting: t("form.submitting"),
+                    successTitle: t("form.successTitle"),
+                    successDescription: t("form.successDescription"),
+                    error: t("form.error")
+                  }}
+                />
+              </>
+            )}
           </div>
         </div>
       </Section>

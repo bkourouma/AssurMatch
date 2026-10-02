@@ -233,6 +233,56 @@
   font-weight: 700;
 }
 
+/* ---------- "Non inclus dans cette formule" - the limit stated next to the promise ---------- */
+
+.am-priceplan__notincluded {
+  margin-top: var(--am-space-8);
+  padding-top: var(--am-space-12);
+  border-top: 1px solid var(--am-border);
+}
+
+.am-priceplan__notincludedtitle {
+  margin: 0 0 var(--am-space-4);
+  color: var(--am-text-subtle);
+  font-size: var(--am-caption-size);
+  font-weight: 800;
+  letter-spacing: var(--am-tracking-wide);
+  text-transform: uppercase;
+}
+
+.am-priceplan__notincluded ul {
+  margin: 0;
+  padding-left: var(--am-space-16);
+  color: var(--am-text-muted);
+  font-size: var(--am-small-size);
+  line-height: 1.7;
+}
+
+/* ---------- "Ce qui n'est inclus dans aucune formule" - global exclusions ---------- */
+
+.am-neverincluded {
+  display: grid;
+  gap: var(--am-space-8);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.am-neverincluded li {
+  padding-left: var(--am-space-20);
+  position: relative;
+  color: var(--am-text-muted);
+  font-size: var(--am-small-size);
+  line-height: 1.6;
+}
+
+.am-neverincluded li::before {
+  content: "\2013";
+  position: absolute;
+  left: 0;
+  color: var(--am-text-subtle);
+}
+
 /* Generic key/value grid: lead ticket fields, plan setup/per-lead prices. */
 .am-kv {
   display: grid;
@@ -630,6 +680,92 @@
   display: grid;
   gap: var(--am-space-8) var(--am-space-20);
   grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+}
+
+/* ---------- Step controller (spec 050 D6): CSS-gated, never JS-dependent for the fallback ----------
+ *
+ * `html[data-js="true"]` is the app-wide progressive-enhancement flag (`Reveal`, `AutoSubmit`, …):
+ * absent, every rule below stays inactive and the plain fallback markup renders as one long page,
+ * exactly the "repli sans JavaScript" the content file describes. Present, `data-step-active` (kept
+ * in sync with React state on every step change) decides what shows. The final submit button is the
+ * one control visible by default (it is the only way to send the form without JavaScript); the
+ * "Continuer" and "Revenir a l'etape precedente" controls and the progress bar only make sense once a
+ * script can react to them, so they start hidden and only appear once `data-js` is set.
+ */
+html[data-js="true"] .am-formstepper__panel[data-step-active="false"] {
+  display: none;
+}
+
+.am-formstepper__progress,
+.am-formstepper__navitem[data-role="continue"],
+.am-formstepper__navitem[data-role="back"] {
+  display: none;
+}
+
+html[data-js="true"] .am-formstepper__progress {
+  display: block;
+  margin-bottom: var(--am-space-8);
+}
+
+html[data-js="true"] .am-formstepper__navitem[data-role="continue"][data-step-active="true"],
+html[data-js="true"] .am-formstepper__navitem[data-role="back"][data-step-active="true"] {
+  display: inline-flex;
+}
+
+/* The submit control is the only one visible by default (it is the sole no-JS action); once a script
+ * runs it hides itself on every step but the last, where "Continuer" (above) takes over instead. */
+html[data-js="true"] .am-formstepper__navitem[data-role="submit"][data-step-active="false"] {
+  display: none;
+}
+
+/* ---------- Review step (step 4): read-only recap of steps 1-3, only ever built client-side ---------- */
+
+.am-review {
+  display: grid;
+  gap: var(--am-space-16);
+  margin-bottom: var(--am-space-8);
+}
+
+.am-review__section {
+  padding: var(--am-space-16);
+  border: 1px solid var(--am-border);
+  border-radius: var(--am-radius-card);
+  background: var(--am-surface-muted);
+}
+
+.am-review__head {
+  display: flex;
+  gap: var(--am-space-12);
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: var(--am-space-8);
+}
+
+.am-review__title {
+  margin: 0;
+  color: var(--am-text);
+  font-size: var(--am-small-size);
+  font-weight: 800;
+  letter-spacing: var(--am-tracking-wide);
+  text-transform: uppercase;
+}
+
+.am-review__list {
+  display: grid;
+  gap: 2px;
+  margin: 0;
+}
+
+.am-review__list dt {
+  color: var(--am-text-subtle);
+  font-size: var(--am-caption-size);
+}
+
+.am-review__list dd {
+  margin: 0 0 var(--am-space-8);
+  color: var(--am-text);
+  font-size: var(--am-small-size);
+  font-weight: 700;
 }
 
 /* ==========================================================================

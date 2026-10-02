@@ -741,6 +741,14 @@
   list-style: none;
 }
 
+/* "L'essentiel en 5 lignes" notice at the top of a legal page. */
+.am-legal-summary {
+  display: grid;
+  gap: var(--am-space-8);
+  margin: 0;
+  padding-left: var(--am-space-20);
+}
+
 /* ==========================================================================
    10. 404 and error pages
    ========================================================================== */
@@ -824,4 +832,31 @@
 .am-errorpage-countries a:hover {
   border-color: var(--am-primary-300);
   color: var(--am-primary-700);
+}
+
+/* ==========================================================================
+   9. Guide detail — key points, mistakes to avoid, disclaimer (owner D)
+   ========================================================================== */
+
+/* "Ce que ce guide ne remplace pas": a muted card, not a Notice, since it is a passive statement
+   rather than an alert or an indicative-price warning. */
+.am-guide-disclaimer {
+  margin-bottom: var(--am-space-24);
+}
+
+.am-guide-disclaimer p {
+  margin: 0;
+  color: var(--am-text-muted);
+}
+
+/* ---------- FAQ grouped by theme (owner D) ---------- */
+
+.am-faq-group + .am-faq-group {
+  margin-top: var(--am-space-32);
+}
+
+.am-faq-group__title {
+  margin: 0 0 var(--am-space-16);
+  font-size: var(--am-h4-size);
+  line-height: var(--am-h4-line);
 }

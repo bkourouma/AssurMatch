@@ -186,13 +186,31 @@ export function OfferCriteria({
           </dd>
         </>
       ) : null}
-      {offer.updatedAt ? (
+      {/* On the card, the update date now sits at first level (`OfferUpdated`, below), outside this
+          drawer (FR-011, `content/02`); the detail page's full criteria list still shows it here. */}
+      {!repeated && offer.updatedAt ? (
         <>
           <dt>{t("criteria.updatedAt")}</dt>
           <dd>{formatDate(offer.updatedAt, { locale, ...(countryCode ? { countryIso: countryCode } : {}) })}</dd>
         </>
       ) : null}
     </dl>
+  );
+}
+
+/**
+ * Last-update date shown at the card's first level, not only inside the collapsed "Voir plus" drawer
+ * (FR-011). Renders nothing when the offer carries no update date.
+ */
+export function OfferUpdated({ offer, countryCode }: { offer: OfferSummary | OfferDetail; countryCode?: string | undefined }) {
+  const t = useTranslations("OfferCards");
+  const locale = useLocale();
+  if (!offer.updatedAt) return null;
+  return (
+    <p className="am-j-updated">
+      <Icon name="clock" size={14} />
+      {t("criteria.updatedAt")} : {formatDate(offer.updatedAt, { locale, ...(countryCode ? { countryIso: countryCode } : {}) })}
+    </p>
   );
 }
 
@@ -373,7 +391,10 @@ export function OfferCard({
             <input type="checkbox" name="ids" value={offer.id} form="compare-form" />
             <span className="am-j-pick__off">{t("pick")}</span>
             <span className="am-j-pick__on">{t("picked")}</span>
+            {/* Comma-separated so the accessible name reads "Ajouter a la comparaison, {name}" /
+                "Retirer de la comparaison, {name}" (charte 5), never the two run together. */}
             <span className="am-visually-hidden">
+              {", "}
               <BackendText>{offer.name}</BackendText>
             </span>
           </label>
@@ -390,6 +411,8 @@ export function OfferCard({
         <OfferPrice offer={offer} countryCode={countryCode} currency={currency} />
         <OfferFacts offer={offer} countryCode={countryCode} currency={currency} />
       </div>
+
+      <OfferUpdated offer={offer} countryCode={countryCode} />
 
       <OfferGuarantees offer={offer} limit={GUARANTEES_ON_CARD} />
 

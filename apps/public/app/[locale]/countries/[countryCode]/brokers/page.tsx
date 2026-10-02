@@ -9,6 +9,7 @@ import { Icon } from "../../../../components/ui/icons";
 import { Reveal } from "../../../../components/motion/reveal";
 import { Section } from "../../../../components/ui/section";
 import { listCountryDirectory, listCountryPartners, listPublicProducts } from "../../../../lib/public-api";
+import { formatDate } from "../../../../lib/country-format";
 import { buildMetadata, localeUrl } from "../../../../lib/seo";
 import type { PageMetadata } from "../../../../lib/seo";
 
@@ -131,6 +132,13 @@ export default async function CountryBrokersPage({ params }: { params: Promise<P
                     approved
                     {...(partner.city ? { city: partner.city } : {})}
                     {...(productLabels.length > 0 ? { products: productLabels } : {})}
+                    {...(partner.licenseExpiresAt
+                      ? {
+                          validityLabel: t("validUntil", {
+                            date: formatDate(partner.licenseExpiresAt, { locale, countryIso: countryCode })
+                          })
+                        }
+                      : {})}
                   />
                   <div className="am-j-cardgrid__actions">
                     <Button

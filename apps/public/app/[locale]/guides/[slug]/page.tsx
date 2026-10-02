@@ -3,6 +3,7 @@ import { getTranslations, setRequestLocale } from "next-intl/server";
 import { routing, toLocale, type AppLocale } from "../../../../i18n/routing";
 import { EntrySelector } from "../../../components/site/entry-selector";
 import { GuideCard } from "../../../components/institutional/guide-card";
+import { GuideDisclaimer, GuideKeyPoints, GuideMistakes } from "../../../components/institutional/guide-blocks";
 import { Breadcrumb } from "../../../components/ui/breadcrumb";
 import { Button } from "../../../components/ui/button";
 import { Hero } from "../../../components/ui/hero";
@@ -10,7 +11,7 @@ import { Icon } from "../../../components/ui/icons";
 import { Section } from "../../../components/ui/section";
 import { Reveal } from "../../../components/motion/reveal";
 import { getEntrySelectorData } from "../../../content/entry-selector-data";
-import { getGuide, guideSlugs, listGuides } from "../../../content/guides";
+import { getGuide, guideReadingTimeMinutes, guideSlugs, listGuides } from "../../../content/guides";
 import { formatDate } from "../../../lib/country-format";
 import { buildMetadata, localeUrl } from "../../../lib/seo";
 import type { PageMetadata } from "../../../lib/seo";
@@ -49,6 +50,9 @@ export default async function GuidePage({ params }: { params: Promise<PageParams
   const others = listGuides(locale)
     .filter((entry) => entry.slug !== guide.slug)
     .slice(0, 3);
+  const productLabel = (key?: string) =>
+    key === "auto" ? t("productAuto") : key === "voyage" ? t("productVoyage") : undefined;
+  const readingTimeLabel = (entry: typeof guide) => t("readingTime", { minutes: guideReadingTimeMinutes(entry) });
 
   return (
     <>
@@ -72,7 +76,11 @@ export default async function GuidePage({ params }: { params: Promise<PageParams
         <p className="am-reading__meta">
           <Icon name="calendar" size={16} />
           {t("updated", { date: formatDate(guide.updatedAt, { locale }) })}
+          <Icon name="clock" size={16} />
+          {readingTimeLabel(guide)}
         </p>
+
+        <GuideKeyPoints title={t("keyPointsTitle")} items={guide.keyPoints} />
 
         {guide.sections.length > 1 ? (
           <nav className="am-legal-toc" aria-label={t("contents")}>
@@ -111,6 +119,10 @@ export default async function GuidePage({ params }: { params: Promise<PageParams
           ))}
         </div>
 
+        <GuideMistakes title={t("mistakesTitle")} items={guide.mistakes} />
+
+        <GuideDisclaimer title={t("disclaimerTitle")}>{t("disclaimerBody")}</GuideDisclaimer>
+
         <div className="am-cluster">
           <Button href="/guides" variant="tertiary" icon={<Icon name="arrow-left" size={18} />}>
             {t("backToGuides")}
@@ -119,7 +131,7 @@ export default async function GuidePage({ params }: { params: Promise<PageParams
       </Section>
 
       {selector.countries.length > 0 ? (
-        <Section tone="muted" title={common("compareOffers")} lead={t("selectorLead")} width="narrow">
+        <Section tone="muted" title={common("compareOffers")} lead={guide.compareCta ?? t("selectorLead")} width="narrow">
           <EntrySelector countries={selector.countries} products={selector.products} defaultCountry={selector.defaultCountry} />
         </Section>
       ) : null}
@@ -134,6 +146,8 @@ export default async function GuidePage({ params }: { params: Promise<PageParams
                 title={entry.title}
                 description={entry.description}
                 meta={t("updated", { date: formatDate(entry.updatedAt, { locale }) })}
+                readingTimeLabel={readingTimeLabel(entry)}
+                productLabel={productLabel(entry.productKey)}
                 readLabel={t("read")}
               />
             ))}

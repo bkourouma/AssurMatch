@@ -73,6 +73,36 @@ export default async function HowItWorksPage({ params }: { params: Promise<{ loc
             </li>
           ))}
         </Reveal>
+
+        <Reveal>
+          <h3 id="qui-fait-quoi" className="am-timeline__title">
+            {t("responsibilitiesHeading")}
+          </h3>
+          <div className="am-table-wrap">
+            <table className="am-table" aria-labelledby="qui-fait-quoi">
+              <thead>
+                <tr>
+                  <th scope="col">{t("responsibilitiesColStep")}</th>
+                  <th scope="col">{t("responsibilitiesColVisitor")}</th>
+                  <th scope="col">{t("responsibilitiesColAssurMatch")}</th>
+                  <th scope="col">{t("responsibilitiesColBroker")}</th>
+                  <th scope="col">{t("responsibilitiesColInsurer")}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {content.responsibilities.map((row) => (
+                  <tr key={row.step}>
+                    <th scope="row">{row.step}</th>
+                    <td>{row.visitor}</td>
+                    <td>{row.assurMatch}</td>
+                    <td>{row.broker}</td>
+                    <td>{row.insurer}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </Reveal>
       </Section>
 
       <Section tone="muted" kicker={t("notDoneKicker")} title={content.notDone.heading} id={content.notDone.id}>

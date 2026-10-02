@@ -11,7 +11,7 @@ import { Icon, type IconName } from "../../components/ui/icons";
 import { IconTile } from "../../components/ui/icon-tile";
 import { Section } from "../../components/ui/section";
 import { Reveal } from "../../components/motion/reveal";
-import { brokerContent, brokerPlans } from "../../content/brokers";
+import { brokerContent, brokerPlans, partnerFaq } from "../../content/brokers";
 import { brokerLoginUrl } from "../../lib/site-config";
 import { buildMetadata, localeUrl } from "../../lib/seo";
 import type { PageMetadata } from "../../lib/seo";
@@ -28,8 +28,9 @@ export async function generateMetadata({ params }: { params: Promise<{ locale: s
   return buildMetadata({ title: t("title"), description: t("description"), href: "/brokers", locale });
 }
 
-/** Icon per expectation line, in the order `partnerExpectations` lists them (PRD: licence, capacity, consent). */
-const EXPECTATION_ICONS: readonly IconName[] = ["badge-check", "clock", "shield-check"];
+/** Icon per expectation line, in the order `partnerExpectations` lists them: licence, response
+ * discipline, price honesty, consent (spec 050 content/05). */
+const EXPECTATION_ICONS: readonly IconName[] = ["badge-check", "clock", "scale", "shield-check"];
 
 export default async function BrokersPage({ params }: { params: Promise<{ locale: string }> }) {
   const locale = toLocale((await params).locale);
@@ -39,6 +40,7 @@ export default async function BrokersPage({ params }: { params: Promise<{ locale
 
   const content = brokerContent(locale);
   const plans = brokerPlans(locale);
+  const faq = partnerFaq(locale);
 
   return (
     <>
@@ -110,7 +112,7 @@ export default async function BrokersPage({ params }: { params: Promise<{ locale
 
       <Reveal as="div">
         <Section title={t("expectations.title")} tone="muted">
-          <Reveal as="ul" stagger className="am-grid am-grid--3">
+          <Reveal as="ul" stagger className="am-grid am-grid--4">
             {content.partnerExpectations.map((expectation, index) => (
               <Card as="li" key={expectation}>
                 <CardHeader>
@@ -122,6 +124,19 @@ export default async function BrokersPage({ params }: { params: Promise<{ locale
               </Card>
             ))}
           </Reveal>
+        </Section>
+      </Reveal>
+
+      <Reveal as="div">
+        <Section title={t("faq.title")}>
+          <div className="am-faq">
+            {faq.map((item) => (
+              <details className="am-faq__item" key={item.id}>
+                <summary>{item.question}</summary>
+                <p className="am-faq__answer">{item.answer}</p>
+              </details>
+            ))}
+          </div>
         </Section>
       </Reveal>
 

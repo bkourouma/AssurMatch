@@ -27,11 +27,11 @@ export default function RootError({ error, reset }: { error: Error & { digest?: 
                 </span>
                 <h1 className="am-errorpage__title">Une erreur est survenue</h1>
                 <p className="am-errorpage__lead">
-                  Le service public est momentanement indisponible. Reessayez dans quelques instants.
+                  Le service public est momentanément indisponible. Réessayez dans quelques instants.
                 </p>
                 <p className="am-errorpage__actions">
                   <button className="am-button" data-variant="primary" type="button" onClick={reset}>
-                    <span>Reessayer</span>
+                    <span>Réessayer</span>
                   </button>
                 </p>
               </div>

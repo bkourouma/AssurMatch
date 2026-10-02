@@ -50,6 +50,7 @@ export default async function CountryCookiesPage({ params }: { params: Promise<P
       kicker={t("kicker")}
       lastUpdatedLabel={t("lastUpdated", { date: formatDate(page.updatedAt, { locale }) })}
       tocTitle={t("tocTitle")}
+      summaryTitle={t("summaryTitle")}
       placeholdersTitle={t("placeholdersTitle")}
       placeholderNotice={t("placeholderNotice")}
       countryNotice={{
