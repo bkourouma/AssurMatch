@@ -39,17 +39,44 @@ export interface PublicQuoteFormField {
   options?: string[];
 }
 
+/** Spec 050 R8: the country's dialling code and accepted national number lengths. */
+export interface PublicPhoneRule {
+  dialCode: string;
+  nationalLengths: number[];
+}
+
+export type PublicQuoteLanguage = "fr" | "en";
+
 export interface PublicQuoteFormState {
   formDefinitionId: string;
   version: string;
+  /** Spec 050 R6: the language of the served form; there is no silent fallback to another language. */
+  language?: string;
+  /** Spec 050 R8: absent or null for a country without a configured rule (the server stays the authority). */
+  phoneRule?: PublicPhoneRule | null;
   /** Spec 043: the published definition's fields, which the form renders and submits as answers. */
   fields: PublicQuoteFormField[];
   consent: {
     consentTextId: string;
     version: string;
+    /** Echoed back unchanged at submission: the server checks it against the published text. */
     contentHash: string;
+    /** Spec 050 R5: the published consent text, variables already resolved by the server. */
+    content?: string;
+    language?: string;
+    purpose?: string;
+    recipientCategory?: string;
   };
 }
+
+/**
+ * Spec 050 R6: the quote form read either succeeds, is refused because the form does not exist in
+ * the requested language (with the languages that do exist), or is unavailable altogether.
+ */
+export type PublicQuoteFormResult =
+  | { status: "success"; data: PublicQuoteFormState }
+  | { status: "language_unavailable"; availableLanguages: PublicQuoteLanguage[] }
+  | { status: "error"; error: string };
 
 export interface PublicQuoteSubmitState {
   status: "success" | "error" | "rate_limited";
@@ -233,8 +260,40 @@ export function comparePublicOffers(ids: string[], priority?: string) {
   return readPublic<OfferCompareResponse | null>(`/offers/compare?${params.toString()}`, null);
 }
 
-export function getPublicQuoteForm(countryCode: string, productKey: string) {
-  return readPublic<PublicQuoteFormState | null>(`/countries/${countryCode}/products/${productKey}/quote-form`, null);
+const publicQuoteLanguages: readonly PublicQuoteLanguage[] = ["fr", "en"];
+
+function isPublicQuoteLanguage(value: unknown): value is PublicQuoteLanguage {
+  return typeof value === "string" && (publicQuoteLanguages as readonly string[]).includes(value);
+}
+
+/**
+ * Spec 050 R6: the form is read in the visitor's language (`?language=`). Unlike `readPublic`, the
+ * error body is kept: a 404 `QUOTE_FORM_LANGUAGE_UNAVAILABLE` lists the languages in which the form
+ * exists, so the page can offer them instead of silently serving another language.
+ */
+export async function getPublicQuoteForm(countryCode: string, productKey: string, language: PublicQuoteLanguage): Promise<PublicQuoteFormResult> {
+  const params = new URLSearchParams({ language });
+  try {
+    const response = await fetch(
+      `${PUBLIC_API_BASE_URL}/countries/${encodeURIComponent(countryCode)}/products/${encodeURIComponent(productKey)}/quote-form?${params.toString()}`,
+      { cache: "no-store" }
+    );
+    if (!response.ok) {
+      const body = await response.json().catch(() => null) as { code?: unknown; availableLanguages?: unknown } | null;
+      if (response.status === 404 && body?.code === "QUOTE_FORM_LANGUAGE_UNAVAILABLE") {
+        const availableLanguages = Array.isArray(body.availableLanguages)
+          ? body.availableLanguages.filter(isPublicQuoteLanguage).filter((item) => item !== language)
+          : [];
+        if (availableLanguages.length > 0) return { status: "language_unavailable", availableLanguages };
+      }
+      return { status: "error", error: `api_${response.status}` };
+    }
+    const data = await response.json() as PublicQuoteFormState | null;
+    if (!data) return { status: "error", error: "empty_quote_form" };
+    return { status: "success", data };
+  } catch (error) {
+    return { status: "error", error: error instanceof Error ? error.message : "api_unavailable" };
+  }
 }
 
 export async function submitPublicQuoteRequest(input: QuoteRequestCreateDto): Promise<PublicQuoteSubmitState> {
@@ -248,6 +307,16 @@ export async function submitPublicQuoteRequest(input: QuoteRequestCreateDto): Pr
       return { status: "rate_limited", error: "rate_limited", messageKey: "rateLimited", publicMessage: "Trop de demandes. Reessayez plus tard." };
     }
     if (!response.ok) {
+      const errorBody = await response.json().catch(() => null) as { message?: unknown } | null;
+      const serverMessage = typeof errorBody?.message === "string" ? errorBody.message : "";
+      // Spec 050 R8: the server is the authority on the country phone rule.
+      if (response.status === 400 && /phone/i.test(serverMessage)) {
+        return { status: "error", error: "phone_invalid", messageKey: "quotePhoneInvalid", publicMessage: "Le numero de telephone ne correspond pas au format attendu pour ce pays." };
+      }
+      // Spec 050 R5: the consent text changed since the page was loaded.
+      if (response.status === 422 && /consent text mismatch/i.test(serverMessage)) {
+        return { status: "error", error: "consent_mismatch", messageKey: "quoteConsentOutdated", publicMessage: "Le texte de consentement a ete mis a jour. Rechargez la page pour lire la version en vigueur." };
+      }
       return { status: "error", error: `api_${response.status}`, messageKey: "quoteRejected", publicMessage: "La demande de devis ne peut pas etre envoyee avec ces informations." };
     }
     const body = await response.json() as { publicReference?: string; message?: string };

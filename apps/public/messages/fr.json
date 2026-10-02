@@ -521,8 +521,32 @@
     "emailHint": "Utilisée par le courtier partenaire pour vous répondre.",
     "phone": "Téléphone",
     "phoneHint": "Indicatif pays compris.",
+    "phoneRuleHint": "Format attendu : {dialCode} suivi de {lengths} chiffres, ou {lengths} chiffres sans indicatif.",
     "needLegend": "Votre besoin",
     "choose": "Choisir",
+    "options": {
+      "contact_preference": {
+        "phone": "Téléphone",
+        "email": "E-mail",
+        "whatsapp": "WhatsApp"
+      },
+      "desired_timing": {
+        "immediate": "Dès que possible",
+        "within_month": "Dans le mois",
+        "within_quarter": "Dans les trois mois"
+      },
+      "preferred_language": {
+        "fr": "Français",
+        "en": "Anglais"
+      },
+      "source": {
+        "search": "Moteur de recherche",
+        "social": "Réseaux sociaux",
+        "word_of_mouth": "Bouche-à-oreille",
+        "partner": "Courtier partenaire",
+        "other": "Autre"
+      }
+    },
     "consentLegend": "Consentement",
     "consentLabel": "J'accepte que ma demande soit transmise à un courtier partenaire éligible pour ce pays et ce produit.",
     "multiBrokerLabel": "Facultatif : j'accepte d'être rappelé par plusieurs courtiers partenaires éligibles (jusqu'à 3). Sans cette case, votre demande n'est transmise qu'à un seul courtier.",
@@ -538,6 +562,15 @@
     "blocked": {
       "title": "Demande de devis indisponible",
       "description": "La demande de devis n'est pas disponible pour ce pays ou ce produit."
+    },
+    "languageUnavailable": {
+      "title": "Formulaire indisponible en français",
+      "description": "La demande de devis pour ce produit n'est pas encore publiée en français. Elle est disponible dans une autre langue : vous pouvez la consulter ci-dessous.",
+      "listLabel": "Langues disponibles",
+      "link": {
+        "fr": "Ouvrir le formulaire en français",
+        "en": "Ouvrir le formulaire en anglais (English)"
+      }
     },
     "fineprint": "AssurMatch ne vend pas d'assurance et n'émet ni contrat ni attestation. Le courtier partenaire responsable confirme le devis et les conditions."
   },
@@ -734,7 +767,9 @@
     "applicationSent": "Candidature reçue. Elle sera étudiée par notre équipe conformité.",
     "applicationFailed": "Envoi de la candidature impossible pour le moment.",
     "consentWithdrawn": "Votre retrait de consentement est enregistré.",
-    "consentWithdrawalFailed": "Le retrait de consentement n'a pas pu être enregistré avec ce lien."
+    "consentWithdrawalFailed": "Le retrait de consentement n'a pas pu être enregistré avec ce lien.",
+    "quotePhoneInvalid": "Le numéro de téléphone ne correspond pas au format attendu pour ce pays.",
+    "quoteConsentOutdated": "Le texte de consentement a été mis à jour. Rechargez la page pour lire la version en vigueur avant d'envoyer votre demande."
   },
   "Forms": {
     "required": "obligatoire",

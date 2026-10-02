@@ -1,12 +1,11 @@
 "use client";
 
-import { useTranslations } from "next-intl";
+import { useLocale, useMessages, useTranslations } from "next-intl";
 import { useState, type FormEvent, type ReactNode } from "react";
 import { Link } from "../../i18n/navigation";
-import { submitPublicQuoteRequest, type PublicQuoteFormField, type PublicQuoteFormState } from "../lib/public-api";
+import { submitPublicQuoteRequest, type PublicPhoneRule, type PublicQuoteFormField, type PublicQuoteFormState, type PublicQuoteLanguage } from "../lib/public-api";
 import { IndicativeOfferNotice } from "./public-journey";
 import { VisitorAiAssistant } from "./visitor-ai-assistant";
-import { BackendText } from "./ui/backend-text";
 import { Button } from "./ui/button";
 import { EmptyState } from "./ui/empty-state";
 import { Field, fieldControlProps } from "./ui/field";
@@ -35,7 +34,31 @@ function collectAnswers(formData: FormData, fields: PublicQuoteFormField[]): Rec
   return answers;
 }
 
-function QuoteFormFieldInput({ field, chooseLabel, requiredLabel }: { field: PublicQuoteFormField; chooseLabel: string; requiredLabel: string }) {
+/** Localised display labels of known select option codes; the submitted value stays the code. */
+type OptionLabels = Record<string, Record<string, string> | undefined>;
+
+function optionLabel(labels: OptionLabels, field: PublicQuoteFormField, option: string): string {
+  return labels[field.key]?.[option] ?? option;
+}
+
+/**
+ * Spec 050 R8: digits only, with spaces, dots and dashes tolerated as the server does. The pattern
+ * is a convenience for the visitor: the server's check of the country rule stays the authority.
+ */
+function dialDigits(rule: PublicPhoneRule): string {
+  return rule.dialCode.replace(/\D/g, "");
+}
+
+function phonePattern(rule: PublicPhoneRule | null | undefined): string | undefined {
+  if (!rule || rule.nationalLengths.length === 0) return undefined;
+  const digits = dialDigits(rule);
+  if (!digits) return undefined;
+  const separator = "[\\s.\\-]*";
+  const national = rule.nationalLengths.map((length) => `(?:${separator}\\d){${length}}`).join("|");
+  return `${separator}(?:\\+${digits})?(?:${national})${separator}`;
+}
+
+function QuoteFormFieldInput({ field, chooseLabel, requiredLabel, optionLabels, language }: { field: PublicQuoteFormField; chooseLabel: string; requiredLabel: string; optionLabels: OptionLabels; language: string }) {
   const name = `answer_${field.key}`;
   const id = `am-answer-${field.key}`;
 
@@ -44,9 +67,7 @@ function QuoteFormFieldInput({ field, chooseLabel, requiredLabel }: { field: Pub
     return (
       <label className="am-j-consent" htmlFor={id}>
         <input id={id} name={name} type="checkbox" required={field.required} />
-        <span>
-          <BackendText>{field.label}</BackendText>
-        </span>
+        <span lang={language}>{field.label}</span>
       </label>
     );
   }
@@ -60,7 +81,7 @@ function QuoteFormFieldInput({ field, chooseLabel, requiredLabel }: { field: Pub
           </option>
           {(field.options ?? []).map((option) => (
             <option key={option} value={option}>
-              {option}
+              {optionLabel(optionLabels, field, option)}
             </option>
           ))}
         </select>
@@ -101,9 +122,41 @@ function QuoteSection({ index, legend, children }: { index: number; legend: stri
   );
 }
 
-export function QuoteFormShell({ countryCode, productKey, quoteForm, selectedOfferId }: { countryCode: string; productKey: string; quoteForm: PublicQuoteFormState; selectedOfferId?: string | undefined }) {
+export function QuoteFormShell({
+  countryCode,
+  productKey,
+  language,
+  quoteForm,
+  selectedOfferId
+}: {
+  countryCode: string;
+  productKey: string;
+  /** Spec 050 R6: the language the form was served in, sent back with the request. */
+  language: PublicQuoteLanguage;
+  quoteForm: PublicQuoteFormState;
+  selectedOfferId?: string | undefined;
+}) {
   const t = useTranslations("QuoteForm");
   const forms = useTranslations("Forms");
+  const api = useTranslations("Api");
+  const locale = useLocale();
+  // Option codes are what the server stores; the labels come from the mounted QuoteForm namespace.
+  const optionLabels: OptionLabels = useMessages().QuoteForm?.options ?? {};
+  const formLanguage = quoteForm.language ?? language;
+
+  // Spec 050 R8: the hint states the country rule; without a rule the generic hint stays.
+  const phoneRule = quoteForm.phoneRule && quoteForm.phoneRule.nationalLengths.length > 0 && dialDigits(quoteForm.phoneRule) ? quoteForm.phoneRule : null;
+  const phoneHint = phoneRule
+    ? t("phoneRuleHint", {
+        dialCode: `+${dialDigits(phoneRule)}`,
+        lengths: new Intl.ListFormat(locale, { type: "disjunction" }).format(phoneRule.nationalLengths.map(String))
+      })
+    : t("phoneHint");
+  const phoneInputPattern = phonePattern(phoneRule);
+
+  // Spec 050 R5: the published consent text, variables resolved server-side, rendered as plain text.
+  // The static sentence only remains for an older API that does not serve the content.
+  const consentContent = quoteForm.consent.content?.trim();
   const [result, setResult] = useState<{ status: "idle" | "submitting" | "success" | "error"; message?: string; publicReference?: string; verificationToken?: string }>({ status: "idle" });
 
   async function submit(event: FormEvent<HTMLFormElement>) {
@@ -121,6 +174,7 @@ export function QuoteFormShell({ countryCode, productKey, quoteForm, selectedOff
       countryCode,
       productKey,
       formDefinitionId: quoteForm.formDefinitionId,
+      language,
       ...(selectedOfferId ? { selectedOfferId } : {}),
       contact: {
         displayName: String(formData.get("displayName") ?? "").trim() || undefined,
@@ -143,7 +197,7 @@ export function QuoteFormShell({ countryCode, productKey, quoteForm, selectedOff
       setResult({ status: "success", message: response.publicMessage, publicReference: response.publicReference ?? "", ...(response.verificationToken ? { verificationToken: response.verificationToken } : {}) });
       return;
     }
-    setResult({ status: "error", message: response.publicMessage });
+    setResult({ status: "error", message: api(response.messageKey) });
   }
 
   const pending = result.status === "submitting";
@@ -229,12 +283,14 @@ export function QuoteFormShell({ countryCode, productKey, quoteForm, selectedOff
                 autoComplete="email"
               />
             </Field>
-            <Field id="am-quote-phone" label={t("phone")} hint={t("phoneHint")} required requiredLabel={forms("required")} leading="phone">
+            <Field id="am-quote-phone" label={t("phone")} hint={phoneHint} required requiredLabel={forms("required")} leading="phone">
               <input
-                {...fieldControlProps("am-quote-phone", { hint: t("phoneHint"), required: true })}
+                {...fieldControlProps("am-quote-phone", { hint: phoneHint, required: true })}
                 name="phone"
                 type="tel"
                 autoComplete="tel"
+                inputMode="tel"
+                {...(phoneInputPattern ? { pattern: phoneInputPattern, title: phoneHint } : {})}
               />
             </Field>
           </div>
@@ -244,7 +300,14 @@ export function QuoteFormShell({ countryCode, productKey, quoteForm, selectedOff
           <QuoteSection index={2} legend={t("needLegend")}>
             <div className="am-j-form__grid">
               {quoteForm.fields.map((field) => (
-                <QuoteFormFieldInput key={field.key} field={field} chooseLabel={t("choose")} requiredLabel={forms("required")} />
+                <QuoteFormFieldInput
+                  key={field.key}
+                  field={field}
+                  chooseLabel={t("choose")}
+                  requiredLabel={forms("required")}
+                  optionLabels={optionLabels}
+                  language={formLanguage}
+                />
               ))}
             </div>
           </QuoteSection>
@@ -255,7 +318,13 @@ export function QuoteFormShell({ countryCode, productKey, quoteForm, selectedOff
           <div className="am-j-consents">
             <label className="am-j-consent" htmlFor="am-quote-consent">
               <input id="am-quote-consent" name="consent" type="checkbox" required />
-              <span>{t("consentLabel")}</span>
+              {consentContent ? (
+                <span className="am-j-consent__text" lang={quoteForm.consent.language ?? formLanguage} style={{ whiteSpace: "pre-line" }}>
+                  {consentContent}
+                </span>
+              ) : (
+                <span>{t("consentLabel")}</span>
+              )}
             </label>
             <label className="am-j-consent" htmlFor="am-quote-multi-broker">
               <input id="am-quote-multi-broker" name="multiBroker" type="checkbox" />
