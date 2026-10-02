@@ -2,10 +2,10 @@
 
 **Feature Branch**: `claude/inspiring-maxwell-58e67d` (branche de session imposée ; pas de branche `051-*` créée)
 **Created**: 2026-10-02
-**Status**: Draft
+**Status**: Validated by user on 2026-10-02
 **Input**: PRD v0.3 (`docs/prd/prd_v0.3_completion_mise_en_production.md`), EPIC A (A-01 à A-10, A-12) et scénario SC-02 « Onboarder un courtier ». Décisions produit du 2026-10-02 : D-6 (Actif test : aucun lead réel) ; suspension en lecture seule et résiliation qui bloque la connexion ; contrat signé hors plateforme et enregistré par l'admin ; preuve d'agrément acceptée obligatoire.
-**Validation State**: Draft
-**Continuous Workflow Eligible**: Pas encore. La spec le deviendra une fois validée par l'utilisateur ; elle ne contient aucun marqueur `[NEEDS CLARIFICATION]`.
+**Validation State**: Validated by user
+**Continuous Workflow Eligible**: Yes. Validée par l'utilisateur le 2026-10-02, aucun marqueur `[NEEDS CLARIFICATION]`.
 
 ## Why this spec exists
 
