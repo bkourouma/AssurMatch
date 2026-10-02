@@ -51,7 +51,19 @@ export const adminNavigation: NavGroup[] = [
   {
     title: "Catalogue",
     items: [
-      { label: "Catalogue", href: "/catalog", icon: "catalog", match: ["/catalog", "/offers"] },
+      // Spec 050: the catalogue became administrable (countries, products, regimes, consent texts).
+      {
+        label: "Catalogue",
+        href: "/catalog",
+        icon: "catalog",
+        match: ["/catalog", "/offers", "/consent-texts"],
+        children: [
+          { label: "Pays", href: "/catalog/countries" },
+          { label: "Produits", href: "/catalog/products" },
+          { label: "Régimes", href: "/catalog/regimes" },
+          { label: "Consentements", href: "/consent-texts" }
+        ]
+      },
       // Spec 043: the screen existed but nothing linked to it, so no operator could reach it.
       { label: "Formulaires devis", href: "/quote-form-definitions", icon: "form", match: ["/quote-form-definitions"] },
       { label: "Scoring", href: "/scoring", icon: "gauge", match: ["/scoring"] },

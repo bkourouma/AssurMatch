@@ -1,4 +1,11 @@
 import { backOfficeApiBaseUrl, getBackOfficeToken } from "./backoffice-auth";
+import type {
+  AdminCountryProductLinkView,
+  AdminCountryView,
+  AdminProductView,
+  AdminRegulatoryRegimeView
+} from "../../../../packages/shared/contracts/catalog.contracts";
+import type { AdminConsentTextView, ConsentTextTemplate } from "../../../../packages/shared/contracts/compliance.contracts";
 
 export const ADMIN_AUTH_SOURCE_MARKER = "admin-auth-client:014";
 
@@ -700,6 +707,8 @@ export interface QuoteFormDefinitionData {
   status: "draft" | "published" | "suspended" | "retired";
   consentTextId: string;
   fieldCount: number;
+  /** Spec 050 FR-019: a more recent published version of the referenced consent text exists. */
+  consentSuperseded?: boolean;
   dataMinimizationNotes?: string;
   publishedAt?: string;
   retiredAt?: string;
@@ -716,8 +725,11 @@ export interface QuoteFormFieldInput {
   options?: string[];
 }
 
-export function readQuoteFormDefinitions() {
-  return readAdmin<QuoteFormDefinitionData[]>("/admin/quote-form-definitions", []);
+export function readQuoteFormDefinitions(filters: { language?: string } = {}) {
+  const params = new URLSearchParams();
+  if (filters.language) params.set("language", filters.language);
+  const query = params.toString();
+  return readAdmin<QuoteFormDefinitionData[]>(`/admin/quote-form-definitions${query ? `?${query}` : ""}`, []);
 }
 
 export function createQuoteFormDefinition(input: {
@@ -946,4 +958,257 @@ export async function consumePasswordReset(token: string, newPassword: string): 
     cache: "no-store"
   });
   if (!response.ok) throw new Error(`api_${response.status}`);
+}
+
+/* ---------------------------------------------------------------------------------------------
+ * Spec 050: catalogue, regimes, consent texts and global feature flags.
+ *
+ * The catalogue mutations go through `writeAdminResult`, which never throws on an API refusal: an
+ * activation refused by the checklist (422 `ACTIVATION_BLOCKED`) or a consent text refused at
+ * publication (422 `CONSENT_TEXT_INVALID`) carries the list of failing controls in `blockers`, and
+ * the screen has to show that list instead of a bare status code. `writeAdmin` above is unchanged
+ * for its existing callers.
+ * ------------------------------------------------------------------------------------------- */
+
+export interface AdminWriteBlocker {
+  section: string;
+  control: string;
+  label: string;
+  evidence: string;
+}
+
+export interface AdminWriteResult<T> {
+  ok: boolean;
+  status: number;
+  data?: T;
+  code?: string;
+  message?: string;
+  blockers: AdminWriteBlocker[];
+  availableLanguages: string[];
+}
+
+function toBlockers(value: unknown): AdminWriteBlocker[] {
+  if (!Array.isArray(value)) return [];
+  return value.flatMap((entry) => {
+    if (!entry || typeof entry !== "object") return [];
+    const record = entry as Record<string, unknown>;
+    const text = (key: string) => (typeof record[key] === "string" ? (record[key] as string) : "");
+    return [{ section: text("section"), control: text("control"), label: text("label") || text("control"), evidence: text("evidence") }];
+  });
+}
+
+async function writeAdminResult<T>(path: string, method: "POST" | "PATCH", body: unknown): Promise<AdminWriteResult<T>> {
+  const token = await getBackOfficeToken();
+  if (!token) return { ok: false, status: 401, code: "session_required", blockers: [], availableLanguages: [] };
+  try {
+    const response = await fetch(`${backOfficeApiBaseUrl()}${path}`, {
+      method,
+      headers: { Authorization: `Bearer ${token}`, "content-type": "application/json" },
+      body: JSON.stringify(body),
+      cache: "no-store"
+    });
+    const payload = await response.json().catch(() => undefined) as unknown;
+    if (response.ok) return { ok: true, status: response.status, data: payload as T, blockers: [], availableLanguages: [] };
+    const record = payload && typeof payload === "object" ? payload as Record<string, unknown> : {};
+    return {
+      ok: false,
+      status: response.status,
+      ...(typeof record.code === "string" ? { code: record.code } : {}),
+      ...(typeof record.message === "string" ? { message: record.message } : {}),
+      blockers: toBlockers(record.blockers),
+      availableLanguages: Array.isArray(record.availableLanguages)
+        ? record.availableLanguages.filter((value): value is string => typeof value === "string")
+        : []
+    };
+  } catch (error) {
+    return { ok: false, status: 0, code: "api_unavailable", message: error instanceof Error ? error.message : "api_unavailable", blockers: [], availableLanguages: [] };
+  }
+}
+
+/** Mirrors `AdminCountryProductLinkView` (packages/shared/contracts/catalog.contracts.ts). */
+export type AdminCountryProductLinkData = AdminCountryProductLinkView;
+export type AdminCountryData = AdminCountryView;
+export type AdminProductData = AdminProductView;
+export type AdminRegulatoryRegimeData = AdminRegulatoryRegimeView;
+export type AdminConsentTextData = AdminConsentTextView;
+export type ConsentTextTemplateData = ConsentTextTemplate;
+
+export interface AdminCountryWriteInput {
+  name?: string;
+  currency?: string;
+  languages?: string[];
+  timezone?: string;
+  regulatoryFamily?: AdminCountryView["regulatoryFamily"];
+  regulatoryRegimeId?: string;
+  phoneDialCode?: string;
+  phoneNationalLengths?: number[];
+}
+
+export function readAdminCountries() {
+  return readAdmin<AdminCountryView[]>("/admin/countries", []);
+}
+
+export function readAdminCountry(countryId: string) {
+  return readAdmin<AdminCountryView | null>(`/admin/countries/${encodeURIComponent(countryId)}`, null);
+}
+
+export function createAdminCountry(input: AdminCountryWriteInput & { isoCode: string; reason: string }) {
+  return writeAdminResult<AdminCountryView>("/admin/countries", "POST", input);
+}
+
+export function updateAdminCountry(countryId: string, input: AdminCountryWriteInput & { expectedUpdatedAt?: string; reason: string }) {
+  return writeAdminResult<AdminCountryView>(`/admin/countries/${encodeURIComponent(countryId)}`, "PATCH", input);
+}
+
+export function changeAdminCountryStatus(countryId: string, input: { status: string; reason: string }) {
+  return writeAdminResult<AdminCountryView>(`/admin/countries/${encodeURIComponent(countryId)}/status`, "POST", input);
+}
+
+export function toggleAdminCountryFlag(countryId: string, input: { key: string; value: boolean; reason: string }) {
+  return writeAdminResult<AdminCountryView>(`/admin/countries/${encodeURIComponent(countryId)}/flags`, "POST", input);
+}
+
+export function readAdminCountryLinks(countryId: string) {
+  return readAdmin<AdminCountryProductLinkView[]>(`/admin/countries/${encodeURIComponent(countryId)}/products`, []);
+}
+
+export function createAdminCountryLink(countryId: string, input: { productId: string; reason: string }) {
+  return writeAdminResult<AdminCountryProductLinkView>(`/admin/countries/${encodeURIComponent(countryId)}/products`, "POST", input);
+}
+
+export function retireAdminCountryLink(countryId: string, productId: string, reason: string) {
+  return writeAdminResult<AdminCountryProductLinkView>(
+    `/admin/countries/${encodeURIComponent(countryId)}/products/${encodeURIComponent(productId)}/retire`,
+    "POST",
+    { reason }
+  );
+}
+
+export function toggleAdminCountryLinkFlag(countryId: string, productId: string, input: { key: string; value: boolean; reason: string }) {
+  return writeAdminResult<AdminCountryProductLinkView>(
+    `/admin/countries/${encodeURIComponent(countryId)}/products/${encodeURIComponent(productId)}/flags`,
+    "POST",
+    input
+  );
+}
+
+export interface AdminProductWriteInput {
+  name?: string;
+  description?: string;
+  sensitivity?: AdminProductView["sensitivity"];
+  requiresDocuments?: boolean;
+  requiresManualReview?: boolean;
+}
+
+export function readAdminProducts(filters: { countryId?: string } = {}) {
+  const query = filters.countryId ? `?countryId=${encodeURIComponent(filters.countryId)}` : "";
+  return readAdmin<AdminProductView[]>(`/admin/products${query}`, []);
+}
+
+export function readAdminProduct(productId: string) {
+  return readAdmin<AdminProductView | null>(`/admin/products/${encodeURIComponent(productId)}`, null);
+}
+
+export function createAdminProduct(input: AdminProductWriteInput & { key: string; name: string; reason: string }) {
+  return writeAdminResult<AdminProductView>("/admin/products", "POST", input);
+}
+
+export function updateAdminProduct(productId: string, input: AdminProductWriteInput & { expectedUpdatedAt?: string; reason: string }) {
+  return writeAdminResult<AdminProductView>(`/admin/products/${encodeURIComponent(productId)}`, "PATCH", input);
+}
+
+export function toggleAdminProductFlag(productId: string, input: { key: string; value: boolean; reason: string }) {
+  return writeAdminResult<AdminProductView>(`/admin/products/${encodeURIComponent(productId)}/flags`, "POST", input);
+}
+
+export interface RegulatoryRegimeWriteInput {
+  name?: string;
+  description?: string;
+  retentionOverrideYears?: number;
+  requiresManualActivationReview?: boolean;
+  status?: "draft" | "active" | "suspended";
+}
+
+export function readRegulatoryRegimes() {
+  return readAdmin<AdminRegulatoryRegimeView[]>("/admin/regulatory-regimes", []);
+}
+
+export function createRegulatoryRegime(input: RegulatoryRegimeWriteInput & { key: string; name: string; reason: string }) {
+  return writeAdminResult<AdminRegulatoryRegimeView>("/admin/regulatory-regimes", "POST", input);
+}
+
+export function updateRegulatoryRegime(regimeId: string, input: RegulatoryRegimeWriteInput & { expectedUpdatedAt?: string; reason: string }) {
+  return writeAdminResult<AdminRegulatoryRegimeView>(`/admin/regulatory-regimes/${encodeURIComponent(regimeId)}`, "PATCH", input);
+}
+
+export function retireRegulatoryRegime(regimeId: string, reason: string) {
+  return writeAdminResult<AdminRegulatoryRegimeView>(`/admin/regulatory-regimes/${encodeURIComponent(regimeId)}/retire`, "POST", { reason });
+}
+
+export interface AdminConsentTextFilters {
+  countryId?: string;
+  productId?: string;
+  purpose?: string;
+  language?: string;
+  status?: string;
+}
+
+export function readAdminConsentTexts(filters: AdminConsentTextFilters = {}) {
+  const params = new URLSearchParams();
+  for (const [key, value] of Object.entries(filters)) {
+    if (value) params.set(key, value);
+  }
+  const query = params.toString();
+  return readAdmin<AdminConsentTextView[]>(`/admin/consent-texts${query ? `?${query}` : ""}`, []);
+}
+
+export function readConsentTextTemplates() {
+  return readAdmin<ConsentTextTemplate[]>("/admin/consent-texts/templates", []);
+}
+
+export function readAdminConsentText(consentTextId: string, options: { preview?: boolean } = {}) {
+  const query = options.preview ? "?preview=1" : "";
+  return readAdmin<AdminConsentTextView | null>(`/admin/consent-texts/${encodeURIComponent(consentTextId)}${query}`, null);
+}
+
+export function createAdminConsentText(input: {
+  purpose: AdminConsentTextView["purpose"];
+  countryId: string;
+  productId?: string;
+  channel: AdminConsentTextView["channel"];
+  recipientCategory: string;
+  language: string;
+  version: string;
+  content: string;
+  reason: string;
+}) {
+  return writeAdminResult<AdminConsentTextView>("/admin/consent-texts", "POST", input);
+}
+
+export function publishAdminConsentText(consentTextId: string, reason: string) {
+  return writeAdminResult<AdminConsentTextView>(`/admin/consent-texts/${encodeURIComponent(consentTextId)}/publish`, "POST", { reason });
+}
+
+export function retireAdminConsentText(consentTextId: string, reason: string) {
+  return writeAdminResult<AdminConsentTextView>(`/admin/consent-texts/${encodeURIComponent(consentTextId)}/retire`, "POST", { reason });
+}
+
+/** A feature flag row as listed by `GET /admin/feature-flags` (global and scoped rows). */
+export interface AdminFeatureFlagData {
+  id: string;
+  key: string;
+  scopeType: "global" | "country" | "product" | "partner" | "plan" | "module" | "ai";
+  scopeId?: string | null;
+  value: boolean;
+  reason?: string;
+  changedAt?: string;
+  changedById?: string | null;
+}
+
+export function readAdminFeatureFlags() {
+  return readAdmin<AdminFeatureFlagData[]>("/admin/feature-flags", []);
+}
+
+export function updateAdminFeatureFlag(flagId: string, input: { value: boolean; reason: string }) {
+  return writeAdminResult<AdminFeatureFlagData>(`/admin/feature-flags/${encodeURIComponent(flagId)}`, "PATCH", input);
 }

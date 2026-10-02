@@ -61,8 +61,8 @@ description: "Task list for 050 — Administration du catalogue, des consentemen
   - flag IA refusé ;
   - 409 concurrence.
 - [x] T013 [P] [US1] Tests unitaires `backend/tests/unit/catalog/catalog-flag.service.spec.ts` : allowlist, désactivation sans condition, historique et audit.
-- [ ] T014 [US1] Admin : client API (`apps/admin/app/lib/admin-api.ts`), actions (`apps/admin/app/lib/catalog-actions.ts`), pages `apps/admin/app/catalog/page.tsx` (hub), `catalog/countries/page.tsx` et `catalog/countries/[countryId]/page.tsx` (fiche, statut, flags, liaisons, résumé de checklist), entrées de navigation dans `lib/ui/admin-shell.tsx`.
-- [ ] T015 [P] [US1] Tests de marqueurs `apps/admin/tests/catalog-admin.spec.ts`. Mettre à jour `catalog-foundation.spec.ts` et `admin-ux-polish.spec.ts` si besoin, sans retirer les garde-fous de formulation.
+- [x] T014 [US1] Admin : client API (`apps/admin/app/lib/admin-api.ts`), actions (`apps/admin/app/lib/catalog-actions.ts`), pages `apps/admin/app/catalog/page.tsx` (hub), `catalog/countries/page.tsx` et `catalog/countries/[countryId]/page.tsx` (fiche, statut, flags, liaisons, résumé de checklist), entrées de navigation dans `lib/ui/admin-shell.tsx`.
+- [x] T015 [P] [US1] Tests de marqueurs `apps/admin/tests/catalog-admin.spec.ts`. Mettre à jour `catalog-foundation.spec.ts` et `admin-ux-polish.spec.ts` si besoin, sans retirer les garde-fous de formulation.
 
 ## Phase 4: User Story 2 — Produits et liaisons (P1)
 
@@ -74,7 +74,7 @@ description: "Task list for 050 — Administration du catalogue, des consentemen
   - revue manuelle d'un produit sensible réservée à la conformité ;
   - flags SN × Voyage sans effet sur CI × Voyage ;
   - suspension globale.
-- [ ] T019 [US2] Admin : pages `catalog/products/page.tsx` et `catalog/products/[productId]/page.tsx`, formulaires de liaison et de flags de liaison sur la fiche pays.
+- [x] T019 [US2] Admin : pages `catalog/products/page.tsx` et `catalog/products/[productId]/page.tsx`, formulaires de liaison et de flags de liaison sur la fiche pays.
 
 ## Phase 5: User Story 3 — Textes de consentement (P1)
 
@@ -89,7 +89,7 @@ description: "Task list for 050 — Administration du catalogue, des consentemen
   - audit.
 - [x] T022 [P] [US3] Tests unitaires du contenu, de l'empreinte et de la résolution des variables dans `backend/tests/unit/consent/consent-content.spec.ts`.
 - [x] T023 [US3] Route publique du formulaire : contenu résolu, langue, `phoneRule`, 404 `QUOTE_FORM_LANGUAGE_UNAVAILABLE` (sans repli). La soumission valide le consentement dans la langue de la demande et stocke `language` (`quote-form-definition.service.ts`, `quote-submission.service.ts`, `quote-requests.repository.ts`, wiring).
-- [ ] T024 [US3] Admin : pages `consent-texts/page.tsx` (liste, création depuis un modèle) et `consent-texts/[consentTextId]/page.tsx` (aperçu, publication, retrait), actions `lib/consent-actions.ts`, navigation.
+- [x] T024 [US3] Admin : pages `consent-texts/page.tsx` (liste, création depuis un modèle) et `consent-texts/[consentTextId]/page.tsx` (aperçu, publication, retrait), actions `lib/consent-actions.ts`, navigation.
 
 ## Phase 6: User Story 4 — Formulaires bilingues complets (P1)
 
@@ -101,18 +101,18 @@ description: "Task list for 050 — Administration du catalogue, des consentemen
 - [x] T027 [P] [US4] Tests :
   - unitaires : `quote-form-definition.service.spec.ts` (génériques, langue), `prospect-identity.service.spec.ts` (+225 avec 10 chiffres, +221 avec 9 chiffres, refus) ;
   - intégration publique : langue `en`, 404 de langue indisponible, consentement EN vérifié à la soumission.
-- [ ] T028 [US4] Site public :
+- [x] T028 [US4] Site public :
   - `getPublicQuoteForm` envoie la locale ;
   - la page affiche le message de langue indisponible avec un lien ;
   - `quote-form.tsx` affiche le contenu du consentement publié au lieu du libellé fixe, envoie `language`, et utilise `phoneRule` pour l'aide et le `pattern` ;
   - messages `fr.json` et `en.json` (séparation public/back-office).
-- [ ] T029 [P] [US4] Tests de marqueurs publics `apps/public/tests/public-quote-form.spec.ts` (langue, contenu du consentement, téléphone) ; parité des clés i18n.
-- [ ] T030 [US4] Admin `quote-form-definitions` : filtre de langue, alerte « consentement remplacé » (FR-019).
+- [x] T029 [P] [US4] Tests de marqueurs publics `apps/public/tests/public-quote-form.spec.ts` (langue, contenu du consentement, téléphone) ; parité des clés i18n.
+- [x] T030 [US4] Admin `quote-form-definitions` : filtre de langue, alerte « consentement remplacé » (FR-019).
 
 ## Phase 7: User Story 5 — Checklist actionnable et seed (P2)
 
-- [ ] T031 [US5] `apps/admin/app/activation-checklist/page.tsx` : filtres pays et produit, lien « Corriger » par contrôle (GET uniquement ; le test « pas de PATCH/POST » est conservé), libellé du nouveau contrôle partenaire.
-- [ ] T032 [US5] `apps/admin/app/feature-flags/page.tsx` : bascule des flags globaux non sensibles existants (PATCH existant via une action), flags sensibles en lecture seule ; mise à jour de `apps/admin/tests/feature-flags.spec.ts` sans retirer les marqueurs de garde.
+- [x] T031 [US5] `apps/admin/app/activation-checklist/page.tsx` : filtres pays et produit, lien « Corriger » par contrôle (GET uniquement ; le test « pas de PATCH/POST » est conservé), libellé du nouveau contrôle partenaire.
+- [x] T032 [US5] `apps/admin/app/feature-flags/page.tsx` : bascule des flags globaux non sensibles existants (PATCH existant via une action), flags sensibles en lecture seule ; mise à jour de `apps/admin/tests/feature-flags.spec.ts` sans retirer les marqueurs de garde.
 - [x] T033 [US5] `scripts/preprod/seed-reference.ts` et `seeds/reference/countries.json` :
   - CI et SN en fr et en, avec règles téléphoniques ;
   - flags et statut écrits à la création seulement ;
@@ -123,14 +123,14 @@ description: "Task list for 050 — Administration du catalogue, des consentemen
 ## Phase 8: User Story 6 — Régimes (P3)
 
 - [x] T035 [US6] Routes `GET/POST /admin/regulatory-regimes`, `PATCH /admin/regulatory-regimes/:id`, `POST /admin/regulatory-regimes/:id/retire` et tests d'intégration (retrait refusé si référencé, persistance).
-- [ ] T036 [US6] Admin : page `catalog/regimes/page.tsx` (liste, création, édition, retrait).
+- [x] T036 [US6] Admin : page `catalog/regimes/page.tsx` (liste, création, édition, retrait).
 
 ## Phase 9: Polish & validations
 
 - [x] T037 Mettre à jour `backend/tests/integration/runtime-route-inventory.spec.ts` (nouveaux contrôleurs) et les contrats OpenAPI de `specs/001-socle-plateforme/contracts/foundation-api.openapi.yaml` si les tests de contrat l'exigent.
-- [ ] T038 Garde-fous : formulations interdites dans les nouveaux écrans et les modèles de consentement ; séparation (aucun import back-office dans `apps/public`).
-- [ ] T039 Validations finales : `prisma generate`, `prisma validate`, `npm run typecheck`, `npm run lint`, `npm run test` (`NODE_ENV=test`), `npm run test:web`, `node scripts/ci/secret-scan.mjs`.
-- [ ] T040 Mettre à jour `docs/prd_coverage_map.md` (catalogue désormais atteignable) et cocher les tâches.
+- [x] T038 Garde-fous : formulations interdites dans les nouveaux écrans et les modèles de consentement ; séparation (aucun import back-office dans `apps/public`).
+- [x] T039 Validations finales : `prisma generate`, `prisma validate`, `npm run typecheck`, `npm run lint`, `npm run test` (`NODE_ENV=test`), `npm run test:web`, `node scripts/ci/secret-scan.mjs`.
+- [x] T040 Mettre à jour `docs/prd_coverage_map.md` (catalogue désormais atteignable) et cocher les tâches.
 
 ## Dependencies & Execution Order
 
