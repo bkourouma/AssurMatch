@@ -123,9 +123,11 @@ export async function seedRuntimeSmokeData(runtime: AssurMatchRuntime, run: Runt
     language: "fr",
     version: `v-${run.id}`,
     status: "draft",
-    contentHash: `${run.id}-consent-hash`
+    // Spec 050 R5: real content (tagged with the run id for cleanup); the hash is computed by the service.
+    content: `En cochant cette case, vous acceptez la transmission de vos coordonnees ({{contactFields}}) a {{brokerName}} pour {{countryName}} et {{productName}} (smoke ${run.id}). AssurMatch est une plateforme technique; elle n'est ni courtier ni assureur.`,
+    contentHash: "computed-by-server"
   }, admin);
-  await runtime.consent.service.publishText(consentText.id, admin);
+  await runtime.consent.service.publishText(consentText.id, admin, { requireContent: true });
   // Spec 043 T008: the form is created and published through the real admin routes. Seeding it
   // in-process would exercise a path no operator can use, which is exactly how the missing HTTP
   // wiring stayed invisible while the whole suite was green.

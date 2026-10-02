@@ -1,7 +1,7 @@
 import { AuditLogWriter } from "../audit-logs/audit-log-writer.service";
 import { AdminQuoteFormDefinitionsController } from "./admin-quote-form-definitions.controller";
 import { PublicQuoteFormsController } from "./public-quote-forms.controller";
-import { QuoteFormDefinitionService, type ConsentTextReference } from "./quote-form-definition.service";
+import { QuoteFormDefinitionService, type ConsentTextReference, type QuoteFormContext } from "./quote-form-definition.service";
 import { MemoryQuoteFormDefinitionsRepository, type QuoteFormDefinitionsRepository } from "./quote-form-definitions.repository";
 
 export interface QuoteFormsModuleOptions {
@@ -9,6 +9,8 @@ export interface QuoteFormsModuleOptions {
   repository?: QuoteFormDefinitionsRepository;
   /** Spec 043 D3: a definition with sensitive fields stays unpublishable while the product flag is closed. */
   sensitiveDataEnabled?: (productId: string) => boolean;
+  /** Spec 050: country and product names for the consent variables, and the country phone rule. */
+  formContext?: (countryId: string, productId: string) => Promise<QuoteFormContext> | QuoteFormContext;
 }
 
 export class QuoteFormsModule {
@@ -21,7 +23,8 @@ export class QuoteFormsModule {
       audit,
       options.consentTexts ?? (() => []),
       options.repository ?? new MemoryQuoteFormDefinitionsRepository(),
-      options.sensitiveDataEnabled ?? (() => false)
+      options.sensitiveDataEnabled ?? (() => false),
+      options.formContext ?? (() => ({}))
     );
     this.adminController = new AdminQuoteFormDefinitionsController(this.service);
     this.publicController = new PublicQuoteFormsController(this.service);

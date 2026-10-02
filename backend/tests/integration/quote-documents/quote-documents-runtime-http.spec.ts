@@ -24,7 +24,7 @@ async function submitQuote(harness: RuntimeHttpHarness, seed: Awaited<ReturnType
       formDefinitionId: seed.form.id,
       contact: { displayName: `Visitor ${suffix}`, email: `docs${suffix}@example.test`, phone: `+22501020305${suffix.padStart(2, "0")}` },
       answers: { vehicle_use: "prive" },
-      consent: { accepted: true, consentTextId: seed.consentText.id, version: "v1", contentHash: "runtime-consent-hash" },
+      consent: { accepted: true, consentTextId: seed.consentText.id, version: "v1", contentHash: seed.consentText.contentHash },
       ipAddress: `203.0.113.${suffix}`,
       sessionId: `documents-session-${suffix}`
     })

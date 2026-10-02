@@ -246,10 +246,20 @@ export class ActivationChecklistService {
     const sections: ActivationChecklistSection[] = [];
     for (const country of countries) {
       for (const product of products.filter((candidate) => candidate.countryIds.includes(country.id))) {
-        const publishedForm = forms.find((form) => form.countryId === country.id && form.productId === product.id && form.status === "published");
-        const publishedConsent = publishedForm
-          ? consentTexts.find((text) => text.id === publishedForm.consentTextId && text.status === "published" && text.purpose === "lead_transmission")
-          : undefined;
+        // Spec 050 R6: one published form per language; each must reference a published
+        // lead_transmission text of its own language, country and product (or no product).
+        const publishedForms = forms.filter((form) => form.countryId === country.id && form.productId === product.id && form.status === "published");
+        const publishedForm = publishedForms[0];
+        const consentFor = (form: (typeof publishedForms)[number]) => consentTexts.find((text) =>
+          text.id === form.consentTextId &&
+          text.status === "published" &&
+          text.purpose === "lead_transmission" &&
+          text.language === form.language &&
+          text.countryId === form.countryId &&
+          (!text.productId || text.productId === form.productId)
+        );
+        const mismatched = publishedForms.filter((form) => !consentFor(form)).map((form) => form.language);
+        const publishedConsent = publishedForms.length > 0 && mismatched.length === 0;
         sections.push(this.section(`quote:${country.id}:${product.id}`, `Parcours devis ${country.isoCode}/${product.key}`, {
           countryId: country.id,
           countryCode: country.isoCode,
@@ -257,7 +267,13 @@ export class ActivationChecklistService {
           productKey: product.key
         }, [
           this.control("published_quote_form", "Formulaire publie", Boolean(publishedForm), true),
-          this.control("published_consent_text", "Consentement publie", Boolean(publishedConsent), true)
+          this.control(
+            "published_consent_text",
+            "Consentement publie",
+            publishedConsent,
+            true,
+            mismatched.length ? `non conforme pour : ${mismatched.join(", ")}` : undefined
+          )
         ]));
       }
     }

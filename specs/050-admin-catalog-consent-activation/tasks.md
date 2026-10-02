@@ -30,7 +30,7 @@ description: "Task list for 050 — Administration du catalogue, des consentemen
 ## Phase 2: Foundational (bloquant pour toutes les stories)
 
 - [x] T005 Créer `RegulatoryRegimesRepository` (mémoire et Prisma) et rendre `RegulatoryRegimesService` asynchrone avec `create`, `update` (`expectedUpdatedAt`), `retire` (refusé si référencé) et `list`, dans `backend/src/modules/regulatory-regimes/`. Câbler dans `backend/src/runtime/assurmatch-runtime.ts`, y compris `runtimeRepositoryModes`. Audit.
-- [ ] T006 `ConsentService` (`backend/src/modules/consent/consent.module.ts`, `consent-records.repository.ts`) :
+- [x] T006 `ConsentService` (`backend/src/modules/consent/consent.module.ts`, `consent-records.repository.ts`) :
   - stockage du contenu ;
   - empreinte sha256 calculée sur le contenu normalisé ;
   - `publishText` refusé si le contenu est absent ou l'empreinte incohérente, si une formulation interdite est présente, ou, pour `lead_transmission`, si `{{brokerName}}` ou « AssurMatch » manque (422 `CONSENT_TEXT_INVALID`) ;
@@ -38,7 +38,7 @@ description: "Task list for 050 — Administration du catalogue, des consentemen
   - `resolveContent(text, vars)` ;
   - modèles chargés depuis `scripts/preprod/seeds/reference/consent-templates.json` ;
   - audit.
-- [ ] T007 Corriger l'adaptateur de consentements des formulaires dans `assurmatch-runtime.ts` : vraie finalité, langue, pays, produit et contenu.
+- [x] T007 Corriger l'adaptateur de consentements des formulaires dans `assurmatch-runtime.ts` : vraie finalité, langue, pays, produit et contenu.
 - [x] T008 Créer `backend/src/modules/catalog/` avec :
   - `catalog-flag.service.ts` : allowlist ; activation conditionnée et désactivation libre ; écriture du JSON et de `FeatureFlag`/`FeatureFlagHistory` via `featureFlags.service.setFlag` ; audit des succès et des refus ;
   - `catalog-activation-guard.ts` : conditions R4, réutilisation de `activationChecklist.service.read`, contrôles ciblés en ignorant le flag ou le statut en cours de modification.
@@ -78,8 +78,8 @@ description: "Task list for 050 — Administration du catalogue, des consentemen
 
 ## Phase 5: User Story 3 — Textes de consentement (P1)
 
-- [ ] T020 [US3] Routes `GET /admin/consent-texts`, `GET /admin/consent-texts/templates`, `GET /admin/consent-texts/:id` (aperçu), `POST /admin/consent-texts`, `POST /admin/consent-texts/:id/publish`, `POST /admin/consent-texts/:id/retire`.
-- [ ] T021 [P] [US3] Tests d'intégration `backend/tests/integration/consent/admin-consent-texts-runtime-http.spec.ts` :
+- [x] T020 [US3] Routes `GET /admin/consent-texts`, `GET /admin/consent-texts/templates`, `GET /admin/consent-texts/:id` (aperçu), `POST /admin/consent-texts`, `POST /admin/consent-texts/:id/publish`, `POST /admin/consent-texts/:id/retire`.
+- [x] T021 [P] [US3] Tests d'intégration `backend/tests/integration/consent/admin-consent-texts-runtime-http.spec.ts` :
   - empreinte calculée ;
   - formulation interdite (422) ;
   - destinataire absent (422) ;
@@ -87,18 +87,18 @@ description: "Task list for 050 — Administration du catalogue, des consentemen
   - Admin Pays qui publie (403) ;
   - nouvelle version, formulaires signalés ;
   - audit.
-- [ ] T022 [P] [US3] Tests unitaires du contenu, de l'empreinte et de la résolution des variables dans `backend/tests/unit/consent/consent-content.spec.ts`.
-- [ ] T023 [US3] Route publique du formulaire : contenu résolu, langue, `phoneRule`, 404 `QUOTE_FORM_LANGUAGE_UNAVAILABLE` (sans repli). La soumission valide le consentement dans la langue de la demande et stocke `language` (`quote-form-definition.service.ts`, `quote-submission.service.ts`, `quote-requests.repository.ts`, wiring).
+- [x] T022 [P] [US3] Tests unitaires du contenu, de l'empreinte et de la résolution des variables dans `backend/tests/unit/consent/consent-content.spec.ts`.
+- [x] T023 [US3] Route publique du formulaire : contenu résolu, langue, `phoneRule`, 404 `QUOTE_FORM_LANGUAGE_UNAVAILABLE` (sans repli). La soumission valide le consentement dans la langue de la demande et stocke `language` (`quote-form-definition.service.ts`, `quote-submission.service.ts`, `quote-requests.repository.ts`, wiring).
 - [ ] T024 [US3] Admin : pages `consent-texts/page.tsx` (liste, création depuis un modèle) et `consent-texts/[consentTextId]/page.tsx` (aperçu, publication, retrait), actions `lib/consent-actions.ts`, navigation.
 
 ## Phase 6: User Story 4 — Formulaires bilingues complets (P1)
 
-- [ ] T025 [US4] `quote-form-definition.service.ts` :
+- [x] T025 [US4] `quote-form-definition.service.ts` :
   - champs génériques ajoutés d'office, libellés selon la langue ;
   - publication refusée si le consentement n'est pas de la même langue, du même pays et du même produit ;
   - `consentSuperseded` dans la vue admin.
-- [ ] T026 [US4] Téléphone par pays dans `backend/src/modules/prospects/prospect-identity.service.ts`, avec la règle passée depuis la soumission ; ancien comportement conservé si le pays n'a pas de règle.
-- [ ] T027 [P] [US4] Tests :
+- [x] T026 [US4] Téléphone par pays dans `backend/src/modules/prospects/prospect-identity.service.ts`, avec la règle passée depuis la soumission ; ancien comportement conservé si le pays n'a pas de règle.
+- [x] T027 [P] [US4] Tests :
   - unitaires : `quote-form-definition.service.spec.ts` (génériques, langue), `prospect-identity.service.spec.ts` (+225 avec 10 chiffres, +221 avec 9 chiffres, refus) ;
   - intégration publique : langue `en`, 404 de langue indisponible, consentement EN vérifié à la soumission.
 - [ ] T028 [US4] Site public :
@@ -113,12 +113,12 @@ description: "Task list for 050 — Administration du catalogue, des consentemen
 
 - [ ] T031 [US5] `apps/admin/app/activation-checklist/page.tsx` : filtres pays et produit, lien « Corriger » par contrôle (GET uniquement ; le test « pas de PATCH/POST » est conservé), libellé du nouveau contrôle partenaire.
 - [ ] T032 [US5] `apps/admin/app/feature-flags/page.tsx` : bascule des flags globaux non sensibles existants (PATCH existant via une action), flags sensibles en lecture seule ; mise à jour de `apps/admin/tests/feature-flags.spec.ts` sans retirer les marqueurs de garde.
-- [ ] T033 [US5] `scripts/preprod/seed-reference.ts` et `seeds/reference/countries.json` :
+- [x] T033 [US5] `scripts/preprod/seed-reference.ts` et `seeds/reference/countries.json` :
   - CI et SN en fr et en, avec règles téléphoniques ;
   - flags et statut écrits à la création seulement ;
   - liaisons CI/SN × auto/voyage (`internal`, flags fermés) ;
   - consentements brouillons FR et EN par pays, avec contenu et empreinte, depuis `consent-templates.json`.
-- [ ] T034 [US5] `scripts/local-app/seed-broker-demo.ts` et helpers de test (`backend/tests/integration/runtime-http-test-utils.ts`, `helpers/comparator-quote-seed.ts`, smoke `runtime-postgres`) : contenu de consentement conforme et empreinte calculée.
+- [x] T034 [US5] `scripts/local-app/seed-broker-demo.ts` et helpers de test (`backend/tests/integration/runtime-http-test-utils.ts`, `helpers/comparator-quote-seed.ts`, smoke `runtime-postgres`) : contenu de consentement conforme et empreinte calculée.
 
 ## Phase 8: User Story 6 — Régimes (P3)
 

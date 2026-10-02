@@ -12,6 +12,9 @@ import {
   type DemoOfferSpec
 } from "./demo-offer-catalog";
 import { withoutUndefined } from "../lib/without-undefined";
+import { consentContentHash } from "../../packages/shared/contracts/consent-content";
+import type { QuoteFormFieldDto } from "../../packages/shared/contracts/quote.contracts";
+import { withGenericFields } from "../../backend/src/modules/quote-forms/quote-form-definition.service";
 
 type PartnerPlan = "starter" | "pro" | "enterprise";
 type LeadStatus = "assigned" | "broker_notified" | "seen" | "accepted" | "rejected" | "closed" | "disputed";
@@ -234,7 +237,10 @@ async function seedCountries(prisma: PrismaClient): Promise<{ ci: CountryRecord;
       isoCode: "CI",
       name: "Côte d'Ivoire",
       currency: "XOF",
-      languages: ["fr"],
+      // Spec 050: the EN public journey is seeded for CI (forms and consent in both languages).
+      languages: ["fr", "en"],
+      phoneDialCode: "+225",
+      phoneNationalLengths: [10],
       timezone: "Africa/Abidjan",
       regulatoryFamily: "cima",
       status: "public",
@@ -250,6 +256,9 @@ async function seedCountries(prisma: PrismaClient): Promise<{ ci: CountryRecord;
     },
     update: {
       name: "Côte d'Ivoire",
+      languages: ["fr", "en"],
+      phoneDialCode: "+225",
+      phoneNationalLengths: [10],
       status: "public",
       flags: {
         country_public_enabled: true,
@@ -360,58 +369,86 @@ async function seedCountryProducts(prisma: PrismaClient, country: CountryRecord,
   }
 }
 
+/**
+ * Spec 050 R5: demo consent texts carry real, compliant content (recipient variable and technical
+ * role of AssurMatch) and the hash the API computes from it, so the public form serves the text and
+ * a submission echoing that hash is accepted. FR and EN are seeded for CI so both journeys work.
+ */
+const DEMO_CONSENT_CONTENT: Record<DemoLanguage, string> = {
+  fr: "En cochant cette case, vous acceptez que vos coordonnées ({{contactFields}}) soient transmises au destinataire suivant : {{brokerName}}, pour le pays {{countryName}} et le produit {{productName}}, afin d'être recontacté au sujet de votre demande de devis. AssurMatch est une plateforme technique de comparaison et de mise en relation ; elle n'est ni courtier ni assureur.",
+  en: "By checking this box, you agree that your contact details ({{contactFields}}) are transmitted to the following recipient: {{brokerName}}, for {{countryName}} and the product {{productName}}, so that you can be contacted about your quote request. AssurMatch is a technical comparison and matching platform; it is neither a broker nor an insurer."
+};
+
+type DemoLanguage = "fr" | "en";
+
+const DEMO_FORM_FIELDS: Record<DemoLanguage, QuoteFormFieldDto[]> = {
+  fr: [
+    { key: "usage", label: "Usage", type: "select", required: true, sensitivity: "public", options: ["personnel", "professionnel"] },
+    { key: "budget", label: "Budget indicatif", type: "number", required: false, sensitivity: "public" }
+  ],
+  en: [
+    { key: "usage", label: "Use", type: "select", required: true, sensitivity: "public", options: ["personnel", "professionnel"] },
+    { key: "budget", label: "Indicative budget", type: "number", required: false, sensitivity: "public" }
+  ]
+};
+
 async function seedConsentAndForms(prisma: PrismaClient, country: CountryRecord, products: ProductRecord[]): Promise<void> {
   for (const product of products) {
-    const consentText = await prisma.consentText.upsert({
-      where: {
-        purpose_countryId_productId_channel_language_version: {
+    for (const language of ["fr", "en"] as const) {
+      const content = DEMO_CONSENT_CONTENT[language];
+      const contentHash = consentContentHash(content);
+      const consentText = await prisma.consentText.upsert({
+        where: {
+          purpose_countryId_productId_channel_language_version: {
+            purpose: "lead_transmission",
+            countryId: country.id,
+            productId: product.id,
+            channel: "public_web",
+            language,
+            version: DEMO_VERSION
+          }
+        },
+        create: {
           purpose: "lead_transmission",
           countryId: country.id,
           productId: product.id,
           channel: "public_web",
-          language: "fr",
-          version: DEMO_VERSION
+          recipientCategory: "courtier_partenaire_eligible",
+          language,
+          version: DEMO_VERSION,
+          status: "published",
+          contentHash,
+          content,
+          publishedAt: SEED_NOW,
+          createdById: DEMO_ACTOR_ID
+        },
+        update: {
+          status: "published",
+          contentHash,
+          content,
+          publishedAt: SEED_NOW,
+          retiredAt: null
         }
-      },
-      create: {
-        purpose: "lead_transmission",
+      });
+      const existingForm = await prisma.quoteFormDefinition.findFirst({
+        where: { countryId: country.id, productId: product.id, language, version: DEMO_VERSION }
+      });
+      const formData = {
         countryId: country.id,
         productId: product.id,
-        channel: "public_web",
-        recipientCategory: "courtier_partenaire_eligible",
-        language: "fr",
+        language,
         version: DEMO_VERSION,
-        status: "published",
-        contentHash: `${product.key}-${DEMO_VERSION}-lead-transmission`,
+        status: "published" as const,
+        // Spec 050 R7: the same generic fields the admin route adds (city, contact preference...).
+        fields: withGenericFields(DEMO_FORM_FIELDS[language], language) as unknown as Prisma.InputJsonValue,
+        consentTextId: consentText.id,
+        dataMinimizationNotes: "Donnees synthetiques locales minimales",
         publishedAt: SEED_NOW,
         createdById: DEMO_ACTOR_ID
-      },
-      update: {
-        status: "published",
-        contentHash: `${product.key}-${DEMO_VERSION}-lead-transmission`,
-        publishedAt: SEED_NOW
-      }
-    });
-    const existingForm = await prisma.quoteFormDefinition.findFirst({
-      where: { countryId: country.id, productId: product.id, language: "fr", version: DEMO_VERSION }
-    });
-    const formData = {
-      countryId: country.id,
-      productId: product.id,
-      language: "fr",
-      version: DEMO_VERSION,
-      status: "published" as const,
-      fields: [
-        { key: "usage", label: "Usage", type: "select", required: true, sensitivity: "public", options: ["personnel", "professionnel"] },
-        { key: "budget", label: "Budget indicatif", type: "number", required: false, sensitivity: "public" }
-      ],
-      consentTextId: consentText.id,
-      dataMinimizationNotes: "Donnees synthetiques locales minimales",
-      publishedAt: SEED_NOW,
-      createdById: DEMO_ACTOR_ID
-    };
-    if (existingForm) await prisma.quoteFormDefinition.update({ where: { id: existingForm.id }, data: formData });
-    else await prisma.quoteFormDefinition.create({ data: formData });
+      };
+      if (existingForm) await prisma.quoteFormDefinition.update({ where: { id: existingForm.id }, data: formData });
+      else await prisma.quoteFormDefinition.create({ data: formData });
+    }
   }
 }
 

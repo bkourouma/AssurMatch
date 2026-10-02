@@ -6,6 +6,7 @@ import { ErrorResponseFilter } from "../../src/modules/common/filters/error-resp
 import type { ActorContext } from "../../src/modules/common/types";
 import { signActorToken } from "../../src/modules/auth/http-auth-token.service";
 import { AssurMatchRuntime } from "../../src/runtime/assurmatch-runtime";
+import { consentContentHash } from "../../../packages/shared/contracts/consent-content";
 
 export interface RuntimeHttpHarness {
   app: INestApplication;
@@ -58,6 +59,10 @@ export async function readJson<T>(response: Response): Promise<T> {
   return response.json() as Promise<T>;
 }
 
+/** Spec 050: a compliant lead transmission template (recipient variable and technical role of AssurMatch). */
+export const RUNTIME_CONSENT_CONTENT = "En cochant cette case, vous acceptez que vos coordonnees ({{contactFields}}) soient transmises a {{brokerName}} pour le pays {{countryName}} et le produit {{productName}}. AssurMatch est une plateforme technique de mise en relation; elle n'est ni courtier ni assureur.";
+export const RUNTIME_CONSENT_HASH = consentContentHash(RUNTIME_CONSENT_CONTENT);
+
 export async function seedPublicRuntime(runtime: AssurMatchRuntime) {
   const admin: ActorContext = { actorId: "admin-runtime", roles: ["super_admin"], mfaVerified: true };
   await runtime.featureFlags.service.setFlag({
@@ -107,9 +112,11 @@ export async function seedPublicRuntime(runtime: AssurMatchRuntime) {
     language: "fr",
     version: "v1",
     status: "draft",
-    contentHash: "runtime-consent-hash"
+    // Spec 050 R5: real content; the service computes the hash from it.
+    content: RUNTIME_CONSENT_CONTENT,
+    contentHash: "computed-by-server"
   }, admin);
-  await runtime.consent.service.publishText(consentText.id, admin);
+  await runtime.consent.service.publishText(consentText.id, admin, { requireContent: true });
   const form = await runtime.quoteForms.service.create({
     countryId: country.id,
     productId: product.id,

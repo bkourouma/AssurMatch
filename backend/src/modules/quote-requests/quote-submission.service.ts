@@ -1,4 +1,5 @@
 import { createHash } from "node:crypto";
+import { NotFoundException } from "@nestjs/common";
 import { quoteRequestCreateSchema, type QuoteConfirmation, type QuoteRequestCreateDto } from "../../../../packages/shared/contracts/quote.contracts";
 import type { ConsentWithdrawalResponse } from "../../../../packages/shared/contracts/public-site.contracts";
 import { AuditLogWriter } from "../audit-logs/audit-log-writer.service";
@@ -36,6 +37,8 @@ export interface QuoteRequestRecord {
   productKey: string;
   selectedOfferId?: string;
   quoteFormDefinitionId: string;
+  /** Spec 050 R6: language of the submitted form (`fr` for every request created before the spec). */
+  language?: string;
   prospectId: string;
   consentRecordId: string;
   surveyConsentRecordId?: string;
@@ -142,8 +145,12 @@ export class QuoteSubmissionService {
       ...(parsed.sessionId ? { sessionId: parsed.sessionId } : {}),
       answers: parsed.answers
     });
-    const publicForm = await this.deps.forms.publicForm(country.id, product.id);
-    if (publicForm.formDefinitionId !== parsed.formDefinitionId || publicForm.consent.consentTextId !== parsed.consent.consentTextId || publicForm.consent.contentHash !== parsed.consent.contentHash) {
+    // Spec 050 R6: the consent is checked against the published form of the submitted language only.
+    const publicForm = await this.deps.forms.publicForm(country.id, product.id, parsed.language).catch((error: unknown) => {
+      if (error instanceof NotFoundException) return undefined;
+      throw error;
+    });
+    if (!publicForm || publicForm.formDefinitionId !== parsed.formDefinitionId || publicForm.consent.consentTextId !== parsed.consent.consentTextId || publicForm.consent.contentHash !== parsed.consent.contentHash) {
       this.audit.write({
         actor,
         action: QuoteAuditActions.consentLeadTransmissionRefused,
@@ -152,7 +159,7 @@ export class QuoteSubmissionService {
         scope: { countryId: country.id, productId: product.id },
         result: "refused",
         reason: "consent_text_mismatch",
-        context: {}
+        context: { language: parsed.language }
       });
       throw new Error("Consent text mismatch");
     }
@@ -160,7 +167,11 @@ export class QuoteSubmissionService {
       ...(parsed.contact.displayName ? { displayName: parsed.contact.displayName } : {}),
       email: parsed.contact.email,
       phone: parsed.contact.phone,
-      countryCode: country.isoCode
+      countryCode: country.isoCode,
+      // Spec 050 R8: the country's own phone rule when it has one; the generic normalisation otherwise.
+      ...(country.phoneDialCode && country.phoneNationalLengths?.length
+        ? { phoneRule: { dialCode: country.phoneDialCode, nationalLengths: country.phoneNationalLengths } }
+        : {})
     });
     const contactFingerprint = contact.emailFingerprint;
     const duplicateDecision = await this.deps.duplicate?.evaluate(country.id, product.id, contactFingerprint) ?? "unique";
@@ -233,6 +244,7 @@ export class QuoteSubmissionService {
       productKey: product.key,
       ...(parsed.selectedOfferId ? { selectedOfferId: parsed.selectedOfferId } : {}),
       quoteFormDefinitionId: parsed.formDefinitionId,
+      language: parsed.language,
       prospectId: prospect.id,
       consentRecordId: consentRecord.id,
       surveyConsentRecordId: surveyConsentRecord.id,

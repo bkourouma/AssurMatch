@@ -1,4 +1,5 @@
 import { QuoteAISummaryService } from "../../../src/modules/ai/quote-summary/quote-ai-summary.service";
+import { consentContentHash } from "../../../../packages/shared/contracts/consent-content";
 import { AuditLogsModule } from "../../../src/modules/audit-logs/audit-logs.module";
 import { RedisModule } from "../../../src/modules/common/redis/redis.module";
 import { ConsentModule } from "../../../src/modules/consent/consent.module";
@@ -31,6 +32,10 @@ export interface ComparatorApp {
   quoteRequests: QuoteRequestsModule;
 }
 
+/** Spec 050: a compliant lead transmission template; its hash is what the visitor's browser echoes back. */
+export const COMPARATOR_CONSENT_CONTENT = "En cochant cette case, vous acceptez la transmission de vos coordonnees ({{contactFields}}) a {{brokerName}} pour {{countryName}} et {{productName}}. AssurMatch est une plateforme technique; elle n'est ni courtier ni assureur.";
+export const COMPARATOR_CONSENT_HASH = consentContentHash(COMPARATOR_CONSENT_CONTENT);
+
 export interface ComparatorSeed {
   app: ComparatorApp;
   countryId: string;
@@ -56,9 +61,16 @@ export function createComparatorApp(): ComparatorApp {
       id: text.id,
       version: text.version,
       contentHash: text.contentHash,
-      purpose: "lead_transmission" as const,
+      purpose: text.purpose,
       recipientCategory: text.recipientCategory,
-      status: text.status ?? "draft"
+      status: text.status ?? "draft",
+      language: text.language,
+      countryId: text.countryId,
+      productId: text.productId ?? null,
+      channel: text.channel,
+      content: text.content ?? null,
+      ...(text.publishedAt ? { publishedAt: text.publishedAt } : {}),
+      createdAt: text.createdAt
     }))
   });
   const prospects = new ProspectsModule(audit.writer);
@@ -151,9 +163,11 @@ export async function seedComparatorQuote(): Promise<ComparatorSeed> {
     language: "fr",
     version: "v1",
     status: "draft",
-    contentHash: "hash-lead-transmission-v1"
+    // Spec 050 R5: real content; the service computes the hash from it.
+    content: COMPARATOR_CONSENT_CONTENT,
+    contentHash: "computed-by-server"
   }, superAdminActor);
-  await app.consent.service.publishText(consentText.id, superAdminActor);
+  await app.consent.service.publishText(consentText.id, superAdminActor, { requireContent: true });
 
   const form = await app.quoteForms.service.create({
     countryId: country.id,
@@ -243,7 +257,7 @@ export function validQuotePayload(seed: ComparatorSeed) {
       accepted: true,
       consentTextId: seed.consentTextId,
       version: "v1",
-      contentHash: "hash-lead-transmission-v1"
+      contentHash: COMPARATOR_CONSENT_HASH
     },
     ipAddress: "203.0.113.10",
     sessionId: "session-1"

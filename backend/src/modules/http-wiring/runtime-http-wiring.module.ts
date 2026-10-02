@@ -7,6 +7,7 @@ import { QUOTE_DOCUMENT_MAX_BYTES } from "../../../../packages/shared/contracts/
 import type { UploadedDocumentFile } from "../quote-documents/quote-documents.service";
 import { activateRequestSchema, loginRequestSchema, mfaVerifyRequestSchema, passwordChangeRequestSchema, passwordResetRequestSchema, type ActivateRequest, type LoginRequest, type PasswordChangeRequest, type PasswordResetRequest } from "../../../../packages/shared/contracts/auth.contracts";
 import { activationChecklistQuerySchema } from "../../../../packages/shared/contracts/activation-checklist.contracts";
+import { adminConsentTextCreateSchema, adminConsentTextListQuerySchema } from "../../../../packages/shared/contracts/compliance.contracts";
 import {
   adminCountryCreateSchema,
   adminCountryUpdateSchema,
@@ -492,6 +493,40 @@ export class AdminRegulatoryRegimesHttpController {
   }
 }
 
+/**
+ * Spec 050 US3: consent texts. The admin never supplies a hash: the server computes it from the
+ * content. Publishing checks FR-012 (422 `CONSENT_TEXT_INVALID`); a published text is immutable.
+ */
+export class AdminConsentTextsHttpController {
+  constructor(private readonly runtime: AssurMatchRuntime) {}
+
+  list(request: AssurMatchHttpRequest, query: Record<string, string>) {
+    return this.runtime.consentTexts.list(protectedActorFromRequest(request), parseHttpInput(adminConsentTextListQuerySchema, query ?? {}));
+  }
+
+  templates(request: AssurMatchHttpRequest) {
+    return this.runtime.consentTexts.templates(protectedActorFromRequest(request));
+  }
+
+  detail(id: string, request: AssurMatchHttpRequest, preview?: string) {
+    return this.runtime.consentTexts.detail(protectedActorFromRequest(request), parseParam("id", id, uuidSchema), preview === "1" || preview === "true");
+  }
+
+  create(request: AssurMatchHttpRequest, input: unknown) {
+    return this.runtime.consentTexts.create(protectedActorFromRequest(request), parseHttpInput(adminConsentTextCreateSchema, input));
+  }
+
+  publish(id: string, request: AssurMatchHttpRequest, input: unknown) {
+    const actor = protectedActorFromRequest(request);
+    return this.runtime.consentTexts.publish(actor, parseParam("id", id, uuidSchema), parseHttpInput(catalogActionReasonSchema, input).reason);
+  }
+
+  retire(id: string, request: AssurMatchHttpRequest, input: unknown) {
+    const actor = protectedActorFromRequest(request);
+    return this.runtime.consentTexts.retire(actor, parseParam("id", id, uuidSchema), parseHttpInput(catalogActionReasonSchema, input).reason);
+  }
+}
+
 export class AdminScoringRulesController {
   constructor(private readonly runtime: AssurMatchRuntime) {}
 
@@ -932,6 +967,24 @@ export class AdminFeatureFlagsController {
     const parsed = parseHttpInput(updateFeatureFlagSchema, input);
     const existing = (await this.runtime.featureFlags.service.list()).find((flag) => flag.id === flagId);
     if (!existing) throw new Error("Feature flag not found");
+    // Spec 050: country and product scoped rows are the history written by the catalogue; they only
+    // change through the catalogue endpoints, whose allowlist and activation conditions apply.
+    if (existing.scopeType !== "global") {
+      this.runtime.audit.writer.write({
+        actor,
+        action: "feature_flag.update_refused",
+        targetType: "FeatureFlag",
+        targetId: existing.id,
+        scope: { scopeType: existing.scopeType, scopeId: existing.scopeId },
+        result: "refused",
+        reason: "scoped_flag_catalog_only",
+        context: { key: existing.key, requestReason: parsed.reason }
+      });
+      throw new ForbiddenException({
+        code: "RBAC_DENIED",
+        message: "Scoped feature flags are managed from the catalogue (country or product flags endpoints), not from this route"
+      });
+    }
     return this.runtime.featureFlags.service.setFlag({ ...existing, value: parsed.value, reason: parsed.reason }, actor);
   }
 }
@@ -1571,6 +1624,14 @@ decorate(AdminCatalogCountriesHttpController, "createLink", [Post("countries/:id
 decorate(AdminCatalogCountriesHttpController, "retireLink", [Post("countries/:id/products/:productId/retire") as MethodDecoratorFactory, HttpCode(200) as MethodDecoratorFactory], [[0, Param("id") as ParamDecoratorFactory], [1, Param("productId") as ParamDecoratorFactory], [2, Req() as ParamDecoratorFactory], [3, Body() as ParamDecoratorFactory]]);
 decorate(AdminCatalogCountriesHttpController, "linkFlags", [Post("countries/:id/products/:productId/flags") as MethodDecoratorFactory, HttpCode(200) as MethodDecoratorFactory], [[0, Param("id") as ParamDecoratorFactory], [1, Param("productId") as ParamDecoratorFactory], [2, Req() as ParamDecoratorFactory], [3, Body() as ParamDecoratorFactory]]);
 
+controller("admin/consent-texts", AdminConsentTextsHttpController, true);
+decorate(AdminConsentTextsHttpController, "list", [Get() as MethodDecoratorFactory], [[0, Req() as ParamDecoratorFactory], [1, Query() as ParamDecoratorFactory]]);
+decorate(AdminConsentTextsHttpController, "templates", [Get("templates") as MethodDecoratorFactory], [[0, Req() as ParamDecoratorFactory]]);
+decorate(AdminConsentTextsHttpController, "detail", [Get(":id") as MethodDecoratorFactory], [[0, Param("id") as ParamDecoratorFactory], [1, Req() as ParamDecoratorFactory], [2, Query("preview") as ParamDecoratorFactory]]);
+decorate(AdminConsentTextsHttpController, "create", [Post() as MethodDecoratorFactory], [[0, Req() as ParamDecoratorFactory], [1, Body() as ParamDecoratorFactory]]);
+decorate(AdminConsentTextsHttpController, "publish", [Post(":id/publish") as MethodDecoratorFactory, HttpCode(200) as MethodDecoratorFactory], [[0, Param("id") as ParamDecoratorFactory], [1, Req() as ParamDecoratorFactory], [2, Body() as ParamDecoratorFactory]]);
+decorate(AdminConsentTextsHttpController, "retire", [Post(":id/retire") as MethodDecoratorFactory, HttpCode(200) as MethodDecoratorFactory], [[0, Param("id") as ParamDecoratorFactory], [1, Req() as ParamDecoratorFactory], [2, Body() as ParamDecoratorFactory]]);
+
 controller("admin", AdminCatalogProductsHttpController, true);
 decorate(AdminCatalogProductsHttpController, "list", [Get("products") as MethodDecoratorFactory], [[0, Req() as ParamDecoratorFactory], [1, Query() as ParamDecoratorFactory]]);
 decorate(AdminCatalogProductsHttpController, "create", [Post("products") as MethodDecoratorFactory], [[0, Req() as ParamDecoratorFactory], [1, Body() as ParamDecoratorFactory]]);
@@ -1671,6 +1732,7 @@ Module({
     AdminCatalogCountriesHttpController,
     AdminCatalogProductsHttpController,
     AdminRegulatoryRegimesHttpController,
+    AdminConsentTextsHttpController,
     AdminScoringRulesController,
     AdminRoutingRulesController,
     AdminRoutingAnomaliesHttpController,

@@ -117,7 +117,13 @@ describe("runtime HTTP route inventory", () => {
       ["GET", "/admin/regulatory-regimes"],
       ["POST", "/admin/regulatory-regimes"],
       ["PATCH", `/admin/regulatory-regimes/${id}`],
-      ["POST", `/admin/regulatory-regimes/${id}/retire`]
+      ["POST", `/admin/regulatory-regimes/${id}/retire`],
+      ["GET", "/admin/consent-texts"],
+      ["GET", "/admin/consent-texts/templates"],
+      ["GET", `/admin/consent-texts/${id}`],
+      ["POST", "/admin/consent-texts"],
+      ["POST", `/admin/consent-texts/${id}/publish`],
+      ["POST", `/admin/consent-texts/${id}/retire`]
     ] as const;
     for (const [method, path] of routes) {
       const response = await harness.request(path, { method });

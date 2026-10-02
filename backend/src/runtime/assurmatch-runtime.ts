@@ -11,6 +11,7 @@ import { PrismaService } from "../modules/common/prisma/prisma.service";
 import { QueuesModule } from "../modules/common/queues/queues.module";
 import { RedisModule } from "../modules/common/redis/redis.module";
 import { ConsentModule } from "../modules/consent/consent.module";
+import { AdminConsentTextsController } from "../modules/consent/admin-consent-texts.controller";
 import { ContactMessagesModule } from "../modules/contact-messages/contact-messages.module";
 import { MemoryContactMessagesRepository, PrismaContactMessagesRepository } from "../modules/contact-messages/contact-messages.repository";
 import { DataRetentionModule } from "../modules/data-retention/data-retention.module";
@@ -175,6 +176,12 @@ export class AssurMatchRuntime {
     this.featureFlagRepository
   );
   readonly consent = new ConsentModule(this.audit.writer, this.consentRecordsRepository);
+  /** Spec 050 US3: consent text administration (hash computed server side, preview resolved with catalogue names). */
+  readonly consentTexts = new AdminConsentTextsController(this.consent.service, this.audit.writer, {
+    countryName: async (countryId: string) => (await this.countries.service.require(countryId).catch(() => undefined))?.name,
+    productName: async (productId: string) => (await this.products.service.require(productId).catch(() => undefined))?.name,
+    countryExists: async (countryId: string) => Boolean(await this.countries.service.require(countryId).catch(() => undefined))
+  });
   private readonly messagingRepository = this.runtimeRepository(new PrismaMessagingRepository(this.prisma)) ?? new MemoryMessagingRepository();
   readonly notifications = new NotificationsModule(this.audit.writer, this.queues.notifications, this.notificationsRepository, {
     smsProvider: process.env.ASSURMATCH_SMS_PROVIDER,
@@ -227,14 +234,37 @@ export class AssurMatchRuntime {
     ...(this.scoringRulesRepository ? { repository: this.scoringRulesRepository } : {})
   });
   readonly quoteForms = new QuoteFormsModule(this.audit.writer, {
+    // Spec 050 T007 (C4): the real purpose, language, scope and content reach the forms service, so
+    // publication can check them and the public form can serve the resolved text.
     consentTexts: async () => (await this.consent.service.listTexts()).map((text) => ({
       id: text.id,
       version: text.version,
       contentHash: text.contentHash,
-      purpose: "lead_transmission" as const,
+      purpose: text.purpose,
       recipientCategory: text.recipientCategory,
-      status: text.status ?? "draft"
+      status: text.status ?? "draft",
+      language: text.language,
+      countryId: text.countryId,
+      productId: text.productId ?? null,
+      channel: text.channel,
+      content: text.content ?? null,
+      ...(text.publishedAt ? { publishedAt: text.publishedAt } : {}),
+      createdAt: text.createdAt
     })),
+    // Spec 050 R5/R8: names for the consent variables and the country phone rule of the public form.
+    formContext: async (countryId: string, productId: string) => {
+      const [country, product] = await Promise.all([
+        this.countries.service.require(countryId).catch(() => undefined),
+        this.products.service.require(productId).catch(() => undefined)
+      ]);
+      return {
+        ...(country ? { countryName: country.name } : {}),
+        ...(product ? { productName: product.name } : {}),
+        phoneRule: country?.phoneDialCode && country.phoneNationalLengths?.length
+          ? { dialCode: country.phoneDialCode, nationalLengths: [...country.phoneNationalLengths] }
+          : null
+      };
+    },
     // Spec 043 D3: the form is what actually collects the data, so publishing one with sensitive
     // fields is what the product flag has to gate.
     sensitiveDataEnabled: (productId: string) => this.featureFlags.service.isEnabled("product_sensitive_data_enabled", "product", productId),

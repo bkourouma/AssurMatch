@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { QuoteRequestCreateDto } from "../../../../packages/shared/contracts/quote.contracts";
-import { seedComparatorQuote, validQuotePayload } from "../helpers/comparator-quote-seed";
+import { COMPARATOR_CONSENT_HASH, seedComparatorQuote, validQuotePayload } from "../helpers/comparator-quote-seed";
 import { superAdminActor } from "../helpers/enterprise-seed";
 
 describe("quote form and consent", () => {
@@ -20,7 +20,7 @@ describe("quote form and consent", () => {
     const seed = await seedComparatorQuote();
     const payload = {
       ...validQuotePayload(seed),
-      consent: { consentTextId: seed.consentTextId, version: "v1", contentHash: "hash-lead-transmission-v1", accepted: false }
+      consent: { consentTextId: seed.consentTextId, version: "v1", contentHash: COMPARATOR_CONSENT_HASH, accepted: false }
     };
 
     await expect(seed.app.quoteRequests.publicController.submit(payload as QuoteRequestCreateDto, superAdminActor)).rejects.toThrow("Quote request validation failed");
