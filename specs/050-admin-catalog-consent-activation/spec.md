@@ -2,10 +2,10 @@
 
 **Feature Branch**: `claude/inspiring-maxwell-58e67d` (branche de session imposée ; pas de branche `050-*` créée)
 **Created**: 2026-10-02
-**Status**: Draft
+**Status**: Validated by user on 2026-10-02
 **Input**: PRD v0.3 (`docs/prd/prd_v0.3_completion_mise_en_production.md`), EPIC B (B-01 à B-09) et scénario SC-01 « Ouvrir un pays et ses produits ». Décision D-1 : lancement en Côte d'Ivoire (CI) et au Sénégal (SN), produits Automobile et Voyage.
-**Validation State**: Draft
-**Continuous Workflow Eligible**: No, pas encore. Elle le deviendra quand l'utilisateur aura validé la spec (elle ne contient aucun marqueur `[NEEDS CLARIFICATION]`).
+**Validation State**: Validated by user
+**Continuous Workflow Eligible**: Yes. Validée par l'utilisateur le 2026-10-02, aucun marqueur `[NEEDS CLARIFICATION]`.
 
 ## Why this spec exists
 
