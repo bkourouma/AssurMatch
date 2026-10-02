@@ -3,7 +3,7 @@
 **Nom de code :** AssurMatch
 **Version :** v0.3 (complète le PRD v0.2 `docs/prd_plateforme_comparaison_assurances.md`, sans le remplacer)
 **Date :** 2 octobre 2026
-**Statut :** Proposition à valider (les décisions de la section 9 sont à trancher avant d'écrire les specs concernées)
+**Statut :** Validé — décisions produit D-1 à D-10 arbitrées le 2 octobre 2026 (section 9)
 **Autorité :** `.specify/memory/constitution.md` (v1.2.0) prime sur ce document en cas de conflit.
 
 ---
@@ -79,11 +79,11 @@ Ce PRD décrit **tout ce qui manque** pour que :
 - Toute activation d'un flag sensible (IA, multi-courtiers, SMS/WhatsApp, webhooks, purge) hors du chemin de conformité audité.
 - CMS éditorial : les contenus légaux restent en TypeScript versionné ; une spec ultérieure pourra changer cela.
 
-### 3.3 Cible de lancement (PRD v0.2 §37, à confirmer en D-1)
+### 3.3 Cible de lancement (décision D-1)
 
-- **1 pays :** Côte d'Ivoire (CI, régime CIMA).
-- **2 produits :** Automobile et Voyage.
-- **3 à 5 courtiers agréés**, en plan Starter et Pro.
+- **2 pays :** Côte d'Ivoire (CI) et Sénégal (SN), tous deux en zone CIMA. Chaque pays est activé séparément : le Sénégal peut rester en statut interne si ses prérequis légaux (EPIC L) ne sont pas prêts en même temps que la CI.
+- **2 produits par pays :** Automobile et Voyage.
+- **3 à 5 courtiers agréés par pays**, en plan Starter et Pro.
 - IA désactivée au lancement, sauf décision contraire.
 - Routage exclusif (multi-courtiers fermé).
 
@@ -97,7 +97,7 @@ Chaque scénario doit :
 - être automatisé en Playwright, en CI, contre une pile Docker complète (EPIC M) ;
 - démarrer d'une base initialisée **uniquement** par le seed de référence et la création du premier Super Admin (EPIC K).
 
-### SC-01 — Ouvrir un pays et ses produits (admin)
+### SC-01 — Ouvrir un pays et ses produits (admin) — à dérouler pour CI puis pour SN
 - **Given** un Super Admin (ou Admin Pays CI) connecté avec MFA.
 - **When** il ouvre la CI et les produits Auto et Voyage, publie les textes de consentement, publie un formulaire de devis par produit (FR et EN), puis active les flags pays et produit.
 - **Then** les pages publiques CI/Auto/Voyage sont visibles.
@@ -140,9 +140,9 @@ Chaque scénario doit :
 
 ### SC-06 — Réponse du courtier (Starter et Pro)
 - **Given** le lead assigné au courtier X.
-- **When** X l'accepte.
-- **Then** les coordonnées complètes du visiteur lui sont révélées (D-2).
-- **And** le visiteur reçoit la notification « Votre demande est prise en charge par X ».
+- **Then** X voit les coordonnées complètes du visiteur dès l'affectation (D-2), et cet accès est audité.
+- **When** X accepte le lead.
+- **Then** le visiteur reçoit la notification « Votre demande est prise en charge par X ».
 - **When** X envoie une proposition non contractuelle (message, prime indicative, PDF facultatif, validité).
 - **Then** le visiteur reçoit un e-mail et voit la proposition dans son espace de suivi, avec la mention « proposition indicative à confirmer par le courtier ».
 - **And** le statut CRM passe à « Devis envoyé ».
@@ -212,7 +212,7 @@ Légende :
 | B-06 | Validation du téléphone par pays (indicatif et longueur, sur la base de `Country`) | P1 | Longueur seulement |
 | B-07 | Checklist d'activation actionnable : chaque ligne en échec mène à l'écran qui la corrige | P1 | Lecture seule |
 | B-08 | Bascule des flags non sensibles depuis l'interface (avec motif). Les flags sensibles restent sur le chemin de conformité audité, et l'interface l'explique | P0 | PATCH câblé, interface en lecture seule |
-| B-09 | Seed de référence de production : charger les modèles de consentement (brouillons), CI/Auto/Voyage et les liaisons pays-produit. Les flags restent fermés, l'admin les ouvre (SC-01) | P0 | Consentements et liaisons absents |
+| B-09 | Seed de référence de production : charger les modèles de consentement (brouillons), CI et SN avec Auto/Voyage et les liaisons pays-produit. Les flags restent fermés, l'admin les ouvre (SC-01) | P0 | Consentements et liaisons absents |
 
 ### EPIC C — Offres (ADM, BRK, API, PUB, DB)
 
@@ -259,7 +259,7 @@ Légende :
 
 | ID | Exigence | Prio | État actuel |
 |---|---|---|---|
-| F-01 | Politique de révélation des coordonnées (D-2) : masquées avant acceptation, complètes après, pour Starter comme pour Pro. Chaque révélation est auditée | P0 | Starter : tout est visible dès l'affectation. Pro : masqué même après acceptation |
+| F-01 | Coordonnées complètes visibles dès l'affectation, pour Starter comme pour Pro (D-2). Chaque consultation des coordonnées est auditée. Un lead réaffecté ou clôturé pour retrait du consentement redevient masqué pour l'ancien courtier | P0 | Starter : conforme. Pro : masqué même après acceptation |
 | F-02 | Interface CRM pour les routes déjà câblées : assignation à un conseiller, documents (vrai téléversement), propositions (E-02), litiges, Kanban | P0 (assignation, propositions) / P1 (le reste) | Routes sans écran |
 | F-03 | Starter : bouton « Répondre au visiteur » (proposition simple, E-02) sans les fonctions CRM. Demande un amendement de la constitution (D-5) | P0 | — |
 | F-04 | Lien d'export CSV Starter (route existante, politique d'export respectée) | P2 | Route non consommée |
@@ -303,7 +303,7 @@ Légende :
 
 | ID | Exigence | Prio | État actuel |
 |---|---|---|---|
-| J-01 | Émission de la facture mensuelle depuis le brouillon : numérotation séquentielle par pays, PDF, mentions légales, devise XOF, TVA selon le pays (à valider par la comptabilité) | P1 | Brouillons non facturants |
+| J-01 | Émission de la facture mensuelle depuis le brouillon : numérotation séquentielle par pays, PDF, mentions légales, devise XOF, TVA de la CI et du Sénégal (à valider par la comptabilité) | P1 | Brouillons non facturants |
 | J-02 | Enregistrement manuel d'un paiement reçu (virement, mobile money hors plateforme) et état des comptes | P1 | — |
 | J-03 | Attribution d'un pack de leads après paiement constaté (existant côté admin) | P1 | OK |
 | J-04 | Paiement en ligne des abonnements et des packs : **hors périmètre**, spec dédiée (D-8) | — | — |
@@ -331,9 +331,9 @@ Légende :
 
 | ID | Exigence | Prio | Responsable |
 |---|---|---|---|
-| L-01 | Mentions légales complètes : société, RCCM, siège, directeur de publication, hébergeur (CI) | P0 | Juridique |
-| L-02 | Politique de confidentialité : responsable de traitement, DPO, autorité (ARTCI), durées de conservation validées, sous-traitants | P0 | Juridique, DPO |
-| L-03 | Déclaration ou autorisation auprès de l'ARTCI (loi ivoirienne 2013-450) | P0 | DPO |
+| L-01 | Mentions légales complètes : société, RCCM, siège, directeur de publication, hébergeur, avec une surcharge par pays (CI et SN) | P0 | Juridique |
+| L-02 | Politique de confidentialité par pays : responsable de traitement, DPO, autorité (ARTCI pour la CI, CDP pour le Sénégal), durées de conservation validées, sous-traitants, transferts hors du pays | P0 | Juridique, DPO |
+| L-03 | Déclaration ou autorisation auprès de l'ARTCI (CI, loi 2013-450) et de la CDP (Sénégal, loi 2008-12), avant l'ouverture de chaque pays | P0 | DPO |
 | L-04 | Contrats de sous-traitance des données (DPA) : hébergeur, e-mail, IA (si activée), stockage | P0 | Juridique |
 | L-05 | Contrat de partenariat courtier : rôle technique d'AssurMatch, prix des leads, litiges, données, SLA ; acceptation tracée dans l'outil (A-10) | P0 | Juridique, commercial |
 | L-06 | Textes de consentement FR et EN validés, puis publiés (B-04) | P0 | Compliance |
@@ -408,7 +408,7 @@ Les statuts internes « injoignable », « hors cible », « doublon » et « co
 | I. Positionnement | E-02 et E-03 : propositions marquées « indicatives, non contractuelles, à confirmer par le courtier ». Aucune souscription : la conclusion se fait chez le courtier. Avis juridique L-08 requis. |
 | II. Consentement et licences | D-01 consentement nommé. A-03 et A-10 licence validée avant activation. A-12 désactivation rapide. Audit de toutes les actions des EPIC A, B, C, E. |
 | III. Séparation des applications | L'espace de suivi visiteur vit dans l'app publique, avec un jeton visiteur distinct de toute session back-office. L'app courtier reste séparée (K-02, domaine propre). |
-| IV. Sécurité | E-07 isolation. F-01 révélation des coordonnées auditée. K-12 et K-13 sécurité. MFA pour les invités (G-03). |
+| IV. Sécurité | E-07 isolation. F-01 consultation des coordonnées auditée (visibles dès l'affectation, jamais pour un courtier non assigné). K-12 et K-13 sécurité. MFA pour les invités (G-03). |
 | V. IA | Aucune activation dans ce PRD. Les nouvelles surfaces n'appellent pas l'IA. |
 | VI. Historique | Versionnage des offres (C-04), historique des propositions, messages et réponses (E-02 à E-04), décisions sur les candidatures (A-08). |
 | VII. Routage | C-06 : la préférence d'offre ne contourne jamais l'éligibilité ; le refus est journalisé. |
@@ -417,20 +417,20 @@ Les statuts internes « injoignable », « hors cible », « doublon » et « co
 
 ---
 
-## 9. Décisions produit à trancher
+## 9. Décisions produit (arbitrées le 2 octobre 2026)
 
-| ID | Question | Recommandation |
-|---|---|---|
-| D-1 | Périmètre du lancement | CI, Auto et Voyage, 3 à 5 courtiers, IA fermée, multi-courtiers fermé. |
-| D-2 | À quel moment le courtier voit-il les coordonnées complètes du visiteur ? | Après acceptation, pour tous les plans. Avant : produit, ville, besoin, coordonnées masquées. Protège le visiteur et rend l'acceptation significative pour la facturation. |
-| D-3 | Le visiteur a-t-il un compte ? | Non : espace de suivi par **lien magique** (e-mail), sans mot de passe. Reste conforme au parcours anonyme du PRD v0.2 et évite une gestion de comptes grand public. |
-| D-4 | Une offre choisie oriente-t-elle le routage ? | Oui, en priorité si le courtier de l'offre est éligible (licence, couverture, quota). Sinon, routage standard, avec le motif affiché au visiteur avant consentement si connu, sinon après. |
-| D-5 | Le courtier Starter peut-il répondre au visiteur sur la plateforme ? | Oui, avec une proposition simple (message et PDF) sans CRM. Demande un amendement MINOR de la constitution (critère n°1). Sinon, la boucle SC-06 ne marche que pour Pro. |
-| D-6 | Que reçoit un courtier « Actif test » ? | Uniquement des leads de test (demandes marquées test, depuis un pays en statut interne). Jamais de lead réel. |
-| D-7 | BullMQ ou sondage en base ? | Garder le sondage en base (déjà idempotent et testé) dans un conteneur worker unique. Retirer les files BullMQ non consommées, ou les réserver à une spec ultérieure. |
-| D-8 | Paiement des abonnements et des packs | Facturation manuelle au lancement (J-01, J-02). Spec « paiements B2B » (mobile money, carte) après 3 mois d'exploitation. |
-| D-9 | Messagerie courtier ↔ visiteur au lancement ? | P1 : la proposition et la réponse visiteur (E-02, E-04) suffisent pour SC-06 et SC-07. La messagerie libre vient juste après, avec modération des formulations. |
-| D-10 | Nom de domaine et marque de production | À fournir (aujourd'hui sous `allianceconsultants.net`). |
+| ID | Question | Décision retenue | Conséquences |
+|---|---|---|---|
+| D-1 | Périmètre du lancement | **CI et Sénégal**, Auto et Voyage, 3 à 5 courtiers par pays, IA et multi-courtiers fermés | Double dossier juridique (ARTCI et CDP), textes légaux et de consentement par pays, seed SN. Chaque pays s'ouvre indépendamment. |
+| D-2 | Quand le courtier voit-il les coordonnées complètes ? | **Dès l'affectation**, pour tous les plans | Le CRM Pro doit afficher les coordonnées complètes (corrige le masquage actuel). Chaque consultation est auditée ; un courtier non assigné ou désaffecté n'y a jamais accès. |
+| D-3 | Le visiteur a-t-il un compte ? | **Non : lien magique par e-mail**, renvoyable depuis `/suivi` | Spec 054. Pas de mot de passe ni de MFA visiteur. |
+| D-4 | L'offre choisie oriente-t-elle le routage ? | **Oui, en priorité si le courtier est éligible**, sinon routage standard avec information du visiteur | Spec 052 (C-06). L'éligibilité reste décidée par les règles déterministes (principe VII). |
+| D-5 | Le Starter peut-il répondre au visiteur ? | **Oui, réponse simple** (message et PDF facultatif, sans CRM) | **Amendement MINOR de la constitution** (critère d'acceptation n°1) à faire avant la spec 055. |
+| D-6 | Que reçoit un courtier « Actif test » ? | **Uniquement des leads de test** | Marqueur « test » sur la demande ; jamais facturé ; jamais routé vers un courtier « Actif public ». |
+| D-7 | BullMQ ou sondage en base ? | **Sondage en base**, dans un conteneur worker dédié | Retirer les files BullMQ jamais consommées (spec 057). |
+| D-8 | Paiement des courtiers | **Facturation manuelle** au lancement | Spec 060. Paiement en ligne dans une spec ultérieure. |
+| D-9 | Messagerie libre au lancement ? | **Après le lancement** | Au lancement : proposition et réponse du visiteur (E-02, E-04). Spec 062 hors chemin critique. |
+| D-10 | Domaine de production | **À définir** | Spec 057 rédigée avec des domaines paramétrables ; le choix est un prérequis de J4. |
 
 ---
 
@@ -467,8 +467,8 @@ Chaque spec démarre par `/speckit.specify`, cite ses surfaces et ses principes,
 | J1 — Fondations | 050, 051, 057 ; préproduction rétablie | SC-01 et SC-02 passent en préproduction |
 | J2 — Boucle complète | 052, 053, 054, 055 | SC-03 à SC-07 passent en préproduction |
 | J3 — Exploitabilité | 056, 058, 060, 059 | SC-08 à SC-10 passent ; suite E2E verte en CI |
-| J4 — Pilote fermé | Production avec 3 à 5 courtiers signés, pays en statut interne, trafic limité (lien direct) | 2 semaines sans incident critique, SLA mesuré, 0 écart de conformité |
-| J5 — Ouverture publique | `country_public_enabled` CI activé par la Compliance, communication | Checklist go/no-go 100 %, EPIC L entièrement signée, test d'intrusion clos |
+| J4 — Pilote fermé | Production avec 3 à 5 courtiers signés par pays, pays en statut interne, trafic limité (lien direct) | 2 semaines sans incident critique, SLA mesuré, 0 écart de conformité |
+| J5 — Ouverture publique | `country_public_enabled` activé par la Compliance pour la CI puis pour le Sénégal, chacun dès que son dossier EPIC L est signé | Checklist go/no-go 100 %, EPIC L entièrement signée, test d'intrusion clos |
 
 ---
 
@@ -477,10 +477,10 @@ Chaque spec démarre par `/speckit.specify`, cite ses surfaces et ses principes,
 | Risque | Impact | Mitigation |
 |---|---|---|
 | Requalification en intermédiaire du fait du relais de propositions | Réglementaire, bloquant | Avis juridique L-08 avant 055. Mentions non contractuelles obligatoires. La proposition émane toujours du courtier nommé. Aucune comparaison de propositions par AssurMatch. |
-| Fuite de données visiteur entre courtiers | Critique | Tests RBAC E-07 et F-01. Révélation auditée. Revue de sécurité de 055. Test d'intrusion. |
+| Fuite de données visiteur entre courtiers | Critique | Tests RBAC E-07 et F-01. Consultation des coordonnées auditée ; accès retiré à l'ancien courtier en cas de réaffectation. Revue de sécurité de 055. Test d'intrusion. |
 | Lien magique intercepté ou partagé | Moyen | Jeton court, révocable, renvoyé uniquement à l'e-mail d'origine. Aucune donnée sensible dans l'URL au-delà du jeton. `noindex`. |
 | Écart entre la carte de couverture et la réalité | Élevé (déjà constaté) | Garde-fou M-02. Critère « atteignable par l'utilisateur cible » dans chaque spec. |
-| Délais juridiques (ARTCI, contrats) | Retarde J5 | Lancer EPIC L dès la validation de ce PRD. Pilote J4 en statut interne. |
+| Délais juridiques (ARTCI, CDP, contrats) | Retarde J5 | Lancer EPIC L dès maintenant. Pilote J4 en statut interne. Ouvrir la CI d'abord si le dossier sénégalais prend du retard. |
 | Courtiers peu réactifs | Expérience visiteur dégradée | SLA visible (E-08). Relances automatiques (I-03). Réaffectation manuelle (H-03). |
 | Arrêt silencieux des e-mails | Le visiteur ne reçoit rien | Worker supervisé (I-01). Alerte sur l'arriéré et les rebonds (K-09). |
 
