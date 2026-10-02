@@ -1,3 +1,4 @@
+import { publicCountryFlags } from "../countries/countries.module";
 import type { PublicPartnerDetail, PublicPartnerProduct, PublicPartnerSummary } from "../../../../packages/shared/contracts/public-site.contracts";
 import { AuditLogWriter } from "../audit-logs/audit-log-writer.service";
 import { PUBLIC_SITE_AUDIT_ACTIONS } from "../audit-logs/public-site-audit-actions";
@@ -76,7 +77,7 @@ export class PublicPartnerDirectoryService {
       });
       throw new Error("Partner not found");
     }
-    const countryProducts = await this.products.listPublicForCountry(country.id, country.flags, globalFlags);
+    const countryProducts = await this.products.listPublicForCountry(country.id, publicCountryFlags(country), globalFlags);
     const nameByKey = new Map(countryProducts.map((product) => [product.key, product.name]));
     const products: PublicPartnerProduct[] = summary.productKeys.map((key) => ({ key, name: nameByKey.get(key) ?? key }));
     this.audit.write({
@@ -98,7 +99,7 @@ export class PublicPartnerDirectoryService {
     const globalFlags = context.globalFlags ?? DEFAULT_GLOBAL_FLAGS;
     const country = await this.countries.findByIsoCode(countryCode);
     const state: PublicJourneyState | undefined = country
-      ? this.journeyFlagPolicy.resolve({ globalFlags, countryFlags: country.flags })
+      ? this.journeyFlagPolicy.resolve({ globalFlags, countryFlags: publicCountryFlags(country) })
       : undefined;
     if (!country || !state?.publicEnabled) {
       this.audit.write({
@@ -131,7 +132,7 @@ export class PublicPartnerDirectoryService {
   }
 
   private async computeEligibleSummaries(country: Country, globalFlags: Partial<Record<string, boolean>>): Promise<PublicPartnerSummary[]> {
-    const countryProducts = await this.products.listPublicForCountry(country.id, country.flags, globalFlags);
+    const countryProducts = await this.products.listPublicForCountry(country.id, publicCountryFlags(country), globalFlags);
     const productByKey = new Map<string, string>(
       countryProducts.filter((product): product is typeof product & { id: string } => Boolean(product.id)).map((product) => [product.id, product.key])
     );

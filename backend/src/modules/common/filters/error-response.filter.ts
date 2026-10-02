@@ -5,6 +5,29 @@ export interface SafeErrorResponse {
   code: ErrorCode;
   message: string;
   correlationId: string;
+  /** Spec 050: activation refusals list the failing checklist controls (no sensitive data). */
+  blockers?: unknown[];
+  /** Spec 050: a quote form missing in the requested language names the languages that exist. */
+  availableLanguages?: string[];
+}
+
+const KNOWN_ERROR_CODES = new Set<string>(Object.values(ErrorCodes));
+
+/**
+ * Spec 050 R11: an `HttpException` built with `{ code, message, ... }` keeps its explicit code, so
+ * new refusals never depend on the wording regexes below. Unknown codes are ignored.
+ */
+function explicitDetails(error: unknown): { code?: ErrorCode; blockers?: unknown[]; availableLanguages?: string[] } {
+  if (!(error instanceof HttpException)) return {};
+  const body = error.getResponse();
+  if (!body || typeof body !== "object") return {};
+  const record = body as Record<string, unknown>;
+  const code = typeof record.code === "string" && KNOWN_ERROR_CODES.has(record.code) ? record.code as ErrorCode : undefined;
+  return {
+    ...(code ? { code } : {}),
+    ...(Array.isArray(record.blockers) ? { blockers: record.blockers } : {}),
+    ...(Array.isArray(record.availableLanguages) ? { availableLanguages: record.availableLanguages.filter((value): value is string => typeof value === "string") } : {})
+  };
 }
 
 const SENSITIVE_PATTERNS = [/password/i, /secret/i, /token/i, /database/i, /stack/i];
@@ -33,10 +56,13 @@ export function toSafeErrorResponse(
   const safeMessage = SENSITIVE_PATTERNS.some((pattern) => pattern.test(message))
     ? "The request could not be processed safely"
     : message;
+  const details = explicitDetails(error);
   return {
-    code: codeForError(error, message, status),
+    code: details.code ?? codeForError(error, message, status),
     message: safeMessage,
-    correlationId
+    correlationId,
+    ...(details.blockers ? { blockers: details.blockers } : {}),
+    ...(details.availableLanguages ? { availableLanguages: details.availableLanguages } : {})
   };
 }
 

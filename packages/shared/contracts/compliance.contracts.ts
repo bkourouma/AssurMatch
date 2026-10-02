@@ -1,18 +1,85 @@
 import { z } from "zod";
-import { dateTimeStringSchema, nonEmptyStringSchema, uuidSchema } from "../validation/common.schemas";
+import { dateTimeStringSchema, languageCodeSchema, nonEmptyStringSchema, reasonSchema, uuidSchema } from "../validation/common.schemas";
+
+export const consentPurposeSchema = z.enum(["lead_transmission", "document_upload", "technical_notification", "ai_processing", "marketing_optional", "service_quality_survey"]);
+export const consentChannelSchema = z.enum(["public_web", "admin", "broker", "api"]);
+export const consentTextStatusSchema = z.enum(["draft", "review", "published", "retired"]);
+
+/** Spec 050 R5: placeholders a consent text template may use; resolved by the server when served. */
+export const CONSENT_TEXT_VARIABLES = ["{{brokerName}}", "{{countryName}}", "{{productName}}", "{{contactFields}}"] as const;
+export const CONSENT_TEXT_MAX_LENGTH = 20000;
 
 export const consentTextSchema = z.object({
   id: uuidSchema.optional(),
-  purpose: z.enum(["lead_transmission", "document_upload", "technical_notification", "ai_processing", "marketing_optional", "service_quality_survey"]),
+  purpose: consentPurposeSchema,
   countryId: uuidSchema,
   productId: uuidSchema.optional(),
   channel: z.enum(["public_web", "admin", "broker", "api"]),
   recipientCategory: nonEmptyStringSchema,
   language: nonEmptyStringSchema,
   version: nonEmptyStringSchema,
-  status: z.enum(["draft", "review", "published", "retired"]).default("draft"),
-  contentHash: nonEmptyStringSchema
+  status: consentTextStatusSchema.default("draft"),
+  contentHash: nonEmptyStringSchema,
+  /**
+   * Spec 050 R5: the full template (variables unresolved). Optional at the domain level so the
+   * fixtures that only carry a hash still load, but required by the admin route and by publication.
+   */
+  content: z.string().max(CONSENT_TEXT_MAX_LENGTH).optional()
 });
+
+/** Spec 050: admin creation. The hash is never accepted from the caller; the server computes it. */
+export const adminConsentTextCreateSchema = z.object({
+  purpose: consentPurposeSchema,
+  countryId: uuidSchema,
+  productId: uuidSchema.optional(),
+  channel: consentChannelSchema.default("public_web"),
+  recipientCategory: nonEmptyStringSchema,
+  language: languageCodeSchema,
+  version: nonEmptyStringSchema,
+  content: z.string().trim().min(1).max(CONSENT_TEXT_MAX_LENGTH),
+  reason: reasonSchema
+});
+
+export const adminConsentTextListQuerySchema = z.object({
+  countryId: uuidSchema.optional(),
+  productId: uuidSchema.optional(),
+  purpose: consentPurposeSchema.optional(),
+  language: languageCodeSchema.optional(),
+  status: consentTextStatusSchema.optional()
+});
+
+/** A reference template shipped with the seed (`scripts/preprod/seeds/reference/consent-templates.json`). */
+export const consentTextTemplateSchema = z.object({
+  templateKey: nonEmptyStringSchema,
+  purpose: consentPurposeSchema,
+  language: languageCodeSchema,
+  status: z.literal("draft").default("draft"),
+  mode: z.literal("template").default("template"),
+  bodyTemplate: nonEmptyStringSchema,
+  notes: z.string().optional()
+});
+
+export interface AdminConsentTextView {
+  id: string;
+  purpose: z.output<typeof consentPurposeSchema>;
+  countryId: string;
+  productId: string | null;
+  channel: z.output<typeof consentChannelSchema>;
+  recipientCategory: string;
+  language: string;
+  version: string;
+  status: z.output<typeof consentTextStatusSchema>;
+  contentHash: string;
+  content: string | null;
+  publishedAt: string | null;
+  retiredAt: string | null;
+  /** Id of a more recent published version for the same purpose, country, product and language. */
+  supersededBy?: string | null;
+  /** Present when the view is requested with `?preview=1`: the content with sample values. */
+  preview?: string;
+  createdAt: string;
+  updatedAt: string;
+}
 
 export const consentRecordSchema = z.object({
   id: uuidSchema.optional(),
@@ -41,6 +108,9 @@ export const auditLogSchema = z.object({
 });
 
 export type ConsentTextDto = z.input<typeof consentTextSchema>;
+export type AdminConsentTextCreateDto = z.input<typeof adminConsentTextCreateSchema>;
+export type AdminConsentTextListQuery = z.input<typeof adminConsentTextListQuerySchema>;
+export type ConsentTextTemplate = z.output<typeof consentTextTemplateSchema>;
 export type ConsentTextRecord = z.output<typeof consentTextSchema>;
 export type ConsentRecordDto = z.input<typeof consentRecordSchema>;
 export type ConsentRecordRecord = z.output<typeof consentRecordSchema>;

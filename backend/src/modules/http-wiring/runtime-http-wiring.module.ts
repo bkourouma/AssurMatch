@@ -1,3 +1,4 @@
+import { publicCountryFlags } from "../countries/countries.module";
 import type { SurveySubmissionInput } from "../satisfaction-surveys/satisfaction-surveys.service";
 import { Body, ConflictException, Controller, Delete, ForbiddenException, Get, HttpCode, Module, NotFoundException, Param, Patch, Post, Put, Query, Req, UnprocessableEntityException, UploadedFile, UseGuards, UseInterceptors } from "@nestjs/common";
 import { FileInterceptor } from "@nestjs/platform-express";
@@ -6,6 +7,19 @@ import { QUOTE_DOCUMENT_MAX_BYTES } from "../../../../packages/shared/contracts/
 import type { UploadedDocumentFile } from "../quote-documents/quote-documents.service";
 import { activateRequestSchema, loginRequestSchema, mfaVerifyRequestSchema, passwordChangeRequestSchema, passwordResetRequestSchema, type ActivateRequest, type LoginRequest, type PasswordChangeRequest, type PasswordResetRequest } from "../../../../packages/shared/contracts/auth.contracts";
 import { activationChecklistQuerySchema } from "../../../../packages/shared/contracts/activation-checklist.contracts";
+import {
+  adminCountryCreateSchema,
+  adminCountryUpdateSchema,
+  adminProductCreateSchema,
+  adminProductListQuerySchema,
+  adminProductUpdateSchema,
+  adminRegulatoryRegimeCreateSchema,
+  catalogActionReasonSchema,
+  catalogFlagToggleSchema,
+  countryProductLinkCreateSchema,
+  countryStatusChangeSchema,
+  regulatoryRegimeUpdateSchema
+} from "../../../../packages/shared/contracts/catalog.contracts";
 import { billingFoundationQuerySchema, billingPlanPriceUpsertSchema, draftInvoiceQuerySchema, draftInvoiceRecomputeSchema, leadPackGrantSchema } from "../../../../packages/shared/contracts/billing.contracts";
 import { partnerApplicationStatusSchema } from "../../../../packages/shared/contracts/partner-application.contracts";
 import {
@@ -267,7 +281,7 @@ export class PublicProductsController {
     const parsedCountryCode = parseParam("countryCode", countryCode, isoCountrySchema);
     const country = await this.runtime.countries.service.findByIsoCode(parsedCountryCode);
     if (!country) return [];
-    return this.runtime.products.service.listPublicForCountry(country.id, country.flags, this.runtime.publicJourneyGlobalFlags());
+    return this.runtime.products.service.listPublicForCountry(country.id, publicCountryFlags(country), this.runtime.publicJourneyGlobalFlags());
   }
 
   async detail(countryCode: string, productKey: string, request: AssurMatchHttpRequest) {
@@ -275,7 +289,7 @@ export class PublicProductsController {
     const parsedProductKey = parseParam("productKey", productKey);
     const country = await this.runtime.countries.service.findByIsoCode(parsedCountryCode);
     if (!country) throw new Error("Country is not publicly available");
-    return this.runtime.products.service.getPublicProductPage(country.id, parsedProductKey, country.flags, this.runtime.publicJourneyGlobalFlags(), actorFromRequest(request));
+    return this.runtime.products.service.getPublicProductPage(country.id, parsedProductKey, publicCountryFlags(country), this.runtime.publicJourneyGlobalFlags(), actorFromRequest(request));
   }
 }
 
@@ -289,7 +303,8 @@ export class PublicOffersController {
     const country = await this.runtime.countries.service.findByIsoCode(parsedCountryCode);
     const product = await this.runtime.products.service.findByKey(parsedProductKey);
     if (!country || !product) return { items: [], total: 0, page: 1, pageSize: 20 };
-    return this.runtime.offers.publicCatalog.list(country.id, product.id, parsedQuery, undefined, this.runtime.publicOfferContext({ countryFlags: country.flags, productFlags: product.flags }));
+    // Spec 050 R2: the product flags as seen from this country (product flag AND link flag).
+    return this.runtime.offers.publicCatalog.list(country.id, product.id, parsedQuery, undefined, this.runtime.publicOfferContext({ countryFlags: publicCountryFlags(country), productFlags: this.runtime.products.service.effectiveFlags(product, country.id) }));
   }
 
   compare(query: Record<string, string>) {
@@ -384,6 +399,99 @@ export class AdminQuoteFormDefinitionsHttpController {
   }
 }
 
+/**
+ * Spec 050: admin catalogue routes. Before this spec the country, product and regime controllers
+ * existed in-process only, so opening a country required a database intervention.
+ */
+export class AdminCatalogCountriesHttpController {
+  constructor(private readonly runtime: AssurMatchRuntime) {}
+
+  list(request: AssurMatchHttpRequest) {
+    return this.runtime.catalog.admin.listCountries(protectedActorFromRequest(request));
+  }
+
+  detail(id: string, request: AssurMatchHttpRequest) {
+    return this.runtime.catalog.admin.getCountry(protectedActorFromRequest(request), parseParam("id", id, uuidSchema));
+  }
+
+  create(request: AssurMatchHttpRequest, input: unknown) {
+    return this.runtime.catalog.admin.createCountry(protectedActorFromRequest(request), parseHttpInput(adminCountryCreateSchema, input));
+  }
+
+  update(id: string, request: AssurMatchHttpRequest, input: unknown) {
+    return this.runtime.catalog.admin.updateCountry(protectedActorFromRequest(request), parseParam("id", id, uuidSchema), parseHttpInput(adminCountryUpdateSchema, input));
+  }
+
+  status(id: string, request: AssurMatchHttpRequest, input: unknown) {
+    return this.runtime.catalog.admin.changeCountryStatus(protectedActorFromRequest(request), parseParam("id", id, uuidSchema), parseHttpInput(countryStatusChangeSchema, input));
+  }
+
+  flags(id: string, request: AssurMatchHttpRequest, input: unknown) {
+    return this.runtime.catalog.admin.toggleCountryFlag(protectedActorFromRequest(request), parseParam("id", id, uuidSchema), parseHttpInput(catalogFlagToggleSchema, input));
+  }
+
+  links(id: string, request: AssurMatchHttpRequest) {
+    return this.runtime.catalog.admin.listLinks(protectedActorFromRequest(request), parseParam("id", id, uuidSchema));
+  }
+
+  createLink(id: string, request: AssurMatchHttpRequest, input: unknown) {
+    return this.runtime.catalog.admin.createLink(protectedActorFromRequest(request), parseParam("id", id, uuidSchema), parseHttpInput(countryProductLinkCreateSchema, input));
+  }
+
+  retireLink(id: string, productId: string, request: AssurMatchHttpRequest, input: unknown) {
+    return this.runtime.catalog.admin.retireLink(protectedActorFromRequest(request), parseParam("id", id, uuidSchema), parseParam("productId", productId, uuidSchema), parseHttpInput(catalogActionReasonSchema, input));
+  }
+
+  linkFlags(id: string, productId: string, request: AssurMatchHttpRequest, input: unknown) {
+    return this.runtime.catalog.admin.toggleLinkFlag(protectedActorFromRequest(request), parseParam("id", id, uuidSchema), parseParam("productId", productId, uuidSchema), parseHttpInput(catalogFlagToggleSchema, input));
+  }
+}
+
+export class AdminCatalogProductsHttpController {
+  constructor(private readonly runtime: AssurMatchRuntime) {}
+
+  list(request: AssurMatchHttpRequest, query: Record<string, string>) {
+    const parsed = parseHttpInput(adminProductListQuerySchema, query ?? {});
+    return this.runtime.catalog.admin.listProducts(protectedActorFromRequest(request), parsed.countryId);
+  }
+
+  detail(id: string, request: AssurMatchHttpRequest) {
+    return this.runtime.catalog.admin.getProduct(protectedActorFromRequest(request), parseParam("id", id, uuidSchema));
+  }
+
+  create(request: AssurMatchHttpRequest, input: unknown) {
+    return this.runtime.catalog.admin.createProduct(protectedActorFromRequest(request), parseHttpInput(adminProductCreateSchema, input));
+  }
+
+  update(id: string, request: AssurMatchHttpRequest, input: unknown) {
+    return this.runtime.catalog.admin.updateProduct(protectedActorFromRequest(request), parseParam("id", id, uuidSchema), parseHttpInput(adminProductUpdateSchema, input));
+  }
+
+  flags(id: string, request: AssurMatchHttpRequest, input: unknown) {
+    return this.runtime.catalog.admin.toggleProductFlag(protectedActorFromRequest(request), parseParam("id", id, uuidSchema), parseHttpInput(catalogFlagToggleSchema, input));
+  }
+}
+
+export class AdminRegulatoryRegimesHttpController {
+  constructor(private readonly runtime: AssurMatchRuntime) {}
+
+  list(request: AssurMatchHttpRequest) {
+    return this.runtime.catalog.admin.listRegimes(protectedActorFromRequest(request));
+  }
+
+  create(request: AssurMatchHttpRequest, input: unknown) {
+    return this.runtime.catalog.admin.createRegime(protectedActorFromRequest(request), parseHttpInput(adminRegulatoryRegimeCreateSchema, input));
+  }
+
+  update(id: string, request: AssurMatchHttpRequest, input: unknown) {
+    return this.runtime.catalog.admin.updateRegime(protectedActorFromRequest(request), parseParam("id", id, uuidSchema), parseHttpInput(regulatoryRegimeUpdateSchema, input));
+  }
+
+  retire(id: string, request: AssurMatchHttpRequest, input: unknown) {
+    return this.runtime.catalog.admin.retireRegime(protectedActorFromRequest(request), parseParam("id", id, uuidSchema), parseHttpInput(catalogActionReasonSchema, input).reason);
+  }
+}
+
 export class AdminScoringRulesController {
   constructor(private readonly runtime: AssurMatchRuntime) {}
 
@@ -453,13 +561,14 @@ export class PublicQuoteRequestsController {
     const country = await this.runtime.countries.service.findByIsoCode(parsedCountryCode);
     const product = await this.runtime.products.service.findByKey(parsedProductKey);
     if (!country || !product) throw new Error("Quote form is not publicly available");
+    const scoped = this.runtime.products.service.forCountry(product, country.id);
     const state = new PublicJourneyFlagPolicy().resolve({
       globalFlags: this.runtime.publicJourneyGlobalFlags(),
-      countryFlags: country.flags,
-      productFlags: product.flags,
+      countryFlags: publicCountryFlags(country),
+      productFlags: scoped.flags,
       requireProductFlags: true
     });
-    if (!state.quoteEnabled) throw new Error("Quote form is not publicly available");
+    if (!state.quoteEnabled || scoped.status === "suspended" || scoped.status === "retired") throw new Error("Quote form is not publicly available");
     return this.runtime.quoteForms.service.publicForm(country.id, product.id, parsedLanguage);
   }
 
@@ -572,15 +681,15 @@ export class PublicInsurersController {
     const country = await this.runtime.countries.service.findByIsoCode(parsedCountryCode);
     const globalFlags = this.runtime.publicJourneyGlobalFlags();
     if (!country) throw new Error("Country is not publicly available");
-    const state = new PublicJourneyFlagPolicy().resolve({ globalFlags, countryFlags: country.flags });
+    const state = new PublicJourneyFlagPolicy().resolve({ globalFlags, countryFlags: publicCountryFlags(country) });
     if (!state.publicEnabled) throw new Error("Country is not publicly available");
     void actorFromRequest(request);
-    const insurers = await this.runtime.offers.publicCatalog.listInsurers(country.id, this.runtime.publicOfferContext({ countryFlags: country.flags }));
+    const insurers = await this.runtime.offers.publicCatalog.listInsurers(country.id, this.runtime.publicOfferContext({ countryFlags: publicCountryFlags(country) }));
     // The catalogue groups by product id because it has no product lookup of its own. The contract
     // promises product keys, and a raw id on a public page is meaningless to a visitor, so the ids
     // are resolved here against the country's public products; an id with no public product is
     // dropped rather than leaked.
-    const products = await this.runtime.products.service.listPublicForCountry(country.id, country.flags, globalFlags);
+    const products = await this.runtime.products.service.listPublicForCountry(country.id, publicCountryFlags(country), globalFlags);
     const keyById = new Map(products.map((product) => [product.id, product.key]));
     return insurers.map((insurer) => ({
       ...insurer,
@@ -1450,6 +1559,31 @@ decorate(AdminQuoteFormDefinitionsHttpController, "list", [Get("quote-form-defin
 decorate(AdminQuoteFormDefinitionsHttpController, "create", [Post("quote-form-definitions") as MethodDecoratorFactory], [[0, Req() as ParamDecoratorFactory], [1, Body() as ParamDecoratorFactory]]);
 decorate(AdminQuoteFormDefinitionsHttpController, "publish", [Post("quote-form-definitions/:id/publish") as MethodDecoratorFactory], [[0, Param("id") as ParamDecoratorFactory], [1, Req() as ParamDecoratorFactory], [2, Body() as ParamDecoratorFactory]]);
 decorate(AdminQuoteFormDefinitionsHttpController, "retire", [Post("quote-form-definitions/:id/retire") as MethodDecoratorFactory], [[0, Param("id") as ParamDecoratorFactory], [1, Req() as ParamDecoratorFactory], [2, Body() as ParamDecoratorFactory]]);
+controller("admin", AdminCatalogCountriesHttpController, true);
+decorate(AdminCatalogCountriesHttpController, "list", [Get("countries") as MethodDecoratorFactory], [[0, Req() as ParamDecoratorFactory]]);
+decorate(AdminCatalogCountriesHttpController, "create", [Post("countries") as MethodDecoratorFactory], [[0, Req() as ParamDecoratorFactory], [1, Body() as ParamDecoratorFactory]]);
+decorate(AdminCatalogCountriesHttpController, "detail", [Get("countries/:id") as MethodDecoratorFactory], [[0, Param("id") as ParamDecoratorFactory], [1, Req() as ParamDecoratorFactory]]);
+decorate(AdminCatalogCountriesHttpController, "update", [Patch("countries/:id") as MethodDecoratorFactory], [[0, Param("id") as ParamDecoratorFactory], [1, Req() as ParamDecoratorFactory], [2, Body() as ParamDecoratorFactory]]);
+decorate(AdminCatalogCountriesHttpController, "status", [Post("countries/:id/status") as MethodDecoratorFactory, HttpCode(200) as MethodDecoratorFactory], [[0, Param("id") as ParamDecoratorFactory], [1, Req() as ParamDecoratorFactory], [2, Body() as ParamDecoratorFactory]]);
+decorate(AdminCatalogCountriesHttpController, "flags", [Post("countries/:id/flags") as MethodDecoratorFactory, HttpCode(200) as MethodDecoratorFactory], [[0, Param("id") as ParamDecoratorFactory], [1, Req() as ParamDecoratorFactory], [2, Body() as ParamDecoratorFactory]]);
+decorate(AdminCatalogCountriesHttpController, "links", [Get("countries/:id/products") as MethodDecoratorFactory], [[0, Param("id") as ParamDecoratorFactory], [1, Req() as ParamDecoratorFactory]]);
+decorate(AdminCatalogCountriesHttpController, "createLink", [Post("countries/:id/products") as MethodDecoratorFactory], [[0, Param("id") as ParamDecoratorFactory], [1, Req() as ParamDecoratorFactory], [2, Body() as ParamDecoratorFactory]]);
+decorate(AdminCatalogCountriesHttpController, "retireLink", [Post("countries/:id/products/:productId/retire") as MethodDecoratorFactory, HttpCode(200) as MethodDecoratorFactory], [[0, Param("id") as ParamDecoratorFactory], [1, Param("productId") as ParamDecoratorFactory], [2, Req() as ParamDecoratorFactory], [3, Body() as ParamDecoratorFactory]]);
+decorate(AdminCatalogCountriesHttpController, "linkFlags", [Post("countries/:id/products/:productId/flags") as MethodDecoratorFactory, HttpCode(200) as MethodDecoratorFactory], [[0, Param("id") as ParamDecoratorFactory], [1, Param("productId") as ParamDecoratorFactory], [2, Req() as ParamDecoratorFactory], [3, Body() as ParamDecoratorFactory]]);
+
+controller("admin", AdminCatalogProductsHttpController, true);
+decorate(AdminCatalogProductsHttpController, "list", [Get("products") as MethodDecoratorFactory], [[0, Req() as ParamDecoratorFactory], [1, Query() as ParamDecoratorFactory]]);
+decorate(AdminCatalogProductsHttpController, "create", [Post("products") as MethodDecoratorFactory], [[0, Req() as ParamDecoratorFactory], [1, Body() as ParamDecoratorFactory]]);
+decorate(AdminCatalogProductsHttpController, "detail", [Get("products/:id") as MethodDecoratorFactory], [[0, Param("id") as ParamDecoratorFactory], [1, Req() as ParamDecoratorFactory]]);
+decorate(AdminCatalogProductsHttpController, "update", [Patch("products/:id") as MethodDecoratorFactory], [[0, Param("id") as ParamDecoratorFactory], [1, Req() as ParamDecoratorFactory], [2, Body() as ParamDecoratorFactory]]);
+decorate(AdminCatalogProductsHttpController, "flags", [Post("products/:id/flags") as MethodDecoratorFactory, HttpCode(200) as MethodDecoratorFactory], [[0, Param("id") as ParamDecoratorFactory], [1, Req() as ParamDecoratorFactory], [2, Body() as ParamDecoratorFactory]]);
+
+controller("admin", AdminRegulatoryRegimesHttpController, true);
+decorate(AdminRegulatoryRegimesHttpController, "list", [Get("regulatory-regimes") as MethodDecoratorFactory], [[0, Req() as ParamDecoratorFactory]]);
+decorate(AdminRegulatoryRegimesHttpController, "create", [Post("regulatory-regimes") as MethodDecoratorFactory], [[0, Req() as ParamDecoratorFactory], [1, Body() as ParamDecoratorFactory]]);
+decorate(AdminRegulatoryRegimesHttpController, "update", [Patch("regulatory-regimes/:id") as MethodDecoratorFactory], [[0, Param("id") as ParamDecoratorFactory], [1, Req() as ParamDecoratorFactory], [2, Body() as ParamDecoratorFactory]]);
+decorate(AdminRegulatoryRegimesHttpController, "retire", [Post("regulatory-regimes/:id/retire") as MethodDecoratorFactory, HttpCode(200) as MethodDecoratorFactory], [[0, Param("id") as ParamDecoratorFactory], [1, Req() as ParamDecoratorFactory], [2, Body() as ParamDecoratorFactory]]);
+
 controller("admin", AdminScoringRulesController, true);
 decorate(AdminScoringRulesController, "list", [Get("scoring-rules") as MethodDecoratorFactory], [[0, Req() as ParamDecoratorFactory]]);
 decorate(AdminScoringRulesController, "create", [Post("scoring-rules") as MethodDecoratorFactory], [[0, Req() as ParamDecoratorFactory], [1, Body() as ParamDecoratorFactory]]);
@@ -1534,6 +1668,9 @@ Module({
     AdminMessagingProvidersController,
     AdminOffersHttpController,
     AdminQuoteFormDefinitionsHttpController,
+    AdminCatalogCountriesHttpController,
+    AdminCatalogProductsHttpController,
+    AdminRegulatoryRegimesHttpController,
     AdminScoringRulesController,
     AdminRoutingRulesController,
     AdminRoutingAnomaliesHttpController,

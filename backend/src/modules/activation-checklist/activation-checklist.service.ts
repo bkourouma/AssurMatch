@@ -13,7 +13,7 @@ import type { FeatureFlagsService } from "../feature-flags/feature-flags.module"
 import type { OfferRecord, OffersModule } from "../offers/offers.module";
 import type { PartnerLicense, PartnerLicensesService } from "../partner-licenses/partner-licenses.module";
 import type { PartnerTenant, PartnersService } from "../partners/partners.module";
-import type { Product, ProductsService } from "../products/products.module";
+import { effectiveProductFlags, countryLinkFor, type Product, type ProductsService } from "../products/products.module";
 import type { QuoteFormDefinitionService } from "../quote-forms/quote-form-definition.service";
 import { OfferPublicationPolicy } from "../offers/offer-publication-policy";
 import { countryCatalog, productCatalog, resolveScopeCodes } from "../common/scope/actor-scope-codes";
@@ -55,8 +55,45 @@ export class ActivationChecklistAccessRefusedError extends Error {
   }
 }
 
+/** Spec 050 R4: one failing blocking control, as returned to the admin when an activation is refused. */
+export interface ActivationBlocker {
+  section: string;
+  control: string;
+  label: string;
+  evidence: string;
+}
+
 export class ActivationChecklistService {
   constructor(private readonly deps: ActivationChecklistDeps) {}
+
+  /**
+   * Spec 050 R4: blocking controls for opening one country to the public. It reuses the checklist
+   * rules (country, linked products, quote readiness, licensed partner, offers) without the role
+   * resolution and the read audit of `read()`: the catalogue layer has already authorised the caller
+   * and audits the activation attempt itself. Per partner sections are left out: the country
+   * control `country_active_licensed_partner` carries the "at least one" condition instead.
+   */
+  async countryActivationBlockers(countryId: string, ignoredControls: string[] = []): Promise<ActivationBlocker[]> {
+    const country = await this.deps.countries.require(countryId);
+    const countries = [country];
+    const products = (await this.deps.products.listAdmin(country.id)).filter((product) => product.countryIds.includes(country.id));
+    const [offers, consentTexts, forms, partners] = await Promise.all([
+      this.deps.offers.repository.list(),
+      this.deps.consent.listTexts(),
+      this.deps.quoteForms.list(),
+      this.deps.partners.list()
+    ]);
+    const sections: ActivationChecklistSection[] = [
+      await this.countrySection(country),
+      ...products.map((product) => this.productSection(product, countries)),
+      ...this.quoteReadinessSections(countries, products, forms, consentTexts),
+      ...await this.offerSections(offers, countries, products, partners)
+    ];
+    const ignored = new Set(ignoredControls);
+    return sections.flatMap((section) => section.controls
+      .filter((control) => control.blocking && control.status === "blocked" && !ignored.has(control.key))
+      .map((control) => ({ section: section.key, control: control.key, label: control.label, evidence: control.evidence })));
+  }
 
   async read(actor: ActorContext, query: ActivationChecklistQuery): Promise<ActivationChecklistResponse> {
     const role = this.resolveRole(actor);
@@ -70,7 +107,7 @@ export class ActivationChecklistService {
     const forms = await this.deps.quoteForms.list();
     const sections: ActivationChecklistSection[] = [
       this.globalSection(),
-      ...countries.map((country) => this.countrySection(country)),
+      ...await Promise.all(countries.map((country) => this.countrySection(country))),
       ...products.map((product) => this.productSection(product, countries)),
       ...this.quoteReadinessSections(countries, products, forms, consentTexts),
       ...await this.partnerSections(partners, countries, products),
@@ -153,24 +190,54 @@ export class ActivationChecklistService {
     ]);
   }
 
-  private countrySection(country: Country): ActivationChecklistSection {
+  private async countrySection(country: Country): Promise<ActivationChecklistSection> {
+    const licensedPartners = await this.activeLicensedPartnerCount(country.id);
     return this.section(`country:${country.id}`, `Pays ${country.isoCode}`, { countryId: country.id, countryCode: country.isoCode }, [
       this.control("country_status_public", "Statut pays public", country.status === "public", true, country.status),
       this.control("country_regime", "Regime reglementaire renseigne", Boolean(country.regulatoryRegimeId), true),
       this.control("country_public_enabled", "Flag pays public", country.flags.country_public_enabled === true, true),
       this.control("country_comparison_enabled", "Flag comparaison pays", country.flags.country_comparison_enabled === true, true),
-      this.control("country_quote_enabled", "Flag devis pays", country.flags.country_quote_enabled === true, true)
+      this.control("country_quote_enabled", "Flag devis pays", country.flags.country_quote_enabled === true, true),
+      // Spec 050 T009: opening a country needs at least one active, authorised and licensed partner.
+      this.control(
+        "country_active_licensed_partner",
+        "Au moins un courtier actif, autorise et licencie",
+        licensedPartners > 0,
+        true,
+        licensedPartners > 0 ? `${licensedPartners} courtier(s)` : "aucun courtier actif licencie"
+      )
     ]);
   }
 
+  /** Active partners authorised for the country and holding a valid, unexpired licence there. */
+  private async activeLicensedPartnerCount(countryId: string): Promise<number> {
+    const partners = (await this.deps.partners.list()).filter((partner) => partner.status === "active");
+    const today = Date.now();
+    let count = 0;
+    for (const partner of partners) {
+      const [authorized, licenses] = await Promise.all([
+        this.deps.partners.isAuthorizedForCountry(partner.id, countryId),
+        this.deps.partnerLicenses.listForPartner(partner.id)
+      ]);
+      const licensed = licenses.some((license: PartnerLicense) =>
+        license.status === "valid" && license.countryId === countryId && new Date(license.expirationDate).getTime() > today
+      );
+      if (authorized && licensed) count += 1;
+    }
+    return count;
+  }
+
   private productSection(product: Product, countries: Country[]): ActivationChecklistSection {
-    const countryIds = new Set(countries.map((country) => country.id));
+    // Spec 050 R2: flags are read per country (product flag AND link flag) for the scoped countries.
+    const links = countries.map((country) => countryLinkFor(product, country.id)).filter((link) => link !== undefined && link.status !== "retired");
+    const effective = links.map((link) => effectiveProductFlags(product, link));
+    const anyEffective = (key: "product_public_enabled" | "product_comparison_enabled" | "product_quote_enabled"): boolean => effective.some((flags) => flags[key] === true);
     return this.section(`product:${product.id}`, `Produit ${product.key}`, { productId: product.id, productKey: product.key }, [
       this.control("product_status_public", "Statut produit public", product.status === "public", true, product.status),
-      this.control("product_country_association", "Produit associe au pays scope", product.countryIds.some((countryId) => countryIds.has(countryId)), true),
-      this.control("product_public_enabled", "Flag produit public", product.flags.product_public_enabled === true, true),
-      this.control("product_comparison_enabled", "Flag comparaison produit", product.flags.product_comparison_enabled === true, true),
-      this.control("product_quote_enabled", "Flag devis produit", product.flags.product_quote_enabled === true, true),
+      this.control("product_country_association", "Produit associe au pays scope", links.length > 0, true),
+      this.control("product_public_enabled", "Flag produit public", anyEffective("product_public_enabled"), true),
+      this.control("product_comparison_enabled", "Flag comparaison produit", anyEffective("product_comparison_enabled"), true),
+      this.control("product_quote_enabled", "Flag devis produit", anyEffective("product_quote_enabled"), true),
       this.control("product_manual_review_required", "Revue manuelle explicite", product.flags.product_manual_review_required === true || product.requiresManualReview === true, false)
     ]);
   }

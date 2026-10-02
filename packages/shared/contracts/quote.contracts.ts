@@ -208,12 +208,24 @@ export const quoteFormFieldSchema = z.object({
   options: z.array(nonEmptyStringSchema).optional()
 });
 
+export const quoteLanguageSchema = z.enum(["fr", "en"]);
+
 export const publicConsentTextSchema = z.object({
   consentTextId: uuidSchema,
   version: nonEmptyStringSchema,
+  /** Hash of the published template (variables unresolved), recorded on the ConsentRecord. */
   contentHash: nonEmptyStringSchema,
   purpose: z.literal("lead_transmission"),
-  recipientCategory: nonEmptyStringSchema
+  recipientCategory: nonEmptyStringSchema,
+  /** Spec 050 R5: the published text with its variables resolved by the server. */
+  content: z.string().optional(),
+  language: z.string().optional()
+});
+
+/** Spec 050 R8: per country phone rule served with the public form. */
+export const publicPhoneRuleSchema = z.object({
+  dialCode: z.string(),
+  nationalLengths: z.array(z.number().int())
 });
 
 export const adminQuoteFormDefinitionSchema = z.object({
@@ -248,6 +260,8 @@ export const adminQuoteFormDefinitionViewSchema = z.object({
   dataMinimizationNotes: z.string().optional(),
   publishedAt: z.string().optional(),
   retiredAt: z.string().optional(),
+  /** Spec 050 FR-019: a more recent published version of the referenced consent text exists. */
+  consentSuperseded: z.boolean().optional(),
   createdAt: z.string(),
   updatedAt: z.string()
 });
@@ -255,6 +269,9 @@ export const adminQuoteFormDefinitionViewSchema = z.object({
 export const publicQuoteFormResponseSchema = z.object({
   formDefinitionId: uuidSchema,
   version: nonEmptyStringSchema,
+  /** Spec 050 R6: the language of the served form; there is no silent fallback. */
+  language: z.string().optional(),
+  phoneRule: publicPhoneRuleSchema.nullable().optional(),
   fields: z.array(quoteFormFieldSchema),
   consent: publicConsentTextSchema
 });
@@ -270,6 +287,8 @@ export const quoteRequestCreateSchema = z.object({
   productKey: nonEmptyStringSchema,
   selectedOfferId: uuidSchema.optional(),
   formDefinitionId: uuidSchema,
+  /** Spec 050 R6: language of the submitted form; consent is checked against the form of this language. */
+  language: quoteLanguageSchema.default("fr"),
   contact: quoteContactSchema,
   answers: z.record(z.string(), z.unknown()).default({}),
   consent: z.object({

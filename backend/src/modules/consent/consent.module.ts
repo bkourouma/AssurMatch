@@ -8,6 +8,8 @@ import { MemoryConsentRecordsRepository, type ConsentRecordsRepository } from ".
 export interface ConsentText extends ConsentTextDto {
   id: string;
   publishedAt?: Date;
+  /** Spec 050: stamped when the text is retired. */
+  retiredAt?: Date;
   createdAt: Date;
   updatedAt: Date;
 }

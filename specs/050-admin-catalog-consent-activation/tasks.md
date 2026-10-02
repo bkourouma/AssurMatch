@@ -17,19 +17,19 @@ description: "Task list for 050 — Administration du catalogue, des consentemen
 
 ## Phase 1: Setup (fondations partagées)
 
-- [ ] T001 Étendre `packages/shared/contracts/catalog.contracts.ts` :
+- [x] T001 Étendre `packages/shared/contracts/catalog.contracts.ts` :
   - règles téléphoniques (`phoneDialCode`, `phoneNationalLengths`) ;
   - `expectedUpdatedAt` sur les mises à jour ;
   - `catalogFlagToggleSchema`, `countryStatusChangeSchema`, `countryProductLinkCreateSchema`, `catalogActionReasonSchema`, `regulatoryRegimeUpdateSchema` ;
   - allowlists `COUNTRY_CATALOG_TOGGLEABLE_FLAGS` et `PRODUCT_CATALOG_TOGGLEABLE_FLAGS` ;
   - vues admin (feature flag / RBAC).
-- [ ] T002 [P] Étendre `packages/shared/contracts/compliance.contracts.ts` : `content` et `retiredAt` sur le texte ; `adminConsentTextCreateSchema` sans empreinte ; vue `AdminConsentTextView` ; schéma de modèle (consent).
-- [ ] T003 [P] Étendre `packages/shared/contracts/quote.contracts.ts` : `language` sur `quoteRequestCreateSchema` (défaut `fr`) ; `content` et `language` sur `publicConsentTextSchema` ; `language` et `phoneRule` sur `publicQuoteFormResponseSchema` ; `consentSuperseded` sur la vue admin des formulaires.
-- [ ] T004 Mettre à jour `backend/prisma/schema.prisma` (`Country.phoneDialCode` et `phoneNationalLengths`, `ConsentText.content` et `retiredAt`, `QuoteRequest.language`), créer `backend/prisma/migrations/0020_catalog_admin_consent_content/migration.sql` (additive), et ajouter la migration à `backend/tests/integration/prisma-migrations.spec.ts` (data history).
+- [x] T002 [P] Étendre `packages/shared/contracts/compliance.contracts.ts` : `content` et `retiredAt` sur le texte ; `adminConsentTextCreateSchema` sans empreinte ; vue `AdminConsentTextView` ; schéma de modèle (consent).
+- [x] T003 [P] Étendre `packages/shared/contracts/quote.contracts.ts` : `language` sur `quoteRequestCreateSchema` (défaut `fr`) ; `content` et `language` sur `publicConsentTextSchema` ; `language` et `phoneRule` sur `publicQuoteFormResponseSchema` ; `consentSuperseded` sur la vue admin des formulaires.
+- [x] T004 Mettre à jour `backend/prisma/schema.prisma` (`Country.phoneDialCode` et `phoneNationalLengths`, `ConsentText.content` et `retiredAt`, `QuoteRequest.language`), créer `backend/prisma/migrations/0020_catalog_admin_consent_content/migration.sql` (additive), et ajouter la migration à `backend/tests/integration/prisma-migrations.spec.ts` (data history).
 
 ## Phase 2: Foundational (bloquant pour toutes les stories)
 
-- [ ] T005 Créer `RegulatoryRegimesRepository` (mémoire et Prisma) et rendre `RegulatoryRegimesService` asynchrone avec `create`, `update` (`expectedUpdatedAt`), `retire` (refusé si référencé) et `list`, dans `backend/src/modules/regulatory-regimes/`. Câbler dans `backend/src/runtime/assurmatch-runtime.ts`, y compris `runtimeRepositoryModes`. Audit.
+- [x] T005 Créer `RegulatoryRegimesRepository` (mémoire et Prisma) et rendre `RegulatoryRegimesService` asynchrone avec `create`, `update` (`expectedUpdatedAt`), `retire` (refusé si référencé) et `list`, dans `backend/src/modules/regulatory-regimes/`. Câbler dans `backend/src/runtime/assurmatch-runtime.ts`, y compris `runtimeRepositoryModes`. Audit.
 - [ ] T006 `ConsentService` (`backend/src/modules/consent/consent.module.ts`, `consent-records.repository.ts`) :
   - stockage du contenu ;
   - empreinte sha256 calculée sur le contenu normalisé ;
@@ -39,20 +39,20 @@ description: "Task list for 050 — Administration du catalogue, des consentemen
   - modèles chargés depuis `scripts/preprod/seeds/reference/consent-templates.json` ;
   - audit.
 - [ ] T007 Corriger l'adaptateur de consentements des formulaires dans `assurmatch-runtime.ts` : vraie finalité, langue, pays, produit et contenu.
-- [ ] T008 Créer `backend/src/modules/catalog/` avec :
+- [x] T008 Créer `backend/src/modules/catalog/` avec :
   - `catalog-flag.service.ts` : allowlist ; activation conditionnée et désactivation libre ; écriture du JSON et de `FeatureFlag`/`FeatureFlagHistory` via `featureFlags.service.setFlag` ; audit des succès et des refus ;
   - `catalog-activation-guard.ts` : conditions R4, réutilisation de `activationChecklist.service.read`, contrôles ciblés en ignorant le flag ou le statut en cours de modification.
 
   Respecte la constitution III (feature flags), VII et IX.
-- [ ] T009 Ajouter le contrôle pays `country_active_licensed_partner` (au moins un partenaire actif, autorisé et licencié pour le pays) dans `backend/src/modules/activation-checklist/activation-checklist.service.ts` (licence).
-- [ ] T010 Garde de concurrence `expectedUpdatedAt` (409 `CATALOG_UPDATE_CONFLICT`) et validation du régime référencé dans `countries.module.ts` et `products.module.ts` (data history).
+- [x] T009 Ajouter le contrôle pays `country_active_licensed_partner` (au moins un partenaire actif, autorisé et licencié pour le pays) dans `backend/src/modules/activation-checklist/activation-checklist.service.ts` (licence).
+- [x] T010 Garde de concurrence `expectedUpdatedAt` (409 `CATALOG_UPDATE_CONFLICT`) et validation du régime référencé dans `countries.module.ts` et `products.module.ts` (data history).
 
 ## Phase 3: User Story 1 — Pays et activation (P1) 🎯 MVP
 
 **Independent Test**: passer le Sénégal en « interne » et activer `country_comparison_enabled` ; l'activation publique est refusée avec la liste des blocages.
 
-- [ ] T011 [US1] Routes `GET/POST /admin/countries`, `GET/PATCH /admin/countries/:id`, `POST /admin/countries/:id/status`, `POST /admin/countries/:id/flags` dans `backend/src/modules/http-wiring/runtime-http-wiring.module.ts` : RBAC, périmètre pays, publication réservée à la conformité, erreurs explicites (R11).
-- [ ] T012 [P] [US1] Tests d'intégration `backend/tests/integration/catalog/admin-countries-runtime-http.spec.ts` :
+- [x] T011 [US1] Routes `GET/POST /admin/countries`, `GET/PATCH /admin/countries/:id`, `POST /admin/countries/:id/status`, `POST /admin/countries/:id/flags` dans `backend/src/modules/http-wiring/runtime-http-wiring.module.ts` : RBAC, périmètre pays, publication réservée à la conformité, erreurs explicites (R11).
+- [x] T012 [P] [US1] Tests d'intégration `backend/tests/integration/catalog/admin-countries-runtime-http.spec.ts` :
   - CRUD ;
   - Admin Pays hors périmètre (403 et audit) ;
   - activation publique refusée par checklist (422 avec blocages) ;
@@ -60,15 +60,15 @@ description: "Task list for 050 — Administration du catalogue, des consentemen
   - suspension immédiate ;
   - flag IA refusé ;
   - 409 concurrence.
-- [ ] T013 [P] [US1] Tests unitaires `backend/tests/unit/catalog/catalog-flag.service.spec.ts` : allowlist, désactivation sans condition, historique et audit.
+- [x] T013 [P] [US1] Tests unitaires `backend/tests/unit/catalog/catalog-flag.service.spec.ts` : allowlist, désactivation sans condition, historique et audit.
 - [ ] T014 [US1] Admin : client API (`apps/admin/app/lib/admin-api.ts`), actions (`apps/admin/app/lib/catalog-actions.ts`), pages `apps/admin/app/catalog/page.tsx` (hub), `catalog/countries/page.tsx` et `catalog/countries/[countryId]/page.tsx` (fiche, statut, flags, liaisons, résumé de checklist), entrées de navigation dans `lib/ui/admin-shell.tsx`.
 - [ ] T015 [P] [US1] Tests de marqueurs `apps/admin/tests/catalog-admin.spec.ts`. Mettre à jour `catalog-foundation.spec.ts` et `admin-ux-polish.spec.ts` si besoin, sans retirer les garde-fous de formulation.
 
 ## Phase 4: User Story 2 — Produits et liaisons (P1)
 
-- [ ] T016 [US2] Services produits : liaison créée en `internal` avec flags fermés, retrait logique, flags de liaison ; résolution du flag effectif `product && (link ?? true)` pour le parcours public, les offres et la checklist (`products.module.ts`, `products.repository.ts`, `public-journey-flag-policy.ts`).
-- [ ] T017 [US2] Routes `GET/POST /admin/products`, `GET/PATCH /admin/products/:id`, `POST /admin/products/:id/flags`, `GET/POST /admin/countries/:id/products`, `POST /admin/countries/:id/products/:productId/retire`, `POST /admin/countries/:id/products/:productId/flags`.
-- [ ] T018 [P] [US2] Tests d'intégration `backend/tests/integration/catalog/admin-products-runtime-http.spec.ts` :
+- [x] T016 [US2] Services produits : liaison créée en `internal` avec flags fermés, retrait logique, flags de liaison ; résolution du flag effectif `product && (link ?? true)` pour le parcours public, les offres et la checklist (`products.module.ts`, `products.repository.ts`, `public-journey-flag-policy.ts`).
+- [x] T017 [US2] Routes `GET/POST /admin/products`, `GET/PATCH /admin/products/:id`, `POST /admin/products/:id/flags`, `GET/POST /admin/countries/:id/products`, `POST /admin/countries/:id/products/:productId/retire`, `POST /admin/countries/:id/products/:productId/flags`.
+- [x] T018 [P] [US2] Tests d'intégration `backend/tests/integration/catalog/admin-products-runtime-http.spec.ts` :
   - `product_quote_enabled` refusé sans formulaire ;
   - `product_public_enabled` refusé sans consentement ;
   - revue manuelle d'un produit sensible réservée à la conformité ;
@@ -122,12 +122,12 @@ description: "Task list for 050 — Administration du catalogue, des consentemen
 
 ## Phase 8: User Story 6 — Régimes (P3)
 
-- [ ] T035 [US6] Routes `GET/POST /admin/regulatory-regimes`, `PATCH /admin/regulatory-regimes/:id`, `POST /admin/regulatory-regimes/:id/retire` et tests d'intégration (retrait refusé si référencé, persistance).
+- [x] T035 [US6] Routes `GET/POST /admin/regulatory-regimes`, `PATCH /admin/regulatory-regimes/:id`, `POST /admin/regulatory-regimes/:id/retire` et tests d'intégration (retrait refusé si référencé, persistance).
 - [ ] T036 [US6] Admin : page `catalog/regimes/page.tsx` (liste, création, édition, retrait).
 
 ## Phase 9: Polish & validations
 
-- [ ] T037 Mettre à jour `backend/tests/integration/runtime-route-inventory.spec.ts` (nouveaux contrôleurs) et les contrats OpenAPI de `specs/001-socle-plateforme/contracts/foundation-api.openapi.yaml` si les tests de contrat l'exigent.
+- [x] T037 Mettre à jour `backend/tests/integration/runtime-route-inventory.spec.ts` (nouveaux contrôleurs) et les contrats OpenAPI de `specs/001-socle-plateforme/contracts/foundation-api.openapi.yaml` si les tests de contrat l'exigent.
 - [ ] T038 Garde-fous : formulations interdites dans les nouveaux écrans et les modèles de consentement ; séparation (aucun import back-office dans `apps/public`).
 - [ ] T039 Validations finales : `prisma generate`, `prisma validate`, `npm run typecheck`, `npm run lint`, `npm run test` (`NODE_ENV=test`), `npm run test:web`, `node scripts/ci/secret-scan.mjs`.
 - [ ] T040 Mettre à jour `docs/prd_coverage_map.md` (catalogue désormais atteignable) et cocher les tâches.

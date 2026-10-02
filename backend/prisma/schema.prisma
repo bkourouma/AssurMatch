@@ -604,6 +604,10 @@ model Country {
   timezone           String
   regulatoryFamily   RegulatoryFamily
   regulatoryRegimeId String?
+  /// Spec 050 R8: international dialling code (for example +225); null keeps the generic normalisation.
+  phoneDialCode        String?
+  /// Spec 050 R8: accepted national number lengths (for example [10]); empty keeps the generic normalisation.
+  phoneNationalLengths Int[]            @default([])
   status             CountryStatus    @default(draft)
   flags              Json
   /// Spec 046: first transition to `public`; anchors the waiting-list retention.
@@ -727,7 +731,10 @@ model ConsentText {
   version           String
   status            ConsentTextStatus @default(draft)
   contentHash       String
+  /// Spec 050 R5: full template (variables unresolved); the hash is computed from it by the server.
+  content           String?
   publishedAt       DateTime?
+  retiredAt         DateTime?
   createdAt         DateTime          @default(now())
   updatedAt         DateTime          @updatedAt
   createdById       String?
@@ -977,6 +984,8 @@ model QuoteRequest {
   consentRecordId       String
   surveyConsentRecordId String?
   source                String
+  /// Spec 050 R6: language of the submitted quote form.
+  language              String             @default("fr")
   payload               Json
   status                QuoteRequestStatus @default(created)
   duplicateStatus       DuplicateStatus    @default(not_checked)

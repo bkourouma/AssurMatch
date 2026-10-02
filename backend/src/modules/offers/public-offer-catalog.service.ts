@@ -16,7 +16,8 @@ export interface PublicOfferVisibilityContext {
   countryFlags?: Partial<Record<string, boolean>>;
   productFlags?: Partial<Record<string, boolean>>;
   resolveCountryFlags?: (countryId: string) => Promise<Partial<Record<string, boolean>> | undefined> | Partial<Record<string, boolean>> | undefined;
-  resolveProductFlags?: (productId: string) => Promise<Partial<Record<string, boolean>> | undefined> | Partial<Record<string, boolean>> | undefined;
+  /** `countryId` lets the resolver apply the country link flags (spec 050 R2). */
+  resolveProductFlags?: (productId: string, countryId?: string) => Promise<Partial<Record<string, boolean>> | undefined> | Partial<Record<string, boolean>> | undefined;
   evaluatePartnerEligibility?: (partnerTenantId: string, countryId: string, productId: string) => Promise<{ eligible: boolean; reasons: string[] }>;
   /** Responsible partner display (OFFER-009); trade name preferred over legal name. */
   resolvePartnerName?: (partnerTenantId: string) => Promise<string | undefined> | string | undefined;
@@ -214,7 +215,7 @@ export class PublicOfferCatalogService {
     if (!context) return context;
     const [countryFlags, productFlags] = await Promise.all([
       context.countryFlags ?? context.resolveCountryFlags?.(countryId),
-      context.productFlags ?? context.resolveProductFlags?.(productId)
+      context.productFlags ?? context.resolveProductFlags?.(productId, countryId)
     ]);
     const evaluate = context.evaluatePartnerEligibility;
     const eligibilityByPartner = new Map<string, Promise<{ eligible: boolean; reasons: string[] }>>();
@@ -244,7 +245,7 @@ export class PublicOfferCatalogService {
     const reasons = [...decision.reasons];
     if (context) {
       const countryFlags = context.countryFlags ?? await context.resolveCountryFlags?.(offer.countryId);
-      const productFlags = context.productFlags ?? await context.resolveProductFlags?.(offer.productId);
+      const productFlags = context.productFlags ?? await context.resolveProductFlags?.(offer.productId, offer.countryId);
       if (context.globalFlags?.public_comparator_enabled !== true) reasons.push("public_comparator_disabled");
       if (countryFlags?.country_public_enabled !== true) reasons.push("country_public_disabled");
       if (countryFlags?.country_comparison_enabled !== true) reasons.push("country_comparison_disabled");

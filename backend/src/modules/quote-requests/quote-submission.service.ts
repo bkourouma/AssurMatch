@@ -8,8 +8,8 @@ import type { PublicAbuseGuardService } from "../common/abuse/public-abuse-guard
 import type { ActorContext } from "../common/types";
 import { ConsentService } from "../consent/consent.module";
 import { MULTI_BROKER_CONSENT, SINGLE_BROKER_CONSENT } from "../leads/quote-routing.service";
-import type { Country } from "../countries/countries.module";
-import type { Product } from "../products/products.module";
+import { publicCountryFlags, type Country } from "../countries/countries.module";
+import { countryLinkFor, effectiveProductFlags, type Product } from "../products/products.module";
 import type { ProspectIdentityService } from "../prospects/prospect-identity.service";
 import type { ProspectsService } from "../prospects/prospects.service";
 import type { QuoteFormDefinitionService } from "../quote-forms/quote-form-definition.service";
@@ -117,12 +117,14 @@ export class QuoteSubmissionService {
     }
     const parsed = parsedResult.data;
     const country = await this.deps.findCountryByCode(parsed.countryCode);
-    const product = await this.deps.findProductByKey(parsed.productKey);
-    if (!country || !product || !product.countryIds.includes(country.id)) {
+    const linkedProduct = await this.deps.findProductByKey(parsed.productKey);
+    if (!country || !linkedProduct || !linkedProduct.countryIds.includes(country.id)) {
       throw new Error("Country or product is not available");
     }
+    // Spec 050 R2: the product as seen from this country (product flag AND country link flag).
+    const product = { ...linkedProduct, flags: effectiveProductFlags(linkedProduct, countryLinkFor(linkedProduct, country.id)) };
     const globalQuoteEnabled = this.deps.isGlobalFlagEnabled ? this.deps.isGlobalFlagEnabled("quote_request_enabled") === true : true;
-    if (!globalQuoteEnabled || !country.flags.country_quote_enabled || !product.flags.product_quote_enabled) {
+    if (!globalQuoteEnabled || !publicCountryFlags(country).country_quote_enabled || !product.flags.product_quote_enabled) {
       this.audit.write({
         actor,
         action: QuoteAuditActions.quoteRequestRefused,

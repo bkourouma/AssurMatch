@@ -16,7 +16,7 @@ import { MemoryContactMessagesRepository, PrismaContactMessagesRepository } from
 import { DataRetentionModule } from "../modules/data-retention/data-retention.module";
 import { PrismaDataRetentionRepository } from "../modules/data-retention/data-retention.repository";
 import { PrismaRetentionSubjectsRepository, type MemoryRetentionSources } from "../modules/data-retention/retention-subjects.repository";
-import { CountriesModule } from "../modules/countries/countries.module";
+import { CountriesModule, publicCountryFlags, type Country } from "../modules/countries/countries.module";
 import { PublicCountryDirectoryService } from "../modules/countries/public-country-directory.service";
 import { DocumentsModule } from "../modules/documents/documents.module";
 import { FeatureFlagsModule } from "../modules/feature-flags/feature-flags.module";
@@ -41,7 +41,8 @@ import { MemoryWaitlistRepository, PrismaWaitlistRepository } from "../modules/w
 import { ProspectsModule } from "../modules/prospects/prospects.module";
 import { QuoteFormsModule } from "../modules/quote-forms/quote-forms.module";
 import { QuoteRequestsModule } from "../modules/quote-requests/quote-requests.module";
-import { RegulatoryRegimesModule } from "../modules/regulatory-regimes/regulatory-regimes.module";
+import { PrismaRegulatoryRegimesRepository, RegulatoryRegimesModule } from "../modules/regulatory-regimes/regulatory-regimes.module";
+import { CatalogModule } from "../modules/catalog/catalog.module";
 import { RoutingModule } from "../modules/routing/routing.module";
 import { AiGateway } from "../modules/ai/core/ai-gateway.service";
 import { MemoryAiInteractionsRepository, PrismaAiInteractionsRepository } from "../modules/ai/core/ai-interactions.repository";
@@ -106,6 +107,8 @@ export class AssurMatchRuntime {
   private readonly countriesRepository: CountriesRepository =
     this.runtimeRepository(new PrismaCountriesRepository(this.prisma)) ?? new MemoryCountriesRepository();
   private readonly productsRepository = this.runtimeRepository(new PrismaProductsRepository(this.prisma));
+  /** Spec 050 R9: regimes were in memory only although the Prisma model existed. */
+  private readonly regulatoryRegimesRepository = this.runtimeRepository(new PrismaRegulatoryRegimesRepository(this.prisma));
   private readonly partnersRepository = this.runtimeRepository(new PrismaPartnersRepository(this.prisma));
   private readonly partnerLicensesRepository = this.runtimeRepository(new PrismaPartnerLicensesRepository(this.prisma));
   private readonly consentRecordsRepository = this.runtimeRepository(new PrismaConsentRecordsRepository(this.prisma));
@@ -151,8 +154,15 @@ export class AssurMatchRuntime {
       }
     }
   });
-  readonly regulatoryRegimes = new RegulatoryRegimesModule(this.audit.writer);
-  readonly countries = new CountriesModule(this.audit.writer, this.countriesRepository);
+  readonly regulatoryRegimes: RegulatoryRegimesModule = new RegulatoryRegimesModule(
+    this.audit.writer,
+    this.regulatoryRegimesRepository,
+    // R9: a regime referenced by a country cannot be retired; resolved lazily (countries come next).
+    async (regimeId: string): Promise<string[]> => (await this.countries.service.listAdmin()).filter((country: Country) => country.regulatoryRegimeId === regimeId).map((country: Country) => country.isoCode)
+  );
+  readonly countries: CountriesModule = new CountriesModule(this.audit.writer, this.countriesRepository, {
+    find: async (id: string): Promise<{ id: string; status: string } | undefined> => this.regulatoryRegimes.service.find(id)
+  });
   readonly products = new ProductsModule(this.audit.writer, this.productsRepository);
   readonly partners = new PartnersModule(this.audit.writer, this.partnersRepository);
   readonly partnerLicenses = new PartnerLicensesModule(this.audit.writer, this.partnerLicensesRepository);
@@ -406,6 +416,18 @@ readonly enterprise = new EnterpriseService({
     quoteForms: this.quoteForms.service,
     consent: this.consent.service
   });
+  /** Spec 050: admin catalogue and controlled flag toggles; closes cached public reads on change. */
+  readonly catalog = new CatalogModule({
+    audit: this.audit.writer,
+    countries: this.countries.service,
+    products: this.products.service,
+    regimes: this.regulatoryRegimes.service,
+    featureFlags: this.featureFlags.service,
+    checklist: this.activationChecklist.service,
+    quoteForms: this.quoteForms.service,
+    consent: this.consent.service,
+    onCatalogChanged: () => this.publicCountryDirectory.invalidate()
+  });
   readonly routingAnomalies = new RoutingAnomalyDetectorService({
     quoteRequests: {
       list: () => this.quoteRequests.submissions.list()
@@ -544,8 +566,14 @@ readonly enterprise = new EnterpriseService({
   publicOfferContext(input: { countryFlags?: Partial<Record<string, boolean>> | undefined; productFlags?: Partial<Record<string, boolean>> | undefined } = {}): PublicOfferVisibilityContext {
     return {
       globalFlags: this.publicJourneyGlobalFlags(),
-      ...(input.countryFlags ? { countryFlags: input.countryFlags } : { resolveCountryFlags: async (countryId: string) => (await this.countries.service.require(countryId)).flags }),
-      ...(input.productFlags ? { productFlags: input.productFlags } : { resolveProductFlags: async (productId: string) => (await this.products.service.require(productId)).flags }),
+      ...(input.countryFlags ? { countryFlags: input.countryFlags } : { resolveCountryFlags: async (countryId: string) => publicCountryFlags(await this.countries.service.require(countryId)) }),
+      ...(input.productFlags ? { productFlags: input.productFlags } : {
+        // Spec 050 R2: an offer is read in its own country, so the link flags apply.
+        resolveProductFlags: async (productId: string, countryId?: string) => {
+          const product = await this.products.service.require(productId);
+          return countryId ? this.products.service.effectiveFlags(product, countryId) : product.flags;
+        }
+      }),
       evaluatePartnerEligibility: (partnerTenantId, countryId, productId) => this.publicOfferPartnerEligibility(partnerTenantId, countryId, productId),
       resolvePartnerName: async (partnerTenantId) => {
         const partner = await this.partners.service.require(partnerTenantId).catch(() => undefined);
@@ -580,6 +608,7 @@ readonly enterprise = new EnterpriseService({
       FeatureFlagRepository: this.featureFlagRepository?.mode,
       CountriesRepository: this.countriesRepository?.mode,
       ProductsRepository: this.productsRepository?.mode,
+      RegulatoryRegimesRepository: this.regulatoryRegimesRepository?.mode,
       OffersRepository: this.offersRepository?.mode,
       ProspectsRepository: this.prospectsRepository?.mode,
       QuoteFormDefinitionsRepository: this.quoteFormDefinitionsRepository?.mode,

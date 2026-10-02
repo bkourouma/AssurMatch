@@ -25,7 +25,8 @@ describe("prisma migration fresh-base readiness", () => {
       "0016_broker_crm_history_event_type",
       "0017_public_site_forms",
       "0018_data_retention",
-      "0019_satisfaction_surveys"
+      "0019_satisfaction_surveys",
+      "0020_catalog_admin_consent_content"
     ]);
     const schema = readFileSync(join(process.cwd(), "backend", "prisma", "schema.prisma"), "utf8");
     for (const model of ["AuditLog", "FeatureFlag", "ConsentRecord", "QuoteRequest", "LeadAssignment", "BrokerCrmLeadState", "PartnerApiKey", "PartnerWebhookEndpoint", "PartnerWebhookDelivery", "PartnerWebhookAllowlistEntry", "RoutingRule", "RoutingRuleHistory"]) {
@@ -134,5 +135,15 @@ describe("prisma migration fresh-base readiness", () => {
     expect(schema).toContain("RetentionPolicy_global_category_key");
     expect(schema).toContain("model RetentionPolicy");
     expect(schema).toContain("model AnonymizationBatch");
+    // Spec 050: additive columns only (phone rule, consent content, quote language).
+    const catalog = readFileSync(join(migrationsDir, "0020_catalog_admin_consent_content", "migration.sql"), "utf8");
+    expect(catalog).toContain('ALTER TABLE "Country" ADD COLUMN IF NOT EXISTS "phoneDialCode" TEXT');
+    expect(catalog).toContain('ALTER TABLE "Country" ADD COLUMN IF NOT EXISTS "phoneNationalLengths" INTEGER[]');
+    expect(catalog).toContain('ALTER TABLE "ConsentText" ADD COLUMN IF NOT EXISTS "content" TEXT');
+    expect(catalog).toContain('ALTER TABLE "ConsentText" ADD COLUMN IF NOT EXISTS "retiredAt" TIMESTAMP(3)');
+    expect(catalog).toContain(`ALTER TABLE "QuoteRequest" ADD COLUMN IF NOT EXISTS "language" TEXT NOT NULL DEFAULT 'fr'`);
+    expect(catalog).not.toMatch(/DROP|DELETE|UPDATE /);
+    expect(schema).toMatch(/phoneNationalLengths\s+Int\[\]/);
+    expect(schema).toMatch(/language\s+String\s+@default\("fr"\)/);
   });
 });

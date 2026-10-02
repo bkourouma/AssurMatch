@@ -95,6 +95,36 @@ describe("runtime HTTP route inventory", () => {
     expect(withdrawal.status).toBe(404);
   });
 
+  it("exposes the spec 050 admin catalogue routes behind authentication", async () => {
+    harness = await createRuntimeHttpHarness();
+    const id = "00000000-0000-4000-8000-000000000099";
+    const routes = [
+      ["GET", "/admin/countries"],
+      ["POST", "/admin/countries"],
+      ["GET", `/admin/countries/${id}`],
+      ["PATCH", `/admin/countries/${id}`],
+      ["POST", `/admin/countries/${id}/status`],
+      ["POST", `/admin/countries/${id}/flags`],
+      ["GET", `/admin/countries/${id}/products`],
+      ["POST", `/admin/countries/${id}/products`],
+      ["POST", `/admin/countries/${id}/products/${id}/retire`],
+      ["POST", `/admin/countries/${id}/products/${id}/flags`],
+      ["GET", "/admin/products"],
+      ["POST", "/admin/products"],
+      ["GET", `/admin/products/${id}`],
+      ["PATCH", `/admin/products/${id}`],
+      ["POST", `/admin/products/${id}/flags`],
+      ["GET", "/admin/regulatory-regimes"],
+      ["POST", "/admin/regulatory-regimes"],
+      ["PATCH", `/admin/regulatory-regimes/${id}`],
+      ["POST", `/admin/regulatory-regimes/${id}/retire`]
+    ] as const;
+    for (const [method, path] of routes) {
+      const response = await harness.request(path, { method });
+      expect(response.status, `${method} ${path}`).toBe(401);
+    }
+  });
+
   it("uses the runtime HTTP wiring module instead of registering RuntimeHttpController in AppModule", async () => {
     const appImports = Reflect.getMetadata("imports", AppModule) as unknown[];
     const appControllers = (Reflect.getMetadata("controllers", AppModule) as unknown[] | undefined) ?? [];
