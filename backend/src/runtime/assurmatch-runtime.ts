@@ -103,6 +103,7 @@ import { DashboardsModule } from "../modules/dashboards/dashboards.module";
 import { aiSurfaceSchema } from "../../../packages/shared/contracts/ai.contracts";
 import type { BrokerOfferCoverageItem } from "../../../packages/shared/contracts/offer-content";
 import { maybeBootstrapAdmin } from "./local-bootstrap-admin";
+import { AdminOperationsModule } from "../modules/admin-operations/admin-operations.module";
 
 export class AssurMatchRuntime {
   readonly config = new ConfigModule();
@@ -508,6 +509,24 @@ readonly enterprise = new EnterpriseService({
       const notificationId = await this.quoteRequests.submissions.notifyBrokerForAssignment(assignment, actor);
       await this.quoteDocuments.shareForAssignment(assignment.quoteRequestId, assignment);
       return notificationId;
+    }
+  });
+  /** Spec 056: quote requests, persisted manual review, assignments, audit search, routing history. */
+  readonly adminOperations = new AdminOperationsModule({
+    audit: this.audit.writer,
+    countries: this.countries.service,
+    products: { listAdmin: () => this.products.service.listAdmin() },
+    partners: this.partners.service,
+    submissions: this.quoteRequests.submissions,
+    assignments: this.leads.assignments,
+    decisions: this.leads.decisions,
+    consent: { findRecord: (id: string) => this.consent.service.findRecord(id) },
+    prospects: { find: (id: string) => this.prospects.service.require(id).catch(() => undefined) },
+    offers: { find: (id: string) => this.offers.repository.require(id).catch(() => undefined) },
+    documents: { list: async (actor, quoteRequestId) => (await this.quoteDocuments.adminList(actor, quoteRequestId)).items },
+    eligibility: this.leads.eligibility,
+    afterAssign: async (quoteRequestId, assignment) => {
+      await this.quoteDocuments.shareForAssignment(quoteRequestId, assignment);
     }
   });
   readonly partnerEligibility = new PartnerEligibilityService(this.partners.service, this.partnerLicenses.service, this.documents.service);

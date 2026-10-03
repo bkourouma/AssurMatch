@@ -31,6 +31,7 @@ describe("prisma migration fresh-base readiness", () => {
       "0022_offer_versions_selected_offer_routing",
       "0023_visitor_access_tokens_notifications",
       "0024_broker_self_service",
+      "0025_admin_operations",
       "0027_broker_response_loop"
     ]);
     const schema = readFileSync(join(process.cwd(), "backend", "prisma", "schema.prisma"), "utf8");
@@ -221,5 +222,12 @@ describe("prisma migration fresh-base readiness", () => {
     expect(selfService).toContain('CREATE TYPE "PartnerChangeRequestStatus"');
     expect(selfService).not.toMatch(/DROP|DELETE|UPDATE |ALTER TABLE/);
     expect(schema).toContain("model PartnerChangeRequest");
+    // Spec 056: persisted manual review, contact inbox status and audit-log search indexes, additive only.
+    const adminOperations = readFileSync(join(migrationsDir, "0025_admin_operations", "migration.sql"), "utf8");
+    expect(adminOperations).toContain('ALTER TABLE "QuoteRequest" ADD COLUMN IF NOT EXISTS "reviewedAt" TIMESTAMP(3)');
+    expect(adminOperations).toContain('ALTER TABLE "QuoteRequest" ADD COLUMN IF NOT EXISTS "duplicateOfQuoteRequestId" TEXT');
+    expect(adminOperations).toContain('ALTER TABLE "ContactMessage" ADD COLUMN IF NOT EXISTS "handledAt" TIMESTAMP(3)');
+    expect(adminOperations).toContain('CREATE INDEX IF NOT EXISTS "AuditLog_action_occurredAt_idx"');
+    expect(adminOperations).not.toMatch(/DROP|DELETE|TRUNCATE/);
   });
 });

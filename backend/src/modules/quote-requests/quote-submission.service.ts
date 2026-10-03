@@ -69,8 +69,34 @@ export interface QuoteRequestRecord {
   correlationId?: string;
   retentionUntil: Date;
   anonymizedAt?: Date;
+  /** Spec 056: persisted manual-review decision. */
+  reviewedAt?: Date;
+  reviewedById?: string;
+  duplicateOfQuoteRequestId?: string;
   createdAt: Date;
   updatedAt: Date;
+}
+
+/** Spec 056: statuses a manual review can no longer change. */
+const REVIEW_TERMINAL_STATUSES = new Set<QuoteRequestStatus>(["routed", "non_routable", "duplicate", "spam_blocked", "cancelled"]);
+
+/**
+ * Spec 056: a request is open to manual review when a product forces it (`manual_review` /
+ * `manual_review_required`) or a `manual` routing rule parked it (`pending_manual_assignment`), and
+ * nothing has closed it since.
+ */
+export function isManualReviewOpen(quote: Pick<QuoteRequestRecord, "status" | "routingStatus">): boolean {
+  if (REVIEW_TERMINAL_STATUSES.has(quote.status)) return false;
+  return quote.status === "manual_review" || quote.routingStatus === "manual_review_required" || quote.routingStatus === "pending_manual_assignment";
+}
+
+export interface ManualReviewStamp {
+  reason: string;
+}
+
+export interface ReviewRoutingOutcome {
+  quote: QuoteRequestRecord;
+  assignmentIds: string[];
 }
 
 /** Read/close access to the assignments of a request; `LeadAssignmentService` satisfies it. */
@@ -436,16 +462,127 @@ export class QuoteSubmissionService {
     return (await this.repository.list()).filter((quote) => quote.routingStatus === "pending_manual_assignment");
   }
 
+  /** Spec 056: every request still open to manual review (forced review or parked by a manual rule). */
+  async listOpenForReview(): Promise<QuoteRequestRecord[]> {
+    return (await this.repository.list()).filter((quote) => isManualReviewOpen(quote));
+  }
+
+  findByPublicReference(publicReference: string): Promise<QuoteRequestRecord | undefined> {
+    return this.repository.findByPublicReference(publicReference);
+  }
+
+  /**
+   * Spec 056: the admin approved a request held for manual review; the deterministic routing engine
+   * runs exactly as it would have at submission (rules, eligibility, multi-broker consent), and its
+   * outcome is persisted with the review stamp.
+   */
+  async routeAfterReview(quoteRequestId: string, actor: ActorContext, stamp: ManualReviewStamp): Promise<ReviewRoutingOutcome> {
+    const quote = await this.repository.findById(quoteRequestId);
+    if (!quote) throw new Error(`Quote request ${quoteRequestId} not found`);
+    if (!isManualReviewOpen(quote)) throw new Error("Manual review conflict: quote_not_reviewable");
+    if (!this.deps.routing) throw new Error("Manual review conflict: routing_not_configured");
+    // Spec 052 R7: the broker of the offer the visitor selected stays preferred after the review,
+    // provided the offer is still public (it is re-verified; an expired one simply drops out).
+    const preferredPartnerTenantId = await this.preferredPartnerAfterReview(quote);
+    const routingResult = await this.deps.routing.route({ ...quote, ...(preferredPartnerTenantId ? { preferredPartnerTenantId } : {}) }, actor);
+    if (routingResult.assignment) {
+      quote.status = "routed";
+      quote.routingStatus = "assigned";
+    } else if (routingResult.routingStatus === "no_broker_available") {
+      quote.status = "non_routable";
+      quote.routingStatus = "no_broker_available";
+      quote.refusalReason = "no_eligible_broker";
+    } else if (routingResult.routingStatus === "pending_manual_assignment") {
+      // A `manual` rule covers the scope: the request stays in the queue, now awaiting an assignment.
+      quote.status = "created";
+      quote.routingStatus = "pending_manual_assignment";
+    } else {
+      quote.status = "non_routable";
+      quote.routingStatus = "blocked";
+      quote.refusalReason = "routing_blocked";
+    }
+    this.stampReview(quote, actor, stamp);
+    await this.repository.update(quote.id, quote);
+    // Spec 054 R4: one "transmitted" visitor e-mail per assignment, as at submission.
+    for (const assignment of routingResult.assignments) {
+      await this.queueTransmitted(quote, assignment, actor);
+    }
+    for (const assignment of routingResult.assignments) {
+      const brokerNotification = await this.deps.notifications?.queueBroker(quote, assignment, actor);
+      if (brokerNotification) assignment.brokerNotificationId = brokerNotification.notification.id;
+    }
+    if (routingResult.assignment) await this.deps.aiSummary?.enqueueIfAllowed(quote, actor);
+    return { quote, assignmentIds: routingResult.assignments.map((assignment) => assignment.id) };
+  }
+
+  /** Spec 056: closes a review without transmission (`non_routable` or `duplicate`); nothing is routed. */
+  async closeReview(
+    quoteRequestId: string,
+    outcome: { kind: "non_routable" } | { kind: "duplicate"; duplicateOfQuoteRequestId?: string | undefined },
+    actor: ActorContext,
+    stamp: ManualReviewStamp
+  ): Promise<QuoteRequestRecord> {
+    const quote = await this.repository.findById(quoteRequestId);
+    if (!quote) throw new Error(`Quote request ${quoteRequestId} not found`);
+    if (!isManualReviewOpen(quote)) throw new Error("Manual review conflict: quote_not_reviewable");
+    quote.routingStatus = "blocked";
+    if (outcome.kind === "duplicate") {
+      quote.status = "duplicate";
+      quote.duplicateStatus = "blocked_duplicate";
+      quote.refusalReason = "admin_review_duplicate";
+      if (outcome.duplicateOfQuoteRequestId) quote.duplicateOfQuoteRequestId = outcome.duplicateOfQuoteRequestId;
+    } else {
+      quote.status = "non_routable";
+      quote.refusalReason = "admin_review_non_routable";
+    }
+    this.stampReview(quote, actor, stamp);
+    await this.repository.update(quote.id, quote);
+    return quote;
+  }
+
+  /**
+   * Spec 056 hook, aligned on the spec 054 visitor steps after a review decision:
+   * - routed: the per-assignment "transmitted" e-mails were already queued by `routeAfterReview` /
+   *   `assignManually`, so nothing more is sent here;
+   * - non-routable: the "not transmitted" e-mail (`visitor_quote_non_routable`);
+   * - duplicate: nothing, the original request is the one the visitor follows;
+   * - still parked by a manual rule: the "in review" e-mail (deduplicated per request).
+   * A notification failure never undoes a persisted decision. Returns whether an e-mail was queued.
+   */
+  async notifyVisitorOfReviewOutcome(quote: QuoteRequestRecord, actor: ActorContext): Promise<boolean> {
+    if (quote.status === "routed" || quote.status === "duplicate") return false;
+    try {
+      return Boolean(await this.deps.notifications?.queueVisitor(quote, actor));
+    } catch {
+      return false;
+    }
+  }
+
+  private async preferredPartnerAfterReview(quote: QuoteRequestRecord): Promise<string | undefined> {
+    if (quote.selectedOfferOutcome !== "accepted" || !quote.selectedOfferId || !this.deps.selectedOffers) return undefined;
+    const verdict = await this.deps.selectedOffers.verify(quote.selectedOfferId, quote.countryId, quote.productId).catch(() => undefined);
+    return verdict?.accepted ? verdict.partnerTenantId : undefined;
+  }
+
+  private stampReview(quote: QuoteRequestRecord, actor: ActorContext, stamp: ManualReviewStamp): void {
+    const now = new Date();
+    quote.reviewedAt = now;
+    if (actor.actorId) quote.reviewedById = actor.actorId;
+    quote.manualReviewReason = stamp.reason.slice(0, 500);
+    quote.updatedAt = now;
+  }
+
   /** Completes a quote parked by a `manual` routing rule; eligibility is enforced by the routing service. */
   async assignManually(quoteRequestId: string, partnerTenantId: string, actor: ActorContext, reason: string): Promise<{ quoteRequestId: string; assignmentId: string; partnerTenantId: string; status: "routed" }> {
     const quote = await this.repository.findById(quoteRequestId);
     if (!quote) throw new Error(`Quote request ${quoteRequestId} not found`);
-    if (quote.routingStatus !== "pending_manual_assignment") throw new Error("Manual routing conflict: quote_not_pending");
+    // Spec 056: a request held by a forced manual review can be assigned the same way.
+    if (!isManualReviewOpen(quote)) throw new Error("Manual routing conflict: quote_not_pending");
     if (!this.deps.routing) throw new Error("Manual routing conflict: routing_not_configured");
     const assignment = await this.deps.routing.assignManually(quote, partnerTenantId, actor, reason);
     quote.status = "routed";
     quote.routingStatus = "assigned";
-    quote.updatedAt = new Date();
+    this.stampReview(quote, actor, { reason });
     await this.repository.update(quote.id, quote);
     await this.queueTransmitted(quote, assignment, actor);
     const brokerNotification = await this.deps.notifications?.queueBroker(quote, assignment, actor);

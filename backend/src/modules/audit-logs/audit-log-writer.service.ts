@@ -1,7 +1,7 @@
 import { maskPii } from "../common/logging/pii-masker";
 import { assertRuntimeRepository } from "../common/repositories/runtime-repository";
 import type { ActorContext, AuditEntry, AuditResult } from "../common/types";
-import { MemoryAuditLogRepository, type AuditLogRepository } from "./audit-log-repository";
+import { MemoryAuditLogRepository, searchAuditEntries, type AuditLogRepository, type AuditLogSearchFilter, type AuditLogSearchPage, type AuditLogSearchResult } from "./audit-log-repository";
 
 export interface AuditWriteInput {
   actor?: ActorContext | undefined;
@@ -66,5 +66,15 @@ export class AuditLogWriter {
 
   all(): AuditEntry[] {
     return [...this.entries];
+  }
+
+  /**
+   * Spec 056: reads the durable store (the `AuditLog` table at runtime) instead of the entries this
+   * process happens to have written since it started. Falls back to the process entries only for a
+   * repository double that does not implement `search`.
+   */
+  async searchDurable(filter: AuditLogSearchFilter, page: AuditLogSearchPage): Promise<AuditLogSearchResult> {
+    if (this.repository.search) return this.repository.search(filter, page);
+    return searchAuditEntries(this.entries, filter, page);
   }
 }

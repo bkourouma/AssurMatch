@@ -911,6 +911,12 @@ model AuditLog {
   occurredAt     DateTime    @default(now())
   retentionUntil DateTime
   createdAt      DateTime    @default(now())
+
+  // Spec 056: admin audit-log search (actor, action prefix, target, period).
+  @@index([occurredAt])
+  @@index([action, occurredAt])
+  @@index([targetType, targetId])
+  @@index([actorId, occurredAt])
 }
 
 model Notification {
@@ -1201,10 +1207,15 @@ model QuoteRequest {
   retentionUntil        DateTime
   anonymizedAt          DateTime?
   anonymizationBatchId  String?
+  // Spec 056: persisted manual-review decision (who, when, and the original when marked duplicate).
+  reviewedAt                DateTime?
+  reviewedById              String?
+  duplicateOfQuoteRequestId String?
   createdAt             DateTime           @default(now())
   updatedAt             DateTime           @updatedAt
 
   @@index([countryId, productId, status, routingStatus, createdAt])
+  @@index([duplicateOfQuoteRequestId])
 }
 
 /// Spec 054 R1: visitor access tokens. Only the SHA-256 of the token is stored; the clear token is
@@ -1830,6 +1841,10 @@ model ContactMessage {
   retentionUntil   DateTime
   anonymizedAt     DateTime?
   anonymizationBatchId String?
+  // Spec 056: status handling by the admin inbox (new, handled, spam).
+  handledAt        DateTime?
+  handledById      String?
+  statusReason     String?
   createdAt        DateTime             @default(now())
   updatedAt        DateTime             @updatedAt
 

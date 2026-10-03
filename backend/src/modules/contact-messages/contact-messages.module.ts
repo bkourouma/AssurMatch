@@ -6,6 +6,7 @@ import {
 } from "../../../../packages/shared/contracts/public-site.contracts";
 import type { AssurMatchRole } from "../../../../packages/shared/rbac/assurmatch-role-matrix";
 import { AuditLogWriter } from "../audit-logs/audit-log-writer.service";
+import { ADMIN_OPERATIONS_AUDIT_ACTIONS } from "../audit-logs/admin-operations-audit-actions";
 import { PUBLIC_SITE_AUDIT_ACTIONS } from "../audit-logs/public-site-audit-actions";
 import { RetentionPolicyService } from "../audit-logs/retention-policy.service";
 import { PublicAbuseGuardService } from "../common/abuse/public-abuse-guard.service";
@@ -19,7 +20,8 @@ import {
   MemoryContactMessagesRepository,
   type ContactMessageRecord,
   type ContactMessagesFilter,
-  type ContactMessagesRepository
+  type ContactMessagesRepository,
+  type ContactMessageStatus
 } from "./contact-messages.repository";
 
 /** Roles allowed to read the contact inbox: the same support/compliance/super-admin set `assertAnyRole`
@@ -197,6 +199,48 @@ export class ContactMessagesService {
   }
 
   /**
+   * Spec 056: the admin inbox moves a message between `new`, `handled` and `spam`. Only the status,
+   * who changed it and when are stored; the audit carries the transition, never the message body.
+   */
+  async updateStatus(actor: ActorContext, id: string, input: { status: ContactMessageStatus; reason?: string | undefined }): Promise<ContactMessageAdminRow & { previousStatus: ContactMessageStatus }> {
+    if (actor.mfaVerified !== true || !actor.roles.some((role) => CONTACT_MESSAGE_ADMIN_ROLES.has(role))) {
+      this.audit.write({
+        actor,
+        action: ADMIN_OPERATIONS_AUDIT_ACTIONS.contactMessageStatusRefused,
+        targetType: "ContactMessage",
+        targetId: id,
+        scope: { roles: actor.roles },
+        result: "refused",
+        reason: actor.mfaVerified !== true ? "mfa_required" : "forbidden_role",
+        context: {}
+      });
+      throw new Error("Contact message access denied");
+    }
+    const existing = await this.repository.findById(id);
+    if (!existing) throw new Error("Contact message not found");
+    // Captured before the write: the memory repository updates the very record it returned.
+    const previousStatus = existing.status;
+    const reason = input.reason?.trim() ? input.reason.trim().slice(0, 500) : null;
+    const updated = await this.repository.updateStatus(id, {
+      status: input.status,
+      handledAt: input.status === "new" ? null : new Date(),
+      handledById: input.status === "new" ? null : actor.actorId ?? null,
+      statusReason: reason
+    });
+    this.audit.write({
+      actor,
+      action: ADMIN_OPERATIONS_AUDIT_ACTIONS.contactMessageStatusUpdated,
+      targetType: "ContactMessage",
+      targetId: id,
+      ...(existing.countryId ? { scope: { countryId: existing.countryId } } : {}),
+      result: "success",
+      ...(reason ? { reason } : {}),
+      context: { previousStatus, status: updated.status, audience: existing.audience }
+    });
+    return { ...this.toAdminRow(updated), previousStatus };
+  }
+
+  /**
    * Explicit allow-list rather than a rest-spread that drops two keys: a column added to the record
    * later must be opted in here to reach an administrator, instead of leaking by default.
    */
@@ -213,6 +257,9 @@ export class ContactMessagesService {
       message: record.message,
       consentVersion: record.consentVersion,
       status: record.status,
+      ...(record.handledAt === undefined ? {} : { handledAt: record.handledAt }),
+      ...(record.handledById === undefined ? {} : { handledById: record.handledById }),
+      ...(record.statusReason === undefined ? {} : { statusReason: record.statusReason }),
       retentionUntil: record.retentionUntil,
       createdAt: record.createdAt,
       updatedAt: record.updatedAt

@@ -124,6 +124,8 @@ import { PublicJourneyFlagPolicy } from "../feature-flags/public-journey-flag-po
 import { AdminUsersController as AdminUsersDomainController } from "../users/admin-users.controller";
 import { AdminUserRolesController as AdminUserRolesDomainController } from "../users/admin-user-roles.controller";
 import { PublicHealthController } from "../health/public-health.controller";
+import { adminAuditLogQuerySchema } from "../../../../packages/shared/contracts/admin-operations.contracts";
+import { ADMIN_OPERATIONS_HTTP_CONTROLLERS } from "./admin-operations-http.controllers";
 
 type MethodDecoratorFactory = (target: object, propertyKey: string | symbol, descriptor: PropertyDescriptor) => void;
 type ParamDecoratorFactory = (target: object, propertyKey: string | symbol | undefined, parameterIndex: number) => void;
@@ -1347,10 +1349,16 @@ export class AdminFeatureFlagsController {
 export class AdminAuditLogsController {
   constructor(private readonly runtime: AssurMatchRuntime) {}
 
-  list(request: AssurMatchHttpRequest) {
+  /**
+   * Spec 056: reads the durable store (the `AuditLog` table at runtime) rather than the entries
+   * written by this process since it started, and accepts the console filters. The response stays
+   * a bare array for existing callers; `GET /admin/operations/audit-logs` is the paginated form.
+   */
+  async list(request: AssurMatchHttpRequest, query: Record<string, string>) {
     const actor = protectedActorFromRequest(request);
     assertAnyRole(actor, adminRoleAllowList.audit);
-    return this.runtime.audit.writer.all();
+    const parsed = parseHttpInput(adminAuditLogQuerySchema, { pageSize: 200, ...(query ?? {}) });
+    return (await this.runtime.adminOperations.auditLogs.search(actor, parsed)).items;
   }
 }
 
@@ -1679,18 +1687,20 @@ export class AdminAIAssistanceController {
 export class AdminRuntimeSupportController {
   constructor(private readonly runtime: AssurMatchRuntime) {}
 
-  quoteRequests(request: AssurMatchHttpRequest) {
+  async quoteRequests(request: AssurMatchHttpRequest) {
     const actor = protectedActorFromRequest(request);
     assertAnyRole(actor, adminRoleAllowList.quoteRequests);
     assertPermission(actor, "quote_requests:read");
-    return this.runtime.quoteRequests.submissions.list();
+    // Spec 056: sanitized, scoped rows (no token hash, no answers); the console route paginates.
+    return (await this.runtime.adminOperations.quoteRequests.list(actor, { page: 1, pageSize: 200 })).items;
   }
 
-  leadAssignments(request: AssurMatchHttpRequest) {
+  async leadAssignments(request: AssurMatchHttpRequest) {
     const actor = protectedActorFromRequest(request);
     assertAnyRole(actor, adminRoleAllowList.leadAssignments);
     assertPermission(actor, "lead_assignments:read");
-    return this.runtime.leads.assignments.list();
+    // Spec 056: routing facts only, never the assignment's contact or answers.
+    return (await this.runtime.adminOperations.leadAssignments.list(actor, { page: 1, pageSize: 200 })).items;
   }
 }
 
@@ -2055,7 +2065,7 @@ decorate(AdminUsersHttpController, "mfaReset", [Post(":id/mfa-reset") as MethodD
 decorate(AdminUsersHttpController, "delete", [Delete(":id") as MethodDecoratorFactory], [[0, Param("id") as ParamDecoratorFactory], [1, Body() as ParamDecoratorFactory], [2, Req() as ParamDecoratorFactory]]);
 
 controller("admin", AdminAuditLogsController, true);
-decorate(AdminAuditLogsController, "list", [Get("audit-logs") as MethodDecoratorFactory], [[0, Req() as ParamDecoratorFactory]]);
+decorate(AdminAuditLogsController, "list", [Get("audit-logs") as MethodDecoratorFactory], [[0, Req() as ParamDecoratorFactory], [1, Query() as ParamDecoratorFactory]]);
 
 controller("admin", AdminHealthController, true);
 decorate(AdminHealthController, "health", [Get("system/health") as MethodDecoratorFactory], [[0, Req() as ParamDecoratorFactory]]);
@@ -2367,6 +2377,8 @@ Module({
     AdminPartnerIntegrationsController,
     PartnerApiController,
     PublicHealthController,
+    // Spec 056: admin operations consoles (see admin-operations-http.controllers.ts).
+    ...ADMIN_OPERATIONS_HTTP_CONTROLLERS,
     // Spec 051: last, after the static `partners/sla` and `partners/applications` routes.
     AdminPartnersHttpController
   ],
