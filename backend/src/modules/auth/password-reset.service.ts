@@ -8,13 +8,31 @@ export interface IssuedPasswordToken {
   expiresAt: Date;
 }
 
+export const DEFAULT_ACTION_TOKEN_TTL_MINUTES = 30;
+const MIN_ACTION_TOKEN_TTL_MINUTES = 5;
+const MAX_ACTION_TOKEN_TTL_MINUTES = 7 * 24 * 60;
+
+/**
+ * Validity of the activation and password-reset tokens, `AUTH_ACTION_TOKEN_TTL_MINUTES` (5 minutes
+ * to 7 days, 30 by default). The e-mails announce the expiry computed from it (spec 059 follow-up).
+ */
+export function actionTokenTtlMinutes(env: Record<string, string | undefined> = process.env): number {
+  const raw = env.AUTH_ACTION_TOKEN_TTL_MINUTES?.trim();
+  const value = raw ? Number(raw) : NaN;
+  if (!Number.isInteger(value)) return DEFAULT_ACTION_TOKEN_TTL_MINUTES;
+  return Math.min(MAX_ACTION_TOKEN_TTL_MINUTES, Math.max(MIN_ACTION_TOKEN_TTL_MINUTES, value));
+}
+
 export class PasswordResetService {
-  private readonly tokenTtlMs = 30 * 60 * 1000;
+  private readonly tokenTtlMs: number;
 
   constructor(
     private readonly hashing = new PasswordHashingService(),
-    private readonly policy = new PasswordPolicyService()
-  ) {}
+    private readonly policy = new PasswordPolicyService(),
+    ttlMinutes: number = actionTokenTtlMinutes()
+  ) {
+    this.tokenTtlMs = ttlMinutes * 60 * 1000;
+  }
 
   issueToken(now = new Date()): IssuedPasswordToken {
     const token = randomBytes(32).toString("base64url");

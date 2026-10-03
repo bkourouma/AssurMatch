@@ -494,6 +494,8 @@ export interface BrokerStarterLeadHistoryEventData {
   previousStatus?: string;
   nextStatus?: string;
   reason?: string;
+  /** Spec 059 (suite): issue d'une cloture (`closed`): gagne, perdu ou sans_suite. */
+  outcome?: string;
   comment?: string;
   occurredAt: string;
 }

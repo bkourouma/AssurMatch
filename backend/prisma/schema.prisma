@@ -902,6 +902,10 @@ model ConsentRecord {
   createdAt         DateTime            @default(now())
   updatedAt         DateTime            @updatedAt
   createdById       String?
+
+  // Spec 059 follow-up: compliance consent-proof search (by e-mail fingerprint, by country).
+  @@index([subjectReference])
+  @@index([countryId, createdAt])
 }
 
 model AuditLog {
@@ -1185,6 +1189,8 @@ model Prospect {
   updatedAt               DateTime @updatedAt
 
   @@index([countryId, productId, emailFingerprint, phoneFingerprint, createdAt])
+  // Spec 059 follow-up (M-03): the prospect match is an OR on the e-mail or the phone fingerprint.
+  @@index([countryId, productId, phoneFingerprint])
 }
 
 model QuoteRequest {
@@ -1223,6 +1229,8 @@ model QuoteRequest {
 
   @@index([countryId, productId, status, routingStatus, createdAt])
   @@index([duplicateOfQuoteRequestId])
+  // Spec 059 follow-up (M-03): offer popularity counted in the database.
+  @@index([selectedOfferId])
 }
 
 /// Spec 054 R1: visitor access tokens. Only the SHA-256 of the token is stored; the clear token is

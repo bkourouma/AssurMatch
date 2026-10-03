@@ -32,8 +32,11 @@ const FORBIDDEN_FLAG_KEYS = [
   "ai_recommendation_enabled",
   "ai_broker_assistant_enabled",
   "multi_broker_routing_enabled",
-  "whatsapp_enabled",
-  "billing_enabled"
+  "whatsapp_enabled"
+  // `billing_enabled` is no longer a blocker (spec 059 follow-up): spec 060 / PRD decision D-8 make
+  // manual B2B invoicing part of the launch, switched on through the audited compliance policy.
+  // Left here, it would forbid opening the second country once invoicing runs for the first one.
+  // Online payment stays forbidden (`payments_enabled` above).
 ] as const;
 
 export interface ActivationChecklistDeps {

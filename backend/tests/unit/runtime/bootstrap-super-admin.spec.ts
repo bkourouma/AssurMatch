@@ -71,9 +71,13 @@ describe("first Super Admin bootstrap (spec 057, PRD K-05)", () => {
 
   it("e-mails the link and withholds the token when the e-mail was really sent", async () => {
     const sent: string[] = [];
-    const { deps } = setup({ deliverActivation: async (_user, token) => { sent.push(token); return { emailStatus: "sent" }; } });
-    const result = await bootstrapSuperAdmin(deps, { email: "mail@example.org", displayName: "Mail", delivery: "email" });
+    const expiries: Date[] = [];
+    const { deps } = setup({ deliverActivation: async (_user, token, expiresAt) => { sent.push(token); expiries.push(expiresAt); return { emailStatus: "sent" }; } });
+    const before = Date.now();
+    const result = await bootstrapSuperAdmin(deps, { email: "mail@example.org", displayName: "Mail", delivery: "email", ttlMinutes: 120 });
     expect(sent).toHaveLength(1);
+    // Spec 059 follow-up: the e-mail is told the --ttl-minutes expiry, not the 30-minute default.
+    expect(expiries[0]!.getTime() - before).toBeGreaterThanOrEqual(119 * 60 * 1000);
     expect(result.emailStatus).toBe("sent");
     expect(result.token).toBeUndefined();
   });

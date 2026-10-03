@@ -42,3 +42,22 @@
 - Dans le conteneur où la spec a été développée, `dl-cdn.alpinelinux.org` répond 403 et le proxy TLS n'est pas reconnu dans les builds Docker.
 - Les quatre images ont donc été construites ici à partir d'une copie temporaire des Dockerfiles : base `node:24-alpine` avec l'AC du proxy, et sans `apk add wget`, le `wget` de busybox suffisant aux sondes. Aucun Dockerfile du dépôt n'a été modifié.
 - En CI GitHub, les Dockerfiles d'origine sont utilisés tels quels.
+
+## R10. Débit de la soumission de devis (M-03, passe de clôture)
+- **Mesure initiale** (pile Docker, 4 vCPU partagés, `npm run test:load -- --forwarded-for`) : catalogue 50 req/s, p95 15 ms ; devis 23 req/s atteints sur 50 demandées, p95 45 s.
+- **Profil** (`node --cpu-prof` sur l'API, journal des requêtes PostgreSQL) : l'API est limitée par le CPU d'un seul processus. Trois lectures croissaient avec le volume :
+  1. `ProspectsService.createOrLink` listait **tous** les prospects, deux fois, pour savoir s'il en avait créé un ;
+  2. `routingStatsForPartners` chargeait chaque lead des 90 derniers jours de chaque candidat ;
+  3. la popularité des offres (lecture du catalogue) chargeait **toutes** les demandes de devis.
+  S'y ajoutaient une écriture d'audit par entrée (une quinzaine d'`INSERT` par soumission), une lecture avant chaque insertion de notification et une liste de produits en N+1.
+- **Corrections, sans retirer aucun contrôle** (consentement, anti-spam, doublon, audit de routage, e-mails 054) :
+  - `createOrLinkWithOutcome` (le dépôt dit s'il a créé) ;
+  - statistiques de routage agrégées en SQL, mêmes chiffres que `computeRoutingStats` (vérifié sur la base de la pile) ;
+  - popularité par `groupBy` indexé ;
+  - audit écrit par lots (10 ms ou 200 lignes) en **une** instruction SQL de texte fixe (`jsonb_to_recordset`) : `createMany` faisait compiler par Prisma un plan par taille de lot (le compilateur wasm coûtait plus que l'insertion) et ouvrait une transaction par lot ; `writeAsync` attend toujours l'écriture, vidage à l'arrêt, repli ligne à ligne si un lot échoue ;
+  - copie mémoire de l'audit bornée en mode durable (5 000 entrées : elle grossissait sans limite) ;
+  - unicité de `dedupeKey` laissée à l'index (le dépôt mémoire applique la même règle) ;
+  - liens pays-produit en une requête ;
+  - index `0029` : `Prospect(countryId, productId, phoneFingerprint)`, `QuoteRequest(selectedOfferId)`, `ConsentRecord(subjectReference)`, `ConsentRecord(countryId, createdAt)`.
+- **Mesure finale** (pile Docker de la dernière exécution e2e, 22/22 au vert, `npm run test:load -- --forwarded-for`) : devis 50 req/s, p50 46 ms, p95 120 ms (93 ms au second passage), 0 erreur ; catalogue 50 req/s, p95 14 ms. Sur une API redémarrée à froid, sans trafic préalable, le premier passage donne p95 826 ms (compilation des plans de requêtes Prisma et JIT pendant les premières secondes), le suivant 182 ms.
+- **Écarté** : passer le routage au worker. Le seuil est atteint sans changer ce que voit le visiteur (courtier nommé à la confirmation) ; un mode cluster Node aurait désynchronisé les flags en mémoire entre processus.

@@ -64,13 +64,17 @@ Légende : 🔴 bloquant pour le pilote fermé (J4) · 🟠 bloquant pour l'ouve
 4. 🔴 **Offres** (spec 052) : saisies par les courtiers dans « Mes offres », puis validées par la conformité.
 5. 🟠 **Flags globaux** : `public_comparator_enabled` et `quote_request_enabled`.
 6. 🟠 **Ouverture publique** : `country_public_enabled`, une fois la checklist d'activation entièrement verte. C'est le jalon J5, réservé à la conformité.
-7. 🟢 **Facturation** : activer `billing_enabled` par le chemin de conformité audité, puis émettre les factures mensuelles (spec 060).
+7. 🟢 **Facturation** : activer `billing_enabled` par le chemin de conformité audité, puis émettre les factures mensuelles (spec 060) :
+   `npm run ops:apply-flag-policy -- --flag billing_enabled --value true --reference <réf. décision> --approved-by "<nom, fonction>" --reason "<motif>"`.
+8. 🟢 **Enquête de satisfaction** (spec 048) : même commande avec `--flag satisfaction_survey_enabled`, une fois le texte de consentement validé. L'API applique la valeur sous 30 s (`ASSURMATCH_FEATURE_FLAG_REFRESH_SECONDS`), le worker au cycle suivant.
 
 ## 5. Recette avant ouverture
 
 | # | Vérification | Référence |
 |---|---|---|
-| 5.1 🔴 | Scénario de bout en bout réussi sur la préproduction : SC-01 à SC-07, avec les e-mails réels | Spec 059 (`npm run test:e2e:stack`) |
+| 5.1 🔴 | Scénario de bout en bout réussi sur la préproduction : SC-01 à SC-08 (clôture, enquête, facture et paiement compris), avec les e-mails réels | Spec 059 (`npm run test:e2e:stack`) |
 | 5.2 🔴 | Cas interdits (SC-09) : pays fermé, absence de consentement, courtier suspendu, isolation | idem |
+| 5.2b 🔴 | Exploitation (SC-10) : sondes `/healthz` et `/readyz` et battement du worker sont automatisés (`ops-health.spec.ts`) ; restauration de sauvegarde chronométrée, alertes et exercice d'incident restent manuels | Spec 059, `docs/runbooks/backup-restore.md`, `docs/runbooks/worker.md` |
+| 5.2c 🟠 | Charge (M-03) : `npm run test:load` sur la préproduction, 50 req/s et p95 < 800 ms sur le catalogue et la soumission de devis | Spec 059 research R10 |
 | 5.3 🟠 | Pilote fermé (J4) : 2 semaines sans incident critique, SLA mesuré, 0 écart de conformité | PRD v0.3 §11 |
 | 5.4 🟠 | Go/no-go signé | `specs/013-preproduction-launch-readiness/checklists/go-no-go.md` |

@@ -79,6 +79,32 @@ export function computeRoutingStats(assignments: readonly LeadAssignmentRecord[]
   }]));
 }
 
+interface RoutingStatsRow {
+  partnerTenantId: string;
+  lastAssignedAtMs: number | string | null;
+  monthlyCount: number | string;
+  received90d: number | string;
+  accepted90d: number | string;
+  averageFirstActionMinutes: number | string | null;
+}
+
+/**
+ * `computeRoutingStats` in SQL. Timestamps are stored as UTC `timestamp(3)`: the ISO parameters are
+ * read as `timestamptz` and brought back to UTC; epochs are therefore UTC milliseconds.
+ * $1 partner ids, $2 window start (now - 90 days), $3 month start, $4 now.
+ */
+const ROUTING_STATS_SQL = `
+SELECT "partnerTenantId",
+  (EXTRACT(EPOCH FROM MAX("assignedAt")) * 1000)::float8 AS "lastAssignedAtMs",
+  (COUNT(*) FILTER (WHERE "assignedAt" >= ($3::timestamptz AT TIME ZONE 'UTC') AND "assignedAt" <= ($4::timestamptz AT TIME ZONE 'UTC') AND "status"::text NOT IN ('rejected', 'disputed')))::int AS "monthlyCount",
+  COUNT(*)::int AS "received90d",
+  (COUNT(*) FILTER (WHERE "status"::text IN ('accepted', 'received', 'contacted', 'closed') OR "acceptedAt" IS NOT NULL))::int AS "accepted90d",
+  (AVG(CASE WHEN COALESCE("seenAt", "acceptedAt", "lastBrokerActionAt") IS NULL THEN NULL
+    ELSE GREATEST(0, EXTRACT(EPOCH FROM (COALESCE("seenAt", "acceptedAt", "lastBrokerActionAt") - "assignedAt")) / 60) END))::float8 AS "averageFirstActionMinutes"
+FROM "LeadAssignment"
+WHERE "partnerTenantId" = ANY($1::text[]) AND "assignedAt" >= ($2::timestamptz AT TIME ZONE 'UTC')
+GROUP BY "partnerTenantId"`;
+
 export class MemoryLeadAssignmentsRepository implements LeadAssignmentsRepository {
   readonly mode = "memory-test" as const;
   private readonly assignments: LeadAssignmentRecord[] = [];
@@ -240,11 +266,30 @@ export class PrismaLeadAssignmentsRepository implements LeadAssignmentsRepositor
     if (partnerTenantIds.length === 0) return new Map();
     // Ninety days covers every window the strategies use; older leads only matter for
     // last-assignment ordering, where "older than the window" already sorts first.
-    const rows = await this.assignments().findMany({
-      where: { partnerTenantId: { in: partnerTenantIds }, assignedAt: { gte: new Date(now.getTime() - 90 * DAY_MS) } },
-      select: { partnerTenantId: true, assignedAt: true, status: true, acceptedAt: true, seenAt: true, lastBrokerActionAt: true }
-    });
-    return computeRoutingStats(rows.map((row) => this.toDomain(row)), partnerTenantIds, now);
+    // Spec 059 follow-up (M-03): aggregated in SQL, the same figures as `computeRoutingStats`
+    // (the shared memory path), instead of loading every lead of the window on each submission.
+    const client = this.prisma.requireRuntimeClient() as unknown as { $queryRawUnsafe?: (sql: string, ...values: unknown[]) => Promise<unknown[]> };
+    if (!client.$queryRawUnsafe) {
+      const rows = await this.assignments().findMany({
+        where: { partnerTenantId: { in: partnerTenantIds }, assignedAt: { gte: new Date(now.getTime() - 90 * DAY_MS) } },
+        select: { partnerTenantId: true, assignedAt: true, status: true, acceptedAt: true, seenAt: true, lastBrokerActionAt: true }
+      });
+      return computeRoutingStats(rows.map((row) => this.toDomain(row)), partnerTenantIds, now);
+    }
+    const rows = await client.$queryRawUnsafe(ROUTING_STATS_SQL, partnerTenantIds, new Date(now.getTime() - 90 * DAY_MS).toISOString(), monthStart(now).toISOString(), now.toISOString()) as RoutingStatsRow[];
+    const stats = new Map<string, RoutingPartnerStats>(partnerTenantIds.map((id) => [id, { monthlyCount: 0, received90d: 0, accepted90d: 0 }]));
+    for (const row of rows) {
+      if (!stats.has(row.partnerTenantId)) continue;
+      const average = row.averageFirstActionMinutes === null ? undefined : Number(row.averageFirstActionMinutes);
+      stats.set(row.partnerTenantId, {
+        monthlyCount: Number(row.monthlyCount),
+        received90d: Number(row.received90d),
+        accepted90d: Number(row.accepted90d),
+        ...(row.lastAssignedAtMs === null ? {} : { lastAssignedAt: new Date(Number(row.lastAssignedAtMs)) }),
+        ...(average === undefined || Number.isNaN(average) ? {} : { averageFirstActionMinutes: average })
+      });
+    }
+    return stats;
   }
 
   async list(): Promise<LeadAssignmentRecord[]> {
@@ -320,7 +365,8 @@ export class PrismaLeadAssignmentsRepository implements LeadAssignmentsRepositor
       nextStatus: event.nextStatus,
       reason: event.reason,
       comment: event.comment,
-      context: {},
+      // Spec 059 follow-up: the Starter closing outcome has no column of its own.
+      context: event.outcome ? { outcome: event.outcome } : {},
       occurredAt: new Date(event.occurredAt),
       createdAt: new Date()
     };
@@ -432,6 +478,10 @@ export class PrismaLeadAssignmentsRepository implements LeadAssignmentsRepositor
   }
 
   private toHistory(row: unknown): LeadAssignmentHistoryRecord {
-    return row as LeadAssignmentHistoryRecord;
+    const record = row as LeadAssignmentHistoryRecord & { context?: unknown };
+    const context = record.context && typeof record.context === "object" ? record.context as Record<string, unknown> : {};
+    const outcome = context.outcome;
+    if (outcome === "gagne" || outcome === "perdu" || outcome === "sans_suite") return { ...record, outcome };
+    return record;
   }
 }

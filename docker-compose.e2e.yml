@@ -39,6 +39,9 @@ x-backend-env: &backend-env
   ASSURMATCH_DOCUMENT_STORAGE_DIR: /tmp/assurmatch-e2e-documents
   ASSURMATCH_ANTIVIRUS: eicar
   ASSURMATCH_WORKER_INTERVAL_SECONDS: "5"
+  # SC-08: survey sent at once (24 h in production); API flag refresh every 5 s (30 s by default).
+  ASSURMATCH_SATISFACTION_SURVEY_DELAY_MINUTES: "0"
+  ASSURMATCH_FEATURE_FLAG_REFRESH_SECONDS: "5"
   # Spec 058 auth rate limiting counts per IP: every browser of the suite logs in from 127.0.0.1.
   ASSURMATCH_AUTH_RATE_LIMIT_IP_MAX: "2000"
   # 0 by default (clients hit the API directly). The load test sets 1 to spread its synthetic clients.

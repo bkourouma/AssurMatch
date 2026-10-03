@@ -50,6 +50,11 @@ export default defineConfig({
       dependencies: ["scenario"]
     },
     {
+      // SC-10 (exploitation): API probes and worker heartbeat. Independent of the journeys.
+      name: "ops",
+      testMatch: ["ops-health.spec.ts"]
+    },
+    {
       // Visitor-only journeys on the Web Publique Client (magic link, resend, feedback page).
       name: "public",
       testMatch: ["visitor-tracking.spec.ts"],

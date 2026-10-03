@@ -333,13 +333,26 @@ export const brokerStarterLeadSummarySchema = brokerLeadSummarySchema.extend({
   seenAt: dateTimeStringSchema.optional()
 });
 
+/**
+ * Spec 059 follow-up: outcome a Starter broker records when closing an accepted lead (part of the
+ * minimal accept/reject lifecycle, constitution 1.3.0). `sans_suite` = no follow-up from the visitor.
+ */
+export const brokerStarterCloseOutcomeSchema = z.enum(["gagne", "perdu", "sans_suite"]);
+
+export const brokerStarterLeadCloseRequestSchema = z.object({
+  outcome: brokerStarterCloseOutcomeSchema,
+  comment: z.string().trim().max(500).optional()
+});
+
 export const brokerStarterLeadHistoryEventSchema = z.object({
   id: z.string(),
   // Spec 055: the proposal loop is part of the lead history (Starter and CRM).
-  eventType: z.enum(["assigned", "reassigned", "viewed", "accepted", "rejected", "disputed", "notification_read", "exported", "blocked", "proposal_sent", "proposal_withdrawn", "visitor_responded"]),
+  eventType: z.enum(["assigned", "reassigned", "viewed", "accepted", "rejected", "disputed", "closed", "notification_read", "exported", "blocked", "proposal_sent", "proposal_withdrawn", "visitor_responded"]),
   previousStatus: brokerStarterLeadStatusSchema.optional(),
   nextStatus: brokerStarterLeadStatusSchema.optional(),
   reason: brokerStarterReasonSchema.optional(),
+  /** Closing outcome (`closed` events only). */
+  outcome: brokerStarterCloseOutcomeSchema.optional(),
   comment: z.string().max(500).optional(),
   occurredAt: dateTimeStringSchema
 });
@@ -632,6 +645,8 @@ export type BrokerStarterLeadListQuery = z.input<typeof brokerStarterLeadListQue
 export type BrokerStarterLeadSummary = z.output<typeof brokerStarterLeadSummarySchema>;
 export type BrokerStarterLeadDetail = z.output<typeof brokerStarterLeadDetailSchema>;
 export type BrokerStarterLeadActionRequest = z.input<typeof brokerStarterLeadActionRequestSchema>;
+export type BrokerStarterCloseOutcome = z.output<typeof brokerStarterCloseOutcomeSchema>;
+export type BrokerStarterLeadCloseRequest = z.input<typeof brokerStarterLeadCloseRequestSchema>;
 export type BrokerStarterLeadHistoryEvent = z.output<typeof brokerStarterLeadHistoryEventSchema>;
 export type BrokerStarterDashboardQuery = z.input<typeof brokerStarterDashboardQuerySchema>;
 export type BrokerStarterDashboard = z.output<typeof brokerStarterDashboardSchema>;

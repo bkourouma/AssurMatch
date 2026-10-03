@@ -84,8 +84,17 @@
   - après la fusion des specs 058 et 061.
 - [x] T030 `npm run test:load` : catalogue au vert ; soumission de devis sous l'objectif à 50 req/s (environ 20 req/s soutenues). Constat documenté.
 
-## Restant (hors périmètre, suivi)
-- SC-08 (clôture, enquête, facturation) et SC-10 (exploitation) ne sont pas automatisés. Clôture Starter non câblée, flag d'enquête sensible.
-- Performance de la soumission de devis (M-03).
-- Durée annoncée dans l'e-mail d'activation.
-- Route de recherche des preuves de consentement.
+## Phase 7 — Passe de clôture (2026-10-03), voir plan G1 à G7
+- [x] T031 G2 : clôture Starter (`POST /broker/starter/leads/:id/close`, issue gagné / perdu / sans suite, `brokerWriteActor`, `BROKER_TENANT_WRITE_GUARDED`, 409 codés, historique, audit, `lead.status_changed`) et bouton « Clôturer ». Tests : unité, HTTP (e-mail « clôturée », enquête en file, suspension 403, autre tenant), marqueurs source.
+- [x] T032 G3 : recherche des preuves de consentement (`POST /admin/consent-records/search`, page `/compliance/consent-records`), retirée d'`INTERNAL_ONLY`. Tests HTTP : référence, e-mail jamais renvoyé ni audité, pagination, 400, 403 audités (rôles, MFA), 401.
+- [x] T033 G1 : durée réelle des jetons dans les e-mails d'activation et de réinitialisation (`AUTH_ACTION_TOKEN_TTL_MINUTES`, `--ttl-minutes`).
+- [x] T034 G4 : graphe de statuts pays partagé entre l'API et le formulaire admin.
+- [x] T035 G5 : `npm run ops:apply-flag-policy` (audité, modules réglementés refusés) ; relecture périodique des flags par l'API ; délai d'enquête réglable (`ASSURMATCH_SATISFACTION_SURVEY_DELAY_MINUTES`, 0 dans la pile e2e).
+- [x] T036 G6 : débit de la soumission de devis (research R10), migration d'index `0029`.
+- [x] T037 G7 : `billing_enabled` retiré des contrôles bloquants de la checklist d'activation.
+- [x] T038 SC-08 automatisé (`scenario-core.spec.ts`) ; SC-10 automatisable (`ops-health.spec.ts`, projet `ops`). Politiques SC-08 appliquées par l'orchestrateur.
+- [x] T039 Validation : typecheck, lint, vitest complet (321 fichiers, 1 071 tests), `test:web` (256), scan des secrets, `next build` des trois apps (images Docker), `test:e2e:stack` en mode docker (22/22 : SC-01 à SC-09, SC-08 compris, et SC-10 sondes) et `test:load` (catalogue p95 14 ms ; devis 50 req/s, p95 120 ms).
+
+## Restant (suivi)
+- SC-10 hors sondes : sauvegarde chiffrée, restauration chronométrée, alertes et incident restent des étapes manuelles (`docs/runbooks/backup-restore.md`, `docs/runbooks/worker.md`, checklist de mise en production §3 et §5).
+- L'en-tête du portail courtier affiche l'identifiant de l'utilisateur au lieu de son nom (constat de la première passe, cosmétique).

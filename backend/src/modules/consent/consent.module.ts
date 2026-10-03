@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
-import { ConflictException, UnprocessableEntityException } from "@nestjs/common";
+import { ConflictException, ForbiddenException, UnprocessableEntityException } from "@nestjs/common";
 import { z } from "zod";
 import { consentRecordSchema, consentTextSchema, consentTextTemplateSchema, type ConsentRecordDto, type ConsentTextDto, type ConsentTextRecord, type ConsentTextTemplate } from "../../../../packages/shared/contracts/compliance.contracts";
 import {
@@ -16,7 +16,7 @@ import { AuditLogWriter } from "../audit-logs/audit-log-writer.service";
 import { PUBLIC_SITE_AUDIT_ACTIONS } from "../audit-logs/public-site-audit-actions";
 import { RetentionPolicyService } from "../audit-logs/retention-policy.service";
 import type { ActorContext } from "../common/types";
-import { MemoryConsentRecordsRepository, type ConsentRecordsRepository } from "./consent-records.repository";
+import { MemoryConsentRecordsRepository, type ConsentRecordSearchFilter, type ConsentRecordsRepository } from "./consent-records.repository";
 
 export interface ConsentText extends ConsentTextDto {
   id: string;
@@ -219,6 +219,38 @@ export class ConsentService {
     return this.repository.searchRecords();
   }
 
+  /**
+   * Spec 059 follow-up: the compliance consent-proof search. Reserved to compliance_admin and
+   * super_admin with a verified MFA; every search (and every refusal) is audited with the criteria
+   * used, never their values (the e-mail is only ever seen as its fingerprint).
+   */
+  async searchRecordsPage(actor: ActorContext, filter: ConsentRecordSearchFilter, criteria: string[]): Promise<{ items: ConsentRecord[]; total: number }> {
+    const allowed = actor.roles.some((role) => role === "super_admin" || role === "compliance_admin");
+    if (!allowed || actor.mfaVerified !== true) {
+      this.audit.write({
+        actor,
+        action: ConsentRecordAuditActions.searchRefused,
+        targetType: "ConsentRecord",
+        targetId: "search",
+        result: "refused",
+        reason: allowed ? "mfa_required" : "role_not_allowed",
+        context: { criteria }
+      });
+      throw new ForbiddenException({ code: ErrorCodes.RBAC_DENIED, message: "Consent record search denied" });
+    }
+    const page = await this.repository.searchRecordsPage(filter);
+    this.audit.write({
+      actor,
+      action: ConsentRecordAuditActions.searched,
+      targetType: "ConsentRecord",
+      targetId: "search",
+      ...(filter.countryId ? { scope: { countryId: filter.countryId } } : {}),
+      result: "success",
+      context: { criteria, total: page.total, returned: page.items.length }
+    });
+    return page;
+  }
+
   listTexts(): Promise<ConsentText[]> {
     return this.repository.listTexts();
   }
@@ -293,6 +325,11 @@ export function findSupersedingText<T extends Pick<ConsentText, "id" | "purpose"
     )
     .sort((left, right) => new Date(right.publishedAt ?? 0).getTime() - new Date(left.publishedAt ?? 0).getTime())[0];
 }
+
+export const ConsentRecordAuditActions = {
+  searched: "consent_record.searched",
+  searchRefused: "consent_record.search_refused"
+} as const;
 
 export const ConsentTextAuditActions = {
   created: "consent_text.created",

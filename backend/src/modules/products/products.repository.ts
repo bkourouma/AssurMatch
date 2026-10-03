@@ -144,7 +144,12 @@ export class PrismaProductsRepository implements ProductsRepository {
 
   async list(countryId?: string): Promise<Product[]> {
     const rows = await this.products().findMany({ orderBy: { name: "asc" } });
-    const products = await Promise.all(rows.map((row) => this.withCountries(row, undefined)));
+    // Spec 059 follow-up: one query for every country link instead of one per product.
+    const ids = rows.map((row) => (row as { id: string }).id);
+    const links = ids.length > 0 ? await this.countryProducts().findMany({ where: { productId: { in: ids } } }) : [];
+    const byProduct = new Map<string, CountryProductRow[]>();
+    for (const link of links) byProduct.set(link.productId, [...(byProduct.get(link.productId) ?? []), link]);
+    const products = rows.map((row) => this.assemble(row, byProduct.get((row as { id: string }).id) ?? []));
     return countryId ? products.filter((product) => product.countryIds.includes(countryId)) : products;
   }
 
@@ -176,7 +181,14 @@ export class PrismaProductsRepository implements ProductsRepository {
     const { description, categoryId, ...rest } = item;
     const base = { ...rest, ...(description ? { description } : {}), ...(categoryId ? { categoryId } : {}) } as Product;
     if (knownCountryIds) return { ...base, countryIds: knownCountryIds, countryLinks: [] };
-    const links = (await this.countryProducts().findMany({ where: { productId: item.id } })).map((link) => this.toLink(link));
+    return this.assemble(row, await this.countryProducts().findMany({ where: { productId: item.id } }));
+  }
+
+  private assemble(row: unknown, linkRows: CountryProductRow[]): Product {
+    const item = row as Product & { description?: string | null; categoryId?: string | null };
+    const { description, categoryId, ...rest } = item;
+    const base = { ...rest, ...(description ? { description } : {}), ...(categoryId ? { categoryId } : {}) } as Product;
+    const links = linkRows.map((link) => this.toLink(link));
     return {
       ...base,
       countryIds: links.filter((link) => link.status !== "retired").map((link) => link.countryId),

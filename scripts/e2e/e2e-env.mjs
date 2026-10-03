@@ -69,6 +69,10 @@ export function backendEnv() {
     ASSURMATCH_DOCUMENT_STORAGE_DIR: path.join(stateDir, "documents"),
     ASSURMATCH_ANTIVIRUS: "eicar",
     ASSURMATCH_WORKER_INTERVAL_SECONDS: "5",
+    // SC-08: the satisfaction survey leaves at once (24 h in production) and the API re-reads the
+    // flags every 5 s (30 s by default), like the worker before each cycle.
+    ASSURMATCH_SATISFACTION_SURVEY_DELAY_MINUTES: "0",
+    ASSURMATCH_FEATURE_FLAG_REFRESH_SECONDS: "5",
     // Spec 058 auth rate limiting counts per IP: every browser of the suite logs in from 127.0.0.1.
     ASSURMATCH_AUTH_RATE_LIMIT_IP_MAX: "2000",
     TRUSTED_PROXY_HOPS: process.env.ASSURMATCH_E2E_TRUSTED_PROXY_HOPS ?? "0",
@@ -97,6 +101,19 @@ export function playwrightEnv() {
     E2E_BROKER_URL: urls.broker,
     E2E_MAILPIT_URL: urls.mailpit,
     E2E_SUPER_ADMIN_EMAIL: superAdmin.email,
-    E2E_STATE_FILE: stateFile
+    E2E_STATE_FILE: stateFile,
+    // SC-10 checks: where the worker heartbeat lives (container health in docker mode, file on host).
+    E2E_COMPOSE_PROJECT: composeProject,
+    E2E_WORKER_HEARTBEAT_FILE: path.join(stateDir, "worker.heartbeat")
   };
 }
+
+/**
+ * Compliance policies applied by the orchestrator right after the reference seed, through the
+ * audited command `scripts/ops/apply-flag-policy.ts` (sensitive flags have no admin toggle):
+ * SC-08 needs the satisfaction survey (spec 048) and the B2B invoicing (spec 060).
+ */
+export const e2eFlagPolicies = [
+  { flag: "satisfaction_survey_enabled", reference: "E2E-POL-048", reason: "Pile e2e spec 059 : enquete de satisfaction (SC-08)" },
+  { flag: "billing_enabled", reference: "E2E-POL-060", reason: "Pile e2e spec 059 : facturation B2B manuelle (SC-08)" }
+];

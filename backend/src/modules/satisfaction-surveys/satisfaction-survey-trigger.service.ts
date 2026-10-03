@@ -28,6 +28,19 @@ export interface SatisfactionSurveyTriggerDeps {
 }
 
 const TRIGGER_STATUSES = new Set(["gagne", "perdu", "closed"]);
+const DEFAULT_SURVEY_DELAY_MINUTES = 24 * 60;
+
+/**
+ * Spec 048: the survey leaves 24 hours after the closure. `ASSURMATCH_SATISFACTION_SURVEY_DELAY_MINUTES`
+ * (0 to 10080) overrides it for acceptance stacks, so the e2e journey (spec 059 SC-08) sees the
+ * e-mail without waiting a day. Production keeps the default.
+ */
+export function satisfactionSurveyDelayMinutes(env: Record<string, string | undefined> = process.env): number {
+  const raw = env.ASSURMATCH_SATISFACTION_SURVEY_DELAY_MINUTES?.trim();
+  if (!raw) return DEFAULT_SURVEY_DELAY_MINUTES;
+  const value = Number(raw);
+  return Number.isInteger(value) && value >= 0 && value <= 7 * 24 * 60 ? value : DEFAULT_SURVEY_DELAY_MINUTES;
+}
 const EXCLUDED_STATUSES = new Set(["doublon", "hors_cible", "injoignable", "rejete_conteste", "rejected"]);
 
 export class SatisfactionSurveyTriggerService {
@@ -73,7 +86,7 @@ export class SatisfactionSurveyTriggerService {
     const tokenHash = this.deps.tokenService.hashToken(token);
 
     const now = new Date();
-    const dueAt = new Date(now.getTime() + 24 * 60 * 60 * 1000); // 24h delay
+    const dueAt = new Date(now.getTime() + satisfactionSurveyDelayMinutes() * 60 * 1000); // 24h by default
     const retentionUntil = new Date(now.getTime() + 730 * 24 * 60 * 60 * 1000); // 2 years default
     // Spec 054 R9: the survey speaks the language of the request (spec 050 `QuoteRequest.language`).
     const locale = quote.language === "en" ? "en" : "fr";

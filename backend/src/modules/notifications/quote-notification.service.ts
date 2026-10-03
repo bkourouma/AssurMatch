@@ -188,7 +188,10 @@ export class QuoteNotificationService {
 
   private async exists(dedupeKey: string): Promise<boolean> {
     if (Array.isArray(this.notifications)) return this.notifications.some((notification) => notification.dedupeKey === dedupeKey);
-    return Boolean(await this.notifications.findByDedupeKey(dedupeKey));
+    // Spec 059 follow-up (M-03): no read-before-write. The unique `dedupeKey` index decides in
+    // `persist` (a repeat is a unique violation, answered as "already queued"); the memory
+    // repository enforces the same rule. Saves one query per queued e-mail on the submission path.
+    return false;
   }
 
   /** `false` when a concurrent writer stored the same idempotency key first (unique index). */

@@ -13,7 +13,7 @@ import type { UploadedLeadFile } from "../lead-proposals/scanned-upload";
 import type { ProposalFile } from "../lead-proposals/lead-proposals.service";
 import { activateRequestSchema, loginRequestSchema, mfaVerifyRequestSchema, passwordChangeRequestSchema, passwordResetRequestSchema, type ActivateRequest, type LoginRequest, type PasswordChangeRequest, type PasswordResetRequest } from "../../../../packages/shared/contracts/auth.contracts";
 import { activationChecklistQuerySchema } from "../../../../packages/shared/contracts/activation-checklist.contracts";
-import { adminConsentTextCreateSchema, adminConsentTextListQuerySchema } from "../../../../packages/shared/contracts/compliance.contracts";
+import { adminConsentRecordSearchQuerySchema, adminConsentTextCreateSchema, adminConsentTextListQuerySchema } from "../../../../packages/shared/contracts/compliance.contracts";
 import {
   adminCountryCreateSchema,
   adminCountryUpdateSchema,
@@ -114,6 +114,7 @@ import {
   brokerStarterDashboardQuerySchema,
   brokerStarterExportQuerySchema,
   brokerStarterLeadActionRequestSchema,
+  brokerStarterLeadCloseRequestSchema,
   brokerStarterLeadListQuerySchema,
   brokerStarterReasonSchema,
   adminQuoteFormDefinitionSchema,
@@ -1155,6 +1156,12 @@ export class BrokerStarterController {
     return this.runtime.leads.brokerStarterController.reject(parseParam("leadId", leadId, uuidSchema), parseHttpInput(starterActionWithReasonSchema, input), actor);
   }
 
+  /** Spec 059 follow-up: closes an accepted lead with its outcome (gagne, perdu, sans_suite). */
+  close(leadId: string, input: unknown, request: AssurMatchHttpRequest) {
+    const actor = brokerWriteActor(request);
+    return this.runtime.leads.brokerStarterController.close(parseParam("leadId", leadId, uuidSchema), parseHttpInput(brokerStarterLeadCloseRequestSchema, input ?? {}), actor);
+  }
+
   dispute(leadId: string, input: unknown, request: AssurMatchHttpRequest) {
     const actor = brokerWriteActor(request);
     return this.runtime.leads.brokerStarterController.dispute(parseParam("leadId", leadId, uuidSchema), parseHttpInput(starterActionWithReasonSchema, input), actor);
@@ -1767,6 +1774,20 @@ async function retentionCall<T>(call: () => Promise<T>): Promise<T> {
   }
 }
 
+/**
+ * Spec 059 follow-up: compliance consent-proof search (`POST /admin/consent-records/search`).
+ * compliance_admin / super_admin with MFA
+ * (checked and audited by `ConsentService.searchRecordsPage`); the e-mail criterion is fingerprinted.
+ */
+export class AdminConsentRecordsHttpController {
+  constructor(private readonly runtime: AssurMatchRuntime) {}
+
+  /** POST so the visitor e-mail criterion never lands in a URL (proxy or access logs, history). */
+  search(input: unknown, request: AssurMatchHttpRequest) {
+    return this.runtime.consentRecords.search(protectedActorFromRequest(request), parseHttpInput(adminConsentRecordSearchQuerySchema, input ?? {}));
+  }
+}
+
 export class AdminDataRetentionController {
   constructor(private readonly runtime: AssurMatchRuntime) {}
 
@@ -2142,6 +2163,7 @@ decorate(BrokerStarterController, "history", [Get("leads/:leadId/history") as Me
 decorate(BrokerStarterController, "accept", [Post("leads/:leadId/accept") as MethodDecoratorFactory], [[0, Param("leadId") as ParamDecoratorFactory], [1, Req() as ParamDecoratorFactory]]);
 decorate(BrokerStarterController, "reject", [Post("leads/:leadId/reject") as MethodDecoratorFactory], [[0, Param("leadId") as ParamDecoratorFactory], [1, Body() as ParamDecoratorFactory], [2, Req() as ParamDecoratorFactory]]);
 decorate(BrokerStarterController, "dispute", [Post("leads/:leadId/dispute") as MethodDecoratorFactory], [[0, Param("leadId") as ParamDecoratorFactory], [1, Body() as ParamDecoratorFactory], [2, Req() as ParamDecoratorFactory]]);
+decorate(BrokerStarterController, "close", [Post("leads/:leadId/close") as MethodDecoratorFactory, HttpCode(200) as MethodDecoratorFactory], [[0, Param("leadId") as ParamDecoratorFactory], [1, Body() as ParamDecoratorFactory], [2, Req() as ParamDecoratorFactory]]);
 decorate(BrokerStarterController, "notifications", [Get("notifications") as MethodDecoratorFactory], [[0, Req() as ParamDecoratorFactory]]);
 decorate(BrokerStarterController, "readNotification", [Post("notifications/:notificationId/read") as MethodDecoratorFactory], [[0, Param("notificationId") as ParamDecoratorFactory], [1, Req() as ParamDecoratorFactory]]);
 decorate(BrokerStarterController, "capabilities", [Get("plan-capabilities") as MethodDecoratorFactory], [[0, Req() as ParamDecoratorFactory]]);
@@ -2272,6 +2294,8 @@ decorate(AdminBillingFoundationController, "recordPayment", [Post("billing/issue
 decorate(AdminBillingFoundationController, "issueCreditNote", [Post("billing/issued-invoices/:id/credit-note") as MethodDecoratorFactory], [[0, Param("id") as ParamDecoratorFactory], [1, Body() as ParamDecoratorFactory], [2, Req() as ParamDecoratorFactory]]);
 decorate(AdminBillingFoundationController, "creditNotePdf", [Get("billing/credit-notes/:id/pdf") as MethodDecoratorFactory, noStore], [[0, Param("id") as ParamDecoratorFactory], [1, Req() as ParamDecoratorFactory]]);
 decorate(AdminBillingFoundationController, "account", [Get("billing/accounts/:partnerId") as MethodDecoratorFactory], [[0, Param("partnerId") as ParamDecoratorFactory], [1, Req() as ParamDecoratorFactory]]);
+controller("admin/consent-records", AdminConsentRecordsHttpController, true);
+decorate(AdminConsentRecordsHttpController, "search", [Post("search") as MethodDecoratorFactory, HttpCode(200) as MethodDecoratorFactory, Header("Cache-Control", "no-store") as MethodDecoratorFactory], [[0, Body() as ParamDecoratorFactory], [1, Req() as ParamDecoratorFactory]]);
 controller("admin/retention", AdminDataRetentionController, true);
 decorate(AdminDataRetentionController, "policies", [Get("policies") as MethodDecoratorFactory], [[0, Req() as ParamDecoratorFactory], [1, Query() as ParamDecoratorFactory]]);
 decorate(AdminDataRetentionController, "upsertPolicy", [Put("policies") as MethodDecoratorFactory], [[0, Body() as ParamDecoratorFactory], [1, Req() as ParamDecoratorFactory]]);
@@ -2497,7 +2521,7 @@ Reflect.defineMetadata("design:paramtypes", [AssurMatchRuntime], AuthRequiredHtt
  * every non-GET broker route is in one of the two lists.
  */
 export const BROKER_TENANT_WRITE_GUARDED: Readonly<Record<string, readonly string[]>> = {
-  BrokerStarterController: ["accept", "reject", "dispute", "sendProposal", "withdrawProposal"],
+  BrokerStarterController: ["accept", "reject", "dispute", "close", "sendProposal", "withdrawProposal"],
   BrokerCrmController: ["status", "note", "task", "reminder", "assign", "document", "proposal", "withdrawProposal", "dispute", "aiRequest", "aiValidate", "aiLossAnalysis", "aiSetOptOut"],
   BrokerEnterpriseController: ["createAgency", "updateAgency", "assignMember", "createRole", "updateRole", "updateSla", "updateBranding"],
   BrokerNotificationsController: ["updatePreferences"],
@@ -2547,6 +2571,7 @@ Module({
     AdminActivationChecklistController,
     AdminBillingFoundationController,
     AdminDataRetentionController,
+    AdminConsentRecordsHttpController,
     BrokerBillingController,
     BrokerNotificationsController,
     BrokerEnterpriseController,

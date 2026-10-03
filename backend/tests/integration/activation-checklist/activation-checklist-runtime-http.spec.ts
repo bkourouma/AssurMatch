@@ -121,8 +121,8 @@ describe("activation checklist runtime HTTP", () => {
     harness = await createRuntimeHttpHarness();
     const admin = { actorId: "activation-admin", roles: ["super_admin" as const], mfaVerified: true };
     (harness.runtime.featureFlags.service as unknown as { flags: unknown[] }).flags.push({
-      id: "bad-billing-flag",
-      key: "billing_enabled",
+      id: "bad-payments-flag",
+      key: "payments_enabled",
       scopeType: "global",
       value: true,
       reason: "simulated bad persisted state",
@@ -135,9 +135,19 @@ describe("activation checklist runtime HTTP", () => {
     const checklist = await readJson<ActivationChecklistResponse>(response);
     expect(checklist.summary.blocked).toBeGreaterThan(0);
     expect(checklist.sections.find((section) => section.key === "global")?.controls).toContainEqual(expect.objectContaining({
-      key: "billing_enabled",
+      key: "payments_enabled",
       status: "blocked"
     }));
+  });
+
+  it("does not block on billing_enabled: manual invoicing is part of the launch (spec 060, D-8)", async () => {
+    harness = await createRuntimeHttpHarness();
+    const admin = { actorId: "activation-admin", roles: ["super_admin" as const], mfaVerified: true };
+    await harness.runtime.featureFlags.service.applyCompliancePolicy({ key: "billing_enabled", scopeType: "global", value: true, reason: "facturation manuelle" }, admin, { reference: "TEST-POL-060", approvedBy: "compliance" });
+    const checklist = await readJson<ActivationChecklistResponse>(await harness.request("/admin/activation-checklist", { headers: actorHeaders(admin) }));
+    const keys = checklist.sections.find((section) => section.key === "global")?.controls.map((control) => control.key) ?? [];
+    expect(keys).not.toContain("billing_enabled");
+    expect(keys).toContain("payments_enabled");
   });
 
   it("refuses support admin and Admin Pays actors without explicit scopes", async () => {

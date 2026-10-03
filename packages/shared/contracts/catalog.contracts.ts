@@ -43,6 +43,8 @@ export const productFlagsSchema = z.object({
 });
 
 export const countryStatusSchema = z.enum(["draft", "internal", "partner_test", "pilot", "public", "suspended", "retired"]);
+
+export { COUNTRY_STATUS_TRANSITIONS, allowedCountryStatusTransitions } from "./country-status-transitions";
 export const productStatusSchema = z.enum(["draft", "internal", "pilot", "public", "suspended", "retired"]);
 export const countryProductLinkStatusSchema = z.enum(["internal", "pilot", "public", "suspended", "retired"]);
 export const regulatoryRegimeStatusSchema = z.enum(["draft", "active", "suspended", "retired"]);

@@ -23,6 +23,10 @@ export class MemoryNotificationsRepository implements NotificationsRepository {
   }
 
   async create(notification: NotificationRecord): Promise<NotificationRecord> {
+    // Same rule as the unique index of the Prisma schema (`Notification.dedupeKey`).
+    if (notification.dedupeKey && this.notifications.some((candidate) => candidate.dedupeKey === notification.dedupeKey)) {
+      throw Object.assign(new Error("Unique constraint failed on the fields: (`dedupeKey`)"), { code: "P2002" });
+    }
     this.notifications.push(notification);
     return notification;
   }

@@ -105,7 +105,7 @@ export class AdminUsersController {
       const user = await this.users.create(input, actor);
       const issued = this.passwordReset.issueToken();
       await this.users.setPasswordResetToken(user.id, issued.tokenHash, issued.expiresAt);
-      const delivery = await this.notifications.deliverActivation(user, issued.token);
+      const delivery = await this.notifications.deliverActivation(user, issued.token, issued.expiresAt);
       return { user, ...delivery, expiresAt: issued.expiresAt };
     } catch (error) {
       this.audit.write({ actor, action: AuthAuditActions.userCreated, targetType: "User", targetId: "refused", result: "refused", reason, context: { email: input.email } });
@@ -155,7 +155,7 @@ export class AdminUsersController {
     const user = await this.users.require(userId);
     const issued = this.passwordReset.issueToken();
     await this.users.setPasswordResetToken(user.id, issued.tokenHash, issued.expiresAt);
-    const delivery = await this.notifications.deliverPasswordReset(user, issued.token);
+    const delivery = await this.notifications.deliverPasswordReset(user, issued.token, issued.expiresAt);
     this.audit.write({
       actor,
       action: AuthAuditActions.userPasswordResetIssued,

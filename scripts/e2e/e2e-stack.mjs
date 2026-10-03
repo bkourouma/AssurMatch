@@ -11,7 +11,8 @@
 // Steps: (1) remove any previous e2e stack and its data, (2) start PostgreSQL (empty, tmpfs), Redis
 // and Mailpit, (3) apply the Prisma migrations, (4) apply the REFERENCE seed only, (5) create the
 // first Super Admin with the spec 057 bootstrap command (activation e-mail sent to Mailpit),
-// (6) start the API, the worker and the three apps, (7) run `playwright test -c
+// (5b) apply the SC-08 compliance policies (satisfaction survey, invoicing) with the audited
+// command, (6) start the API, the worker and the three apps, (7) run `playwright test -c
 // playwright.e2e.config.ts`, (8) tear everything down unless --keep. The exit code is Playwright's.
 //
 // Modes: `--apps=docker` (default, CI) builds the production Dockerfiles and runs them from
@@ -23,6 +24,7 @@ import path from "node:path";
 import {
   backendEnv,
   composeFile,
+  e2eFlagPolicies,
   composeProject,
   frontendBuildEnv,
   logDir,
@@ -229,6 +231,14 @@ function bootstrapSuperAdmin() {
   if (!dryRun) writeState({ superAdminActivationUrl: link ?? null, superAdminEmail: superAdmin.email });
 }
 
+/** Sensitive flags of SC-08, switched on through the audited compliance-policy command. */
+function applyFlagPolicies() {
+  for (const policy of e2eFlagPolicies) {
+    log(`compliance policy ${policy.reference}: ${policy.flag} -> true (scripts/ops/apply-flag-policy.ts)`);
+    backendCommand(["node", "--import", "tsx", "scripts/ops/apply-flag-policy.ts", "--flag", policy.flag, "--value", "true", "--reference", policy.reference, "--approved-by", "Conformite E2E", "--reason", policy.reason]);
+  }
+}
+
 async function prepareStack() {
   teardown();
   if (!dryRun) {
@@ -251,6 +261,7 @@ async function prepareStack() {
   log("applying the reference seed (no demo data)");
   backendCommand(["node", "--import", "tsx", "scripts/preprod/seed-reference.ts"]);
   bootstrapSuperAdmin();
+  applyFlagPolicies();
 
   if (appsMode === "docker") {
     log("starting the API, worker and apps containers");
@@ -265,7 +276,7 @@ async function prepareStack() {
 function runPlaywright() {
   log(`running Playwright (playwright.e2e.config.ts) ${playwrightArgs.join(" ")}`);
   return run("npx", ["playwright", "test", "-c", "playwright.e2e.config.ts", ...playwrightArgs], {
-    env: playwrightEnv(),
+    env: { ...playwrightEnv(), E2E_APPS_MODE: appsMode },
     allowFailure: true
   }).status;
 }

@@ -516,3 +516,106 @@ test("SC-07 le visiteur répond « intéressé » depuis son espace de suivi ; l
   await expect(card(broker, "Informations utiles")).not.toContainText(/Gagn|Clotur|Perdu/u);
   await broker.context().close();
 });
+
+// SC-08 (PRD v0.3 section 4): the broker closes the lead, the visitor is told and receives the
+// satisfaction survey, answers it, and finance invoices the month and records the payment the broker
+// then sees. The survey (spec 048) and invoicing (spec 060) flags are sensitive: the orchestrator
+// switched them on through the audited compliance-policy command (scripts/ops/apply-flag-policy.ts),
+// never through a back-office toggle (none exists for them by design).
+test("SC-08 le courtier Starter clôture le lead « gagné », le visiteur est informé puis donne son avis ; la finance facture le mois et constate le paiement", async ({ browser }) => {
+  const state = loadJourneyState();
+  const owner = requireState(state, "brokerOwner");
+  const leadAssignmentId = requireState(state, "leadAssignmentId");
+  const quoteReference = requireState(state, "quoteReference");
+  const visitorEmail = requireState(state, "visitorEmail");
+  const partnerName = requireState(state, "partnerName");
+
+  // 1. Closure from the Starter lead page ("Clôturer", outcome "Gagne").
+  const seenByVisitor = await messageIdsTo(visitorEmail);
+  const broker = await (await newAppContext(browser, e2eEnv.brokerUrl)).newPage();
+  await openAs(broker, owner, `/leads/${leadAssignmentId}`);
+  await confirmInDialog(broker, card(broker, "Actions Starter"), "Clôturer", async (dialog) => {
+    await dialog.locator("#close-outcome").selectOption("gagne");
+    await dialog.locator("#close-comment").fill("Contrat signe par le visiteur chez l'assureur partenaire");
+  }, "Clôturer le lead");
+  await expect(broker.getByText("Lead cloture avec son issue")).toBeVisible();
+  await expect(card(broker, "Informations utiles")).toContainText("Cloture");
+  await expect(card(broker, "Historique minimal")).toContainText("issue: Gagne");
+  await expect(card(broker, "Actions Starter")).toContainText("Ce lead est cloture");
+  await broker.context().close();
+
+  // 2. Spec 054: the visitor is told the request is closed (without the commercial outcome).
+  const closed = await waitForMail({ to: visitorEmail, exclude: seenByVisitor, subject: new RegExp(`${escapeRegExp(quoteReference)} est cloturee`, "u") });
+  expect(`${closed.Text}`).toContain(partnerName);
+  // The commercial outcome stays between the broker and AssurMatch.
+  expect(closed.Text).not.toMatch(/\bgagn[ée]\b/iu);
+
+  // 3. Spec 048: the worker sends the survey (delay 0 on this stack, 24 h in production).
+  const survey = await waitForMail({ to: visitorEmail, subject: /Votre avis sur votre mise en relation/u, timeoutMs: 120_000 });
+  // The survey has its own reference (SF-...), never the quote reference nor any contact data.
+  const feedbackLink = extractLink(survey, new RegExp(`^${escapeRegExp(e2eEnv.publicUrl)}/avis/SF-[A-Z0-9]+\\?token=`, "u"));
+  const surveyReference = new URL(feedbackLink).pathname.split("/").pop() as string;
+  const visitor = await (await newAppContext(browser, e2eEnv.publicUrl)).newPage();
+  await visitor.goto(feedbackLink);
+  await expect(visitor.getByRole("heading", { level: 1 })).toContainText(surveyReference);
+  await visitor.getByLabel("4 - Satisfait").check({ force: true });
+  await visitor.getByLabel("Commentaire (optionnel)").fill("Courtier reactif, proposition claire.");
+  await visitor.getByRole("button", { name: "Envoyer mon avis" }).click();
+  await expect(visitor.getByText("Merci pour votre avis")).toBeVisible();
+  // The link is single-use.
+  await visitor.goto(feedbackLink);
+  await expect(visitor.getByText("Merci pour votre avis").or(visitor.getByText("Ce questionnaire n'est plus disponible")).first()).toBeVisible();
+  await visitor.context().close();
+
+  // 4. Spec 060: finance (Super Admin here) sets the CI Starter tariff, computes the month's draft,
+  // issues the numbered invoice and records the payment received outside the platform.
+  const admin = await adminPage(browser);
+  await openAs(admin, superAdmin(), "/billing?tab=tarifs");
+  const tariff = card(admin, "Tarifs par plan et pays");
+  await tariff.locator("#billing-plan").selectOption("starter");
+  await tariff.locator("#billing-country").fill("CI");
+  await tariff.locator("#billing-subscription").fill("25000");
+  await tariff.locator("#billing-per-lead").fill("5000");
+  await tariff.locator("#billing-plan-reason").fill("Tarif Starter CI de lancement");
+  await tariff.getByRole("button", { name: "Enregistrer le tarif" }).click();
+  await expect(admin.getByText("Tarif de plan enregistre et audite.")).toBeVisible();
+
+  await admin.goto("/billing?tab=brouillons");
+  const drafts = card(admin, "Brouillons mensuels non facturables");
+  await drafts.locator("#billing-draft-reason").fill("Cloture mensuelle E2E");
+  await drafts.getByRole("button", { name: "Recalculer les brouillons" }).click();
+  await expect(admin.getByText(/Brouillons recalcules/u)).toBeVisible();
+
+  await admin.goto("/billing?tab=factures");
+  const issue = card(admin, "Emettre la facture d'un brouillon");
+  const draftOption = issue.locator("#invoice-draft option").filter({ hasText: partnerName }).first();
+  await expect(draftOption).toHaveCount(1);
+  await issue.locator("#invoice-draft").selectOption(await draftOption.getAttribute("value") as string);
+  await issue.locator("#invoice-reason").fill("Facture mensuelle E2E");
+  await issue.getByRole("button", { name: "Emettre la facture" }).click();
+  await expect(admin.getByText("Facture numerotee emise, PDF archive et courtier notifie.")).toBeVisible();
+  const invoiceRow = card(admin, "Factures B2B numerotees").getByRole("row").filter({ hasText: partnerName }).first();
+  const invoiceNumber = ((await invoiceRow.innerText()).match(/CI-\d{4}-\d{6}/u) ?? [])[0] as string;
+  expect(invoiceNumber, "numbered invoice CI-YYYY-NNNNNN").toBeTruthy();
+
+  const payment = card(admin, "Enregistrer un paiement recu");
+  const invoiceOption = payment.locator("#payment-invoice option").filter({ hasText: invoiceNumber }).first();
+  const due = Number(((await invoiceOption.innerText()).match(/reste ([\d\s\u202f\u00a0.]+)/u)?.[1] ?? "").replace(/\D/gu, ""));
+  expect(due, "amount due of the invoice").toBeGreaterThan(0);
+  await payment.locator("#payment-invoice").selectOption(await invoiceOption.getAttribute("value") as string);
+  await payment.locator("#payment-amount").fill(String(due));
+  await payment.locator("#payment-date").fill(isoDate(new Date()));
+  await payment.locator("#payment-method").selectOption("bank_transfer");
+  await payment.locator("#payment-reference").fill(`VIR-E2E-${quoteReference}`);
+  await payment.getByRole("button", { name: "Enregistrer le paiement" }).click();
+  await expect(admin.getByText("Paiement recu hors plateforme enregistre et audite.")).toBeVisible();
+  await expect(card(admin, "Factures B2B numerotees").getByRole("row").filter({ hasText: invoiceNumber })).toContainText("payee");
+  await admin.context().close();
+
+  // 5. G-05: the broker sees the invoice, settled, on /billing (Starter plan included).
+  const brokerBilling = await (await newAppContext(browser, e2eEnv.brokerUrl)).newPage();
+  await openAs(brokerBilling, owner, "/billing");
+  const invoices = card(brokerBilling, "Factures et avoirs");
+  await expect(invoices.getByRole("row").filter({ hasText: invoiceNumber })).toContainText("reglee");
+  await brokerBilling.context().close();
+});

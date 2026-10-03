@@ -32,8 +32,6 @@ export const INTERNAL_ONLY: Record<string, string> = {
     "Not exposed on purpose (constitution V): AI modules are only switched through the compliance procedure; the admin reads them through AdminAIAssistanceController (/admin/ai-assistance).",
   "AdminAuditLogsController.search":
     "Superseded: GET /admin/audit-logs is served by the wiring AdminAuditLogsController / spec 056 audit search, which call the audit service directly.",
-  "AdminConsentRecordsController.search":
-    "Gap kept internal (spec 059 finding): no consent-record search route; consent proofs are read per request in the admin quote-request detail and in the audit search. Tracked as a follow-up task.",
   "AdminCountriesController.create":
     "Superseded: /admin/countries routes are served by AdminCatalogCountriesHttpController through CatalogAdminService (spec 050 checks and audit).",
   "AdminCountriesController.list":
@@ -104,8 +102,6 @@ export const INTERNAL_ONLY: Record<string, string> = {
     "Superseded: broker leads are served by BrokerStarterController (/broker/starter) and BrokerCrmController (/broker/crm, status pipeline for Pro).",
   "BrokerStarterController.blockedProCapability":
     "Internal guard: called by the Starter access policy to refuse a Pro capability; it is a refusal helper, not a capability.",
-  "BrokerStarterController.close":
-    "Gap kept internal (spec 059 finding): a Starter broker cannot close a lead (won/lost) over HTTP, so SC-08 (survey on closure) is only reachable for Pro via /broker/crm. Tracked as a follow-up task.",
   "PublicCountriesController.detail":
     "Superseded: /countries routes are served by the wiring PublicCountriesController (public journey flags, directory).",
   "PublicCountriesController.list":

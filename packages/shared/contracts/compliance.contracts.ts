@@ -94,6 +94,51 @@ export const consentRecordSchema = z.object({
   grantedAt: dateTimeStringSchema
 });
 
+/**
+ * Spec 059 follow-up (consent-proof search, compliance_admin / super_admin): at least one criterion
+ * among the request reference, the visitor e-mail (fingerprinted server side, never stored or
+ * echoed) or the country is required, so the search never dumps every proof.
+ */
+export const adminConsentRecordSearchQuerySchema = z.object({
+  publicReference: z.string().trim().toUpperCase().regex(/^QR-\d{4}-[A-Z0-9]{8}$/).optional(),
+  email: z.string().trim().toLowerCase().email().max(254).optional(),
+  countryId: uuidSchema.optional(),
+  purpose: consentPurposeSchema.optional(),
+  status: z.enum(["granted", "withdrawn", "expired", "anonymized"]).optional(),
+  page: z.coerce.number().int().min(1).max(1000).default(1),
+  pageSize: z.coerce.number().int().min(1).max(100).default(50)
+}).refine((value) => Boolean(value.publicReference || value.email || value.countryId), {
+  message: "A reference, an e-mail or a country is required"
+});
+export type AdminConsentRecordSearchQuery = z.input<typeof adminConsentRecordSearchQuerySchema>;
+
+/** One consent proof as the compliance console shows it: the subject fingerprint is truncated. */
+export interface AdminConsentRecordView {
+  id: string;
+  consentTextId: string;
+  consentTextVersion: string | null;
+  consentTextLanguage: string | null;
+  consentTextHash: string | null;
+  purpose: z.output<typeof consentPurposeSchema>;
+  countryId: string;
+  productId: string | null;
+  channel: z.output<typeof consentChannelSchema>;
+  intendedRecipient: string;
+  status: "granted" | "withdrawn" | "expired" | "anonymized";
+  grantedAt: string;
+  withdrawnAt: string | null;
+  retentionUntil: string;
+  /** First 8 hexadecimal characters of the e-mail fingerprint, enough to group, not to identify. */
+  subjectFingerprint: string;
+}
+
+export interface AdminConsentRecordSearchResult {
+  items: AdminConsentRecordView[];
+  total: number;
+  page: number;
+  pageSize: number;
+}
+
 export const auditLogSchema = z.object({
   id: uuidSchema.optional(),
   actorId: uuidSchema.optional(),

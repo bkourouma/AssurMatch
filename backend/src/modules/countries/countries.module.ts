@@ -1,4 +1,4 @@
-import { countryCreateSchema, countryUpdateSchema, COUNTRY_FEATURE_FLAG_DEFAULTS, type CountryDto, type CountryFlags, type CountryRecord, type CountryStatus, type CountryUpdateDto } from "../../../../packages/shared/contracts/catalog.contracts";
+import { countryCreateSchema, countryUpdateSchema, COUNTRY_FEATURE_FLAG_DEFAULTS, COUNTRY_STATUS_TRANSITIONS, type CountryDto, type CountryFlags, type CountryRecord, type CountryStatus, type CountryUpdateDto } from "../../../../packages/shared/contracts/catalog.contracts";
 import type { CountryPageResponse } from "../../../../packages/shared/contracts/quote.contracts";
 import { pickDefined } from "../../../../packages/shared/validation/patch.schemas";
 import { AuditLogWriter } from "../audit-logs/audit-log-writer.service";
@@ -23,20 +23,6 @@ export interface CountryRegimeLookup {
   find(id: string): Promise<{ id: string; status: string } | undefined>;
 }
 
-/**
- * Spec 050 FR-002: draft -> internal -> partner_test -> pilot -> public. Going back to an earlier
- * operational step, suspending and retiring are always allowed (deactivation needs no condition);
- * a suspended country comes back to internal, pilot or public; retired is terminal.
- */
-const COUNTRY_STATUS_TRANSITIONS: Record<CountryStatus, CountryStatus[]> = {
-  draft: ["internal", "suspended", "retired"],
-  internal: ["partner_test", "pilot", "suspended", "retired"],
-  partner_test: ["internal", "pilot", "suspended", "retired"],
-  pilot: ["internal", "partner_test", "public", "suspended", "retired"],
-  public: ["internal", "partner_test", "pilot", "suspended", "retired"],
-  suspended: ["internal", "pilot", "public", "retired"],
-  retired: []
-};
 
 /**
  * Spec 050 FR-005 / US1-4: flags as the public journey must read them. A suspended or retired

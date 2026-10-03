@@ -17,6 +17,7 @@ import {
   updateRegimeAction,
   type CatalogActionState
 } from "../lib/catalog-actions";
+import { allowedCountryStatusTransitions } from "../../../../packages/shared/contracts/country-status-transitions";
 import { COUNTRY_STATUS_OPTIONS, LANGUAGE_OPTIONS, PRODUCT_STATUS_OPTIONS, REGULATORY_FAMILY_OPTIONS } from "../lib/catalog-messages";
 import { CatalogActionResult } from "../lib/ui/catalog-action-result";
 import {
@@ -155,8 +156,10 @@ export function CountryStatusForm({ countryId, currentStatus, canApprovePublic }
 }) {
   const [state, formAction, pending] = useActionState(changeCountryStatusAction, initialState);
   const base = useId();
+  // Spec 059 follow-up: only the transitions the API accepts (shared graph), e.g. never draft -> pilot.
+  const allowed = new Set<string>(allowedCountryStatusTransitions(currentStatus));
   const options = COUNTRY_STATUS_OPTIONS
-    .filter((status) => status !== currentStatus)
+    .filter((status) => status !== currentStatus && allowed.has(status))
     .filter((status) => status !== "public" || canApprovePublic)
     .map((status) => ({ value: status, label: status }));
   return (

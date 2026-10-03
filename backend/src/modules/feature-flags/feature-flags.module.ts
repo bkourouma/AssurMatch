@@ -30,6 +30,8 @@ export interface FeatureFlagMutationOptions {
 export class FeatureFlagsService {
   private readonly flags: FeatureFlag[] = [];
   private readonly history: FeatureFlagHistory[] = [];
+  /** Bumped by every local change; lets a concurrent reload discard its stale read. */
+  private mutationGeneration = 0;
 
   constructor(
     private readonly audit: AuditLogWriter,
@@ -44,7 +46,10 @@ export class FeatureFlagsService {
   }
 
   async hydrateFromRepository(): Promise<void> {
+    // A change made by this process while the read was in flight wins over the (older) read.
+    const generation = this.mutationGeneration;
     const persisted = await this.repository.list();
+    if (generation !== this.mutationGeneration) return;
     this.flags.splice(0, this.flags.length, ...persisted);
   }
 
@@ -119,6 +124,7 @@ export class FeatureFlagsService {
       changedAt: new Date(),
       cacheVersion: 0
     };
+    this.mutationGeneration += 1;
     const previousValue = flag.value;
     flag.value = input.value;
     flag.reason = input.reason;

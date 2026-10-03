@@ -13,6 +13,7 @@ import { QueuesModule } from "../modules/common/queues/queues.module";
 import { RedisModule } from "../modules/common/redis/redis.module";
 import { ConsentModule } from "../modules/consent/consent.module";
 import { AdminConsentTextsController } from "../modules/consent/admin-consent-texts.controller";
+import { AdminConsentRecordsController } from "../modules/consent/admin-consent-records.controller";
 import { ContactMessagesModule } from "../modules/contact-messages/contact-messages.module";
 import { MemoryContactMessagesRepository, PrismaContactMessagesRepository } from "../modules/contact-messages/contact-messages.repository";
 import { DataRetentionModule } from "../modules/data-retention/data-retention.module";
@@ -231,6 +232,13 @@ export class AssurMatchRuntime {
     countryName: async (countryId: string) => (await this.countries.service.require(countryId).catch(() => undefined))?.name,
     productName: async (productId: string) => (await this.products.service.require(productId).catch(() => undefined))?.name,
     countryExists: async (countryId: string) => Boolean(await this.countries.service.require(countryId).catch(() => undefined))
+  });
+  /** Spec 059 follow-up: compliance consent-proof search (quote requests resolved lazily, built later). */
+  readonly consentRecords = new AdminConsentRecordsController(this.consent.service, {
+    quoteConsentIds: async (publicReference: string): Promise<string[] | undefined> => {
+      const quote = await this.quoteRequests.submissions.findByPublicReference(publicReference);
+      return quote ? [quote.consentRecordId, quote.surveyConsentRecordId].filter((id): id is string => Boolean(id)) : undefined;
+    }
   });
   private readonly messagingRepository = this.runtimeRepository(new PrismaMessagingRepository(this.prisma)) ?? new MemoryMessagingRepository();
   readonly notifications = new NotificationsModule(this.audit.writer, this.queues.notifications, this.notificationsRepository, {
@@ -858,16 +866,9 @@ readonly enterprise = new EnterpriseService({
         const partner = await this.partners.service.require(partnerTenantId).catch(() => undefined);
         return (partner as { tradeName?: string } | undefined)?.tradeName ?? partner?.legalName;
       },
-      resolvePopularity: async (offerIds) => {
-        const wanted = new Set(offerIds);
-        const counts = new Map<string, number>();
-        for (const quote of await this.quoteRequests.submissions.list()) {
-          // Spec 052: an ignored (forged, expired, other scope) selection never counts as popularity.
-          if (quote.selectedOfferOutcome === "ignored") continue;
-          if (quote.selectedOfferId && wanted.has(quote.selectedOfferId)) counts.set(quote.selectedOfferId, (counts.get(quote.selectedOfferId) ?? 0) + 1);
-        }
-        return counts;
-      },
+      // Spec 052: an ignored (forged, expired, other scope) selection never counts as popularity.
+      // Spec 059 follow-up: counted in the database instead of loading every quote request.
+      resolvePopularity: (offerIds) => this.quoteRequests.submissions.countSelectedOffers(offerIds),
       resolveScoringWeights: (countryId, productId) => this.scoringRules.resolveWeights(countryId, productId)
     };
   }

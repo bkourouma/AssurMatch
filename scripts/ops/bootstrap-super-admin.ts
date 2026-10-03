@@ -57,7 +57,7 @@ try {
     users: runtime.users.service,
     passwordReset: runtime.auth.passwordReset,
     audit: runtime.audit.writer,
-    deliverActivation: (user, token) => runtime.auth.userNotifications.deliverActivation(user, token),
+    deliverActivation: (user, token, expiresAt) => runtime.auth.userNotifications.deliverActivation(user, token, expiresAt),
     appEnv
   }, {
     email: values.email,

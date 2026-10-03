@@ -16,15 +16,31 @@ export function isBrokerAccount(user: Pick<UserAccount, "partnerTenantId" | "rol
   return Boolean(user.partnerTenantId) || user.roles.some((role) => role.startsWith("broker_"));
 }
 
+/**
+ * Spec 059 follow-up: the validity announced in the e-mail is computed from the token's real expiry
+ * (`AUTH_ACTION_TOKEN_TTL_MINUTES` for invitations and resets, `--ttl-minutes` for the bootstrap
+ * command), never a hard-coded duration. Rounded down to the minute so it never over-promises.
+ */
+export function formatTokenValidity(expiresAt: Date, now: Date = new Date()): string {
+  const minutes = Math.max(1, Math.floor((expiresAt.getTime() - now.getTime()) / 60_000));
+  if (minutes < 60) return `${minutes} minute${minutes > 1 ? "s" : ""}`;
+  const days = minutes / 1440;
+  if (Number.isInteger(days)) return `${days} jour${days > 1 ? "s" : ""}`;
+  const hours = Math.floor(minutes / 60);
+  const rest = minutes % 60;
+  const hoursLabel = `${hours} heure${hours > 1 ? "s" : ""}`;
+  return rest === 0 ? hoursLabel : `${hoursLabel} ${String(rest).padStart(2, "0")}`;
+}
+
 export class AuthEmailTemplateService {
   constructor(private readonly options: TemplateOptions = {}) {}
 
-  activation(user: UserAccount, token: string): AuthEmailPayload {
-    return this.render(user, token, "auth_activation", "Activation de votre acces AssurMatch", "activer votre acces", "/activate");
+  activation(user: UserAccount, token: string, expiresAt: Date, now: Date = new Date()): AuthEmailPayload {
+    return this.render(user, token, "auth_activation", "Activation de votre acces AssurMatch", "activer votre acces", "/activate", formatTokenValidity(expiresAt, now));
   }
 
-  passwordReset(user: UserAccount, token: string): AuthEmailPayload {
-    return this.render(user, token, "auth_password_reset", "Reinitialisation de votre mot de passe AssurMatch", "reinitialiser votre mot de passe", "/password-reset");
+  passwordReset(user: UserAccount, token: string, expiresAt: Date, now: Date = new Date()): AuthEmailPayload {
+    return this.render(user, token, "auth_password_reset", "Reinitialisation de votre mot de passe AssurMatch", "reinitialiser votre mot de passe", "/password-reset", formatTokenValidity(expiresAt, now));
   }
 
   private render(
@@ -33,7 +49,8 @@ export class AuthEmailTemplateService {
     purpose: EmailPurpose,
     subject: string,
     actionLabel: string,
-    path: string
+    path: string,
+    validity: string
   ): AuthEmailPayload {
     const link = this.link(user, path, token);
     const lines = [
@@ -43,7 +60,7 @@ export class AuthEmailTemplateService {
       `Utilisez ce lien pour ${actionLabel}: ${link}`,
       `Jeton temporaire: ${token}`,
       "",
-      "Ce jeton expire dans 30 minutes.",
+      `Ce lien et ce jeton expirent dans ${validity}.`,
       "AssurMatch est une plateforme technique de mise en relation et de comparaison indicative.",
       "Ignorez ce message si vous n'etes pas a l'origine de cette demande."
     ];
@@ -60,7 +77,7 @@ export class AuthEmailTemplateService {
         "<p>Une action de securite a ete initiee pour votre compte AssurMatch.</p>",
         `<p><a href="${escapeHtml(link)}">Continuer</a></p>`,
         `<p>Jeton temporaire: <strong>${escapeHtml(token)}</strong></p>`,
-        "<p>Ce jeton expire dans 30 minutes.</p>",
+        `<p>Ce lien et ce jeton expirent dans ${escapeHtml(validity)}.</p>`,
         "<p>AssurMatch est une plateforme technique de mise en relation et de comparaison indicative.</p>",
         "<p>Ignorez ce message si vous n'etes pas a l'origine de cette demande.</p>",
         "</body>",

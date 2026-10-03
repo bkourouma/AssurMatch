@@ -471,6 +471,11 @@ export class QuoteSubmissionService {
     return this.repository.findByPublicReference(publicReference);
   }
 
+  /** Spec 052 COMP-003 popularity, counted by the repository (see `countSelectedOffers`). */
+  countSelectedOffers(offerIds: string[]): Promise<Map<string, number>> {
+    return this.repository.countSelectedOffers(offerIds);
+  }
+
   /**
    * Spec 056: the admin approved a request held for manual review; the deterministic routing engine
    * runs exactly as it would have at submission (rules, eligibility, multi-broker consent), and its

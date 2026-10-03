@@ -8,6 +8,11 @@ export const PROSPECTS_REPOSITORY = Symbol("PROSPECTS_REPOSITORY");
 
 export interface ProspectsRepository extends RuntimeRepository {
   createOrLink(countryId: string, productId: string, contact: NormalizedProspectContact, consentRecordId: string): Promise<ProspectRecord>;
+  /**
+   * Same as `createOrLink`, and tells whether the prospect was created. Spec 059 follow-up: the
+   * service used to list every prospect twice to find out, which made each quote submission O(n).
+   */
+  createOrLinkWithOutcome(countryId: string, productId: string, contact: NormalizedProspectContact, consentRecordId: string): Promise<{ prospect: ProspectRecord; created: boolean }>;
   list(): Promise<ProspectRecord[]>;
   require(id: string): Promise<ProspectRecord>;
 }
@@ -21,6 +26,10 @@ export class MemoryProspectsRepository implements ProspectsRepository {
   }
 
   async createOrLink(countryId: string, productId: string, contact: NormalizedProspectContact, consentRecordId: string): Promise<ProspectRecord> {
+    return (await this.createOrLinkWithOutcome(countryId, productId, contact, consentRecordId)).prospect;
+  }
+
+  async createOrLinkWithOutcome(countryId: string, productId: string, contact: NormalizedProspectContact, consentRecordId: string): Promise<{ prospect: ProspectRecord; created: boolean }> {
     const existing = this.prospects.find((prospect) =>
       prospect.countryId === countryId &&
       prospect.productId === productId &&
@@ -29,7 +38,7 @@ export class MemoryProspectsRepository implements ProspectsRepository {
     if (existing) {
       if (!existing.consentRecordIds.includes(consentRecordId)) existing.consentRecordIds.push(consentRecordId);
       existing.updatedAt = new Date();
-      return existing;
+      return { prospect: existing, created: false };
     }
     const now = new Date();
     const prospect: ProspectRecord = {
@@ -43,7 +52,7 @@ export class MemoryProspectsRepository implements ProspectsRepository {
       updatedAt: now
     };
     this.prospects.push(prospect);
-    return prospect;
+    return { prospect, created: true };
   }
 
   async list(): Promise<ProspectRecord[]> {
@@ -71,6 +80,10 @@ export class PrismaProspectsRepository implements ProspectsRepository {
   constructor(private readonly prisma: PrismaService) {}
 
   async createOrLink(countryId: string, productId: string, contact: NormalizedProspectContact, consentRecordId: string): Promise<ProspectRecord> {
+    return (await this.createOrLinkWithOutcome(countryId, productId, contact, consentRecordId)).prospect;
+  }
+
+  async createOrLinkWithOutcome(countryId: string, productId: string, contact: NormalizedProspectContact, consentRecordId: string): Promise<{ prospect: ProspectRecord; created: boolean }> {
     const existing = await this.client().findFirst({
       where: {
         countryId,
@@ -84,10 +97,10 @@ export class PrismaProspectsRepository implements ProspectsRepository {
     if (existing) {
       const current = existing as ProspectRecord;
       const consentRecordIds = current.consentRecordIds.includes(consentRecordId) ? current.consentRecordIds : [...current.consentRecordIds, consentRecordId];
-      return this.toDomain(await this.client().update({ where: { id: current.id }, data: { consentRecordIds, updatedAt: new Date() } }));
+      return { prospect: this.toDomain(await this.client().update({ where: { id: current.id }, data: { consentRecordIds, updatedAt: new Date() } })), created: false };
     }
     const now = new Date();
-    return this.toDomain(await this.client().create({
+    const created = this.toDomain(await this.client().create({
       data: {
         id: crypto.randomUUID(),
         countryId,
@@ -103,6 +116,7 @@ export class PrismaProspectsRepository implements ProspectsRepository {
         updatedAt: now
       }
     }));
+    return { prospect: created, created: true };
   }
 
   async list(): Promise<ProspectRecord[]> {

@@ -10,11 +10,17 @@
   - Web Publique Client : formulaire de candidature, durée du cache catalogue paramétrable ;
   - Back-office Plateforme : statut produit ;
   - Back-office Courtier : redirections relatives, libellé du nom du contact.
-- **Aucun** changement de schéma ni migration. **Aucune** activation de flag sensible. Les parcours visiteur et back-office restent dans des contextes navigateur séparés.
+- Passe de clôture (G1 à G7 ci-dessous) :
+  - Backend API : clôture Starter, recherche des preuves de consentement, durée réelle des jetons dans les e-mails, graphe de statuts pays partagé, relecture périodique des flags, commande `ops:apply-flag-policy`, débit de la soumission de devis ;
+  - Back-office Plateforme : page `/compliance/consent-records`, formulaire de statut pays ;
+  - Back-office Courtier : bouton « Clôturer » ;
+  - shared packages : contrats de clôture, de recherche des preuves et graphe de statuts ;
+  - base de données : migration `0029_query_performance_indexes` (index seulement, aucune donnée modifiée).
+- La pile e2e active deux flags sensibles (enquête, facturation) par le chemin de conformité audité, jamais par l'interface. Les parcours visiteur et back-office restent dans des contextes navigateur séparés.
 
 ## Architecture
 1. `scripts/e2e/e2e-env.mjs` : ports, URL, environnement de l'API et du worker, arguments de build des frontends et variables Playwright. Cette source unique est relue par la pile, l'orchestrateur et Playwright.
-2. `scripts/e2e/e2e-stack.mjs` (`npm run test:e2e:stack`) : démontage → build des images → infra (PostgreSQL vide, Redis, Mailpit) → `migrate deploy` → seed de référence → premier Super Admin (spec 057, e-mail) → API, worker et trois apps → attente des sondes → Playwright → collecte des logs → démontage.
+2. `scripts/e2e/e2e-stack.mjs` (`npm run test:e2e:stack`) : démontage → build des images → infra (PostgreSQL vide, Redis, Mailpit) → `migrate deploy` → seed de référence → premier Super Admin (spec 057, e-mail) → politiques de conformité SC-08 (`satisfaction_survey_enabled`, `billing_enabled` par `scripts/ops/apply-flag-policy.ts`) → API, worker et trois apps → attente des sondes → Playwright → collecte des logs → démontage.
    - Options : `--apps=docker|host`, `--keep`, `--up-only`, `--down`, `--no-build`, `--dry-run` ; les arguments après `--` vont à Playwright.
 3. `playwright.e2e.config.ts` :
    - un seul worker ;
@@ -28,7 +34,9 @@
 5. Spécifications :
    - `scenario-core.spec.ts` : SC-01a/b, SC-02a/b, SC-03, SC-04a/b, SC-01c (ouverture publique, qui exige courtier et offre), SC-05, SC-06, SC-07 ;
    - `forbidden-cases.spec.ts` : SC-09a pays fermé, SC-09b désactivation immédiate, SC-09c absence de consentement, SC-09d isolation entre courtiers et quarantaine EICAR, SC-09e courtier suspendu en lecture seule ;
-   - `visitor-tracking.spec.ts` : lien magique et jeton altéré, renvoi depuis `/suivi` avec réponse neutre, page d'avis sans lien valide.
+   - `visitor-tracking.spec.ts` : lien magique et jeton altéré, renvoi depuis `/suivi` avec réponse neutre, page d'avis sans lien valide ;
+   - `scenario-core.spec.ts` SC-08 : clôture Starter « gagné », e-mail « clôturée », enquête envoyée par le worker et remplie sur `/avis`, tarif, brouillon, facture numérotée, paiement constaté, facture « réglée » côté courtier ;
+   - `ops-health.spec.ts` (projet `ops`) : SC-10 automatisable, `/healthz`, `/readyz` (base et Redis) et battement de cœur du worker.
 6. Garde-fou FR-005 : voir research R7.
 7. Charge FR-006 : `npm run test:load` (research R8).
 
@@ -46,13 +54,22 @@ L'ouverture publique d'un pays exige un courtier actif licencié et une offre pu
 | D6 | Fiche lead du courtier : la clé brute `displayName` était affichée comme libellé. | Libellé « Nom ». |
 | D7 | Le contexte de build Docker embarquait `apps/*/.next`, les `node_modules` imbriqués, `.claude/` (plusieurs Go) et `.local/`. Le disque s'est saturé au premier build. | `.dockerignore` complété. |
 
-## Constats hors périmètre (documentés, non corrigés)
-- L'e-mail d'activation annonce toujours « expire dans 30 minutes », quelle que soit la durée réelle : 120 minutes pour le bootstrap avec `--ttl-minutes 120`.
-- Un courtier Starter ne peut pas clôturer un lead (gagné ou perdu) par HTTP (`BrokerStarterController.close` non câblé). SC-08 (enquête de satisfaction à la clôture) n'est donc atteignable qu'en Pro. De plus, `satisfaction_survey_enabled` est un flag sensible, sans bascule dans l'interface. SC-08 n'est pas automatisé.
-- La recherche des preuves de consentement (`AdminConsentRecordsController.search`) n'a pas de route.
-- Le formulaire de statut pays propose des transitions refusées par l'API (par exemple brouillon → pilote).
-- L'en-tête du portail courtier affiche l'identifiant de l'utilisateur au lieu de son nom.
-- Charge : la soumission de devis plafonne à environ 20 req/s avec un seul processus API (environ 65 ms CPU par demande) sur 4 vCPU partagés. L'objectif M-03 (50 req/s, p95 < 800 ms) n'est atteint que pour le catalogue.
+## Constats de la première passe : tous traités (passe de clôture du 2026-10-03)
+| # | Constat | Traitement |
+|---|---|---|
+| G1 | E-mail d'activation : « expire dans 30 minutes » en dur (120 min réelles au bootstrap). | Le texte est calculé depuis l'expiration réelle du jeton (`formatTokenValidity`) : `--ttl-minutes` du bootstrap, `AUTH_ACTION_TOKEN_TTL_MINUTES` (30 par défaut) pour les invitations et réinitialisations. |
+| G2 | Un courtier Starter ne pouvait pas clôturer un lead ; SC-08 inatteignable en Starter. | `POST /broker/starter/leads/:id/close` (`brokerWriteActor`, `BROKER_TENANT_WRITE_GUARDED`), issue `gagne` / `perdu` / `sans_suite`, 409 `LEAD_NOT_ACCEPTED` / `LEAD_CLOSED`, historique et audit ; publie `lead.status_changed` (statut `closed`) : e-mail visiteur « clôturée » (054) et enquête (048). Bouton « Clôturer » sur la fiche lead Starter. |
+| G3 | Recherche des preuves de consentement sans route. | `POST /admin/consent-records/search` (POST : l'e-mail n'apparaît dans aucune URL), compliance_admin / super_admin avec MFA, au moins un critère (référence `QR-`, e-mail empreinté côté serveur, pays), empreinte du sujet tronquée, recherches et refus audités sans les valeurs ; page `/compliance/consent-records`. Retiré d'`INTERNAL_ONLY`. |
+| G4 | Le formulaire de statut pays proposait des transitions refusées (brouillon → pilote). | Graphe unique `packages/shared/contracts/country-status-transitions.ts`, appliqué par l'API et seul proposé par le formulaire. |
+| G5 | `satisfaction_survey_enabled` sans chemin opérable ; l'API ne relisait jamais les flags. | Commande auditée `npm run ops:apply-flag-policy` (référence, approbateur, motif ; modules réglementés refusés) ; l'API relit les flags toutes les `ASSURMATCH_FEATURE_FLAG_REFRESH_SECONDS` (30 s ; une lecture concurrente d'un changement local est ignorée). |
+| G6 | Débit de `POST /quote-requests` ≈ 20-24 req/s. | Voir research R10 : 23 → 50 req/s, p95 45 s → 120 ms sur la pile Docker (826 ms juste après un redémarrage à froid). |
+| G7 | La checklist d'activation bloquait sur `billing_enabled`, alors que la spec 060 et la décision D-8 font de la facturation manuelle une composante du lancement : une fois la CI facturée, le Sénégal n'aurait plus pu ouvrir. | `billing_enabled` retiré des contrôles bloquants (décision consignée ci-dessous) ; `payments_enabled` reste bloquant. |
+
+### Décisions prises pendant la passe de clôture (cohérentes avec le PRD v0.3 et la constitution)
+- **Clôture Starter** : fait partie du cycle de vie minimal (accepter, rejeter, contester, clôturer) de la constitution 1.3.0, critère n°1 ; aucun pipeline n'est exposé. L'issue commerciale n'est jamais communiquée au visiteur (e-mail « demande clôturée » générique). Une clôture `sans_suite` déclenche aussi l'enquête, comme `closed`.
+- **`billing_enabled` hors checklist bloquante** : D-8 (facturation manuelle au lancement) et la checklist de mise en production 4.7 l'activent ; seul le paiement en ligne reste interdit.
+- **Délai de l'enquête** : 24 h en production (spec 048) ; `ASSURMATCH_SATISFACTION_SURVEY_DELAY_MINUTES` le réduit à 0 dans la pile e2e uniquement.
+- **Routage synchrone conservé** : le débit cible est atteint sans déplacer le routage dans le worker ; la confirmation continue de nommer le courtier retenu (spec 052 R8, spec 054).
 
 ## Validation
-`npm run typecheck`, `npm run lint`, `npm run test` (vitest complet, garde-fou compris), `npm run test:web` (marqueurs source), `node scripts/ci/secret-scan.mjs`, `npm run test:e2e:stack` (modes docker et host), `npm run test:load`.
+`npm run typecheck`, `npm run lint`, `npm run test` (vitest complet, garde-fou compris), `npm run test:web` (marqueurs source), `node scripts/ci/secret-scan.mjs`, `next build` des trois apps, `npm run test:e2e:stack` (modes docker et host), `npm run test:load`.

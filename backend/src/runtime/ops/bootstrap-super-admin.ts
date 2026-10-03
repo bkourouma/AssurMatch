@@ -36,7 +36,7 @@ export interface BootstrapSuperAdminDependencies {
   users: Pick<UsersService, "list" | "findByEmail" | "create" | "setPasswordResetToken">;
   passwordReset: Pick<PasswordResetService, "issueToken">;
   audit: Pick<AuditLogWriter, "writeAsync">;
-  deliverActivation?: (user: UserAccount, token: string) => Promise<AuthTokenDeliveryResult>;
+  deliverActivation?: (user: UserAccount, token: string, expiresAt: Date) => Promise<AuthTokenDeliveryResult>;
   appEnv: string;
   now?: () => Date;
 }
@@ -93,7 +93,7 @@ export async function bootstrapSuperAdmin(deps: BootstrapSuperAdminDependencies,
   let showToken = true;
   if (input.delivery === "email") {
     if (!deps.deliverActivation) throw new Error("E-mail delivery requested but no sender is wired");
-    const delivery = await deps.deliverActivation(user, issued.token);
+    const delivery = await deps.deliverActivation(user, issued.token, expiresAt);
     emailStatus = delivery.emailStatus;
     showToken = delivery.emailStatus !== "sent";
   }

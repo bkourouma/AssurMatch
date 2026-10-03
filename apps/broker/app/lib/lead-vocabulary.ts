@@ -40,6 +40,7 @@ export const STARTER_EVENT_LABELS: Record<string, string> = {
   accepted: "Lead accepte par le courtier",
   rejected: "Lead rejete avec motif",
   disputed: "Lead conteste avec motif",
+  closed: "Lead cloture par le courtier",
   notification_read: "Notification lue",
   exported: "Lead exporte",
   blocked: "Action bloquee",
@@ -51,6 +52,31 @@ export const STARTER_EVENT_LABELS: Record<string, string> = {
 
 /** Statuts terminaux Starter: plus aucune action courtier n'est possible. */
 export const STARTER_FINAL_STATUSES = ["closed"] as const;
+
+/**
+ * Spec 059 (suite): issue de la cloture d'un lead accepte, comme `brokerStarterCloseOutcomeSchema`.
+ * La cloture fait partie du cycle de vie minimal Starter (constitution 1.3.0) ; elle informe le
+ * visiteur (e-mail "demande cloturee") sans rien dire de l'issue commerciale.
+ */
+export const STARTER_CLOSE_OUTCOMES = ["gagne", "perdu", "sans_suite"] as const;
+export type StarterCloseOutcome = (typeof STARTER_CLOSE_OUTCOMES)[number];
+
+export const STARTER_CLOSE_OUTCOME_LABELS: Record<StarterCloseOutcome, string> = {
+  gagne: "Gagne",
+  perdu: "Perdu",
+  sans_suite: "Sans suite"
+};
+
+/** Statuts Starter a partir desquels le courtier peut cloturer: le lead doit avoir ete accepte. */
+export const STARTER_CLOSABLE_STATUSES = ["accepted", "received", "contacted"] as const;
+
+export function isStarterCloseOutcome(value: string): value is StarterCloseOutcome {
+  return (STARTER_CLOSE_OUTCOMES as readonly string[]).includes(value);
+}
+
+export function starterCloseOutcomeLabel(value: string | undefined): string {
+  return value && isStarterCloseOutcome(value) ? STARTER_CLOSE_OUTCOME_LABELS[value] : value ?? "";
+}
 
 export const CRM_PIPELINE_STATUSES = [
   "nouveau",

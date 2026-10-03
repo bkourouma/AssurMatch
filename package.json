@@ -31,6 +31,7 @@
     "local:seed:broker-demo:crm-off": "node --import tsx scripts/local-app/seed-broker-demo.ts --apply --crm-off",
     "ops:import:partners": "node --import tsx scripts/import-partners.ts",
     "ops:bootstrap-super-admin": "node --import tsx scripts/ops/bootstrap-super-admin.ts",
+    "ops:apply-flag-policy": "node --import tsx scripts/ops/apply-flag-policy.ts",
     "worker:run": "node --import tsx scripts/worker/assurmatch-worker.ts",
     "test:web:local": "node scripts/local-app/local-browser-smoke.mjs",
     "test:web": "playwright test",

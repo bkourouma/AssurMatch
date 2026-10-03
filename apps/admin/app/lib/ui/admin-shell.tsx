@@ -47,7 +47,9 @@ export const adminNavigation: NavGroup[] = [
           // Spec 046: retention policies, anonymization batches and erasure requests.
           { label: "Conservation des donnees", href: "/compliance/retention" },
           // Spec 056 (H-05): audit-log search and restricted export.
-          { label: "Journaux d'audit", href: "/compliance/audit-logs" }
+          { label: "Journaux d'audit", href: "/compliance/audit-logs" },
+          // Spec 059 follow-up: consent-proof search (compliance_admin, super_admin).
+          { label: "Preuves de consentement", href: "/compliance/consent-records" }
         ]
       }
     ]
