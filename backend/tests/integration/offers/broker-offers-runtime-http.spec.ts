@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from "vitest";
-import type { BrokerOfferView } from "../../../../packages/shared/contracts/offer-content";
+import type { BrokerOfferCoverageItem, BrokerOfferView } from "../../../../packages/shared/contracts/offer-content";
 import type { ActorContext } from "../../../src/modules/common/types";
 import { OfferAuditActions } from "../../../src/modules/offers/offer-lifecycle.service";
 import { actorHeaders, createRuntimeHttpHarness, readJson, seedPublicRuntime, seedWaitlistCountry, type RuntimeHttpHarness } from "../runtime-http-test-utils";
@@ -96,6 +96,47 @@ describe("spec 052 broker offers runtime HTTP", () => {
     expect((await publicNames(harness)).map((item) => item.name)).not.toContain("Auto Courtier");
     expect(harness.runtime.audit.writer.search({ action: OfferAuditActions.actionRefused }).map((entry) => entry.reason)).toEqual(expect.arrayContaining(["scope_not_covered", "offer_incomplete"]));
     expect(harness.runtime.audit.writer.search({ action: OfferAuditActions.accessRefused }).map((entry) => entry.reason)).toContain("sponsorship_admin_only");
+  });
+
+  it("lists the licensed and authorised coverage, non-public countries included, as the create check sees it", async () => {
+    harness = await createRuntimeHttpHarness();
+    const seed = await seedPublicRuntime(harness.runtime);
+    const waitlist = await seedWaitlistCountry(harness.runtime);
+    const health = await harness.runtime.products.service.create({ key: "sante", name: "Assurance sante" }, superAdmin);
+    // Senegal is internal (not public): authorised and licensed for auto only. Sante is authorised
+    // but outside every licence, so it must stay out of the list and be refused on create.
+    await harness.runtime.partners.service.authorizeCountry(seed.partner.id, waitlist.country.id, superAdmin);
+    await harness.runtime.partners.service.authorizeProduct(seed.partner.id, health.id, superAdmin);
+    await harness.runtime.partnerLicenses.service.create({
+      partnerTenantId: seed.partner.id,
+      licenseNumber: "LIC-SN",
+      issuingAuthority: "Regulator",
+      countryId: waitlist.country.id,
+      productIds: [seed.product.id],
+      status: "valid",
+      effectiveDate: "2026-01-01",
+      expirationDate: "2030-01-01"
+    }, superAdmin);
+    const other = await harness.runtime.partners.service.create({ legalName: "Autre Courtier", primaryEmail: "autre@broker.example", primaryWhatsApp: "+2250102030406", status: "active", quotaMonthlyLeads: 10 }, superAdmin);
+
+    const expected = [
+      { countryId: seed.country.id, countryIsoCode: "CI", countryName: "Cote d'Ivoire", productId: seed.product.id, productKey: seed.product.key, productName: seed.product.name },
+      { countryId: waitlist.country.id, countryIsoCode: "SN", countryName: "Senegal", productId: seed.product.id, productKey: seed.product.key, productName: seed.product.name }
+    ];
+    for (const role of ["broker_owner_pro", "broker_agent"] as const) {
+      const response = await call(harness, broker(seed.partner.id, role), "GET", "/broker/offers/coverage");
+      expect(response.status, role).toBe(200);
+      expect(await readJson<BrokerOfferCoverageItem[]>(response), role).toEqual(expected);
+    }
+    expect(await readJson<BrokerOfferCoverageItem[]>(await call(harness, broker(other.id), "GET", "/broker/offers/coverage"))).toEqual([]);
+    expect((await call(harness, compliance, "GET", "/broker/offers/coverage")).status).toBe(403);
+
+    const owner = broker(seed.partner.id);
+    const nonPublic = await call(harness, owner, "POST", "/broker/offers", completeContent(seed, { countryId: waitlist.country.id }));
+    expect(nonPublic.status).toBe(201);
+    const unlicensed = await call(harness, owner, "POST", "/broker/offers", completeContent(seed, { productId: health.id }));
+    expect(unlicensed.status).toBe(422);
+    expect(await unlicensed.json()).toMatchObject({ code: "OFFER_SCOPE_NOT_COVERED", blockers: [{ code: "license_not_valid_for_scope" }] });
   });
 
   it("lets agents and read-only users read only, hides other partners' offers and keeps a suspended partner read-only", async () => {

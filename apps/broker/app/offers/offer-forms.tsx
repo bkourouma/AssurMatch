@@ -283,12 +283,12 @@ export function CreateBrokerOfferForm({ scopes }: { scopes: ScopeChoice[] }) {
         <OfferActionResult state={state} />
         <FormSection
           legend="Périmètre"
-          description="Seuls les pays et produits couverts à la fois par une licence valide et par des autorisations actives de votre cabinet sont acceptés. Un périmètre non couvert est refusé avec le motif."
+          description="La liste reprend les pays et produits couverts à la fois par une licence valide et par des autorisations actives de votre cabinet, y compris les pays pas encore ouverts au public."
         >
-          <Field id={`${base}-scope`} label="Pays et produit" required>
-            <Select {...fieldControlProps(`${base}-scope`, { required: true })} name="scope" options={scopes} placeholder="Choisir un pays et un produit" defaultValue="" />
+          <Field id={`${base}-scope`} label="Pays — Produit" required>
+            <Select {...fieldControlProps(`${base}-scope`, { required: true })} name="scope" options={scopes} placeholder="Choisir un pays et un produit couverts" defaultValue="" />
           </Field>
-          {scopes.length === 0 ? <Notice tone="warning">Aucun pays ni produit ouvert n&apos;est disponible pour le moment. Contactez AssurMatch.</Notice> : null}
+          {scopes.length === 0 ? <Notice tone="warning">Aucune couverture licenciée : contactez AssurMatch pour compléter votre dossier.</Notice> : null}
         </FormSection>
         <CompletenessChecklist completeness={completeness} />
         <OfferContentFields base={base} content={undefined} onChange={recompute} />

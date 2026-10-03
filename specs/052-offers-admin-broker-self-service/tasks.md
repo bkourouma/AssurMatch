@@ -26,5 +26,5 @@ description: "Task list for 052 — Offres"
 - [x] T012 [US4] Public : `offerId` transmis au formulaire, nom du courtier dans l'en-tête, message de confirmation selon `selectedOfferPartnerRetained` (FR et EN) ; tests de marqueurs.
 
 ## Phase 4: Validations
-- [ ] T013 Validations finales : `prisma generate` et `validate`, typecheck, lint, `npm run test`, `npm run test:web`, scan de secrets, builds Next.
-- [ ] T014 Carte de couverture et tâches cochées.
+- [x] T013 Validations finales : `prisma generate` et `validate`, typecheck, lint, `npm run test`, `npm run test:web`, scan de secrets, builds Next.
+- [x] T014 Carte de couverture et tâches cochées.

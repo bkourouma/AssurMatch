@@ -415,6 +415,11 @@ export class BrokerOffersController {
     return this.runtime.offers.brokerService.list(query, protectedActorFromRequest(request));
   }
 
+  /** Country x product pairs the partner may create an offer for (licence + authorisations). */
+  coverage(request: AssurMatchHttpRequest) {
+    return this.runtime.offers.brokerService.coverage(protectedActorFromRequest(request));
+  }
+
   detail(id: string, request: AssurMatchHttpRequest) {
     return this.runtime.offers.brokerService.detail(parseParam("id", id, uuidSchema), protectedActorFromRequest(request));
   }
@@ -1872,6 +1877,7 @@ decorate(AdminOffersHttpController, "reject", [Post("offers/:id/reject") as Meth
 decorate(AdminOffersHttpController, "suspend", [Post("offers/:id/suspend") as MethodDecoratorFactory], [[0, Param("id") as ParamDecoratorFactory], [1, Req() as ParamDecoratorFactory], [2, Body() as ParamDecoratorFactory]]);
 controller("broker/offers", BrokerOffersController, true);
 decorate(BrokerOffersController, "list", [Get() as MethodDecoratorFactory], [[0, Req() as ParamDecoratorFactory], [1, Query() as ParamDecoratorFactory]]);
+decorate(BrokerOffersController, "coverage", [Get("coverage") as MethodDecoratorFactory], [[0, Req() as ParamDecoratorFactory]]);
 decorate(BrokerOffersController, "detail", [Get(":id") as MethodDecoratorFactory], [[0, Param("id") as ParamDecoratorFactory], [1, Req() as ParamDecoratorFactory]]);
 decorate(BrokerOffersController, "create", [Post() as MethodDecoratorFactory], [[0, Body() as ParamDecoratorFactory], [1, Req() as ParamDecoratorFactory]]);
 decorate(BrokerOffersController, "update", [Patch(":id") as MethodDecoratorFactory], [[0, Param("id") as ParamDecoratorFactory], [1, Body() as ParamDecoratorFactory], [2, Req() as ParamDecoratorFactory]]);

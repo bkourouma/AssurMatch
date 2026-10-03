@@ -6,6 +6,7 @@ import {
   offerRenewSchema,
   offerSubmitSchema,
   offerWithdrawSchema,
+  type BrokerOfferCoverageItem,
   type BrokerOfferView,
   type OfferVersionView
 } from "../../../../packages/shared/contracts/offer-content";
@@ -65,6 +66,22 @@ export class BrokerOffersService {
       views.push(toBrokerOfferView(offer, versions, { suspensionReason: await this.lifecycle.suspensionReason(offer) }, now));
     }
     return views.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)).map(brokerSafe);
+  }
+
+  /**
+   * Country x product pairs the broker's partner may create an offer for. Every candidate goes
+   * through the same `coverage` check as the writes (FR-007), so a listed pair is always writable.
+   */
+  async coverage(actor: ActorContext): Promise<BrokerOfferCoverageItem[]> {
+    const partnerTenantId = this.requireBroker(actor, "broker_offers:read", "coverage");
+    const candidates = await this.lifecycle.integrations.coverageCandidates?.(partnerTenantId) ?? [];
+    const check = this.lifecycle.integrations.coverage;
+    if (!check) return [];
+    const covered: BrokerOfferCoverageItem[] = [];
+    for (const candidate of candidates) {
+      if (!(await check(partnerTenantId, candidate.countryId, candidate.productId)).length) covered.push(candidate);
+    }
+    return covered.sort((a, b) => a.countryName.localeCompare(b.countryName, "fr") || a.productName.localeCompare(b.productName, "fr"));
   }
 
   async detail(id: string, actor: ActorContext): Promise<BrokerOfferView> {

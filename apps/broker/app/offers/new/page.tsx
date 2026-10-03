@@ -7,8 +7,8 @@ import { CreateBrokerOfferForm } from "../offer-forms";
 
 /**
  * Spec 052 US1: creation of an offer (owner and managers). The country x product choices come from
- * the open public catalogue; the API refuses a scope the broker's licence and authorisations do not
- * cover (422 OFFER_SCOPE_NOT_COVERED, shown with its reason).
+ * the broker coverage (`GET /broker/offers/coverage`: licence + active authorisations, non-public
+ * countries included); the API re-runs the same check on create (422 OFFER_SCOPE_NOT_COVERED).
  */
 const BREADCRUMB = [{ label: "Activite" }, { label: "Mes offres", href: "/offers" }, { label: "Nouvelle offre" }];
 
@@ -39,7 +39,7 @@ export default async function NewBrokerOfferPage() {
   return (
     <PageStack>
       {header}
-      <CreateBrokerOfferForm scopes={scopes.map((scope) => ({ value: `${scope.countryId}:${scope.productId}`, label: `${scope.countryLabel} · ${scope.productLabel}` }))} />
+      <CreateBrokerOfferForm scopes={scopes.map((scope) => ({ value: `${scope.countryId}:${scope.productId}`, label: `${scope.countryLabel} — ${scope.productLabel}` }))} />
     </PageStack>
   );
 }

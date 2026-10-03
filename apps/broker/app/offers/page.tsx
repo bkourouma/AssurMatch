@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import { loginRedirect, readBackOfficeSession } from "../lib/backoffice-auth";
 import { TENANT_SUSPENDED_MESSAGE, canMutateOffers, canReadOffers, isTenantReadOnly } from "../lib/broker-permissions";
-import { readBrokerOffers, readOfferScopeChoices, type BrokerOfferView, type OfferEffectiveStatus } from "../lib/offer-api";
+import { readBrokerOffers, readOfferScopeChoices, OFFER_SCOPE_OUTSIDE_COVERAGE, type BrokerOfferView, type OfferEffectiveStatus } from "../lib/offer-api";
 import { OFFER_STATUS_LABELS, OFFER_STATUS_OPTIONS, OFFER_STATUS_TONES, offerDisplayName, offerFormatDate } from "../lib/offer-messages";
 import {
   Badge,
@@ -73,7 +73,7 @@ export default async function BrokerOffersPage({
       render: (offer) => (
         <>
           <a href={`/offers/${encodeURIComponent(offer.id)}`}><strong>{offerDisplayName(offer)}</strong></a>
-          <div>{scopeLabel.get(`${offer.countryId}:${offer.productId}`) ?? "Périmètre non ouvert au public"}</div>
+          <div>{scopeLabel.get(`${offer.countryId}:${offer.productId}`) ?? OFFER_SCOPE_OUTSIDE_COVERAGE}</div>
         </>
       ),
       sortable: true,

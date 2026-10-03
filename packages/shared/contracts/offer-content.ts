@@ -314,6 +314,20 @@ export interface BrokerOfferView {
   versions?: OfferVersionView[];
 }
 
+/**
+ * Spec 052 follow-up: one country x product pair the broker may create an offer for (active country
+ * and product authorisations and an eligible licence). Non-public countries are included: the offer
+ * is the prerequisite for opening the country publicly.
+ */
+export interface BrokerOfferCoverageItem {
+  countryId: string;
+  countryIsoCode: string;
+  countryName: string;
+  productId: string;
+  productKey: string;
+  productName: string;
+}
+
 export interface AdminOfferListItem extends BrokerOfferView {
   partnerTenantId?: string;
   partnerName?: string;

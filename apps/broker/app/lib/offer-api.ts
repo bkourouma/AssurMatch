@@ -1,6 +1,7 @@
 import { backOfficeApiBaseUrl, getBackOfficeToken } from "./backoffice-auth";
 import { PARTNER_SUSPENDED_CODE } from "./broker-write";
 import type {
+  BrokerOfferCoverageItem,
   BrokerOfferView,
   OfferBlocker,
   OfferContent,
@@ -112,10 +113,10 @@ export function offerPath(offerId: string, suffix = ""): string {
 }
 
 /* ---------------------------------------------------------------------------------------------
- * Country x product choices. No broker endpoint exposes the licensed coverage: the choices come
- * from the public catalogue (countries and products open to the public) plus the scopes of the
- * broker's existing offers. The API stays the authority and answers 422 OFFER_SCOPE_NOT_COVERED
- * for a scope the broker's licence and authorisations do not cover (FR-007).
+ * Country x product choices: the broker coverage (`GET /broker/offers/coverage`), i.e. the pairs
+ * covered by an active country authorisation, an active product authorisation and a valid licence
+ * of the broker's partner, non-public countries included (an offer is what lets a country open).
+ * The API runs the same check on every write (422 OFFER_SCOPE_NOT_COVERED, FR-007).
  * ------------------------------------------------------------------------------------------- */
 
 export interface OfferScopeChoice {
@@ -125,40 +126,14 @@ export interface OfferScopeChoice {
   productLabel: string;
 }
 
-interface PublicCountry {
-  id: string;
-  isoCode: string;
-  name: string;
-}
-
-interface PublicProduct {
-  id: string;
-  key: string;
-  name: string;
-}
-
-async function readPublic<T>(path: string, fallback: T): Promise<T> {
-  try {
-    const response = await fetch(`${backOfficeApiBaseUrl()}${path}`, { cache: "no-store" });
-    if (!response.ok) return fallback;
-    return await response.json() as T;
-  } catch {
-    return fallback;
-  }
-}
+export const OFFER_SCOPE_OUTSIDE_COVERAGE = "Périmètre hors couverture licenciée";
 
 export async function readOfferScopeChoices(): Promise<OfferScopeChoice[]> {
-  const countries = await readPublic<PublicCountry[]>("/countries", []);
-  const perCountry = await Promise.all(
-    (Array.isArray(countries) ? countries : []).map(async (country) => {
-      const products = await readPublic<PublicProduct[]>(`/countries/${encodeURIComponent(country.isoCode)}/products`, []);
-      return (Array.isArray(products) ? products : []).map((product) => ({
-        countryId: country.id,
-        productId: product.id,
-        countryLabel: `${country.name} (${country.isoCode})`,
-        productLabel: product.name
-      }));
-    })
-  );
-  return perCountry.flat();
+  const result = await readOffers<BrokerOfferCoverageItem[]>("/broker/offers/coverage", []);
+  return (Array.isArray(result.data) ? result.data : []).map((item) => ({
+    countryId: item.countryId,
+    productId: item.productId,
+    countryLabel: `${item.countryName} (${item.countryIsoCode})`,
+    productLabel: item.productName
+  }));
 }

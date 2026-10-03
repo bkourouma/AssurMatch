@@ -1,6 +1,7 @@
 import {
   hasIndicativeDisclaimer,
   offerCompleteness,
+  type BrokerOfferCoverageItem,
   type OfferBlocker
 } from "../../../../packages/shared/contracts/offer-content";
 import { AuditLogWriter } from "../audit-logs/audit-log-writer.service";
@@ -44,6 +45,12 @@ export interface OfferIntegrations {
   partnerEligibility?: (partnerTenantId: string, countryId: string, productId: string) => Promise<{ eligible: boolean; reasons: string[] }>;
   /** FR-007: blocker codes when the partner's licence and authorisations do not cover the scope. */
   coverage?: (partnerTenantId: string, countryId: string, productId: string) => Promise<string[]>;
+  /**
+   * Candidate pairs for the broker coverage list (active country x active product authorisations,
+   * retired catalogue entries excluded). Each is then filtered through `coverage`, so the list and
+   * the write check cannot disagree.
+   */
+  coverageCandidates?: (partnerTenantId: string) => Promise<BrokerOfferCoverageItem[]>;
   partnerName?: (partnerTenantId: string) => Promise<string | undefined>;
   partnerStatus?: (partnerTenantId: string) => Promise<string | undefined>;
   notifier?: OfferNotifierPort;

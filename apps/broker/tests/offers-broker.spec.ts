@@ -39,12 +39,16 @@ test("the broker client calls the spec 052 broker routes only", () => {
   for (const marker of [
     "`/broker/offers${query ? `?${query}` : \"\"}`",
     "`/broker/offers/${encodeURIComponent(offerId)}`",
+    "\"/broker/offers/coverage\"",
     "suspended: response.status === 403 && code === PARTNER_SUSPENDED_CODE",
     "response.status === 404"
   ]) {
     expect(api).toContain(marker);
   }
   expect(api).not.toContain("/admin/");
+  // The create choices come from the broker coverage, never from the public catalogue.
+  expect(api).not.toContain("\"/countries\"");
+  expect(api).not.toContain("/countries/${");
   const actions = source("apps/broker/app/lib/offer-actions.ts");
   for (const marker of [
     "writeBrokerOffer(\"/broker/offers\", \"POST\"",
@@ -90,7 +94,7 @@ test("the detail keeps the published version read-only and edits the version in 
     expect(detail).toContain(marker);
   }
   const forms = source("apps/broker/app/offers/offer-forms.tsx");
-  for (const marker of ["offerCompleteness", "name=\"scope\"", "name=\"guaranteeLabel\"", "name=\"expectedUpdatedAt\" value={concurrencyToken}", "OFFER_INDICATIVE_DISCLAIMERS"]) {
+  for (const marker of ["offerCompleteness", "name=\"scope\"", "label=\"Pays — Produit\"", "Aucune couverture licenciée : contactez AssurMatch pour compléter votre dossier.", "name=\"guaranteeLabel\"", "name=\"expectedUpdatedAt\" value={concurrencyToken}", "OFFER_INDICATIVE_DISCLAIMERS"]) {
     expect(forms).toContain(marker);
   }
 });

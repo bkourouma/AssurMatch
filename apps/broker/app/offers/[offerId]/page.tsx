@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import { loginRedirect, readBackOfficeSession } from "../../lib/backoffice-auth";
 import { TENANT_SUSPENDED_MESSAGE, canMutateOffers, canReadOffers, isTenantReadOnly } from "../../lib/broker-permissions";
-import { readBrokerOffer, readOfferScopeChoices, type OfferVersionView } from "../../lib/offer-api";
+import { readBrokerOffer, readOfferScopeChoices, OFFER_SCOPE_OUTSIDE_COVERAGE, type OfferVersionView } from "../../lib/offer-api";
 import {
   OFFER_STATUS_LABELS,
   OFFER_STATUS_TONES,
@@ -125,7 +125,7 @@ export default async function BrokerOfferPage({ params, searchParams }: BrokerOf
         breadcrumb={[{ label: "Activite" }, { label: "Mes offres", href: "/offers" }, { label: offerDisplayName(offer) }]}
         kicker={offer.offerType === "partner" ? "Offre partenaire" : "Offre indicative"}
         title={offerDisplayName(offer)}
-        description={`${scope ? `${scope.countryLabel} · ${scope.productLabel}` : "Périmètre non ouvert au public"}. Offre indicative : prix à confirmer par le courtier partenaire.`}
+        description={`${scope ? `${scope.countryLabel} · ${scope.productLabel}` : OFFER_SCOPE_OUTSIDE_COVERAGE}. Offre indicative : prix à confirmer par le courtier partenaire.`}
         actions={
           <Cluster>
             <StatusBadge status={offer.status} labels={OFFER_STATUS_LABELS} tones={OFFER_STATUS_TONES} />

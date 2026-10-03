@@ -93,6 +93,7 @@ import { PrismaCrmActivityRepository } from "../modules/leads/crm-activity.repos
 import { PrismaNotificationsRepository } from "../modules/notifications/notifications.repository";
 import { DashboardsModule } from "../modules/dashboards/dashboards.module";
 import { aiSurfaceSchema } from "../../../packages/shared/contracts/ai.contracts";
+import type { BrokerOfferCoverageItem } from "../../../packages/shared/contracts/offer-content";
 import { maybeBootstrapAdmin } from "./local-bootstrap-admin";
 
 export class AssurMatchRuntime {
@@ -247,6 +248,7 @@ export class AssurMatchRuntime {
   readonly offers: OffersModule = new OffersModule(this.audit.writer, this.redis.client, this.offersRepository, {
     partnerEligibility: (partnerTenantId: string, countryId: string, productId: string) => this.publicOfferPartnerEligibility(partnerTenantId, countryId, productId),
     coverage: (partnerTenantId: string, countryId: string, productId: string) => this.offerCoverageBlockers(partnerTenantId, countryId, productId),
+    coverageCandidates: (partnerTenantId: string) => this.offerCoverageCandidates(partnerTenantId),
     partnerName: async (partnerTenantId: string) => {
       const partner = await this.partners.service.require(partnerTenantId).catch(() => undefined);
       return partner?.tradeName ?? partner?.legalName;
@@ -702,6 +704,37 @@ readonly enterprise = new EnterpriseService({
     if (!await this.partners.service.isAuthorizedForProduct(partnerTenantId, productId)) blockers.push("partner_product_not_authorized");
     if (!await this.partnerLicenses.service.eligible(partnerTenantId, countryId, productId)) blockers.push("license_not_valid_for_scope");
     return blockers;
+  }
+
+  /**
+   * Spec 052 follow-up: candidate pairs for the broker coverage list = active country authorisations
+   * x active product authorisations, whatever the country's public status (the offer is what lets a
+   * country open). Retired countries, products and country-product links are left out; the licence
+   * filter is applied by the caller through `offerCoverageBlockers`.
+   */
+  async offerCoverageCandidates(partnerTenantId: string): Promise<BrokerOfferCoverageItem[]> {
+    const active = (rows: Array<{ scopeId: string; status: string }>) => [...new Set(rows.filter((row) => row.status === "active").map((row) => row.scopeId))];
+    const countryIds = active(await this.partners.service.listAuthorizations(partnerTenantId, "country"));
+    const productIds = active(await this.partners.service.listAuthorizations(partnerTenantId, "product"));
+    const countries = (await Promise.all(countryIds.map((id) => this.countries.service.require(id).catch(() => undefined))))
+      .filter((country): country is NonNullable<typeof country> => Boolean(country) && country?.status !== "retired");
+    const products = (await Promise.all(productIds.map((id) => this.products.service.require(id).catch(() => undefined))))
+      .filter((product): product is NonNullable<typeof product> => Boolean(product) && product?.status !== "retired");
+    const items: BrokerOfferCoverageItem[] = [];
+    for (const country of countries) {
+      for (const product of products) {
+        if (this.products.service.linkFor(product, country.id)?.status === "retired") continue;
+        items.push({
+          countryId: country.id,
+          countryIsoCode: country.isoCode,
+          countryName: country.name,
+          productId: product.id,
+          productKey: product.key,
+          productName: product.name
+        });
+      }
+    }
+    return items;
   }
 
   /**
