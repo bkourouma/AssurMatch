@@ -1,6 +1,8 @@
 # syntax=docker/dockerfile:1.7
 # AssurMatch backend API image. Topology B (3 containers).
-# Listens on PORT 3600. Stateless. Health: GET /admin/system/health.
+# Listens on PORT 3600. Stateless. Public probes (spec 057): GET /healthz (liveness), GET /readyz
+# (database + Redis). The same image runs the worker container with
+#   CMD ["node", "--import", "tsx", "scripts/worker/assurmatch-worker.ts"]
 
 FROM node:24-alpine AS deps
 WORKDIR /app
@@ -39,7 +41,7 @@ COPY --from=build --chown=app:app /app/scripts ./scripts
 USER app
 EXPOSE 3600
 HEALTHCHECK --interval=30s --timeout=5s --retries=3 \
-  CMD wget -qO- "http://127.0.0.1:${PORT:-3600}/countries" >/dev/null || exit 1
+  CMD wget -qO- "http://127.0.0.1:${PORT:-3600}/healthz" >/dev/null || exit 1
 # The repo's npm run build is a typecheck only (tsc --noEmit) — no JS is emitted.
 # Run the TS source via tsx (same pattern as test:runtime:postgres). A future task may add
 # a real JS emission step (tsc emit or nest build) for a smaller runtime image.

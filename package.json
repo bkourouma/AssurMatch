@@ -30,6 +30,8 @@
     "local:seed:broker-demo": "node --import tsx scripts/local-app/seed-broker-demo.ts --apply",
     "local:seed:broker-demo:crm-off": "node --import tsx scripts/local-app/seed-broker-demo.ts --apply --crm-off",
     "ops:import:partners": "node --import tsx scripts/import-partners.ts",
+    "ops:bootstrap-super-admin": "node --import tsx scripts/ops/bootstrap-super-admin.ts",
+    "worker:run": "node --import tsx scripts/worker/assurmatch-worker.ts",
     "test:web:local": "node scripts/local-app/local-browser-smoke.mjs",
     "test:web": "playwright test",
     "partner-webhooks:deliver-due": "node --import tsx scripts/partner-webhook-delivery-worker.ts",

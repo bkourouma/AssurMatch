@@ -123,6 +123,7 @@ import { RetentionAccessRefusedError, RetentionBatchConflictError, RetentionBatc
 import { PublicJourneyFlagPolicy } from "../feature-flags/public-journey-flag-policy";
 import { AdminUsersController as AdminUsersDomainController } from "../users/admin-users.controller";
 import { AdminUserRolesController as AdminUserRolesDomainController } from "../users/admin-user-roles.controller";
+import { PublicHealthController } from "../health/public-health.controller";
 
 type MethodDecoratorFactory = (target: object, propertyKey: string | symbol, descriptor: PropertyDescriptor) => void;
 type ParamDecoratorFactory = (target: object, propertyKey: string | symbol | undefined, parameterIndex: number) => void;
@@ -2365,6 +2366,7 @@ Module({
     AdminRoutingOperationsController,
     AdminPartnerIntegrationsController,
     PartnerApiController,
+    PublicHealthController,
     // Spec 051: last, after the static `partners/sla` and `partners/applications` routes.
     AdminPartnersHttpController
   ],
