@@ -16,7 +16,7 @@ test("admin billing page manages plans, drafts and packs without any payment con
   expect(page).toContain("Tarifs par plan et pays");
   expect(page).toContain("Brouillons mensuels non facturables");
   expect(page).toContain("Packs de leads prepayes");
-  expect(page).toContain("aucune facture n'est emise");
+  expect(page).toContain("prime n'est collectee par AssurMatch");
   expect(actions).toContain('"use server"');
   expect(actions).toContain("/admin/billing/invoices/recompute");
 });
@@ -32,10 +32,12 @@ test("broker CRM page shows lead consumption without payment wording (DASH-B-008
   expect(page).toContain("paiement: desactive");
 });
 
-test("billing surfaces avoid payment, issued-invoice and regulated wording", () => {
+// Spec 060: issuing invoices is now legitimate (manual invoicing, decision D-8); online payment and
+// regulated wording stay forbidden on every billing surface.
+test("billing surfaces avoid online payment and regulated wording", () => {
   const admin = source("apps/admin/app/billing/page.tsx").toLowerCase();
   const broker = source("apps/broker/app/crm/page.tsx").toLowerCase();
-  for (const forbidden of ["payer maintenant", "facture emise", "acheter", "souscrire maintenant", "contrat valide", "garantie acceptee"]) {
+  for (const forbidden of ["payer maintenant", "payer en ligne", "acheter", "souscrire maintenant", "contrat valide", "garantie acceptee"]) {
     expect(admin).not.toContain(forbidden);
     expect(broker).not.toContain(forbidden);
   }

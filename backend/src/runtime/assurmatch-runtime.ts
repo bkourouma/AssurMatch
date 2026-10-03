@@ -4,6 +4,7 @@ import { ActivationChecklistModule } from "../modules/activation-checklist/activ
 import { AIModule } from "../modules/ai/ai.module";
 import { BillingModule } from "../modules/billing/billing.module";
 import { PrismaBillingRepository } from "../modules/billing/billing.repository";
+import { PrismaInvoicingRepository } from "../modules/billing/invoicing.repository";
 import { AuditLogsModule } from "../modules/audit-logs/audit-logs.module";
 import { PrismaAuditLogRepository } from "../modules/audit-logs/audit-log-repository";
 import { ConfigModule } from "../config/config.module";
@@ -650,6 +651,7 @@ readonly enterprise = new EnterpriseService({
   });
   readonly adminRoutingAnomalies = new AdminRoutingAnomaliesController(this.routingAnomalies, this.adminAi);
   private readonly billingRepository = this.runtimeRepository(new PrismaBillingRepository(this.prisma));
+  private readonly invoicingRepository = this.runtimeRepository(new PrismaInvoicingRepository(this.prisma));
   readonly billing = new BillingModule({
     audit: this.audit.writer,
     featureFlags: this.featureFlags.service,
@@ -659,7 +661,11 @@ readonly enterprise = new EnterpriseService({
     products: this.products.service,
     partnerLicenses: this.partnerLicenses.service,
     crmActivity: this.leads.crmActivityRepository,
-    ...(this.billingRepository ? { repository: this.billingRepository } : {})
+    ...(this.billingRepository ? { repository: this.billingRepository } : {}),
+    // Spec 060: invoice PDFs share the document storage; the broker is notified in-app.
+    ...(this.invoicingRepository ? { invoicingRepository: this.invoicingRepository } : {}),
+    documentStorage: this.documentStorage,
+    inApp: this.notifications.dispatch
   });
   readonly partnerIntegrations = new PartnerIntegrationsModule({
     audit: this.audit.writer,

@@ -82,6 +82,8 @@ function brokerNavigation(plan?: BrokerPlan | undefined): NavGroup[] {
       title: "Compte",
       items: [
         { label: "Notifications", href: "/notifications", icon: "bell", match: ["/notifications"] },
+        // Spec 060 G-05: facturation visible pour tous les plans, Starter compris.
+        { label: "Facturation", href: "/billing", icon: "receipt", match: ["/billing"] },
         { label: "Compte", href: "/account", icon: "user", match: ["/account"] }
       ]
     }

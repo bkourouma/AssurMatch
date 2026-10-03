@@ -25,6 +25,8 @@ export interface LeadPackRecord {
   creditsConsumed: number;
   reason: string;
   grantedById: string | null;
+  /** Spec 060 J-03: invoice whose recorded payment justified the grant. */
+  invoiceId?: string | null | undefined;
   grantedAt: Date;
   updatedAt: Date;
 }

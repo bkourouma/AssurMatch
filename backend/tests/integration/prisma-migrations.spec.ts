@@ -32,6 +32,7 @@ describe("prisma migration fresh-base readiness", () => {
       "0023_visitor_access_tokens_notifications",
       "0024_broker_self_service",
       "0025_admin_operations",
+      "0026_b2b_invoicing",
       "0027_broker_response_loop"
     ]);
     const schema = readFileSync(join(process.cwd(), "backend", "prisma", "schema.prisma"), "utf8");
@@ -229,5 +230,18 @@ describe("prisma migration fresh-base readiness", () => {
     expect(adminOperations).toContain('ALTER TABLE "ContactMessage" ADD COLUMN IF NOT EXISTS "handledAt" TIMESTAMP(3)');
     expect(adminOperations).toContain('CREATE INDEX IF NOT EXISTS "AuditLog_action_occurredAt_idx"');
     expect(adminOperations).not.toMatch(/DROP|DELETE|TRUNCATE/);
+    // Spec 060: issued invoices are immutable, payments and credit notes append-only, all in SQL.
+    const invoicing = readFileSync(join(migrationsDir, "0026_b2b_invoicing", "migration.sql"), "utf8");
+    for (const table of ["IssuedInvoice", "InvoicePayment", "CreditNote", "InvoiceNumberSequence"]) {
+      expect(invoicing).toContain(`CREATE TABLE IF NOT EXISTS "${table}"`);
+      expect(schema).toContain(`model ${table}`);
+    }
+    expect(invoicing).toContain('ALTER TABLE "LeadPack" ADD COLUMN IF NOT EXISTS "invoiceId" TEXT');
+    expect(invoicing).toContain('CREATE TRIGGER "IssuedInvoice_immutable" BEFORE UPDATE OR DELETE ON "IssuedInvoice"');
+    expect(invoicing).toContain('CREATE TRIGGER "InvoicePayment_append_only" BEFORE UPDATE OR DELETE ON "InvoicePayment"');
+    expect(invoicing).toContain('CREATE TRIGGER "CreditNote_append_only" BEFORE UPDATE OR DELETE ON "CreditNote"');
+    expect(invoicing).toContain('"IssuedInvoice_active_partner_period_key"');
+    expect(schema).toContain("IssuedInvoice_active_partner_period_key");
+    expect(invoicing).not.toMatch(/DROP TABLE|DELETE FROM/);
   });
 });

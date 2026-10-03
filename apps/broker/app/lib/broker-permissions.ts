@@ -27,11 +27,11 @@ export function isTenantReadOnly(profile: Pick<BackOfficeProfile, "tenantReadOnl
  * echoue des que la matrice partagee change.
  */
 export const BROKER_ROLE_PERMISSIONS: Record<string, string[]> = {
-  broker_owner_starter: ["broker_leads:read", "broker_leads:update", "broker_leads:export", "notifications:read", "broker_offers:read", "broker_offers:write", "broker_account:read", "broker_account:write", "broker_team:read", "broker_team:write"],
-  broker_owner_pro: ["broker_leads:*", "broker_crm:*", "notifications:read", "broker_offers:read", "broker_offers:write", "broker_account:read", "broker_account:write", "broker_team:read", "broker_team:write"],
-  broker_manager: ["broker_leads:read", "broker_leads:update", "broker_crm:read", "broker_crm:update", "broker_crm:assign", "broker_crm:export", "notifications:read", "broker_offers:read", "broker_offers:write", "broker_account:read", "broker_account:write", "broker_team:read", "broker_team:write"],
+  broker_owner_starter: ["broker_leads:read", "broker_leads:update", "broker_leads:export", "notifications:read", "broker_offers:read", "broker_offers:write", "broker_account:read", "broker_account:write", "broker_team:read", "broker_team:write", "billing:read_own"],
+  broker_owner_pro: ["broker_leads:*", "broker_crm:*", "notifications:read", "broker_offers:read", "broker_offers:write", "broker_account:read", "broker_account:write", "broker_team:read", "broker_team:write", "billing:read_own"],
+  broker_manager: ["broker_leads:read", "broker_leads:update", "broker_crm:read", "broker_crm:update", "broker_crm:assign", "broker_crm:export", "notifications:read", "broker_offers:read", "broker_offers:write", "broker_account:read", "broker_account:write", "broker_team:read", "broker_team:write", "billing:read_own"],
   broker_agent: ["broker_leads:read", "broker_leads:update", "broker_crm:read_assigned", "broker_crm:update_assigned", "notifications:read", "broker_offers:read", "broker_account:read", "broker_team:read"],
-  broker_read_only: ["broker_leads:read", "broker_crm:read", "broker_offers:read", "broker_account:read", "broker_team:read"]
+  broker_read_only: ["broker_leads:read", "broker_crm:read", "broker_offers:read", "broker_account:read", "broker_team:read", "billing:read_own"]
 };
 
 /** Meme semantique que `roleHasPermission` de la matrice RBAC partagee. */
@@ -47,6 +47,11 @@ function hasPermission(profile: BackOfficeProfile, permission: string): boolean 
 
 export function isReadOnlyBroker(profile: BackOfficeProfile): boolean {
   return profile.roles.includes("broker_read_only");
+}
+
+/** Spec 060 G-05: la facturation du cabinet se lit avec billing:read_own (refusee aux agents). */
+export function canReadBrokerBilling(profile: BackOfficeProfile): boolean {
+  return hasPermission(profile, "billing:read_own");
 }
 
 /** Accepter, rejeter ou contester un lead Starter exige broker_leads:update. */

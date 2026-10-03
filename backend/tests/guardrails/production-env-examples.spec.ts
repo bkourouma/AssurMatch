@@ -31,8 +31,9 @@ function corpus(...directories: string[]): string {
   return files.map((file) => readFileSync(file, "utf8")).join("\n");
 }
 
-// Introduced by the visitor-tracking spec developed in parallel; documented ahead of its code.
-const pendingKeys = new Set(["ASSURMATCH_VISITOR_TOKEN_TTL_DAYS"]);
+// Spec 060: the invoicing settings are read through a computed name
+// (`ASSURMATCH_INVOICE_${country}_ISSUER_${field}`, `ASSURMATCH_INVOICE_ISSUER_${field}`...).
+const computedKeyPrefixes = ["ASSURMATCH_INVOICE_"];
 const secretKeys = ["DATABASE_URL", "REDIS_URL", "ASSURMATCH_AUTH_TOKEN_SECRET", "ENCRYPTION_KEY", "EMAIL_SMTP_PASS", "ASSURMATCH_S3_SECRET_ACCESS_KEY", "ANTHROPIC_API_KEY"];
 const deadKeys = ["JWT_SECRET", "SESSION_SECRET", "LOCAL_STORAGE_ROOT", "S3_ENDPOINT", "S3_BUCKET", "S3_ACCESS_KEY_ID", "S3_SECRET_ACCESS_KEY", "COOKIE_DOMAIN", "RATE_LIMIT_GLOBAL_PER_MIN", "MFA_REQUIRED"];
 
@@ -40,7 +41,8 @@ describe("production env examples (spec 057)", () => {
   const backendCode = corpus("backend/src", "scripts", "packages");
 
   it.each([".env.production.api.example", ".env.production.worker.example"])("%s only sets variables the backend reads", (file) => {
-    const unread = keys(file).filter((key) => !pendingKeys.has(key) && !backendCode.includes(key));
+    const computed = (key: string) => computedKeyPrefixes.some((prefix) => key.startsWith(prefix) && backendCode.includes(`${prefix}\${`));
+    const unread = keys(file).filter((key) => !computed(key) && !backendCode.includes(key));
     expect(unread).toEqual([]);
     expect(keys(file).filter((key) => deadKeys.includes(key))).toEqual([]);
   });

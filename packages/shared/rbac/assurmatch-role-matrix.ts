@@ -25,12 +25,13 @@ export const RolePermissions: Record<AssurMatchRole, string[]> = {
   support_admin: ["users:read", "partners:read", "quote_requests:read", "prospects:read", "lead_assignments:read", "routing_rules:read", "audit_logs:read"],
   // Spec 052 R4: every plan manages its offers; owners and managers write, agents and read-only read.
   // Spec 053 R7: same split for the company profile, licences, coverage requests and the team.
-  broker_owner_starter: ["broker_leads:read", "broker_leads:update", "broker_leads:export", "notifications:read", "broker_offers:read", "broker_offers:write", "broker_account:read", "broker_account:write", "broker_team:read", "broker_team:write"],
-  broker_owner_pro: ["broker_leads:*", "broker_crm:*", "notifications:read", "broker_offers:read", "broker_offers:write", "broker_account:read", "broker_account:write", "broker_team:read", "broker_team:write"],
-  broker_manager: ["broker_leads:read", "broker_leads:update", "broker_crm:read", "broker_crm:update", "broker_crm:assign", "broker_crm:export", "notifications:read", "broker_offers:read", "broker_offers:write", "broker_account:read", "broker_account:write", "broker_team:read", "broker_team:write"],
+  // Spec 060 G-05: owners, managers and read-only users read their own invoices (billing:read_own); agents do not.
+  broker_owner_starter: ["broker_leads:read", "broker_leads:update", "broker_leads:export", "notifications:read", "broker_offers:read", "broker_offers:write", "broker_account:read", "broker_account:write", "broker_team:read", "broker_team:write", "billing:read_own"],
+  broker_owner_pro: ["broker_leads:*", "broker_crm:*", "notifications:read", "broker_offers:read", "broker_offers:write", "broker_account:read", "broker_account:write", "broker_team:read", "broker_team:write", "billing:read_own"],
+  broker_manager: ["broker_leads:read", "broker_leads:update", "broker_crm:read", "broker_crm:update", "broker_crm:assign", "broker_crm:export", "notifications:read", "broker_offers:read", "broker_offers:write", "broker_account:read", "broker_account:write", "broker_team:read", "broker_team:write", "billing:read_own"],
   broker_agent: ["broker_leads:read", "broker_leads:update", "broker_crm:read_assigned", "broker_crm:update_assigned", "notifications:read", "broker_offers:read", "broker_account:read", "broker_team:read"],
-  broker_read_only: ["broker_leads:read", "broker_crm:read", "broker_offers:read", "broker_account:read", "broker_team:read"],
-  finance_admin: ["billing:read", "reports:read", "audit_logs:read"],
+  broker_read_only: ["broker_leads:read", "broker_crm:read", "broker_offers:read", "broker_account:read", "broker_team:read", "billing:read_own"],
+  finance_admin: ["billing:read", "billing:invoice_issue", "billing:payment_record", "billing:credit_note", "billing:pack_grant", "reports:read", "audit_logs:read"],
   content_admin: ["content:*", "offers:*", "quote_form_definitions:read", "countries:read", "products:read"],
   ai_admin: ["ai:*", "feature_flags:read", "audit_logs:read"]
 };

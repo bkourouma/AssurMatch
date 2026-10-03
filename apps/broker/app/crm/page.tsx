@@ -219,7 +219,8 @@ export default async function BrokerCrmPage({ searchParams }: { searchParams: Pr
             <Badge tone="disabled">paiement: desactive</Badge>
             {statement.data.draft ? <Badge tone="disabled">{statement.data.draft.status}</Badge> : null}
           </Cluster>
-          <p>{statement.data.notice || "Brouillon non facturable: aucun encaissement, aucune emission de facture."}</p>
+          <p>{statement.data.notice || "Brouillon non facturable: estimation du mois en cours, aucun encaissement en ligne."}</p>
+          <p><a href="/billing">Voir les factures, le solde et les packs du cabinet</a></p>
         </Card>
       ) : null}
 

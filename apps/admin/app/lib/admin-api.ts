@@ -548,7 +548,54 @@ export interface LeadPackData {
   creditsConsumed: number;
   creditsRemaining: number;
   reason: string;
+  invoiceId?: string | null;
   grantedAt: string;
+}
+
+/** Spec 060: mirrors `issuedInvoiceSchema` of `packages/shared/contracts/billing.contracts.ts`. */
+export interface IssuedInvoiceData {
+  id: string;
+  number: string;
+  draftId: string;
+  countryCode: string;
+  plan: string;
+  status: "issued" | "partially_paid" | "paid" | "cancelled";
+  currency: "XOF";
+  periodFrom: string;
+  periodTo: string;
+  issuedAt: string;
+  dueDate: string;
+  customer: { partnerId: string; legalName: string; tradeName: string | null; city: string | null; registrationNumber: string | null };
+  legalMentionsComplete: boolean;
+  subtotalAmount: number;
+  vatRatePercent: number;
+  vatAmount: number;
+  totalAmount: number;
+  amountPaid: number;
+  amountDue: number;
+  creditNote: { id: string; number: string; invoiceNumber: string; totalAmount: number; reason: string; issuedAt: string } | null;
+  paymentsEnabled: false;
+}
+
+export interface AccountStatementData {
+  partnerId: string;
+  currency: "XOF";
+  generatedAt: string;
+  totals: { invoiced: number; credited: number; paid: number; balanceDue: number };
+  entries: Array<{ kind: "invoice" | "credit_note" | "payment"; documentId: string; reference: string; date: string; label: string; debit: number; credit: number; balance: number }>;
+  invoices: IssuedInvoiceData[];
+  packs: LeadPackData[];
+  packCreditsRemaining: number;
+  paymentsEnabled: false;
+  notice: string;
+}
+
+export function readIssuedInvoices() {
+  return readAdmin<IssuedInvoiceData[]>("/admin/billing/issued-invoices", []);
+}
+
+export function readAccountStatement(partnerId: string) {
+  return readAdmin<AccountStatementData | null>(`/admin/billing/accounts/${encodeURIComponent(partnerId)}`, null);
 }
 
 export function readBillingPlans() {

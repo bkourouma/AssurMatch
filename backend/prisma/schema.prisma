@@ -1650,6 +1650,8 @@ model LeadPack {
   creditsConsumed Int      @default(0)
   reason          String
   grantedById     String?
+  /// Spec 060 J-03: invoice whose recorded payment justified the grant.
+  invoiceId       String?
   grantedAt       DateTime @default(now())
   updatedAt       DateTime @default(now())
 
@@ -1677,6 +1679,101 @@ model DraftInvoice {
 
   @@unique([partnerId, periodFrom])
   @@index([periodFrom])
+}
+
+/// Spec 060: gapless invoice and credit note numbering per country, year and document kind.
+model InvoiceNumberSequence {
+  countryCode String
+  year        Int
+  kind        String
+  lastValue   Int      @default(0)
+  updatedAt   DateTime @default(now()) @updatedAt
+
+  @@id([countryCode, year, kind])
+}
+
+/// Spec 060: issued B2B invoice. Immutable once issued (database triggers in 0026_b2b_invoicing);
+/// only status, amountPaid, creditNoteId, cancelledAt and updatedAt may change. The SQL-only
+/// partial unique index IssuedInvoice_active_partner_period_key keeps one active invoice per
+/// partner and period (Prisma cannot express a partial index).
+model IssuedInvoice {
+  id                    String    @id @default(uuid())
+  number                String    @unique
+  countryCode           String
+  year                  Int
+  sequence              Int
+  draftId               String
+  partnerId             String
+  plan                  String
+  periodFrom            DateTime
+  periodTo              DateTime
+  currency              String    @default("XOF")
+  customer              Json
+  issuer                Json
+  legalMentionsComplete Boolean
+  lines                 Json
+  subtotalAmount        Int
+  vatRateBps            Int
+  vatAmount             Int
+  totalAmount           Int
+  dueDate               String
+  documentStorageKey    String
+  documentSha256        String
+  issuedById            String?
+  issueReason           String
+  issuedAt              DateTime
+  status                String    @default("issued")
+  amountPaid            Int       @default(0)
+  creditNoteId          String?
+  cancelledAt           DateTime?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @default(now())
+
+  @@unique([countryCode, year, sequence])
+  @@index([partnerId, issuedAt])
+  @@index([partnerId, periodFrom])
+  @@index([status])
+}
+
+/// Spec 060: payment received outside the platform and recorded by finance. Append-only.
+model InvoicePayment {
+  id           String   @id @default(uuid())
+  invoiceId    String
+  partnerId    String
+  amount       Int
+  receivedAt   String
+  method       String
+  reference    String
+  note         String?
+  recordedById String?
+  recordedAt   DateTime @default(now())
+
+  @@index([invoiceId])
+  @@index([partnerId, recordedAt])
+}
+
+/// Spec 060: credit note cancelling an issued invoice in full. Append-only.
+model CreditNote {
+  id                 String   @id @default(uuid())
+  number             String   @unique
+  countryCode        String
+  year               Int
+  sequence           Int
+  invoiceId          String   @unique
+  invoiceNumber      String
+  partnerId          String
+  currency           String   @default("XOF")
+  subtotalAmount     Int
+  vatAmount          Int
+  totalAmount        Int
+  reason             String
+  documentStorageKey String
+  documentSha256     String
+  issuedById         String?
+  issuedAt           DateTime
+
+  @@unique([countryCode, year, sequence])
+  @@index([partnerId, issuedAt])
 }
 
 model MessagingDelivery {
