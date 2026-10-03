@@ -1,11 +1,22 @@
-import { createHash } from "node:crypto";
+import { timingSafeEqual } from "node:crypto";
 import { NotFoundException } from "@nestjs/common";
 import { quoteRequestCreateSchema, type QuoteConfirmation, type QuoteRequestCreateDto } from "../../../../packages/shared/contracts/quote.contracts";
 import type { ConsentWithdrawalResponse } from "../../../../packages/shared/contracts/public-site.contracts";
+import {
+  projectPublicQuoteStatus,
+  trackingLinkRequestSchema,
+  VISITOR_ACCESS_DENIED_CODE,
+  type ProjectionHistoryEvent,
+  type PublicQuoteStatusView,
+  type TrackingLinkResponse
+} from "../../../../packages/shared/contracts/public-quote-status";
 import { AuditLogWriter } from "../audit-logs/audit-log-writer.service";
+import { VisitorTrackingAuditActions } from "../audit-logs/visitor-tracking-audit-actions";
 import { PUBLIC_SITE_AUDIT_ACTIONS } from "../audit-logs/public-site-audit-actions";
 import { QuoteAuditActions } from "../audit-logs/quote-audit-actions";
 import type { PublicAbuseGuardService } from "../common/abuse/public-abuse-guard.service";
+import { QuoteRedisKeys } from "../common/redis/quote-redis-keys";
+import type { RedisClientPort } from "../common/redis/redis.module";
 import type { ActorContext } from "../common/types";
 import { ConsentService } from "../consent/consent.module";
 import { MULTI_BROKER_CONSENT, SINGLE_BROKER_CONSENT } from "../leads/quote-routing.service";
@@ -22,6 +33,8 @@ import type { PublicAntiSpamService } from "./public-anti-spam.service";
 import type { PublicQuoteRateLimitService } from "./public-quote-rate-limit.service";
 import type { QuoteDuplicateDetectionService } from "./quote-duplicate-detection.service";
 import { MemoryQuoteRequestsRepository, type QuoteRequestsRepository } from "./quote-requests.repository";
+import { VISITOR_ACCESS_TOKEN_MARKER, VisitorAccessService, type VisitorAccessOptions } from "./visitor-access.service";
+import { MemoryVisitorAccessTokensRepository, type VisitorAccessTokensRepository } from "./visitor-access-tokens.repository";
 
 export type QuoteRequestStatus = "created" | "manual_review" | "routed" | "non_routable" | "duplicate" | "spam_blocked" | "cancelled";
 export type RoutingStatus = "not_started" | "assigned" | "no_broker_available" | "manual_review_required" | "blocked" | "pending_manual_assignment";
@@ -76,6 +89,28 @@ const CLOSED_ASSIGNMENT_STATUS: LeadAssignmentStatus = "closed";
 const QUOTE_NOT_AVAILABLE = "Quote status not available";
 const CONSENT_WITHDRAWAL_LIMIT_PER_WINDOW = 5;
 const CONSENT_WITHDRAWAL_WINDOW_SECONDS = 3600;
+/** Spec 054 contract: 60 status reads per hour and IP; 5 link resends per hour and IP, 3 per reference. */
+const STATUS_LIMIT_PER_WINDOW = 60;
+const TRACKING_LINK_LIMIT_PER_IP = 5;
+const TRACKING_LINK_LIMIT_PER_REFERENCE = 3;
+const TRACKING_WINDOW_SECONDS = 3600;
+const RATE_LIMIT_MESSAGE = "Rate limit exceeded for public submissions";
+/** Used when no partner lookup is wired (unit harnesses); the runtime always names the broker. */
+const GENERIC_BROKER_NAME = "courtier partenaire";
+const REASSIGNED_FROM = /^Reassigned from partner ([0-9a-fA-F-]{36})/;
+
+/** Spec 054: one neutral refusal for every visitor route (unknown reference, wrong, expired or revoked token). */
+export function visitorAccessDenied(): NotFoundException {
+  return new NotFoundException({ code: VISITOR_ACCESS_DENIED_CODE, message: QUOTE_NOT_AVAILABLE });
+}
+
+/** History rows the visitor timeline is built from (`LeadAssignmentsRepository.historyForLead`). */
+export interface QuoteAssignmentHistoryEvent {
+  eventType: string;
+  partnerTenantId: string;
+  occurredAt: Date | string;
+  comment?: string | undefined;
+}
 
 /**
  * Spec 052 R7: verifies the offer a visitor selected (exists, publicly visible with the catalogue
@@ -113,14 +148,35 @@ export interface QuoteSubmissionDependencies {
   isGlobalFlagEnabled?: (key: string) => boolean;
   /** Spec 052 R7: absent means the selected offer is recorded without verification (legacy unit tests). */
   selectedOffers?: SelectedOfferVerifier;
+  /** Spec 054 R1: persisted visitor access tokens (memory store when absent, tests only). */
+  visitorAccessTokens?: VisitorAccessTokensRepository;
+  visitorAccessOptions?: VisitorAccessOptions;
+  /** Spec 054: trade name, else legal name, of a partner; the broker the visitor sees. */
+  partnerName?: (partnerTenantId: string) => Promise<string | undefined>;
+  /** Spec 054 R5: assignment history (reassignment, acceptance) for the public timeline. */
+  assignmentHistory?: (leadAssignmentId: string) => Promise<QuoteAssignmentHistoryEvent[]>;
+  findCountryById?: (countryId: string) => Promise<{ isoCode: string; name: string } | undefined>;
+  findProductById?: (productId: string) => Promise<{ key: string; name: string } | undefined>;
+  /** Spec 054 R7: per-reference counter of the tracking-link resend. */
+  redis?: RedisClientPort;
 }
 
 export class QuoteSubmissionService {
+  /** Spec 054 R1: issues and verifies the visitor tokens of every visitor route. */
+  readonly visitorAccess: VisitorAccessService<QuoteRequestRecord>;
+
   constructor(
     private readonly deps: QuoteSubmissionDependencies,
     private readonly audit: AuditLogWriter,
     private readonly repository: QuoteRequestsRepository = new MemoryQuoteRequestsRepository()
-  ) {}
+  ) {
+    this.visitorAccess = new VisitorAccessService<QuoteRequestRecord>(
+      deps.visitorAccessTokens ?? new MemoryVisitorAccessTokensRepository(),
+      audit,
+      (publicReference) => this.repository.findByPublicReference(publicReference),
+      deps.visitorAccessOptions ?? {}
+    );
+  }
 
   async submit(input: QuoteRequestCreateDto, actor: ActorContext): Promise<QuoteConfirmation> {
     const parsedResult = quoteRequestCreateSchema.safeParse(input);
@@ -254,12 +310,12 @@ export class QuoteSubmissionService {
       context: { intendedRecipient: "AssurMatch" }
     });
     const prospect = await this.deps.prospects.createOrLink(country.id, product.id, contact, consentRecord.id, actor);
-    const token = crypto.randomUUID();
     const now = new Date();
     const quote: QuoteRequestRecord = {
       id: crypto.randomUUID(),
       publicReference: `QR-${now.getFullYear()}-${crypto.randomUUID().slice(0, 8).toUpperCase()}`,
-      verificationTokenHash: this.hash(token),
+      // Spec 054 R1: the access goes through `VisitorAccessToken`; this marker never matches a token.
+      verificationTokenHash: VISITOR_ACCESS_TOKEN_MARKER,
       countryId: country.id,
       countryCode: country.isoCode,
       productId: product.id,
@@ -283,6 +339,7 @@ export class QuoteSubmissionService {
       updatedAt: now
     };
     await this.repository.create(quote);
+    const access = await this.visitorAccess.issue(quote.id, { reason: "submission", actor });
     this.audit.write({
       actor,
       action: QuoteAuditActions.quoteRequestCreated,
@@ -308,24 +365,30 @@ export class QuoteSubmissionService {
     }
     quote.updatedAt = new Date();
     await this.repository.update(quote.id, quote);
+    // Spec 054 R4: "received" (or "in review", or "not transmitted") first, then one "transmitted"
+    // e-mail per assignment, each naming its broker.
     await this.deps.notifications?.queueVisitor(quote, actor);
+    for (const assignment of routingResult?.assignments ?? []) {
+      await this.queueTransmitted(quote, assignment, actor);
+    }
     // Spec 042: every recipient of a fanned-out request is notified, not just the first one.
     for (const assignment of routingResult?.assignments ?? []) {
       const brokerNotification = await this.deps.notifications?.queueBroker(quote, assignment, actor);
       if (brokerNotification) assignment.brokerNotificationId = brokerNotification.notification.id;
     }
     await this.deps.aiSummary?.enqueueIfAllowed(quote, actor);
+    const brokerName = routingResult?.assignment ? await this.brokerName(routingResult.assignment.partnerTenantId) : undefined;
     return {
       publicReference: quote.publicReference,
       status: quote.status === "routed" ? "routed" : quote.status === "manual_review" ? "manual_review" : quote.status === "duplicate" ? "duplicate" : "non_routable",
       routed: quote.status === "routed",
-      ...(routingResult?.assignment ? { brokerName: "courtier partenaire" } : {}),
+      ...(brokerName ? { brokerName } : {}),
       message: quote.status === "routed"
         ? (routingResult?.assignments.length ?? 0) > 1
           ? `Votre demande indicative a ete transmise a ${routingResult?.assignments.length} courtiers partenaires eligibles, comme vous l'avez accepte.`
           : "Votre demande indicative a ete transmise au courtier partenaire identifie."
         : "Votre demande a ete recue et reste a confirmer par un courtier partenaire.",
-      verificationToken: token,
+      verificationToken: access.token,
       selectedOfferPartnerRetained: this.selectedOfferPartnerRetained(selectedOffer, routingResult?.selectedOfferOutcome)
     };
   }
@@ -379,6 +442,7 @@ export class QuoteSubmissionService {
     quote.routingStatus = "assigned";
     quote.updatedAt = new Date();
     await this.repository.update(quote.id, quote);
+    await this.queueTransmitted(quote, assignment, actor);
     const brokerNotification = await this.deps.notifications?.queueBroker(quote, assignment, actor);
     if (brokerNotification) assignment.brokerNotificationId = brokerNotification.notification.id;
     await this.deps.aiSummary?.enqueueIfAllowed(quote, actor);
@@ -393,22 +457,161 @@ export class QuoteSubmissionService {
     return queued?.notification.id;
   }
 
-  /** Visitor-side authentication: the public reference plus the verification token issued at submission. */
-  async authenticateVisitor(publicReference: string, token: string): Promise<QuoteRequestRecord | undefined> {
-    if (!token) return undefined;
-    const quote = await this.repository.findByPublicReference(publicReference);
-    if (!quote || quote.verificationTokenHash !== this.hash(token)) return undefined;
-    return quote;
+  /**
+   * Visitor-side authentication (documents, withdrawal, status): the public reference plus a valid
+   * visitor access token (spec 054 R1), or a pre-054 token before its cutover date.
+   */
+  async authenticateVisitor(publicReference: string, token: string, actor?: ActorContext): Promise<QuoteRequestRecord | undefined> {
+    return (await this.visitorAccess.verify(publicReference, token, actor))?.quote;
   }
 
-  async status(publicReference: string, token: string) {
-    const quote = await this.repository.findByPublicReference(publicReference);
-    if (!quote || quote.verificationTokenHash !== this.hash(token)) throw new Error(QUOTE_NOT_AVAILABLE);
+  /**
+   * Spec 054 R5 / FR-006: the public status of the visitor's own request. Every refusal (unknown
+   * reference, wrong, expired or revoked token, anonymized request) is the same neutral 404.
+   */
+  async status(publicReference: string, token: string, context: { ipAddress?: string; actor?: ActorContext } = {}): Promise<PublicQuoteStatusView> {
+    const actor = context.actor ?? { roles: [] };
+    if (context.ipAddress) {
+      await this.deps.abuseGuard?.assertAllowed({
+        scope: "tracking_status",
+        ipAddress: context.ipAddress,
+        limitPerWindow: STATUS_LIMIT_PER_WINDOW,
+        windowSeconds: TRACKING_WINDOW_SECONDS
+      });
+    }
+    const grant = await this.visitorAccess.verify(publicReference, token, actor);
+    if (!grant) throw visitorAccessDenied();
+    const { quote } = grant;
+    const assignments = (await this.safeListAssignments(quote, actor)).filter((assignment) => assignment.quoteRequestId === quote.id);
+    const names = new Map<string, string>();
+    const nameOf = async (partnerTenantId: string): Promise<string> => {
+      if (!names.has(partnerTenantId)) names.set(partnerTenantId, await this.brokerName(partnerTenantId));
+      return names.get(partnerTenantId)!;
+    };
+    const history: ProjectionHistoryEvent[] = [];
+    for (const assignment of assignments) {
+      const events = this.deps.assignmentHistory ? await this.deps.assignmentHistory(assignment.id).catch(() => []) : [];
+      for (const event of events) {
+        if (event.eventType !== "reassigned" && event.eventType !== "accepted") continue;
+        const previous = event.eventType === "reassigned" ? REASSIGNED_FROM.exec(event.comment ?? "")?.[1] : undefined;
+        history.push({
+          assignmentId: assignment.id,
+          eventType: event.eventType,
+          occurredAt: event.occurredAt,
+          partnerName: await nameOf(event.partnerTenantId),
+          ...(previous ? { previousPartnerName: await nameOf(previous) } : {})
+        });
+      }
+    }
+    const projected = projectPublicQuoteStatus(
+      quote,
+      await Promise.all(assignments.map(async (assignment) => ({
+        id: assignment.id,
+        partnerName: await nameOf(assignment.partnerTenantId),
+        status: assignment.status,
+        crmStatus: assignment.crmStatus,
+        createdAt: assignment.createdAt,
+        assignedAt: assignment.assignedAt,
+        acceptedAt: assignment.acceptedAt,
+        crmUpdatedAt: assignment.crmUpdatedAt,
+        lastBrokerActionAt: assignment.lastBrokerActionAt,
+        updatedAt: assignment.updatedAt
+      }))),
+      history
+    );
+    const [country, product] = await Promise.all([
+      this.deps.findCountryById?.(quote.countryId).catch(() => undefined),
+      this.deps.findProductById?.(quote.productId).catch(() => undefined)
+    ]);
+    this.audit.write({
+      actor,
+      action: VisitorTrackingAuditActions.spaceOpened,
+      targetType: "QuoteRequest",
+      targetId: quote.id,
+      scope: { countryId: quote.countryId, productId: quote.productId },
+      result: "success",
+      context: { legacyToken: grant.legacy, status: projected.status }
+    });
     return {
       publicReference: quote.publicReference,
-      status: quote.status,
-      ...(quote.status === "routed" ? { brokerName: "courtier partenaire" } : {})
+      language: quote.language === "en" ? "en" : "fr",
+      country: { isoCode: country?.isoCode ?? quote.countryCode ?? "", name: country?.name ?? country?.isoCode ?? quote.countryCode ?? "" },
+      product: { key: product?.key ?? quote.productKey ?? "", name: product?.name ?? product?.key ?? quote.productKey ?? "" },
+      status: projected.status,
+      brokers: projected.brokers,
+      timeline: projected.timeline,
+      consent: projected.consent,
+      tokenExpiresAt: grant.expiresAt.toISOString()
     };
+  }
+
+  /**
+   * Spec 054 R7 / FR-004: sends a new tracking link when the reference and the e-mail match. The
+   * answer is the same `202 { accepted: true }` in every case; the e-mail itself leaves through the
+   * notification worker, so the response time does not depend on the outcome either.
+   */
+  async requestTrackingLink(input: unknown, context: { ipAddress: string; actor: ActorContext }): Promise<TrackingLinkResponse> {
+    const { actor } = context;
+    const raw = (input && typeof input === "object" ? input : {}) as Record<string, unknown>;
+    if (typeof raw.website === "string" && raw.website.trim().length > 0) {
+      this.auditTrackingLink(actor, undefined, "refused", "honeypot");
+      return { accepted: true };
+    }
+    const parsed = trackingLinkRequestSchema.safeParse(input);
+    if (!parsed.success) throw new Error("Invalid submission: validation_failed");
+    await this.deps.abuseGuard?.assertAllowed({
+      scope: "tracking_link_resend",
+      ipAddress: context.ipAddress,
+      limitPerWindow: TRACKING_LINK_LIMIT_PER_IP,
+      windowSeconds: TRACKING_WINDOW_SECONDS
+    });
+    const publicReference = parsed.data.publicReference.toUpperCase();
+    if (this.deps.redis) {
+      const count = await this.deps.redis.incr(QuoteRedisKeys.publicScopeRateLimit("tracking_link_reference", publicReference), TRACKING_WINDOW_SECONDS);
+      if (count > TRACKING_LINK_LIMIT_PER_REFERENCE) throw new Error(RATE_LIMIT_MESSAGE);
+    }
+    const quote = await this.repository.findByPublicReference(publicReference);
+    if (!quote) {
+      this.auditTrackingLink(actor, undefined, "refused", "unknown_reference");
+      return { accepted: true };
+    }
+    if (quote.anonymizedAt) {
+      this.auditTrackingLink(actor, quote.id, "refused", "quote_anonymized");
+      return { accepted: true };
+    }
+    const prospect = await this.deps.prospects.require(quote.prospectId).catch(() => undefined);
+    const candidate = this.deps.identity.fingerprint(parsed.data.email.trim().toLowerCase());
+    if (!prospect || !sameHex(candidate, prospect.emailFingerprint)) {
+      this.auditTrackingLink(actor, quote.id, "refused", "email_mismatch");
+      return { accepted: true };
+    }
+    await this.deps.notifications?.queueVisitorEvent(quote, { type: "visitor_tracking_link", seq: crypto.randomUUID() }, actor);
+    this.auditTrackingLink(actor, quote.id, "success", "link_queued");
+    return { accepted: true };
+  }
+
+  private auditTrackingLink(actor: ActorContext, quoteRequestId: string | undefined, result: "success" | "refused", reason: string): void {
+    this.audit.write({
+      actor,
+      action: result === "success" ? VisitorTrackingAuditActions.trackingLinkRequested : VisitorTrackingAuditActions.trackingLinkRefused,
+      targetType: "QuoteRequest",
+      targetId: quoteRequestId ?? "unknown",
+      result,
+      reason,
+      context: {}
+    });
+  }
+
+  private async brokerName(partnerTenantId: string): Promise<string> {
+    return (await this.deps.partnerName?.(partnerTenantId).catch(() => undefined)) ?? GENERIC_BROKER_NAME;
+  }
+
+  private async queueTransmitted(quote: QuoteRequestRecord, assignment: LeadAssignmentRecord, actor: ActorContext): Promise<void> {
+    await this.deps.notifications?.queueVisitorEvent(quote, {
+      type: "visitor_quote_transmitted",
+      assignmentId: assignment.id,
+      partnerTenantId: assignment.partnerTenantId
+    }, actor);
   }
 
   /**
@@ -416,7 +619,7 @@ export class QuoteSubmissionService {
    * of the call, so nothing downstream may block it: once the consent record is withdrawn and the
    * request cancelled, a failing assignment close or inbox publish is audited and stepped over.
    *
-   * No e-mail is sent here: that would need a new `NotificationType` enum value and a migration, out of scope.
+   * Spec 054 US4: the first withdrawal queues one confirmation e-mail; a repeated call sends none.
    */
   async withdrawConsent(publicReference: string, token: string, context: { ipAddress: string; actor: ActorContext }): Promise<ConsentWithdrawalResponse> {
     const { actor } = context;
@@ -426,9 +629,9 @@ export class QuoteSubmissionService {
       limitPerWindow: CONSENT_WITHDRAWAL_LIMIT_PER_WINDOW,
       windowSeconds: CONSENT_WITHDRAWAL_WINDOW_SECONDS
     });
-    const quote = await this.repository.findByPublicReference(publicReference);
-    // Same message as `status()` for an unknown reference: the endpoint must not reveal which references exist.
-    if (!quote || quote.verificationTokenHash !== this.hash(token)) throw new Error(QUOTE_NOT_AVAILABLE);
+    // Same neutral refusal as `status()`: the endpoint must not reveal which references exist.
+    const quote = await this.authenticateVisitor(publicReference, token, actor);
+    if (!quote) throw visitorAccessDenied();
 
     if (quote.status === "cancelled") {
       return {
@@ -469,6 +672,9 @@ export class QuoteSubmissionService {
       result: "success",
       reason: "consent_withdrawn",
       context: { consentRecordId: quote.consentRecordId, closedAssignments: assignments.length, notifiedPartners: notifiedTenants.size }
+    });
+    await this.deps.notifications?.queueVisitorEvent(quote, { type: "visitor_consent_withdrawn" }, actor).catch((error: unknown) => {
+      this.auditWithdrawalFailure(actor, "Notification", quote.id, "visitor_confirmation_failed", error);
     });
 
     return {
@@ -549,9 +755,14 @@ export class QuoteSubmissionService {
     };
   }
 
-  private hash(value: string): string {
-    return createHash("sha256").update(value).digest("hex");
-  }
+}
+
+/** Constant-time equality of two hex digests of the same length. */
+function sameHex(candidate: string, stored: string | undefined): boolean {
+  if (!stored || candidate.length !== stored.length || !/^[0-9a-f]+$/i.test(stored)) return false;
+  const left = Buffer.from(candidate, "hex");
+  const right = Buffer.from(stored, "hex");
+  return left.length === right.length && timingSafeEqual(left, right);
 }
 
 export { QUOTE_REQUESTS_REPOSITORY, MemoryQuoteRequestsRepository, type QuoteRequestsRepository } from "./quote-requests.repository";

@@ -87,6 +87,8 @@ import { PrismaPartnerLicensesRepository } from "../modules/partner-licenses/par
 import { PrismaProspectsRepository } from "../modules/prospects/prospects.repository";
 import { PrismaQuoteFormDefinitionsRepository } from "../modules/quote-forms/quote-form-definitions.repository";
 import { PrismaQuoteRequestsRepository } from "../modules/quote-requests/quote-requests.repository";
+import { PrismaVisitorAccessTokensRepository } from "../modules/quote-requests/visitor-access-tokens.repository";
+import { VisitorQuoteNotifier } from "../modules/notifications/visitor-quote-notifier";
 import { PrismaLeadAssignmentsRepository } from "../modules/leads/lead-assignments.repository";
 import { PrismaRoutingDecisionsRepository } from "../modules/leads/routing-decisions.repository";
 import { PrismaCrmActivityRepository } from "../modules/leads/crm-activity.repository";
@@ -126,6 +128,8 @@ export class AssurMatchRuntime {
   private readonly prospectsRepository = this.runtimeRepository(new PrismaProspectsRepository(this.prisma));
   private readonly quoteFormDefinitionsRepository = this.runtimeRepository(new PrismaQuoteFormDefinitionsRepository(this.prisma));
   private readonly quoteRequestsRepository = this.runtimeRepository(new PrismaQuoteRequestsRepository(this.prisma));
+  /** Spec 054 R1: hashed visitor access tokens. */
+  private readonly visitorAccessTokensRepository = this.runtimeRepository(new PrismaVisitorAccessTokensRepository(this.prisma));
   private readonly routingRulesRepository = this.runtimeRepository(new PrismaRoutingRulesRepository(this.prisma));
   private readonly scoringRulesRepository = this.runtimeRepository(new PrismaScoringRulesRepository(this.prisma));
   private readonly quoteDocumentsRepository = this.runtimeRepository(new PrismaQuoteDocumentsRepository(this.prisma)) ?? new MemoryQuoteDocumentsRepository();
@@ -157,8 +161,10 @@ export class AssurMatchRuntime {
           status: String(data.status),
           ...(typeof data.previousStatus === "string" ? { previousStatus: data.previousStatus } : {}),
           ...(partnerTenantId ? { partnerTenantId } : {})
-        });
+        }).catch(() => undefined);
       }
+      // Spec 054 R6: the visitor is told of every public step (accepted, reassigned, closed).
+      await this.visitorQuoteNotifier?.onLeadEvent(eventType, partnerTenantId, data);
     }
   });
   readonly regulatoryRegimes: RegulatoryRegimesModule = new RegulatoryRegimesModule(
@@ -389,8 +395,19 @@ readonly enterprise = new EnterpriseService({
     isGlobalFlagEnabled: (key) => this.featureFlags.service.isEnabled(key),
     satisfactionSurveys: { onConsentWithdrawn: (id: string) => this.satisfactionSurveys.service.onConsentWithdrawn(id) },
     // Spec 052 R7: the selected offer must be publicly visible here, with the catalogue's own rules.
-    selectedOffers: { verify: (offerId: string, countryId: string, productId: string) => this.verifySelectedOffer(offerId, countryId, productId) }
+    selectedOffers: { verify: (offerId: string, countryId: string, productId: string) => this.verifySelectedOffer(offerId, countryId, productId) },
+    // Spec 054: hashed visitor tokens, the broker named to the visitor and the public timeline.
+    ...(this.visitorAccessTokensRepository ? { visitorAccessTokens: this.visitorAccessTokensRepository } : {}),
+    partnerName: (partnerTenantId: string) => this.partnerDisplayName(partnerTenantId),
+    assignmentHistory: (leadAssignmentId: string) => this.leads.assignmentsRepository.historyForLead(leadAssignmentId)
   }, this.audit.writer, this.redis.client, this.quoteRequestsRepository);
+  /** Spec 054 R6: subscriber of the lead event bus that queues the visitor e-mails. */
+  readonly visitorQuoteNotifier: VisitorQuoteNotifier = new VisitorQuoteNotifier({
+    notifications: this.notifications.quoteService,
+    assignments: this.leads.assignments,
+    quotes: { findById: (id: string) => this.quoteRequests.submissions.findById(id) },
+    audit: this.audit.writer
+  });
   /** Spec 044: drains the quote notification backlog into the email delivery service. */
   readonly quoteNotificationDelivery = new QuoteNotificationDeliveryService({
     notifications: this.notifications.service,
@@ -400,7 +417,9 @@ readonly enterprise = new EnterpriseService({
     // The stored row keeps ids only, so the ISO code and product key are resolved from the catalogue.
     quotes: { findById: (id: string) => this.resolveQuoteScope(id) },
     prospects: { findById: (id: string) => this.prospects.service.require(id).catch(() => undefined) },
-    partners: { findById: (id: string) => this.partners.service.require(id).catch(() => undefined) }
+    partners: { findById: (id: string) => this.partners.service.require(id).catch(() => undefined) },
+    // Spec 054 R2: a fresh visitor token is minted when the e-mail is rendered.
+    visitorAccess: { issue: (quoteRequestId: string, context: { reason: string }) => this.quoteRequests.submissions.visitorAccess.issue(quoteRequestId, context) }
   });
   readonly quoteDocuments = new QuoteDocumentsService({
     audit: this.audit.writer,
@@ -446,6 +465,8 @@ readonly enterprise = new EnterpriseService({
     decisions: this.leads.decisions,
     countries: this.countries.service,
     products: this.products.service,
+    // Spec 054 R6: internal `lead.reassigned`, consumed by the visitor notifier only.
+    events: this.partnerWebhookEvents,
     notifyBroker: async (assignment, actor) => {
       const notificationId = await this.quoteRequests.submissions.notifyBrokerForAssignment(assignment, actor);
       await this.quoteDocuments.shareForAssignment(assignment.quoteRequestId, assignment);
@@ -753,6 +774,12 @@ readonly enterprise = new EnterpriseService({
     return { accepted: true, ...(offer.partnerTenantId ? { partnerTenantId: offer.partnerTenantId } : {}) };
   }
 
+  /** Spec 054: the name a visitor sees for a partner (trade name, else legal name). */
+  async partnerDisplayName(partnerTenantId: string): Promise<string | undefined> {
+    const partner = await this.partners.service.require(partnerTenantId).catch(() => undefined);
+    return partner?.tradeName ?? partner?.legalName;
+  }
+
   /** Spec 052 R8: broker named by the quote form when the selected offer is public and its broker eligible. */
   async selectedOfferPartnerName(offerId: string, countryId: string, productId: string): Promise<string | undefined> {
     const verdict = await this.verifySelectedOffer(offerId, countryId, productId);
@@ -773,6 +800,7 @@ readonly enterprise = new EnterpriseService({
       QuoteFormDefinitionsRepository: this.quoteFormDefinitionsRepository?.mode,
       ConsentRecordsRepository: this.consentRecordsRepository?.mode,
       QuoteRequestsRepository: this.quoteRequestsRepository?.mode,
+      VisitorAccessTokensRepository: this.visitorAccessTokensRepository?.mode,
       LeadAssignmentsRepository: this.leadRepositorySet.assignments?.mode,
       RoutingDecisionsRepository: this.leadRepositorySet.decisions?.mode,
       PartnersRepository: this.partnersRepository?.mode,

@@ -73,6 +73,10 @@ export class NotificationsService {
     return this.repository.list();
   }
 
+  findByDedupeKey(dedupeKey: string): Promise<NotificationRecord | undefined> {
+    return this.repository.findByDedupeKey(dedupeKey);
+  }
+
   mutableList(): NotificationRecord[] {
     return this.repository.mutableList();
   }

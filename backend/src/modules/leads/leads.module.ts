@@ -37,7 +37,7 @@ export interface LeadsModuleRoutingOptions {
   rules?: RoutingRuleResolver | undefined;
   /** Partner webhook observer for `lead.assigned` and `lead.status_changed`; failures are swallowed. */
   events?: {
-    publish(eventType: "lead.assigned" | "lead.status_changed", partnerTenantId: string, data: Record<string, unknown>): Promise<void>;
+    publish(eventType: "lead.assigned" | "lead.status_changed" | "lead.accepted" | "lead.rejected", partnerTenantId: string, data: Record<string, unknown>): Promise<void>;
   } | undefined;
   /** Spec 042: consent resolver and `multi_broker_routing_enabled` gate for multi-send. */
   consent?: ConsentRecordResolver | undefined;

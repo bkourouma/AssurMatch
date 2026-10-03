@@ -9,6 +9,8 @@ export interface NotificationsRepository extends RuntimeRepository {
   create(notification: NotificationRecord): Promise<NotificationRecord>;
   updateDelivery(id: string, update: Pick<NotificationRecord, "whatsAppStatus" | "emailStatus" | "updatedAt"> & Partial<Pick<NotificationRecord, "retryCount">>): Promise<NotificationRecord>;
   list(): Promise<NotificationRecord[]>;
+  /** Spec 054 R3: the row already queued for this idempotency key, if any. */
+  findByDedupeKey(dedupeKey: string): Promise<NotificationRecord | undefined>;
   mutableList(): NotificationRecord[];
 }
 
@@ -36,6 +38,10 @@ export class MemoryNotificationsRepository implements NotificationsRepository {
     return [...this.notifications];
   }
 
+  async findByDedupeKey(dedupeKey: string): Promise<NotificationRecord | undefined> {
+    return this.notifications.find((notification) => notification.dedupeKey === dedupeKey);
+  }
+
   mutableList(): NotificationRecord[] {
     return this.notifications;
   }
@@ -45,6 +51,7 @@ type NotificationDelegate = {
   create(input: unknown): Promise<unknown>;
   update(input: unknown): Promise<unknown>;
   findMany(input?: unknown): Promise<unknown[]>;
+  findUnique(input: unknown): Promise<unknown | null>;
 };
 
 export class PrismaNotificationsRepository implements NotificationsRepository {
@@ -62,6 +69,11 @@ export class PrismaNotificationsRepository implements NotificationsRepository {
 
   async list(): Promise<NotificationRecord[]> {
     return (await this.client().findMany({ orderBy: { createdAt: "desc" } })).map((row) => this.toDomain(row));
+  }
+
+  async findByDedupeKey(dedupeKey: string): Promise<NotificationRecord | undefined> {
+    const row = await this.client().findUnique({ where: { dedupeKey } });
+    return row ? this.toDomain(row) : undefined;
   }
 
   mutableList(): NotificationRecord[] {

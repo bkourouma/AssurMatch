@@ -15,7 +15,7 @@ export class BrokerStarterLeadActionsService {
     private readonly access: BrokerStarterAccessPolicy,
     private readonly history: BrokerStarterHistoryService,
     private readonly audit: AuditLogWriter,
-    private readonly events?: { publish(eventType: "lead.status_changed", partnerTenantId: string, data: Record<string, unknown>): Promise<void> } | undefined
+    private readonly events?: { publish(eventType: "lead.status_changed" | "lead.accepted" | "lead.rejected", partnerTenantId: string, data: Record<string, unknown>): Promise<void> } | undefined
   ) {}
 
     close(id: string, actor: ActorContext): Promise<LeadAssignmentRecord> {
@@ -73,7 +73,17 @@ accept(id: string, actor: ActorContext): Promise<LeadAssignmentRecord> {
       ...(input.reason ? { reason: input.reason } : {}),
       context: { previousStatus, nextStatus: status }
     });
-        if (status === "closed") {
+    // Spec 054 R6: acceptance and rejection change the public status, so they are published too
+    // (internal events, never forwarded to partner webhooks).
+    if (status === "accepted" || status === "rejected") {
+      await this.events?.publish(status === "accepted" ? "lead.accepted" : "lead.rejected", updated.partnerTenantId, {
+        leadAssignmentId: updated.id,
+        publicReference: updated.publicReference,
+        previousStatus: this.toStarterStatus(previousStatus),
+        status
+      }).catch(() => {});
+    }
+    if (status === "closed") {
       await this.events?.publish("lead.status_changed", updated.partnerTenantId, {
         leadAssignmentId: updated.id,
         publicReference: updated.publicReference,

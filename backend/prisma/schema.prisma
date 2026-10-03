@@ -191,6 +191,14 @@ enum NotificationType {
   offer_rejected
   offer_suspended
   offer_expiring
+  visitor_quote_received
+  visitor_quote_in_review
+  visitor_quote_transmitted
+  visitor_quote_accepted
+  visitor_quote_reassigned
+  visitor_quote_closed
+  visitor_consent_withdrawn
+  visitor_tracking_link
 }
 
 enum DeliveryStatus {
@@ -881,6 +889,10 @@ model Notification {
   queueJobRecordId  String?
   lastAttemptAt     DateTime?
   retryCount        Int              @default(0)
+  /// Spec 054 R3: persisted idempotency key `{type}:{quoteRequestId}:{assignmentId|-}:{seq}`.
+  dedupeKey         String?          @unique
+  /// Spec 054 R3: non-sensitive identifiers of the event (assignment and partner ids).
+  eventPayload      Json?
   createdAt         DateTime         @default(now())
   updatedAt         DateTime         @updatedAt
   createdById       String?
@@ -1158,6 +1170,22 @@ model QuoteRequest {
   updatedAt             DateTime           @updatedAt
 
   @@index([countryId, productId, status, routingStatus, createdAt])
+}
+
+/// Spec 054 R1: visitor access tokens. Only the SHA-256 of the token is stored; the clear token is
+/// shown once (confirmation screen, e-mail link) and compared in constant time.
+model VisitorAccessToken {
+  id             String    @id @default(uuid())
+  quoteRequestId String
+  tokenHash      String    @unique
+  purpose        String    @default("tracking")
+  issuedAt       DateTime  @default(now())
+  expiresAt      DateTime
+  revokedAt      DateTime?
+  lastUsedAt     DateTime?
+  createdAt      DateTime  @default(now())
+
+  @@index([quoteRequestId, expiresAt])
 }
 
 model LeadAssignment {

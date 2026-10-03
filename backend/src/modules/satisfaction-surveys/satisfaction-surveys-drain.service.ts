@@ -4,6 +4,7 @@ import type { AuthEmailPayload } from "../notifications/email/email-delivery.ser
 import type { ProspectRecord } from "../prospects/prospects.service";
 import type { QuoteRequestRecord } from "../quote-requests/quote-submission.service";
 import { SatisfactionSurveyEmailTemplateService } from "./satisfaction-survey-email-template.service";
+import { SatisfactionSurveyTokenService } from "./satisfaction-survey-token.service";
 import type { SatisfactionSurveyRecord, SatisfactionSurveyRepository } from "./satisfaction-survey.model";
 
 export interface SatisfactionSurveysDrainDeps {
@@ -29,6 +30,8 @@ export interface SatisfactionSurveysDrainDeps {
     findById(id: string): Promise<{ id: string; status: string; flags?: { product_public_enabled?: boolean } } | undefined>;
   };
   isFlagEnabled: (flag: string) => boolean;
+  /** Spec 054 R9: mints the token sent in the e-mail (rotation); a default instance when absent. */
+  tokenService?: SatisfactionSurveyTokenService;
 }
 
 export interface DrainSummary {
@@ -84,12 +87,19 @@ export class SatisfactionSurveysDrainService {
           continue;
         }
 
+        // Spec 054 R9: the clear token only exists at render time. A fresh one is minted and its
+        // hash replaces the stored one before sending, so the link in the e-mail is the only valid
+        // token and nothing in clear is ever persisted. The language is the request's own.
+        const tokenService = this.deps.tokenService ?? new SatisfactionSurveyTokenService();
+        const token = tokenService.generateToken();
+        const locale = quote?.language === "en" ? "en" : quote?.language === "fr" ? "fr" : survey.locale;
         const emailPayload = this.deps.emailTemplate.render({
           to: email,
           publicReference: survey.publicReference,
-          token: survey.tokenHash.slice(0, 16), // Mock or placeholder if token is already dispatched
-          locale: survey.locale
+          token,
+          locale
         });
+        await this.deps.repository.update(survey.id, { tokenHash: tokenService.hashToken(token), locale });
 
         await this.deps.emailDelivery.sendAuthEmail(emailPayload);
 

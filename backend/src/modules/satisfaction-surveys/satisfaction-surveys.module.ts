@@ -63,7 +63,8 @@ export class SatisfactionSurveysModule {
       consent: deps.consent,
       countries: deps.countries,
       products: deps.products,
-      isFlagEnabled: deps.isFlagEnabled
+      isFlagEnabled: deps.isFlagEnabled,
+      tokenService: this.tokenService
     });
 
     this.service = new SatisfactionSurveysService({

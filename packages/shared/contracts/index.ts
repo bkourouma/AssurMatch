@@ -16,6 +16,7 @@ export * from "./partner-application.contracts";
 export * from "./partner.contracts";
 export * from "./partner-integration.contracts";
 export * from "./public-site.contracts";
+export * from "./public-quote-status";
 export * from "./quote.contracts";
 export * from "./quote-document.contracts";
 export * from "./routing-rule.contracts";

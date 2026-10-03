@@ -51,6 +51,8 @@ export const ErrorCodes = {
   OFFER_VALIDATION_BLOCKED: "OFFER_VALIDATION_BLOCKED",
   OFFER_VERSION_CONFLICT: "OFFER_VERSION_CONFLICT",
   OFFER_TRANSITION_INVALID: "OFFER_TRANSITION_INVALID",
+  /** Spec 054: neutral refusal of every visitor route (unknown reference, wrong, expired or revoked token). */
+  VISITOR_ACCESS_DENIED: "VISITOR_ACCESS_DENIED",
   INTERNAL_ERROR: "INTERNAL_ERROR"
 } as const;
 

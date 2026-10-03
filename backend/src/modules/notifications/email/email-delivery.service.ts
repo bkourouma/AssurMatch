@@ -10,6 +10,15 @@ export type EmailPurpose =
   | "quote_visitor_confirmation"
   | "quote_visitor_non_routable"
   | "quote_broker_lead"
+  // Spec 054 R4: one purpose per public step of the visitor's request, plus the link resend.
+  | "quote_visitor_received"
+  | "quote_visitor_in_review"
+  | "quote_visitor_transmitted"
+  | "quote_visitor_accepted"
+  | "quote_visitor_reassigned"
+  | "quote_visitor_closed"
+  | "quote_visitor_consent_withdrawn"
+  | "quote_visitor_tracking_link"
   // Spec 047: the three public-site forms confirm their own submission, so each one needs a
   // distinct purpose in the `email.delivery.*` audit trail rather than a shared "public form" value.
   | "public_waitlist_confirmation"

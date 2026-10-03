@@ -209,7 +209,20 @@ describe("routing rules runtime HTTP", () => {
     const partnerA = await seedPartner(harness, seed, "Origin Broker");
     const partnerB = await seedPartner(harness, seed, "Target Broker");
     await harness.runtime.routingRules.create(superAdmin, { countryId: seed.country.id, mode: "exclusive", exclusivePartnerTenantId: partnerA.id, reason: "Start with origin" });
-    await submitQuote(harness, seed, "7");
+    const submitted = await readJson<{ publicReference: string; verificationToken: string }>(await harness.request("/quote-requests", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        countryCode: "CI",
+        productKey: "auto",
+        formDefinitionId: seed.form.id,
+        contact: { displayName: "Visitor 7", email: "visitor7@example.test", phone: "+2250102030407" },
+        answers: { vehicle_use: "prive" },
+        consent: { accepted: true, consentTextId: seed.consentText.id, version: "v1", contentHash: seed.consentText.contentHash },
+        ipAddress: "203.0.113.7",
+        sessionId: "routing-session-7"
+      })
+    }));
     const [assignment] = await harness.runtime.leads.assignments.list();
     expect(assignment?.partnerTenantId).toBe(partnerA.id);
 
@@ -237,6 +250,18 @@ describe("routing rules runtime HTTP", () => {
     expect(harness.runtime.audit.writer.search({ action: RoutingAuditActions.reassigned })).toHaveLength(1);
     const notifications = await harness.runtime.notifications.service.list();
     expect(notifications.filter((notification) => notification.recipientScope === `partner:${partnerB.id}`)).toHaveLength(1);
+    // Spec 054 R6: the visitor is told of the reassignment, naming the new broker, once.
+    const reassignedVisitor = notifications.filter((notification) => notification.type === "visitor_quote_reassigned");
+    expect(reassignedVisitor).toHaveLength(1);
+    expect(reassignedVisitor[0]?.eventPayload).toMatchObject({ partnerTenantId: partnerB.id, previousPartnerTenantId: partnerA.id });
+    const space = await readJson<{ brokers: Array<{ partnerName: string }>; timeline: Array<{ step: string; partnerName?: string }> }>(
+      await harness.request(`/quote-requests/${submitted.publicReference}?token=${encodeURIComponent(submitted.verificationToken)}`)
+    );
+    expect(space.brokers.map((broker) => broker.partnerName)).toEqual(["Target Broker"]);
+    expect(space.timeline.filter((entry) => entry.step !== "received")).toEqual([
+      expect.objectContaining({ step: "transmitted", partnerName: "Origin Broker" }),
+      expect.objectContaining({ step: "reassigned", partnerName: "Target Broker" })
+    ]);
 
     const broker: ActorContext = { actorId: "broker", roles: ["broker_owner_pro"], partnerTenantId: partnerA.id, partnerPlan: "pro", mfaVerified: true };
     const forbidden = await harness.request(`/admin/lead-assignments/${assignment!.id}/reassign`, {

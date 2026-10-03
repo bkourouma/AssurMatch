@@ -75,9 +75,8 @@ export class SatisfactionSurveyTriggerService {
     const now = new Date();
     const dueAt = new Date(now.getTime() + 24 * 60 * 60 * 1000); // 24h delay
     const retentionUntil = new Date(now.getTime() + 730 * 24 * 60 * 60 * 1000); // 2 years default
-    const locale = typeof (quote.payload as Record<string, unknown>)?.locale === "string"
-      ? (quote.payload as Record<string, unknown>).locale as string
-      : "fr";
+    // Spec 054 R9: the survey speaks the language of the request (spec 050 `QuoteRequest.language`).
+    const locale = quote.language === "en" ? "en" : "fr";
 
     const record = await this.deps.repository.create({
       publicReference,
@@ -106,8 +105,7 @@ export class SatisfactionSurveyTriggerService {
         leadAssignmentId: record.leadAssignmentId,
         quoteRequestId: record.quoteRequestId,
         triggerStatus: record.triggerStatus,
-        dueAt: record.dueAt.toISOString(),
-        token // Note: returned for testability in memory/unit tests
+        dueAt: record.dueAt.toISOString()
       }
     });
 

@@ -158,6 +158,14 @@ function parseParam(name: string, value: string, schema: z.ZodType<string> = non
 }
 
 /**
+ * Spec 054: a visitor token is never validated by shape, so an absent or malformed token gets the
+ * same neutral 404 as a wrong one instead of a distinguishable 400. Oversized input is cut.
+ */
+function visitorToken(token: string | undefined): string {
+  return typeof token === "string" ? token.slice(0, 256) : "";
+}
+
+/**
  * Spec 051 FR-021 / R12: every broker write route starts with this, before any input parsing, so a
  * user of a suspended partner is refused (403 PARTNER_SUSPENDED) whatever the payload. Reads,
  * marking a notification read and the account security routes stay allowed.
@@ -700,8 +708,20 @@ export class PublicQuoteRequestsController {
     return this.runtime.quoteRequests.submissions.submit(parseHttpInput(quoteRequestCreateSchema, input), actorFromRequest(request));
   }
 
-  quoteStatus(publicReference: string, token?: string) {
-    return this.runtime.quoteRequests.submissions.status(parseParam("publicReference", publicReference), parseParam("token", token ?? ""));
+  /**
+   * Spec 054 R5: public status of the visitor's own request. A missing, wrong, expired or revoked
+   * token and an unknown reference all answer the same 404 `VISITOR_ACCESS_DENIED`.
+   */
+  quoteStatus(publicReference: string, token: string | undefined, request: AssurMatchHttpRequest) {
+    return this.runtime.quoteRequests.submissions.status(parseParam("publicReference", publicReference), visitorToken(token), {
+      ipAddress: clientIp(request),
+      actor: actorFromRequest(request)
+    });
+  }
+
+  /** Spec 054 R7: always `202 { accepted: true }`; 429 beyond 5 per hour and IP or 3 per reference. */
+  requestTrackingLink(input: unknown, request: AssurMatchHttpRequest) {
+    return this.runtime.quoteRequests.submissions.requestTrackingLink(input, { ipAddress: clientIp(request), actor: actorFromRequest(request) });
   }
 
   /**
@@ -711,7 +731,7 @@ export class PublicQuoteRequestsController {
   withdrawConsent(publicReference: string, token: string | undefined, request: AssurMatchHttpRequest) {
     return this.runtime.quoteRequests.submissions.withdrawConsent(
       parseParam("publicReference", publicReference),
-      parseParam("token", token ?? ""),
+      visitorToken(token),
       { ipAddress: clientIp(request), actor: actorFromRequest(request) }
     );
   }
@@ -1647,7 +1667,8 @@ decorate(PublicOffersController, "detail", [Get("offers/:offerId") as MethodDeco
 controller(undefined, PublicQuoteRequestsController);
 decorate(PublicQuoteRequestsController, "quoteForm", [Get("countries/:countryCode/products/:productKey/quote-form") as MethodDecoratorFactory], [[0, Param("countryCode") as ParamDecoratorFactory], [1, Param("productKey") as ParamDecoratorFactory], [2, Query("language") as ParamDecoratorFactory], [3, Query("offerId") as ParamDecoratorFactory]]);
 decorate(PublicQuoteRequestsController, "submitQuote", [Post("quote-requests") as MethodDecoratorFactory], [[0, Body() as ParamDecoratorFactory], [1, Req() as ParamDecoratorFactory]]);
-decorate(PublicQuoteRequestsController, "quoteStatus", [Get("quote-requests/:publicReference") as MethodDecoratorFactory], [[0, Param("publicReference") as ParamDecoratorFactory], [1, Query("token") as ParamDecoratorFactory]]);
+decorate(PublicQuoteRequestsController, "quoteStatus", [Get("quote-requests/:publicReference") as MethodDecoratorFactory, Header("Cache-Control", "no-store") as MethodDecoratorFactory], [[0, Param("publicReference") as ParamDecoratorFactory], [1, Query("token") as ParamDecoratorFactory], [2, Req() as ParamDecoratorFactory]]);
+decorate(PublicQuoteRequestsController, "requestTrackingLink", [Post("quote-requests/tracking-link") as MethodDecoratorFactory, HttpCode(202) as MethodDecoratorFactory], [[0, Body() as ParamDecoratorFactory], [1, Req() as ParamDecoratorFactory]]);
 decorate(PublicQuoteRequestsController, "withdrawConsent", [Post("quote-requests/:publicReference/consent-withdrawal") as MethodDecoratorFactory, HttpCode(200) as MethodDecoratorFactory], [[0, Param("publicReference") as ParamDecoratorFactory], [1, Query("token") as ParamDecoratorFactory], [2, Req() as ParamDecoratorFactory]]);
 
 controller("satisfaction-surveys", PublicSatisfactionSurveysController);

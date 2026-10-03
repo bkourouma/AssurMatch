@@ -12,10 +12,11 @@ export interface SurveyEmailContext {
 export class SatisfactionSurveyEmailTemplateService {
   render(context: SurveyEmailContext): AuthEmailPayload {
     const locale = (context.locale ?? "fr").toLowerCase().startsWith("en") ? "en" : "fr";
-    const baseUrl = (context.baseUrl ?? "https://assurmatch.com").replace(/\/+$/, "");
+    // Spec 054 R9: the public site the pages `/avis/{ref}` and `/en/feedback/{ref}` live on.
+    const baseUrl = (context.baseUrl ?? process.env.PUBLIC_APP_URL ?? "http://127.0.0.1:3601").replace(/\/+$/, "");
     const feedbackUrl = locale === "en"
-      ? `${baseUrl}/en/feedback/${context.publicReference}?token=${encodeURIComponent(context.token)}`
-      : `${baseUrl}/avis/${context.publicReference}?token=${encodeURIComponent(context.token)}`;
+      ? `${baseUrl}/en/feedback/${encodeURIComponent(context.publicReference)}?token=${encodeURIComponent(context.token)}`
+      : `${baseUrl}/avis/${encodeURIComponent(context.publicReference)}?token=${encodeURIComponent(context.token)}`;
 
     let subject: string;
     let body: string;

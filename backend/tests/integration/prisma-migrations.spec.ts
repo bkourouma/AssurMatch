@@ -28,7 +28,8 @@ describe("prisma migration fresh-base readiness", () => {
       "0019_satisfaction_surveys",
       "0020_catalog_admin_consent_content",
       "0021_partner_onboarding_lifecycle",
-      "0022_offer_versions_selected_offer_routing"
+      "0022_offer_versions_selected_offer_routing",
+      "0023_visitor_access_tokens_notifications"
     ]);
     const schema = readFileSync(join(process.cwd(), "backend", "prisma", "schema.prisma"), "utf8");
     for (const model of ["AuditLog", "FeatureFlag", "ConsentRecord", "QuoteRequest", "LeadAssignment", "BrokerCrmLeadState", "PartnerApiKey", "PartnerWebhookEndpoint", "PartnerWebhookDelivery", "PartnerWebhookAllowlistEntry", "RoutingRule", "RoutingRuleHistory"]) {
@@ -184,5 +185,20 @@ describe("prisma migration fresh-base readiness", () => {
     expect(offerVersions.match(/UPDATE /g)).toHaveLength(2);
     expect(schema).toContain("model OfferVersion");
     expect(schema).toMatch(/enum OfferVersionStatus/);
+    // Spec 054: visitor access tokens and visitor notification types (additive).
+    const visitorAccess = readFileSync(join(migrationsDir, "0023_visitor_access_tokens_notifications", "migration.sql"), "utf8");
+    expect(visitorAccess).toContain('CREATE TABLE IF NOT EXISTS "VisitorAccessToken"');
+    expect(visitorAccess).toContain('CREATE UNIQUE INDEX IF NOT EXISTS "VisitorAccessToken_tokenHash_key"');
+    expect(visitorAccess).toContain('ALTER TABLE "Notification" ADD COLUMN IF NOT EXISTS "dedupeKey" TEXT');
+    expect(visitorAccess).toContain('ALTER TABLE "Notification" ADD COLUMN IF NOT EXISTS "eventPayload" JSONB');
+    expect(visitorAccess).toContain('CREATE UNIQUE INDEX IF NOT EXISTS "Notification_dedupeKey_key"');
+    for (const value of ["visitor_quote_received", "visitor_quote_in_review", "visitor_quote_transmitted", "visitor_quote_accepted", "visitor_quote_reassigned", "visitor_quote_closed", "visitor_consent_withdrawn", "visitor_tracking_link"]) {
+      expect(visitorAccess).toContain(`ALTER TYPE "NotificationType" ADD VALUE IF NOT EXISTS '${value}'`);
+      expect(schema).toContain(`  ${value}\n`);
+    }
+    expect(visitorAccess).not.toMatch(/DROP|DELETE|UPDATE /);
+    expect(schema).toContain("model VisitorAccessToken");
+    // No clear token column: only the hash is stored.
+    expect(schema).not.toMatch(/model VisitorAccessToken \{[^}]*\btoken\s+String/);
   });
 });
