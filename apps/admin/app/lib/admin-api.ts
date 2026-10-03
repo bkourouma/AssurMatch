@@ -36,6 +36,7 @@ import type {
   PartnerApplicationRejectionReasonCode,
   PartnerApplicationStatus
 } from "../../../../packages/shared/contracts/partner-application.contracts";
+import type { PartnerChangeRequestView } from "../../../../packages/shared/contracts/broker-self-service.contracts";
 
 export const ADMIN_AUTH_SOURCE_MARKER = "admin-auth-client:014";
 
@@ -1439,6 +1440,22 @@ export function convertAdminPartnerApplication(applicationId: string, reason: st
 
 export function rejectAdminPartnerApplication(applicationId: string, input: { rejectionReasonCode: PartnerApplicationRejectionReasonCode; reason: string }) {
   return writeAdminResult<AdminPartnerApplication>(applicationPath(applicationId, "reject"), "POST", input);
+}
+
+/* ---------------------------------------------------------------------------------------------
+ * Spec 053: broker requests (identity changes and coverage extensions) shown on the partner page
+ * (« Demandes du courtier ») and decided by the admin; the API applies an accepted request through
+ * the spec 051 partner rules and keeps it pending when one of them refuses.
+ * ------------------------------------------------------------------------------------------- */
+
+export type { PartnerChangeRequestView };
+
+export function readAdminPartnerRequests(partnerTenantId: string) {
+  return readAdmin<PartnerChangeRequestView[]>(`/admin/partner-requests?partnerTenantId=${encodeURIComponent(partnerTenantId)}`, []);
+}
+
+export function decideAdminPartnerRequest(requestId: string, input: { decision: "accepted" | "rejected"; reason: string }) {
+  return writeAdminResult<PartnerChangeRequestView>(`/admin/partner-requests/${encodeURIComponent(requestId)}/decision`, "POST", input);
 }
 
 
