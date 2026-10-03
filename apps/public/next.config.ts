@@ -1,4 +1,5 @@
 import createNextIntlPlugin from "next-intl/plugin";
+import { securityHeadersFromEnv } from "../../packages/shared/security/security-headers";
 
 const withNextIntl = createNextIntlPlugin("./i18n/request.ts");
 
@@ -43,7 +44,14 @@ const nextConfig = {
   // rule and no Pages-Router data routes, which is all this normalisation step touches.
   skipProxyUrlNormalize: true,
   async headers() {
-    return VISITOR_TOKEN_PATHS.map((source) => ({ source, headers: VISITOR_TOKEN_HEADERS }));
+    return [
+      // Spec 058 FR-007: CSP, HSTS (production), DENY framing, nosniff, strict-origin-when-cross-origin.
+      // The browser submits quote requests to the API directly (spec 043), hence its origin in connect-src.
+      { source: "/:path*", headers: securityHeadersFromEnv(process.env, [process.env.NEXT_PUBLIC_ASSURMATCH_API_URL]) },
+      // Declared AFTER the general rule: for the same key Next keeps the last matching value, so the
+      // visitor token pages keep `Referrer-Policy: no-referrer` (spec 054 R8).
+      ...VISITOR_TOKEN_PATHS.map((source) => ({ source, headers: VISITOR_TOKEN_HEADERS }))
+    ];
   },
   async redirects() {
     return [

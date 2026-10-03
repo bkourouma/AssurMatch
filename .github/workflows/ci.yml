@@ -1,6 +1,6 @@
 # AssurMatch CI/CD
 # - verify: PR + push main + manual run (typecheck, lint, test, build, prisma validate, audit, playwright source-marker)
-# - secret-scan: ensure no real EMAIL_SMTP_PASS / private key shipped
+# - secret-scan: gitleaks-like scan of tracked files (keys, provider tokens, credential URLs, literal secrets; spec 058)
 # - build-images: push main + manual run - four GHCR images (assurmatch, assurmatch-public,
 #   assurmatch-backoffice, assurmatch-broker). The three frontends are the preproduction ones: their
 #   NEXT_PUBLIC_* come from the repository variables PREPROD_API_URL, PREPROD_PUBLIC_URL and
@@ -84,7 +84,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      - name: Forbid real SMTP password in tracked files
+      - name: Scan tracked files for secrets (spec 058 FR-008)
         run: |
           node scripts/ci/secret-scan.mjs
 

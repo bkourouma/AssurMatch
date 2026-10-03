@@ -1,0 +1,104 @@
+# AssurMatch alert rules (spec 058 FR-004). Load with `rule_files: [prometheus-alerts.yml]`.
+# Series come from GET /metrics of the API (token-protected, private network), see
+# docs/runbooks/observability.md. Certificate expiry needs the blackbox exporter (probe_*).
+# Thresholds are starting values: tune them after two weeks of production traffic.
+groups:
+  - name: assurmatch-api
+    rules:
+      - alert: AssurMatchApiDown
+        expr: up{job="assurmatch-api"} == 0
+        for: 2m
+        labels: { severity: critical }
+        annotations:
+          summary: "API AssurMatch injoignable par Prometheus"
+          runbook: docs/runbooks/health.md
+
+      - alert: AssurMatchHigh5xxRate
+        # More than 2 % of responses in 5xx AND at least 5 errors in 5 minutes.
+        expr: |
+          (sum(rate(assurmatch_http_request_errors_total[5m])) / clamp_min(sum(rate(assurmatch_http_requests_total[5m])), 1e-9)) > 0.02
+          and sum(increase(assurmatch_http_request_errors_total[5m])) >= 5
+        for: 5m
+        labels: { severity: critical }
+        annotations:
+          summary: "Taux de 5xx > 2 % sur 5 min"
+          description: "Retrouver les requêtes par correlationId dans les journaux JSON (event=http.error)."
+          runbook: docs/runbooks/observability.md
+
+      - alert: AssurMatch5xxOnRoute
+        expr: sum by (route) (increase(assurmatch_http_request_errors_total[15m])) >= 10
+        labels: { severity: warning }
+        annotations:
+          summary: "≥ 10 erreurs 5xx en 15 min sur {{ $labels.route }}"
+
+      - alert: AssurMatchSlowRequests
+        expr: histogram_quantile(0.95, sum by (le) (rate(assurmatch_http_request_duration_seconds_bucket[5m]))) > 2
+        for: 10m
+        labels: { severity: warning }
+        annotations:
+          summary: "p95 de latence API > 2 s depuis 10 min"
+
+      - alert: AssurMatchAuthBruteForce
+        expr: sum(increase(assurmatch_auth_rate_limited_total[15m])) > 20
+        labels: { severity: warning }
+        annotations:
+          summary: "Plus de 20 refus 429 d'authentification en 15 min (force brute probable)"
+          runbook: docs/runbooks/monitoring-alerts.md
+
+  - name: assurmatch-worker
+    rules:
+      - alert: AssurMatchWorkerIdle
+        # Worker cycle every 30 s by default; 10 minutes without a cycle means it is stuck or down.
+        expr: assurmatch_worker_last_cycle_age_seconds > 600
+        for: 1m
+        labels: { severity: critical }
+        annotations:
+          summary: "Worker inactif depuis plus de 10 min"
+          runbook: docs/runbooks/worker.md
+
+      - alert: AssurMatchWorkerNeverSeen
+        expr: absent(assurmatch_worker_last_cycle_timestamp_seconds)
+        for: 15m
+        labels: { severity: critical }
+        annotations:
+          summary: "Aucun état du worker publié dans Redis depuis 15 min"
+          runbook: docs/runbooks/worker.md
+
+      - alert: AssurMatchNotificationBacklog
+        expr: assurmatch_notifications_backlog > 50
+        for: 15m
+        labels: { severity: warning }
+        annotations:
+          summary: "Plus de 50 notifications en attente depuis 15 min"
+          runbook: docs/runbooks/quote-notification-delivery.md
+
+      - alert: AssurMatchEmailFailures
+        expr: increase(assurmatch_worker_task_failures_total{task="quote-notifications"}[1h]) > 5
+        labels: { severity: warning }
+        annotations:
+          summary: "Plus de 5 échecs d'envoi d'e-mail en 1 h"
+          runbook: docs/runbooks/quote-notification-delivery.md
+
+      - alert: AssurMatchWorkerTaskErrors
+        expr: increase(assurmatch_worker_task_errors_total[30m]) > 0
+        labels: { severity: warning }
+        annotations:
+          summary: "La tâche worker {{ $labels.task }} a levé une erreur"
+          runbook: docs/runbooks/worker.md
+
+  - name: assurmatch-edge
+    rules:
+      - alert: AssurMatchCertificateExpiresSoon
+        expr: (probe_ssl_earliest_cert_expiry{job="assurmatch-blackbox"} - time()) < 14 * 86400
+        for: 1h
+        labels: { severity: warning }
+        annotations:
+          summary: "Certificat TLS de {{ $labels.instance }} expirant dans moins de 14 jours"
+          runbook: docs/runbooks/monitoring-alerts.md
+
+      - alert: AssurMatchEndpointDown
+        expr: probe_success{job="assurmatch-blackbox"} == 0
+        for: 3m
+        labels: { severity: critical }
+        annotations:
+          summary: "{{ $labels.instance }} ne répond plus"

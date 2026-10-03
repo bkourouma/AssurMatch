@@ -1,5 +1,8 @@
 import { ArgumentsHost, Catch, ExceptionFilter, HttpException, HttpStatus, NotFoundException } from "@nestjs/common";
 import { ErrorCodes, type ErrorCode } from "../../../../../packages/shared/contracts/error-codes";
+import { errorReporter } from "../../observability/error-reporter";
+import { routeTemplate } from "../../observability/request-logging.middleware";
+import { logEvent, maskedStack } from "../../observability/structured-logger";
 
 export interface SafeErrorResponse {
   code: ErrorCode;
@@ -99,16 +102,42 @@ function statusForError(error: unknown): number {
   return HttpStatus.INTERNAL_SERVER_ERROR;
 }
 
+/**
+ * Spec 058 FR-001 / FR-002: every 5xx is logged with its correlationId, the route template and the
+ * masked stack (server side only; the response body stays `toSafeErrorResponse`), then handed to the
+ * optional error reporter. Nothing from the request body, headers or query is logged.
+ */
+function reportServerError(
+  exception: unknown,
+  correlationId: string,
+  status: number,
+  request: { method?: string; baseUrl?: string; route?: { path?: unknown } }
+): void {
+  const route = routeTemplate(request);
+  const method = (request.method ?? "GET").toUpperCase();
+  logEvent("error", "http.error", {
+    correlationId,
+    method,
+    route,
+    status,
+    errorName: exception instanceof Error ? exception.name : typeof exception,
+    message: exception instanceof Error ? exception.message : String(exception),
+    stack: maskedStack(exception)
+  });
+  void errorReporter().report(exception, { correlationId, route, method, status, source: "http" });
+}
+
 export class ErrorResponseFilter implements ExceptionFilter {
   catch(exception: unknown, host: ArgumentsHost): void {
     const http = host.switchToHttp();
     const response = http.getResponse<{ status(status: number): { json(body: unknown): void } }>();
-    const request = http.getRequest<{ headers?: Record<string, string | string[] | undefined> }>();
+    const request = http.getRequest<{ method?: string; baseUrl?: string; route?: { path?: unknown }; headers?: Record<string, string | string[] | undefined> }>();
     const correlationIdHeader = request.headers?.["x-correlation-id"];
     const correlationId = Array.isArray(correlationIdHeader)
       ? correlationIdHeader[0] ?? crypto.randomUUID()
       : correlationIdHeader ?? crypto.randomUUID();
     const status = statusForError(exception);
+    if (status >= HttpStatus.INTERNAL_SERVER_ERROR) reportServerError(exception, correlationId, status, request);
     response.status(status).json(toSafeErrorResponse(exception, correlationId, status));
   }
 }

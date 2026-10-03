@@ -131,6 +131,7 @@ import { roleHasPermission, type AssurMatchRole } from "../../../../packages/sha
 import { isoCountrySchema, languageCodeSchema, nonEmptyStringSchema, reasonSchema, uuidSchema } from "../../../../packages/shared/validation/common.schemas";
 import { AssurMatchRuntime } from "../../runtime/assurmatch-runtime";
 import { AuthRequiredHttpGuard, MfaRequiredHttpGuard } from "../auth/guards/http-auth.guard";
+import { AuthRateLimiter } from "../auth/rate-limit.guard";
 import { assertBrokerTenantWritable } from "../partners/partner-tenant-status.service";
 import { actorFromRequest, clientIp, protectedActorFromRequest, type AssurMatchHttpRequest } from "../common/http/request-actor";
 import { parseHttpInput } from "../common/http/zod-validation";
@@ -140,6 +141,7 @@ import { PublicJourneyFlagPolicy } from "../feature-flags/public-journey-flag-po
 import { AdminUsersController as AdminUsersDomainController } from "../users/admin-users.controller";
 import { AdminUserRolesController as AdminUserRolesDomainController } from "../users/admin-user-roles.controller";
 import { PublicHealthController } from "../health/public-health.controller";
+import { MetricsController } from "../observability/metrics.controller";
 import { adminAuditLogQuerySchema } from "../../../../packages/shared/contracts/admin-operations.contracts";
 import { ADMIN_OPERATIONS_HTTP_CONTROLLERS } from "./admin-operations-http.controllers";
 
@@ -250,11 +252,25 @@ function assertLocalDevReloadAllowed(request: AssurMatchHttpRequest): void {
   }
 }
 
-export class AuthController {
-  constructor(private readonly runtime: AssurMatchRuntime) {}
+/** Spec 058 FR-006: identifier of a rate-limit bucket, read from the raw body before validation. */
+function bodyString(input: unknown, field: string): string | undefined {
+  const value = input && typeof input === "object" ? (input as Record<string, unknown>)[field] : undefined;
+  return typeof value === "string" && value.trim().length > 0 ? value.slice(0, 512) : undefined;
+}
 
-  login(input: LoginRequest) {
-    return this.runtime.auth.service.login(parseHttpInput(loginRequestSchema, input));
+export class AuthController {
+  /** Spec 058 FR-006: Redis-backed limits on login, password reset and MFA verification. */
+  private readonly rateLimiter: AuthRateLimiter;
+
+  constructor(private readonly runtime: AssurMatchRuntime) {
+    this.rateLimiter = new AuthRateLimiter(runtime.redis.client);
+  }
+
+  login(input: LoginRequest, request: AssurMatchHttpRequest) {
+    return this.rateLimiter.run(
+      { route: "/auth/login", ip: clientIp(request), identifier: bodyString(input, "email") },
+      () => this.runtime.auth.service.login(parseHttpInput(loginRequestSchema, input))
+    );
   }
 
   activate(input: ActivateRequest) {
@@ -273,8 +289,11 @@ export class AuthController {
     return this.runtime.auth.service.changePassword(protectedActorFromRequest(request), parseHttpInput(passwordChangeRequestSchema, input));
   }
 
-  passwordReset(input: PasswordResetRequest) {
-    return this.runtime.auth.service.resetPassword(parseHttpInput(passwordResetRequestSchema, input));
+  passwordReset(input: PasswordResetRequest, request: AssurMatchHttpRequest) {
+    return this.rateLimiter.run(
+      { route: "/auth/password-reset", ip: clientIp(request), identifier: bodyString(input, "token") },
+      () => this.runtime.auth.service.resetPassword(parseHttpInput(passwordResetRequestSchema, input))
+    );
   }
 
   async enrollMfa(request: AssurMatchHttpRequest) {
@@ -284,8 +303,10 @@ export class AuthController {
 
   async verifyMfa(request: AssurMatchHttpRequest, input: { challengeId: string; code: string }) {
     const actor = protectedActorFromRequest(request);
-    const parsed = parseHttpInput(mfaVerifyRequestSchema, input);
-    return this.runtime.auth.service.verifyMfa(await this.runtime.users.service.require(actor.actorId ?? ""), parsed.challengeId ?? "", parsed.code, parsed.kind);
+    return this.rateLimiter.run({ route: "/auth/mfa/verify", ip: clientIp(request), identifier: actor.actorId ?? undefined }, async () => {
+      const parsed = parseHttpInput(mfaVerifyRequestSchema, input);
+      return this.runtime.auth.service.verifyMfa(await this.runtime.users.service.require(actor.actorId ?? ""), parsed.challengeId ?? "", parsed.code, parsed.kind);
+    });
   }
 }
 
@@ -1998,12 +2019,12 @@ function headerValue(value: string | string[] | undefined): string | undefined {
 }
 
 controller("auth", AuthController);
-decorate(AuthController, "login", [Post("login") as MethodDecoratorFactory], [[0, Body() as ParamDecoratorFactory]]);
+decorate(AuthController, "login", [Post("login") as MethodDecoratorFactory], [[0, Body() as ParamDecoratorFactory], [1, Req() as ParamDecoratorFactory]]);
 decorate(AuthController, "activate", [Post("activate") as MethodDecoratorFactory], [[0, Body() as ParamDecoratorFactory]]);
 decorate(AuthController, "logout", [authRoute, Post("logout") as MethodDecoratorFactory]);
 decorate(AuthController, "me", [authRoute, Get("me") as MethodDecoratorFactory], [[0, Req() as ParamDecoratorFactory]]);
 decorate(AuthController, "passwordChange", [authRoute, Post("password-change") as MethodDecoratorFactory], [[0, Req() as ParamDecoratorFactory], [1, Body() as ParamDecoratorFactory]]);
-decorate(AuthController, "passwordReset", [Post("password-reset") as MethodDecoratorFactory], [[0, Body() as ParamDecoratorFactory]]);
+decorate(AuthController, "passwordReset", [Post("password-reset") as MethodDecoratorFactory], [[0, Body() as ParamDecoratorFactory], [1, Req() as ParamDecoratorFactory]]);
 decorate(AuthController, "enrollMfa", [authRoute, Post("mfa/enroll") as MethodDecoratorFactory], [[0, Req() as ParamDecoratorFactory]]);
 decorate(AuthController, "verifyMfa", [authRoute, Post("mfa/verify") as MethodDecoratorFactory], [[0, Req() as ParamDecoratorFactory], [1, Body() as ParamDecoratorFactory]]);
 
@@ -2531,6 +2552,8 @@ Module({
     AdminPartnerIntegrationsController,
     PartnerApiController,
     PublicHealthController,
+    // Spec 058: Prometheus scrape endpoint (token-protected, 404 when METRICS_TOKEN is unset).
+    MetricsController,
     // Spec 056: admin operations consoles (see admin-operations-http.controllers.ts).
     ...ADMIN_OPERATIONS_HTTP_CONTROLLERS,
     // Spec 051: last, after the static `partners/sla` and `partners/applications` routes.
