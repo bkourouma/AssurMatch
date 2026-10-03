@@ -11,7 +11,7 @@ Le courtier affecté, Starter (« Répondre au visiteur ») ou CRM Pro/Enterpris
 ## Technical Context
 
 - **Langage** : TypeScript strict ; NestJS 11, Next.js 16.3, Prisma 7.8, zod 4.
-- **Stockage** : PostgreSQL (migration `0028_broker_response_loop`, renumérotée à la fusion) ; stockage documentaire et antivirus des specs 033/051 ; Redis pour les limites.
+- **Stockage** : PostgreSQL (migration `0027_broker_response_loop`, renumérotée à la fusion) ; stockage documentaire et antivirus des specs 033/051 ; Redis pour les limites.
 - **Tests** : Vitest (unitaires, intégration HTTP de bout en bout), Playwright en marqueurs de source pour le back-office courtier.
 - **Surfaces impactées** : Backend API ; Broker Back-office (Starter et CRM) ; notifications et worker ; base de données ; packages partagés (contrats). **Web Publique Client** : contrat exposé seulement (`proposals` dans la vue de statut, routes de document et de réponse) ; l'écran visiteur est livré ensuite par un autre agent (aucune modification de `apps/public` ici). Back-office Plateforme/Admin : aucun changement.
 - **Contraintes** : aucun jeton côté navigateur du courtier (relais serveur) ; aucun fichier non sain servi ; aucune donnée de réponse visiteur dans les e-mails ; aucun statut CRM modifié par le visiteur ; Starter sans fonction CRM.
@@ -37,7 +37,7 @@ Le courtier affecté, Starter (« Répondre au visiteur ») ou CRM Pro/Enterpris
 
 ```text
 packages/shared/contracts/lead-proposals.ts (new), public-quote-status.ts (proposals, proposal_available), content-safety.ts (EN), quote.contracts.ts, ops.contracts.ts, error-codes.ts
-backend/prisma/schema.prisma + migrations/0028_broker_response_loop/
+backend/prisma/schema.prisma + migrations/0027_broker_response_loop/
 backend/src/modules/lead-proposals/{lead-proposals.repository.ts, lead-proposals.service.ts, lead-documents.service.ts, scanned-upload.ts, lead-proposals.module.ts} (new)
 backend/src/modules/leads/{lead-contact-policy.ts (new), broker-crm-leads.service.ts, broker-starter-leads.service.ts, lead-assignment.service.ts, lead-assignments.repository.ts, crm-activity.repository.ts, leads.module.ts}
 backend/src/modules/notifications/{quote-notification.service.ts, quote-notification-delivery.service.ts, email/quote-email-template.service.ts, email/email-delivery.service.ts}

@@ -13,6 +13,7 @@ import {
   changePartnerStatusAction,
   createPartnerAction,
   createPartnerLicenseAction,
+  decidePartnerRequestAction,
   invitePartnerUserAction,
   partnerLicenseAction,
   recordPartnerContractAction,
@@ -610,5 +611,55 @@ export function InviteUserForm({ partnerId, plan }: { partnerId: string; plan: s
         <Button type="submit" pending={pending} pendingLabel="Invitation...">Inviter et émettre l&apos;activation</Button>
       </FormActions>
     </Form>
+  );
+}
+
+/* ------------------------------------------------------------------- broker requests (053) */
+
+/**
+ * Spec 053 FR-004/FR-013: accept or reject a broker request (identity change, coverage
+ * extension). Accepting applies the change through the spec 051 rules; their refusals (RCCM
+ * duplicate, licence required for a country) are shown and the request stays pending.
+ */
+export function PartnerRequestDecisionForm({ partnerId, requestId }: { partnerId: string; requestId: string }) {
+  const [state, formAction] = useActionState(decidePartnerRequestAction, initialState);
+  const base = useId();
+  return (
+    <div data-partner-request-decision="true">
+      <PartnerActionResult state={state} />
+      <Cluster>
+        <ConfirmDialog
+          triggerLabel="Accepter"
+          triggerVariant="primary"
+          title="Accepter la demande du courtier"
+          description="La modification demandée est appliquée à la fiche (mêmes contrôles qu'une modification admin) et auditée."
+          confirmLabel="Accepter"
+          cancelLabel="Annuler"
+          formAction={formAction}
+          dataAttributes={{ "data-partner-form": "request-accept" }}
+        >
+          <input type="hidden" name="partnerId" value={partnerId} />
+          <input type="hidden" name="requestId" value={requestId} />
+          <input type="hidden" name="decision" value="accepted" />
+          <ReasonField id={`${base}-accept-reason`} />
+        </ConfirmDialog>
+        <ConfirmDialog
+          triggerLabel="Refuser"
+          triggerVariant="danger"
+          title="Refuser la demande du courtier"
+          description="Rien n'est modifié ; le courtier voit le motif dans son portail."
+          confirmLabel="Refuser"
+          cancelLabel="Annuler"
+          tone="danger"
+          formAction={formAction}
+          dataAttributes={{ "data-partner-form": "request-reject" }}
+        >
+          <input type="hidden" name="partnerId" value={partnerId} />
+          <input type="hidden" name="requestId" value={requestId} />
+          <input type="hidden" name="decision" value="rejected" />
+          <ReasonField id={`${base}-reject-reason`} />
+        </ConfirmDialog>
+      </Cluster>
+    </div>
   );
 }

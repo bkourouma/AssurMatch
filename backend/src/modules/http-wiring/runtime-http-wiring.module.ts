@@ -50,6 +50,19 @@ import {
 } from "../../../../packages/shared/contracts/partner.contracts";
 import type { UploadedAccreditationFile } from "../documents/documents.module";
 import {
+  adminPartnerRequestListQuerySchema,
+  brokerLicenseProofUploadSchema,
+  brokerLicenseRenewalSchema,
+  brokerProfileUpdateSchema,
+  brokerTeamActionSchema,
+  brokerTeamInviteSchema,
+  brokerTeamRoleChangeSchema,
+  partnerCoverageExtensionRequestSchema,
+  partnerProfileChangeRequestSchema,
+  partnerRequestCancelSchema,
+  partnerRequestDecisionSchema
+} from "../../../../packages/shared/contracts/broker-self-service.contracts";
+import {
   retentionBatchApproveRequestSchema,
   retentionErasurePreviewRequestSchema,
   retentionPoliciesQuerySchema,
@@ -480,6 +493,115 @@ export class BrokerOffersController {
   renew(id: string, input: unknown, request: AssurMatchHttpRequest) {
     const actor = brokerWriteActor(request);
     return this.runtime.offers.brokerService.renew(parseParam("id", id, uuidSchema), input, actor);
+  }
+}
+
+/**
+ * Spec 053 (G-01, G-04): the broker's company profile, coverage and requests. The partner is always
+ * the actor's. Writes start with `brokerWriteActor` (403 PARTNER_SUSPENDED before any parsing) and
+ * are listed in `BROKER_TENANT_WRITE_GUARDED`; roles are checked and audited by `BrokerAccountService`.
+ */
+export class BrokerAccountController {
+  constructor(private readonly runtime: AssurMatchRuntime) {}
+
+  profile(request: AssurMatchHttpRequest) {
+    return this.runtime.brokerAccount.account(protectedActorFromRequest(request));
+  }
+
+  updateProfile(input: unknown, request: AssurMatchHttpRequest) {
+    const actor = brokerWriteActor(request);
+    return this.runtime.brokerAccount.updateProfile(actor, parseHttpInput(brokerProfileUpdateSchema, input ?? {}));
+  }
+
+  coverage(request: AssurMatchHttpRequest) {
+    return this.runtime.brokerAccount.coverage(protectedActorFromRequest(request));
+  }
+
+  requests(request: AssurMatchHttpRequest) {
+    return this.runtime.brokerAccount.listRequests(protectedActorFromRequest(request));
+  }
+
+  catalog(request: AssurMatchHttpRequest) {
+    return this.runtime.brokerAccount.catalogChoices(protectedActorFromRequest(request));
+  }
+
+  requestProfileChange(input: unknown, request: AssurMatchHttpRequest) {
+    const actor = brokerWriteActor(request);
+    return this.runtime.brokerAccount.requestProfileChange(actor, parseHttpInput(partnerProfileChangeRequestSchema, input ?? {}));
+  }
+
+  requestCoverageExtension(input: unknown, request: AssurMatchHttpRequest) {
+    const actor = brokerWriteActor(request);
+    return this.runtime.brokerAccount.requestCoverageExtension(actor, parseHttpInput(partnerCoverageExtensionRequestSchema, input ?? {}));
+  }
+
+  cancelRequest(id: string, input: unknown, request: AssurMatchHttpRequest) {
+    const actor = brokerWriteActor(request);
+    return this.runtime.brokerAccount.cancelRequest(actor, parseParam("id", id, uuidSchema), parseHttpInput(partnerRequestCancelSchema, input ?? {}));
+  }
+}
+
+/** Spec 053 (G-02): licences of the broker's partner, renewal drafts and licence proofs. */
+export class BrokerLicensesController {
+  constructor(private readonly runtime: AssurMatchRuntime) {}
+
+  list(request: AssurMatchHttpRequest) {
+    return this.runtime.brokerAccount.listLicenses(protectedActorFromRequest(request));
+  }
+
+  renew(id: string, input: unknown, request: AssurMatchHttpRequest) {
+    const actor = brokerWriteActor(request);
+    return this.runtime.brokerAccount.renewLicense(actor, parseParam("id", id, uuidSchema), parseHttpInput(brokerLicenseRenewalSchema, input ?? {}));
+  }
+
+  /** Multipart: `file` plus an optional `reason`; same file rules as the admin upload (spec 051). */
+  uploadProof(id: string, file: UploadedAccreditationFile | undefined, body: Record<string, string | undefined>, request: AssurMatchHttpRequest) {
+    const actor = brokerWriteActor(request);
+    const fields = Object.fromEntries(Object.entries(body ?? {}).filter(([key, value]) => key === "reason" && typeof value === "string" && value.trim() !== ""));
+    const { reason } = parseHttpInput(brokerLicenseProofUploadSchema, fields);
+    return this.runtime.brokerAccount.uploadLicenseProof(actor, parseParam("id", id, uuidSchema), file, reason);
+  }
+}
+
+/** Spec 053 (G-03): the broker's own team; owners and managers write, every broker role reads. */
+export class BrokerTeamController {
+  constructor(private readonly runtime: AssurMatchRuntime) {}
+
+  list(request: AssurMatchHttpRequest) {
+    return this.runtime.brokerTeam.list(protectedActorFromRequest(request));
+  }
+
+  invite(input: unknown, request: AssurMatchHttpRequest) {
+    const actor = brokerWriteActor(request);
+    return this.runtime.brokerTeam.invite(actor, parseHttpInput(brokerTeamInviteSchema, input ?? {}));
+  }
+
+  deactivate(id: string, input: unknown, request: AssurMatchHttpRequest) {
+    const actor = brokerWriteActor(request);
+    return this.runtime.brokerTeam.deactivate(actor, parseParam("id", id, optionalUuidParamSchema), parseHttpInput(brokerTeamActionSchema, input ?? {}));
+  }
+
+  reactivate(id: string, input: unknown, request: AssurMatchHttpRequest) {
+    const actor = brokerWriteActor(request);
+    return this.runtime.brokerTeam.reactivate(actor, parseParam("id", id, optionalUuidParamSchema), parseHttpInput(brokerTeamActionSchema, input ?? {}));
+  }
+
+  changeRole(id: string, input: unknown, request: AssurMatchHttpRequest) {
+    const actor = brokerWriteActor(request);
+    return this.runtime.brokerTeam.changeRole(actor, parseParam("id", id, optionalUuidParamSchema), parseHttpInput(brokerTeamRoleChangeSchema, input ?? {}));
+  }
+}
+
+/** Spec 053 FR-004/FR-013: admin list and decision of the broker requests (country scope applied). */
+export class AdminPartnerRequestsHttpController {
+  constructor(private readonly runtime: AssurMatchRuntime) {}
+
+  list(request: AssurMatchHttpRequest, query: Record<string, string>) {
+    return this.runtime.partnerRequestAdmin.list(protectedActorFromRequest(request), parseHttpInput(adminPartnerRequestListQuerySchema, query ?? {}));
+  }
+
+  decide(id: string, request: AssurMatchHttpRequest, input: unknown) {
+    return this.runtime.partnerRequestAdmin.decide(protectedActorFromRequest(request), parseParam("id", id, uuidSchema), parseHttpInput(partnerRequestDecisionSchema, input ?? {}));
   }
 }
 
@@ -2048,6 +2170,40 @@ decorate(BrokerOffersController, "update", [Patch(":id") as MethodDecoratorFacto
 decorate(BrokerOffersController, "submit", [Post(":id/submit") as MethodDecoratorFactory, HttpCode(200) as MethodDecoratorFactory], [[0, Param("id") as ParamDecoratorFactory], [1, Body() as ParamDecoratorFactory], [2, Req() as ParamDecoratorFactory]]);
 decorate(BrokerOffersController, "withdraw", [Post(":id/withdraw") as MethodDecoratorFactory, HttpCode(200) as MethodDecoratorFactory], [[0, Param("id") as ParamDecoratorFactory], [1, Body() as ParamDecoratorFactory], [2, Req() as ParamDecoratorFactory]]);
 decorate(BrokerOffersController, "renew", [Post(":id/renew") as MethodDecoratorFactory], [[0, Param("id") as ParamDecoratorFactory], [1, Body() as ParamDecoratorFactory], [2, Req() as ParamDecoratorFactory]]);
+// Spec 053: broker self-service (company profile, requests, licences, team) and the admin decisions.
+{
+  const id = Param("id") as ParamDecoratorFactory;
+  const req = Req() as ParamDecoratorFactory;
+  const body = Body() as ParamDecoratorFactory;
+  const ok = HttpCode(200) as MethodDecoratorFactory;
+  controller("broker/account", BrokerAccountController, true);
+  decorate(BrokerAccountController, "profile", [Get("profile") as MethodDecoratorFactory], [[0, req]]);
+  decorate(BrokerAccountController, "updateProfile", [Patch("profile") as MethodDecoratorFactory], [[0, body], [1, req]]);
+  decorate(BrokerAccountController, "coverage", [Get("coverage") as MethodDecoratorFactory], [[0, req]]);
+  decorate(BrokerAccountController, "requests", [Get("requests") as MethodDecoratorFactory], [[0, req]]);
+  decorate(BrokerAccountController, "catalog", [Get("catalog") as MethodDecoratorFactory], [[0, req]]);
+  decorate(BrokerAccountController, "requestProfileChange", [Post("requests/profile") as MethodDecoratorFactory], [[0, body], [1, req]]);
+  decorate(BrokerAccountController, "requestCoverageExtension", [Post("requests/coverage") as MethodDecoratorFactory], [[0, body], [1, req]]);
+  decorate(BrokerAccountController, "cancelRequest", [Post("requests/:id/cancel") as MethodDecoratorFactory, ok], [[0, id], [1, body], [2, req]]);
+  controller("broker/licenses", BrokerLicensesController, true);
+  decorate(BrokerLicensesController, "list", [Get() as MethodDecoratorFactory], [[0, req]]);
+  decorate(BrokerLicensesController, "renew", [Post(":id/renewals") as MethodDecoratorFactory], [[0, id], [1, body], [2, req]]);
+  decorate(
+    BrokerLicensesController,
+    "uploadProof",
+    [Post(":id/documents") as MethodDecoratorFactory, UseInterceptors(FileInterceptor("file", { limits: { fileSize: ACCREDITATION_DOCUMENT_MAX_BYTES, files: 1 } })) as MethodDecoratorFactory],
+    [[0, id], [1, UploadedFile() as ParamDecoratorFactory], [2, body], [3, req]]
+  );
+  controller("broker/team", BrokerTeamController, true);
+  decorate(BrokerTeamController, "list", [Get() as MethodDecoratorFactory], [[0, req]]);
+  decorate(BrokerTeamController, "invite", [Post() as MethodDecoratorFactory], [[0, body], [1, req]]);
+  decorate(BrokerTeamController, "deactivate", [Post(":id/deactivate") as MethodDecoratorFactory, ok], [[0, id], [1, body], [2, req]]);
+  decorate(BrokerTeamController, "reactivate", [Post(":id/reactivate") as MethodDecoratorFactory, ok], [[0, id], [1, body], [2, req]]);
+  decorate(BrokerTeamController, "changeRole", [Patch(":id/role") as MethodDecoratorFactory], [[0, id], [1, body], [2, req]]);
+  controller("admin", AdminPartnerRequestsHttpController, true);
+  decorate(AdminPartnerRequestsHttpController, "list", [Get("partner-requests") as MethodDecoratorFactory], [[0, req], [1, Query() as ParamDecoratorFactory]]);
+  decorate(AdminPartnerRequestsHttpController, "decide", [Post("partner-requests/:id/decision") as MethodDecoratorFactory, ok], [[0, id], [1, req], [2, body]]);
+}
 controller("admin", AdminQuoteFormDefinitionsHttpController, true);
 decorate(AdminQuoteFormDefinitionsHttpController, "list", [Get("quote-form-definitions") as MethodDecoratorFactory], [[0, Req() as ParamDecoratorFactory], [1, Query("countryId") as ParamDecoratorFactory], [2, Query("productId") as ParamDecoratorFactory], [3, Query("language") as ParamDecoratorFactory], [4, Query("status") as ParamDecoratorFactory]]);
 decorate(AdminQuoteFormDefinitionsHttpController, "create", [Post("quote-form-definitions") as MethodDecoratorFactory], [[0, Req() as ParamDecoratorFactory], [1, Body() as ParamDecoratorFactory]]);
@@ -2140,7 +2296,11 @@ export const BROKER_TENANT_WRITE_GUARDED: Readonly<Record<string, readonly strin
   BrokerCrmController: ["status", "note", "task", "reminder", "assign", "document", "proposal", "withdrawProposal", "dispute", "aiRequest", "aiValidate", "aiLossAnalysis", "aiSetOptOut"],
   BrokerEnterpriseController: ["createAgency", "updateAgency", "assignMember", "createRole", "updateRole", "updateSla", "updateBranding"],
   BrokerNotificationsController: ["updatePreferences"],
-  BrokerOffersController: ["create", "update", "submit", "withdraw", "renew"]
+  BrokerOffersController: ["create", "update", "submit", "withdraw", "renew"],
+  // Spec 053 FR-016: every self-service write of a suspended partner is refused.
+  BrokerAccountController: ["updateProfile", "requestProfileChange", "requestCoverageExtension", "cancelRequest"],
+  BrokerLicensesController: ["renew", "uploadProof"],
+  BrokerTeamController: ["invite", "deactivate", "reactivate", "changeRole"]
 };
 export const BROKER_TENANT_WRITE_ALLOWED_WHEN_SUSPENDED: Readonly<Record<string, readonly string[]>> = {
   BrokerStarterController: ["readNotification"],
@@ -2184,6 +2344,10 @@ Module({
     BrokerNotificationsController,
     BrokerEnterpriseController,
     BrokerOffersController,
+    BrokerAccountController,
+    BrokerLicensesController,
+    BrokerTeamController,
+    AdminPartnerRequestsHttpController,
     AdminPartnerSlaController,
     AdminAIAssistanceController,
     AdminRuntimeSupportController,

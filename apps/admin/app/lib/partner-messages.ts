@@ -242,6 +242,34 @@ export function partnerBlockerHref(control: string, partner: { id: string; count
   }
 }
 
+/** Spec 053: broker requests shown in « Demandes du courtier ». */
+export const PARTNER_REQUEST_TYPE_LABELS: Record<string, string> = {
+  profile_change: "Modification d'identité",
+  coverage_extension: "Extension de couverture"
+};
+
+export const PARTNER_REQUEST_STATUS_LABELS: Record<string, string> = {
+  pending: "En attente",
+  accepted: "Acceptée",
+  rejected: "Refusée",
+  cancelled: "Annulée par le courtier"
+};
+
+export const PARTNER_REQUEST_STATUS_TONES: Record<string, "warning" | "success" | "danger" | "disabled"> = {
+  pending: "warning",
+  accepted: "success",
+  rejected: "danger",
+  cancelled: "disabled"
+};
+
+export const PARTNER_REQUEST_FIELD_LABELS: Record<string, string> = {
+  legalName: "Raison sociale",
+  tradeName: "Nom commercial",
+  registrationNumber: "RCCM",
+  countryId: "Pays",
+  productId: "Produit"
+};
+
 export function partnerFormatDate(value?: string | null): string {
   return value ? new Date(value).toISOString().slice(0, 10) : "-";
 }

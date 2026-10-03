@@ -9,6 +9,7 @@ import {
   convertAdminPartnerApplication,
   createAdminPartner,
   createAdminPartnerLicense,
+  decideAdminPartnerRequest,
   inviteAdminPartnerUser,
   recordAdminPartnerContract,
   rejectAdminPartnerApplication,
@@ -372,4 +373,27 @@ export async function rejectApplicationAction(_previous: PartnerActionState, for
     reason
   });
   return toState(result, "Candidature refusée. Le candidat reçoit un e-mail neutre, sans la note interne.", applicationPaths(applicationId));
+}
+
+/**
+ * Spec 053 FR-004/FR-013: decision on a broker request (identity change or coverage extension).
+ * Accepting applies it through the partner rules of spec 051 (RCCM duplicate, country scope,
+ * licence required for a country); a refusal there keeps the request pending.
+ */
+export async function decidePartnerRequestAction(_previous: PartnerActionState, formData: FormData): Promise<PartnerActionState> {
+  const reason = text(formData, "reason");
+  const invalid = reasonError(reason);
+  if (invalid) return invalid;
+  const partnerId = text(formData, "partnerId");
+  const requestId = text(formData, "requestId");
+  const badId = idError(partnerId, requestId);
+  if (badId) return badId;
+  const decision = text(formData, "decision");
+  if (decision !== "accepted" && decision !== "rejected") return { status: "error", message: "Décision inconnue." };
+  const result = await decideAdminPartnerRequest(requestId, { decision, reason });
+  return toState(
+    result,
+    decision === "accepted" ? "Demande acceptée : la modification est appliquée à la fiche et auditée." : "Demande refusée : le courtier voit le motif dans son portail.",
+    partnerPaths(partnerId)
+  );
 }

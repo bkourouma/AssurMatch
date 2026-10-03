@@ -113,7 +113,9 @@ export const PARTNER_ERROR_MESSAGES: Record<string, string> = {
   COUNTRY_BROKER_ONBOARDING_DISABLED: "Refusé : l'inscription des courtiers est désactivée pour ce pays (country_broker_onboarding_enabled).",
   APPLICATION_ALREADY_DECIDED: "Candidature déjà décidée : la décision est définitive. Rechargez la page.",
   SLA_TARGET_EXCEEDS_CONTRACT: "Objectif de réactivité refusé : il ne peut pas être plus lâche que la cible contractuelle.",
-  PAYLOAD_TOO_LARGE: "Fichier trop volumineux : 5 Mo au maximum."
+  PAYLOAD_TOO_LARGE: "Fichier trop volumineux : 5 Mo au maximum.",
+  PARTNER_REQUEST_ALREADY_DECIDED: "Demande déjà traitée ou annulée par le courtier : rechargez la page.",
+  PARTNER_REQUEST_PENDING: "Une demande identique est déjà en attente."
 };
 
 /**

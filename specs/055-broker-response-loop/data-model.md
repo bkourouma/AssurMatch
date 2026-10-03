@@ -1,6 +1,6 @@
 # Data Model: 055
 
-Migration `0028_broker_response_loop` (additive ; numéro à réaligner par le superviseur à la fusion).
+Migration `0027_broker_response_loop` (additive ; numéro à réaligner par le superviseur à la fusion).
 
 ## LeadProposal (nouvelle table)
 | Champ | Type | Règle |

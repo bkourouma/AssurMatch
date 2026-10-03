@@ -2,11 +2,13 @@ import { redirect } from "next/navigation";
 import {
   readAdminCountries,
   readAdminPartner,
+  readAdminPartnerRequests,
   readAdminProducts,
   readPartnerSla,
   type AdminPartnerDetailData,
   type AdminPartnerDocumentData,
-  type AdminPartnerLicenseData
+  type AdminPartnerLicenseData,
+  type PartnerChangeRequestView
 } from "../../lib/admin-api";
 import { isAdminProfile, loginRedirect, readBackOfficeSession } from "../../lib/backoffice-auth";
 import { adminReadErrorMessage } from "../../lib/catalog-messages";
@@ -17,6 +19,10 @@ import {
   LICENSE_STATUS_TONES,
   PARTNER_CAPACITY_LABELS,
   PARTNER_PLAN_LABELS,
+  PARTNER_REQUEST_FIELD_LABELS,
+  PARTNER_REQUEST_STATUS_LABELS,
+  PARTNER_REQUEST_STATUS_TONES,
+  PARTNER_REQUEST_TYPE_LABELS,
   PARTNER_STATUS_LABELS,
   PARTNER_STATUS_TONES,
   PARTNER_USER_ROLE_LABELS,
@@ -50,6 +56,7 @@ import {
   InviteUserForm,
   LicenseActionForm,
   PartnerBlockers,
+  PartnerRequestDecisionForm,
   PartnerStatusTransitionForm,
   RecordContractForm,
   RenewLicenseForm,
@@ -126,11 +133,12 @@ export default async function PartnerDetailPage({ params, searchParams }: Partne
   const canPrepare = canPreparePartner(roles);
   const canDownload = canDownloadPartnerDocuments(roles);
 
-  const [partnerResult, countriesResult, productsResult, slaResult] = await Promise.all([
+  const [partnerResult, countriesResult, productsResult, slaResult, requestsResult] = await Promise.all([
     readAdminPartner(partnerId),
     readAdminCountries(),
     readAdminProducts(),
-    readPartnerSla()
+    readPartnerSla(),
+    readAdminPartnerRequests(partnerId)
   ]);
   if (partnerResult.unauthenticated) redirect(loginRedirect(path, partnerResult.error ?? "session_required"));
   const partner = partnerResult.data;
@@ -172,6 +180,16 @@ export default async function PartnerDetailPage({ params, searchParams }: Partne
   const sla = slaResult.status === "success" ? slaResult.data.find((row) => row.partnerTenantId === partner.id) : undefined;
   const transitions = partner.allowedTransitions.filter((target) => (target === "pending_compliance" ? canPrepare : canDecide));
   const journal = journalOf(partner);
+  // Spec 053: broker requests and licence renewals submitted from the broker portal.
+  const brokerRequests = requestsResult.data;
+  const pendingRequestCount = brokerRequests.filter((request) => request.status === "pending").length;
+  const pendingRenewals = partner.licenses.filter((license) => license.renewsLicenseId && ["draft", "pending_review"].includes(license.status));
+  const requestValue = (field: string, value: string | null | undefined) => {
+    if (!value) return "-";
+    if (field === "countryId") return countryLabel(value);
+    if (field === "productId") return productLabel(value);
+    return value;
+  };
 
   return (
     <PageStack>
@@ -248,6 +266,61 @@ export default async function PartnerDetailPage({ params, searchParams }: Partne
           </Card>
         </div>
       </Grid>
+
+      <div id="demandes">
+        <Card
+          title="Demandes du courtier"
+          description="Demandes déposées depuis le portail courtier : modification d'identité (raison sociale, nom commercial, RCCM, pays) et extension de couverture. Une acceptation applique la modification avec les contrôles habituels de la fiche."
+        >
+          {pendingRequestCount > 0 ? <Notice tone="warning">{`${pendingRequestCount} demande(s) en attente de décision.`}</Notice> : null}
+          {pendingRenewals.length > 0 ? (
+            <Notice tone="info">
+              {`Renouvellement(s) de licence déposé(s) par le courtier : ${pendingRenewals.map((license) => `${license.licenseNumber} (${LICENSE_STATUS_LABELS[license.status] ?? license.status})`).join(", ")}. `}
+              <a href="#licences">Examiner la preuve et valider</a>
+            </Notice>
+          ) : null}
+          <DataTable
+            columns={[
+              { key: "type", header: "Demande", render: (request: PartnerChangeRequestView) => PARTNER_REQUEST_TYPE_LABELS[request.type] ?? request.type },
+              {
+                key: "changes",
+                header: "Valeurs demandées",
+                render: (request: PartnerChangeRequestView) => (
+                  <ul className="bo-list">
+                    {Object.entries(request.requestedChanges).map(([field, value]) => (
+                      <li key={field}>
+                        {PARTNER_REQUEST_FIELD_LABELS[field] ?? field} : {requestValue(field, value)}
+                        {request.previousValues[field] !== undefined ? ` (actuel : ${requestValue(field, request.previousValues[field])})` : ""}
+                      </li>
+                    ))}
+                  </ul>
+                )
+              },
+              { key: "justification", header: "Justification", render: (request: PartnerChangeRequestView) => request.justification },
+              { key: "status", header: "Statut", render: (request: PartnerChangeRequestView) => <StatusBadge status={request.status} labels={PARTNER_REQUEST_STATUS_LABELS} tones={PARTNER_REQUEST_STATUS_TONES} /> },
+              {
+                key: "dates",
+                header: "Dates",
+                render: (request: PartnerChangeRequestView) => (
+                  <>
+                    <div>Déposée le {partnerFormatDate(request.createdAt)}</div>
+                    {request.decidedAt ? <div>Décidée le {partnerFormatDate(request.decidedAt)}{request.decisionReason ? ` — ${request.decisionReason}` : ""}</div> : null}
+                  </>
+                )
+              },
+              {
+                key: "actions",
+                header: "Décision",
+                render: (request: PartnerChangeRequestView) => (canPrepare && !retired && request.status === "pending" ? <PartnerRequestDecisionForm partnerId={partner.id} requestId={request.id} /> : null)
+              }
+            ]}
+            items={brokerRequests}
+            getKey={(request) => request.id}
+            emptyLabel="Aucune demande du courtier."
+            aria-label="Demandes du courtier"
+          />
+        </Card>
+      </div>
 
       <div id="licences">
         <Card title="Licences" description="Statut effectif : une licence valide dont la date est passée est affichée expirée. Validation, suspension et révocation : conformité uniquement.">
