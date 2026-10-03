@@ -40,7 +40,7 @@ describe("billing foundation runtime HTTP", () => {
     expect(billing.totals.acceptedLeadCount).toBe(1);
     expect(billing.partners[0]).toMatchObject({ partnerId: partner.id, invoiceStatus: "draft_not_billable", paymentStatus: "not_applicable" });
     expect(billing.partners[0]?.draftNonBillableReference).toContain("DRAFT-NON-BILLABLE");
-    expect(billing.restrictions).toEqual(expect.arrayContaining(["no_payment_collection", "no_premium_collection", "no_invoice_issuance"]));
+    expect(billing.restrictions).toEqual(expect.arrayContaining(["no_payment_collection", "no_premium_collection", "manual_invoicing_only", "no_online_payment"]));
     const audit = harness.runtime.audit.writer.search({ action: BillingAuditActions.foundationRead })[0];
     expect(audit?.result).toBe("success");
     expect(JSON.stringify(audit?.context)).not.toContain("billing@broker.example");

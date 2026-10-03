@@ -11,6 +11,8 @@ export const QuoteAuditActions = {
   quoteFormRefused: "quote_form.refused",
   quoteRequestRefused: "quote_request.refused",
   quoteRequestCreated: "quote_request.created",
+  /** Spec 052 FR-016: a selected offer that failed verification is ignored, never blocking. */
+  quoteRequestSelectedOfferIgnored: "quote_request.selected_offer_ignored",
   quoteRequestDuplicateDetected: "quote_request.duplicate_detected",
   quoteRequestSpamBlocked: "quote_request.spam_blocked",
   quoteRequestRateLimited: "quote_request.rate_limited",

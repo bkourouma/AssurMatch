@@ -14,20 +14,21 @@ export class UserAuthNotificationService {
 
   constructor(private readonly sender?: AuthEmailDeliveryPort) {}
 
-  buildActivationEmail(user: UserAccount, token: string): AuthEmailPayload {
-    return this.templates.activation(user, token);
+  /** `expiresAt` is the stored expiry of the token: the e-mail announces exactly that validity. */
+  buildActivationEmail(user: UserAccount, token: string, expiresAt: Date): AuthEmailPayload {
+    return this.templates.activation(user, token, expiresAt);
   }
 
-  buildPasswordResetEmail(user: UserAccount, token: string): AuthEmailPayload {
-    return this.templates.passwordReset(user, token);
+  buildPasswordResetEmail(user: UserAccount, token: string, expiresAt: Date): AuthEmailPayload {
+    return this.templates.passwordReset(user, token, expiresAt);
   }
 
-  async deliverPasswordReset(user: UserAccount, token: string): Promise<AuthTokenDeliveryResult> {
-    return this.deliver(this.buildPasswordResetEmail(user, token), token);
+  async deliverPasswordReset(user: UserAccount, token: string, expiresAt: Date): Promise<AuthTokenDeliveryResult> {
+    return this.deliver(this.buildPasswordResetEmail(user, token, expiresAt), token);
   }
 
-  async deliverActivation(user: UserAccount, token: string): Promise<AuthTokenDeliveryResult> {
-    return this.deliver(this.buildActivationEmail(user, token), token);
+  async deliverActivation(user: UserAccount, token: string, expiresAt: Date): Promise<AuthTokenDeliveryResult> {
+    return this.deliver(this.buildActivationEmail(user, token, expiresAt), token);
   }
 
   private async deliver(payload: AuthEmailPayload, token: string): Promise<AuthTokenDeliveryResult> {

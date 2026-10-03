@@ -1,4 +1,4 @@
-import type { BrokerStarterLeadHistoryEvent, BrokerStarterLeadStatus, BrokerStarterReason } from "../../../../packages/shared/contracts/quote.contracts";
+import type { BrokerStarterCloseOutcome, BrokerStarterLeadHistoryEvent, BrokerStarterLeadStatus, BrokerStarterReason } from "../../../../packages/shared/contracts/quote.contracts";
 import type { ActorContext } from "../common/types";
 import { MemoryLeadAssignmentsRepository, type LeadAssignmentHistoryRecord, type LeadAssignmentsRepository } from "./lead-assignments.repository";
 
@@ -10,6 +10,7 @@ export interface BrokerStarterHistoryInput {
   previousStatus?: BrokerStarterLeadStatus;
   nextStatus?: BrokerStarterLeadStatus;
   reason?: BrokerStarterReason;
+  outcome?: BrokerStarterCloseOutcome;
   comment?: string;
 }
 
@@ -26,6 +27,7 @@ export class BrokerStarterHistoryService {
       ...(input.previousStatus ? { previousStatus: input.previousStatus } : {}),
       ...(input.nextStatus ? { nextStatus: input.nextStatus } : {}),
       ...(input.reason ? { reason: input.reason } : {}),
+      ...(input.outcome ? { outcome: input.outcome } : {}),
       ...(input.comment ? { comment: input.comment.slice(0, 500) } : {}),
       occurredAt: new Date().toISOString()
     };
@@ -47,6 +49,7 @@ export class BrokerStarterHistoryService {
       ...(event.previousStatus ? { previousStatus: event.previousStatus } : {}),
       ...(event.nextStatus ? { nextStatus: event.nextStatus } : {}),
       ...(event.reason ? { reason: event.reason } : {}),
+      ...(event.outcome ? { outcome: event.outcome } : {}),
       ...(event.comment ? { comment: event.comment } : {}),
       occurredAt: event.occurredAt
     };

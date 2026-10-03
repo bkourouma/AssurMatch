@@ -31,17 +31,24 @@ export class BrokerEligibilityPolicy {
     private readonly partners: PartnersService,
     private readonly licenses: PartnerLicensesService,
     /** Leads consumed in the current month, compared against `quotaMonthlyLeads`. */
-    private readonly monthlyAssignmentsForPartner: (partnerTenantId: string) => number | Promise<number> = () => 0
+    private readonly monthlyAssignmentsForPartner: (partnerTenantId: string) => number | Promise<number> = () => 0,
+    /**
+     * Spec 051 R14: at least one persisted accreditation document, accepted and clean. Optional so
+     * unit tests that build the policy by hand keep their scope; the runtime always provides it.
+     */
+    private readonly hasAcceptedAccreditation?: (partnerTenantId: string) => Promise<boolean>
   ) {}
 
   async evaluate(partnerTenantId: string, countryId: string, productId: string): Promise<BrokerEligibilityResult> {
     const partner = await this.partners.require(partnerTenantId);
     const reasons: string[] = [];
+    // Spec 051 R1: only `active` (Actif public) is routable; `active_test`, suspended and retired never are.
     if (partner.status !== "active") reasons.push("partner_not_active");
     if (partner.capacityStatus === "blocked" || partner.capacityStatus === "full") reasons.push("partner_capacity_blocked");
     if (!await this.partners.isAuthorizedForCountry(partnerTenantId, countryId)) reasons.push("partner_country_not_authorized");
     if (!await this.partners.isAuthorizedForProduct(partnerTenantId, productId)) reasons.push("partner_product_not_authorized");
     if (!await this.licenses.eligible(partnerTenantId, countryId, productId)) reasons.push("license_not_valid_for_scope");
+    if (this.hasAcceptedAccreditation && !await this.hasAcceptedAccreditation(partnerTenantId)) reasons.push("accreditation_document_missing");
     if (partner.quotaMonthlyLeads > 0 && await this.monthlyAssignmentsForPartner(partnerTenantId) >= partner.quotaMonthlyLeads) reasons.push("partner_quota_exhausted");
     return { partner, eligible: reasons.length === 0, reasons };
   }

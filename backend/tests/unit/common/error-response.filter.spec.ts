@@ -1,4 +1,4 @@
-import { BadRequestException, NotFoundException } from "@nestjs/common";
+import { BadRequestException, ConflictException, NotFoundException, UnprocessableEntityException } from "@nestjs/common";
 import { describe, expect, it } from "vitest";
 import { toSafeErrorResponse } from "../../../src/modules/common/filters/error-response.filter";
 
@@ -35,5 +35,14 @@ describe("toSafeErrorResponse", () => {
       message: "The request could not be processed safely",
       correlationId
     });
+  });
+
+  it("keeps an explicit known code and the activation blockers (spec 050 R11)", () => {
+    const blockers = [{ section: "country:1", control: "country_regime", label: "Regime", evidence: "manquant" }];
+    const response = toSafeErrorResponse(new UnprocessableEntityException({ code: "ACTIVATION_BLOCKED", message: "Country activation blocked", blockers }), correlationId);
+    expect(response.code).toBe("ACTIVATION_BLOCKED");
+    expect(response.blockers).toEqual(blockers);
+    expect(toSafeErrorResponse(new ConflictException({ code: "CATALOG_UPDATE_CONFLICT", message: "Catalog update conflict" }), correlationId).code).toBe("CATALOG_UPDATE_CONFLICT");
+    expect(toSafeErrorResponse(new ConflictException({ code: "NOT_A_CODE", message: "Product conflict" }), correlationId).code).toBe("PRODUCT_DISABLED");
   });
 });

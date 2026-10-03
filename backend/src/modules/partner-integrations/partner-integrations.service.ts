@@ -1,3 +1,4 @@
+import { assertBrokerTenantWritable } from "../partners/partner-tenant-status.service";
 import { createHash, randomBytes } from "node:crypto";
 import argon2 from "argon2";
 import type {
@@ -206,7 +207,7 @@ export class PartnerIntegrationsService {
   }
 
   async createWebhookEndpointFromApiKey(apiKey: string, input: Omit<PartnerWebhookEndpointCreate, "partnerTenantId">): Promise<PartnerWebhookEndpointCreateResponse> {
-    const auth = await this.authenticate(apiKey, "webhooks:manage");
+    const auth = await this.authenticate(apiKey, "webhooks:manage", true);
     const parsed = partnerWebhookEndpointCreateSchema.parse({ ...input, partnerTenantId: auth.record.partnerTenantId });
     return this.createWebhookEndpointRecord(auth.actor, parsed);
   }
@@ -221,7 +222,7 @@ export class PartnerIntegrationsService {
   }
 
   async updateWebhookEndpointFromApiKey(apiKey: string, id: string, input: PartnerWebhookEndpointUpdate): Promise<PartnerWebhookEndpointsResponse> {
-    const auth = await this.authenticate(apiKey, "webhooks:manage");
+    const auth = await this.authenticate(apiKey, "webhooks:manage", true);
     const existing = await this.repository.requireEndpoint(id);
     if (existing.partnerTenantId !== auth.record.partnerTenantId) this.refuseApiRead("cross_tenant_endpoint", "webhooks:manage", auth.record);
     await this.updateWebhookEndpoint(auth.actor, id, input, false);
@@ -443,7 +444,7 @@ export class PartnerIntegrationsService {
     return summary;
   }
 
-  private async authenticate(rawKey: string, requiredScope: PartnerApiScope): Promise<AuthenticatedPartnerApiKey> {
+  private async authenticate(rawKey: string, requiredScope: PartnerApiScope, write = false): Promise<AuthenticatedPartnerApiKey> {
     if (!this.deps.featureFlags.isEnabled("partner_api_enabled")) this.refuseApiRead("feature_disabled", requiredScope);
     if (!rawKey.startsWith(API_KEY_PREFIX)) this.refuseApiRead("invalid_key_format", requiredScope);
     const parsedKey = this.parseApiKey(rawKey);
@@ -456,6 +457,16 @@ export class PartnerIntegrationsService {
     if (!await argon2.verify(record.keyHash, parsedKey.secret).catch(() => false)) this.refuseApiRead("invalid_api_key", requiredScope);
     if (record.status !== "active") this.refuseApiRead("api_key_revoked", requiredScope, record);
     if (!record.scopes.includes(requiredScope)) this.refuseApiRead("missing_scope", requiredScope, record);
+    // Spec 051 R12: a retired partner's keys stop working; a suspended partner keeps read access only.
+    const partnerStatus = (await this.deps.partners.find(record.partnerTenantId))?.status;
+    if (partnerStatus === "retired") this.refuseApiRead("partner_retired", requiredScope, record);
+    if (partnerStatus === "suspended" && write) {
+      try {
+        this.refuseApiRead("partner_suspended", requiredScope, record);
+      } catch {
+        assertBrokerTenantWritable({ roles: ["broker_read_only"], tenantReadOnly: true });
+      }
+    }
     await this.repository.updateApiKey(record.id, { lastUsedAt: new Date(), updatedAt: new Date() });
     return {
       record,

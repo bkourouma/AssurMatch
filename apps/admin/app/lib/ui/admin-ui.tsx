@@ -40,6 +40,9 @@ export const quoteFormStatusTones: Record<string, Tone> = {
 
 export const offerStatusTones: Record<string, Tone> = {
   active: "success",
+  published: "success",
+  submitted: "info",
+  withdrawn: "disabled",
   suspended: "danger",
   draft: "warning",
   expired: "warning",
@@ -71,4 +74,35 @@ export const checklistStatusTones: Record<string, Tone> = {
   passed: "success",
   warning: "warning",
   blocked: "danger"
+};
+
+/** Spec 050: catalogue lifecycle (country, product, country x product link). */
+export const catalogStatusTones: Record<string, Tone> = {
+  public: "success",
+  pilot: "info",
+  partner_test: "info",
+  internal: "neutral",
+  draft: "neutral",
+  suspended: "warning",
+  retired: "disabled"
+};
+
+export const regimeStatusTones: Record<string, Tone> = {
+  active: "success",
+  draft: "neutral",
+  suspended: "warning",
+  retired: "disabled"
+};
+
+export const consentTextStatusTones: Record<string, Tone> = {
+  published: "success",
+  review: "info",
+  draft: "neutral",
+  retired: "disabled"
+};
+
+/** An open flag is highlighted (warning), a closed one stays muted, as on the dashboard. */
+export const flagValueTones: Record<string, Tone> = {
+  on: "warning",
+  off: "disabled"
 };

@@ -13,6 +13,7 @@ import {
   Form,
   FormActions,
   Input,
+  Select,
   Textarea,
   fieldControlProps
 } from "../lib/ui/admin-ui";
@@ -30,7 +31,16 @@ function noticeState(state: UserActionState) {
   };
 }
 
-export function CreateUserForm() {
+export interface PartnerChoice {
+  value: string;
+  label: string;
+}
+
+/**
+ * Spec 051 T026: the partner is picked from the directory (`GET /admin/partners`) instead of a
+ * free-text UUID. Retired partners are never offered; the API refuses them anyway (422).
+ */
+export function CreateUserForm({ partners = [] }: { partners?: PartnerChoice[] }) {
   const [state, formAction, pending] = useActionState(createAdminUserAction, initialState);
   const base = useId();
   const ids = {
@@ -57,8 +67,11 @@ export function CreateUserForm() {
           <Input {...fieldControlProps(ids.phone)} name="phone" placeholder="+2250000000000" />
         </Field>
         <CheckboxGroup legend="Roles" name="roles" options={adminRoleOptions.map((role) => ({ value: role, label: role }))} />
-        <Field id={ids.partnerTenantId} label="Tenant partenaire">
-          <Input {...fieldControlProps(ids.partnerTenantId)} name="partnerTenantId" placeholder="UUID tenant pour utilisateurs courtier" />
+        <Field id={ids.partnerTenantId} label="Courtier de rattachement" hint="Obligatoire pour un rôle courtier, interdit pour un rôle admin.">
+          <Select {...fieldControlProps(ids.partnerTenantId, { hint: "x" })} name="partnerTenantId" defaultValue="">
+            <option value="">Aucun (utilisateur admin)</option>
+            {partners.map((partner) => <option key={partner.value} value={partner.value}>{partner.label}</option>)}
+          </Select>
         </Field>
         <Field id={ids.countryScopes} label="Scopes pays">
           <Input {...fieldControlProps(ids.countryScopes)} name="countryScopes" placeholder="UUID, UUID" />

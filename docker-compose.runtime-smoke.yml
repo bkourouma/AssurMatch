@@ -4,7 +4,7 @@ services:
     environment:
       POSTGRES_DB: assurmatch_runtime_smoke
       POSTGRES_USER: assurmatch_smoke
-      POSTGRES_PASSWORD: assurmatch_smoke
+      POSTGRES_PASSWORD: assurmatch_smoke # secret-scan:allow (disposable smoke database)
     ports:
       - "${ASSURMATCH_RUNTIME_SMOKE_POSTGRES_PORT:-55432}:5432"
     healthcheck:

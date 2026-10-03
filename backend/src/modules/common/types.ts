@@ -1,3 +1,4 @@
+import type { PartnerStatus } from "../../../../packages/shared/contracts/partner.contracts";
 import type { AssurMatchRole } from "../../../../packages/shared/rbac/assurmatch-role-matrix";
 
 export interface ActorContext {
@@ -10,6 +11,10 @@ export interface ActorContext {
   countryScopes?: string[];
   productScopes?: string[];
   correlationId?: string;
+  /** Spec 051 R12: status of the actor's partner, resolved per request by the auth guard. */
+  partnerTenantStatus?: PartnerStatus;
+  /** Spec 051 R12: the actor's partner is suspended; broker write routes refuse with PARTNER_SUSPENDED. */
+  tenantReadOnly?: boolean;
 }
 
 export interface ScopedResource {

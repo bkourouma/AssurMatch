@@ -1,19 +1,36 @@
 import { AuditLogWriter } from "../audit-logs/audit-log-writer.service";
 import type { AuthEmailDeliveryPort, AuthEmailPayload } from "./email/email-delivery.service";
 import { maskEmail } from "./email/email-delivery.service";
-import { QuoteEmailTemplateNotSafeError, QuoteEmailTemplateService } from "./email/quote-email-template.service";
+import { ADMIN_ALERT_LABELS, type AdminAlertType } from "../../../../packages/shared/contracts/admin-alerts.contracts";
+import { QuoteEmailTemplateNotSafeError, QuoteEmailTemplateService, type BrokerAlertEmailType, type VisitorEmailStep } from "./email/quote-email-template.service";
 import type { NotificationRecord, NotificationsService } from "./notifications.module";
+import type { VisitorEmailNotificationType } from "./quote-notification.service";
 
-export type DeliverableQuoteNotificationType =
-  | "visitor_quote_confirmation"
-  | "visitor_quote_non_routable"
-  | "broker_lead_assigned";
+export type DeliverableQuoteNotificationType = VisitorEmailNotificationType | "broker_lead_assigned" | "broker_visitor_response" | "broker_lead_reassigned" | BrokerAlertEmailType | "admin_alert_raised";
 
-const DELIVERABLE_TYPES = new Set<DeliverableQuoteNotificationType>([
-  "visitor_quote_confirmation",
-  "visitor_quote_non_routable",
-  "broker_lead_assigned"
-]);
+/** Spec 061: broker alert pointers rendered from the partner alone (no quote lookup). */
+const BROKER_ALERT_TYPES = new Set<string>(["broker_document_received", "broker_task_due", "broker_quota_threshold", "broker_license_expiring", "broker_offer_expiring"]);
+
+/**
+ * Spec 054 R4: the step each visitor type announces. The two spec 044 types stay renderable for the
+ * rows queued before the spec: a "confirmation" is rendered as "received", never as "transmitted",
+ * because spec 044 also queued it for requests held in manual review.
+ */
+const VISITOR_STEP: Record<VisitorEmailNotificationType, VisitorEmailStep> = {
+  visitor_quote_confirmation: "received",
+  visitor_quote_non_routable: "not_transmitted",
+  visitor_quote_received: "received",
+  visitor_quote_in_review: "in_review",
+  visitor_quote_transmitted: "transmitted",
+  visitor_quote_accepted: "accepted",
+  visitor_quote_reassigned: "reassigned",
+  visitor_quote_closed: "closed",
+  visitor_consent_withdrawn: "consent_withdrawn",
+  visitor_tracking_link: "tracking_link",
+  visitor_proposal_available: "proposal_available"
+};
+
+const DELIVERABLE_TYPES = new Set<string>([...Object.keys(VISITOR_STEP), "broker_lead_assigned", "broker_visitor_response", "broker_lead_reassigned", ...BROKER_ALERT_TYPES, "admin_alert_raised"]);
 
 /** A row is due while it has never been delivered and has not exhausted its retries. */
 const DUE_STATUSES = new Set(["pending", "queued", "retryable"]);
@@ -27,6 +44,9 @@ export interface QuoteNotificationQuoteLookup {
   productKey: string;
   prospectId: string;
   routingStatus: string;
+  /** Spec 054 R3: the language of the e-mail is the language of the request. */
+  language?: string | undefined;
+  anonymizedAt?: Date | string | null | undefined;
 }
 
 export interface QuoteNotificationProspectLookup {
@@ -38,6 +58,7 @@ export interface QuoteNotificationProspectLookup {
 export interface QuoteNotificationPartnerLookup {
   id: string;
   legalName: string;
+  tradeName?: string | undefined;
   primaryEmail?: string;
 }
 
@@ -49,7 +70,11 @@ export interface QuoteNotificationDeliveryDeps {
   quotes: { findById(id: string): Promise<QuoteNotificationQuoteLookup | undefined> };
   prospects: { findById(id: string): Promise<QuoteNotificationProspectLookup | undefined> };
   partners: { findById(id: string): Promise<QuoteNotificationPartnerLookup | undefined> };
+  /** Spec 054 R2: mints the visitor access token at render time; the clear token is never stored. */
+  visitorAccess?: { issue(quoteRequestId: string, context: { reason: string }): Promise<{ token: string; expiresAt: Date }> };
   retryCap?: number;
+  /** Spec 061: compliance team address of the `admin_alert_raised` pointer (env, read at render time). */
+  complianceEmail?: () => string | undefined;
 }
 
 export interface QuoteNotificationDeliveryOutcome {
@@ -81,7 +106,10 @@ export class QuoteNotificationDeliveryService {
   async processDueNotifications(options: { limit?: number } = {}): Promise<QuoteNotificationDeliveryRun> {
     const limit = Math.min(Math.max(options.limit ?? 25, 1), 100);
     const all = await this.deps.notifications.list();
-    const due = all.filter((notification) => this.isDue(notification));
+    // Oldest first, so a request's "received" e-mail always leaves before its "transmitted" one.
+    const due = all
+      .filter((notification) => this.isDue(notification))
+      .sort((left, right) => new Date(left.createdAt).getTime() - new Date(right.createdAt).getTime());
     const batch = due.slice(0, limit);
     const run: QuoteNotificationDeliveryRun = { due: due.length, processed: 0, sent: 0, retryable: 0, failed: 0, notConfigured: 0, outcomes: [] };
 
@@ -98,7 +126,7 @@ export class QuoteNotificationDeliveryService {
   }
 
   private isDue(notification: NotificationRecord): boolean {
-    return DELIVERABLE_TYPES.has(notification.type as DeliverableQuoteNotificationType) && DUE_STATUSES.has(notification.emailStatus);
+    return DELIVERABLE_TYPES.has(notification.type) && DUE_STATUSES.has(notification.emailStatus);
   }
 
   private async deliver(notification: NotificationRecord): Promise<QuoteNotificationDeliveryOutcome> {
@@ -144,23 +172,38 @@ export class QuoteNotificationDeliveryService {
   }
 
   private async render(notification: NotificationRecord): Promise<AuthEmailPayload> {
-    if (notification.type === "broker_lead_assigned") return this.renderBroker(notification);
+    if (notification.type === "broker_lead_assigned" || notification.type === "broker_visitor_response" || notification.type === "broker_lead_reassigned") return this.renderBroker(notification);
+    if (BROKER_ALERT_TYPES.has(notification.type)) return this.renderBrokerAlert(notification);
+    if (notification.type === "admin_alert_raised") return this.renderAdminAlert(notification);
     return this.renderVisitor(notification);
   }
 
+  /**
+   * Spec 054 R2/R10: the e-mail is rendered in the language of the request, names the broker of
+   * the step and carries a token minted now, so no clear token ever sits in the notification row.
+   */
   private async renderVisitor(notification: NotificationRecord): Promise<AuthEmailPayload> {
     const quote = await this.deps.quotes.findById(notification.payloadReference);
     if (!quote) throw new Error("recipient_unresolved");
     assertQuoteScope(quote);
+    if (quote.anonymizedAt) throw new Error("quote_anonymized");
     const prospect = await this.deps.prospects.findById(quote.prospectId);
     if (!prospect?.emailNormalized) throw new Error("recipient_unresolved");
-    return this.deps.templates.visitor({
+    const step = VISITOR_STEP[notification.type as VisitorEmailNotificationType];
+    const partnerTenantId = notification.eventPayload?.partnerTenantId;
+    const partner = partnerTenantId ? await this.deps.partners.findById(partnerTenantId).catch(() => undefined) : undefined;
+    const access = this.deps.visitorAccess ? await this.deps.visitorAccess.issue(quote.id, { reason: `notification:${notification.type}` }) : undefined;
+    return this.deps.templates.visitorStep({
+      step,
       to: prospect.emailNormalized,
-      ...(prospect.displayName ? { displayName: prospect.displayName } : {}),
+      displayName: prospect.displayName,
       publicReference: quote.publicReference,
       countryCode: quote.countryCode,
       productKey: quote.productKey,
-      routed: notification.type === "visitor_quote_confirmation"
+      locale: quote.language === "en" ? "en" : "fr",
+      partnerName: partner ? partner.tradeName ?? partner.legalName : undefined,
+      token: access?.token,
+      tokenExpiresAt: access?.expiresAt
     });
   }
 
@@ -175,13 +218,40 @@ export class QuoteNotificationDeliveryService {
     ]);
     if (!partner?.primaryEmail || !quote) throw new Error("recipient_unresolved");
     assertQuoteScope(quote);
+    if (notification.type === "broker_visitor_response") {
+      return this.deps.templates.brokerVisitorResponse({
+        to: partner.primaryEmail,
+        partnerLegalName: partner.legalName,
+        publicReference: quote.publicReference,
+        countryCode: quote.countryCode,
+        productKey: quote.productKey
+      });
+    }
     return this.deps.templates.brokerLead({
       to: partner.primaryEmail,
       partnerLegalName: partner.legalName,
       publicReference: quote.publicReference,
       countryCode: quote.countryCode,
-      productKey: quote.productKey
+      productKey: quote.productKey,
+      reassigned: notification.type === "broker_lead_reassigned"
     });
+  }
+
+  /** Spec 061 FR-002: pointer to the portal, the detail never leaves the back-office. */
+  private async renderBrokerAlert(notification: NotificationRecord): Promise<AuthEmailPayload> {
+    const partnerTenantId = notification.recipientScope.startsWith("partner:") ? notification.recipientScope.slice("partner:".length) : undefined;
+    if (!partnerTenantId) throw new Error("recipient_unresolved");
+    const partner = await this.deps.partners.findById(partnerTenantId);
+    if (!partner?.primaryEmail) throw new Error("recipient_unresolved");
+    return this.deps.templates.brokerAlert({ to: partner.primaryEmail, partnerLegalName: partner.legalName, type: notification.type as BrokerAlertEmailType });
+  }
+
+  /** Spec 061 FR-004: compliance team pointer to the alerts center. */
+  private async renderAdminAlert(notification: NotificationRecord): Promise<AuthEmailPayload> {
+    const to = this.deps.complianceEmail?.();
+    if (!to) throw new Error("recipient_unresolved");
+    const type = notification.eventPayload?.alertType as AdminAlertType | undefined;
+    return this.deps.templates.adminAlert({ to, label: (type && ADMIN_ALERT_LABELS[type]) || "Alerte plateforme" });
   }
 
   private async mark(notification: NotificationRecord, emailStatus: NotificationRecord["emailStatus"], retryCount?: number): Promise<void> {

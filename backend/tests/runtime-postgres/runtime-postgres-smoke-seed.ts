@@ -1,4 +1,6 @@
 import assert from "node:assert/strict";
+import { seedAcceptedAccreditation } from "../integration/helpers/partner-onboarding-seed";
+import { publishOffer } from "../integration/helpers/offer-test-helpers";
 import type { AssurMatchRuntime } from "../../src/runtime/assurmatch-runtime";
 import type { ActorContext } from "../../src/modules/common/types";
 import type { QuoteFormFieldDto } from "../../../packages/shared/contracts/quote.contracts";
@@ -99,7 +101,7 @@ export async function seedRuntimeSmokeData(runtime: AssurMatchRuntime, run: Runt
   const eligiblePartner = await createBroker(runtime, run, admin, "Eligible", "starter");
   await authorizeBroker(runtime, eligiblePartner.id, country.id, product.id, admin);
 
-  const offer = await runtime.offers.adminService.create({
+  const offer = await publishOffer(runtime.offers, {
     countryId: country.id,
     productId: product.id,
     partnerTenantId: eligiblePartner.id,
@@ -111,8 +113,7 @@ export async function seedRuntimeSmokeData(runtime: AssurMatchRuntime, run: Runt
     validUntil: "2030-01-01T00:00:00.000Z",
     publicDisclaimers: ["offre indicative", "prix a confirmer par le courtier partenaire"],
     reason: "runtime smoke offer seed"
-  }, admin);
-  await runtime.offers.adminService.validate(offer.id, { validationStatus: "validated", reason: "runtime smoke offer validation" }, admin);
+  }, admin, admin);
 
   const consentText = await runtime.consent.service.createText({
     purpose: "lead_transmission",
@@ -123,9 +124,11 @@ export async function seedRuntimeSmokeData(runtime: AssurMatchRuntime, run: Runt
     language: "fr",
     version: `v-${run.id}`,
     status: "draft",
-    contentHash: `${run.id}-consent-hash`
+    // Spec 050 R5: real content (tagged with the run id for cleanup); the hash is computed by the service.
+    content: `En cochant cette case, vous acceptez la transmission de vos coordonnees ({{contactFields}}) a {{brokerName}} pour {{countryName}} et {{productName}} (smoke ${run.id}). AssurMatch est une plateforme technique; elle n'est ni courtier ni assureur.`,
+    contentHash: "computed-by-server"
   }, admin);
-  await runtime.consent.service.publishText(consentText.id, admin);
+  await runtime.consent.service.publishText(consentText.id, admin, { requireContent: true });
   // Spec 043 T008: the form is created and published through the real admin routes. Seeding it
   // in-process would exercise a path no operator can use, which is exactly how the missing HTTP
   // wiring stayed invisible while the whole suite was green.
@@ -193,7 +196,7 @@ async function createBroker(runtime: AssurMatchRuntime, run: RuntimeSmokeRun, ad
 async function authorizeBroker(runtime: AssurMatchRuntime, partnerTenantId: string, countryId: string, productId: string, admin: ActorContext): Promise<void> {
   await runtime.partners.service.authorizeCountry(partnerTenantId, countryId, admin);
   await runtime.partners.service.authorizeProduct(partnerTenantId, productId, admin);
-  await runtime.partnerLicenses.service.create({
+  const license = await runtime.partnerLicenses.service.create({
     partnerTenantId,
     licenseNumber: `LIC-${partnerTenantId.slice(0, 8)}`,
     issuingAuthority: "Runtime Smoke Regulator",
@@ -203,4 +206,6 @@ async function authorizeBroker(runtime: AssurMatchRuntime, partnerTenantId: stri
     effectiveDate: "2026-01-01",
     expirationDate: "2030-01-01"
   }, admin);
+  // Spec 051 R14: routing reads a persisted, accepted and clean accreditation document.
+  await seedAcceptedAccreditation(runtime, partnerTenantId, license.id, admin);
 }

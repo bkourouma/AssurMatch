@@ -1,4 +1,4 @@
-import type { PartnerWebhookEventType } from "../../../../packages/shared/contracts/partner-integration.contracts";
+import { partnerWebhookEventTypeSchema, type PartnerWebhookEventType } from "../../../../packages/shared/contracts/partner-integration.contracts";
 import type { AuditLogWriter } from "../audit-logs/audit-log-writer.service";
 import { PartnerIntegrationAuditActions } from "./partner-integration-audit-actions";
 
@@ -11,10 +11,23 @@ export interface PartnerWebhookPreparer {
   }): Promise<unknown>;
 }
 
+/**
+ * Spec 054 R6: internal lead events. They feed the visitor notifications only and are never sent to
+ * a partner webhook, whose catalogue (spec 039) is `partnerWebhookEventTypeSchema`.
+ */
+export type InternalLeadEventType = "lead.accepted" | "lead.rejected" | "lead.reassigned";
+export type LeadBusEventType = PartnerWebhookEventType | InternalLeadEventType;
+
+const WEBHOOK_EVENT_TYPES = new Set<string>(partnerWebhookEventTypeSchema.options);
+
+export function isPartnerWebhookEventType(eventType: string): eventType is PartnerWebhookEventType {
+  return WEBHOOK_EVENT_TYPES.has(eventType);
+}
+
 export interface PartnerWebhookEventPublisherDeps {
   audit: AuditLogWriter;
   integrations?: PartnerWebhookPreparer | undefined;
-  onEvent?: (eventType: PartnerWebhookEventType, partnerTenantId: string, data: Record<string, unknown>) => Promise<void>;
+  onEvent?: (eventType: LeadBusEventType, partnerTenantId: string, data: Record<string, unknown>) => Promise<void>;
 }
 
 /**
@@ -25,10 +38,12 @@ export interface PartnerWebhookEventPublisherDeps {
 export class PartnerWebhookEventPublisher {
   constructor(private readonly deps: PartnerWebhookEventPublisherDeps) {}
 
-  async publish(eventType: PartnerWebhookEventType, partnerTenantId: string, data: Record<string, unknown>): Promise<void> {
+  async publish(eventType: LeadBusEventType, partnerTenantId: string, data: Record<string, unknown>): Promise<void> {
     if (this.deps.onEvent) {
       await this.deps.onEvent(eventType, partnerTenantId, data).catch(() => {});
     }
+    // Spec 054 R6: internal event types stop here; only the published catalogue reaches webhooks.
+    if (!isPartnerWebhookEventType(eventType)) return;
     if (!this.deps.integrations || !partnerTenantId) return;
     try {
       await this.deps.integrations.prepareWebhookDelivery({ partnerTenantId, eventType, data });

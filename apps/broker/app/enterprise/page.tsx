@@ -19,8 +19,10 @@ import {
   Notice,
   PageHeader,
   PageStack,
-  StatusBadge
+  StatusBadge,
+  TenantWriteGuard
 } from "../lib/ui/broker-ui";
+import { TENANT_SUSPENDED_MESSAGE, isTenantReadOnly } from "../lib/broker-permissions";
 import type { DataTableColumn } from "../lib/ui/broker-ui";
 
 const NOTICES: Record<string, string> = {
@@ -28,8 +30,11 @@ const NOTICES: Record<string, string> = {
   member_assigned: "Membre rattache a l'agence.",
   role_created: "Role personnalise cree. Seules les permissions courtier autorisees sont conservees.",
   sla_saved: "Engagement de reactivite enregistre.",
+  sla_contract: "Objectif refuse : il ne peut pas etre plus lache que la cible contractuelle fixee par AssurMatch.",
   branding_saved: "Charte du portail courtier enregistree.",
   forbidden: "Action reservee au proprietaire d'un cabinet Enterprise.",
+  // Spec 051 FR-021: 403 PARTNER_SUSPENDED.
+  suspended: TENANT_SUSPENDED_MESSAGE,
   not_found: "Element introuvable pour votre cabinet.",
   invalid: "Saisie incomplete.",
   error: "Espace Enterprise temporairement indisponible."
@@ -104,6 +109,8 @@ export default async function BrokerEnterprisePage({ searchParams }: { searchPar
     );
   }
 
+  // Spec 051 FR-021: a suspended partner reads its organisation but cannot change it.
+  const readOnly = isTenantReadOnly(session.profile);
   const [agencies, roles, sla, branding] = await Promise.all([readBrokerAgencies(), readBrokerCustomRoles(), readBrokerSla(), readBrokerBranding()]);
 
   return (
@@ -126,6 +133,7 @@ export default async function BrokerEnterprisePage({ searchParams }: { searchPar
           aria-label="Agences du cabinet"
           emptyLabel="Aucune agence enregistree."
           rowActions={(agency) => (
+            <TenantWriteGuard readOnly={readOnly}>
             <ConfirmDialog
               triggerLabel="Rattacher un membre"
               title={`Rattacher un membre a ${agency.name}`}
@@ -142,8 +150,10 @@ export default async function BrokerEnterprisePage({ searchParams }: { searchPar
                 <Input id={`member-reason-${agency.id}`} name="reason" placeholder="Motif" aria-label="Motif du rattachement" />
               </Field>
             </ConfirmDialog>
+            </TenantWriteGuard>
           )}
         />
+        <TenantWriteGuard readOnly={readOnly}>
         <Form action={createAgencyAction} columns={2}>
           <Field id="agency-name" label="Nom de l'agence">
             <Input id="agency-name" name="name" placeholder="Nom de l'agence" aria-label="Nom de l'agence" />
@@ -161,6 +171,7 @@ export default async function BrokerEnterprisePage({ searchParams }: { searchPar
             <Button type="submit" variant="secondary">Creer une agence</Button>
           </FormActions>
         </Form>
+        </TenantWriteGuard>
       </Card>
 
       <Card title="Roles personnalises">
@@ -174,6 +185,7 @@ export default async function BrokerEnterprisePage({ searchParams }: { searchPar
           aria-label="Roles personnalises du cabinet"
           emptyLabel="Aucun role personnalise."
         />
+        <TenantWriteGuard readOnly={readOnly}>
         <Form action={createCustomRoleAction}>
           <Field id="role-name" label="Nom du role">
             <Input id="role-name" name="name" placeholder="Nom du role" aria-label="Nom du role" />
@@ -190,6 +202,7 @@ export default async function BrokerEnterprisePage({ searchParams }: { searchPar
             <Button type="submit" variant="secondary">Creer le role</Button>
           </FormActions>
         </Form>
+        </TenantWriteGuard>
       </Card>
 
       <Card title="Engagement de reactivite (SLA)">
@@ -206,6 +219,7 @@ export default async function BrokerEnterprisePage({ searchParams }: { searchPar
               />
               <KpiCard label="Delai moyen" value={sla.data.averageFirstActionMinutes === null ? "-" : `${sla.data.averageFirstActionMinutes} min`} />
             </Grid>
+            <TenantWriteGuard readOnly={readOnly}>
             <Form action={updateSlaAction} columns={2}>
               <Field id="sla-target" label="Objectif en minutes">
                 <Input
@@ -225,6 +239,7 @@ export default async function BrokerEnterprisePage({ searchParams }: { searchPar
                 <Button type="submit" variant="secondary">Enregistrer l'objectif</Button>
               </FormActions>
             </Form>
+            </TenantWriteGuard>
           </>
         ) : (
           <Notice tone="warning">SLA indisponible: {sla.error ?? "erreur inconnue"}.</Notice>
@@ -236,6 +251,7 @@ export default async function BrokerEnterprisePage({ searchParams }: { searchPar
           La charte s'applique uniquement a votre back-office. Le comparateur public reste presente par AssurMatch, plateforme technique.
         </p>
         {branding.status === "success" ? (
+          <TenantWriteGuard readOnly={readOnly}>
           <Form action={updateBrandingAction} columns={2}>
             <Field id="branding-label" label="Libelle affiche">
               <Input id="branding-label" name="displayLabel" defaultValue={branding.data.displayLabel} aria-label="Libelle affiche" />
@@ -251,6 +267,7 @@ export default async function BrokerEnterprisePage({ searchParams }: { searchPar
               <Button type="submit" variant="secondary">Enregistrer la charte</Button>
             </FormActions>
           </Form>
+          </TenantWriteGuard>
         ) : (
           <Notice tone="warning">Charte indisponible: {branding.error ?? "erreur inconnue"}.</Notice>
         )}

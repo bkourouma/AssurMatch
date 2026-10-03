@@ -176,7 +176,12 @@ describe("PublicStatsService", () => {
       update: () => Promise.reject(new Error("boom")),
       appendHistory: () => Promise.reject(new Error("boom")),
       history: () => Promise.reject(new Error("boom")),
-      require: () => Promise.reject(new Error("boom"))
+      require: () => Promise.reject(new Error("boom")),
+      find: () => Promise.reject(new Error("boom")),
+      createVersion: () => Promise.reject(new Error("boom")),
+      updateVersion: () => Promise.reject(new Error("boom")),
+      listVersions: () => Promise.reject(new Error("boom")),
+      listAllVersions: () => Promise.reject(new Error("boom"))
     };
     const service = new PublicStatsService(countries, partners, licenses, brokenOffers, new InMemoryRedisClient());
 

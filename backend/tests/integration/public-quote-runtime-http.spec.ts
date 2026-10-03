@@ -22,7 +22,7 @@ describe("public quote runtime HTTP", () => {
         accepted: true,
         consentTextId: seed.consentText.id,
         version: "v1",
-        contentHash: "runtime-consent-hash"
+        contentHash: seed.consentText.contentHash
       },
       ipAddress: "203.0.113.10",
       sessionId: "runtime-session-1"
@@ -65,7 +65,7 @@ describe("public quote runtime HTTP", () => {
         accepted: true,
         consentTextId: seed.consentText.id,
         version: "v1",
-        contentHash: "runtime-consent-hash"
+        contentHash: seed.consentText.contentHash
       },
       ipAddress: "203.0.113.11",
       sessionId: "runtime-session-global-disabled"

@@ -1,9 +1,11 @@
 import { getTranslations, setRequestLocale } from "next-intl/server";
+import { Link } from "../../../../../../../i18n/navigation";
 import { toLocale } from "../../../../../../../i18n/routing";
 import { QuoteBlockedState, QuoteFormShell } from "../../../../../../components/quote-form";
 import { TechnicalRoleNotice } from "../../../../../../components/public-journey";
 import { Breadcrumb } from "../../../../../../components/ui/breadcrumb";
 import { Hero } from "../../../../../../components/ui/hero";
+import { EmptyState } from "../../../../../../components/ui/empty-state";
 import { Section } from "../../../../../../components/ui/section";
 import { getPublicQuoteForm, listCountryDirectory, listPublicProducts } from "../../../../../../lib/public-api";
 import { buildMetadata, localeUrl } from "../../../../../../lib/seo";
@@ -48,7 +50,8 @@ export default async function PublicQuotePage({
   const query = searchParams ? await searchParams : {};
   const offerIdParam = Array.isArray(query.offerId) ? query.offerId[0] : query.offerId;
   const selectedOfferId = offerIdParam && /^[0-9a-f-]{36}$/i.test(offerIdParam) ? offerIdParam : undefined;
-  const quoteForm = await getPublicQuoteForm(countryCode, productKey);
+  // Spec 050 R6: the form is requested in the page language; another language is offered, never served.
+  const quoteForm = await getPublicQuoteForm(countryCode, productKey, locale, selectedOfferId);
 
   const directory = await listCountryDirectory();
   const iso = countryCode.trim().toUpperCase();
@@ -89,12 +92,40 @@ export default async function PublicQuotePage({
         <div className="am-stack am-stack--xl am-j-column">
           {/* The stepper travels with the form: only the client boundary knows the request went
               through, and it moves to step 4 the moment it does. */}
-          {quoteForm.status === "success" && quoteForm.data ? (
+          {quoteForm.status === "success" ? (
             <QuoteFormShell
               countryCode={countryCode}
               productKey={productKey}
+              language={locale}
               quoteForm={quoteForm.data}
               selectedOfferId={selectedOfferId}
+            />
+          ) : quoteForm.status === "language_unavailable" ? (
+            <EmptyState
+              icon="globe"
+              tone="muted"
+              align="center"
+              title={t("languageUnavailable.title")}
+              description={t("languageUnavailable.description")}
+              action={
+                <ul className="am-stack" aria-label={t("languageUnavailable.listLabel")}>
+                  {quoteForm.availableLanguages.map((language) => (
+                    <li key={language}>
+                      <Link
+                        locale={language}
+                        hrefLang={language}
+                        href={{
+                          pathname: "/countries/[countryCode]/products/[productKey]/quote",
+                          params: { countryCode, productKey },
+                          ...(selectedOfferId ? { query: { offerId: selectedOfferId } } : {})
+                        }}
+                      >
+                        {t(`languageUnavailable.link.${language}`)}
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+              }
             />
           ) : (
             <QuoteBlockedState />

@@ -3,6 +3,7 @@ import {
   PublicFormEmailTemplateService,
   type ContactConfirmationContext,
   type PartnerApplicationConfirmationContext,
+  type PartnerApplicationDecisionContext,
   type WaitlistConfirmationContext
 } from "./email/public-form-email-template.service";
 
@@ -18,6 +19,11 @@ export interface PublicFormNotificationPort {
   confirmPartnerApplication(context: PartnerApplicationConfirmationContext): Promise<PublicFormEmailStatus>;
 }
 
+/** Spec 051 R10: the decision e-mail sent after a conversion or a refusal; best effort. */
+export interface PartnerApplicationDecisionNotificationPort {
+  notifyPartnerApplicationDecision(context: PartnerApplicationDecisionContext): Promise<PublicFormEmailStatus>;
+}
+
 /**
  * Spec 047: outbound confirmation for the waitlist, contact and broker-application forms.
  *
@@ -26,7 +32,7 @@ export interface PublicFormNotificationPort {
  * SMTP host must never turn an accepted submission into an error. `RuntimeEmailDeliveryService`
  * audits every outcome under `email.delivery.*`, which is where a failed confirmation is read.
  */
-export class PublicFormNotificationService implements PublicFormNotificationPort {
+export class PublicFormNotificationService implements PublicFormNotificationPort, PartnerApplicationDecisionNotificationPort {
   private readonly templates: PublicFormEmailTemplateService;
 
   constructor(
@@ -46,6 +52,10 @@ export class PublicFormNotificationService implements PublicFormNotificationPort
 
   async confirmPartnerApplication(context: PartnerApplicationConfirmationContext): Promise<PublicFormEmailStatus> {
     return this.deliver(() => this.templates.partnerApplication(context));
+  }
+
+  async notifyPartnerApplicationDecision(context: PartnerApplicationDecisionContext): Promise<PublicFormEmailStatus> {
+    return this.deliver(() => this.templates.partnerApplicationDecision(context));
   }
 
   /**

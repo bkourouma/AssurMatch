@@ -15,7 +15,9 @@ const BILLING_RESTRICTIONS = [
   "no_payment_collection",
   "no_premium_collection",
   "no_policy_sale",
-  "no_invoice_issuance",
+  // Spec 060: invoices are issued manually by finance from drafts; nothing is collected online.
+  "manual_invoicing_only",
+  "no_online_payment",
   "draft_lead_counts_only"
 ] as const;
 

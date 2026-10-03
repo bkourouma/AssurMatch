@@ -1,8 +1,17 @@
 # AssurMatch — local repro of preprod stack.
-# Build the three images first:
+# Build the four images first (NEXT_PUBLIC_* are compiled in, see the Dockerfiles):
 #   docker build -f backend/Dockerfile        -t assurmatch-api:test .
-#   docker build -f apps/public/Dockerfile    -t assurmatch-public:test .
-#   docker build -f apps/admin/Dockerfile     -t assurmatch-backoffice:test .
+#   docker build -f apps/public/Dockerfile    -t assurmatch-public:test \
+#     --build-arg NEXT_PUBLIC_ASSURMATCH_API_URL=http://localhost:3600 \
+#     --build-arg NEXT_PUBLIC_ASSURMATCH_PUBLIC_URL=http://localhost:3601 \
+#     --build-arg NEXT_PUBLIC_ASSURMATCH_BROKER_URL=http://localhost:3603 .
+#   docker build -f apps/admin/Dockerfile     -t assurmatch-backoffice:test \
+#     --build-arg NEXT_PUBLIC_ASSURMATCH_API_URL=http://localhost:3600 .
+#   docker build -f apps/broker/Dockerfile    -t assurmatch-broker:test \
+#     --build-arg NEXT_PUBLIC_ASSURMATCH_API_URL=http://localhost:3600 .
+# (the worker reuses the API image). The frontends' server-side calls use the same compiled URL as
+# the browser: `localhost` inside a container is the container itself, so for a full local repro use
+# a name both sides resolve (e.g. http://host.docker.internal:3600 plus `extra_hosts`).
 #
 # Then bring everything up:
 #   docker compose -f docker-compose.preproduction.yml up -d
@@ -14,10 +23,13 @@
 #     node --import tsx /app/scripts/preprod/seed-reference.ts
 #
 # Verify:
+#   curl http://localhost:3600/healthz               (public liveness)
+#   curl http://localhost:3600/readyz                (public readiness: database + Redis)
 #   curl http://localhost:3600/admin/system/health   (needs admin token; expect 401 if unauthenticated)
 #   curl http://localhost:3600/countries
 #   open http://localhost:3601    (public)
-#   open http://localhost:3602    (back-office)
+#   open http://localhost:3602    (back-office admin)
+#   open http://localhost:3603    (broker back-office)
 #
 # Tear down:
 #   docker compose -f docker-compose.preproduction.yml down
@@ -29,7 +41,7 @@ services:
     environment:
       POSTGRES_DB: assurmatch_preproduction
       POSTGRES_USER: assurmatch
-      POSTGRES_PASSWORD: assurmatch
+      POSTGRES_PASSWORD: assurmatch # secret-scan:allow (local reproduction only)
     # No host port binding — services reach postgres via the compose network on port 5432.
     # Add `ports: ["127.0.0.1:55432:5432"]` if you want to inspect from the host (avoid 5432/5433
     # which may already be taken by the existing docker-compose.yml).
@@ -74,14 +86,13 @@ services:
       DATABASE_URL: postgresql://assurmatch:assurmatch@postgres:5432/assurmatch_preproduction
       REDIS_URL: redis://redis:6379
       BULLMQ_PREFIX: assurmatch-preprod-local
-      JWT_SECRET: local-preprod-jwt-secret-please-change-32bytes
-      SESSION_SECRET: local-preprod-session-secret-please-change-32bytes
       PUBLIC_APP_URL: http://localhost:3601
-      BACKOFFICE_APP_URL: http://localhost:3602
-      API_BASE_URL: http://localhost:3600
-      CORS_ORIGINS: http://localhost:3601,http://localhost:3602
-      LOCAL_STORAGE_ROOT: /app/uploads
-      LOG_LEVEL: info
+      APP_BASE_URL: http://localhost:3602
+      BROKER_APP_URL: http://localhost:3603
+      ASSURMATCH_AUTH_TOKEN_SECRET: local-preprod-auth-token-secret-please-change-32bytes
+      ENCRYPTION_KEY: local-preprod-encryption-key-please-change-32bytes
+      TRUSTED_PROXY_HOPS: "0"
+      CORS_ORIGINS: http://localhost:3601
       EMAIL_SERVICE_TYPE: mailpit
       EMAIL_FROM: dev@assurmatch.local
       EMAIL_SMTP_HOST: mailpit
@@ -98,6 +109,36 @@ services:
       - assurmatch-uploads:/app/uploads
       - assurmatch-data:/app/data
 
+  assurmatch-worker:
+    image: assurmatch-api:test
+    command: ["node", "--import", "tsx", "scripts/worker/assurmatch-worker.ts"]
+    depends_on:
+      - assurmatch-app
+    stop_grace_period: 40s
+    healthcheck:
+      test: ["CMD", "node", "scripts/worker/worker-healthcheck.mjs"]
+      interval: 30s
+      timeout: 5s
+      start_period: 60s
+      retries: 3
+    environment:
+      NODE_ENV: production
+      APP_ENV: preproduction
+      DATABASE_URL: postgresql://assurmatch:assurmatch@postgres:5432/assurmatch_preproduction
+      REDIS_URL: redis://redis:6379
+      ASSURMATCH_AUTH_TOKEN_SECRET: local-preprod-auth-token-secret-please-change-32bytes
+      ENCRYPTION_KEY: local-preprod-encryption-key-please-change-32bytes
+      PUBLIC_APP_URL: http://localhost:3601
+      APP_BASE_URL: http://localhost:3602
+      BROKER_APP_URL: http://localhost:3603
+      EMAIL_SERVICE_TYPE: mailpit
+      EMAIL_FROM: dev@assurmatch.local
+      EMAIL_SMTP_HOST: mailpit
+      EMAIL_SMTP_PORT: "1025"
+      EMAIL_SMTP_SECURE: "false"
+      EMAIL_PREVIEW_MODE: "true"
+      ASSURMATCH_WORKER_INTERVAL_SECONDS: "15"
+
   assurmatch-public:
     image: assurmatch-public:test
     depends_on:
@@ -105,9 +146,6 @@ services:
     environment:
       NODE_ENV: production
       PORT: "3601"
-      # Server-side rendering inside the container reaches the API via the compose network.
-      API_BASE_URL: http://assurmatch-app:3600
-      PUBLIC_APP_URL: http://localhost:3601
     ports:
       - "127.0.0.1:3601:3601"
 
@@ -118,10 +156,19 @@ services:
     environment:
       NODE_ENV: production
       PORT: "3602"
-      API_BASE_URL: http://assurmatch-app:3600
-      BACKOFFICE_APP_URL: http://localhost:3602
+      APP_ENV: preproduction
     ports:
       - "127.0.0.1:3602:3602"
+
+  assurmatch-broker:
+    image: assurmatch-broker:test
+    depends_on:
+      - assurmatch-app
+    environment:
+      NODE_ENV: production
+      APP_ENV: preproduction
+    ports:
+      - "127.0.0.1:3603:3603"
 
 volumes:
   postgres-preprod-data:

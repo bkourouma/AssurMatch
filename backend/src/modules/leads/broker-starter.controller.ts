@@ -1,6 +1,7 @@
 import type {
   BrokerStarterExportQuery,
   BrokerStarterLeadActionRequest,
+  BrokerStarterLeadCloseRequest,
   BrokerStarterLeadListQuery
 } from "../../../../packages/shared/contracts/quote.contracts";
 import { QuoteAuditActions } from "../audit-logs/quote-audit-actions";
@@ -40,8 +41,8 @@ export class BrokerStarterController {
     return this.actions.accept(id, actor);
   }
 
-  close(id: string, actor: ActorContext) {
-    return this.actions.close(id, actor);
+  close(id: string, input: BrokerStarterLeadCloseRequest, actor: ActorContext) {
+    return this.actions.close(id, input, actor);
   }
 
   reject(id: string, input: BrokerStarterLeadActionRequest, actor: ActorContext) {

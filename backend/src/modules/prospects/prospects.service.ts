@@ -17,9 +17,8 @@ export class ProspectsService {
   constructor(private readonly audit: AuditLogWriter, private readonly repository: ProspectsRepository = new MemoryProspectsRepository()) {}
 
   async createOrLink(countryId: string, productId: string, contact: NormalizedProspectContact, consentRecordId: string, actor: ActorContext): Promise<ProspectRecord> {
-    const before = (await this.repository.list()).length;
-    const prospect = await this.repository.createOrLink(countryId, productId, contact, consentRecordId);
-    if ((await this.repository.list()).length === before) return prospect;
+    const { prospect, created } = await this.repository.createOrLinkWithOutcome(countryId, productId, contact, consentRecordId);
+    if (!created) return prospect;
     this.audit.write({
       actor,
       action: "prospect.created",

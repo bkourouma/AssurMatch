@@ -7,15 +7,22 @@ export interface SurveyEmailContext {
   token: string;
   locale?: string;
   baseUrl?: string;
+  /** Spec 061 FR-005: signed opt-out token; the link is added when present. */
+  unsubscribeToken?: string;
 }
 
 export class SatisfactionSurveyEmailTemplateService {
   render(context: SurveyEmailContext): AuthEmailPayload {
     const locale = (context.locale ?? "fr").toLowerCase().startsWith("en") ? "en" : "fr";
-    const baseUrl = (context.baseUrl ?? "https://assurmatch.com").replace(/\/+$/, "");
+    // Spec 054 R9: the public site the pages `/avis/{ref}` and `/en/feedback/{ref}` live on.
+    const baseUrl = (context.baseUrl ?? process.env.PUBLIC_APP_URL ?? "http://127.0.0.1:3601").replace(/\/+$/, "");
     const feedbackUrl = locale === "en"
-      ? `${baseUrl}/en/feedback/${context.publicReference}?token=${encodeURIComponent(context.token)}`
-      : `${baseUrl}/avis/${context.publicReference}?token=${encodeURIComponent(context.token)}`;
+      ? `${baseUrl}/en/feedback/${encodeURIComponent(context.publicReference)}?token=${encodeURIComponent(context.token)}`
+      : `${baseUrl}/avis/${encodeURIComponent(context.publicReference)}?token=${encodeURIComponent(context.token)}`;
+    // Spec 061 FR-005: `/desinscription` (FR) and `/en/unsubscribe` (EN), token in the query.
+    const unsubscribeUrl = context.unsubscribeToken
+      ? `${baseUrl}${locale === "en" ? "/en/unsubscribe" : "/desinscription"}?token=${encodeURIComponent(context.unsubscribeToken)}`
+      : undefined;
 
     let subject: string;
     let body: string;
@@ -32,6 +39,7 @@ export class SatisfactionSurveyEmailTemplateService {
         `Share my feedback: ${feedbackUrl}`,
         "",
         "If you do not wish to reply, simply ignore this message.",
+        ...(unsubscribeUrl ? ["", `To stop receiving satisfaction surveys: ${unsubscribeUrl}`] : []),
         "",
         "The AssurMatch Team"
       ].join("\n");
@@ -47,6 +55,7 @@ export class SatisfactionSurveyEmailTemplateService {
         `Donner mon avis : ${feedbackUrl}`,
         "",
         "Si vous ne souhaitez pas répondre, vous pouvez simplement ignorer ce message.",
+        ...(unsubscribeUrl ? ["", `Ne plus recevoir d'enquêtes de satisfaction : ${unsubscribeUrl}`] : []),
         "",
         "L'équipe AssurMatch"
       ].join("\n");

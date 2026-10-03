@@ -6,7 +6,9 @@ const operationsTabs = [
   { label: "Demandes de devis", href: "/quote-requests" },
   { label: "Assignations", href: "/lead-assignments" },
   { label: "Prospects", href: "/prospects" },
-  { label: "Revue devis", href: "/operations/quote-review" }
+  { label: "Revue devis", href: "/operations/quote-review" },
+  // Spec 056 (H-04): contact inbox.
+  { label: "Messages de contact", href: "/operations/contact-messages" }
 ];
 
 export function OperationsTabs({ current }: { current: string }) {

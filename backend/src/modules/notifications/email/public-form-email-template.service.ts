@@ -22,6 +22,15 @@ export interface PartnerApplicationConfirmationContext {
   locale?: PublicLocale;
 }
 
+/** Spec 051 R10: the decision e-mail carries the reference and a neutral sentence, nothing else. */
+export interface PartnerApplicationDecisionContext {
+  to: string;
+  contactName: string;
+  publicReference: string;
+  decision: "accepted" | "rejected";
+  locale?: PublicLocale;
+}
+
 interface TemplateOptions {
   publicAppUrl?: string;
 }
@@ -179,6 +188,64 @@ export class PublicFormEmailTemplateService {
           };
 
     return this.render(context.to, copy.subject, copy.lines, "public_partner_application_confirmation");
+  }
+
+  /**
+   * Spec 051 FR-017: the decision on a broker application, in the language of the application. It
+   * quotes the `PA-` reference only: never the internal note, the refusal reason or any data the
+   * applicant did not provide. An acceptance opens a technical partnership; it is not an
+   * accreditation and says so. A refusal is neutral and is not an opinion on the accreditation.
+   */
+  partnerApplicationDecision(context: PartnerApplicationDecisionContext): AuthEmailPayload {
+    const locale = this.resolveLocale(context.locale);
+    const privacy = this.privacyLink(locale);
+    const accepted = context.decision === "accepted";
+    const copy =
+      locale === "en"
+        ? {
+            subject: `Your AssurMatch partner application ${context.publicReference}`,
+            lines: [
+              `Hello ${context.contactName},`,
+              "",
+              accepted
+                ? "Our compliance team has reviewed your broker partner application and accepted it."
+                : "Our compliance team has reviewed your broker partner application and cannot take it further at this stage.",
+              `Your reference: ${context.publicReference}`,
+              "",
+              ...(accepted
+                ? [
+                    "This acceptance opens a technical partnership with AssurMatch. It is not an accreditation and does not replace the one issued by your supervisory authority.",
+                    "We will contact you to complete your file before any activation: no lead is sent to you at this stage."
+                  ]
+                : ["This decision is not an opinion on your accreditation or on your activity."]),
+              `Our privacy policy: ${privacy}`,
+              "",
+              DISCLAIMER.en
+            ]
+          }
+        : {
+            subject: `Votre candidature partenaire AssurMatch ${context.publicReference}`,
+            lines: [
+              `Bonjour ${context.contactName},`,
+              "",
+              accepted
+                ? "Notre equipe conformite a examine votre candidature de courtier partenaire et l'a acceptee."
+                : "Notre equipe conformite a examine votre candidature de courtier partenaire et ne peut pas y donner suite a ce stade.",
+              `Votre reference: ${context.publicReference}`,
+              "",
+              ...(accepted
+                ? [
+                    "Cette acceptation ouvre un partenariat technique avec AssurMatch. Elle ne constitue pas un agrement et ne remplace pas celui delivre par votre autorite de controle.",
+                    "Nous vous contacterons pour completer votre dossier avant toute activation: aucune demande ne vous est transmise a ce stade."
+                  ]
+                : ["Cette decision ne constitue pas un avis sur votre agrement ni sur votre activite."]),
+              `Notre politique de confidentialite: ${privacy}`,
+              "",
+              DISCLAIMER.fr
+            ]
+          };
+
+    return this.render(context.to, copy.subject, copy.lines, "partner_application_decision");
   }
 
   /** An unsupported or absent locale falls back to French rather than failing the submission. */
