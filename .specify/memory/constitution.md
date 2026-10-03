@@ -1,34 +1,33 @@
 <!--
 Sync Impact Report
-Version change: 1.1.0 -> 1.2.0
+Version change: 1.2.0 -> 1.3.0
 Modified principles:
-- XI. Gouvernance Spec Kit et activation des features: ajout d'une regle de
-  workflow continu apres spec validee pour les features standards.
+- Constitutional Acceptance Criteria n°1 (Courtier Starter sans CRM): le
+  courtier Starter peut repondre au visiteur par une proposition simple
+  (message et PDF facultatif, non contractuelle) sans acceder aux fonctions
+  CRM. Decision produit D-5 du 2026-10-02 (PRD v0.3).
 Added sections:
-- Workflow Spec Kit continu
+- none
 Removed sections:
 - none
 Templates requiring updates:
-- updated: .specify/templates/plan-template.md
-- updated: .specify/templates/spec-template.md
-- updated: .specify/templates/tasks-template.md
-- updated: .specify/templates/checklist-template.md
-- reviewed: .specify/templates/commands/*.md not present
-- reviewed: .specify/extensions/git/commands/*.md
-- updated: AGENTS.md
+- reviewed: .specify/templates/spec-template.md (criteres repris par reference)
+- reviewed: .specify/templates/plan-template.md
+- reviewed: .specify/templates/tasks-template.md
 Existing specs impact:
-- Specs terminees existantes restent valides et ne sont pas amendees par cette
-  regle. Elle guide les prochaines features standards.
-Runtime hook status:
-- before_constitution speckit.git.initialize executed; repository already
-  initialized, so no Git initialization change was needed.
+- Specs 003, 012, 025 (portail Starter) restent valides; la spec 055 introduit
+  la reponse Starter. Le test d'acceptation constitutionnel Starter doit
+  autoriser l'action "repondre au visiteur" et continuer d'interdire Kanban,
+  pipeline avance, assignation equipe, taches, rappels et IA commerciale.
+Approver: utilisateur (decision D-5, 2026-10-02). Revalidation: a la revue de
+la spec 055.
 Follow-up TODOs: none
 -->
 
 # AssurMatch Constitution
 
-**Version**: 1.2.0
-**Date**: 2026-04-26
+**Version**: 1.3.0
+**Date**: 2026-10-03
 **Statut**: Ratified
 
 ## Core Principles
@@ -410,7 +409,9 @@ des features concernees.
 1. Courtier Starter sans CRM
    Given un courtier en plan Starter, When il ouvre son portail, Then il voit
    uniquement ses leads recus, le detail du lead, accepter, rejeter, contester,
-   l'historique minimal, le dashboard basique et les notifications configurees.
+   repondre au visiteur par une proposition simple (message et document
+   facultatif, marquee non contractuelle), l'historique minimal, le dashboard
+   basique et les notifications configurees.
    Then il NE voit PAS Kanban, pipeline avance, assignation equipe, taches,
    rappels ou IA commerciale non incluse.
 
@@ -590,4 +591,4 @@ Compliance review:
 - Une feature reglementee ou sensible NE DOIT PAS etre activee sans validation
   explicite de conformite.
 
-**Version**: 1.2.0 | **Ratified**: 2026-04-25 | **Last Amended**: 2026-04-26
+**Version**: 1.3.0 | **Ratified**: 2026-04-25 | **Last Amended**: 2026-10-03
