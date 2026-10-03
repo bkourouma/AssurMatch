@@ -514,6 +514,7 @@
     },
     "stepStatus": "Step {current} of {total}",
     "preselected": "Pre-selected indicative offer: the responsible partner broker will confirm the quote and the conditions.",
+    "offerPartner": "Your request will be sent to {partner}, an approved partner broker, subject to its availability. The offer remains indicative: the broker will confirm the quote and the conditions.",
     "contactLegend": "Your details",
     "name": "Name",
     "nameHint": "Optional.",
@@ -557,6 +558,8 @@
     "submit": "Request a quote",
     "successTitle": "Request received",
     "successPrefix": "Public reference:",
+    "offerPartnerRetained": "Your request has been sent to {partner}.",
+    "offerPartnerNotRetained": "The broker of the selected offer was not available: your request has been directed to another approved partner broker.",
     "trackLink": "Follow my request and add documents (optional)",
     "backToOffers": "Back to the offers",
     "blocked": {

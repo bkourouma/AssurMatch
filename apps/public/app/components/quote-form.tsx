@@ -157,7 +157,15 @@ export function QuoteFormShell({
   // Spec 050 R5: the published consent text, variables resolved server-side, rendered as plain text.
   // The static sentence only remains for an older API that does not serve the content.
   const consentContent = quoteForm.consent.content?.trim();
-  const [result, setResult] = useState<{ status: "idle" | "submitting" | "success" | "error"; message?: string; publicReference?: string; verificationToken?: string }>({ status: "idle" });
+  // Spec 052 FR-018: the selected offer's broker, served only when it is eligible for display.
+  const offerPartnerName = selectedOfferId ? quoteForm.offerPartnerName?.trim() || undefined : undefined;
+  const [result, setResult] = useState<{
+    status: "idle" | "submitting" | "success" | "error";
+    message?: string;
+    publicReference?: string;
+    verificationToken?: string;
+    selectedOfferPartnerRetained?: boolean | null;
+  }>({ status: "idle" });
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -194,7 +202,13 @@ export function QuoteFormShell({
     if (response.status === "success") {
       // No `form.reset()`: the form is replaced by the confirmation panel below, and emptying a form
       // that stays on screen next to "demande recue" reads as an invitation to send it again.
-      setResult({ status: "success", message: response.publicMessage, publicReference: response.publicReference ?? "", ...(response.verificationToken ? { verificationToken: response.verificationToken } : {}) });
+      setResult({
+        status: "success",
+        message: response.publicMessage,
+        publicReference: response.publicReference ?? "",
+        ...(response.verificationToken ? { verificationToken: response.verificationToken } : {}),
+        selectedOfferPartnerRetained: response.selectedOfferPartnerRetained ?? null
+      });
       return;
     }
     setResult({ status: "error", message: api(response.messageKey) });
@@ -222,6 +236,15 @@ export function QuoteFormShell({
   );
 
   if (sent) {
+    // Spec 052 FR-019: say whether the selected offer's broker received the request. Without an
+    // offer (`null`) the confirmation stays as it was; the retained broker's name beyond the offer's
+    // own is left to the follow-up page (spec 054).
+    const offerRouting =
+      selectedOfferId && result.selectedOfferPartnerRetained === true && offerPartnerName
+        ? t("offerPartnerRetained", { partner: offerPartnerName })
+        : selectedOfferId && result.selectedOfferPartnerRetained === false
+          ? t("offerPartnerNotRetained")
+          : null;
     return (
       <div className="am-stack am-stack--xl">
         {stepper}
@@ -232,6 +255,11 @@ export function QuoteFormShell({
             <p className="am-j-reference__label">{t("successPrefix")}</p>
             <p className="am-j-reference__value am-tabular">{result.publicReference}</p>
           </div>
+          {offerRouting ? (
+            <Notice tone="info" role="status">
+              {offerRouting}
+            </Notice>
+          ) : null}
           {result.verificationToken ? (
             <p>
               <Link
@@ -264,7 +292,9 @@ export function QuoteFormShell({
     <div className="am-stack am-stack--xl">
       {stepper}
       <form className="am-j-form" onSubmit={submit}>
-        {selectedOfferId ? <Notice tone="indicative">{t("preselected")}</Notice> : null}
+        {selectedOfferId ? (
+          <Notice tone="indicative">{offerPartnerName ? t("offerPartner", { partner: offerPartnerName }) : t("preselected")}</Notice>
+        ) : null}
 
         <QuoteSection index={1} legend={t("contactLegend")}>
           <div className="am-j-form__grid">

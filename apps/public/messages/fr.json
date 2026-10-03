@@ -514,6 +514,7 @@
     },
     "stepStatus": "Étape {current} sur {total}",
     "preselected": "Offre indicative présélectionnée : le courtier partenaire responsable confirmera le devis et les conditions.",
+    "offerPartner": "Votre demande sera transmise à {partner}, courtier partenaire agréé, si sa disponibilité le permet. L'offre reste indicative : le courtier confirmera le devis et les conditions.",
     "contactLegend": "Vos coordonnées",
     "name": "Nom",
     "nameHint": "Facultatif.",
@@ -557,6 +558,8 @@
     "submit": "Demander un devis",
     "successTitle": "Demande reçue",
     "successPrefix": "Référence publique :",
+    "offerPartnerRetained": "Votre demande a été transmise à {partner}.",
+    "offerPartnerNotRetained": "Le courtier de l'offre choisie n'était pas disponible : votre demande a été orientée vers un autre courtier partenaire agréé.",
     "trackLink": "Suivre ma demande et ajouter des documents (optionnel)",
     "backToOffers": "Retour aux offres",
     "blocked": {

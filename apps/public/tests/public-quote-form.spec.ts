@@ -29,7 +29,7 @@ test("spec 050: the quote form is read and submitted in the page language, never
   // The language travels on the read and on the submission.
   expect(api).toContain("new URLSearchParams({ language })");
   expect(api).toContain("/quote-form?${params.toString()}");
-  expect(page).toContain("getPublicQuoteForm(countryCode, productKey, locale)");
+  expect(page).toContain("getPublicQuoteForm(countryCode, productKey, locale, selectedOfferId)");
   expect(component).toMatch(/formDefinitionId: quoteForm\.formDefinitionId,\s*language,/);
 
   // A form missing in this language is announced with links to the languages that exist.

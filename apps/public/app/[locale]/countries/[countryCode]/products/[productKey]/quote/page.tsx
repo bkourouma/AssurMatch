@@ -51,7 +51,7 @@ export default async function PublicQuotePage({
   const offerIdParam = Array.isArray(query.offerId) ? query.offerId[0] : query.offerId;
   const selectedOfferId = offerIdParam && /^[0-9a-f-]{36}$/i.test(offerIdParam) ? offerIdParam : undefined;
   // Spec 050 R6: the form is requested in the page language; another language is offered, never served.
-  const quoteForm = await getPublicQuoteForm(countryCode, productKey, locale);
+  const quoteForm = await getPublicQuoteForm(countryCode, productKey, locale, selectedOfferId);
 
   const directory = await listCountryDirectory();
   const iso = countryCode.trim().toUpperCase();

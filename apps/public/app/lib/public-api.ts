@@ -56,6 +56,11 @@ export interface PublicQuoteFormState {
   phoneRule?: PublicPhoneRule | null;
   /** Spec 043: the published definition's fields, which the form renders and submits as answers. */
   fields: PublicQuoteFormField[];
+  /**
+   * Spec 052 FR-018: the selected offer's broker (trade name, else legal name), only served when the
+   * offer is public for this country and product and its broker is eligible for display.
+   */
+  offerPartnerName?: string;
   consent: {
     consentTextId: string;
     version: string;
@@ -83,6 +88,11 @@ export interface PublicQuoteSubmitState {
   publicReference?: string;
   /** Visitor-only token to read the request status and attach optional documents. */
   verificationToken?: string;
+  /**
+   * Spec 052 FR-019: `true` the selected offer's broker received the request, `false` it was
+   * routed to another partner broker (or the offer was ignored), `null` no offer was selected.
+   */
+  selectedOfferPartnerRetained?: boolean | null;
   error?: string;
   publicMessage: string;
   messageKey: ApiMessageKey;
@@ -271,8 +281,10 @@ function isPublicQuoteLanguage(value: unknown): value is PublicQuoteLanguage {
  * error body is kept: a 404 `QUOTE_FORM_LANGUAGE_UNAVAILABLE` lists the languages in which the form
  * exists, so the page can offer them instead of silently serving another language.
  */
-export async function getPublicQuoteForm(countryCode: string, productKey: string, language: PublicQuoteLanguage): Promise<PublicQuoteFormResult> {
+export async function getPublicQuoteForm(countryCode: string, productKey: string, language: PublicQuoteLanguage, offerId?: string): Promise<PublicQuoteFormResult> {
   const params = new URLSearchParams({ language });
+  // Spec 052 FR-018: the selected offer lets the server name its broker in the consent text.
+  if (offerId) params.set("offerId", offerId);
   try {
     const response = await fetch(
       `${PUBLIC_API_BASE_URL}/countries/${encodeURIComponent(countryCode)}/products/${encodeURIComponent(productKey)}/quote-form?${params.toString()}`,
@@ -319,7 +331,7 @@ export async function submitPublicQuoteRequest(input: QuoteRequestCreateDto): Pr
       }
       return { status: "error", error: `api_${response.status}`, messageKey: "quoteRejected", publicMessage: "La demande de devis ne peut pas etre envoyee avec ces informations." };
     }
-    const body = await response.json() as { publicReference?: string; message?: string };
+    const body = await response.json() as { publicReference?: string; message?: string; selectedOfferPartnerRetained?: unknown };
     if (!body.publicReference) {
       return { status: "error", error: "missing_public_reference", messageKey: "confirmationFailed", publicMessage: "La confirmation n'a pas pu etre generee." };
     }
@@ -327,6 +339,7 @@ export async function submitPublicQuoteRequest(input: QuoteRequestCreateDto): Pr
       status: "success",
       publicReference: body.publicReference,
       ...(typeof (body as { verificationToken?: unknown }).verificationToken === "string" ? { verificationToken: (body as { verificationToken: string }).verificationToken } : {}),
+      selectedOfferPartnerRetained: typeof body.selectedOfferPartnerRetained === "boolean" ? body.selectedOfferPartnerRetained : null,
       messageKey: "quoteTransmitted",
       // The server message states how many brokers received the request (spec 042).
       publicMessage: body.message ?? "Demande transmise selon votre consentement."
