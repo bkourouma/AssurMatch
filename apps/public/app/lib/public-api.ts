@@ -742,6 +742,27 @@ export async function submitSatisfactionSurvey(publicReference: string, token: s
   }
 }
 
+/**
+ * Spec 061 FR-005: `POST /notifications/unsubscribe` with the signed token of the survey e-mail.
+ * Every refusal (wrong, forged, malformed link) reads as the same neutral "unavailable".
+ */
+export async function unsubscribeFromSurveys(token: string): Promise<"unsubscribed" | "unavailable" | "error"> {
+  try {
+    const response = await fetch(`${PUBLIC_API_BASE_URL}/notifications/unsubscribe`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ token }),
+      cache: "no-store"
+    });
+    if (response.status >= 500) return "error";
+    if (!response.ok) return "unavailable";
+    const payload = await response.json() as { status?: string };
+    return payload.status === "unsubscribed" ? "unsubscribed" : "unavailable";
+  } catch {
+    return "error";
+  }
+}
+
 /* ---------- Spec 055: broker proposals on the tracking space (visitor side) ---------- */
 
 /**

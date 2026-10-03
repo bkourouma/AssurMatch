@@ -250,6 +250,10 @@ describe("routing rules runtime HTTP", () => {
     expect(harness.runtime.audit.writer.search({ action: RoutingAuditActions.reassigned })).toHaveLength(1);
     const notifications = await harness.runtime.notifications.service.list();
     expect(notifications.filter((notification) => notification.recipientScope === `partner:${partnerB.id}`)).toHaveLength(1);
+    // Spec 061 FR-002: the receiving cabinet is told the lead was reassigned to it (e-mail + in-app).
+    expect(notifications.filter((notification) => notification.recipientScope === `partner:${partnerB.id}`).map((notification) => notification.type)).toEqual(["broker_lead_reassigned"]);
+    expect((await harness.runtime.notifications.dispatch.listInApp(partnerB.id)).map((item) => item.type)).toEqual(["broker_lead_reassigned"]);
+    expect((await harness.runtime.notifications.dispatch.listInApp(partnerA.id)).some((item) => item.type === "broker_lead_reassigned")).toBe(false);
     // Spec 054 R6: the visitor is told of the reassignment, naming the new broker, once.
     const reassignedVisitor = notifications.filter((notification) => notification.type === "visitor_quote_reassigned");
     expect(reassignedVisitor).toHaveLength(1);

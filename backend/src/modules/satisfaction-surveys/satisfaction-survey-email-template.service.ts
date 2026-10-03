@@ -7,6 +7,8 @@ export interface SurveyEmailContext {
   token: string;
   locale?: string;
   baseUrl?: string;
+  /** Spec 061 FR-005: signed opt-out token; the link is added when present. */
+  unsubscribeToken?: string;
 }
 
 export class SatisfactionSurveyEmailTemplateService {
@@ -17,6 +19,10 @@ export class SatisfactionSurveyEmailTemplateService {
     const feedbackUrl = locale === "en"
       ? `${baseUrl}/en/feedback/${encodeURIComponent(context.publicReference)}?token=${encodeURIComponent(context.token)}`
       : `${baseUrl}/avis/${encodeURIComponent(context.publicReference)}?token=${encodeURIComponent(context.token)}`;
+    // Spec 061 FR-005: `/desinscription` (FR) and `/en/unsubscribe` (EN), token in the query.
+    const unsubscribeUrl = context.unsubscribeToken
+      ? `${baseUrl}${locale === "en" ? "/en/unsubscribe" : "/desinscription"}?token=${encodeURIComponent(context.unsubscribeToken)}`
+      : undefined;
 
     let subject: string;
     let body: string;
@@ -33,6 +39,7 @@ export class SatisfactionSurveyEmailTemplateService {
         `Share my feedback: ${feedbackUrl}`,
         "",
         "If you do not wish to reply, simply ignore this message.",
+        ...(unsubscribeUrl ? ["", `To stop receiving satisfaction surveys: ${unsubscribeUrl}`] : []),
         "",
         "The AssurMatch Team"
       ].join("\n");
@@ -48,6 +55,7 @@ export class SatisfactionSurveyEmailTemplateService {
         `Donner mon avis : ${feedbackUrl}`,
         "",
         "Si vous ne souhaitez pas répondre, vous pouvez simplement ignorer ce message.",
+        ...(unsubscribeUrl ? ["", `Ne plus recevoir d'enquêtes de satisfaction : ${unsubscribeUrl}`] : []),
         "",
         "L'équipe AssurMatch"
       ].join("\n");

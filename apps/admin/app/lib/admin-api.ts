@@ -1,4 +1,5 @@
 import { backOfficeApiBaseUrl, getBackOfficeToken } from "./backoffice-auth";
+import type { AdminAlertsListResponse } from "../../../../packages/shared/contracts/admin-alerts.contracts";
 import type {
   AdminCountryProductLinkView,
   AdminCountryView,
@@ -441,6 +442,12 @@ export function readAdminDashboard() {
 export function readComplianceAlerts(page = 1, pageSize = 25) {
   const params = new URLSearchParams({ page: String(page), pageSize: String(pageSize) });
   return readAdmin<ComplianceAlertsData>(`/admin/dashboard/compliance-alerts?${params.toString()}`, emptyComplianceAlerts);
+}
+
+/** Spec 061 FR-004: alerts center (licences, offers, coverage, routing, disputes, worker). */
+export function readAdminAlerts(status: "open" | "acknowledged" | "all" = "open") {
+  const fallback: AdminAlertsListResponse = { items: [], open: 0 };
+  return readAdmin<AdminAlertsListResponse>(`/admin/alerts?status=${status}`, fallback);
 }
 
 export function readActivationChecklist(filters: { country?: string; product?: string; partnerId?: string } = {}) {

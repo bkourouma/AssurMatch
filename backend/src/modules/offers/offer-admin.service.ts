@@ -193,13 +193,12 @@ export class OfferAdminService {
     return this.repository.require(id);
   }
 
-  /** FR-010: filtered list restricted to the actor's country scope (C3); R9 reminders are created here. */
+  /** FR-010: filtered list restricted to the actor's country scope (C3). R9 reminders come from the spec 061 scheduled job. */
   async listViews(query: unknown, actor: ActorContext): Promise<AdminOfferListItem[]> {
     this.requireAccess(actor, this.canRead(actor), undefined, "list", "forbidden_role");
     const parsed: AdminOfferListQuery = parseOfferInput(adminOfferListQuerySchema, query ?? {});
     const now = new Date();
     const scoped = (await this.repository.list()).filter((offer) => this.inCountryScope(actor, offer.countryId));
-    await this.lifecycle.notifyExpiring(scoped, now);
     const items: AdminOfferListItem[] = [];
     const names = new Map<string, string | undefined>();
     for (const offer of scoped) {

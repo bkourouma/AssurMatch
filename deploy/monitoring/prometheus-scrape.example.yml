@@ -1,0 +1,37 @@
+# AssurMatch Prometheus scrape example (spec 058 FR-003). Replace <domain>; put the METRICS_TOKEN
+# value in /etc/prometheus/assurmatch-metrics-token (mode 0600), never in this file.
+# The API is scraped on the private network: nginx answers 404 for /metrics on api.<domain>.
+global:
+  scrape_interval: 30s
+  evaluation_interval: 30s
+
+rule_files:
+  - prometheus-alerts.yml
+
+scrape_configs:
+  - job_name: assurmatch-api
+    metrics_path: /metrics
+    authorization:
+      type: Bearer
+      credentials_file: /etc/prometheus/assurmatch-metrics-token
+    static_configs:
+      - targets: ["api:3600"]   # compose service name, or 127.0.0.1:3600 on the host
+
+  # Optional: TLS / availability probes through the blackbox exporter (module http_2xx).
+  - job_name: assurmatch-blackbox
+    metrics_path: /probe
+    params:
+      module: [http_2xx]
+    static_configs:
+      - targets:
+          - https://<domain>/
+          - https://admin.<domain>/login
+          - https://pro.<domain>/login
+          - https://api.<domain>/readyz
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: __param_target
+      - source_labels: [__param_target]
+        target_label: instance
+      - target_label: __address__
+        replacement: blackbox-exporter:9115

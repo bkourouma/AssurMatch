@@ -1,11 +1,15 @@
 import { AuditLogWriter } from "../audit-logs/audit-log-writer.service";
 import type { AuthEmailDeliveryPort, AuthEmailPayload } from "./email/email-delivery.service";
 import { maskEmail } from "./email/email-delivery.service";
-import { QuoteEmailTemplateNotSafeError, QuoteEmailTemplateService, type VisitorEmailStep } from "./email/quote-email-template.service";
+import { ADMIN_ALERT_LABELS, type AdminAlertType } from "../../../../packages/shared/contracts/admin-alerts.contracts";
+import { QuoteEmailTemplateNotSafeError, QuoteEmailTemplateService, type BrokerAlertEmailType, type VisitorEmailStep } from "./email/quote-email-template.service";
 import type { NotificationRecord, NotificationsService } from "./notifications.module";
 import type { VisitorEmailNotificationType } from "./quote-notification.service";
 
-export type DeliverableQuoteNotificationType = VisitorEmailNotificationType | "broker_lead_assigned" | "broker_visitor_response";
+export type DeliverableQuoteNotificationType = VisitorEmailNotificationType | "broker_lead_assigned" | "broker_visitor_response" | "broker_lead_reassigned" | BrokerAlertEmailType | "admin_alert_raised";
+
+/** Spec 061: broker alert pointers rendered from the partner alone (no quote lookup). */
+const BROKER_ALERT_TYPES = new Set<string>(["broker_document_received", "broker_task_due", "broker_quota_threshold", "broker_license_expiring", "broker_offer_expiring"]);
 
 /**
  * Spec 054 R4: the step each visitor type announces. The two spec 044 types stay renderable for the
@@ -26,7 +30,7 @@ const VISITOR_STEP: Record<VisitorEmailNotificationType, VisitorEmailStep> = {
   visitor_proposal_available: "proposal_available"
 };
 
-const DELIVERABLE_TYPES = new Set<string>([...Object.keys(VISITOR_STEP), "broker_lead_assigned", "broker_visitor_response"]);
+const DELIVERABLE_TYPES = new Set<string>([...Object.keys(VISITOR_STEP), "broker_lead_assigned", "broker_visitor_response", "broker_lead_reassigned", ...BROKER_ALERT_TYPES, "admin_alert_raised"]);
 
 /** A row is due while it has never been delivered and has not exhausted its retries. */
 const DUE_STATUSES = new Set(["pending", "queued", "retryable"]);
@@ -69,6 +73,8 @@ export interface QuoteNotificationDeliveryDeps {
   /** Spec 054 R2: mints the visitor access token at render time; the clear token is never stored. */
   visitorAccess?: { issue(quoteRequestId: string, context: { reason: string }): Promise<{ token: string; expiresAt: Date }> };
   retryCap?: number;
+  /** Spec 061: compliance team address of the `admin_alert_raised` pointer (env, read at render time). */
+  complianceEmail?: () => string | undefined;
 }
 
 export interface QuoteNotificationDeliveryOutcome {
@@ -166,7 +172,9 @@ export class QuoteNotificationDeliveryService {
   }
 
   private async render(notification: NotificationRecord): Promise<AuthEmailPayload> {
-    if (notification.type === "broker_lead_assigned" || notification.type === "broker_visitor_response") return this.renderBroker(notification);
+    if (notification.type === "broker_lead_assigned" || notification.type === "broker_visitor_response" || notification.type === "broker_lead_reassigned") return this.renderBroker(notification);
+    if (BROKER_ALERT_TYPES.has(notification.type)) return this.renderBrokerAlert(notification);
+    if (notification.type === "admin_alert_raised") return this.renderAdminAlert(notification);
     return this.renderVisitor(notification);
   }
 
@@ -224,8 +232,26 @@ export class QuoteNotificationDeliveryService {
       partnerLegalName: partner.legalName,
       publicReference: quote.publicReference,
       countryCode: quote.countryCode,
-      productKey: quote.productKey
+      productKey: quote.productKey,
+      reassigned: notification.type === "broker_lead_reassigned"
     });
+  }
+
+  /** Spec 061 FR-002: pointer to the portal, the detail never leaves the back-office. */
+  private async renderBrokerAlert(notification: NotificationRecord): Promise<AuthEmailPayload> {
+    const partnerTenantId = notification.recipientScope.startsWith("partner:") ? notification.recipientScope.slice("partner:".length) : undefined;
+    if (!partnerTenantId) throw new Error("recipient_unresolved");
+    const partner = await this.deps.partners.findById(partnerTenantId);
+    if (!partner?.primaryEmail) throw new Error("recipient_unresolved");
+    return this.deps.templates.brokerAlert({ to: partner.primaryEmail, partnerLegalName: partner.legalName, type: notification.type as BrokerAlertEmailType });
+  }
+
+  /** Spec 061 FR-004: compliance team pointer to the alerts center. */
+  private async renderAdminAlert(notification: NotificationRecord): Promise<AuthEmailPayload> {
+    const to = this.deps.complianceEmail?.();
+    if (!to) throw new Error("recipient_unresolved");
+    const type = notification.eventPayload?.alertType as AdminAlertType | undefined;
+    return this.deps.templates.adminAlert({ to, label: (type && ADMIN_ALERT_LABELS[type]) || "Alerte plateforme" });
   }
 
   private async mark(notification: NotificationRecord, emailStatus: NotificationRecord["emailStatus"], retryCount?: number): Promise<void> {

@@ -100,6 +100,20 @@ import { PrismaRoutingDecisionsRepository } from "../modules/leads/routing-decis
 import { PrismaCrmActivityRepository } from "../modules/leads/crm-activity.repository";
 import { LeadProposalsModule, MemoryLeadProposalsRepository, PrismaLeadProposalsRepository } from "../modules/lead-proposals/lead-proposals.module";
 import { PrismaNotificationsRepository } from "../modules/notifications/notifications.repository";
+import { BrokerAlertNotifier } from "../modules/notifications/broker-alert-notifier";
+import { AdminAlertsService } from "../modules/notifications/admin-alerts.service";
+import { MemoryAdminAlertsRepository, MemoryWorkerHeartbeatRepository, PrismaAdminAlertsRepository, PrismaWorkerHeartbeatRepository } from "../modules/notifications/admin-alerts.repository";
+import { ScheduledAlertsService, readScheduledAlertsConfig } from "../modules/notifications/scheduled-alerts.service";
+import { RuntimeScheduledAlertSources } from "../modules/notifications/scheduled-alert-sources";
+import { PrismaNotificationUnsubscribeRepository } from "../modules/satisfaction-surveys/survey-unsubscribe.service";
+import type { OfferLifecycleService } from "../modules/offers/offer-lifecycle.service";
+import { readIntegerEnv } from "./worker/delivery-worker-loop";
+
+/** Spec 061 FR-004: compliance team address of the alerts e-mail (none: the center only). */
+function complianceAlertEmail(): string | undefined {
+  const value = process.env.ASSURMATCH_COMPLIANCE_ALERT_EMAIL?.trim();
+  return value && /^[^\s@]+@[^\s@]+$/.test(value) ? value : undefined;
+}
 import { DashboardsModule } from "../modules/dashboards/dashboards.module";
 import { aiSurfaceSchema } from "../../../packages/shared/contracts/ai.contracts";
 import type { BrokerOfferCoverageItem } from "../../../packages/shared/contracts/offer-content";
@@ -226,6 +240,25 @@ export class AssurMatchRuntime {
     whatsappSecretConfigured: Boolean(process.env.ASSURMATCH_WHATSAPP_API_KEY)
   }, this.featureFlags.service, this.messagingRepository, this.partnerWebhookEvents);
   readonly brokerNotifications = new BrokerNotificationsService({ audit: this.audit.writer, dispatch: this.notifications.dispatch });
+  /** Spec 061 FR-002/FR-003: broker alerts (in-app always, pointer e-mail, opted-in SMS/WhatsApp). */
+  readonly brokerAlerts = new BrokerAlertNotifier({
+    notifications: this.notifications.service,
+    dispatch: this.notifications.dispatch,
+    audit: this.audit.writer,
+    partnerPhone: async (partnerTenantId: string) => (await this.partners.service.require(partnerTenantId).catch(() => undefined))?.primaryWhatsApp
+  });
+  private readonly adminAlertsRepository = this.runtimeRepository(new PrismaAdminAlertsRepository(this.prisma)) ?? new MemoryAdminAlertsRepository();
+  /** Spec 061: liveness of the spec 057 worker, written by the worker, read by the alerts center. */
+  readonly workerHeartbeats = this.runtimeRepository(new PrismaWorkerHeartbeatRepository(this.prisma)) ?? new MemoryWorkerHeartbeatRepository();
+  /** Spec 061 FR-004: admin alerts center (raise, list, acknowledge, compliance e-mail). */
+  readonly adminAlerts = new AdminAlertsService({
+    repository: this.adminAlertsRepository,
+    heartbeats: this.workerHeartbeats,
+    audit: this.audit.writer,
+    notifications: this.notifications.service,
+    complianceEmail: () => complianceAlertEmail(),
+    workerStaleMinutes: () => readIntegerEnv(process.env, "ASSURMATCH_WORKER_STALE_MINUTES", 10, 1, 1440)
+  });
   private readonly enterpriseRepository = this.runtimeRepository(new PrismaEnterpriseRepository(this.prisma));
   private readonly aiInteractionsRepository = this.runtimeRepository(new PrismaAiInteractionsRepository(this.prisma)) ?? new MemoryAiInteractionsRepository();
   private readonly aiProviders = resolveAiProvider();
@@ -385,7 +418,8 @@ export class AssurMatchRuntime {
     },
     this.audit.writer,
     this.redis.client,
-    this.runtimeRepository(new PrismaSatisfactionSurveyRepository(this.prisma))
+    this.runtimeRepository(new PrismaSatisfactionSurveyRepository(this.prisma)),
+    this.runtimeRepository(new PrismaNotificationUnsubscribeRepository(this.prisma))
   );
 
 readonly enterprise = new EnterpriseService({
@@ -458,7 +492,8 @@ readonly enterprise = new EnterpriseService({
     prospects: { findById: (id: string) => this.prospects.service.require(id).catch(() => undefined) },
     partners: { findById: (id: string) => this.partners.service.require(id).catch(() => undefined) },
     // Spec 054 R2: a fresh visitor token is minted when the e-mail is rendered.
-    visitorAccess: { issue: (quoteRequestId: string, context: { reason: string }) => this.quoteRequests.submissions.visitorAccess.issue(quoteRequestId, context) }
+    visitorAccess: { issue: (quoteRequestId: string, context: { reason: string }) => this.quoteRequests.submissions.visitorAccess.issue(quoteRequestId, context) },
+    complianceEmail: () => complianceAlertEmail()
   });
   readonly quoteDocuments = new QuoteDocumentsService({
     audit: this.audit.writer,
@@ -472,6 +507,7 @@ readonly enterprise = new EnterpriseService({
     assignments: this.leads.assignments,
     crmDocuments: this.leads.crmActivityRepository,
     notifications: this.notifications.service,
+    brokerAlerts: this.brokerAlerts,
     isGlobalFlagEnabled: (key) => this.featureFlags.service.isEnabled(key),
     ...(this.quoteDocumentsRepository ? { repository: this.quoteDocumentsRepository } : {}),
     // Tests drive scans explicitly through processPendingScans(); runtime scans right after the response.
@@ -508,6 +544,9 @@ readonly enterprise = new EnterpriseService({
     events: this.partnerWebhookEvents,
     notifyBroker: async (assignment, actor) => {
       const notificationId = await this.quoteRequests.submissions.notifyBrokerForAssignment(assignment, actor);
+      // Spec 061 FR-003: the pointer e-mail and in-app entry come with the notification above;
+      // SMS / WhatsApp only reach a tenant that opted in.
+      if (notificationId) await this.brokerAlerts.optionalChannels({ partnerTenantId: assignment.partnerTenantId, type: "broker_lead_reassigned", title: "Lead reaffecte a votre cabinet" }, actor).catch(() => 0);
       await this.quoteDocuments.shareForAssignment(assignment.quoteRequestId, assignment);
       return notificationId;
     }
@@ -682,6 +721,30 @@ readonly enterprise = new EnterpriseService({
    * `not_configured` instead of failing a submission.
    */
   readonly publicFormNotifications = new PublicFormNotificationService(this.emailDelivery);
+  /**
+   * Spec 061 FR-001: the `scheduled-alerts` task of the worker. Replaces the spec 052 R9 reminders
+   * that were created when an offer list was read.
+   */
+  readonly scheduledAlerts = new ScheduledAlertsService({
+    broker: this.brokerAlerts,
+    admin: this.adminAlerts,
+    config: readScheduledAlertsConfig(),
+    sources: new RuntimeScheduledAlertSources({
+      partners: this.partners.service,
+      licenses: this.partnerLicenses.service,
+      offers: {
+        list: () => this.offers.repository.list(),
+        versions: (offer) => this.offers.lifecycle.versions(offer as Parameters<OfferLifecycleService["versions"]>[0])
+      },
+      crm: this.leads.crmActivityRepository,
+      assignments: {
+        list: () => this.leads.assignments.list(),
+        monthlyCountForPartner: (partnerTenantId: string, now: Date) => this.leads.assignmentsRepository.monthlyCountForPartner(partnerTenantId, now)
+      },
+      countries: this.countries.service,
+      quotes: { list: () => this.quoteRequests.submissions.list() }
+    })
+  });
   /** Spec 045: public-site intake (waitlist, partner applications, contact) and public read models. */
   readonly waitlist = new WaitlistModule({
     findCountryByCode: (countryCode) => this.countries.service.findByIsoCode(countryCode),

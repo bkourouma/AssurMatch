@@ -1,5 +1,8 @@
 import { publicCountryFlags } from "../countries/countries.module";
 import type { SurveySubmissionInput } from "../satisfaction-surveys/satisfaction-surveys.service";
+import { UnsubscribeTokenInvalidError } from "../satisfaction-surveys/survey-unsubscribe.service";
+import { AdminAlertAccessRefusedError, AdminAlertConflictError, AdminAlertNotFoundError } from "../notifications/admin-alerts.service";
+import { adminAlertAcknowledgeSchema, adminAlertsQuerySchema } from "../../../../packages/shared/contracts/admin-alerts.contracts";
 import { Body, ConflictException, Controller, Delete, ForbiddenException, Get, Header, HttpCode, InternalServerErrorException, Module, NotFoundException, Param, Patch, Post, Put, Query, Req, StreamableFile, UnprocessableEntityException, UploadedFile, UseGuards, UseInterceptors } from "@nestjs/common";
 import { FileInterceptor } from "@nestjs/platform-express";
 import { z } from "zod";
@@ -128,6 +131,7 @@ import { roleHasPermission, type AssurMatchRole } from "../../../../packages/sha
 import { isoCountrySchema, languageCodeSchema, nonEmptyStringSchema, reasonSchema, uuidSchema } from "../../../../packages/shared/validation/common.schemas";
 import { AssurMatchRuntime } from "../../runtime/assurmatch-runtime";
 import { AuthRequiredHttpGuard, MfaRequiredHttpGuard } from "../auth/guards/http-auth.guard";
+import { AuthRateLimiter } from "../auth/rate-limit.guard";
 import { assertBrokerTenantWritable } from "../partners/partner-tenant-status.service";
 import { actorFromRequest, clientIp, protectedActorFromRequest, type AssurMatchHttpRequest } from "../common/http/request-actor";
 import { parseHttpInput } from "../common/http/zod-validation";
@@ -137,6 +141,7 @@ import { PublicJourneyFlagPolicy } from "../feature-flags/public-journey-flag-po
 import { AdminUsersController as AdminUsersDomainController } from "../users/admin-users.controller";
 import { AdminUserRolesController as AdminUserRolesDomainController } from "../users/admin-user-roles.controller";
 import { PublicHealthController } from "../health/public-health.controller";
+import { MetricsController } from "../observability/metrics.controller";
 import { adminAuditLogQuerySchema } from "../../../../packages/shared/contracts/admin-operations.contracts";
 import { ADMIN_OPERATIONS_HTTP_CONTROLLERS } from "./admin-operations-http.controllers";
 
@@ -247,11 +252,25 @@ function assertLocalDevReloadAllowed(request: AssurMatchHttpRequest): void {
   }
 }
 
-export class AuthController {
-  constructor(private readonly runtime: AssurMatchRuntime) {}
+/** Spec 058 FR-006: identifier of a rate-limit bucket, read from the raw body before validation. */
+function bodyString(input: unknown, field: string): string | undefined {
+  const value = input && typeof input === "object" ? (input as Record<string, unknown>)[field] : undefined;
+  return typeof value === "string" && value.trim().length > 0 ? value.slice(0, 512) : undefined;
+}
 
-  login(input: LoginRequest) {
-    return this.runtime.auth.service.login(parseHttpInput(loginRequestSchema, input));
+export class AuthController {
+  /** Spec 058 FR-006: Redis-backed limits on login, password reset and MFA verification. */
+  private readonly rateLimiter: AuthRateLimiter;
+
+  constructor(private readonly runtime: AssurMatchRuntime) {
+    this.rateLimiter = new AuthRateLimiter(runtime.redis.client);
+  }
+
+  login(input: LoginRequest, request: AssurMatchHttpRequest) {
+    return this.rateLimiter.run(
+      { route: "/auth/login", ip: clientIp(request), identifier: bodyString(input, "email") },
+      () => this.runtime.auth.service.login(parseHttpInput(loginRequestSchema, input))
+    );
   }
 
   activate(input: ActivateRequest) {
@@ -270,8 +289,11 @@ export class AuthController {
     return this.runtime.auth.service.changePassword(protectedActorFromRequest(request), parseHttpInput(passwordChangeRequestSchema, input));
   }
 
-  passwordReset(input: PasswordResetRequest) {
-    return this.runtime.auth.service.resetPassword(parseHttpInput(passwordResetRequestSchema, input));
+  passwordReset(input: PasswordResetRequest, request: AssurMatchHttpRequest) {
+    return this.rateLimiter.run(
+      { route: "/auth/password-reset", ip: clientIp(request), identifier: bodyString(input, "token") },
+      () => this.runtime.auth.service.resetPassword(parseHttpInput(passwordResetRequestSchema, input))
+    );
   }
 
   async enrollMfa(request: AssurMatchHttpRequest) {
@@ -281,8 +303,10 @@ export class AuthController {
 
   async verifyMfa(request: AssurMatchHttpRequest, input: { challengeId: string; code: string }) {
     const actor = protectedActorFromRequest(request);
-    const parsed = parseHttpInput(mfaVerifyRequestSchema, input);
-    return this.runtime.auth.service.verifyMfa(await this.runtime.users.service.require(actor.actorId ?? ""), parsed.challengeId ?? "", parsed.code, parsed.kind);
+    return this.rateLimiter.run({ route: "/auth/mfa/verify", ip: clientIp(request), identifier: actor.actorId ?? undefined }, async () => {
+      const parsed = parseHttpInput(mfaVerifyRequestSchema, input);
+      return this.runtime.auth.service.verifyMfa(await this.runtime.users.service.require(actor.actorId ?? ""), parsed.challengeId ?? "", parsed.code, parsed.kind);
+    });
   }
 }
 
@@ -1677,6 +1701,51 @@ export class BrokerNotificationsController {
   }
 }
 
+/** Spec 061 FR-004: admin alerts center (list, acknowledge with a reason). */
+async function adminAlertsCall<T>(call: () => Promise<T>): Promise<T> {
+  try {
+    return await call();
+  } catch (error) {
+    if (error instanceof AdminAlertAccessRefusedError) throw new ForbiddenException(error.message);
+    if (error instanceof AdminAlertNotFoundError) throw new NotFoundException(error.message);
+    if (error instanceof AdminAlertConflictError) throw new ConflictException(error.message);
+    throw error;
+  }
+}
+
+export class AdminAlertsHttpController {
+  constructor(private readonly runtime: AssurMatchRuntime) {}
+
+  list(request: AssurMatchHttpRequest, query: Record<string, string>) {
+    const actor = protectedActorFromRequest(request);
+    const parsed = parseHttpInput(adminAlertsQuerySchema, query ?? {});
+    return adminAlertsCall(() => this.runtime.adminAlerts.list(actor, parsed));
+  }
+
+  acknowledge(id: string, input: unknown, request: AssurMatchHttpRequest) {
+    const actor = protectedActorFromRequest(request);
+    const parsed = parseHttpInput(adminAlertAcknowledgeSchema, input ?? {});
+    return adminAlertsCall(() => this.runtime.adminAlerts.acknowledge(parseParam("id", id, uuidSchema), parsed, actor));
+  }
+}
+
+/**
+ * Spec 061 FR-005: public opt-out of the satisfaction survey. No authentication: the signed token is
+ * the proof. Any wrong, forged or malformed token reads as the same neutral 404.
+ */
+export class PublicNotificationUnsubscribeController {
+  constructor(private readonly runtime: AssurMatchRuntime) {}
+
+  async unsubscribe(input: unknown) {
+    try {
+      return await this.runtime.satisfactionSurveys.unsubscribe.unsubscribe(input);
+    } catch (error) {
+      if (error instanceof UnsubscribeTokenInvalidError) throw new NotFoundException("Unsubscribe link not found");
+      throw error;
+    }
+  }
+}
+
 /**
  * Spec 046: retention policies and anonymization batches. The domain errors are mapped explicitly
  * so the admin UI can rely on 403 (MFA or permission), 404, 409 (expired, executed or refused batch)
@@ -1966,12 +2035,12 @@ function headerValue(value: string | string[] | undefined): string | undefined {
 }
 
 controller("auth", AuthController);
-decorate(AuthController, "login", [Post("login") as MethodDecoratorFactory], [[0, Body() as ParamDecoratorFactory]]);
+decorate(AuthController, "login", [Post("login") as MethodDecoratorFactory], [[0, Body() as ParamDecoratorFactory], [1, Req() as ParamDecoratorFactory]]);
 decorate(AuthController, "activate", [Post("activate") as MethodDecoratorFactory], [[0, Body() as ParamDecoratorFactory]]);
 decorate(AuthController, "logout", [authRoute, Post("logout") as MethodDecoratorFactory]);
 decorate(AuthController, "me", [authRoute, Get("me") as MethodDecoratorFactory], [[0, Req() as ParamDecoratorFactory]]);
 decorate(AuthController, "passwordChange", [authRoute, Post("password-change") as MethodDecoratorFactory], [[0, Req() as ParamDecoratorFactory], [1, Body() as ParamDecoratorFactory]]);
-decorate(AuthController, "passwordReset", [Post("password-reset") as MethodDecoratorFactory], [[0, Body() as ParamDecoratorFactory]]);
+decorate(AuthController, "passwordReset", [Post("password-reset") as MethodDecoratorFactory], [[0, Body() as ParamDecoratorFactory], [1, Req() as ParamDecoratorFactory]]);
 decorate(AuthController, "enrollMfa", [authRoute, Post("mfa/enroll") as MethodDecoratorFactory], [[0, Req() as ParamDecoratorFactory]]);
 decorate(AuthController, "verifyMfa", [authRoute, Post("mfa/verify") as MethodDecoratorFactory], [[0, Req() as ParamDecoratorFactory], [1, Body() as ParamDecoratorFactory]]);
 
@@ -2143,6 +2212,13 @@ decorate(BrokerDashboardController, "advisors", [Get("advisors") as MethodDecora
 decorate(BrokerDashboardController, "export", [Get("export.csv") as MethodDecoratorFactory], [[0, Req() as ParamDecoratorFactory], [1, Query() as ParamDecoratorFactory]]);
 controller("admin/dashboard", AdminDashboardExportController, true);
 decorate(AdminDashboardExportController, "export", [Get("export.csv") as MethodDecoratorFactory], [[0, Req() as ParamDecoratorFactory], [1, Query() as ParamDecoratorFactory]]);
+
+controller("admin/alerts", AdminAlertsHttpController, true);
+decorate(AdminAlertsHttpController, "list", [Get() as MethodDecoratorFactory], [[0, Req() as ParamDecoratorFactory], [1, Query() as ParamDecoratorFactory]]);
+decorate(AdminAlertsHttpController, "acknowledge", [Post(":id/acknowledge") as MethodDecoratorFactory, HttpCode(200) as MethodDecoratorFactory], [[0, Param("id") as ParamDecoratorFactory], [1, Body() as ParamDecoratorFactory], [2, Req() as ParamDecoratorFactory]]);
+
+controller("notifications", PublicNotificationUnsubscribeController);
+decorate(PublicNotificationUnsubscribeController, "unsubscribe", [Post("unsubscribe") as MethodDecoratorFactory, HttpCode(200) as MethodDecoratorFactory], [[0, Body() as ParamDecoratorFactory]]);
 
 controller("admin/dashboard", AdminDashboardController, true);
 decorate(AdminDashboardController, "dashboard", [Get() as MethodDecoratorFactory], [[0, Req() as ParamDecoratorFactory], [1, Query() as ParamDecoratorFactory]]);
@@ -2457,6 +2533,8 @@ Module({
     BrokerCrmController,
     BrokerDashboardController,
     AdminDashboardController,
+    AdminAlertsHttpController,
+    PublicNotificationUnsubscribeController,
     AdminDashboardExportController,
     AdminFeatureFlagsController,
     AdminUsersHttpController,
@@ -2491,6 +2569,8 @@ Module({
     AdminPartnerIntegrationsController,
     PartnerApiController,
     PublicHealthController,
+    // Spec 058: Prometheus scrape endpoint (token-protected, 404 when METRICS_TOKEN is unset).
+    MetricsController,
     // Spec 056: admin operations consoles (see admin-operations-http.controllers.ts).
     ...ADMIN_OPERATIONS_HTTP_CONTROLLERS,
     // Spec 051: last, after the static `partners/sla` and `partners/applications` routes.

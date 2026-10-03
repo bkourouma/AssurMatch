@@ -1,6 +1,7 @@
-# AssurMatch production reverse proxy — TEMPLATE (spec 057). Domain not decided yet (D-10):
+# AssurMatch production reverse proxy — TEMPLATE (specs 057 and 058). Domain not decided yet (D-10):
 # replace every <domain> (e.g. `sed 's/<domain>/assurmatch.example/g'`) and save as
 # deploy/nginx/assurmatch-production.conf (host nginx: /etc/nginx/sites-available/assurmatch).
+# This file is loaded in the `http { }` context (conf.d/ or sites-enabled/).
 #
 # Four sub-domains, four upstreams, TLS terminated here:
 #   <domain>        Web Publique Client      :3601
@@ -12,7 +13,37 @@
 # service names instead (api:3600, public:3601, admin:3602, broker:3603).
 # The API counts ONE trusted hop (TRUSTED_PROXY_HOPS=1): this proxy. Behind a CDN/load balancer
 # that also appends X-Forwarded-For, raise TRUSTED_PROXY_HOPS accordingly.
-# Full security headers (CSP per app, etc.) are versioned by spec 058.
+#
+# Spec 058 (versioned security configuration):
+#   - security headers: deploy/nginx/security-headers.conf, installed as
+#     /etc/nginx/snippets/assurmatch-security-headers.conf and included in every TLS vhost;
+#   - per-client-IP rate limiting of authentication POSTs (the API also limits per IP and per
+#     account in Redis, but sees the Next server's address for back-office logins);
+#   - /metrics is never served publicly (Prometheus scrapes the API on the private network);
+#   - TLS 1.2+ only, server_tokens off.
+# Validate after every change: `sudo nginx -t && sudo systemctl reload nginx`.
+
+server_tokens off;
+
+# --- Header fallbacks (used by security-headers.conf) -------------------------------------------
+# The app's own CSP / Referrer-Policy wins; nginx supplies a strict default when the upstream sent
+# none (API JSON, nginx error pages).
+map $upstream_http_content_security_policy $assurmatch_csp {
+    ""      "default-src 'none'; frame-ancestors 'none'; base-uri 'none'; form-action 'none'";
+    default $upstream_http_content_security_policy;
+}
+map $upstream_http_referrer_policy $assurmatch_referrer_policy {
+    ""      "strict-origin-when-cross-origin";
+    default $upstream_http_referrer_policy;
+}
+
+# --- Rate limiting (per real client IP, POST only) ----------------------------------------------
+map $request_method $assurmatch_auth_limit_key {
+    POST    $binary_remote_addr;
+    default "";
+}
+limit_req_zone $assurmatch_auth_limit_key zone=assurmatch_auth:10m rate=10r/m;
+limit_req_status 429;
 
 upstream assurmatch_api    { server 127.0.0.1:3600; }
 upstream assurmatch_public { server 127.0.0.1:3601; }
@@ -33,10 +64,8 @@ server {
     server_name <domain>;
     ssl_certificate     /etc/letsencrypt/live/<domain>/fullchain.pem;
     ssl_certificate_key /etc/letsencrypt/live/<domain>/privkey.pem;
-    add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
-    add_header X-Content-Type-Options nosniff always;
-    add_header X-Frame-Options SAMEORIGIN always;
-    add_header Referrer-Policy strict-origin-when-cross-origin always;
+    ssl_protocols TLSv1.2 TLSv1.3;
+    include /etc/nginx/snippets/assurmatch-security-headers.conf;
 
     location / {
         proxy_pass http://assurmatch_public;
@@ -55,11 +84,20 @@ server {
     server_name admin.<domain>;
     ssl_certificate     /etc/letsencrypt/live/admin.<domain>/fullchain.pem;
     ssl_certificate_key /etc/letsencrypt/live/admin.<domain>/privkey.pem;
-    add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
-    add_header X-Content-Type-Options nosniff always;
-    add_header X-Frame-Options DENY always;
-    add_header Referrer-Policy same-origin always;
+    ssl_protocols TLSv1.2 TLSv1.3;
+    include /etc/nginx/snippets/assurmatch-security-headers.conf;
     add_header X-Robots-Tag "noindex, nofollow" always;
+
+    # Login, MFA, activation and password reset forms post to the app (server actions).
+    location ~ ^/(login|mfa|activate|password-reset) {
+        limit_req zone=assurmatch_auth burst=10 nodelay;
+        proxy_pass http://assurmatch_admin;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
 
     location / {
         proxy_pass http://assurmatch_admin;
@@ -78,11 +116,19 @@ server {
     server_name pro.<domain>;
     ssl_certificate     /etc/letsencrypt/live/pro.<domain>/fullchain.pem;
     ssl_certificate_key /etc/letsencrypt/live/pro.<domain>/privkey.pem;
-    add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
-    add_header X-Content-Type-Options nosniff always;
-    add_header X-Frame-Options DENY always;
-    add_header Referrer-Policy same-origin always;
+    ssl_protocols TLSv1.2 TLSv1.3;
+    include /etc/nginx/snippets/assurmatch-security-headers.conf;
     add_header X-Robots-Tag "noindex, nofollow" always;
+
+    location ~ ^/(login|mfa|activate|password-reset) {
+        limit_req zone=assurmatch_auth burst=10 nodelay;
+        proxy_pass http://assurmatch_broker;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
 
     location / {
         proxy_pass http://assurmatch_broker;
@@ -101,10 +147,22 @@ server {
     server_name api.<domain>;
     ssl_certificate     /etc/letsencrypt/live/api.<domain>/fullchain.pem;
     ssl_certificate_key /etc/letsencrypt/live/api.<domain>/privkey.pem;
-    add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
-    add_header X-Content-Type-Options nosniff always;
-    add_header X-Frame-Options DENY always;
+    ssl_protocols TLSv1.2 TLSv1.3;
+    include /etc/nginx/snippets/assurmatch-security-headers.conf;
     client_max_body_size 12m;
+
+    # Spec 058 FR-003: metrics are scraped on the private network only (http://api:3600/metrics).
+    location = /metrics { return 404; }
+
+    location ^~ /auth/ {
+        limit_req zone=assurmatch_auth burst=10 nodelay;
+        proxy_pass http://assurmatch_api;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
 
     location / {
         proxy_pass http://assurmatch_api;

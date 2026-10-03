@@ -25,7 +25,11 @@ Domaine : **non décidé (D-10)**. Rien n'est codé en dur ; voir « Paramètres
 2. **TLS** : certbot sur l'hôte (`certbot certonly --webroot -w /var/www/certbot -d ...` pour les 4
    noms), renouvellement par timer systemd + `reload nginx`.
 3. **nginx** : `deploy/nginx/assurmatch-production.conf.example` → remplacer `<domain>`, installer,
-   `nginx -t && systemctl reload nginx`. Variante conteneur : profil compose `edge`.
+   copier `deploy/nginx/security-headers.conf` en `/etc/nginx/snippets/assurmatch-security-headers.conf`
+   (spec 058, `docs/security/security-headers.md`), `nginx -t && systemctl reload nginx`. Variante
+   conteneur : profil compose `edge` (le fichier d'en-têtes y est monté).
+   Spec 058 : supervision (`docs/runbooks/observability.md`, `docs/runbooks/monitoring-alerts.md`) et
+   sauvegarde hors site (`docs/runbooks/backup-restore.md`) à mettre en place avant l'ouverture.
 4. **Hôte** : utilisateur `deployer` (groupe `docker`), répertoire `/home/deployer/apps/assurmatch`,
    sous-répertoire `env/` en `0700`.
 5. **Fichiers d'environnement** (mode `0600`, propriétaire `deployer`) dans `/home/deployer/apps/assurmatch/env/` :

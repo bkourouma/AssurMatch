@@ -39,6 +39,16 @@ export interface CrmActivityRepository extends RuntimeRepository {
   documentsForLead(leadAssignmentId: string): Promise<BrokerCrmDocument[]>;
   proposalsForLead(leadAssignmentId: string): Promise<BrokerCrmProposal[]>;
   disputesForLead(leadAssignmentId: string): Promise<BrokerCrmDispute[]>;
+  /** Spec 061: open tasks due in [from, to], across tenants (scheduled-alerts job only). */
+  openTasksDueBetween(from: Date, to: Date): Promise<Array<BrokerCrmTask & { partnerTenantId?: string }>>;
+  /** Spec 061: reminders scheduled in [from, to], across tenants (scheduled-alerts job only). */
+  remindersDueBetween(from: Date, to: Date): Promise<Array<BrokerCrmReminder & { partnerTenantId?: string }>>;
+}
+
+function within(value: string | Date | undefined, from: Date, to: Date): boolean {
+  if (!value) return false;
+  const time = new Date(value).getTime();
+  return time >= from.getTime() && time <= to.getTime();
 }
 
 export class MemoryCrmActivityRepository implements CrmActivityRepository {
@@ -117,6 +127,14 @@ export class MemoryCrmActivityRepository implements CrmActivityRepository {
   async disputesForLead(leadAssignmentId: string): Promise<BrokerCrmDispute[]> {
     return this.disputes.filter((item) => item.leadAssignmentId === leadAssignmentId);
   }
+
+  async openTasksDueBetween(from: Date, to: Date): Promise<Array<BrokerCrmTask & { partnerTenantId?: string }>> {
+    return this.tasks.filter((item) => !item.completedAt && within(item.dueAt, from, to));
+  }
+
+  async remindersDueBetween(from: Date, to: Date): Promise<Array<BrokerCrmReminder & { partnerTenantId?: string }>> {
+    return this.reminders.filter((item) => within(item.remindAt, from, to));
+  }
 }
 
 type Delegate = {
@@ -194,6 +212,14 @@ export class PrismaCrmActivityRepository implements CrmActivityRepository {
 
   async disputesForLead(leadAssignmentId: string): Promise<BrokerCrmDispute[]> {
     return (await this.delegate("brokerCrmDispute").findMany({ where: { leadAssignmentId }, orderBy: { createdAt: "asc" } })).map((row) => this.toDispute(row));
+  }
+
+  async openTasksDueBetween(from: Date, to: Date): Promise<Array<BrokerCrmTask & { partnerTenantId?: string }>> {
+    return (await this.delegate("brokerCrmTask").findMany({ where: { completedAt: null, dueAt: { gte: from, lte: to } }, orderBy: { dueAt: "asc" } })).map((row) => this.toTask(row));
+  }
+
+  async remindersDueBetween(from: Date, to: Date): Promise<Array<BrokerCrmReminder & { partnerTenantId?: string }>> {
+    return (await this.delegate("brokerCrmReminder").findMany({ where: { remindAt: { gte: from, lte: to } }, orderBy: { remindAt: "asc" } })).map((row) => this.toReminder(row));
   }
 
   private delegate(name: string): Delegate {

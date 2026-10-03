@@ -5,6 +5,9 @@
 //   - quote notifications        (spec 044)  runtime.quoteNotificationDelivery
 //   - satisfaction surveys       (spec 048)  runtime.satisfactionSurveys.drain
 //   - partner webhooks           (spec 033)  only with ASSURMATCH_PARTNER_WEBHOOK_DELIVERY_ENABLED=true
+//   - scheduled alerts           (spec 061)  broker reminders + admin alerts, at most once per
+//                                            ASSURMATCH_SCHEDULED_ALERTS_INTERVAL_MINUTES (default 60);
+//                                            off with ASSURMATCH_SCHEDULED_ALERTS_ENABLED=false
 // Each service keeps its own feature-flag, consent and audit checks; flags are reloaded from the
 // database before every cycle so an admin toggle takes effect without a restart.
 //
@@ -15,7 +18,9 @@
 import { mkdirSync, writeFileSync } from "node:fs";
 import { dirname } from "node:path";
 import { AssurMatchRuntime } from "../../backend/src/runtime/assurmatch-runtime";
-import { DeliveryWorkerLoop, describeError, readIntegerEnv } from "../../backend/src/runtime/worker/delivery-worker-loop";
+import { DeliveryWorkerLoop, describeError, readIntegerEnv, type CycleOutcome } from "../../backend/src/runtime/worker/delivery-worker-loop";
+import { recordWorkerCycle } from "../../backend/src/runtime/worker/worker-status";
+import { WORKER_HEARTBEAT_NAME } from "../../backend/src/modules/notifications/admin-alerts.service";
 
 const env = process.env;
 const log = (event: Record<string, unknown>) => process.stdout.write(`${JSON.stringify({ at: new Date().toISOString(), ...event })}\n`);
@@ -29,6 +34,10 @@ const heartbeatFile = env.ASSURMATCH_WORKER_HEARTBEAT_FILE?.trim() || "/tmp/assu
 // Off unless explicitly enabled: with deliveries disabled the webhook service audits a refusal on
 // every call, which would bury the audit log under one entry per cycle.
 const webhooksEnabled = env.ASSURMATCH_PARTNER_WEBHOOK_DELIVERY_ENABLED === "true";
+// Spec 061 FR-001: idempotent per day and per target, so it is on by default.
+const scheduledAlertsEnabled = env.ASSURMATCH_SCHEDULED_ALERTS_ENABLED !== "false";
+// Spec 058: optional Uptime Kuma "Push" monitor URL. Its token is a credential: never logged.
+const pushUrl = env.ASSURMATCH_WORKER_PUSH_URL?.trim();
 
 const runtime = new AssurMatchRuntime();
 if (runtime.prisma.runtimeMode !== "prisma-client" && env.NODE_ENV !== "test") {
@@ -36,17 +45,38 @@ if (runtime.prisma.runtimeMode !== "prisma-client" && env.NODE_ENV !== "test") {
   process.exit(1);
 }
 
+async function publishCycle(outcomes: CycleOutcome[]): Promise<void> {
+  // Spec 058 FR-003: status snapshot read by the API `/metrics` endpoint (counters only).
+  await recordWorkerCycle(runtime.redis.client, outcomes);
+  if (!pushUrl) return;
+  const failed = outcomes.filter((outcome) => outcome.status === "error").length;
+  const url = new URL(pushUrl);
+  url.searchParams.set("status", failed > 0 ? "down" : "up");
+  url.searchParams.set("msg", failed > 0 ? `${failed} task(s) failed` : "OK");
+  try {
+    const response = await fetch(url, { signal: AbortSignal.timeout(5000) });
+    if (!response.ok) log({ level: "warn", event: "worker.push.refused", status: response.status });
+  } catch (error) {
+    log({ level: "warn", event: "worker.push.failed", error: error instanceof Error ? error.name : "Error" });
+  }
+}
+
 const loop = new DeliveryWorkerLoop({
   intervalMs: intervalSeconds * 1000,
+  afterCycle: publishCycle,
   beforeCycle: () => runtime.reloadRuntimeFeatureFlags(),
-  heartbeat: () => {
+  heartbeat: async () => {
+    const now = new Date();
     mkdirSync(dirname(heartbeatFile), { recursive: true });
-    writeFileSync(heartbeatFile, `${new Date().toISOString()}\n`, "utf8");
+    writeFileSync(heartbeatFile, `${now.toISOString()}\n`, "utf8");
+    // Spec 061: the API cannot read this container's file; the alerts center reads this row.
+    await runtime.workerHeartbeats.beat(WORKER_HEARTBEAT_NAME, now);
   },
   tasks: [
     { name: "quote-notifications", enabled: true, run: () => runtime.quoteNotificationDelivery.processDueNotifications({ limit: quoteLimit }) },
     { name: "satisfaction-surveys", enabled: true, run: () => runtime.satisfactionSurveys.drain.deliverDue(surveyLimit) },
-    { name: "partner-webhooks", enabled: webhooksEnabled, run: () => runtime.partnerIntegrations.service.processDueWebhookDeliveries({ limit: webhookLimit }) }
+    { name: "partner-webhooks", enabled: webhooksEnabled, run: () => runtime.partnerIntegrations.service.processDueWebhookDeliveries({ limit: webhookLimit }) },
+    { name: "scheduled-alerts", enabled: scheduledAlertsEnabled, run: () => runtime.scheduledAlerts.runIfDue() }
   ]
 });
 
