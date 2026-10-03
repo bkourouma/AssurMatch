@@ -7,6 +7,16 @@ import type {
 } from "../../../../packages/shared/contracts/catalog.contracts";
 import type { AdminConsentTextView, ConsentTextTemplate } from "../../../../packages/shared/contracts/compliance.contracts";
 import type {
+  AdminOfferContent,
+  AdminOfferDetailView,
+  AdminOfferListItem,
+  OfferBlocker,
+  OfferEffectiveStatus,
+  OfferType,
+  OfferVersionDiffEntry,
+  OfferVersionView
+} from "../../../../packages/shared/contracts/offer-content";
+import type {
   AdminAccreditationDocumentView,
   AdminPartnerContractView,
   AdminPartnerDetailView,
@@ -835,20 +845,8 @@ export interface ScoringRulesData {
   total: number;
 }
 
-export interface AdminOfferData {
-  id: string;
-  countryId: string;
-  productId: string;
-  partnerTenantId?: string;
-  name: string;
-  status: string;
-  validationStatus: string;
-  isSponsored: boolean;
-  guaranteeLevel?: number;
-  insurerName?: string;
-  validUntil: string;
-  updatedAt: string;
-}
+/** Spec 052: `GET /admin/offers` serves `AdminOfferListItem` (published + pending versions). */
+export type AdminOfferData = AdminOfferListItem;
 
 const emptyScoringRules: ScoringRulesData = {
   generatedAt: new Date(0).toISOString(),
@@ -873,12 +871,13 @@ export function updateScoringRule(ruleId: string, input: { weights?: ScoringWeig
   return writeAdmin<ScoringRuleData>(`/admin/scoring-rules/${encodeURIComponent(ruleId)}`, "PATCH", input);
 }
 
+/** Scoring page (legacy body `{ validationStatus, reason }`, still accepted by the API, spec 052 R6). */
 export function validateAdminOffer(offerId: string, input: { validationStatus: "validated" | "rejected"; reason: string }) {
-  return writeAdmin<AdminOfferData>(`/admin/offers/${encodeURIComponent(offerId)}/validate`, "POST", input);
+  return writeAdmin<AdminOfferDetailView>(`/admin/offers/${encodeURIComponent(offerId)}/validate`, "POST", input);
 }
 
 export function suspendAdminOffer(offerId: string, reason: string) {
-  return writeAdmin<AdminOfferData>(`/admin/offers/${encodeURIComponent(offerId)}/suspend`, "POST", { reason });
+  return writeAdmin<AdminOfferDetailView>(`/admin/offers/${encodeURIComponent(offerId)}/suspend`, "POST", { reason });
 }
 
 export interface AdminQuoteDocumentData {
@@ -1005,7 +1004,19 @@ export interface AdminWriteResult<T> {
   code?: string;
   message?: string;
   blockers: AdminWriteBlocker[];
+  /** Spec 052: offer refusals (422 `OFFER_INCOMPLETE`, `OFFER_VALIDATION_BLOCKED`, `OFFER_SCOPE_NOT_COVERED`) carry `{ code, field? }`. */
+  offerBlockers?: OfferBlocker[];
   availableLanguages: string[];
+}
+
+function toOfferBlockers(value: unknown): OfferBlocker[] {
+  if (!Array.isArray(value)) return [];
+  return value.flatMap((entry) => {
+    if (!entry || typeof entry !== "object") return [];
+    const record = entry as Record<string, unknown>;
+    if (typeof record.code !== "string") return [];
+    return [{ code: record.code, ...(typeof record.field === "string" ? { field: record.field } : {}) }];
+  });
 }
 
 function toBlockers(value: unknown): AdminWriteBlocker[] {
@@ -1044,6 +1055,7 @@ async function toAdminWriteResult<T>(response: Response): Promise<AdminWriteResu
     ...(typeof record.code === "string" ? { code: record.code } : {}),
     ...(typeof record.message === "string" ? { message: record.message } : {}),
     blockers: toBlockers(record.blockers),
+    ...(toOfferBlockers(record.blockers).length > 0 ? { offerBlockers: toOfferBlockers(record.blockers) } : {}),
     availableLanguages: Array.isArray(record.availableLanguages)
       ? record.availableLanguages.filter((value): value is string => typeof value === "string")
       : []
@@ -1427,4 +1439,67 @@ export function convertAdminPartnerApplication(applicationId: string, reason: st
 
 export function rejectAdminPartnerApplication(applicationId: string, input: { rejectionReasonCode: PartnerApplicationRejectionReasonCode; reason: string }) {
   return writeAdminResult<AdminPartnerApplication>(applicationPath(applicationId, "reject"), "POST", input);
+}
+
+
+/* ---------------------------------------------------------------------------------------------
+ * Spec 052: offers (list with filters and validation queue, detail with versions and diff,
+ * creation and versioned update for a partner, submission, and the compliance decisions). Every
+ * mutation goes through `writeAdminResult`, so a 422 keeps its `{ code, field }` blockers.
+ * ------------------------------------------------------------------------------------------- */
+
+export type { AdminOfferContent, AdminOfferDetailView, AdminOfferListItem, OfferBlocker, OfferEffectiveStatus, OfferType, OfferVersionView };
+export type OfferVersionDiffEntryData = OfferVersionDiffEntry;
+
+export interface AdminOfferListFilters {
+  countryId?: string | undefined;
+  productId?: string | undefined;
+  partnerTenantId?: string | undefined;
+  status?: OfferEffectiveStatus | undefined;
+  sponsored?: boolean | undefined;
+  expiringWithinDays?: number | undefined;
+  queue?: "submitted" | undefined;
+}
+
+export function readAdminOfferList(filters: AdminOfferListFilters = {}) {
+  const params = new URLSearchParams();
+  if (filters.countryId) params.set("countryId", filters.countryId);
+  if (filters.productId) params.set("productId", filters.productId);
+  if (filters.partnerTenantId) params.set("partnerTenantId", filters.partnerTenantId);
+  if (filters.status) params.set("status", filters.status);
+  if (filters.sponsored !== undefined) params.set("sponsored", String(filters.sponsored));
+  if (filters.expiringWithinDays !== undefined) params.set("expiringWithinDays", String(filters.expiringWithinDays));
+  if (filters.queue) params.set("queue", filters.queue);
+  const query = params.toString();
+  return readAdmin<AdminOfferListItem[]>(`/admin/offers${query ? `?${query}` : ""}`, []);
+}
+
+export function readAdminOffer(offerId: string) {
+  return readAdmin<AdminOfferDetailView | null>(offerPath(offerId), null);
+}
+
+/** Body of `POST /admin/offers` and `PATCH /admin/offers/:id` (`adminOfferUpsertSchema`). */
+export type AdminOfferWriteInput = Partial<AdminOfferContent> & {
+  countryId: string;
+  productId: string;
+  partnerTenantId?: string;
+  offerType?: OfferType;
+  expectedUpdatedAt?: string;
+  reason: string;
+};
+
+function offerPath(offerId: string, suffix = ""): string {
+  return `/admin/offers/${encodeURIComponent(offerId)}${suffix}`;
+}
+
+export function createAdminOffer(input: AdminOfferWriteInput) {
+  return writeAdminResult<AdminOfferDetailView>("/admin/offers", "POST", input);
+}
+
+export function updateAdminOffer(offerId: string, input: AdminOfferWriteInput) {
+  return writeAdminResult<AdminOfferDetailView>(offerPath(offerId), "PATCH", input);
+}
+
+export function runAdminOfferDecision(offerId: string, action: "submit" | "validate" | "reject" | "suspend", reason: string) {
+  return writeAdminResult<AdminOfferDetailView>(offerPath(offerId, `/${action}`), "POST", { reason });
 }

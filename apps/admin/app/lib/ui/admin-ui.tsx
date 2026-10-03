@@ -40,6 +40,9 @@ export const quoteFormStatusTones: Record<string, Tone> = {
 
 export const offerStatusTones: Record<string, Tone> = {
   active: "success",
+  published: "success",
+  submitted: "info",
+  withdrawn: "disabled",
   suspended: "danger",
   draft: "warning",
   expired: "warning",

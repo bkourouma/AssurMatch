@@ -83,7 +83,8 @@ export async function validateOfferAction(_previous: ScoringActionState, formDat
     const offer = await validateAdminOffer(stringValue(formData.get("offerId")), { validationStatus: decision, reason: stringValue(formData.get("reason")) });
     revalidatePath("/scoring");
     revalidatePath("/offers");
-    return { status: "success", message: `Offre ${offer.name}: ${offer.validationStatus} (${offer.status}).` };
+    const name = offer.published?.content.name ?? offer.pending?.content.name ?? offer.publicKey;
+    return { status: "success", message: `Offre ${name}: ${decision === "validated" ? "validee" : "refusee"} (${offer.status}).` };
   } catch (error) {
     return actionError(error);
   }
@@ -94,7 +95,8 @@ export async function suspendOfferAction(_previous: ScoringActionState, formData
     const offer = await suspendAdminOffer(stringValue(formData.get("offerId")), stringValue(formData.get("reason")));
     revalidatePath("/scoring");
     revalidatePath("/offers");
-    return { status: "success", message: `Offre ${offer.name} suspendue: retiree du comparateur public.` };
+    const name = offer.published?.content.name ?? offer.pending?.content.name ?? offer.publicKey;
+    return { status: "success", message: `Offre ${name} suspendue: retiree du comparateur public.` };
   } catch (error) {
     return actionError(error);
   }

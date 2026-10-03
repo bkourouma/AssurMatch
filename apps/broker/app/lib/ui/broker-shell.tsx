@@ -54,7 +54,9 @@ function brokerNavigation(plan?: BrokerPlan | undefined): NavGroup[] {
       title: "Activite",
       items: [
         { label: "Dashboard", href: "/", icon: "dashboard", match: ["/"] },
-        { label: "Leads", href: "/leads", icon: "leads", match: ["/leads"] }
+        { label: "Leads", href: "/leads", icon: "leads", match: ["/leads"] },
+        // Spec 052 FR-006: every broker role reads its offers; owner and managers edit them.
+        { label: "Mes offres", href: "/offers", icon: "catalog", match: ["/offers"] }
       ]
     },
     {
