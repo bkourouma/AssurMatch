@@ -282,8 +282,11 @@ export class AuthController {
     return this.runtime.auth.service.logout();
   }
 
-  me(request: AssurMatchHttpRequest) {
-    return this.runtime.auth.service.me(protectedActorFromRequest(request));
+  async me(request: AssurMatchHttpRequest) {
+    const actor = this.runtime.auth.service.me(protectedActorFromRequest(request));
+    // The back-office headers show the user's name; a missing account keeps the actor as before.
+    const account = actor.actorId ? await this.runtime.users.service.require(actor.actorId).catch(() => undefined) : undefined;
+    return account?.displayName ? { ...actor, displayName: account.displayName } : actor;
   }
 
   passwordChange(request: AssurMatchHttpRequest, input: PasswordChangeRequest) {

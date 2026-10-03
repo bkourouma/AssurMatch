@@ -69,7 +69,10 @@ describe("spec 051 R12 broker tenant guard", () => {
     const login = () => harness!.request("/auth/login", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ email: user.email, password: "Correct horse battery 51" }) });
     expect((await login()).status).toBeLessThan(300);
     const broker = brokerActor(partner.id, { actorId: user.id });
-    expect((await harness.request("/auth/me", { headers: actorHeaders(broker) })).status).toBe(200);
+    const meActive = await harness.request("/auth/me", { headers: actorHeaders(broker) });
+    expect(meActive.status).toBe(200);
+    // The portal header shows the user's name rather than its id.
+    expect(await meActive.json()).toMatchObject({ actorId: user.id, displayName: "Owner Retired" });
 
     await harness.runtime.partners.service.changeStatus(partner.id, "retired", "resiliation du partenariat", superAdmin);
 

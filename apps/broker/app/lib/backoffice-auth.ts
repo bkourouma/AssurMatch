@@ -9,6 +9,8 @@ const BROKER_API_BASE_URL = process.env.NEXT_PUBLIC_ASSURMATCH_BROKER_API_URL ??
 
 export interface BackOfficeProfile {
   actorId?: string;
+  /** Name returned by `/auth/me`, shown in the portal header. */
+  displayName?: string;
   roles: string[];
   partnerTenantId?: string;
   partnerPlan?: "starter" | "pro" | "enterprise";

@@ -14,7 +14,7 @@ export const metadata = {
 export default async function BrokerLayout({ children }: { children: React.ReactNode }) {
   const session = await readBackOfficeSession();
   const profile = session.status === "authenticated" || session.status === "mfa_required" ? session.profile : undefined;
-  const label = profile?.actorId ?? "Courtier connecte";
+  const label = profile?.displayName ?? profile?.actorId ?? "Courtier connecte";
   const user = profile
     ? {
         label,
