@@ -10,7 +10,7 @@ description: "Task list for 055 — Réponse du courtier au visiteur et suite do
 
 ## Phase 1: Setup
 - [x] T001 Contrats `packages/shared/contracts/lead-proposals.ts` (création, retrait, réponse visiteur, vues courtier et visiteur, mention non contractuelle FR/EN, limites), `public-quote-status.ts` (`proposals`, `activeProposalAt` → `proposal_available`), `content-safety.ts` (équivalents anglais partagés), types de notification, codes d'erreur, évènements d'historique, `contactVisibility`, métadonnées de fichier des documents CRM.
-- [x] T002 Schéma + migration `0028_broker_response_loop` (`LeadProposal`, `VisitorProposalResponse`, colonnes fichier de `BrokerCrmDocument`, 2 valeurs `NotificationType`) + `prisma-migrations.spec.ts`.
+- [x] T002 Schéma + migration `0027_broker_response_loop` (`LeadProposal`, `VisitorProposalResponse`, colonnes fichier de `BrokerCrmDocument`, 2 valeurs `NotificationType`) + `prisma-migrations.spec.ts`.
 
 ## Phase 2: Backend
 - [x] T003 [US1] `LeadContactPolicy` : coordonnées complètes au courtier affecté (Starter et CRM), audit de chaque consultation, masquage après retrait du consentement ou anonymisation ; contact lu depuis le prospect si l'affectation ne le porte pas.
@@ -30,4 +30,4 @@ description: "Task list for 055 — Réponse du courtier au visiteur et suite do
 
 ## Phase 4: Validations
 - [x] T015 Validations finales : `prisma validate`, typecheck, lint, `npx vitest run`, `npx playwright test apps/broker`, `next build` (broker), scan de secrets.
-- [ ] T016 Écran visiteur des propositions dans `apps/public` (hors périmètre de cet agent : contrat exposé, livré ensuite).
+- [x] T016 Écran visiteur des propositions dans `apps/public` (hors périmètre de cet agent : contrat exposé, livré ensuite).

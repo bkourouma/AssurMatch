@@ -4,11 +4,19 @@ import type {
   PublicQuoteStatus,
   PublicTimelineStep
 } from "../../../../../../packages/shared/contracts/public-quote-status";
+import {
+  PUBLIC_PROPOSAL_STATUSES,
+  VISITOR_DECLINE_REASONS,
+  type PublicLeadProposal,
+  type VisitorDeclineReason
+} from "../../../../../../packages/shared/contracts/lead-proposals";
 import { toLocale } from "../../../../i18n/routing";
 import { ConsentWithdrawal } from "../../../components/forms/consent-withdrawal";
 import { CopyReference } from "../../../components/journey/copy-reference";
 import { IndicativeOfferNotice } from "../../../components/public-journey";
 import { QuoteDocumentUpload } from "../../../components/quote-document-upload";
+import { QuoteProposalCard, type QuoteProposalCardLabels } from "../../../components/tracking/quote-proposal-card";
+import type { ProposalResponseFormLabels } from "../../../components/tracking/proposal-response-form";
 import { hasProposals, QuoteProposalsSlot } from "../../../components/tracking/quote-proposals-slot";
 import { BackendText } from "../../../components/ui/backend-text";
 import { Breadcrumb } from "../../../components/ui/breadcrumb";
@@ -195,6 +203,107 @@ export default async function PublicQuoteTrackingPage({
   const withdrawnAt = formatDate(view.consent.withdrawnAt);
   const timeline = view.timeline.filter((entry) => isOneOf(TIMELINE_STEPS, entry.step));
 
+  // Spec 055: broker proposals, newest first as the API sends them; never re-ordered or ranked here.
+  const proposals: PublicLeadProposal[] = view.consent.withdrawn
+    ? []
+    : (view.proposals ?? []).filter((proposal) => isOneOf(PUBLIC_PROPOSAL_STATUSES, proposal.status));
+
+  const formatAmount = (amount: number, currency: string): string => {
+    try {
+      return format.number(amount, { style: "currency", currency, maximumFractionDigits: 0 });
+    } catch {
+      return `${format.number(amount, { maximumFractionDigits: 0 })} ${currency}`;
+    }
+  };
+
+  const proposalPrice = (proposal: PublicLeadProposal): string | null => {
+    const { priceMin, priceMax, currency } = proposal;
+    if (priceMin !== undefined && priceMax !== undefined) {
+      return priceMin === priceMax
+        ? t("proposals.priceSingle", { amount: formatAmount(priceMin, currency) })
+        : t("proposals.priceRange", { min: formatAmount(priceMin, currency), max: formatAmount(priceMax, currency) });
+    }
+    if (priceMin !== undefined) return t("proposals.priceFrom", { amount: formatAmount(priceMin, currency) });
+    if (priceMax !== undefined) return t("proposals.priceUpTo", { amount: formatAmount(priceMax, currency) });
+    return null;
+  };
+
+  const declineReasonLabels = Object.fromEntries(
+    VISITOR_DECLINE_REASONS.map((reason) => [reason, t(`proposals.response.declineReasons.${reason}`)])
+  ) as Record<VisitorDeclineReason, string>;
+
+  const responseLabels: ProposalResponseFormLabels = {
+    legend: t("proposals.response.legend"),
+    intro: t("proposals.response.intro"),
+    interested: t("proposals.response.interested"),
+    declined: t("proposals.response.declined"),
+    question: t("proposals.response.question"),
+    callbackSlot: t("proposals.response.callbackSlot"),
+    callbackSlotHint: t("proposals.response.callbackSlotHint"),
+    declineReason: t("proposals.response.declineReason"),
+    declineReasonNone: t("proposals.response.declineReasonNone"),
+    declineReasons: declineReasonLabels,
+    questionLabel: t("proposals.response.questionLabel"),
+    questionHint: t("proposals.response.questionHint"),
+    questionRequired: t("proposals.response.questionRequired"),
+    submit: t("proposals.response.submit"),
+    sending: t("proposals.response.sending"),
+    recordedTitle: t("proposals.response.recordedTitle"),
+    recorded: {
+      interested: t("proposals.response.recordedInterested"),
+      declined: t("proposals.response.recordedDeclined"),
+      question: t("proposals.response.recordedQuestion")
+    },
+    // Formatted in the browser once the API returns the recording time.
+    recordedAt: t("proposals.response.recordedAt", { date: "{date}" }),
+    notRespondable: t("proposals.response.notRespondable"),
+    rateLimited: t("proposals.response.rateLimited"),
+    invalid: t("proposals.response.invalid"),
+    denied: t("proposals.response.denied"),
+    error: t("proposals.response.error")
+  };
+
+  const proposalStatusLabels = Object.fromEntries(
+    PUBLIC_PROPOSAL_STATUSES.map((value) => [value, t(`proposals.status.${value}`)])
+  ) as QuoteProposalCardLabels["status"];
+
+  const proposalLabels = (proposal: PublicLeadProposal): QuoteProposalCardLabels => {
+    const validUntil = formatDate(proposal.validUntil) ?? proposal.validUntil;
+    const response = proposal.visitorResponse;
+    const previousLines: string[] = [];
+    if (response) {
+      previousLines.push(t(`proposals.response.previousType.${response.type}`));
+      if (response.callbackSlot) previousLines.push(t("proposals.response.previousSlot", { slot: response.callbackSlot }));
+      if (response.declineReason && isOneOf(VISITOR_DECLINE_REASONS, response.declineReason)) {
+        previousLines.push(t("proposals.response.previousReason", { reason: declineReasonLabels[response.declineReason] }));
+      }
+      if (response.question) previousLines.push(t("proposals.response.previousQuestion", { question: response.question }));
+      const at = formatDate(response.at);
+      if (at) previousLines.push(t("proposals.response.recordedAt", { date: at }));
+    }
+    return {
+      from: t("proposals.from", { partner: proposal.partnerName }),
+      sentAt: t("proposals.sentAt", { date: formatDate(proposal.sentAt) ?? proposal.sentAt }),
+      validUntil: t("proposals.validUntil", { date: validUntil }),
+      validUntilExpired: t("proposals.validUntilExpired", { date: validUntil }),
+      messageLabel: t("proposals.messageLabel"),
+      priceLabel: t("proposals.priceLabel"),
+      price: proposalPrice(proposal),
+      guaranteesLabel: t("proposals.guaranteesLabel"),
+      noGuarantees: t("proposals.noGuarantees"),
+      document: t("proposals.document"),
+      documentHint: t("proposals.documentHint"),
+      noticeTitle: t("proposals.noticeTitle"),
+      status: proposalStatusLabels,
+      closedBody: t("proposals.closedBody"),
+      expiredBody: t("proposals.expiredBody"),
+      previousTitle: t("proposals.response.previousTitle"),
+      previousLines,
+      changeHint: t("proposals.response.changeHint"),
+      response: responseLabels
+    };
+  };
+
   return (
     <>
       {hero}
@@ -291,12 +400,26 @@ export default async function PublicQuoteTrackingPage({
         </div>
       </Section>
 
-      {/* Spec 055 fills this slot with the broker proposals; it renders nothing until then. */}
+      {/* Spec 055: the broker proposals; the slot renders nothing while there is none. */}
       <QuoteProposalsSlot
-        proposals={hasProposals(view) ? view.proposals : undefined}
+        proposals={hasProposals({ proposals }) ? proposals : undefined}
         title={t("proposals.title")}
         lead={t("proposals.lead")}
-      />
+      >
+        <div className="am-stack am-stack--lg" role="list" aria-label={t("proposals.listLabel")}>
+          {proposals.map((proposal) => (
+            <div role="listitem" key={proposal.id}>
+              <QuoteProposalCard
+                proposal={proposal}
+                publicReference={publicReference}
+                token={token}
+                locale={locale}
+                labels={proposalLabels(proposal)}
+              />
+            </div>
+          ))}
+        </div>
+      </QuoteProposalsSlot>
 
       <Section title={t("documentsTitle")} tone="muted">
         <div className="am-stack am-stack--lg am-j-column">

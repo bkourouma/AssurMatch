@@ -13,6 +13,11 @@ import type {
   WaitlistSubscribeDto
 } from "../../../../packages/shared/contracts/public-site.contracts";
 import type { PublicQuoteStatusView, TrackingLinkRequest } from "../../../../packages/shared/contracts/public-quote-status";
+import type {
+  VisitorDeclineReason,
+  VisitorProposalResponseResult,
+  VisitorResponseType
+} from "../../../../packages/shared/contracts/lead-proposals";
 import type frMessages from "../../messages/fr.json";
 
 const PUBLIC_API_BASE_URL = process.env.NEXT_PUBLIC_ASSURMATCH_API_URL ?? "http://127.0.0.1:3000";
@@ -709,4 +714,76 @@ export async function submitSatisfactionSurvey(publicReference: string, token: s
   } catch {
     return "error";
   }
+}
+
+/* ---------- Spec 055: broker proposals on the tracking space (visitor side) ---------- */
+
+/**
+ * `POST /quote-requests/:publicReference/proposals/:proposalId/responses?token=`. The answer only
+ * tells the named broker how to continue the conversation; it never commits the visitor and never
+ * moves the broker's CRM status (FR-006, FR-007).
+ */
+export interface ProposalResponseBody {
+  type: VisitorResponseType;
+  callbackSlot?: string;
+  declineReason?: VisitorDeclineReason;
+  question?: string;
+}
+
+export type ProposalResponseResult =
+  | { status: "recorded"; type: VisitorResponseType; at: string }
+  | { status: "invalid" }
+  | { status: "not_respondable" }
+  | { status: "denied" }
+  | { status: "rate_limited" }
+  | { status: "error" };
+
+export async function respondToProposal(
+  publicReference: string,
+  proposalId: string,
+  token: string,
+  body: ProposalResponseBody
+): Promise<ProposalResponseResult> {
+  try {
+    const params = new URLSearchParams({ token });
+    const response = await fetch(
+      `${PUBLIC_API_BASE_URL}/quote-requests/${encodeURIComponent(publicReference)}/proposals/${encodeURIComponent(proposalId)}/responses?${params.toString()}`,
+      {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(body),
+        cache: "no-store"
+      }
+    );
+    if (response.status === 429) return { status: "rate_limited" };
+    if (response.status === 409) return { status: "not_respondable" };
+    if (response.status === 400 || response.status === 422) return { status: "invalid" };
+    if (response.status === 404 || response.status === 401 || response.status === 403) return { status: "denied" };
+    if (!response.ok) return { status: "error" };
+    const payload = await response.json() as Partial<VisitorProposalResponseResult>;
+    return payload.recorded === true && typeof payload.at === "string" && payload.type
+      ? { status: "recorded", type: payload.type, at: payload.at }
+      : { status: "error" };
+  } catch {
+    return { status: "error" };
+  }
+}
+
+/**
+ * `GET /quote-requests/:publicReference/proposals/:proposalId/document?token=`, called server-side
+ * only by the `/api/quote-requests/.../document` route handler, which streams the PDF back with
+ * `no-store`. Every refusal of the API is the same neutral 404.
+ */
+export async function fetchProposalDocument(publicReference: string, proposalId: string, token: string): Promise<Response> {
+  const params = new URLSearchParams({ token });
+  return fetch(
+    `${PUBLIC_API_BASE_URL}/quote-requests/${encodeURIComponent(publicReference)}/proposals/${encodeURIComponent(proposalId)}/document?${params.toString()}`,
+    { cache: "no-store" }
+  );
+}
+
+/** Same-origin path of the proposal PDF proxy; the token stays in the URL, as on the tracking page. */
+export function proposalDocumentHref(publicReference: string, proposalId: string, token: string): string {
+  const params = new URLSearchParams({ token });
+  return `/api/quote-requests/${encodeURIComponent(publicReference)}/proposals/${encodeURIComponent(proposalId)}/document?${params.toString()}`;
 }
