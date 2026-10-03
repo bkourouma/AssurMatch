@@ -23,7 +23,7 @@ description: "Task list for 052 — Offres"
 ## Phase 3: Interfaces
 - [ ] T010 [US2][US5] Admin `apps/admin/app/offers` : liste filtrée, file « à valider », fiche avec versions et différences, création et modification pour un courtier, validation, refus et suspension (conformité seulement), sponsorisation ; tests de marqueurs.
 - [ ] T011 [US1][US3] Courtier `apps/broker/app/offers` : liste (statut, complétude, expiration), création, modification (nouvelle version), soumission, retrait, renouvellement, motif de refus visible ; lecture seule pour Agent, Read-only et compte suspendu ; navigation ; tests de marqueurs.
-- [ ] T012 [US4] Public : `offerId` transmis au formulaire, nom du courtier dans l'en-tête, message de confirmation selon `selectedOfferPartnerRetained` (FR et EN) ; tests de marqueurs.
+- [x] T012 [US4] Public : `offerId` transmis au formulaire, nom du courtier dans l'en-tête, message de confirmation selon `selectedOfferPartnerRetained` (FR et EN) ; tests de marqueurs.
 
 ## Phase 4: Validations
 - [ ] T013 Validations finales : `prisma generate` et `validate`, typecheck, lint, `npm run test`, `npm run test:web`, scan de secrets, builds Next.
