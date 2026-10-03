@@ -9,6 +9,26 @@ import { RbacGuard } from "../auth/guards/rbac.guard";
 import type { ActorContext } from "../common/types";
 import { UserAuthNotificationService, type AuthTokenDeliveryResult } from "../notifications/user-auth-notification.service";
 import { UsersService, type UserAccount } from "./users.module";
+import { ErrorCodes } from "../../../../packages/shared/contracts/error-codes";
+import { partnerUnprocessable } from "../partners/partner-errors";
+
+/** Spec 051 R11: what user creation needs to know about the partner a user is attached to. */
+export interface PartnerTenantLookup {
+  find(id: string): Promise<{ id: string; status: string } | undefined>;
+}
+
+/** Spec 051 R11: a user created from the partner page (the caller has authorised the actor). */
+export interface PartnerUserProvisionInput {
+  email: string;
+  displayName: string;
+  role: AssurMatchRole;
+  partnerTenantId: string;
+  reason: string;
+}
+
+export function isBrokerRole(role: AssurMatchRole): boolean {
+  return role.startsWith("broker_");
+}
 
 export interface PasswordResetIssueResponse extends AuthTokenDeliveryResult {
   expiresAt: Date;
@@ -26,7 +46,9 @@ export class AdminUsersController {
     private readonly users: UsersService,
     private readonly audit = new AuditLogWriter(),
     private readonly passwordReset = new PasswordResetService(),
-    private readonly notifications = new UserAuthNotificationService()
+    private readonly notifications = new UserAuthNotificationService(),
+    /** Spec 051 R11: left out (unit tests), the partner existence check is skipped. */
+    private readonly partners?: PartnerTenantLookup
   ) {}
 
   async list(actor: ActorContext, query: AdminUsersListQuery = {}): Promise<UserAccount[]> {
@@ -51,23 +73,63 @@ export class AdminUsersController {
       this.audit.write({ actor, action: AuthAuditActions.userCreated, targetType: "User", targetId: "refused", result: "refused", reason: parsed.reason, context: { email: parsed.email, roles: parsed.roles } });
       throw new Error("RBAC denied");
     }
+    await this.assertPartnerConsistency(actor, parsed.roles, parsed.partnerTenantId ?? undefined, parsed.email, parsed.reason);
+    return this.provision(actor, {
+      email: parsed.email,
+      displayName: parsed.displayName,
+      ...(parsed.phone ? { phone: parsed.phone } : {}),
+      roles: parsed.roles,
+      ...(parsed.partnerTenantId ? { partnerTenantId: parsed.partnerTenantId } : {}),
+      scopes: parsed.scopes
+    }, parsed.reason);
+  }
+
+  /**
+   * Spec 051 FR-018: invitation from the partner page. The caller (`PartnerAdminService.inviteUser`)
+   * has already authorised the actor and checked the role against the plan; the partner consistency
+   * rules still apply here, then the existing activation path runs (token + activation e-mail).
+   */
+  async createPartnerUser(actor: ActorContext, input: PartnerUserProvisionInput): Promise<AdminUserCreateResponse> {
+    await this.assertPartnerConsistency(actor, [input.role], input.partnerTenantId, input.email, input.reason);
+    return this.provision(actor, {
+      email: input.email,
+      displayName: input.displayName,
+      roles: [input.role],
+      partnerTenantId: input.partnerTenantId,
+      scopes: { countryIds: [], productIds: [] }
+    }, input.reason);
+  }
+
+  private async provision(actor: ActorContext, input: Parameters<UsersService["create"]>[0], reason: string): Promise<AdminUserCreateResponse> {
     try {
-      const user = await this.users.create({
-        email: parsed.email,
-        displayName: parsed.displayName,
-        ...(parsed.phone ? { phone: parsed.phone } : {}),
-        roles: parsed.roles,
-        ...(parsed.partnerTenantId ? { partnerTenantId: parsed.partnerTenantId } : {}),
-        scopes: parsed.scopes
-      }, actor);
+      const user = await this.users.create(input, actor);
       const issued = this.passwordReset.issueToken();
       await this.users.setPasswordResetToken(user.id, issued.tokenHash, issued.expiresAt);
       const delivery = await this.notifications.deliverActivation(user, issued.token);
       return { user, ...delivery, expiresAt: issued.expiresAt };
     } catch (error) {
-      this.audit.write({ actor, action: AuthAuditActions.userCreated, targetType: "User", targetId: "refused", result: "refused", reason: parsed.reason, context: { email: parsed.email } });
+      this.audit.write({ actor, action: AuthAuditActions.userCreated, targetType: "User", targetId: "refused", result: "refused", reason, context: { email: input.email } });
       throw error;
     }
+  }
+
+  /**
+   * Spec 051 FR-019 / R11: a broker role needs an existing partner that is not retired; an admin
+   * role is never attached to a partner. Refusals are audited and answered 422 with a code.
+   */
+  private async assertPartnerConsistency(actor: ActorContext, roles: AssurMatchRole[], partnerTenantId: string | undefined, email: string, reason: string): Promise<void> {
+    const refuse = (refusal: string, code: string, message: string): never => {
+      this.audit.write({ actor, action: AuthAuditActions.userCreated, targetType: "User", targetId: "refused", result: "refused", reason, context: { email, roles, refusal, ...(partnerTenantId ? { partnerTenantId } : {}) } });
+      throw partnerUnprocessable(code, message);
+    };
+    const brokerRoles = roles.filter(isBrokerRole);
+    const adminRoles = roles.filter((role) => !isBrokerRole(role));
+    if (brokerRoles.length > 0 && !partnerTenantId) refuse("broker_role_without_partner", ErrorCodes.PARTNER_USER_INVALID, "A broker role requires a partner");
+    if (adminRoles.length > 0 && partnerTenantId) refuse("admin_role_with_partner", ErrorCodes.PARTNER_USER_INVALID, "A platform role cannot be attached to a partner");
+    if (!partnerTenantId || !this.partners) return;
+    const partner = await this.partners.find(partnerTenantId);
+    if (!partner) refuse("partner_not_found", ErrorCodes.PARTNER_USER_INVALID, "The partner does not exist");
+    if (partner?.status === "retired") refuse("partner_retired", ErrorCodes.PARTNER_RETIRED, "The partner is retired; no user can be attached to it");
   }
 
   async update(actor: ActorContext, userId: string, input: AdminUserUpdateRequest): Promise<UserAccount> {

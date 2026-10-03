@@ -12,6 +12,7 @@ import {
   partnerLicenseRenewSchema,
   partnerProductAuthorizationSchema,
   partnerStatusTransitionSchema,
+  partnerUserInviteSchema,
   type AdminAccreditationDocumentView,
   type AdminPartnerAuthorizationView,
   type AdminPartnerContractView,
@@ -31,6 +32,8 @@ import type { AccreditationDocument, DocumentsService, UploadedAccreditationFile
 import type { PartnerLicense, PartnerLicensesService } from "../partner-licenses/partner-licenses.module";
 import type { ProductsService } from "../products/products.module";
 import type { UserAccount } from "../users/users.repository";
+import type { AdminUserCreateResponse, PartnerUserProvisionInput } from "../users/admin-users.controller";
+import { ErrorCodes } from "../../../../packages/shared/contracts/error-codes";
 import { PartnerErrorCodes, partnerConflict, partnerForbidden, partnerNotFound, partnerUnprocessable } from "./partner-errors";
 import {
   allowedPartnerTransitions,
@@ -60,6 +63,22 @@ export interface PartnerAdminServiceDeps {
   products: Pick<ProductsService, "require">;
   /** Every user account (unfiltered); used for the owner condition and the partner page. */
   listUsers: () => Promise<UserAccount[]>;
+  /** Spec 051 R11: the existing user creation and activation path (token + activation e-mail). */
+  provisionUser?: (actor: ActorContext, input: PartnerUserProvisionInput) => Promise<AdminUserCreateResponse>;
+}
+
+/** Spec 051 R11: response of `POST /admin/partners/:id/users`. */
+export interface PartnerUserInviteResult {
+  user: AdminPartnerUserView;
+  emailStatus: AdminUserCreateResponse["emailStatus"];
+  expiresAt: string;
+  /** Only when the activation e-mail was not sent (local or unconfigured delivery), as `POST /admin/users` does. */
+  token?: string;
+}
+
+/** R11: the owner role follows the plan (Starter -> Owner Starter; Pro and Enterprise -> Owner Pro). */
+export function ownerRoleForPlan(plan: string): (typeof PARTNER_OWNER_ROLES)[number] {
+  return plan === "starter" ? "broker_owner_starter" : "broker_owner_pro";
 }
 
 /** Spec 051 R3 / R14: per partner readiness flags reused by the activation checklist. */
@@ -495,6 +514,43 @@ export class PartnerAdminService {
     }
     const contract = await this.deps.partners.recordContract({ partnerTenantId: partnerId, version: parsed.version, signedAt: parsed.signedAt, signatoryName: parsed.signatoryName, documentId: parsed.documentId, recordedById: actor.actorId ?? null }, reason, actor);
     return this.contractView(contract);
+  }
+
+  /* ----------------------------------------------------------- users (US6) */
+
+  /**
+   * FR-018: invites a broker user from the partner page through the existing activation path.
+   * `users:create` or `partners:update`, within the country scope; refused for a retired partner;
+   * an owner role must match the plan.
+   */
+  async inviteUser(actor: ActorContext, partnerId: string, input: unknown): Promise<PartnerUserInviteResult> {
+    const parsed = partnerUserInviteSchema.parse(input);
+    const partner = await this.requirePartner(partnerId);
+    const refusal = { action: "partner.user_invite_refused", targetType: "PartnerTenant", targetId: partnerId, scope: this.scopeOf(partner), requestReason: parsed.reason, context: { role: parsed.role } };
+    this.require(actor, (this.rbac.can(actor, "users:create") || this.rbac.can(actor, "partners:update")) && this.inCountryScope(actor, partner.countryId), { ...refusal, refusal: "rbac_denied" });
+    this.assertNotRetired(actor, partner, "partner.user_invite_refused", parsed.reason);
+    if ((PARTNER_OWNER_ROLES as readonly string[]).includes(parsed.role) && parsed.role !== ownerRoleForPlan(partner.plan)) {
+      this.refuse(actor, { ...refusal, refusal: "owner_role_plan_mismatch", context: { role: parsed.role, plan: partner.plan } });
+      throw partnerUnprocessable(ErrorCodes.PARTNER_USER_INVALID, `The owner role of a ${partner.plan} partner is ${ownerRoleForPlan(partner.plan)}`);
+    }
+    if (!this.deps.provisionUser) throw new Error("Partner user invitation is not configured");
+    const created = await this.deps.provisionUser(actor, { email: parsed.email, displayName: parsed.displayName, role: parsed.role, partnerTenantId: partnerId, reason: parsed.reason });
+    this.deps.audit.write({
+      actor,
+      action: "partner.user_invited",
+      targetType: "PartnerTenant",
+      targetId: partnerId,
+      scope: this.scopeOf(partner),
+      result: "success",
+      reason: parsed.reason,
+      context: { userId: created.user.id, role: parsed.role, emailStatus: created.emailStatus }
+    });
+    return {
+      user: { id: created.user.id, displayName: created.user.displayName, email: created.user.email, roles: [...created.user.roles], status: created.user.status },
+      emailStatus: created.emailStatus,
+      expiresAt: iso(created.expiresAt),
+      ...(created.token ? { token: created.token } : {})
+    };
   }
 
   /* ------------------------------------------------------------ helpers */

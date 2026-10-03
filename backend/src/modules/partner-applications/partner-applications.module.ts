@@ -1,12 +1,18 @@
 import {
   adminPartnerApplicationSchema,
+  partnerApplicationConvertSchema,
   partnerApplicationCreateSchema,
+  partnerApplicationRejectSchema,
+  partnerApplicationReviewSchema,
   type AdminPartnerApplication,
+  type PartnerApplicationConversionResult,
   type PartnerApplicationCreateInput,
   type PartnerApplicationResponse,
   type PartnerApplicationStatus
 } from "../../../../packages/shared/contracts/partner-application.contracts";
-import type { PublicLocale } from "../../../../packages/shared/contracts/public-site.contracts";
+import { PUBLIC_DEFAULT_LOCALE, type PublicLocale } from "../../../../packages/shared/contracts/public-site.contracts";
+import { ErrorCodes } from "../../../../packages/shared/contracts/error-codes";
+import { partnerLicenseSchema } from "../../../../packages/shared/contracts/partner.contracts";
 import type { AssurMatchRole } from "../../../../packages/shared/rbac/assurmatch-role-matrix";
 import { AuditLogWriter } from "../audit-logs/audit-log-writer.service";
 import { PUBLIC_SITE_AUDIT_ACTIONS } from "../audit-logs/public-site-audit-actions";
@@ -16,7 +22,12 @@ import { QuoteRedisKeys } from "../common/redis/quote-redis-keys";
 import { InMemoryRedisClient, type RedisClientPort } from "../common/redis/redis.module";
 import type { ActorContext } from "../common/types";
 import type { Country } from "../countries/countries.module";
-import type { PublicFormNotificationPort } from "../notifications/public-form-notification.service";
+import { maskEmail } from "../notifications/email/email-delivery.service";
+import type { PartnerApplicationDecisionNotificationPort, PublicFormNotificationPort } from "../notifications/public-form-notification.service";
+import { RbacGuard } from "../auth/guards/rbac.guard";
+import type { PartnerLicense, PartnerLicensesService } from "../partner-licenses/partner-licenses.module";
+import { partnerConflict, partnerForbidden, partnerNotFound, partnerUnprocessable } from "../partners/partner-errors";
+import type { PartnersService, PartnerTenant } from "../partners/partners.module";
 import type { Product } from "../products/products.module";
 import type { ProspectIdentityService } from "../prospects/prospect-identity.service";
 import {
@@ -32,6 +43,11 @@ const RETENTION_YEARS = 5;
 const CONSENT_VERSION = "partner-application-v1";
 const CLOSED_COUNTRY_STATUSES = new Set(["draft", "suspended", "retired"]);
 const ADMIN_READ_ROLES = new Set<AssurMatchRole>(["super_admin", "admin_pays", "compliance_admin"]);
+/** Spec 051 R10 / R13: conversion and refusal are reserved to these roles (explicit role check). */
+const DECISION_ROLES = new Set<AssurMatchRole>(["super_admin", "compliance_admin"]);
+const DECIDED_STATUSES = new Set<PartnerApplicationStatus>(["accepted", "rejected"]);
+/** Issuing authority of a draft licence whose application left it blank; compliance completes it. */
+const UNKNOWN_ISSUING_AUTHORITY = "A completer (non declaree dans la candidature)";
 
 export interface PartnerApplicationsDependencies {
   findCountryByCode: (countryCode: string) => Country | undefined | Promise<Country | undefined>;
@@ -39,6 +55,16 @@ export interface PartnerApplicationsDependencies {
   identity: ProspectIdentityService;
   /** Spec 047. Left out and no confirmation is sent; a submission still succeeds. */
   notifications?: PublicFormNotificationPort;
+  /** Spec 051 R10: back-office decisions. Left out, `convert` is unavailable (tests of the intake). */
+  decisions?: PartnerApplicationDecisionDeps;
+}
+
+export interface PartnerApplicationDecisionDeps {
+  partners: Pick<PartnersService, "create">;
+  licenses: Pick<PartnerLicensesService, "create">;
+  findCountryById: (countryId: string) => Promise<Country | undefined>;
+  /** Best effort; left out and no decision e-mail is sent (audited as not configured). */
+  notifications?: PartnerApplicationDecisionNotificationPort;
 }
 
 export interface PartnerApplicationSubmitContext {
@@ -54,6 +80,7 @@ export interface PartnerApplicationSubmitContext {
  */
 export class PartnerApplicationsService {
   private readonly abuseGuard: PublicAbuseGuardService;
+  private readonly rbac = new RbacGuard();
   private readonly retention = new RetentionPolicyService();
 
   constructor(
@@ -144,6 +171,8 @@ export class PartnerApplicationsService {
       ...(parsed.whatsapp ? { whatsapp: parsed.whatsapp } : {}),
       desiredPlan: parsed.desiredPlan,
       ...(parsed.message ? { message: parsed.message } : {}),
+      // Spec 051 R10: the decision e-mail is written in the language of the application.
+      locale: parsed.locale ?? PUBLIC_DEFAULT_LOCALE,
       consentVersion: CONSENT_VERSION,
       status: "received",
       ipHash: QuoteRedisKeys.ipHash(context.ipAddress),
@@ -208,7 +237,222 @@ export class PartnerApplicationsService {
       context: { count: rows.length, ...(filter.status ? { status: filter.status } : {}) }
     });
 
-    return rows.map((row) => this.toAdminDto(row));
+    return rows.map((row) => this.toAdminDto(row, "hidden"));
+  }
+
+  /**
+   * Spec 051 FR-014: detail of one application. The full contact e-mail is shown to the deciding
+   * roles only (compliance_admin, super_admin); the Admin Pays sees it masked.
+   */
+  async detailForAdmin(actor: ActorContext, id: string): Promise<AdminPartnerApplication> {
+    const row = await this.requireForAdmin(actor, id);
+    this.audit.write({
+      actor,
+      action: PUBLIC_SITE_AUDIT_ACTIONS.partnerApplicationAdminViewed,
+      targetType: "PartnerApplication",
+      targetId: row.id,
+      scope: { countryId: row.countryId },
+      result: "success",
+      context: { status: row.status, contactEmailVisible: this.isDecisionRole(actor) }
+    });
+    return this.toAdminDto(row, this.isDecisionRole(actor) ? "full" : "masked");
+  }
+
+  /** FR-015: received -> under_review. `partner_applications:review` within the country scope. */
+  async review(actor: ActorContext, id: string, input: unknown): Promise<AdminPartnerApplication> {
+    const { reason } = partnerApplicationReviewSchema.parse(input ?? {});
+    const row = await this.requireForAdmin(actor, id);
+    if (!this.rbac.can(actor, "partner_applications:review")) {
+      this.refuseDecision(actor, row, "review", "rbac_denied", reason);
+      throw partnerForbidden();
+    }
+    this.assertUndecided(actor, row, "review", reason);
+    if (row.status !== "received") {
+      this.refuseDecision(actor, row, "review", "already_under_review", reason);
+      throw partnerConflict("The application is already under review");
+    }
+    const now = new Date();
+    const updated = await this.repository.update(row.id, { status: "under_review", ...(actor.actorId ? { reviewedById: actor.actorId } : {}), reviewedAt: now, reviewNote: reason });
+    this.audit.write({
+      actor,
+      action: PUBLIC_SITE_AUDIT_ACTIONS.partnerApplicationReviewStarted,
+      targetType: "PartnerApplication",
+      targetId: row.id,
+      scope: { countryId: row.countryId },
+      result: "success",
+      reason,
+      context: { before: { status: row.status }, after: { status: updated.status } }
+    });
+    return this.toAdminDto(updated, this.isDecisionRole(actor) ? "full" : "masked");
+  }
+
+  /**
+   * FR-016: one operation creates a Prospect (`draft`) partner and a draft licence from the
+   * declared data, then marks the application accepted (converted) with the partner reference. It
+   * is refused when the country's broker onboarding is off. The decision is final.
+   */
+  async convert(actor: ActorContext, id: string, input: unknown): Promise<PartnerApplicationConversionResult> {
+    const { reason } = partnerApplicationConvertSchema.parse(input ?? {});
+    const row = await this.requireForAdmin(actor, id);
+    this.assertDecisionRole(actor, row, "convert", reason);
+    this.assertUndecided(actor, row, "convert", reason);
+    const decisions = this.deps.decisions;
+    if (!decisions) throw new Error("Partner application conversion is not configured");
+    const country = await decisions.findCountryById(row.countryId);
+    if (!country?.flags.country_broker_onboarding_enabled) {
+      this.refuseDecision(actor, row, "convert", "broker_onboarding_disabled", reason);
+      throw partnerUnprocessable(ErrorCodes.COUNTRY_BROKER_ONBOARDING_DISABLED, "Broker onboarding is disabled for the country of this application");
+    }
+
+    // The licence is written after the partner: validate its declared data first so a refused
+    // licence never leaves an orphan draft partner behind (the two writes are not transactional).
+    const licenseDraft = {
+      licenseNumber: row.licenseNumber,
+      issuingAuthority: row.licenseIssuingAuthority ?? UNKNOWN_ISSUING_AUTHORITY,
+      countryId: row.countryId,
+      productIds: row.productIds,
+      status: "draft" as const,
+      effectiveDate: new Date().toISOString().slice(0, 10),
+      expirationDate: new Date(row.licenseExpiresAt).toISOString().slice(0, 10)
+    };
+    if (!partnerLicenseSchema.safeParse({ ...licenseDraft, partnerTenantId: crypto.randomUUID() }).success) {
+      this.refuseDecision(actor, row, "convert", "declared_license_invalid", reason);
+      throw partnerUnprocessable(ErrorCodes.VALIDATION_FAILED, "The licence declared in this application is invalid; complete it before conversion");
+    }
+
+    const partner: PartnerTenant = await decisions.partners.create({
+      legalName: row.legalName,
+      ...(row.tradeName ? { tradeName: row.tradeName } : {}),
+      countryId: row.countryId,
+      plan: row.desiredPlan,
+      status: "draft",
+      primaryEmail: row.contactEmailNormalized,
+      primaryWhatsApp: row.whatsapp ?? row.contactPhone,
+      adminContactName: row.contactName,
+      adminContactEmail: row.contactEmailNormalized,
+      adminContactPhone: row.contactPhone,
+      quotaMonthlyLeads: row.monthlyCapacity
+    }, actor, `converted from application ${row.publicReference}: ${reason}`);
+    const license: PartnerLicense = await decisions.licenses.create({ ...licenseDraft, partnerTenantId: partner.id }, actor, `declared in application ${row.publicReference}: ${reason}`);
+
+    const now = new Date();
+    const updated = await this.repository.update(row.id, {
+      status: "accepted",
+      partnerTenantId: partner.id,
+      ...(actor.actorId ? { reviewedById: actor.actorId } : {}),
+      reviewedAt: now,
+      reviewNote: reason,
+      decidedAt: now
+    });
+    this.audit.write({
+      actor,
+      action: PUBLIC_SITE_AUDIT_ACTIONS.partnerApplicationConverted,
+      targetType: "PartnerApplication",
+      targetId: row.id,
+      scope: { countryId: row.countryId, partnerTenantId: partner.id },
+      result: "success",
+      reason,
+      context: { before: { status: row.status }, after: { status: "accepted", partnerTenantId: partner.id, licenseId: license.id } }
+    });
+    await this.notifyDecision(actor, updated, "accepted");
+    return { application: this.toAdminDto(updated, "full"), partnerTenantId: partner.id, licenseId: license.id };
+  }
+
+  /** FR-015: refusal with a closed-list reason; the internal note is never e-mailed. Final. */
+  async reject(actor: ActorContext, id: string, input: unknown): Promise<AdminPartnerApplication> {
+    const { rejectionReasonCode, reason } = partnerApplicationRejectSchema.parse(input ?? {});
+    const row = await this.requireForAdmin(actor, id);
+    this.assertDecisionRole(actor, row, "reject", reason);
+    this.assertUndecided(actor, row, "reject", reason);
+    const now = new Date();
+    const updated = await this.repository.update(row.id, {
+      status: "rejected",
+      rejectionReasonCode,
+      ...(actor.actorId ? { reviewedById: actor.actorId } : {}),
+      reviewedAt: now,
+      reviewNote: reason,
+      decidedAt: now
+    });
+    this.audit.write({
+      actor,
+      action: PUBLIC_SITE_AUDIT_ACTIONS.partnerApplicationRejected,
+      targetType: "PartnerApplication",
+      targetId: row.id,
+      scope: { countryId: row.countryId },
+      result: "success",
+      reason,
+      context: { before: { status: row.status }, after: { status: "rejected", rejectionReasonCode } }
+    });
+    await this.notifyDecision(actor, updated, "rejected");
+    return this.toAdminDto(updated, "full");
+  }
+
+  /**
+   * FR-017 / SC-008: best effort. The decision is stored before this runs and never undone; the
+   * outcome is audited (a failure or a missing transport is recorded, never thrown).
+   */
+  private async notifyDecision(actor: ActorContext, row: PartnerApplicationRecord, decision: "accepted" | "rejected"): Promise<void> {
+    const port = this.deps.decisions?.notifications;
+    let emailStatus: string = "not_configured";
+    if (port) {
+      try {
+        emailStatus = await port.notifyPartnerApplicationDecision({
+          to: row.contactEmailNormalized,
+          contactName: row.contactName,
+          publicReference: row.publicReference,
+          decision,
+          locale: row.locale ?? PUBLIC_DEFAULT_LOCALE
+        });
+      } catch {
+        emailStatus = "failed";
+      }
+    }
+    this.audit.write({
+      actor,
+      action: PUBLIC_SITE_AUDIT_ACTIONS.partnerApplicationDecisionNotified,
+      targetType: "PartnerApplication",
+      targetId: row.id,
+      scope: { countryId: row.countryId },
+      result: emailStatus === "sent" || emailStatus === "previewed" ? "success" : emailStatus === "failed" ? "failed" : "refused",
+      context: { decision, emailStatus, locale: row.locale ?? PUBLIC_DEFAULT_LOCALE, recipientMasked: maskEmail(row.contactEmailNormalized) }
+    });
+  }
+
+  private isDecisionRole(actor: ActorContext): boolean {
+    return actor.roles.some((role) => DECISION_ROLES.has(role));
+  }
+
+  private assertDecisionRole(actor: ActorContext, row: PartnerApplicationRecord, decision: string, reason: string): void {
+    if (this.isDecisionRole(actor)) return;
+    this.refuseDecision(actor, row, decision, "decision_requires_compliance", reason);
+    throw partnerForbidden();
+  }
+
+  private assertUndecided(actor: ActorContext, row: PartnerApplicationRecord, decision: string, reason: string): void {
+    if (!DECIDED_STATUSES.has(row.status)) return;
+    this.refuseDecision(actor, row, decision, "application_already_decided", reason);
+    throw partnerConflict(`The application is already ${row.status}; a decision is final`, ErrorCodes.APPLICATION_ALREADY_DECIDED);
+  }
+
+  private refuseDecision(actor: ActorContext, row: PartnerApplicationRecord, decision: string, refusal: string, reason?: string): void {
+    this.audit.write({
+      actor,
+      action: PUBLIC_SITE_AUDIT_ACTIONS.partnerApplicationDecisionRefused,
+      targetType: "PartnerApplication",
+      targetId: row.id,
+      scope: { countryId: row.countryId },
+      result: "refused",
+      reason: refusal,
+      context: { decision, status: row.status, ...(reason ? { requestReason: reason } : {}) }
+    });
+  }
+
+  /** Admin read rights and country scope; an application outside the scope reads as not found. */
+  private async requireForAdmin(actor: ActorContext, id: string): Promise<PartnerApplicationRecord> {
+    if (!actor.roles.some((role) => ADMIN_READ_ROLES.has(role))) throw partnerForbidden();
+    const row = await this.repository.find(id);
+    if (!row || this.scopeToActor(actor, [row]).length === 0) throw partnerNotFound(`Partner application ${id} not found`);
+    return row;
   }
 
   private async resolveProductIds(productKeys: readonly string[], country: Country): Promise<string[]> {
@@ -239,7 +483,11 @@ export class PartnerApplicationsService {
     return rows.filter((row) => scopes.includes(row.countryId));
   }
 
-  private toAdminDto(row: PartnerApplicationRecord): AdminPartnerApplication {
+  /**
+   * `hidden`: no contact e-mail (lists). `masked`: first letter and domain (Admin Pays detail).
+   * `full`: the deciding roles only (spec 051 R10).
+   */
+  private toAdminDto(row: PartnerApplicationRecord, email: "hidden" | "masked" | "full"): AdminPartnerApplication {
     return adminPartnerApplicationSchema.parse({
       id: row.id,
       publicReference: row.publicReference,
@@ -248,7 +496,7 @@ export class PartnerApplicationsService {
       ...(row.tradeName ? { tradeName: row.tradeName } : {}),
       licenseNumber: row.licenseNumber,
       ...(row.licenseIssuingAuthority ? { licenseIssuingAuthority: row.licenseIssuingAuthority } : {}),
-      licenseExpiresAt: row.licenseExpiresAt.toISOString(),
+      licenseExpiresAt: new Date(row.licenseExpiresAt).toISOString(),
       productIds: row.productIds,
       monthlyCapacity: row.monthlyCapacity,
       contactName: row.contactName,
@@ -258,10 +506,15 @@ export class PartnerApplicationsService {
       ...(row.message ? { message: row.message } : {}),
       status: row.status,
       ...(row.reviewedById ? { reviewedById: row.reviewedById } : {}),
-      ...(row.reviewedAt ? { reviewedAt: row.reviewedAt.toISOString() } : {}),
+      ...(row.reviewedAt ? { reviewedAt: new Date(row.reviewedAt).toISOString() } : {}),
       ...(row.reviewNote ? { reviewNote: row.reviewNote } : {}),
       ...(row.partnerTenantId ? { partnerTenantId: row.partnerTenantId } : {}),
-      createdAt: row.createdAt.toISOString()
+      ...(row.rejectionReasonCode ? { rejectionReasonCode: row.rejectionReasonCode } : {}),
+      ...(row.decidedAt ? { decidedAt: new Date(row.decidedAt).toISOString() } : {}),
+      locale: row.locale ?? PUBLIC_DEFAULT_LOCALE,
+      ...(email === "full" ? { contactEmail: row.contactEmailNormalized, contactEmailMasked: false } : {}),
+      ...(email === "masked" ? { contactEmail: maskEmail(row.contactEmailNormalized), contactEmailMasked: true } : {}),
+      createdAt: new Date(row.createdAt).toISOString()
     });
   }
 

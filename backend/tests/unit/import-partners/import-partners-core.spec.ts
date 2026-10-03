@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  IMPORT_ACCREDITATION_WARNING,
   MemoryPartnerImportStore,
   computeSha256,
   parsePartnerImportPayload,
@@ -159,6 +160,15 @@ describe("secure partner import core", () => {
       "partner_import.attempted",
       "partner_import.completed"
     ]);
+  });
+
+  it("accepts the spec 051 active_test status and warns that imported partners need an accepted proof", async () => {
+    const payload = mutablePayload();
+    records(payload, "partners")[0]!.status = "active_test";
+    const rawInput = JSON.stringify(payload);
+    const report = await runPartnerImport({ rawInput, expectedChecksum: computeSha256(rawInput), apply: true, store: new MemoryPartnerImportStore() });
+    expect(report.errors).toEqual([]);
+    expect(report.warnings).toEqual([IMPORT_ACCREDITATION_WARNING]);
   });
 });
 

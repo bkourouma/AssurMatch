@@ -41,6 +41,10 @@ export const ErrorCodes = {
   CONTRACT_DOCUMENT_INVALID: "CONTRACT_DOCUMENT_INVALID",
   COUNTRY_BROKER_ONBOARDING_DISABLED: "COUNTRY_BROKER_ONBOARDING_DISABLED",
   APPLICATION_ALREADY_DECIDED: "APPLICATION_ALREADY_DECIDED",
+  /** Spec 051 R11: user/partner inconsistency (unknown partner, broker role without partner, admin role with one, owner role not matching the plan). */
+  PARTNER_USER_INVALID: "PARTNER_USER_INVALID",
+  /** Spec 051 R9: a broker SLA target looser than the contractual target. */
+  SLA_TARGET_EXCEEDS_CONTRACT: "SLA_TARGET_EXCEEDS_CONTRACT",
   INTERNAL_ERROR: "INTERNAL_ERROR"
 } as const;
 

@@ -1,4 +1,4 @@
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { PrismaPg } from "@prisma/adapter-pg";
 import { PrismaClient } from "@prisma/client";
 import type { Prisma } from "@prisma/client";
@@ -15,6 +15,7 @@ import { withoutUndefined } from "../lib/without-undefined";
 import { consentContentHash } from "../../packages/shared/contracts/consent-content";
 import type { QuoteFormFieldDto } from "../../packages/shared/contracts/quote.contracts";
 import { withGenericFields } from "../../backend/src/modules/quote-forms/quote-form-definition.service";
+import { resolveDocumentStorage } from "../../backend/src/modules/quote-documents/quote-documents.config";
 
 type PartnerPlan = "starter" | "pro" | "enterprise";
 type LeadStatus = "assigned" | "broker_notified" | "seen" | "accepted" | "rejected" | "closed" | "disputed";
@@ -178,8 +179,11 @@ async function main(): Promise<void> {
     await seedCountryProducts(prisma, countries.ci, [products.auto, products.voyage]);
     await seedConsentAndForms(prisma, countries.ci, [products.auto, products.voyage]);
 
-    const partners = await seedPartners(prisma);
-    await seedPartnerCoverage(prisma, partners, countries.ci, [products.auto, products.voyage]);
+    const partners = await seedPartners(prisma, countries.ci);
+    const licenses = await seedPartnerCoverage(prisma, partners, countries.ci, [products.auto, products.voyage]);
+    // Spec 051 R15: routing reads persisted accepted proofs; each active demo partner gets one,
+    // plus a recorded contract (its owner user is seeded below). The blocked partner gets none.
+    await seedPartnerOnboardingEvidence(prisma, partners, licenses);
     const users = await seedBrokerUsers(prisma, partners, passwordHash);
     const adminUsers = await seedAdminUsers(prisma, passwordHash);
     await seedBillingPlanPrices(prisma, countries.ci);
@@ -482,8 +486,8 @@ async function seedBillingPlanPrices(prisma: PrismaClient, country: CountryRecor
   }
 }
 
-async function seedPartners(prisma: PrismaClient): Promise<{ starter: PartnerRecord; pro: PartnerRecord; enterprise: PartnerRecord; blocked: PartnerRecord }> {
-  const starter = await upsertPartner(prisma, {
+async function seedPartners(prisma: PrismaClient, country: CountryRecord): Promise<{ starter: PartnerRecord; pro: PartnerRecord; enterprise: PartnerRecord; blocked: PartnerRecord }> {
+  const starter = await upsertPartner(prisma, country, {
     registrationNumber: "LOCAL-DEMO-STARTER",
     legalName: "Courtier Local Starter SARL",
     tradeName: "Starter Demo",
@@ -493,7 +497,7 @@ async function seedPartners(prisma: PrismaClient): Promise<{ starter: PartnerRec
     quotaMonthlyLeads: 30,
     capacityStatus: "available"
   });
-  const pro = await upsertPartner(prisma, {
+  const pro = await upsertPartner(prisma, country, {
     registrationNumber: "LOCAL-DEMO-PRO",
     legalName: "Courtier Local Pro SARL",
     tradeName: "Pro Demo",
@@ -503,7 +507,7 @@ async function seedPartners(prisma: PrismaClient): Promise<{ starter: PartnerRec
     quotaMonthlyLeads: 120,
     capacityStatus: "available"
   });
-  const enterprise = await upsertPartner(prisma, {
+  const enterprise = await upsertPartner(prisma, country, {
     registrationNumber: "LOCAL-DEMO-ENTERPRISE",
     legalName: "Courtier Local Enterprise SA",
     tradeName: "Enterprise Demo",
@@ -513,7 +517,7 @@ async function seedPartners(prisma: PrismaClient): Promise<{ starter: PartnerRec
     quotaMonthlyLeads: 500,
     capacityStatus: "limited"
   });
-  const blocked = await upsertPartner(prisma, {
+  const blocked = await upsertPartner(prisma, country, {
     registrationNumber: "LOCAL-DEMO-BLOCKED",
     legalName: "Courtier Local Licence Expiree",
     tradeName: "Blocked Demo",
@@ -525,7 +529,7 @@ async function seedPartners(prisma: PrismaClient): Promise<{ starter: PartnerRec
   return { starter, pro, enterprise, blocked };
 }
 
-async function upsertPartner(prisma: PrismaClient, input: {
+async function upsertPartner(prisma: PrismaClient, country: CountryRecord, input: {
   registrationNumber: string;
   legalName: string;
   tradeName: string;
@@ -548,6 +552,16 @@ async function upsertPartner(prisma: PrismaClient, input: {
     primaryWhatsApp: "+2250102030405",
     quotaMonthlyLeads: input.quotaMonthlyLeads,
     capacityStatus: input.capacityStatus,
+    // Spec 051 R8: main country (Admin Pays scope), structured contacts and contractual SLA.
+    countryId: country.id,
+    adminContactName: `${input.tradeName} Administration`,
+    adminContactEmail: input.primaryEmail,
+    adminContactPhone: "+2250102030405",
+    commercialContactName: `${input.tradeName} Commercial`,
+    commercialContactEmail: input.primaryEmail.replace(".office@", ".sales@"),
+    commercialContactPhone: "+2250102030406",
+    partnerInsurers: ["Assureur Demo Un", "Assureur Demo Deux"],
+    slaTargetMinutes: 240,
     createdById: DEMO_ACTOR_ID
   };
   const partner = existing
@@ -556,7 +570,8 @@ async function upsertPartner(prisma: PrismaClient, input: {
   return { id: partner.id, legalName: partner.legalName, plan: partner.plan };
 }
 
-async function seedPartnerCoverage(prisma: PrismaClient, partners: { starter: PartnerRecord; pro: PartnerRecord; enterprise: PartnerRecord; blocked: PartnerRecord }, country: CountryRecord, products: ProductRecord[]): Promise<void> {
+async function seedPartnerCoverage(prisma: PrismaClient, partners: { starter: PartnerRecord; pro: PartnerRecord; enterprise: PartnerRecord; blocked: PartnerRecord }, country: CountryRecord, products: ProductRecord[]): Promise<Map<string, string>> {
+  const licenses = new Map<string, string>();
   for (const partner of [partners.starter, partners.pro, partners.enterprise]) {
     await prisma.partnerCountryAuthorization.upsert({
       where: { partnerTenantId_countryId: { partnerTenantId: partner.id, countryId: country.id } },
@@ -570,12 +585,13 @@ async function seedPartnerCoverage(prisma: PrismaClient, partners: { starter: Pa
         update: { status: "active" }
       });
     }
-    await upsertLicense(prisma, partner, country, products, partner.plan === "enterprise" ? futureDays(35) : new Date("2030-01-01T00:00:00.000Z"), "valid");
+    licenses.set(partner.id, await upsertLicense(prisma, partner, country, products, partner.plan === "enterprise" ? futureDays(35) : new Date("2030-01-01T00:00:00.000Z"), "valid"));
   }
   await upsertLicense(prisma, partners.blocked, country, products, new Date("2024-01-01T00:00:00.000Z"), "expired");
+  return licenses;
 }
 
-async function upsertLicense(prisma: PrismaClient, partner: PartnerRecord, country: CountryRecord, products: ProductRecord[], expirationDate: Date, status: "valid" | "expired"): Promise<void> {
+async function upsertLicense(prisma: PrismaClient, partner: PartnerRecord, country: CountryRecord, products: ProductRecord[], expirationDate: Date, status: "valid" | "expired"): Promise<string> {
   const licenseNumber = `LIC-${partner.id.slice(0, 8).toUpperCase()}`;
   const existing = await prisma.partnerLicense.findFirst({ where: { partnerTenantId: partner.id, countryId: country.id, licenseNumber } });
   const data = {
@@ -591,8 +607,63 @@ async function upsertLicense(prisma: PrismaClient, partner: PartnerRecord, count
     validatedAt: SEED_NOW,
     createdById: DEMO_ACTOR_ID
   };
-  if (existing) await prisma.partnerLicense.update({ where: { id: existing.id }, data });
-  else await prisma.partnerLicense.create({ data });
+  const license = existing
+    ? await prisma.partnerLicense.update({ where: { id: existing.id }, data })
+    : await prisma.partnerLicense.create({ data });
+  return license.id;
+}
+
+/** Smallest byte sequence that passes the PDF signature check (`%PDF`); synthetic demo content only. */
+const DEMO_PDF = Buffer.from("%PDF-1.4\n% AssurMatch local demo document - synthetic, no real data\n1 0 obj << /Type /Catalog >> endobj\ntrailer << /Root 1 0 R >>\n%%EOF\n", "latin1");
+
+/**
+ * Spec 051 R15: an accepted, clean accreditation proof attached to the valid licence and a recorded
+ * partnership contract (clean signed document) for every active demo partner, written straight to
+ * the database and to the configured document storage (`.local/documents` by default), so the
+ * partners stay eligible and their activation checklist is green locally. Idempotent.
+ */
+async function seedPartnerOnboardingEvidence(prisma: PrismaClient, partners: { starter: PartnerRecord; pro: PartnerRecord; enterprise: PartnerRecord }, licenses: Map<string, string>): Promise<void> {
+  const storage = resolveDocumentStorage();
+  for (const partner of [partners.starter, partners.pro, partners.enterprise]) {
+    const licenseId = licenses.get(partner.id);
+    if (!licenseId) throw new Error(`Missing demo licence for ${partner.legalName}`);
+    await upsertDemoDocument(prisma, storage, partner, "license", licenseId);
+    const contractDocumentId = await upsertDemoDocument(prisma, storage, partner, "partnership_contract");
+    await prisma.partnerContract.upsert({
+      where: { partnerTenantId_version: { partnerTenantId: partner.id, version: "v1" } },
+      create: { partnerTenantId: partner.id, version: "v1", signedAt: new Date("2026-01-15T00:00:00.000Z"), signatoryName: `${partner.legalName} - signataire`, documentId: contractDocumentId, recordedById: DEMO_ACTOR_ID },
+      update: { documentId: contractDocumentId }
+    });
+  }
+}
+
+async function upsertDemoDocument(prisma: PrismaClient, storage: ReturnType<typeof resolveDocumentStorage>, partner: PartnerRecord, documentType: "license" | "partnership_contract", licenseId?: string): Promise<string> {
+  const storageKey = `ad-demo-${partner.id}-${documentType}`;
+  await storage.put(storageKey, DEMO_PDF, "application/pdf");
+  const data = {
+    partnerTenantId: partner.id,
+    licenseId: licenseId ?? null,
+    documentType,
+    storageKey,
+    checksum: createHash("sha256").update(DEMO_PDF).digest("hex"),
+    status: "accepted" as const,
+    reviewedById: DEMO_ACTOR_ID,
+    reviewedAt: SEED_NOW,
+    fileName: documentType === "license" ? "agrement-demo.pdf" : "contrat-partenariat-demo.pdf",
+    mimeType: "application/pdf",
+    sizeBytes: DEMO_PDF.length,
+    scanStatus: "clean" as const,
+    scanEngine: "local-demo-seed",
+    scannedAt: SEED_NOW,
+    reviewReason: "local demo seed: synthetic document accepted",
+    retentionUntil: RETENTION_UNTIL,
+    createdById: DEMO_ACTOR_ID
+  };
+  const existing = await prisma.accreditationDocument.findFirst({ where: { storageKey } });
+  const document = existing
+    ? await prisma.accreditationDocument.update({ where: { id: existing.id }, data })
+    : await prisma.accreditationDocument.create({ data });
+  return document.id;
 }
 
 async function seedBrokerUsers(prisma: PrismaClient, partners: { starter: PartnerRecord; pro: PartnerRecord; enterprise: PartnerRecord }, passwordHash: string): Promise<DemoUserRecord[]> {

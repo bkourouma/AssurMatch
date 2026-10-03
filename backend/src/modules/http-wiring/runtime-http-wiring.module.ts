@@ -22,7 +22,12 @@ import {
   regulatoryRegimeUpdateSchema
 } from "../../../../packages/shared/contracts/catalog.contracts";
 import { billingFoundationQuerySchema, billingPlanPriceUpsertSchema, draftInvoiceQuerySchema, draftInvoiceRecomputeSchema, leadPackGrantSchema } from "../../../../packages/shared/contracts/billing.contracts";
-import { partnerApplicationStatusSchema } from "../../../../packages/shared/contracts/partner-application.contracts";
+import {
+  partnerApplicationConvertSchema,
+  partnerApplicationRejectSchema,
+  partnerApplicationReviewSchema,
+  partnerApplicationStatusSchema
+} from "../../../../packages/shared/contracts/partner-application.contracts";
 import {
   ACCREDITATION_DOCUMENT_MAX_BYTES,
   accreditationDocumentReviewSchema,
@@ -37,7 +42,8 @@ import {
   partnerLicenseCreateSchema,
   partnerLicenseRenewSchema,
   partnerProductAuthorizationSchema,
-  partnerStatusTransitionSchema
+  partnerStatusTransitionSchema,
+  partnerUserInviteSchema
 } from "../../../../packages/shared/contracts/partner.contracts";
 import type { UploadedAccreditationFile } from "../documents/documents.module";
 import {
@@ -95,6 +101,7 @@ import { roleHasPermission, type AssurMatchRole } from "../../../../packages/sha
 import { isoCountrySchema, languageCodeSchema, nonEmptyStringSchema, reasonSchema, uuidSchema } from "../../../../packages/shared/validation/common.schemas";
 import { AssurMatchRuntime } from "../../runtime/assurmatch-runtime";
 import { AuthRequiredHttpGuard, MfaRequiredHttpGuard } from "../auth/guards/http-auth.guard";
+import { assertBrokerTenantWritable } from "../partners/partner-tenant-status.service";
 import { actorFromRequest, clientIp, protectedActorFromRequest, type AssurMatchHttpRequest } from "../common/http/request-actor";
 import { parseHttpInput } from "../common/http/zod-validation";
 import type { ActorContext } from "../common/types";
@@ -149,6 +156,17 @@ function controller(path: string | undefined, target: ControllerTarget, protecte
 
 function parseParam(name: string, value: string, schema: z.ZodType<string> = nonEmptyStringSchema): string {
   return parseHttpInput(z.object({ [name]: schema }), { [name]: value })[name] as string;
+}
+
+/**
+ * Spec 051 FR-021 / R12: every broker write route starts with this, before any input parsing, so a
+ * user of a suspended partner is refused (403 PARTNER_SUSPENDED) whatever the payload. Reads,
+ * marking a notification read and the account security routes stay allowed.
+ */
+function brokerWriteActor(request: AssurMatchHttpRequest): ActorContext {
+  const actor = protectedActorFromRequest(request);
+  assertBrokerTenantWritable(actor);
+  return actor;
 }
 
 function assertPermission(actor: ActorContext, permission: string): void {
@@ -211,7 +229,7 @@ export class AdminUsersHttpController {
   constructor(private readonly runtime: AssurMatchRuntime) {}
 
   private usersController(): AdminUsersDomainController {
-    return new AdminUsersDomainController(this.runtime.users.service, this.runtime.audit.writer, this.runtime.auth.passwordReset, this.runtime.auth.userNotifications);
+    return this.runtime.adminUsersController();
   }
 
   private rolesController(): AdminUserRolesDomainController {
@@ -768,6 +786,23 @@ export class AdminPartnerApplicationsController {
       ...(parsed.countryId ? { countryId: parsed.countryId } : {})
     });
   }
+
+  /** Spec 051 FR-014: detail (full contact e-mail for compliance_admin and super_admin only). */
+  detail(id: string, request: AssurMatchHttpRequest) {
+    return this.runtime.partnerApplications.service.detailForAdmin(protectedActorFromRequest(request), parseParam("id", id, uuidSchema));
+  }
+
+  review(id: string, request: AssurMatchHttpRequest, input: unknown) {
+    return this.runtime.partnerApplications.service.review(protectedActorFromRequest(request), parseParam("id", id, uuidSchema), parseHttpInput(partnerApplicationReviewSchema, input ?? {}));
+  }
+
+  convert(id: string, request: AssurMatchHttpRequest, input: unknown) {
+    return this.runtime.partnerApplications.service.convert(protectedActorFromRequest(request), parseParam("id", id, uuidSchema), parseHttpInput(partnerApplicationConvertSchema, input ?? {}));
+  }
+
+  reject(id: string, request: AssurMatchHttpRequest, input: unknown) {
+    return this.runtime.partnerApplications.service.reject(protectedActorFromRequest(request), parseParam("id", id, uuidSchema), parseHttpInput(partnerApplicationRejectSchema, input ?? {}));
+  }
 }
 
 export class AdminContactMessagesController {
@@ -807,15 +842,18 @@ export class BrokerStarterController {
   }
 
   accept(leadId: string, request: AssurMatchHttpRequest) {
-    return this.runtime.leads.brokerStarterController.accept(parseParam("leadId", leadId, uuidSchema), protectedActorFromRequest(request));
+    const actor = brokerWriteActor(request);
+    return this.runtime.leads.brokerStarterController.accept(parseParam("leadId", leadId, uuidSchema), actor);
   }
 
   reject(leadId: string, input: unknown, request: AssurMatchHttpRequest) {
-    return this.runtime.leads.brokerStarterController.reject(parseParam("leadId", leadId, uuidSchema), parseHttpInput(starterActionWithReasonSchema, input), protectedActorFromRequest(request));
+    const actor = brokerWriteActor(request);
+    return this.runtime.leads.brokerStarterController.reject(parseParam("leadId", leadId, uuidSchema), parseHttpInput(starterActionWithReasonSchema, input), actor);
   }
 
   dispute(leadId: string, input: unknown, request: AssurMatchHttpRequest) {
-    return this.runtime.leads.brokerStarterController.dispute(parseParam("leadId", leadId, uuidSchema), parseHttpInput(starterActionWithReasonSchema, input), protectedActorFromRequest(request));
+    const actor = brokerWriteActor(request);
+    return this.runtime.leads.brokerStarterController.dispute(parseParam("leadId", leadId, uuidSchema), parseHttpInput(starterActionWithReasonSchema, input), actor);
   }
 
   notifications(request: AssurMatchHttpRequest) {
@@ -855,35 +893,43 @@ export class BrokerCrmController {
   }
 
   status(leadId: string, input: unknown, request: AssurMatchHttpRequest) {
-    return this.runtime.leads.brokerCrmController.changeStatus(parseParam("leadId", leadId, uuidSchema), parseHttpInput(brokerCrmStatusUpdateSchema, input), protectedActorFromRequest(request));
+    const actor = brokerWriteActor(request);
+    return this.runtime.leads.brokerCrmController.changeStatus(parseParam("leadId", leadId, uuidSchema), parseHttpInput(brokerCrmStatusUpdateSchema, input), actor);
   }
 
   note(leadId: string, input: unknown, request: AssurMatchHttpRequest) {
-    return this.runtime.leads.brokerCrmController.addNote(parseParam("leadId", leadId, uuidSchema), parseHttpInput(brokerCrmNoteCreateSchema, input), protectedActorFromRequest(request));
+    const actor = brokerWriteActor(request);
+    return this.runtime.leads.brokerCrmController.addNote(parseParam("leadId", leadId, uuidSchema), parseHttpInput(brokerCrmNoteCreateSchema, input), actor);
   }
 
   task(leadId: string, input: unknown, request: AssurMatchHttpRequest) {
-    return this.runtime.leads.brokerCrmController.addTask(parseParam("leadId", leadId, uuidSchema), parseHttpInput(brokerCrmTaskCreateSchema, input), protectedActorFromRequest(request));
+    const actor = brokerWriteActor(request);
+    return this.runtime.leads.brokerCrmController.addTask(parseParam("leadId", leadId, uuidSchema), parseHttpInput(brokerCrmTaskCreateSchema, input), actor);
   }
 
   reminder(leadId: string, input: unknown, request: AssurMatchHttpRequest) {
-    return this.runtime.leads.brokerCrmController.addReminder(parseParam("leadId", leadId, uuidSchema), parseHttpInput(brokerCrmReminderCreateSchema, input), protectedActorFromRequest(request));
+    const actor = brokerWriteActor(request);
+    return this.runtime.leads.brokerCrmController.addReminder(parseParam("leadId", leadId, uuidSchema), parseHttpInput(brokerCrmReminderCreateSchema, input), actor);
   }
 
   assign(leadId: string, input: unknown, request: AssurMatchHttpRequest) {
-    return this.runtime.leads.brokerCrmController.assignAdvisor(parseParam("leadId", leadId, uuidSchema), parseHttpInput(brokerCrmAssignRequestSchema, input), protectedActorFromRequest(request));
+    const actor = brokerWriteActor(request);
+    return this.runtime.leads.brokerCrmController.assignAdvisor(parseParam("leadId", leadId, uuidSchema), parseHttpInput(brokerCrmAssignRequestSchema, input), actor);
   }
 
   document(leadId: string, input: unknown, request: AssurMatchHttpRequest) {
-    return this.runtime.leads.brokerCrmController.addDocument(parseParam("leadId", leadId, uuidSchema), parseHttpInput(brokerCrmDocumentCreateSchema, input), protectedActorFromRequest(request));
+    const actor = brokerWriteActor(request);
+    return this.runtime.leads.brokerCrmController.addDocument(parseParam("leadId", leadId, uuidSchema), parseHttpInput(brokerCrmDocumentCreateSchema, input), actor);
   }
 
   proposal(leadId: string, input: unknown, request: AssurMatchHttpRequest) {
-    return this.runtime.leads.brokerCrmController.addProposal(parseParam("leadId", leadId, uuidSchema), parseHttpInput(brokerCrmProposalCreateSchema, input), protectedActorFromRequest(request));
+    const actor = brokerWriteActor(request);
+    return this.runtime.leads.brokerCrmController.addProposal(parseParam("leadId", leadId, uuidSchema), parseHttpInput(brokerCrmProposalCreateSchema, input), actor);
   }
 
   dispute(leadId: string, input: unknown, request: AssurMatchHttpRequest) {
-    return this.runtime.leads.brokerCrmController.addDispute(parseParam("leadId", leadId, uuidSchema), parseHttpInput(brokerCrmDisputeCreateSchema, input), protectedActorFromRequest(request));
+    const actor = brokerWriteActor(request);
+    return this.runtime.leads.brokerCrmController.addDispute(parseParam("leadId", leadId, uuidSchema), parseHttpInput(brokerCrmDisputeCreateSchema, input), actor);
   }
 
   notifications(request: AssurMatchHttpRequest) {
@@ -901,7 +947,8 @@ export class BrokerCrmController {
   }
 
   aiRequest(leadId: string, assistType: string, input: unknown, request: AssurMatchHttpRequest) {
-    return this.runtime.brokerAi.requestForLead(parseParam("leadId", leadId, uuidSchema), parseParam("assistType", assistType), input, protectedActorFromRequest(request));
+    const actor = brokerWriteActor(request);
+    return this.runtime.brokerAi.requestForLead(parseParam("leadId", leadId, uuidSchema), parseParam("assistType", assistType), input, actor);
   }
 
   aiListForLead(leadId: string, request: AssurMatchHttpRequest) {
@@ -913,11 +960,13 @@ export class BrokerCrmController {
   }
 
   aiValidate(id: string, input: unknown, request: AssurMatchHttpRequest) {
-    return this.runtime.brokerAi.validate(parseParam("id", id, uuidSchema), input, protectedActorFromRequest(request));
+    const actor = brokerWriteActor(request);
+    return this.runtime.brokerAi.validate(parseParam("id", id, uuidSchema), input, actor);
   }
 
   aiLossAnalysis(input: unknown, request: AssurMatchHttpRequest) {
-    return this.runtime.brokerAi.lossAnalysis(protectedActorFromRequest(request), input);
+    const actor = brokerWriteActor(request);
+    return this.runtime.brokerAi.lossAnalysis(actor, input);
   }
 
   aiOptOutStatus(request: AssurMatchHttpRequest) {
@@ -925,7 +974,8 @@ export class BrokerCrmController {
   }
 
   aiSetOptOut(input: unknown, request: AssurMatchHttpRequest) {
-    return this.runtime.brokerAi.setOptOut(protectedActorFromRequest(request), input);
+    const actor = brokerWriteActor(request);
+    return this.runtime.brokerAi.setOptOut(actor, input);
   }
 }
 
@@ -1152,6 +1202,11 @@ export class AdminPartnersHttpController {
   recordContract(id: string, request: AssurMatchHttpRequest, input: unknown) {
     return this.runtime.partnerAdmin.recordContract(protectedActorFromRequest(request), parseParam("id", id, uuidSchema), parseHttpInput(partnerContractCreateSchema, input));
   }
+
+  /** FR-018: invitation from the partner page (existing activation path). */
+  inviteUser(id: string, request: AssurMatchHttpRequest, input: unknown) {
+    return this.runtime.partnerAdmin.inviteUser(protectedActorFromRequest(request), parseParam("id", id, uuidSchema), parseHttpInput(partnerUserInviteSchema, input));
+  }
 }
 
 export class AdminPartnerSlaController {
@@ -1170,15 +1225,18 @@ export class BrokerEnterpriseController {
   }
 
   createAgency(input: unknown, request: AssurMatchHttpRequest) {
-    return this.runtime.enterprise.createAgency(input, protectedActorFromRequest(request));
+    const actor = brokerWriteActor(request);
+    return this.runtime.enterprise.createAgency(input, actor);
   }
 
   updateAgency(id: string, input: unknown, request: AssurMatchHttpRequest) {
-    return this.runtime.enterprise.updateAgency(parseParam("id", id, uuidSchema), input, protectedActorFromRequest(request));
+    const actor = brokerWriteActor(request);
+    return this.runtime.enterprise.updateAgency(parseParam("id", id, uuidSchema), input, actor);
   }
 
   assignMember(id: string, input: unknown, request: AssurMatchHttpRequest) {
-    return this.runtime.enterprise.assignMember(parseParam("id", id, uuidSchema), input, protectedActorFromRequest(request));
+    const actor = brokerWriteActor(request);
+    return this.runtime.enterprise.assignMember(parseParam("id", id, uuidSchema), input, actor);
   }
 
   roles(request: AssurMatchHttpRequest) {
@@ -1186,11 +1244,13 @@ export class BrokerEnterpriseController {
   }
 
   createRole(input: unknown, request: AssurMatchHttpRequest) {
-    return this.runtime.enterprise.createCustomRole(input, protectedActorFromRequest(request));
+    const actor = brokerWriteActor(request);
+    return this.runtime.enterprise.createCustomRole(input, actor);
   }
 
   updateRole(id: string, input: unknown, request: AssurMatchHttpRequest) {
-    return this.runtime.enterprise.updateCustomRole(parseParam("id", id, uuidSchema), input, protectedActorFromRequest(request));
+    const actor = brokerWriteActor(request);
+    return this.runtime.enterprise.updateCustomRole(parseParam("id", id, uuidSchema), input, actor);
   }
 
   sla(request: AssurMatchHttpRequest) {
@@ -1198,7 +1258,8 @@ export class BrokerEnterpriseController {
   }
 
   updateSla(input: unknown, request: AssurMatchHttpRequest) {
-    return this.runtime.enterprise.updateSla(input, protectedActorFromRequest(request));
+    const actor = brokerWriteActor(request);
+    return this.runtime.enterprise.updateSla(input, actor);
   }
 
   branding(request: AssurMatchHttpRequest) {
@@ -1206,7 +1267,8 @@ export class BrokerEnterpriseController {
   }
 
   updateBranding(input: unknown, request: AssurMatchHttpRequest) {
-    return this.runtime.enterprise.updateBranding(input, protectedActorFromRequest(request));
+    const actor = brokerWriteActor(request);
+    return this.runtime.enterprise.updateBranding(input, actor);
   }
 }
 
@@ -1226,7 +1288,8 @@ export class BrokerNotificationsController {
   }
 
   updatePreferences(input: unknown, request: AssurMatchHttpRequest) {
-    return this.runtime.brokerNotifications.updatePreferences(input, protectedActorFromRequest(request));
+    const actor = brokerWriteActor(request);
+    return this.runtime.brokerNotifications.updatePreferences(input, actor);
   }
 }
 
@@ -1559,6 +1622,11 @@ decorate(PublicStatsController, "read", [Get() as MethodDecoratorFactory]);
 
 controller("admin", AdminPartnerApplicationsController, true);
 decorate(AdminPartnerApplicationsController, "list", [Get("partners/applications") as MethodDecoratorFactory], [[0, Req() as ParamDecoratorFactory], [1, Query() as ParamDecoratorFactory]]);
+// Spec 051: registered before `AdminPartnersHttpController` (`partners/:id`), see the controllers list.
+decorate(AdminPartnerApplicationsController, "detail", [Get("partners/applications/:id") as MethodDecoratorFactory], [[0, Param("id") as ParamDecoratorFactory], [1, Req() as ParamDecoratorFactory]]);
+decorate(AdminPartnerApplicationsController, "review", [Post("partners/applications/:id/review") as MethodDecoratorFactory, HttpCode(200) as MethodDecoratorFactory], [[0, Param("id") as ParamDecoratorFactory], [1, Req() as ParamDecoratorFactory], [2, Body() as ParamDecoratorFactory]]);
+decorate(AdminPartnerApplicationsController, "convert", [Post("partners/applications/:id/convert") as MethodDecoratorFactory], [[0, Param("id") as ParamDecoratorFactory], [1, Req() as ParamDecoratorFactory], [2, Body() as ParamDecoratorFactory]]);
+decorate(AdminPartnerApplicationsController, "reject", [Post("partners/applications/:id/reject") as MethodDecoratorFactory, HttpCode(200) as MethodDecoratorFactory], [[0, Param("id") as ParamDecoratorFactory], [1, Req() as ParamDecoratorFactory], [2, Body() as ParamDecoratorFactory]]);
 
 controller("admin", AdminContactMessagesController, true);
 decorate(AdminContactMessagesController, "list", [Get("contact-messages") as MethodDecoratorFactory], [[0, Req() as ParamDecoratorFactory], [1, Query() as ParamDecoratorFactory]]);
@@ -1708,6 +1776,7 @@ decorate(AdminPartnerSlaController, "sla", [Get("partners/sla") as MethodDecorat
     [[0, id], [1, Param("documentId") as ParamDecoratorFactory], [2, req]]
   );
   decorate(AdminPartnersHttpController, "recordContract", [Post("partners/:id/contracts") as MethodDecoratorFactory], [[0, id], [1, req], [2, body]]);
+  decorate(AdminPartnersHttpController, "inviteUser", [Post("partners/:id/users") as MethodDecoratorFactory], [[0, id], [1, req], [2, body]]);
 }
 controller("broker/enterprise", BrokerEnterpriseController, true);
 decorate(BrokerEnterpriseController, "agencies", [Get("agencies") as MethodDecoratorFactory], [[0, Req() as ParamDecoratorFactory]]);
@@ -1827,6 +1896,25 @@ decorate(PartnerApiController, "notifications", [Get("notifications") as MethodD
 decorate(PartnerApiController, "webhookEndpoints", [Get("webhook-endpoints") as MethodDecoratorFactory], [[0, Req() as ParamDecoratorFactory]]);
 decorate(PartnerApiController, "createWebhookEndpoint", [Post("webhook-endpoints") as MethodDecoratorFactory], [[0, Req() as ParamDecoratorFactory], [1, Body() as ParamDecoratorFactory]]);
 decorate(PartnerApiController, "updateWebhookEndpoint", [Patch("webhook-endpoints/:id") as MethodDecoratorFactory], [[0, Param("id") as ParamDecoratorFactory], [1, Req() as ParamDecoratorFactory], [2, Body() as ParamDecoratorFactory]]);
+
+// Spec 051 R12: the auth guard reads the partner status through the runtime (Nest injects it).
+Reflect.defineMetadata("design:paramtypes", [AssurMatchRuntime], AuthRequiredHttpGuard);
+
+/**
+ * Spec 051 FR-021: broker write routes guarded by `brokerWriteActor`, and the write routes that stay
+ * allowed for a suspended partner (acknowledging a notification). The inventory test checks that
+ * every non-GET broker route is in one of the two lists.
+ */
+export const BROKER_TENANT_WRITE_GUARDED: Readonly<Record<string, readonly string[]>> = {
+  BrokerStarterController: ["accept", "reject", "dispute"],
+  BrokerCrmController: ["status", "note", "task", "reminder", "assign", "document", "proposal", "dispute", "aiRequest", "aiValidate", "aiLossAnalysis", "aiSetOptOut"],
+  BrokerEnterpriseController: ["createAgency", "updateAgency", "assignMember", "createRole", "updateRole", "updateSla", "updateBranding"],
+  BrokerNotificationsController: ["updatePreferences"]
+};
+export const BROKER_TENANT_WRITE_ALLOWED_WHEN_SUSPENDED: Readonly<Record<string, readonly string[]>> = {
+  BrokerStarterController: ["readNotification"],
+  BrokerNotificationsController: ["markRead"]
+};
 
 export class RuntimeHttpWiringModule {}
 

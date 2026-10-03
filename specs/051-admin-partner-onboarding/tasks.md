@@ -38,15 +38,15 @@ description: "Task list for 051 — Onboarding et cycle de vie des courtiers par
 - [x] T017 [P] [US4] Tests : chaque blocage d'activation, Admin Pays qui active (403), Actif test jamais candidat ni public, suspension qui exclut du routage et des offres, réactivation refusée si une condition manque, « Expiré » calculé.
 
 ## Phase 7: US5 Candidatures (P1)
-- [ ] T018 [US5] `PartnerApplicationsService` : `review`, `convert` (courtier et licence brouillons, flag pays), `reject` (code), décision définitive ; `locale` stocké à la soumission ; e-mail masqué hors CO.
-- [ ] T019 [US5] E-mail `partner_application_decision` (gabarits FR et EN, garde de formulations, best effort, audit).
-- [ ] T020 [US5] Routes candidatures et tests (conversion, double décision 409, flag désactivé 422, e-mail envoyé ou échec audité, périmètre).
+- [x] T018 [US5] `PartnerApplicationsService` : `review`, `convert` (courtier et licence brouillons, flag pays), `reject` (code), décision définitive ; `locale` stocké à la soumission ; e-mail masqué hors CO.
+- [x] T019 [US5] E-mail `partner_application_decision` (gabarits FR et EN, garde de formulations, best effort, audit).
+- [x] T020 [US5] Routes candidatures et tests (conversion, double décision 409, flag désactivé 422, e-mail envoyé ou échec audité, périmètre).
 
 ## Phase 8: US6 Utilisateurs (P1)
-- [ ] T021 [US6] Validation de `POST /admin/users` (courtier existant et non résilié, cohérence rôle/courtier) ; `POST /admin/partners/:id/users` (rôle propriétaire selon le plan).
-- [ ] T022 [US6] Garde de tenant (R12) : connexion refusée et 401 si `retired` ; `tenantReadOnly` si `suspended` ; `assertBrokerTenantWritable` sur toutes les routes d'écriture courtier ; `/auth/me` renvoie `partnerTenantStatus` ; cache invalidé aux transitions.
-- [ ] T023 [P] [US6] Tests : tenant inexistant, rôle courtier sans tenant, invitation et e-mail, écritures courtier refusées après suspension (inventaire des routes d'écriture), lectures permises, 401 et connexion refusée après résiliation.
-- [ ] T024 [US6] SLA contractuel : `EnterpriseService.updateSla` borné, vue SLA admin (R9), test.
+- [x] T021 [US6] Validation de `POST /admin/users` (courtier existant et non résilié, cohérence rôle/courtier) ; `POST /admin/partners/:id/users` (rôle propriétaire selon le plan).
+- [x] T022 [US6] Garde de tenant (R12) : connexion refusée et 401 si `retired` ; `tenantReadOnly` si `suspended` ; `assertBrokerTenantWritable` sur toutes les routes d'écriture courtier ; `/auth/me` renvoie `partnerTenantStatus` ; cache invalidé aux transitions.
+- [x] T023 [P] [US6] Tests : tenant inexistant, rôle courtier sans tenant, invitation et e-mail, écritures courtier refusées après suspension (inventaire des routes d'écriture), lectures permises, 401 et connexion refusée après résiliation.
+- [x] T024 [US6] SLA contractuel : `EnterpriseService.updateSla` borné, vue SLA admin (R9), test.
 
 ## Phase 9: US7 Interface admin et portail (P1/P2)
 - [ ] T025 [US7] Admin :
@@ -60,7 +60,7 @@ description: "Task list for 051 — Onboarding et cycle de vie des courtiers par
 - [ ] T028 [P] [US7] Tests de marqueurs admin et courtier.
 
 ## Phase 10: Seeds et validations
-- [ ] T029 Helpers de test, seed démo, `import-partners` (`active_test`, documents acceptés persistés, propriétaire, contrat) ; tests existants verts.
+- [x] T029 Helpers de test, seed démo, `import-partners` (`active_test`, documents acceptés persistés, propriétaire, contrat) ; tests existants verts.
 - [ ] T030 Validations finales : `prisma generate` et `validate`, typecheck, lint, `npm run test`, `npm run test:web`, scan de secrets.
 - [ ] T031 Carte de couverture et tâches cochées.
 

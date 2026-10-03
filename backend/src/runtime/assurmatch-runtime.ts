@@ -36,6 +36,8 @@ import { PartnerLicensesModule } from "../modules/partner-licenses/partner-licen
 import { PartnersModule } from "../modules/partners/partners.module";
 import { PublicPartnerDirectoryService } from "../modules/partners/public-partner-directory.service";
 import { PartnerAdminService } from "../modules/partners/partner-admin.service";
+import { AdminUsersController } from "../modules/users/admin-users.controller";
+import { PartnerTenantStatusService } from "../modules/partners/partner-tenant-status.service";
 import { ProductsModule } from "../modules/products/products.module";
 import { PublicStatsModule } from "../modules/public-stats/public-stats.module";
 import { WaitlistModule } from "../modules/waitlist/waitlist.module";
@@ -170,6 +172,8 @@ export class AssurMatchRuntime {
   readonly products = new ProductsModule(this.audit.writer, this.productsRepository);
   readonly partners = new PartnersModule(this.audit.writer, this.partnersRepository);
   readonly partnerLicenses = new PartnerLicensesModule(this.audit.writer, this.partnerLicensesRepository);
+  /** Spec 051 R12: partner status per request (auth guard, login), invalidated on every partner change. */
+  readonly partnerTenantStatus = new PartnerTenantStatusService(this.partners.service);
   /** Shared by uploads and by the retention anonymizer, which deletes the files (spec 046). */
   readonly documentStorage = resolveDocumentStorage();
   /** Spec 051 C6: one antivirus for quote documents and accreditation documents. */
@@ -182,7 +186,7 @@ export class AssurMatchRuntime {
     requireDurableStorage: process.env.APP_ENV === "production" || process.env.APP_ENV === "preproduction"
   });
   readonly users = new UsersModule(this.audit.writer, this.usersRepository);
-  readonly auth = new AuthModule(this.users.service, this.audit.writer, this.emailDelivery);
+  readonly auth = new AuthModule(this.users.service, this.audit.writer, this.emailDelivery, this.partnerTenantStatus);
   readonly featureFlags = new FeatureFlagsModule(
     this.audit.writer,
     new FeatureFlagCacheService(this.redis.client),
@@ -456,7 +460,8 @@ readonly enterprise = new EnterpriseService({
     documents: this.documents.service,
     countries: this.countries.service,
     products: this.products.service,
-    listUsers: () => this.users.service.list({ actorId: "system:partner-admin", roles: ["super_admin"], mfaVerified: true })
+    listUsers: () => this.users.service.list({ actorId: "system:partner-admin", roles: ["super_admin"], mfaVerified: true }),
+    provisionUser: (actor, input) => this.adminUsersController().createPartnerUser(actor, input)
   });
   readonly activationChecklist = new ActivationChecklistModule({
     audit: this.audit.writer,
@@ -549,7 +554,14 @@ readonly enterprise = new EnterpriseService({
     findCountryByCode: (countryCode) => this.countries.service.findByIsoCode(countryCode),
     findProductByKey: (productKey) => this.products.service.findByKey(productKey),
     identity: this.prospects.identity,
-    notifications: this.publicFormNotifications
+    notifications: this.publicFormNotifications,
+    // Spec 051 R10: conversion creates a draft partner and a draft licence; decisions are e-mailed.
+    decisions: {
+      partners: this.partners.service,
+      licenses: this.partnerLicenses.service,
+      findCountryById: (countryId: string) => this.countries.service.require(countryId).catch(() => undefined),
+      notifications: this.publicFormNotifications
+    }
   }, this.audit.writer, this.redis.client, this.partnerApplicationsRepository);
   readonly contactMessages = new ContactMessagesModule({
     findCountryByCode: (countryCode) => this.countries.service.findByIsoCode(countryCode),
@@ -586,6 +598,16 @@ readonly enterprise = new EnterpriseService({
     subjects: this.retentionSubjectsRepository,
     memorySources: this.retentionSubjectsRepository ? undefined : this.memoryRetentionSources()
   });
+
+  /**
+   * The user administration entry point (`/admin/users` and the spec 051 partner invitation): the
+   * existing activation path, plus the partner lookup that enforces R11.
+   */
+  adminUsersController(): AdminUsersController {
+    return new AdminUsersController(this.users.service, this.audit.writer, this.auth.passwordReset, this.auth.userNotifications, {
+      find: (id: string) => this.partners.service.find(id)
+    });
+  }
 
   async onModuleInit(): Promise<void> {
     await this.prisma.onModuleInit();

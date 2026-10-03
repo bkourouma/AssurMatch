@@ -15,6 +15,8 @@ export type EmailPurpose =
   | "public_waitlist_confirmation"
   | "public_contact_confirmation"
   | "public_partner_application_confirmation"
+  // Spec 051 R10: the decision (acceptance or refusal) on a broker application.
+  | "partner_application_decision"
   | "satisfaction_survey_requested";
 export type EmailDeliveryStatus = "not_configured" | "previewed" | "sent" | "failed";
 export type EmailProvider = "disabled" | "mailpit" | "smtp";

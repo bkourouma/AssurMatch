@@ -77,7 +77,7 @@ export const adminPartnerApplicationSchema = z.object({
   desiredPlan: billingPlanKeySchema,
   message: z.string().optional(),
   status: partnerApplicationStatusSchema,
-  reviewedById: uuidSchema.optional(),
+  reviewedById: nonEmptyStringSchema.optional(),
   reviewedAt: dateTimeStringSchema.optional(),
   reviewNote: z.string().optional(),
   partnerTenantId: uuidSchema.optional(),
@@ -88,6 +88,8 @@ export const adminPartnerApplicationSchema = z.object({
   locale: publicLocaleSchema.optional(),
   /** Spec 051: the full contact e-mail, only for the roles that decide (compliance_admin, super_admin). */
   contactEmail: z.string().optional(),
+  /** True when `contactEmail` is masked (detail read by a role that does not decide). */
+  contactEmailMasked: z.boolean().optional(),
   createdAt: dateTimeStringSchema
 });
 

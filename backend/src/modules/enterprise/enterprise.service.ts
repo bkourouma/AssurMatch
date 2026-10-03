@@ -1,3 +1,5 @@
+import { UnprocessableEntityException } from "@nestjs/common";
+import { ErrorCodes } from "../../../../packages/shared/contracts/error-codes";
 import type {
   AdminPartnerSlaRow,
   BrokerBranding,
@@ -45,6 +47,12 @@ export class EnterpriseAccessRefusedError extends Error {
 }
 
 const DEFAULT_SLA_MINUTES = 240;
+
+/** Spec 051 R9: the broker's own target, never looser than the contractual one. */
+function effectiveSlaTarget(brokerTarget: number | undefined, contractual: number | undefined): number {
+  if (contractual === undefined) return brokerTarget ?? DEFAULT_SLA_MINUTES;
+  return brokerTarget === undefined ? contractual : Math.min(brokerTarget, contractual);
+}
 const SLA_WINDOW_DAYS = 30;
 const PLATFORM_MENTION = "Plateforme technique AssurMatch" as const;
 const ALLOWED_PERMISSIONS = new Set<string>(brokerCustomPermissions);
@@ -178,7 +186,7 @@ export class EnterpriseService {
   async sla(actor: ActorContext): Promise<PartnerSla> {
     const tenantId = this.assertBroker(actor);
     const branding = await this.repository.findBranding(tenantId);
-    const target = branding?.firstActionTargetMinutes ?? DEFAULT_SLA_MINUTES;
+    const target = effectiveSlaTarget(branding?.firstActionTargetMinutes, await this.contractualTarget(tenantId));
     const metrics = await this.slaMetrics(tenantId, target);
     this.audit(actor, EnterpriseAuditActions.slaRead, "PartnerSla", tenantId, tenantId, undefined, { complianceRate: metrics.complianceRate });
     return {
@@ -193,6 +201,24 @@ export class EnterpriseService {
   async updateSla(input: unknown, actor: ActorContext): Promise<PartnerSla> {
     const tenantId = this.assertEnterprise(actor, "write");
     const parsed = partnerSlaUpdateSchema.parse(input ?? {});
+    // Spec 051 R9: the broker may tighten its target, never loosen it past the contractual target.
+    const contractual = await this.contractualTarget(tenantId);
+    if (contractual !== undefined && parsed.firstActionTargetMinutes > contractual) {
+      this.deps.audit.write({
+        actor,
+        action: EnterpriseAuditActions.slaChanged,
+        targetType: "PartnerSla",
+        targetId: tenantId,
+        scope: { partnerTenantId: tenantId },
+        result: "refused",
+        reason: "sla_target_exceeds_contract",
+        context: { requested: parsed.firstActionTargetMinutes, contractual, requestReason: parsed.reason }
+      });
+      throw new UnprocessableEntityException({
+        code: ErrorCodes.SLA_TARGET_EXCEEDS_CONTRACT,
+        message: `The target cannot exceed the contractual target of ${contractual} minutes`
+      });
+    }
     const existing = await this.repository.findBranding(tenantId);
     const saved = await this.saveBranding(tenantId, {
       displayLabel: existing?.displayLabel ?? "Espace courtier",
@@ -248,7 +274,8 @@ export class EnterpriseService {
     const targets = new Map(branding.map((entry) => [entry.partnerTenantId, entry.firstActionTargetMinutes]));
     const rows: AdminPartnerSlaRow[] = [];
     for (const partner of partners) {
-      const target = targets.get(partner.id) ?? DEFAULT_SLA_MINUTES;
+      // Spec 051 R9: the contractual target set by the admin prevails when it exists.
+      const target = partner.slaTargetMinutes ?? targets.get(partner.id) ?? DEFAULT_SLA_MINUTES;
       const metrics = await this.slaMetrics(partner.id, target);
       rows.push({
         partnerTenantId: partner.id,
@@ -260,6 +287,11 @@ export class EnterpriseService {
     }
     this.audit(actor, EnterpriseAuditActions.slaRead, "PartnerSla", "admin-overview", null, undefined, { partners: rows.length });
     return rows;
+  }
+
+  private async contractualTarget(partnerTenantId: string): Promise<number | undefined> {
+    const partner = await this.deps.partners.require(partnerTenantId).catch(() => undefined);
+    return partner?.slaTargetMinutes ?? undefined;
   }
 
   private async slaMetrics(partnerTenantId: string, targetMinutes: number) {
