@@ -622,7 +622,81 @@
       "noToken": "Withdrawing consent requires the tracking link received at the end of your request."
     },
     "journeyLabel": "Public journey",
-    "backToCountries": "Back to the countries"
+    "backToCountries": "Back to the countries",
+    "trackingTitle": "Tracking of request {reference}",
+    "statusTitle": "Where your request stands",
+    "statusLabel": "Current status",
+    "status": {
+      "received": {
+        "headline": "Request received",
+        "body": "Your request is recorded. It will be directed to a partner broker when routing is possible for this country and product."
+      },
+      "in_review": {
+        "headline": "Request being checked",
+        "body": "Our team is checking your request before passing it on. Nothing is expected from you for now."
+      },
+      "transmitted": {
+        "headline": "Request passed on to a partner broker",
+        "body": "Your request was passed on according to your consent. The partner broker listed below is solely responsible for what comes next."
+      },
+      "in_progress": {
+        "headline": "A partner broker is reviewing your request",
+        "body": "The partner broker has taken up your request. They may contact you to complete the information needed."
+      },
+      "proposal_available": {
+        "headline": "A broker proposal is available",
+        "body": "A partner broker has prepared an indicative proposal. It commits neither you nor them until you have spoken with them directly."
+      },
+      "closed": {
+        "headline": "Request closed",
+        "body": "Work on this request is over. You can submit a new request at any time."
+      },
+      "not_transmitted": {
+        "headline": "Request not passed on",
+        "body": "No eligible partner broker could be identified for this request. No callback is promised."
+      }
+    },
+    "brokers": {
+      "title": "Partner brokers",
+      "empty": "No partner broker is linked to this request yet.",
+      "since": "since {date}",
+      "status": {
+        "transmitted": "Request passed on",
+        "in_progress": "Under review",
+        "proposal_available": "Proposal available",
+        "closed": "Handling finished"
+      }
+    },
+    "timeline": {
+      "title": "History",
+      "partner": "Partner broker: {partner}",
+      "steps": {
+        "received": "Request received",
+        "in_review": "Checked by our team",
+        "transmitted": "Request passed on to a partner broker",
+        "accepted": "Taken up by the partner broker",
+        "reassigned": "Request handed to another partner broker",
+        "closed": "Handling finished",
+        "consent_withdrawn": "Consent withdrawn",
+        "not_transmitted": "Request not passed on"
+      }
+    },
+    "role": "AssurMatch is a technical matching platform. Only the partner broker can advise you and send you a proposal; AssurMatch plays no part in that choice.",
+    "expiry": "This tracking link is personal and stays valid until {date}. Do not share it.",
+    "expiryUnknown": "This tracking link is personal. Do not share it.",
+    "consentWithdrawnNotice": "You withdrew your consent on {date}. This request is cancelled and is no longer passed on.",
+    "consentWithdrawnNoDate": "You withdrew your consent. This request is cancelled and is no longer passed on.",
+    "proposals": {
+      "title": "Broker proposals",
+      "lead": "Indicative proposals from partner brokers appear here."
+    },
+    "access": {
+      "title": "This tracking link cannot display a request",
+      "body": "The link may be incomplete or no longer valid. You can receive a new link at the e-mail address used for your request.",
+      "cta": "Receive a new link",
+      "rateLimited": "Too many views in a short time. Try again in a few minutes.",
+      "unavailable": "Tracking is temporarily unavailable. Try again in a few minutes."
+    }
   },
   "VisitorAi": {
     "defaultLabel": "AI assistance to help understanding",
@@ -1116,5 +1190,55 @@
         "description": "The public service is temporarily unavailable. Try again in a few minutes."
       }
     }
+  },
+  "Tracking": {
+    "kicker": "Request tracking",
+    "title": "Receive my tracking link",
+    "description": "Receive the personal tracking link of your quote request again.",
+    "lead": "Enter your request reference and the e-mail address you used. If they match, a new link is sent to you by e-mail.",
+    "breadcrumb": "Request tracking",
+    "reference": "Request reference",
+    "referenceHint": "For example QR-2026-ABC123, shown in the confirmation e-mail.",
+    "email": "E-mail address",
+    "honeypot": "Leave this field empty",
+    "requiredMark": "required",
+    "invalidReference": "Enter a valid reference (letters, digits and hyphens).",
+    "invalidEmail": "Enter a valid e-mail address.",
+    "submit": "Send the link",
+    "sending": "Sending.",
+    "confirmationTitle": "Request taken into account",
+    "confirmationBody": "If this reference matches this e-mail address, a new tracking link has just been sent to it. Remember to check your spam folder.",
+    "again": "Make another request",
+    "rateLimited": "Too many requests in a short time. Try again in an hour.",
+    "error": "The service is temporarily unavailable. Try again in a few minutes.",
+    "privacy": "To protect your data, we never say whether a reference or an e-mail address exists."
+  },
+  "Feedback": {
+    "kicker": "Your feedback",
+    "title": "Your feedback on request {reference}",
+    "description": "Satisfaction survey about your quote request.",
+    "breadcrumb": "Your feedback",
+    "lead": "Your feedback is about your matching experience. It helps us improve the service and is never published.",
+    "ratingLegend": "Your overall satisfaction",
+    "rating": {
+      "1": "1 - Not satisfied at all",
+      "2": "2 - Slightly satisfied",
+      "3": "3 - Moderately satisfied",
+      "4": "4 - Satisfied",
+      "5": "5 - Very satisfied"
+    },
+    "ratingRequired": "Choose a rating from 1 to 5.",
+    "comment": "Comment (optional)",
+    "commentHint": "1000 characters maximum. Do not include health data or bank details.",
+    "flaggedConcern": "I want to report a problem with the partner broker",
+    "flaggedConcernHint": "Our compliance team will review your report.",
+    "submit": "Send my feedback",
+    "sending": "Sending.",
+    "successTitle": "Thank you for your feedback",
+    "successBody": "Your answer is recorded.",
+    "unavailableTitle": "This survey is no longer available",
+    "unavailableBody": "The link may be incomplete, expired or already used.",
+    "rateLimited": "Too many submissions in a short time. Try again later.",
+    "error": "The service is temporarily unavailable. Try again in a few minutes."
   }
 }

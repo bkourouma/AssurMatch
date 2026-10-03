@@ -59,6 +59,8 @@ export const routing = defineRouting({
       fr: "/demandes-de-devis/[publicReference]",
       en: "/quote-requests/[publicReference]"
     },
+    "/track": { fr: "/suivi", en: "/track" },
+    "/feedback/[publicReference]": { fr: "/avis/[publicReference]", en: "/feedback/[publicReference]" },
     "/how-it-works": { fr: "/comment-ca-marche", en: "/how-it-works" },
     "/regulatory-status": { fr: "/statut-reglementaire", en: "/regulatory-status" },
     "/legal-notice": { fr: "/mentions-legales", en: "/legal-notice" },

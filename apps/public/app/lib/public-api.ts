@@ -12,6 +12,7 @@ import type {
   PublicStats as ContractPublicStats,
   WaitlistSubscribeDto
 } from "../../../../packages/shared/contracts/public-site.contracts";
+import type { PublicQuoteStatusView, TrackingLinkRequest } from "../../../../packages/shared/contracts/public-quote-status";
 import type frMessages from "../../messages/fr.json";
 
 const PUBLIC_API_BASE_URL = process.env.NEXT_PUBLIC_ASSURMATCH_API_URL ?? "http://127.0.0.1:3000";
@@ -605,4 +606,107 @@ export function withdrawQuoteConsent(publicReference: string, token: string): Pr
     "Votre retrait de consentement est enregistre.",
     "Le retrait de consentement n'a pas pu etre enregistre avec ce lien."
   );
+}
+
+/* ---------- Spec 054: visitor tracking space, tracking-link resend, satisfaction survey ---------- */
+
+/**
+ * `GET /quote-requests/:publicReference?token=` (contract `visitor-tracking-api.md`). Every refusal
+ * (unknown reference, wrong, expired or revoked token, anonymised request) is the same neutral 404,
+ * so the page cannot, and must not, tell those cases apart.
+ */
+export type PublicQuoteStatusResult =
+  | { status: "success"; data: PublicQuoteStatusView }
+  | { status: "denied" }
+  | { status: "rate_limited" }
+  | { status: "error" };
+
+function isPublicQuoteStatusView(value: unknown): value is PublicQuoteStatusView {
+  if (!value || typeof value !== "object") return false;
+  const candidate = value as Partial<PublicQuoteStatusView>;
+  return typeof candidate.publicReference === "string"
+    && typeof candidate.status === "string"
+    && Array.isArray(candidate.brokers)
+    && Array.isArray(candidate.timeline)
+    && typeof candidate.consent === "object" && candidate.consent !== null;
+}
+
+export async function getPublicQuoteStatus(publicReference: string, token: string): Promise<PublicQuoteStatusResult> {
+  try {
+    const params = new URLSearchParams({ token });
+    const response = await fetch(`${PUBLIC_API_BASE_URL}/quote-requests/${encodeURIComponent(publicReference)}?${params.toString()}`, { cache: "no-store" });
+    if (response.status === 404 || response.status === 400 || response.status === 403 || response.status === 401) return { status: "denied" };
+    if (response.status === 429) return { status: "rate_limited" };
+    if (!response.ok) return { status: "error" };
+    const payload: unknown = await response.json();
+    return isPublicQuoteStatusView(payload) ? { status: "success", data: payload } : { status: "error" };
+  } catch {
+    return { status: "error" };
+  }
+}
+
+/** `POST /quote-requests/tracking-link`: always 202 when well formed, whether the pair matched or not. */
+export type TrackingLinkResult = "accepted" | "rate_limited" | "invalid" | "error";
+
+export async function requestTrackingLink(body: TrackingLinkRequest): Promise<TrackingLinkResult> {
+  try {
+    const response = await fetch(`${PUBLIC_API_BASE_URL}/quote-requests/tracking-link`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(body),
+      cache: "no-store"
+    });
+    if (response.status === 429) return "rate_limited";
+    if (response.status === 400) return "invalid";
+    return response.ok ? "accepted" : "error";
+  } catch {
+    return "error";
+  }
+}
+
+/**
+ * `GET /satisfaction-surveys/:publicReference?token=`: `available`, or a neutral `unavailable` for an
+ * unknown reference, a wrong or expired token and a survey already answered alike.
+ */
+export type SatisfactionSurveyResult = "available" | "unavailable" | "error";
+
+export async function getSatisfactionSurvey(publicReference: string, token: string): Promise<SatisfactionSurveyResult> {
+  try {
+    const params = new URLSearchParams({ token });
+    const response = await fetch(`${PUBLIC_API_BASE_URL}/satisfaction-surveys/${encodeURIComponent(publicReference)}?${params.toString()}`, { cache: "no-store" });
+    if (response.status >= 500) return "error";
+    if (!response.ok) return "unavailable";
+    const payload = await response.json() as { status?: string };
+    return payload.status === "available" ? "available" : "unavailable";
+  } catch {
+    return "error";
+  }
+}
+
+export interface SatisfactionSurveyAnswer {
+  rating: number;
+  comment?: string;
+  flaggedConcern: boolean;
+}
+
+export type SatisfactionSurveySubmitResult = "submitted" | "unavailable" | "rate_limited" | "error";
+
+export async function submitSatisfactionSurvey(publicReference: string, token: string, answer: SatisfactionSurveyAnswer): Promise<SatisfactionSurveySubmitResult> {
+  try {
+    const params = new URLSearchParams({ token });
+    const response = await fetch(`${PUBLIC_API_BASE_URL}/satisfaction-surveys/${encodeURIComponent(publicReference)}?${params.toString()}`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ token, ...answer }),
+      cache: "no-store"
+    });
+    if (response.status === 429) return "rate_limited";
+    // The survey service refuses an expired, used or wrong link with a plain error: whatever the
+    // status code, the visitor only ever reads the same neutral message.
+    if (!response.ok) return "unavailable";
+    const payload = await response.json() as { status?: string };
+    return payload.status === "submitted" ? "submitted" : "unavailable";
+  } catch {
+    return "error";
+  }
 }

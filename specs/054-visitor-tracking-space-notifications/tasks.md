@@ -22,10 +22,10 @@ description: "Task list for 054 — Espace de suivi visiteur et notifications"
 - [x] T009 [P] Tests unitaires et d'intégration (couvrant la ligne « Tests » ci-dessus) ; tests existants verts (adapter les attentes sur le lien sans jeton, le message de revue manuelle et le jeton d'enquête factice).
 
 ## Phase 3: Site public
-- [ ] T010 [US1] Espace de suivi dynamique (statut, courtiers, chronologie, documents, retrait, jeton expiré qui renvoie vers le renvoi de lien).
-- [ ] T011 [US2] Page `/suivi` et `/en/track` (formulaire de renvoi de lien, réponse neutre, pot de miel).
-- [ ] T012 [US5] Pages `/avis/[ref]` et `/en/feedback/[ref]`.
-- [ ] T013 En-têtes `Referrer-Policy: no-referrer` et `X-Robots-Tag` sur les pages de suivi, d'avis et de renvoi ; `robots.ts` ; chemins localisés dans `i18n/routing.ts` ; messages FR et EN avec parité des clés ; tests de marqueurs.
+- [x] T010 [US1] Espace de suivi dynamique (statut, courtiers, chronologie, documents, retrait, jeton expiré qui renvoie vers le renvoi de lien).
+- [x] T011 [US2] Page `/suivi` et `/en/track` (formulaire de renvoi de lien, réponse neutre, pot de miel).
+- [x] T012 [US5] Pages `/avis/[ref]` et `/en/feedback/[ref]`.
+- [x] T013 En-têtes `Referrer-Policy: no-referrer` et `X-Robots-Tag` sur les pages de suivi, d'avis et de renvoi ; `robots.ts` ; chemins localisés dans `i18n/routing.ts` ; messages FR et EN avec parité des clés ; tests de marqueurs.
 
 ## Phase 4: Validations
 - [ ] T014 Validations finales : `prisma generate` et `validate`, typecheck, lint, `npm run test`, `npm run test:web`, scan de secrets, build public.
