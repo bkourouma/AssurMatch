@@ -2,13 +2,13 @@
 
 **Feature Branch**: `claude/inspiring-maxwell-58e67d` (branche de session imposée)
 **Created**: 2026-10-03
-**Status**: Draft
+**Status**: Validated by user on 2026-10-03
 **Input**: PRD v0.3, EPIC C (C-01 à C-06), scénario SC-04 « Le courtier gère ses offres » et décision D-4 (routage vers le courtier de l'offre choisie s'il est éligible). Décisions du 2026-10-03 :
 - tous les plans peuvent gérer leurs offres ; seuls le propriétaire et le manager créent et modifient ;
 - modifier une offre publiée crée une nouvelle version à valider, et la version publiée reste en ligne jusqu'à cette validation.
 
-**Validation State**: Draft
-**Continuous Workflow Eligible**: Pas encore. La spec le deviendra une fois validée par l'utilisateur ; elle ne contient aucun marqueur `[NEEDS CLARIFICATION]`.
+**Validation State**: Validated by user
+**Continuous Workflow Eligible**: Yes. Validée par l'utilisateur le 2026-10-03, aucun marqueur `[NEEDS CLARIFICATION]`.
 
 ## Why this spec exists
 
