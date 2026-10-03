@@ -17,7 +17,7 @@ import { PublicQuoteRequestsController } from "./public-quote-requests.controlle
 import { PublicQuoteStatusController } from "./public-quote-status.controller";
 import { QuoteDuplicateDetectionService } from "./quote-duplicate-detection.service";
 import type { QuoteRequestsRepository } from "./quote-requests.repository";
-import { QuoteSubmissionService, type QuoteAssignmentHistoryEvent, type QuoteAssignmentsPort, type QuoteInAppNotifierPort, type SelectedOfferVerifier } from "./quote-submission.service";
+import { QuoteSubmissionService, type QuoteSubmissionDependencies, type QuoteAssignmentHistoryEvent, type QuoteAssignmentsPort, type QuoteInAppNotifierPort, type SelectedOfferVerifier } from "./quote-submission.service";
 import type { VisitorAccessOptions } from "./visitor-access.service";
 import type { VisitorAccessTokensRepository } from "./visitor-access-tokens.repository";
 
@@ -46,6 +46,8 @@ export interface QuoteRequestsModuleDeps {
   partnerName?: (partnerTenantId: string) => Promise<string | undefined>;
   /** Spec 054 R5: assignment history for the public timeline. */
   assignmentHistory?: (leadAssignmentId: string) => Promise<QuoteAssignmentHistoryEvent[]>;
+  /** Spec 055 FR-005: proposals shown in the tracking space. */
+  proposals?: QuoteSubmissionDependencies["proposals"];
 }
 
 export class QuoteRequestsModule {
@@ -83,6 +85,7 @@ export class QuoteRequestsModule {
       ...(deps.visitorAccessOptions ? { visitorAccessOptions: deps.visitorAccessOptions } : {}),
       ...(deps.partnerName ? { partnerName: deps.partnerName } : {}),
       ...(deps.assignmentHistory ? { assignmentHistory: deps.assignmentHistory } : {}),
+      ...(deps.proposals ? { proposals: deps.proposals } : {}),
       findCountryById: async (countryId: string) => {
         const country = await deps.countries.require(countryId).catch(() => undefined);
         return country ? { isoCode: country.isoCode, name: country.name } : undefined;

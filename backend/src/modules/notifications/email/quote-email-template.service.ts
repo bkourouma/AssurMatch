@@ -1,4 +1,4 @@
-import { findForbiddenWording } from "../../../../../packages/shared/contracts/content-safety";
+import { FORBIDDEN_ENGLISH_WORDING, findForbiddenWording } from "../../../../../packages/shared/contracts/content-safety";
 import type { AuthEmailPayload, EmailPurpose } from "./email-delivery.service";
 
 export type VisitorEmailLocale = "fr" | "en";
@@ -13,7 +13,9 @@ export type VisitorEmailStep =
   | "closed"
   | "not_transmitted"
   | "consent_withdrawn"
-  | "tracking_link";
+  | "tracking_link"
+  /** Spec 055: the named broker sent an indicative proposal. */
+  | "proposal_available";
 
 /** Spec 044 legacy context, kept for the rows queued before spec 054. */
 export interface VisitorQuoteEmailContext {
@@ -45,6 +47,15 @@ export interface VisitorStepEmailContext {
   /** Fresh visitor access token minted at render time (R2); never stored in clear. */
   token?: string | undefined;
   tokenExpiresAt?: Date | undefined;
+}
+
+/** Spec 055 FR-008: a pointer only; the visitor's answer itself stays in the back-office. */
+export interface BrokerVisitorResponseEmailContext {
+  to: string;
+  partnerLegalName: string;
+  publicReference: string;
+  countryCode: string;
+  productKey: string;
 }
 
 export interface BrokerLeadEmailContext {
@@ -87,14 +98,10 @@ const STEP_PURPOSE: Record<VisitorEmailStep, EmailPurpose> = {
   closed: "quote_visitor_closed",
   not_transmitted: "quote_visitor_non_routable",
   consent_withdrawn: "quote_visitor_consent_withdrawn",
-  tracking_link: "quote_visitor_tracking_link"
+  tracking_link: "quote_visitor_tracking_link",
+  proposal_available: "quote_visitor_proposal_available"
 };
 
-/**
- * The shared regulated list is French only; the English copy is checked against its equivalents so
- * a translated promise cannot slip through either.
- */
-const FORBIDDEN_ENGLISH_WORDING = ["buy now", "subscribe now", "valid contract", "cover accepted", "best insurance on the market", "guaranteed callback", "firm price"] as const;
 
 export class QuoteEmailTemplateNotSafeError extends Error {
   constructor(public readonly wording: string[]) {
@@ -201,6 +208,32 @@ export class QuoteEmailTemplateService {
     });
   }
 
+  /**
+   * Spec 055 FR-008: the visitor answered a proposal. Like `brokerLead`, the e-mail is a pointer to
+   * the back-office: the answer (callback slot, question) never leaves the access-controlled portal.
+   */
+  brokerVisitorResponse(context: BrokerVisitorResponseEmailContext): AuthEmailPayload {
+    const lines = [
+      `Bonjour ${context.partnerLegalName},`,
+      "",
+      `Le visiteur a repondu a votre proposition pour la demande ${context.publicReference} (${context.productKey}, ${context.countryCode}).`,
+      "",
+      `Consultez sa reponse dans votre back-office: ${this.brokerLink()}`,
+      "Elle n'est pas reprise dans cet email: sa consultation est tracee et limitee a votre cabinet.",
+      "Le statut du lead n'est pas modifie automatiquement: c'est a vous de le faire evoluer.",
+      "",
+      "Notification operationnelle. Aucun engagement contractuel ne resulte de ce message.",
+      PLATFORM_DISCLAIMER
+    ];
+    return this.assertSafe({
+      to: context.to,
+      subject: `Reponse du visiteur ${context.publicReference}`,
+      body: lines.join("\n"),
+      html: this.html(lines.filter((line) => line !== "").map((line) => `<p>${escapeHtml(line)}</p>`)),
+      purpose: "quote_broker_visitor_response"
+    });
+  }
+
   /** Spec 054 R10: FR `/demandes-de-devis/{ref}`, EN `/en/quote-requests/{ref}`, token in the query. */
   trackingLink(publicReference: string, locale: VisitorEmailLocale = "fr", token?: string): string {
     const base = (this.options.publicAppUrl ?? process.env.PUBLIC_APP_URL ?? "http://127.0.0.1:3601").replace(/\/$/, "");
@@ -289,6 +322,16 @@ export class QuoteEmailTemplateService {
           lines: [
             `Nous confirmons le retrait de votre consentement pour votre demande de devis ${scope}.`,
             "La demande est cloturee et chaque courtier partenaire concerne a ete informe qu'il ne doit plus la traiter.",
+            ""
+          ]
+        };
+      case "proposal_available":
+        return {
+          subject: `Une proposition est disponible pour votre demande ${context.publicReference}`,
+          lines: [
+            `${broker ?? "Le courtier partenaire"} vous a adresse une proposition pour votre demande de devis ${scope}.`,
+            "Consultez-la dans votre espace de suivi: vous pourrez demander a etre rappele, poser une question ou indiquer que vous ne donnez pas suite.",
+            "Proposition indicative non contractuelle, a confirmer par le courtier.",
             ""
           ]
         };
@@ -385,6 +428,16 @@ export class QuoteEmailTemplateService {
           lines: [
             `We confirm the withdrawal of your consent for your ${scope} quote request.`,
             "The request is closed and every partner broker concerned has been told to stop handling it.",
+            ""
+          ]
+        };
+      case "proposal_available":
+        return {
+          subject: `A proposal is available for your request ${context.publicReference}`,
+          lines: [
+            `${broker ?? "The partner broker"} has sent you a proposal for your ${scope} quote request.`,
+            "View it in your tracking space: you can ask to be called back, ask a question or say that you will not follow up.",
+            "Indicative, non-contractual proposal, to be confirmed by the broker.",
             ""
           ]
         };

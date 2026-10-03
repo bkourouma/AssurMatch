@@ -24,3 +24,4 @@ export * from "./scoring-rule.contracts";
 export * from "./user.contracts";
 export * from "./enterprise.contracts";
 export * from "./offer-content";
+export * from "./lead-proposals";

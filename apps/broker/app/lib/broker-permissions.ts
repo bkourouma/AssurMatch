@@ -71,3 +71,9 @@ export function canMutateOffers(profile: BackOfficeProfile): boolean {
   if (isReadOnlyBroker(profile) || isTenantReadOnly(profile)) return false;
   return hasPermission(profile, "broker_offers:write");
 }
+
+/** Spec 055 FR-010: assigner un lead a un conseiller exige broker_crm:assign (owner, manager). */
+export function canAssignCrmLead(profile: BackOfficeProfile): boolean {
+  if (isReadOnlyBroker(profile) || isTenantReadOnly(profile)) return false;
+  return hasPermission(profile, "broker_crm:assign");
+}

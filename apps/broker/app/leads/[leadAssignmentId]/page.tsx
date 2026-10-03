@@ -1,6 +1,8 @@
 import { redirect } from "next/navigation";
 import { loginRedirect, readBackOfficeSession } from "../../lib/backoffice-auth";
-import { isNotFoundState, readStarterLeadDetail, readStarterLeadHistory } from "../../lib/broker-api";
+import { isNotFoundState, readLeadProposals, readStarterLeadDetail, readStarterLeadHistory } from "../../lib/broker-api";
+import { PROPOSAL_NOTICES } from "../../lib/proposal-vocabulary";
+import { ProposalPanel } from "../../lib/ui/proposal-panel";
 import { acceptStarterLeadAction, disputeStarterLeadAction, rejectStarterLeadAction } from "../../lib/lead-actions";
 import { TENANT_SUSPENDED_MESSAGE, canMutateStarterLead, isTenantReadOnly } from "../../lib/broker-permissions";
 import {
@@ -64,10 +66,10 @@ export default async function BrokerLeadDetailPage({
   searchParams
 }: {
   params: Promise<{ leadAssignmentId: string }>;
-  searchParams: Promise<{ lead?: string }>;
+  searchParams: Promise<{ lead?: string; proposal?: string }>;
 }) {
   const { leadAssignmentId } = await params;
-  const { lead: notice } = await searchParams;
+  const { lead: notice, proposal: proposalNotice } = await searchParams;
   const session = await readBackOfficeSession();
   if (session.status === "unauthenticated" || session.status === "expired") redirect(loginRedirect(`/leads/${leadAssignmentId}`, session.status));
   if (session.status !== "authenticated") {
@@ -87,7 +89,7 @@ export default async function BrokerLeadDetailPage({
     );
   }
 
-  const [detail, history] = await Promise.all([readStarterLeadDetail(leadAssignmentId), readStarterLeadHistory(leadAssignmentId)]);
+  const [detail, history, proposals] = await Promise.all([readStarterLeadDetail(leadAssignmentId), readStarterLeadHistory(leadAssignmentId), readLeadProposals("starter", leadAssignmentId)]);
   if (detail.unauthenticated) redirect(loginRedirect(`/leads/${leadAssignmentId}`, detail.error ?? "session_required"));
 
   const lead = detail.status === "success" ? detail.data : undefined;
@@ -100,6 +102,8 @@ export default async function BrokerLeadDetailPage({
   const isFinal = Boolean(lead && (STARTER_FINAL_STATUSES as readonly string[]).includes(lead.status));
   const showActions = Boolean(lead) && canMutate && !isFinal;
   const noticeEntry = notice ? NOTICES[notice] : undefined;
+  const proposalNoticeEntry = proposalNotice ? PROPOSAL_NOTICES[proposalNotice] : undefined;
+  const contactMasked = lead?.contactVisibility === "masked";
 
   return (
     <PageStack>
@@ -153,6 +157,11 @@ export default async function BrokerLeadDetailPage({
           </Card>
 
           <Card title="Contact consenti">
+            {contactMasked ? (
+              <Notice tone="warning">Le visiteur a retire son consentement : ses coordonnees sont masquees et ne doivent plus etre utilisees.</Notice>
+            ) : (
+              <p>Coordonnees completes visibles par votre cabinet, courtier affecte. Chaque consultation est auditee.</p>
+            )}
             {contactEntries.length > 0 ? (
               <DescriptionList>
                 {contactEntries.map(([key, value]) => (
@@ -254,6 +263,19 @@ export default async function BrokerLeadDetailPage({
             </>
           )}
         </Card>
+      ) : null}
+
+      {lead ? (
+        <div id="repondre-au-visiteur">
+          <Card title="Répondre au visiteur" description="Proposition simple et non contractuelle (constitution 1.3.0) : message, prime indicative ou fourchette, garanties, validite et PDF facultatif. Aucune fonction CRM.">
+            {proposalNoticeEntry ? <Notice tone={proposalNoticeEntry.tone}>{proposalNoticeEntry.message}</Notice> : null}
+            {proposals.status === "success" ? (
+              <ProposalPanel channel="starter" leadAssignmentId={lead.leadAssignmentId} data={proposals.data} canMutate={canMutate} tenantReadOnly={tenantReadOnly} />
+            ) : (
+              <Notice tone="warning">Propositions temporairement indisponibles.</Notice>
+            )}
+          </Card>
+        </div>
       ) : null}
 
       {lead && answerEntries.length > 0 ? (

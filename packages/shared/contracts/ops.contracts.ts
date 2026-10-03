@@ -10,7 +10,9 @@ export const VISITOR_NOTIFICATION_TYPES = [
   "visitor_quote_reassigned",
   "visitor_quote_closed",
   "visitor_consent_withdrawn",
-  "visitor_tracking_link"
+  "visitor_tracking_link",
+  // Spec 055 FR-008: a broker sent a proposal.
+  "visitor_proposal_available"
 ] as const;
 
 export type VisitorNotificationType = (typeof VISITOR_NOTIFICATION_TYPES)[number];
@@ -29,6 +31,8 @@ export const notificationSchema = z.object({
     "visitor_quote_non_routable",
     "broker_lead_assigned",
     "broker_document_received",
+    // Spec 055 FR-008: the visitor answered a proposal (pointer e-mail, never the answer itself).
+    "broker_visitor_response",
     "quote_notification_failed",
     // Spec 054 R4: one notification type per public step of the visitor's request.
     ...VISITOR_NOTIFICATION_TYPES

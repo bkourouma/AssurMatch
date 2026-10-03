@@ -42,7 +42,11 @@ export const STARTER_EVENT_LABELS: Record<string, string> = {
   disputed: "Lead conteste avec motif",
   notification_read: "Notification lue",
   exported: "Lead exporte",
-  blocked: "Action bloquee"
+  blocked: "Action bloquee",
+  // Spec 055: boucle de reponse au visiteur.
+  proposal_sent: "Proposition envoyee au visiteur",
+  proposal_withdrawn: "Proposition retiree",
+  visitor_responded: "Reponse du visiteur recue"
 };
 
 /** Statuts terminaux Starter: plus aucune action courtier n'est possible. */
@@ -126,7 +130,9 @@ export const CRM_EVENT_LABELS: Record<string, string> = {
   document_added: "Document interne ajoute",
   proposal_added: "Reference de devis ajoutee",
   disputed: "Contestation ouverte",
-  exported: "Export realise"
+  exported: "Export realise",
+  proposal_sent: "Proposition envoyee au visiteur",
+  proposal_withdrawn: "Proposition retiree"
 };
 
 export function isStarterActionReason(value: string): value is StarterActionReason {

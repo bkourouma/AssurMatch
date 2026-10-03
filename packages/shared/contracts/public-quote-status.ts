@@ -1,11 +1,13 @@
 import { z } from "zod";
+import { publicLeadProposalSchema } from "./lead-proposals";
 
 /**
  * Spec 054 R5: the status a visitor sees for their own request. It is a pure projection of the
  * request, its assignments and the broker CRM state: no internal status (CRM pipeline, rejection
  * reason, dispute, notes) ever leaves this module as is.
  *
- * `proposal_available` is reserved for spec 055, which also adds a `proposals` field to the view.
+ * Spec 055: `proposal_available` is the status of an assignment whose broker has an active proposal
+ * (sent, not withdrawn, not expired), and the view carries the visible proposals in `proposals`.
  */
 export const PUBLIC_QUOTE_STATUSES = ["received", "in_review", "transmitted", "in_progress", "proposal_available", "closed", "not_transmitted"] as const;
 export const PUBLIC_BROKER_STATUSES = ["transmitted", "in_progress", "proposal_available", "closed"] as const;
@@ -41,7 +43,12 @@ export const publicQuoteStatusViewSchema = z.object({
   brokers: z.array(publicQuoteBrokerSchema),
   timeline: z.array(publicQuoteTimelineEntrySchema),
   consent: z.object({ withdrawn: z.boolean(), withdrawnAt: z.string().optional() }),
-  tokenExpiresAt: z.string().nullable()
+  tokenExpiresAt: z.string().nullable(),
+  /**
+   * Spec 055 FR-005: proposals of the request, sent and not withdrawn, newest first; empty after a
+   * consent withdrawal. Optional on input so a pre-055 payload still parses.
+   */
+  proposals: z.array(publicLeadProposalSchema).default([])
 });
 
 export type PublicQuoteBroker = z.output<typeof publicQuoteBrokerSchema>;
@@ -90,6 +97,8 @@ export interface ProjectionAssignment {
   crmUpdatedAt?: Date | string | undefined;
   lastBrokerActionAt?: Date | string | undefined;
   updatedAt: Date | string;
+  /** Spec 055: sending time of the latest active proposal of the current broker, if any. */
+  activeProposalAt?: Date | string | undefined;
 }
 
 /** Assignment history reduced to what the visitor may see; `partnerName` is the partner of that moment. */
@@ -121,10 +130,14 @@ function iso(value: Date | string | undefined): string | undefined {
   return Number.isNaN(date.getTime()) ? undefined : date.toISOString();
 }
 
-/** Public status of one assignment (R5 table). A CRM status that is not listed keeps the assignment status. */
-export function projectBrokerStatus(assignment: Pick<ProjectionAssignment, "status" | "crmStatus">): PublicBrokerStatus {
+/**
+ * Public status of one assignment (R5 table). A CRM status that is not listed keeps the assignment
+ * status. Spec 055: an open assignment with an active proposal is `proposal_available`.
+ */
+export function projectBrokerStatus(assignment: Pick<ProjectionAssignment, "status" | "crmStatus" | "activeProposalAt">): PublicBrokerStatus {
   if (CLOSED_ASSIGNMENT.has(assignment.status)) return "closed";
   if (assignment.crmStatus && CLOSED_CRM.has(assignment.crmStatus)) return "closed";
+  if (assignment.activeProposalAt) return "proposal_available";
   if (assignment.crmStatus && IN_PROGRESS_CRM.has(assignment.crmStatus)) return "in_progress";
   if (IN_PROGRESS_ASSIGNMENT.has(assignment.status)) return "in_progress";
   return "transmitted";
@@ -135,7 +148,7 @@ function brokerSince(assignment: ProjectionAssignment, status: PublicBrokerStatu
     ? assignment.assignedAt
     : status === "in_progress"
       ? assignment.acceptedAt ?? assignment.crmUpdatedAt ?? assignment.updatedAt
-      : assignment.lastBrokerActionAt ?? assignment.crmUpdatedAt ?? assignment.updatedAt;
+      : assignment.activeProposalAt ?? assignment.lastBrokerActionAt ?? assignment.crmUpdatedAt ?? assignment.updatedAt;
   return iso(at) ?? iso(assignment.updatedAt) ?? new Date(0).toISOString();
 }
 
@@ -205,8 +218,8 @@ function buildTimeline(quote: ProjectionQuote, assignments: ProjectionAssignment
       }
     }
     const brokerStatus = projectBrokerStatus(assignment);
-    if (!accepted && (brokerStatus === "in_progress" || (brokerStatus === "closed" && (assignment.acceptedAt || (assignment.crmStatus && IN_PROGRESS_CRM.has(assignment.crmStatus)))))) {
-      push("accepted", assignment.acceptedAt ?? assignment.crmUpdatedAt, assignment.partnerName);
+    if (!accepted && (brokerStatus === "in_progress" || brokerStatus === "proposal_available" || (brokerStatus === "closed" && (assignment.acceptedAt || (assignment.crmStatus && IN_PROGRESS_CRM.has(assignment.crmStatus)))))) {
+      push("accepted", assignment.acceptedAt ?? assignment.crmUpdatedAt ?? assignment.activeProposalAt, assignment.partnerName);
     }
     if (brokerStatus === "closed" && !withdrawn) {
       push("closed", assignment.lastBrokerActionAt ?? assignment.crmUpdatedAt ?? assignment.updatedAt, assignment.partnerName);

@@ -29,7 +29,8 @@ describe("prisma migration fresh-base readiness", () => {
       "0020_catalog_admin_consent_content",
       "0021_partner_onboarding_lifecycle",
       "0022_offer_versions_selected_offer_routing",
-      "0023_visitor_access_tokens_notifications"
+      "0023_visitor_access_tokens_notifications",
+      "0028_broker_response_loop"
     ]);
     const schema = readFileSync(join(process.cwd(), "backend", "prisma", "schema.prisma"), "utf8");
     for (const model of ["AuditLog", "FeatureFlag", "ConsentRecord", "QuoteRequest", "LeadAssignment", "BrokerCrmLeadState", "PartnerApiKey", "PartnerWebhookEndpoint", "PartnerWebhookDelivery", "PartnerWebhookAllowlistEntry", "RoutingRule", "RoutingRuleHistory"]) {
@@ -200,5 +201,17 @@ describe("prisma migration fresh-base readiness", () => {
     expect(schema).toContain("model VisitorAccessToken");
     // No clear token column: only the hash is stored.
     expect(schema).not.toMatch(/model VisitorAccessToken \{[^}]*\btoken\s+String/);
+    // Spec 055: proposals, visitor responses, scanned internal documents and two notification types.
+    const responseLoop = readFileSync(join(migrationsDir, "0028_broker_response_loop", "migration.sql"), "utf8");
+    expect(responseLoop).toContain('CREATE TABLE IF NOT EXISTS "LeadProposal"');
+    expect(responseLoop).toContain('CREATE TABLE IF NOT EXISTS "VisitorProposalResponse"');
+    expect(responseLoop).toContain('ALTER TABLE "BrokerCrmDocument" ADD COLUMN IF NOT EXISTS "scanStatus" TEXT');
+    for (const value of ["visitor_proposal_available", "broker_visitor_response"]) {
+      expect(responseLoop).toContain(`ALTER TYPE "NotificationType" ADD VALUE IF NOT EXISTS '${value}'`);
+      expect(schema).toContain(`  ${value}\n`);
+    }
+    expect(responseLoop).not.toMatch(/DROP|DELETE|UPDATE /);
+    expect(schema).toContain("model LeadProposal");
+    expect(schema).toContain("model VisitorProposalResponse");
   });
 });

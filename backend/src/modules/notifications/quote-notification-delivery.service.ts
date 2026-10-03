@@ -5,7 +5,7 @@ import { QuoteEmailTemplateNotSafeError, QuoteEmailTemplateService, type Visitor
 import type { NotificationRecord, NotificationsService } from "./notifications.module";
 import type { VisitorEmailNotificationType } from "./quote-notification.service";
 
-export type DeliverableQuoteNotificationType = VisitorEmailNotificationType | "broker_lead_assigned";
+export type DeliverableQuoteNotificationType = VisitorEmailNotificationType | "broker_lead_assigned" | "broker_visitor_response";
 
 /**
  * Spec 054 R4: the step each visitor type announces. The two spec 044 types stay renderable for the
@@ -22,10 +22,11 @@ const VISITOR_STEP: Record<VisitorEmailNotificationType, VisitorEmailStep> = {
   visitor_quote_reassigned: "reassigned",
   visitor_quote_closed: "closed",
   visitor_consent_withdrawn: "consent_withdrawn",
-  visitor_tracking_link: "tracking_link"
+  visitor_tracking_link: "tracking_link",
+  visitor_proposal_available: "proposal_available"
 };
 
-const DELIVERABLE_TYPES = new Set<string>([...Object.keys(VISITOR_STEP), "broker_lead_assigned"]);
+const DELIVERABLE_TYPES = new Set<string>([...Object.keys(VISITOR_STEP), "broker_lead_assigned", "broker_visitor_response"]);
 
 /** A row is due while it has never been delivered and has not exhausted its retries. */
 const DUE_STATUSES = new Set(["pending", "queued", "retryable"]);
@@ -165,7 +166,7 @@ export class QuoteNotificationDeliveryService {
   }
 
   private async render(notification: NotificationRecord): Promise<AuthEmailPayload> {
-    if (notification.type === "broker_lead_assigned") return this.renderBroker(notification);
+    if (notification.type === "broker_lead_assigned" || notification.type === "broker_visitor_response") return this.renderBroker(notification);
     return this.renderVisitor(notification);
   }
 
@@ -209,6 +210,15 @@ export class QuoteNotificationDeliveryService {
     ]);
     if (!partner?.primaryEmail || !quote) throw new Error("recipient_unresolved");
     assertQuoteScope(quote);
+    if (notification.type === "broker_visitor_response") {
+      return this.deps.templates.brokerVisitorResponse({
+        to: partner.primaryEmail,
+        partnerLegalName: partner.legalName,
+        publicReference: quote.publicReference,
+        countryCode: quote.countryCode,
+        productKey: quote.productKey
+      });
+    }
     return this.deps.templates.brokerLead({
       to: partner.primaryEmail,
       partnerLegalName: partner.legalName,

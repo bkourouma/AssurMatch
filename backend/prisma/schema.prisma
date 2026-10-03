@@ -199,6 +199,8 @@ enum NotificationType {
   visitor_quote_closed
   visitor_consent_withdrawn
   visitor_tracking_link
+  visitor_proposal_available
+  broker_visitor_response
 }
 
 enum DeliveryStatus {
@@ -1316,10 +1318,79 @@ model BrokerCrmDocument {
   storageKey       String
   visibility       String   @default("internal")
   uploadedById     String?
+  /// Spec 055 FR-010: uploaded internal file, scanned by the antivirus; never served to the visitor.
+  fileName         String?
+  mimeType         String?
+  sizeBytes        Int?
+  checksum         String?
+  scanStatus       String?
+  scanEngine       String?
+  scannedAt        DateTime?
   createdAt        DateTime @default(now())
 
   @@index([leadAssignmentId, createdAt])
   @@index([partnerTenantId, visibility])
+}
+
+/// Spec 055: the broker's indicative, non-contractual proposal to the visitor. Immutable once sent:
+/// only the lifecycle columns (viewedAt, respondedAt, withdrawnAt, status) change afterwards.
+/// `partnerTenantId` is the broker that sent it; after a reassignment it differs from the
+/// assignment's partner and the proposal is closed for responses.
+model LeadProposal {
+  id                 String    @id @default(uuid())
+  leadAssignmentId   String
+  quoteRequestId     String
+  partnerTenantId    String
+  authorId           String?
+  channel            String    @default("crm")
+  status             String    @default("sent")
+  message            String
+  priceMin           Decimal?  @db.Decimal(16, 2)
+  priceMax           Decimal?  @db.Decimal(16, 2)
+  currency           String    @default("XOF")
+  guarantees         String[]
+  validUntil         DateTime
+  nonContractual     Boolean   @default(true)
+  documentStorageKey String?
+  documentFileName   String?
+  documentMimeType   String?
+  documentSizeBytes  Int?
+  documentChecksum   String?
+  documentScanStatus String?
+  documentScanEngine String?
+  documentScannedAt  DateTime?
+  sentAt             DateTime  @default(now())
+  viewedAt           DateTime?
+  respondedAt        DateTime?
+  withdrawnAt        DateTime?
+  withdrawnById      String?
+  withdrawReason     String?
+  anonymizedAt       DateTime?
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+
+  @@index([leadAssignmentId, sentAt])
+  @@index([quoteRequestId, sentAt])
+  @@index([partnerTenantId, sentAt])
+}
+
+/// Spec 055 US3: the visitor's follow-up to a proposal (callback request, decline or question).
+/// Append-only: the latest row prevails, every row is kept.
+model VisitorProposalResponse {
+  id               String   @id @default(uuid())
+  proposalId       String
+  leadAssignmentId String
+  quoteRequestId   String
+  partnerTenantId  String
+  type             String
+  callbackSlot     String?
+  declineReason    String?
+  question         String?
+  createdAt        DateTime @default(now())
+
+  @@index([proposalId, createdAt])
+  @@index([leadAssignmentId, createdAt])
+  @@index([partnerTenantId, createdAt])
 }
 
 model BrokerCrmProposal {

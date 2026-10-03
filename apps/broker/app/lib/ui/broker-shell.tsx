@@ -63,7 +63,9 @@ function brokerNavigation(plan?: BrokerPlan | undefined): NavGroup[] {
       title: CRM_GROUP.label,
       items: [
         { label: "Pipeline", href: "/crm", icon: "crm", match: ["/crm"], ...crmRestriction },
-        { label: "Vue tableau", href: "/crm/leads", icon: "checklist", match: ["/crm/leads"], ...crmRestriction }
+        { label: "Vue tableau", href: "/crm/leads", icon: "checklist", match: ["/crm/leads"], ...crmRestriction },
+        // Spec 055 FR-010: the Kanban route existed without a screen.
+        { label: "Vue Kanban", href: "/crm/kanban", icon: "crm", match: ["/crm/kanban"], ...crmRestriction }
       ]
     },
     {

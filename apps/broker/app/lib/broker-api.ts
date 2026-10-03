@@ -233,6 +233,8 @@ export interface BrokerCrmLeadDetailData {
   proposals: Array<Record<string, unknown>>;
   /** Champs egalement exposes par brokerCrmLeadDetailSchema, optionnels cote UI. */
   contact?: Record<string, unknown>;
+  /** Spec 055 FR-001: coordonnees completes pour le courtier affecte, masquees apres retrait. */
+  contactVisibility?: "full" | "masked";
   reminders?: Array<Record<string, unknown>>;
   disputes?: Array<Record<string, unknown>>;
   advisorId?: string;
@@ -454,6 +456,8 @@ export interface BrokerStarterLeadDetailData {
   seen: boolean;
   seenAt?: string;
   contact: Record<string, unknown>;
+  /** Spec 055 FR-001: `masked` apres un retrait du consentement. */
+  contactVisibility?: "full" | "masked";
   answers: Record<string, unknown>;
   history: BrokerStarterLeadHistoryEventData[];
 }
@@ -484,4 +488,57 @@ export function readStarterLeadHistory(leadAssignmentId: string) {
 /** Distingue un lead inexistant d'une indisponibilite d'API, sans exposer d'information sensible. */
 export function isNotFoundState(state: BrokerApiState<unknown>): boolean {
   return state.status === "error" && state.error === "api_404";
+}
+
+/** Spec 055: proposition envoyee au visiteur et reponses du visiteur (vue courtier). */
+export const BROKER_PROPOSALS_SOURCE_MARKER = "broker-proposals:055";
+
+export interface BrokerProposalResponseData {
+  id: string;
+  type: "interested" | "declined" | "question";
+  callbackSlot?: string;
+  declineReason?: string;
+  question?: string;
+  createdAt: string;
+}
+
+export interface BrokerProposalData {
+  id: string;
+  leadAssignmentId: string;
+  status: "sent" | "viewed" | "responded" | "withdrawn" | "expired";
+  message: string;
+  priceMin?: number;
+  priceMax?: number;
+  currency: string;
+  guarantees: string[];
+  validUntil: string;
+  document?: { fileName: string; mimeType: string; sizeBytes: number };
+  sentAt: string;
+  viewedAt?: string;
+  respondedAt?: string;
+  withdrawnAt?: string;
+  withdrawReason?: string;
+  nonContractualNotice: string;
+  responses: BrokerProposalResponseData[];
+}
+
+export interface BrokerProposalListData {
+  items: BrokerProposalData[];
+  activeCount: number;
+  maxActive: number;
+  canSend: boolean;
+  blockers: string[];
+  suggestedNextStatus?: string;
+}
+
+const emptyProposalList: BrokerProposalListData = { items: [], activeCount: 0, maxActive: 10, canSend: false, blockers: [] };
+
+/** GET /broker/{starter|crm}/leads/:leadId/proposals - le courtier ne voit que ses propres propositions. */
+export function readLeadProposals(channel: "starter" | "crm", leadAssignmentId: string) {
+  return readBroker<BrokerProposalListData>(`/broker/${channel}/leads/${encodeURIComponent(leadAssignmentId)}/proposals`, emptyProposalList);
+}
+
+/** Spec 055 FR-010: vue Kanban CRM (colonnes = statuts pipeline). */
+export function readCrmKanban() {
+  return readBroker<Record<string, Array<Record<string, unknown>>>>("/broker/crm/leads/kanban", {});
 }

@@ -5,6 +5,9 @@ import { FileInterceptor } from "@nestjs/platform-express";
 import { z } from "zod";
 import { QUOTE_DOCUMENT_MAX_BYTES } from "../../../../packages/shared/contracts/quote-document.contracts";
 import type { UploadedDocumentFile } from "../quote-documents/quote-documents.service";
+import { LEAD_DOCUMENT_MAX_BYTES, LEAD_PROPOSAL_DOCUMENT_MAX_BYTES, leadDocumentUploadSchema, leadProposalCreateSchema, leadProposalWithdrawSchema, visitorProposalResponseCreateSchema } from "../../../../packages/shared/contracts/lead-proposals";
+import type { UploadedLeadFile } from "../lead-proposals/scanned-upload";
+import type { ProposalFile } from "../lead-proposals/lead-proposals.service";
 import { activateRequestSchema, loginRequestSchema, mfaVerifyRequestSchema, passwordChangeRequestSchema, passwordResetRequestSchema, type ActivateRequest, type LoginRequest, type PasswordChangeRequest, type PasswordResetRequest } from "../../../../packages/shared/contracts/auth.contracts";
 import { activationChecklistQuerySchema } from "../../../../packages/shared/contracts/activation-checklist.contracts";
 import { adminConsentTextCreateSchema, adminConsentTextListQuerySchema } from "../../../../packages/shared/contracts/compliance.contracts";
@@ -76,7 +79,6 @@ import {
   brokerCrmExportQuerySchema,
   brokerCrmLeadListQuerySchema,
   brokerCrmNoteCreateSchema,
-  brokerCrmProposalCreateSchema,
   brokerCrmReminderCreateSchema,
   brokerCrmStatusUpdateSchema,
   brokerCrmTaskCreateSchema,
@@ -163,6 +165,29 @@ function parseParam(name: string, value: string, schema: z.ZodType<string> = non
  */
 function visitorToken(token: string | undefined): string {
   return typeof token === "string" ? token.slice(0, 256) : "";
+}
+
+/**
+ * Spec 055: a proposal is sent as JSON, or as multipart with the JSON in a `payload` field and an
+ * optional PDF in `file`. An unreadable payload is a 400 like any other invalid input.
+ */
+function proposalPayload(body: unknown): unknown {
+  const record = body && typeof body === "object" ? body as Record<string, unknown> : {};
+  if (typeof record.payload !== "string") return body ?? {};
+  try {
+    return JSON.parse(record.payload) as unknown;
+  } catch {
+    throw new Error("Invalid proposal payload: validation_failed");
+  }
+}
+
+/** Spec 055: proposal PDFs and internal documents leave as attachments, never cached or sniffed. */
+function attachment(file: ProposalFile): StreamableFile {
+  return new StreamableFile(file.bytes, {
+    type: file.mimeType,
+    length: file.bytes.length,
+    disposition: `attachment; filename="${file.fileName.replace(/["\r\n]/g, "")}"`
+  });
 }
 
 /**
@@ -735,6 +760,29 @@ export class PublicQuoteRequestsController {
       { ipAddress: clientIp(request), actor: actorFromRequest(request) }
     );
   }
+
+  /**
+   * Spec 055 FR-005: the PDF of a proposal, with the visitor token. Clean files only, audited,
+   * `no-store`; every refusal is the neutral 404 of the visitor routes.
+   */
+  async proposalDocument(publicReference: string, proposalId: string, token: string | undefined, request: AssurMatchHttpRequest) {
+    const file = await this.runtime.leadProposals.service.visitorDocument(parseParam("publicReference", publicReference), visitorToken(token), parseParam("proposalId", proposalId, uuidSchema), {
+      ipAddress: clientIp(request),
+      actor: actorFromRequest(request)
+    });
+    return attachment(file);
+  }
+
+  /** Spec 055 FR-006: interested (callback), declined or a short question; rate limited. */
+  respondToProposal(publicReference: string, proposalId: string, token: string | undefined, input: unknown, request: AssurMatchHttpRequest) {
+    return this.runtime.leadProposals.service.visitorRespond(
+      parseParam("publicReference", publicReference),
+      visitorToken(token),
+      parseParam("proposalId", proposalId, uuidSchema),
+      parseHttpInput(visitorProposalResponseCreateSchema, input ?? {}),
+      { ipAddress: clientIp(request), actor: actorFromRequest(request) }
+    );
+  }
 }
 
 /**
@@ -941,6 +989,25 @@ export class BrokerStarterController {
   capabilities(request: AssurMatchHttpRequest) {
     return this.runtime.leads.brokerStarterController.planCapabilities(protectedActorFromRequest(request));
   }
+
+  /** Spec 055 FR-009: "Répondre au visiteur" (same proposal service, no CRM feature). */
+  proposals(leadId: string, request: AssurMatchHttpRequest) {
+    return this.runtime.leadProposals.service.listForBroker("starter", parseParam("leadId", leadId, uuidSchema), protectedActorFromRequest(request));
+  }
+
+  sendProposal(leadId: string, file: UploadedLeadFile | undefined, input: unknown, request: AssurMatchHttpRequest) {
+    const actor = brokerWriteActor(request);
+    return this.runtime.leadProposals.service.send("starter", parseParam("leadId", leadId, uuidSchema), parseHttpInput(leadProposalCreateSchema, proposalPayload(input)), file, actor);
+  }
+
+  withdrawProposal(leadId: string, proposalId: string, input: unknown, request: AssurMatchHttpRequest) {
+    const actor = brokerWriteActor(request);
+    return this.runtime.leadProposals.service.withdraw("starter", parseParam("leadId", leadId, uuidSchema), parseParam("proposalId", proposalId, uuidSchema), parseHttpInput(leadProposalWithdrawSchema, input ?? {}), actor);
+  }
+
+  async proposalDocument(leadId: string, proposalId: string, request: AssurMatchHttpRequest) {
+    return attachment(await this.runtime.leadProposals.service.brokerDocument("starter", parseParam("leadId", leadId, uuidSchema), parseParam("proposalId", proposalId, uuidSchema), protectedActorFromRequest(request)));
+  }
 }
 
 export class BrokerCrmController {
@@ -991,14 +1058,38 @@ export class BrokerCrmController {
     return this.runtime.leads.brokerCrmController.assignAdvisor(parseParam("leadId", leadId, uuidSchema), parseHttpInput(brokerCrmAssignRequestSchema, input), actor);
   }
 
-  document(leadId: string, input: unknown, request: AssurMatchHttpRequest) {
+  /**
+   * Spec 055 FR-010: multipart (`file` + `label`) stores a real, scanned internal file; a JSON body
+   * keeps the legacy metadata-only reference.
+   */
+  document(leadId: string, file: UploadedLeadFile | undefined, input: unknown, request: AssurMatchHttpRequest) {
     const actor = brokerWriteActor(request);
-    return this.runtime.leads.brokerCrmController.addDocument(parseParam("leadId", leadId, uuidSchema), parseHttpInput(brokerCrmDocumentCreateSchema, input), actor);
+    const id = parseParam("leadId", leadId, uuidSchema);
+    if (file) return this.runtime.leadProposals.documents.upload(id, file, parseHttpInput(leadDocumentUploadSchema, input ?? {}), actor);
+    return this.runtime.leads.brokerCrmController.addDocument(id, parseHttpInput(brokerCrmDocumentCreateSchema, input), actor);
   }
 
-  proposal(leadId: string, input: unknown, request: AssurMatchHttpRequest) {
+  async documentFile(leadId: string, documentId: string, request: AssurMatchHttpRequest) {
+    return attachment(await this.runtime.leadProposals.documents.download(parseParam("leadId", leadId, uuidSchema), parseParam("documentId", documentId, uuidSchema), protectedActorFromRequest(request)));
+  }
+
+  /** Spec 055 FR-002: the proposal sent to the visitor (JSON, or multipart with an optional PDF). */
+  proposal(leadId: string, file: UploadedLeadFile | undefined, input: unknown, request: AssurMatchHttpRequest) {
     const actor = brokerWriteActor(request);
-    return this.runtime.leads.brokerCrmController.addProposal(parseParam("leadId", leadId, uuidSchema), parseHttpInput(brokerCrmProposalCreateSchema, input), actor);
+    return this.runtime.leadProposals.service.send("crm", parseParam("leadId", leadId, uuidSchema), parseHttpInput(leadProposalCreateSchema, proposalPayload(input)), file, actor);
+  }
+
+  proposals(leadId: string, request: AssurMatchHttpRequest) {
+    return this.runtime.leadProposals.service.listForBroker("crm", parseParam("leadId", leadId, uuidSchema), protectedActorFromRequest(request));
+  }
+
+  withdrawProposal(leadId: string, proposalId: string, input: unknown, request: AssurMatchHttpRequest) {
+    const actor = brokerWriteActor(request);
+    return this.runtime.leadProposals.service.withdraw("crm", parseParam("leadId", leadId, uuidSchema), parseParam("proposalId", proposalId, uuidSchema), parseHttpInput(leadProposalWithdrawSchema, input ?? {}), actor);
+  }
+
+  async proposalDocument(leadId: string, proposalId: string, request: AssurMatchHttpRequest) {
+    return attachment(await this.runtime.leadProposals.service.brokerDocument("crm", parseParam("leadId", leadId, uuidSchema), parseParam("proposalId", proposalId, uuidSchema), protectedActorFromRequest(request)));
   }
 
   dispute(leadId: string, input: unknown, request: AssurMatchHttpRequest) {
@@ -1670,6 +1761,19 @@ decorate(PublicQuoteRequestsController, "submitQuote", [Post("quote-requests") a
 decorate(PublicQuoteRequestsController, "quoteStatus", [Get("quote-requests/:publicReference") as MethodDecoratorFactory, Header("Cache-Control", "no-store") as MethodDecoratorFactory], [[0, Param("publicReference") as ParamDecoratorFactory], [1, Query("token") as ParamDecoratorFactory], [2, Req() as ParamDecoratorFactory]]);
 decorate(PublicQuoteRequestsController, "requestTrackingLink", [Post("quote-requests/tracking-link") as MethodDecoratorFactory, HttpCode(202) as MethodDecoratorFactory], [[0, Body() as ParamDecoratorFactory], [1, Req() as ParamDecoratorFactory]]);
 decorate(PublicQuoteRequestsController, "withdrawConsent", [Post("quote-requests/:publicReference/consent-withdrawal") as MethodDecoratorFactory, HttpCode(200) as MethodDecoratorFactory], [[0, Param("publicReference") as ParamDecoratorFactory], [1, Query("token") as ParamDecoratorFactory], [2, Req() as ParamDecoratorFactory]]);
+// Spec 055: proposal PDF and visitor follow-up, both behind the visitor token.
+decorate(
+  PublicQuoteRequestsController,
+  "proposalDocument",
+  [Get("quote-requests/:publicReference/proposals/:proposalId/document") as MethodDecoratorFactory, Header("Cache-Control", "no-store") as MethodDecoratorFactory, Header("X-Content-Type-Options", "nosniff") as MethodDecoratorFactory, Header("Referrer-Policy", "no-referrer") as MethodDecoratorFactory],
+  [[0, Param("publicReference") as ParamDecoratorFactory], [1, Param("proposalId") as ParamDecoratorFactory], [2, Query("token") as ParamDecoratorFactory], [3, Req() as ParamDecoratorFactory]]
+);
+decorate(
+  PublicQuoteRequestsController,
+  "respondToProposal",
+  [Post("quote-requests/:publicReference/proposals/:proposalId/responses") as MethodDecoratorFactory, Header("Cache-Control", "no-store") as MethodDecoratorFactory],
+  [[0, Param("publicReference") as ParamDecoratorFactory], [1, Param("proposalId") as ParamDecoratorFactory], [2, Query("token") as ParamDecoratorFactory], [3, Body() as ParamDecoratorFactory], [4, Req() as ParamDecoratorFactory]]
+);
 
 controller("satisfaction-surveys", PublicSatisfactionSurveysController);
 decorate(PublicSatisfactionSurveysController, "status", [Get(":publicReference") as MethodDecoratorFactory], [[0, Param("publicReference") as ParamDecoratorFactory], [1, Query("token") as ParamDecoratorFactory]]);
@@ -1733,6 +1837,21 @@ decorate(BrokerStarterController, "dispute", [Post("leads/:leadId/dispute") as M
 decorate(BrokerStarterController, "notifications", [Get("notifications") as MethodDecoratorFactory], [[0, Req() as ParamDecoratorFactory]]);
 decorate(BrokerStarterController, "readNotification", [Post("notifications/:notificationId/read") as MethodDecoratorFactory], [[0, Param("notificationId") as ParamDecoratorFactory], [1, Req() as ParamDecoratorFactory]]);
 decorate(BrokerStarterController, "capabilities", [Get("plan-capabilities") as MethodDecoratorFactory], [[0, Req() as ParamDecoratorFactory]]);
+// Spec 055 FR-009: "Répondre au visiteur" for Starter.
+decorate(BrokerStarterController, "proposals", [Get("leads/:leadId/proposals") as MethodDecoratorFactory, Header("Cache-Control", "no-store") as MethodDecoratorFactory], [[0, Param("leadId") as ParamDecoratorFactory], [1, Req() as ParamDecoratorFactory]]);
+decorate(
+  BrokerStarterController,
+  "sendProposal",
+  [Post("leads/:leadId/proposals") as MethodDecoratorFactory, UseInterceptors(FileInterceptor("file", { limits: { fileSize: LEAD_PROPOSAL_DOCUMENT_MAX_BYTES, files: 1 } })) as MethodDecoratorFactory],
+  [[0, Param("leadId") as ParamDecoratorFactory], [1, UploadedFile() as ParamDecoratorFactory], [2, Body() as ParamDecoratorFactory], [3, Req() as ParamDecoratorFactory]]
+);
+decorate(BrokerStarterController, "withdrawProposal", [Post("leads/:leadId/proposals/:proposalId/withdraw") as MethodDecoratorFactory, HttpCode(200) as MethodDecoratorFactory], [[0, Param("leadId") as ParamDecoratorFactory], [1, Param("proposalId") as ParamDecoratorFactory], [2, Body() as ParamDecoratorFactory], [3, Req() as ParamDecoratorFactory]]);
+decorate(
+  BrokerStarterController,
+  "proposalDocument",
+  [Get("leads/:leadId/proposals/:proposalId/document") as MethodDecoratorFactory, Header("Cache-Control", "no-store") as MethodDecoratorFactory, Header("X-Content-Type-Options", "nosniff") as MethodDecoratorFactory],
+  [[0, Param("leadId") as ParamDecoratorFactory], [1, Param("proposalId") as ParamDecoratorFactory], [2, Req() as ParamDecoratorFactory]]
+);
 
 controller("broker/crm", BrokerCrmController, true);
 decorate(BrokerCrmController, "dashboard", [Get("dashboard") as MethodDecoratorFactory], [[0, Req() as ParamDecoratorFactory], [1, Query() as ParamDecoratorFactory]]);
@@ -1745,8 +1864,32 @@ decorate(BrokerCrmController, "note", [Post("leads/:leadId/notes") as MethodDeco
 decorate(BrokerCrmController, "task", [Post("leads/:leadId/tasks") as MethodDecoratorFactory], [[0, Param("leadId") as ParamDecoratorFactory], [1, Body() as ParamDecoratorFactory], [2, Req() as ParamDecoratorFactory]]);
 decorate(BrokerCrmController, "reminder", [Post("leads/:leadId/reminders") as MethodDecoratorFactory], [[0, Param("leadId") as ParamDecoratorFactory], [1, Body() as ParamDecoratorFactory], [2, Req() as ParamDecoratorFactory]]);
 decorate(BrokerCrmController, "assign", [Post("leads/:leadId/assign") as MethodDecoratorFactory], [[0, Param("leadId") as ParamDecoratorFactory], [1, Body() as ParamDecoratorFactory], [2, Req() as ParamDecoratorFactory]]);
-decorate(BrokerCrmController, "document", [Post("leads/:leadId/documents") as MethodDecoratorFactory], [[0, Param("leadId") as ParamDecoratorFactory], [1, Body() as ParamDecoratorFactory], [2, Req() as ParamDecoratorFactory]]);
-decorate(BrokerCrmController, "proposal", [Post("leads/:leadId/proposals") as MethodDecoratorFactory], [[0, Param("leadId") as ParamDecoratorFactory], [1, Body() as ParamDecoratorFactory], [2, Req() as ParamDecoratorFactory]]);
+decorate(
+  BrokerCrmController,
+  "document",
+  [Post("leads/:leadId/documents") as MethodDecoratorFactory, UseInterceptors(FileInterceptor("file", { limits: { fileSize: LEAD_DOCUMENT_MAX_BYTES, files: 1 } })) as MethodDecoratorFactory],
+  [[0, Param("leadId") as ParamDecoratorFactory], [1, UploadedFile() as ParamDecoratorFactory], [2, Body() as ParamDecoratorFactory], [3, Req() as ParamDecoratorFactory]]
+);
+decorate(
+  BrokerCrmController,
+  "documentFile",
+  [Get("leads/:leadId/documents/:documentId/file") as MethodDecoratorFactory, Header("Cache-Control", "no-store") as MethodDecoratorFactory, Header("X-Content-Type-Options", "nosniff") as MethodDecoratorFactory],
+  [[0, Param("leadId") as ParamDecoratorFactory], [1, Param("documentId") as ParamDecoratorFactory], [2, Req() as ParamDecoratorFactory]]
+);
+decorate(
+  BrokerCrmController,
+  "proposal",
+  [Post("leads/:leadId/proposals") as MethodDecoratorFactory, UseInterceptors(FileInterceptor("file", { limits: { fileSize: LEAD_PROPOSAL_DOCUMENT_MAX_BYTES, files: 1 } })) as MethodDecoratorFactory],
+  [[0, Param("leadId") as ParamDecoratorFactory], [1, UploadedFile() as ParamDecoratorFactory], [2, Body() as ParamDecoratorFactory], [3, Req() as ParamDecoratorFactory]]
+);
+decorate(BrokerCrmController, "proposals", [Get("leads/:leadId/proposals") as MethodDecoratorFactory, Header("Cache-Control", "no-store") as MethodDecoratorFactory], [[0, Param("leadId") as ParamDecoratorFactory], [1, Req() as ParamDecoratorFactory]]);
+decorate(BrokerCrmController, "withdrawProposal", [Post("leads/:leadId/proposals/:proposalId/withdraw") as MethodDecoratorFactory, HttpCode(200) as MethodDecoratorFactory], [[0, Param("leadId") as ParamDecoratorFactory], [1, Param("proposalId") as ParamDecoratorFactory], [2, Body() as ParamDecoratorFactory], [3, Req() as ParamDecoratorFactory]]);
+decorate(
+  BrokerCrmController,
+  "proposalDocument",
+  [Get("leads/:leadId/proposals/:proposalId/document") as MethodDecoratorFactory, Header("Cache-Control", "no-store") as MethodDecoratorFactory, Header("X-Content-Type-Options", "nosniff") as MethodDecoratorFactory],
+  [[0, Param("leadId") as ParamDecoratorFactory], [1, Param("proposalId") as ParamDecoratorFactory], [2, Req() as ParamDecoratorFactory]]
+);
 decorate(BrokerCrmController, "dispute", [Post("leads/:leadId/disputes") as MethodDecoratorFactory], [[0, Param("leadId") as ParamDecoratorFactory], [1, Body() as ParamDecoratorFactory], [2, Req() as ParamDecoratorFactory]]);
 decorate(BrokerCrmController, "notifications", [Get("notifications") as MethodDecoratorFactory], [[0, Req() as ParamDecoratorFactory]]);
 decorate(BrokerCrmController, "aiFoundations", [Get("ai-foundations") as MethodDecoratorFactory], [[0, Req() as ParamDecoratorFactory]]);
@@ -1993,8 +2136,8 @@ Reflect.defineMetadata("design:paramtypes", [AssurMatchRuntime], AuthRequiredHtt
  * every non-GET broker route is in one of the two lists.
  */
 export const BROKER_TENANT_WRITE_GUARDED: Readonly<Record<string, readonly string[]>> = {
-  BrokerStarterController: ["accept", "reject", "dispute"],
-  BrokerCrmController: ["status", "note", "task", "reminder", "assign", "document", "proposal", "dispute", "aiRequest", "aiValidate", "aiLossAnalysis", "aiSetOptOut"],
+  BrokerStarterController: ["accept", "reject", "dispute", "sendProposal", "withdrawProposal"],
+  BrokerCrmController: ["status", "note", "task", "reminder", "assign", "document", "proposal", "withdrawProposal", "dispute", "aiRequest", "aiValidate", "aiLossAnalysis", "aiSetOptOut"],
   BrokerEnterpriseController: ["createAgency", "updateAgency", "assignMember", "createRole", "updateRole", "updateSla", "updateBranding"],
   BrokerNotificationsController: ["updatePreferences"],
   BrokerOffersController: ["create", "update", "submit", "withdraw", "renew"]

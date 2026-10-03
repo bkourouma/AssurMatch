@@ -92,6 +92,7 @@ import { VisitorQuoteNotifier } from "../modules/notifications/visitor-quote-not
 import { PrismaLeadAssignmentsRepository } from "../modules/leads/lead-assignments.repository";
 import { PrismaRoutingDecisionsRepository } from "../modules/leads/routing-decisions.repository";
 import { PrismaCrmActivityRepository } from "../modules/leads/crm-activity.repository";
+import { LeadProposalsModule, MemoryLeadProposalsRepository, PrismaLeadProposalsRepository } from "../modules/lead-proposals/lead-proposals.module";
 import { PrismaNotificationsRepository } from "../modules/notifications/notifications.repository";
 import { DashboardsModule } from "../modules/dashboards/dashboards.module";
 import { aiSurfaceSchema } from "../../../packages/shared/contracts/ai.contracts";
@@ -140,6 +141,8 @@ export class AssurMatchRuntime {
    * memory instances owned here rather than inside their modules, so the retention anonymizer reads
    * and scrubs the very records the modules hold.
    */
+  /** Spec 055: proposals and visitor responses (memory instance owned here under test, see spec 046 note). */
+  private readonly leadProposalsRepository = this.runtimeRepository(new PrismaLeadProposalsRepository(this.prisma)) ?? new MemoryLeadProposalsRepository();
   private readonly contactMessagesRepository = this.runtimeRepository(new PrismaContactMessagesRepository(this.prisma)) ?? new MemoryContactMessagesRepository();
   readonly leadRepositorySet = this.leadRepositories();
   private readonly brokerCrmConfig = { brokerCrmEnabled: process.env.ASSURMATCH_BROKER_CRM_ENABLED === "true" };
@@ -329,7 +332,10 @@ export class AssurMatchRuntime {
       consent: { findRecord: (id: string) => this.consent.service.findRecord(id) },
       multiBroker: { isEnabled: () => this.featureFlags.service.isEnabled("multi_broker_routing_enabled") },
       // Spec 051 R14: routing requires a persisted, accepted and clean accreditation document.
-      accreditation: (partnerTenantId: string) => this.documents.service.hasAcceptedCleanForPartner(partnerTenantId)
+      accreditation: (partnerTenantId: string) => this.documents.service.hasAcceptedCleanForPartner(partnerTenantId),
+      // Spec 055 FR-001: contact masked once the visitor withdrew consent (resolved lazily).
+      quoteState: (quoteRequestId: string) => this.quoteRequests.submissions.findById(quoteRequestId),
+      contact: (quoteRequestId: string) => this.consentedContact(quoteRequestId)
     }
   );
     readonly satisfactionSurveys: SatisfactionSurveysModule = new SatisfactionSurveysModule(
@@ -399,8 +405,32 @@ readonly enterprise = new EnterpriseService({
     // Spec 054: hashed visitor tokens, the broker named to the visitor and the public timeline.
     ...(this.visitorAccessTokensRepository ? { visitorAccessTokens: this.visitorAccessTokensRepository } : {}),
     partnerName: (partnerTenantId: string) => this.partnerDisplayName(partnerTenantId),
-    assignmentHistory: (leadAssignmentId: string) => this.leads.assignmentsRepository.historyForLead(leadAssignmentId)
+    assignmentHistory: (leadAssignmentId: string) => this.leads.assignmentsRepository.historyForLead(leadAssignmentId),
+    // Spec 055 FR-005: proposals of the request in the tracking space (resolved lazily).
+    proposals: { forVisitorStatus: (quote, assignments, actor) => this.leadProposals.service.forVisitorStatus(quote, assignments, actor) }
   }, this.audit.writer, this.redis.client, this.quoteRequestsRepository);
+  /** Spec 055: broker proposals, visitor follow-up and internal lead documents. */
+  readonly leadProposals: LeadProposalsModule = new LeadProposalsModule({
+    audit: this.audit.writer,
+    repository: this.leadProposalsRepository,
+    assignments: this.leads.assignments,
+    crmAccess: this.leads.brokerCrmAccess,
+    starterAccess: this.leads.brokerStarterAccess,
+    crmPipeline: this.leads.brokerCrmPipeline,
+    crmHistory: this.leads.brokerCrmHistory,
+    leadHistory: this.leads.brokerStarterHistory,
+    upload: {
+      storage: this.documentStorage,
+      scanner: this.virusScanner,
+      requireDurableStorage: process.env.APP_ENV === "production" || process.env.APP_ENV === "preproduction"
+    },
+    quotes: { findById: (id: string) => this.quoteRequests.submissions.findById(id) },
+    partnerName: async (partnerTenantId: string) => (await this.partnerDisplayName(partnerTenantId)) ?? "courtier partenaire",
+    notifications: this.notifications.quoteService,
+    visitorAccess: this.quoteRequests.submissions.visitorAccess,
+    abuseGuard: this.quoteRequests.abuseGuard,
+    redis: this.redis.client
+  }, { crmActivity: this.leads.crmActivityRepository });
   /** Spec 054 R6: subscriber of the lead event bus that queues the visitor e-mails. */
   readonly visitorQuoteNotifier: VisitorQuoteNotifier = new VisitorQuoteNotifier({
     notifications: this.notifications.quoteService,
@@ -850,6 +880,22 @@ readonly enterprise = new EnterpriseService({
     };
   }
 
+  /**
+   * Spec 055 FR-001: the consented contact of a request (the Prisma assignment repository already
+   * enriches its records with it; the memory one does not).
+   */
+  private async consentedContact(quoteRequestId: string): Promise<Record<string, unknown> | undefined> {
+    const quote = await this.quoteRequests.submissions.findById(quoteRequestId).catch(() => undefined);
+    if (!quote || quote.anonymizedAt) return undefined;
+    const prospect = await this.prospects.service.require(quote.prospectId).catch(() => undefined);
+    if (!prospect) return undefined;
+    return {
+      ...(prospect.displayName ? { displayName: prospect.displayName } : {}),
+      ...(prospect.emailNormalized ? { email: prospect.emailNormalized } : {}),
+      ...(prospect.phoneNormalized ? { phone: prospect.phoneNormalized } : {})
+    };
+  }
+
   /** Test runtime only: the live memory records behind each data category of spec 046. */
   private memoryRetentionSources(): MemoryRetentionSources {
     const quoteDocuments = this.quoteDocumentsRepository;
@@ -862,6 +908,7 @@ readonly enterprise = new EnterpriseService({
       leadAssignments: () => this.leads.assignments.list(),
       leadHistory: (leadAssignmentId) => this.leads.assignmentsRepository.historyForLead(leadAssignmentId),
       crmActivity: this.leads.crmActivityRepository,
+      leadProposals: this.leadProposalsRepository,
       quoteAiSummaries: async () => this.quoteAiSummary.list(),
       aiInteractions: async () => (await Promise.all(aiSurfaceSchema.options.map((surface) => aiInteractions.listForSurface(surface, Number.MAX_SAFE_INTEGER)))).flat(),
       contactMessages: () => this.contactMessagesRepository.list({}),

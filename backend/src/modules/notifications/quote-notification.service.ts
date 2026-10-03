@@ -136,6 +136,54 @@ export class QuoteNotificationService {
     return { notification, job };
   }
 
+  /**
+   * Spec 055 FR-008: the visitor answered a proposal. One row per response (e-mail pointer) and one
+   * in-app inbox entry for the broker that sent the proposal; the answer itself stays in the portal.
+   */
+  async queueBrokerVisitorResponse(
+    quote: Pick<QuoteRequestRecord, "id" | "publicReference">,
+    event: { assignmentId: string; partnerTenantId: string; proposalId: string; responseId: string; responseType: string },
+    actor: ActorContext
+  ): Promise<QueuedNotification | undefined> {
+    const dedupeKey = `broker_visitor_response:${quote.id}:${event.assignmentId}:${event.responseId}`;
+    if (await this.exists(dedupeKey)) return undefined;
+    const now = new Date();
+    const job = this.queue.add("broker-lead-notifications", "broker_lead_notification", event.assignmentId, actor.correlationId);
+    const notification: NotificationRecord = {
+      id: crypto.randomUUID(),
+      type: "broker_visitor_response",
+      recipientScope: `partner:${event.partnerTenantId}`,
+      whatsAppStatus: "queued",
+      emailStatus: "queued",
+      payloadReference: quote.id,
+      dedupeKey,
+      eventPayload: { assignmentId: event.assignmentId, partnerTenantId: event.partnerTenantId, proposalId: event.proposalId, responseType: event.responseType },
+      queueJobRecordId: job.id,
+      retryCount: 0,
+      createdAt: now,
+      updatedAt: now
+    };
+    if (!(await this.persist(notification))) return undefined;
+    await this.inApp?.publishInApp({
+      scopeId: event.partnerTenantId,
+      template: "broker_visitor_response",
+      title: "Reponse du visiteur a votre proposition",
+      body: `Le visiteur a repondu a votre proposition pour la demande ${quote.publicReference}. Le statut du lead n'est pas modifie automatiquement.`,
+      targetType: "LeadAssignment",
+      targetId: event.assignmentId
+    }).catch(() => undefined);
+    this.audit.write({
+      actor,
+      action: QuoteAuditActions.notificationBrokerQueued,
+      targetType: "Notification",
+      targetId: notification.id,
+      scope: { quoteRequestId: quote.id, partnerTenantId: event.partnerTenantId },
+      result: "success",
+      context: { type: notification.type, responseType: event.responseType }
+    });
+    return { notification, job };
+  }
+
   private async exists(dedupeKey: string): Promise<boolean> {
     if (Array.isArray(this.notifications)) return this.notifications.some((notification) => notification.dedupeKey === dedupeKey);
     return Boolean(await this.notifications.findByDedupeKey(dedupeKey));

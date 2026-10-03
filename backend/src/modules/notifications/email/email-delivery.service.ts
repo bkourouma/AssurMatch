@@ -19,6 +19,9 @@ export type EmailPurpose =
   | "quote_visitor_closed"
   | "quote_visitor_consent_withdrawn"
   | "quote_visitor_tracking_link"
+  // Spec 055 FR-008: a new broker proposal (visitor) and a visitor response (broker pointer).
+  | "quote_visitor_proposal_available"
+  | "quote_broker_visitor_response"
   // Spec 047: the three public-site forms confirm their own submission, so each one needs a
   // distinct purpose in the `email.delivery.*` audit trail rather than a shared "public form" value.
   | "public_waitlist_confirmation"

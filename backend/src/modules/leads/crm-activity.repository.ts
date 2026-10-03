@@ -238,7 +238,8 @@ export class PrismaCrmActivityRepository implements CrmActivityRepository {
   }
 
   private toDocument(row: unknown): BrokerCrmDocument {
-    const item = row as BrokerCrmDocument;
+    // Spec 055: the file columns are null for a metadata-only reference; they are left out then.
+    const item = Object.fromEntries(Object.entries(row as Record<string, unknown>).filter(([, value]) => value !== null)) as BrokerCrmDocument;
     return { ...item, createdAt: this.dateString(item.createdAt) };
   }
 

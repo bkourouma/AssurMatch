@@ -26,6 +26,21 @@ export interface LeadAssignmentsRepository extends RuntimeRepository {
   appendHistory(event: LeadAssignmentHistoryRecord): Promise<LeadAssignmentHistoryRecord>;
   historyForLead(leadAssignmentId: string): Promise<LeadAssignmentHistoryRecord[]>;
   historyForTenant(partnerTenantId: string): Promise<LeadAssignmentHistoryRecord[]>;
+  /**
+   * Spec 055 (FR-011 relies on it): persists the CRM state of a lead (`BrokerCrmLeadState`). The
+   * memory repository keeps it on the record itself, so it only needs the Prisma implementation.
+   */
+  saveCrmState?(id: string, partnerTenantId: string, state: LeadCrmStatePatch): Promise<void>;
+  /** A reassigned lead starts a fresh CRM state for its new partner. */
+  clearCrmState?(id: string): Promise<void>;
+}
+
+export interface LeadCrmStatePatch {
+  status?: string | undefined;
+  urgency?: string | undefined;
+  source?: string | undefined;
+  assignedAdvisorId?: string | undefined;
+  tags?: string[] | undefined;
 }
 
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -198,6 +213,17 @@ export class PrismaLeadAssignmentsRepository implements LeadAssignmentsRepositor
 
   async update(id: string, update: Partial<LeadAssignmentRecord>): Promise<LeadAssignmentRecord> {
     return this.enrichOne(this.toDomain(await this.assignments().update({ where: { id }, data: this.toPrismaUpdate(update) })));
+  }
+
+  async saveCrmState(id: string, partnerTenantId: string, state: LeadCrmStatePatch): Promise<void> {
+    const data = Object.fromEntries(Object.entries(state).filter(([, value]) => value !== undefined));
+    const delegate = (this.prisma.requireRuntimeClient() as unknown as { brokerCrmLeadState: { upsert(input: unknown): Promise<unknown> } }).brokerCrmLeadState;
+    await delegate.upsert({ where: { leadAssignmentId: id }, create: { leadAssignmentId: id, partnerTenantId, ...data }, update: { partnerTenantId, ...data } });
+  }
+
+  async clearCrmState(id: string): Promise<void> {
+    const delegate = (this.prisma.requireRuntimeClient() as unknown as { brokerCrmLeadState: { deleteMany(input: unknown): Promise<unknown> } }).brokerCrmLeadState;
+    await delegate.deleteMany({ where: { leadAssignmentId: id } });
   }
 
   async activeCountForPartner(partnerTenantId: string): Promise<number> {

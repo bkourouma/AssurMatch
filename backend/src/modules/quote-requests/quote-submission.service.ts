@@ -10,6 +10,7 @@ import {
   type PublicQuoteStatusView,
   type TrackingLinkResponse
 } from "../../../../packages/shared/contracts/public-quote-status";
+import type { PublicLeadProposal } from "../../../../packages/shared/contracts/lead-proposals";
 import { AuditLogWriter } from "../audit-logs/audit-log-writer.service";
 import { VisitorTrackingAuditActions } from "../audit-logs/visitor-tracking-audit-actions";
 import { PUBLIC_SITE_AUDIT_ACTIONS } from "../audit-logs/public-site-audit-actions";
@@ -159,6 +160,10 @@ export interface QuoteSubmissionDependencies {
   findProductById?: (productId: string) => Promise<{ key: string; name: string } | undefined>;
   /** Spec 054 R7: per-reference counter of the tracking-link resend. */
   redis?: RedisClientPort;
+  /** Spec 055 FR-005: visible proposals of the request and the active proposal per assignment. */
+  proposals?: {
+    forVisitorStatus(quote: QuoteRequestRecord, assignments: LeadAssignmentRecord[], actor?: ActorContext): Promise<{ proposals: PublicLeadProposal[]; activeProposalAt: Map<string, Date> }>;
+  };
 }
 
 export class QuoteSubmissionService {
@@ -503,6 +508,9 @@ export class QuoteSubmissionService {
         });
       }
     }
+    const visible = this.deps.proposals
+      ? await this.deps.proposals.forVisitorStatus(quote, assignments, actor)
+      : { proposals: [] as PublicLeadProposal[], activeProposalAt: new Map<string, Date>() };
     const projected = projectPublicQuoteStatus(
       quote,
       await Promise.all(assignments.map(async (assignment) => ({
@@ -515,7 +523,8 @@ export class QuoteSubmissionService {
         acceptedAt: assignment.acceptedAt,
         crmUpdatedAt: assignment.crmUpdatedAt,
         lastBrokerActionAt: assignment.lastBrokerActionAt,
-        updatedAt: assignment.updatedAt
+        updatedAt: assignment.updatedAt,
+        activeProposalAt: visible.activeProposalAt.get(assignment.id)
       }))),
       history
     );
@@ -541,7 +550,8 @@ export class QuoteSubmissionService {
       brokers: projected.brokers,
       timeline: projected.timeline,
       consent: projected.consent,
-      tokenExpiresAt: grant.expiresAt.toISOString()
+      tokenExpiresAt: grant.expiresAt.toISOString(),
+      proposals: visible.proposals
     };
   }
 

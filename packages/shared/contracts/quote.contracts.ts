@@ -335,7 +335,8 @@ export const brokerStarterLeadSummarySchema = brokerLeadSummarySchema.extend({
 
 export const brokerStarterLeadHistoryEventSchema = z.object({
   id: z.string(),
-  eventType: z.enum(["assigned", "reassigned", "viewed", "accepted", "rejected", "disputed", "notification_read", "exported", "blocked"]),
+  // Spec 055: the proposal loop is part of the lead history (Starter and CRM).
+  eventType: z.enum(["assigned", "reassigned", "viewed", "accepted", "rejected", "disputed", "notification_read", "exported", "blocked", "proposal_sent", "proposal_withdrawn", "visitor_responded"]),
   previousStatus: brokerStarterLeadStatusSchema.optional(),
   nextStatus: brokerStarterLeadStatusSchema.optional(),
   reason: brokerStarterReasonSchema.optional(),
@@ -343,8 +344,12 @@ export const brokerStarterLeadHistoryEventSchema = z.object({
   occurredAt: dateTimeStringSchema
 });
 
+/** Spec 055 FR-001: full contact for the assigned broker; masked after a consent withdrawal. */
+export const leadContactVisibilitySchema = z.enum(["full", "masked"]);
+
 export const brokerStarterLeadDetailSchema = brokerStarterLeadSummarySchema.extend({
   contact: z.record(z.string(), z.unknown()).default({}),
+  contactVisibility: leadContactVisibilitySchema.optional(),
   answers: z.record(z.string(), z.unknown()).default({}),
   history: z.array(brokerStarterLeadHistoryEventSchema).default([])
 });
@@ -453,7 +458,8 @@ export const brokerCrmLeadSummarySchema = z.object({
 
 export const brokerCrmHistoryEventSchema = z.object({
   id: z.string(),
-  eventType: z.enum(["status_changed", "note_created", "task_created", "reminder_created", "assigned", "document_added", "proposal_added", "disputed", "exported"]),
+  // Spec 055: proposals sent or withdrawn from the CRM.
+  eventType: z.enum(["status_changed", "note_created", "task_created", "reminder_created", "assigned", "document_added", "proposal_added", "disputed", "exported", "proposal_sent", "proposal_withdrawn"]),
   previousStatus: brokerCrmPipelineStatusSchema.optional(),
   nextStatus: brokerCrmPipelineStatusSchema.optional(),
   reason: brokerCrmOutcomeReasonSchema.optional(),
@@ -493,6 +499,11 @@ export const brokerCrmDocumentSchema = z.object({
   label: nonEmptyStringSchema,
   storageKey: nonEmptyStringSchema,
   visibility: z.enum(["internal", "prospect_provided"]),
+  /** Spec 055 FR-010: uploaded internal file (scanned); absent for a metadata-only reference. */
+  fileName: z.string().optional(),
+  mimeType: z.string().optional(),
+  sizeBytes: z.number().int().nonnegative().optional(),
+  scanStatus: z.enum(["pending", "clean", "infected", "failed"]).optional(),
   createdAt: dateTimeStringSchema
 });
 
@@ -518,6 +529,7 @@ export const brokerCrmDisputeSchema = z.object({
 
 export const brokerCrmLeadDetailSchema = brokerCrmLeadSummarySchema.extend({
   contact: z.record(z.string(), z.unknown()).default({}),
+  contactVisibility: leadContactVisibilitySchema.optional(),
   answers: z.record(z.string(), z.unknown()).default({}),
   history: z.array(brokerCrmHistoryEventSchema).default([]),
   notes: z.array(brokerCrmNoteSchema).default([]),
