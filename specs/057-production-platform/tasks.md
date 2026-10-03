@@ -1,6 +1,9 @@
 # Tasks: Plateforme de production (057)
 
 **Spec**: `specs/057-production-platform/spec.md` — **Plan**: `plan.md`
+**Statut**: Terminé le 2026-10-03 — typecheck, lint, `npx vitest run` (269 fichiers, 747 tests), `secret-scan`,
+`docker compose config` (production avec profils `bundled-db`/`edge`, préproduction) verts. Non exécuté ici :
+`docker build`, démarrage réel des conteneurs, job CI de production (pas d'hôte ni de registre).
 **Surfaces impactées**: Backend API, Runtime/Docker/CI, opérations ; Dockerfiles des trois apps Next
 (aucune page). Aucune migration.
 
