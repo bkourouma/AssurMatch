@@ -17,8 +17,11 @@ export type AssurMatchRole = (typeof AssurMatchRoles)[number];
 
 export const RolePermissions: Record<AssurMatchRole, string[]> = {
   super_admin: ["*:*"],
-  admin_pays: ["countries:*", "products:*", "offers:*", "quote_requests:read", "lead_assignments:read", "lead_assignments:update", "routing_rules:*", "feature_flags:read", "feature_flags:update", "audit_logs:read"],
-  compliance_admin: ["partners:*", "licenses:*", "documents:*", "consent:*", "offers:read", "quote_form_definitions:*", "quote_requests:*", "prospects:read", "lead_assignments:read", "routing_rules:read", "audit_logs:read", "retention:read", "retention:*"],
+  admin_pays: ["countries:*", "products:*", "offers:*", "quote_requests:read", "lead_assignments:read", "lead_assignments:update", "routing_rules:*", "feature_flags:read", "feature_flags:update", "audit_logs:read",
+    // Spec 051 R13: creation and preparation of the partners of the admin's own countries. Licence
+    // approval, document review, activation and application decisions stay compliance-only.
+    "partners:read", "partners:create", "partners:update", "licenses:read", "licenses:create", "documents:read", "documents:create", "partner_applications:review"],
+  compliance_admin: ["partners:*", "partner_applications:*", "licenses:*", "documents:*", "consent:*", "offers:read", "quote_form_definitions:*", "quote_requests:*", "prospects:read", "lead_assignments:read", "routing_rules:read", "audit_logs:read", "retention:read", "retention:*"],
   support_admin: ["users:read", "partners:read", "quote_requests:read", "prospects:read", "lead_assignments:read", "routing_rules:read", "audit_logs:read"],
   broker_owner_starter: ["broker_leads:read", "broker_leads:update", "broker_leads:export", "notifications:read"],
   broker_owner_pro: ["broker_leads:*", "broker_crm:*", "notifications:read"],

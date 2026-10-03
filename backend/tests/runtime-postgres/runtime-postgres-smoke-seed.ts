@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { seedAcceptedAccreditation } from "../integration/helpers/partner-onboarding-seed";
 import type { AssurMatchRuntime } from "../../src/runtime/assurmatch-runtime";
 import type { ActorContext } from "../../src/modules/common/types";
 import type { QuoteFormFieldDto } from "../../../packages/shared/contracts/quote.contracts";
@@ -195,7 +196,7 @@ async function createBroker(runtime: AssurMatchRuntime, run: RuntimeSmokeRun, ad
 async function authorizeBroker(runtime: AssurMatchRuntime, partnerTenantId: string, countryId: string, productId: string, admin: ActorContext): Promise<void> {
   await runtime.partners.service.authorizeCountry(partnerTenantId, countryId, admin);
   await runtime.partners.service.authorizeProduct(partnerTenantId, productId, admin);
-  await runtime.partnerLicenses.service.create({
+  const license = await runtime.partnerLicenses.service.create({
     partnerTenantId,
     licenseNumber: `LIC-${partnerTenantId.slice(0, 8)}`,
     issuingAuthority: "Runtime Smoke Regulator",
@@ -205,4 +206,6 @@ async function authorizeBroker(runtime: AssurMatchRuntime, partnerTenantId: stri
     effectiveDate: "2026-01-01",
     expirationDate: "2030-01-01"
   }, admin);
+  // Spec 051 R14: routing reads a persisted, accepted and clean accreditation document.
+  await seedAcceptedAccreditation(runtime, partnerTenantId, license.id, admin);
 }

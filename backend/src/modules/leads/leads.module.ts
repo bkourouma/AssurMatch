@@ -42,6 +42,8 @@ export interface LeadsModuleRoutingOptions {
   /** Spec 042: consent resolver and `multi_broker_routing_enabled` gate for multi-send. */
   consent?: ConsentRecordResolver | undefined;
   multiBroker?: MultiBrokerPolicy | undefined;
+  /** Spec 051 R14: persisted accreditation document check for routing eligibility. */
+  accreditation?: ((partnerTenantId: string) => Promise<boolean>) | undefined;
 }
 
 export class LeadsModule {
@@ -78,7 +80,7 @@ export class LeadsModule {
     this.assignmentsRepository = assignmentRepository;
     this.assignments = new LeadAssignmentService(audit, assignmentRepository, routingOptions.events);
     this.decisions = new RoutingDecisionService(audit, repositories.decisions);
-    this.eligibility = new BrokerEligibilityPolicy(partners, licenses, (partnerTenantId) => assignmentRepository.monthlyCountForPartner(partnerTenantId, new Date()));
+    this.eligibility = new BrokerEligibilityPolicy(partners, licenses, (partnerTenantId) => assignmentRepository.monthlyCountForPartner(partnerTenantId, new Date()), routingOptions.accreditation);
     this.routing = new QuoteRoutingService(this.eligibility, this.decisions, this.assignments, audit, {
       rules: routingOptions.rules,
       consent: routingOptions.consent,

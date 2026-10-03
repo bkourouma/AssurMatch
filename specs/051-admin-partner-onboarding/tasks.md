@@ -9,33 +9,33 @@ description: "Task list for 051 — Onboarding et cycle de vie des courtiers par
 **Tests**: obligatoires pour le RBAC, le périmètre pays, les conditions d'activation, les licences expirées, suspendues ou révoquées, la quarantaine, l'exclusion de « Actif test », la lecture seule après suspension, le refus après résiliation et la séparation des applications.
 
 ## Phase 1: Setup
-- [ ] T001 Contrats `packages/shared/contracts/partner.contracts.ts`, `partner-application.contracts.ts`, `error-codes.ts` (data-model.md).
-- [ ] T002 Matrice RBAC `packages/shared/rbac/assurmatch-role-matrix.ts` : `admin_pays` reçoit `partners:read/create/update`, `licenses:read/create`, `documents:read/create`, `partner_applications:review` (R13). Mettre à jour les tests RBAC existants.
-- [ ] T003 Schéma Prisma, migration `0021_partner_onboarding_lifecycle` (additive, `ADD VALUE IF NOT EXISTS`, index unique partiel), `prisma-migrations.spec.ts`.
+- [x] T001 Contrats `packages/shared/contracts/partner.contracts.ts`, `partner-application.contracts.ts`, `error-codes.ts` (data-model.md).
+- [x] T002 Matrice RBAC `packages/shared/rbac/assurmatch-role-matrix.ts` : `admin_pays` reçoit `partners:read/create/update`, `licenses:read/create`, `documents:read/create`, `partner_applications:review` (R13). Mettre à jour les tests RBAC existants.
+- [x] T003 Schéma Prisma, migration `0021_partner_onboarding_lifecycle` (additive, `ADD VALUE IF NOT EXISTS`, index unique partiel), `prisma-migrations.spec.ts`.
 
 ## Phase 2: Foundational
-- [ ] T004 Exposer le scanner antivirus du runtime (`assurmatch-runtime.ts`). Dépôts mémoire et Prisma pour les documents d'agrément, les contrats et les historiques.
-- [ ] T005 `partnerActivationBlockers()` pure (R3), réutilisée partout ; statut effectif « Expiré » (R1).
+- [x] T004 Exposer le scanner antivirus du runtime (`assurmatch-runtime.ts`). Dépôts mémoire et Prisma pour les documents d'agrément, les contrats et les historiques.
+- [x] T005 `partnerActivationBlockers()` pure (R3), réutilisée partout ; statut effectif « Expiré » (R1).
 
 ## Phase 3: US1 Courtier (P1) 🎯
-- [ ] T006 [US1] `PartnersService` : création et mise à jour (identité, contacts, assureurs, plan, quota, capacité, SLA, pays), doublon RCCM, `expectedUpdatedAt`, audit avant/après.
-- [ ] T007 [US1] Routes `GET/POST /admin/partners`, `GET/PATCH /admin/partners/:id` (filtres de l'annuaire, périmètre de l'Admin Pays).
-- [ ] T008 [P] [US1] Tests d'intégration `backend/tests/integration/partners/admin-partners-runtime-http.spec.ts` (CRUD, doublon, hors périmètre, 409).
+- [x] T006 [US1] `PartnersService` : création et mise à jour (identité, contacts, assureurs, plan, quota, capacité, SLA, pays), doublon RCCM, `expectedUpdatedAt`, audit avant/après.
+- [x] T007 [US1] Routes `GET/POST /admin/partners`, `GET/PATCH /admin/partners/:id` (filtres de l'annuaire, périmètre de l'Admin Pays).
+- [x] T008 [P] [US1] Tests d'intégration `backend/tests/integration/partners/admin-partners-runtime-http.spec.ts` (CRUD, doublon, hors périmètre, 409).
 
 ## Phase 4: US2 Licences et documents (P1)
-- [ ] T009 [US2] Licences : `validate` (document accepté et non expirée), `suspend`, `revoke`, `renew` (puis `superseded`), historique, audit (`partner-licenses/`).
-- [ ] T010 [US2] Documents : téléversement multipart (MIME, octets de signature, 5 Mo, sha256, stockage durable), analyse, quarantaine, revue, téléchargement audité (`documents/`).
-- [ ] T011 [US2] Routes licences et documents (contrats/admin-partners-api.md).
-- [ ] T012 [P] [US2] Tests : validation sans document (422), licence expirée, Admin Pays qui valide (403), EICAR en quarantaine, mauvais type, consultation auditée, `support_admin` refusé sur le fichier, renouvellement sans interruption.
+- [x] T009 [US2] Licences : `validate` (document accepté et non expirée), `suspend`, `revoke`, `renew` (puis `superseded`), historique, audit (`partner-licenses/`).
+- [x] T010 [US2] Documents : téléversement multipart (MIME, octets de signature, 5 Mo, sha256, stockage durable), analyse, quarantaine, revue, téléchargement audité (`documents/`).
+- [x] T011 [US2] Routes licences et documents (contrats/admin-partners-api.md).
+- [x] T012 [P] [US2] Tests : validation sans document (422), licence expirée, Admin Pays qui valide (403), EICAR en quarantaine, mauvais type, consultation auditée, `support_admin` refusé sur le fichier, renouvellement sans interruption.
 
 ## Phase 5: US3 Couverture (P1)
-- [ ] T013 [US3] Autoriser et retirer par pays (licence exigée) et par produit ; dépôts mémoire et Prisma avec statut ; périmètre.
-- [ ] T014 [P] [US3] Tests (retrait immédiat, hors périmètre, pays sans licence).
+- [x] T013 [US3] Autoriser et retirer par pays (licence exigée) et par produit ; dépôts mémoire et Prisma avec statut ; périmètre.
+- [x] T014 [P] [US3] Tests (retrait immédiat, hors périmètre, pays sans licence).
 
 ## Phase 6: US4 Statuts (P1)
-- [ ] T015 [US4] Transitions (graphe, historique, `previousActiveStatus`, CO pour les activations, suspensions et résiliations), contrat (`POST /admin/partners/:id/contracts`), route `POST /admin/partners/:id/status`.
-- [ ] T016 [US4] Éligibilité et checklist : documents persistés ; contrôles `partner_document_accepted`, `partner_owner_user`, `partner_contract` ; `country_active_licensed_partner` (actif, licence valide et document accepté) ; `active_test` exclu partout (vérifier les 8 sites).
-- [ ] T017 [P] [US4] Tests : chaque blocage d'activation, Admin Pays qui active (403), Actif test jamais candidat ni public, suspension qui exclut du routage et des offres, réactivation refusée si une condition manque, « Expiré » calculé.
+- [x] T015 [US4] Transitions (graphe, historique, `previousActiveStatus`, CO pour les activations, suspensions et résiliations), contrat (`POST /admin/partners/:id/contracts`), route `POST /admin/partners/:id/status`.
+- [x] T016 [US4] Éligibilité et checklist : documents persistés ; contrôles `partner_document_accepted`, `partner_owner_user`, `partner_contract` ; `country_active_licensed_partner` (actif, licence valide et document accepté) ; `active_test` exclu partout (vérifier les 8 sites).
+- [x] T017 [P] [US4] Tests : chaque blocage d'activation, Admin Pays qui active (403), Actif test jamais candidat ni public, suspension qui exclut du routage et des offres, réactivation refusée si une condition manque, « Expiré » calculé.
 
 ## Phase 7: US5 Candidatures (P1)
 - [ ] T018 [US5] `PartnerApplicationsService` : `review`, `convert` (courtier et licence brouillons, flag pays), `reject` (code), décision définitive ; `locale` stocké à la soumission ; e-mail masqué hors CO.

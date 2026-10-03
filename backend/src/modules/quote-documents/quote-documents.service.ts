@@ -4,6 +4,7 @@ import { QUOTE_DOCUMENT_MAX_BYTES, QUOTE_DOCUMENT_MAX_PER_REQUEST, quoteDocument
 import type { BrokerCrmDocument } from "../../../../packages/shared/contracts/quote.contracts";
 import { roleHasPermission } from "../../../../packages/shared/rbac/assurmatch-role-matrix";
 import type { AuditLogWriter } from "../audit-logs/audit-log-writer.service";
+import { matchesFileSignature, safeUploadFileName } from "../common/files/file-signature";
 import type { QueuePort } from "../common/queues/queues.module";
 import type { RedisClientPort } from "../common/redis/redis.module";
 import type { ActorContext } from "../common/types";
@@ -72,7 +73,7 @@ export class QuoteDocumentsService {
     if (file.size > QUOTE_DOCUMENT_MAX_BYTES || file.buffer.length > QUOTE_DOCUMENT_MAX_BYTES) this.refuse(actor, quote, "file_too_large", "Invalid document: file_too_large");
     const mimeType = file.mimetype.toLowerCase();
     if (!(quoteDocumentMimeTypes as readonly string[]).includes(mimeType)) this.refuse(actor, quote, "mime_not_allowed", "Invalid document: mime_not_allowed");
-    if (!this.matchesMagicBytes(mimeType, file.buffer)) this.refuse(actor, quote, "content_mismatch", "Invalid document: content_mismatch");
+    if (!matchesFileSignature(mimeType, file.buffer)) this.refuse(actor, quote, "content_mismatch", "Invalid document: content_mismatch");
     const existing = await this.repository.listForQuote(quote.id);
     if (existing.filter((document) => document.status !== "removed").length >= QUOTE_DOCUMENT_MAX_PER_REQUEST) this.refuse(actor, quote, "too_many_documents", "Invalid document: too_many_documents");
 
@@ -83,7 +84,7 @@ export class QuoteDocumentsService {
       prospectId: quote.prospectId ?? null,
       label: parsed.label,
       documentKind: parsed.documentKind,
-      fileName: this.safeFileName(file.originalname),
+      fileName: safeUploadFileName(file.originalname),
       mimeType,
       sizeBytes: file.buffer.length,
       checksum: createHash("sha256").update(file.buffer).digest("hex"),
@@ -250,17 +251,6 @@ export class QuoteDocumentsService {
     return { enabled };
   }
 
-  private matchesMagicBytes(mimeType: string, bytes: Buffer): boolean {
-    if (mimeType === "application/pdf") return bytes.subarray(0, 4).toString("latin1") === "%PDF";
-    if (mimeType === "image/jpeg") return bytes.length > 2 && bytes[0] === 0xff && bytes[1] === 0xd8;
-    if (mimeType === "image/png") return bytes.length > 4 && bytes[0] === 0x89 && bytes[1] === 0x50 && bytes[2] === 0x4e && bytes[3] === 0x47;
-    return false;
-  }
-
-  private safeFileName(name: string): string {
-    const base = name.split(/[\\/]/).pop() ?? "document";
-    return base.replace(/[^A-Za-z0-9._ -]/g, "_").slice(0, 120) || "document";
-  }
 
   private refuse(actor: ActorContext, quote: QuoteRequestRecord, reason: string, message: string): never {
     this.deps.audit.write({

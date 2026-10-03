@@ -1,6 +1,6 @@
 import { publicCountryFlags } from "../countries/countries.module";
 import type { SurveySubmissionInput } from "../satisfaction-surveys/satisfaction-surveys.service";
-import { Body, ConflictException, Controller, Delete, ForbiddenException, Get, HttpCode, Module, NotFoundException, Param, Patch, Post, Put, Query, Req, UnprocessableEntityException, UploadedFile, UseGuards, UseInterceptors } from "@nestjs/common";
+import { Body, ConflictException, Controller, Delete, ForbiddenException, Get, Header, HttpCode, Module, NotFoundException, Param, Patch, Post, Put, Query, Req, StreamableFile, UnprocessableEntityException, UploadedFile, UseGuards, UseInterceptors } from "@nestjs/common";
 import { FileInterceptor } from "@nestjs/platform-express";
 import { z } from "zod";
 import { QUOTE_DOCUMENT_MAX_BYTES } from "../../../../packages/shared/contracts/quote-document.contracts";
@@ -23,6 +23,23 @@ import {
 } from "../../../../packages/shared/contracts/catalog.contracts";
 import { billingFoundationQuerySchema, billingPlanPriceUpsertSchema, draftInvoiceQuerySchema, draftInvoiceRecomputeSchema, leadPackGrantSchema } from "../../../../packages/shared/contracts/billing.contracts";
 import { partnerApplicationStatusSchema } from "../../../../packages/shared/contracts/partner-application.contracts";
+import {
+  ACCREDITATION_DOCUMENT_MAX_BYTES,
+  accreditationDocumentReviewSchema,
+  accreditationDocumentUploadSchema,
+  adminPartnerListQuerySchema,
+  partnerActionReasonSchema,
+  partnerAdminCreateSchema,
+  partnerAdminUpdateSchema,
+  partnerContractCreateSchema,
+  partnerCountryAuthorizationSchema,
+  partnerLicenseActionSchema,
+  partnerLicenseCreateSchema,
+  partnerLicenseRenewSchema,
+  partnerProductAuthorizationSchema,
+  partnerStatusTransitionSchema
+} from "../../../../packages/shared/contracts/partner.contracts";
+import type { UploadedAccreditationFile } from "../documents/documents.module";
 import {
   retentionBatchApproveRequestSchema,
   retentionErasurePreviewRequestSchema,
@@ -1049,6 +1066,94 @@ export class AdminBillingFoundationController {
   }
 }
 
+/**
+ * Spec 051: partner onboarding and lifecycle. Every route is protected (auth + MFA); the role,
+ * country scope, compliance-only and lifecycle rules live in `PartnerAdminService`.
+ */
+export class AdminPartnersHttpController {
+  constructor(private readonly runtime: AssurMatchRuntime) {}
+
+  list(request: AssurMatchHttpRequest, query: Record<string, string>) {
+    return this.runtime.partnerAdmin.list(protectedActorFromRequest(request), parseHttpInput(adminPartnerListQuerySchema, query ?? {}));
+  }
+
+  create(request: AssurMatchHttpRequest, input: unknown) {
+    return this.runtime.partnerAdmin.create(protectedActorFromRequest(request), parseHttpInput(partnerAdminCreateSchema, input));
+  }
+
+  detail(id: string, request: AssurMatchHttpRequest) {
+    return this.runtime.partnerAdmin.detail(protectedActorFromRequest(request), parseParam("id", id, uuidSchema));
+  }
+
+  update(id: string, request: AssurMatchHttpRequest, input: unknown) {
+    return this.runtime.partnerAdmin.update(protectedActorFromRequest(request), parseParam("id", id, uuidSchema), parseHttpInput(partnerAdminUpdateSchema, input));
+  }
+
+  status(id: string, request: AssurMatchHttpRequest, input: unknown) {
+    return this.runtime.partnerAdmin.changeStatus(protectedActorFromRequest(request), parseParam("id", id, uuidSchema), parseHttpInput(partnerStatusTransitionSchema, input));
+  }
+
+  authorizeCountry(id: string, request: AssurMatchHttpRequest, input: unknown) {
+    return this.runtime.partnerAdmin.authorizeCountry(protectedActorFromRequest(request), parseParam("id", id, uuidSchema), parseHttpInput(partnerCountryAuthorizationSchema, input));
+  }
+
+  withdrawCountry(id: string, countryId: string, request: AssurMatchHttpRequest, input: unknown) {
+    return this.runtime.partnerAdmin.withdrawAuthorization(protectedActorFromRequest(request), parseParam("id", id, uuidSchema), "country", parseParam("countryId", countryId, uuidSchema), parseHttpInput(partnerActionReasonSchema, input));
+  }
+
+  authorizeProduct(id: string, request: AssurMatchHttpRequest, input: unknown) {
+    return this.runtime.partnerAdmin.authorizeProduct(protectedActorFromRequest(request), parseParam("id", id, uuidSchema), parseHttpInput(partnerProductAuthorizationSchema, input));
+  }
+
+  withdrawProduct(id: string, productId: string, request: AssurMatchHttpRequest, input: unknown) {
+    return this.runtime.partnerAdmin.withdrawAuthorization(protectedActorFromRequest(request), parseParam("id", id, uuidSchema), "product", parseParam("productId", productId, uuidSchema), parseHttpInput(partnerActionReasonSchema, input));
+  }
+
+  createLicense(id: string, request: AssurMatchHttpRequest, input: unknown) {
+    return this.runtime.partnerAdmin.createLicense(protectedActorFromRequest(request), parseParam("id", id, uuidSchema), parseHttpInput(partnerLicenseCreateSchema, input));
+  }
+
+  validateLicense(id: string, licenseId: string, request: AssurMatchHttpRequest, input: unknown) {
+    return this.runtime.partnerAdmin.validateLicense(protectedActorFromRequest(request), parseParam("id", id, uuidSchema), parseParam("licenseId", licenseId, uuidSchema), parseHttpInput(partnerLicenseActionSchema, input));
+  }
+
+  suspendLicense(id: string, licenseId: string, request: AssurMatchHttpRequest, input: unknown) {
+    return this.runtime.partnerAdmin.suspendLicense(protectedActorFromRequest(request), parseParam("id", id, uuidSchema), parseParam("licenseId", licenseId, uuidSchema), parseHttpInput(partnerLicenseActionSchema, input));
+  }
+
+  revokeLicense(id: string, licenseId: string, request: AssurMatchHttpRequest, input: unknown) {
+    return this.runtime.partnerAdmin.revokeLicense(protectedActorFromRequest(request), parseParam("id", id, uuidSchema), parseParam("licenseId", licenseId, uuidSchema), parseHttpInput(partnerLicenseActionSchema, input));
+  }
+
+  renewLicense(id: string, licenseId: string, request: AssurMatchHttpRequest, input: unknown) {
+    return this.runtime.partnerAdmin.renewLicense(protectedActorFromRequest(request), parseParam("id", id, uuidSchema), parseParam("licenseId", licenseId, uuidSchema), parseHttpInput(partnerLicenseRenewSchema, input));
+  }
+
+  /** Multipart: `file` plus the text fields `documentType`, `licenseId?`, `expirationDate?`, `reason`. */
+  uploadDocument(id: string, file: UploadedAccreditationFile | undefined, body: Record<string, string | undefined>, request: AssurMatchHttpRequest) {
+    const fields = Object.fromEntries(Object.entries(body ?? {}).filter(([, value]) => typeof value === "string" && value.trim() !== ""));
+    return this.runtime.partnerAdmin.uploadDocument(protectedActorFromRequest(request), parseParam("id", id, uuidSchema), file, parseHttpInput(accreditationDocumentUploadSchema, fields));
+  }
+
+  reviewDocument(id: string, documentId: string, request: AssurMatchHttpRequest, input: unknown) {
+    return this.runtime.partnerAdmin.reviewDocument(protectedActorFromRequest(request), parseParam("id", id, uuidSchema), parseParam("documentId", documentId, uuidSchema), parseHttpInput(accreditationDocumentReviewSchema, input));
+  }
+
+  /** FR-012: audited download; quarantined files are never served. */
+  async downloadDocument(id: string, documentId: string, request: AssurMatchHttpRequest) {
+    const file = await this.runtime.partnerAdmin.downloadDocument(protectedActorFromRequest(request), parseParam("id", id, uuidSchema), parseParam("documentId", documentId, uuidSchema));
+    return new StreamableFile(file.bytes, {
+      type: file.mimeType,
+      length: file.bytes.length,
+      disposition: `attachment; filename="${file.fileName.replace(/"/g, "")}"`
+    });
+  }
+
+  recordContract(id: string, request: AssurMatchHttpRequest, input: unknown) {
+    return this.runtime.partnerAdmin.recordContract(protectedActorFromRequest(request), parseParam("id", id, uuidSchema), parseHttpInput(partnerContractCreateSchema, input));
+  }
+}
+
 export class AdminPartnerSlaController {
   constructor(private readonly runtime: AssurMatchRuntime) {}
 
@@ -1567,6 +1672,43 @@ decorate(AdminDataRetentionController, "erasurePreview", [Post("batches/erasure-
 decorate(AdminDataRetentionController, "approve", [Post("batches/:id/approve") as MethodDecoratorFactory, HttpCode(200) as MethodDecoratorFactory], [[0, Param("id") as ParamDecoratorFactory], [1, Body() as ParamDecoratorFactory], [2, Req() as ParamDecoratorFactory]]);
 controller("admin", AdminPartnerSlaController, true);
 decorate(AdminPartnerSlaController, "sla", [Get("partners/sla") as MethodDecoratorFactory], [[0, Req() as ParamDecoratorFactory]]);
+// Spec 051: registered after the static `partners/sla` and `partners/applications` routes (see the
+// controllers list), so `partners/:id` never shadows them; `:id` is also validated as a UUID.
+{
+  const id = Param("id") as ParamDecoratorFactory;
+  const req = Req() as ParamDecoratorFactory;
+  const body = Body() as ParamDecoratorFactory;
+  const ok = HttpCode(200) as MethodDecoratorFactory;
+  controller("admin", AdminPartnersHttpController, true);
+  decorate(AdminPartnersHttpController, "list", [Get("partners") as MethodDecoratorFactory], [[0, req], [1, Query() as ParamDecoratorFactory]]);
+  decorate(AdminPartnersHttpController, "create", [Post("partners") as MethodDecoratorFactory], [[0, req], [1, body]]);
+  decorate(AdminPartnersHttpController, "detail", [Get("partners/:id") as MethodDecoratorFactory], [[0, id], [1, req]]);
+  decorate(AdminPartnersHttpController, "update", [Patch("partners/:id") as MethodDecoratorFactory], [[0, id], [1, req], [2, body]]);
+  decorate(AdminPartnersHttpController, "status", [Post("partners/:id/status") as MethodDecoratorFactory, ok], [[0, id], [1, req], [2, body]]);
+  decorate(AdminPartnersHttpController, "authorizeCountry", [Post("partners/:id/authorizations/countries") as MethodDecoratorFactory], [[0, id], [1, req], [2, body]]);
+  decorate(AdminPartnersHttpController, "withdrawCountry", [Post("partners/:id/authorizations/countries/:countryId/withdraw") as MethodDecoratorFactory, ok], [[0, id], [1, Param("countryId") as ParamDecoratorFactory], [2, req], [3, body]]);
+  decorate(AdminPartnersHttpController, "authorizeProduct", [Post("partners/:id/authorizations/products") as MethodDecoratorFactory], [[0, id], [1, req], [2, body]]);
+  decorate(AdminPartnersHttpController, "withdrawProduct", [Post("partners/:id/authorizations/products/:productId/withdraw") as MethodDecoratorFactory, ok], [[0, id], [1, Param("productId") as ParamDecoratorFactory], [2, req], [3, body]]);
+  decorate(AdminPartnersHttpController, "createLicense", [Post("partners/:id/licenses") as MethodDecoratorFactory], [[0, id], [1, req], [2, body]]);
+  for (const action of ["validate", "suspend", "revoke"] as const) {
+    decorate(AdminPartnersHttpController, `${action}License`, [Post(`partners/:id/licenses/:licenseId/${action}`) as MethodDecoratorFactory, ok], [[0, id], [1, Param("licenseId") as ParamDecoratorFactory], [2, req], [3, body]]);
+  }
+  decorate(AdminPartnersHttpController, "renewLicense", [Post("partners/:id/licenses/:licenseId/renew") as MethodDecoratorFactory], [[0, id], [1, Param("licenseId") as ParamDecoratorFactory], [2, req], [3, body]]);
+  decorate(
+    AdminPartnersHttpController,
+    "uploadDocument",
+    [Post("partners/:id/documents") as MethodDecoratorFactory, UseInterceptors(FileInterceptor("file", { limits: { fileSize: ACCREDITATION_DOCUMENT_MAX_BYTES, files: 1 } })) as MethodDecoratorFactory],
+    [[0, id], [1, UploadedFile() as ParamDecoratorFactory], [2, body], [3, req]]
+  );
+  decorate(AdminPartnersHttpController, "reviewDocument", [Post("partners/:id/documents/:documentId/review") as MethodDecoratorFactory, ok], [[0, id], [1, Param("documentId") as ParamDecoratorFactory], [2, req], [3, body]]);
+  decorate(
+    AdminPartnersHttpController,
+    "downloadDocument",
+    [Get("partners/:id/documents/:documentId/file") as MethodDecoratorFactory, Header("Cache-Control", "no-store") as MethodDecoratorFactory, Header("X-Content-Type-Options", "nosniff") as MethodDecoratorFactory],
+    [[0, id], [1, Param("documentId") as ParamDecoratorFactory], [2, req]]
+  );
+  decorate(AdminPartnersHttpController, "recordContract", [Post("partners/:id/contracts") as MethodDecoratorFactory], [[0, id], [1, req], [2, body]]);
+}
 controller("broker/enterprise", BrokerEnterpriseController, true);
 decorate(BrokerEnterpriseController, "agencies", [Get("agencies") as MethodDecoratorFactory], [[0, Req() as ParamDecoratorFactory]]);
 decorate(BrokerEnterpriseController, "createAgency", [Post("agencies") as MethodDecoratorFactory], [[0, Body() as ParamDecoratorFactory], [1, Req() as ParamDecoratorFactory]]);
@@ -1738,7 +1880,9 @@ Module({
     AdminRoutingAnomaliesHttpController,
     AdminRoutingOperationsController,
     AdminPartnerIntegrationsController,
-    PartnerApiController
+    PartnerApiController,
+    // Spec 051: last, after the static `partners/sla` and `partners/applications` routes.
+    AdminPartnersHttpController
   ],
   providers: [AssurMatchRuntime, AuthRequiredHttpGuard, MfaRequiredHttpGuard],
   exports: [AssurMatchRuntime]

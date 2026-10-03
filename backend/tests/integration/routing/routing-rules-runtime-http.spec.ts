@@ -10,6 +10,7 @@ import {
 import type { ActorContext } from "../../../src/modules/common/types";
 import { RoutingAuditActions } from "../../../src/modules/routing/routing-audit-actions";
 import { actorHeaders, createRuntimeHttpHarness, readJson, seedPublicRuntime, type RuntimeHttpHarness } from "../runtime-http-test-utils";
+import { seedAcceptedAccreditation } from "../helpers/partner-onboarding-seed";
 
 const superAdmin: ActorContext = { actorId: "super", roles: ["super_admin"], mfaVerified: true };
 
@@ -24,7 +25,7 @@ async function seedPartner(harness: RuntimeHttpHarness, seed: Awaited<ReturnType
   }, superAdmin);
   await harness.runtime.partners.service.authorizeCountry(partner.id, seed.country.id, superAdmin);
   await harness.runtime.partners.service.authorizeProduct(partner.id, seed.product.id, superAdmin);
-  await harness.runtime.partnerLicenses.service.create({
+  const license = await harness.runtime.partnerLicenses.service.create({
     partnerTenantId: partner.id,
     licenseNumber: `LIC-${partner.id.slice(0, 8)}`,
     issuingAuthority: "Regulator",
@@ -34,6 +35,7 @@ async function seedPartner(harness: RuntimeHttpHarness, seed: Awaited<ReturnType
     effectiveDate: "2026-01-01",
     expirationDate: "2030-01-01"
   }, superAdmin);
+  await seedAcceptedAccreditation(harness.runtime, partner.id, license.id);
   return partner;
 }
 

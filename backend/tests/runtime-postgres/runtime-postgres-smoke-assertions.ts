@@ -19,7 +19,8 @@ const REQUIRED_REPOSITORIES = [
   "NotificationsRepository",
   "DataRetentionRepository",
   "RetentionSubjectsRepository",
-  "RegulatoryRegimesRepository"
+  "RegulatoryRegimesRepository",
+  "AccreditationDocumentsRepository"
 ];
 
 export function assertPrismaRuntimeRepositories(modes: Record<string, string | undefined>): void {

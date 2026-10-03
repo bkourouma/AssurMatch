@@ -46,6 +46,12 @@ export interface ActivationChecklistDeps {
   offers: OffersModule;
   quoteForms: QuoteFormDefinitionService;
   consent: ConsentService;
+  /**
+   * Spec 051 R14: per partner readiness (accepted and clean accreditation document, owner user,
+   * recorded contract). Optional so hand-built checklists in unit tests keep their scope; the
+   * runtime always provides it.
+   */
+  partnerReadiness?: { readiness(partnerId: string): Promise<{ documentAccepted: boolean; ownerUser: boolean; contract: boolean }> } | undefined;
 }
 
 export class ActivationChecklistAccessRefusedError extends Error {
@@ -198,10 +204,11 @@ export class ActivationChecklistService {
       this.control("country_public_enabled", "Flag pays public", country.flags.country_public_enabled === true, true),
       this.control("country_comparison_enabled", "Flag comparaison pays", country.flags.country_comparison_enabled === true, true),
       this.control("country_quote_enabled", "Flag devis pays", country.flags.country_quote_enabled === true, true),
-      // Spec 050 T009: opening a country needs at least one active, authorised and licensed partner.
+      // Spec 050 T009 / spec 051 R14: opening a country needs at least one Actif public partner,
+      // authorised, holding a valid licence there and an accepted accreditation document.
       this.control(
         "country_active_licensed_partner",
-        "Au moins un courtier actif, autorise et licencie",
+        "Au moins un courtier actif public, autorise, licencie et avec agrement accepte",
         licensedPartners > 0,
         true,
         licensedPartners > 0 ? `${licensedPartners} courtier(s)` : "aucun courtier actif licencie"
@@ -209,7 +216,10 @@ export class ActivationChecklistService {
     ]);
   }
 
-  /** Active partners authorised for the country and holding a valid, unexpired licence there. */
+  /**
+   * Actif public partners (`active` only: `active_test` never counts) authorised for the country,
+   * holding a valid, unexpired licence there and an accepted, clean accreditation document.
+   */
   private async activeLicensedPartnerCount(countryId: string): Promise<number> {
     const partners = (await this.deps.partners.list()).filter((partner) => partner.status === "active");
     const today = Date.now();
@@ -222,7 +232,8 @@ export class ActivationChecklistService {
       const licensed = licenses.some((license: PartnerLicense) =>
         license.status === "valid" && license.countryId === countryId && new Date(license.expirationDate).getTime() > today
       );
-      if (authorized && licensed) count += 1;
+      const documented = !this.deps.partnerReadiness || (authorized && licensed && (await this.deps.partnerReadiness.readiness(partner.id)).documentAccepted);
+      if (authorized && licensed && documented) count += 1;
     }
     return count;
   }
@@ -286,6 +297,7 @@ export class ActivationChecklistService {
       for (const country of countries) {
         for (const product of products.filter((candidate) => candidate.countryIds.includes(country.id))) {
           const eligibility = await this.partnerEligibility(partner.id, country.id, product.id);
+          const readiness = this.deps.partnerReadiness ? await this.deps.partnerReadiness.readiness(partner.id) : undefined;
           sections.push(this.section(`partner:${partner.id}:${country.id}:${product.id}`, `${partner.legalName} - ${country.isoCode}/${product.key}`, {
             partnerId: partner.id,
             countryId: country.id,
@@ -297,7 +309,13 @@ export class ActivationChecklistService {
             this.control("partner_capacity", "Capacite disponible", partner.capacityStatus !== "blocked" && partner.capacityStatus !== "full", true, partner.capacityStatus),
             this.control("partner_country_authorized", "Autorisation pays", eligibility.countryAuthorized, true),
             this.control("partner_product_authorized", "Autorisation produit", eligibility.productAuthorized, true),
-            this.control("partner_license_valid", "Licence valide sur scope", eligibility.licenseValid, true)
+            this.control("partner_license_valid", "Licence valide sur scope", eligibility.licenseValid, true),
+            // Spec 051 R14: accreditation proof, owner user and contract (FR-027).
+            ...(readiness ? [
+              this.control("partner_document_accepted", "Preuve d'agrement acceptee et saine", readiness.documentAccepted, true),
+              this.control("partner_owner_user", "Utilisateur proprietaire invite ou actif", readiness.ownerUser, true),
+              this.control("partner_contract", "Contrat de partenariat enregistre", readiness.contract, true)
+            ] : [])
           ]));
         }
       }

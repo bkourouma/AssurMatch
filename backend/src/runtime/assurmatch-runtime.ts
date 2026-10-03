@@ -19,7 +19,7 @@ import { PrismaDataRetentionRepository } from "../modules/data-retention/data-re
 import { PrismaRetentionSubjectsRepository, type MemoryRetentionSources } from "../modules/data-retention/retention-subjects.repository";
 import { CountriesModule, publicCountryFlags, type Country } from "../modules/countries/countries.module";
 import { PublicCountryDirectoryService } from "../modules/countries/public-country-directory.service";
-import { DocumentsModule } from "../modules/documents/documents.module";
+import { DocumentsModule, PrismaAccreditationDocumentsRepository } from "../modules/documents/documents.module";
 import { FeatureFlagsModule } from "../modules/feature-flags/feature-flags.module";
 import { FeatureFlagCacheService } from "../modules/feature-flags/feature-flag-cache.service";
 import { PrismaFeatureFlagRepository } from "../modules/feature-flags/feature-flag-repository";
@@ -35,6 +35,7 @@ import { MemoryPartnerApplicationsRepository, PrismaPartnerApplicationsRepositor
 import { PartnerLicensesModule } from "../modules/partner-licenses/partner-licenses.module";
 import { PartnersModule } from "../modules/partners/partners.module";
 import { PublicPartnerDirectoryService } from "../modules/partners/public-partner-directory.service";
+import { PartnerAdminService } from "../modules/partners/partner-admin.service";
 import { ProductsModule } from "../modules/products/products.module";
 import { PublicStatsModule } from "../modules/public-stats/public-stats.module";
 import { WaitlistModule } from "../modules/waitlist/waitlist.module";
@@ -112,6 +113,8 @@ export class AssurMatchRuntime {
   private readonly regulatoryRegimesRepository = this.runtimeRepository(new PrismaRegulatoryRegimesRepository(this.prisma));
   private readonly partnersRepository = this.runtimeRepository(new PrismaPartnersRepository(this.prisma));
   private readonly partnerLicensesRepository = this.runtimeRepository(new PrismaPartnerLicensesRepository(this.prisma));
+  /** Spec 051 R5: accreditation documents were in memory only although the Prisma model existed. */
+  private readonly accreditationDocumentsRepository = this.runtimeRepository(new PrismaAccreditationDocumentsRepository(this.prisma));
   private readonly consentRecordsRepository = this.runtimeRepository(new PrismaConsentRecordsRepository(this.prisma));
   private readonly notificationsRepository = this.runtimeRepository(new PrismaNotificationsRepository(this.prisma));
   private readonly usersRepository = this.runtimeRepository(new PrismaUsersRepository(this.prisma));
@@ -167,7 +170,17 @@ export class AssurMatchRuntime {
   readonly products = new ProductsModule(this.audit.writer, this.productsRepository);
   readonly partners = new PartnersModule(this.audit.writer, this.partnersRepository);
   readonly partnerLicenses = new PartnerLicensesModule(this.audit.writer, this.partnerLicensesRepository);
-  readonly documents = new DocumentsModule(this.audit.writer);
+  /** Shared by uploads and by the retention anonymizer, which deletes the files (spec 046). */
+  readonly documentStorage = resolveDocumentStorage();
+  /** Spec 051 C6: one antivirus for quote documents and accreditation documents. */
+  readonly virusScanner = resolveVirusScanner();
+  /** Spec 051 R5: persisted accreditation documents, scanned synchronously, durable storage outside local/test. */
+  readonly documents = new DocumentsModule(this.audit.writer, {
+    storage: this.documentStorage,
+    scanner: this.virusScanner,
+    repository: this.accreditationDocumentsRepository,
+    requireDurableStorage: process.env.APP_ENV === "production" || process.env.APP_ENV === "preproduction"
+  });
   readonly users = new UsersModule(this.audit.writer, this.usersRepository);
   readonly auth = new AuthModule(this.users.service, this.audit.writer, this.emailDelivery);
   readonly featureFlags = new FeatureFlagsModule(
@@ -289,7 +302,9 @@ export class AssurMatchRuntime {
       events: this.partnerWebhookEvents,
       // Spec 042: multi-send needs the flag open AND the visitor's own recorded consent.
       consent: { findRecord: (id: string) => this.consent.service.findRecord(id) },
-      multiBroker: { isEnabled: () => this.featureFlags.service.isEnabled("multi_broker_routing_enabled") }
+      multiBroker: { isEnabled: () => this.featureFlags.service.isEnabled("multi_broker_routing_enabled") },
+      // Spec 051 R14: routing requires a persisted, accepted and clean accreditation document.
+      accreditation: (partnerTenantId: string) => this.documents.service.hasAcceptedCleanForPartner(partnerTenantId)
     }
   );
     readonly satisfactionSurveys: SatisfactionSurveysModule = new SatisfactionSurveysModule(
@@ -366,12 +381,10 @@ readonly enterprise = new EnterpriseService({
     prospects: { findById: (id: string) => this.prospects.service.require(id).catch(() => undefined) },
     partners: { findById: (id: string) => this.partners.service.require(id).catch(() => undefined) }
   });
-  /** Shared by uploads and by the retention anonymizer, which deletes the files (spec 046). */
-  readonly documentStorage = resolveDocumentStorage();
   readonly quoteDocuments = new QuoteDocumentsService({
     audit: this.audit.writer,
     storage: this.documentStorage,
-    scanner: resolveVirusScanner(),
+    scanner: this.virusScanner,
     queue: this.queues.notifications,
     redis: this.redis.client,
     submissions: this.quoteRequests.submissions,
@@ -435,6 +448,16 @@ readonly enterprise = new EnterpriseService({
     crmActivity: this.leadRepositorySet.crmActivity,
     brokerCrmConfig: this.brokerCrmConfig
   });
+  /** Spec 051: partner onboarding and lifecycle behind the `/admin/partners` routes. */
+  readonly partnerAdmin = new PartnerAdminService({
+    audit: this.audit.writer,
+    partners: this.partners.service,
+    licenses: this.partnerLicenses.service,
+    documents: this.documents.service,
+    countries: this.countries.service,
+    products: this.products.service,
+    listUsers: () => this.users.service.list({ actorId: "system:partner-admin", roles: ["super_admin"], mfaVerified: true })
+  });
   readonly activationChecklist = new ActivationChecklistModule({
     audit: this.audit.writer,
     featureFlags: this.featureFlags.service,
@@ -444,7 +467,8 @@ readonly enterprise = new EnterpriseService({
     partnerLicenses: this.partnerLicenses.service,
     offers: this.offers,
     quoteForms: this.quoteForms.service,
-    consent: this.consent.service
+    consent: this.consent.service,
+    partnerReadiness: this.partnerAdmin
   });
   /** Spec 050: admin catalogue and controlled flag toggles; closes cached public reads on change. */
   readonly catalog = new CatalogModule({
@@ -648,6 +672,7 @@ readonly enterprise = new EnterpriseService({
       RoutingDecisionsRepository: this.leadRepositorySet.decisions?.mode,
       PartnersRepository: this.partnersRepository?.mode,
       PartnerLicensesRepository: this.partnerLicensesRepository?.mode,
+      AccreditationDocumentsRepository: this.accreditationDocumentsRepository?.mode,
       CrmActivityRepository: this.leadRepositorySet.crmActivity?.mode,
       NotificationsRepository: this.notificationsRepository?.mode,
       UsersRepository: this.usersRepository?.mode,

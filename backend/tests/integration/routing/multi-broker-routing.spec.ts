@@ -3,6 +3,7 @@ import { QuoteAuditActions } from "../../../src/modules/audit-logs/quote-audit-a
 import { MULTI_BROKER_CONSENT, SINGLE_BROKER_CONSENT } from "../../../src/modules/leads/quote-routing.service";
 import type { ActorContext } from "../../../src/modules/common/types";
 import { createRuntimeHttpHarness, seedPublicRuntime, type RuntimeHttpHarness } from "../runtime-http-test-utils";
+import { seedAcceptedAccreditation } from "../helpers/partner-onboarding-seed";
 
 const superAdmin: ActorContext = { actorId: "super-admin", roles: ["super_admin"], mfaVerified: true };
 
@@ -19,7 +20,7 @@ async function seedExtraPartners(harness: RuntimeHttpHarness, seed: Awaited<Retu
     }, seed.admin);
     await harness.runtime.partners.service.authorizeCountry(partner.id, seed.country.id, seed.admin);
     await harness.runtime.partners.service.authorizeProduct(partner.id, seed.product.id, seed.admin);
-    await harness.runtime.partnerLicenses.service.create({
+    const license = await harness.runtime.partnerLicenses.service.create({
       partnerTenantId: partner.id,
       licenseNumber: `LIC-${index}`,
       issuingAuthority: "Regulator",
@@ -29,6 +30,7 @@ async function seedExtraPartners(harness: RuntimeHttpHarness, seed: Awaited<Retu
       effectiveDate: "2026-01-01",
       expirationDate: "2030-01-01"
     }, seed.admin);
+    await seedAcceptedAccreditation(harness.runtime, partner.id, license.id);
     partners.push(partner);
   }
   return partners;

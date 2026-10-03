@@ -26,7 +26,8 @@ describe("prisma migration fresh-base readiness", () => {
       "0017_public_site_forms",
       "0018_data_retention",
       "0019_satisfaction_surveys",
-      "0020_catalog_admin_consent_content"
+      "0020_catalog_admin_consent_content",
+      "0021_partner_onboarding_lifecycle"
     ]);
     const schema = readFileSync(join(process.cwd(), "backend", "prisma", "schema.prisma"), "utf8");
     for (const model of ["AuditLog", "FeatureFlag", "ConsentRecord", "QuoteRequest", "LeadAssignment", "BrokerCrmLeadState", "PartnerApiKey", "PartnerWebhookEndpoint", "PartnerWebhookDelivery", "PartnerWebhookAllowlistEntry", "RoutingRule", "RoutingRuleHistory"]) {
@@ -145,5 +146,22 @@ describe("prisma migration fresh-base readiness", () => {
     expect(catalog).not.toMatch(/DROP|DELETE|UPDATE /);
     expect(schema).toMatch(/phoneNationalLengths\s+Int\[\]/);
     expect(schema).toMatch(/language\s+String\s+@default\("fr"\)/);
+    // Spec 051: additive partner lifecycle (enum values, columns, history and contract tables).
+    const onboarding = readFileSync(join(migrationsDir, "0021_partner_onboarding_lifecycle", "migration.sql"), "utf8");
+    expect(onboarding).toContain(`ALTER TYPE "PartnerStatus" ADD VALUE IF NOT EXISTS 'active_test'`);
+    expect(onboarding).toContain(`ALTER TYPE "LicenseStatus" ADD VALUE IF NOT EXISTS 'superseded'`);
+    expect(onboarding).toContain(`ALTER TYPE "DocumentType" ADD VALUE IF NOT EXISTS 'partnership_contract'`);
+    expect(onboarding).toContain('CREATE TABLE IF NOT EXISTS "PartnerStatusHistory"');
+    expect(onboarding).toContain('CREATE TABLE IF NOT EXISTS "PartnerLicenseHistory"');
+    expect(onboarding).toContain('CREATE TABLE IF NOT EXISTS "PartnerContract"');
+    expect(onboarding).toContain('ADD COLUMN IF NOT EXISTS "scanStatus" "AccreditationScanStatus" NOT NULL DEFAULT \'pending\'');
+    expect(onboarding).toContain('CREATE UNIQUE INDEX IF NOT EXISTS "PartnerTenant_countryId_registrationNumber_key" ON "PartnerTenant"("countryId", "registrationNumber") WHERE "countryId" IS NOT NULL AND "registrationNumber" IS NOT NULL');
+    expect(onboarding).not.toMatch(/DROP|DELETE|UPDATE /);
+    for (const later of migrations.filter((name) => name > "0021_partner_onboarding_lifecycle")) {
+      expect(readFileSync(join(migrationsDir, later, "migration.sql"), "utf8"), later).not.toContain("PartnerTenant_countryId_registrationNumber_key");
+    }
+    for (const model of ["PartnerStatusHistory", "PartnerLicenseHistory", "PartnerContract"]) expect(schema).toContain(`model ${model}`);
+    expect(schema).toContain("PartnerTenant_countryId_registrationNumber_key");
+    expect(schema).toMatch(/enum AccreditationScanStatus/);
   });
 });

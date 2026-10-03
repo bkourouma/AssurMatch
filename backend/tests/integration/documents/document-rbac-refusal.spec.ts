@@ -7,14 +7,14 @@ describe("document RBAC refusal", () => {
   it("audits refused access without document permission", async () => {
     const audit = new AuditLogWriter();
     const documents = new DocumentsService(audit);
-    const document = documents.register({
+    const document = await documents.register({
       partnerTenantId: "00000000-0000-4000-8000-000000000060",
       documentType: "license",
       storageKey: "partners/doc.pdf",
       checksum: "sha256:test"
     }, superAdminActor);
 
-    expect(() => documents.getAuthorized(document.id, { roles: ["broker_read_only"], partnerTenantId: "00000000-0000-4000-8000-000000000061" })).toThrow();
+    await expect(documents.getAuthorized(document.id, { roles: ["broker_read_only"], partnerTenantId: "00000000-0000-4000-8000-000000000061" })).rejects.toThrow();
     expect(audit.all().some((entry) => entry.action === "accreditation_document.access_refused")).toBe(true);
   });
 });

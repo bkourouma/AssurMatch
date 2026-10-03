@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import { activationChecklistResponseSchema, type ActivationChecklistResponse } from "../../../../packages/shared/contracts/activation-checklist.contracts";
 import { ActivationChecklistAuditActions } from "../../../src/modules/activation-checklist/activation-checklist-audit-actions";
 import { actorHeaders, createRuntimeHttpHarness, readJson, type RuntimeHttpHarness } from "../runtime-http-test-utils";
+import { seedAcceptedAccreditation, seedOwnerAndContract } from "../helpers/partner-onboarding-seed";
 
 describe("activation checklist runtime HTTP", () => {
   let harness: RuntimeHttpHarness | undefined;
@@ -68,7 +69,7 @@ describe("activation checklist runtime HTTP", () => {
     }, admin);
     await harness.runtime.partners.service.authorizeCountry(partner.id, country.id, admin);
     await harness.runtime.partners.service.authorizeProduct(partner.id, product.id, admin);
-    await harness.runtime.partnerLicenses.service.create({
+    const license = await harness.runtime.partnerLicenses.service.create({
       partnerTenantId: partner.id,
       licenseNumber: "LIC-CHECK",
       issuingAuthority: "Regulator",
@@ -78,6 +79,9 @@ describe("activation checklist runtime HTTP", () => {
       effectiveDate: "2026-01-01",
       expirationDate: "2030-01-01"
     }, admin);
+    // Spec 051 R14: accepted accreditation proof, owner user and contract complete the partner sections.
+    await seedAcceptedAccreditation(harness.runtime, partner.id, license.id);
+    await seedOwnerAndContract(harness.runtime, partner.id);
     const offer = await harness.runtime.offers.adminService.create({
       countryId: country.id,
       productId: product.id,

@@ -18,6 +18,7 @@ const extractedDomainFiles = [
   "backend/src/modules/leads/broker-crm-activity.service.ts",
   "backend/src/modules/partners/partners.module.ts",
   "backend/src/modules/partner-licenses/partner-licenses.module.ts",
+  "backend/src/modules/documents/documents.module.ts",
   "backend/src/modules/notifications/notifications.module.ts",
   "backend/src/modules/waitlist/waitlist.module.ts",
   "backend/src/modules/partner-applications/partner-applications.module.ts",

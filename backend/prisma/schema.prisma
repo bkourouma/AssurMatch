@@ -27,9 +27,13 @@ enum PartnerPlan {
   enterprise
 }
 
+/// Spec 051 R1: draft = Prospect, pending_compliance = En vérification, active_test = Actif test,
+/// active = Actif public (the only routable and public status), suspended = Suspendu, retired = Résilié.
+/// "Expiré" is computed from the licences, never stored.
 enum PartnerStatus {
   draft
   pending_compliance
+  active_test
   active
   suspended
   retired
@@ -95,6 +99,7 @@ enum LicenseStatus {
   suspended
   invalid
   revoked
+  superseded
 }
 
 enum DocumentStatus {
@@ -112,7 +117,16 @@ enum DocumentType {
   identity
   mandate
   compliance_certificate
+  partnership_contract
   other
+}
+
+/// Spec 051 R5: antivirus verdict of an accreditation document. Only `clean` files can be accepted or served.
+enum AccreditationScanStatus {
+  pending
+  clean
+  infected
+  failed
 }
 
 enum FeatureFlagScopeType {
@@ -553,16 +567,78 @@ model PartnerTenant {
   primaryWhatsApp   String
   quotaMonthlyLeads Int            @default(0)
   capacityStatus    CapacityStatus @default(available)
+  /// Spec 051 R8: primary country (Admin Pays scope), contacts, insurers, contractual SLA, lifecycle.
+  countryId              String?
+  adminContactName       String?
+  adminContactEmail      String?
+  adminContactPhone      String?
+  commercialContactName  String?
+  commercialContactEmail String?
+  commercialContactPhone String?
+  partnerInsurers        String[]       @default([])
+  slaTargetMinutes       Int?
+  statusReason           String?
+  previousActiveStatus   PartnerStatus?
   createdAt         DateTime       @default(now())
   updatedAt         DateTime       @updatedAt
   createdById       String?
+
+  /// The partial unique index "PartnerTenant_countryId_registrationNumber_key" on (countryId,
+  /// registrationNumber) WHERE both are NOT NULL is managed in SQL (migration 0021): Prisma cannot
+  /// express it, and a regenerated migration must never drop it (guarded by prisma-migrations.spec.ts).
+  @@index([countryId, status])
+}
+
+/// Spec 051 R2: every partner status transition, with its reason and actor.
+model PartnerStatusHistory {
+  id              String         @id @default(uuid())
+  partnerTenantId String
+  fromStatus      PartnerStatus?
+  toStatus        PartnerStatus
+  reason          String
+  actorId         String?
+  createdAt       DateTime       @default(now())
+
+  @@index([partnerTenantId, createdAt])
+}
+
+/// Spec 051 R4: every licence status change.
+model PartnerLicenseHistory {
+  id              String         @id @default(uuid())
+  licenseId       String
+  partnerTenantId String
+  fromStatus      LicenseStatus?
+  toStatus        LicenseStatus
+  reason          String
+  actorId         String?
+  createdAt       DateTime       @default(now())
+
+  @@index([licenseId, createdAt])
+  @@index([partnerTenantId, createdAt])
+}
+
+/// Spec 051 R6: partnership contract signed outside the platform and recorded by an admin.
+model PartnerContract {
+  id              String   @id @default(uuid())
+  partnerTenantId String
+  version         String
+  signedAt        DateTime
+  signatoryName   String
+  documentId      String
+  recordedById    String?
+  createdAt       DateTime @default(now())
+
+  @@unique([partnerTenantId, version])
 }
 
 model PartnerCountryAuthorization {
   id              String   @id @default(uuid())
   partnerTenantId String
   countryId       String
+  /// Spec 051 R7: `active` or `withdrawn` (written by the application).
   status          String   @default("pending")
+  withdrawnAt      DateTime?
+  withdrawalReason String?
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
   createdById     String?
@@ -574,7 +650,10 @@ model PartnerProductAuthorization {
   id              String   @id @default(uuid())
   partnerTenantId String
   productId       String
+  /// Spec 051 R7: `active` or `withdrawn` (written by the application).
   status          String   @default("pending")
+  withdrawnAt      DateTime?
+  withdrawalReason String?
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
   createdById     String?
@@ -668,6 +747,9 @@ model PartnerLicense {
   expirationDate  DateTime
   validatedById   String?
   validatedAt     DateTime?
+  /// Spec 051 R4: reason of the last status change and the licence this one renews.
+  statusReason    String?
+  renewsLicenseId String?
   createdAt       DateTime      @default(now())
   updatedAt       DateTime      @updatedAt
   createdById     String?
@@ -684,6 +766,14 @@ model AccreditationDocument {
   expirationDate  DateTime?
   reviewedById    String?
   reviewedAt      DateTime?
+  /// Spec 051 R5: uploaded file metadata, antivirus verdict and review reason.
+  fileName        String?
+  mimeType        String?
+  sizeBytes       Int?
+  scanStatus      AccreditationScanStatus @default(pending)
+  scanEngine      String?
+  scannedAt       DateTime?
+  reviewReason    String?
   retentionUntil  DateTime
   createdAt       DateTime       @default(now())
   updatedAt       DateTime       @updatedAt
@@ -1505,6 +1595,10 @@ model PartnerApplication {
   reviewedAt              DateTime?
   reviewNote              String?
   partnerTenantId         String?
+  /// Spec 051 R10: closed-list rejection reason, application language and decision date.
+  rejectionReasonCode     String?
+  locale                  String                   @default("fr")
+  decidedAt               DateTime?
   ipHash                  String?
   retentionUntil          DateTime
   anonymizedAt            DateTime?

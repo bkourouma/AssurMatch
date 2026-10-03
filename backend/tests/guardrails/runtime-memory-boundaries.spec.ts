@@ -20,7 +20,8 @@ const extractedRepositoryFiles = [
   "backend/src/modules/contact-messages/contact-messages.repository.ts",
   "backend/src/modules/data-retention/data-retention.repository.ts",
   "backend/src/modules/data-retention/retention-subjects.repository.ts",
-  "backend/src/modules/regulatory-regimes/regulatory-regimes.repository.ts"
+  "backend/src/modules/regulatory-regimes/regulatory-regimes.repository.ts",
+  "backend/src/modules/documents/accreditation-documents.repository.ts"
 ];
 
 describe("runtime memory boundaries", () => {
@@ -59,7 +60,8 @@ describe("runtime memory boundaries", () => {
       "PrismaContactMessagesRepository",
       "PrismaDataRetentionRepository",
       "PrismaRetentionSubjectsRepository",
-      "PrismaRegulatoryRegimesRepository"
+      "PrismaRegulatoryRegimesRepository",
+      "PrismaAccreditationDocumentsRepository"
     ]) {
       expect(runtime).toContain(repositoryName);
     }

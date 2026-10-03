@@ -241,7 +241,10 @@ export class EnterpriseService {
   async adminSlaOverview(actor: ActorContext): Promise<AdminPartnerSlaRow[]> {
     if (actor.mfaVerified !== true) this.refuse(actor, "mfa_required");
     if (!actor.roles.some((role) => roleHasPermission(role, "partners:read"))) this.refuse(actor, "forbidden_role");
-    const [partners, branding] = await Promise.all([this.deps.partners.list(), this.repository.listBranding()]);
+    const [allPartners, branding] = await Promise.all([this.deps.partners.list(), this.repository.listBranding()]);
+    // Spec 051 R13: the Admin Pays now reads partners; a country-scoped admin only sees its countries.
+    const scoped = !actor.roles.includes("super_admin") && Boolean(actor.countryScopes?.length);
+    const partners = scoped ? allPartners.filter((partner) => Boolean(partner.countryId) && actor.countryScopes!.includes(partner.countryId as string)) : allPartners;
     const targets = new Map(branding.map((entry) => [entry.partnerTenantId, entry.firstActionTargetMinutes]));
     const rows: AdminPartnerSlaRow[] = [];
     for (const partner of partners) {

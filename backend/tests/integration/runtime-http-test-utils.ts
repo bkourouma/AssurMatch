@@ -7,6 +7,7 @@ import type { ActorContext } from "../../src/modules/common/types";
 import { signActorToken } from "../../src/modules/auth/http-auth-token.service";
 import { AssurMatchRuntime } from "../../src/runtime/assurmatch-runtime";
 import { consentContentHash } from "../../../packages/shared/contracts/consent-content";
+import { seedAcceptedAccreditation } from "./helpers/partner-onboarding-seed";
 
 export interface RuntimeHttpHarness {
   app: INestApplication;
@@ -136,7 +137,7 @@ export async function seedPublicRuntime(runtime: AssurMatchRuntime) {
   }, admin);
   await runtime.partners.service.authorizeCountry(partner.id, country.id, admin);
   await runtime.partners.service.authorizeProduct(partner.id, product.id, admin);
-  await runtime.partnerLicenses.service.create({
+  const license = await runtime.partnerLicenses.service.create({
     partnerTenantId: partner.id,
     licenseNumber: "LIC-RUNTIME",
     issuingAuthority: "Regulator",
@@ -146,6 +147,8 @@ export async function seedPublicRuntime(runtime: AssurMatchRuntime) {
     effectiveDate: "2026-01-01",
     expirationDate: "2030-01-01"
   }, admin);
+  // Spec 051 R14: routing reads a persisted, accepted and clean accreditation document.
+  await seedAcceptedAccreditation(runtime, partner.id, license.id);
   const offer = await runtime.offers.adminService.create({
     countryId: country.id,
     productId: product.id,

@@ -18,6 +18,7 @@ describe("partner and license memory repositories", () => {
       primaryWhatsApp: "+2250102030405",
       quotaMonthlyLeads: 10,
       capacityStatus: "available",
+      partnerInsurers: [],
       createdAt: now,
       updatedAt: now
     };
