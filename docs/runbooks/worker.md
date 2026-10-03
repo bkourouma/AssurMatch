@@ -72,3 +72,12 @@ démarrage suivant.
 Le lanceur local continue d'utiliser `scripts/local-app/notification-worker-loop.mjs` (refusé en
 préproduction/production). `npm run worker:run` lance le worker de production contre la configuration
 courante.
+
+## Supervision (spec 058)
+
+Après chaque cycle, le worker publie dans Redis (`assurmatch:worker:status`) l'heure du cycle, l'arriéré
+de notifications et des compteurs cumulés d'échecs ; l'API les expose sur `/metrics`
+(`assurmatch_worker_last_cycle_age_seconds`, `assurmatch_notifications_backlog`,
+`assurmatch_worker_task_failures_total`, `assurmatch_worker_task_errors_total`). Optionnel :
+`ASSURMATCH_WORKER_PUSH_URL` (moniteur Push Uptime Kuma, `status=down` si une tâche a échoué). Alertes :
+`docs/runbooks/monitoring-alerts.md`.
