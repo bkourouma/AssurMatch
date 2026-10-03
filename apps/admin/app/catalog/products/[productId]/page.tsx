@@ -22,7 +22,7 @@ import {
   StatusBadge,
   catalogStatusTones
 } from "../../../lib/ui/admin-ui";
-import { EditProductForm, FlagToggleForm } from "../../catalog-forms";
+import { EditProductForm, FlagToggleForm, ProductStatusForm } from "../../catalog-forms";
 
 interface ProductDetailPageProps {
   params: Promise<{ productId: string }>;
@@ -88,6 +88,8 @@ export default async function CatalogProductDetailPage({ params }: ProductDetail
       </Card>
 
       <EditProductForm product={product} />
+
+      <ProductStatusForm productId={product.id} currentStatus={product.status} canApprovePublic={canApproveCompliance} />
 
       <Card title="Flags globaux du produit" description="Un formulaire par flag. Désactiver n'a aucune condition ; activer vérifie les conditions (formulaire et consentement publiés).">
         <DataTable

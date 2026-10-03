@@ -70,7 +70,16 @@ export async function relayBrokerFile(path: string): Promise<Response> {
   }
 }
 
-/** 303 back to the page after a form post (the browser then GETs the page with the notice). */
-export function seeOther(request: Request, location: string): Response {
-  return Response.redirect(new URL(location, request.url), 303);
+/**
+ * 303 back to the page after a form post (the browser then GETs the page with the notice).
+ *
+ * Spec 059 fix: the Location is RELATIVE. `new URL(location, request.url)` resolved against the
+ * address Next.js listens on (`http://localhost:<port>`), not the one the browser used, so behind a
+ * proxy or on 127.0.0.1 the broker was sent to another origin without its session cookie and
+ * landed on the login page right after sending a proposal. A relative Location (RFC 9110) always
+ * stays on the origin of the request. `request` is kept for the call sites' signature.
+ */
+export function seeOther(_request: Request, location: string): Response {
+  const path = location.startsWith("/") && !location.startsWith("//") ? location : "/";
+  return new Response(null, { status: 303, headers: { Location: path } });
 }

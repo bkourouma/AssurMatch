@@ -48,6 +48,8 @@ const NOTICES: Record<string, { tone: "info" | "warning" | "danger"; message: st
 
 const CONTACT_LABELS: Record<string, string> = {
   fullName: "Nom",
+  // Spec 059: the public form sends `displayName`; the raw key was shown to the broker.
+  displayName: "Nom",
   firstName: "Prenom",
   lastName: "Nom",
   email: "Email",

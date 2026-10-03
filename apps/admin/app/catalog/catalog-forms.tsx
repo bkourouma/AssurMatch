@@ -4,6 +4,7 @@ import { useActionState, useId } from "react";
 import type { AdminCountryData, AdminProductData, AdminRegulatoryRegimeData } from "../lib/admin-api";
 import {
   changeCountryStatusAction,
+  changeProductStatusAction,
   createCountryAction,
   createCountryLinkAction,
   createProductAction,
@@ -16,7 +17,7 @@ import {
   updateRegimeAction,
   type CatalogActionState
 } from "../lib/catalog-actions";
-import { COUNTRY_STATUS_OPTIONS, LANGUAGE_OPTIONS, REGULATORY_FAMILY_OPTIONS } from "../lib/catalog-messages";
+import { COUNTRY_STATUS_OPTIONS, LANGUAGE_OPTIONS, PRODUCT_STATUS_OPTIONS, REGULATORY_FAMILY_OPTIONS } from "../lib/catalog-messages";
 import { CatalogActionResult } from "../lib/ui/catalog-action-result";
 import {
   Button,
@@ -171,6 +172,40 @@ export function CountryStatusForm({ countryId, currentStatus, canApprovePublic }
           <Notice tone="warning">Le statut « public » est refusé tant que la checklist d'activation du pays a un contrôle bloquant.</Notice>
         ) : (
           <p className="bo-description">L'ouverture au public est réservée à la conformité (compliance_admin, super_admin).</p>
+        )}
+        <FormActions>
+          <Button type="submit" pending={pending} pendingLabel="Changement..." disabled={options.length === 0}>Changer le statut</Button>
+        </FormActions>
+      </Form>
+    </Card>
+  );
+}
+
+/** Spec 059: product status change (the API accepted it, no screen offered it). */
+export function ProductStatusForm({ productId, currentStatus, canApprovePublic }: {
+  productId: string;
+  currentStatus: string;
+  canApprovePublic: boolean;
+}) {
+  const [state, formAction, pending] = useActionState(changeProductStatusAction, initialState);
+  const base = useId();
+  const options = PRODUCT_STATUS_OPTIONS
+    .filter((status) => status !== currentStatus)
+    .filter((status) => status !== "public" || canApprovePublic)
+    .map((status) => ({ value: status, label: status }));
+  return (
+    <Card title="Statut du produit">
+      <Form action={formAction} data-catalog-form="product-status">
+        <CatalogActionResult state={state} scope={{ productId }} />
+        <input type="hidden" name="productId" value={productId} />
+        <Field id={`${base}-status`} label="Nouveau statut" required>
+          <Select {...fieldControlProps(`${base}-status`, { required: true })} name="status" options={options} />
+        </Field>
+        <ReasonField id={`${base}-reason`} />
+        {canApprovePublic ? (
+          <Notice tone="warning">Le statut « public » exige le flag global « Exposition publique du produit » et au moins un pays lié. Le produit est global : une suspension le coupe dans tous les pays.</Notice>
+        ) : (
+          <p className="bo-description">L&apos;ouverture au public est réservée à la conformité (compliance_admin, super_admin).</p>
         )}
         <FormActions>
           <Button type="submit" pending={pending} pendingLabel="Changement..." disabled={options.length === 0}>Changer le statut</Button>

@@ -978,6 +978,22 @@ export class PublicPartnersController {
   plans(country: string | undefined, request: AssurMatchHttpRequest) {
     return this.runtime.billing.plans.listPublicForCountry(parseParam("country", country ?? "", isoCountrySchema), actorFromRequest(request));
   }
+
+  /**
+   * Spec 059 (SC-02 fix): countries accepting broker applications (public or pilot status AND
+   * `country_broker_onboarding_enabled`) with the products a broker may apply for. Public data
+   * only (codes and names), the same the application endpoint already validates against.
+   */
+  async applicationOptions() {
+    const countries = (await this.runtime.countries.service.listAdmin())
+      .filter((country) => (country.status === "public" || country.status === "pilot") && country.flags.country_broker_onboarding_enabled === true)
+      .sort((a, b) => a.name.localeCompare(b.name));
+    return Promise.all(countries.map(async (country) => ({
+      isoCode: country.isoCode,
+      name: country.name,
+      products: await this.runtime.products.service.listForBrokerOnboarding(country.id)
+    })));
+  }
 }
 
 export class PublicPartnerDirectoryController {
@@ -2006,6 +2022,7 @@ decorate(PublicContactController, "submit", [Post() as MethodDecoratorFactory, H
 controller("partners", PublicPartnersController);
 decorate(PublicPartnersController, "apply", [Post("applications") as MethodDecoratorFactory, HttpCode(202) as MethodDecoratorFactory], [[0, Body() as ParamDecoratorFactory], [1, Req() as ParamDecoratorFactory]]);
 decorate(PublicPartnersController, "plans", [Get("plans") as MethodDecoratorFactory], [[0, Query("country") as ParamDecoratorFactory], [1, Req() as ParamDecoratorFactory]]);
+decorate(PublicPartnersController, "applicationOptions", [Get("applications/options") as MethodDecoratorFactory]);
 
 controller("countries/:countryCode/partners", PublicPartnerDirectoryController);
 decorate(PublicPartnerDirectoryController, "list", [Get() as MethodDecoratorFactory], [[0, Param("countryCode") as ParamDecoratorFactory], [1, Req() as ParamDecoratorFactory]]);

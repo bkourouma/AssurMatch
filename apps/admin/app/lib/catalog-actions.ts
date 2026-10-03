@@ -218,6 +218,22 @@ export async function updateProductAction(_previous: CatalogActionState, formDat
   return toState(result, "Fiche produit enregistrée.", ["/catalog/products", `/catalog/products/${productId}`]);
 }
 
+/**
+ * Spec 059 (reachability fix): the product status (draft -> internal -> public ...) was accepted by
+ * the API (`PATCH /admin/products/:id`, `adminProductUpdateSchema.status`) and required by the
+ * activation checklist ("Statut produit public"), but no back-office screen could change it, so a
+ * country could never be opened from the UI. Same shape as the country status action.
+ */
+export async function changeProductStatusAction(_previous: CatalogActionState, formData: FormData): Promise<CatalogActionState> {
+  const reason = text(formData, "reason");
+  const invalid = reasonError(reason);
+  if (invalid) return invalid;
+  const productId = text(formData, "productId");
+  const status = text(formData, "status") as NonNullable<AdminProductWriteInput["status"]>;
+  const result = await updateAdminProduct(productId, { status, reason });
+  return toState(result, `Statut du produit passé à « ${status} ».`, ["/catalog/products", `/catalog/products/${productId}`, "/activation-checklist"]);
+}
+
 function regimeFields(formData: FormData): RegulatoryRegimeWriteInput {
   const name = optionalText(formData, "name");
   const description = optionalText(formData, "description");

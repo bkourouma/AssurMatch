@@ -217,7 +217,21 @@ async function readPublic<T>(path: string, emptyValue: T, init?: PublicFetchInit
  * Offers, quote forms, request status and documents keep `no-store` so nothing stale is shown.
  */
 export function readPublicCached<T>(path: string, emptyValue: T, revalidate = 600): Promise<PublicApiState<T>> {
-  return readPublic<T>(path, emptyValue, { next: { revalidate } });
+  const seconds = publicCatalogRevalidateSeconds(revalidate);
+  return seconds > 0 ? readPublic<T>(path, emptyValue, { next: { revalidate: seconds } }) : readPublic<T>(path, emptyValue);
+}
+
+/**
+ * Spec 059: `ASSURMATCH_PUBLIC_CACHE_SECONDS` (server runtime variable, never inlined) overrides the
+ * catalogue cache lifetime; `0` reads the API on every request. The end-to-end stack sets it to 0:
+ * with the ten-minute default, a country opened (or closed) in the back-office stayed invisible (or
+ * visible) on the public site for up to ten minutes, which no journey test can wait for.
+ */
+function publicCatalogRevalidateSeconds(fallback: number): number {
+  const raw = process.env.ASSURMATCH_PUBLIC_CACHE_SECONDS;
+  if (raw === undefined || raw.trim() === "") return fallback;
+  const value = Number(raw);
+  return Number.isInteger(value) && value >= 0 ? value : fallback;
 }
 
 /** Public country exposed by GET /countries (only publicly activated countries are returned). */
@@ -242,6 +256,18 @@ export interface PublicProductSummary {
 
 export function listPublicCountries() {
   return readPublic<PublicCountrySummary[]>("/countries", []);
+}
+
+/** Spec 059: a country accepting broker applications, with the products one may apply for. */
+export interface PartnerApplicationCountryOptions {
+  isoCode: string;
+  name: string;
+  products: Array<{ key: string; name: string }>;
+}
+
+/** GET /partners/applications/options - never cached: onboarding opens and closes from the back-office. */
+export function listPartnerApplicationOptions() {
+  return readPublic<PartnerApplicationCountryOptions[]>("/partners/applications/options", []);
 }
 
 export function listPublicProducts(countryCode: string) {

@@ -241,6 +241,20 @@ export class ProductsService {
     return this.repository.list(countryId);
   }
 
+  /**
+   * Spec 059 (SC-02 fix): products a broker may apply for in a country - every product linked to
+   * it and not draft, suspended or retired (country link included), whatever its public journey
+   * flags. The first broker of a country applies BEFORE the country opens to visitors (opening
+   * requires a licensed broker), so the visitor-facing list is always empty at that point.
+   */
+  async listForBrokerOnboarding(countryId: string): Promise<Array<{ key: string; name: string }>> {
+    return (await this.repository.list(countryId))
+      .map((product) => this.forCountry(product, countryId))
+      .filter((product) => product.countryIds.includes(countryId) && !["draft", "suspended", "retired"].includes(product.status))
+      .map((product) => ({ key: product.key, name: product.name }))
+      .sort((a, b) => a.name.localeCompare(b.name));
+  }
+
   listPublic(countryId: string): Promise<Product[]> {
     return this.repository.listPublic(countryId);
   }

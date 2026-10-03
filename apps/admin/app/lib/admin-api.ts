@@ -1183,6 +1183,8 @@ export interface AdminProductWriteInput {
   sensitivity?: AdminProductView["sensitivity"];
   requiresDocuments?: boolean;
   requiresManualReview?: boolean;
+  /** Spec 059: status change from the product page (`adminProductUpdateSchema.status`). */
+  status?: "draft" | "internal" | "pilot" | "public" | "suspended" | "retired";
 }
 
 export function readAdminProducts(filters: { countryId?: string } = {}) {
