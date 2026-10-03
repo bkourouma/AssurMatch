@@ -36,6 +36,9 @@ export interface QuoteRequestRecord {
   productId: string;
   productKey: string;
   selectedOfferId?: string;
+  /** Spec 052 R7: outcome of the verification of `selectedOfferId` (absent without offer). */
+  selectedOfferOutcome?: "accepted" | "ignored";
+  selectedOfferIgnoredReason?: string;
   quoteFormDefinitionId: string;
   /** Spec 050 R6: language of the submitted form (`fr` for every request created before the spec). */
   language?: string;
@@ -74,6 +77,19 @@ const QUOTE_NOT_AVAILABLE = "Quote status not available";
 const CONSENT_WITHDRAWAL_LIMIT_PER_WINDOW = 5;
 const CONSENT_WITHDRAWAL_WINDOW_SECONDS = 3600;
 
+/**
+ * Spec 052 R7: verifies the offer a visitor selected (exists, publicly visible with the catalogue
+ * rules, same country and product). `partnerTenantId` is the broker of an accepted offer.
+ */
+export interface SelectedOfferVerifier {
+  verify(offerId: string, countryId: string, productId: string): Promise<{ accepted: true; partnerTenantId?: string | undefined } | { accepted: false; reason: string }>;
+}
+
+/** Spec 052 R8: consent recipient category recorded when the broker of the selected offer is named. */
+export function selectedOfferRecipient(partnerTenantId: string): string {
+  return `partner:${partnerTenantId}`;
+}
+
 export interface QuoteSubmissionDependencies {
   findCountryByCode: (countryCode: string) => Country | undefined | Promise<Country | undefined>;
   findProductByKey: (productKey: string) => Product | undefined | Promise<Product | undefined>;
@@ -95,6 +111,8 @@ export interface QuoteSubmissionDependencies {
   /** Spec 045 consent withdrawal: per-IP rate limit on the unauthenticated withdrawal endpoint. */
   abuseGuard?: PublicAbuseGuardService;
   isGlobalFlagEnabled?: (key: string) => boolean;
+  /** Spec 052 R7: absent means the selected offer is recorded without verification (legacy unit tests). */
+  selectedOffers?: SelectedOfferVerifier;
 }
 
 export class QuoteSubmissionService {
@@ -163,6 +181,7 @@ export class QuoteSubmissionService {
       });
       throw new Error("Consent text mismatch");
     }
+    const selectedOffer = await this.verifySelectedOffer(parsed.selectedOfferId, country.id, product.id, actor);
     const contact = this.deps.identity.normalize({
       ...(parsed.contact.displayName ? { displayName: parsed.contact.displayName } : {}),
       email: parsed.contact.email,
@@ -197,7 +216,10 @@ export class QuoteSubmissionService {
       channel: "public_web",
       // Spec 042 D2: the visitor decides. The category recorded here is what routing will honour,
       // so a request submitted without the opt-in can never be fanned out later.
-      intendedRecipient: parsed.consent.multiBrokerAccepted ? MULTI_BROKER_CONSENT : SINGLE_BROKER_CONSENT,
+      // Spec 052 R8: the broker of an accepted offer is the named recipient (never a fan-out).
+      intendedRecipient: selectedOffer?.partnerTenantId
+        ? selectedOfferRecipient(selectedOffer.partnerTenantId)
+        : parsed.consent.multiBrokerAccepted ? MULTI_BROKER_CONSENT : SINGLE_BROKER_CONSENT,
       status: "granted",
       grantedAt: new Date().toISOString()
     }, actor);
@@ -243,6 +265,8 @@ export class QuoteSubmissionService {
       productId: product.id,
       productKey: product.key,
       ...(parsed.selectedOfferId ? { selectedOfferId: parsed.selectedOfferId } : {}),
+      ...(selectedOffer ? { selectedOfferOutcome: selectedOffer.outcome } : {}),
+      ...(selectedOffer?.ignoredReason ? { selectedOfferIgnoredReason: selectedOffer.ignoredReason } : {}),
       quoteFormDefinitionId: parsed.formDefinitionId,
       language: parsed.language,
       prospectId: prospect.id,
@@ -268,7 +292,9 @@ export class QuoteSubmissionService {
       result: "success",
       context: { duplicateStatus: quote.duplicateStatus, routingStatus: quote.routingStatus }
     });
-    const routingResult = quote.routingStatus === "manual_review_required" ? undefined : await this.deps.routing?.route(quote, actor);
+    const routingResult = quote.routingStatus === "manual_review_required"
+      ? undefined
+      : await this.deps.routing?.route({ ...quote, ...(selectedOffer?.partnerTenantId ? { preferredPartnerTenantId: selectedOffer.partnerTenantId } : {}) }, actor);
     if (routingResult?.assignment) {
       quote.status = "routed";
       quote.routingStatus = "assigned";
@@ -299,8 +325,39 @@ export class QuoteSubmissionService {
           ? `Votre demande indicative a ete transmise a ${routingResult?.assignments.length} courtiers partenaires eligibles, comme vous l'avez accepte.`
           : "Votre demande indicative a ete transmise au courtier partenaire identifie."
         : "Votre demande a ete recue et reste a confirmer par un courtier partenaire.",
-      verificationToken: token
+      verificationToken: token,
+      selectedOfferPartnerRetained: this.selectedOfferPartnerRetained(selectedOffer, routingResult?.selectedOfferOutcome)
     };
+  }
+
+  /** FR-019: `true` broker of the offer retained, `false` routed elsewhere or offer ignored, `null` without offer. */
+  private selectedOfferPartnerRetained(selectedOffer: { outcome: "accepted" | "ignored"; partnerTenantId?: string | undefined } | undefined, routingOutcome: string | undefined): boolean | null {
+    if (!selectedOffer) return null;
+    if (selectedOffer.outcome === "ignored") return false;
+    if (!selectedOffer.partnerTenantId) return null;
+    return routingOutcome === "retained";
+  }
+
+  /**
+   * Spec 052 R7 / FR-016: a selected offer that does not exist, is not public (unpublished, expired,
+   * suspended, broker not eligible) or belongs to another country or product is ignored: the request
+   * goes on without it and the discrepancy is audited, the visitor is never blocked.
+   */
+  private async verifySelectedOffer(offerId: string | undefined, countryId: string, productId: string, actor: ActorContext): Promise<{ outcome: "accepted" | "ignored"; partnerTenantId?: string | undefined; ignoredReason?: string } | undefined> {
+    if (!offerId || !this.deps.selectedOffers) return undefined;
+    const verdict = await this.deps.selectedOffers.verify(offerId, countryId, productId).catch(() => ({ accepted: false as const, reason: "offer_verification_failed" }));
+    if (verdict.accepted) return { outcome: "accepted", ...(verdict.partnerTenantId ? { partnerTenantId: verdict.partnerTenantId } : {}) };
+    this.audit.write({
+      actor,
+      action: QuoteAuditActions.quoteRequestSelectedOfferIgnored,
+      targetType: "Offer",
+      targetId: offerId,
+      scope: { countryId, productId },
+      result: "refused",
+      reason: verdict.reason,
+      context: {}
+    });
+    return { outcome: "ignored", ignoredReason: verdict.reason };
   }
 
   findById(id: string): Promise<QuoteRequestRecord | undefined> {

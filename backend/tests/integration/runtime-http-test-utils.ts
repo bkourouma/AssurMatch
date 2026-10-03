@@ -8,6 +8,7 @@ import { signActorToken } from "../../src/modules/auth/http-auth-token.service";
 import { AssurMatchRuntime } from "../../src/runtime/assurmatch-runtime";
 import { consentContentHash } from "../../../packages/shared/contracts/consent-content";
 import { seedAcceptedAccreditation } from "./helpers/partner-onboarding-seed";
+import { publishOffer } from "./helpers/offer-test-helpers";
 
 export interface RuntimeHttpHarness {
   app: INestApplication;
@@ -149,7 +150,8 @@ export async function seedPublicRuntime(runtime: AssurMatchRuntime) {
   }, admin);
   // Spec 051 R14: routing reads a persisted, accepted and clean accreditation document.
   await seedAcceptedAccreditation(runtime, partner.id, license.id);
-  const offer = await runtime.offers.adminService.create({
+  // Spec 052: created, submitted, then validated (the public catalogue reads published versions only).
+  const offer = await publishOffer(runtime.offers, {
     countryId: country.id,
     productId: product.id,
     partnerTenantId: partner.id,
@@ -159,8 +161,7 @@ export async function seedPublicRuntime(runtime: AssurMatchRuntime) {
     validFrom: "2026-01-01T00:00:00.000Z",
     validUntil: "2030-01-01T00:00:00.000Z",
     reason: "runtime offer seed"
-  }, admin);
-  await runtime.offers.adminService.validate(offer.id, { validationStatus: "validated", reason: "runtime validate" }, admin);
+  }, admin, admin);
   return { admin, country, product, partner, consentText, form, offer };
 }
 

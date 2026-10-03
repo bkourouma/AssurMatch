@@ -8,7 +8,7 @@ import {
   reasonSchema,
   uuidSchema
 } from "../validation/common.schemas";
-import { findForbiddenWording } from "./content-safety";
+import { adminOfferContentObjectSchema, offerContentGuaranteeSchema, offerContentPaymentFlexibilitySchema, refineOfferContent } from "./offer-content";
 
 export const quoteFeatureFlags = [
   "public_comparator_enabled",
@@ -48,19 +48,14 @@ export const productPageResponseSchema = publicProductSchema.extend({
   indicativeNotice: nonEmptyStringSchema
 });
 
-export const offerPaymentFlexibilitySchema = z.enum(["annual", "semiannual", "quarterly", "monthly"]);
+export const offerPaymentFlexibilitySchema = offerContentPaymentFlexibilitySchema;
 export const offerSortSchema = z.enum(["price_asc", "price_desc", "name_asc", "updated_desc", "sponsored_explicit", "coverage_desc", "speed_asc", "score_desc", "popularity_desc"]);
 /** Visitor preference feeding the `userPreferences` slot of the indicative score (PRD §15). */
 export const offerPreferenceSchema = z.enum(["price", "guarantees", "speed", "deductible", "flexibility"]);
 export const scoringCriteria = ["guaranteeLevel", "price", "deductible", "processingSpeed", "paymentFlexibility", "informationQuality", "userPreferences"] as const;
 export const scoringCriterionSchema = z.enum(scoringCriteria);
 
-export const offerGuaranteeSchema = z.object({
-  key: nonEmptyStringSchema.max(64),
-  label: nonEmptyStringSchema.max(120),
-  included: z.boolean(),
-  detail: z.string().max(300).optional()
-});
+export const offerGuaranteeSchema = offerContentGuaranteeSchema;
 
 export const offerListQuerySchema = z.object({
   minPrice: z.coerce.number().nonnegative().optional(),
@@ -143,59 +138,27 @@ export const offerCompareResponseSchema = z.object({
   rows: z.array(offerCompareRowSchema)
 });
 
-export const adminOfferUpsertSchema = z.object({
+/**
+ * Admin create/update of an offer (spec 052 R3/R4): the shared version content (with sponsorship)
+ * plus the offer scope. Forbidden wording, date order and price order are checked on every field.
+ */
+export const adminOfferUpsertSchema = adminOfferContentObjectSchema.extend({
   id: uuidSchema.optional(),
   countryId: uuidSchema,
   productId: uuidSchema,
   partnerTenantId: uuidSchema.optional(),
   publicKey: nonEmptyStringSchema.optional(),
-  name: nonEmptyStringSchema,
-  shortDescription: z.string().optional(),
-  guaranteeSummary: z.string().optional(),
-  indicativePriceMin: z.number().nonnegative().optional(),
-  indicativePriceMax: z.number().nonnegative().optional(),
-  currency: z.string().min(3).max(3).default("XOF"),
-  pricingUnit: z.string().optional(),
-  validFrom: dateTimeStringSchema,
-  validUntil: dateTimeStringSchema,
-  isSponsored: z.boolean().default(false),
-  sponsorLabel: z.string().optional(),
-  publicDisclaimers: z.array(nonEmptyStringSchema).default(["offre indicative", "prix a confirmer par le courtier partenaire"]),
-  insurerName: z.string().trim().max(120).optional(),
-  guaranteeLevel: z.number().int().min(1).max(5).optional(),
-  deductibleAmount: z.number().nonnegative().optional(),
-  coverageCeiling: z.number().nonnegative().optional(),
-  processingDelayDays: z.number().int().nonnegative().max(365).optional(),
-  paymentFlexibility: offerPaymentFlexibilitySchema.optional(),
-  guarantees: z.array(offerGuaranteeSchema).max(50).default([]),
-  exclusionsSummary: z.string().max(1000).optional(),
-  requiredDocuments: z.array(nonEmptyStringSchema.max(120)).max(30).default([]),
-  sourceOfInformation: z.string().trim().max(200).optional(),
+  offerType: z.enum(["indicative", "partner"]).optional(),
+  expectedUpdatedAt: dateTimeStringSchema.optional(),
   reason: reasonSchema
-}).superRefine((value, ctx) => {
-  const publicText = [
-    value.name,
-    value.shortDescription,
-    value.guaranteeSummary,
-    value.sponsorLabel,
-    value.insurerName,
-    value.exclusionsSummary,
-    ...value.publicDisclaimers,
-    ...value.guarantees.flatMap((guarantee) => [guarantee.label, guarantee.detail])
-  ]
-    .filter((item): item is string => Boolean(item))
-    .join(" ");
-  const forbidden = findForbiddenWording(publicText);
-  if (forbidden.length > 0) {
-    ctx.addIssue({ code: "custom", message: `Forbidden regulated wording: ${forbidden.join(", ")}` });
-  }
-  if (new Date(value.validUntil) <= new Date(value.validFrom)) {
-    ctx.addIssue({ code: "custom", message: "validUntil must be after validFrom" });
-  }
-});
+}).superRefine(refineOfferContent);
 
+/**
+ * Spec 052 R6: `POST /admin/offers/:id/validate` takes `{ reason }`. The former body
+ * `{ validationStatus, reason }` stays accepted; `validationStatus: "rejected"` means a refusal.
+ */
 export const offerValidationSchema = z.object({
-  validationStatus: z.enum(["validated", "rejected"]),
+  validationStatus: z.enum(["validated", "rejected"]).default("validated"),
   reason: reasonSchema
 });
 
@@ -273,7 +236,9 @@ export const publicQuoteFormResponseSchema = z.object({
   language: z.string().optional(),
   phoneRule: publicPhoneRuleSchema.nullable().optional(),
   fields: z.array(quoteFormFieldSchema),
-  consent: publicConsentTextSchema
+  consent: publicConsentTextSchema,
+  /** Spec 052 R8: trade name (else legal name) of the broker of the selected offer, when eligible. */
+  offerPartnerName: z.string().optional()
 });
 
 export const quoteContactSchema = z.object({
@@ -312,7 +277,12 @@ export const quoteConfirmationSchema = z.object({
   routed: z.boolean(),
   brokerName: z.string().optional(),
   message: nonEmptyStringSchema,
-  verificationToken: nonEmptyStringSchema
+  verificationToken: nonEmptyStringSchema,
+  /**
+   * Spec 052 R7 / FR-019: `true` when the broker of the selected offer received the request, `false`
+   * when it was routed to another eligible partner (or the offer was ignored), `null` without offer.
+   */
+  selectedOfferPartnerRetained: z.boolean().nullable().optional()
 });
 
 export const quoteStatusResponseSchema = z.object({

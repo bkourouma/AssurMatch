@@ -187,6 +187,10 @@ enum NotificationType {
   visitor_quote_non_routable
   broker_lead_assigned
   quote_notification_failed
+  offer_validated
+  offer_rejected
+  offer_suspended
+  offer_expiring
 }
 
 enum DeliveryStatus {
@@ -1001,12 +1005,73 @@ model Offer {
   sourceOfInformation String?
   validatedById       String?
   validatedAt         DateTime?
+  /// Spec 052 R1: the columns above hold the published version only (or v1 of a never published offer).
+  publishedVersionId  String?
+  pendingVersionId    String?
+  /// Spec 052: `indicative` or `partner`.
+  offerType           String                @default("indicative")
+  withdrawnAt         DateTime?
   createdAt           DateTime              @default(now())
   updatedAt           DateTime              @updatedAt
   createdById         String?
 
   @@unique([countryId, productId, publicKey])
   @@index([countryId, productId, status, validationStatus, validFrom, validUntil])
+}
+
+enum OfferVersionStatus {
+  draft
+  submitted
+  published
+  archived
+  withdrawn
+}
+
+/// Spec 052 R1/R2: every version of an offer. At most one `published` and one `draft|submitted`
+/// version per offer, enforced by the partial unique indexes `OfferVersion_offerId_published_key`
+/// and `OfferVersion_offerId_pending_key` of migration 0022 (Prisma cannot express them).
+model OfferVersion {
+  id                  String             @id @default(uuid())
+  offerId             String
+  versionNumber       Int
+  status              OfferVersionStatus @default(draft)
+  name                String
+  shortDescription    String?
+  guaranteeSummary    String?
+  exclusionsSummary   String?
+  insurerName         String?
+  guarantees          Json               @default("[]")
+  guaranteeLevel      Int?
+  deductibleAmount    Decimal?
+  coverageCeiling     Decimal?
+  processingDelayDays Int?
+  paymentFlexibility  String?
+  requiredDocuments   String[]           @default([])
+  sourceOfInformation String?
+  indicativePriceMin  Decimal?
+  indicativePriceMax  Decimal?
+  currency            String
+  pricingUnit         String?
+  validFrom           DateTime
+  validUntil          DateTime
+  publicDisclaimers   String[]
+  isSponsored         Boolean            @default(false)
+  sponsorLabel        String?
+  displayPriority     Int                @default(0)
+  completenessScore   Int                @default(0)
+  authorId            String?
+  authorRole          String             @default("admin")
+  submittedAt         DateTime?
+  decidedById         String?
+  decidedAt           DateTime?
+  lastDecision        String?
+  decisionReason      String?
+  createdAt           DateTime           @default(now())
+  updatedAt           DateTime           @updatedAt
+
+  @@unique([offerId, versionNumber])
+  @@index([offerId, status])
+  @@index([status, submittedAt])
 }
 
 model OfferHistory {
@@ -1069,6 +1134,9 @@ model QuoteRequest {
   countryId             String
   productId             String
   selectedOfferId       String?
+  /// Spec 052 R7: `accepted` or `ignored` (with the reason) after verification of the selected offer.
+  selectedOfferOutcome       String?
+  selectedOfferIgnoredReason String?
   quoteFormDefinitionId String
   prospectId            String
   consentRecordId       String
@@ -1379,6 +1447,9 @@ model RoutingDecision {
   excludedCandidates      Json
   reasons                 String[]
   correlationId           String?
+  /// Spec 052 R7: offer chosen by the visitor and whether its broker was retained (`retained|unavailable|none`).
+  selectedOfferId         String?
+  selectedOfferOutcome    String?
   createdAt               DateTime @default(now())
 
   @@index([quoteRequestId, createdAt])

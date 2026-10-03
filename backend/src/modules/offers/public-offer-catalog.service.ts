@@ -139,6 +139,19 @@ export class PublicOfferCatalogService {
     return this.toDetail({ offer, partnerName, popularity: 0 });
   }
 
+  /**
+   * Spec 052 R7/R8: whether an offer chosen by a visitor is publicly visible for this country and
+   * product, with exactly the visibility rules of `list()`/`detail()` (publication policy, flags,
+   * partner eligibility). Nothing is audited here; the caller records the outcome.
+   */
+  async selectableOffer(offerId: string, countryId: string, productId: string, context?: PublicOfferVisibilityContext): Promise<{ offer?: OfferRecord; reasons: string[] }> {
+    const offer = (await this.repository.list()).find((candidate) => candidate.id === offerId);
+    if (!offer) return { reasons: ["offer_not_found"] };
+    if (offer.countryId !== countryId || offer.productId !== productId) return { reasons: ["offer_scope_mismatch"] };
+    const decision = await this.visibilityDecision(offer, context);
+    return decision.public ? { offer, reasons: [] } : { reasons: decision.reasons };
+  }
+
   /** Side-by-side comparison of 2 to 4 visible offers sharing the same country and product (COMP-005). */
   async compare(query: OfferCompareQuery | { ids: string; priority?: string | undefined }, actor?: ActorContext, context?: PublicOfferVisibilityContext): Promise<OfferCompareResponse> {
     const validation = typeof query.ids === "string" ? offerCompareQuerySchema.safeParse(query) : { success: true as const, data: query as OfferCompareQuery };

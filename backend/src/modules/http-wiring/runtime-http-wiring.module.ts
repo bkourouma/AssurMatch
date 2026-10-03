@@ -68,9 +68,8 @@ import {
   routingRuleUpdateSchema
 } from "../../../../packages/shared/contracts/routing-rule.contracts";
 import { scoringRuleCreateSchema, scoringRuleUpdateSchema } from "../../../../packages/shared/contracts/scoring-rule.contracts";
+import { offerDecisionReasonSchema, offerRejectSchema, offerSubmitSchema } from "../../../../packages/shared/contracts/offer-content";
 import {
-  adminOfferUpsertSchema,
-  offerValidationSchema,
   brokerCrmAssignRequestSchema,
   brokerCrmDisputeCreateSchema,
   brokerCrmDocumentCreateSchema,
@@ -352,50 +351,97 @@ export class PublicOffersController {
   }
 }
 
-function assertCountryScope(actor: ActorContext, countryId: string): void {
-  if (actor.roles.includes("super_admin")) return;
-  if (actor.countryScopes?.length && !actor.countryScopes.includes(countryId)) throw new Error("RBAC denied: out_of_scope_country");
-}
-
+/**
+ * Spec 052 R6: admin offers. Reads are filtered by the actor's country scope; create/update need
+ * `offers:update` within the scope of the stored offer; validate, reject and suspend are reserved
+ * to Compliance Admin and Super Admin (checked and audited by `OfferAdminService`).
+ */
 export class AdminOffersHttpController {
   constructor(private readonly runtime: AssurMatchRuntime) {}
 
-  list(request: AssurMatchHttpRequest) {
-    const actor = protectedActorFromRequest(request);
-    assertPermission(actor, "offers:read");
-    return this.runtime.offers.adminService.list();
+  list(request: AssurMatchHttpRequest, query: Record<string, unknown> = {}) {
+    return this.runtime.offers.adminService.listViews(query, protectedActorFromRequest(request));
   }
 
-  create(request: AssurMatchHttpRequest, input: unknown) {
-    const actor = protectedActorFromRequest(request);
-    assertPermission(actor, "offers:update");
-    const parsed = parseHttpInput(adminOfferUpsertSchema, input);
-    assertCountryScope(actor, parsed.countryId);
-    return this.runtime.offers.adminService.create(parsed, actor);
+  detail(id: string, request: AssurMatchHttpRequest) {
+    return this.runtime.offers.adminService.detail(parseParam("id", id, uuidSchema), protectedActorFromRequest(request));
   }
 
-  update(id: string, request: AssurMatchHttpRequest, input: unknown) {
-    const actor = protectedActorFromRequest(request);
-    assertPermission(actor, "offers:update");
-    const parsed = parseHttpInput(adminOfferUpsertSchema, input);
-    assertCountryScope(actor, parsed.countryId);
-    return this.runtime.offers.adminService.update(parseParam("id", id, uuidSchema), parsed, actor);
+  async create(request: AssurMatchHttpRequest, input: unknown) {
+    const offer = await this.runtime.offers.adminService.create(input, protectedActorFromRequest(request));
+    return this.runtime.offers.adminService.detailView(offer);
+  }
+
+  async update(id: string, request: AssurMatchHttpRequest, input: unknown) {
+    const offer = await this.runtime.offers.adminService.update(parseParam("id", id, uuidSchema), input, protectedActorFromRequest(request));
+    return this.runtime.offers.adminService.detailView(offer);
+  }
+
+  async submit(id: string, request: AssurMatchHttpRequest, input: unknown) {
+    const parsed = parseHttpInput(offerSubmitSchema, input ?? {});
+    const offer = await this.runtime.offers.adminService.submit(parseParam("id", id, uuidSchema), parsed.reason, protectedActorFromRequest(request));
+    return this.runtime.offers.adminService.detailView(offer);
   }
 
   async validate(id: string, request: AssurMatchHttpRequest, input: unknown) {
+    const offer = await this.runtime.offers.adminService.validate(parseParam("id", id, uuidSchema), input, protectedActorFromRequest(request));
+    return this.runtime.offers.adminService.detailView(offer);
+  }
+
+  async reject(id: string, request: AssurMatchHttpRequest, input: unknown) {
     const actor = protectedActorFromRequest(request);
-    assertPermission(actor, "offers:update");
-    const offer = await this.runtime.offers.adminService.require(parseParam("id", id, uuidSchema));
-    assertCountryScope(actor, offer.countryId);
-    return this.runtime.offers.adminService.validate(offer.id, parseHttpInput(offerValidationSchema, input), actor);
+    const offerId = parseParam("id", id, uuidSchema);
+    const offer = await this.runtime.offers.adminService.reject(offerId, parseHttpInput(offerRejectSchema, input).reason, actor);
+    return this.runtime.offers.adminService.detailView(offer);
   }
 
   async suspend(id: string, request: AssurMatchHttpRequest, input: unknown) {
     const actor = protectedActorFromRequest(request);
-    assertPermission(actor, "offers:update");
-    const offer = await this.runtime.offers.adminService.require(parseParam("id", id, uuidSchema));
-    assertCountryScope(actor, offer.countryId);
-    return this.runtime.offers.adminService.suspend(offer.id, parseHttpInput(z.object({ reason: reasonSchema }), input).reason, actor);
+    const offerId = parseParam("id", id, uuidSchema);
+    const offer = await this.runtime.offers.adminService.suspend(offerId, parseHttpInput(offerDecisionReasonSchema, input).reason, actor);
+    return this.runtime.offers.adminService.detailView(offer);
+  }
+}
+
+/**
+ * Spec 052 R5: a broker's own offers. Writes start with `brokerWriteActor` (403 PARTNER_SUSPENDED
+ * before any parsing) and are listed in `BROKER_TENANT_WRITE_GUARDED`; ownership (404 for another
+ * partner's offer), role and coverage are checked by `BrokerOffersService`.
+ */
+export class BrokerOffersController {
+  constructor(private readonly runtime: AssurMatchRuntime) {}
+
+  list(request: AssurMatchHttpRequest, query: Record<string, unknown> = {}) {
+    return this.runtime.offers.brokerService.list(query, protectedActorFromRequest(request));
+  }
+
+  detail(id: string, request: AssurMatchHttpRequest) {
+    return this.runtime.offers.brokerService.detail(parseParam("id", id, uuidSchema), protectedActorFromRequest(request));
+  }
+
+  create(input: unknown, request: AssurMatchHttpRequest) {
+    const actor = brokerWriteActor(request);
+    return this.runtime.offers.brokerService.create(input, actor);
+  }
+
+  update(id: string, input: unknown, request: AssurMatchHttpRequest) {
+    const actor = brokerWriteActor(request);
+    return this.runtime.offers.brokerService.update(parseParam("id", id, uuidSchema), input, actor);
+  }
+
+  submit(id: string, input: unknown, request: AssurMatchHttpRequest) {
+    const actor = brokerWriteActor(request);
+    return this.runtime.offers.brokerService.submit(parseParam("id", id, uuidSchema), input, actor);
+  }
+
+  withdraw(id: string, input: unknown, request: AssurMatchHttpRequest) {
+    const actor = brokerWriteActor(request);
+    return this.runtime.offers.brokerService.withdraw(parseParam("id", id, uuidSchema), input, actor);
+  }
+
+  renew(id: string, input: unknown, request: AssurMatchHttpRequest) {
+    const actor = brokerWriteActor(request);
+    return this.runtime.offers.brokerService.renew(parseParam("id", id, uuidSchema), input, actor);
   }
 }
 
@@ -624,7 +670,7 @@ export class AdminQuoteDocumentsController {
 export class PublicQuoteRequestsController {
   constructor(private readonly runtime: AssurMatchRuntime) {}
 
-  async quoteForm(countryCode: string, productKey: string, language?: string) {
+  async quoteForm(countryCode: string, productKey: string, language?: string, offerId?: string) {
     const parsedCountryCode = parseParam("countryCode", countryCode, isoCountrySchema);
     const parsedProductKey = parseParam("productKey", productKey);
     const parsedLanguage = parseParam("language", language ?? "fr", languageCodeSchema);
@@ -639,7 +685,10 @@ export class PublicQuoteRequestsController {
       requireProductFlags: true
     });
     if (!state.quoteEnabled || scoped.status === "suspended" || scoped.status === "retired") throw new Error("Quote form is not publicly available");
-    return this.runtime.quoteForms.service.publicForm(country.id, product.id, parsedLanguage);
+    // Spec 052 R8: an offer that is not (or no longer) public is ignored; the generic wording applies.
+    const parsedOfferId = offerId ? uuidSchema.safeParse(offerId) : undefined;
+    const brokerName = parsedOfferId?.success ? await this.runtime.selectedOfferPartnerName(parsedOfferId.data, country.id, product.id) : undefined;
+    return this.runtime.quoteForms.service.publicForm(country.id, product.id, parsedLanguage, undefined, { brokerName });
   }
 
   submitQuote(input: QuoteRequestCreateDto, request: AssurMatchHttpRequest) {
@@ -1591,7 +1640,7 @@ decorate(PublicOffersController, "compare", [Get("offers/compare") as MethodDeco
 decorate(PublicOffersController, "detail", [Get("offers/:offerId") as MethodDecoratorFactory], [[0, Param("offerId") as ParamDecoratorFactory]]);
 
 controller(undefined, PublicQuoteRequestsController);
-decorate(PublicQuoteRequestsController, "quoteForm", [Get("countries/:countryCode/products/:productKey/quote-form") as MethodDecoratorFactory], [[0, Param("countryCode") as ParamDecoratorFactory], [1, Param("productKey") as ParamDecoratorFactory], [2, Query("language") as ParamDecoratorFactory]]);
+decorate(PublicQuoteRequestsController, "quoteForm", [Get("countries/:countryCode/products/:productKey/quote-form") as MethodDecoratorFactory], [[0, Param("countryCode") as ParamDecoratorFactory], [1, Param("productKey") as ParamDecoratorFactory], [2, Query("language") as ParamDecoratorFactory], [3, Query("offerId") as ParamDecoratorFactory]]);
 decorate(PublicQuoteRequestsController, "submitQuote", [Post("quote-requests") as MethodDecoratorFactory], [[0, Body() as ParamDecoratorFactory], [1, Req() as ParamDecoratorFactory]]);
 decorate(PublicQuoteRequestsController, "quoteStatus", [Get("quote-requests/:publicReference") as MethodDecoratorFactory], [[0, Param("publicReference") as ParamDecoratorFactory], [1, Query("token") as ParamDecoratorFactory]]);
 decorate(PublicQuoteRequestsController, "withdrawConsent", [Post("quote-requests/:publicReference/consent-withdrawal") as MethodDecoratorFactory, HttpCode(200) as MethodDecoratorFactory], [[0, Param("publicReference") as ParamDecoratorFactory], [1, Query("token") as ParamDecoratorFactory], [2, Req() as ParamDecoratorFactory]]);
@@ -1813,11 +1862,22 @@ controller("local/dev", LocalDevRuntimeController);
 decorate(LocalDevRuntimeController, "reloadFeatureFlags", [Post("reload-feature-flags") as MethodDecoratorFactory], [[0, Req() as ParamDecoratorFactory]]);
 
 controller("admin", AdminOffersHttpController, true);
-decorate(AdminOffersHttpController, "list", [Get("offers") as MethodDecoratorFactory], [[0, Req() as ParamDecoratorFactory]]);
+decorate(AdminOffersHttpController, "list", [Get("offers") as MethodDecoratorFactory], [[0, Req() as ParamDecoratorFactory], [1, Query() as ParamDecoratorFactory]]);
+decorate(AdminOffersHttpController, "detail", [Get("offers/:id") as MethodDecoratorFactory], [[0, Param("id") as ParamDecoratorFactory], [1, Req() as ParamDecoratorFactory]]);
 decorate(AdminOffersHttpController, "create", [Post("offers") as MethodDecoratorFactory], [[0, Req() as ParamDecoratorFactory], [1, Body() as ParamDecoratorFactory]]);
 decorate(AdminOffersHttpController, "update", [Patch("offers/:id") as MethodDecoratorFactory], [[0, Param("id") as ParamDecoratorFactory], [1, Req() as ParamDecoratorFactory], [2, Body() as ParamDecoratorFactory]]);
+decorate(AdminOffersHttpController, "submit", [Post("offers/:id/submit") as MethodDecoratorFactory], [[0, Param("id") as ParamDecoratorFactory], [1, Req() as ParamDecoratorFactory], [2, Body() as ParamDecoratorFactory]]);
 decorate(AdminOffersHttpController, "validate", [Post("offers/:id/validate") as MethodDecoratorFactory], [[0, Param("id") as ParamDecoratorFactory], [1, Req() as ParamDecoratorFactory], [2, Body() as ParamDecoratorFactory]]);
+decorate(AdminOffersHttpController, "reject", [Post("offers/:id/reject") as MethodDecoratorFactory], [[0, Param("id") as ParamDecoratorFactory], [1, Req() as ParamDecoratorFactory], [2, Body() as ParamDecoratorFactory]]);
 decorate(AdminOffersHttpController, "suspend", [Post("offers/:id/suspend") as MethodDecoratorFactory], [[0, Param("id") as ParamDecoratorFactory], [1, Req() as ParamDecoratorFactory], [2, Body() as ParamDecoratorFactory]]);
+controller("broker/offers", BrokerOffersController, true);
+decorate(BrokerOffersController, "list", [Get() as MethodDecoratorFactory], [[0, Req() as ParamDecoratorFactory], [1, Query() as ParamDecoratorFactory]]);
+decorate(BrokerOffersController, "detail", [Get(":id") as MethodDecoratorFactory], [[0, Param("id") as ParamDecoratorFactory], [1, Req() as ParamDecoratorFactory]]);
+decorate(BrokerOffersController, "create", [Post() as MethodDecoratorFactory], [[0, Body() as ParamDecoratorFactory], [1, Req() as ParamDecoratorFactory]]);
+decorate(BrokerOffersController, "update", [Patch(":id") as MethodDecoratorFactory], [[0, Param("id") as ParamDecoratorFactory], [1, Body() as ParamDecoratorFactory], [2, Req() as ParamDecoratorFactory]]);
+decorate(BrokerOffersController, "submit", [Post(":id/submit") as MethodDecoratorFactory, HttpCode(200) as MethodDecoratorFactory], [[0, Param("id") as ParamDecoratorFactory], [1, Body() as ParamDecoratorFactory], [2, Req() as ParamDecoratorFactory]]);
+decorate(BrokerOffersController, "withdraw", [Post(":id/withdraw") as MethodDecoratorFactory, HttpCode(200) as MethodDecoratorFactory], [[0, Param("id") as ParamDecoratorFactory], [1, Body() as ParamDecoratorFactory], [2, Req() as ParamDecoratorFactory]]);
+decorate(BrokerOffersController, "renew", [Post(":id/renew") as MethodDecoratorFactory], [[0, Param("id") as ParamDecoratorFactory], [1, Body() as ParamDecoratorFactory], [2, Req() as ParamDecoratorFactory]]);
 controller("admin", AdminQuoteFormDefinitionsHttpController, true);
 decorate(AdminQuoteFormDefinitionsHttpController, "list", [Get("quote-form-definitions") as MethodDecoratorFactory], [[0, Req() as ParamDecoratorFactory], [1, Query("countryId") as ParamDecoratorFactory], [2, Query("productId") as ParamDecoratorFactory], [3, Query("language") as ParamDecoratorFactory], [4, Query("status") as ParamDecoratorFactory]]);
 decorate(AdminQuoteFormDefinitionsHttpController, "create", [Post("quote-form-definitions") as MethodDecoratorFactory], [[0, Req() as ParamDecoratorFactory], [1, Body() as ParamDecoratorFactory]]);
@@ -1909,7 +1969,8 @@ export const BROKER_TENANT_WRITE_GUARDED: Readonly<Record<string, readonly strin
   BrokerStarterController: ["accept", "reject", "dispute"],
   BrokerCrmController: ["status", "note", "task", "reminder", "assign", "document", "proposal", "dispute", "aiRequest", "aiValidate", "aiLossAnalysis", "aiSetOptOut"],
   BrokerEnterpriseController: ["createAgency", "updateAgency", "assignMember", "createRole", "updateRole", "updateSla", "updateBranding"],
-  BrokerNotificationsController: ["updatePreferences"]
+  BrokerNotificationsController: ["updatePreferences"],
+  BrokerOffersController: ["create", "update", "submit", "withdraw", "renew"]
 };
 export const BROKER_TENANT_WRITE_ALLOWED_WHEN_SUSPENDED: Readonly<Record<string, readonly string[]>> = {
   BrokerStarterController: ["readNotification"],
@@ -1952,6 +2013,7 @@ Module({
     BrokerBillingController,
     BrokerNotificationsController,
     BrokerEnterpriseController,
+    BrokerOffersController,
     AdminPartnerSlaController,
     AdminAIAssistanceController,
     AdminRuntimeSupportController,

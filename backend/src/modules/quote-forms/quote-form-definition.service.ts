@@ -239,7 +239,11 @@ export class QuoteFormDefinitionService {
    * product whose forms exist in other languages answers 404 `QUOTE_FORM_LANGUAGE_UNAVAILABLE` with
    * the languages that do exist. The consent content is served with its variables resolved.
    */
-  async publicForm(countryId: string, productId: string, language = "fr", actor?: ActorContext): Promise<PublicQuoteFormResponse> {
+  /**
+   * Spec 052 R8: `options.brokerName` (broker of an eligible selected offer) resolves `{{brokerName}}`
+   * and is returned as `offerPartnerName`; the template hash is unchanged.
+   */
+  async publicForm(countryId: string, productId: string, language = "fr", actor?: ActorContext, options: { brokerName?: string | undefined } = {}): Promise<PublicQuoteFormResponse> {
     const published = await this.repository.findPublished(countryId, productId);
     const form = published.find((candidate) => candidate.language === language);
     if (!form) {
@@ -287,6 +291,7 @@ export class QuoteFormDefinitionService {
     });
     const content = consent.content
       ? resolveConsentContent(consent.content, form.language, {
+        ...(options.brokerName ? { brokerName: options.brokerName } : {}),
         ...(context.countryName ? { countryName: context.countryName } : {}),
         ...(context.productName ? { productName: context.productName } : {}),
         contactFields: this.contactFieldLabels(form)
@@ -306,7 +311,8 @@ export class QuoteFormDefinitionService {
         ...(content ? { content } : {}),
         purpose: "lead_transmission",
         recipientCategory: consent.recipientCategory
-      }
+      },
+      ...(options.brokerName ? { offerPartnerName: options.brokerName } : {})
     };
   }
 

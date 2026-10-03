@@ -243,7 +243,20 @@ export class AssurMatchRuntime {
     countryFlags: { country_ai_enabled: false },
     productFlags: { product_ai_form_assistant_enabled: false }
   });
-  readonly offers = new OffersModule(this.audit.writer, this.redis.client, this.offersRepository);
+  /** Spec 052: offer versions; the integrations are lazy (partners, licences, inbox, eligibility). */
+  readonly offers: OffersModule = new OffersModule(this.audit.writer, this.redis.client, this.offersRepository, {
+    partnerEligibility: (partnerTenantId: string, countryId: string, productId: string) => this.publicOfferPartnerEligibility(partnerTenantId, countryId, productId),
+    coverage: (partnerTenantId: string, countryId: string, productId: string) => this.offerCoverageBlockers(partnerTenantId, countryId, productId),
+    partnerName: async (partnerTenantId: string) => {
+      const partner = await this.partners.service.require(partnerTenantId).catch(() => undefined);
+      return partner?.tradeName ?? partner?.legalName;
+    },
+    partnerStatus: async (partnerTenantId: string) => (await this.partners.service.require(partnerTenantId).catch(() => undefined))?.status,
+    notifier: {
+      publishInApp: (input) => this.notifications.dispatch.publishInApp(input),
+      listInApp: (scopeId: string, limit?: number) => this.notifications.dispatch.listInApp(scopeId, limit)
+    }
+  });
   readonly scoringRules = new ScoringRulesService({
     audit: this.audit.writer,
     countries: this.countries.service,
@@ -372,7 +385,9 @@ readonly enterprise = new EnterpriseService({
     assignments: this.leads.assignments,
     inApp: this.notifications.dispatch,
     isGlobalFlagEnabled: (key) => this.featureFlags.service.isEnabled(key),
-    satisfactionSurveys: { onConsentWithdrawn: (id: string) => this.satisfactionSurveys.service.onConsentWithdrawn(id) }
+    satisfactionSurveys: { onConsentWithdrawn: (id: string) => this.satisfactionSurveys.service.onConsentWithdrawn(id) },
+    // Spec 052 R7: the selected offer must be publicly visible here, with the catalogue's own rules.
+    selectedOffers: { verify: (offerId: string, countryId: string, productId: string) => this.verifySelectedOffer(offerId, countryId, productId) }
   }, this.audit.writer, this.redis.client, this.quoteRequestsRepository);
   /** Spec 044: drains the quote notification backlog into the email delivery service. */
   readonly quoteNotificationDelivery = new QuoteNotificationDeliveryService({
@@ -659,6 +674,8 @@ readonly enterprise = new EnterpriseService({
         const wanted = new Set(offerIds);
         const counts = new Map<string, number>();
         for (const quote of await this.quoteRequests.submissions.list()) {
+          // Spec 052: an ignored (forged, expired, other scope) selection never counts as popularity.
+          if (quote.selectedOfferOutcome === "ignored") continue;
           if (quote.selectedOfferId && wanted.has(quote.selectedOfferId)) counts.set(quote.selectedOfferId, (counts.get(quote.selectedOfferId) ?? 0) + 1);
         }
         return counts;
@@ -676,6 +693,39 @@ readonly enterprise = new EnterpriseService({
     if (!await this.partners.service.isAuthorizedForProduct(partnerTenantId, productId)) reasons.push("partner_product_not_authorized");
     if (!await this.partnerLicenses.service.eligible(partnerTenantId, countryId, productId)) reasons.push("license_not_valid_for_scope");
     return { eligible: reasons.length === 0, reasons };
+  }
+
+  /** Spec 052 FR-007: blockers when the partner's authorisations and licence do not cover the scope. */
+  async offerCoverageBlockers(partnerTenantId: string, countryId: string, productId: string): Promise<string[]> {
+    const blockers: string[] = [];
+    if (!await this.partners.service.isAuthorizedForCountry(partnerTenantId, countryId)) blockers.push("partner_country_not_authorized");
+    if (!await this.partners.service.isAuthorizedForProduct(partnerTenantId, productId)) blockers.push("partner_product_not_authorized");
+    if (!await this.partnerLicenses.service.eligible(partnerTenantId, countryId, productId)) blockers.push("license_not_valid_for_scope");
+    return blockers;
+  }
+
+  /**
+   * Spec 052 R7/R8: an offer selected by a visitor is accepted only when the public catalogue would
+   * show it for this country and product right now (policy, flags, partner eligibility).
+   */
+  async verifySelectedOffer(offerId: string, countryId: string, productId: string): Promise<{ accepted: true; partnerTenantId?: string | undefined } | { accepted: false; reason: string }> {
+    const country = await this.countries.service.require(countryId).catch(() => undefined);
+    const product = await this.products.service.require(productId).catch(() => undefined);
+    if (!country || !product) return { accepted: false, reason: "scope_unavailable" };
+    const { offer, reasons } = await this.offers.publicCatalog.selectableOffer(offerId, countryId, productId, this.publicOfferContext({
+      countryFlags: publicCountryFlags(country),
+      productFlags: this.products.service.effectiveFlags(product, country.id)
+    }));
+    if (!offer) return { accepted: false, reason: reasons[0] ?? "offer_not_public" };
+    return { accepted: true, ...(offer.partnerTenantId ? { partnerTenantId: offer.partnerTenantId } : {}) };
+  }
+
+  /** Spec 052 R8: broker named by the quote form when the selected offer is public and its broker eligible. */
+  async selectedOfferPartnerName(offerId: string, countryId: string, productId: string): Promise<string | undefined> {
+    const verdict = await this.verifySelectedOffer(offerId, countryId, productId);
+    if (!verdict.accepted || !verdict.partnerTenantId) return undefined;
+    const partner = await this.partners.service.require(verdict.partnerTenantId).catch(() => undefined);
+    return partner?.tradeName ?? partner?.legalName;
   }
 
   runtimeRepositoryModes(): Record<string, string | undefined> {

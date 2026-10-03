@@ -17,7 +17,7 @@ import { PublicQuoteRequestsController } from "./public-quote-requests.controlle
 import { PublicQuoteStatusController } from "./public-quote-status.controller";
 import { QuoteDuplicateDetectionService } from "./quote-duplicate-detection.service";
 import type { QuoteRequestsRepository } from "./quote-requests.repository";
-import { QuoteSubmissionService, type QuoteAssignmentsPort, type QuoteInAppNotifierPort } from "./quote-submission.service";
+import { QuoteSubmissionService, type QuoteAssignmentsPort, type QuoteInAppNotifierPort, type SelectedOfferVerifier } from "./quote-submission.service";
 
 export interface QuoteRequestsModuleDeps {
   countries: CountriesService;
@@ -35,6 +35,8 @@ export interface QuoteRequestsModuleDeps {
   /** Spec 045: partner inbox used to tell a broker the withdrawn lead must not be worked (`MessagingDispatchService`). */
   inApp?: QuoteInAppNotifierPort;
   isGlobalFlagEnabled?: (key: string) => boolean;
+  /** Spec 052 R7: verification of the offer selected by the visitor. */
+  selectedOffers?: SelectedOfferVerifier;
 }
 
 export class QuoteRequestsModule {
@@ -67,6 +69,7 @@ export class QuoteRequestsModule {
       ...(deps.satisfactionSurveys ? { satisfactionSurveys: deps.satisfactionSurveys } : {}),
       ...(deps.inApp ? { inApp: deps.inApp } : {}),
       ...(deps.isGlobalFlagEnabled ? { isGlobalFlagEnabled: deps.isGlobalFlagEnabled } : {}),
+      ...(deps.selectedOffers ? { selectedOffers: deps.selectedOffers } : {}),
       ...(deps.routing ? { routing: deps.routing } : {}),
       ...(deps.notifications ? { notifications: deps.notifications } : {}),
       ...(deps.aiSummary ? { aiSummary: deps.aiSummary } : {})

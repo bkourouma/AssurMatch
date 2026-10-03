@@ -27,7 +27,8 @@ describe("prisma migration fresh-base readiness", () => {
       "0018_data_retention",
       "0019_satisfaction_surveys",
       "0020_catalog_admin_consent_content",
-      "0021_partner_onboarding_lifecycle"
+      "0021_partner_onboarding_lifecycle",
+      "0022_offer_versions_selected_offer_routing"
     ]);
     const schema = readFileSync(join(process.cwd(), "backend", "prisma", "schema.prisma"), "utf8");
     for (const model of ["AuditLog", "FeatureFlag", "ConsentRecord", "QuoteRequest", "LeadAssignment", "BrokerCrmLeadState", "PartnerApiKey", "PartnerWebhookEndpoint", "PartnerWebhookDelivery", "PartnerWebhookAllowlistEntry", "RoutingRule", "RoutingRuleHistory"]) {
@@ -163,5 +164,25 @@ describe("prisma migration fresh-base readiness", () => {
     for (const model of ["PartnerStatusHistory", "PartnerLicenseHistory", "PartnerContract"]) expect(schema).toContain(`model ${model}`);
     expect(schema).toContain("PartnerTenant_countryId_registrationNumber_key");
     expect(schema).toMatch(/enum AccreditationScanStatus/);
+    // Spec 052: offer versions (additive), version 1 backfill, selected offer on requests and decisions.
+    const offerVersions = readFileSync(join(migrationsDir, "0022_offer_versions_selected_offer_routing", "migration.sql"), "utf8");
+    expect(offerVersions).toContain('CREATE TABLE IF NOT EXISTS "OfferVersion"');
+    expect(offerVersions).toContain('CREATE TYPE "OfferVersionStatus"');
+    for (const value of ["offer_validated", "offer_rejected", "offer_suspended", "offer_expiring"]) {
+      expect(offerVersions).toContain(`ALTER TYPE "NotificationType" ADD VALUE IF NOT EXISTS '${value}'`);
+    }
+    expect(offerVersions).toContain(`CREATE UNIQUE INDEX IF NOT EXISTS "OfferVersion_offerId_published_key" ON "OfferVersion"("offerId") WHERE "status" = 'published'`);
+    expect(offerVersions).toContain(`CREATE UNIQUE INDEX IF NOT EXISTS "OfferVersion_offerId_pending_key" ON "OfferVersion"("offerId") WHERE "status" IN ('draft', 'submitted')`);
+    expect(offerVersions).toContain('ALTER TABLE "Offer" ADD COLUMN IF NOT EXISTS "publishedVersionId" TEXT');
+    expect(offerVersions).toContain('ALTER TABLE "QuoteRequest" ADD COLUMN IF NOT EXISTS "selectedOfferOutcome" TEXT');
+    expect(offerVersions).toContain('ALTER TABLE "RoutingDecision" ADD COLUMN IF NOT EXISTS "selectedOfferId" TEXT');
+    expect(offerVersions).toContain('INSERT INTO "OfferVersion"');
+    expect(offerVersions).toContain("ON CONFLICT DO NOTHING");
+    // The backfill only sets the two new pointers; it never deletes nor rewrites offer content.
+    expect(offerVersions).not.toMatch(/DROP|DELETE/);
+    expect(offerVersions.match(/UPDATE "Offer" o SET "(publishedVersionId|pendingVersionId)"/g)).toHaveLength(2);
+    expect(offerVersions.match(/UPDATE /g)).toHaveLength(2);
+    expect(schema).toContain("model OfferVersion");
+    expect(schema).toMatch(/enum OfferVersionStatus/);
   });
 });

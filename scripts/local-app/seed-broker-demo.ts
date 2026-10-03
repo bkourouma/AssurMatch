@@ -815,7 +815,7 @@ async function upsertOffer(prisma: PrismaClient, country: CountryRecord, product
     validatedById: DEMO_ACTOR_ID,
     validatedAt: SEED_NOW
   };
-  await prisma.offer.upsert({
+  const offer = await prisma.offer.upsert({
     where: { countryId_productId_publicKey: { countryId: country.id, productId: product.id, publicKey: spec.publicKey } },
     create: {
       countryId: country.id,
@@ -831,6 +831,62 @@ async function upsertOffer(prisma: PrismaClient, country: CountryRecord, product
       ...comparatorFields
     }
   });
+  await upsertPublishedOfferVersion(prisma, offer.id, comparatorFields);
+}
+
+/**
+ * Spec 052 R1/R11: the `Offer` row is the projection of a published version, so every demo offer
+ * carries a published version 1. A re-run refreshes v1 while it is the published version and never
+ * touches versions created afterwards in the back-offices.
+ */
+async function upsertPublishedOfferVersion(prisma: PrismaClient, offerId: string, fields: Record<string, unknown> & { validUntil: Date }): Promise<void> {
+  const versions = await prisma.offerVersion.findMany({ where: { offerId }, orderBy: { versionNumber: "asc" } });
+  const content = {
+    name: fields.name as string,
+    shortDescription: fields.shortDescription as string,
+    guaranteeSummary: fields.guaranteeSummary as string,
+    exclusionsSummary: fields.exclusionsSummary as string,
+    insurerName: fields.insurerName as string,
+    guarantees: fields.guarantees as Prisma.InputJsonValue,
+    guaranteeLevel: fields.guaranteeLevel as number,
+    deductibleAmount: fields.deductibleAmount as number,
+    coverageCeiling: fields.coverageCeiling as number,
+    processingDelayDays: fields.processingDelayDays as number,
+    paymentFlexibility: fields.paymentFlexibility as string,
+    requiredDocuments: fields.requiredDocuments as string[],
+    sourceOfInformation: fields.sourceOfInformation as string,
+    indicativePriceMin: fields.indicativePriceMin as number,
+    indicativePriceMax: fields.indicativePriceMax as number,
+    currency: fields.currency as string,
+    pricingUnit: fields.pricingUnit as string,
+    validFrom: new Date("2026-01-01T00:00:00.000Z"),
+    validUntil: fields.validUntil,
+    publicDisclaimers: fields.publicDisclaimers as string[],
+    isSponsored: false,
+    sponsorLabel: null,
+    displayPriority: fields.displayPriority as number
+  };
+  const first = versions[0];
+  if (first && (versions.length > 1 || first.status !== "published")) return;
+  const version = first
+    ? await prisma.offerVersion.update({ where: { id: first.id }, data: content })
+    : await prisma.offerVersion.create({
+      data: {
+        ...content,
+        offerId,
+        versionNumber: 1,
+        status: "published",
+        completenessScore: 100,
+        authorId: DEMO_ACTOR_ID,
+        authorRole: "admin",
+        submittedAt: SEED_NOW,
+        decidedById: DEMO_ACTOR_ID,
+        decidedAt: SEED_NOW,
+        lastDecision: "validated",
+        decisionReason: "Jeu de donnees de demonstration"
+      }
+    });
+  await prisma.offer.update({ where: { id: offerId }, data: { publishedVersionId: version.id, pendingVersionId: null } });
 }
 
 async function seedStarterLeads(prisma: PrismaClient, partner: PartnerRecord, country: CountryRecord, products: { auto: ProductRecord; voyage: ProductRecord }): Promise<void> {

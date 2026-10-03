@@ -3,6 +3,7 @@ import { activationChecklistResponseSchema, type ActivationChecklistResponse } f
 import { ActivationChecklistAuditActions } from "../../../src/modules/activation-checklist/activation-checklist-audit-actions";
 import { actorHeaders, createRuntimeHttpHarness, readJson, type RuntimeHttpHarness } from "../runtime-http-test-utils";
 import { seedAcceptedAccreditation, seedOwnerAndContract } from "../helpers/partner-onboarding-seed";
+import { publishOffer } from "../helpers/offer-test-helpers";
 
 describe("activation checklist runtime HTTP", () => {
   let harness: RuntimeHttpHarness | undefined;
@@ -82,7 +83,7 @@ describe("activation checklist runtime HTTP", () => {
     // Spec 051 R14: accepted accreditation proof, owner user and contract complete the partner sections.
     await seedAcceptedAccreditation(harness.runtime, partner.id, license.id);
     await seedOwnerAndContract(harness.runtime, partner.id);
-    const offer = await harness.runtime.offers.adminService.create({
+    await publishOffer(harness.runtime.offers, {
       countryId: country.id,
       productId: product.id,
       partnerTenantId: partner.id,
@@ -92,8 +93,7 @@ describe("activation checklist runtime HTTP", () => {
       validFrom: "2026-01-01T00:00:00.000Z",
       validUntil: "2030-01-01T00:00:00.000Z",
       reason: "activation checklist test"
-    }, admin);
-    await harness.runtime.offers.adminService.validate(offer.id, { validationStatus: "validated", reason: "activation checklist test" }, admin);
+    }, admin, admin);
 
     const response = await harness.request("/admin/activation-checklist?country=CI&product=auto", { headers: actorHeaders(admin) });
     expect(response.status).toBe(200);

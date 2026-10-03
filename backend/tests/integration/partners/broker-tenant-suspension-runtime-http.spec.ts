@@ -8,7 +8,7 @@ import { PartnerTenantStatusService } from "../../../src/modules/partners/partne
 import { actorHeaders, createRuntimeHttpHarness, readJson, type RuntimeHttpHarness } from "../runtime-http-test-utils";
 import { createPartner, seedOnboardingRuntime, superAdmin } from "./partner-admin-http-helpers";
 
-const BROKER_CONTROLLERS = ["BrokerStarterController", "BrokerCrmController", "BrokerDashboardController", "BrokerEnterpriseController", "BrokerNotificationsController", "BrokerBillingController"] as const;
+const BROKER_CONTROLLERS = ["BrokerStarterController", "BrokerCrmController", "BrokerDashboardController", "BrokerEnterpriseController", "BrokerNotificationsController", "BrokerBillingController", "BrokerOffersController"] as const;
 
 function brokerActor(partnerTenantId: string, overrides: Partial<ActorContext> = {}): ActorContext {
   return { actorId: `broker-${partnerTenantId.slice(0, 8)}`, roles: ["broker_owner_pro"], partnerTenantId, partnerPlan: "pro", mfaVerified: true, ...overrides };

@@ -107,3 +107,12 @@ Le seed démo, les helpers de test et le smoke Postgres créent une version 1 pu
 
 ### R12 — Hors périmètre
 Offres assureur et offres privées, résumé et cohérence par IA, nom du courtier retenu sur la confirmation et le suivi (spec 054), ordonnanceur d'expiration (spec 061).
+
+## Écarts retenus à l'implémentation (2026-10-03)
+
+- **Règle de routage exclusive** : une règle `exclusive` reste une contrainte déterministe. Le courtier de l'offre n'est prioritaire que s'il est le partenaire exclusif ; sinon, la décision enregistre `selected_offer_partner_unavailable:exclusive_rule` (principe VII).
+- **Mode manuel** : la demande est mise en attente ; la décision enregistre l'offre avec le résultat `unavailable`.
+- **Courtier obligatoire** : une offre sans courtier ne peut pas être validée (`partner_missing`). La couverture licenciée est aussi vérifiée quand l'admin rattache un courtier.
+- **Modification d'une version soumise** : elle la renvoie en brouillon, et une nouvelle soumission est requise.
+- **Offre ignorée** : `selectedOfferId` reste stocké, avec `selectedOfferOutcome = ignored`. Une offre ignorée ne compte pas dans la popularité.
+- **Codes HTTP** : les décisions admin répondent 201 (défaut Nest, attendu par les tests existants). Côté courtier, la soumission et le retrait répondent 200.

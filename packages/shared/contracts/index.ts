@@ -22,3 +22,4 @@ export * from "./routing-rule.contracts";
 export * from "./scoring-rule.contracts";
 export * from "./user.contracts";
 export * from "./enterprise.contracts";
+export * from "./offer-content";

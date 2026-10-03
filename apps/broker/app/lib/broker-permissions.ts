@@ -27,11 +27,11 @@ export function isTenantReadOnly(profile: Pick<BackOfficeProfile, "tenantReadOnl
  * echoue des que la matrice partagee change.
  */
 export const BROKER_ROLE_PERMISSIONS: Record<string, string[]> = {
-  broker_owner_starter: ["broker_leads:read", "broker_leads:update", "broker_leads:export", "notifications:read"],
-  broker_owner_pro: ["broker_leads:*", "broker_crm:*", "notifications:read"],
-  broker_manager: ["broker_leads:read", "broker_leads:update", "broker_crm:read", "broker_crm:update", "broker_crm:assign", "broker_crm:export", "notifications:read"],
-  broker_agent: ["broker_leads:read", "broker_leads:update", "broker_crm:read_assigned", "broker_crm:update_assigned", "notifications:read"],
-  broker_read_only: ["broker_leads:read", "broker_crm:read"]
+  broker_owner_starter: ["broker_leads:read", "broker_leads:update", "broker_leads:export", "notifications:read", "broker_offers:read", "broker_offers:write"],
+  broker_owner_pro: ["broker_leads:*", "broker_crm:*", "notifications:read", "broker_offers:read", "broker_offers:write"],
+  broker_manager: ["broker_leads:read", "broker_leads:update", "broker_crm:read", "broker_crm:update", "broker_crm:assign", "broker_crm:export", "notifications:read", "broker_offers:read", "broker_offers:write"],
+  broker_agent: ["broker_leads:read", "broker_leads:update", "broker_crm:read_assigned", "broker_crm:update_assigned", "notifications:read", "broker_offers:read"],
+  broker_read_only: ["broker_leads:read", "broker_crm:read", "broker_offers:read"]
 };
 
 /** Meme semantique que `roleHasPermission` de la matrice RBAC partagee. */
@@ -59,4 +59,15 @@ export function canMutateStarterLead(profile: BackOfficeProfile): boolean {
 export function canMutateCrmLead(profile: BackOfficeProfile): boolean {
   if (isReadOnlyBroker(profile) || isTenantReadOnly(profile)) return false;
   return hasPermission(profile, "broker_crm:update") || hasPermission(profile, "broker_crm:update_assigned");
+}
+
+/** Spec 052 FR-006: every broker role reads its partner's offers. */
+export function canReadOffers(profile: BackOfficeProfile): boolean {
+  return hasPermission(profile, "broker_offers:read");
+}
+
+/** Spec 052 FR-006/FR-009: owners and managers write, never on a suspended partner. */
+export function canMutateOffers(profile: BackOfficeProfile): boolean {
+  if (isReadOnlyBroker(profile) || isTenantReadOnly(profile)) return false;
+  return hasPermission(profile, "broker_offers:write");
 }

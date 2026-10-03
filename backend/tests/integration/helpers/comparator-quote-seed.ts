@@ -14,6 +14,7 @@ import { ProspectsModule } from "../../../src/modules/prospects/prospects.module
 import { QuoteFormsModule } from "../../../src/modules/quote-forms/quote-forms.module";
 import { QuoteRequestsModule } from "../../../src/modules/quote-requests/quote-requests.module";
 import { superAdminActor } from "./enterprise-seed";
+import { expireOffer, publishOffer } from "./offer-test-helpers";
 
 export interface ComparatorApp {
   audit: AuditLogsModule;
@@ -202,7 +203,7 @@ export async function seedComparatorQuote(): Promise<ComparatorSeed> {
     expirationDate: "2030-01-01"
   }, superAdminActor);
 
-  const activeOffer = await app.offers.adminService.create({
+  const activeOffer = await publishOffer(app.offers, {
     countryId: country.id,
     productId: product.id,
     partnerTenantId: partner.id,
@@ -215,20 +216,21 @@ export async function seedComparatorQuote(): Promise<ComparatorSeed> {
     validUntil: "2030-01-01T00:00:00.000Z",
     isSponsored: false,
     reason: "seed active indicative offer"
-  }, superAdminActor);
-  await app.offers.adminService.validate(activeOffer.id, { validationStatus: "validated", reason: "validate public offer" }, superAdminActor);
+  }, superAdminActor, superAdminActor);
 
-  const expiredOffer = await app.offers.adminService.create({
+  // Spec 052: validation refuses an expired offer, so the fixture is an offer that expired after publication.
+  const expiredOffer = await publishOffer(app.offers, {
     countryId: country.id,
     productId: product.id,
+    partnerTenantId: partner.id,
     name: "Auto Expiree",
     indicativePriceMin: 5000,
     currency: "XOF",
-    validFrom: "2020-01-01T00:00:00.000Z",
-    validUntil: "2021-01-01T00:00:00.000Z",
+    validFrom: "2026-01-01T00:00:00.000Z",
+    validUntil: "2030-01-01T00:00:00.000Z",
     reason: "seed expired offer"
-  }, superAdminActor);
-  await app.offers.adminService.validate(expiredOffer.id, { validationStatus: "validated", reason: "validate expired fixture" }, superAdminActor);
+  }, superAdminActor, superAdminActor);
+  await expireOffer(app.offers, expiredOffer.id);
 
   return {
     app,
