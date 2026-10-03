@@ -49,20 +49,20 @@ description: "Task list for 051 — Onboarding et cycle de vie des courtiers par
 - [x] T024 [US6] SLA contractuel : `EnterpriseService.updateSla` borné, vue SLA admin (R9), test.
 
 ## Phase 9: US7 Interface admin et portail (P1/P2)
-- [ ] T025 [US7] Admin :
+- [x] T025 [US7] Admin :
   - `partners/page.tsx` (annuaire filtrable, conserver le tableau SLA) ;
   - `partners/[partnerId]/page.tsx` (identité, statut et historique, conditions d'activation et liens, licences et actions, documents et téléversement, contrat, couverture, utilisateurs et invitation, journal) ;
   - `partners/applications/page.tsx` et `[applicationId]/page.tsx` ;
   - actions et client API ;
   - navigation.
-- [ ] T026 [US7] Admin `users` : sélecteur de courtier à la place de l'UUID libre.
-- [ ] T027 [US7] Courtier : bannière « Compte suspendu : consultation seule » et désactivation des actions d'écriture si `partnerTenantStatus = suspended`.
-- [ ] T028 [P] [US7] Tests de marqueurs admin et courtier.
+- [x] T026 [US7] Admin `users` : sélecteur de courtier à la place de l'UUID libre.
+- [x] T027 [US7] Courtier : bannière « Compte suspendu : consultation seule » et désactivation des actions d'écriture si `partnerTenantStatus = suspended`.
+- [x] T028 [P] [US7] Tests de marqueurs admin et courtier.
 
 ## Phase 10: Seeds et validations
 - [x] T029 Helpers de test, seed démo, `import-partners` (`active_test`, documents acceptés persistés, propriétaire, contrat) ; tests existants verts.
-- [ ] T030 Validations finales : `prisma generate` et `validate`, typecheck, lint, `npm run test`, `npm run test:web`, scan de secrets.
-- [ ] T031 Carte de couverture et tâches cochées.
+- [x] T030 Validations finales : `prisma generate` et `validate`, typecheck, lint, `npm run test`, `npm run test:web`, scan de secrets.
+- [x] T031 Carte de couverture et tâches cochées.
 
 ## Dependencies
 Phase 1 → Phase 2 → US1 → (US2, US3) → US4 → US5 et US6 → UI → Phase 10. Le lot backend A couvre T001 à T017, le lot backend B T018 à T024 et T029. Le lot UI couvre T025 à T028 après les deux lots backend.

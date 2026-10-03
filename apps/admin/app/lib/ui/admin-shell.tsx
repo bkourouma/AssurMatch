@@ -73,7 +73,17 @@ export const adminNavigation: NavGroup[] = [
   {
     title: "Partenaires",
     items: [
-      { label: "Partenaires", href: "/partners", icon: "partners", match: ["/partners"] },
+      // Spec 051: partner directory and partner page, plus the broker applications.
+      {
+        label: "Partenaires",
+        href: "/partners",
+        icon: "partners",
+        match: ["/partners"],
+        children: [
+          { label: "Courtiers", href: "/partners" },
+          { label: "Candidatures", href: "/partners/applications" }
+        ]
+      },
       { label: "Integrations", href: "/partner-integrations", icon: "plug", match: ["/partner-integrations"] },
       { label: "Facturation", href: "/billing", icon: "receipt", match: ["/billing"] },
       { label: "Messagerie", href: "/messaging", icon: "message", match: ["/messaging"] }

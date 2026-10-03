@@ -16,6 +16,10 @@ export interface BackOfficeProfile {
   productScopes?: string[];
   mfaVerified?: boolean;
   correlationId?: string;
+  /** Spec 051 R12: status of the partner, returned by `/auth/me`. */
+  partnerTenantStatus?: string;
+  /** Spec 051 R12: true while the partner is suspended (read-only access, writes refused 403 PARTNER_SUSPENDED). */
+  tenantReadOnly?: boolean;
 }
 
 export type BackOfficeSession =

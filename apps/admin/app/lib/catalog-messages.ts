@@ -91,6 +91,32 @@ export function blockerLabel(blocker: AdminWriteBlocker): string {
 }
 
 /**
+ * Spec 051: partner onboarding refusals (codes of `packages/shared/contracts/error-codes.ts`). They
+ * are checked before the generic status wording, so a 409 or a 422 says exactly what to fix.
+ */
+export const PARTNER_ERROR_MESSAGES: Record<string, string> = {
+  PARTNER_ACTIVATION_BLOCKED: "Activation refusée : des conditions d'activation ne sont pas remplies. Corrigez-les puis recommencez.",
+  PARTNER_TRANSITION_INVALID: "Changement de statut refusé : cette transition n'est pas permise depuis le statut actuel. Rechargez la page.",
+  PARTNER_DUPLICATE_REGISTRATION: "Doublon : un courtier avec ce numéro RCCM existe déjà dans ce pays.",
+  PARTNER_UPDATE_CONFLICT: "Conflit de mise à jour : la fiche courtier a été modifiée depuis son chargement. Rechargez la page puis recommencez.",
+  PARTNER_RETIRED: "Courtier résilié : aucune modification ni invitation n'est plus possible.",
+  PARTNER_SUSPENDED: "Compte suspendu : consultation seule. Contactez AssurMatch.",
+  PARTNER_USER_INVALID: "Utilisateur refusé : courtier inexistant ou résilié, rôle courtier sans courtier, rôle admin rattaché à un courtier, ou rôle propriétaire incompatible avec le plan.",
+  LICENSE_DOCUMENT_REQUIRED: "Validation refusée : rattachez à la licence une preuve d'agrément acceptée et saine.",
+  LICENSE_EXPIRED: "Licence expirée : sa date d'expiration est passée. Enregistrez un renouvellement.",
+  LICENSE_TRANSITION_INVALID: "Action refusée : le statut actuel de la licence ne permet pas cette action.",
+  LICENSE_REQUIRED_FOR_COUNTRY: "Autorisation refusée : le courtier n'a aucune licence (brouillon ou valide) pour ce pays.",
+  DOCUMENT_QUARANTINED: "Document en quarantaine ou non analysé : il ne peut être ni accepté ni téléchargé.",
+  DOCUMENT_INVALID: "Document refusé : type de fichier non autorisé (PDF, JPEG ou PNG) ou contenu illisible.",
+  DOCUMENT_STORAGE_NOT_CONFIGURED: "Stockage des documents non configuré sur cet environnement : téléversement impossible.",
+  CONTRACT_DOCUMENT_INVALID: "Contrat refusé : choisissez un document de type contrat de partenariat de ce courtier, analysé sain.",
+  COUNTRY_BROKER_ONBOARDING_DISABLED: "Refusé : l'inscription des courtiers est désactivée pour ce pays (country_broker_onboarding_enabled).",
+  APPLICATION_ALREADY_DECIDED: "Candidature déjà décidée : la décision est définitive. Rechargez la page.",
+  SLA_TARGET_EXCEEDS_CONTRACT: "Objectif de réactivité refusé : il ne peut pas être plus lâche que la cible contractuelle.",
+  PAYLOAD_TOO_LARGE: "Fichier trop volumineux : 5 Mo au maximum."
+};
+
+/**
  * Translates an API refusal into an operator message. 422 refusals keep their `blockers`, which the
  * screen lists separately; the message only says why the list is there.
  */
@@ -100,6 +126,9 @@ export function adminWriteErrorMessage(result: Pick<AdminWriteResult<unknown>, "
     return "Session expirée : reconnectez-vous puis recommencez.";
   }
   if (code === "MFA_REQUIRED") return "Vérification MFA requise avant cette action.";
+  const partnerMessage = PARTNER_ERROR_MESSAGES[code];
+  if (partnerMessage) return partnerMessage;
+  if (result.status === 413) return PARTNER_ERROR_MESSAGES.PAYLOAD_TOO_LARGE ?? "Fichier trop volumineux.";
   if (code === "CATALOG_FLAG_NOT_TOGGLEABLE") return SENSITIVE_FLAG_EXPLANATION;
   if (result.status === 403) return "Action refusée : droits insuffisants ou hors périmètre.";
   if (code === "CATALOG_UPDATE_CONFLICT") {

@@ -2,7 +2,7 @@
 
 import { usePathname } from "next/navigation";
 import type { ReactNode } from "react";
-import { AppShell, AuthShell } from "@assurmatch/ui/backoffice";
+import { AppShell, AuthShell, Notice } from "@assurmatch/ui/backoffice";
 import type { AppShellUser, NavGroup } from "@assurmatch/ui/backoffice";
 import { logoutAction } from "../backoffice-session-actions";
 
@@ -13,6 +13,8 @@ export interface BrokerShellProps {
   user?: AppShellUser | undefined;
   plan?: BrokerPlan | undefined;
   envBadge?: string | undefined;
+  /** Spec 051 R12: persistent banner of a suspended partner (computed by the layout from the session). */
+  suspendedBanner?: string | undefined;
 }
 
 /** Ecrans d'authentification: rendus hors du shell applicatif, sans navigation ni session. */
@@ -80,7 +82,7 @@ function brokerNavigation(plan?: BrokerPlan | undefined): NavGroup[] {
 }
 
 /** Enveloppe mince autour du design system back-office partage: aucune logique de session ici. */
-export function BrokerShell({ children, user, plan, envBadge }: BrokerShellProps) {
+export function BrokerShell({ children, user, plan, envBadge, suspendedBanner }: BrokerShellProps) {
   const pathname = usePathname() || "/";
 
   if (isAuthRoute(pathname)) {
@@ -107,6 +109,11 @@ export function BrokerShell({ children, user, plan, envBadge }: BrokerShellProps
       breadcrumbLabel="Fil d'Ariane"
       dataAttributes={{ "data-broker-shell": "true" }}
     >
+      {suspendedBanner ? (
+        <div role="status" data-tenant-suspended-banner="true">
+          <Notice tone="warning" title="Compte suspendu">{suspendedBanner}</Notice>
+        </div>
+      ) : null}
       {children}
     </AppShell>
   );

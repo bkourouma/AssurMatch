@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 import { loginRedirect, readBackOfficeSession } from "../../lib/backoffice-auth";
 import { isNotFoundState, readStarterLeadDetail, readStarterLeadHistory } from "../../lib/broker-api";
 import { acceptStarterLeadAction, disputeStarterLeadAction, rejectStarterLeadAction } from "../../lib/lead-actions";
-import { canMutateStarterLead } from "../../lib/broker-permissions";
+import { TENANT_SUSPENDED_MESSAGE, canMutateStarterLead, isTenantReadOnly } from "../../lib/broker-permissions";
 import {
   STARTER_ACTION_REASONS,
   STARTER_FINAL_STATUSES,
@@ -37,6 +37,8 @@ const NOTICES: Record<string, { tone: "info" | "warning" | "danger"; message: st
   disputed: { tone: "info", message: "Contestation enregistree et historisee. Le traitement suit le workflow existant." },
   reason_required: { tone: "warning", message: "Un motif allowliste est obligatoire pour rejeter ou contester un lead." },
   forbidden: { tone: "warning", message: "Action refusee: vos permissions, votre tenant ou votre MFA ne l'autorisent pas." },
+  // Spec 051 FR-021: 403 PARTNER_SUSPENDED.
+  suspended: { tone: "warning", message: TENANT_SUSPENDED_MESSAGE },
   not_found: { tone: "warning", message: "Ce lead n'existe pas ou ne vous est pas assigne." },
   invalid: { tone: "warning", message: "Saisie refusee par l'API. Verifiez le motif selectionne." },
   error: { tone: "danger", message: "Action indisponible pour le moment. Aucun changement n'a ete enregistre." }
@@ -94,6 +96,7 @@ export default async function BrokerLeadDetailPage({
   const contactEntries = Object.entries(lead?.contact ?? {}).filter(([, value]) => value !== null && value !== undefined && value !== "");
   const answerEntries = Object.entries(lead?.answers ?? {});
   const canMutate = canMutateStarterLead(session.profile);
+  const tenantReadOnly = isTenantReadOnly(session.profile);
   const isFinal = Boolean(lead && (STARTER_FINAL_STATUSES as readonly string[]).includes(lead.status));
   const showActions = Boolean(lead) && canMutate && !isFinal;
   const noticeEntry = notice ? NOTICES[notice] : undefined;
@@ -244,7 +247,9 @@ export default async function BrokerLeadDetailPage({
               <Notice tone="info" title="Lecture seule">
                 {isFinal
                   ? "Ce lead est cloture: aucune action courtier n'est plus possible."
-                  : "Votre role ne permet pas d'agir sur ce lead. Les actions restent visibles en lecture seule."}
+                  : tenantReadOnly
+                    ? TENANT_SUSPENDED_MESSAGE
+                    : "Votre role ne permet pas d'agir sur ce lead. Les actions restent visibles en lecture seule."}
               </Notice>
             </>
           )}

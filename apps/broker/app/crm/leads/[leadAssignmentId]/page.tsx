@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import { isStarterCrmDenied, loginRedirect, readBackOfficeSession } from "../../../lib/backoffice-auth";
 import { isNotFoundState, listLeadAiInteractions, readBrokerAIAssistance, readCrmLeadDetail } from "../../../lib/broker-api";
-import { canMutateCrmLead } from "../../../lib/broker-permissions";
+import { TENANT_SUSPENDED_MESSAGE, canMutateCrmLead, isTenantReadOnly } from "../../../lib/broker-permissions";
 import { addCrmLeadNoteAction, addCrmLeadReminderAction, addCrmLeadTaskAction, changeCrmLeadStatusAction } from "../../../lib/lead-actions";
 import {
   CRM_OUTCOME_REASONS,
@@ -42,6 +42,8 @@ const NOTICES: Record<string, { tone: "info" | "warning" | "danger"; message: st
   reminder_created: { tone: "info", message: "Rappel programme pour votre cabinet." },
   reason_required: { tone: "warning", message: "Un motif allowliste est obligatoire pour un statut de perte ou de contestation." },
   forbidden: { tone: "warning", message: "Action refusee par vos permissions CRM, votre tenant ou votre MFA." },
+  // Spec 051 FR-021: 403 PARTNER_SUSPENDED.
+  suspended: { tone: "warning", message: TENANT_SUSPENDED_MESSAGE },
   not_found: { tone: "warning", message: "Ce lead n'existe pas ou n'est pas accessible pour votre cabinet." },
   invalid: { tone: "warning", message: "Saisie refusee par l'API. Verifiez les champs obligatoires." },
   error: { tone: "danger", message: "Action CRM indisponible pour le moment. Aucun changement n'a ete enregistre." }
@@ -85,6 +87,7 @@ export default async function BrokerCrmLeadDetailPage({ params, searchParams }: 
   const lead = detail.status === "success" ? detail.data : undefined;
   const notFound = isNotFoundState(detail);
   const canMutate = canMutateCrmLead(session.profile);
+  const tenantReadOnly = isTenantReadOnly(session.profile);
   const showForms = Boolean(lead) && canMutate;
   const noticeEntry = crm ? NOTICES[crm] : undefined;
   const notes = lead?.notes ?? [];
@@ -116,7 +119,9 @@ export default async function BrokerCrmLeadDetailPage({ params, searchParams }: 
       {detail.status === "error" && !notFound ? <Notice tone="warning" title="Lead indisponible">{detail.error ?? "erreur inconnue"}</Notice> : null}
       {lead && !canMutate ? (
         <Notice tone="info" title="Lecture seule">
-          Votre role CRM ne permet pas de modifier ce lead. Statut, notes, taches et rappels restent consultables uniquement.
+          {tenantReadOnly
+            ? TENANT_SUSPENDED_MESSAGE
+            : "Votre role CRM ne permet pas de modifier ce lead. Statut, notes, taches et rappels restent consultables uniquement."}
         </Notice>
       ) : null}
 
@@ -305,6 +310,7 @@ export default async function BrokerCrmLeadDetailPage({ params, searchParams }: 
                 availableAssistTypes={assistance.data.availableAssistTypes}
                 interactions={interactions.status === "success" ? interactions.data : []}
                 notice={ai}
+                readOnly={tenantReadOnly}
               />
             </>
           ) : null}

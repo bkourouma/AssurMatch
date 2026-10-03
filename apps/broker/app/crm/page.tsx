@@ -14,8 +14,10 @@ import {
   Notice,
   PageHeader,
   PageStack,
-  Split
+  Split,
+  TenantWriteGuard
 } from "../lib/ui/broker-ui";
+import { TENANT_SUSPENDED_MESSAGE, isTenantReadOnly } from "../lib/broker-permissions";
 import { crmKpis, dashboardKpis } from "../lib/ui/broker-view-models";
 
 const BREADCRUMB = [{ label: "CRM" }, { label: "Pipeline" }];
@@ -230,6 +232,7 @@ export default async function BrokerCrmPage({ searchParams }: { searchParams: Pr
           </Cluster>
           <p>{aiAssistance.data.message}</p>
           {aiOptOut.status === "success" ? (
+            <TenantWriteGuard readOnly={isTenantReadOnly(session.profile)}>
             <form action={setAiOptOutAction}>
               <input type="hidden" name="optOut" value={aiOptOut.data.optedOut ? "false" : "true"} />
               <input
@@ -246,8 +249,10 @@ export default async function BrokerCrmPage({ searchParams }: { searchParams: Pr
                 </Button>
               </Cluster>
             </form>
+            </TenantWriteGuard>
           ) : null}
           {aiNotice === "optout_saved" ? <Notice tone="success">Preference IA du cabinet enregistree et auditee.</Notice> : null}
+          {aiNotice === "suspended" ? <Notice tone="warning">{TENANT_SUSPENDED_MESSAGE}</Notice> : null}
           {aiNotice === "forbidden" ? <Notice tone="danger">Seul le proprietaire du cabinet peut modifier la preference IA.</Notice> : null}
         </Card>
       ) : null}

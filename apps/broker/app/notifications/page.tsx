@@ -16,14 +16,18 @@ import {
   PageHeader,
   PageStack,
   Stack,
-  StatusBadge
+  StatusBadge,
+  TenantWriteGuard
 } from "../lib/ui/broker-ui";
+import { TENANT_SUSPENDED_MESSAGE, isTenantReadOnly } from "../lib/broker-permissions";
 
 const NOTICES: Record<string, string> = {
   read: "Notification marquee comme lue.",
   preferences_saved: "Preferences de canaux enregistrees et auditees.",
   baseline: "Email et notifications in-app restent actifs: ce sont les canaux operationnels de base.",
   forbidden: "Action refusee par vos permissions.",
+  // Spec 051 FR-021: 403 PARTNER_SUSPENDED (marking a notification read stays allowed).
+  suspended: TENANT_SUSPENDED_MESSAGE,
   error: "Notifications temporairement indisponibles."
 };
 
@@ -99,6 +103,7 @@ export default async function BrokerNotificationsPage({ searchParams }: { search
           Email et notifications in-app restent actifs en permanence. SMS et WhatsApp ne sont utilises que si la plateforme les a actives et si vous les acceptez ici.
         </p>
         {preferences.status === "success" ? (
+          <TenantWriteGuard readOnly={isTenantReadOnly(session.profile)}>
           <Form action={updateNotificationPreferencesAction}>
             <Cluster>
               <Badge tone="info">email: toujours actif</Badge>
@@ -113,6 +118,7 @@ export default async function BrokerNotificationsPage({ searchParams }: { search
               <Button type="submit" variant="secondary">Enregistrer mes canaux</Button>
             </FormActions>
           </Form>
+          </TenantWriteGuard>
         ) : (
           <Notice tone="warning">Preferences indisponibles: {preferences.error ?? "erreur inconnue"}.</Notice>
         )}

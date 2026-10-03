@@ -1,6 +1,17 @@
 import type { BackOfficeProfile } from "./backoffice-auth";
 
 /**
+ * Spec 051 FR-021: a suspended partner keeps read access only. The API refuses every broker write
+ * with 403 `PARTNER_SUSPENDED`; the portal disables the write actions beforehand and shows the same
+ * message.
+ */
+export const TENANT_SUSPENDED_MESSAGE = "Compte suspendu : consultation seule. Contactez AssurMatch.";
+
+export function isTenantReadOnly(profile: Pick<BackOfficeProfile, "tenantReadOnly" | "partnerTenantStatus"> | undefined): boolean {
+  return profile?.tenantReadOnly === true || profile?.partnerTenantStatus === "suspended";
+}
+
+/**
  * Lecture cote back-office des memes permissions que celles appliquees par
  * `BrokerStarterAccessPolicy` et `BrokerCrmAccessPolicy` cote backend.
  *
@@ -40,12 +51,12 @@ export function isReadOnlyBroker(profile: BackOfficeProfile): boolean {
 
 /** Accepter, rejeter ou contester un lead Starter exige broker_leads:update. */
 export function canMutateStarterLead(profile: BackOfficeProfile): boolean {
-  if (isReadOnlyBroker(profile)) return false;
+  if (isReadOnlyBroker(profile) || isTenantReadOnly(profile)) return false;
   return hasPermission(profile, "broker_leads:update");
 }
 
 /** Statut, note, tache et rappel CRM exigent broker_crm:update ou broker_crm:update_assigned. */
 export function canMutateCrmLead(profile: BackOfficeProfile): boolean {
-  if (isReadOnlyBroker(profile)) return false;
+  if (isReadOnlyBroker(profile) || isTenantReadOnly(profile)) return false;
   return hasPermission(profile, "broker_crm:update") || hasPermission(profile, "broker_crm:update_assigned");
 }

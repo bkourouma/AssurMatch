@@ -6,6 +6,26 @@ import type {
   AdminRegulatoryRegimeView
 } from "../../../../packages/shared/contracts/catalog.contracts";
 import type { AdminConsentTextView, ConsentTextTemplate } from "../../../../packages/shared/contracts/compliance.contracts";
+import type {
+  AdminAccreditationDocumentView,
+  AdminPartnerContractView,
+  AdminPartnerDetailView,
+  AdminPartnerLicenseView,
+  AdminPartnerUserView,
+  AdminPartnerView,
+  AccreditationDocumentType,
+  PartnerCapacityStatus,
+  PartnerEffectiveStatus,
+  PartnerPlan,
+  PartnerStatus,
+  PartnerUserRole
+} from "../../../../packages/shared/contracts/partner.contracts";
+import type {
+  AdminPartnerApplication,
+  PartnerApplicationConversionResult,
+  PartnerApplicationRejectionReasonCode,
+  PartnerApplicationStatus
+} from "../../../../packages/shared/contracts/partner-application.contracts";
 
 export const ADMIN_AUTH_SOURCE_MARKER = "admin-auth-client:014";
 
@@ -916,7 +936,8 @@ export function createAdminUser(input: {
   scopes: { countryIds: string[]; productIds: string[] };
   reason: string;
 }) {
-  return writeAdmin<AdminUserCreateResult>("/admin/users", "POST", input);
+  // Spec 051: a 422 `PARTNER_USER_INVALID` / `PARTNER_RETIRED` refusal keeps its code for the form.
+  return writeAdminResult<AdminUserCreateResult>("/admin/users", "POST", input);
 }
 
 export function updateAdminUser(userId: string, input: { displayName?: string; phone?: string; scopes?: { countryIds: string[]; productIds: string[] }; reason: string }) {
@@ -1007,22 +1028,26 @@ async function writeAdminResult<T>(path: string, method: "POST" | "PATCH", body:
       body: JSON.stringify(body),
       cache: "no-store"
     });
-    const payload = await response.json().catch(() => undefined) as unknown;
-    if (response.ok) return { ok: true, status: response.status, data: payload as T, blockers: [], availableLanguages: [] };
-    const record = payload && typeof payload === "object" ? payload as Record<string, unknown> : {};
-    return {
-      ok: false,
-      status: response.status,
-      ...(typeof record.code === "string" ? { code: record.code } : {}),
-      ...(typeof record.message === "string" ? { message: record.message } : {}),
-      blockers: toBlockers(record.blockers),
-      availableLanguages: Array.isArray(record.availableLanguages)
-        ? record.availableLanguages.filter((value): value is string => typeof value === "string")
-        : []
-    };
+    return await toAdminWriteResult<T>(response);
   } catch (error) {
     return { ok: false, status: 0, code: "api_unavailable", message: error instanceof Error ? error.message : "api_unavailable", blockers: [], availableLanguages: [] };
   }
+}
+
+async function toAdminWriteResult<T>(response: Response): Promise<AdminWriteResult<T>> {
+  const payload = await response.json().catch(() => undefined) as unknown;
+  if (response.ok) return { ok: true, status: response.status, data: payload as T, blockers: [], availableLanguages: [] };
+  const record = payload && typeof payload === "object" ? payload as Record<string, unknown> : {};
+  return {
+    ok: false,
+    status: response.status,
+    ...(typeof record.code === "string" ? { code: record.code } : {}),
+    ...(typeof record.message === "string" ? { message: record.message } : {}),
+    blockers: toBlockers(record.blockers),
+    availableLanguages: Array.isArray(record.availableLanguages)
+      ? record.availableLanguages.filter((value): value is string => typeof value === "string")
+      : []
+  };
 }
 
 /** Mirrors `AdminCountryProductLinkView` (packages/shared/contracts/catalog.contracts.ts). */
@@ -1211,4 +1236,195 @@ export function readAdminFeatureFlags() {
 
 export function updateAdminFeatureFlag(flagId: string, input: { value: boolean; reason: string }) {
   return writeAdminResult<AdminFeatureFlagData>(`/admin/feature-flags/${encodeURIComponent(flagId)}`, "PATCH", input);
+}
+
+/* ---------------------------------------------------------------------------------------------
+ * Spec 051: partner onboarding (directory, partner page, licences, documents, contract, coverage,
+ * users) and broker applications. Every mutation goes through `writeAdminResult`, so a 422
+ * `PARTNER_ACTIVATION_BLOCKED` keeps its `blockers` and every refusal keeps its code. The session
+ * token never leaves the server: the multipart upload and the document download below run in a
+ * route handler or a server action of the admin app, never in the browser.
+ * ------------------------------------------------------------------------------------------- */
+
+export type AdminPartnerData = AdminPartnerView;
+export type AdminPartnerDetailData = AdminPartnerDetailView;
+export type AdminPartnerLicenseData = AdminPartnerLicenseView;
+export type AdminPartnerDocumentData = AdminAccreditationDocumentView;
+export type AdminPartnerContractData = AdminPartnerContractView;
+export type AdminPartnerUserData = AdminPartnerUserView;
+export type AdminPartnerApplicationData = AdminPartnerApplication;
+export type { AccreditationDocumentType, PartnerCapacityStatus, PartnerEffectiveStatus, PartnerPlan, PartnerStatus, PartnerUserRole };
+
+export interface AdminPartnerListFilters {
+  status?: PartnerEffectiveStatus | undefined;
+  countryId?: string | undefined;
+  plan?: PartnerPlan | undefined;
+  licenseExpiringWithinDays?: number | undefined;
+}
+
+export function readAdminPartners(filters: AdminPartnerListFilters = {}) {
+  const params = new URLSearchParams();
+  if (filters.status) params.set("status", filters.status);
+  if (filters.countryId) params.set("countryId", filters.countryId);
+  if (filters.plan) params.set("plan", filters.plan);
+  if (filters.licenseExpiringWithinDays) params.set("licenseExpiringWithinDays", String(filters.licenseExpiringWithinDays));
+  const query = params.toString();
+  return readAdmin<AdminPartnerView[]>(`/admin/partners${query ? `?${query}` : ""}`, []);
+}
+
+export function readAdminPartner(partnerId: string) {
+  return readAdmin<AdminPartnerDetailView | null>(`/admin/partners/${encodeURIComponent(partnerId)}`, null);
+}
+
+export interface AdminPartnerWriteInput {
+  legalName?: string;
+  tradeName?: string;
+  countryId?: string;
+  city?: string;
+  registrationNumber?: string;
+  primaryEmail?: string;
+  primaryWhatsApp?: string;
+  adminContactName?: string;
+  adminContactEmail?: string;
+  adminContactPhone?: string;
+  commercialContactName?: string;
+  commercialContactEmail?: string;
+  commercialContactPhone?: string;
+  partnerInsurers?: string[];
+  plan?: PartnerPlan;
+  quotaMonthlyLeads?: number;
+  capacityStatus?: PartnerCapacityStatus;
+  slaTargetMinutes?: number;
+}
+
+function partnerPath(partnerId: string, suffix = ""): string {
+  return `/admin/partners/${encodeURIComponent(partnerId)}${suffix}`;
+}
+
+export function createAdminPartner(input: AdminPartnerWriteInput & { reason: string }) {
+  return writeAdminResult<AdminPartnerDetailView>("/admin/partners", "POST", input);
+}
+
+export function updateAdminPartner(partnerId: string, input: AdminPartnerWriteInput & { expectedUpdatedAt?: string; reason: string }) {
+  return writeAdminResult<AdminPartnerDetailView>(partnerPath(partnerId), "PATCH", input);
+}
+
+export function changeAdminPartnerStatus(partnerId: string, input: { status: PartnerStatus; reason: string }) {
+  return writeAdminResult<AdminPartnerDetailView>(partnerPath(partnerId, "/status"), "POST", input);
+}
+
+export function authorizeAdminPartnerCountry(partnerId: string, input: { countryId: string; reason: string }) {
+  return writeAdminResult<unknown>(partnerPath(partnerId, "/authorizations/countries"), "POST", input);
+}
+
+export function withdrawAdminPartnerCountry(partnerId: string, countryId: string, reason: string) {
+  return writeAdminResult<unknown>(partnerPath(partnerId, `/authorizations/countries/${encodeURIComponent(countryId)}/withdraw`), "POST", { reason });
+}
+
+export function authorizeAdminPartnerProduct(partnerId: string, input: { productId: string; reason: string }) {
+  return writeAdminResult<unknown>(partnerPath(partnerId, "/authorizations/products"), "POST", input);
+}
+
+export function withdrawAdminPartnerProduct(partnerId: string, productId: string, reason: string) {
+  return writeAdminResult<unknown>(partnerPath(partnerId, `/authorizations/products/${encodeURIComponent(productId)}/withdraw`), "POST", { reason });
+}
+
+export interface AdminPartnerLicenseWriteInput {
+  licenseNumber: string;
+  issuingAuthority: string;
+  countryId?: string;
+  productIds: string[];
+  effectiveDate: string;
+  expirationDate: string;
+  reason: string;
+}
+
+export function createAdminPartnerLicense(partnerId: string, input: AdminPartnerLicenseWriteInput & { countryId: string }) {
+  return writeAdminResult<AdminPartnerLicenseView>(partnerPath(partnerId, "/licenses"), "POST", input);
+}
+
+export function runAdminPartnerLicenseAction(partnerId: string, licenseId: string, action: "validate" | "suspend" | "revoke", reason: string) {
+  return writeAdminResult<AdminPartnerLicenseView>(partnerPath(partnerId, `/licenses/${encodeURIComponent(licenseId)}/${action}`), "POST", { reason });
+}
+
+export function renewAdminPartnerLicense(partnerId: string, licenseId: string, input: AdminPartnerLicenseWriteInput) {
+  return writeAdminResult<AdminPartnerLicenseView>(partnerPath(partnerId, `/licenses/${encodeURIComponent(licenseId)}/renew`), "POST", input);
+}
+
+/**
+ * Multipart upload (`file`, `documentType`, `licenseId?`, `expirationDate?`, `reason`) forwarded
+ * to `POST /admin/partners/:id/documents` with the session token. Called from the admin route
+ * handler only; the browser never sees the token.
+ */
+export async function uploadAdminPartnerDocument(partnerId: string, form: FormData): Promise<AdminWriteResult<AdminAccreditationDocumentView>> {
+  const token = await getBackOfficeToken();
+  if (!token) return { ok: false, status: 401, code: "session_required", blockers: [], availableLanguages: [] };
+  try {
+    const response = await fetch(`${backOfficeApiBaseUrl()}${partnerPath(partnerId, "/documents")}`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}` },
+      body: form,
+      cache: "no-store"
+    });
+    return await toAdminWriteResult<AdminAccreditationDocumentView>(response);
+  } catch (error) {
+    return { ok: false, status: 0, code: "api_unavailable", message: error instanceof Error ? error.message : "api_unavailable", blockers: [], availableLanguages: [] };
+  }
+}
+
+/** Audited download (`GET /admin/partners/:id/documents/:documentId/file`); the caller streams the bytes. */
+export async function fetchAdminPartnerDocumentFile(partnerId: string, documentId: string): Promise<Response> {
+  const token = await getBackOfficeToken();
+  if (!token) return new Response(null, { status: 401 });
+  return fetch(`${backOfficeApiBaseUrl()}${partnerPath(partnerId, `/documents/${encodeURIComponent(documentId)}/file`)}`, {
+    headers: { Authorization: `Bearer ${token}` },
+    cache: "no-store"
+  });
+}
+
+export function reviewAdminPartnerDocument(partnerId: string, documentId: string, input: { decision: "accepted" | "rejected"; reason: string }) {
+  return writeAdminResult<AdminAccreditationDocumentView>(partnerPath(partnerId, `/documents/${encodeURIComponent(documentId)}/review`), "POST", input);
+}
+
+export function recordAdminPartnerContract(partnerId: string, input: { version: string; signedAt: string; signatoryName: string; documentId: string; reason: string }) {
+  return writeAdminResult<AdminPartnerContractView>(partnerPath(partnerId, "/contracts"), "POST", input);
+}
+
+export interface AdminPartnerUserInviteResult {
+  user: AdminPartnerUserView;
+  emailStatus: "not_configured" | "sent" | "failed";
+  token?: string;
+  expiresAt: string;
+}
+
+export function inviteAdminPartnerUser(partnerId: string, input: { email: string; displayName: string; role: PartnerUserRole; reason: string }) {
+  return writeAdminResult<AdminPartnerUserInviteResult>(partnerPath(partnerId, "/users"), "POST", input);
+}
+
+export function readAdminPartnerApplications(filters: { status?: PartnerApplicationStatus | undefined; countryId?: string | undefined } = {}) {
+  const params = new URLSearchParams();
+  if (filters.status) params.set("status", filters.status);
+  if (filters.countryId) params.set("countryId", filters.countryId);
+  const query = params.toString();
+  return readAdmin<AdminPartnerApplication[]>(`/admin/partners/applications${query ? `?${query}` : ""}`, []);
+}
+
+export function readAdminPartnerApplication(applicationId: string) {
+  return readAdmin<AdminPartnerApplication | null>(`/admin/partners/applications/${encodeURIComponent(applicationId)}`, null);
+}
+
+function applicationPath(applicationId: string, action: "review" | "convert" | "reject"): string {
+  return `/admin/partners/applications/${encodeURIComponent(applicationId)}/${action}`;
+}
+
+export function reviewAdminPartnerApplication(applicationId: string, reason: string) {
+  return writeAdminResult<AdminPartnerApplication>(applicationPath(applicationId, "review"), "POST", { reason });
+}
+
+export function convertAdminPartnerApplication(applicationId: string, reason: string) {
+  return writeAdminResult<PartnerApplicationConversionResult>(applicationPath(applicationId, "convert"), "POST", { reason });
+}
+
+export function rejectAdminPartnerApplication(applicationId: string, input: { rejectionReasonCode: PartnerApplicationRejectionReasonCode; reason: string }) {
+  return writeAdminResult<AdminPartnerApplication>(applicationPath(applicationId, "reject"), "POST", input);
 }

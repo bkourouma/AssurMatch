@@ -1,6 +1,7 @@
 import type { BrokerAiInteraction } from "../../../lib/broker-api";
 import { requestLeadAiAction, validateLeadAiAction } from "../../../lib/crm-ai-actions";
-import { Badge, Button, Card, Cluster, Notice, Stack } from "../../../lib/ui/broker-ui";
+import { TENANT_SUSPENDED_MESSAGE } from "../../../lib/broker-permissions";
+import { Badge, Button, Card, Cluster, Notice, Stack, TenantWriteGuard } from "../../../lib/ui/broker-ui";
 
 const ASSIST_LABELS: Record<string, string> = {
   lead_summary: "Resume du lead",
@@ -17,6 +18,7 @@ const NOTICES: Record<string, string> = {
   quota: "Quota quotidien d'assistance IA atteint pour votre cabinet.",
   disabled: "Assistance IA indisponible pour ce lead (flags, pays, produit ou plan).",
   forbidden: "Action IA refusee par vos permissions CRM.",
+  suspended: TENANT_SUSPENDED_MESSAGE,
   error: "Assistance IA temporairement indisponible."
 };
 
@@ -30,7 +32,7 @@ function statusTone(status: BrokerAiInteraction["status"]): "success" | "warning
  * Broker AI panel: rendered only when the tenant's assistance status is enabled. Every output is a
  * suggestion to validate; the broker decides, nothing changes the lead automatically.
  */
-export function LeadAiPanel({ leadAssignmentId, enabled, availableAssistTypes, interactions, notice }: { leadAssignmentId: string; enabled: boolean; availableAssistTypes: string[]; interactions: BrokerAiInteraction[]; notice?: string | undefined }) {
+export function LeadAiPanel({ leadAssignmentId, enabled, availableAssistTypes, interactions, notice, readOnly = false }: { leadAssignmentId: string; enabled: boolean; availableAssistTypes: string[]; interactions: BrokerAiInteraction[]; notice?: string | undefined; readOnly?: boolean | undefined }) {
   if (!enabled) return null;
   const assistTypes = Object.keys(ASSIST_LABELS).filter((assistType) => availableAssistTypes.includes(assistType));
   if (assistTypes.length === 0) return null;
@@ -41,6 +43,7 @@ export function LeadAiPanel({ leadAssignmentId, enabled, availableAssistTypes, i
         Suggestions IA a valider: le courtier decide, aucune decision automatique sur le lead, donnees de contact jamais transmises au modele.
       </p>
       {notice && NOTICES[notice] ? <Notice tone={notice === "error" ? "danger" : "info"}>{NOTICES[notice]}</Notice> : null}
+      <TenantWriteGuard readOnly={readOnly}>
       <Cluster>
         {assistTypes.map((assistType) => (
           <form key={assistType} action={requestLeadAiAction}>
@@ -50,6 +53,7 @@ export function LeadAiPanel({ leadAssignmentId, enabled, availableAssistTypes, i
           </form>
         ))}
       </Cluster>
+      </TenantWriteGuard>
       {interactions.length === 0 ? (
         <p>Aucune suggestion IA pour ce lead.</p>
       ) : (
@@ -66,6 +70,7 @@ export function LeadAiPanel({ leadAssignmentId, enabled, availableAssistTypes, i
               {interaction.status === "refused" ? <p>Suggestion retenue par les garde-fous ou assistance desactivee ({interaction.refusalReason ?? "refus"}).</p> : null}
               {interaction.status === "queued" ? <p>Suggestion en cours de preparation.</p> : null}
               {interaction.status === "completed" && interaction.humanValidationStatus === "pending" ? (
+                <TenantWriteGuard readOnly={readOnly}>
                 <Cluster>
                   {(["approved", "rejected"] as const).map((decision) => (
                     <form key={decision} action={validateLeadAiAction}>
@@ -76,6 +81,7 @@ export function LeadAiPanel({ leadAssignmentId, enabled, availableAssistTypes, i
                     </form>
                   ))}
                 </Cluster>
+                </TenantWriteGuard>
               ) : null}
             </Card>
           ))}

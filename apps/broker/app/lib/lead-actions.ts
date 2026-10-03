@@ -2,7 +2,8 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { backOfficeApiBaseUrl, getBackOfficeToken, loginRedirect } from "./backoffice-auth";
+import { loginRedirect } from "./backoffice-auth";
+import { callBrokerWrite, type BrokerWriteResult } from "./broker-write";
 import { crmStatusRequiresReason, isCrmOutcomeReason, isCrmPipelineStatus, isStarterActionReason } from "./lead-vocabulary";
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -16,23 +17,14 @@ function stringValue(value: FormDataEntryValue | null): string {
  * Aucune donnee d'un autre tenant ne peut transiter: le backend re-verifie le
  * tenant, le role, le plan et audite chaque refus.
  */
-async function callBrokerApi(path: string, body: Record<string, unknown>): Promise<number> {
-  const token = await getBackOfficeToken();
-  if (!token) return 401;
-  try {
-    const response = await fetch(`${backOfficeApiBaseUrl()}${path}`, {
-      method: "POST",
-      headers: { Authorization: `Bearer ${token}`, "content-type": "application/json" },
-      body: JSON.stringify(body),
-      cache: "no-store"
-    });
-    return response.status;
-  } catch {
-    return 0;
-  }
+function callBrokerApi(path: string, body: Record<string, unknown>): Promise<BrokerWriteResult> {
+  return callBrokerWrite(path, "POST", body);
 }
 
-function outcome(status: number, success: string): string {
+function outcome(result: BrokerWriteResult, success: string): string {
+  const { status } = result;
+  // Spec 051 FR-021: 403 PARTNER_SUSPENDED is shown as "Compte suspendu : consultation seule".
+  if (result.suspended) return "suspended";
   if (status === 200 || status === 201) return success;
   if (status === 403) return "forbidden";
   if (status === 404) return "not_found";
@@ -48,18 +40,18 @@ function toIsoDateTime(value: string): string | undefined {
   return date.toISOString();
 }
 
-async function finishStarter(leadId: string, status: number, success: string): Promise<void> {
-  if (status === 401) redirect(loginRedirect(`/leads/${leadId}`, "session_expired"));
+async function finishStarter(leadId: string, result: BrokerWriteResult, success: string): Promise<void> {
+  if (result.status === 401) redirect(loginRedirect(`/leads/${leadId}`, "session_expired"));
   revalidatePath(`/leads/${leadId}`);
   revalidatePath("/leads");
-  redirect(`/leads/${leadId}?lead=${outcome(status, success)}`);
+  redirect(`/leads/${leadId}?lead=${outcome(result, success)}`);
 }
 
-async function finishCrm(leadId: string, status: number, success: string): Promise<void> {
-  if (status === 401) redirect(loginRedirect(`/crm/leads/${leadId}`, "session_expired"));
+async function finishCrm(leadId: string, result: BrokerWriteResult, success: string): Promise<void> {
+  if (result.status === 401) redirect(loginRedirect(`/crm/leads/${leadId}`, "session_expired"));
   revalidatePath(`/crm/leads/${leadId}`);
   revalidatePath("/crm/leads");
-  redirect(`/crm/leads/${leadId}?crm=${outcome(status, success)}`);
+  redirect(`/crm/leads/${leadId}?crm=${outcome(result, success)}`);
 }
 
 /** Portail Starter: acceptation d'un lead assigne. POST /broker/starter/leads/:leadId/accept */

@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { isAdminProfile, loginRedirect, readBackOfficeSession } from "../lib/backoffice-auth";
-import { readAdminUsers, type AdminUser } from "../lib/admin-api";
+import { readAdminPartners, readAdminUsers, type AdminUser } from "../lib/admin-api";
+import { partnerStatusLabel } from "../lib/partner-messages";
 import { CreateUserForm } from "./user-action-forms";
 import { adminRoleOptions, userStatusOptions } from "./user-options";
 import {
@@ -84,7 +85,15 @@ export default async function UserManagementPage({ searchParams }: UsersPageProp
   const role = firstParam(params.role);
   const notice = firstParam(params.notice);
 
-  const users = await readAdminUsers({ ...(status ? { status } : {}), ...(role ? { role } : {}) });
+  const [users, partners] = await Promise.all([
+    readAdminUsers({ ...(status ? { status } : {}), ...(role ? { role } : {}) }),
+    readAdminPartners()
+  ]);
+  // Spec 051 T026: partner select of the creation form; a retired partner is never offered.
+  const partnerChoices = partners.data
+    .filter((partner) => partner.status !== "retired")
+    .map((partner) => ({ value: partner.id, label: `${partner.tradeName || partner.legalName} (${partnerStatusLabel(partner.status)})` }))
+    .sort((left, right) => left.label.localeCompare(right.label));
   if (users.unauthenticated) redirect(loginRedirect("/users", users.error ?? "session_required"));
   const filtered = users.data.filter((user) => includesSearch(user, search));
 
@@ -160,7 +169,7 @@ export default async function UserManagementPage({ searchParams }: UsersPageProp
           </Card>
         </Stack>
 
-        <CreateUserForm />
+        <CreateUserForm partners={partnerChoices} />
       </Split>
     </PageStack>
   );
