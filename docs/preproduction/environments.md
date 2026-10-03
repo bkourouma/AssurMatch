@@ -29,7 +29,10 @@ the code. Documents use `ASSURMATCH_DOCUMENT_STORAGE`, `ASSURMATCH_S3_*`, `ASSUR
 
 The frontends read only `NEXT_PUBLIC_*` values, **compiled at `next build`**: images built without
 build arguments fall back to `http://127.0.0.1:3000` for the API. Pass them as build arguments
-(see the Dockerfiles).
+(see the Dockerfiles). In CI, the `build-images` job (whose frontend images are the ones deployed
+to preproduction) reads them from the repository variables `PREPROD_API_URL`, `PREPROD_PUBLIC_URL`
+and `PREPROD_BROKER_URL` (Settings > Secrets and variables > Actions > Variables) and warns when
+one is missing; production frontends are rebuilt with the `PROD_*` variables.
 
 `CORS_ORIGINS` is a comma-separated allowlist of browser origins permitted to call the API
 cross-origin, and it must list the Web Publique Client's origin: the visitor's browser submits the

@@ -2,7 +2,18 @@ import type { UserAccount } from "../../users/users.module";
 import type { AuthEmailPayload, EmailPurpose } from "./email-delivery.service";
 
 interface TemplateOptions {
+  /** Admin back-office URL (`APP_BASE_URL`). */
   appBaseUrl?: string;
+  /** Broker back-office URL (`BROKER_APP_URL`), used for every broker user. */
+  brokerAppUrl?: string;
+}
+
+/**
+ * A broker user (attached to a partner tenant, or holding a broker role) signs in on the broker
+ * back-office, never on the admin one: their activation and password-reset links point there.
+ */
+export function isBrokerAccount(user: Pick<UserAccount, "partnerTenantId" | "roles">): boolean {
+  return Boolean(user.partnerTenantId) || user.roles.some((role) => role.startsWith("broker_"));
 }
 
 export class AuthEmailTemplateService {
@@ -24,7 +35,7 @@ export class AuthEmailTemplateService {
     actionLabel: string,
     path: string
   ): AuthEmailPayload {
-    const link = this.link(path, token);
+    const link = this.link(user, path, token);
     const lines = [
       `Bonjour ${user.displayName},`,
       "",
@@ -59,8 +70,10 @@ export class AuthEmailTemplateService {
     };
   }
 
-  private link(path: string, token: string): string {
-    const base = (this.options.appBaseUrl ?? process.env.APP_BASE_URL ?? "http://127.0.0.1:3702").replace(/\/$/, "");
+  private link(user: UserAccount, path: string, token: string): string {
+    const base = (isBrokerAccount(user)
+      ? this.options.brokerAppUrl ?? process.env.BROKER_APP_URL ?? "http://127.0.0.1:3603"
+      : this.options.appBaseUrl ?? process.env.APP_BASE_URL ?? "http://127.0.0.1:3702").replace(/\/$/, "");
     return `${base}${path}?token=${encodeURIComponent(token)}`;
   }
 }

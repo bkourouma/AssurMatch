@@ -2,7 +2,9 @@
 # - verify: PR + push main + manual run (typecheck, lint, test, build, prisma validate, audit, playwright source-marker)
 # - secret-scan: ensure no real EMAIL_SMTP_PASS / private key shipped
 # - build-images: push main + manual run - four GHCR images (assurmatch, assurmatch-public,
-#   assurmatch-backoffice, assurmatch-broker), built without NEXT_PUBLIC_* build arguments.
+#   assurmatch-backoffice, assurmatch-broker). The three frontends are the preproduction ones: their
+#   NEXT_PUBLIC_* come from the repository variables PREPROD_API_URL, PREPROD_PUBLIC_URL and
+#   PREPROD_BROKER_URL (an unset variable leaves the app fallback, see scripts/ops/next-build.sh).
 # - deploy-preproduction: self-hosted runner deploys three containers behind Nginx.
 #   Health checks cover the three surfaces. (Unchanged by spec 057; the broker image is built but
 #   not deployed to preproduction by this job.)
@@ -108,8 +110,20 @@ jobs:
           password: ${{ github.token }}
       - name: Set up Buildx
         uses: docker/setup-buildx-action@v3
+      - name: Check the preproduction frontend URL variables
+        env:
+          PREPROD_API_URL: ${{ vars.PREPROD_API_URL }}
+          PREPROD_PUBLIC_URL: ${{ vars.PREPROD_PUBLIC_URL }}
+          PREPROD_BROKER_URL: ${{ vars.PREPROD_BROKER_URL }}
+        run: |
+          for name in PREPROD_API_URL PREPROD_PUBLIC_URL PREPROD_BROKER_URL; do
+            eval "value=\${$name:-}"
+            if [ -z "$value" ]; then
+              echo "::warning::Repository variable $name is not set: the frontend images keep their local fallback URL (Settings > Secrets and variables > Actions > Variables)"
+            fi
+          done
 
-      # Three images from the same monorepo: API, public, back-office.
+      # API, public, back-office and broker images from the same monorepo.
       - name: Build & push API image
         uses: docker/build-push-action@v6
         with:
@@ -125,6 +139,11 @@ jobs:
           context: .
           file: apps/public/Dockerfile
           push: true
+          build-args: |
+            NEXT_PUBLIC_ASSURMATCH_API_URL=${{ vars.PREPROD_API_URL }}
+            NEXT_PUBLIC_ASSURMATCH_PUBLIC_URL=${{ vars.PREPROD_PUBLIC_URL }}
+            NEXT_PUBLIC_ASSURMATCH_BROKER_URL=${{ vars.PREPROD_BROKER_URL }}
+            NEXT_PUBLIC_APP_ENV=preproduction
           tags: |
             ghcr.io/bkourouma/assurmatch-public:latest
             ghcr.io/bkourouma/assurmatch-public:${{ env.SHA }}
@@ -134,6 +153,10 @@ jobs:
           context: .
           file: apps/admin/Dockerfile
           push: true
+          build-args: |
+            NEXT_PUBLIC_ASSURMATCH_API_URL=${{ vars.PREPROD_API_URL }}
+            NEXT_PUBLIC_ASSURMATCH_ADMIN_API_URL=${{ vars.PREPROD_API_URL }}
+            NEXT_PUBLIC_APP_ENV=preproduction
           tags: |
             ghcr.io/bkourouma/assurmatch-backoffice:latest
             ghcr.io/bkourouma/assurmatch-backoffice:${{ env.SHA }}
@@ -143,6 +166,10 @@ jobs:
           context: .
           file: apps/broker/Dockerfile
           push: true
+          build-args: |
+            NEXT_PUBLIC_ASSURMATCH_API_URL=${{ vars.PREPROD_API_URL }}
+            NEXT_PUBLIC_ASSURMATCH_BROKER_API_URL=${{ vars.PREPROD_API_URL }}
+            NEXT_PUBLIC_APP_ENV=preproduction
           tags: |
             ghcr.io/bkourouma/assurmatch-broker:latest
             ghcr.io/bkourouma/assurmatch-broker:${{ env.SHA }}

@@ -29,7 +29,7 @@ Les `NEXT_PUBLIC_*` sont figés au build : changer l'URL de l'API impose une rec
 ## Liens entrants
 
 - Le site public pointe vers le portail via `NEXT_PUBLIC_ASSURMATCH_BROKER_URL` (build de l'image publique, variable `PROD_BROKER_URL`).
-- Les e-mails envoyés aux courtiers utilisent `BROKER_APP_URL` (`api.env`, `worker.env`).
+- Les e-mails envoyés aux courtiers utilisent `BROKER_APP_URL` (`api.env`, `worker.env`) : liens vers les leads, et liens d'activation et de réinitialisation du mot de passe de tout compte rattaché à un partenaire ou porteur d'un rôle courtier (les comptes plateforme restent sur `APP_BASE_URL`).
 
 ## Vérifier
 

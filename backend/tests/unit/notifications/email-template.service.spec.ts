@@ -44,4 +44,31 @@ describe("auth email templates", () => {
     expect(email.body).toContain("https://admin.assurmatch.test/password-reset?token=reset%20token");
     expect(email.subject).toContain("Reinitialisation");
   });
+
+  it("sends broker users to the broker back-office, never to the admin one", () => {
+    const template = new AuthEmailTemplateService({ appBaseUrl: "https://admin.assurmatch.test", brokerAppUrl: "https://pro.assurmatch.test/" });
+    const broker: UserAccount = { ...user, roles: ["broker_owner_starter"], partnerTenantId: "partner-1" };
+    expect(template.activation(broker, "tok").body).toContain("https://pro.assurmatch.test/activate?token=tok");
+    expect(template.passwordReset(broker, "tok").body).toContain("https://pro.assurmatch.test/password-reset?token=tok");
+    expect(template.passwordReset(broker, "tok").body).not.toContain("admin.assurmatch.test");
+    // A partner-attached account is a broker account even before a role is granted.
+    expect(template.activation({ ...user, roles: [], partnerTenantId: "partner-1" }, "tok").body).toContain("https://pro.assurmatch.test/activate");
+    expect(template.activation({ ...user, roles: ["broker_agent"] }, "tok").body).toContain("https://pro.assurmatch.test/activate");
+    // Platform admins keep the admin back-office.
+    expect(template.activation(user, "tok").body).toContain("https://admin.assurmatch.test/activate?token=tok");
+  });
+
+  it("reads BROKER_APP_URL for broker users when no option is given", () => {
+    const previous = { app: process.env.APP_BASE_URL, broker: process.env.BROKER_APP_URL };
+    process.env.APP_BASE_URL = "https://admin.env.test";
+    process.env.BROKER_APP_URL = "https://pro.env.test";
+    try {
+      const template = new AuthEmailTemplateService();
+      expect(template.passwordReset({ ...user, roles: ["broker_manager"], partnerTenantId: "partner-1" }, "tok").body).toContain("https://pro.env.test/password-reset?token=tok");
+      expect(template.passwordReset(user, "tok").body).toContain("https://admin.env.test/password-reset?token=tok");
+    } finally {
+      if (previous.app === undefined) delete process.env.APP_BASE_URL; else process.env.APP_BASE_URL = previous.app;
+      if (previous.broker === undefined) delete process.env.BROKER_APP_URL; else process.env.BROKER_APP_URL = previous.broker;
+    }
+  });
 });

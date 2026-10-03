@@ -28,5 +28,5 @@ description: "Task list for 054 — Espace de suivi visiteur et notifications"
 - [x] T013 En-têtes `Referrer-Policy: no-referrer` et `X-Robots-Tag` sur les pages de suivi, d'avis et de renvoi ; `robots.ts` ; chemins localisés dans `i18n/routing.ts` ; messages FR et EN avec parité des clés ; tests de marqueurs.
 
 ## Phase 4: Validations
-- [ ] T014 Validations finales : `prisma generate` et `validate`, typecheck, lint, `npm run test`, `npm run test:web`, scan de secrets, build public.
-- [ ] T015 Carte de couverture et tâches cochées.
+- [x] T014 Validations finales : `prisma generate` et `validate`, typecheck, lint, `npm run test`, `npm run test:web`, scan de secrets, build public.
+- [x] T015 Carte de couverture et tâches cochées.
