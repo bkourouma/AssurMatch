@@ -593,6 +593,39 @@ model PartnerTenant {
   @@index([countryId, status])
 }
 
+/// Spec 053 R3: broker self-service requests decided by the admin: identity changes (legal name,
+/// trade name, RCCM, country) and coverage extensions (one country or one product).
+enum PartnerChangeRequestType {
+  profile_change
+  coverage_extension
+}
+
+enum PartnerChangeRequestStatus {
+  pending
+  accepted
+  rejected
+  cancelled
+}
+
+model PartnerChangeRequest {
+  id               String                     @id @default(uuid())
+  partnerTenantId  String
+  type             PartnerChangeRequestType
+  status           PartnerChangeRequestStatus @default(pending)
+  requestedChanges Json
+  previousValues   Json                       @default("{}")
+  justification    String
+  requestedById    String?
+  decidedById      String?
+  decidedAt        DateTime?
+  decisionReason   String?
+  createdAt        DateTime                   @default(now())
+  updatedAt        DateTime                   @default(now())
+
+  @@index([partnerTenantId, status])
+  @@index([status, createdAt])
+}
+
 /// Spec 051 R2: every partner status transition, with its reason and actor.
 model PartnerStatusHistory {
   id              String         @id @default(uuid())

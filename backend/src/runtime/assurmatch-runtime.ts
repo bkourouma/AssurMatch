@@ -36,6 +36,11 @@ import { PartnerLicensesModule } from "../modules/partner-licenses/partner-licen
 import { PartnersModule } from "../modules/partners/partners.module";
 import { PublicPartnerDirectoryService } from "../modules/partners/public-partner-directory.service";
 import { PartnerAdminService } from "../modules/partners/partner-admin.service";
+import { BrokerAccountService } from "../modules/broker-self-service/broker-account.service";
+import { BrokerTeamService } from "../modules/broker-self-service/broker-team.service";
+import { PartnerRequestAdminService } from "../modules/broker-self-service/partner-request-admin.service";
+import { MemoryPartnerChangeRequestsRepository, PrismaPartnerChangeRequestsRepository } from "../modules/broker-self-service/partner-change-requests.repository";
+import { UserAccessStatusService } from "../modules/auth/user-access-status.service";
 import { AdminUsersController } from "../modules/users/admin-users.controller";
 import { PartnerTenantStatusService } from "../modules/partners/partner-tenant-status.service";
 import { ProductsModule } from "../modules/products/products.module";
@@ -187,6 +192,8 @@ export class AssurMatchRuntime {
     requireDurableStorage: process.env.APP_ENV === "production" || process.env.APP_ENV === "preproduction"
   });
   readonly users = new UsersModule(this.audit.writer, this.usersRepository);
+  /** Spec 053 R6: stored status and roles of a broker user, read by the auth guard on every request. */
+  readonly userAccessStatus = new UserAccessStatusService(this.users.service);
   readonly auth = new AuthModule(this.users.service, this.audit.writer, this.emailDelivery, this.partnerTenantStatus);
   readonly featureFlags = new FeatureFlagsModule(
     this.audit.writer,
@@ -479,6 +486,46 @@ readonly enterprise = new EnterpriseService({
     products: this.products.service,
     listUsers: () => this.users.service.list({ actorId: "system:partner-admin", roles: ["super_admin"], mfaVerified: true }),
     provisionUser: (actor, input) => this.adminUsersController().createPartnerUser(actor, input)
+  });
+  /** Spec 053 R3: broker requests (identity changes, coverage extensions) decided by the admin. */
+  private readonly partnerChangeRequestsRepository = this.runtimeRepository(new PrismaPartnerChangeRequestsRepository(this.prisma)) ?? new MemoryPartnerChangeRequestsRepository();
+  /** Spec 053: broker self-service (company profile, licences, coverage) behind `/broker/account` and `/broker/licenses`. */
+  readonly brokerAccount = new BrokerAccountService({
+    audit: this.audit.writer,
+    partners: this.partners.service,
+    licenses: this.partnerLicenses.service,
+    documents: this.documents.service,
+    catalog: {
+      country: async (id: string) => {
+        const country = await this.countries.service.require(id).catch(() => undefined);
+        return country ? { id: country.id, name: country.name, isoCode: country.isoCode } : undefined;
+      },
+      product: async (id: string) => {
+        const product = await this.products.service.require(id).catch(() => undefined);
+        return product ? { id: product.id, name: product.name, key: product.key } : undefined;
+      },
+      choices: async () => ({
+        countries: (await this.countries.service.listAdmin()).filter((country) => country.status !== "retired")
+          .map((country) => ({ id: country.id, name: country.name, code: country.isoCode })).sort((left, right) => left.name.localeCompare(right.name)),
+        products: (await this.products.service.listAdmin()).filter((product) => product.status !== "retired")
+          .map((product) => ({ id: product.id, name: product.name, code: product.key })).sort((left, right) => left.name.localeCompare(right.name))
+      })
+    },
+    requests: this.partnerChangeRequestsRepository
+  });
+  /** Spec 053 US3: the broker's own team behind `/broker/team`. */
+  readonly brokerTeam = new BrokerTeamService({
+    audit: this.audit.writer,
+    users: this.users.service,
+    provisionUser: (actor, input) => this.adminUsersController().createPartnerUser(actor, input),
+    invalidateUserAccess: (userId: string) => this.userAccessStatus.invalidate(userId)
+  });
+  /** Spec 053 FR-004/FR-013: admin decisions on the broker requests (applied through `partnerAdmin`). */
+  readonly partnerRequestAdmin = new PartnerRequestAdminService({
+    audit: this.audit.writer,
+    partners: this.partners.service,
+    partnerAdmin: this.partnerAdmin,
+    requests: this.partnerChangeRequestsRepository
   });
   readonly activationChecklist = new ActivationChecklistModule({
     audit: this.audit.writer,

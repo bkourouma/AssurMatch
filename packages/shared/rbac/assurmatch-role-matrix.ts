@@ -24,11 +24,12 @@ export const RolePermissions: Record<AssurMatchRole, string[]> = {
   compliance_admin: ["partners:*", "partner_applications:*", "licenses:*", "documents:*", "consent:*", "offers:read", "quote_form_definitions:*", "quote_requests:*", "prospects:read", "lead_assignments:read", "routing_rules:read", "audit_logs:read", "retention:read", "retention:*"],
   support_admin: ["users:read", "partners:read", "quote_requests:read", "prospects:read", "lead_assignments:read", "routing_rules:read", "audit_logs:read"],
   // Spec 052 R4: every plan manages its offers; owners and managers write, agents and read-only read.
-  broker_owner_starter: ["broker_leads:read", "broker_leads:update", "broker_leads:export", "notifications:read", "broker_offers:read", "broker_offers:write"],
-  broker_owner_pro: ["broker_leads:*", "broker_crm:*", "notifications:read", "broker_offers:read", "broker_offers:write"],
-  broker_manager: ["broker_leads:read", "broker_leads:update", "broker_crm:read", "broker_crm:update", "broker_crm:assign", "broker_crm:export", "notifications:read", "broker_offers:read", "broker_offers:write"],
-  broker_agent: ["broker_leads:read", "broker_leads:update", "broker_crm:read_assigned", "broker_crm:update_assigned", "notifications:read", "broker_offers:read"],
-  broker_read_only: ["broker_leads:read", "broker_crm:read", "broker_offers:read"],
+  // Spec 053 R7: same split for the company profile, licences, coverage requests and the team.
+  broker_owner_starter: ["broker_leads:read", "broker_leads:update", "broker_leads:export", "notifications:read", "broker_offers:read", "broker_offers:write", "broker_account:read", "broker_account:write", "broker_team:read", "broker_team:write"],
+  broker_owner_pro: ["broker_leads:*", "broker_crm:*", "notifications:read", "broker_offers:read", "broker_offers:write", "broker_account:read", "broker_account:write", "broker_team:read", "broker_team:write"],
+  broker_manager: ["broker_leads:read", "broker_leads:update", "broker_crm:read", "broker_crm:update", "broker_crm:assign", "broker_crm:export", "notifications:read", "broker_offers:read", "broker_offers:write", "broker_account:read", "broker_account:write", "broker_team:read", "broker_team:write"],
+  broker_agent: ["broker_leads:read", "broker_leads:update", "broker_crm:read_assigned", "broker_crm:update_assigned", "notifications:read", "broker_offers:read", "broker_account:read", "broker_team:read"],
+  broker_read_only: ["broker_leads:read", "broker_crm:read", "broker_offers:read", "broker_account:read", "broker_team:read"],
   finance_admin: ["billing:read", "reports:read", "audit_logs:read"],
   content_admin: ["content:*", "offers:*", "quote_form_definitions:read", "countries:read", "products:read"],
   ai_admin: ["ai:*", "feature_flags:read", "audit_logs:read"]

@@ -21,4 +21,21 @@ describe("constitution role matrix", () => {
     expect(roleHasPermission("support_admin", "documents:read")).toBe(false);
     expect(roleHasPermission("support_admin", "partners:update")).toBe(false);
   });
+
+  it("spec 053 R7: every broker role reads its account and team, only owners and managers write them", () => {
+    for (const role of ["broker_owner_starter", "broker_owner_pro", "broker_manager", "broker_agent", "broker_read_only"] as const) {
+      expect(roleHasPermission(role, "broker_account:read"), role).toBe(true);
+      expect(roleHasPermission(role, "broker_team:read"), role).toBe(true);
+    }
+    for (const role of ["broker_owner_starter", "broker_owner_pro", "broker_manager"] as const) {
+      expect(roleHasPermission(role, "broker_account:write"), role).toBe(true);
+      expect(roleHasPermission(role, "broker_team:write"), role).toBe(true);
+    }
+    for (const role of ["broker_agent", "broker_read_only"] as const) {
+      expect(roleHasPermission(role, "broker_account:write"), role).toBe(false);
+      expect(roleHasPermission(role, "broker_team:write"), role).toBe(false);
+    }
+    // Admin roles never act as a broker (the broker routes also require the actor's partner).
+    expect(roleHasPermission("admin_pays", "broker_team:write")).toBe(false);
+  });
 });

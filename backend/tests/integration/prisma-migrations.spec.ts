@@ -28,7 +28,8 @@ describe("prisma migration fresh-base readiness", () => {
       "0019_satisfaction_surveys",
       "0020_catalog_admin_consent_content",
       "0021_partner_onboarding_lifecycle",
-      "0022_offer_versions_selected_offer_routing"
+      "0022_offer_versions_selected_offer_routing",
+      "0025_broker_self_service"
     ]);
     const schema = readFileSync(join(process.cwd(), "backend", "prisma", "schema.prisma"), "utf8");
     for (const model of ["AuditLog", "FeatureFlag", "ConsentRecord", "QuoteRequest", "LeadAssignment", "BrokerCrmLeadState", "PartnerApiKey", "PartnerWebhookEndpoint", "PartnerWebhookDelivery", "PartnerWebhookAllowlistEntry", "RoutingRule", "RoutingRuleHistory"]) {
@@ -184,5 +185,12 @@ describe("prisma migration fresh-base readiness", () => {
     expect(offerVersions.match(/UPDATE /g)).toHaveLength(2);
     expect(schema).toContain("model OfferVersion");
     expect(schema).toMatch(/enum OfferVersionStatus/);
+    // Spec 053: additive self-service request table (identity changes, coverage extensions).
+    const selfService = readFileSync(join(migrationsDir, "0025_broker_self_service", "migration.sql"), "utf8");
+    expect(selfService).toContain('CREATE TABLE IF NOT EXISTS "PartnerChangeRequest"');
+    expect(selfService).toContain('CREATE TYPE "PartnerChangeRequestType"');
+    expect(selfService).toContain('CREATE TYPE "PartnerChangeRequestStatus"');
+    expect(selfService).not.toMatch(/DROP|DELETE|UPDATE |ALTER TABLE/);
+    expect(schema).toContain("model PartnerChangeRequest");
   });
 });
