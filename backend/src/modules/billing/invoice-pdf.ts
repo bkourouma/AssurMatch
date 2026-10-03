@@ -23,11 +23,11 @@ export function toWinAnsi(input: string): string {
   let output = "";
   for (const char of input.normalize("NFC")) {
     const code = char.codePointAt(0) ?? 63;
-    if (char === " " || char === " " || char === "\t") output += " ";
-    else if (char === "’" || char === "‘") output += "'";
-    else if (char === "“" || char === "”") output += "\"";
-    else if (char === "–" || char === "—") output += "-";
-    else if (char === "…") output += "...";
+    if (char === "\u202f" || char === "\u00a0" || char === "\t") output += " ";
+    else if (char === "\u2019" || char === "\u2018") output += "'";
+    else if (char === "\u201c" || char === "\u201d") output += "\"";
+    else if (char === "\u2013" || char === "\u2014") output += "-";
+    else if (char === "\u2026") output += "...";
     else if (code < 0x20 || (code >= 0x7f && code < 0xa0)) output += "";
     else if (code <= 0xff) output += char;
     else output += "?";

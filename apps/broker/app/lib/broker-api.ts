@@ -349,9 +349,61 @@ export function readBrokerNotificationPreferences() {
   return readBroker<BrokerNotificationPreferences>("/broker/notifications/preferences", { scopeId: "", email: true, inApp: true, sms: false, whatsapp: false, updatedAt: null });
 }
 
-/** DASH-B-008: consommation de leads et brouillon du cabinet, sans paiement ni facture emise. */
+/** DASH-B-008: consommation de leads et brouillon du mois en cours (estimation, sans paiement en ligne). */
 export function readBrokerBillingStatement() {
   return readBroker<BrokerBillingStatementData>("/broker/billing/statement", emptyStatement);
+}
+
+/** Spec 060: miroir de `issuedInvoiceSchema` (contrat partage) pour la vue courtier. */
+export interface BrokerInvoiceData {
+  id: string;
+  number: string;
+  countryCode: string;
+  plan: string;
+  status: "issued" | "partially_paid" | "paid" | "cancelled";
+  currency: "XOF";
+  periodFrom: string;
+  periodTo: string;
+  issuedAt: string;
+  dueDate: string;
+  subtotalAmount: number;
+  vatRatePercent: number;
+  vatAmount: number;
+  totalAmount: number;
+  amountPaid: number;
+  amountDue: number;
+  creditNote: { id: string; number: string; invoiceNumber: string; totalAmount: number; reason: string; issuedAt: string } | null;
+}
+
+export interface BrokerAccountData {
+  partnerId: string;
+  currency: "XOF";
+  generatedAt: string;
+  totals: { invoiced: number; credited: number; paid: number; balanceDue: number };
+  entries: Array<{ kind: "invoice" | "credit_note" | "payment"; documentId: string; reference: string; date: string; label: string; debit: number; credit: number; balance: number }>;
+  invoices: BrokerInvoiceData[];
+  packs: Array<{ id: string; creditsGranted: number; creditsConsumed: number; creditsRemaining: number; reason: string; grantedAt: string }>;
+  packCreditsRemaining: number;
+  paymentsEnabled: false;
+  notice: string;
+}
+
+const emptyAccount: BrokerAccountData = {
+  partnerId: "",
+  currency: "XOF",
+  generatedAt: "",
+  totals: { invoiced: 0, credited: 0, paid: 0, balanceDue: 0 },
+  entries: [],
+  invoices: [],
+  packs: [],
+  packCreditsRemaining: 0,
+  paymentsEnabled: false,
+  notice: ""
+};
+
+/** Spec 060 G-05: etat des comptes du cabinet (tous plans), lu avec billing:read_own. */
+export function readBrokerBillingAccount() {
+  return readBroker<BrokerAccountData>("/broker/billing/account", emptyAccount);
 }
 
 export function readBrokerAiOptOut() {

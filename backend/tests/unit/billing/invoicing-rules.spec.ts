@@ -259,7 +259,7 @@ describe("spec 060 PDF writer", () => {
 
   it("renders credit notes and escapes unsupported characters", () => {
     const pdf = renderCreditNotePdf({
-      creditNote: { number: "CI-AV-2026-000001", invoiceNumber: "CI-2026-000001", subtotalAmount: 50_000, vatAmount: 9_000, totalAmount: 59_000, reason: "Erreur de période — refacturation" },
+      creditNote: { number: "CI-AV-2026-000001", invoiceNumber: "CI-2026-000001", subtotalAmount: 50_000, vatAmount: 9_000, totalAmount: 59_000, reason: "Erreur de période \u2014 refacturation" },
       issuedAt: new Date("2026-11-02T08:00:00.000Z"),
       vatRateBps: 1800,
       issuer: model.issuer,
@@ -269,7 +269,7 @@ describe("spec 060 PDF writer", () => {
     expect(pdf).toContain("AVOIR CI-AV-2026-000001");
     expect(pdf).toContain("Annule la facture : CI-2026-000001");
     expect(pdf).toContain("59 000 XOF");
-    expect(toWinAnsi("a b — \u{1F600}")).toBe("a b - ?");
+    expect(toWinAnsi("a\u202fb \u2014 \u{1F600}")).toBe("a b - ?");
     expect(escapePdfText("a\\b(c)")).toBe("a\\\\b\\(c\\)");
   });
 });
