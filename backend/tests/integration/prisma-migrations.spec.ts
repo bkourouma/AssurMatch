@@ -25,7 +25,8 @@ describe("prisma migration fresh-base readiness", () => {
       "0016_broker_crm_history_event_type",
       "0017_public_site_forms",
       "0018_data_retention",
-      "0019_satisfaction_surveys"
+      "0019_satisfaction_surveys",
+      "0026_admin_operations"
     ]);
     const schema = readFileSync(join(process.cwd(), "backend", "prisma", "schema.prisma"), "utf8");
     for (const model of ["AuditLog", "FeatureFlag", "ConsentRecord", "QuoteRequest", "LeadAssignment", "BrokerCrmLeadState", "PartnerApiKey", "PartnerWebhookEndpoint", "PartnerWebhookDelivery", "PartnerWebhookAllowlistEntry", "RoutingRule", "RoutingRuleHistory"]) {
@@ -134,5 +135,12 @@ describe("prisma migration fresh-base readiness", () => {
     expect(schema).toContain("RetentionPolicy_global_category_key");
     expect(schema).toContain("model RetentionPolicy");
     expect(schema).toContain("model AnonymizationBatch");
+    // Spec 056: persisted manual review, contact inbox status and audit-log search indexes, additive only.
+    const adminOperations = readFileSync(join(migrationsDir, "0026_admin_operations", "migration.sql"), "utf8");
+    expect(adminOperations).toContain('ALTER TABLE "QuoteRequest" ADD COLUMN IF NOT EXISTS "reviewedAt" TIMESTAMP(3)');
+    expect(adminOperations).toContain('ALTER TABLE "QuoteRequest" ADD COLUMN IF NOT EXISTS "duplicateOfQuoteRequestId" TEXT');
+    expect(adminOperations).toContain('ALTER TABLE "ContactMessage" ADD COLUMN IF NOT EXISTS "handledAt" TIMESTAMP(3)');
+    expect(adminOperations).toContain('CREATE INDEX IF NOT EXISTS "AuditLog_action_occurredAt_idx"');
+    expect(adminOperations).not.toMatch(/DROP|DELETE|TRUNCATE/);
   });
 });
