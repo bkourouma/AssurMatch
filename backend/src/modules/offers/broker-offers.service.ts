@@ -56,7 +56,6 @@ export class BrokerOffersService {
     const parsed = parseOfferInput(brokerOfferListQuerySchema, query ?? {});
     const now = new Date();
     const own = (await this.repository.list()).filter((offer) => offer.partnerTenantId === partnerTenantId);
-    await this.lifecycle.notifyExpiring(own, now);
     const views: BrokerOfferView[] = [];
     for (const offer of own) {
       if (parsed.countryId && offer.countryId !== parsed.countryId) continue;

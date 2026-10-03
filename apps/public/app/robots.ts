@@ -17,6 +17,9 @@ export default function robots() {
         "/en/track",
         "/avis/",
         "/en/feedback/",
+        // Spec 061 FR-005: the survey opt-out link carries a signed token.
+        "/desinscription",
+        "/en/unsubscribe",
         "/aller",
         "/*/devis"
       ]

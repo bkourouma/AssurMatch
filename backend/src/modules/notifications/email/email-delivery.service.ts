@@ -29,7 +29,10 @@ export type EmailPurpose =
   | "public_partner_application_confirmation"
   // Spec 051 R10: the decision (acceptance or refusal) on a broker application.
   | "partner_application_decision"
-  | "satisfaction_survey_requested";
+  | "satisfaction_survey_requested"
+  // Spec 061: broker alert pointers and the compliance team pointer to the alerts center.
+  | "broker_alert"
+  | "admin_alert";
 export type EmailDeliveryStatus = "not_configured" | "previewed" | "sent" | "failed";
 export type EmailProvider = "disabled" | "mailpit" | "smtp";
 

@@ -17,6 +17,18 @@ export const VISITOR_NOTIFICATION_TYPES = [
 
 export type VisitorNotificationType = (typeof VISITOR_NOTIFICATION_TYPES)[number];
 
+/** Spec 061 FR-002: broker alerts (in-app always, pointer e-mail, optional channels per preference). */
+export const BROKER_ALERT_NOTIFICATION_TYPES = [
+  "broker_lead_reassigned",
+  "broker_document_received",
+  "broker_task_due",
+  "broker_quota_threshold",
+  "broker_license_expiring",
+  "broker_offer_expiring"
+] as const;
+
+export type BrokerAlertNotificationType = (typeof BROKER_ALERT_NOTIFICATION_TYPES)[number];
+
 export const notificationSchema = z.object({
   id: uuidSchema.optional(),
   type: z.enum([
@@ -30,9 +42,11 @@ export const notificationSchema = z.object({
     "visitor_quote_confirmation",
     "visitor_quote_non_routable",
     "broker_lead_assigned",
-    "broker_document_received",
     // Spec 055 FR-008: the visitor answered a proposal (pointer e-mail, never the answer itself).
     "broker_visitor_response",
+    // Spec 061 FR-002: pointer e-mails of the broker alerts and of the compliance team.
+    ...BROKER_ALERT_NOTIFICATION_TYPES,
+    "admin_alert_raised",
     "quote_notification_failed",
     // Spec 054 R4: one notification type per public step of the visitor's request.
     ...VISITOR_NOTIFICATION_TYPES

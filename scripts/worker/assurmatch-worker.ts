@@ -5,6 +5,9 @@
 //   - quote notifications        (spec 044)  runtime.quoteNotificationDelivery
 //   - satisfaction surveys       (spec 048)  runtime.satisfactionSurveys.drain
 //   - partner webhooks           (spec 033)  only with ASSURMATCH_PARTNER_WEBHOOK_DELIVERY_ENABLED=true
+//   - scheduled alerts           (spec 061)  broker reminders + admin alerts, at most once per
+//                                            ASSURMATCH_SCHEDULED_ALERTS_INTERVAL_MINUTES (default 60);
+//                                            off with ASSURMATCH_SCHEDULED_ALERTS_ENABLED=false
 // Each service keeps its own feature-flag, consent and audit checks; flags are reloaded from the
 // database before every cycle so an admin toggle takes effect without a restart.
 //
@@ -16,6 +19,7 @@ import { mkdirSync, writeFileSync } from "node:fs";
 import { dirname } from "node:path";
 import { AssurMatchRuntime } from "../../backend/src/runtime/assurmatch-runtime";
 import { DeliveryWorkerLoop, describeError, readIntegerEnv } from "../../backend/src/runtime/worker/delivery-worker-loop";
+import { WORKER_HEARTBEAT_NAME } from "../../backend/src/modules/notifications/admin-alerts.service";
 
 const env = process.env;
 const log = (event: Record<string, unknown>) => process.stdout.write(`${JSON.stringify({ at: new Date().toISOString(), ...event })}\n`);
@@ -29,6 +33,8 @@ const heartbeatFile = env.ASSURMATCH_WORKER_HEARTBEAT_FILE?.trim() || "/tmp/assu
 // Off unless explicitly enabled: with deliveries disabled the webhook service audits a refusal on
 // every call, which would bury the audit log under one entry per cycle.
 const webhooksEnabled = env.ASSURMATCH_PARTNER_WEBHOOK_DELIVERY_ENABLED === "true";
+// Spec 061 FR-001: idempotent per day and per target, so it is on by default.
+const scheduledAlertsEnabled = env.ASSURMATCH_SCHEDULED_ALERTS_ENABLED !== "false";
 
 const runtime = new AssurMatchRuntime();
 if (runtime.prisma.runtimeMode !== "prisma-client" && env.NODE_ENV !== "test") {
@@ -39,14 +45,18 @@ if (runtime.prisma.runtimeMode !== "prisma-client" && env.NODE_ENV !== "test") {
 const loop = new DeliveryWorkerLoop({
   intervalMs: intervalSeconds * 1000,
   beforeCycle: () => runtime.reloadRuntimeFeatureFlags(),
-  heartbeat: () => {
+  heartbeat: async () => {
+    const now = new Date();
     mkdirSync(dirname(heartbeatFile), { recursive: true });
-    writeFileSync(heartbeatFile, `${new Date().toISOString()}\n`, "utf8");
+    writeFileSync(heartbeatFile, `${now.toISOString()}\n`, "utf8");
+    // Spec 061: the API cannot read this container's file; the alerts center reads this row.
+    await runtime.workerHeartbeats.beat(WORKER_HEARTBEAT_NAME, now);
   },
   tasks: [
     { name: "quote-notifications", enabled: true, run: () => runtime.quoteNotificationDelivery.processDueNotifications({ limit: quoteLimit }) },
     { name: "satisfaction-surveys", enabled: true, run: () => runtime.satisfactionSurveys.drain.deliverDue(surveyLimit) },
-    { name: "partner-webhooks", enabled: webhooksEnabled, run: () => runtime.partnerIntegrations.service.processDueWebhookDeliveries({ limit: webhookLimit }) }
+    { name: "partner-webhooks", enabled: webhooksEnabled, run: () => runtime.partnerIntegrations.service.processDueWebhookDeliveries({ limit: webhookLimit }) },
+    { name: "scheduled-alerts", enabled: scheduledAlertsEnabled, run: () => runtime.scheduledAlerts.runIfDue() }
   ]
 });
 

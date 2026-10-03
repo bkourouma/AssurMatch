@@ -64,11 +64,44 @@ export interface BrokerLeadEmailContext {
   publicReference: string;
   countryCode: string;
   productKey: string;
+  reassigned?: boolean | undefined;
+}
+
+/**
+ * Spec 061 FR-002: the pointer e-mail of a broker alert. It names the kind of alert and links to the
+ * portal; the detail (lead, task, licence, offer, quota) is only shown in the back-office.
+ */
+export interface BrokerAlertEmailContext {
+  to: string;
+  partnerLegalName: string;
+  type: BrokerAlertEmailType;
+}
+
+export type BrokerAlertEmailType =
+  | "broker_document_received"
+  | "broker_task_due"
+  | "broker_quota_threshold"
+  | "broker_license_expiring"
+  | "broker_offer_expiring";
+
+const BROKER_ALERT_COPY: Record<BrokerAlertEmailType, { subject: string; line: string; path: string }> = {
+  broker_document_received: { subject: "Nouveau document d'un visiteur", line: "Un visiteur a ajoute un document a l'un de vos leads.", path: "/leads" },
+  broker_task_due: { subject: "Rappel de tache CRM", line: "Une tache ou un rappel de votre CRM arrive a echeance.", path: "/crm" },
+  broker_quota_threshold: { subject: "Quota mensuel de leads", line: "Votre quota mensuel de leads atteint un seuil d'alerte.", path: "/account" },
+  broker_license_expiring: { subject: "Licence bientot expiree", line: "Une licence de votre cabinet arrive bientot a expiration. Pensez a transmettre son renouvellement.", path: "/licenses" },
+  broker_offer_expiring: { subject: "Offre bientot expiree", line: "Une de vos offres publiees arrive bientot a la fin de sa periode de validite.", path: "/offers" }
+};
+
+/** Spec 061 FR-004: pointer e-mail to the compliance team; the alert itself stays in the center. */
+export interface AdminAlertEmailContext {
+  to: string;
+  label: string;
 }
 
 interface TemplateOptions {
   publicAppUrl?: string;
   brokerAppUrl?: string;
+  adminAppUrl?: string;
 }
 
 const PLATFORM_DISCLAIMER = "AssurMatch est une plateforme technique de comparaison indicative et de mise en relation avec des courtiers partenaires autorises.";
@@ -181,10 +214,14 @@ export class QuoteEmailTemplateService {
    * withdrawal, so the broker reads the lead in the back-office, behind its tenant check and audit.
    */
   brokerLead(context: BrokerLeadEmailContext): AuthEmailPayload {
+    // Spec 061: a lead moved to this cabinet by a reassignment says so.
+    const headline = context.reassigned
+      ? `Un lead a ete reaffecte a votre cabinet: ${context.publicReference} (${context.productKey}, ${context.countryCode}).`
+      : `Un nouveau lead vous a ete assigne: ${context.publicReference} (${context.productKey}, ${context.countryCode}).`;
     const lines = [
       `Bonjour ${context.partnerLegalName},`,
       "",
-      `Un nouveau lead vous a ete assigne: ${context.publicReference} (${context.productKey}, ${context.countryCode}).`,
+      headline,
       "",
       `Les informations consenties sont consultables dans votre back-office: ${this.brokerLink()}`,
       "Elles ne sont pas reprises dans cet email: leur consultation est tracee et limitee a votre cabinet.",
@@ -194,11 +231,11 @@ export class QuoteEmailTemplateService {
     ];
     return this.assertSafe({
       to: context.to,
-      subject: `Nouveau lead assigne ${context.publicReference}`,
+      subject: context.reassigned ? `Lead reaffecte ${context.publicReference}` : `Nouveau lead assigne ${context.publicReference}`,
       body: lines.join("\n"),
       html: this.html([
         `<p>Bonjour ${escapeHtml(context.partnerLegalName)},</p>`,
-        `<p>Un nouveau lead vous a ete assigne: <strong>${escapeHtml(context.publicReference)}</strong> (${escapeHtml(context.productKey)}, ${escapeHtml(context.countryCode)}).</p>`,
+        `<p>${escapeHtml(headline)}</p>`,
         `<p><a href="${escapeHtml(this.brokerLink())}">Consulter le lead dans votre back-office</a></p>`,
         "<p>Les informations consenties ne sont pas reprises dans cet email: leur consultation est tracee et limitee a votre cabinet.</p>",
         "<p>Notification operationnelle. Aucun engagement contractuel ne resulte de ce message.</p>",
@@ -231,6 +268,62 @@ export class QuoteEmailTemplateService {
       body: lines.join("\n"),
       html: this.html(lines.filter((line) => line !== "").map((line) => `<p>${escapeHtml(line)}</p>`)),
       purpose: "quote_broker_visitor_response"
+    });
+  }
+
+  /** Spec 061 FR-002: generic broker alert pointer (no lead, task or prospect detail). */
+  brokerAlert(context: BrokerAlertEmailContext): AuthEmailPayload {
+    const copy = BROKER_ALERT_COPY[context.type];
+    const link = `${this.brokerBase()}${copy.path}`;
+    const lines = [
+      `Bonjour ${context.partnerLegalName},`,
+      "",
+      copy.line,
+      "",
+      `Consultez le detail dans votre back-office: ${link}`,
+      "",
+      "Notification operationnelle. Aucun engagement contractuel ne resulte de ce message.",
+      PLATFORM_DISCLAIMER
+    ];
+    return this.assertSafe({
+      to: context.to,
+      subject: copy.subject,
+      body: lines.join("\n"),
+      html: this.html([
+        `<p>Bonjour ${escapeHtml(context.partnerLegalName)},</p>`,
+        `<p>${escapeHtml(copy.line)}</p>`,
+        `<p><a href="${escapeHtml(link)}">Consulter le detail dans votre back-office</a></p>`,
+        "<p>Notification operationnelle. Aucun engagement contractuel ne resulte de ce message.</p>",
+        `<p>${escapeHtml(PLATFORM_DISCLAIMER)}</p>`
+      ]),
+      purpose: "broker_alert"
+    });
+  }
+
+  /** Spec 061 FR-004: compliance team pointer to the alerts center. */
+  adminAlert(context: AdminAlertEmailContext): AuthEmailPayload {
+    const base = (this.options.adminAppUrl ?? process.env.BACKOFFICE_APP_URL ?? "http://127.0.0.1:3602").replace(/\/$/, "");
+    const link = `${base}/dashboard/compliance-alerts`;
+    const lines = [
+      "Bonjour,",
+      "",
+      `Une nouvelle alerte est ouverte dans le centre d'alertes AssurMatch: ${context.label}.`,
+      "",
+      `Consultez-la et acquittez-la dans le back-office: ${link}`,
+      "",
+      "Message interne. Le detail de l'alerte n'est pas repris dans cet email."
+    ];
+    return this.assertSafe({
+      to: context.to,
+      subject: `Alerte AssurMatch: ${context.label}`,
+      body: lines.join("\n"),
+      html: this.html([
+        "<p>Bonjour,</p>",
+        `<p>Une nouvelle alerte est ouverte dans le centre d'alertes AssurMatch: <strong>${escapeHtml(context.label)}</strong>.</p>`,
+        `<p><a href="${escapeHtml(link)}">Ouvrir le centre d'alertes</a></p>`,
+        "<p>Message interne. Le detail de l'alerte n'est pas repris dans cet email.</p>"
+      ]),
+      purpose: "admin_alert"
     });
   }
 
@@ -469,8 +562,11 @@ export class QuoteEmailTemplateService {
   }
 
   private brokerLink(): string {
-    const base = (this.options.brokerAppUrl ?? process.env.BROKER_APP_URL ?? "http://127.0.0.1:3603").replace(/\/$/, "");
-    return `${base}/leads`;
+    return `${this.brokerBase()}/leads`;
+  }
+
+  private brokerBase(): string {
+    return (this.options.brokerAppUrl ?? process.env.BROKER_APP_URL ?? "http://127.0.0.1:3603").replace(/\/$/, "");
   }
 
   private html(paragraphs: string[]): string {

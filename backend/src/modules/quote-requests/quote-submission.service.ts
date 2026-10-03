@@ -595,7 +595,7 @@ export class QuoteSubmissionService {
   async notifyBrokerForAssignment(assignment: LeadAssignmentRecord, actor: ActorContext): Promise<string | undefined> {
     const quote = await this.repository.findById(assignment.quoteRequestId);
     if (!quote) return undefined;
-    const queued = await this.deps.notifications?.queueBroker(quote, assignment, actor, { allowRepeat: true });
+    const queued = await this.deps.notifications?.queueBroker(quote, assignment, actor, { allowRepeat: true, reassigned: true });
     return queued?.notification.id;
   }
 

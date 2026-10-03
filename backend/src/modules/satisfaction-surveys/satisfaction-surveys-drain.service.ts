@@ -5,6 +5,7 @@ import type { ProspectRecord } from "../prospects/prospects.service";
 import type { QuoteRequestRecord } from "../quote-requests/quote-submission.service";
 import { SatisfactionSurveyEmailTemplateService } from "./satisfaction-survey-email-template.service";
 import { SatisfactionSurveyTokenService } from "./satisfaction-survey-token.service";
+import type { SurveyUnsubscribeService } from "./survey-unsubscribe.service";
 import type { SatisfactionSurveyRecord, SatisfactionSurveyRepository } from "./satisfaction-survey.model";
 
 export interface SatisfactionSurveysDrainDeps {
@@ -32,6 +33,8 @@ export interface SatisfactionSurveysDrainDeps {
   isFlagEnabled: (flag: string) => boolean;
   /** Spec 054 R9: mints the token sent in the e-mail (rotation); a default instance when absent. */
   tokenService?: SatisfactionSurveyTokenService;
+  /** Spec 061 FR-005: opt-out registry and signed link of the e-mail. */
+  unsubscribe?: Pick<SurveyUnsubscribeService, "isUnsubscribed" | "linkToken"> | undefined;
 }
 
 export interface DrainSummary {
@@ -87,6 +90,22 @@ export class SatisfactionSurveysDrainService {
           continue;
         }
 
+        // Spec 061 FR-005: a visitor who opted out of the survey is never e-mailed again.
+        if (this.deps.unsubscribe && await this.deps.unsubscribe.isUnsubscribed(email)) {
+          await this.deps.repository.update(survey.id, { status: "skipped", skippedReason: "visitor_unsubscribed" });
+          this.deps.audit.write({
+            action: SatisfactionAuditActions.satisfactionSurveySkipped,
+            targetType: "SatisfactionSurveyRequest",
+            targetId: survey.id,
+            scope: { partnerTenantId: survey.partnerTenantId },
+            result: "success",
+            reason: "visitor_unsubscribed",
+            context: { publicReference: survey.publicReference }
+          });
+          summary.skipped += 1;
+          continue;
+        }
+
         // Spec 054 R9: the clear token only exists at render time. A fresh one is minted and its
         // hash replaces the stored one before sending, so the link in the e-mail is the only valid
         // token and nothing in clear is ever persisted. The language is the request's own.
@@ -97,7 +116,8 @@ export class SatisfactionSurveysDrainService {
           to: email,
           publicReference: survey.publicReference,
           token,
-          locale
+          locale,
+          ...(this.deps.unsubscribe ? { unsubscribeToken: this.deps.unsubscribe.linkToken(email, locale === "en" ? "en" : "fr") } : {})
         });
         await this.deps.repository.update(survey.id, { tokenHash: tokenService.hashToken(token), locale });
 

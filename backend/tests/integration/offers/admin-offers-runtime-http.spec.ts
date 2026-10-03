@@ -147,7 +147,7 @@ describe("spec 052 admin offers runtime HTTP", () => {
     expect(versions.map((version) => [version.versionNumber, version.status])).toEqual([[2, "published"], [1, "archived"]]);
   });
 
-  it("filters offers expiring within N days and notifies the broker once per version", async () => {
+  it("filters offers expiring within N days; the scheduled job (spec 061) notifies the broker once per version", async () => {
     harness = await createRuntimeHttpHarness();
     const seed = await seedPublicRuntime(harness.runtime);
     const soon = new Date(Date.now() + 10 * 24 * 60 * 60 * 1000).toISOString();
@@ -158,8 +158,12 @@ describe("spec 052 admin offers runtime HTTP", () => {
     expect(expiring.map((item) => item.id)).toEqual([offer.id]);
     expect(expiring[0]).toMatchObject({ expiringSoon: true, status: "published" });
     await call(harness, compliance, "GET", "/admin/offers");
-    const notices = (await harness.runtime.notifications.dispatch.listInApp(seed.partner.id)).filter((item) => item.type === "offer_expiring");
-    expect(notices).toHaveLength(1);
+    // Spec 061 FR-001: reading a list no longer writes reminders; the worker job does, once.
+    const inbox = async () => (await harness!.runtime.notifications.dispatch.listInApp(seed.partner.id)).filter((item) => item.type === "offer_expiring");
+    expect(await inbox()).toHaveLength(0);
+    await harness.runtime.scheduledAlerts.run();
+    await harness.runtime.scheduledAlerts.run();
+    expect(await inbox()).toHaveLength(1);
     expect((await call(harness, compliance, "GET", "/admin/offers?expiringWithinDays=abc")).status).toBe(400);
   });
 });
