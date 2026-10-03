@@ -27,12 +27,17 @@
                                               ▼                ▼
                                           PostgreSQL         Redis
                                               │                │
-                                              └─── BullMQ      │
+                                                               │
                                                                │
                                           /home/deployer/apps/assurmatch/uploads
                                           /home/deployer/apps/assurmatch/data
                                           /home/deployer/apps/assurmatch/backups
 ```
+
+Since spec 057 there is no BullMQ queue any more (decision D-7): asynchronous delivery is done by
+polling the database from a dedicated worker container (`docs/runbooks/worker.md`). The broker
+back-office has its own image (`assurmatch-broker`, port 3603). Production topology:
+`docs/runbooks/deployment-production.md`.
 
 ## Surfaces
 

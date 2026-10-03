@@ -1,5 +1,8 @@
 # Runbook — Deliver quote notifications
 
+> Spec 057: in production the dedicated worker container runs this delivery continuously (see
+> `worker.md`). The manual command below remains for one-off runs and for preproduction.
+
 Quote notifications are written as `Notification` rows at `emailStatus = "queued"` when a request is
 submitted and routed. A worker drains them into the configured mailer. Nothing is sent by the API
 process itself, so if the worker never runs, nothing ever leaves.
