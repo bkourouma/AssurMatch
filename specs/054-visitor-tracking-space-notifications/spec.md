@@ -2,10 +2,10 @@
 
 **Feature Branch**: `claude/inspiring-maxwell-58e67d` (branche de session imposée)
 **Created**: 2026-10-03
-**Status**: Draft
+**Status**: Validated by user on 2026-10-03
 **Input**: PRD v0.3, EPIC D (D-01 à D-09), E-01 et E-06, scénario SC-05 et décision D-3 (pas de compte visiteur : accès par lien magique envoyé par e-mail). Socle pour la spec 055 (réponse du courtier).
-**Validation State**: Draft
-**Continuous Workflow Eligible**: Pas encore. La spec le deviendra une fois validée par l'utilisateur ; elle ne contient aucun marqueur `[NEEDS CLARIFICATION]`.
+**Validation State**: Validated by user
+**Continuous Workflow Eligible**: Yes. Validée par l'utilisateur le 2026-10-03, aucun marqueur `[NEEDS CLARIFICATION]`.
 
 ## Why this spec exists
 
