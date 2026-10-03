@@ -95,15 +95,17 @@ export class QuoteNotificationService {
     return { notification, job };
   }
 
-  async queueBroker(quote: QuoteRequestRecord, assignment: LeadAssignmentRecord, actor: ActorContext, options: { allowRepeat?: boolean } = {}): Promise<QueuedNotification | undefined> {
+  async queueBroker(quote: QuoteRequestRecord, assignment: LeadAssignmentRecord, actor: ActorContext, options: { allowRepeat?: boolean; reassigned?: boolean } = {}): Promise<QueuedNotification | undefined> {
+    // Spec 061: a lead moved by a reassignment is announced as such to the receiving cabinet.
+    const type = options.reassigned ? "broker_lead_reassigned" : "broker_lead_assigned";
     // A reassigned lead keeps its assignment id but must reach the new partner.
-    const dedupeKey = `broker_lead_assigned:${quote.id}:${assignment.id}:${assignment.partnerTenantId}${options.allowRepeat ? `:${crypto.randomUUID()}` : ""}`;
+    const dedupeKey = `${type}:${quote.id}:${assignment.id}:${assignment.partnerTenantId}${options.allowRepeat ? `:${crypto.randomUUID()}` : ""}`;
     if (await this.exists(dedupeKey)) return undefined;
     const now = new Date();
     const job = this.queue.add("broker-lead-notifications", "broker_lead_notification", assignment.id, actor.correlationId);
     const notification: NotificationRecord = {
       id: crypto.randomUUID(),
-      type: "broker_lead_assigned",
+      type,
       recipientScope: `partner:${assignment.partnerTenantId}`,
       whatsAppStatus: "queued",
       emailStatus: "queued",
@@ -118,9 +120,9 @@ export class QuoteNotificationService {
     // In-app is part of the operational baseline: the assigned tenant always sees the lead in its inbox.
     await this.inApp?.publishInApp({
       scopeId: assignment.partnerTenantId,
-      template: "broker_lead_assigned",
-      title: "Nouveau lead assigne",
-      body: `Un lead ${assignment.productKey ?? "assurance"} (${assignment.countryCode ?? "-"}) vous a ete assigne. Notification operationnelle, aucun engagement contractuel.`,
+      template: type,
+      title: options.reassigned ? "Lead reaffecte a votre cabinet" : "Nouveau lead assigne",
+      body: `Un lead ${assignment.productKey ?? "assurance"} (${assignment.countryCode ?? "-"}) vous a ete ${options.reassigned ? "reaffecte" : "assigne"}. Notification operationnelle, aucun engagement contractuel.`,
       targetType: "LeadAssignment",
       targetId: assignment.id
     });

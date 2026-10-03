@@ -1308,5 +1308,19 @@
     "unavailableBody": "The link may be incomplete, expired or already used.",
     "rateLimited": "Too many submissions in a short time. Try again later.",
     "error": "The service is temporarily unavailable. Try again in a few minutes."
+  },
+  "Unsubscribe": {
+    "kicker": "Unsubscribe",
+    "title": "Stop receiving satisfaction surveys",
+    "description": "Unsubscribe from AssurMatch satisfaction surveys.",
+    "breadcrumb": "Unsubscribe",
+    "lead": "Confirm to stop receiving a satisfaction survey after your broker introductions. Messages about the follow-up of your quote requests are still sent to you.",
+    "confirm": "Confirm unsubscribe",
+    "sending": "Sending.",
+    "successTitle": "You are unsubscribed",
+    "successBody": "You will no longer receive AssurMatch satisfaction surveys at this address.",
+    "unavailableTitle": "This link is not valid",
+    "unavailableBody": "The link may be incomplete. Use the link from the survey e-mail.",
+    "error": "The service is temporarily unavailable. Try again in a few minutes."
   }
 }

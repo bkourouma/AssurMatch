@@ -1308,5 +1308,19 @@
     "unavailableBody": "Le lien est peut-être incomplet, a expiré ou a déjà été utilisé.",
     "rateLimited": "Trop d'envois en peu de temps. Réessayez plus tard.",
     "error": "Le service est temporairement indisponible. Réessayez dans quelques minutes."
+  },
+  "Unsubscribe": {
+    "kicker": "Désinscription",
+    "title": "Ne plus recevoir d'enquêtes de satisfaction",
+    "description": "Désinscription des enquêtes de satisfaction AssurMatch.",
+    "breadcrumb": "Désinscription",
+    "lead": "Confirmez pour ne plus recevoir d'enquête de satisfaction après vos mises en relation. Les messages liés au suivi de vos demandes de devis continuent de vous être envoyés.",
+    "confirm": "Confirmer la désinscription",
+    "sending": "Envoi en cours.",
+    "successTitle": "Désinscription enregistrée",
+    "successBody": "Vous ne recevrez plus d'enquête de satisfaction AssurMatch à cette adresse.",
+    "unavailableTitle": "Ce lien n'est pas valide",
+    "unavailableBody": "Le lien est peut-être incomplet. Utilisez le lien reçu dans l'e-mail d'enquête.",
+    "error": "Le service est momentanément indisponible. Réessayez dans quelques minutes."
   }
 }

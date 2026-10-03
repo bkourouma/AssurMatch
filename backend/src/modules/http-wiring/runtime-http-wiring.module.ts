@@ -1,5 +1,8 @@
 import { publicCountryFlags } from "../countries/countries.module";
 import type { SurveySubmissionInput } from "../satisfaction-surveys/satisfaction-surveys.service";
+import { UnsubscribeTokenInvalidError } from "../satisfaction-surveys/survey-unsubscribe.service";
+import { AdminAlertAccessRefusedError, AdminAlertConflictError, AdminAlertNotFoundError } from "../notifications/admin-alerts.service";
+import { adminAlertAcknowledgeSchema, adminAlertsQuerySchema } from "../../../../packages/shared/contracts/admin-alerts.contracts";
 import { Body, ConflictException, Controller, Delete, ForbiddenException, Get, Header, HttpCode, InternalServerErrorException, Module, NotFoundException, Param, Patch, Post, Put, Query, Req, StreamableFile, UnprocessableEntityException, UploadedFile, UseGuards, UseInterceptors } from "@nestjs/common";
 import { FileInterceptor } from "@nestjs/platform-express";
 import { z } from "zod";
@@ -1661,6 +1664,51 @@ export class BrokerNotificationsController {
   }
 }
 
+/** Spec 061 FR-004: admin alerts center (list, acknowledge with a reason). */
+async function adminAlertsCall<T>(call: () => Promise<T>): Promise<T> {
+  try {
+    return await call();
+  } catch (error) {
+    if (error instanceof AdminAlertAccessRefusedError) throw new ForbiddenException(error.message);
+    if (error instanceof AdminAlertNotFoundError) throw new NotFoundException(error.message);
+    if (error instanceof AdminAlertConflictError) throw new ConflictException(error.message);
+    throw error;
+  }
+}
+
+export class AdminAlertsHttpController {
+  constructor(private readonly runtime: AssurMatchRuntime) {}
+
+  list(request: AssurMatchHttpRequest, query: Record<string, string>) {
+    const actor = protectedActorFromRequest(request);
+    const parsed = parseHttpInput(adminAlertsQuerySchema, query ?? {});
+    return adminAlertsCall(() => this.runtime.adminAlerts.list(actor, parsed));
+  }
+
+  acknowledge(id: string, input: unknown, request: AssurMatchHttpRequest) {
+    const actor = protectedActorFromRequest(request);
+    const parsed = parseHttpInput(adminAlertAcknowledgeSchema, input ?? {});
+    return adminAlertsCall(() => this.runtime.adminAlerts.acknowledge(parseParam("id", id, uuidSchema), parsed, actor));
+  }
+}
+
+/**
+ * Spec 061 FR-005: public opt-out of the satisfaction survey. No authentication: the signed token is
+ * the proof. Any wrong, forged or malformed token reads as the same neutral 404.
+ */
+export class PublicNotificationUnsubscribeController {
+  constructor(private readonly runtime: AssurMatchRuntime) {}
+
+  async unsubscribe(input: unknown) {
+    try {
+      return await this.runtime.satisfactionSurveys.unsubscribe.unsubscribe(input);
+    } catch (error) {
+      if (error instanceof UnsubscribeTokenInvalidError) throw new NotFoundException("Unsubscribe link not found");
+      throw error;
+    }
+  }
+}
+
 /**
  * Spec 046: retention policies and anonymization batches. The domain errors are mapped explicitly
  * so the admin UI can rely on 403 (MFA or permission), 404, 409 (expired, executed or refused batch)
@@ -2127,6 +2175,13 @@ decorate(BrokerDashboardController, "export", [Get("export.csv") as MethodDecora
 controller("admin/dashboard", AdminDashboardExportController, true);
 decorate(AdminDashboardExportController, "export", [Get("export.csv") as MethodDecoratorFactory], [[0, Req() as ParamDecoratorFactory], [1, Query() as ParamDecoratorFactory]]);
 
+controller("admin/alerts", AdminAlertsHttpController, true);
+decorate(AdminAlertsHttpController, "list", [Get() as MethodDecoratorFactory], [[0, Req() as ParamDecoratorFactory], [1, Query() as ParamDecoratorFactory]]);
+decorate(AdminAlertsHttpController, "acknowledge", [Post(":id/acknowledge") as MethodDecoratorFactory, HttpCode(200) as MethodDecoratorFactory], [[0, Param("id") as ParamDecoratorFactory], [1, Body() as ParamDecoratorFactory], [2, Req() as ParamDecoratorFactory]]);
+
+controller("notifications", PublicNotificationUnsubscribeController);
+decorate(PublicNotificationUnsubscribeController, "unsubscribe", [Post("unsubscribe") as MethodDecoratorFactory, HttpCode(200) as MethodDecoratorFactory], [[0, Body() as ParamDecoratorFactory]]);
+
 controller("admin/dashboard", AdminDashboardController, true);
 decorate(AdminDashboardController, "dashboard", [Get() as MethodDecoratorFactory], [[0, Req() as ParamDecoratorFactory], [1, Query() as ParamDecoratorFactory]]);
 decorate(AdminDashboardController, "complianceAlerts", [Get("compliance-alerts") as MethodDecoratorFactory], [[0, Req() as ParamDecoratorFactory], [1, Query() as ParamDecoratorFactory]]);
@@ -2440,6 +2495,8 @@ Module({
     BrokerCrmController,
     BrokerDashboardController,
     AdminDashboardController,
+    AdminAlertsHttpController,
+    PublicNotificationUnsubscribeController,
     AdminDashboardExportController,
     AdminFeatureFlagsController,
     AdminUsersHttpController,

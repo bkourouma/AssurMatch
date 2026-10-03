@@ -17,7 +17,11 @@ const VISITOR_TOKEN_PATHS = [
   "/fr/track",
   "/avis/:publicReference*",
   "/en/feedback/:publicReference*",
-  "/fr/feedback/:publicReference*"
+  "/fr/feedback/:publicReference*",
+  // Spec 061 FR-005: the opt-out link carries a signed token.
+  "/desinscription",
+  "/en/unsubscribe",
+  "/fr/unsubscribe"
 ];
 
 const VISITOR_TOKEN_HEADERS = [

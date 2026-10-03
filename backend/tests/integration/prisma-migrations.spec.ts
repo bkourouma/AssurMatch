@@ -33,7 +33,8 @@ describe("prisma migration fresh-base readiness", () => {
       "0024_broker_self_service",
       "0025_admin_operations",
       "0026_b2b_invoicing",
-      "0027_broker_response_loop"
+      "0027_broker_response_loop",
+      "0028_notifications_completion"
     ]);
     const schema = readFileSync(join(process.cwd(), "backend", "prisma", "schema.prisma"), "utf8");
     for (const model of ["AuditLog", "FeatureFlag", "ConsentRecord", "QuoteRequest", "LeadAssignment", "BrokerCrmLeadState", "PartnerApiKey", "PartnerWebhookEndpoint", "PartnerWebhookDelivery", "PartnerWebhookAllowlistEntry", "RoutingRule", "RoutingRuleHistory"]) {
@@ -243,5 +244,18 @@ describe("prisma migration fresh-base readiness", () => {
     expect(invoicing).toContain('"IssuedInvoice_active_partner_period_key"');
     expect(schema).toContain("IssuedInvoice_active_partner_period_key");
     expect(invoicing).not.toMatch(/DROP TABLE|DELETE FROM/);
+    // Spec 061: broker/admin alert types, alerts center, worker heartbeat and survey opt-out.
+    const completion = readFileSync(join(migrationsDir, "0028_notifications_completion", "migration.sql"), "utf8");
+    for (const value of ["broker_document_received", "broker_lead_reassigned", "broker_task_due", "broker_quota_threshold", "broker_license_expiring", "broker_offer_expiring", "admin_alert_raised"]) {
+      expect(completion).toContain(`ALTER TYPE "NotificationType" ADD VALUE IF NOT EXISTS '${value}'`);
+      expect(schema).toContain(`  ${value}\n`);
+    }
+    for (const table of ["AdminAlert", "WorkerHeartbeat", "NotificationUnsubscribe"]) {
+      expect(completion).toContain(`CREATE TABLE IF NOT EXISTS "${table}"`);
+      expect(schema).toContain(`model ${table}`);
+    }
+    expect(completion).toContain('CREATE UNIQUE INDEX IF NOT EXISTS "AdminAlert_dedupeKey_key"');
+    expect(completion).toContain('CREATE UNIQUE INDEX IF NOT EXISTS "NotificationUnsubscribe_subjectHash_purpose_key"');
+    expect(completion).not.toMatch(/DROP|DELETE|UPDATE /);
   });
 });

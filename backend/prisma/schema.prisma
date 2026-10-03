@@ -201,6 +201,13 @@ enum NotificationType {
   visitor_tracking_link
   visitor_proposal_available
   broker_visitor_response
+  broker_document_received
+  broker_lead_reassigned
+  broker_task_due
+  broker_quota_threshold
+  broker_license_expiring
+  broker_offer_expiring
+  admin_alert_raised
 }
 
 enum DeliveryStatus {
@@ -2037,4 +2044,52 @@ model SatisfactionSurveyRequest {
 
   @@index([partnerTenantId, status])
   @@index([status, dueAt])
+}
+
+/// Spec 061 FR-004: admin alerts center. One open alert per condition (`conditionKey`); the
+/// `dedupeKey` (condition + day bucket) is unique so a condition is raised at most once a day.
+/// Only identifiers and counters are stored, never a prospect's data.
+model AdminAlert {
+  id                String    @id @default(uuid())
+  type              String
+  severity          String    @default("warning")
+  conditionKey      String
+  dedupeKey         String    @unique
+  targetType        String
+  targetId          String?
+  countryId         String?
+  partnerTenantId   String?
+  details           Json      @default("{}")
+  status            String    @default("open")
+  occurrences       Int       @default(1)
+  firstSeenAt       DateTime  @default(now())
+  lastSeenAt        DateTime  @default(now())
+  acknowledgedAt    DateTime?
+  acknowledgedById  String?
+  acknowledgeReason String?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  @@index([status, lastSeenAt])
+  @@index([conditionKey, status])
+}
+
+/// Spec 061: liveness of the spec 057 worker, written after every cycle and read by the API.
+model WorkerHeartbeat {
+  name       String   @id
+  lastBeatAt DateTime
+  cycles     Int      @default(0)
+  updatedAt  DateTime @updatedAt
+}
+
+/// Spec 061 FR-005: opt-out of non-transactional messages (satisfaction survey). Only the SHA-256
+/// of the normalised e-mail address is stored.
+model NotificationUnsubscribe {
+  id          String   @id @default(uuid())
+  subjectHash String
+  purpose     String
+  locale      String   @default("fr")
+  createdAt   DateTime @default(now())
+
+  @@unique([subjectHash, purpose])
 }

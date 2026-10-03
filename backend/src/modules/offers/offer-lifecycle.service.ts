@@ -8,7 +8,7 @@ import { AuditLogWriter } from "../audit-logs/audit-log-writer.service";
 import { QuoteAuditActions } from "../audit-logs/quote-audit-actions";
 import type { ActorContext } from "../common/types";
 import { OfferErrorCodes, offerConflict, offerUnprocessable } from "./offer-errors";
-import { OFFER_CONTENT_KEYS, OFFER_EXPIRY_WARNING_DAYS, daysUntil, pendingVersion, publishedVersion, versionContent } from "./offer-views";
+import { OFFER_CONTENT_KEYS, pendingVersion, publishedVersion, versionContent } from "./offer-views";
 import type { OfferPatch, OfferRecord, OfferVersionContent, OfferVersionRecord } from "./offers.module";
 import type { OffersRepository } from "./offers.repository";
 
@@ -465,41 +465,6 @@ export class OfferLifecycleService {
     const version = await this.saveContent(offer, content, { actor, authorRole, reason });
     this.audit.write({ actor, action: OfferAuditActions.renewed, targetType: "OfferVersion", targetId: version.id, scope: this.scope(offer), result: "success", reason, context: { offerId: offer.id, validFrom: dates.validFrom.toISOString(), validUntil: dates.validUntil.toISOString() } });
     return version;
-  }
-
-  /** R9: one `offer_expiring` notification per published version entering the 15 day window. */
-  async notifyExpiring(offers: OfferRecord[], now = new Date()): Promise<number> {
-    const notifier = this.integrations.notifier;
-    if (!notifier) return 0;
-    let created = 0;
-    const seenByPartner = new Map<string, Set<string>>();
-    for (const offer of offers) {
-      if (!offer.partnerTenantId || (offer.status !== "active" && offer.status !== "validated")) continue;
-      const versions = await this.versions(offer);
-      const published = publishedVersion(offer, versions);
-      if (!published) continue;
-      const days = daysUntil(published.validUntil, now);
-      if (days < 0 || days > OFFER_EXPIRY_WARNING_DAYS || published.validUntil <= now) continue;
-      let seen = seenByPartner.get(offer.partnerTenantId);
-      if (!seen) {
-        const inbox = await notifier.listInApp(offer.partnerTenantId, 500).catch(() => []);
-        seen = new Set(inbox.filter((item) => item.type === "offer_expiring" && item.targetId).map((item) => String(item.targetId)));
-        seenByPartner.set(offer.partnerTenantId, seen);
-      }
-      if (seen.has(published.id)) continue;
-      seen.add(published.id);
-      await notifier.publishInApp({
-        scopeId: offer.partnerTenantId,
-        template: "offer_expiring",
-        title: NOTIFICATIONS.offer_expiring.title,
-        body: NOTIFICATIONS.offer_expiring.body(published.name, String(days)),
-        targetType: "OfferVersion",
-        targetId: published.id
-      }).catch(() => undefined);
-      this.audit.write({ action: OfferAuditActions.expiringNotified, targetType: "OfferVersion", targetId: published.id, scope: this.scope(offer), result: "success", context: { offerId: offer.id, daysLeft: days } });
-      created += 1;
-    }
-    return created;
   }
 
   /** Last suspension reason (shown to the broker, FR-011). */

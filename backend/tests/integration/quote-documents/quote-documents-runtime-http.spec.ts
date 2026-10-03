@@ -85,6 +85,9 @@ describe("visitor quote documents runtime HTTP", () => {
     expect(crmDocuments[0]?.storageKey).not.toContain("carte-grise");
     const notifications = await harness.runtime.notifications.service.list();
     expect(notifications.filter((notification) => notification.type === "broker_document_received" && notification.recipientScope === `partner:${seed.partner.id}`)).toHaveLength(1);
+    // Spec 061 FR-002: the broker also sees it in-app, linked to the lead (never the file itself).
+    const inbox = (await harness.runtime.notifications.dispatch.listInApp(seed.partner.id)).filter((item) => item.type === "broker_document_received");
+    expect(inbox.map((item) => item.targetId)).toEqual([assignment!.id]);
     expect(harness.runtime.audit.writer.search({ action: QuoteDocumentAuditActions.quarantined })).toHaveLength(1);
     expect(harness.runtime.audit.writer.search({ action: QuoteDocumentAuditActions.shared })).toHaveLength(1);
   });

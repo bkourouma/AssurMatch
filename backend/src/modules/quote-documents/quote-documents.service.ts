@@ -1,4 +1,5 @@
 import { createHash } from "node:crypto";
+import type { BrokerAlertInput } from "../notifications/broker-alert-notifier";
 import type { AdminQuoteDocument, AdminQuoteDocumentsResponse, QuoteDocument, QuoteDocumentUploadMetadata, QuoteDocumentsResponse } from "../../../../packages/shared/contracts/quote-document.contracts";
 import { QUOTE_DOCUMENT_MAX_BYTES, QUOTE_DOCUMENT_MAX_PER_REQUEST, quoteDocumentMimeTypes, quoteDocumentUploadMetadataSchema } from "../../../../packages/shared/contracts/quote-document.contracts";
 import type { BrokerCrmDocument } from "../../../../packages/shared/contracts/quote.contracts";
@@ -37,6 +38,11 @@ export interface QuoteDocumentsDeps {
   assignments: LeadAssignmentService;
   crmDocuments: { addDocument(document: BrokerCrmDocument): Promise<BrokerCrmDocument> };
   notifications?: NotificationsService | undefined;
+  /**
+   * Spec 061: broker alert (in-app always, pointer e-mail, optional channels). When absent the
+   * legacy paired notification row is queued instead.
+   */
+  brokerAlerts?: { notify(input: BrokerAlertInput): Promise<unknown> } | undefined;
   isGlobalFlagEnabled: (key: string) => boolean;
   repository?: QuoteDocumentsRepository | undefined;
   /** Run the scan right after the response in-process (memory queue); tests set it to false and call processPendingScans(). */
@@ -214,11 +220,23 @@ export class QuoteDocumentsService {
     };
     await this.deps.crmDocuments.addDocument(crmDocument);
     await this.repository.update(document.id, { sharedLeadAssignmentId: assignment.id, sharedAt: new Date(), updatedAt: new Date() });
-    await this.deps.notifications?.queuePaired({
-      type: "broker_document_received",
-      recipientScope: `partner:${assignment.partnerTenantId}`,
-      payloadReference: document.id
-    }, SYSTEM_ACTOR);
+    if (this.deps.brokerAlerts) {
+      await this.deps.brokerAlerts.notify({
+        partnerTenantId: assignment.partnerTenantId,
+        type: "broker_document_received",
+        dedupeKey: `broker_document_received:${document.id}:${assignment.id}`,
+        title: "Nouveau document d'un visiteur",
+        body: `Le visiteur a ajoute un document (${document.documentKind}) a son dossier. Il est consultable dans la fiche du lead.`,
+        targetType: "LeadAssignment",
+        targetId: assignment.id
+      });
+    } else {
+      await this.deps.notifications?.queuePaired({
+        type: "broker_document_received",
+        recipientScope: `partner:${assignment.partnerTenantId}`,
+        payloadReference: document.id
+      }, SYSTEM_ACTOR);
+    }
     this.deps.audit.write({
       actor: SYSTEM_ACTOR,
       action: QuoteDocumentAuditActions.shared,
