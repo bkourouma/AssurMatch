@@ -1,12 +1,25 @@
 import type { SurveySubmissionInput } from "../satisfaction-surveys/satisfaction-surveys.service";
-import { Body, ConflictException, Controller, Delete, ForbiddenException, Get, HttpCode, Module, NotFoundException, Param, Patch, Post, Put, Query, Req, UnprocessableEntityException, UploadedFile, UseGuards, UseInterceptors } from "@nestjs/common";
+import { Body, ConflictException, Controller, Delete, ForbiddenException, Get, Header, HttpCode, InternalServerErrorException, Module, NotFoundException, Param, Patch, Post, Put, Query, Req, StreamableFile, UnprocessableEntityException, UploadedFile, UseGuards, UseInterceptors } from "@nestjs/common";
 import { FileInterceptor } from "@nestjs/platform-express";
 import { z } from "zod";
 import { QUOTE_DOCUMENT_MAX_BYTES } from "../../../../packages/shared/contracts/quote-document.contracts";
 import type { UploadedDocumentFile } from "../quote-documents/quote-documents.service";
 import { activateRequestSchema, loginRequestSchema, mfaVerifyRequestSchema, passwordChangeRequestSchema, passwordResetRequestSchema, type ActivateRequest, type LoginRequest, type PasswordChangeRequest, type PasswordResetRequest } from "../../../../packages/shared/contracts/auth.contracts";
 import { activationChecklistQuerySchema } from "../../../../packages/shared/contracts/activation-checklist.contracts";
-import { billingFoundationQuerySchema, billingPlanPriceUpsertSchema, draftInvoiceQuerySchema, draftInvoiceRecomputeSchema, leadPackGrantSchema } from "../../../../packages/shared/contracts/billing.contracts";
+import {
+  billingFoundationQuerySchema,
+  billingPlanPriceUpsertSchema,
+  creditNoteRequestSchema,
+  draftInvoiceQuerySchema,
+  draftInvoiceRecomputeSchema,
+  issueInvoiceRequestSchema,
+  issuedInvoiceQuerySchema,
+  leadPackGrantSchema,
+  recordInvoicePaymentSchema
+} from "../../../../packages/shared/contracts/billing.contracts";
+import { BillingAccessRefusedError, BillingDisabledError } from "../billing/billing-foundation.service";
+import { InvoiceConflictError, InvoiceIntegrityError, InvoiceNotFoundError, InvoicingConfigurationError } from "../billing/invoicing-errors";
+import type { InvoiceDocumentFile } from "../billing/invoicing.service";
 import { partnerApplicationStatusSchema } from "../../../../packages/shared/contracts/partner-application.contracts";
 import {
   retentionBatchApproveRequestSchema,
@@ -883,8 +896,67 @@ export class AdminBillingFoundationController {
   }
 
   grantPack(input: unknown, request: AssurMatchHttpRequest) {
-    return this.runtime.billing.packs.grant(parseHttpInput(leadPackGrantSchema, input), protectedActorFromRequest(request));
+    return invoicingCall(() => this.runtime.billing.packs.grant(parseHttpInput(leadPackGrantSchema, input), protectedActorFromRequest(request)));
   }
+
+  // Spec 060 - manual B2B invoicing. "issued-invoices" keeps the spec 037 draft routes untouched.
+  listIssuedInvoices(request: AssurMatchHttpRequest, query: Record<string, string>) {
+    return invoicingCall(() => this.runtime.billing.invoicing.list(protectedActorFromRequest(request), parseHttpInput(issuedInvoiceQuerySchema, query)));
+  }
+
+  issueInvoice(input: unknown, request: AssurMatchHttpRequest) {
+    return invoicingCall(() => this.runtime.billing.invoicing.issue(parseHttpInput(issueInvoiceRequestSchema, input), protectedActorFromRequest(request)));
+  }
+
+  issuedInvoice(id: string, request: AssurMatchHttpRequest) {
+    return invoicingCall(() => this.runtime.billing.invoicing.detail(protectedActorFromRequest(request), parseParam("id", id, uuidSchema)));
+  }
+
+  issuedInvoicePdf(id: string, request: AssurMatchHttpRequest) {
+    return invoicingCall(async () => pdfFile(await this.runtime.billing.invoicing.invoicePdf(protectedActorFromRequest(request), parseParam("id", id, uuidSchema))));
+  }
+
+  recordPayment(id: string, input: unknown, request: AssurMatchHttpRequest) {
+    return invoicingCall(() => this.runtime.billing.invoicing.recordPayment(parseParam("id", id, uuidSchema), parseHttpInput(recordInvoicePaymentSchema, input), protectedActorFromRequest(request)));
+  }
+
+  issueCreditNote(id: string, input: unknown, request: AssurMatchHttpRequest) {
+    return invoicingCall(() => this.runtime.billing.invoicing.issueCreditNote(parseParam("id", id, uuidSchema), parseHttpInput(creditNoteRequestSchema, input), protectedActorFromRequest(request)));
+  }
+
+  creditNotePdf(id: string, request: AssurMatchHttpRequest) {
+    return invoicingCall(async () => pdfFile(await this.runtime.billing.invoicing.creditNotePdf(protectedActorFromRequest(request), parseParam("id", id, uuidSchema))));
+  }
+
+  account(partnerId: string, request: AssurMatchHttpRequest) {
+    return invoicingCall(() => this.runtime.billing.invoicing.accountStatement(protectedActorFromRequest(request), parseParam("partnerId", partnerId, uuidSchema)));
+  }
+}
+
+/**
+ * Spec 060: invoicing errors are mapped explicitly so the admin and broker apps can rely on 403
+ * (MFA or permission), 404 (unknown or foreign document), 409 (state conflict) and 422 (billing
+ * disabled or invoicing configuration incomplete) whatever the wording.
+ */
+async function invoicingCall<T>(call: () => Promise<T>): Promise<T> {
+  try {
+    return await call();
+  } catch (error) {
+    if (error instanceof BillingAccessRefusedError) throw new ForbiddenException(error.message);
+    if (error instanceof InvoiceNotFoundError) throw new NotFoundException(error.message);
+    if (error instanceof InvoiceConflictError) throw new ConflictException(error.message);
+    if (error instanceof BillingDisabledError || error instanceof InvoicingConfigurationError) throw new UnprocessableEntityException(error.message);
+    if (error instanceof InvoiceIntegrityError) throw new InternalServerErrorException("Invoice document integrity check failed");
+    throw error;
+  }
+}
+
+function pdfFile(file: InvoiceDocumentFile): StreamableFile {
+  return new StreamableFile(file.bytes, {
+    type: "application/pdf",
+    disposition: `attachment; filename="${file.filename.replace(/[^A-Za-z0-9._-]/g, "_")}"`,
+    length: file.bytes.length
+  });
 }
 
 export class AdminPartnerSlaController {
@@ -1029,6 +1101,19 @@ export class BrokerBillingController {
 
   statement(request: AssurMatchHttpRequest) {
     return this.runtime.billing.drafts.statement(protectedActorFromRequest(request));
+  }
+
+  /** Spec 060 G-05: account statement, invoices, credit notes and packs of the caller's tenant. */
+  account(request: AssurMatchHttpRequest) {
+    return invoicingCall(() => this.runtime.billing.invoicing.brokerAccount(protectedActorFromRequest(request)));
+  }
+
+  invoicePdf(id: string, request: AssurMatchHttpRequest) {
+    return invoicingCall(async () => pdfFile(await this.runtime.billing.invoicing.brokerInvoicePdf(protectedActorFromRequest(request), parseParam("id", id, uuidSchema))));
+  }
+
+  creditNotePdf(id: string, request: AssurMatchHttpRequest) {
+    return invoicingCall(async () => pdfFile(await this.runtime.billing.invoicing.brokerCreditNotePdf(protectedActorFromRequest(request), parseParam("id", id, uuidSchema))));
   }
 }
 
@@ -1395,6 +1480,15 @@ decorate(AdminBillingFoundationController, "listInvoices", [Get("billing/invoice
 decorate(AdminBillingFoundationController, "recomputeInvoices", [Post("billing/invoices/recompute") as MethodDecoratorFactory], [[0, Body() as ParamDecoratorFactory], [1, Req() as ParamDecoratorFactory]]);
 decorate(AdminBillingFoundationController, "listPacks", [Get("billing/packs") as MethodDecoratorFactory], [[0, Req() as ParamDecoratorFactory], [1, Query() as ParamDecoratorFactory]]);
 decorate(AdminBillingFoundationController, "grantPack", [Post("billing/packs") as MethodDecoratorFactory], [[0, Body() as ParamDecoratorFactory], [1, Req() as ParamDecoratorFactory]]);
+const noStore = Header("Cache-Control", "no-store") as MethodDecoratorFactory;
+decorate(AdminBillingFoundationController, "listIssuedInvoices", [Get("billing/issued-invoices") as MethodDecoratorFactory], [[0, Req() as ParamDecoratorFactory], [1, Query() as ParamDecoratorFactory]]);
+decorate(AdminBillingFoundationController, "issueInvoice", [Post("billing/issued-invoices") as MethodDecoratorFactory], [[0, Body() as ParamDecoratorFactory], [1, Req() as ParamDecoratorFactory]]);
+decorate(AdminBillingFoundationController, "issuedInvoice", [Get("billing/issued-invoices/:id") as MethodDecoratorFactory], [[0, Param("id") as ParamDecoratorFactory], [1, Req() as ParamDecoratorFactory]]);
+decorate(AdminBillingFoundationController, "issuedInvoicePdf", [Get("billing/issued-invoices/:id/pdf") as MethodDecoratorFactory, noStore], [[0, Param("id") as ParamDecoratorFactory], [1, Req() as ParamDecoratorFactory]]);
+decorate(AdminBillingFoundationController, "recordPayment", [Post("billing/issued-invoices/:id/payments") as MethodDecoratorFactory], [[0, Param("id") as ParamDecoratorFactory], [1, Body() as ParamDecoratorFactory], [2, Req() as ParamDecoratorFactory]]);
+decorate(AdminBillingFoundationController, "issueCreditNote", [Post("billing/issued-invoices/:id/credit-note") as MethodDecoratorFactory], [[0, Param("id") as ParamDecoratorFactory], [1, Body() as ParamDecoratorFactory], [2, Req() as ParamDecoratorFactory]]);
+decorate(AdminBillingFoundationController, "creditNotePdf", [Get("billing/credit-notes/:id/pdf") as MethodDecoratorFactory, noStore], [[0, Param("id") as ParamDecoratorFactory], [1, Req() as ParamDecoratorFactory]]);
+decorate(AdminBillingFoundationController, "account", [Get("billing/accounts/:partnerId") as MethodDecoratorFactory], [[0, Param("partnerId") as ParamDecoratorFactory], [1, Req() as ParamDecoratorFactory]]);
 controller("admin/retention", AdminDataRetentionController, true);
 decorate(AdminDataRetentionController, "policies", [Get("policies") as MethodDecoratorFactory], [[0, Req() as ParamDecoratorFactory], [1, Query() as ParamDecoratorFactory]]);
 decorate(AdminDataRetentionController, "upsertPolicy", [Put("policies") as MethodDecoratorFactory], [[0, Body() as ParamDecoratorFactory], [1, Req() as ParamDecoratorFactory]]);
@@ -1424,6 +1518,9 @@ decorate(BrokerNotificationsController, "preferences", [Get("preferences") as Me
 decorate(BrokerNotificationsController, "updatePreferences", [Put("preferences") as MethodDecoratorFactory], [[0, Body() as ParamDecoratorFactory], [1, Req() as ParamDecoratorFactory]]);
 controller("broker/billing", BrokerBillingController, true);
 decorate(BrokerBillingController, "statement", [Get("statement") as MethodDecoratorFactory], [[0, Req() as ParamDecoratorFactory]]);
+decorate(BrokerBillingController, "account", [Get("account") as MethodDecoratorFactory], [[0, Req() as ParamDecoratorFactory]]);
+decorate(BrokerBillingController, "invoicePdf", [Get("invoices/:id/pdf") as MethodDecoratorFactory, noStore], [[0, Param("id") as ParamDecoratorFactory], [1, Req() as ParamDecoratorFactory]]);
+decorate(BrokerBillingController, "creditNotePdf", [Get("credit-notes/:id/pdf") as MethodDecoratorFactory, noStore], [[0, Param("id") as ParamDecoratorFactory], [1, Req() as ParamDecoratorFactory]]);
 
 controller("admin", AdminAIAssistanceController, true);
 decorate(AdminAIAssistanceController, "read", [Get("ai/assistance") as MethodDecoratorFactory], [[0, Req() as ParamDecoratorFactory]]);

@@ -25,7 +25,8 @@ describe("prisma migration fresh-base readiness", () => {
       "0016_broker_crm_history_event_type",
       "0017_public_site_forms",
       "0018_data_retention",
-      "0019_satisfaction_surveys"
+      "0019_satisfaction_surveys",
+      "0027_b2b_invoicing"
     ]);
     const schema = readFileSync(join(process.cwd(), "backend", "prisma", "schema.prisma"), "utf8");
     for (const model of ["AuditLog", "FeatureFlag", "ConsentRecord", "QuoteRequest", "LeadAssignment", "BrokerCrmLeadState", "PartnerApiKey", "PartnerWebhookEndpoint", "PartnerWebhookDelivery", "PartnerWebhookAllowlistEntry", "RoutingRule", "RoutingRuleHistory"]) {
@@ -134,5 +135,18 @@ describe("prisma migration fresh-base readiness", () => {
     expect(schema).toContain("RetentionPolicy_global_category_key");
     expect(schema).toContain("model RetentionPolicy");
     expect(schema).toContain("model AnonymizationBatch");
+    // Spec 060: issued invoices are immutable, payments and credit notes append-only, all in SQL.
+    const invoicing = readFileSync(join(migrationsDir, "0027_b2b_invoicing", "migration.sql"), "utf8");
+    for (const table of ["IssuedInvoice", "InvoicePayment", "CreditNote", "InvoiceNumberSequence"]) {
+      expect(invoicing).toContain(`CREATE TABLE IF NOT EXISTS "${table}"`);
+      expect(schema).toContain(`model ${table}`);
+    }
+    expect(invoicing).toContain('ALTER TABLE "LeadPack" ADD COLUMN IF NOT EXISTS "invoiceId" TEXT');
+    expect(invoicing).toContain('CREATE TRIGGER "IssuedInvoice_immutable" BEFORE UPDATE OR DELETE ON "IssuedInvoice"');
+    expect(invoicing).toContain('CREATE TRIGGER "InvoicePayment_append_only" BEFORE UPDATE OR DELETE ON "InvoicePayment"');
+    expect(invoicing).toContain('CREATE TRIGGER "CreditNote_append_only" BEFORE UPDATE OR DELETE ON "CreditNote"');
+    expect(invoicing).toContain('"IssuedInvoice_active_partner_period_key"');
+    expect(schema).toContain("IssuedInvoice_active_partner_period_key");
+    expect(invoicing).not.toMatch(/DROP TABLE|DELETE FROM/);
   });
 });
