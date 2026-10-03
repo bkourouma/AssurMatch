@@ -63,3 +63,12 @@ Lecture côté serveur via `apps/admin/app/lib/operations-api.ts` (aucune modifi
 
 ### R11 — Hors périmètre
 H-07, H-08, H-09 ; analyse IA des anomalies dans l'écran ; envoi d'e-mail de réponse aux messages de contact ; notification visiteur par statut (spec 054).
+
+## Écarts retenus à l'implémentation (2026-10-03)
+
+- **Validation Playwright** : la configuration racine ignore `**/.claude/**`, chemin de ce worktree. Les tests `apps/admin` ont été lancés avec une configuration temporaire identique sans cet ignore (non commitée) ; depuis la racine du dépôt principal, `npx playwright test apps/admin` les exécute normalement.
+- **Revue `route` sur une règle manuelle** : si une règle `manual` couvre le périmètre, la demande passe `created` / `pending_manual_assignment` et reste dans la file pour une assignation (pas de transmission implicite).
+- **Notification visiteur** : point d'accroche unique `QuoteSubmissionService.notifyVisitorOfReviewOutcome` → `queueVisitor` (dédupliqué par processus) ; la spec 054 doit y brancher le message par statut.
+- **Affectations et décisions** : filtrées en mémoire puis paginées par l'API (volume V1) ; seuls les journaux d'audit sont paginés en base.
+- **Offre choisie** : l'issue (`retained` / `not_retained` / `pending`) est calculée à partir des affectations, la base n'ayant pas encore le `selectedOfferOutcome` de la spec 052.
+- **`GET /admin/audit-logs`** (forme tableau) lit désormais le dépôt durable : 200 entrées les plus récentes par défaut, filtres acceptés.
