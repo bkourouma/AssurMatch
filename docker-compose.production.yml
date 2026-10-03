@@ -167,6 +167,8 @@ services:
       - "443:443"
     volumes:
       - ${ASSURMATCH_NGINX_CONF:-./deploy/nginx/assurmatch-production.conf}:/etc/nginx/conf.d/default.conf:ro
+      # Spec 058: versioned security headers, included by every TLS vhost.
+      - ./deploy/nginx/security-headers.conf:/etc/nginx/snippets/assurmatch-security-headers.conf:ro
       - ${ASSURMATCH_TLS_DIR:-/etc/letsencrypt}:/etc/letsencrypt:ro
 
 volumes:
