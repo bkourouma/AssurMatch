@@ -24,7 +24,7 @@ x-backend-env: &backend-env
   DATABASE_URL: postgresql://assurmatch_e2e:assurmatch_e2e@127.0.0.1:${ASSURMATCH_E2E_POSTGRES_PORT:-48632}/assurmatch_e2e
   REDIS_URL: redis://127.0.0.1:${ASSURMATCH_E2E_REDIS_PORT:-48679}
   BULLMQ_PREFIX: assurmatch-e2e
-  ASSURMATCH_AUTH_TOKEN_SECRET: assurmatch-e2e-auth-token-secret-for-ci-only-32b
+  ASSURMATCH_AUTH_TOKEN_SECRET: assurmatch-e2e-auth-token-secret-for-ci-only-32b # secret-scan:allow throwaway e2e stack value
   ENCRYPTION_KEY: assurmatch-e2e-encryption-key-for-ci-only-32bytes
   EMAIL_SERVICE_TYPE: mailpit
   EMAIL_FROM: e2e@assurmatch.test
@@ -39,6 +39,10 @@ x-backend-env: &backend-env
   ASSURMATCH_DOCUMENT_STORAGE_DIR: /tmp/assurmatch-e2e-documents
   ASSURMATCH_ANTIVIRUS: eicar
   ASSURMATCH_WORKER_INTERVAL_SECONDS: "5"
+  # Spec 058 auth rate limiting counts per IP: every browser of the suite logs in from 127.0.0.1.
+  ASSURMATCH_AUTH_RATE_LIMIT_IP_MAX: "2000"
+  # 0 by default (clients hit the API directly). The load test sets 1 to spread its synthetic clients.
+  TRUSTED_PROXY_HOPS: ${ASSURMATCH_E2E_TRUSTED_PROXY_HOPS:-0}
 
 x-frontend-build-args: &frontend-build-args
   NEXT_PUBLIC_ASSURMATCH_API_URL: http://127.0.0.1:${ASSURMATCH_E2E_API_PORT:-48600}
@@ -62,7 +66,7 @@ services:
     environment:
       POSTGRES_DB: assurmatch_e2e
       POSTGRES_USER: assurmatch_e2e
-      POSTGRES_PASSWORD: assurmatch_e2e
+      POSTGRES_PASSWORD: assurmatch_e2e # secret-scan:allow throwaway e2e database
       PGPORT: ${ASSURMATCH_E2E_POSTGRES_PORT:-48632}
     # No volume: every run starts from an empty database (tmpfs keeps it fast).
     tmpfs:
@@ -130,6 +134,13 @@ services:
     depends_on:
       api:
         condition: service_healthy
+    # The image HEALTHCHECK probes the API port; the worker is healthy when its heartbeat is fresh.
+    healthcheck:
+      test: ["CMD", "node", "scripts/worker/worker-healthcheck.mjs"]
+      interval: 5s
+      timeout: 5s
+      start_period: 30s
+      retries: 10
 
   public:
     profiles: ["apps"]

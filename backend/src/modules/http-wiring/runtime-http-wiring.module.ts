@@ -892,7 +892,11 @@ export class PublicQuoteRequestsController {
   }
 
   submitQuote(input: QuoteRequestCreateDto, request: AssurMatchHttpRequest) {
-    return this.runtime.quoteRequests.submissions.submit(parseHttpInput(quoteRequestCreateSchema, input), actorFromRequest(request));
+    // Spec 059 fix: the client address comes from the connection (trusted proxy hops applied),
+    // never from the body. Before, `ipAddress` was whatever the body said - absent from the public
+    // form - so every visitor shared the "unknown" bucket of the per-IP quote rate limit (5 per
+    // minute per country x product for the whole country) and anyone could pick their own bucket.
+    return this.runtime.quoteRequests.submissions.submit({ ...parseHttpInput(quoteRequestCreateSchema, input), ipAddress: clientIp(request) }, actorFromRequest(request));
   }
 
   /**

@@ -1,4 +1,5 @@
 import { expect, type Page } from "@playwright/test";
+import { pdfFile } from "./files";
 import { card, confirmInDialog, expectActionSuccess, fillReason } from "./ui";
 
 // Admin partner (broker) record screens: documents, scopes, status transitions (spec 051).
@@ -9,7 +10,8 @@ export async function uploadPartnerDocument(
   page: Page,
   documentType: string,
   file: { name: string; mimeType: string; buffer: Buffer },
-  licenseNumber?: string
+  licenseNumber?: string,
+  options: { infected?: boolean } = {}
 ): Promise<void> {
   const upload = card(page, "Téléverser un document");
   await upload.getByLabel("Fichier").setInputFiles(file);
@@ -21,7 +23,13 @@ export async function uploadPartnerDocument(
   }
   await fillReason(upload, REASON);
   await upload.getByRole("button", { name: "Téléverser" }).click();
-  await expectActionSuccess(upload, `upload ${documentType}`);
+  if (options.infected) {
+    // An infected file is stored in quarantine; the upload may report it as a refusal.
+    await expect(upload.locator(".bo-notice[data-tone='success'], .bo-notice[data-tone='danger']").first()).toBeVisible();
+    await page.reload();
+  } else {
+    await expectActionSuccess(upload, `upload ${documentType}`);
+  }
   // The upload form refreshes the page data (router.refresh) once the file is stored.
   await expect(documentRow(page, file.name)).toBeVisible();
 }
@@ -74,4 +82,71 @@ export async function submitStatusTransition(page: Page, label: string, expected
       return (await statusCard.innerText()).includes(`Statut actuel : ${expectedStatus}`) ? "done" : "pending";
     }, { timeout: 30_000, message: `partner status: ${label}` })
     .toBe("done");
+}
+
+export interface DirectBrokerInput {
+  legalName: string;
+  ownerEmail: string;
+  licenseNumber: string;
+}
+
+/**
+ * SC-02 alternative path: the admin creates a broker without an application and takes it to
+ * "Actif public" (licence + accepted proof, CI x Auto coverage, contract, owner invitation).
+ * Starts on /partners; returns the new partner id.
+ */
+export async function onboardBrokerDirect(page: Page, input: DirectBrokerInput): Promise<string> {
+  const create = card(page, "Créer un courtier");
+  await create.locator("input[name='legalName']").fill(input.legalName);
+  const country = create.locator("select[name='countryId']");
+  const ci = await country.locator("option", { hasText: "(CI)" }).first().getAttribute("value");
+  await country.selectOption(ci ?? "");
+  await create.locator("input[name='primaryEmail']").fill(input.ownerEmail);
+  await create.locator("input[name='primaryWhatsApp']").fill("+2250709080706");
+  await fillReason(create, REASON);
+  await create.getByRole("button", { name: "Créer le courtier" }).click();
+  await page.waitForURL(/\/partners\/[0-9a-f-]{36}/u);
+  const partnerId = new URL(page.url()).pathname.split("/").pop() as string;
+
+  const license = card(page, "Enregistrer une licence");
+  await license.locator("input[name='licenseNumber']").fill(input.licenseNumber);
+  await license.locator("input[name='issuingAuthority']").fill("Direction des Assurances CI");
+  await license.locator("select[name='countryId']").selectOption(ci ?? "");
+  const today = new Date();
+  await license.locator("input[name='effectiveDate']").fill(today.toISOString().slice(0, 10));
+  await license.locator("input[name='expirationDate']").fill(new Date(today.getTime() + 365 * 86_400_000).toISOString().slice(0, 10));
+  await fillReason(license, REASON);
+  await license.getByRole("button", { name: "Enregistrer la licence" }).click();
+  await expectActionSuccess(license, "create licence");
+  await page.reload();
+
+  await uploadPartnerDocument(page, "license", pdfFile("agrement-y.pdf", `Agrement ${input.licenseNumber}`), input.licenseNumber);
+  await reviewDocument(page, "agrement-y.pdf", "Accepter");
+  await confirmInDialog(page, card(page, `Licence ${input.licenseNumber}`), "Valider", (dialog) => fillReason(dialog, REASON));
+  await expect(card(page, `Licence ${input.licenseNumber}`)).toContainText("Valide");
+  await authorizeScope(page, "Pays autorisés", "Côte d'Ivoire (CI)");
+  await authorizeScope(page, "Produits autorisés", /Assurance auto/u);
+
+  await uploadPartnerDocument(page, "partnership_contract", pdfFile("contrat-y.pdf", "Contrat Y"));
+  await reviewDocument(page, "contrat-y.pdf", "Accepter");
+  const contract = card(page, "Contrat de partenariat");
+  await contract.getByLabel("Version").fill("v1");
+  await contract.getByLabel("Date de signature").fill(today.toISOString().slice(0, 10));
+  await contract.getByLabel("Signataire pour le courtier").fill("Henri Bédié");
+  await contract.getByLabel("Document du contrat signé").selectOption({ index: 1 });
+  await fillReason(contract, REASON);
+  await contract.getByRole("button", { name: "Enregistrer le contrat" }).click();
+  await expectActionSuccess(contract, "record contract");
+
+  const users = card(page, "Utilisateurs du courtier");
+  await users.getByLabel("E-mail").fill(input.ownerEmail);
+  await users.getByLabel("Nom affiché").fill("Henri Bédié");
+  await fillReason(users, REASON);
+  await users.getByRole("button", { name: /Inviter et émettre/u }).click();
+  await expectActionSuccess(users, "invite owner");
+
+  await page.goto(`/partners/${partnerId}`);
+  await submitStatusTransition(page, "Envoyer en vérification", "En vérification");
+  await submitStatusTransition(page, "Passer en Actif public", "Actif public");
+  return partnerId;
 }

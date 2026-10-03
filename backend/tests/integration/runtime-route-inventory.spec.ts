@@ -57,6 +57,8 @@ describe("runtime HTTP route inventory", () => {
     const checks = [
       // `directory` must resolve to the country directory, never be captured as a country code.
       ["/countries/directory", 200],
+      // Spec 059: countries and products a broker may apply for (before the country is public).
+      ["/partners/applications/options", 200],
       ["/public-stats", 200],
       ["/admin/partners/applications", 401],
       ["/admin/contact-messages", 401]

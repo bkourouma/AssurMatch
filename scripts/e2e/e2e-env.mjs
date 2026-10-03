@@ -69,6 +69,9 @@ export function backendEnv() {
     ASSURMATCH_DOCUMENT_STORAGE_DIR: path.join(stateDir, "documents"),
     ASSURMATCH_ANTIVIRUS: "eicar",
     ASSURMATCH_WORKER_INTERVAL_SECONDS: "5",
+    // Spec 058 auth rate limiting counts per IP: every browser of the suite logs in from 127.0.0.1.
+    ASSURMATCH_AUTH_RATE_LIMIT_IP_MAX: "2000",
+    TRUSTED_PROXY_HOPS: process.env.ASSURMATCH_E2E_TRUSTED_PROXY_HOPS ?? "0",
     ASSURMATCH_WORKER_HEARTBEAT_FILE: path.join(stateDir, "worker.heartbeat")
   };
 }

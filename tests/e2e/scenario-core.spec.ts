@@ -96,7 +96,7 @@ test("SC-01b ouvrir la Côte d'Ivoire, Auto et Voyage : consentements, formulair
         language,
         version: `e2e-${key}-${language}-v1`,
         consentTextId: language === "fr" ? consentFr : consentEn,
-        fields: fields[key][language]
+        fields: fields[key]?.[language] ?? []
       }, REASON);
     }
   }

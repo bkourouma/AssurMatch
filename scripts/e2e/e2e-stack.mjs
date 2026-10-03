@@ -96,7 +96,8 @@ function portEnv() {
     ASSURMATCH_E2E_POSTGRES_PORT: String(ports.postgres),
     ASSURMATCH_E2E_REDIS_PORT: String(ports.redis),
     ASSURMATCH_E2E_MAILPIT_SMTP_PORT: String(ports.mailpitSmtp),
-    ASSURMATCH_E2E_MAILPIT_HTTP_PORT: String(ports.mailpitHttp)
+    ASSURMATCH_E2E_MAILPIT_HTTP_PORT: String(ports.mailpitHttp),
+    ASSURMATCH_E2E_TRUSTED_PROXY_HOPS: process.env.ASSURMATCH_E2E_TRUSTED_PROXY_HOPS ?? "0"
   };
 }
 
@@ -139,6 +140,7 @@ function writeState(patch) {
 }
 
 function killHostProcesses() {
+  if (dryRun) return;
   const { pids = [] } = readState();
   for (const pid of pids) {
     try {
@@ -224,14 +226,16 @@ function bootstrapSuperAdmin() {
   for (const line of stdout.split(/\r?\n/)) {
     if (line && !/token=/.test(line)) log(`bootstrap: ${line}`);
   }
-  writeState({ superAdminActivationUrl: link ?? null, superAdminEmail: superAdmin.email });
+  if (!dryRun) writeState({ superAdminActivationUrl: link ?? null, superAdminEmail: superAdmin.email });
 }
 
 async function prepareStack() {
   teardown();
-  rmSync(stateDir, { recursive: true, force: true });
-  mkdirSync(logDir, { recursive: true });
-  writeState({ appsMode, startedAt: new Date().toISOString(), pids: [] });
+  if (!dryRun) {
+    rmSync(stateDir, { recursive: true, force: true });
+    mkdirSync(logDir, { recursive: true });
+    writeState({ appsMode, startedAt: new Date().toISOString(), pids: [] });
+  }
 
   if (appsMode === "docker" && !noBuild) {
     log("building the API, public, admin and broker images (production Dockerfiles)");
@@ -284,7 +288,7 @@ async function main() {
     console.error("[e2e] Docker is not available: start the Docker daemon (the stack needs PostgreSQL, Redis and Mailpit containers).");
     return 69;
   }
-  let status = 1;
+  let status;
   try {
     await prepareStack();
     if (upOnly) {
