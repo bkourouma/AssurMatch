@@ -3,6 +3,7 @@ import { NestFactory } from "@nestjs/core";
 import type { AddressInfo } from "node:net";
 import { AppModule } from "../../src/app.module";
 import { ErrorResponseFilter } from "../../src/modules/common/filters/error-response.filter";
+import { applyObservability } from "../../src/modules/observability/observability";
 import type { ActorContext } from "../../src/modules/common/types";
 import { signActorToken } from "../../src/modules/auth/http-auth-token.service";
 import { AssurMatchRuntime } from "../../src/runtime/assurmatch-runtime";
@@ -40,6 +41,8 @@ export function simulationActorHeaders(actor: ActorContext): Record<string, stri
 
 export async function createRuntimeHttpHarness(): Promise<RuntimeHttpHarness> {
   const app = await NestFactory.create(AppModule, { logger: false });
+  // Spec 058: same request logging / metrics middleware as `main.ts` (silent under NODE_ENV=test).
+  applyObservability(app);
   app.useGlobalFilters(new ErrorResponseFilter());
   await app.listen(0);
   const address = app.getHttpServer().address() as AddressInfo;

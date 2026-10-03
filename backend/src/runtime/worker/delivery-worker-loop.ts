@@ -22,6 +22,8 @@ export interface WorkerLoopOptions {
   beforeCycle?: () => Promise<void>;
   /** Liveness signal, called after every cycle (and once at start). */
   heartbeat?: () => void | Promise<void>;
+  /** Spec 058: publishes the cycle outcomes (counters only), e.g. to Redis for `/metrics`. Failures are logged, never fatal. */
+  afterCycle?: (outcomes: CycleOutcome[]) => void | Promise<void>;
   log?: (event: WorkerLogEvent) => void;
   now?: () => Date;
 }
@@ -105,6 +107,13 @@ export class DeliveryWorkerLoop {
     }
     this.cycles += 1;
     this.log({ event: "worker.cycle.completed", cycle: this.cycles, ms: Date.now() - started, failed: outcomes.filter((outcome) => outcome.status === "error").length });
+    if (this.options.afterCycle) {
+      try {
+        await this.options.afterCycle(outcomes);
+      } catch (error) {
+        this.log({ event: "worker.status.publish_failed", error: describeError(error) });
+      }
+    }
     await this.beat();
     return outcomes;
   }

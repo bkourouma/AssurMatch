@@ -3,6 +3,9 @@ import type { INestApplication } from "@nestjs/common";
 import { AppModule } from "./app.module";
 import { corsAllowedOrigins } from "./config/config.module";
 import { ErrorResponseFilter } from "./modules/common/filters/error-response.filter";
+import { applyObservability, installProcessErrorHandlers, JsonNestLogger } from "./modules/observability/observability";
+import { errorReporter } from "./modules/observability/error-reporter";
+import { logEvent } from "./modules/observability/structured-logger";
 
 /**
  * Spec 043: the public app submits quote requests from the visitor's browser, so a cross-origin
@@ -23,6 +26,7 @@ function applyCors(app: INestApplication): void {
 
 export async function createAssurMatchApp() {
   const app = await NestFactory.create(AppModule, { logger: false });
+  applyObservability(app);
   applyCors(app);
   app.useGlobalFilters(new ErrorResponseFilter());
   app.enableShutdownHooks();
@@ -30,11 +34,14 @@ export async function createAssurMatchApp() {
 }
 
 export async function bootstrap(port = Number(process.env.PORT ?? 3000)): Promise<void> {
-  const app = await NestFactory.create(AppModule, { logger: ["error", "warn", "log"] });
+  installProcessErrorHandlers();
+  const app = await NestFactory.create(AppModule, { logger: new JsonNestLogger() });
+  applyObservability(app);
   applyCors(app);
   app.useGlobalFilters(new ErrorResponseFilter());
   app.enableShutdownHooks();
   await app.listen(port);
+  logEvent("info", "api.started", { port, errorReporting: errorReporter().enabled ? "enabled" : "disabled", metrics: process.env.METRICS_TOKEN?.trim() ? "enabled" : "disabled" });
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) {

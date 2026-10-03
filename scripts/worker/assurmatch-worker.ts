@@ -15,7 +15,8 @@
 import { mkdirSync, writeFileSync } from "node:fs";
 import { dirname } from "node:path";
 import { AssurMatchRuntime } from "../../backend/src/runtime/assurmatch-runtime";
-import { DeliveryWorkerLoop, describeError, readIntegerEnv } from "../../backend/src/runtime/worker/delivery-worker-loop";
+import { DeliveryWorkerLoop, describeError, readIntegerEnv, type CycleOutcome } from "../../backend/src/runtime/worker/delivery-worker-loop";
+import { recordWorkerCycle } from "../../backend/src/runtime/worker/worker-status";
 
 const env = process.env;
 const log = (event: Record<string, unknown>) => process.stdout.write(`${JSON.stringify({ at: new Date().toISOString(), ...event })}\n`);
@@ -29,6 +30,8 @@ const heartbeatFile = env.ASSURMATCH_WORKER_HEARTBEAT_FILE?.trim() || "/tmp/assu
 // Off unless explicitly enabled: with deliveries disabled the webhook service audits a refusal on
 // every call, which would bury the audit log under one entry per cycle.
 const webhooksEnabled = env.ASSURMATCH_PARTNER_WEBHOOK_DELIVERY_ENABLED === "true";
+// Spec 058: optional Uptime Kuma "Push" monitor URL. Its token is a credential: never logged.
+const pushUrl = env.ASSURMATCH_WORKER_PUSH_URL?.trim();
 
 const runtime = new AssurMatchRuntime();
 if (runtime.prisma.runtimeMode !== "prisma-client" && env.NODE_ENV !== "test") {
@@ -36,8 +39,25 @@ if (runtime.prisma.runtimeMode !== "prisma-client" && env.NODE_ENV !== "test") {
   process.exit(1);
 }
 
+async function publishCycle(outcomes: CycleOutcome[]): Promise<void> {
+  // Spec 058 FR-003: status snapshot read by the API `/metrics` endpoint (counters only).
+  await recordWorkerCycle(runtime.redis.client, outcomes);
+  if (!pushUrl) return;
+  const failed = outcomes.filter((outcome) => outcome.status === "error").length;
+  const url = new URL(pushUrl);
+  url.searchParams.set("status", failed > 0 ? "down" : "up");
+  url.searchParams.set("msg", failed > 0 ? `${failed} task(s) failed` : "OK");
+  try {
+    const response = await fetch(url, { signal: AbortSignal.timeout(5000) });
+    if (!response.ok) log({ level: "warn", event: "worker.push.refused", status: response.status });
+  } catch (error) {
+    log({ level: "warn", event: "worker.push.failed", error: error instanceof Error ? error.name : "Error" });
+  }
+}
+
 const loop = new DeliveryWorkerLoop({
   intervalMs: intervalSeconds * 1000,
+  afterCycle: publishCycle,
   beforeCycle: () => runtime.reloadRuntimeFeatureFlags(),
   heartbeat: () => {
     mkdirSync(dirname(heartbeatFile), { recursive: true });
