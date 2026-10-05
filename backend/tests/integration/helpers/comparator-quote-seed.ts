@@ -1,4 +1,5 @@
 import { QuoteAISummaryService } from "../../../src/modules/ai/quote-summary/quote-ai-summary.service";
+import { consentContentHash } from "../../../../packages/shared/contracts/consent-content";
 import { AuditLogsModule } from "../../../src/modules/audit-logs/audit-logs.module";
 import { RedisModule } from "../../../src/modules/common/redis/redis.module";
 import { ConsentModule } from "../../../src/modules/consent/consent.module";
@@ -13,6 +14,7 @@ import { ProspectsModule } from "../../../src/modules/prospects/prospects.module
 import { QuoteFormsModule } from "../../../src/modules/quote-forms/quote-forms.module";
 import { QuoteRequestsModule } from "../../../src/modules/quote-requests/quote-requests.module";
 import { superAdminActor } from "./enterprise-seed";
+import { expireOffer, publishOffer } from "./offer-test-helpers";
 
 export interface ComparatorApp {
   audit: AuditLogsModule;
@@ -30,6 +32,10 @@ export interface ComparatorApp {
   quoteAiSummary: QuoteAISummaryService;
   quoteRequests: QuoteRequestsModule;
 }
+
+/** Spec 050: a compliant lead transmission template; its hash is what the visitor's browser echoes back. */
+export const COMPARATOR_CONSENT_CONTENT = "En cochant cette case, vous acceptez la transmission de vos coordonnees ({{contactFields}}) a {{brokerName}} pour {{countryName}} et {{productName}}. AssurMatch est une plateforme technique; elle n'est ni courtier ni assureur.";
+export const COMPARATOR_CONSENT_HASH = consentContentHash(COMPARATOR_CONSENT_CONTENT);
 
 export interface ComparatorSeed {
   app: ComparatorApp;
@@ -56,9 +62,16 @@ export function createComparatorApp(): ComparatorApp {
       id: text.id,
       version: text.version,
       contentHash: text.contentHash,
-      purpose: "lead_transmission" as const,
+      purpose: text.purpose,
       recipientCategory: text.recipientCategory,
-      status: text.status ?? "draft"
+      status: text.status ?? "draft",
+      language: text.language,
+      countryId: text.countryId,
+      productId: text.productId ?? null,
+      channel: text.channel,
+      content: text.content ?? null,
+      ...(text.publishedAt ? { publishedAt: text.publishedAt } : {}),
+      createdAt: text.createdAt
     }))
   });
   const prospects = new ProspectsModule(audit.writer);
@@ -151,9 +164,11 @@ export async function seedComparatorQuote(): Promise<ComparatorSeed> {
     language: "fr",
     version: "v1",
     status: "draft",
-    contentHash: "hash-lead-transmission-v1"
+    // Spec 050 R5: real content; the service computes the hash from it.
+    content: COMPARATOR_CONSENT_CONTENT,
+    contentHash: "computed-by-server"
   }, superAdminActor);
-  await app.consent.service.publishText(consentText.id, superAdminActor);
+  await app.consent.service.publishText(consentText.id, superAdminActor, { requireContent: true });
 
   const form = await app.quoteForms.service.create({
     countryId: country.id,
@@ -188,7 +203,7 @@ export async function seedComparatorQuote(): Promise<ComparatorSeed> {
     expirationDate: "2030-01-01"
   }, superAdminActor);
 
-  const activeOffer = await app.offers.adminService.create({
+  const activeOffer = await publishOffer(app.offers, {
     countryId: country.id,
     productId: product.id,
     partnerTenantId: partner.id,
@@ -201,20 +216,21 @@ export async function seedComparatorQuote(): Promise<ComparatorSeed> {
     validUntil: "2030-01-01T00:00:00.000Z",
     isSponsored: false,
     reason: "seed active indicative offer"
-  }, superAdminActor);
-  await app.offers.adminService.validate(activeOffer.id, { validationStatus: "validated", reason: "validate public offer" }, superAdminActor);
+  }, superAdminActor, superAdminActor);
 
-  const expiredOffer = await app.offers.adminService.create({
+  // Spec 052: validation refuses an expired offer, so the fixture is an offer that expired after publication.
+  const expiredOffer = await publishOffer(app.offers, {
     countryId: country.id,
     productId: product.id,
+    partnerTenantId: partner.id,
     name: "Auto Expiree",
     indicativePriceMin: 5000,
     currency: "XOF",
-    validFrom: "2020-01-01T00:00:00.000Z",
-    validUntil: "2021-01-01T00:00:00.000Z",
+    validFrom: "2026-01-01T00:00:00.000Z",
+    validUntil: "2030-01-01T00:00:00.000Z",
     reason: "seed expired offer"
-  }, superAdminActor);
-  await app.offers.adminService.validate(expiredOffer.id, { validationStatus: "validated", reason: "validate expired fixture" }, superAdminActor);
+  }, superAdminActor, superAdminActor);
+  await expireOffer(app.offers, expiredOffer.id);
 
   return {
     app,
@@ -243,7 +259,7 @@ export function validQuotePayload(seed: ComparatorSeed) {
       accepted: true,
       consentTextId: seed.consentTextId,
       version: "v1",
-      contentHash: "hash-lead-transmission-v1"
+      contentHash: COMPARATOR_CONSENT_HASH
     },
     ipAddress: "203.0.113.10",
     sessionId: "session-1"

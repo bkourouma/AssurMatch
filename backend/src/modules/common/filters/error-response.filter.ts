@@ -1,10 +1,36 @@
 import { ArgumentsHost, Catch, ExceptionFilter, HttpException, HttpStatus, NotFoundException } from "@nestjs/common";
 import { ErrorCodes, type ErrorCode } from "../../../../../packages/shared/contracts/error-codes";
+import { errorReporter } from "../../observability/error-reporter";
+import { routeTemplate } from "../../observability/request-logging.middleware";
+import { logEvent, maskedStack } from "../../observability/structured-logger";
 
 export interface SafeErrorResponse {
   code: ErrorCode;
   message: string;
   correlationId: string;
+  /** Spec 050: activation refusals list the failing checklist controls (no sensitive data). */
+  blockers?: unknown[];
+  /** Spec 050: a quote form missing in the requested language names the languages that exist. */
+  availableLanguages?: string[];
+}
+
+const KNOWN_ERROR_CODES = new Set<string>(Object.values(ErrorCodes));
+
+/**
+ * Spec 050 R11: an `HttpException` built with `{ code, message, ... }` keeps its explicit code, so
+ * new refusals never depend on the wording regexes below. Unknown codes are ignored.
+ */
+function explicitDetails(error: unknown): { code?: ErrorCode; blockers?: unknown[]; availableLanguages?: string[] } {
+  if (!(error instanceof HttpException)) return {};
+  const body = error.getResponse();
+  if (!body || typeof body !== "object") return {};
+  const record = body as Record<string, unknown>;
+  const code = typeof record.code === "string" && KNOWN_ERROR_CODES.has(record.code) ? record.code as ErrorCode : undefined;
+  return {
+    ...(code ? { code } : {}),
+    ...(Array.isArray(record.blockers) ? { blockers: record.blockers } : {}),
+    ...(Array.isArray(record.availableLanguages) ? { availableLanguages: record.availableLanguages.filter((value): value is string => typeof value === "string") } : {})
+  };
 }
 
 const SENSITIVE_PATTERNS = [/password/i, /secret/i, /token/i, /database/i, /stack/i];
@@ -33,10 +59,13 @@ export function toSafeErrorResponse(
   const safeMessage = SENSITIVE_PATTERNS.some((pattern) => pattern.test(message))
     ? "The request could not be processed safely"
     : message;
+  const details = explicitDetails(error);
   return {
-    code: codeForError(error, message, status),
+    code: details.code ?? codeForError(error, message, status),
     message: safeMessage,
-    correlationId
+    correlationId,
+    ...(details.blockers ? { blockers: details.blockers } : {}),
+    ...(details.availableLanguages ? { availableLanguages: details.availableLanguages } : {})
   };
 }
 
@@ -73,16 +102,42 @@ function statusForError(error: unknown): number {
   return HttpStatus.INTERNAL_SERVER_ERROR;
 }
 
+/**
+ * Spec 058 FR-001 / FR-002: every 5xx is logged with its correlationId, the route template and the
+ * masked stack (server side only; the response body stays `toSafeErrorResponse`), then handed to the
+ * optional error reporter. Nothing from the request body, headers or query is logged.
+ */
+function reportServerError(
+  exception: unknown,
+  correlationId: string,
+  status: number,
+  request: { method?: string; baseUrl?: string; route?: { path?: unknown } }
+): void {
+  const route = routeTemplate(request);
+  const method = (request.method ?? "GET").toUpperCase();
+  logEvent("error", "http.error", {
+    correlationId,
+    method,
+    route,
+    status,
+    errorName: exception instanceof Error ? exception.name : typeof exception,
+    message: exception instanceof Error ? exception.message : String(exception),
+    stack: maskedStack(exception)
+  });
+  void errorReporter().report(exception, { correlationId, route, method, status, source: "http" });
+}
+
 export class ErrorResponseFilter implements ExceptionFilter {
   catch(exception: unknown, host: ArgumentsHost): void {
     const http = host.switchToHttp();
     const response = http.getResponse<{ status(status: number): { json(body: unknown): void } }>();
-    const request = http.getRequest<{ headers?: Record<string, string | string[] | undefined> }>();
+    const request = http.getRequest<{ method?: string; baseUrl?: string; route?: { path?: unknown }; headers?: Record<string, string | string[] | undefined> }>();
     const correlationIdHeader = request.headers?.["x-correlation-id"];
     const correlationId = Array.isArray(correlationIdHeader)
       ? correlationIdHeader[0] ?? crypto.randomUUID()
       : correlationIdHeader ?? crypto.randomUUID();
     const status = statusForError(exception);
+    if (status >= HttpStatus.INTERNAL_SERVER_ERROR) reportServerError(exception, correlationId, status, request);
     response.status(status).json(toSafeErrorResponse(exception, correlationId, status));
   }
 }

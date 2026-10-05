@@ -140,6 +140,14 @@ export class LeadAssignmentService {
     if (actor.actorId) assignment.lastBrokerActionById = actor.actorId;
     assignment.lastBrokerActionAt = now;
     await this.repository.update(id, assignment);
+    // Spec 055: the CRM state lives in its own table with the Prisma repository; it was never written.
+    await this.repository.saveCrmState?.(id, assignment.partnerTenantId, {
+      status: assignment.crmStatus,
+      urgency: assignment.urgency,
+      source: assignment.source,
+      assignedAdvisorId: assignment.assignedAdvisorId,
+      tags: assignment.tags
+    });
     return assignment;
   }
 
@@ -203,6 +211,7 @@ export class LeadAssignmentService {
     }
     Object.assign(assignment, update);
     await this.repository.update(id, assignment);
+    await this.repository.clearCrmState?.(id);
     await this.repository.appendHistory({
       id: crypto.randomUUID(),
       leadAssignmentId: id,

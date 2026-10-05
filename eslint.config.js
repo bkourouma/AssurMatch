@@ -16,7 +16,8 @@ export default tseslint.config(
       "specs/**",
       ".specify/**",
       ".agents/**",
-      ".claude/**"
+      ".claude/**",
+      ".local/**"
     ]
   },
   js.configs.recommended,
@@ -26,6 +27,8 @@ export default tseslint.config(
     languageOptions: {
       globals: {
         AbortController: "readonly",
+        AbortSignal: "readonly",
+        performance: "readonly",
         clearTimeout: "readonly",
         console: "readonly",
         fetch: "readonly",

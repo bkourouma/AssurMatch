@@ -10,7 +10,7 @@ import { Notice } from "../../../components/ui/notice";
 import { Section } from "../../../components/ui/section";
 import { Reveal } from "../../../components/motion/reveal";
 import { brokerPlans } from "../../../content/brokers";
-import { listCountryDirectory, listPublicProducts, submitPartnerApplication, type PartnerApplicationSubmission } from "../../../lib/public-api";
+import { listPartnerApplicationOptions, submitPartnerApplication, type PartnerApplicationSubmission } from "../../../lib/public-api";
 import { buildMetadata, localePath, localeUrl } from "../../../lib/seo";
 import type { PageMetadata } from "../../../lib/seo";
 import { readVisitorCountryCode } from "../../../lib/visitor-country";
@@ -69,17 +69,15 @@ export default async function BrokerApplyPage({
           ? api(formErrorParam as KnownApplyErrorKey)
           : undefined;
 
-  const directory = await listCountryDirectory();
-  const eligibleCountries = directory.data.filter((country) => country.availability !== "waitlist");
-
-  const productsEntries = await Promise.all(
-    eligibleCountries.map(async (country) => {
-      const products = await listPublicProducts(country.isoCode);
-      const options: PartnerApplicationProductOption[] = products.data.map((product) => ({ key: product.key, name: product.name }));
-      return [country.isoCode, options] as const;
-    })
+  // Spec 059: countries accepting applications and the products a broker may apply for, whatever
+  // the visitor journey flags - a country only opens to visitors once a licensed broker exists, so
+  // the visitor-facing product list (listPublicProducts) left the first applicant with nothing to
+  // select and the application could never be sent.
+  const applicationOptions = await listPartnerApplicationOptions();
+  const eligibleCountries = applicationOptions.data;
+  const productsByCountry: Record<string, readonly PartnerApplicationProductOption[]> = Object.fromEntries(
+    eligibleCountries.map((country) => [country.isoCode, country.products.map((product) => ({ key: product.key, name: product.name }))] as const)
   );
-  const productsByCountry: Record<string, readonly PartnerApplicationProductOption[]> = Object.fromEntries(productsEntries);
 
   const defaultCountry = await readVisitorCountryCode();
 

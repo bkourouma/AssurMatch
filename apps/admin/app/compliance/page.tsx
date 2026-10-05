@@ -15,6 +15,7 @@ export default function ComplianceEvidencePage() {
           description="Les preuves critiques sont conservees selon la retention applicable et masquees dans les logs."
         >
           <Badge tone="success">Historique opposable</Badge>
+          <Button href="/compliance/consent-records" variant="secondary">Rechercher une preuve de consentement</Button>
         </Card>
         <Card
           title="Alertes"

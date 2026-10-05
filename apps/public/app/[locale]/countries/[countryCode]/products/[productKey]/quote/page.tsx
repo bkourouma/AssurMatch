@@ -1,15 +1,16 @@
 import { getTranslations, setRequestLocale } from "next-intl/server";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
+import { Link } from "../../../../../../../i18n/navigation";
 import { toLocale, type AppLocale } from "../../../../../../../i18n/routing";
 import { QuoteBlockedState, QuoteFormShell, type ResponsibleBrokerInfo } from "../../../../../../components/quote-form";
 import { TechnicalRoleNotice } from "../../../../../../components/public-journey";
 import { Breadcrumb } from "../../../../../../components/ui/breadcrumb";
+import { EmptyState } from "../../../../../../components/ui/empty-state";
 import { Hero } from "../../../../../../components/ui/hero";
 import { Notice } from "../../../../../../components/ui/notice";
 import { Section } from "../../../../../../components/ui/section";
 import {
-  getPublicOffer,
   getPublicQuoteForm,
   listCountryDirectory,
   listCountryPartners,
@@ -30,7 +31,7 @@ import type { PageMetadata } from "../../../../../../lib/seo";
 type SearchParams = Record<string, string | string[] | undefined>;
 type PageParams = { locale: string; countryCode: string; productKey: string };
 
-const KNOWN_QUOTE_ERROR_KEYS = ["quoteRejected", "rateLimited", "apiUnavailable", "confirmationFailed"] as const;
+const KNOWN_QUOTE_ERROR_KEYS = ["quoteRejected", "rateLimited", "apiUnavailable", "confirmationFailed", "quotePhoneInvalid", "quoteConsentOutdated"] as const;
 type KnownQuoteErrorKey = (typeof KNOWN_QUOTE_ERROR_KEYS)[number];
 
 function first(value: string | string[] | undefined): string | undefined {
@@ -86,7 +87,8 @@ export default async function PublicQuotePage({
   const query = searchParams ? await searchParams : {};
   const offerIdParam = first(query.offerId);
   const selectedOfferId = offerIdParam && /^[0-9a-f-]{36}$/i.test(offerIdParam) ? offerIdParam : undefined;
-  const quoteForm = await getPublicQuoteForm(countryCode, productKey);
+  // Spec 050 R6: the form is requested in the page language; another language is offered, never served.
+  const quoteForm = await getPublicQuoteForm(countryCode, productKey, locale, selectedOfferId);
 
   const directory = await listCountryDirectory();
   const iso = countryCode.trim().toUpperCase();
@@ -94,21 +96,18 @@ export default async function PublicQuotePage({
   const products = await listPublicProducts(countryCode);
   const productName = products.data.find((item) => item.key === productKey)?.name ?? productKey;
 
-  // D4: with a preselected offer, the responsible broker is resolved the same way the offer detail
-  // page does it - by trade name against the country's public partner directory - so its licence and
-  // issuing authority can be named before the consent box. Without a match, the name alone is used;
-  // without a name at all, the form falls back to the generic routing explanation.
+  // D4 (spec 050) + FR-018 (spec 052): the quote form read names the selected offer's broker only
+  // when that broker is eligible for the request. That served name is then looked up in the
+  // country's public partner directory, so its licence and issuing authority can be shown before the
+  // consent box. Without a served name, the form falls back to the generic pre-selection notice.
   let responsibleBroker: ResponsibleBrokerInfo | undefined;
-  if (selectedOfferId) {
-    const offer = await getPublicOffer(selectedOfferId);
-    const responsibleName = offer.status === "success" ? (offer.data?.partnerName ?? offer.data?.brokerName) : undefined;
-    if (responsibleName) {
-      const partners = await listCountryPartners(countryCode);
-      const partner = partners.data.find((item) => item.displayName.trim().toLowerCase() === responsibleName.trim().toLowerCase());
-      responsibleBroker = partner
-        ? { name: partner.displayName, licenceNumber: partner.licenseNumber, issuingAuthority: partner.issuingAuthority }
-        : { name: responsibleName };
-    }
+  const servedPartnerName = selectedOfferId && quoteForm.status === "success" ? quoteForm.data.offerPartnerName?.trim() : undefined;
+  if (servedPartnerName) {
+    const partners = await listCountryPartners(countryCode);
+    const partner = partners.data.find((item) => item.displayName.trim().toLowerCase() === servedPartnerName.toLowerCase());
+    responsibleBroker = partner
+      ? { name: partner.displayName, licenceNumber: partner.licenseNumber, issuingAuthority: partner.issuingAuthority }
+      : { name: servedPartnerName };
   }
 
   // Query-carried outcome of a no-JavaScript submission (D6): the server action below cannot keep any
@@ -152,6 +151,7 @@ export default async function PublicQuotePage({
       countryCode: boundCountryCode,
       productKey: boundProductKey,
       formDefinitionId: boundQuoteForm.formDefinitionId,
+      language: boundLocale,
       ...(boundSelectedOfferId ? { selectedOfferId: boundSelectedOfferId } : {}),
       contact: {
         displayName: String(formData.get("displayName") ?? "").trim() || undefined,
@@ -178,7 +178,7 @@ export default async function PublicQuotePage({
   }
 
   const boundSubmitAction =
-    quoteForm.status === "success" && quoteForm.data
+    quoteForm.status === "success"
       ? submitQuoteRequestAction.bind(null, countryCode, productKey, locale, selectedOfferId, quoteForm.data)
       : undefined;
 
@@ -220,16 +220,44 @@ export default async function PublicQuotePage({
           ) : null}
           {/* The stepper travels with the form: only the client boundary knows the request went
               through, and it moves to step 4 the moment it does. */}
-          {quoteForm.status === "success" && quoteForm.data ? (
+          {quoteForm.status === "success" ? (
             <QuoteFormShell
               countryCode={countryCode}
               productKey={productKey}
               countryName={countryName}
               productName={productName}
+              language={locale}
               quoteForm={quoteForm.data}
               selectedOfferId={selectedOfferId}
               responsibleBroker={responsibleBroker}
               formAction={boundSubmitAction}
+            />
+          ) : quoteForm.status === "language_unavailable" ? (
+            <EmptyState
+              icon="globe"
+              tone="muted"
+              align="center"
+              title={t("languageUnavailable.title")}
+              description={t("languageUnavailable.description")}
+              action={
+                <ul className="am-stack" aria-label={t("languageUnavailable.listLabel")}>
+                  {quoteForm.availableLanguages.map((language) => (
+                    <li key={language}>
+                      <Link
+                        locale={language}
+                        hrefLang={language}
+                        href={{
+                          pathname: "/countries/[countryCode]/products/[productKey]/quote",
+                          params: { countryCode, productKey },
+                          ...(selectedOfferId ? { query: { offerId: selectedOfferId } } : {})
+                        }}
+                      >
+                        {t(`languageUnavailable.link.${language}`)}
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+              }
             />
           ) : (
             <QuoteBlockedState />

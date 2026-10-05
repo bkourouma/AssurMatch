@@ -1,7 +1,7 @@
 import { QuoteRedisKeys } from "../redis/quote-redis-keys";
 import type { RedisClientPort } from "../redis/redis.module";
 
-export const PUBLIC_ABUSE_SCOPES = ["waitlist", "contact", "partner_application", "consent_withdrawal"] as const;
+export const PUBLIC_ABUSE_SCOPES = ["waitlist", "contact", "partner_application", "consent_withdrawal", "tracking_status", "tracking_link_resend", "proposal_response", "proposal_document"] as const;
 
 export type PublicAbuseScope = (typeof PUBLIC_ABUSE_SCOPES)[number];
 

@@ -2,6 +2,8 @@ import { afterEach, describe, expect, it } from "vitest";
 import { activationChecklistResponseSchema, type ActivationChecklistResponse } from "../../../../packages/shared/contracts/activation-checklist.contracts";
 import { ActivationChecklistAuditActions } from "../../../src/modules/activation-checklist/activation-checklist-audit-actions";
 import { actorHeaders, createRuntimeHttpHarness, readJson, type RuntimeHttpHarness } from "../runtime-http-test-utils";
+import { seedAcceptedAccreditation, seedOwnerAndContract } from "../helpers/partner-onboarding-seed";
+import { publishOffer } from "../helpers/offer-test-helpers";
 
 describe("activation checklist runtime HTTP", () => {
   let harness: RuntimeHttpHarness | undefined;
@@ -68,7 +70,7 @@ describe("activation checklist runtime HTTP", () => {
     }, admin);
     await harness.runtime.partners.service.authorizeCountry(partner.id, country.id, admin);
     await harness.runtime.partners.service.authorizeProduct(partner.id, product.id, admin);
-    await harness.runtime.partnerLicenses.service.create({
+    const license = await harness.runtime.partnerLicenses.service.create({
       partnerTenantId: partner.id,
       licenseNumber: "LIC-CHECK",
       issuingAuthority: "Regulator",
@@ -78,7 +80,10 @@ describe("activation checklist runtime HTTP", () => {
       effectiveDate: "2026-01-01",
       expirationDate: "2030-01-01"
     }, admin);
-    const offer = await harness.runtime.offers.adminService.create({
+    // Spec 051 R14: accepted accreditation proof, owner user and contract complete the partner sections.
+    await seedAcceptedAccreditation(harness.runtime, partner.id, license.id);
+    await seedOwnerAndContract(harness.runtime, partner.id);
+    await publishOffer(harness.runtime.offers, {
       countryId: country.id,
       productId: product.id,
       partnerTenantId: partner.id,
@@ -88,8 +93,7 @@ describe("activation checklist runtime HTTP", () => {
       validFrom: "2026-01-01T00:00:00.000Z",
       validUntil: "2030-01-01T00:00:00.000Z",
       reason: "activation checklist test"
-    }, admin);
-    await harness.runtime.offers.adminService.validate(offer.id, { validationStatus: "validated", reason: "activation checklist test" }, admin);
+    }, admin, admin);
 
     const response = await harness.request("/admin/activation-checklist?country=CI&product=auto", { headers: actorHeaders(admin) });
     expect(response.status).toBe(200);
@@ -117,8 +121,8 @@ describe("activation checklist runtime HTTP", () => {
     harness = await createRuntimeHttpHarness();
     const admin = { actorId: "activation-admin", roles: ["super_admin" as const], mfaVerified: true };
     (harness.runtime.featureFlags.service as unknown as { flags: unknown[] }).flags.push({
-      id: "bad-billing-flag",
-      key: "billing_enabled",
+      id: "bad-payments-flag",
+      key: "payments_enabled",
       scopeType: "global",
       value: true,
       reason: "simulated bad persisted state",
@@ -131,9 +135,19 @@ describe("activation checklist runtime HTTP", () => {
     const checklist = await readJson<ActivationChecklistResponse>(response);
     expect(checklist.summary.blocked).toBeGreaterThan(0);
     expect(checklist.sections.find((section) => section.key === "global")?.controls).toContainEqual(expect.objectContaining({
-      key: "billing_enabled",
+      key: "payments_enabled",
       status: "blocked"
     }));
+  });
+
+  it("does not block on billing_enabled: manual invoicing is part of the launch (spec 060, D-8)", async () => {
+    harness = await createRuntimeHttpHarness();
+    const admin = { actorId: "activation-admin", roles: ["super_admin" as const], mfaVerified: true };
+    await harness.runtime.featureFlags.service.applyCompliancePolicy({ key: "billing_enabled", scopeType: "global", value: true, reason: "facturation manuelle" }, admin, { reference: "TEST-POL-060", approvedBy: "compliance" });
+    const checklist = await readJson<ActivationChecklistResponse>(await harness.request("/admin/activation-checklist", { headers: actorHeaders(admin) }));
+    const keys = checklist.sections.find((section) => section.key === "global")?.controls.map((control) => control.key) ?? [];
+    expect(keys).not.toContain("billing_enabled");
+    expect(keys).toContain("payments_enabled");
   });
 
   it("refuses support admin and Admin Pays actors without explicit scopes", async () => {

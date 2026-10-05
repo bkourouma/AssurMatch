@@ -36,6 +36,15 @@ export class PublicCountryDirectoryService {
     return items;
   }
 
+  /** Spec 050 SC-006: a catalogue change drops the cached directory so a closure shows at once. */
+  async invalidate(): Promise<void> {
+    try {
+      await this.cache.del(CACHE_KEY);
+    } catch {
+      // best-effort cache only
+    }
+  }
+
   private async computeSafely(context: PublicCountryDirectoryContext): Promise<PublicCountryDirectoryItem[]> {
     try {
       const globalFlags = context.globalFlags ?? DEFAULT_GLOBAL_FLAGS;

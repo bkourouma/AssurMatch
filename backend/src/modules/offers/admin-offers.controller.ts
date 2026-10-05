@@ -5,8 +5,8 @@ import { OfferAdminService } from "./offer-admin.service";
 export class AdminOffersController {
   constructor(private readonly admin: OfferAdminService) {}
 
-  list() {
-    return this.admin.list();
+  list(actor: ActorContext, query: unknown = {}) {
+    return this.admin.listViews(query, actor);
   }
 
   create(input: AdminOfferUpsertDto, actor: ActorContext) {

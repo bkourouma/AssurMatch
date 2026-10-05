@@ -15,6 +15,7 @@ import { BrokerStarterAccessPolicy } from "./broker-starter-access-policy";
 import { BrokerStarterExportPolicy } from "./broker-starter-export-policy";
 import { BrokerStarterHistoryService } from "./broker-starter-history.service";
 import { LeadAssignmentService, type LeadAssignmentRecord } from "./lead-assignment.service";
+import type { LeadContactPolicy } from "./lead-contact-policy";
 
 export class BrokerStarterLeadsService {
   constructor(
@@ -22,7 +23,9 @@ export class BrokerStarterLeadsService {
     private readonly access: BrokerStarterAccessPolicy,
     private readonly history: BrokerStarterHistoryService,
     private readonly audit: AuditLogWriter,
-    private readonly exportPolicy: BrokerStarterExportPolicy
+    private readonly exportPolicy: BrokerStarterExportPolicy,
+    /** Spec 055 FR-001: full contact for the assigned broker (audited), masked after a withdrawal. */
+    private readonly contactPolicy?: LeadContactPolicy
   ) {}
 
   async list(actor: ActorContext, query: BrokerStarterLeadListQuery = {}): Promise<Page<BrokerStarterLeadSummary>> {
@@ -56,7 +59,8 @@ export class BrokerStarterLeadsService {
       result: "success",
       context: { status: assignment.status }
     });
-    if (!assignment.seenAt) {
+    // A lead already accepted (or answered) is never moved back to "seen" by a first opening.
+    if (!assignment.seenAt && (assignment.status === "assigned" || assignment.status === "broker_notified")) {
       const previousStatus = assignment.status;
       await this.assignments.updateStatus(id, "seen", actor, "viewed");
       this.audit.write({
@@ -73,11 +77,12 @@ export class BrokerStarterLeadsService {
         partnerTenantId: assignment.partnerTenantId,
         actor,
         eventType: "viewed",
-        previousStatus: previousStatus === "received" || previousStatus === "contacted" ? "assigned" : previousStatus,
+        previousStatus,
         nextStatus: "seen"
       });
     }
-    return this.toDetail(assignment, await this.history.forLead(assignment.id));
+    const revealed = this.contactPolicy ? await this.contactPolicy.reveal(assignment, actor, "starter") : { contact: assignment.contact ?? {}, visibility: "full" as const };
+    return { ...this.toDetail(assignment, await this.history.forLead(assignment.id)), contact: revealed.contact, contactVisibility: revealed.visibility };
   }
 
   async historyForLead(id: string, actor: ActorContext) {
@@ -101,7 +106,8 @@ export class BrokerStarterLeadsService {
     const dashboard = {
       received: filtered.length,
       seen: filtered.filter((assignment) => Boolean(assignment.seenAt) || assignment.status === "seen").length,
-      accepted: filtered.filter((assignment) => assignment.status === "accepted").length,
+      // Spec 055: a lead the broker answered (contacted) stays an accepted lead for the dashboard.
+      accepted: filtered.filter((assignment) => assignment.status === "accepted" || assignment.status === "contacted").length,
       rejected: filtered.filter((assignment) => assignment.status === "rejected").length,
       disputed: filtered.filter((assignment) => assignment.status === "disputed").length
     };
@@ -157,7 +163,9 @@ export class BrokerStarterLeadsService {
   }
 
   private normalizeStatus(assignment: LeadAssignmentRecord): BrokerStarterLeadSummary["status"] {
-    if (assignment.status === "received" || assignment.status === "contacted") return "assigned";
+    // Spec 055 FR-011: "contacted" only follows an accepted lead the broker answered.
+    if (assignment.status === "contacted") return "accepted";
+    if (assignment.status === "received") return "assigned";
     return assignment.status as BrokerStarterLeadSummary["status"];
   }
 

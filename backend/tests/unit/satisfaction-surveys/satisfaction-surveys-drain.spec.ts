@@ -4,10 +4,11 @@ import { AuditLogWriter } from "../../../src/modules/audit-logs/audit-log-writer
 import {
   MemorySatisfactionSurveyRepository,
   SatisfactionSurveyEmailTemplateService,
-  SatisfactionSurveysDrainService
+  SatisfactionSurveysDrainService,
+  SatisfactionSurveyTokenService
 } from "../../../src/modules/satisfaction-surveys/satisfaction-surveys.module";
 
-function createDrainHarness(overrides: { flagEnabled?: boolean; hasConsent?: boolean } = {}) {
+function createDrainHarness(overrides: { flagEnabled?: boolean; hasConsent?: boolean; language?: string } = {}) {
   const repository = new MemorySatisfactionSurveyRepository();
   const audit = new AuditLogWriter();
   const emailTemplate = new SatisfactionSurveyEmailTemplateService();
@@ -32,6 +33,7 @@ function createDrainHarness(overrides: { flagEnabled?: boolean; hasConsent?: boo
       productId: "product-1",
       productKey: "auto",
       quoteFormDefinitionId: "form-1",
+      ...(overrides.language ? { language: overrides.language } : {}),
       prospectId: "prospect-1",
       consentRecordId: "consent-lead",
       surveyConsentRecordId: "consent-survey",
@@ -150,5 +152,34 @@ describe("SatisfactionSurveysDrainService", () => {
     expect(updated?.status).toBe("skipped");
     expect(updated?.skippedReason).toBe("consent_withdrawn_or_missing");
     expect(audit.search({ action: "satisfaction_survey.skipped" })).toHaveLength(1);
+  });
+
+  it("sends a real token, valid against the stored hash, in the language of the request (spec 054 R9)", async () => {
+    const { repository, drain, sentEmails, audit } = createDrainHarness({ language: "en" });
+    await repository.create({
+      publicReference: "SF-REALTOKEN",
+      tokenHash: "hash-of-a-token-never-sent",
+      leadAssignmentId: "lead-real",
+      quoteRequestId: "quote-1",
+      partnerTenantId: "partner-1",
+      consentRecordId: "consent-survey",
+      triggerStatus: "gagne",
+      status: "queued",
+      dueAt: new Date(Date.now() - 3600_000),
+      flaggedConcern: false,
+      locale: "fr"
+    });
+
+    await drain.deliverDue();
+    const body = sentEmails[0]!.body;
+    expect(body).toContain("/en/feedback/SF-REALTOKEN?token=");
+    const token = decodeURIComponent(/\?token=([^\s]+)/.exec(body)![1]!);
+    const stored = await repository.findByPublicReference("SF-REALTOKEN");
+    expect(stored?.locale).toBe("en");
+    expect(stored?.tokenHash).not.toBe("hash-of-a-token-never-sent");
+    expect(new SatisfactionSurveyTokenService().verifyToken(token, stored!.tokenHash)).toBe(true);
+    // The clear token is in the e-mail only: neither the record nor the audit trail holds it.
+    expect(JSON.stringify(stored)).not.toContain(token);
+    expect(JSON.stringify(audit.all())).not.toContain(token);
   });
 });

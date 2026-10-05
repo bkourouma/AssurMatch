@@ -158,6 +158,13 @@ paths:
       parameters:
         - $ref: "#/components/parameters/CountryCode"
         - $ref: "#/components/parameters/ProductKey"
+        - name: language
+          in: query
+          required: false
+          description: Spec 050 R6. Language of the page (default fr); there is no fallback to another language.
+          schema:
+            type: string
+            enum: [fr, en]
       responses:
         "200":
           description: Quote form.
@@ -165,6 +172,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/PublicQuoteForm"
+        "404":
+          description: Spec 050. No published form in the requested language (code QUOTE_FORM_LANGUAGE_UNAVAILABLE, availableLanguages).
         "409":
           $ref: "#/components/responses/PublicNotAvailable"
   /quote-requests:
@@ -585,6 +594,19 @@ components:
           format: uuid
         version:
           type: string
+        language:
+          type: string
+        phoneRule:
+          type: object
+          nullable: true
+          description: Spec 050 R8. Country dialling code and accepted national lengths.
+          properties:
+            dialCode:
+              type: string
+            nationalLengths:
+              type: array
+              items:
+                type: integer
         fields:
           type: array
           items:
@@ -627,6 +649,11 @@ components:
           enum: [lead_transmission]
         recipientCategory:
           type: string
+        language:
+          type: string
+        content:
+          type: string
+          description: Spec 050 R5. Published template with its variables resolved by the server; contentHash is the template hash.
     QuoteRequestCreate:
       type: object
       required: [countryCode, productKey, formDefinitionId, contact, answers, consent]
@@ -641,6 +668,10 @@ components:
         formDefinitionId:
           type: string
           format: uuid
+        language:
+          type: string
+          enum: [fr, en]
+          default: fr
         contact:
           type: object
           required: [email, phone]

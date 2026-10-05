@@ -35,8 +35,8 @@ describe("runtime adapter boundaries", () => {
       expect(new PrismaService().runtimeMode).toBe("prisma-client");
       expect(new RedisModule().runtimeMode).toBe("redis-client");
       expect(new RedisModule().client.mode).toBe("redis-client");
-      expect(new QueuesModule().runtimeMode).toBe("bullmq");
-      expect(new QueuesModule().notifications.mode).toBe("bullmq");
+      expect(new QueuesModule().runtimeMode).toBe("process-ledger");
+      expect(new QueuesModule().notifications.mode).toBe("process-ledger");
     });
   });
 

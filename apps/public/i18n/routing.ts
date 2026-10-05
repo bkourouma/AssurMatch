@@ -59,6 +59,10 @@ export const routing = defineRouting({
       fr: "/demandes-de-devis/[publicReference]",
       en: "/quote-requests/[publicReference]"
     },
+    "/track": { fr: "/suivi", en: "/track" },
+    "/feedback/[publicReference]": { fr: "/avis/[publicReference]", en: "/feedback/[publicReference]" },
+    // Spec 061 FR-005: opt-out link of the satisfaction survey e-mail.
+    "/unsubscribe": { fr: "/desinscription", en: "/unsubscribe" },
     "/how-it-works": { fr: "/comment-ca-marche", en: "/how-it-works" },
     "/regulatory-status": { fr: "/statut-reglementaire", en: "/regulatory-status" },
     "/our-commitment": { fr: "/notre-engagement", en: "/our-commitment" },

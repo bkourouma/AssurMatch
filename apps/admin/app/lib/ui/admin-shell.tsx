@@ -32,7 +32,9 @@ export const adminNavigation: NavGroup[] = [
           { label: "Demandes de devis", href: "/quote-requests" },
           { label: "Assignations", href: "/lead-assignments" },
           { label: "Prospects", href: "/prospects" },
-          { label: "Revue devis", href: "/operations/quote-review" }
+          { label: "Revue devis", href: "/operations/quote-review" },
+          // Spec 056 (H-04): contact inbox.
+          { label: "Messages de contact", href: "/operations/contact-messages" }
         ]
       },
       {
@@ -43,7 +45,11 @@ export const adminNavigation: NavGroup[] = [
         children: [
           { label: "Alertes", href: "/dashboard/compliance-alerts" },
           // Spec 046: retention policies, anonymization batches and erasure requests.
-          { label: "Conservation des donnees", href: "/compliance/retention" }
+          { label: "Conservation des donnees", href: "/compliance/retention" },
+          // Spec 056 (H-05): audit-log search and restricted export.
+          { label: "Journaux d'audit", href: "/compliance/audit-logs" },
+          // Spec 059 follow-up: consent-proof search (compliance_admin, super_admin).
+          { label: "Preuves de consentement", href: "/compliance/consent-records" }
         ]
       }
     ]
@@ -51,17 +57,50 @@ export const adminNavigation: NavGroup[] = [
   {
     title: "Catalogue",
     items: [
-      { label: "Catalogue", href: "/catalog", icon: "catalog", match: ["/catalog", "/offers"] },
+      // Spec 050: the catalogue became administrable (countries, products, regimes, consent texts).
+      {
+        label: "Catalogue",
+        href: "/catalog",
+        icon: "catalog",
+        match: ["/catalog", "/offers", "/consent-texts"],
+        children: [
+          { label: "Pays", href: "/catalog/countries" },
+          { label: "Produits", href: "/catalog/products" },
+          { label: "Régimes", href: "/catalog/regimes" },
+          { label: "Consentements", href: "/consent-texts" }
+        ]
+      },
       // Spec 043: the screen existed but nothing linked to it, so no operator could reach it.
       { label: "Formulaires devis", href: "/quote-form-definitions", icon: "form", match: ["/quote-form-definitions"] },
       { label: "Scoring", href: "/scoring", icon: "gauge", match: ["/scoring"] },
-      { label: "Routage", href: "/routing", icon: "route", match: ["/routing"] }
+      {
+        label: "Routage",
+        href: "/routing",
+        icon: "route",
+        match: ["/routing"],
+        // Spec 056 (H-06): screens of the spec 049 anomaly routes and the decision history.
+        children: [
+          { label: "Regles", href: "/routing" },
+          { label: "Anomalies", href: "/routing/anomalies" },
+          { label: "Historique", href: "/routing/history" }
+        ]
+      }
     ]
   },
   {
     title: "Partenaires",
     items: [
-      { label: "Partenaires", href: "/partners", icon: "partners", match: ["/partners"] },
+      // Spec 051: partner directory and partner page, plus the broker applications.
+      {
+        label: "Partenaires",
+        href: "/partners",
+        icon: "partners",
+        match: ["/partners"],
+        children: [
+          { label: "Courtiers", href: "/partners" },
+          { label: "Candidatures", href: "/partners/applications" }
+        ]
+      },
       { label: "Integrations", href: "/partner-integrations", icon: "plug", match: ["/partner-integrations"] },
       { label: "Facturation", href: "/billing", icon: "receipt", match: ["/billing"] },
       { label: "Messagerie", href: "/messaging", icon: "message", match: ["/messaging"] }

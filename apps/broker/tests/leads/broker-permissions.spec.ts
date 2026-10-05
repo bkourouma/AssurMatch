@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { BROKER_ROLE_PERMISSIONS, canMutateCrmLead, canMutateStarterLead, isReadOnlyBroker } from "../../app/lib/broker-permissions";
+import { BROKER_ROLE_PERMISSIONS, canMutateCrmLead, canMutateOffers, canMutateStarterLead, canReadOffers, isReadOnlyBroker } from "../../app/lib/broker-permissions";
 import { RolePermissions } from "../../../../packages/shared/rbac/assurmatch-role-matrix";
 
 const profile = (roles: string[]) => ({ roles, partnerTenantId: "tenant-a", partnerPlan: "pro" as const, mfaVerified: true });
@@ -38,4 +38,15 @@ test("owner, manager and agent roles keep their documented mutation rights", asy
   // An unknown or non-broker role grants nothing.
   expect(canMutateStarterLead(profile(["finance_admin"]))).toBe(false);
   expect(canMutateCrmLead(profile(["finance_admin"]))).toBe(false);
+});
+
+test("spec 052: owners and managers write offers, agents and read-only users only read them", async () => {
+  for (const role of ["broker_owner_starter", "broker_owner_pro", "broker_manager"]) {
+    expect(canMutateOffers(profile([role])), role).toBe(true);
+  }
+  for (const role of ["broker_agent", "broker_read_only"]) {
+    expect(canMutateOffers(profile([role])), role).toBe(false);
+    expect(canReadOffers(profile([role])), role).toBe(true);
+  }
+  expect(canMutateOffers({ ...profile(["broker_owner_pro"]), partnerTenantStatus: "suspended" } as Parameters<typeof canMutateOffers>[0])).toBe(false);
 });

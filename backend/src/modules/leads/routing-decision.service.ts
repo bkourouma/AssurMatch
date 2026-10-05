@@ -11,6 +11,9 @@ export interface RoutingDecisionRecord {
   /** Spec 042: every partner selected for this request; single-send holds one id. */
   selectedPartnerTenantIds?: string[];
   candidateCount: number;
+  /** Spec 052 R7: offer chosen by the visitor and whether its broker was retained. */
+  selectedOfferId?: string;
+  selectedOfferOutcome?: "retained" | "unavailable" | "none";
   excludedCandidates: Array<{ partnerTenantId: string; reasons: string[] }>;
   reasons: string[];
   correlationId?: string;
@@ -44,6 +47,7 @@ export class RoutingDecisionService {
         candidateCount: decision.candidateCount,
         excludedCandidates: decision.excludedCandidates,
         recipientCount: decision.selectedPartnerTenantIds?.length ?? (decision.selectedPartnerTenantId ? 1 : 0),
+        ...(decision.selectedOfferId ? { selectedOfferId: decision.selectedOfferId, selectedOfferOutcome: decision.selectedOfferOutcome ?? null } : {}),
         ...(decision.selectedPartnerTenantIds ? { selectedPartnerTenantIds: decision.selectedPartnerTenantIds } : {})
       }
     });

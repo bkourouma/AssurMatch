@@ -65,7 +65,7 @@ export async function cleanupRuntimeSmokeData(prisma: RuntimeSmokePrismaClient, 
   await prisma.partnerProductAuthorization.deleteMany({ where: { partnerTenantId: { in: partnerIds } } });
   await prisma.partnerTenant.deleteMany({ where: { id: { in: partnerIds } } });
   await prisma.quoteFormDefinition.deleteMany({ where: { OR: [{ countryId: { in: countryIds } }, { productId: { in: productIds } }] } });
-  await prisma.consentText.deleteMany({ where: { OR: [{ countryId: { in: countryIds } }, { productId: { in: productIds } }, { contentHash: { contains: run.id } }] } });
+  await prisma.consentText.deleteMany({ where: { OR: [{ countryId: { in: countryIds } }, { productId: { in: productIds } }, { content: { contains: run.id } }] } });
   await prisma.countryProduct.deleteMany({ where: { OR: [{ countryId: { in: countryIds } }, { productId: { in: productIds } }] } });
   await prisma.product.deleteMany({ where: { id: { in: productIds } } });
   await prisma.country.deleteMany({ where: { id: { in: countryIds } } });

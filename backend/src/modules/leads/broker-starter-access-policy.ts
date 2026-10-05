@@ -16,6 +16,7 @@ const STARTER_ALLOWED = [
   "accept",
   "reject",
   "dispute",
+  "close",
   "history",
   "dashboard",
   "notifications",

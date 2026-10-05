@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createAdminUser, issueAdminUserPasswordReset, runAdminUserAction, updateAdminUser, updateAdminUserRoles } from "../lib/admin-api";
+import { adminWriteErrorMessage } from "../lib/catalog-messages";
 
 export interface UserActionState {
   status: "idle" | "success" | "error";
@@ -40,14 +41,24 @@ function actionError(error: unknown): UserActionState {
 }
 
 export async function createAdminUserAction(_previous: UserActionState, formData: FormData): Promise<UserActionState> {
+  const phone = optionalString(formData.get("phone"));
+  const partnerTenantId = optionalString(formData.get("partnerTenantId"));
+  const roles = formRoles(formData);
+  // Spec 051 R11: a broker role needs a partner and an admin role never has one. The API is the
+  // authority (422 PARTNER_USER_INVALID); this only spares the operator an obvious refusal.
+  const brokerRole = roles.some((role) => role.startsWith("broker_"));
+  if (brokerRole && !partnerTenantId) {
+    return { status: "error", message: "Un rôle courtier exige de choisir le courtier de rattachement." };
+  }
+  if (!brokerRole && partnerTenantId) {
+    return { status: "error", message: "Un rôle admin ne peut pas être rattaché à un courtier : retirez le courtier ou choisissez un rôle courtier." };
+  }
   try {
-    const phone = optionalString(formData.get("phone"));
-    const partnerTenantId = optionalString(formData.get("partnerTenantId"));
     const result = await createAdminUser({
       email: stringValue(formData.get("email")),
       displayName: stringValue(formData.get("displayName")),
       ...(phone ? { phone } : {}),
-      roles: formRoles(formData),
+      roles,
       partnerTenantId: partnerTenantId ?? null,
       scopes: {
         countryIds: csvValues(formData.get("countryScopes")),
@@ -55,12 +66,13 @@ export async function createAdminUserAction(_previous: UserActionState, formData
       },
       reason: stringValue(formData.get("reason"))
     });
+    if (!result.ok || !result.data) return { status: "error", message: adminWriteErrorMessage(result) };
     revalidatePath("/users");
     return {
       status: "success",
-      message: `Utilisateur ${result.user.email} cree. Livraison activation: ${result.emailStatus}.`,
-      ...(result.token ? { token: result.token } : {}),
-      expiresAt: result.expiresAt
+      message: `Utilisateur ${result.data.user.email} cree. Livraison activation: ${result.data.emailStatus}.`,
+      ...(result.data.token ? { token: result.data.token } : {}),
+      expiresAt: result.data.expiresAt
     };
   } catch (error) {
     return actionError(error);

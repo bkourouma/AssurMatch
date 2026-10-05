@@ -22,7 +22,7 @@ describe("partner compliance workflow", () => {
       effectiveDate: "2026-01-01",
       expirationDate: "2028-01-01"
     }, superAdminActor);
-    const document = documents.register({
+    const document = await documents.register({
       partnerTenantId: partner.id,
       licenseId: license.id,
       documentType: "license",

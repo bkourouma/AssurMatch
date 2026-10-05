@@ -1,5 +1,6 @@
 import { readQuoteFormDefinitions, type QuoteFormDefinitionData } from "../lib/admin-api";
 import {
+  Badge,
   Card,
   DataTable,
   Field,
@@ -21,6 +22,7 @@ import type { DataTableColumn } from "../lib/ui/admin-ui";
 import { CreateQuoteFormDefinitionForm, PublishQuoteFormDefinitionForm, RetireQuoteFormDefinitionForm } from "./quote-form-forms";
 
 const statusOptions = ["published", "draft", "suspended", "retired"];
+const languageOptions = ["fr", "en"];
 
 function scopeKey(form: QuoteFormDefinitionData): string {
   return `${form.countryId}:${form.productId}:${form.language}`;
@@ -43,7 +45,17 @@ const columns: Array<DataTableColumn<QuoteFormDefinitionData>> = [
     sortValue: (form) => form.status
   },
   { key: "fieldCount", header: "Champs", render: (form) => form.fieldCount, numeric: true, align: "right", sortable: true, sortValue: (form) => form.fieldCount },
-  { key: "consent", header: "Consentement", render: (form) => <code>{form.consentTextId.slice(0, 8)}</code> },
+  {
+    key: "consent",
+    header: "Consentement",
+    render: (form) => (
+      <>
+        <a href={`/consent-texts/${encodeURIComponent(form.consentTextId)}`}><code>{form.consentTextId.slice(0, 8)}</code></a>
+        {/* Spec 050 FR-019: a more recent published version of the linked consent text exists. */}
+        {form.consentSuperseded ? <Badge tone="warning">Consentement remplacé</Badge> : null}
+      </>
+    )
+  },
   {
     key: "publishedAt",
     header: "Publie le",
@@ -61,11 +73,13 @@ export default async function AdminQuoteFormDefinitionsPage({
 }) {
   const params = searchParams ? await searchParams : {};
   const statusFilter = firstParam(params.status);
-  const forms = await readQuoteFormDefinitions();
+  const languageFilter = firstParam(params.language);
+  const forms = await readQuoteFormDefinitions(languageFilter ? { language: languageFilter } : {});
   const items = forms.data;
   const published = items.filter((form) => form.status === "published");
   const drafts = items.filter((form) => form.status === "draft");
   const exposedScopes = new Set(published.map(scopeKey));
+  const superseded = items.filter((form) => form.consentSuperseded === true && form.status !== "retired");
 
   const table = readTableParams(params, {
     pathname: "/quote-form-definitions",
@@ -94,7 +108,14 @@ export default async function AdminQuoteFormDefinitionsPage({
             <KpiCard label="Versions publiees" value={published.length} tone={published.length > 0 ? "success" : "warning"} />
             <KpiCard label="Brouillons" value={drafts.length} tone="neutral" />
             <KpiCard label="Parcours exposes" value={exposedScopes.size} tone={exposedScopes.size > 0 ? "success" : "warning"} />
+            <KpiCard label="Consentement remplacé" value={superseded.length} tone={superseded.length > 0 ? "warning" : "neutral"} />
           </Grid>
+
+          {superseded.length > 0 ? (
+            <StateMessage tone="warning">
+              {`${superseded.length} formulaire(s) lient un texte de consentement dont une version plus récente est publiée. Créez puis publiez une nouvelle version du formulaire liée au texte à jour.`}
+            </StateMessage>
+          ) : null}
 
           <Card title="Versions">
             <FilterBar
@@ -103,13 +124,19 @@ export default async function AdminQuoteFormDefinitionsPage({
               submitLabel="Filtrer"
               resetLabel="Reinitialiser"
               resetHref="/quote-form-definitions"
-              activeCount={statusFilter ? 1 : 0}
+              activeCount={(statusFilter ? 1 : 0) + (languageFilter ? 1 : 0)}
               autoSubmit
             >
               <Field id="quote-form-status" label="Statut">
                 <Select {...fieldControlProps("quote-form-status")} name="status" defaultValue={statusFilter}>
                   <option value="">Tous</option>
                   {statusOptions.map((option) => <option key={option} value={option}>{option}</option>)}
+                </Select>
+              </Field>
+              <Field id="quote-form-language" label="Langue">
+                <Select {...fieldControlProps("quote-form-language")} name="language" defaultValue={languageFilter}>
+                  <option value="">Toutes</option>
+                  {languageOptions.map((option) => <option key={option} value={option}>{option}</option>)}
                 </Select>
               </Field>
             </FilterBar>
@@ -146,7 +173,7 @@ export default async function AdminQuoteFormDefinitionsPage({
             <RetireQuoteFormDefinitionForm formIds={published.map((form) => form.id)} />
             <Card title="Regles de publication">
               <ul className="bo-list">
-                <li>Le texte de consentement doit etre publie et de finalite transmission de lead.</li>
+                <li>Le texte de consentement doit etre publie, de finalite transmission de lead, et de meme langue, pays et produit (ou sans produit).</li>
                 <li>Les libelles de champ sont exposes aux visiteurs: le vocabulaire reglemente y est refuse.</li>
                 <li>Un champ sensible n'est publiable que si le flag produit correspondant est ouvert.</li>
                 <li>Une seule version publiee par pays, produit et langue: publier retire la precedente.</li>

@@ -569,17 +569,15 @@
     "continueLabel": "Continuer",
     "backLabel": "Revenir à l'étape précédente",
     "verifyLabel": "Vérifier ma demande",
+    "offerPartner": "Votre demande sera transmise à {partner}, courtier partenaire agréé, si sa disponibilité le permet. L'offre reste indicative : le courtier confirmera le devis et les conditions.",
+    "phoneRuleHint": "Format attendu : {dialCode} suivi de {lengths} chiffres, ou {lengths} chiffres sans indicatif.",
     "needLegend": "Votre besoin",
     "needIntro": "Ces informations viennent du courtier partenaire concerné par ce produit ; elles nous aident à orienter votre demande vers le bon type d'offre. Elles ne remplacent pas l'analyse du courtier.",
     "fieldsIntro": "Les champs suivants dépendent du produit choisi.",
     "choose": "Choisir",
     "optionalTag": "facultatif",
-    "preselected": {
-      "resolved": "Offre indicative présélectionnée : {name}, agrément {licence}. Ce courtier confirmera le devis et les conditions.",
-      "namedOnly": "Offre indicative présélectionnée : {name}. Ce courtier confirmera le devis et les conditions.",
-      "generic": "Offre indicative présélectionnée : le courtier partenaire responsable confirmera le devis et les conditions.",
-      "routing": "Votre demande sera transmise à un courtier partenaire autorisé pour {product} en {country} (ou jusqu'à 3 courtiers partenaires si vous cochez la case correspondante à l'étape suivante). Le nom du courtier retenu apparaîtra sur votre page de suivi."
-    },
+    "preselected": "Offre indicative présélectionnée : le courtier partenaire responsable confirmera le devis et les conditions.",
+    "preselectedRouting": "Votre demande sera transmise à un courtier partenaire autorisé pour {product} en {country} (ou jusqu'à 3 courtiers partenaires si vous cochez la case correspondante à l'étape suivante). Le nom du courtier retenu apparaîtra sur votre page de suivi.",
     "contactLegend": "Vos coordonnées",
     "contactIntro": "Ces informations permettent au courtier partenaire de vous répondre. Elles ne sont transmises qu'après votre consentement, à l'étape suivante.",
     "name": "Nom",
@@ -596,11 +594,33 @@
     "reviewEmpty": "non renseigné",
     "brokerTitle": "Courtier partenaire responsable",
     "brokerConfirm": {
-      "resolved": "{name}, agrément {licence} ({authority}), confirmera le devis et les conditions de cette offre.",
-      "namedOnly": "{name} confirmera le devis et les conditions de cette offre.",
       "routing": "Votre demande sera transmise à un courtier partenaire autorisé pour {product} en {country} (ou jusqu'à 3 courtiers partenaires si la case ci-dessous est cochée). Le nom du courtier retenu apparaîtra sur votre page de suivi après l'envoi."
     },
+    "brokerLicence": "Agrément {licence} ({authority}).",
     "transmissionNotice": "Rien n'est transmis tant que vous n'avez pas coché la case de consentement et envoyé votre demande.",
+    "options": {
+      "contact_preference": {
+        "phone": "Téléphone",
+        "email": "E-mail",
+        "whatsapp": "WhatsApp"
+      },
+      "desired_timing": {
+        "immediate": "Dès que possible",
+        "within_month": "Dans le mois",
+        "within_quarter": "Dans les trois mois"
+      },
+      "preferred_language": {
+        "fr": "Français",
+        "en": "Anglais"
+      },
+      "source": {
+        "search": "Moteur de recherche",
+        "social": "Réseaux sociaux",
+        "word_of_mouth": "Bouche-à-oreille",
+        "partner": "Courtier partenaire",
+        "other": "Autre"
+      }
+    },
     "consentLegend": "Consentement",
     "consentIntro": "Lisez le texte ci-dessous avant de cocher la case.",
     "consentLabel": "J'accepte que ma demande soit transmise à un courtier partenaire éligible pour ce pays et ce produit.",
@@ -612,11 +632,22 @@
     "submit": "Envoyer ma demande",
     "successTitle": "Demande reçue",
     "successPrefix": "Référence publique :",
+    "offerPartnerRetained": "Votre demande a été transmise à {partner}.",
+    "offerPartnerNotRetained": "Le courtier de l'offre choisie n'était pas disponible : votre demande a été orientée vers un autre courtier partenaire agréé.",
     "trackLink": "Suivre ma demande et ajouter des documents (optionnel)",
     "backToOffers": "Retour aux offres",
     "blocked": {
       "title": "Demande de devis indisponible",
       "description": "La demande de devis n'est pas disponible pour ce pays ou ce produit."
+    },
+    "languageUnavailable": {
+      "title": "Formulaire indisponible en français",
+      "description": "La demande de devis pour ce produit n'est pas encore publiée en français. Elle est disponible dans une autre langue : vous pouvez la consulter ci-dessous.",
+      "listLabel": "Langues disponibles",
+      "link": {
+        "fr": "Ouvrir le formulaire en français",
+        "en": "Ouvrir le formulaire en anglais (English)"
+      }
     },
     "fineprint": "AssurMatch ne vend pas d'assurance et n'émet ni contrat ni attestation. Le courtier partenaire responsable confirme le devis et les conditions.",
     "commitmentLink": "Nos engagements sur vos données"
@@ -667,7 +698,149 @@
       "noToken": "Le retrait de consentement nécessite le lien de suivi reçu à la fin de votre demande."
     },
     "journeyLabel": "Parcours public",
-    "backToCountries": "Retour aux pays"
+    "backToCountries": "Retour aux pays",
+    "trackingTitle": "Suivi de la demande {reference}",
+    "statusTitle": "Où en est votre demande",
+    "statusLabel": "Statut actuel",
+    "status": {
+      "received": {
+        "headline": "Demande reçue",
+        "body": "Votre demande est enregistrée. Elle va être orientée vers un courtier partenaire lorsque le routage est possible pour ce pays et ce produit."
+      },
+      "in_review": {
+        "headline": "Demande en cours de vérification",
+        "body": "Notre équipe vérifie votre demande avant de la transmettre. Aucune action n'est attendue de votre part pour le moment."
+      },
+      "transmitted": {
+        "headline": "Demande transmise à un courtier partenaire",
+        "body": "Votre demande a été transmise selon votre consentement. Le courtier partenaire indiqué ci-dessous est seul responsable de la suite."
+      },
+      "in_progress": {
+        "headline": "Un courtier partenaire étudie votre demande",
+        "body": "Le courtier partenaire a pris en charge votre demande. Il peut vous contacter pour compléter les informations nécessaires."
+      },
+      "proposal_available": {
+        "headline": "Une proposition de courtier est disponible",
+        "body": "Un courtier partenaire a préparé une proposition indicative. Elle n'engage ni vous ni lui tant que vous n'avez pas échangé directement avec lui."
+      },
+      "closed": {
+        "headline": "Demande clôturée",
+        "body": "Le traitement de cette demande est terminé. Vous pouvez déposer une nouvelle demande à tout moment."
+      },
+      "not_transmitted": {
+        "headline": "Demande non transmise",
+        "body": "Aucun courtier partenaire éligible n'a pu être identifié pour cette demande. Aucune promesse de rappel n'est faite."
+      }
+    },
+    "brokers": {
+      "title": "Courtiers partenaires",
+      "empty": "Aucun courtier partenaire n'est encore associé à cette demande.",
+      "since": "depuis le {date}",
+      "status": {
+        "transmitted": "Demande transmise",
+        "in_progress": "En cours d'étude",
+        "proposal_available": "Proposition disponible",
+        "closed": "Traitement terminé"
+      }
+    },
+    "timeline": {
+      "title": "Historique",
+      "partner": "Courtier partenaire : {partner}",
+      "steps": {
+        "received": "Demande reçue",
+        "in_review": "Vérification par notre équipe",
+        "transmitted": "Demande transmise à un courtier partenaire",
+        "accepted": "Prise en charge par le courtier partenaire",
+        "reassigned": "Demande confiée à un autre courtier partenaire",
+        "closed": "Traitement terminé",
+        "consent_withdrawn": "Consentement retiré",
+        "not_transmitted": "Demande non transmise"
+      }
+    },
+    "role": "AssurMatch est une plateforme technique de mise en relation. Seul le courtier partenaire peut vous conseiller et vous adresser une proposition ; AssurMatch n'intervient pas dans ce choix.",
+    "expiry": "Ce lien de suivi est personnel et reste valable jusqu'au {date}. Ne le partagez pas.",
+    "expiryUnknown": "Ce lien de suivi est personnel. Ne le partagez pas.",
+    "consentWithdrawnNotice": "Vous avez retiré votre consentement le {date}. Cette demande est annulée et n'est plus transmise.",
+    "consentWithdrawnNoDate": "Vous avez retiré votre consentement. Cette demande est annulée et n'est plus transmise.",
+    "proposals": {
+      "title": "Propositions des courtiers",
+      "lead": "Les propositions indicatives des courtiers partenaires apparaissent ici. Chaque proposition vient du courtier nommé : AssurMatch ne les compare pas et n'en recommande aucune.",
+      "listLabel": "Propositions reçues",
+      "from": "Proposition de {partner}",
+      "sentAt": "Envoyée le {date}",
+      "validUntil": "Valable jusqu'au {date}",
+      "validUntilExpired": "Validité dépassée depuis le {date}",
+      "messageLabel": "Message du courtier",
+      "priceLabel": "Prime indicative",
+      "priceSingle": "{amount}",
+      "priceRange": "Entre {min} et {max}",
+      "priceFrom": "À partir de {amount}",
+      "priceUpTo": "Jusqu'à {amount}",
+      "guaranteesLabel": "Garanties mentionnées par le courtier",
+      "noGuarantees": "Aucune garantie détaillée dans cette proposition.",
+      "document": "Télécharger le document du courtier (PDF)",
+      "documentHint": "Le document est transmis par le courtier ; il reste indicatif tant que vous n'avez pas échangé avec lui.",
+      "noticeTitle": "À lire avant toute suite",
+      "status": {
+        "sent": "Nouvelle",
+        "viewed": "Consultée",
+        "responded": "Réponse envoyée",
+        "expired": "Expirée",
+        "closed": "Plus active"
+      },
+      "closedBody": "Cette proposition n'est plus active : vous ne pouvez plus y répondre depuis cet espace.",
+      "expiredBody": "La date de validité de cette proposition est dépassée : vous ne pouvez plus y répondre depuis cet espace.",
+      "response": {
+        "legend": "Quelle suite souhaitez-vous donner à cette proposition ?",
+        "intro": "Votre réponse est transmise au courtier nommé. Elle ne vous engage pas : elle lui indique seulement comment poursuivre l'échange.",
+        "interested": "Je suis intéressé, rappelez-moi",
+        "declined": "Je ne donne pas suite",
+        "question": "Poser une question",
+        "callbackSlot": "Créneau de rappel souhaité (facultatif)",
+        "callbackSlotHint": "Par exemple : demain entre 10 h et 12 h. 100 caractères au maximum.",
+        "declineReason": "Motif (facultatif)",
+        "declineReasonNone": "Je préfère ne pas préciser",
+        "declineReasons": {
+          "price": "Le prix ne me convient pas",
+          "guarantees": "Les garanties ne me conviennent pas",
+          "delay": "Le délai ne me convient pas",
+          "already_insured": "Je suis déjà assuré",
+          "other": "Autre raison"
+        },
+        "questionLabel": "Votre question au courtier",
+        "questionHint": "500 caractères au maximum. N'indiquez pas de données sensibles.",
+        "questionRequired": "Saisissez votre question avant de l'envoyer.",
+        "submit": "Envoyer ma réponse au courtier",
+        "sending": "Envoi en cours.",
+        "recordedTitle": "Réponse transmise au courtier",
+        "recordedInterested": "Le courtier vous recontactera pour échanger sur sa proposition.",
+        "recordedDeclined": "Le courtier est informé que vous ne donnez pas suite à cette proposition.",
+        "recordedQuestion": "Le courtier a reçu votre question et vous répondra directement.",
+        "recordedAt": "Réponse enregistrée le {date}",
+        "previousTitle": "Votre dernière réponse",
+        "previousType": {
+          "interested": "Vous êtes intéressé et souhaitez être rappelé.",
+          "declined": "Vous ne donnez pas suite à cette proposition.",
+          "question": "Vous avez posé une question au courtier."
+        },
+        "previousSlot": "Créneau indiqué : {slot}",
+        "previousReason": "Motif : {reason}",
+        "previousQuestion": "Votre question : {question}",
+        "changeHint": "Vous pouvez envoyer une nouvelle réponse : c'est la plus récente que le courtier prend en compte.",
+        "notRespondable": "Cette proposition ne peut plus recevoir de réponse (retirée, expirée ou plus active). Rechargez la page pour voir son état.",
+        "rateLimited": "Trop de réponses envoyées en peu de temps. Réessayez dans quelques minutes.",
+        "invalid": "La réponse n'a pas pu être envoyée : vérifiez les champs saisis.",
+        "denied": "Ce lien de suivi ne permet plus de répondre. Vous pouvez recevoir un nouveau lien depuis la page de suivi.",
+        "error": "La réponse n'a pas pu être envoyée pour le moment. Réessayez dans quelques minutes."
+      }
+    },
+    "access": {
+      "title": "Ce lien de suivi ne permet pas d'afficher une demande",
+      "body": "Le lien est peut-être incomplet ou n'est plus valable. Vous pouvez recevoir un nouveau lien à l'adresse e-mail utilisée pour votre demande.",
+      "cta": "Recevoir un nouveau lien",
+      "rateLimited": "Trop de consultations en peu de temps. Réessayez dans quelques minutes.",
+      "unavailable": "Le suivi est temporairement indisponible. Réessayez dans quelques minutes."
+    }
   },
   "VisitorAi": {
     "defaultLabel": "Assistant de lecture",
@@ -817,7 +990,9 @@
     "applicationSent": "Candidature reçue. Elle sera étudiée par notre équipe conformité.",
     "applicationFailed": "Envoi de la candidature impossible pour le moment.",
     "consentWithdrawn": "Votre retrait de consentement est enregistré.",
-    "consentWithdrawalFailed": "Le retrait de consentement n'a pas pu être enregistré avec ce lien."
+    "consentWithdrawalFailed": "Le retrait de consentement n'a pas pu être enregistré avec ce lien.",
+    "quotePhoneInvalid": "Le numéro de téléphone ne correspond pas au format attendu pour ce pays.",
+    "quoteConsentOutdated": "Le texte de consentement a été mis à jour. Rechargez la page pour lire la version en vigueur avant d'envoyer votre demande."
   },
   "Forms": {
     "required": "obligatoire",
@@ -1260,5 +1435,69 @@
       "body": "Si vous venez d'envoyer une candidature, revenez au formulaire pour recommencer l'envoi.",
       "cta": "Revenir au formulaire de candidature"
     }
+  },
+  "Tracking": {
+    "kicker": "Suivi de demande",
+    "title": "Recevoir mon lien de suivi",
+    "description": "Recevez à nouveau le lien personnel de suivi de votre demande de devis.",
+    "lead": "Indiquez la référence de votre demande et l'adresse e-mail utilisée. Si elles correspondent, un nouveau lien vous est envoyé par e-mail.",
+    "breadcrumb": "Suivi de demande",
+    "reference": "Référence de la demande",
+    "referenceHint": "Par exemple QR-2026-ABC123, indiquée dans l'e-mail de confirmation.",
+    "email": "Adresse e-mail",
+    "honeypot": "Ne pas remplir ce champ",
+    "requiredMark": "obligatoire",
+    "invalidReference": "Indiquez une référence valide (lettres, chiffres et tirets).",
+    "invalidEmail": "Indiquez une adresse e-mail valide.",
+    "submit": "Envoyer le lien",
+    "sending": "Envoi en cours.",
+    "confirmationTitle": "Demande prise en compte",
+    "confirmationBody": "Si cette référence correspond à cette adresse e-mail, un nouveau lien de suivi vient d'y être envoyé. Pensez à vérifier vos courriers indésirables.",
+    "again": "Faire une autre demande",
+    "rateLimited": "Trop de demandes en peu de temps. Réessayez dans une heure.",
+    "error": "Le service est temporairement indisponible. Réessayez dans quelques minutes.",
+    "privacy": "Pour protéger vos données, nous n'indiquons jamais si une référence ou une adresse e-mail existe."
+  },
+  "Feedback": {
+    "kicker": "Votre avis",
+    "title": "Votre avis sur la demande {reference}",
+    "description": "Questionnaire de satisfaction sur votre demande de devis.",
+    "breadcrumb": "Votre avis",
+    "lead": "Votre avis porte sur votre expérience de mise en relation. Il nous aide à améliorer le service et n'est jamais publié.",
+    "ratingLegend": "Votre satisfaction globale",
+    "rating": {
+      "1": "1 - Pas du tout satisfait",
+      "2": "2 - Peu satisfait",
+      "3": "3 - Moyennement satisfait",
+      "4": "4 - Satisfait",
+      "5": "5 - Très satisfait"
+    },
+    "ratingRequired": "Choisissez une note de 1 à 5.",
+    "comment": "Commentaire (optionnel)",
+    "commentHint": "1000 caractères maximum. N'indiquez pas de données de santé ni de coordonnées bancaires.",
+    "flaggedConcern": "Je souhaite signaler un problème avec le courtier partenaire",
+    "flaggedConcernHint": "Notre équipe conformité examinera votre signalement.",
+    "submit": "Envoyer mon avis",
+    "sending": "Envoi en cours.",
+    "successTitle": "Merci pour votre avis",
+    "successBody": "Votre réponse est enregistrée.",
+    "unavailableTitle": "Ce questionnaire n'est plus disponible",
+    "unavailableBody": "Le lien est peut-être incomplet, a expiré ou a déjà été utilisé.",
+    "rateLimited": "Trop d'envois en peu de temps. Réessayez plus tard.",
+    "error": "Le service est temporairement indisponible. Réessayez dans quelques minutes."
+  },
+  "Unsubscribe": {
+    "kicker": "Désinscription",
+    "title": "Ne plus recevoir d'enquêtes de satisfaction",
+    "description": "Désinscription des enquêtes de satisfaction AssurMatch.",
+    "breadcrumb": "Désinscription",
+    "lead": "Confirmez pour ne plus recevoir d'enquête de satisfaction après vos mises en relation. Les messages liés au suivi de vos demandes de devis continuent de vous être envoyés.",
+    "confirm": "Confirmer la désinscription",
+    "sending": "Envoi en cours.",
+    "successTitle": "Désinscription enregistrée",
+    "successBody": "Vous ne recevrez plus d'enquête de satisfaction AssurMatch à cette adresse.",
+    "unavailableTitle": "Ce lien n'est pas valide",
+    "unavailableBody": "Le lien est peut-être incomplet. Utilisez le lien reçu dans l'e-mail d'enquête.",
+    "error": "Le service est momentanément indisponible. Réessayez dans quelques minutes."
   }
 }

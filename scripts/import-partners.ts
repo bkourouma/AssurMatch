@@ -37,6 +37,12 @@ function parseArgs(argv: string[]): CliArgs {
   return args;
 }
 
+/**
+ * Persists partners, users, licences and coverage as-is. Spec 051 R15: a JSON import carries no
+ * file, so it never creates an accreditation proof or a contract; routing and activation read
+ * persisted accepted proofs, so an imported partner stays ineligible until compliance uploads and
+ * accepts its proof in the back office (the report carries a warning saying so).
+ */
 class PrismaPartnerImportStore implements ImportStore {
   constructor(private readonly prisma: PrismaClient) {}
 

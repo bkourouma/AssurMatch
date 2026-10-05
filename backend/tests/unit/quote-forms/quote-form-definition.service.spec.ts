@@ -150,4 +150,79 @@ describe("QuoteFormDefinitionService", () => {
     expect(refusals).toHaveLength(1);
     expect(refusals[0]?.reason).toBe("published_consent_text_missing");
   });
+
+  describe("spec 050 generic fields, consent scope and languages", () => {
+    function scopedConsent(context: Harness, overrides: Partial<ConsentTextReference> = {}): ConsentTextReference {
+      return {
+        ...publishedConsent(context.consentTextId),
+        language: "fr",
+        countryId: context.countryId,
+        productId: null,
+        channel: "public_web",
+        content: "Transmission a {{brokerName}} pour {{countryName}} ({{contactFields}}). AssurMatch est une plateforme technique.",
+        publishedAt: new Date("2026-01-01T00:00:00.000Z"),
+        ...overrides
+      };
+    }
+
+    it("adds the generic fields in the form language without duplicating a key already defined", async () => {
+      const context = harness();
+      const fr = await context.service.create(draft(context, { fields: [{ key: "budget", label: "Budget maison", type: "number", required: false, sensitivity: "public" }] }), complianceAdmin);
+      expect(fr.fields.map((field) => field.key)).toEqual(["budget", "city", "contact_preference", "desired_timing", "preferred_language", "source"]);
+      expect(fr.fields[0]?.label).toBe("Budget maison");
+      expect(fr.fields.find((field) => field.key === "contact_preference")).toMatchObject({ required: true, options: ["phone", "email", "whatsapp"] });
+
+      const en = await context.service.create(draft(context, { language: "en", version: "en-v1" }), complianceAdmin);
+      expect(en.fields.find((field) => field.key === "city")?.label).toBe("City");
+
+      const legacy = await context.service.create(draft(context, { version: "legacy" }), complianceAdmin, { includeGenericFields: false });
+      expect(legacy.fields.map((field) => field.key)).toEqual(["vehicle_use"]);
+    });
+
+    it("refuses to publish with a consent text of another language, country or product", async () => {
+      const context = harness();
+      const otherProduct = crypto.randomUUID();
+      for (const [overrides, reason] of [
+        [{ language: "en" }, "consent_text_language_mismatch"],
+        [{ countryId: crypto.randomUUID() }, "consent_text_country_mismatch"],
+        [{ productId: otherProduct }, "consent_text_product_mismatch"]
+      ] as const) {
+        context.setConsentTexts([scopedConsent(context, overrides)]);
+        await expect(context.service.create(draft(context, { status: "published", version: reason }), complianceAdmin)).rejects.toThrow("does not match");
+        expect(context.audit.search({ action: "quote_form.publication_refused" }).at(-1)?.reason).toBe(reason);
+      }
+      // Same country and language, no product: a country-wide text is accepted.
+      context.setConsentTexts([scopedConsent(context)]);
+      await expect(context.service.create(draft(context, { status: "published", version: "ok" }), complianceAdmin)).resolves.toMatchObject({ status: "published" });
+    });
+
+    it("never falls back to another language and resolves the consent content", async () => {
+      const context = harness();
+      context.setConsentTexts([scopedConsent(context)]);
+      await context.service.create(draft(context, { status: "published" }), complianceAdmin);
+
+      await expect(context.service.publicForm(context.countryId, context.productId, "en")).rejects.toMatchObject({
+        response: { code: "QUOTE_FORM_LANGUAGE_UNAVAILABLE", availableLanguages: ["fr"] }
+      });
+      const fr = await context.service.publicForm(context.countryId, context.productId, "fr");
+      expect(fr.language).toBe("fr");
+      expect(fr.consent.contentHash).toBe("hash");
+      expect(fr.consent.content).toContain("le courtier partenaire agréé auquel votre demande sera attribuée");
+      expect(fr.consent.content).toContain("nom, e-mail, téléphone");
+      expect(fr.consent.content).not.toContain("{{");
+    });
+
+    it("flags forms whose consent text has a more recent published version", async () => {
+      const context = harness();
+      context.setConsentTexts([scopedConsent(context)]);
+      const form = await context.service.create(draft(context, { status: "published" }), complianceAdmin);
+      expect((await context.service.supersededConsentFormIds([form])).size).toBe(0);
+      context.setConsentTexts([
+        scopedConsent(context),
+        scopedConsent(context, { id: crypto.randomUUID(), version: "v2", publishedAt: new Date("2026-06-01T00:00:00.000Z") })
+      ]);
+      expect([...await context.service.supersededConsentFormIds([form])]).toEqual([form.id]);
+    });
+  });
 });
+

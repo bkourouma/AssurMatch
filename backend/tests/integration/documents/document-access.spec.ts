@@ -6,7 +6,7 @@ import { superAdminActor } from "../helpers/enterprise-seed";
 describe("document access RBAC", () => {
   it("denies cross-partner document reads", async () => {
     const documents = new DocumentsService(new AuditLogWriter());
-    const document = documents.register({
+    const document = await documents.register({
       partnerTenantId: "00000000-0000-4000-8000-000000000020",
       documentType: "license",
       storageKey: "partners/one/license.pdf",
@@ -14,11 +14,11 @@ describe("document access RBAC", () => {
       status: "accepted"
     }, superAdminActor);
 
-    expect(() => documents.getAuthorized(document.id, {
+    await expect(documents.getAuthorized(document.id, {
       actorId: "00000000-0000-4000-8000-000000000021",
       roles: ["broker_read_only"],
       partnerTenantId: "00000000-0000-4000-8000-000000000022",
       mfaVerified: true
-    })).toThrow();
+    })).rejects.toThrow();
   });
 });

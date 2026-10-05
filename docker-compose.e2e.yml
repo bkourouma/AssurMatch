@@ -1,0 +1,197 @@
+# AssurMatch — end-to-end business journey stack (spec 059, PRD EPIC M / M-01).
+#
+# Driven by `npm run test:e2e:stack` (scripts/e2e/e2e-stack.mjs); not meant for production.
+# A blank stack: PostgreSQL starts empty, the orchestrator applies the migrations, the REFERENCE seed
+# (scripts/preprod/seed-reference.ts, no demo data) and creates the first Super Admin
+# (scripts/ops/bootstrap-super-admin.ts), then Playwright drives the three apps from the host.
+#
+# Every service uses the host network: the frontends call the API with the SAME URL from the
+# browser and from their server (NEXT_PUBLIC_ASSURMATCH_API_URL is inlined at build time), so the
+# only address both sides agree on is the host's loopback. Linux (CI) only; on Docker Desktop
+# enable host networking or run `npm run test:e2e:stack -- --apps=host` (apps as host processes).
+#
+# Ports (override with the same variables when building and running):
+#   API 48600  public 48601  admin 48602  broker 48603
+#   PostgreSQL 48632  Redis 48679  Mailpit SMTP 48025 / HTTP 48825
+# Antivirus: the in-process EICAR signature scanner (ASSURMATCH_ANTIVIRUS=eicar) - the uploads in
+# the scenarios are real files and the forbidden-case test uploads the EICAR test string.
+
+name: ${ASSURMATCH_E2E_COMPOSE_PROJECT:-assurmatch-e2e}
+
+x-backend-env: &backend-env
+  NODE_ENV: production
+  APP_ENV: staging
+  DATABASE_URL: postgresql://assurmatch_e2e:assurmatch_e2e@127.0.0.1:${ASSURMATCH_E2E_POSTGRES_PORT:-48632}/assurmatch_e2e
+  REDIS_URL: redis://127.0.0.1:${ASSURMATCH_E2E_REDIS_PORT:-48679}
+  BULLMQ_PREFIX: assurmatch-e2e
+  ASSURMATCH_AUTH_TOKEN_SECRET: assurmatch-e2e-auth-token-secret-for-ci-only-32b # secret-scan:allow throwaway e2e stack value
+  ENCRYPTION_KEY: assurmatch-e2e-encryption-key-for-ci-only-32bytes
+  EMAIL_SERVICE_TYPE: mailpit
+  EMAIL_FROM: e2e@assurmatch.test
+  EMAIL_SMTP_HOST: 127.0.0.1
+  EMAIL_SMTP_PORT: ${ASSURMATCH_E2E_MAILPIT_SMTP_PORT:-48025}
+  EMAIL_PREVIEW_MODE: "false"
+  APP_BASE_URL: http://127.0.0.1:${ASSURMATCH_E2E_ADMIN_PORT:-48602}
+  PUBLIC_APP_URL: http://127.0.0.1:${ASSURMATCH_E2E_PUBLIC_PORT:-48601}
+  BROKER_APP_URL: http://127.0.0.1:${ASSURMATCH_E2E_BROKER_PORT:-48603}
+  CORS_ORIGINS: http://127.0.0.1:${ASSURMATCH_E2E_PUBLIC_PORT:-48601},http://localhost:${ASSURMATCH_E2E_PUBLIC_PORT:-48601}
+  ASSURMATCH_DOCUMENT_STORAGE: disk
+  ASSURMATCH_DOCUMENT_STORAGE_DIR: /tmp/assurmatch-e2e-documents
+  ASSURMATCH_ANTIVIRUS: eicar
+  ASSURMATCH_WORKER_INTERVAL_SECONDS: "5"
+  # SC-08: survey sent at once (24 h in production); API flag refresh every 5 s (30 s by default).
+  ASSURMATCH_SATISFACTION_SURVEY_DELAY_MINUTES: "0"
+  ASSURMATCH_FEATURE_FLAG_REFRESH_SECONDS: "5"
+  # Spec 058 auth rate limiting counts per IP: every browser of the suite logs in from 127.0.0.1.
+  ASSURMATCH_AUTH_RATE_LIMIT_IP_MAX: "2000"
+  # 0 by default (clients hit the API directly). The load test sets 1 to spread its synthetic clients.
+  TRUSTED_PROXY_HOPS: ${ASSURMATCH_E2E_TRUSTED_PROXY_HOPS:-0}
+
+x-frontend-build-args: &frontend-build-args
+  NEXT_PUBLIC_ASSURMATCH_API_URL: http://127.0.0.1:${ASSURMATCH_E2E_API_PORT:-48600}
+  NEXT_PUBLIC_ASSURMATCH_ADMIN_API_URL: http://127.0.0.1:${ASSURMATCH_E2E_API_PORT:-48600}
+  NEXT_PUBLIC_ASSURMATCH_BROKER_API_URL: http://127.0.0.1:${ASSURMATCH_E2E_API_PORT:-48600}
+  NEXT_PUBLIC_ASSURMATCH_PUBLIC_URL: http://127.0.0.1:${ASSURMATCH_E2E_PUBLIC_PORT:-48601}
+  NEXT_PUBLIC_ASSURMATCH_BROKER_URL: http://127.0.0.1:${ASSURMATCH_E2E_BROKER_PORT:-48603}
+  NEXT_PUBLIC_APP_ENV: staging
+
+x-frontend-env: &frontend-env
+  NODE_ENV: production
+  APP_ENV: staging
+  # The journeys open the country in the back-office and expect the public site to show it at once.
+  ASSURMATCH_PUBLIC_CACHE_SECONDS: "0"
+
+services:
+  postgres:
+    image: postgres:18-alpine
+    network_mode: host
+    command: ["postgres", "-p", "${ASSURMATCH_E2E_POSTGRES_PORT:-48632}", "-c", "listen_addresses=127.0.0.1", "-c", "fsync=off"]
+    environment:
+      POSTGRES_DB: assurmatch_e2e
+      POSTGRES_USER: assurmatch_e2e
+      POSTGRES_PASSWORD: assurmatch_e2e # secret-scan:allow throwaway e2e database
+      PGPORT: ${ASSURMATCH_E2E_POSTGRES_PORT:-48632}
+    # No volume: every run starts from an empty database (tmpfs keeps it fast).
+    tmpfs:
+      - /var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -U assurmatch_e2e -d assurmatch_e2e"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+  redis:
+    image: redis:8-alpine
+    network_mode: host
+    command: ["redis-server", "--port", "${ASSURMATCH_E2E_REDIS_PORT:-48679}", "--bind", "127.0.0.1", "--save", ""]
+    healthcheck:
+      test: ["CMD", "redis-cli", "-p", "${ASSURMATCH_E2E_REDIS_PORT:-48679}", "ping"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+  mailpit:
+    image: axllent/mailpit:latest
+    network_mode: host
+    environment:
+      MP_SMTP_BIND_ADDR: 127.0.0.1:${ASSURMATCH_E2E_MAILPIT_SMTP_PORT:-48025}
+      MP_UI_BIND_ADDR: 127.0.0.1:${ASSURMATCH_E2E_MAILPIT_HTTP_PORT:-48825}
+      MP_MAX_MESSAGES: "2000"
+    healthcheck:
+      test: ["CMD", "/mailpit", "readyz", "--listen", "127.0.0.1:${ASSURMATCH_E2E_MAILPIT_HTTP_PORT:-48825}"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+  api:
+    profiles: ["apps"]
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    image: assurmatch-e2e-api:local
+    network_mode: host
+    environment:
+      <<: *backend-env
+      PORT: ${ASSURMATCH_E2E_API_PORT:-48600}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      mailpit:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:${ASSURMATCH_E2E_API_PORT:-48600}/readyz >/dev/null || exit 1"]
+      interval: 3s
+      timeout: 5s
+      start_period: 60s
+      retries: 40
+
+  worker:
+    profiles: ["apps"]
+    image: assurmatch-e2e-api:local
+    network_mode: host
+    command: ["node", "--import", "tsx", "scripts/worker/assurmatch-worker.ts"]
+    environment:
+      <<: *backend-env
+    depends_on:
+      api:
+        condition: service_healthy
+    # The image HEALTHCHECK probes the API port; the worker is healthy when its heartbeat is fresh.
+    healthcheck:
+      test: ["CMD", "node", "scripts/worker/worker-healthcheck.mjs"]
+      interval: 5s
+      timeout: 5s
+      start_period: 30s
+      retries: 10
+
+  public:
+    profiles: ["apps"]
+    build:
+      context: .
+      dockerfile: apps/public/Dockerfile
+      args: *frontend-build-args
+    image: assurmatch-e2e-public:local
+    network_mode: host
+    command: ["npx", "next", "start", "-H", "127.0.0.1", "-p", "${ASSURMATCH_E2E_PUBLIC_PORT:-48601}"]
+    environment: *frontend-env
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:${ASSURMATCH_E2E_PUBLIC_PORT:-48601}/ >/dev/null || exit 1"]
+      interval: 3s
+      timeout: 5s
+      start_period: 30s
+      retries: 40
+
+  admin:
+    profiles: ["apps"]
+    build:
+      context: .
+      dockerfile: apps/admin/Dockerfile
+      args: *frontend-build-args
+    image: assurmatch-e2e-admin:local
+    network_mode: host
+    command: ["npx", "next", "start", "-H", "127.0.0.1", "-p", "${ASSURMATCH_E2E_ADMIN_PORT:-48602}"]
+    environment: *frontend-env
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:${ASSURMATCH_E2E_ADMIN_PORT:-48602}/login >/dev/null || exit 1"]
+      interval: 3s
+      timeout: 5s
+      start_period: 30s
+      retries: 40
+
+  broker:
+    profiles: ["apps"]
+    build:
+      context: .
+      dockerfile: apps/broker/Dockerfile
+      args: *frontend-build-args
+    image: assurmatch-e2e-broker:local
+    network_mode: host
+    command: ["npx", "next", "start", "-H", "127.0.0.1", "-p", "${ASSURMATCH_E2E_BROKER_PORT:-48603}"]
+    environment: *frontend-env
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:${ASSURMATCH_E2E_BROKER_PORT:-48603}/login >/dev/null || exit 1"]
+      interval: 3s
+      timeout: 5s
+      start_period: 30s
+      retries: 40
