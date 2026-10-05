@@ -146,23 +146,29 @@ test("SC-02a candidature courtier sur le site public, examen et conversion par l
   // Public site (visitor context): /courtiers/candidature.
   const visitor = await (await newAppContext(browser, e2eEnv.publicUrl)).newPage();
   await visitor.goto("/courtiers/candidature");
+  // Spec 050 D6: the application is a four-step form; "Continuer" validates and reveals each step.
+  const nextStep = () => visitor.getByRole("button", { name: "Continuer" }).click();
   await visitor.locator("#am-apply-legalname").fill(partnerName);
   await visitor.locator("#am-apply-country").selectOption("CI");
+  await nextStep();
   await visitor.locator("#am-apply-contactname").fill("Awa Kouassi");
   await visitor.locator("#am-apply-contactemail").fill(ownerEmail);
   await visitor.locator("#am-apply-contactphone").fill("+2250701020304");
+  await nextStep();
   await visitor.locator("#am-apply-licensenumber").fill(`CI-AGR-${suffix}`);
   await visitor.locator("#am-apply-licenseexpires").fill(isoDate(addDays(new Date(), 400)));
   await visitor.locator("#am-apply-issuingauthority").fill("Direction des Assurances CI");
   await visitor.locator("#am-apply-capacity").fill("50");
   await visitor.locator("#am-apply-product-auto").check();
   await visitor.locator("#am-apply-product-voyage").check();
+  await nextStep();
   await visitor.locator("input[name='desiredPlan'][value='starter']").check({ force: true });
   await visitor.locator("#am-apply-consent").check();
-  await visitor.getByRole("button", { name: "Envoyer la candidature" }).click();
-  const confirmation = visitor.getByRole("status").filter({ hasText: /PA-/u });
-  await expect(confirmation).toBeVisible();
-  const applicationReference = (await confirmation.innerText()).match(/PA-[A-Z0-9-]+/u)?.[0];
+  await visitor.getByRole("button", { name: "Envoyer ma candidature" }).click();
+  // Spec 050 D7: success lands on the confirmation page, which carries only the public reference.
+  await visitor.waitForURL(/\/courtiers\/candidature\/confirmation\?reference=PA-/u);
+  await expect(visitor.getByRole("heading", { level: 1, name: "Candidature reçue" })).toBeVisible();
+  const applicationReference = new URL(visitor.url()).searchParams.get("reference")?.match(/^PA-[A-Z0-9-]+$/u)?.[0];
   expect(applicationReference, "application reference PA-...").toBeTruthy();
   await visitor.context().close();
   saveJourneyState({ applicationReference: applicationReference as string, partnerName, brokerOwner: { app: "broker", email: ownerEmail, password: "", totpSecret: "" } });
@@ -411,18 +417,23 @@ test("SC-05 le visiteur compare, choisit l'offre du courtier, consent nommément
   await offer.getByRole("link", { name: "Demander un devis" }).click();
   await visitor.waitForURL(/\/devis\?offerId=/u);
 
-  // The consent names the recipient broker (constitution II, decision D-4).
-  const consent = visitor.locator("label[for='am-quote-consent'], #am-quote-consent >> xpath=..").first();
-  await expect(consent).toContainText(partnerName);
-  await visitor.locator("#am-quote-name").fill("Mariam Traoré");
-  await visitor.locator("#am-quote-email").fill(visitorEmail);
-  await visitor.locator("#am-quote-phone").fill("+2250102030405");
+  // Spec 050 D6: the request is a three-step form (the need, the contact details, then the review
+  // with the consent); "Continuer" and "Vérifier ma demande" validate each step before the next.
   await visitor.locator("#am-answer-vehicle_use").selectOption("prive");
   await visitor.locator("#am-answer-vehicle_brand").fill("Toyota");
   await visitor.locator("#am-answer-city").fill("Abidjan");
   await visitor.locator("#am-answer-contact_preference").selectOption("email");
+  await visitor.getByRole("button", { name: "Continuer" }).click();
+  await visitor.locator("#am-quote-name").fill("Mariam Traoré");
+  await visitor.locator("#am-quote-email").fill(visitorEmail);
+  await visitor.locator("#am-quote-phone").fill("+2250102030405");
+  await visitor.getByRole("button", { name: "Vérifier ma demande" }).click();
+
+  // The consent names the recipient broker (constitution II, decision D-4).
+  const consent = visitor.locator("label[for='am-quote-consent'], #am-quote-consent >> xpath=..").first();
+  await expect(consent).toContainText(partnerName);
   await visitor.locator("#am-quote-consent").check();
-  await visitor.getByRole("button", { name: "Demander un devis" }).click();
+  await visitor.getByRole("button", { name: "Envoyer ma demande" }).click();
 
   const reference = visitor.getByText(/QR-[A-Z0-9-]+/u).first();
   await expect(reference).toBeVisible();
