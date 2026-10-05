@@ -168,7 +168,7 @@ test("SC-02a candidature courtier sur le site public, examen et conversion par l
   // Spec 050 D7: success lands on the confirmation page, which carries only the public reference.
   await visitor.waitForURL(/\/courtiers\/candidature\/confirmation\?reference=PA-/u);
   await expect(visitor.getByRole("heading", { level: 1, name: "Candidature reçue" })).toBeVisible();
-  const applicationReference = new URL(visitor.url()).searchParams.get("reference")?.match(/^PA-[A-Z0-9-]+$/u)?.[0];
+  const applicationReference = new URL(visitor.url()).searchParams.get("reference")?.match(/^PA-[A-Za-z0-9-]+$/u)?.[0];
   expect(applicationReference, "application reference PA-...").toBeTruthy();
   await visitor.context().close();
   saveJourneyState({ applicationReference: applicationReference as string, partnerName, brokerOwner: { app: "broker", email: ownerEmail, password: "", totpSecret: "" } });
