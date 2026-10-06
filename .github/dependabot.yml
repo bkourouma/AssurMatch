@@ -1,0 +1,73 @@
+# Spec 058 FR-008: dependency updates. Security updates are opened as soon as an advisory is
+# published (repository setting "Dependabot security updates"); version updates are weekly and
+# grouped so the PR queue stays reviewable. Every PR goes through the CI `verify` job
+# (typecheck, lint, tests, `npm audit --audit-level=high`, Playwright source checks) and
+# `secret-scan` before review. Nothing is auto-merged.
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: "/"
+    schedule:
+      interval: weekly
+      day: monday
+      time: "05:00"
+      timezone: Africa/Abidjan
+    open-pull-requests-limit: 10
+    labels: ["dependencies"]
+    commit-message:
+      prefix: "chore(deps)"
+    groups:
+      npm-minor-and-patch:
+        update-types: ["minor", "patch"]
+      nestjs:
+        patterns: ["@nestjs/*"]
+        update-types: ["major"]
+      prisma:
+        patterns: ["prisma", "@prisma/*"]
+        update-types: ["major"]
+      next-react:
+        patterns: ["next", "react", "react-dom", "@types/react", "@types/react-dom", "eslint-config-next"]
+        update-types: ["major"]
+
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule:
+      interval: weekly
+      day: monday
+      time: "05:00"
+      timezone: Africa/Abidjan
+    labels: ["dependencies", "ci"]
+    commit-message:
+      prefix: "chore(ci)"
+    groups:
+      actions:
+        patterns: ["*"]
+
+  - package-ecosystem: docker
+    directories:
+      - "/backend"
+      - "/apps/public"
+      - "/apps/admin"
+      - "/apps/broker"
+    schedule:
+      interval: weekly
+      day: monday
+      time: "05:00"
+      timezone: Africa/Abidjan
+    labels: ["dependencies", "docker"]
+    commit-message:
+      prefix: "chore(docker)"
+    groups:
+      base-images:
+        patterns: ["*"]
+
+  - package-ecosystem: docker-compose
+    directory: "/"
+    schedule:
+      interval: weekly
+      day: monday
+      time: "05:00"
+      timezone: Africa/Abidjan
+    labels: ["dependencies", "docker"]
+    commit-message:
+      prefix: "chore(docker)"

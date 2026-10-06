@@ -10,6 +10,7 @@ import {
 import type { ActorContext } from "../../../src/modules/common/types";
 import { RoutingAuditActions } from "../../../src/modules/routing/routing-audit-actions";
 import { actorHeaders, createRuntimeHttpHarness, readJson, seedPublicRuntime, type RuntimeHttpHarness } from "../runtime-http-test-utils";
+import { seedAcceptedAccreditation } from "../helpers/partner-onboarding-seed";
 
 const superAdmin: ActorContext = { actorId: "super", roles: ["super_admin"], mfaVerified: true };
 
@@ -24,7 +25,7 @@ async function seedPartner(harness: RuntimeHttpHarness, seed: Awaited<ReturnType
   }, superAdmin);
   await harness.runtime.partners.service.authorizeCountry(partner.id, seed.country.id, superAdmin);
   await harness.runtime.partners.service.authorizeProduct(partner.id, seed.product.id, superAdmin);
-  await harness.runtime.partnerLicenses.service.create({
+  const license = await harness.runtime.partnerLicenses.service.create({
     partnerTenantId: partner.id,
     licenseNumber: `LIC-${partner.id.slice(0, 8)}`,
     issuingAuthority: "Regulator",
@@ -34,6 +35,7 @@ async function seedPartner(harness: RuntimeHttpHarness, seed: Awaited<ReturnType
     effectiveDate: "2026-01-01",
     expirationDate: "2030-01-01"
   }, superAdmin);
+  await seedAcceptedAccreditation(harness.runtime, partner.id, license.id);
   return partner;
 }
 
@@ -54,7 +56,7 @@ async function submitQuote(harness: RuntimeHttpHarness, seed: Awaited<ReturnType
       formDefinitionId: seed.form.id,
       contact: { displayName: `Visitor ${suffix}`, email: `visitor${suffix}@example.test`, phone: `+22501020304${suffix.padStart(2, "0")}` },
       answers: { vehicle_use: "prive" },
-      consent: { accepted: true, consentTextId: seed.consentText.id, version: "v1", contentHash: "runtime-consent-hash" },
+      consent: { accepted: true, consentTextId: seed.consentText.id, version: "v1", contentHash: seed.consentText.contentHash },
       ipAddress: `203.0.113.${suffix}`,
       sessionId: `routing-session-${suffix}`
     })
@@ -207,7 +209,20 @@ describe("routing rules runtime HTTP", () => {
     const partnerA = await seedPartner(harness, seed, "Origin Broker");
     const partnerB = await seedPartner(harness, seed, "Target Broker");
     await harness.runtime.routingRules.create(superAdmin, { countryId: seed.country.id, mode: "exclusive", exclusivePartnerTenantId: partnerA.id, reason: "Start with origin" });
-    await submitQuote(harness, seed, "7");
+    const submitted = await readJson<{ publicReference: string; verificationToken: string }>(await harness.request("/quote-requests", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        countryCode: "CI",
+        productKey: "auto",
+        formDefinitionId: seed.form.id,
+        contact: { displayName: "Visitor 7", email: "visitor7@example.test", phone: "+2250102030407" },
+        answers: { vehicle_use: "prive" },
+        consent: { accepted: true, consentTextId: seed.consentText.id, version: "v1", contentHash: seed.consentText.contentHash },
+        ipAddress: "203.0.113.7",
+        sessionId: "routing-session-7"
+      })
+    }));
     const [assignment] = await harness.runtime.leads.assignments.list();
     expect(assignment?.partnerTenantId).toBe(partnerA.id);
 
@@ -235,6 +250,22 @@ describe("routing rules runtime HTTP", () => {
     expect(harness.runtime.audit.writer.search({ action: RoutingAuditActions.reassigned })).toHaveLength(1);
     const notifications = await harness.runtime.notifications.service.list();
     expect(notifications.filter((notification) => notification.recipientScope === `partner:${partnerB.id}`)).toHaveLength(1);
+    // Spec 061 FR-002: the receiving cabinet is told the lead was reassigned to it (e-mail + in-app).
+    expect(notifications.filter((notification) => notification.recipientScope === `partner:${partnerB.id}`).map((notification) => notification.type)).toEqual(["broker_lead_reassigned"]);
+    expect((await harness.runtime.notifications.dispatch.listInApp(partnerB.id)).map((item) => item.type)).toEqual(["broker_lead_reassigned"]);
+    expect((await harness.runtime.notifications.dispatch.listInApp(partnerA.id)).some((item) => item.type === "broker_lead_reassigned")).toBe(false);
+    // Spec 054 R6: the visitor is told of the reassignment, naming the new broker, once.
+    const reassignedVisitor = notifications.filter((notification) => notification.type === "visitor_quote_reassigned");
+    expect(reassignedVisitor).toHaveLength(1);
+    expect(reassignedVisitor[0]?.eventPayload).toMatchObject({ partnerTenantId: partnerB.id, previousPartnerTenantId: partnerA.id });
+    const space = await readJson<{ brokers: Array<{ partnerName: string }>; timeline: Array<{ step: string; partnerName?: string }> }>(
+      await harness.request(`/quote-requests/${submitted.publicReference}?token=${encodeURIComponent(submitted.verificationToken)}`)
+    );
+    expect(space.brokers.map((broker) => broker.partnerName)).toEqual(["Target Broker"]);
+    expect(space.timeline.filter((entry) => entry.step !== "received")).toEqual([
+      expect.objectContaining({ step: "transmitted", partnerName: "Origin Broker" }),
+      expect.objectContaining({ step: "reassigned", partnerName: "Target Broker" })
+    ]);
 
     const broker: ActorContext = { actorId: "broker", roles: ["broker_owner_pro"], partnerTenantId: partnerA.id, partnerPlan: "pro", mfaVerified: true };
     const forbidden = await harness.request(`/admin/lead-assignments/${assignment!.id}/reassign`, {

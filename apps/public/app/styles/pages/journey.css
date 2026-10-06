@@ -236,6 +236,66 @@
   border-top: 0;
 }
 
+/*
+ * A headed panel of the tracking space, the tracking-link, feedback and unsubscribe pages and a broker
+ * proposal: no box, a pale tile and a title over a 2px navy rule, then its content. `--muted` sets
+ * the panel on the band (the consent withdrawal).
+ */
+.am-j-panel {
+  display: grid;
+  gap: var(--am-space-16);
+  align-content: start;
+  min-width: 0;
+}
+
+.am-j-panel--muted {
+  padding: var(--am-space-20);
+  border-radius: var(--am-radius-sm);
+  background: var(--am-band);
+}
+
+.am-j-panel__head {
+  display: flex;
+  gap: var(--am-space-12);
+  align-items: center;
+  padding-bottom: var(--am-space-8);
+  border-bottom: 2px solid var(--am-primary-800);
+}
+
+.am-j-panel__title {
+  margin: 0;
+  color: var(--am-heading);
+  font-size: var(--am-h3-size);
+  font-weight: 700;
+  line-height: var(--am-h3-line);
+}
+
+.am-j-panel > p {
+  margin: 0;
+}
+
+/* Ruled list with a leading glyph per row (brokers, timeline, proposal details). */
+.am-j-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.am-j-list > li {
+  display: grid;
+  gap: var(--am-space-12);
+  align-items: start;
+  margin: 0;
+  padding: var(--am-space-12) 0;
+  border-bottom: 1px solid var(--am-rule);
+  grid-template-columns: auto minmax(0, 1fr);
+}
+
+.am-j-list > li > .am-icon {
+  margin-top: 3px;
+  color: var(--am-heading);
+}
+
 /* A headed part of a page column (offer detail, broker profile, next steps). */
 .am-j-part {
   display: grid;

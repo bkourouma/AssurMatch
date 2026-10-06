@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it } from "vitest";
 import type { ActorContext } from "../../../src/modules/common/types";
+import { publishOffer } from "../helpers/offer-test-helpers";
 import {
   createRuntimeHttpHarness,
   seedBrokerOnboarding,
@@ -26,7 +27,7 @@ describe("public catalog runtime HTTP", () => {
   it("lists the insurers behind the publicly visible offers of a country", async () => {
     harness = await createRuntimeHttpHarness();
     const seed = await seedPublicRuntime(harness.runtime);
-    const offer = await harness.runtime.offers.adminService.create({
+    await publishOffer(harness.runtime.offers, {
       countryId: seed.country.id,
       productId: seed.product.id,
       partnerTenantId: seed.partner.id,
@@ -37,15 +38,18 @@ describe("public catalog runtime HTTP", () => {
       validFrom: "2026-01-01T00:00:00.000Z",
       validUntil: "2030-01-01T00:00:00.000Z",
       reason: "insurer directory seed"
-    }, seed.admin);
-    await harness.runtime.offers.adminService.validate(offer.id, { validationStatus: "validated", reason: "insurer seed validate" }, seed.admin);
+    }, seed.admin, seed.admin);
 
     const response = await harness.request("/countries/CI/insurers");
 
     expect(response.status).toBe(200);
     // The catalogue groups by product id; the controller resolves those ids to the public product
     // keys, because a raw identifier on a visitor-facing page means nothing to a reader.
-    expect(await response.json()).toEqual([{ insurerName: "NSIA Assurances", offerCount: 1, productKeys: [seed.product.key] }]);
+    // Spec 052: the seeded "Auto Runtime" offer now carries an insurer (validation requires one).
+    expect(await response.json()).toEqual([
+      { insurerName: "Assureur partenaire", offerCount: 1, productKeys: [seed.product.key] },
+      { insurerName: "NSIA Assurances", offerCount: 1, productKeys: [seed.product.key] }
+    ]);
     expect(harness.runtime.audit.writer.search({ action: "public_insurers.listed" })).toHaveLength(1);
   });
 

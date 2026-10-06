@@ -11,6 +11,17 @@ export interface ConsentRecordUpdate {
   withdrawnAt?: Date;
 }
 
+/** Spec 059 follow-up: filters of the compliance consent-proof search (all optional, AND-ed). */
+export interface ConsentRecordSearchFilter {
+  ids?: string[];
+  subjectReference?: string;
+  countryId?: string;
+  purpose?: ConsentRecord["purpose"];
+  status?: ConsentRecord["status"];
+  skip: number;
+  take: number;
+}
+
 export interface ConsentRecordsRepository extends RuntimeRepository {
   createText(text: ConsentText): Promise<ConsentText>;
   updateText(id: string, update: Partial<ConsentText>): Promise<ConsentText>;
@@ -25,7 +36,18 @@ export interface ConsentRecordsRepository extends RuntimeRepository {
   /** Spec 042: routing reads the consent actually recorded, to know which recipients it covers. */
   findRecord(id: string): Promise<ConsentRecord | undefined>;
   searchRecords(): Promise<ConsentRecord[]>;
+  /** Spec 059 follow-up: one page of matching proofs, newest first, and the total count. */
+  searchRecordsPage(filter: ConsentRecordSearchFilter): Promise<{ items: ConsentRecord[]; total: number }>;
   requireText(id: string): Promise<ConsentText>;
+}
+
+function matchesFilter(record: ConsentRecord, filter: ConsentRecordSearchFilter): boolean {
+  if (filter.ids && !filter.ids.includes(record.id)) return false;
+  if (filter.subjectReference && record.subjectReference !== filter.subjectReference) return false;
+  if (filter.countryId && record.countryId !== filter.countryId) return false;
+  if (filter.purpose && record.purpose !== filter.purpose) return false;
+  if (filter.status && record.status !== filter.status) return false;
+  return true;
 }
 
 export class MemoryConsentRecordsRepository implements ConsentRecordsRepository {
@@ -83,6 +105,11 @@ export class MemoryConsentRecordsRepository implements ConsentRecordsRepository 
     return [...this.records];
   }
 
+  async searchRecordsPage(filter: ConsentRecordSearchFilter): Promise<{ items: ConsentRecord[]; total: number }> {
+    const matching = this.records.filter((record) => matchesFilter(record, filter)).sort((left, right) => right.createdAt.getTime() - left.createdAt.getTime());
+    return { items: matching.slice(filter.skip, filter.skip + filter.take), total: matching.length };
+  }
+
   async requireText(id: string): Promise<ConsentText> {
     const text = this.texts.find((candidate) => candidate.id === id);
     if (!text) throw new Error(`Consent text ${id} not found`);
@@ -102,6 +129,7 @@ type ConsentRecordDelegate = {
   update(input: unknown): Promise<unknown>;
   findMany(input?: unknown): Promise<unknown[]>;
   findFirst(input: unknown): Promise<unknown | null>;
+  count(input?: unknown): Promise<number>;
 };
 
 export class PrismaConsentRecordsRepository implements ConsentRecordsRepository {
@@ -157,6 +185,21 @@ export class PrismaConsentRecordsRepository implements ConsentRecordsRepository 
 
   async searchRecords(): Promise<ConsentRecord[]> {
     return (await this.records().findMany({ orderBy: { createdAt: "desc" } })).map((row) => this.toRecord(row));
+  }
+
+  async searchRecordsPage(filter: ConsentRecordSearchFilter): Promise<{ items: ConsentRecord[]; total: number }> {
+    const where = {
+      ...(filter.ids ? { id: { in: filter.ids } } : {}),
+      ...(filter.subjectReference ? { subjectReference: filter.subjectReference } : {}),
+      ...(filter.countryId ? { countryId: filter.countryId } : {}),
+      ...(filter.purpose ? { purpose: filter.purpose } : {}),
+      ...(filter.status ? { status: filter.status } : {})
+    };
+    const [rows, total] = await Promise.all([
+      this.records().findMany({ where, orderBy: { createdAt: "desc" }, skip: filter.skip, take: filter.take }),
+      this.records().count({ where })
+    ]);
+    return { items: rows.map((row) => this.toRecord(row)), total };
   }
 
   async requireText(id: string): Promise<ConsentText> {

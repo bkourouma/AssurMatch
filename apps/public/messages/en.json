@@ -576,17 +576,15 @@
     "continueLabel": "Continue",
     "backLabel": "Back to previous step",
     "verifyLabel": "Review my request",
+    "offerPartner": "Your request will be sent to {partner}, an approved partner broker, subject to its availability. The offer remains indicative: the broker will confirm the quote and the conditions.",
+    "phoneRuleHint": "Expected format: {dialCode} followed by {lengths} digits, or {lengths} digits without the country code.",
     "needLegend": "Your need",
     "needIntro": "This information comes from the partner broker concerned by this product; it helps us route your request to the right type of offer. It does not replace the broker's own analysis.",
     "fieldsIntro": "The following fields depend on the product chosen.",
     "choose": "Choose",
     "optionalTag": "optional",
-    "preselected": {
-      "resolved": "Pre-selected indicative offer: {name}, licence {licence}. This broker will confirm the quote and the conditions.",
-      "namedOnly": "Pre-selected indicative offer: {name}. This broker will confirm the quote and the conditions.",
-      "generic": "Pre-selected indicative offer: the responsible partner broker will confirm the quote and the conditions.",
-      "routing": "Your request will be transmitted to a partner broker authorised for {product} in {country} (or up to 3 partner brokers if you tick the box on the next step). The name of the broker chosen will appear on your tracking page."
-    },
+    "preselected": "Pre-selected indicative offer: the responsible partner broker will confirm the quote and the conditions.",
+    "preselectedRouting": "Your request will be transmitted to a partner broker authorised for {product} in {country} (or up to 3 partner brokers if you tick the box on the next step). The name of the broker chosen will appear on your tracking page.",
     "contactLegend": "Your details",
     "contactIntro": "This information lets the partner broker answer you. It is only transmitted after your consent, on the next step.",
     "name": "Name",
@@ -603,11 +601,33 @@
     "reviewEmpty": "not provided",
     "brokerTitle": "Responsible partner broker",
     "brokerConfirm": {
-      "resolved": "{name}, licence {licence} ({authority}), will confirm the quote and the conditions of this offer.",
-      "namedOnly": "{name} will confirm the quote and the conditions of this offer.",
       "routing": "Your request will be transmitted to a partner broker authorised for {product} in {country} (or up to 3 partner brokers if the box below is ticked). The name of the broker chosen will appear on your tracking page after sending."
     },
+    "brokerLicence": "Licence {licence} ({authority}).",
     "transmissionNotice": "Nothing is transmitted until you have ticked the consent box and sent your request.",
+    "options": {
+      "contact_preference": {
+        "phone": "Phone",
+        "email": "Email",
+        "whatsapp": "WhatsApp"
+      },
+      "desired_timing": {
+        "immediate": "As early as possible",
+        "within_month": "Within a month",
+        "within_quarter": "Within three months"
+      },
+      "preferred_language": {
+        "fr": "French",
+        "en": "English"
+      },
+      "source": {
+        "search": "Search engine",
+        "social": "Social media",
+        "word_of_mouth": "Word of mouth",
+        "partner": "Partner broker",
+        "other": "Other"
+      }
+    },
     "consentLegend": "Consent",
     "consentIntro": "Read the text below before ticking the box.",
     "consentLabel": "I agree that my request is transmitted to a partner broker eligible for this country and this product.",
@@ -619,11 +639,22 @@
     "submit": "Send my request",
     "successTitle": "Request received",
     "successPrefix": "Public reference:",
+    "offerPartnerRetained": "Your request has been sent to {partner}.",
+    "offerPartnerNotRetained": "The broker of the selected offer was not available: your request has been directed to another approved partner broker.",
     "trackLink": "Follow my request and add documents (optional)",
     "backToOffers": "Back to the offers",
     "blocked": {
       "title": "Quote request unavailable",
       "description": "Quote requests are not available for this country or this product."
+    },
+    "languageUnavailable": {
+      "title": "Form not available in English",
+      "description": "The quote request for this product is not yet published in English. It is available in another language, which you can open below.",
+      "listLabel": "Available languages",
+      "link": {
+        "fr": "Open the form in French (français)",
+        "en": "Open the form in English"
+      }
     },
     "fineprint": "AssurMatch does not sell insurance and issues neither a policy nor a certificate. The responsible partner broker confirms the quote and the conditions.",
     "commitmentLink": "Our commitments on your data"
@@ -674,7 +705,149 @@
       "noToken": "Withdrawing consent requires the tracking link received at the end of your request."
     },
     "journeyLabel": "Public journey",
-    "backToCountries": "Back to the countries"
+    "backToCountries": "Back to the countries",
+    "trackingTitle": "Tracking of request {reference}",
+    "statusTitle": "Where your request stands",
+    "statusLabel": "Current status",
+    "status": {
+      "received": {
+        "headline": "Request received",
+        "body": "Your request is recorded. It will be directed to a partner broker when routing is possible for this country and product."
+      },
+      "in_review": {
+        "headline": "Request being checked",
+        "body": "Our team is checking your request before passing it on. Nothing is expected from you for now."
+      },
+      "transmitted": {
+        "headline": "Request passed on to a partner broker",
+        "body": "Your request was passed on according to your consent. The partner broker listed below is solely responsible for what comes next."
+      },
+      "in_progress": {
+        "headline": "A partner broker is reviewing your request",
+        "body": "The partner broker has taken up your request. They may contact you to complete the information needed."
+      },
+      "proposal_available": {
+        "headline": "A broker proposal is available",
+        "body": "A partner broker has prepared an indicative proposal. It commits neither you nor them until you have spoken with them directly."
+      },
+      "closed": {
+        "headline": "Request closed",
+        "body": "Work on this request is over. You can submit a new request at any time."
+      },
+      "not_transmitted": {
+        "headline": "Request not passed on",
+        "body": "No eligible partner broker could be identified for this request. No callback is promised."
+      }
+    },
+    "brokers": {
+      "title": "Partner brokers",
+      "empty": "No partner broker is linked to this request yet.",
+      "since": "since {date}",
+      "status": {
+        "transmitted": "Request passed on",
+        "in_progress": "Under review",
+        "proposal_available": "Proposal available",
+        "closed": "Handling finished"
+      }
+    },
+    "timeline": {
+      "title": "History",
+      "partner": "Partner broker: {partner}",
+      "steps": {
+        "received": "Request received",
+        "in_review": "Checked by our team",
+        "transmitted": "Request passed on to a partner broker",
+        "accepted": "Taken up by the partner broker",
+        "reassigned": "Request handed to another partner broker",
+        "closed": "Handling finished",
+        "consent_withdrawn": "Consent withdrawn",
+        "not_transmitted": "Request not passed on"
+      }
+    },
+    "role": "AssurMatch is a technical matching platform. Only the partner broker can advise you and send you a proposal; AssurMatch plays no part in that choice.",
+    "expiry": "This tracking link is personal and stays valid until {date}. Do not share it.",
+    "expiryUnknown": "This tracking link is personal. Do not share it.",
+    "consentWithdrawnNotice": "You withdrew your consent on {date}. This request is cancelled and is no longer passed on.",
+    "consentWithdrawnNoDate": "You withdrew your consent. This request is cancelled and is no longer passed on.",
+    "proposals": {
+      "title": "Broker proposals",
+      "lead": "Indicative proposals from partner brokers appear here. Each proposal comes from the named broker: AssurMatch does not compare them and recommends none.",
+      "listLabel": "Proposals received",
+      "from": "Proposal from {partner}",
+      "sentAt": "Sent on {date}",
+      "validUntil": "Valid until {date}",
+      "validUntilExpired": "Validity ended on {date}",
+      "messageLabel": "Broker's message",
+      "priceLabel": "Indicative premium",
+      "priceSingle": "{amount}",
+      "priceRange": "Between {min} and {max}",
+      "priceFrom": "From {amount}",
+      "priceUpTo": "Up to {amount}",
+      "guaranteesLabel": "Cover mentioned by the broker",
+      "noGuarantees": "No cover detailed in this proposal.",
+      "document": "Download the broker's document (PDF)",
+      "documentHint": "The document comes from the broker; it remains indicative until you have discussed it with them.",
+      "noticeTitle": "Please read before going further",
+      "status": {
+        "sent": "New",
+        "viewed": "Viewed",
+        "responded": "Answer sent",
+        "expired": "Expired",
+        "closed": "No longer active"
+      },
+      "closedBody": "This proposal is no longer active: you can no longer answer it from this page.",
+      "expiredBody": "This proposal's validity date has passed: you can no longer answer it from this page.",
+      "response": {
+        "legend": "How would you like to follow up on this proposal?",
+        "intro": "Your answer goes to the named broker. It does not commit you: it only tells them how to continue the conversation.",
+        "interested": "I am interested, call me back",
+        "declined": "I will not follow up",
+        "question": "Ask a question",
+        "callbackSlot": "Preferred callback time (optional)",
+        "callbackSlotHint": "For example: tomorrow between 10am and noon. 100 characters maximum.",
+        "declineReason": "Reason (optional)",
+        "declineReasonNone": "I prefer not to say",
+        "declineReasons": {
+          "price": "The price does not suit me",
+          "guarantees": "The cover does not suit me",
+          "delay": "The timing does not suit me",
+          "already_insured": "I am already insured",
+          "other": "Another reason"
+        },
+        "questionLabel": "Your question to the broker",
+        "questionHint": "500 characters maximum. Do not include sensitive data.",
+        "questionRequired": "Type your question before sending it.",
+        "submit": "Send my answer to the broker",
+        "sending": "Sending.",
+        "recordedTitle": "Answer sent to the broker",
+        "recordedInterested": "The broker will get back to you to discuss their proposal.",
+        "recordedDeclined": "The broker knows you will not follow up on this proposal.",
+        "recordedQuestion": "The broker has received your question and will answer you directly.",
+        "recordedAt": "Answer recorded on {date}",
+        "previousTitle": "Your latest answer",
+        "previousType": {
+          "interested": "You are interested and would like a callback.",
+          "declined": "You will not follow up on this proposal.",
+          "question": "You asked the broker a question."
+        },
+        "previousSlot": "Time given: {slot}",
+        "previousReason": "Reason: {reason}",
+        "previousQuestion": "Your question: {question}",
+        "changeHint": "You can send a new answer: the broker takes the most recent one into account.",
+        "notRespondable": "This proposal can no longer be answered (withdrawn, expired or no longer active). Reload the page to see its state.",
+        "rateLimited": "Too many answers sent in a short time. Try again in a few minutes.",
+        "invalid": "The answer could not be sent: please check the fields.",
+        "denied": "This tracking link can no longer be used to answer. You can get a new link from the tracking page.",
+        "error": "The answer could not be sent right now. Try again in a few minutes."
+      }
+    },
+    "access": {
+      "title": "This tracking link cannot display a request",
+      "body": "The link may be incomplete or no longer valid. You can receive a new link at the e-mail address used for your request.",
+      "cta": "Receive a new link",
+      "rateLimited": "Too many views in a short time. Try again in a few minutes.",
+      "unavailable": "Tracking is temporarily unavailable. Try again in a few minutes."
+    }
   },
   "VisitorAi": {
     "defaultLabel": "Reading assistant",
@@ -824,7 +997,9 @@
     "applicationSent": "Application received. It will be reviewed by our compliance team.",
     "applicationFailed": "Sending the application is impossible for the moment.",
     "consentWithdrawn": "Your consent withdrawal is recorded.",
-    "consentWithdrawalFailed": "The consent withdrawal could not be recorded with this link."
+    "consentWithdrawalFailed": "The consent withdrawal could not be recorded with this link.",
+    "quotePhoneInvalid": "The phone number does not match the expected format for this country.",
+    "quoteConsentOutdated": "The consent text has been updated. Reload the page to read the current version before sending your request."
   },
   "Forms": {
     "required": "required",
@@ -1276,5 +1451,69 @@
     "offers": "Offers",
     "request": "Request",
     "broker": "Broker"
+  },
+  "Tracking": {
+    "kicker": "Request tracking",
+    "title": "Receive my tracking link",
+    "description": "Receive the personal tracking link of your quote request again.",
+    "lead": "Enter your request reference and the e-mail address you used. If they match, a new link is sent to you by e-mail.",
+    "breadcrumb": "Request tracking",
+    "reference": "Request reference",
+    "referenceHint": "For example QR-2026-ABC123, shown in the confirmation e-mail.",
+    "email": "E-mail address",
+    "honeypot": "Leave this field empty",
+    "requiredMark": "required",
+    "invalidReference": "Enter a valid reference (letters, digits and hyphens).",
+    "invalidEmail": "Enter a valid e-mail address.",
+    "submit": "Send the link",
+    "sending": "Sending.",
+    "confirmationTitle": "Request taken into account",
+    "confirmationBody": "If this reference matches this e-mail address, a new tracking link has just been sent to it. Remember to check your spam folder.",
+    "again": "Make another request",
+    "rateLimited": "Too many requests in a short time. Try again in an hour.",
+    "error": "The service is temporarily unavailable. Try again in a few minutes.",
+    "privacy": "To protect your data, we never say whether a reference or an e-mail address exists."
+  },
+  "Feedback": {
+    "kicker": "Your feedback",
+    "title": "Your feedback on request {reference}",
+    "description": "Satisfaction survey about your quote request.",
+    "breadcrumb": "Your feedback",
+    "lead": "Your feedback is about your matching experience. It helps us improve the service and is never published.",
+    "ratingLegend": "Your overall satisfaction",
+    "rating": {
+      "1": "1 - Not satisfied at all",
+      "2": "2 - Slightly satisfied",
+      "3": "3 - Moderately satisfied",
+      "4": "4 - Satisfied",
+      "5": "5 - Very satisfied"
+    },
+    "ratingRequired": "Choose a rating from 1 to 5.",
+    "comment": "Comment (optional)",
+    "commentHint": "1000 characters maximum. Do not include health data or bank details.",
+    "flaggedConcern": "I want to report a problem with the partner broker",
+    "flaggedConcernHint": "Our compliance team will review your report.",
+    "submit": "Send my feedback",
+    "sending": "Sending.",
+    "successTitle": "Thank you for your feedback",
+    "successBody": "Your answer is recorded.",
+    "unavailableTitle": "This survey is no longer available",
+    "unavailableBody": "The link may be incomplete, expired or already used.",
+    "rateLimited": "Too many submissions in a short time. Try again later.",
+    "error": "The service is temporarily unavailable. Try again in a few minutes."
+  },
+  "Unsubscribe": {
+    "kicker": "Unsubscribe",
+    "title": "Stop receiving satisfaction surveys",
+    "description": "Unsubscribe from AssurMatch satisfaction surveys.",
+    "breadcrumb": "Unsubscribe",
+    "lead": "Confirm to stop receiving a satisfaction survey after your broker introductions. Messages about the follow-up of your quote requests are still sent to you.",
+    "confirm": "Confirm unsubscribe",
+    "sending": "Sending.",
+    "successTitle": "You are unsubscribed",
+    "successBody": "You will no longer receive AssurMatch satisfaction surveys at this address.",
+    "unavailableTitle": "This link is not valid",
+    "unavailableBody": "The link may be incomplete. Use the link from the survey e-mail.",
+    "error": "The service is temporarily unavailable. Try again in a few minutes."
   }
 }

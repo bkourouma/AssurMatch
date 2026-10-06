@@ -47,7 +47,8 @@ describe("QuoteNotificationService", () => {
       updatedAt: new Date()
     };
 
-    expect((await service.queueVisitor(routedQuote, superAdminActor))?.notification.type).toBe("visitor_quote_confirmation");
+    // Spec 054 R4: the first visitor e-mail is "received" (was the spec 044 "confirmation").
+    expect((await service.queueVisitor(routedQuote, superAdminActor))?.notification.type).toBe("visitor_quote_received");
     expect(await service.queueVisitor(routedQuote, superAdminActor)).toBeUndefined();
     expect((await service.queueBroker(routedQuote, assignment, superAdminActor))?.notification.recipientScope).toBe(`partner:${assignment.partnerTenantId}`);
     expect(notifications.map((notification) => notification.payloadReference)).toEqual([routedQuote.id, routedQuote.id]);

@@ -13,28 +13,32 @@ export class AdminQuoteFormDefinitionsController {
 
   async list(query: AdminQuoteFormDefinitionListQuery = {}): Promise<AdminQuoteFormDefinitionView[]> {
     const filters = adminQuoteFormDefinitionListQuerySchema.parse(query);
-    const forms = await this.forms.list();
-    return forms
+    const forms = (await this.forms.list())
       .filter((form) => !filters.countryId || form.countryId === filters.countryId)
       .filter((form) => !filters.productId || form.productId === filters.productId)
       .filter((form) => !filters.language || form.language === filters.language)
-      .filter((form) => !filters.status || form.status === filters.status)
-      .map((form) => this.toView(form));
+      .filter((form) => !filters.status || form.status === filters.status);
+    const superseded = await this.forms.supersededConsentFormIds(forms);
+    return forms.map((form) => this.toView(form, superseded));
   }
 
   async create(input: AdminQuoteFormDefinitionDto, actor: ActorContext): Promise<AdminQuoteFormDefinitionView> {
-    return this.toView(await this.forms.create(input, actor));
+    return this.view(await this.forms.create(input, actor));
   }
 
   async publish(id: string, actor: ActorContext): Promise<AdminQuoteFormDefinitionView> {
-    return this.toView(await this.forms.publish(id, actor));
+    return this.view(await this.forms.publish(id, actor));
   }
 
   async retire(id: string, actor: ActorContext): Promise<AdminQuoteFormDefinitionView> {
-    return this.toView(await this.forms.retire(id, actor));
+    return this.view(await this.forms.retire(id, actor));
   }
 
-  private toView(form: QuoteFormDefinitionRecord): AdminQuoteFormDefinitionView {
+  private async view(form: QuoteFormDefinitionRecord): Promise<AdminQuoteFormDefinitionView> {
+    return this.toView(form, await this.forms.supersededConsentFormIds([form]));
+  }
+
+  private toView(form: QuoteFormDefinitionRecord, superseded: Set<string>): AdminQuoteFormDefinitionView {
     return {
       id: form.id,
       countryId: form.countryId,
@@ -47,6 +51,7 @@ export class AdminQuoteFormDefinitionsController {
       ...(form.dataMinimizationNotes ? { dataMinimizationNotes: form.dataMinimizationNotes } : {}),
       publishedAt: form.publishedAt ? new Date(form.publishedAt).toISOString() : undefined,
       retiredAt: form.retiredAt ? new Date(form.retiredAt).toISOString() : undefined,
+      consentSuperseded: superseded.has(form.id),
       createdAt: new Date(form.createdAt).toISOString(),
       updatedAt: new Date(form.updatedAt).toISOString()
     };

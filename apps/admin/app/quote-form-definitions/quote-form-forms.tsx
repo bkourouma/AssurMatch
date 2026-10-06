@@ -71,6 +71,11 @@ export function CreateQuoteFormDefinitionForm() {
           <Input {...fieldControlProps(ids.reason, { required: true })} name="reason" />
         </Field>
         <p className="bo-description">Un formulaire est toujours cree en brouillon: la publication est un acte distinct et audite.</p>
+        <p className="bo-description">
+          Les champs generiques (ville, preference de contact, delai souhaite, budget, langue preferee, source) sont ajoutes d&apos;office
+          par le serveur, libelles dans la langue du formulaire; nom, e-mail et telephone restent les champs de contact du parcours. Ne
+          saisissez ici que les champs propres au produit.
+        </p>
         <FormActions>
           <Button type="submit" pending={pending} pendingLabel="Creation...">Creer le brouillon</Button>
         </FormActions>

@@ -1,8 +1,11 @@
 import { redirect } from "next/navigation";
 import { isStarterCrmDenied, loginRedirect, readBackOfficeSession } from "../../../lib/backoffice-auth";
-import { isNotFoundState, listLeadAiInteractions, readBrokerAIAssistance, readCrmLeadDetail } from "../../../lib/broker-api";
-import { canMutateCrmLead } from "../../../lib/broker-permissions";
+import { isNotFoundState, listLeadAiInteractions, readBrokerAIAssistance, readCrmLeadDetail, readLeadProposals } from "../../../lib/broker-api";
+import { TENANT_SUSPENDED_MESSAGE, canAssignCrmLead, canMutateCrmLead, isTenantReadOnly } from "../../../lib/broker-permissions";
 import { addCrmLeadNoteAction, addCrmLeadReminderAction, addCrmLeadTaskAction, changeCrmLeadStatusAction } from "../../../lib/lead-actions";
+import { assignCrmAdvisorAction } from "../../../lib/proposal-actions";
+import { PROPOSAL_NOTICES } from "../../../lib/proposal-vocabulary";
+import { ProposalPanel } from "../../../lib/ui/proposal-panel";
 import {
   CRM_OUTCOME_REASONS,
   CRM_PIPELINE_STATUSES,
@@ -30,7 +33,8 @@ import {
   Select,
   Split,
   Stack,
-  Tabs
+  Tabs,
+  TenantWriteGuard
 } from "../../../lib/ui/broker-ui";
 import { formatDate } from "../../../lib/ui/broker-view-models";
 import { LeadAiPanel } from "./lead-ai-panel";
@@ -42,7 +46,14 @@ const NOTICES: Record<string, { tone: "info" | "warning" | "danger"; message: st
   reminder_created: { tone: "info", message: "Rappel programme pour votre cabinet." },
   reason_required: { tone: "warning", message: "Un motif allowliste est obligatoire pour un statut de perte ou de contestation." },
   forbidden: { tone: "warning", message: "Action refusee par vos permissions CRM, votre tenant ou votre MFA." },
+  // Spec 051 FR-021: 403 PARTNER_SUSPENDED.
+  suspended: { tone: "warning", message: TENANT_SUSPENDED_MESSAGE },
   not_found: { tone: "warning", message: "Ce lead n'existe pas ou n'est pas accessible pour votre cabinet." },
+  // Spec 055 FR-010: assignation conseiller et documents internes analyses par l'antivirus.
+  assigned: { tone: "info", message: "Lead assigne au conseiller. Seul ce conseiller (et les managers) le voit parmi les agents." },
+  document_added: { tone: "info", message: "Document interne ajoute apres analyse antivirus. Il n'est jamais visible du visiteur." },
+  quarantined: { tone: "danger", message: "Document refuse : il n'a pas passe l'antivirus et n'a pas ete conserve." },
+  document_invalid: { tone: "warning", message: "Document refuse : PDF, JPEG ou PNG de 5 Mo au maximum." },
   invalid: { tone: "warning", message: "Saisie refusee par l'API. Verifiez les champs obligatoires." },
   error: { tone: "danger", message: "Action CRM indisponible pour le moment. Aucun changement n'a ete enregistre." }
 };
@@ -50,9 +61,23 @@ const NOTICES: Record<string, { tone: "info" | "warning" | "danger"; message: st
 /** Onglets de la fiche CRM: chaque onglet est une vraie navigation, donc une URL partageable. */
 const TABS = [
   { key: "synthese", label: "Synthese" },
+  { key: "propositions", label: "Propositions" },
   { key: "activite", label: "Activite" },
   { key: "historique", label: "Historique" }
 ] as const;
+
+const CONTACT_LABELS: Record<string, string> = {
+  displayName: "Nom",
+  fullName: "Nom",
+  firstName: "Prenom",
+  lastName: "Nom",
+  email: "Email",
+  emailMasked: "Email (masque)",
+  phone: "Telephone",
+  phoneMasked: "Telephone (masque)",
+  preferredContactChannel: "Canal prefere",
+  preferredContactTime: "Creneau prefere"
+};
 
 type TabKey = (typeof TABS)[number]["key"];
 
@@ -61,9 +86,9 @@ function textOf(row: Record<string, unknown>, key: string): string {
   return value === null || value === undefined ? "" : String(value);
 }
 
-export default async function BrokerCrmLeadDetailPage({ params, searchParams }: { params: Promise<{ leadAssignmentId: string }>; searchParams: Promise<{ ai?: string; crm?: string; tab?: string }> }) {
+export default async function BrokerCrmLeadDetailPage({ params, searchParams }: { params: Promise<{ leadAssignmentId: string }>; searchParams: Promise<{ ai?: string; crm?: string; tab?: string; proposal?: string }> }) {
   const { leadAssignmentId } = await params;
-  const { ai, crm, tab } = await searchParams;
+  const { ai, crm, tab, proposal } = await searchParams;
   const session = await readBackOfficeSession();
   if (session.status === "unauthenticated" || session.status === "expired") redirect(loginRedirect(`/crm/leads/${leadAssignmentId}`, session.status));
   if (session.status !== "authenticated" || isStarterCrmDenied(session.profile)) {
@@ -80,13 +105,20 @@ export default async function BrokerCrmLeadDetailPage({ params, searchParams }: 
     );
   }
 
-  const [detail, assistance, interactions] = await Promise.all([readCrmLeadDetail(leadAssignmentId), readBrokerAIAssistance(), listLeadAiInteractions(leadAssignmentId)]);
+  const [detail, assistance, interactions, proposals] = await Promise.all([readCrmLeadDetail(leadAssignmentId), readBrokerAIAssistance(), listLeadAiInteractions(leadAssignmentId), readLeadProposals("crm", leadAssignmentId)]);
   if (detail.unauthenticated) redirect(loginRedirect(`/crm/leads/${leadAssignmentId}`, detail.error ?? "session_required"));
   const lead = detail.status === "success" ? detail.data : undefined;
   const notFound = isNotFoundState(detail);
   const canMutate = canMutateCrmLead(session.profile);
+  const tenantReadOnly = isTenantReadOnly(session.profile);
   const showForms = Boolean(lead) && canMutate;
   const noticeEntry = crm ? NOTICES[crm] : undefined;
+  const proposalNoticeEntry = proposal ? PROPOSAL_NOTICES[proposal] : undefined;
+  const canAssign = canAssignCrmLead(session.profile);
+  const contactEntries = Object.entries(lead?.contact ?? {}).filter(([, value]) => value !== null && value !== undefined && value !== "");
+  const contactMasked = lead?.contactVisibility === "masked";
+  const documents = lead?.documents ?? [];
+  const suggested = proposals.status === "success" ? proposals.data.suggestedNextStatus : undefined;
   const notes = lead?.notes ?? [];
   const tasks = lead?.tasks ?? [];
   const reminders = lead?.reminders ?? [];
@@ -105,18 +137,22 @@ export default async function BrokerCrmLeadDetailPage({ params, searchParams }: 
         actions={
           <Cluster>
             <Badge tone="success">CRM autorise</Badge>
+            <Button href="/crm/kanban" variant="secondary" size="sm">Vue Kanban</Button>
             <Button href="/crm/leads" variant="secondary" size="sm">Retour aux leads CRM</Button>
           </Cluster>
         }
       />
 
       {noticeEntry ? <Notice tone={noticeEntry.tone}>{noticeEntry.message}</Notice> : null}
+      {proposalNoticeEntry ? <Notice tone={proposalNoticeEntry.tone}>{proposalNoticeEntry.message}</Notice> : null}
       {detail.status === "forbidden" ? <Notice tone="warning" title="Acces refuse">Ce lead n'est pas accessible avec vos permissions CRM ou votre tenant.</Notice> : null}
       {notFound ? <Notice tone="warning" title="Lead introuvable">Aucun lead CRM ne correspond a cette reference pour votre cabinet.</Notice> : null}
       {detail.status === "error" && !notFound ? <Notice tone="warning" title="Lead indisponible">{detail.error ?? "erreur inconnue"}</Notice> : null}
       {lead && !canMutate ? (
         <Notice tone="info" title="Lecture seule">
-          Votre role CRM ne permet pas de modifier ce lead. Statut, notes, taches et rappels restent consultables uniquement.
+          {tenantReadOnly
+            ? TENANT_SUSPENDED_MESSAGE
+            : "Votre role CRM ne permet pas de modifier ce lead. Statut, notes, taches et rappels restent consultables uniquement."}
         </Notice>
       ) : null}
 
@@ -150,11 +186,49 @@ export default async function BrokerCrmLeadDetailPage({ params, searchParams }: 
                       { term: "Source", value: lead.source },
                       { term: "Recu le", value: formatDate(lead.assignedAt) },
                       { term: "Conseiller", value: lead.advisorId ?? "Non assigne" },
-                      { term: "Contact", value: [lead.prospectName, lead.emailMasked, lead.phoneMasked].filter(Boolean).join(" - ") || "Masque" }
                     ]}
                   />
                 ) : null}
               </Card>
+
+              {lead ? (
+                <Card title="Coordonnees du visiteur" description="Spec 055 FR-001 : coordonnees completes pour le courtier affecte, des l'affectation. Chaque consultation est auditee.">
+                  {contactMasked ? (
+                    <Notice tone="warning">Le visiteur a retire son consentement : coordonnees masquees, le lead ne doit plus etre recontacte.</Notice>
+                  ) : null}
+                  {contactEntries.length > 0 ? (
+                    <DescriptionList>
+                      {contactEntries.map(([key, value]) => (
+                        <div key={key}>
+                          <dt>{CONTACT_LABELS[key] ?? key}</dt>
+                          <dd>{key === "email" ? <a href={`mailto:${String(value)}`}>{String(value)}</a> : key === "phone" ? <a href={`tel:${String(value)}`}>{String(value)}</a> : renderAnswerValue(value)}</dd>
+                        </div>
+                      ))}
+                    </DescriptionList>
+                  ) : (
+                    <p>Aucune coordonnee exposee pour ce lead.</p>
+                  )}
+                </Card>
+              ) : null}
+
+              {lead ? (
+                <Card title="Conseiller assigne" description="Un agent ne voit que les leads qui lui sont assignes.">
+                  <p>Conseiller actuel : {lead.advisorId ?? "Non assigne"}</p>
+                  {canAssign ? (
+                    <Form action={assignCrmAdvisorAction} columns={2}>
+                      <input type="hidden" name="leadAssignmentId" value={lead.leadAssignmentId} />
+                      <Field id="crm-advisor-id" label="Identifiant du conseiller" required requiredLabel="obligatoire" hint="Utilisateur de votre cabinet ; un conseiller d'un autre cabinet est refuse.">
+                        <Input id="crm-advisor-id" name="advisorId" required maxLength={120} defaultValue={lead.advisorId ?? ""} aria-label="Identifiant du conseiller" />
+                      </Field>
+                      <FormActions>
+                        <Button type="submit" variant="secondary">Assigner au conseiller</Button>
+                      </FormActions>
+                    </Form>
+                  ) : (
+                    <p>Votre role ne permet pas d'assigner ce lead.</p>
+                  )}
+                </Card>
+              ) : null}
 
               {showForms && lead ? (
                 <Card title="Changer le statut">
@@ -204,6 +278,23 @@ export default async function BrokerCrmLeadDetailPage({ params, searchParams }: 
                 </Card>
               ) : null}
             </>
+          ) : null}
+
+          {currentTab === "propositions" ? (
+            <Card title="Propositions au visiteur" description="Proposition indicative envoyee au visiteur dans son espace de suivi. L'envoi fait passer le lead a « devis envoye » s'il etait moins avance.">
+              {proposals.status === "success" && lead ? (
+                <ProposalPanel
+                  channel="crm"
+                  leadAssignmentId={lead.leadAssignmentId}
+                  data={proposals.data}
+                  canMutate={canMutate}
+                  tenantReadOnly={tenantReadOnly}
+                  suggestedStatusLabel={suggested ? crmStatusLabel(suggested) : undefined}
+                />
+              ) : (
+                <Notice tone="warning">Propositions temporairement indisponibles.</Notice>
+              )}
+            </Card>
           ) : null}
 
           {currentTab === "activite" ? (
@@ -305,6 +396,7 @@ export default async function BrokerCrmLeadDetailPage({ params, searchParams }: 
                 availableAssistTypes={assistance.data.availableAssistTypes}
                 interactions={interactions.status === "success" ? interactions.data : []}
                 notice={ai}
+                readOnly={tenantReadOnly}
               />
             </>
           ) : null}
@@ -332,12 +424,43 @@ export default async function BrokerCrmLeadDetailPage({ params, searchParams }: 
               <Card title="Documents et references">
                 <p>
                   Les propositions ou references de devis sont un suivi interne partenaire, pas une emission contractuelle par AssurMatch.
+                  Les documents internes sont analyses par l'antivirus et ne sont jamais visibles du visiteur.
                 </p>
                 <Cluster>
-                  <Badge>Document interne ({lead?.documents.length ?? 0})</Badge>
-                  <Badge>Document prospect</Badge>
+                  <Badge>Document interne ({documents.filter((document) => document.visibility === "internal").length})</Badge>
+                  <Badge>Document prospect ({documents.filter((document) => document.visibility === "prospect_provided").length})</Badge>
                   <Badge>Reference devis ({lead?.proposals.length ?? 0})</Badge>
                 </Cluster>
+                {documents.length > 0 ? (
+                  <ul>
+                    {documents.map((document, index) => (
+                      <li key={textOf(document, "id") || `document-${index}`}>
+                        {formatDate(textOf(document, "createdAt"))} - {textOf(document, "label")}
+                        {document.visibility === "prospect_provided" ? " (fourni par le visiteur)" : " (interne)"}
+                        {document.scanStatus === "clean" && document.fileName ? (
+                          <> - <a href={`/crm/leads/${leadAssignmentId}/documents/${textOf(document, "id")}/file`}>{textOf(document, "fileName")}</a></>
+                        ) : null}
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p>Aucun document pour ce lead.</p>
+                )}
+                {lead && (showForms || tenantReadOnly) ? (
+                  <TenantWriteGuard readOnly={tenantReadOnly}>
+                    <form action={`/crm/leads/${lead.leadAssignmentId}/documents`} method="post" encType="multipart/form-data" className="bo-form" aria-label="Ajouter un document interne">
+                      <Field id="crm-document-label" label="Libelle du document" required requiredLabel="obligatoire">
+                        <Input id="crm-document-label" name="label" required maxLength={120} aria-label="Libelle du document interne" />
+                      </Field>
+                      <Field id="crm-document-file" label="Fichier" required requiredLabel="obligatoire" hint="PDF, JPEG ou PNG, 5 Mo au maximum, analyse par l'antivirus.">
+                        <Input id="crm-document-file" name="file" type="file" required accept="application/pdf,image/jpeg,image/png" aria-label="Fichier du document interne" />
+                      </Field>
+                      <FormActions>
+                        <Button type="submit" variant="secondary">Televerser le document interne</Button>
+                      </FormActions>
+                    </form>
+                  </TenantWriteGuard>
+                ) : null}
               </Card>
             </>
           ) : null}

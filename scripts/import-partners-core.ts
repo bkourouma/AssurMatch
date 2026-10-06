@@ -12,7 +12,8 @@ const partnerSchema = z.object({
   tradeName: z.string().min(1).optional(),
   registrationNumber: z.string().min(3),
   plan: z.enum(["starter", "pro", "enterprise"]).default("starter"),
-  status: z.enum(["draft", "pending_compliance", "active", "suspended", "retired"]).default("pending_compliance"),
+  // Spec 051 R1: `active_test` ("Actif test") is a stored status; it is never routable nor public.
+  status: z.enum(["draft", "pending_compliance", "active_test", "active", "suspended", "retired"]).default("pending_compliance"),
   primaryEmail: allowedEmail,
   primaryWhatsApp: z.string().regex(/^\+2250{6,12}$/),
   quotaMonthlyLeads: z.number().int().min(0).default(0),
@@ -23,7 +24,7 @@ const partnerUserSchema = z.object({
   partnerRegistrationNumber: z.string().min(3),
   email: allowedEmail,
   displayName: z.string().min(2),
-  role: z.enum(["broker_owner_starter", "broker_owner_pro", "broker_manager", "broker_agent", "broker_readonly"])
+  role: z.enum(["broker_owner_starter", "broker_owner_pro", "broker_manager", "broker_agent", "broker_read_only"])
 }).strict();
 
 const licenseSchema = z.object({
@@ -41,7 +42,8 @@ const coverageSchema = z.object({
   partnerRegistrationNumber: z.string().min(3),
   countryIsoCode: z.string().length(2),
   productKeys: z.array(z.string().min(2)).default([]),
-  status: z.enum(["pending", "active", "suspended"]).default("active")
+  // Spec 051 R7: the application writes `active` or `withdrawn`; legacy values stay accepted.
+  status: z.enum(["pending", "active", "suspended", "withdrawn"]).default("active")
 }).strict();
 
 const offerSchema = z.object({
@@ -100,7 +102,15 @@ export type ImportReport = {
   updated: number;
   skipped: number;
   errors: Array<{ path: string; message: string }>;
+  /**
+   * Spec 051 R15: an import carries no file, so it creates no accreditation proof and no contract.
+   * Each imported partner needs a proof uploaded and accepted (and a contract recorded) in the back
+   * office before it is eligible to routing, the public offers or an activation.
+   */
+  warnings: string[];
 };
+
+export const IMPORT_ACCREDITATION_WARNING = "Imported partners have no accreditation proof nor contract: upload and accept a proof, record the contract and invite an owner in the back office before any activation or routing.";
 
 export type StoreOutcome = "created" | "updated" | "skipped";
 
@@ -153,7 +163,15 @@ export function parsePartnerImportPayload(rawInput: string): PartnerImportPayloa
 export async function runPartnerImport(options: RunImportOptions): Promise<ImportReport> {
   const checksum = verifySha256(options.rawInput, options.expectedChecksum);
   const payload = parsePartnerImportPayload(options.rawInput);
-  const report: ImportReport = { dryRun: !options.apply, checksum, created: 0, updated: 0, skipped: 0, errors: [] };
+  const report: ImportReport = {
+    dryRun: !options.apply,
+    checksum,
+    created: 0,
+    updated: 0,
+    skipped: 0,
+    errors: [],
+    warnings: payload.partners.length > 0 ? [IMPORT_ACCREDITATION_WARNING] : []
+  };
 
   if (!options.apply) {
     report.skipped = countLogicalRecords(payload);

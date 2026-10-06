@@ -1,3 +1,4 @@
+import type { PartnerLicenseStatus } from "../../../../packages/shared/contracts/partner.contracts";
 import type { RuntimeRepository } from "../common/repositories/runtime-repository";
 import { assertRuntimeRepository } from "../common/repositories/runtime-repository";
 import type { PrismaService } from "../common/prisma/prisma.service";
@@ -5,17 +6,33 @@ import type { PartnerLicense } from "./partner-licenses.module";
 
 export const PARTNER_LICENSES_REPOSITORY = Symbol("PARTNER_LICENSES_REPOSITORY");
 
+/** Spec 051 R4: one licence status change. */
+export interface PartnerLicenseHistoryRecord {
+  id: string;
+  licenseId: string;
+  partnerTenantId: string;
+  fromStatus: PartnerLicenseStatus | null;
+  toStatus: PartnerLicenseStatus;
+  reason: string;
+  actorId: string | null;
+  createdAt: Date;
+}
+
 export interface PartnerLicensesRepository extends RuntimeRepository {
   create(license: PartnerLicense): Promise<PartnerLicense>;
   update(id: string, update: Partial<PartnerLicense>): Promise<PartnerLicense>;
   listForPartner(partnerTenantId: string): Promise<PartnerLicense[]>;
   eligible(partnerTenantId: string, countryId: string, productId?: string): Promise<boolean>;
   require(id: string): Promise<PartnerLicense>;
+  addHistory(entry: PartnerLicenseHistoryRecord): Promise<void>;
+  /** Every licence status change of the partner, oldest first. */
+  listHistory(partnerTenantId: string): Promise<PartnerLicenseHistoryRecord[]>;
 }
 
 export class MemoryPartnerLicensesRepository implements PartnerLicensesRepository {
   readonly mode = "memory-test" as const;
   private readonly licenses: PartnerLicense[] = [];
+  private readonly history: PartnerLicenseHistoryRecord[] = [];
 
   constructor() {
     assertRuntimeRepository(this.mode, "PartnerLicensesRepository");
@@ -50,6 +67,14 @@ export class MemoryPartnerLicensesRepository implements PartnerLicensesRepositor
     const license = this.licenses.find((candidate) => candidate.id === id);
     if (!license) throw new Error(`License ${id} not found`);
     return license;
+  }
+
+  async addHistory(entry: PartnerLicenseHistoryRecord): Promise<void> {
+    this.history.push({ ...entry });
+  }
+
+  async listHistory(partnerTenantId: string): Promise<PartnerLicenseHistoryRecord[]> {
+    return this.history.filter((entry) => entry.partnerTenantId === partnerTenantId).map((entry) => ({ ...entry }));
   }
 }
 
@@ -95,6 +120,18 @@ export class PrismaPartnerLicensesRepository implements PartnerLicensesRepositor
     return this.toDomain(row);
   }
 
+  async addHistory(entry: PartnerLicenseHistoryRecord): Promise<void> {
+    await this.historyClient().create({ data: { ...entry } });
+  }
+
+  async listHistory(partnerTenantId: string): Promise<PartnerLicenseHistoryRecord[]> {
+    return (await this.historyClient().findMany({ where: { partnerTenantId }, orderBy: { createdAt: "asc" } })) as PartnerLicenseHistoryRecord[];
+  }
+
+  private historyClient(): { create(input: unknown): Promise<unknown>; findMany(input: unknown): Promise<unknown[]> } {
+    return (this.prisma.requireRuntimeClient() as unknown as { partnerLicenseHistory: { create(input: unknown): Promise<unknown>; findMany(input: unknown): Promise<unknown[]> } }).partnerLicenseHistory;
+  }
+
   private client(): PartnerLicenseDelegate {
     return (this.prisma.requireRuntimeClient() as unknown as { partnerLicense: PartnerLicenseDelegate }).partnerLicense;
   }
@@ -107,7 +144,10 @@ export class PrismaPartnerLicensesRepository implements PartnerLicensesRepositor
   }
 
   private toDomain(row: unknown): PartnerLicense {
-    const record = row as PartnerLicense & { effectiveDate: Date | string; expirationDate: Date | string };
+    const raw = { ...(row as Record<string, unknown>) };
+    // Prisma answers `null` for absent optional columns; the domain uses `undefined`.
+    for (const [key, value] of Object.entries(raw)) if (value === null) delete raw[key];
+    const record = raw as unknown as PartnerLicense & { effectiveDate: Date | string; expirationDate: Date | string };
     return {
       ...record,
       effectiveDate: this.toDateOnly(record.effectiveDate),

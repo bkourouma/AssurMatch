@@ -25,7 +25,7 @@ describe("no-consent repository blocker", () => {
           accepted: false,
           consentTextId: seed.consentText.id,
           version: "v1",
-          contentHash: "runtime-consent-hash"
+          contentHash: seed.consentText.contentHash
         },
         ipAddress: "203.0.113.11",
         sessionId: "no-consent-session"

@@ -7,7 +7,7 @@ import type { PartnerLicensesService } from "../partner-licenses/partner-license
 import type { PartnersService } from "../partners/partners.module";
 import type { ProductsService } from "../products/products.module";
 import type { QuoteFormDefinitionService } from "../quote-forms/quote-form-definition.service";
-import { ActivationChecklistAccessRefusedError, ActivationChecklistService } from "./activation-checklist.service";
+import { ActivationChecklistAccessRefusedError, ActivationChecklistService, type ActivationChecklistDeps } from "./activation-checklist.service";
 
 export interface ActivationChecklistModuleDeps {
   audit: AuditLogWriter;
@@ -19,6 +19,7 @@ export interface ActivationChecklistModuleDeps {
   offers: OffersModule;
   quoteForms: QuoteFormDefinitionService;
   consent: ConsentService;
+  partnerReadiness?: ActivationChecklistDeps["partnerReadiness"];
 }
 
 export class ActivationChecklistModule {

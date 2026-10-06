@@ -1,0 +1,177 @@
+# AssurMatch — production stack (spec 057, PRD K-01 / K-02 / I-01).
+#
+# Runs on the production host from /home/deployer/apps/assurmatch, driven by the CI job
+# `deploy-production` (manual, approved). Nothing here is domain-specific (decision D-10): public
+# URLs live in the per-app env files and in the frontend images' build arguments.
+#
+# Variables read by this file (export them, or put them in the `.env` file next to it, which compose
+# reads for interpolation only - containers never see it):
+#   ASSURMATCH_REGISTRY       image registry/owner, default ghcr.io/bkourouma
+#   ASSURMATCH_IMAGE_TAG      API + worker image tag, e.g. sha-<commit>            (required)
+#   ASSURMATCH_FRONTEND_TAG   public/admin/broker image tag, e.g. production-sha-<commit> (required)
+#   ASSURMATCH_ENV_DIR        directory holding api.env, worker.env, public.env, admin.env,
+#                             broker.env (and postgres.env with the bundled-db profile), default ./env
+#
+# Services:
+#   api, worker, public, admin, broker, redis, clamav      always
+#   postgres                                              profile `bundled-db` (default: external managed DB)
+#   nginx                                                 profile `edge` (default: host nginx, see
+#                                                         deploy/nginx/assurmatch-production.conf.example)
+#
+# Apps bind to 127.0.0.1 only; TLS is terminated by nginx. The worker exposes no port and must run
+# as ONE replica (container_name forbids scaling it).
+#
+#   docker compose -f docker-compose.production.yml pull
+#   docker compose -f docker-compose.production.yml run --rm --no-deps api npx prisma migrate deploy --schema backend/prisma/schema.prisma
+#   docker compose -f docker-compose.production.yml up -d --remove-orphans
+#   curl -fsS http://127.0.0.1:3600/readyz
+
+name: assurmatch-production
+
+x-restart: &restart
+  restart: unless-stopped
+
+x-logging: &logging
+  logging:
+    driver: json-file
+    options:
+      max-size: "20m"
+      max-file: "5"
+
+services:
+  api:
+    <<: [*restart, *logging]
+    image: ${ASSURMATCH_REGISTRY:-ghcr.io/bkourouma}/assurmatch:${ASSURMATCH_IMAGE_TAG:?set ASSURMATCH_IMAGE_TAG (sha-<commit>)}
+    container_name: assurmatch-prod-api
+    env_file:
+      - ${ASSURMATCH_ENV_DIR:-./env}/api.env
+    depends_on:
+      redis:
+        condition: service_healthy
+      clamav:
+        condition: service_started
+      postgres:
+        condition: service_healthy
+        required: false
+    ports:
+      - "127.0.0.1:${ASSURMATCH_API_HOST_PORT:-3600}:3600"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:3600/readyz >/dev/null || exit 1"]
+      interval: 30s
+      timeout: 5s
+      start_period: 40s
+      retries: 3
+
+  worker:
+    <<: [*restart, *logging]
+    image: ${ASSURMATCH_REGISTRY:-ghcr.io/bkourouma}/assurmatch:${ASSURMATCH_IMAGE_TAG:?set ASSURMATCH_IMAGE_TAG (sha-<commit>)}
+    container_name: assurmatch-prod-worker
+    command: ["node", "--import", "tsx", "scripts/worker/assurmatch-worker.ts"]
+    env_file:
+      - ${ASSURMATCH_ENV_DIR:-./env}/worker.env
+    depends_on:
+      api:
+        condition: service_healthy
+    stop_signal: SIGTERM
+    stop_grace_period: 40s
+    healthcheck:
+      test: ["CMD", "node", "scripts/worker/worker-healthcheck.mjs"]
+      interval: 30s
+      timeout: 5s
+      start_period: 60s
+      retries: 3
+
+  public:
+    <<: [*restart, *logging]
+    image: ${ASSURMATCH_REGISTRY:-ghcr.io/bkourouma}/assurmatch-public:${ASSURMATCH_FRONTEND_TAG:?set ASSURMATCH_FRONTEND_TAG (production-sha-<commit>)}
+    container_name: assurmatch-prod-public
+    env_file:
+      - ${ASSURMATCH_ENV_DIR:-./env}/public.env
+    ports:
+      - "127.0.0.1:${ASSURMATCH_PUBLIC_HOST_PORT:-3601}:3601"
+
+  admin:
+    <<: [*restart, *logging]
+    image: ${ASSURMATCH_REGISTRY:-ghcr.io/bkourouma}/assurmatch-backoffice:${ASSURMATCH_FRONTEND_TAG:?set ASSURMATCH_FRONTEND_TAG (production-sha-<commit>)}
+    container_name: assurmatch-prod-admin
+    env_file:
+      - ${ASSURMATCH_ENV_DIR:-./env}/admin.env
+    ports:
+      - "127.0.0.1:${ASSURMATCH_ADMIN_HOST_PORT:-3602}:3602"
+
+  broker:
+    <<: [*restart, *logging]
+    image: ${ASSURMATCH_REGISTRY:-ghcr.io/bkourouma}/assurmatch-broker:${ASSURMATCH_FRONTEND_TAG:?set ASSURMATCH_FRONTEND_TAG (production-sha-<commit>)}
+    container_name: assurmatch-prod-broker
+    env_file:
+      - ${ASSURMATCH_ENV_DIR:-./env}/broker.env
+    ports:
+      - "127.0.0.1:${ASSURMATCH_BROKER_HOST_PORT:-3603}:3603"
+
+  redis:
+    <<: [*restart, *logging]
+    image: redis:8-alpine
+    container_name: assurmatch-prod-redis
+    command: ["redis-server", "--appendonly", "yes", "--save", "300", "10"]
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+
+  clamav:
+    <<: [*restart, *logging]
+    image: clamav/clamav:1.4
+    container_name: assurmatch-prod-clamav
+    # Signature download + daemon start take several minutes on first boot; the API only needs it
+    # once an upload feature is enabled (ASSURMATCH_ANTIVIRUS=clamav, host `clamav`, port 3310).
+    volumes:
+      - clamav-db:/var/lib/clamav
+    healthcheck:
+      test: ["CMD", "clamdcheck.sh"]
+      interval: 60s
+      timeout: 10s
+      start_period: 600s
+      retries: 3
+
+  postgres:
+    <<: [*restart, *logging]
+    profiles: ["bundled-db"]
+    image: postgres:18-alpine
+    container_name: assurmatch-prod-postgres
+    env_file:
+      - path: ${ASSURMATCH_ENV_DIR:-./env}/postgres.env
+        required: false
+    volumes:
+      - postgres-data:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U \"$${POSTGRES_USER:-postgres}\" -d \"$${POSTGRES_DB:-postgres}\""]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  nginx:
+    <<: [*restart, *logging]
+    profiles: ["edge"]
+    image: nginx:1.27-alpine
+    container_name: assurmatch-prod-nginx
+    depends_on:
+      - api
+      - public
+      - admin
+      - broker
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ${ASSURMATCH_NGINX_CONF:-./deploy/nginx/assurmatch-production.conf}:/etc/nginx/conf.d/default.conf:ro
+      # Spec 058: versioned security headers, included by every TLS vhost.
+      - ./deploy/nginx/security-headers.conf:/etc/nginx/snippets/assurmatch-security-headers.conf:ro
+      - ${ASSURMATCH_TLS_DIR:-/etc/letsencrypt}:/etc/letsencrypt:ro
+
+volumes:
+  redis-data:
+  clamav-db:
+  postgres-data:

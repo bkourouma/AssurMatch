@@ -7,7 +7,10 @@ describe("visitor quote notifications", () => {
   it("queues visitor confirmation for routed and non-routable outcomes", async () => {
     const routed = await seedComparatorQuote();
     await routed.app.quoteRequests.publicController.submit(validQuotePayload(routed) as QuoteRequestCreateDto, superAdminActor);
-    expect((await routed.app.notifications.service.list()).some((notification) => notification.type === "visitor_quote_confirmation")).toBe(true);
+    // Spec 054 R4: "received" then one "transmitted" per assignment (was a single spec 044 "confirmation").
+    const routedTypes = (await routed.app.notifications.service.list()).map((notification) => notification.type);
+    expect(routedTypes).toContain("visitor_quote_received");
+    expect(routedTypes).toContain("visitor_quote_transmitted");
 
     const nonRoutable = await seedComparatorQuote();
     await nonRoutable.app.partners.service.update(nonRoutable.partnerTenantId, { capacityStatus: "blocked", reason: "closed" }, superAdminActor);
@@ -20,7 +23,10 @@ describe("visitor quote notifications", () => {
       reason: "manual review smoke"
     }, superAdminActor);
     await manualReview.app.quoteRequests.publicController.submit(validQuotePayload(manualReview) as QuoteRequestCreateDto, superAdminActor);
-    expect((await manualReview.app.notifications.service.list()).some((notification) => notification.type === "visitor_quote_confirmation")).toBe(true);
+    // Spec 054 FR-010: a request in manual review is "in review", never announced as transmitted.
+    const manualTypes = (await manualReview.app.notifications.service.list()).map((notification) => notification.type);
+    expect(manualTypes).toContain("visitor_quote_in_review");
+    expect(manualTypes).not.toContain("visitor_quote_transmitted");
 
     const duplicate = await seedComparatorQuote();
     await duplicate.app.quoteRequests.publicController.submit(validQuotePayload(duplicate) as QuoteRequestCreateDto, superAdminActor);

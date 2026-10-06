@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { dateTimeStringSchema, isoCountrySchema, nonEmptyStringSchema, uuidSchema } from "../validation/common.schemas";
+import { dateStringSchema, dateTimeStringSchema, isoCountrySchema, nonEmptyStringSchema, uuidSchema } from "../validation/common.schemas";
 
 export const billingFoundationQuerySchema = z.object({
   partnerId: uuidSchema.optional(),
@@ -127,13 +127,16 @@ export const leadPackSchema = z.object({
   creditsConsumed: z.number().int().min(0),
   creditsRemaining: z.number().int().min(0),
   reason: nonEmptyStringSchema,
+  /** Spec 060 J-03: invoice whose recorded payment justified the grant, when there is one. */
+  invoiceId: uuidSchema.nullable().optional(),
   grantedAt: dateTimeStringSchema
 });
 
 export const leadPackGrantSchema = z.object({
   partnerId: uuidSchema,
   credits: z.number().int().min(1).max(10_000),
-  reason: z.string().trim().min(3).max(300)
+  reason: z.string().trim().min(3).max(300),
+  invoiceId: uuidSchema.optional()
 });
 
 export const brokerBillingStatementSchema = z.object({
@@ -175,3 +178,164 @@ export type LeadPackGrant = z.infer<typeof leadPackGrantSchema>;
 export type BrokerBillingStatement = z.infer<typeof brokerBillingStatementSchema>;
 export type DraftInvoiceQuery = z.infer<typeof draftInvoiceQuerySchema>;
 export type DraftInvoiceRecompute = z.infer<typeof draftInvoiceRecomputeSchema>;
+
+/**
+ * Spec 060 - manual B2B invoicing (PRD v0.3 EPIC J, decision D-8). An issued invoice is an
+ * immutable snapshot of a monthly draft; payments are recorded by finance after they were received
+ * outside the platform (bank transfer, mobile money). Online payment stays out of scope:
+ * `paymentsEnabled` remains false everywhere. Amounts are whole XOF (no minor unit).
+ */
+export const issuedInvoiceStatusSchema = z.enum(["issued", "partially_paid", "paid", "cancelled"]);
+export const invoicePaymentMethodSchema = z.enum(["bank_transfer", "mobile_money", "cheque", "other"]);
+const xofAmountSchema = z.number().int();
+
+export const issuedInvoiceLineSchema = z.object({
+  kind: draftInvoiceLineSchema.shape.kind,
+  label: nonEmptyStringSchema,
+  quantity: z.number().min(0),
+  unitAmount: z.number(),
+  amount: xofAmountSchema,
+  /** Pack and dispute credits are already netted out of the draft total: shown for information only. */
+  informational: z.boolean()
+});
+
+export const invoiceIssuerSchema = z.object({
+  legalName: nonEmptyStringSchema,
+  address: nonEmptyStringSchema,
+  registrationNumber: nonEmptyStringSchema,
+  taxIdLabel: nonEmptyStringSchema,
+  taxId: nonEmptyStringSchema,
+  email: nonEmptyStringSchema,
+  paymentInstructions: nonEmptyStringSchema
+});
+
+export const invoiceCustomerSchema = z.object({
+  partnerId: uuidSchema,
+  legalName: nonEmptyStringSchema,
+  tradeName: z.string().nullable(),
+  city: z.string().nullable(),
+  registrationNumber: z.string().nullable()
+});
+
+export const invoicePaymentSchema = z.object({
+  id: uuidSchema,
+  invoiceId: uuidSchema,
+  amount: xofAmountSchema.min(1),
+  receivedAt: dateStringSchema,
+  method: invoicePaymentMethodSchema,
+  reference: nonEmptyStringSchema,
+  note: z.string().nullable(),
+  recordedAt: dateTimeStringSchema
+});
+
+export const creditNoteSchema = z.object({
+  id: uuidSchema,
+  number: nonEmptyStringSchema,
+  invoiceId: uuidSchema,
+  invoiceNumber: nonEmptyStringSchema,
+  partnerId: uuidSchema,
+  countryCode: isoCountrySchema,
+  currency: z.literal("XOF"),
+  subtotalAmount: xofAmountSchema,
+  vatAmount: xofAmountSchema,
+  totalAmount: xofAmountSchema,
+  reason: nonEmptyStringSchema,
+  issuedAt: dateTimeStringSchema
+});
+
+export const issuedInvoiceSchema = z.object({
+  id: uuidSchema,
+  number: nonEmptyStringSchema,
+  draftId: uuidSchema,
+  countryCode: isoCountrySchema,
+  plan: billingPlanKeySchema,
+  status: issuedInvoiceStatusSchema,
+  currency: z.literal("XOF"),
+  periodFrom: dateTimeStringSchema,
+  periodTo: dateTimeStringSchema,
+  issuedAt: dateTimeStringSchema,
+  dueDate: dateStringSchema,
+  customer: invoiceCustomerSchema,
+  issuer: invoiceIssuerSchema,
+  legalMentionsComplete: z.boolean(),
+  lines: z.array(issuedInvoiceLineSchema),
+  subtotalAmount: xofAmountSchema,
+  vatRatePercent: z.number().min(0).max(100),
+  vatAmount: xofAmountSchema,
+  totalAmount: xofAmountSchema,
+  amountPaid: xofAmountSchema,
+  amountDue: xofAmountSchema,
+  creditNote: creditNoteSchema.nullable(),
+  paymentsEnabled: z.literal(false)
+});
+
+export const issuedInvoiceDetailSchema = issuedInvoiceSchema.extend({
+  payments: z.array(invoicePaymentSchema)
+});
+
+export const issuedInvoiceQuerySchema = z.object({
+  partnerId: uuidSchema.optional(),
+  status: issuedInvoiceStatusSchema.optional()
+});
+
+export const issueInvoiceRequestSchema = z.object({
+  draftId: uuidSchema,
+  reason: z.string().trim().min(3).max(300)
+});
+
+export const recordInvoicePaymentSchema = z.object({
+  amount: z.number().int().min(1).max(1_000_000_000),
+  receivedAt: dateStringSchema,
+  method: invoicePaymentMethodSchema,
+  reference: z.string().trim().min(2).max(120),
+  note: z.string().trim().max(300).optional()
+});
+
+export const creditNoteRequestSchema = z.object({
+  reason: z.string().trim().min(8).max(300)
+});
+
+export const accountEntrySchema = z.object({
+  kind: z.enum(["invoice", "credit_note", "payment"]),
+  documentId: uuidSchema,
+  reference: nonEmptyStringSchema,
+  date: dateTimeStringSchema,
+  label: nonEmptyStringSchema,
+  debit: xofAmountSchema,
+  credit: xofAmountSchema,
+  balance: xofAmountSchema
+});
+
+export const accountStatementSchema = z.object({
+  partnerId: uuidSchema,
+  currency: z.literal("XOF"),
+  generatedAt: dateTimeStringSchema,
+  totals: z.object({
+    invoiced: xofAmountSchema,
+    credited: xofAmountSchema,
+    paid: xofAmountSchema,
+    balanceDue: xofAmountSchema
+  }),
+  entries: z.array(accountEntrySchema),
+  invoices: z.array(issuedInvoiceSchema),
+  packs: z.array(leadPackSchema),
+  packCreditsRemaining: z.number().int().min(0),
+  paymentsEnabled: z.literal(false),
+  notice: nonEmptyStringSchema
+});
+
+export type IssuedInvoiceStatus = z.infer<typeof issuedInvoiceStatusSchema>;
+export type InvoicePaymentMethod = z.infer<typeof invoicePaymentMethodSchema>;
+export type IssuedInvoiceLine = z.infer<typeof issuedInvoiceLineSchema>;
+export type InvoiceIssuer = z.infer<typeof invoiceIssuerSchema>;
+export type InvoiceCustomer = z.infer<typeof invoiceCustomerSchema>;
+export type InvoicePayment = z.infer<typeof invoicePaymentSchema>;
+export type CreditNote = z.infer<typeof creditNoteSchema>;
+export type IssuedInvoice = z.infer<typeof issuedInvoiceSchema>;
+export type IssuedInvoiceDetail = z.infer<typeof issuedInvoiceDetailSchema>;
+export type IssuedInvoiceQuery = z.infer<typeof issuedInvoiceQuerySchema>;
+export type IssueInvoiceRequest = z.infer<typeof issueInvoiceRequestSchema>;
+export type RecordInvoicePayment = z.infer<typeof recordInvoicePaymentSchema>;
+export type CreditNoteRequest = z.infer<typeof creditNoteRequestSchema>;
+export type AccountEntry = z.infer<typeof accountEntrySchema>;
+export type AccountStatement = z.infer<typeof accountStatementSchema>;

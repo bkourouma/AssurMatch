@@ -1,7 +1,7 @@
 import type { RuntimeRepository } from "../common/repositories/runtime-repository";
 import { assertRuntimeRepository } from "../common/repositories/runtime-repository";
 import type { PrismaService } from "../common/prisma/prisma.service";
-import type { Product } from "./products.module";
+import type { CountryProductLink, Product } from "./products.module";
 
 export const PRODUCTS_REPOSITORY = Symbol("PRODUCTS_REPOSITORY");
 
@@ -9,6 +9,8 @@ export interface ProductsRepository extends RuntimeRepository {
   create(product: Product): Promise<Product>;
   update(id: string, update: Partial<Product>): Promise<Product>;
   associateCountry(productId: string, countryId: string): Promise<Product>;
+  /** Spec 050: creates or replaces the CountryProduct row (status and flags). */
+  saveLink(productId: string, link: CountryProductLink): Promise<CountryProductLink>;
   list(countryId?: string): Promise<Product[]>;
   listPublic(countryId: string): Promise<Product[]>;
   findByKey(productKey: string): Promise<Product | undefined>;
@@ -41,6 +43,20 @@ export class MemoryProductsRepository implements ProductsRepository {
     return product;
   }
 
+  async saveLink(productId: string, link: CountryProductLink): Promise<CountryProductLink> {
+    const product = await this.require(productId);
+    const links = product.countryLinks ?? [];
+    const index = links.findIndex((candidate) => candidate.countryId === link.countryId);
+    const saved: CountryProductLink = { ...link, flags: { ...link.flags } };
+    if (index >= 0) links[index] = saved;
+    else links.push(saved);
+    product.countryLinks = links;
+    const active = product.countryIds.includes(link.countryId);
+    if (link.status === "retired" && active) product.countryIds.splice(product.countryIds.indexOf(link.countryId), 1);
+    if (link.status !== "retired" && !active) product.countryIds.push(link.countryId);
+    return saved;
+  }
+
   async list(countryId?: string): Promise<Product[]> {
     return countryId ? this.products.filter((product) => product.countryIds.includes(countryId)) : [...this.products];
   }
@@ -70,9 +86,19 @@ type ProductDelegate = {
   findUnique(input: unknown): Promise<unknown | null>;
 };
 
+type CountryProductRow = {
+  productId: string;
+  countryId: string;
+  status?: string;
+  flags?: unknown;
+  createdAt?: Date;
+  updatedAt?: Date;
+  createdById?: string | null;
+};
+
 type CountryProductDelegate = {
   upsert(input: unknown): Promise<unknown>;
-  findMany(input?: unknown): Promise<Array<{ productId: string; countryId: string }>>;
+  findMany(input?: unknown): Promise<CountryProductRow[]>;
 };
 
 export class PrismaProductsRepository implements ProductsRepository {
@@ -87,8 +113,7 @@ export class PrismaProductsRepository implements ProductsRepository {
 
   async update(id: string, update: Partial<Product>): Promise<Product> {
     const row = await this.products().update({ where: { id }, data: this.toPrismaUpdate(update) });
-    const countries = await this.countryIds(id);
-    return this.withCountries(row, countries);
+    return this.withCountries(row, undefined);
   }
 
   async associateCountry(productId: string, countryId: string): Promise<Product> {
@@ -100,9 +125,31 @@ export class PrismaProductsRepository implements ProductsRepository {
     return this.require(productId);
   }
 
+  async saveLink(productId: string, link: CountryProductLink): Promise<CountryProductLink> {
+    await this.countryProducts().upsert({
+      where: { countryId_productId: { countryId: link.countryId, productId } },
+      create: {
+        countryId: link.countryId,
+        productId,
+        status: link.status,
+        flags: link.flags,
+        createdAt: link.createdAt,
+        updatedAt: link.updatedAt,
+        ...(link.createdById ? { createdById: link.createdById } : {})
+      },
+      update: { status: link.status, flags: link.flags, updatedAt: link.updatedAt }
+    });
+    return link;
+  }
+
   async list(countryId?: string): Promise<Product[]> {
     const rows = await this.products().findMany({ orderBy: { name: "asc" } });
-    const products = await Promise.all(rows.map((row) => this.withCountries(row, undefined)));
+    // Spec 059 follow-up: one query for every country link instead of one per product.
+    const ids = rows.map((row) => (row as { id: string }).id);
+    const links = ids.length > 0 ? await this.countryProducts().findMany({ where: { productId: { in: ids } } }) : [];
+    const byProduct = new Map<string, CountryProductRow[]>();
+    for (const link of links) byProduct.set(link.productId, [...(byProduct.get(link.productId) ?? []), link]);
+    const products = rows.map((row) => this.assemble(row, byProduct.get((row as { id: string }).id) ?? []));
     return countryId ? products.filter((product) => product.countryIds.includes(countryId)) : products;
   }
 
@@ -129,14 +176,38 @@ export class PrismaProductsRepository implements ProductsRepository {
     return (this.prisma.requireRuntimeClient() as unknown as { countryProduct: CountryProductDelegate }).countryProduct;
   }
 
-  private async countryIds(productId: string): Promise<string[]> {
-    const rows = await this.countryProducts().findMany({ where: { productId } });
-    return rows.map((row) => row.countryId);
+  private async withCountries(row: unknown, knownCountryIds?: string[]): Promise<Product> {
+    const item = row as Product & { description?: string | null; categoryId?: string | null };
+    const { description, categoryId, ...rest } = item;
+    const base = { ...rest, ...(description ? { description } : {}), ...(categoryId ? { categoryId } : {}) } as Product;
+    if (knownCountryIds) return { ...base, countryIds: knownCountryIds, countryLinks: [] };
+    return this.assemble(row, await this.countryProducts().findMany({ where: { productId: item.id } }));
   }
 
-  private async withCountries(row: unknown, knownCountryIds?: string[]): Promise<Product> {
-    const item = row as Product;
-    return { ...item, countryIds: knownCountryIds ?? await this.countryIds(item.id) };
+  private assemble(row: unknown, linkRows: CountryProductRow[]): Product {
+    const item = row as Product & { description?: string | null; categoryId?: string | null };
+    const { description, categoryId, ...rest } = item;
+    const base = { ...rest, ...(description ? { description } : {}), ...(categoryId ? { categoryId } : {}) } as Product;
+    const links = linkRows.map((link) => this.toLink(link));
+    return {
+      ...base,
+      countryIds: links.filter((link) => link.status !== "retired").map((link) => link.countryId),
+      countryLinks: links
+    };
+  }
+
+  private toLink(row: CountryProductRow): CountryProductLink {
+    const status = (["internal", "pilot", "public", "suspended", "retired"] as const).find((candidate) => candidate === row.status) ?? "internal";
+    const flags = row.flags && typeof row.flags === "object" && !Array.isArray(row.flags) ? row.flags as CountryProductLink["flags"] : {};
+    const epoch = new Date(0);
+    return {
+      countryId: row.countryId,
+      status,
+      flags,
+      createdAt: row.createdAt ?? epoch,
+      updatedAt: row.updatedAt ?? epoch,
+      ...(row.createdById ? { createdById: row.createdById } : {})
+    };
   }
 
   private toPrisma(product: Product): Record<string, unknown> {

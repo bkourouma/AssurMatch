@@ -17,7 +17,9 @@ import { PublicQuoteRequestsController } from "./public-quote-requests.controlle
 import { PublicQuoteStatusController } from "./public-quote-status.controller";
 import { QuoteDuplicateDetectionService } from "./quote-duplicate-detection.service";
 import type { QuoteRequestsRepository } from "./quote-requests.repository";
-import { QuoteSubmissionService, type QuoteAssignmentsPort, type QuoteInAppNotifierPort } from "./quote-submission.service";
+import { QuoteSubmissionService, type QuoteSubmissionDependencies, type QuoteAssignmentHistoryEvent, type QuoteAssignmentsPort, type QuoteInAppNotifierPort, type SelectedOfferVerifier } from "./quote-submission.service";
+import type { VisitorAccessOptions } from "./visitor-access.service";
+import type { VisitorAccessTokensRepository } from "./visitor-access-tokens.repository";
 
 export interface QuoteRequestsModuleDeps {
   countries: CountriesService;
@@ -35,6 +37,17 @@ export interface QuoteRequestsModuleDeps {
   /** Spec 045: partner inbox used to tell a broker the withdrawn lead must not be worked (`MessagingDispatchService`). */
   inApp?: QuoteInAppNotifierPort;
   isGlobalFlagEnabled?: (key: string) => boolean;
+  /** Spec 052 R7: verification of the offer selected by the visitor. */
+  selectedOffers?: SelectedOfferVerifier;
+  /** Spec 054 R1: persisted visitor access tokens (memory store when absent, tests only). */
+  visitorAccessTokens?: VisitorAccessTokensRepository;
+  visitorAccessOptions?: VisitorAccessOptions;
+  /** Spec 054: the broker named to the visitor (trade name, else legal name). */
+  partnerName?: (partnerTenantId: string) => Promise<string | undefined>;
+  /** Spec 054 R5: assignment history for the public timeline. */
+  assignmentHistory?: (leadAssignmentId: string) => Promise<QuoteAssignmentHistoryEvent[]>;
+  /** Spec 055 FR-005: proposals shown in the tracking space. */
+  proposals?: QuoteSubmissionDependencies["proposals"];
 }
 
 export class QuoteRequestsModule {
@@ -67,6 +80,21 @@ export class QuoteRequestsModule {
       ...(deps.satisfactionSurveys ? { satisfactionSurveys: deps.satisfactionSurveys } : {}),
       ...(deps.inApp ? { inApp: deps.inApp } : {}),
       ...(deps.isGlobalFlagEnabled ? { isGlobalFlagEnabled: deps.isGlobalFlagEnabled } : {}),
+      ...(deps.selectedOffers ? { selectedOffers: deps.selectedOffers } : {}),
+      ...(deps.visitorAccessTokens ? { visitorAccessTokens: deps.visitorAccessTokens } : {}),
+      ...(deps.visitorAccessOptions ? { visitorAccessOptions: deps.visitorAccessOptions } : {}),
+      ...(deps.partnerName ? { partnerName: deps.partnerName } : {}),
+      ...(deps.assignmentHistory ? { assignmentHistory: deps.assignmentHistory } : {}),
+      ...(deps.proposals ? { proposals: deps.proposals } : {}),
+      findCountryById: async (countryId: string) => {
+        const country = await deps.countries.require(countryId).catch(() => undefined);
+        return country ? { isoCode: country.isoCode, name: country.name } : undefined;
+      },
+      findProductById: async (productId: string) => {
+        const product = await deps.products.require(productId).catch(() => undefined);
+        return product ? { key: product.key, name: product.name } : undefined;
+      },
+      redis,
       ...(deps.routing ? { routing: deps.routing } : {}),
       ...(deps.notifications ? { notifications: deps.notifications } : {}),
       ...(deps.aiSummary ? { aiSummary: deps.aiSummary } : {})

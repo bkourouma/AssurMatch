@@ -1,10 +1,11 @@
 "use client";
 
-import { useTranslations } from "next-intl";
+import { useLocale, useMessages, useTranslations } from "next-intl";
 import { useEffect, useRef, useState, type FormEvent, type RefObject } from "react";
 import { Link } from "../../i18n/navigation";
-import { submitPublicQuoteRequest, type PublicQuoteFormField, type PublicQuoteFormState } from "../lib/public-api";
+import { submitPublicQuoteRequest, type PublicPhoneRule, type PublicQuoteFormField, type PublicQuoteFormState, type PublicQuoteLanguage } from "../lib/public-api";
 import { InitialsTile } from "./journey/tiles";
+import { IndicativeOfferNotice } from "./public-journey";
 import { VisitorAiAssistant } from "./visitor-ai-assistant";
 import { BackendText } from "./ui/backend-text";
 import { Button } from "./ui/button";
@@ -48,17 +49,46 @@ function withOptionalTag(label: string, required: boolean, optionalTag: string):
   return required ? label : `${label} (${optionalTag})`;
 }
 
+/** Localised display labels of known select option codes; the submitted value stays the code. */
+type OptionLabels = Record<string, Record<string, string> | undefined>;
+
+function optionLabel(labels: OptionLabels, field: PublicQuoteFormField, option: string): string {
+  return labels[field.key]?.[option] ?? option;
+}
+
+/**
+ * Spec 050 R8: digits only, with spaces, dots and dashes tolerated as the server does. The pattern
+ * is a convenience for the visitor: the server's check of the country rule stays the authority.
+ */
+function dialDigits(rule: PublicPhoneRule): string {
+  return rule.dialCode.replace(/\D/g, "");
+}
+
+function phonePattern(rule: PublicPhoneRule | null | undefined): string | undefined {
+  if (!rule || rule.nationalLengths.length === 0) return undefined;
+  const digits = dialDigits(rule);
+  if (!digits) return undefined;
+  const separator = "[\\s.\\-]*";
+  const national = rule.nationalLengths.map((length) => `(?:${separator}\\d){${length}}`).join("|");
+  return `${separator}(?:\\+${digits})?(?:${national})${separator}`;
+}
+
 function QuoteFormFieldInput({
   field,
   chooseLabel,
   requiredLabel,
   optionalTag,
+  optionLabels,
+  language,
   error
 }: {
   field: PublicQuoteFormField;
   chooseLabel: string;
   requiredLabel: string;
   optionalTag: string;
+  optionLabels: OptionLabels;
+  /** Language the published form was served in (spec 050 R6): its labels are marked with it. */
+  language: string;
   error?: string | undefined;
 }) {
   const name = `answer_${field.key}`;
@@ -70,9 +100,7 @@ function QuoteFormFieldInput({
     return (
       <label className="am-j-consent" htmlFor={id}>
         <input id={id} name={name} type="checkbox" required={field.required} />
-        <span>
-          <BackendText>{field.label}</BackendText>
-        </span>
+        <span lang={language}>{field.label}</span>
       </label>
     );
   }
@@ -86,7 +114,7 @@ function QuoteFormFieldInput({
           </option>
           {(field.options ?? []).map((option) => (
             <option key={option} value={option}>
-              {option}
+              {optionLabel(optionLabels, field, option)}
             </option>
           ))}
         </select>
@@ -136,8 +164,11 @@ interface ResponsibleBrokerBlockProps {
 }
 
 /**
- * D4: the broker who will confirm the offer is named before the consent box whenever it is knowable,
- * with its initials plate, the way the broker directories show it.
+ * D4 (spec 050) + FR-018 (spec 052): the offer's broker is named before the consent box when the
+ * server serves its name (it does so only when that broker is eligible for the request), with its
+ * initials plate as the broker directories show it, and its licence when the public directory
+ * resolves it. The wording stays conditional: routing may still hand the request to another eligible
+ * broker, which the confirmation then says.
  */
 function ResponsibleBrokerBlock({ broker, hasSelectedOffer, productName, countryName }: ResponsibleBrokerBlockProps) {
   const t = useTranslations("QuoteForm");
@@ -148,17 +179,20 @@ function ResponsibleBrokerBlock({ broker, hasSelectedOffer, productName, country
     return (
       <div className="am-quote-broker__named">
         <InitialsTile name={broker.name} />
-        <p className="am-quote-broker__text">
-          <BackendText>
-            {broker.licenceNumber && broker.issuingAuthority
-              ? t("brokerConfirm.resolved", { name: broker.name, licence: broker.licenceNumber, authority: broker.issuingAuthority })
-              : t("brokerConfirm.namedOnly", { name: broker.name })}
-          </BackendText>
-        </p>
+        <div className="am-quote-broker__text">
+          <p>
+            <BackendText>{t("offerPartner", { partner: broker.name })}</BackendText>
+          </p>
+          {broker.licenceNumber && broker.issuingAuthority ? (
+            <p>
+              <BackendText>{t("brokerLicence", { licence: broker.licenceNumber, authority: broker.issuingAuthority })}</BackendText>
+            </p>
+          ) : null}
+        </div>
       </div>
     );
   }
-  return <p className="am-quote-broker__text">{t("preselected.generic")}</p>;
+  return <p className="am-quote-broker__text">{t("preselected")}</p>;
 }
 
 export function QuoteFormShell({
@@ -166,6 +200,7 @@ export function QuoteFormShell({
   productKey,
   countryName,
   productName,
+  language,
   quoteForm,
   selectedOfferId,
   responsibleBroker,
@@ -175,6 +210,8 @@ export function QuoteFormShell({
   productKey: string;
   countryName: string;
   productName: string;
+  /** Spec 050 R6: the language the form was served in, sent back with the request. */
+  language: PublicQuoteLanguage;
   quoteForm: PublicQuoteFormState;
   selectedOfferId?: string | undefined;
   responsibleBroker?: ResponsibleBrokerInfo | undefined;
@@ -187,6 +224,27 @@ export function QuoteFormShell({
 }) {
   const t = useTranslations("QuoteForm");
   const forms = useTranslations("Forms");
+  const api = useTranslations("Api");
+  const locale = useLocale();
+  // Option codes are what the server stores; the labels come from the mounted QuoteForm namespace.
+  const optionLabels: OptionLabels = useMessages().QuoteForm?.options ?? {};
+  const formLanguage = quoteForm.language ?? language;
+
+  // Spec 050 R8: the hint states the country rule; without a rule the generic hint stays.
+  const phoneRule = quoteForm.phoneRule && quoteForm.phoneRule.nationalLengths.length > 0 && dialDigits(quoteForm.phoneRule) ? quoteForm.phoneRule : null;
+  const phoneHint = phoneRule
+    ? t("phoneRuleHint", {
+        dialCode: `+${dialDigits(phoneRule)}`,
+        lengths: new Intl.ListFormat(locale, { type: "disjunction" }).format(phoneRule.nationalLengths.map(String))
+      })
+    : t("phoneHint");
+  const phoneInputPattern = phonePattern(phoneRule);
+
+  // Spec 050 R5: the published consent text, variables resolved server-side, rendered as plain text.
+  // The static sentence only remains for an older API that does not serve the content.
+  const consentContent = quoteForm.consent.content?.trim();
+  // Spec 052 FR-018: the selected offer's broker, served only when it is eligible for display.
+  const offerPartnerName = selectedOfferId ? quoteForm.offerPartnerName?.trim() || undefined : undefined;
   const formRef = useRef<HTMLFormElement>(null);
   const needHeadingRef = useRef<HTMLHeadingElement>(null);
   const contactHeadingRef = useRef<HTMLHeadingElement>(null);
@@ -199,7 +257,13 @@ export function QuoteFormShell({
   const [needErrors, setNeedErrors] = useState<Record<string, string>>({});
   const [contactErrors, setContactErrors] = useState<Record<string, string>>({});
   const [review, setReview] = useState<{ need: ReviewRow[]; name: string; email: string; phone: string } | null>(null);
-  const [result, setResult] = useState<{ status: "idle" | "submitting" | "success" | "error"; message?: string; publicReference?: string; verificationToken?: string }>({ status: "idle" });
+  const [result, setResult] = useState<{
+    status: "idle" | "submitting" | "success" | "error";
+    message?: string;
+    publicReference?: string;
+    verificationToken?: string;
+    selectedOfferPartnerRetained?: boolean | null;
+  }>({ status: "idle" });
 
   useEffect(() => {
     setJsEnabled(true);
@@ -239,7 +303,7 @@ export function QuoteFormShell({
     if (!email) errors.email = forms("fieldRequired");
     else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) errors.email = forms("invalidEmail");
     if (!phone) errors.phone = forms("fieldRequired");
-    else if (!/^[0-9+()\-\s]{6,}$/.test(phone)) errors.phone = forms("invalidPhone");
+    else if (phoneInputPattern ? !new RegExp(`^(?:${phoneInputPattern})$`).test(phone) : !/^[0-9+()\-\s]{6,}$/.test(phone)) errors.phone = forms("invalidPhone");
     setContactErrors(errors);
     return errors;
   }
@@ -252,7 +316,8 @@ export function QuoteFormShell({
       .map((field) => {
         const raw = formData.get(`answer_${field.key}`);
         const value = typeof raw === "string" ? raw.trim() : "";
-        return { label: field.label, value: value || t("reviewEmpty") };
+        const shown = value && field.type === "select" ? optionLabel(optionLabels, field, value) : value;
+        return { label: field.label, value: shown || t("reviewEmpty") };
       });
     return {
       need,
@@ -324,6 +389,7 @@ export function QuoteFormShell({
       countryCode,
       productKey,
       formDefinitionId: quoteForm.formDefinitionId,
+      language,
       ...(selectedOfferId ? { selectedOfferId } : {}),
       contact: {
         displayName: String(formData.get("displayName") ?? "").trim() || undefined,
@@ -343,10 +409,16 @@ export function QuoteFormShell({
     if (response.status === "success") {
       // No `form.reset()`: the form is replaced by the confirmation panel below, and emptying a form
       // that stays on screen next to "demande recue" reads as an invitation to send it again.
-      setResult({ status: "success", message: response.publicMessage, publicReference: response.publicReference ?? "", ...(response.verificationToken ? { verificationToken: response.verificationToken } : {}) });
+      setResult({
+        status: "success",
+        message: response.publicMessage,
+        publicReference: response.publicReference ?? "",
+        ...(response.verificationToken ? { verificationToken: response.verificationToken } : {}),
+        selectedOfferPartnerRetained: response.selectedOfferPartnerRetained ?? null
+      });
       return;
     }
-    setResult({ status: "error", message: response.publicMessage });
+    setResult({ status: "error", message: api(response.messageKey) });
   }
 
   const pending = result.status === "submitting";
@@ -371,6 +443,15 @@ export function QuoteFormShell({
   );
 
   if (sent) {
+    // Spec 052 FR-019: say whether the selected offer's broker received the request. Without an
+    // offer (`null`) the confirmation stays as it was; the retained broker's name beyond the offer's
+    // own is left to the follow-up page (spec 054).
+    const offerRouting =
+      selectedOfferId && result.selectedOfferPartnerRetained === true && offerPartnerName
+        ? t("offerPartnerRetained", { partner: offerPartnerName })
+        : selectedOfferId && result.selectedOfferPartnerRetained === false
+          ? t("offerPartnerNotRetained")
+          : null;
     return (
       <div className="am-stack am-stack--xl">
         {stepper}
@@ -381,6 +462,11 @@ export function QuoteFormShell({
             <p className="am-j-reference__label">{t("successPrefix")}</p>
             <p className="am-j-reference__value am-tabular">{result.publicReference}</p>
           </div>
+          {offerRouting ? (
+            <Notice tone="info" role="status">
+              {offerRouting}
+            </Notice>
+          ) : null}
           {result.message ? (
             <p className="am-j-fineprint">
               <BackendText>{result.message}</BackendText>
@@ -415,13 +501,13 @@ export function QuoteFormShell({
   }
 
   const hasSelectedOffer = Boolean(selectedOfferId);
+  // Without an offer, the routing explanation; with one, its broker when the server serves the name
+  // (spec 052), otherwise the generic pre-selection notice.
   const preselectedNotice = !hasSelectedOffer
-    ? t("preselected.routing", { product: productName, country: countryName })
-    : responsibleBroker?.licenceNumber
-      ? t("preselected.resolved", { name: responsibleBroker.name, licence: responsibleBroker.licenceNumber })
-      : responsibleBroker?.name
-        ? t("preselected.namedOnly", { name: responsibleBroker.name })
-        : t("preselected.generic");
+    ? t("preselectedRouting", { product: productName, country: countryName })
+    : offerPartnerName
+      ? t("offerPartner", { partner: offerPartnerName })
+      : t("preselected");
 
   return (
     <div className="am-stack am-stack--xl">
@@ -451,6 +537,8 @@ export function QuoteFormShell({
                     chooseLabel={t("choose")}
                     requiredLabel={forms("required")}
                     optionalTag={t("optionalTag")}
+                    optionLabels={optionLabels}
+                    language={formLanguage}
                     error={needErrors[field.key]}
                   />
                 ))}
@@ -497,17 +585,19 @@ export function QuoteFormShell({
             <Field
               id="am-quote-phone"
               label={t("phone")}
-              hint={t("phoneHint")}
+              hint={phoneHint}
               required
               requiredLabel={forms("required")}
               leading="phone"
               error={contactErrors.phone}
             >
               <input
-                {...fieldControlProps("am-quote-phone", { hint: t("phoneHint"), required: true, error: contactErrors.phone })}
+                {...fieldControlProps("am-quote-phone", { hint: phoneHint, required: true, error: contactErrors.phone })}
                 name="phone"
                 type="tel"
                 autoComplete="tel"
+                inputMode="tel"
+                {...(phoneInputPattern ? { pattern: phoneInputPattern, title: phoneHint } : {})}
               />
             </Field>
           </div>
@@ -541,9 +631,7 @@ export function QuoteFormShell({
                   <dl className="am-quote-review__list">
                     {review.need.map((row) => (
                       <div className="am-quote-review__row" key={row.label}>
-                        <dt>
-                          <BackendText>{row.label}</BackendText>
-                        </dt>
+                        <dt lang={formLanguage}>{row.label}</dt>
                         <dd>{row.value}</dd>
                       </div>
                     ))}
@@ -600,12 +688,21 @@ export function QuoteFormShell({
             <div className="am-j-consents">
               <label className="am-j-consent" htmlFor="am-quote-consent">
                 <input id="am-quote-consent" name="consent" type="checkbox" required />
-                <span>{t("consentLabel")}</span>
+                {consentContent ? (
+                  <span className="am-j-consent__text" lang={quoteForm.consent.language ?? formLanguage} style={{ whiteSpace: "pre-line" }}>
+                    {consentContent}
+                  </span>
+                ) : (
+                  <span>{t("consentLabel")}</span>
+                )}
               </label>
               <label className="am-j-consent" htmlFor="am-quote-multi-broker">
                 <input id="am-quote-multi-broker" name="multiBroker" type="checkbox" />
                 <span>{t("multiBrokerLabel")}</span>
               </label>
+            </div>
+            <div className="am-j-tail">
+              <IndicativeOfferNotice />
             </div>
           </div>
 

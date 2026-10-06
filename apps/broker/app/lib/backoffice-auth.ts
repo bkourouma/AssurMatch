@@ -9,6 +9,8 @@ const BROKER_API_BASE_URL = process.env.NEXT_PUBLIC_ASSURMATCH_BROKER_API_URL ??
 
 export interface BackOfficeProfile {
   actorId?: string;
+  /** Name returned by `/auth/me`, shown in the portal header. */
+  displayName?: string;
   roles: string[];
   partnerTenantId?: string;
   partnerPlan?: "starter" | "pro" | "enterprise";
@@ -16,6 +18,10 @@ export interface BackOfficeProfile {
   productScopes?: string[];
   mfaVerified?: boolean;
   correlationId?: string;
+  /** Spec 051 R12: status of the partner, returned by `/auth/me`. */
+  partnerTenantStatus?: string;
+  /** Spec 051 R12: true while the partner is suspended (read-only access, writes refused 403 PARTNER_SUSPENDED). */
+  tenantReadOnly?: boolean;
 }
 
 export type BackOfficeSession =

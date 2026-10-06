@@ -3,6 +3,7 @@ import { offerCompareResponseSchema, offerSummarySchema, scoringRuleSchema, scor
 import type { ActorContext } from "../../../src/modules/common/types";
 import { ScoringAuditActions } from "../../../src/modules/offers/scoring-rules.service";
 import { actorHeaders, createRuntimeHttpHarness, readJson, seedPublicRuntime, type RuntimeHttpHarness } from "../runtime-http-test-utils";
+import { COMPLETE_OFFER_DEFAULTS } from "../helpers/offer-test-helpers";
 
 const superAdmin: ActorContext = { actorId: "super", roles: ["super_admin"], mfaVerified: true };
 const priceHeavy = { guaranteeLevel: 10, price: 60, deductible: 10, processingSpeed: 5, paymentFlexibility: 5, informationQuality: 5, userPreferences: 5 };
@@ -20,11 +21,19 @@ async function createOffer(harness: RuntimeHttpHarness, seed: Awaited<ReturnType
       validFrom: "2026-01-01T00:00:00.000Z",
       validUntil: "2030-01-01T00:00:00.000Z",
       reason: "comparison runtime seed",
+      ...COMPLETE_OFFER_DEFAULTS,
       ...extra
     })
   });
   expect(response.status).toBe(201);
   const offer = await readJson<{ id: string }>(response);
+  // Spec 052: only a submitted version can be validated.
+  const submitted = await harness.request(`/admin/offers/${offer.id}/submit`, {
+    method: "POST",
+    headers: { ...actorHeaders(superAdmin), "content-type": "application/json" },
+    body: JSON.stringify({ reason: "comparison runtime submission" })
+  });
+  expect(submitted.status).toBe(201);
   const validated = await harness.request(`/admin/offers/${offer.id}/validate`, {
     method: "POST",
     headers: { ...actorHeaders(superAdmin), "content-type": "application/json" },
@@ -110,7 +119,7 @@ describe("offer comparison runtime HTTP", () => {
     });
     expect(forbidden.status).toBe(400);
 
-    const offer = await createOffer(harness, seed, "Suspendable", { guaranteeLevel: 3 });
+    const offer = await createOffer(harness, seed, "Suspendable", { guaranteeLevel: 3, indicativePriceMin: 15000 });
     expect((await readJson<Array<{ name: string }>>(await harness.request("/countries/CI/products/auto/offers"))).some((item) => item.name === "Suspendable")).toBe(true);
     const suspended = await harness.request(`/admin/offers/${offer.id}/suspend`, {
       method: "POST",

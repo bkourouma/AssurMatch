@@ -32,9 +32,15 @@ export interface DraftInvoiceDeps {
   packs: LeadPacksService;
   repository: BillingRepository;
   crmActivity?: CrmActivityRepository | undefined;
+  /** Spec 060: true when the partner's draft for that period already became an active invoice. */
+  isPeriodInvoiced?: ((partnerId: string, periodFrom: Date) => Promise<boolean>) | undefined;
 }
 
-const DRAFT_NOTICE = "Brouillon non facturable: aucun encaissement, aucune emission de facture, aucune prime collectee par AssurMatch.";
+/**
+ * Spec 060: the draft is still an estimate; the invoice is issued separately by finance (manual
+ * invoicing, decision D-8) and paid outside the platform.
+ */
+const DRAFT_NOTICE = "Brouillon non facturable: estimation du mois en cours, aucun encaissement en ligne et aucune prime collectee par AssurMatch. La facture du mois est emise separement par la finance.";
 
 /**
  * Monthly draft per partner: subscription + billable leads - accepted disputes - pack credits.
@@ -76,7 +82,17 @@ export class DraftInvoiceService {
     if (!this.deps.featureFlags.isEnabled("billing_enabled")) this.refuseDisabled(actor, "DraftInvoice");
     const partners = (await this.deps.partners.list()).filter((partner) => !parsed.partnerId || partner.id === parsed.partnerId);
     const drafts: DraftInvoice[] = [];
+    const period = this.currentMonth();
     for (const partner of partners) {
+      // Spec 060 R-6: an invoiced draft stays aligned with its immutable invoice (and pack credits
+      // are not consumed twice); cancelling the invoice with a credit note re-opens recomputation.
+      if (await this.deps.isPeriodInvoiced?.(partner.id, period.from)) {
+        const existing = (await this.deps.repository.listDrafts(partner.id)).find((record) => record.periodFrom.getTime() === period.from.getTime());
+        if (existing) {
+          drafts.push(this.toDto(existing));
+          continue;
+        }
+      }
       drafts.push(await this.computeForPartner(partner.id, partner.legalName, partner.plan as BillingPlanKey, actor, parsed.reason));
     }
     return drafts;
@@ -86,7 +102,8 @@ export class DraftInvoiceService {
   async statement(actor: ActorContext): Promise<BrokerBillingStatement> {
     if (actor.mfaVerified !== true) this.refuse(actor, "BrokerBillingStatement", "mfa_required");
     if (!actor.partnerTenantId) this.refuse(actor, "BrokerBillingStatement", "missing_broker_tenant");
-    if (!actor.roles.some((role) => role.startsWith("broker_"))) this.refuse(actor, "BrokerBillingStatement", "forbidden_role");
+    // Spec 060 FR-16: owners, managers and read-only members read billing; agents do not.
+    if (!actor.roles.some((role) => role.startsWith("broker_") && roleHasPermission(role, "billing:read_own"))) this.refuse(actor, "BrokerBillingStatement", "forbidden_role");
     const tenantId = actor.partnerTenantId;
     const period = this.currentMonth();
     const { evaluations, assignments } = await this.evaluateLeads(tenantId, period);

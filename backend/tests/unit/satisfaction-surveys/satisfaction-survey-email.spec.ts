@@ -8,7 +8,9 @@ describe("SatisfactionSurveyEmailTemplateService", () => {
       to: "visitor@example.com",
       publicReference: "SF-ABCDEF12",
       token: "secret-token-123",
-      locale: "fr"
+      locale: "fr",
+      // Spec 054 R9: the base URL now defaults to PUBLIC_APP_URL (the local site otherwise).
+      baseUrl: "https://assurmatch.com"
     });
 
     expect(payload.to).toBe("visitor@example.com");
@@ -24,7 +26,8 @@ describe("SatisfactionSurveyEmailTemplateService", () => {
       to: "visitor@example.com",
       publicReference: "SF-ABCDEF12",
       token: "secret-token-123",
-      locale: "en"
+      locale: "en",
+      baseUrl: "https://assurmatch.com"
     });
 
     expect(payload.to).toBe("visitor@example.com");

@@ -1,4 +1,4 @@
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { PrismaPg } from "@prisma/adapter-pg";
 import { PrismaClient } from "@prisma/client";
 import type { Prisma } from "@prisma/client";
@@ -12,6 +12,10 @@ import {
   type DemoOfferSpec
 } from "./demo-offer-catalog";
 import { withoutUndefined } from "../lib/without-undefined";
+import { consentContentHash } from "../../packages/shared/contracts/consent-content";
+import type { QuoteFormFieldDto } from "../../packages/shared/contracts/quote.contracts";
+import { withGenericFields } from "../../backend/src/modules/quote-forms/quote-form-definition.service";
+import { resolveDocumentStorage } from "../../backend/src/modules/quote-documents/quote-documents.config";
 
 type PartnerPlan = "starter" | "pro" | "enterprise";
 type LeadStatus = "assigned" | "broker_notified" | "seen" | "accepted" | "rejected" | "closed" | "disputed";
@@ -175,8 +179,11 @@ async function main(): Promise<void> {
     await seedCountryProducts(prisma, countries.ci, [products.auto, products.voyage]);
     await seedConsentAndForms(prisma, countries.ci, [products.auto, products.voyage]);
 
-    const partners = await seedPartners(prisma);
-    await seedPartnerCoverage(prisma, partners, countries.ci, [products.auto, products.voyage]);
+    const partners = await seedPartners(prisma, countries.ci);
+    const licenses = await seedPartnerCoverage(prisma, partners, countries.ci, [products.auto, products.voyage]);
+    // Spec 051 R15: routing reads persisted accepted proofs; each active demo partner gets one,
+    // plus a recorded contract (its owner user is seeded below). The blocked partner gets none.
+    await seedPartnerOnboardingEvidence(prisma, partners, licenses);
     const users = await seedBrokerUsers(prisma, partners, passwordHash);
     const adminUsers = await seedAdminUsers(prisma, passwordHash);
     await seedBillingPlanPrices(prisma, countries.ci);
@@ -234,7 +241,10 @@ async function seedCountries(prisma: PrismaClient): Promise<{ ci: CountryRecord;
       isoCode: "CI",
       name: "Côte d'Ivoire",
       currency: "XOF",
-      languages: ["fr"],
+      // Spec 050: the EN public journey is seeded for CI (forms and consent in both languages).
+      languages: ["fr", "en"],
+      phoneDialCode: "+225",
+      phoneNationalLengths: [10],
       timezone: "Africa/Abidjan",
       regulatoryFamily: "cima",
       status: "public",
@@ -250,6 +260,9 @@ async function seedCountries(prisma: PrismaClient): Promise<{ ci: CountryRecord;
     },
     update: {
       name: "Côte d'Ivoire",
+      languages: ["fr", "en"],
+      phoneDialCode: "+225",
+      phoneNationalLengths: [10],
       status: "public",
       flags: {
         country_public_enabled: true,
@@ -360,58 +373,86 @@ async function seedCountryProducts(prisma: PrismaClient, country: CountryRecord,
   }
 }
 
+/**
+ * Spec 050 R5: demo consent texts carry real, compliant content (recipient variable and technical
+ * role of AssurMatch) and the hash the API computes from it, so the public form serves the text and
+ * a submission echoing that hash is accepted. FR and EN are seeded for CI so both journeys work.
+ */
+const DEMO_CONSENT_CONTENT: Record<DemoLanguage, string> = {
+  fr: "En cochant cette case, vous acceptez que vos coordonnées ({{contactFields}}) soient transmises au destinataire suivant : {{brokerName}}, pour le pays {{countryName}} et le produit {{productName}}, afin d'être recontacté au sujet de votre demande de devis. AssurMatch est une plateforme technique de comparaison et de mise en relation ; elle n'est ni courtier ni assureur.",
+  en: "By checking this box, you agree that your contact details ({{contactFields}}) are transmitted to the following recipient: {{brokerName}}, for {{countryName}} and the product {{productName}}, so that you can be contacted about your quote request. AssurMatch is a technical comparison and matching platform; it is neither a broker nor an insurer."
+};
+
+type DemoLanguage = "fr" | "en";
+
+const DEMO_FORM_FIELDS: Record<DemoLanguage, QuoteFormFieldDto[]> = {
+  fr: [
+    { key: "usage", label: "Usage", type: "select", required: true, sensitivity: "public", options: ["personnel", "professionnel"] },
+    { key: "budget", label: "Budget indicatif", type: "number", required: false, sensitivity: "public" }
+  ],
+  en: [
+    { key: "usage", label: "Use", type: "select", required: true, sensitivity: "public", options: ["personnel", "professionnel"] },
+    { key: "budget", label: "Indicative budget", type: "number", required: false, sensitivity: "public" }
+  ]
+};
+
 async function seedConsentAndForms(prisma: PrismaClient, country: CountryRecord, products: ProductRecord[]): Promise<void> {
   for (const product of products) {
-    const consentText = await prisma.consentText.upsert({
-      where: {
-        purpose_countryId_productId_channel_language_version: {
+    for (const language of ["fr", "en"] as const) {
+      const content = DEMO_CONSENT_CONTENT[language];
+      const contentHash = consentContentHash(content);
+      const consentText = await prisma.consentText.upsert({
+        where: {
+          purpose_countryId_productId_channel_language_version: {
+            purpose: "lead_transmission",
+            countryId: country.id,
+            productId: product.id,
+            channel: "public_web",
+            language,
+            version: DEMO_VERSION
+          }
+        },
+        create: {
           purpose: "lead_transmission",
           countryId: country.id,
           productId: product.id,
           channel: "public_web",
-          language: "fr",
-          version: DEMO_VERSION
+          recipientCategory: "courtier_partenaire_eligible",
+          language,
+          version: DEMO_VERSION,
+          status: "published",
+          contentHash,
+          content,
+          publishedAt: SEED_NOW,
+          createdById: DEMO_ACTOR_ID
+        },
+        update: {
+          status: "published",
+          contentHash,
+          content,
+          publishedAt: SEED_NOW,
+          retiredAt: null
         }
-      },
-      create: {
-        purpose: "lead_transmission",
+      });
+      const existingForm = await prisma.quoteFormDefinition.findFirst({
+        where: { countryId: country.id, productId: product.id, language, version: DEMO_VERSION }
+      });
+      const formData = {
         countryId: country.id,
         productId: product.id,
-        channel: "public_web",
-        recipientCategory: "courtier_partenaire_eligible",
-        language: "fr",
+        language,
         version: DEMO_VERSION,
-        status: "published",
-        contentHash: `${product.key}-${DEMO_VERSION}-lead-transmission`,
+        status: "published" as const,
+        // Spec 050 R7: the same generic fields the admin route adds (city, contact preference...).
+        fields: withGenericFields(DEMO_FORM_FIELDS[language], language) as unknown as Prisma.InputJsonValue,
+        consentTextId: consentText.id,
+        dataMinimizationNotes: "Donnees synthetiques locales minimales",
         publishedAt: SEED_NOW,
         createdById: DEMO_ACTOR_ID
-      },
-      update: {
-        status: "published",
-        contentHash: `${product.key}-${DEMO_VERSION}-lead-transmission`,
-        publishedAt: SEED_NOW
-      }
-    });
-    const existingForm = await prisma.quoteFormDefinition.findFirst({
-      where: { countryId: country.id, productId: product.id, language: "fr", version: DEMO_VERSION }
-    });
-    const formData = {
-      countryId: country.id,
-      productId: product.id,
-      language: "fr",
-      version: DEMO_VERSION,
-      status: "published" as const,
-      fields: [
-        { key: "usage", label: "Usage", type: "select", required: true, sensitivity: "public", options: ["personnel", "professionnel"] },
-        { key: "budget", label: "Budget indicatif", type: "number", required: false, sensitivity: "public" }
-      ],
-      consentTextId: consentText.id,
-      dataMinimizationNotes: "Donnees synthetiques locales minimales",
-      publishedAt: SEED_NOW,
-      createdById: DEMO_ACTOR_ID
-    };
-    if (existingForm) await prisma.quoteFormDefinition.update({ where: { id: existingForm.id }, data: formData });
-    else await prisma.quoteFormDefinition.create({ data: formData });
+      };
+      if (existingForm) await prisma.quoteFormDefinition.update({ where: { id: existingForm.id }, data: formData });
+      else await prisma.quoteFormDefinition.create({ data: formData });
+    }
   }
 }
 
@@ -445,8 +486,8 @@ async function seedBillingPlanPrices(prisma: PrismaClient, country: CountryRecor
   }
 }
 
-async function seedPartners(prisma: PrismaClient): Promise<{ starter: PartnerRecord; pro: PartnerRecord; enterprise: PartnerRecord; blocked: PartnerRecord }> {
-  const starter = await upsertPartner(prisma, {
+async function seedPartners(prisma: PrismaClient, country: CountryRecord): Promise<{ starter: PartnerRecord; pro: PartnerRecord; enterprise: PartnerRecord; blocked: PartnerRecord }> {
+  const starter = await upsertPartner(prisma, country, {
     registrationNumber: "LOCAL-DEMO-STARTER",
     legalName: "Courtier Local Starter SARL",
     tradeName: "Starter Demo",
@@ -456,7 +497,7 @@ async function seedPartners(prisma: PrismaClient): Promise<{ starter: PartnerRec
     quotaMonthlyLeads: 30,
     capacityStatus: "available"
   });
-  const pro = await upsertPartner(prisma, {
+  const pro = await upsertPartner(prisma, country, {
     registrationNumber: "LOCAL-DEMO-PRO",
     legalName: "Courtier Local Pro SARL",
     tradeName: "Pro Demo",
@@ -466,7 +507,7 @@ async function seedPartners(prisma: PrismaClient): Promise<{ starter: PartnerRec
     quotaMonthlyLeads: 120,
     capacityStatus: "available"
   });
-  const enterprise = await upsertPartner(prisma, {
+  const enterprise = await upsertPartner(prisma, country, {
     registrationNumber: "LOCAL-DEMO-ENTERPRISE",
     legalName: "Courtier Local Enterprise SA",
     tradeName: "Enterprise Demo",
@@ -476,7 +517,7 @@ async function seedPartners(prisma: PrismaClient): Promise<{ starter: PartnerRec
     quotaMonthlyLeads: 500,
     capacityStatus: "limited"
   });
-  const blocked = await upsertPartner(prisma, {
+  const blocked = await upsertPartner(prisma, country, {
     registrationNumber: "LOCAL-DEMO-BLOCKED",
     legalName: "Courtier Local Licence Expiree",
     tradeName: "Blocked Demo",
@@ -488,7 +529,7 @@ async function seedPartners(prisma: PrismaClient): Promise<{ starter: PartnerRec
   return { starter, pro, enterprise, blocked };
 }
 
-async function upsertPartner(prisma: PrismaClient, input: {
+async function upsertPartner(prisma: PrismaClient, country: CountryRecord, input: {
   registrationNumber: string;
   legalName: string;
   tradeName: string;
@@ -511,6 +552,16 @@ async function upsertPartner(prisma: PrismaClient, input: {
     primaryWhatsApp: "+2250102030405",
     quotaMonthlyLeads: input.quotaMonthlyLeads,
     capacityStatus: input.capacityStatus,
+    // Spec 051 R8: main country (Admin Pays scope), structured contacts and contractual SLA.
+    countryId: country.id,
+    adminContactName: `${input.tradeName} Administration`,
+    adminContactEmail: input.primaryEmail,
+    adminContactPhone: "+2250102030405",
+    commercialContactName: `${input.tradeName} Commercial`,
+    commercialContactEmail: input.primaryEmail.replace(".office@", ".sales@"),
+    commercialContactPhone: "+2250102030406",
+    partnerInsurers: ["Assureur Demo Un", "Assureur Demo Deux"],
+    slaTargetMinutes: 240,
     createdById: DEMO_ACTOR_ID
   };
   const partner = existing
@@ -519,7 +570,8 @@ async function upsertPartner(prisma: PrismaClient, input: {
   return { id: partner.id, legalName: partner.legalName, plan: partner.plan };
 }
 
-async function seedPartnerCoverage(prisma: PrismaClient, partners: { starter: PartnerRecord; pro: PartnerRecord; enterprise: PartnerRecord; blocked: PartnerRecord }, country: CountryRecord, products: ProductRecord[]): Promise<void> {
+async function seedPartnerCoverage(prisma: PrismaClient, partners: { starter: PartnerRecord; pro: PartnerRecord; enterprise: PartnerRecord; blocked: PartnerRecord }, country: CountryRecord, products: ProductRecord[]): Promise<Map<string, string>> {
+  const licenses = new Map<string, string>();
   for (const partner of [partners.starter, partners.pro, partners.enterprise]) {
     await prisma.partnerCountryAuthorization.upsert({
       where: { partnerTenantId_countryId: { partnerTenantId: partner.id, countryId: country.id } },
@@ -533,12 +585,13 @@ async function seedPartnerCoverage(prisma: PrismaClient, partners: { starter: Pa
         update: { status: "active" }
       });
     }
-    await upsertLicense(prisma, partner, country, products, partner.plan === "enterprise" ? futureDays(35) : new Date("2030-01-01T00:00:00.000Z"), "valid");
+    licenses.set(partner.id, await upsertLicense(prisma, partner, country, products, partner.plan === "enterprise" ? futureDays(35) : new Date("2030-01-01T00:00:00.000Z"), "valid"));
   }
   await upsertLicense(prisma, partners.blocked, country, products, new Date("2024-01-01T00:00:00.000Z"), "expired");
+  return licenses;
 }
 
-async function upsertLicense(prisma: PrismaClient, partner: PartnerRecord, country: CountryRecord, products: ProductRecord[], expirationDate: Date, status: "valid" | "expired"): Promise<void> {
+async function upsertLicense(prisma: PrismaClient, partner: PartnerRecord, country: CountryRecord, products: ProductRecord[], expirationDate: Date, status: "valid" | "expired"): Promise<string> {
   const licenseNumber = `LIC-${partner.id.slice(0, 8).toUpperCase()}`;
   const existing = await prisma.partnerLicense.findFirst({ where: { partnerTenantId: partner.id, countryId: country.id, licenseNumber } });
   const data = {
@@ -554,8 +607,63 @@ async function upsertLicense(prisma: PrismaClient, partner: PartnerRecord, count
     validatedAt: SEED_NOW,
     createdById: DEMO_ACTOR_ID
   };
-  if (existing) await prisma.partnerLicense.update({ where: { id: existing.id }, data });
-  else await prisma.partnerLicense.create({ data });
+  const license = existing
+    ? await prisma.partnerLicense.update({ where: { id: existing.id }, data })
+    : await prisma.partnerLicense.create({ data });
+  return license.id;
+}
+
+/** Smallest byte sequence that passes the PDF signature check (`%PDF`); synthetic demo content only. */
+const DEMO_PDF = Buffer.from("%PDF-1.4\n% AssurMatch local demo document - synthetic, no real data\n1 0 obj << /Type /Catalog >> endobj\ntrailer << /Root 1 0 R >>\n%%EOF\n", "latin1");
+
+/**
+ * Spec 051 R15: an accepted, clean accreditation proof attached to the valid licence and a recorded
+ * partnership contract (clean signed document) for every active demo partner, written straight to
+ * the database and to the configured document storage (`.local/documents` by default), so the
+ * partners stay eligible and their activation checklist is green locally. Idempotent.
+ */
+async function seedPartnerOnboardingEvidence(prisma: PrismaClient, partners: { starter: PartnerRecord; pro: PartnerRecord; enterprise: PartnerRecord }, licenses: Map<string, string>): Promise<void> {
+  const storage = resolveDocumentStorage();
+  for (const partner of [partners.starter, partners.pro, partners.enterprise]) {
+    const licenseId = licenses.get(partner.id);
+    if (!licenseId) throw new Error(`Missing demo licence for ${partner.legalName}`);
+    await upsertDemoDocument(prisma, storage, partner, "license", licenseId);
+    const contractDocumentId = await upsertDemoDocument(prisma, storage, partner, "partnership_contract");
+    await prisma.partnerContract.upsert({
+      where: { partnerTenantId_version: { partnerTenantId: partner.id, version: "v1" } },
+      create: { partnerTenantId: partner.id, version: "v1", signedAt: new Date("2026-01-15T00:00:00.000Z"), signatoryName: `${partner.legalName} - signataire`, documentId: contractDocumentId, recordedById: DEMO_ACTOR_ID },
+      update: { documentId: contractDocumentId }
+    });
+  }
+}
+
+async function upsertDemoDocument(prisma: PrismaClient, storage: ReturnType<typeof resolveDocumentStorage>, partner: PartnerRecord, documentType: "license" | "partnership_contract", licenseId?: string): Promise<string> {
+  const storageKey = `ad-demo-${partner.id}-${documentType}`;
+  await storage.put(storageKey, DEMO_PDF, "application/pdf");
+  const data = {
+    partnerTenantId: partner.id,
+    licenseId: licenseId ?? null,
+    documentType,
+    storageKey,
+    checksum: createHash("sha256").update(DEMO_PDF).digest("hex"),
+    status: "accepted" as const,
+    reviewedById: DEMO_ACTOR_ID,
+    reviewedAt: SEED_NOW,
+    fileName: documentType === "license" ? "agrement-demo.pdf" : "contrat-partenariat-demo.pdf",
+    mimeType: "application/pdf",
+    sizeBytes: DEMO_PDF.length,
+    scanStatus: "clean" as const,
+    scanEngine: "local-demo-seed",
+    scannedAt: SEED_NOW,
+    reviewReason: "local demo seed: synthetic document accepted",
+    retentionUntil: RETENTION_UNTIL,
+    createdById: DEMO_ACTOR_ID
+  };
+  const existing = await prisma.accreditationDocument.findFirst({ where: { storageKey } });
+  const document = existing
+    ? await prisma.accreditationDocument.update({ where: { id: existing.id }, data })
+    : await prisma.accreditationDocument.create({ data });
+  return document.id;
 }
 
 async function seedBrokerUsers(prisma: PrismaClient, partners: { starter: PartnerRecord; pro: PartnerRecord; enterprise: PartnerRecord }, passwordHash: string): Promise<DemoUserRecord[]> {
@@ -707,7 +815,7 @@ async function upsertOffer(prisma: PrismaClient, country: CountryRecord, product
     validatedById: DEMO_ACTOR_ID,
     validatedAt: SEED_NOW
   };
-  await prisma.offer.upsert({
+  const offer = await prisma.offer.upsert({
     where: { countryId_productId_publicKey: { countryId: country.id, productId: product.id, publicKey: spec.publicKey } },
     create: {
       countryId: country.id,
@@ -723,6 +831,62 @@ async function upsertOffer(prisma: PrismaClient, country: CountryRecord, product
       ...comparatorFields
     }
   });
+  await upsertPublishedOfferVersion(prisma, offer.id, comparatorFields);
+}
+
+/**
+ * Spec 052 R1/R11: the `Offer` row is the projection of a published version, so every demo offer
+ * carries a published version 1. A re-run refreshes v1 while it is the published version and never
+ * touches versions created afterwards in the back-offices.
+ */
+async function upsertPublishedOfferVersion(prisma: PrismaClient, offerId: string, fields: Record<string, unknown> & { validUntil: Date }): Promise<void> {
+  const versions = await prisma.offerVersion.findMany({ where: { offerId }, orderBy: { versionNumber: "asc" } });
+  const content = {
+    name: fields.name as string,
+    shortDescription: fields.shortDescription as string,
+    guaranteeSummary: fields.guaranteeSummary as string,
+    exclusionsSummary: fields.exclusionsSummary as string,
+    insurerName: fields.insurerName as string,
+    guarantees: fields.guarantees as Prisma.InputJsonValue,
+    guaranteeLevel: fields.guaranteeLevel as number,
+    deductibleAmount: fields.deductibleAmount as number,
+    coverageCeiling: fields.coverageCeiling as number,
+    processingDelayDays: fields.processingDelayDays as number,
+    paymentFlexibility: fields.paymentFlexibility as string,
+    requiredDocuments: fields.requiredDocuments as string[],
+    sourceOfInformation: fields.sourceOfInformation as string,
+    indicativePriceMin: fields.indicativePriceMin as number,
+    indicativePriceMax: fields.indicativePriceMax as number,
+    currency: fields.currency as string,
+    pricingUnit: fields.pricingUnit as string,
+    validFrom: new Date("2026-01-01T00:00:00.000Z"),
+    validUntil: fields.validUntil,
+    publicDisclaimers: fields.publicDisclaimers as string[],
+    isSponsored: false,
+    sponsorLabel: null,
+    displayPriority: fields.displayPriority as number
+  };
+  const first = versions[0];
+  if (first && (versions.length > 1 || first.status !== "published")) return;
+  const version = first
+    ? await prisma.offerVersion.update({ where: { id: first.id }, data: content })
+    : await prisma.offerVersion.create({
+      data: {
+        ...content,
+        offerId,
+        versionNumber: 1,
+        status: "published",
+        completenessScore: 100,
+        authorId: DEMO_ACTOR_ID,
+        authorRole: "admin",
+        submittedAt: SEED_NOW,
+        decidedById: DEMO_ACTOR_ID,
+        decidedAt: SEED_NOW,
+        lastDecision: "validated",
+        decisionReason: "Jeu de donnees de demonstration"
+      }
+    });
+  await prisma.offer.update({ where: { id: offerId }, data: { publishedVersionId: version.id, pendingVersionId: null } });
 }
 
 async function seedStarterLeads(prisma: PrismaClient, partner: PartnerRecord, country: CountryRecord, products: { auto: ProductRecord; voyage: ProductRecord }): Promise<void> {

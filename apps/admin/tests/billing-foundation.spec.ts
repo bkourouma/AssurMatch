@@ -5,15 +5,16 @@ function source(path: string): string {
   return readFileSync(path, "utf8");
 }
 
-test("billing foundation page is read-only and payment-free", () => {
+// Spec 060: the page now issues invoices through server actions, but never collects money online.
+test("billing foundation page stays free of online payment", () => {
   const api = source("apps/admin/app/lib/admin-api.ts");
   const page = source("apps/admin/app/billing/page.tsx");
   const shell = source("apps/admin/app/lib/ui/admin-shell.tsx");
 
   expect(api).toContain("readBillingFoundation");
   expect(api).toContain("/admin/billing/foundation");
-  expect(page).toContain("Billing sans paiements");
-  expect(page).toContain("Aucun encaissement, prime, paiement ou emission de facture");
+  expect(page).toContain("Facturation des courtiers");
+  expect(page).toContain("Aucun paiement en ligne et aucune prime d'assurance ne sont encaisses par AssurMatch");
   expect(page).toContain("Reference non facturable");
   expect(page).toContain("payments_enabled: desactive");
   expect(page).toContain("collection: desactivee");

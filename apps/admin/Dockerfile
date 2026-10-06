@@ -1,11 +1,12 @@
 # syntax=docker/dockerfile:1.7
-# AssurMatch Back-office (Next.js). Packages both apps/admin and apps/broker as the back-office surface.
-# Topology B. Listens on PORT 3602 by default for admin; broker is launched separately if needed.
+# AssurMatch Back-office Plateforme/Admin (Next.js). Listens on PORT 3602.
+# The broker back-office has its own image since spec 057 (apps/broker/Dockerfile).
 #
-# This Dockerfile builds the admin app on port 3602. If the back-office is split into two Next processes
-# (admin + broker), use this Dockerfile twice with different build args, or run two containers from a
-# combined image — to be finalized in /speckit.tasks. Recommendation: a single container running admin,
-# and broker accessible via a sub-path or a second container — chose during implementation.
+# NEXT_PUBLIC_* values are inlined by `next build`: build one image per environment.
+#   docker build -f apps/admin/Dockerfile \
+#     --build-arg NEXT_PUBLIC_ASSURMATCH_API_URL=https://api.<domain> \
+#     --build-arg NEXT_PUBLIC_ASSURMATCH_ADMIN_API_URL=https://api.<domain> \
+#     -t assurmatch-backoffice:local .
 
 FROM node:24-alpine AS deps
 WORKDIR /app
@@ -19,6 +20,11 @@ RUN npm ci
 
 FROM node:24-alpine AS build
 WORKDIR /app
+ARG NEXT_PUBLIC_ASSURMATCH_API_URL
+ARG NEXT_PUBLIC_ASSURMATCH_ADMIN_API_URL
+ARG NEXT_PUBLIC_APP_ENV
+# Space-separated list of NEXT_PUBLIC_* that must be non-empty (set by CI for production builds).
+ARG REQUIRE_NEXT_PUBLIC
 # The local demo login picker imports @prisma/client, so the client must be generated before
 # `next build` type-checks it. Placeholder DATABASE_URL satisfies prisma.config.ts at build time.
 ENV DATABASE_URL=postgresql://placeholder:placeholder@localhost:5432/placeholder
@@ -26,9 +32,7 @@ COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 RUN npx prisma generate --schema backend/prisma/schema.prisma
 WORKDIR /app/apps/admin
-RUN npx next build
-WORKDIR /app/apps/broker
-RUN npx next build
+RUN sh /app/scripts/ops/next-build.sh
 
 FROM node:24-alpine AS runtime
 ENV NODE_ENV=production
@@ -39,11 +43,9 @@ RUN addgroup -S app && adduser -S app -G app && \
 COPY --from=build --chown=app:app /app/node_modules /app/node_modules
 COPY --from=build --chown=app:app /app/packages /app/packages
 COPY --from=build --chown=app:app /app/apps/admin /app/apps/admin
-COPY --from=build --chown=app:app /app/apps/broker /app/apps/broker
 USER app
 EXPOSE 3602
-HEALTHCHECK --interval=30s --timeout=5s --retries=3 \
-  CMD wget -qO- "http://127.0.0.1:${PORT:-3602}/" >/dev/null || exit 1
-# Default: admin on 3602. To run broker too, launch a second container from this image with
-# CMD ["npx", "next", "start", "-p", "3603"] in /app/apps/broker.
+HEALTHCHECK --interval=30s --timeout=5s --start-period=30s --retries=3 \
+  CMD wget -qO- "http://127.0.0.1:3602/login" >/dev/null || exit 1
+# Fixed port: the preproduction deploy shares one env file whose PORT is the API's (3600).
 CMD ["npx", "next", "start", "-p", "3602"]
