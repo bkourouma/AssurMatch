@@ -12,6 +12,12 @@ import type {
   PublicStats as ContractPublicStats,
   WaitlistSubscribeDto
 } from "../../../../packages/shared/contracts/public-site.contracts";
+import type { PublicQuoteStatusView, TrackingLinkRequest } from "../../../../packages/shared/contracts/public-quote-status";
+import type {
+  VisitorDeclineReason,
+  VisitorProposalResponseResult,
+  VisitorResponseType
+} from "../../../../packages/shared/contracts/lead-proposals";
 import type frMessages from "../../messages/fr.json";
 
 const PUBLIC_API_BASE_URL = process.env.NEXT_PUBLIC_ASSURMATCH_API_URL ?? "http://127.0.0.1:3000";
@@ -39,23 +45,60 @@ export interface PublicQuoteFormField {
   options?: string[];
 }
 
+/** Spec 050 R8: the country's dialling code and accepted national number lengths. */
+export interface PublicPhoneRule {
+  dialCode: string;
+  nationalLengths: number[];
+}
+
+export type PublicQuoteLanguage = "fr" | "en";
+
 export interface PublicQuoteFormState {
   formDefinitionId: string;
   version: string;
+  /** Spec 050 R6: the language of the served form; there is no silent fallback to another language. */
+  language?: string;
+  /** Spec 050 R8: absent or null for a country without a configured rule (the server stays the authority). */
+  phoneRule?: PublicPhoneRule | null;
   /** Spec 043: the published definition's fields, which the form renders and submits as answers. */
   fields: PublicQuoteFormField[];
+  /**
+   * Spec 052 FR-018: the selected offer's broker (trade name, else legal name), only served when the
+   * offer is public for this country and product and its broker is eligible for display.
+   */
+  offerPartnerName?: string;
   consent: {
     consentTextId: string;
     version: string;
+    /** Echoed back unchanged at submission: the server checks it against the published text. */
     contentHash: string;
+    /** Spec 050 R5: the published consent text, variables already resolved by the server. */
+    content?: string;
+    language?: string;
+    purpose?: string;
+    recipientCategory?: string;
   };
 }
+
+/**
+ * Spec 050 R6: the quote form read either succeeds, is refused because the form does not exist in
+ * the requested language (with the languages that do exist), or is unavailable altogether.
+ */
+export type PublicQuoteFormResult =
+  | { status: "success"; data: PublicQuoteFormState }
+  | { status: "language_unavailable"; availableLanguages: PublicQuoteLanguage[] }
+  | { status: "error"; error: string };
 
 export interface PublicQuoteSubmitState {
   status: "success" | "error" | "rate_limited";
   publicReference?: string;
   /** Visitor-only token to read the request status and attach optional documents. */
   verificationToken?: string;
+  /**
+   * Spec 052 FR-019: `true` the selected offer's broker received the request, `false` it was
+   * routed to another partner broker (or the offer was ignored), `null` no offer was selected.
+   */
+  selectedOfferPartnerRetained?: boolean | null;
   error?: string;
   publicMessage: string;
   messageKey: ApiMessageKey;
@@ -174,7 +217,21 @@ async function readPublic<T>(path: string, emptyValue: T, init?: PublicFetchInit
  * Offers, quote forms, request status and documents keep `no-store` so nothing stale is shown.
  */
 export function readPublicCached<T>(path: string, emptyValue: T, revalidate = 600): Promise<PublicApiState<T>> {
-  return readPublic<T>(path, emptyValue, { next: { revalidate } });
+  const seconds = publicCatalogRevalidateSeconds(revalidate);
+  return seconds > 0 ? readPublic<T>(path, emptyValue, { next: { revalidate: seconds } }) : readPublic<T>(path, emptyValue);
+}
+
+/**
+ * Spec 059: `ASSURMATCH_PUBLIC_CACHE_SECONDS` (server runtime variable, never inlined) overrides the
+ * catalogue cache lifetime; `0` reads the API on every request. The end-to-end stack sets it to 0:
+ * with the ten-minute default, a country opened (or closed) in the back-office stayed invisible (or
+ * visible) on the public site for up to ten minutes, which no journey test can wait for.
+ */
+function publicCatalogRevalidateSeconds(fallback: number): number {
+  const raw = process.env.ASSURMATCH_PUBLIC_CACHE_SECONDS;
+  if (raw === undefined || raw.trim() === "") return fallback;
+  const value = Number(raw);
+  return Number.isInteger(value) && value >= 0 ? value : fallback;
 }
 
 /** Public country exposed by GET /countries (only publicly activated countries are returned). */
@@ -199,6 +256,18 @@ export interface PublicProductSummary {
 
 export function listPublicCountries() {
   return readPublic<PublicCountrySummary[]>("/countries", []);
+}
+
+/** Spec 059: a country accepting broker applications, with the products one may apply for. */
+export interface PartnerApplicationCountryOptions {
+  isoCode: string;
+  name: string;
+  products: Array<{ key: string; name: string }>;
+}
+
+/** GET /partners/applications/options - never cached: onboarding opens and closes from the back-office. */
+export function listPartnerApplicationOptions() {
+  return readPublic<PartnerApplicationCountryOptions[]>("/partners/applications/options", []);
 }
 
 export function listPublicProducts(countryCode: string) {
@@ -233,8 +302,42 @@ export function comparePublicOffers(ids: string[], priority?: string) {
   return readPublic<OfferCompareResponse | null>(`/offers/compare?${params.toString()}`, null);
 }
 
-export function getPublicQuoteForm(countryCode: string, productKey: string) {
-  return readPublic<PublicQuoteFormState | null>(`/countries/${countryCode}/products/${productKey}/quote-form`, null);
+const publicQuoteLanguages: readonly PublicQuoteLanguage[] = ["fr", "en"];
+
+function isPublicQuoteLanguage(value: unknown): value is PublicQuoteLanguage {
+  return typeof value === "string" && (publicQuoteLanguages as readonly string[]).includes(value);
+}
+
+/**
+ * Spec 050 R6: the form is read in the visitor's language (`?language=`). Unlike `readPublic`, the
+ * error body is kept: a 404 `QUOTE_FORM_LANGUAGE_UNAVAILABLE` lists the languages in which the form
+ * exists, so the page can offer them instead of silently serving another language.
+ */
+export async function getPublicQuoteForm(countryCode: string, productKey: string, language: PublicQuoteLanguage, offerId?: string): Promise<PublicQuoteFormResult> {
+  const params = new URLSearchParams({ language });
+  // Spec 052 FR-018: the selected offer lets the server name its broker in the consent text.
+  if (offerId) params.set("offerId", offerId);
+  try {
+    const response = await fetch(
+      `${PUBLIC_API_BASE_URL}/countries/${encodeURIComponent(countryCode)}/products/${encodeURIComponent(productKey)}/quote-form?${params.toString()}`,
+      { cache: "no-store" }
+    );
+    if (!response.ok) {
+      const body = await response.json().catch(() => null) as { code?: unknown; availableLanguages?: unknown } | null;
+      if (response.status === 404 && body?.code === "QUOTE_FORM_LANGUAGE_UNAVAILABLE") {
+        const availableLanguages = Array.isArray(body.availableLanguages)
+          ? body.availableLanguages.filter(isPublicQuoteLanguage).filter((item) => item !== language)
+          : [];
+        if (availableLanguages.length > 0) return { status: "language_unavailable", availableLanguages };
+      }
+      return { status: "error", error: `api_${response.status}` };
+    }
+    const data = await response.json() as PublicQuoteFormState | null;
+    if (!data) return { status: "error", error: "empty_quote_form" };
+    return { status: "success", data };
+  } catch (error) {
+    return { status: "error", error: error instanceof Error ? error.message : "api_unavailable" };
+  }
 }
 
 export async function submitPublicQuoteRequest(input: QuoteRequestCreateDto): Promise<PublicQuoteSubmitState> {
@@ -248,9 +351,19 @@ export async function submitPublicQuoteRequest(input: QuoteRequestCreateDto): Pr
       return { status: "rate_limited", error: "rate_limited", messageKey: "rateLimited", publicMessage: "Trop de demandes. Reessayez plus tard." };
     }
     if (!response.ok) {
+      const errorBody = await response.json().catch(() => null) as { message?: unknown } | null;
+      const serverMessage = typeof errorBody?.message === "string" ? errorBody.message : "";
+      // Spec 050 R8: the server is the authority on the country phone rule.
+      if (response.status === 400 && /phone/i.test(serverMessage)) {
+        return { status: "error", error: "phone_invalid", messageKey: "quotePhoneInvalid", publicMessage: "Le numero de telephone ne correspond pas au format attendu pour ce pays." };
+      }
+      // Spec 050 R5: the consent text changed since the page was loaded.
+      if (response.status === 422 && /consent text mismatch/i.test(serverMessage)) {
+        return { status: "error", error: "consent_mismatch", messageKey: "quoteConsentOutdated", publicMessage: "Le texte de consentement a ete mis a jour. Rechargez la page pour lire la version en vigueur." };
+      }
       return { status: "error", error: `api_${response.status}`, messageKey: "quoteRejected", publicMessage: "La demande de devis ne peut pas etre envoyee avec ces informations." };
     }
-    const body = await response.json() as { publicReference?: string; message?: string };
+    const body = await response.json() as { publicReference?: string; message?: string; selectedOfferPartnerRetained?: unknown };
     if (!body.publicReference) {
       return { status: "error", error: "missing_public_reference", messageKey: "confirmationFailed", publicMessage: "La confirmation n'a pas pu etre generee." };
     }
@@ -258,6 +371,7 @@ export async function submitPublicQuoteRequest(input: QuoteRequestCreateDto): Pr
       status: "success",
       publicReference: body.publicReference,
       ...(typeof (body as { verificationToken?: unknown }).verificationToken === "string" ? { verificationToken: (body as { verificationToken: string }).verificationToken } : {}),
+      selectedOfferPartnerRetained: typeof body.selectedOfferPartnerRetained === "boolean" ? body.selectedOfferPartnerRetained : null,
       messageKey: "quoteTransmitted",
       // The server message states how many brokers received the request (spec 042).
       publicMessage: body.message ?? "Demande transmise selon votre consentement."
@@ -523,4 +637,200 @@ export function withdrawQuoteConsent(publicReference: string, token: string): Pr
     "Votre retrait de consentement est enregistre.",
     "Le retrait de consentement n'a pas pu etre enregistre avec ce lien."
   );
+}
+
+/* ---------- Spec 054: visitor tracking space, tracking-link resend, satisfaction survey ---------- */
+
+/**
+ * `GET /quote-requests/:publicReference?token=` (contract `visitor-tracking-api.md`). Every refusal
+ * (unknown reference, wrong, expired or revoked token, anonymised request) is the same neutral 404,
+ * so the page cannot, and must not, tell those cases apart.
+ */
+export type PublicQuoteStatusResult =
+  | { status: "success"; data: PublicQuoteStatusView }
+  | { status: "denied" }
+  | { status: "rate_limited" }
+  | { status: "error" };
+
+function isPublicQuoteStatusView(value: unknown): value is PublicQuoteStatusView {
+  if (!value || typeof value !== "object") return false;
+  const candidate = value as Partial<PublicQuoteStatusView>;
+  return typeof candidate.publicReference === "string"
+    && typeof candidate.status === "string"
+    && Array.isArray(candidate.brokers)
+    && Array.isArray(candidate.timeline)
+    && typeof candidate.consent === "object" && candidate.consent !== null;
+}
+
+export async function getPublicQuoteStatus(publicReference: string, token: string): Promise<PublicQuoteStatusResult> {
+  try {
+    const params = new URLSearchParams({ token });
+    const response = await fetch(`${PUBLIC_API_BASE_URL}/quote-requests/${encodeURIComponent(publicReference)}?${params.toString()}`, { cache: "no-store" });
+    if (response.status === 404 || response.status === 400 || response.status === 403 || response.status === 401) return { status: "denied" };
+    if (response.status === 429) return { status: "rate_limited" };
+    if (!response.ok) return { status: "error" };
+    const payload: unknown = await response.json();
+    return isPublicQuoteStatusView(payload) ? { status: "success", data: payload } : { status: "error" };
+  } catch {
+    return { status: "error" };
+  }
+}
+
+/** `POST /quote-requests/tracking-link`: always 202 when well formed, whether the pair matched or not. */
+export type TrackingLinkResult = "accepted" | "rate_limited" | "invalid" | "error";
+
+export async function requestTrackingLink(body: TrackingLinkRequest): Promise<TrackingLinkResult> {
+  try {
+    const response = await fetch(`${PUBLIC_API_BASE_URL}/quote-requests/tracking-link`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(body),
+      cache: "no-store"
+    });
+    if (response.status === 429) return "rate_limited";
+    if (response.status === 400) return "invalid";
+    return response.ok ? "accepted" : "error";
+  } catch {
+    return "error";
+  }
+}
+
+/**
+ * `GET /satisfaction-surveys/:publicReference?token=`: `available`, or a neutral `unavailable` for an
+ * unknown reference, a wrong or expired token and a survey already answered alike.
+ */
+export type SatisfactionSurveyResult = "available" | "unavailable" | "error";
+
+export async function getSatisfactionSurvey(publicReference: string, token: string): Promise<SatisfactionSurveyResult> {
+  try {
+    const params = new URLSearchParams({ token });
+    const response = await fetch(`${PUBLIC_API_BASE_URL}/satisfaction-surveys/${encodeURIComponent(publicReference)}?${params.toString()}`, { cache: "no-store" });
+    if (response.status >= 500) return "error";
+    if (!response.ok) return "unavailable";
+    const payload = await response.json() as { status?: string };
+    return payload.status === "available" ? "available" : "unavailable";
+  } catch {
+    return "error";
+  }
+}
+
+export interface SatisfactionSurveyAnswer {
+  rating: number;
+  comment?: string;
+  flaggedConcern: boolean;
+}
+
+export type SatisfactionSurveySubmitResult = "submitted" | "unavailable" | "rate_limited" | "error";
+
+export async function submitSatisfactionSurvey(publicReference: string, token: string, answer: SatisfactionSurveyAnswer): Promise<SatisfactionSurveySubmitResult> {
+  try {
+    const params = new URLSearchParams({ token });
+    const response = await fetch(`${PUBLIC_API_BASE_URL}/satisfaction-surveys/${encodeURIComponent(publicReference)}?${params.toString()}`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ token, ...answer }),
+      cache: "no-store"
+    });
+    if (response.status === 429) return "rate_limited";
+    // The survey service refuses an expired, used or wrong link with a plain error: whatever the
+    // status code, the visitor only ever reads the same neutral message.
+    if (!response.ok) return "unavailable";
+    const payload = await response.json() as { status?: string };
+    return payload.status === "submitted" ? "submitted" : "unavailable";
+  } catch {
+    return "error";
+  }
+}
+
+/**
+ * Spec 061 FR-005: `POST /notifications/unsubscribe` with the signed token of the survey e-mail.
+ * Every refusal (wrong, forged, malformed link) reads as the same neutral "unavailable".
+ */
+export async function unsubscribeFromSurveys(token: string): Promise<"unsubscribed" | "unavailable" | "error"> {
+  try {
+    const response = await fetch(`${PUBLIC_API_BASE_URL}/notifications/unsubscribe`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ token }),
+      cache: "no-store"
+    });
+    if (response.status >= 500) return "error";
+    if (!response.ok) return "unavailable";
+    const payload = await response.json() as { status?: string };
+    return payload.status === "unsubscribed" ? "unsubscribed" : "unavailable";
+  } catch {
+    return "error";
+  }
+}
+
+/* ---------- Spec 055: broker proposals on the tracking space (visitor side) ---------- */
+
+/**
+ * `POST /quote-requests/:publicReference/proposals/:proposalId/responses?token=`. The answer only
+ * tells the named broker how to continue the conversation; it never commits the visitor and never
+ * moves the broker's CRM status (FR-006, FR-007).
+ */
+export interface ProposalResponseBody {
+  type: VisitorResponseType;
+  callbackSlot?: string;
+  declineReason?: VisitorDeclineReason;
+  question?: string;
+}
+
+export type ProposalResponseResult =
+  | { status: "recorded"; type: VisitorResponseType; at: string }
+  | { status: "invalid" }
+  | { status: "not_respondable" }
+  | { status: "denied" }
+  | { status: "rate_limited" }
+  | { status: "error" };
+
+export async function respondToProposal(
+  publicReference: string,
+  proposalId: string,
+  token: string,
+  body: ProposalResponseBody
+): Promise<ProposalResponseResult> {
+  try {
+    const params = new URLSearchParams({ token });
+    const response = await fetch(
+      `${PUBLIC_API_BASE_URL}/quote-requests/${encodeURIComponent(publicReference)}/proposals/${encodeURIComponent(proposalId)}/responses?${params.toString()}`,
+      {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(body),
+        cache: "no-store"
+      }
+    );
+    if (response.status === 429) return { status: "rate_limited" };
+    if (response.status === 409) return { status: "not_respondable" };
+    if (response.status === 400 || response.status === 422) return { status: "invalid" };
+    if (response.status === 404 || response.status === 401 || response.status === 403) return { status: "denied" };
+    if (!response.ok) return { status: "error" };
+    const payload = await response.json() as Partial<VisitorProposalResponseResult>;
+    return payload.recorded === true && typeof payload.at === "string" && payload.type
+      ? { status: "recorded", type: payload.type, at: payload.at }
+      : { status: "error" };
+  } catch {
+    return { status: "error" };
+  }
+}
+
+/**
+ * `GET /quote-requests/:publicReference/proposals/:proposalId/document?token=`, called server-side
+ * only by the `/api/quote-requests/.../document` route handler, which streams the PDF back with
+ * `no-store`. Every refusal of the API is the same neutral 404.
+ */
+export async function fetchProposalDocument(publicReference: string, proposalId: string, token: string): Promise<Response> {
+  const params = new URLSearchParams({ token });
+  return fetch(
+    `${PUBLIC_API_BASE_URL}/quote-requests/${encodeURIComponent(publicReference)}/proposals/${encodeURIComponent(proposalId)}/document?${params.toString()}`,
+    { cache: "no-store" }
+  );
+}
+
+/** Same-origin path of the proposal PDF proxy; the token stays in the URL, as on the tracking page. */
+export function proposalDocumentHref(publicReference: string, proposalId: string, token: string): string {
+  const params = new URLSearchParams({ token });
+  return `/api/quote-requests/${encodeURIComponent(publicReference)}/proposals/${encodeURIComponent(proposalId)}/document?${params.toString()}`;
 }

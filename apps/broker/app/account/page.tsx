@@ -16,7 +16,7 @@ export default async function BrokerAccountPage() {
         kicker="Compte courtier"
         title="Securite du compte"
         description="Gestion du mot de passe, de la MFA et des informations du profil connecte."
-        actions={<Button href="/" variant="secondary">Retour portail</Button>}
+        actions={<Button href="/company" variant="secondary">Profil société</Button>}
       />
 
       <Grid columns="two">

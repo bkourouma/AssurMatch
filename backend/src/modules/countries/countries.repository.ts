@@ -114,6 +114,8 @@ export class PrismaCountriesRepository implements CountriesRepository {
       timezone: country.timezone,
       regulatoryFamily: country.regulatoryFamily,
       regulatoryRegimeId: country.regulatoryRegimeId,
+      phoneDialCode: country.phoneDialCode,
+      phoneNationalLengths: country.phoneNationalLengths,
       status: country.status,
       flags: country.flags,
       publicSince: country.publicSince,
@@ -131,7 +133,13 @@ export class PrismaCountriesRepository implements CountriesRepository {
   }
 
   private toDomain(row: unknown): Country {
-    const item = row as Country;
-    return { ...item, flags: item.flags };
+    const item = row as Country & { phoneDialCode?: string | null; regulatoryRegimeId?: string | null };
+    const { phoneDialCode, regulatoryRegimeId, ...rest } = item;
+    return {
+      ...rest,
+      ...(phoneDialCode ? { phoneDialCode } : {}),
+      ...(regulatoryRegimeId ? { regulatoryRegimeId } : {}),
+      flags: item.flags
+    };
   }
 }

@@ -18,7 +18,8 @@ describe("QuoteEmailTemplateService (spec 044)", () => {
     expect(email.subject).toContain("QR-2026-ABCDEF12");
     expect(email.body).toContain("Bonjour Awa,");
     expect(email.body).toContain("transmise a un courtier partenaire eligible");
-    expect(email.body).toContain("http://public.test/quote-requests/QR-2026-ABCDEF12");
+    // Spec 054 R10: localised path of the tracking space (was `/quote-requests/` without locale).
+    expect(email.body).toContain("http://public.test/demandes-de-devis/QR-2026-ABCDEF12");
     expect(email.body).toContain("plateforme technique de comparaison indicative");
     // The platform does not disclose which broker was selected before first contact.
     expect(email.body.toLowerCase()).not.toContain("courtier local");

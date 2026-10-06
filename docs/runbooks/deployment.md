@@ -1,8 +1,10 @@
-# Runbook — Deployment
+# Runbook — Deployment (preproduction)
+
+> Production has its own approved, manual job since spec 057: see `deployment-production.md`.
 
 ## When
 
-Every push on `main` triggers `.github/workflows/ci.yml`: it verifies, scans for secrets and publishes the three `sha-<commit>` images to GHCR. **It does not deploy by default.**
+Every push on `main` triggers `.github/workflows/ci.yml`: it verifies, scans for secrets and publishes the four `sha-<commit>` images to GHCR (API, public, back-office, broker; the preproduction job still deploys the first three). **It does not deploy by default.**
 
 Deploying needs the self-hosted runner `assurmatch-preprod` to be online, and is opt-in:
 
@@ -65,7 +67,8 @@ Expect one `assurmatch-preprod` row, `online`, carrying both `self-hosted` and `
 3. Watch the SSH deploy step: it pulls three images, swaps three containers (`assurmatch-app`, `assurmatch-public`, `assurmatch-backoffice`), runs health checks, prunes.
 4. Verify externally:
    ```bash
-   curl -I https://api-assurmatch.allianceconsultants.net/admin/system/health
+   curl -fsS https://api-assurmatch.allianceconsultants.net/healthz
+   curl -fsS https://api-assurmatch.allianceconsultants.net/readyz
    curl -I https://assurmatch.allianceconsultants.net
    curl -I https://backoffice-assurmatch.allianceconsultants.net
    ```

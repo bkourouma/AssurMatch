@@ -1,18 +1,44 @@
-import { readActivationChecklist } from "../lib/admin-api";
+import { readActivationChecklist, readAdminCountries, readAdminProducts } from "../lib/admin-api";
+import { correctionTarget } from "../lib/catalog-messages";
 import {
   Card,
   DataTable,
+  Field,
+  FilterBar,
   Grid,
   KpiCard,
   PageHeader,
   PageStack,
+  Select,
   StateMessage,
   StatusBadge,
-  checklistStatusTones
+  checklistStatusTones,
+  fieldControlProps
 } from "../lib/ui/admin-ui";
 
-export default async function ActivationChecklistPage() {
-  const checklist = await readActivationChecklist();
+function firstParam(value: string | string[] | undefined): string {
+  return Array.isArray(value) ? value[0] ?? "" : value ?? "";
+}
+
+/**
+ * Read-only screen. The filters are a GET form and every "Corriger" entry is a plain link to the
+ * screen that owns the fix (catalogue, consent texts, quote forms, offers, partners).
+ */
+export default async function ActivationChecklistPage({
+  searchParams
+}: {
+  searchParams?: Promise<Record<string, string | string[] | undefined>>;
+}) {
+  const params = searchParams ? await searchParams : {};
+  const countryFilter = firstParam(params.country).toUpperCase();
+  const productFilter = firstParam(params.product);
+  const [checklist, countries, products] = await Promise.all([
+    readActivationChecklist({ ...(countryFilter ? { country: countryFilter } : {}), ...(productFilter ? { product: productFilter } : {}) }),
+    readAdminCountries(),
+    readAdminProducts()
+  ]);
+  const filteredCountryId = countryFilter ? countries.data.find((country) => country.isoCode === countryFilter)?.id : undefined;
+  const activeCount = (countryFilter ? 1 : 0) + (productFilter ? 1 : 0);
 
   return (
     <PageStack>
@@ -23,8 +49,31 @@ export default async function ActivationChecklistPage() {
         description="Verification lecture seule des preconditions techniques pays, produit, consentement, formulaire, partenaire, licence, offre et flags avant exposition publique."
       />
 
+      <FilterBar
+        action="/activation-checklist"
+        label="Filtres checklist d'activation"
+        submitLabel="Filtrer"
+        resetLabel="Reinitialiser"
+        resetHref="/activation-checklist"
+        activeCount={activeCount}
+        autoSubmit
+      >
+        <Field id="checklist-country" label="Pays">
+          <Select {...fieldControlProps("checklist-country")} name="country" defaultValue={countryFilter}>
+            <option value="">Tous</option>
+            {countries.data.map((country) => <option key={country.id} value={country.isoCode}>{`${country.isoCode} - ${country.name}`}</option>)}
+          </Select>
+        </Field>
+        <Field id="checklist-product" label="Produit">
+          <Select {...fieldControlProps("checklist-product")} name="product" defaultValue={productFilter}>
+            <option value="">Tous</option>
+            {products.data.map((product) => <option key={product.id} value={product.key}>{`${product.key} - ${product.name}`}</option>)}
+          </Select>
+        </Field>
+      </FilterBar>
+
       {checklist.unauthenticated ? <StateMessage tone="danger">Session admin requise.</StateMessage> : null}
-      {checklist.forbidden ? <StateMessage tone="danger">Acces checklist refuse pour ce role admin.</StateMessage> : null}
+      {checklist.forbidden ? <StateMessage tone="danger">Acces checklist refuse pour ce role admin ou hors perimetre.</StateMessage> : null}
       {checklist.status === "error" ? <StateMessage tone="danger">Checklist indisponible: {checklist.error}</StateMessage> : null}
 
       {checklist.status === "success" ? (
@@ -54,11 +103,21 @@ export default async function ActivationChecklistPage() {
                   header: "Controles",
                   render: (section) => (
                     <ul className="bo-list">
-                      {section.controls.map((control) => (
-                        <li key={control.key}>
-                          <StatusBadge status={control.status} tones={checklistStatusTones} /> {control.label}: {control.evidence}
-                        </li>
-                      ))}
+                      {section.controls.map((control) => {
+                        const target = control.status === "passed"
+                          ? undefined
+                          : correctionTarget(control.key, {
+                            countryId: section.scope.countryId ?? filteredCountryId,
+                            productId: section.scope.productId
+                          });
+                        return (
+                          <li key={control.key}>
+                            <StatusBadge status={control.status} tones={checklistStatusTones} /> {control.label}: {control.evidence}
+                            {target ? <> — <a href={target.href}>Corriger</a></> : null}
+                            {target?.note ? <> ({target.note})</> : null}
+                          </li>
+                        );
+                      })}
                     </ul>
                   )
                 }

@@ -31,6 +31,8 @@ export interface LeadReassignmentDeps {
   decisions: RoutingDecisionService;
   countries: CountriesService;
   products: ProductsService;
+  /** Spec 054 R6: internal `lead.reassigned` event (visitor notification); never a partner webhook. */
+  events?: { publish(eventType: "lead.reassigned", partnerTenantId: string, data: Record<string, unknown>): Promise<void> } | undefined;
   /** Re-notifies the new partner; returns the notification id when one was queued. */
   notifyBroker?: (assignment: LeadAssignmentRecord, actor: ActorContext) => Promise<string | undefined>;
 }
@@ -79,6 +81,11 @@ export class LeadReassignmentService {
     }, actor);
     const notificationId = await this.deps.notifyBroker?.(updated, actor);
     if (notificationId) await this.deps.assignments.setBrokerNotification(updated.id, notificationId);
+    await this.deps.events?.publish("lead.reassigned", updated.partnerTenantId, {
+      leadAssignmentId: updated.id,
+      previousPartnerTenantId,
+      routingDecisionId: decision.id
+    }).catch(() => {});
     this.deps.audit.write({
       actor,
       action: RoutingAuditActions.reassigned,

@@ -16,7 +16,8 @@ export interface PublicOfferVisibilityContext {
   countryFlags?: Partial<Record<string, boolean>>;
   productFlags?: Partial<Record<string, boolean>>;
   resolveCountryFlags?: (countryId: string) => Promise<Partial<Record<string, boolean>> | undefined> | Partial<Record<string, boolean>> | undefined;
-  resolveProductFlags?: (productId: string) => Promise<Partial<Record<string, boolean>> | undefined> | Partial<Record<string, boolean>> | undefined;
+  /** `countryId` lets the resolver apply the country link flags (spec 050 R2). */
+  resolveProductFlags?: (productId: string, countryId?: string) => Promise<Partial<Record<string, boolean>> | undefined> | Partial<Record<string, boolean>> | undefined;
   evaluatePartnerEligibility?: (partnerTenantId: string, countryId: string, productId: string) => Promise<{ eligible: boolean; reasons: string[] }>;
   /** Responsible partner display (OFFER-009); trade name preferred over legal name. */
   resolvePartnerName?: (partnerTenantId: string) => Promise<string | undefined> | string | undefined;
@@ -138,6 +139,19 @@ export class PublicOfferCatalogService {
     return this.toDetail({ offer, partnerName, popularity: 0 });
   }
 
+  /**
+   * Spec 052 R7/R8: whether an offer chosen by a visitor is publicly visible for this country and
+   * product, with exactly the visibility rules of `list()`/`detail()` (publication policy, flags,
+   * partner eligibility). Nothing is audited here; the caller records the outcome.
+   */
+  async selectableOffer(offerId: string, countryId: string, productId: string, context?: PublicOfferVisibilityContext): Promise<{ offer?: OfferRecord; reasons: string[] }> {
+    const offer = (await this.repository.list()).find((candidate) => candidate.id === offerId);
+    if (!offer) return { reasons: ["offer_not_found"] };
+    if (offer.countryId !== countryId || offer.productId !== productId) return { reasons: ["offer_scope_mismatch"] };
+    const decision = await this.visibilityDecision(offer, context);
+    return decision.public ? { offer, reasons: [] } : { reasons: decision.reasons };
+  }
+
   /** Side-by-side comparison of 2 to 4 visible offers sharing the same country and product (COMP-005). */
   async compare(query: OfferCompareQuery | { ids: string; priority?: string | undefined }, actor?: ActorContext, context?: PublicOfferVisibilityContext): Promise<OfferCompareResponse> {
     const validation = typeof query.ids === "string" ? offerCompareQuerySchema.safeParse(query) : { success: true as const, data: query as OfferCompareQuery };
@@ -214,7 +228,7 @@ export class PublicOfferCatalogService {
     if (!context) return context;
     const [countryFlags, productFlags] = await Promise.all([
       context.countryFlags ?? context.resolveCountryFlags?.(countryId),
-      context.productFlags ?? context.resolveProductFlags?.(productId)
+      context.productFlags ?? context.resolveProductFlags?.(productId, countryId)
     ]);
     const evaluate = context.evaluatePartnerEligibility;
     const eligibilityByPartner = new Map<string, Promise<{ eligible: boolean; reasons: string[] }>>();
@@ -244,7 +258,7 @@ export class PublicOfferCatalogService {
     const reasons = [...decision.reasons];
     if (context) {
       const countryFlags = context.countryFlags ?? await context.resolveCountryFlags?.(offer.countryId);
-      const productFlags = context.productFlags ?? await context.resolveProductFlags?.(offer.productId);
+      const productFlags = context.productFlags ?? await context.resolveProductFlags?.(offer.productId, offer.countryId);
       if (context.globalFlags?.public_comparator_enabled !== true) reasons.push("public_comparator_disabled");
       if (countryFlags?.country_public_enabled !== true) reasons.push("country_public_disabled");
       if (countryFlags?.country_comparison_enabled !== true) reasons.push("country_comparison_disabled");

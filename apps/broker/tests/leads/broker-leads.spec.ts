@@ -103,3 +103,22 @@ test("starter lead actions stay hidden for a broker role without the update perm
   expect(permissions).toContain('roles.includes("broker_read_only")');
   expect(permissions).toContain('hasPermission(profile, "broker_leads:update")');
 });
+
+test("spec 059 follow-up: a Starter broker closes an accepted lead with its outcome (Clôturer)", async () => {
+  const detail = readFileSync("apps/broker/app/leads/[leadAssignmentId]/page.tsx", "utf8");
+  const actions = readFileSync("apps/broker/app/lib/lead-actions.ts", "utf8");
+  const vocabulary = readFileSync("apps/broker/app/lib/lead-vocabulary.ts", "utf8");
+  const contract = readFileSync("packages/shared/contracts/quote.contracts.ts", "utf8");
+
+  expect(detail).toContain('triggerLabel="Clôturer"');
+  expect(detail).toContain("formAction={closeStarterLeadAction}");
+  // Only an accepted lead offers the closure; a closed one is read-only.
+  expect(detail).toContain("STARTER_CLOSABLE_STATUSES");
+  expect(actions).toContain("/broker/starter/leads/${leadId}/close");
+  expect(actions).toContain("if (!isStarterCloseOutcome(outcomeValue)) redirect(`/leads/${leadId}?lead=outcome_required`);");
+  // The outcomes mirror brokerStarterCloseOutcomeSchema exactly.
+  expect(vocabulary).toContain('STARTER_CLOSE_OUTCOMES = ["gagne", "perdu", "sans_suite"]');
+  expect(contract).toContain('brokerStarterCloseOutcomeSchema = z.enum(["gagne", "perdu", "sans_suite"])');
+  // Still no CRM wording on the Starter page.
+  expect(detail).not.toContain("Kanban</");
+});

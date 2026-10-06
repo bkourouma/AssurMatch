@@ -17,3 +17,13 @@ backend/tests/
 !.env.preproduction.example
 backups/
 scripts/preprod/imports/
+# Spec 059: nested build outputs and local state must never enter the build context (a local
+# checkout carries apps/*/.next, agent worktrees under .claude/ with their own node_modules, and the
+# e2e stack state under .local/ - several GB that filled the disk during the first e2e image build).
+**/node_modules/
+**/.next/
+.claude/
+.local/
+tests/
+playwright-report/
+test-results/

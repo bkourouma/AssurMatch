@@ -27,9 +27,13 @@ enum PartnerPlan {
   enterprise
 }
 
+/// Spec 051 R1: draft = Prospect, pending_compliance = En vérification, active_test = Actif test,
+/// active = Actif public (the only routable and public status), suspended = Suspendu, retired = Résilié.
+/// "Expiré" is computed from the licences, never stored.
 enum PartnerStatus {
   draft
   pending_compliance
+  active_test
   active
   suspended
   retired
@@ -95,6 +99,7 @@ enum LicenseStatus {
   suspended
   invalid
   revoked
+  superseded
 }
 
 enum DocumentStatus {
@@ -112,7 +117,16 @@ enum DocumentType {
   identity
   mandate
   compliance_certificate
+  partnership_contract
   other
+}
+
+/// Spec 051 R5: antivirus verdict of an accreditation document. Only `clean` files can be accepted or served.
+enum AccreditationScanStatus {
+  pending
+  clean
+  infected
+  failed
 }
 
 enum FeatureFlagScopeType {
@@ -173,6 +187,27 @@ enum NotificationType {
   visitor_quote_non_routable
   broker_lead_assigned
   quote_notification_failed
+  offer_validated
+  offer_rejected
+  offer_suspended
+  offer_expiring
+  visitor_quote_received
+  visitor_quote_in_review
+  visitor_quote_transmitted
+  visitor_quote_accepted
+  visitor_quote_reassigned
+  visitor_quote_closed
+  visitor_consent_withdrawn
+  visitor_tracking_link
+  visitor_proposal_available
+  broker_visitor_response
+  broker_document_received
+  broker_lead_reassigned
+  broker_task_due
+  broker_quota_threshold
+  broker_license_expiring
+  broker_offer_expiring
+  admin_alert_raised
 }
 
 enum DeliveryStatus {
@@ -553,16 +588,111 @@ model PartnerTenant {
   primaryWhatsApp   String
   quotaMonthlyLeads Int            @default(0)
   capacityStatus    CapacityStatus @default(available)
+  /// Spec 051 R8: primary country (Admin Pays scope), contacts, insurers, contractual SLA, lifecycle.
+  countryId              String?
+  adminContactName       String?
+  adminContactEmail      String?
+  adminContactPhone      String?
+  commercialContactName  String?
+  commercialContactEmail String?
+  commercialContactPhone String?
+  partnerInsurers        String[]       @default([])
+  slaTargetMinutes       Int?
+  statusReason           String?
+  previousActiveStatus   PartnerStatus?
   createdAt         DateTime       @default(now())
   updatedAt         DateTime       @updatedAt
   createdById       String?
+
+  /// The partial unique index "PartnerTenant_countryId_registrationNumber_key" on (countryId,
+  /// registrationNumber) WHERE both are NOT NULL is managed in SQL (migration 0021): Prisma cannot
+  /// express it, and a regenerated migration must never drop it (guarded by prisma-migrations.spec.ts).
+  @@index([countryId, status])
+}
+
+/// Spec 053 R3: broker self-service requests decided by the admin: identity changes (legal name,
+/// trade name, RCCM, country) and coverage extensions (one country or one product).
+enum PartnerChangeRequestType {
+  profile_change
+  coverage_extension
+}
+
+enum PartnerChangeRequestStatus {
+  pending
+  accepted
+  rejected
+  cancelled
+}
+
+model PartnerChangeRequest {
+  id               String                     @id @default(uuid())
+  partnerTenantId  String
+  type             PartnerChangeRequestType
+  status           PartnerChangeRequestStatus @default(pending)
+  requestedChanges Json
+  previousValues   Json                       @default("{}")
+  justification    String
+  requestedById    String?
+  decidedById      String?
+  decidedAt        DateTime?
+  decisionReason   String?
+  createdAt        DateTime                   @default(now())
+  updatedAt        DateTime                   @default(now())
+
+  @@index([partnerTenantId, status])
+  @@index([status, createdAt])
+}
+
+/// Spec 051 R2: every partner status transition, with its reason and actor.
+model PartnerStatusHistory {
+  id              String         @id @default(uuid())
+  partnerTenantId String
+  fromStatus      PartnerStatus?
+  toStatus        PartnerStatus
+  reason          String
+  actorId         String?
+  createdAt       DateTime       @default(now())
+
+  @@index([partnerTenantId, createdAt])
+}
+
+/// Spec 051 R4: every licence status change.
+model PartnerLicenseHistory {
+  id              String         @id @default(uuid())
+  licenseId       String
+  partnerTenantId String
+  fromStatus      LicenseStatus?
+  toStatus        LicenseStatus
+  reason          String
+  actorId         String?
+  createdAt       DateTime       @default(now())
+
+  @@index([licenseId, createdAt])
+  @@index([partnerTenantId, createdAt])
+}
+
+/// Spec 051 R6: partnership contract signed outside the platform and recorded by an admin.
+model PartnerContract {
+  id              String   @id @default(uuid())
+  partnerTenantId String
+  version         String
+  signedAt        DateTime
+  signatoryName   String
+  documentId      String
+  recordedById    String?
+  createdAt       DateTime @default(now())
+
+  @@unique([partnerTenantId, version])
 }
 
 model PartnerCountryAuthorization {
   id              String   @id @default(uuid())
   partnerTenantId String
   countryId       String
+  /// Spec 051 R7: `active` or `withdrawn` (written by the application).
   status          String   @default("pending")
+  withdrawnAt      DateTime?
+  withdrawalReason String?
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
   createdById     String?
@@ -574,7 +704,10 @@ model PartnerProductAuthorization {
   id              String   @id @default(uuid())
   partnerTenantId String
   productId       String
+  /// Spec 051 R7: `active` or `withdrawn` (written by the application).
   status          String   @default("pending")
+  withdrawnAt      DateTime?
+  withdrawalReason String?
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
   createdById     String?
@@ -604,6 +737,10 @@ model Country {
   timezone           String
   regulatoryFamily   RegulatoryFamily
   regulatoryRegimeId String?
+  /// Spec 050 R8: international dialling code (for example +225); null keeps the generic normalisation.
+  phoneDialCode        String?
+  /// Spec 050 R8: accepted national number lengths (for example [10]); empty keeps the generic normalisation.
+  phoneNationalLengths Int[]            @default([])
   status             CountryStatus    @default(draft)
   flags              Json
   /// Spec 046: first transition to `public`; anchors the waiting-list retention.
@@ -664,6 +801,9 @@ model PartnerLicense {
   expirationDate  DateTime
   validatedById   String?
   validatedAt     DateTime?
+  /// Spec 051 R4: reason of the last status change and the licence this one renews.
+  statusReason    String?
+  renewsLicenseId String?
   createdAt       DateTime      @default(now())
   updatedAt       DateTime      @updatedAt
   createdById     String?
@@ -680,6 +820,14 @@ model AccreditationDocument {
   expirationDate  DateTime?
   reviewedById    String?
   reviewedAt      DateTime?
+  /// Spec 051 R5: uploaded file metadata, antivirus verdict and review reason.
+  fileName        String?
+  mimeType        String?
+  sizeBytes       Int?
+  scanStatus      AccreditationScanStatus @default(pending)
+  scanEngine      String?
+  scannedAt       DateTime?
+  reviewReason    String?
   retentionUntil  DateTime
   createdAt       DateTime       @default(now())
   updatedAt       DateTime       @updatedAt
@@ -727,7 +875,10 @@ model ConsentText {
   version           String
   status            ConsentTextStatus @default(draft)
   contentHash       String
+  /// Spec 050 R5: full template (variables unresolved); the hash is computed from it by the server.
+  content           String?
   publishedAt       DateTime?
+  retiredAt         DateTime?
   createdAt         DateTime          @default(now())
   updatedAt         DateTime          @updatedAt
   createdById       String?
@@ -751,6 +902,10 @@ model ConsentRecord {
   createdAt         DateTime            @default(now())
   updatedAt         DateTime            @updatedAt
   createdById       String?
+
+  // Spec 059 follow-up: compliance consent-proof search (by e-mail fingerprint, by country).
+  @@index([subjectReference])
+  @@index([countryId, createdAt])
 }
 
 model AuditLog {
@@ -767,6 +922,12 @@ model AuditLog {
   occurredAt     DateTime    @default(now())
   retentionUntil DateTime
   createdAt      DateTime    @default(now())
+
+  // Spec 056: admin audit-log search (actor, action prefix, target, period).
+  @@index([occurredAt])
+  @@index([action, occurredAt])
+  @@index([targetType, targetId])
+  @@index([actorId, occurredAt])
 }
 
 model Notification {
@@ -780,6 +941,10 @@ model Notification {
   queueJobRecordId  String?
   lastAttemptAt     DateTime?
   retryCount        Int              @default(0)
+  /// Spec 054 R3: persisted idempotency key `{type}:{quoteRequestId}:{assignmentId|-}:{seq}`.
+  dedupeKey         String?          @unique
+  /// Spec 054 R3: non-sensitive identifiers of the event (assignment and partner ids).
+  eventPayload      Json?
   createdAt         DateTime         @default(now())
   updatedAt         DateTime         @updatedAt
   createdById       String?
@@ -904,12 +1069,73 @@ model Offer {
   sourceOfInformation String?
   validatedById       String?
   validatedAt         DateTime?
+  /// Spec 052 R1: the columns above hold the published version only (or v1 of a never published offer).
+  publishedVersionId  String?
+  pendingVersionId    String?
+  /// Spec 052: `indicative` or `partner`.
+  offerType           String                @default("indicative")
+  withdrawnAt         DateTime?
   createdAt           DateTime              @default(now())
   updatedAt           DateTime              @updatedAt
   createdById         String?
 
   @@unique([countryId, productId, publicKey])
   @@index([countryId, productId, status, validationStatus, validFrom, validUntil])
+}
+
+enum OfferVersionStatus {
+  draft
+  submitted
+  published
+  archived
+  withdrawn
+}
+
+/// Spec 052 R1/R2: every version of an offer. At most one `published` and one `draft|submitted`
+/// version per offer, enforced by the partial unique indexes `OfferVersion_offerId_published_key`
+/// and `OfferVersion_offerId_pending_key` of migration 0022 (Prisma cannot express them).
+model OfferVersion {
+  id                  String             @id @default(uuid())
+  offerId             String
+  versionNumber       Int
+  status              OfferVersionStatus @default(draft)
+  name                String
+  shortDescription    String?
+  guaranteeSummary    String?
+  exclusionsSummary   String?
+  insurerName         String?
+  guarantees          Json               @default("[]")
+  guaranteeLevel      Int?
+  deductibleAmount    Decimal?
+  coverageCeiling     Decimal?
+  processingDelayDays Int?
+  paymentFlexibility  String?
+  requiredDocuments   String[]           @default([])
+  sourceOfInformation String?
+  indicativePriceMin  Decimal?
+  indicativePriceMax  Decimal?
+  currency            String
+  pricingUnit         String?
+  validFrom           DateTime
+  validUntil          DateTime
+  publicDisclaimers   String[]
+  isSponsored         Boolean            @default(false)
+  sponsorLabel        String?
+  displayPriority     Int                @default(0)
+  completenessScore   Int                @default(0)
+  authorId            String?
+  authorRole          String             @default("admin")
+  submittedAt         DateTime?
+  decidedById         String?
+  decidedAt           DateTime?
+  lastDecision        String?
+  decisionReason      String?
+  createdAt           DateTime           @default(now())
+  updatedAt           DateTime           @updatedAt
+
+  @@unique([offerId, versionNumber])
+  @@index([offerId, status])
+  @@index([status, submittedAt])
 }
 
 model OfferHistory {
@@ -963,6 +1189,8 @@ model Prospect {
   updatedAt               DateTime @updatedAt
 
   @@index([countryId, productId, emailFingerprint, phoneFingerprint, createdAt])
+  // Spec 059 follow-up (M-03): the prospect match is an OR on the e-mail or the phone fingerprint.
+  @@index([countryId, productId, phoneFingerprint])
 }
 
 model QuoteRequest {
@@ -972,11 +1200,16 @@ model QuoteRequest {
   countryId             String
   productId             String
   selectedOfferId       String?
+  /// Spec 052 R7: `accepted` or `ignored` (with the reason) after verification of the selected offer.
+  selectedOfferOutcome       String?
+  selectedOfferIgnoredReason String?
   quoteFormDefinitionId String
   prospectId            String
   consentRecordId       String
   surveyConsentRecordId String?
   source                String
+  /// Spec 050 R6: language of the submitted quote form.
+  language              String             @default("fr")
   payload               Json
   status                QuoteRequestStatus @default(created)
   duplicateStatus       DuplicateStatus    @default(not_checked)
@@ -987,10 +1220,33 @@ model QuoteRequest {
   retentionUntil        DateTime
   anonymizedAt          DateTime?
   anonymizationBatchId  String?
+  // Spec 056: persisted manual-review decision (who, when, and the original when marked duplicate).
+  reviewedAt                DateTime?
+  reviewedById              String?
+  duplicateOfQuoteRequestId String?
   createdAt             DateTime           @default(now())
   updatedAt             DateTime           @updatedAt
 
   @@index([countryId, productId, status, routingStatus, createdAt])
+  @@index([duplicateOfQuoteRequestId])
+  // Spec 059 follow-up (M-03): offer popularity counted in the database.
+  @@index([selectedOfferId])
+}
+
+/// Spec 054 R1: visitor access tokens. Only the SHA-256 of the token is stored; the clear token is
+/// shown once (confirmation screen, e-mail link) and compared in constant time.
+model VisitorAccessToken {
+  id             String    @id @default(uuid())
+  quoteRequestId String
+  tokenHash      String    @unique
+  purpose        String    @default("tracking")
+  issuedAt       DateTime  @default(now())
+  expiresAt      DateTime
+  revokedAt      DateTime?
+  lastUsedAt     DateTime?
+  createdAt      DateTime  @default(now())
+
+  @@index([quoteRequestId, expiresAt])
 }
 
 model LeadAssignment {
@@ -1121,10 +1377,79 @@ model BrokerCrmDocument {
   storageKey       String
   visibility       String   @default("internal")
   uploadedById     String?
+  /// Spec 055 FR-010: uploaded internal file, scanned by the antivirus; never served to the visitor.
+  fileName         String?
+  mimeType         String?
+  sizeBytes        Int?
+  checksum         String?
+  scanStatus       String?
+  scanEngine       String?
+  scannedAt        DateTime?
   createdAt        DateTime @default(now())
 
   @@index([leadAssignmentId, createdAt])
   @@index([partnerTenantId, visibility])
+}
+
+/// Spec 055: the broker's indicative, non-contractual proposal to the visitor. Immutable once sent:
+/// only the lifecycle columns (viewedAt, respondedAt, withdrawnAt, status) change afterwards.
+/// `partnerTenantId` is the broker that sent it; after a reassignment it differs from the
+/// assignment's partner and the proposal is closed for responses.
+model LeadProposal {
+  id                 String    @id @default(uuid())
+  leadAssignmentId   String
+  quoteRequestId     String
+  partnerTenantId    String
+  authorId           String?
+  channel            String    @default("crm")
+  status             String    @default("sent")
+  message            String
+  priceMin           Decimal?  @db.Decimal(16, 2)
+  priceMax           Decimal?  @db.Decimal(16, 2)
+  currency           String    @default("XOF")
+  guarantees         String[]
+  validUntil         DateTime
+  nonContractual     Boolean   @default(true)
+  documentStorageKey String?
+  documentFileName   String?
+  documentMimeType   String?
+  documentSizeBytes  Int?
+  documentChecksum   String?
+  documentScanStatus String?
+  documentScanEngine String?
+  documentScannedAt  DateTime?
+  sentAt             DateTime  @default(now())
+  viewedAt           DateTime?
+  respondedAt        DateTime?
+  withdrawnAt        DateTime?
+  withdrawnById      String?
+  withdrawReason     String?
+  anonymizedAt       DateTime?
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+
+  @@index([leadAssignmentId, sentAt])
+  @@index([quoteRequestId, sentAt])
+  @@index([partnerTenantId, sentAt])
+}
+
+/// Spec 055 US3: the visitor's follow-up to a proposal (callback request, decline or question).
+/// Append-only: the latest row prevails, every row is kept.
+model VisitorProposalResponse {
+  id               String   @id @default(uuid())
+  proposalId       String
+  leadAssignmentId String
+  quoteRequestId   String
+  partnerTenantId  String
+  type             String
+  callbackSlot     String?
+  declineReason    String?
+  question         String?
+  createdAt        DateTime @default(now())
+
+  @@index([proposalId, createdAt])
+  @@index([leadAssignmentId, createdAt])
+  @@index([partnerTenantId, createdAt])
 }
 
 model BrokerCrmProposal {
@@ -1280,6 +1605,9 @@ model RoutingDecision {
   excludedCandidates      Json
   reasons                 String[]
   correlationId           String?
+  /// Spec 052 R7: offer chosen by the visitor and whether its broker was retained (`retained|unavailable|none`).
+  selectedOfferId         String?
+  selectedOfferOutcome    String?
   createdAt               DateTime @default(now())
 
   @@index([quoteRequestId, createdAt])
@@ -1337,6 +1665,8 @@ model LeadPack {
   creditsConsumed Int      @default(0)
   reason          String
   grantedById     String?
+  /// Spec 060 J-03: invoice whose recorded payment justified the grant.
+  invoiceId       String?
   grantedAt       DateTime @default(now())
   updatedAt       DateTime @default(now())
 
@@ -1364,6 +1694,101 @@ model DraftInvoice {
 
   @@unique([partnerId, periodFrom])
   @@index([periodFrom])
+}
+
+/// Spec 060: gapless invoice and credit note numbering per country, year and document kind.
+model InvoiceNumberSequence {
+  countryCode String
+  year        Int
+  kind        String
+  lastValue   Int      @default(0)
+  updatedAt   DateTime @default(now()) @updatedAt
+
+  @@id([countryCode, year, kind])
+}
+
+/// Spec 060: issued B2B invoice. Immutable once issued (database triggers in 0026_b2b_invoicing);
+/// only status, amountPaid, creditNoteId, cancelledAt and updatedAt may change. The SQL-only
+/// partial unique index IssuedInvoice_active_partner_period_key keeps one active invoice per
+/// partner and period (Prisma cannot express a partial index).
+model IssuedInvoice {
+  id                    String    @id @default(uuid())
+  number                String    @unique
+  countryCode           String
+  year                  Int
+  sequence              Int
+  draftId               String
+  partnerId             String
+  plan                  String
+  periodFrom            DateTime
+  periodTo              DateTime
+  currency              String    @default("XOF")
+  customer              Json
+  issuer                Json
+  legalMentionsComplete Boolean
+  lines                 Json
+  subtotalAmount        Int
+  vatRateBps            Int
+  vatAmount             Int
+  totalAmount           Int
+  dueDate               String
+  documentStorageKey    String
+  documentSha256        String
+  issuedById            String?
+  issueReason           String
+  issuedAt              DateTime
+  status                String    @default("issued")
+  amountPaid            Int       @default(0)
+  creditNoteId          String?
+  cancelledAt           DateTime?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @default(now())
+
+  @@unique([countryCode, year, sequence])
+  @@index([partnerId, issuedAt])
+  @@index([partnerId, periodFrom])
+  @@index([status])
+}
+
+/// Spec 060: payment received outside the platform and recorded by finance. Append-only.
+model InvoicePayment {
+  id           String   @id @default(uuid())
+  invoiceId    String
+  partnerId    String
+  amount       Int
+  receivedAt   String
+  method       String
+  reference    String
+  note         String?
+  recordedById String?
+  recordedAt   DateTime @default(now())
+
+  @@index([invoiceId])
+  @@index([partnerId, recordedAt])
+}
+
+/// Spec 060: credit note cancelling an issued invoice in full. Append-only.
+model CreditNote {
+  id                 String   @id @default(uuid())
+  number             String   @unique
+  countryCode        String
+  year               Int
+  sequence           Int
+  invoiceId          String   @unique
+  invoiceNumber      String
+  partnerId          String
+  currency           String   @default("XOF")
+  subtotalAmount     Int
+  vatAmount          Int
+  totalAmount        Int
+  reason             String
+  documentStorageKey String
+  documentSha256     String
+  issuedById         String?
+  issuedAt           DateTime
+
+  @@unique([countryCode, year, sequence])
+  @@index([partnerId, issuedAt])
 }
 
 model MessagingDelivery {
@@ -1496,6 +1921,10 @@ model PartnerApplication {
   reviewedAt              DateTime?
   reviewNote              String?
   partnerTenantId         String?
+  /// Spec 051 R10: closed-list rejection reason, application language and decision date.
+  rejectionReasonCode     String?
+  locale                  String                   @default("fr")
+  decidedAt               DateTime?
   ipHash                  String?
   retentionUntil          DateTime
   anonymizedAt            DateTime?
@@ -1524,6 +1953,10 @@ model ContactMessage {
   retentionUntil   DateTime
   anonymizedAt     DateTime?
   anonymizationBatchId String?
+  // Spec 056: status handling by the admin inbox (new, handled, spam).
+  handledAt        DateTime?
+  handledById      String?
+  statusReason     String?
   createdAt        DateTime             @default(now())
   updatedAt        DateTime             @updatedAt
 
@@ -1619,4 +2052,52 @@ model SatisfactionSurveyRequest {
 
   @@index([partnerTenantId, status])
   @@index([status, dueAt])
+}
+
+/// Spec 061 FR-004: admin alerts center. One open alert per condition (`conditionKey`); the
+/// `dedupeKey` (condition + day bucket) is unique so a condition is raised at most once a day.
+/// Only identifiers and counters are stored, never a prospect's data.
+model AdminAlert {
+  id                String    @id @default(uuid())
+  type              String
+  severity          String    @default("warning")
+  conditionKey      String
+  dedupeKey         String    @unique
+  targetType        String
+  targetId          String?
+  countryId         String?
+  partnerTenantId   String?
+  details           Json      @default("{}")
+  status            String    @default("open")
+  occurrences       Int       @default(1)
+  firstSeenAt       DateTime  @default(now())
+  lastSeenAt        DateTime  @default(now())
+  acknowledgedAt    DateTime?
+  acknowledgedById  String?
+  acknowledgeReason String?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  @@index([status, lastSeenAt])
+  @@index([conditionKey, status])
+}
+
+/// Spec 061: liveness of the spec 057 worker, written after every cycle and read by the API.
+model WorkerHeartbeat {
+  name       String   @id
+  lastBeatAt DateTime
+  cycles     Int      @default(0)
+  updatedAt  DateTime @updatedAt
+}
+
+/// Spec 061 FR-005: opt-out of non-transactional messages (satisfaction survey). Only the SHA-256
+/// of the normalised e-mail address is stored.
+model NotificationUnsubscribe {
+  id          String   @id @default(uuid())
+  subjectHash String
+  purpose     String
+  locale      String   @default("fr")
+  createdAt   DateTime @default(now())
+
+  @@unique([subjectHash, purpose])
 }

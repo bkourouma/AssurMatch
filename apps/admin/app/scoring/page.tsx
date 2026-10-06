@@ -1,4 +1,4 @@
-import { readAdminOffers, readScoringRules } from "../lib/admin-api";
+import { readAdminOffers, readScoringRules, type AdminOfferData } from "../lib/admin-api";
 import {
   Card,
   DataTable,
@@ -12,6 +12,10 @@ import {
   ruleStatusTones
 } from "../lib/ui/admin-ui";
 import { CreateScoringRuleForm, OfferDecisionForm, UpdateScoringRuleForm } from "./scoring-forms";
+
+function offerLabel(offer: AdminOfferData): string {
+  return offer.published?.content.name ?? offer.pending?.content.name ?? offer.publicKey;
+}
 
 function weightsLabel(weights: Record<string, number>): string {
   return `garantie ${weights.guaranteeLevel} / prix ${weights.price} / franchise ${weights.deductible} / delai ${weights.processingSpeed} / paiement ${weights.paymentFlexibility} / infos ${weights.informationQuality} / preferences ${weights.userPreferences}`;
@@ -70,13 +74,13 @@ export default async function ScoringPage() {
             {offers.status === "forbidden" ? <StateMessage tone="warning">Liste des offres non accessible pour ce role.</StateMessage> : null}
             <DataTable
               columns={[
-                { key: "name", header: "Offre", render: (offer) => offer.name },
+                { key: "name", header: "Offre", render: (offer) => <a href={`/offers/${encodeURIComponent(offer.id)}`}>{offerLabel(offer)}</a> },
                 { key: "status", header: "Statut", render: (offer) => <StatusBadge status={offer.status} tones={offerStatusTones} /> },
-                { key: "validation", header: "Validation", render: (offer) => offer.validationStatus },
+                { key: "validation", header: "Version en cours", render: (offer) => (offer.pending ? `v${offer.pending.versionNumber} ${offer.pending.status}` : "-") },
                 { key: "sponsored", header: "Sponsorisee", render: (offer) => (offer.isSponsored ? "oui" : "non") },
-                { key: "guarantee", header: "Garantie", render: (offer) => (offer.guaranteeLevel !== undefined ? `${offer.guaranteeLevel}/5` : "-") },
-                { key: "validUntil", header: "Validite", render: (offer) => String(offer.validUntil).slice(0, 10) },
-                { key: "decision", header: "Decision", render: (offer) => <OfferDecisionForm offerId={offer.id} offerName={offer.name} /> }
+                { key: "guarantee", header: "Garantie", render: (offer) => (offer.published?.content.guaranteeLevel !== undefined ? `${offer.published.content.guaranteeLevel}/5` : "-") },
+                { key: "validUntil", header: "Validite", render: (offer) => (offer.expiresAt ? offer.expiresAt.slice(0, 10) : "-") },
+                { key: "decision", header: "Decision", render: (offer) => <OfferDecisionForm offerId={offer.id} offerName={offerLabel(offer)} /> }
               ]}
               items={offers.data}
               getKey={(offer) => offer.id}

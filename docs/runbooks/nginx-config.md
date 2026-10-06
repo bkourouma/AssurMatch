@@ -6,7 +6,7 @@
 - `/etc/nginx/conf.d/assurmatch-backoffice.conf`
 - `/etc/nginx/conf.d/assurmatch-api.conf`
 
-Templates live in `docs/preproduction/nginx.md` (this repo).
+Templates live in `docs/preproduction/nginx.md` (this repo). Production: `deploy/nginx/assurmatch-production.conf.example` + the versioned security headers `deploy/nginx/security-headers.conf` (spec 058, `docs/security/security-headers.md`).
 
 ## Edit and reload
 

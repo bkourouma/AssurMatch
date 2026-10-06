@@ -1,4 +1,3 @@
-import { Queue } from "bullmq";
 import { isTestEnvironment, validateRuntimeEnvironment } from "../../../config/config.module";
 
 export type QueueJobStatus = "queued" | "active" | "completed" | "failed" | "retryable" | "discarded";
@@ -17,7 +16,7 @@ export interface QueueJobRecord {
 }
 
 export interface QueuePort {
-  readonly mode: "memory-test" | "bullmq";
+  readonly mode: "memory-test" | "process-ledger";
   add(queueName: string, jobType: string, payloadReference: string, correlationId?: string): QueueJobRecord;
   transition(id: string, status: QueueJobStatus, failureReason?: string): QueueJobRecord;
   list(): QueueJobRecord[];
@@ -64,11 +63,19 @@ export class InMemoryQueue implements QueuePort {
   }
 }
 
-export class BullMqQueuePort implements QueuePort {
-  readonly mode = "bullmq" as const;
+/**
+ * Spec 057 / PRD decision D-7: asynchronous work is driven by database polling in the dedicated
+ * worker container (quote notifications, satisfaction surveys, partner webhooks), never by BullMQ.
+ *
+ * The previous BullMQ port pushed every job to Redis queues that no `Worker` ever consumed, so they
+ * grew forever, and kept an unbounded in-process list on top. Callers only use the returned
+ * `QueueJobRecord` and `transition()` for in-process traceability, which this ledger keeps, bounded.
+ */
+export class ProcessJobLedger implements QueuePort {
+  readonly mode = "process-ledger" as const;
   private readonly jobs: QueueJobRecord[] = [];
 
-  constructor(private readonly queues: Record<string, Queue>) {}
+  constructor(private readonly capacity = 1000) {}
 
   add(queueName: string, jobType: string, payloadReference: string, correlationId?: string): QueueJobRecord {
     const now = new Date();
@@ -84,8 +91,7 @@ export class BullMqQueuePort implements QueuePort {
       updatedAt: now
     };
     this.jobs.push(job);
-    const queue = this.queues[queueName] ?? this.queues.notifications;
-    void queue?.add(jobType, { payloadReference, correlationId, queueJobRecordId: job.id }, { jobId: job.id }).catch(() => undefined);
+    this.evict();
     return job;
   }
 
@@ -106,48 +112,35 @@ export class BullMqQueuePort implements QueuePort {
   health(): "ok" | "degraded" {
     return this.jobs.some((job) => job.status === "failed") ? "degraded" : "ok";
   }
+
+  /** Drops finished records first, then the oldest ones, so a running job is the last to go. */
+  private evict(): void {
+    while (this.jobs.length > this.capacity) {
+      const finished = this.jobs.findIndex((job) => job.status === "completed" || job.status === "discarded");
+      this.jobs.splice(finished >= 0 ? finished : 0, 1);
+    }
+  }
 }
 
 export class QueuesModule {
-  readonly runtimeMode: "memory-test" | "bullmq";
+  readonly runtimeMode: "memory-test" | "process-ledger";
   readonly notifications: QueuePort;
   readonly futureIa: QueuePort;
   readonly futureRouting: QueuePort;
   readonly maintenance: QueuePort;
-  readonly bullQueues?: {
-    notifications: Queue;
-    futureIa: Queue;
-    futureRouting: Queue;
-    maintenance: Queue;
-  };
 
   constructor() {
     validateRuntimeEnvironment();
-    const redisUrl = process.env.REDIS_URL;
-    const useBullMq = !isTestEnvironment() && redisUrl && process.env.ASSURMATCH_QUEUE_MEMORY !== "true";
-    this.runtimeMode = useBullMq ? "bullmq" : "memory-test";
-    if (useBullMq && redisUrl) {
-      const connection = { url: redisUrl };
-      this.bullQueues = {
-        notifications: new Queue("assurmatch.notifications", { connection }),
-        futureIa: new Queue("assurmatch.future-ia", { connection }),
-        futureRouting: new Queue("assurmatch.future-routing", { connection }),
-        maintenance: new Queue("assurmatch.maintenance", { connection })
-      };
-      this.notifications = new BullMqQueuePort({ notifications: this.bullQueues.notifications });
-      this.futureIa = new BullMqQueuePort({ notifications: this.bullQueues.futureIa, "ai-quote-summary": this.bullQueues.futureIa });
-      this.futureRouting = new BullMqQueuePort({ notifications: this.bullQueues.futureRouting });
-      this.maintenance = new BullMqQueuePort({ notifications: this.bullQueues.maintenance });
-    } else {
-      this.notifications = new InMemoryQueue();
-      this.futureIa = new InMemoryQueue();
-      this.futureRouting = new InMemoryQueue();
-      this.maintenance = new InMemoryQueue();
-    }
+    const useLedger = !isTestEnvironment() && process.env.ASSURMATCH_QUEUE_MEMORY !== "true";
+    this.runtimeMode = useLedger ? "process-ledger" : "memory-test";
+    const create = (): QueuePort => (useLedger ? new ProcessJobLedger() : new InMemoryQueue());
+    this.notifications = create();
+    this.futureIa = create();
+    this.futureRouting = create();
+    this.maintenance = create();
   }
 
   async close(): Promise<void> {
-    if (!this.bullQueues) return;
-    await Promise.all(Object.values(this.bullQueues).map((queue) => queue.close()));
+    return undefined;
   }
 }

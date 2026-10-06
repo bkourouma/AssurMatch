@@ -15,6 +15,7 @@ import { BrokerCrmAccessPolicy } from "./broker-crm-access-policy";
 import { BrokerCrmExportPolicy } from "./broker-crm-export-policy";
 import { BrokerCrmHistoryService } from "./broker-crm-history.service";
 import type { BrokerCrmActivityService } from "./broker-crm-activity.service";
+import { maskEmail, maskPhone, type LeadContactPolicy } from "./lead-contact-policy";
 import { LeadAssignmentService, type LeadAssignmentRecord } from "./lead-assignment.service";
 
 const CRM_STATUSES: BrokerCrmPipelineStatus[] = [
@@ -42,7 +43,9 @@ export class BrokerCrmLeadsService {
     private readonly history: BrokerCrmHistoryService,
     private readonly audit: AuditLogWriter,
     private readonly exportPolicy: BrokerCrmExportPolicy,
-    private readonly activity?: BrokerCrmActivityService
+    private readonly activity?: BrokerCrmActivityService,
+    /** Spec 055 FR-001: full contact for the assigned broker (audited), masked after a withdrawal. */
+    private readonly contactPolicy?: LeadContactPolicy
   ) {}
 
   async list(actor: ActorContext, query: BrokerCrmLeadListQuery = {}): Promise<Page<BrokerCrmLeadSummary>> {
@@ -95,9 +98,11 @@ export class BrokerCrmLeadsService {
       result: "success",
       context: { status: this.statusOf(assignment) }
     });
+    const revealed = this.contactPolicy ? await this.contactPolicy.reveal(assignment, actor, "crm") : { contact: assignment.contact ?? {}, visibility: "full" as const };
     return {
       ...this.toSummary(assignment),
-      contact: assignment.contact ?? {},
+      contact: revealed.contact,
+      contactVisibility: revealed.visibility,
       answers: assignment.answers ?? {},
       history: await this.history.forLead(id),
       notes: await this.activity?.notesForLead(id) ?? [],
@@ -201,12 +206,11 @@ export class BrokerCrmLeadsService {
   }
 
   private maskEmail(email: string): string {
-    const [user, domain] = email.split("@");
-    return `${user?.slice(0, 2) ?? "**"}***@${domain ?? "masked"}`;
+    return maskEmail(email);
   }
 
   private maskPhone(phone: string): string {
-    return `${phone.slice(0, 3)}***${phone.slice(-2)}`;
+    return maskPhone(phone);
   }
 
   private safeFilters(query: Partial<BrokerCrmLeadListQuery>): Record<string, unknown> {

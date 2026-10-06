@@ -13,7 +13,7 @@ import type { FeatureFlagsService } from "../feature-flags/feature-flags.module"
 import type { OfferRecord, OffersModule } from "../offers/offers.module";
 import type { PartnerLicense, PartnerLicensesService } from "../partner-licenses/partner-licenses.module";
 import type { PartnerTenant, PartnersService } from "../partners/partners.module";
-import type { Product, ProductsService } from "../products/products.module";
+import { effectiveProductFlags, countryLinkFor, type Product, type ProductsService } from "../products/products.module";
 import type { QuoteFormDefinitionService } from "../quote-forms/quote-form-definition.service";
 import { OfferPublicationPolicy } from "../offers/offer-publication-policy";
 import { countryCatalog, productCatalog, resolveScopeCodes } from "../common/scope/actor-scope-codes";
@@ -32,8 +32,11 @@ const FORBIDDEN_FLAG_KEYS = [
   "ai_recommendation_enabled",
   "ai_broker_assistant_enabled",
   "multi_broker_routing_enabled",
-  "whatsapp_enabled",
-  "billing_enabled"
+  "whatsapp_enabled"
+  // `billing_enabled` is no longer a blocker (spec 059 follow-up): spec 060 / PRD decision D-8 make
+  // manual B2B invoicing part of the launch, switched on through the audited compliance policy.
+  // Left here, it would forbid opening the second country once invoicing runs for the first one.
+  // Online payment stays forbidden (`payments_enabled` above).
 ] as const;
 
 export interface ActivationChecklistDeps {
@@ -46,6 +49,12 @@ export interface ActivationChecklistDeps {
   offers: OffersModule;
   quoteForms: QuoteFormDefinitionService;
   consent: ConsentService;
+  /**
+   * Spec 051 R14: per partner readiness (accepted and clean accreditation document, owner user,
+   * recorded contract). Optional so hand-built checklists in unit tests keep their scope; the
+   * runtime always provides it.
+   */
+  partnerReadiness?: { readiness(partnerId: string): Promise<{ documentAccepted: boolean; ownerUser: boolean; contract: boolean }> } | undefined;
 }
 
 export class ActivationChecklistAccessRefusedError extends Error {
@@ -55,8 +64,45 @@ export class ActivationChecklistAccessRefusedError extends Error {
   }
 }
 
+/** Spec 050 R4: one failing blocking control, as returned to the admin when an activation is refused. */
+export interface ActivationBlocker {
+  section: string;
+  control: string;
+  label: string;
+  evidence: string;
+}
+
 export class ActivationChecklistService {
   constructor(private readonly deps: ActivationChecklistDeps) {}
+
+  /**
+   * Spec 050 R4: blocking controls for opening one country to the public. It reuses the checklist
+   * rules (country, linked products, quote readiness, licensed partner, offers) without the role
+   * resolution and the read audit of `read()`: the catalogue layer has already authorised the caller
+   * and audits the activation attempt itself. Per partner sections are left out: the country
+   * control `country_active_licensed_partner` carries the "at least one" condition instead.
+   */
+  async countryActivationBlockers(countryId: string, ignoredControls: string[] = []): Promise<ActivationBlocker[]> {
+    const country = await this.deps.countries.require(countryId);
+    const countries = [country];
+    const products = (await this.deps.products.listAdmin(country.id)).filter((product) => product.countryIds.includes(country.id));
+    const [offers, consentTexts, forms, partners] = await Promise.all([
+      this.deps.offers.repository.list(),
+      this.deps.consent.listTexts(),
+      this.deps.quoteForms.list(),
+      this.deps.partners.list()
+    ]);
+    const sections: ActivationChecklistSection[] = [
+      await this.countrySection(country),
+      ...products.map((product) => this.productSection(product, countries)),
+      ...this.quoteReadinessSections(countries, products, forms, consentTexts),
+      ...await this.offerSections(offers, countries, products, partners)
+    ];
+    const ignored = new Set(ignoredControls);
+    return sections.flatMap((section) => section.controls
+      .filter((control) => control.blocking && control.status === "blocked" && !ignored.has(control.key))
+      .map((control) => ({ section: section.key, control: control.key, label: control.label, evidence: control.evidence })));
+  }
 
   async read(actor: ActorContext, query: ActivationChecklistQuery): Promise<ActivationChecklistResponse> {
     const role = this.resolveRole(actor);
@@ -70,7 +116,7 @@ export class ActivationChecklistService {
     const forms = await this.deps.quoteForms.list();
     const sections: ActivationChecklistSection[] = [
       this.globalSection(),
-      ...countries.map((country) => this.countrySection(country)),
+      ...await Promise.all(countries.map((country) => this.countrySection(country))),
       ...products.map((product) => this.productSection(product, countries)),
       ...this.quoteReadinessSections(countries, products, forms, consentTexts),
       ...await this.partnerSections(partners, countries, products),
@@ -153,24 +199,59 @@ export class ActivationChecklistService {
     ]);
   }
 
-  private countrySection(country: Country): ActivationChecklistSection {
+  private async countrySection(country: Country): Promise<ActivationChecklistSection> {
+    const licensedPartners = await this.activeLicensedPartnerCount(country.id);
     return this.section(`country:${country.id}`, `Pays ${country.isoCode}`, { countryId: country.id, countryCode: country.isoCode }, [
       this.control("country_status_public", "Statut pays public", country.status === "public", true, country.status),
       this.control("country_regime", "Regime reglementaire renseigne", Boolean(country.regulatoryRegimeId), true),
       this.control("country_public_enabled", "Flag pays public", country.flags.country_public_enabled === true, true),
       this.control("country_comparison_enabled", "Flag comparaison pays", country.flags.country_comparison_enabled === true, true),
-      this.control("country_quote_enabled", "Flag devis pays", country.flags.country_quote_enabled === true, true)
+      this.control("country_quote_enabled", "Flag devis pays", country.flags.country_quote_enabled === true, true),
+      // Spec 050 T009 / spec 051 R14: opening a country needs at least one Actif public partner,
+      // authorised, holding a valid licence there and an accepted accreditation document.
+      this.control(
+        "country_active_licensed_partner",
+        "Au moins un courtier actif public, autorise, licencie et avec agrement accepte",
+        licensedPartners > 0,
+        true,
+        licensedPartners > 0 ? `${licensedPartners} courtier(s)` : "aucun courtier actif licencie"
+      )
     ]);
   }
 
+  /**
+   * Actif public partners (`active` only: `active_test` never counts) authorised for the country,
+   * holding a valid, unexpired licence there and an accepted, clean accreditation document.
+   */
+  private async activeLicensedPartnerCount(countryId: string): Promise<number> {
+    const partners = (await this.deps.partners.list()).filter((partner) => partner.status === "active");
+    const today = Date.now();
+    let count = 0;
+    for (const partner of partners) {
+      const [authorized, licenses] = await Promise.all([
+        this.deps.partners.isAuthorizedForCountry(partner.id, countryId),
+        this.deps.partnerLicenses.listForPartner(partner.id)
+      ]);
+      const licensed = licenses.some((license: PartnerLicense) =>
+        license.status === "valid" && license.countryId === countryId && new Date(license.expirationDate).getTime() > today
+      );
+      const documented = !this.deps.partnerReadiness || (authorized && licensed && (await this.deps.partnerReadiness.readiness(partner.id)).documentAccepted);
+      if (authorized && licensed && documented) count += 1;
+    }
+    return count;
+  }
+
   private productSection(product: Product, countries: Country[]): ActivationChecklistSection {
-    const countryIds = new Set(countries.map((country) => country.id));
+    // Spec 050 R2: flags are read per country (product flag AND link flag) for the scoped countries.
+    const links = countries.map((country) => countryLinkFor(product, country.id)).filter((link) => link !== undefined && link.status !== "retired");
+    const effective = links.map((link) => effectiveProductFlags(product, link));
+    const anyEffective = (key: "product_public_enabled" | "product_comparison_enabled" | "product_quote_enabled"): boolean => effective.some((flags) => flags[key] === true);
     return this.section(`product:${product.id}`, `Produit ${product.key}`, { productId: product.id, productKey: product.key }, [
       this.control("product_status_public", "Statut produit public", product.status === "public", true, product.status),
-      this.control("product_country_association", "Produit associe au pays scope", product.countryIds.some((countryId) => countryIds.has(countryId)), true),
-      this.control("product_public_enabled", "Flag produit public", product.flags.product_public_enabled === true, true),
-      this.control("product_comparison_enabled", "Flag comparaison produit", product.flags.product_comparison_enabled === true, true),
-      this.control("product_quote_enabled", "Flag devis produit", product.flags.product_quote_enabled === true, true),
+      this.control("product_country_association", "Produit associe au pays scope", links.length > 0, true),
+      this.control("product_public_enabled", "Flag produit public", anyEffective("product_public_enabled"), true),
+      this.control("product_comparison_enabled", "Flag comparaison produit", anyEffective("product_comparison_enabled"), true),
+      this.control("product_quote_enabled", "Flag devis produit", anyEffective("product_quote_enabled"), true),
       this.control("product_manual_review_required", "Revue manuelle explicite", product.flags.product_manual_review_required === true || product.requiresManualReview === true, false)
     ]);
   }
@@ -179,10 +260,20 @@ export class ActivationChecklistService {
     const sections: ActivationChecklistSection[] = [];
     for (const country of countries) {
       for (const product of products.filter((candidate) => candidate.countryIds.includes(country.id))) {
-        const publishedForm = forms.find((form) => form.countryId === country.id && form.productId === product.id && form.status === "published");
-        const publishedConsent = publishedForm
-          ? consentTexts.find((text) => text.id === publishedForm.consentTextId && text.status === "published" && text.purpose === "lead_transmission")
-          : undefined;
+        // Spec 050 R6: one published form per language; each must reference a published
+        // lead_transmission text of its own language, country and product (or no product).
+        const publishedForms = forms.filter((form) => form.countryId === country.id && form.productId === product.id && form.status === "published");
+        const publishedForm = publishedForms[0];
+        const consentFor = (form: (typeof publishedForms)[number]) => consentTexts.find((text) =>
+          text.id === form.consentTextId &&
+          text.status === "published" &&
+          text.purpose === "lead_transmission" &&
+          text.language === form.language &&
+          text.countryId === form.countryId &&
+          (!text.productId || text.productId === form.productId)
+        );
+        const mismatched = publishedForms.filter((form) => !consentFor(form)).map((form) => form.language);
+        const publishedConsent = publishedForms.length > 0 && mismatched.length === 0;
         sections.push(this.section(`quote:${country.id}:${product.id}`, `Parcours devis ${country.isoCode}/${product.key}`, {
           countryId: country.id,
           countryCode: country.isoCode,
@@ -190,7 +281,13 @@ export class ActivationChecklistService {
           productKey: product.key
         }, [
           this.control("published_quote_form", "Formulaire publie", Boolean(publishedForm), true),
-          this.control("published_consent_text", "Consentement publie", Boolean(publishedConsent), true)
+          this.control(
+            "published_consent_text",
+            "Consentement publie",
+            publishedConsent,
+            true,
+            mismatched.length ? `non conforme pour : ${mismatched.join(", ")}` : undefined
+          )
         ]));
       }
     }
@@ -203,6 +300,7 @@ export class ActivationChecklistService {
       for (const country of countries) {
         for (const product of products.filter((candidate) => candidate.countryIds.includes(country.id))) {
           const eligibility = await this.partnerEligibility(partner.id, country.id, product.id);
+          const readiness = this.deps.partnerReadiness ? await this.deps.partnerReadiness.readiness(partner.id) : undefined;
           sections.push(this.section(`partner:${partner.id}:${country.id}:${product.id}`, `${partner.legalName} - ${country.isoCode}/${product.key}`, {
             partnerId: partner.id,
             countryId: country.id,
@@ -214,7 +312,13 @@ export class ActivationChecklistService {
             this.control("partner_capacity", "Capacite disponible", partner.capacityStatus !== "blocked" && partner.capacityStatus !== "full", true, partner.capacityStatus),
             this.control("partner_country_authorized", "Autorisation pays", eligibility.countryAuthorized, true),
             this.control("partner_product_authorized", "Autorisation produit", eligibility.productAuthorized, true),
-            this.control("partner_license_valid", "Licence valide sur scope", eligibility.licenseValid, true)
+            this.control("partner_license_valid", "Licence valide sur scope", eligibility.licenseValid, true),
+            // Spec 051 R14: accreditation proof, owner user and contract (FR-027).
+            ...(readiness ? [
+              this.control("partner_document_accepted", "Preuve d'agrement acceptee et saine", readiness.documentAccepted, true),
+              this.control("partner_owner_user", "Utilisateur proprietaire invite ou actif", readiness.ownerUser, true),
+              this.control("partner_contract", "Contrat de partenariat enregistre", readiness.contract, true)
+            ] : [])
           ]));
         }
       }

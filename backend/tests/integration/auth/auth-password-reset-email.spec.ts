@@ -18,10 +18,12 @@ const user: UserAccount = {
   updatedAt: new Date()
 };
 
+const expiresAt = new Date(Date.now() + 30 * 60 * 1000 + 30_000);
+
 describe("password reset email fallback", () => {
   it("returns a one-time token preview when SMTP is not configured", async () => {
     const service = new UserAuthNotificationService();
-    await expect(service.deliverPasswordReset(user, "preview-token")).resolves.toEqual({
+    await expect(service.deliverPasswordReset(user, "preview-token", expiresAt)).resolves.toEqual({
       emailStatus: "not_configured",
       token: "preview-token"
     });
@@ -32,7 +34,7 @@ describe("password reset email fallback", () => {
       send: async () => ({ status: "failed", provider: "smtp", errorClass: "smtp_unavailable" })
     });
 
-    await expect(service.deliverPasswordReset(user, "fallback-token")).resolves.toEqual({
+    await expect(service.deliverPasswordReset(user, "fallback-token", expiresAt)).resolves.toEqual({
       emailStatus: "failed",
       token: "fallback-token"
     });
@@ -47,7 +49,7 @@ describe("password reset email fallback", () => {
       }
     });
 
-    await expect(service.deliverPasswordReset(user, "sent-token")).resolves.toEqual({ emailStatus: "sent" });
+    await expect(service.deliverPasswordReset(user, "sent-token", expiresAt)).resolves.toEqual({ emailStatus: "sent" });
     expect(sent[0]).toMatchObject({ to: user.email, subject: expect.stringContaining("Reinitialisation") });
     expect(sent[0]?.body).toContain("sent-token");
     expect(sent[0]?.purpose).toBe("auth_password_reset");

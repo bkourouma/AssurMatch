@@ -1,7 +1,7 @@
-import { partnerLicenseSchema, type PartnerLicenseDto, type PartnerLicenseRecord } from "../../../../packages/shared/contracts/partner.contracts";
+import { partnerLicenseSchema, type PartnerLicenseDto, type PartnerLicenseRecord, type PartnerLicenseStatus } from "../../../../packages/shared/contracts/partner.contracts";
 import { AuditLogWriter } from "../audit-logs/audit-log-writer.service";
 import type { ActorContext } from "../common/types";
-import { MemoryPartnerLicensesRepository, type PartnerLicensesRepository } from "./partner-licenses.repository";
+import { MemoryPartnerLicensesRepository, type PartnerLicenseHistoryRecord, type PartnerLicensesRepository } from "./partner-licenses.repository";
 
 export interface PartnerLicense extends PartnerLicenseRecord {
   id: string;
@@ -9,58 +9,111 @@ export interface PartnerLicense extends PartnerLicenseRecord {
   updatedAt: Date;
   validatedById?: string;
   validatedAt?: Date;
+  createdById?: string;
 }
+
+/** Audit action per target status of a licence (spec 051 R4). */
+const STATUS_ACTIONS: Partial<Record<PartnerLicenseStatus, string>> = {
+  valid: "partner_license.validated",
+  suspended: "partner_license.suspended",
+  revoked: "partner_license.revoked",
+  superseded: "partner_license.superseded",
+  expired: "partner_license.expired"
+};
 
 export class PartnerLicensesService {
   constructor(private readonly audit: AuditLogWriter, private readonly repository: PartnerLicensesRepository = new MemoryPartnerLicensesRepository()) {}
 
-  async create(input: PartnerLicenseDto, actor: ActorContext): Promise<PartnerLicense> {
+  async create(input: PartnerLicenseDto, actor: ActorContext, reason?: string): Promise<PartnerLicense> {
     const parsed = partnerLicenseSchema.parse(input);
     const now = new Date();
     const license: PartnerLicense = {
       ...parsed,
       id: parsed.id ?? crypto.randomUUID(),
+      ...(actor.actorId ? { createdById: actor.actorId } : {}),
       createdAt: now,
       updatedAt: now
     };
     await this.repository.create(license);
+    await this.repository.addHistory({
+      id: crypto.randomUUID(),
+      licenseId: license.id,
+      partnerTenantId: license.partnerTenantId,
+      fromStatus: null,
+      toStatus: license.status,
+      reason: reason ?? (license.renewsLicenseId ? "licence renewal recorded" : "licence created"),
+      actorId: actor.actorId ?? null,
+      createdAt: now
+    });
     this.audit.write({
       actor,
-      action: "partner_license.created",
+      action: license.renewsLicenseId ? "partner_license.renewal_created" : "partner_license.created",
       targetType: "PartnerLicense",
       targetId: license.id,
       scope: { partnerTenantId: license.partnerTenantId, countryId: license.countryId },
       result: "success",
-      context: { licenseNumber: license.licenseNumber, status: license.status }
+      ...(reason ? { reason } : {}),
+      context: {
+        licenseNumber: license.licenseNumber,
+        status: license.status,
+        ...(license.renewsLicenseId ? { renewsLicenseId: license.renewsLicenseId } : {})
+      }
     });
     return license;
   }
 
-  async validate(id: string, actor: ActorContext): Promise<PartnerLicense> {
+  /** Legacy validation path (no document rule); the admin routes go through PartnerAdminService. */
+  async validate(id: string, actor: ActorContext, reason = "licence validated"): Promise<PartnerLicense> {
     const license = await this.require(id);
     if (new Date(license.expirationDate) <= new Date()) {
-      license.status = "expired";
       throw new Error("Expired license cannot be validated");
     }
-    license.status = "valid";
-    if (actor.actorId) license.validatedById = actor.actorId;
-    license.validatedAt = new Date();
-    license.updatedAt = new Date();
-    await this.repository.update(id, license);
+    return this.changeStatus(id, "valid", reason, actor);
+  }
+
+  /**
+   * Spec 051 R4: stores the new status and its reason, records the history row and the audit log.
+   * The caller checks the transition rules (document, expiration, role).
+   */
+  async changeStatus(id: string, to: PartnerLicenseStatus, reason: string, actor: ActorContext): Promise<PartnerLicense> {
+    const license = await this.require(id);
+    const from = license.status;
+    const now = new Date();
+    const changes: Partial<PartnerLicense> = { status: to, statusReason: reason, updatedAt: now };
+    if (to === "valid") {
+      if (actor.actorId) changes.validatedById = actor.actorId;
+      changes.validatedAt = now;
+    }
+    const updated = await this.repository.update(id, changes);
+    await this.repository.addHistory({
+      id: crypto.randomUUID(),
+      licenseId: id,
+      partnerTenantId: license.partnerTenantId,
+      fromStatus: from,
+      toStatus: to,
+      reason,
+      actorId: actor.actorId ?? null,
+      createdAt: now
+    });
     this.audit.write({
       actor,
-      action: "partner_license.validated",
+      action: STATUS_ACTIONS[to] ?? "partner_license.status_changed",
       targetType: "PartnerLicense",
-      targetId: license.id,
+      targetId: id,
       scope: { partnerTenantId: license.partnerTenantId, countryId: license.countryId },
       result: "success",
-      context: { status: license.status }
+      reason,
+      context: { before: { status: from }, after: { status: to } }
     });
-    return license;
+    return updated;
   }
 
   listForPartner(partnerTenantId: string): Promise<PartnerLicense[]> {
     return this.repository.listForPartner(partnerTenantId);
+  }
+
+  history(partnerTenantId: string): Promise<PartnerLicenseHistoryRecord[]> {
+    return this.repository.listHistory(partnerTenantId);
   }
 
   eligible(partnerTenantId: string, countryId: string, productId?: string): Promise<boolean> {
@@ -80,4 +133,9 @@ export class PartnerLicensesModule {
   }
 }
 
-export { PARTNER_LICENSES_REPOSITORY, MemoryPartnerLicensesRepository, type PartnerLicensesRepository } from "./partner-licenses.repository";
+export {
+  PARTNER_LICENSES_REPOSITORY,
+  MemoryPartnerLicensesRepository,
+  type PartnerLicenseHistoryRecord,
+  type PartnerLicensesRepository
+} from "./partner-licenses.repository";

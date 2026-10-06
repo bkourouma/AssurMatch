@@ -24,7 +24,7 @@ async function submitQuote(harness: RuntimeHttpHarness, seed: Awaited<ReturnType
       formDefinitionId: seed.form.id,
       contact: { displayName: `Visitor ${suffix}`, email: `docs${suffix}@example.test`, phone: `+22501020305${suffix.padStart(2, "0")}` },
       answers: { vehicle_use: "prive" },
-      consent: { accepted: true, consentTextId: seed.consentText.id, version: "v1", contentHash: "runtime-consent-hash" },
+      consent: { accepted: true, consentTextId: seed.consentText.id, version: "v1", contentHash: seed.consentText.contentHash },
       ipAddress: `203.0.113.${suffix}`,
       sessionId: `documents-session-${suffix}`
     })
@@ -85,6 +85,9 @@ describe("visitor quote documents runtime HTTP", () => {
     expect(crmDocuments[0]?.storageKey).not.toContain("carte-grise");
     const notifications = await harness.runtime.notifications.service.list();
     expect(notifications.filter((notification) => notification.type === "broker_document_received" && notification.recipientScope === `partner:${seed.partner.id}`)).toHaveLength(1);
+    // Spec 061 FR-002: the broker also sees it in-app, linked to the lead (never the file itself).
+    const inbox = (await harness.runtime.notifications.dispatch.listInApp(seed.partner.id)).filter((item) => item.type === "broker_document_received");
+    expect(inbox.map((item) => item.targetId)).toEqual([assignment!.id]);
     expect(harness.runtime.audit.writer.search({ action: QuoteDocumentAuditActions.quarantined })).toHaveLength(1);
     expect(harness.runtime.audit.writer.search({ action: QuoteDocumentAuditActions.shared })).toHaveLength(1);
   });

@@ -6,6 +6,13 @@ export const PUBLIC_SITE_AUDIT_ACTIONS = {
   partnerApplicationRefused: "partner_application.refused",
   partnerApplicationDuplicateIgnored: "partner_application.duplicate_ignored",
   partnerApplicationAdminListed: "partner_application.admin_listed",
+  /** Spec 051 R10: back-office decisions on an application. */
+  partnerApplicationAdminViewed: "partner_application.admin_viewed",
+  partnerApplicationReviewStarted: "partner_application.review_started",
+  partnerApplicationConverted: "partner_application.converted",
+  partnerApplicationRejected: "partner_application.rejected",
+  partnerApplicationDecisionRefused: "partner_application.decision_refused",
+  partnerApplicationDecisionNotified: "partner_application.decision_notified",
   contactMessageReceived: "contact_message.received",
   contactMessageRefused: "contact_message.refused",
   contactMessageAdminListed: "contact_message.admin_listed",

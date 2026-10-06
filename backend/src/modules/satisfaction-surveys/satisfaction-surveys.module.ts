@@ -8,6 +8,7 @@ import { SatisfactionSurveyTriggerService, type SatisfactionSurveyTriggerDeps } 
 import { SatisfactionSurveysDrainService, type SatisfactionSurveysDrainDeps } from "./satisfaction-surveys-drain.service";
 import { SatisfactionSurveysService, type SatisfactionSurveysServiceDeps } from "./satisfaction-surveys.service";
 import { SatisfactionSurveysController } from "./satisfaction-surveys.controller";
+import { MemoryNotificationUnsubscribeRepository, SurveyUnsubscribeService, type NotificationUnsubscribeRepository } from "./survey-unsubscribe.service";
 
 export interface SatisfactionSurveysModuleDeps {
   assignments: SatisfactionSurveyTriggerDeps["assignments"];
@@ -29,17 +30,21 @@ export class SatisfactionSurveysModule {
   readonly drain: SatisfactionSurveysDrainService;
   readonly service: SatisfactionSurveysService;
   readonly controller: SatisfactionSurveysController;
+  /** Spec 061 FR-005: opt-out of the survey e-mails. */
+  readonly unsubscribe: SurveyUnsubscribeService;
 
   constructor(
     deps: SatisfactionSurveysModuleDeps,
     audit = new AuditLogWriter(),
     redis: RedisClientPort = new InMemoryRedisClient(),
-    repository?: SatisfactionSurveyRepository
+    repository?: SatisfactionSurveyRepository,
+    unsubscribeRepository?: NotificationUnsubscribeRepository
   ) {
     this.repository = repository ?? new MemorySatisfactionSurveyRepository();
     this.tokenService = new SatisfactionSurveyTokenService();
     this.emailTemplate = new SatisfactionSurveyEmailTemplateService();
     const abuseGuard = new PublicAbuseGuardService(redis);
+    this.unsubscribe = new SurveyUnsubscribeService(unsubscribeRepository ?? new MemoryNotificationUnsubscribeRepository(), audit);
 
     this.trigger = new SatisfactionSurveyTriggerService({
       repository: this.repository,
@@ -63,7 +68,9 @@ export class SatisfactionSurveysModule {
       consent: deps.consent,
       countries: deps.countries,
       products: deps.products,
-      isFlagEnabled: deps.isFlagEnabled
+      isFlagEnabled: deps.isFlagEnabled,
+      tokenService: this.tokenService,
+      unsubscribe: this.unsubscribe
     });
 
     this.service = new SatisfactionSurveysService({
@@ -85,3 +92,4 @@ export * from "./satisfaction-survey-trigger.service";
 export * from "./satisfaction-surveys-drain.service";
 export * from "./satisfaction-surveys.service";
 export * from "./satisfaction-surveys.controller";
+export * from "./survey-unsubscribe.service";

@@ -2,6 +2,7 @@ import type { EmailRuntimeConfig } from "../modules/notifications/email/email-co
 import { resolveEmailRuntimeConfig, validateEmailRuntimeEnvironment } from "../modules/notifications/email/email-config";
 import { validateDocumentEnvironment } from "../modules/quote-documents/quote-documents.config";
 import { validateAiEnvironment } from "../modules/ai/core/ai-provider.config";
+import { trustedProxyHops } from "../modules/common/http/trusted-proxy";
 
 export interface AppConfig {
   appEnv: "local" | "test" | "runtime-smoke" | "staging" | "preproduction" | "production";
@@ -100,6 +101,7 @@ export function validateRuntimeEnvironment(env: Record<string, string | undefine
   validateEmailRuntimeEnvironment(env);
   validateDocumentEnvironment(env);
   validateAiEnvironment(env);
+  trustedProxyHops(env);
 }
 
 export class ConfigModule {

@@ -161,6 +161,8 @@ export interface MemoryRetentionSources {
   leadAssignments?: () => Promise<LeadAssignmentRecord[]>;
   leadHistory?: (leadAssignmentId: string) => Promise<Array<{ comment?: string | undefined }>>;
   crmActivity?: MemoryCrmActivitySource;
+  /** Spec 055: proposals and visitor responses follow the lead content policy. */
+  leadProposals?: { anonymizeForAssignments(leadAssignmentIds: readonly string[], marker: string, now: Date): Promise<void> };
   quoteAiSummaries?: () => Promise<Array<QuoteAISummaryRecord & { aiInteractionId?: string | undefined }>>;
   aiInteractions?: () => Promise<AiInteractionRecord[]>;
   contactMessages?: () => Promise<Array<Anonymizable<ContactMessageRecord>>>;
@@ -250,6 +252,7 @@ export class MemoryRetentionSubjectsRepository implements RetentionSubjectsRepos
       // The memory assignment also carries the CRM lead state tags (BrokerCrmLeadState.tags in Prisma).
       if (ids.has(assignment.id)) scrub(assignment, { contact: {}, answers: {}, ...(assignment.tags ? { tags: [] } : {}) }, ["actionComment"]);
     }
+    await this.sources.leadProposals?.anonymizeForAssignments(assignmentIds, ANONYMIZED_MARKER, new Date());
     const crm = this.sources.crmActivity;
     for (const id of assignmentIds) {
       for (const event of this.sources.leadHistory ? await this.sources.leadHistory(id) : []) scrub(event, {}, ["comment"]);
@@ -513,6 +516,8 @@ type DelegateName =
   | "brokerCrmDispute"
   | "brokerCrmPipelineHistory"
   | "brokerCrmLeadState"
+  | "leadProposal"
+  | "visitorProposalResponse"
   | "quoteAISummary"
   | "aIInteraction"
   | "contactMessage"
@@ -713,6 +718,9 @@ export class PrismaRetentionSubjectsRepository implements RetentionSubjectsRepos
     // Security review L6: the outcome reason a broker typed and the free tags of the CRM lead state.
     await this.delegate("brokerCrmPipelineHistory").updateMany({ ...byAssignment, data: { reason: null } });
     await this.delegate("brokerCrmLeadState").updateMany({ ...byAssignment, data: { tags: [] } });
+    // Spec 055: the proposal text and the visitor's free answers; amounts, dates and types stay.
+    await this.delegate("leadProposal").updateMany({ ...byAssignment, data: { message: ANONYMIZED_MARKER, guarantees: [], withdrawReason: null, documentFileName: ANONYMIZED_MARKER, anonymizedAt: new Date() } });
+    await this.delegate("visitorProposalResponse").updateMany({ ...byAssignment, data: { callbackSlot: null, question: null } });
   }
 
   async anonymizeQuoteAi(quoteRequestId: string, assignmentIds: readonly string[]): Promise<void> {

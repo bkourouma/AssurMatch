@@ -4,6 +4,12 @@ This directory holds **non-sensitive reference data** versioned in the repo. The
 `scripts/preprod/seed-reference.ts` reads these files and upserts the corresponding rows in PostgreSQL.
 The script is idempotent: running it again on an already-seeded database is a no-op for unchanged rows.
 
+Spec 050: country and product **flags and status are written on creation only** (a rerun never reopens
+or closes what an admin changed), a country phone rule is filled only when absent, pilot links CI/SN x
+auto/voyage are created `internal` with closed flags, and draft `lead_transmission` consent texts (FR and
+EN, version `template-v1`, no product) are created for CI and SN from `consent-templates.json`, with the
+same sha256 hash the API computes. Publishing them stays a compliance act in the back-office.
+
 | File | Role |
 |------|------|
 | `countries.json` | Catalog of 10 countries (9 CIMA + Guinea under FANAF); ML, GN and SN are waitlist-only, all others fail-closed |

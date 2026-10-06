@@ -50,7 +50,9 @@ test("broker dashboard and account surfaces use polished primitives", () => {
   expect(home).toContain("Notifications");
   expect(account).toContain("Securite du compte");
   expect(account).toContain("DescriptionList");
-  expect(team).toContain("Module indisponible");
+  // Spec 053: the team page is functional (no more "Module indisponible" placeholder).
+  expect(team).not.toContain("Module indisponible");
+  expect(team).toContain("readBrokerTeam");
   expect(team).toContain("Permissions conservees");
 });
 

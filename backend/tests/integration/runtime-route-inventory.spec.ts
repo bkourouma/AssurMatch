@@ -57,6 +57,8 @@ describe("runtime HTTP route inventory", () => {
     const checks = [
       // `directory` must resolve to the country directory, never be captured as a country code.
       ["/countries/directory", 200],
+      // Spec 059: countries and products a broker may apply for (before the country is public).
+      ["/partners/applications/options", 200],
       ["/public-stats", 200],
       ["/admin/partners/applications", 401],
       ["/admin/contact-messages", 401]
@@ -93,6 +95,42 @@ describe("runtime HTTP route inventory", () => {
 
     const withdrawal = await harness.request("/quote-requests/QR-UNKNOWN/consent-withdrawal?token=nope", { method: "POST" });
     expect(withdrawal.status).toBe(404);
+  });
+
+  it("exposes the spec 050 admin catalogue routes behind authentication", async () => {
+    harness = await createRuntimeHttpHarness();
+    const id = "00000000-0000-4000-8000-000000000099";
+    const routes = [
+      ["GET", "/admin/countries"],
+      ["POST", "/admin/countries"],
+      ["GET", `/admin/countries/${id}`],
+      ["PATCH", `/admin/countries/${id}`],
+      ["POST", `/admin/countries/${id}/status`],
+      ["POST", `/admin/countries/${id}/flags`],
+      ["GET", `/admin/countries/${id}/products`],
+      ["POST", `/admin/countries/${id}/products`],
+      ["POST", `/admin/countries/${id}/products/${id}/retire`],
+      ["POST", `/admin/countries/${id}/products/${id}/flags`],
+      ["GET", "/admin/products"],
+      ["POST", "/admin/products"],
+      ["GET", `/admin/products/${id}`],
+      ["PATCH", `/admin/products/${id}`],
+      ["POST", `/admin/products/${id}/flags`],
+      ["GET", "/admin/regulatory-regimes"],
+      ["POST", "/admin/regulatory-regimes"],
+      ["PATCH", `/admin/regulatory-regimes/${id}`],
+      ["POST", `/admin/regulatory-regimes/${id}/retire`],
+      ["GET", "/admin/consent-texts"],
+      ["GET", "/admin/consent-texts/templates"],
+      ["GET", `/admin/consent-texts/${id}`],
+      ["POST", "/admin/consent-texts"],
+      ["POST", `/admin/consent-texts/${id}/publish`],
+      ["POST", `/admin/consent-texts/${id}/retire`]
+    ] as const;
+    for (const [method, path] of routes) {
+      const response = await harness.request(path, { method });
+      expect(response.status, `${method} ${path}`).toBe(401);
+    }
   });
 
   it("uses the runtime HTTP wiring module instead of registering RuntimeHttpController in AppModule", async () => {

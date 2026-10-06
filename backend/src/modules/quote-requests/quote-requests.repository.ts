@@ -11,6 +11,21 @@ export interface QuoteRequestsRepository extends RuntimeRepository {
   findByPublicReference(publicReference: string): Promise<QuoteRequestRecord | undefined>;
   findById(id: string): Promise<QuoteRequestRecord | undefined>;
   list(): Promise<QuoteRequestRecord[]>;
+  /**
+   * Spec 059 follow-up (M-03): requests that selected each of these offers (an `ignored` selection
+   * never counts), for the COMP-003 popularity sort. Replaces a full `list()` on every offers read.
+   */
+  countSelectedOffers(offerIds: string[]): Promise<Map<string, number>>;
+}
+
+function countSelections(requests: readonly QuoteRequestRecord[], offerIds: string[]): Map<string, number> {
+  const wanted = new Set(offerIds);
+  const counts = new Map<string, number>();
+  for (const quote of requests) {
+    if (quote.selectedOfferOutcome === "ignored") continue;
+    if (quote.selectedOfferId && wanted.has(quote.selectedOfferId)) counts.set(quote.selectedOfferId, (counts.get(quote.selectedOfferId) ?? 0) + 1);
+  }
+  return counts;
 }
 
 export class MemoryQuoteRequestsRepository implements QuoteRequestsRepository {
@@ -44,9 +59,14 @@ export class MemoryQuoteRequestsRepository implements QuoteRequestsRepository {
   async list(): Promise<QuoteRequestRecord[]> {
     return [...this.requests];
   }
+
+  async countSelectedOffers(offerIds: string[]): Promise<Map<string, number>> {
+    return countSelections(this.requests, offerIds);
+  }
 }
 
 type QuoteRequestDelegate = {
+  groupBy?(input: unknown): Promise<Array<{ selectedOfferId: string | null; _count: { _all: number } }>>;
   create(input: unknown): Promise<unknown>;
   update(input: unknown): Promise<unknown>;
   findMany(input?: unknown): Promise<unknown[]>;
@@ -79,6 +99,18 @@ export class PrismaQuoteRequestsRepository implements QuoteRequestsRepository {
 
   async list(): Promise<QuoteRequestRecord[]> {
     return (await this.client().findMany({ orderBy: { createdAt: "desc" } })).map((row) => this.toDomain(row));
+  }
+
+  async countSelectedOffers(offerIds: string[]): Promise<Map<string, number>> {
+    if (offerIds.length === 0) return new Map();
+    const client = this.client();
+    if (!client.groupBy) return countSelections(await this.list(), offerIds);
+    const rows = await client.groupBy({
+      by: ["selectedOfferId"],
+      where: { selectedOfferId: { in: offerIds }, OR: [{ selectedOfferOutcome: null }, { selectedOfferOutcome: { not: "ignored" } }] },
+      _count: { _all: true }
+    });
+    return new Map(rows.filter((row) => row.selectedOfferId).map((row) => [row.selectedOfferId as string, row._count._all]));
   }
 
   private client(): QuoteRequestDelegate {

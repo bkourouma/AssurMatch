@@ -14,8 +14,10 @@ import {
   Notice,
   PageHeader,
   PageStack,
-  Split
+  Split,
+  TenantWriteGuard
 } from "../lib/ui/broker-ui";
+import { TENANT_SUSPENDED_MESSAGE, isTenantReadOnly } from "../lib/broker-permissions";
 import { crmKpis, dashboardKpis } from "../lib/ui/broker-view-models";
 
 const BREADCRUMB = [{ label: "CRM" }, { label: "Pipeline" }];
@@ -217,7 +219,8 @@ export default async function BrokerCrmPage({ searchParams }: { searchParams: Pr
             <Badge tone="disabled">paiement: desactive</Badge>
             {statement.data.draft ? <Badge tone="disabled">{statement.data.draft.status}</Badge> : null}
           </Cluster>
-          <p>{statement.data.notice || "Brouillon non facturable: aucun encaissement, aucune emission de facture."}</p>
+          <p>{statement.data.notice || "Brouillon non facturable: estimation du mois en cours, aucun encaissement en ligne."}</p>
+          <p><a href="/billing">Voir les factures, le solde et les packs du cabinet</a></p>
         </Card>
       ) : null}
 
@@ -230,6 +233,7 @@ export default async function BrokerCrmPage({ searchParams }: { searchParams: Pr
           </Cluster>
           <p>{aiAssistance.data.message}</p>
           {aiOptOut.status === "success" ? (
+            <TenantWriteGuard readOnly={isTenantReadOnly(session.profile)}>
             <form action={setAiOptOutAction}>
               <input type="hidden" name="optOut" value={aiOptOut.data.optedOut ? "false" : "true"} />
               <input
@@ -246,8 +250,10 @@ export default async function BrokerCrmPage({ searchParams }: { searchParams: Pr
                 </Button>
               </Cluster>
             </form>
+            </TenantWriteGuard>
           ) : null}
           {aiNotice === "optout_saved" ? <Notice tone="success">Preference IA du cabinet enregistree et auditee.</Notice> : null}
+          {aiNotice === "suspended" ? <Notice tone="warning">{TENANT_SUSPENDED_MESSAGE}</Notice> : null}
           {aiNotice === "forbidden" ? <Notice tone="danger">Seul le proprietaire du cabinet peut modifier la preference IA.</Notice> : null}
         </Card>
       ) : null}

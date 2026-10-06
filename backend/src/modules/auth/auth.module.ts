@@ -11,6 +11,9 @@ import { PasswordHashingService } from "./password-hashing.service";
 import { PasswordPolicyService } from "./password-policy.service";
 import { PasswordResetService } from "./password-reset.service";
 import { UserAuthNotificationService, type AuthEmailDeliveryPort } from "../notifications/user-auth-notification.service";
+import { UnauthorizedException } from "@nestjs/common";
+import { ErrorCodes } from "../../../../packages/shared/contracts/error-codes";
+import type { PartnerTenantStatusPort } from "../partners/partner-tenant-status.service";
 
 export interface AuthSession {
   accessToken: string;
@@ -24,7 +27,9 @@ export class AuthService {
     private readonly mfa: MfaService,
     private readonly audit = new AuditLogWriter(),
     private readonly passwordHashing = new PasswordHashingService(),
-    private readonly passwordReset = new PasswordResetService()
+    private readonly passwordReset = new PasswordResetService(),
+    /** Spec 051 R12: the login of a user of a retired partner is refused. */
+    private readonly tenantStatus?: PartnerTenantStatusPort
   ) {}
 
   async login(input: LoginRequest): Promise<AuthSession> {
@@ -51,6 +56,12 @@ export class AuthService {
         this.audit.write({ action: AuthAuditActions.userLockedAfterFailedLogins, targetType: "User", targetId: user.id, result: "success", context: { email: user.email } });
       }
       throw new Error("Invalid credentials");
+    }
+    // Spec 051 FR-022: checked only once the password is proven, with a neutral message, so the
+    // response tells nothing about the partner to someone who does not hold the credentials.
+    if (user.partnerTenantId && this.tenantStatus && await this.tenantStatus.status(user.partnerTenantId) === "retired") {
+      this.audit.write({ action: AuthAuditActions.userLoginFailed, targetType: "User", targetId: user.id, result: "refused", reason: "partner_retired", context: { email: user.email, partnerTenantId: user.partnerTenantId } });
+      throw new UnauthorizedException({ code: ErrorCodes.AUTH_REQUIRED, message: "Account unavailable" });
     }
     const activeUser = await this.users.recordSuccessfulLogin(user.id);
     this.audit.write({ action: AuthAuditActions.userLoginSucceeded, targetType: "User", targetId: user.id, result: "success", context: { email: user.email } });
@@ -180,8 +191,8 @@ export class AuthModule {
   readonly userNotifications: UserAuthNotificationService;
   readonly service: AuthService;
 
-  constructor(users: UsersService, audit = new AuditLogWriter(), emailSender?: AuthEmailDeliveryPort) {
+  constructor(users: UsersService, audit = new AuditLogWriter(), emailSender?: AuthEmailDeliveryPort, tenantStatus?: PartnerTenantStatusPort) {
     this.userNotifications = new UserAuthNotificationService(emailSender);
-    this.service = new AuthService(users, this.mfa, audit, this.passwordHashing, this.passwordReset);
+    this.service = new AuthService(users, this.mfa, audit, this.passwordHashing, this.passwordReset, tenantStatus);
   }
 }

@@ -1,3 +1,4 @@
+import { publicCountryFlags } from "../modules/countries/countries.module";
 import { Body, Controller, Delete, Get, Headers, Param, Patch, Post, Query, UseGuards } from "@nestjs/common";
 import type { IncomingHttpHeaders } from "node:http";
 import { z } from "zod";
@@ -182,7 +183,7 @@ export class RuntimeHttpController {
     const parsedCountryCode = parseParam("countryCode", countryCode, isoCountrySchema);
     const country = await this.runtime.countries.service.findByIsoCode(parsedCountryCode);
     if (!country) return [];
-    return this.runtime.products.service.listPublicForCountry(country.id, country.flags, this.runtime.publicJourneyGlobalFlags());
+    return this.runtime.products.service.listPublicForCountry(country.id, publicCountryFlags(country), this.runtime.publicJourneyGlobalFlags());
   }
 
   async productDetail(countryCode: string, productKey: string, headers: IncomingHttpHeaders) {
@@ -190,7 +191,7 @@ export class RuntimeHttpController {
     const parsedProductKey = parseParam("productKey", productKey);
     const country = await this.runtime.countries.service.findByIsoCode(parsedCountryCode);
     if (!country) throw new Error("Country is not publicly available");
-    return this.runtime.products.service.getPublicProductPage(country.id, parsedProductKey, country.flags, this.runtime.publicJourneyGlobalFlags(), actorFromHeaders(headers));
+    return this.runtime.products.service.getPublicProductPage(country.id, parsedProductKey, publicCountryFlags(country), this.runtime.publicJourneyGlobalFlags(), actorFromHeaders(headers));
   }
 
   async offers(countryCode: string, productKey: string, query: Partial<OfferListQuery>) {
@@ -200,7 +201,7 @@ export class RuntimeHttpController {
     const country = await this.runtime.countries.service.findByIsoCode(parsedCountryCode);
     const product = await this.runtime.products.service.findByKey(parsedProductKey);
     if (!country || !product) return { items: [], total: 0, page: 1, pageSize: 20 };
-    return this.runtime.offers.publicCatalog.list(country.id, product.id, parsedQuery, undefined, this.runtime.publicOfferContext({ countryFlags: country.flags, productFlags: product.flags }));
+    return this.runtime.offers.publicCatalog.list(country.id, product.id, parsedQuery, undefined, this.runtime.publicOfferContext({ countryFlags: publicCountryFlags(country), productFlags: this.runtime.products.service.effectiveFlags(product, country.id) }));
   }
 
   offersCompare(query: Record<string, string>) {
@@ -220,8 +221,8 @@ export class RuntimeHttpController {
     if (!country || !product) throw new Error("Quote form is not publicly available");
     const state = new PublicJourneyFlagPolicy().resolve({
       globalFlags: this.runtime.publicJourneyGlobalFlags(),
-      countryFlags: country.flags,
-      productFlags: product.flags,
+      countryFlags: publicCountryFlags(country),
+      productFlags: this.runtime.products.service.effectiveFlags(product, country.id),
       requireProductFlags: true
     });
     if (!state.quoteEnabled) throw new Error("Quote form is not publicly available");

@@ -19,6 +19,7 @@ export class AdminNotificationsController {
       notification.type === "visitor_quote_confirmation" ||
       notification.type === "visitor_quote_non_routable" ||
       notification.type === "broker_lead_assigned" ||
+      notification.type === "broker_lead_reassigned" ||
       notification.type === "quote_notification_failed"
     );
   }

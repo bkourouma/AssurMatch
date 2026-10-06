@@ -3,9 +3,13 @@ import { NestFactory } from "@nestjs/core";
 import type { AddressInfo } from "node:net";
 import { AppModule } from "../../src/app.module";
 import { ErrorResponseFilter } from "../../src/modules/common/filters/error-response.filter";
+import { applyObservability } from "../../src/modules/observability/observability";
 import type { ActorContext } from "../../src/modules/common/types";
 import { signActorToken } from "../../src/modules/auth/http-auth-token.service";
 import { AssurMatchRuntime } from "../../src/runtime/assurmatch-runtime";
+import { consentContentHash } from "../../../packages/shared/contracts/consent-content";
+import { seedAcceptedAccreditation } from "./helpers/partner-onboarding-seed";
+import { publishOffer } from "./helpers/offer-test-helpers";
 
 export interface RuntimeHttpHarness {
   app: INestApplication;
@@ -37,6 +41,8 @@ export function simulationActorHeaders(actor: ActorContext): Record<string, stri
 
 export async function createRuntimeHttpHarness(): Promise<RuntimeHttpHarness> {
   const app = await NestFactory.create(AppModule, { logger: false });
+  // Spec 058: same request logging / metrics middleware as `main.ts` (silent under NODE_ENV=test).
+  applyObservability(app);
   app.useGlobalFilters(new ErrorResponseFilter());
   await app.listen(0);
   const address = app.getHttpServer().address() as AddressInfo;
@@ -57,6 +63,10 @@ export async function createRuntimeHttpHarness(): Promise<RuntimeHttpHarness> {
 export async function readJson<T>(response: Response): Promise<T> {
   return response.json() as Promise<T>;
 }
+
+/** Spec 050: a compliant lead transmission template (recipient variable and technical role of AssurMatch). */
+export const RUNTIME_CONSENT_CONTENT = "En cochant cette case, vous acceptez que vos coordonnees ({{contactFields}}) soient transmises a {{brokerName}} pour le pays {{countryName}} et le produit {{productName}}. AssurMatch est une plateforme technique de mise en relation; elle n'est ni courtier ni assureur.";
+export const RUNTIME_CONSENT_HASH = consentContentHash(RUNTIME_CONSENT_CONTENT);
 
 export async function seedPublicRuntime(runtime: AssurMatchRuntime) {
   const admin: ActorContext = { actorId: "admin-runtime", roles: ["super_admin"], mfaVerified: true };
@@ -107,9 +117,11 @@ export async function seedPublicRuntime(runtime: AssurMatchRuntime) {
     language: "fr",
     version: "v1",
     status: "draft",
-    contentHash: "runtime-consent-hash"
+    // Spec 050 R5: real content; the service computes the hash from it.
+    content: RUNTIME_CONSENT_CONTENT,
+    contentHash: "computed-by-server"
   }, admin);
-  await runtime.consent.service.publishText(consentText.id, admin);
+  await runtime.consent.service.publishText(consentText.id, admin, { requireContent: true });
   const form = await runtime.quoteForms.service.create({
     countryId: country.id,
     productId: product.id,
@@ -129,7 +141,7 @@ export async function seedPublicRuntime(runtime: AssurMatchRuntime) {
   }, admin);
   await runtime.partners.service.authorizeCountry(partner.id, country.id, admin);
   await runtime.partners.service.authorizeProduct(partner.id, product.id, admin);
-  await runtime.partnerLicenses.service.create({
+  const license = await runtime.partnerLicenses.service.create({
     partnerTenantId: partner.id,
     licenseNumber: "LIC-RUNTIME",
     issuingAuthority: "Regulator",
@@ -139,7 +151,10 @@ export async function seedPublicRuntime(runtime: AssurMatchRuntime) {
     effectiveDate: "2026-01-01",
     expirationDate: "2030-01-01"
   }, admin);
-  const offer = await runtime.offers.adminService.create({
+  // Spec 051 R14: routing reads a persisted, accepted and clean accreditation document.
+  await seedAcceptedAccreditation(runtime, partner.id, license.id);
+  // Spec 052: created, submitted, then validated (the public catalogue reads published versions only).
+  const offer = await publishOffer(runtime.offers, {
     countryId: country.id,
     productId: product.id,
     partnerTenantId: partner.id,
@@ -149,8 +164,7 @@ export async function seedPublicRuntime(runtime: AssurMatchRuntime) {
     validFrom: "2026-01-01T00:00:00.000Z",
     validUntil: "2030-01-01T00:00:00.000Z",
     reason: "runtime offer seed"
-  }, admin);
-  await runtime.offers.adminService.validate(offer.id, { validationStatus: "validated", reason: "runtime validate" }, admin);
+  }, admin, admin);
   return { admin, country, product, partner, consentText, form, offer };
 }
 
