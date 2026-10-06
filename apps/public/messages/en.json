@@ -148,6 +148,9 @@
   },
   "Home": {
     "breadcrumb": "Home",
+    "changeCountry": "Change country",
+    "productsTitle": "Choose a product",
+    "entryOther": "Another country or product",
     "kicker": "Indicative comparison, country by country",
     "title": "Compare first. Get support next.",
     "lead": "AssurMatch compares indicative offers and puts you in touch with an authorised broker. We do not sell insurance, we do not sign any contract and we do not receive your premium.",
@@ -164,7 +167,11 @@
       "partners": "Active partner brokers",
       "offers": "Validated offers",
       "updatedAt": "Figures as of {date}.",
-      "indicative": "These figures are indicative and describe the state of the public activations, not audited data."
+      "indicative": "These figures are indicative and describe the state of the public activations, not audited data.",
+      "lineLabel": "AssurMatch today:",
+      "countriesCount": "{count, plural, one {# open country} other {# open countries}}",
+      "partnersCount": "{count, plural, one {# active partner broker} other {# active partner brokers}}",
+      "offersCount": "{count, plural, one {# validated offer} other {# validated offers}}"
     },
     "statusTitle": "Our role",
     "statusLead": "What AssurMatch does, and what AssurMatch does not do.",
@@ -280,10 +287,10 @@
     "lead": "The visible products depend on the public activations per country and per product. The indicative price remains to be confirmed by the partner broker.",
     "variants": {
       "CI": {
-        "lead": "Compare indicative car, health, home and travel insurance offers in Côte d'Ivoire, then have the quote and the guarantees confirmed by a broker authorised by the competent authority."
+        "lead": "Compare indicative insurance offers in Côte d'Ivoire, then have the quote and the guarantees confirmed by a broker authorised by the competent authority."
       },
       "SN": {
-        "lead": "Compare indicative car, health, home and travel insurance offers in Senegal, then have the quote and the guarantees confirmed by a broker authorised by the competent authority."
+        "lead": "Compare indicative insurance offers in Senegal, then have the quote and the guarantees confirmed by a broker authorised by the competent authority."
       }
     },
     "pilotNotice": "This country is in its pilot phase: the number of partner brokers and comparable offers is still limited.",
@@ -1193,8 +1200,7 @@
     },
     "portal": {
       "title": "The broker portal",
-      "lead": "A dedicated space to accept a lead, track its file and, depending on the plan, manage a sales pipeline.",
-      "caption": "Illustration of the partner broker portal. No real screenshot is available at this time."
+      "lead": "A dedicated space to accept a lead, track its file and, depending on the plan, manage a sales pipeline."
     },
     "expectations": {
       "title": "What AssurMatch expects from a partner"
@@ -1419,6 +1425,7 @@
     "received": {
       "title": "Application received",
       "referencePrefix": "Your application reference:",
+      "nextStepsTitle": "Next steps",
       "steps": {
         "review": "Our compliance team is reviewing your file.",
         "licenceCheck": "It checks your licence with the authority you named.",
@@ -1435,6 +1442,15 @@
       "body": "If you have just sent an application, go back to the form to send it again.",
       "cta": "Back to the application form"
     }
+  },
+  "Route": {
+    "label": "Your journey",
+    "current": "(you are here)",
+    "country": "Country",
+    "product": "Product",
+    "offers": "Offers",
+    "request": "Request",
+    "broker": "Broker"
   },
   "Tracking": {
     "kicker": "Request tracking",

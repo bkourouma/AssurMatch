@@ -1,0 +1,419 @@
+{
+  "title": "Choisir le monde visuel du site public",
+  "question": "The roll assigned La signalétique, a plain wayfinding system. Keep it, take Impeccable’s pick or the category standard, or re-roll. Mockup images are unavailable (the OpenAI key is deactivated), so the build is code-first and each card shows a phone layout sketch.",
+  "options": [
+    {
+      "id": "assigned",
+      "label": "La signalétique",
+      "kicker": "THE ROLL",
+      "lineage": "Airport and bus-station wayfinding (Frutiger's Roissy signage, FHB airport, gare routière boards)",
+      "thesis": "The site is a sign system for an insurance decision: every page says where you are, what is indicative and who confirms.",
+      "palette": [
+        "#0E2F63",
+        "#FFFFFF",
+        "#EEF1F4",
+        "#2F8F3A",
+        "#F2B200"
+      ],
+      "materials": [
+        "flat navy sign panels with white type",
+        "pictograms built from a few flat planes",
+        "a route line with numbered stops"
+      ],
+      "viewport": "Phone: logo bar, then one navy directory sign with the headline and the country, then the product rows (pictogram, name, arrow) as the working entry, then the route Comparez, Demandez un devis, Le courtier confirme.",
+      "risk": "If the route and pictograms are over-played it slides toward a transit theme; it must stay flat signage, never a station costume.",
+      "raised": [
+        {
+          "from": "challenger-sneaker-boxes",
+          "raise": "One fixed label grid rules every offer card: product, insurer, indicative price, status, who confirms, always in the same place."
+        },
+        {
+          "from": "challenger-provenance-ribbon",
+          "raise": "One state language site-wide: solid means confirmed by the broker, outlined means indicative or to confirm."
+        },
+        {
+          "from": "challenger-arcade",
+          "raise": "Palette law: each colour means one thing everywhere (navy navigation, green done, amber sponsored) and is never decoration."
+        },
+        {
+          "from": "challenger-single-hue",
+          "raise": "The logo blue is owned at full strength on the sign panels instead of being scattered as accents."
+        },
+        {
+          "from": "challenger-tanaka",
+          "raise": "Product pictograms are drawn from a few flat planes with no outlines; every element on a page has a job."
+        },
+        {
+          "from": "challenger-split-flap",
+          "raise": "On the offer list, columns never move; sponsored or unavailable rows restyle without breaking the grid."
+        }
+      ],
+      "wireframe": {
+        "cols": 4,
+        "rows": 16,
+        "regions": [
+          {
+            "label": "logo bar",
+            "x": 0,
+            "y": 0,
+            "w": 4,
+            "h": 1
+          },
+          {
+            "label": "navy sign: country + headline",
+            "x": 0,
+            "y": 1,
+            "w": 4,
+            "h": 5,
+            "accent": true
+          },
+          {
+            "label": "auto  →",
+            "x": 0,
+            "y": 6,
+            "w": 4,
+            "h": 1
+          },
+          {
+            "label": "moto  →",
+            "x": 0,
+            "y": 7,
+            "w": 4,
+            "h": 1
+          },
+          {
+            "label": "santé  →",
+            "x": 0,
+            "y": 8,
+            "w": 4,
+            "h": 1
+          },
+          {
+            "label": "habitation  →",
+            "x": 0,
+            "y": 9,
+            "w": 4,
+            "h": 1
+          },
+          {
+            "label": "voyage  →",
+            "x": 0,
+            "y": 10,
+            "w": 4,
+            "h": 1
+          },
+          {
+            "label": "route 1-2-3",
+            "x": 0,
+            "y": 11,
+            "w": 4,
+            "h": 4
+          },
+          {
+            "label": "next: ce que nous ne faisons pas",
+            "x": 0,
+            "y": 15,
+            "w": 4,
+            "h": 1
+          }
+        ]
+      }
+    },
+    {
+      "id": "model-pick",
+      "label": "Le guichet",
+      "kicker": "IMPECCABLE’S PICK",
+      "lineage": "Plain public-service web writing (service-public.fr, GOV.UK discipline), without any state insignia",
+      "thesis": "A service counter that explains before it asks: plain text, numbered steps, and the important limits set in inset panels.",
+      "palette": [
+        "#FFFFFF",
+        "#161616",
+        "#1F4FB8",
+        "#F3F5F8",
+        "#2F8F3A"
+      ],
+      "materials": [
+        "black text on white",
+        "inset panels with a thick left rule",
+        "numbered procedures and underlined links"
+      ],
+      "viewport": "Phone: logo bar, a large left-aligned headline, a two-field form (pays, produit) with one solid button, then a 'Bon à savoir' inset panel with the role sentence, then numbered steps.",
+      "risk": "The most familiar of the three and where most runs in this category land; it can feel administrative and must never look like a government site.",
+      "wireframe": {
+        "cols": 4,
+        "rows": 16,
+        "regions": [
+          {
+            "label": "logo bar",
+            "x": 0,
+            "y": 0,
+            "w": 4,
+            "h": 1
+          },
+          {
+            "label": "headline + lead",
+            "x": 0,
+            "y": 1,
+            "w": 4,
+            "h": 4
+          },
+          {
+            "label": "pays select",
+            "x": 0,
+            "y": 5,
+            "w": 4,
+            "h": 1
+          },
+          {
+            "label": "produit select",
+            "x": 0,
+            "y": 6,
+            "w": 4,
+            "h": 1
+          },
+          {
+            "label": "Comparer les offres",
+            "x": 0,
+            "y": 7,
+            "w": 4,
+            "h": 1,
+            "accent": true
+          },
+          {
+            "label": "Bon à savoir inset",
+            "x": 0,
+            "y": 9,
+            "w": 4,
+            "h": 2
+          },
+          {
+            "label": "numbered steps",
+            "x": 0,
+            "y": 11,
+            "w": 4,
+            "h": 5
+          }
+        ]
+      }
+    },
+    {
+      "id": "challenger-split-flap",
+      "label": "Le tableau des départs",
+      "verdict": "declined",
+      "lineage": "Rail concourse split-flap boards",
+      "thesis": "Offers as a departure board: fixed columns, rows ranked by score, status lamps.",
+      "palette": [
+        "#111111",
+        "#FFFFFF",
+        "#F2A900",
+        "#C0392B"
+      ],
+      "materials": [
+        "matte black flaps",
+        "condensed caps"
+      ],
+      "viewport": "A dark board of products and offers with flap animation.",
+      "case": "Fuses into a clear offer board, but dark condensed caps read badly on a phone and the flap motion is the kind of effect you ruled out.",
+      "risk": "Fancy by nature.",
+      "kept": "Columns never move; row states restyle without breaking the grid (raise on the offer list).",
+      "hero": "https://impeccable.style/worlds/cards/signals-instruments-split-flap-concourse-hero.webp"
+    },
+    {
+      "id": "challenger-provenance-ribbon",
+      "label": "Le ruban de provenance",
+      "verdict": "declined",
+      "lineage": "Museum provenance displays",
+      "thesis": "The quote request as a custody ribbon: who holds it, when, and what is confirmed.",
+      "palette": [
+        "#EFE6D2",
+        "#B3261E",
+        "#2B2B2B"
+      ],
+      "materials": [
+        "archival buff",
+        "red silk line"
+      ],
+      "viewport": "A single ribbon column tracing the request from consent to broker.",
+      "case": "Matches the transmission story, but archival buff and ledger serifs are foreign to the visitor and slow on a phone.",
+      "risk": "Museum costume.",
+      "kept": "Solid for confirmed, outlined for indicative: one state language everywhere.",
+      "hero": "https://impeccable.style/worlds/cards/exhibition-museum-curation-provenance-ribbon-hero.webp"
+    },
+    {
+      "id": "challenger-sneaker-boxes",
+      "label": "Le mur de boîtes",
+      "verdict": "declined",
+      "lineage": "Sneaker archive box walls",
+      "thesis": "Products as stacked boxes with end labels.",
+      "palette": [
+        "#D9622B",
+        "#111111",
+        "#FAFAFA"
+      ],
+      "materials": [
+        "box board",
+        "tissue paper"
+      ],
+      "viewport": "A wall of product boxes; open a lid to see offers.",
+      "case": "No link to insurance or to the visitor's world; lid hinges add steps.",
+      "risk": "Retail costume.",
+      "kept": "A fixed label grid that rules every card.",
+      "hero": "https://impeccable.style/worlds/cards/textiles-weave-drape-fashion-sneaker-box-stacks-hero.webp"
+    },
+    {
+      "id": "challenger-arcade",
+      "label": "L'écran d'arcade",
+      "verdict": "declined",
+      "lineage": "CRT pixel-art arcade",
+      "thesis": "Offers as sprites on a pixel grid.",
+      "palette": [
+        "#000000",
+        "#FFD700",
+        "#00A8FF",
+        "#FF3366"
+      ],
+      "materials": [
+        "scanlines",
+        "phosphor glow"
+      ],
+      "viewport": "A pixel playfield of products.",
+      "case": "Contradicts a calm money decision and 'not fancy'.",
+      "risk": "Novelty.",
+      "kept": "Palette law: a colour has one meaning.",
+      "hero": "https://impeccable.style/worlds/cards/medium-native-crt-arcade-pixel-glow-hero.webp"
+    },
+    {
+      "id": "challenger-single-hue",
+      "label": "Le programme monochrome",
+      "verdict": "declined",
+      "lineage": "Single-hue toy brand programs",
+      "thesis": "One blue floods everything.",
+      "palette": [
+        "#1B4FBF",
+        "#FFFFFF"
+      ],
+      "materials": [
+        "gloss",
+        "script logotype"
+      ],
+      "viewport": "A full-bleed blue page with a swept logotype.",
+      "case": "Strong recognition but a toy-like gloss that undercuts a regulated money decision.",
+      "risk": "Toy register.",
+      "kept": "Own the logo blue at full strength where it is used.",
+      "hero": "https://impeccable.style/worlds/cards/brand-identity-canon-single-hue-doll-program-hero.webp"
+    },
+    {
+      "id": "challenger-tanaka",
+      "label": "Les plans Tanaka",
+      "verdict": "declined",
+      "lineage": "Ikko Tanaka posters",
+      "thesis": "Figures rebuilt from a few flat colour planes.",
+      "palette": [
+        "#F4EFE6",
+        "#D4421E",
+        "#22356F",
+        "#E1A21B"
+      ],
+      "materials": [
+        "flat planes",
+        "quiet grid"
+      ],
+      "viewport": "A poster figure with a whisper caption.",
+      "case": "Beautiful but a poster, not a comparator; the offer and the action would be hidden.",
+      "risk": "Art piece.",
+      "kept": "Pictograms from a few flat planes; every element has a job.",
+      "hero": "https://impeccable.style/worlds/cards/tanaka-plane-portrait-hero.webp"
+    }
+  ],
+  "reroll": {
+    "registers": [
+      "safer",
+      "bolder"
+    ]
+  },
+  "buildPath": {
+    "value": "code"
+  },
+  "canon": true,
+  "canonCard": {
+    "label": "Le comparateur classique",
+    "thesis": "What insurance comparators ship: a search form hero, product tiles, three steps, reassurance, FAQ, at full craft.",
+    "palette": [
+      "#FFFFFF",
+      "#0F172A",
+      "#1B4FBF",
+      "#F6F8FC"
+    ],
+    "materials": [
+      "clean grid",
+      "rounded cards",
+      "search form hero"
+    ],
+    "viewport": "Phone: logo bar, headline, a card with country and product selects and a blue button, then product tiles.",
+    "risk": "Indistinguishable from every comparator, including today's site without its gradients.",
+    "wireframe": {
+      "cols": 4,
+      "rows": 16,
+      "regions": [
+        {
+          "label": "header",
+          "x": 0,
+          "y": 0,
+          "w": 4,
+          "h": 1
+        },
+        {
+          "label": "hero headline",
+          "x": 0,
+          "y": 1,
+          "w": 4,
+          "h": 3
+        },
+        {
+          "label": "form card",
+          "x": 0,
+          "y": 4,
+          "w": 4,
+          "h": 4,
+          "accent": true
+        },
+        {
+          "label": "auto",
+          "x": 0,
+          "y": 8,
+          "w": 2,
+          "h": 2
+        },
+        {
+          "label": "moto",
+          "x": 2,
+          "y": 8,
+          "w": 2,
+          "h": 2
+        },
+        {
+          "label": "santé",
+          "x": 0,
+          "y": 10,
+          "w": 2,
+          "h": 2
+        },
+        {
+          "label": "habitation",
+          "x": 2,
+          "y": 10,
+          "w": 2,
+          "h": 2
+        },
+        {
+          "label": "steps cards",
+          "x": 0,
+          "y": 13,
+          "w": 4,
+          "h": 3
+        }
+      ]
+    }
+  },
+  "steer": true
+}

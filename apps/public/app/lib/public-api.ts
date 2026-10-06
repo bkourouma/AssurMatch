@@ -292,6 +292,26 @@ export function listPublicOffers(countryCode: string, productKey: string, filter
   return readPublic<OfferSummary[]>(`/countries/${countryCode}/products/${productKey}/offers${query ? `?${query}` : ""}`, []);
 }
 
+/**
+ * Country and product an offer is published under, for a link to the offer that carries neither (a
+ * shared or bookmarked offer page). The public offer payload does not name them, so the open
+ * countries' product lists are searched; every read is cached, so the cost is paid once per
+ * revalidation window. Returns null when the offer is not (or no longer) listed anywhere.
+ */
+export async function findOfferContext(offerId: string): Promise<{ countryCode: string; productKey: string } | null> {
+  const directory = await listCountryDirectory();
+  const countries = directory.data.filter((country) => country.availability !== "waitlist" && country.comparisonEnabled);
+  for (const country of countries) {
+    const iso = encodeURIComponent(country.isoCode);
+    const products = await readPublicCached<PublicProductSummary[]>(`/countries/${iso}/products`, []);
+    for (const product of products.data) {
+      const offers = await readPublicCached<OfferSummary[]>(`/countries/${iso}/products/${encodeURIComponent(product.key)}/offers`, []);
+      if (offers.data.some((offer) => offer.id === offerId)) return { countryCode: country.isoCode, productKey: product.key };
+    }
+  }
+  return null;
+}
+
 export function getPublicOffer(offerId: string) {
   return readPublic<OfferDetail | null>(`/offers/${encodeURIComponent(offerId)}`, null);
 }

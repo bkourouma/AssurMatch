@@ -47,7 +47,6 @@ export default async function CountryPrivacyPage({ params }: { params: Promise<P
         { name: page.title, url: localeUrl(locale, HREF, { countryCode: iso }) }
       ]}
       page={page}
-      kicker={t("kicker")}
       lastUpdatedLabel={t("lastUpdated", { date: formatDate(page.updatedAt, { locale }) })}
       tocTitle={t("tocTitle")}
       summaryTitle={t("summaryTitle")}

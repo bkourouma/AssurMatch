@@ -1,6 +1,8 @@
 import { getTranslations, setRequestLocale } from "next-intl/server";
+import { Link } from "../../../i18n/navigation";
 import { toLocale } from "../../../i18n/routing";
 import { OfferScore, ScoreBreakdown, SponsoredBadge } from "../../components/offer-cards";
+import { JourneyRoute } from "../../components/journey/journey-route";
 import { JourneyHeroNotice } from "../../components/public-journey";
 import { EntrySelector, type EntrySelectorProduct } from "../../components/site/entry-selector";
 import { BackendText } from "../../components/ui/backend-text";
@@ -8,9 +10,9 @@ import { Breadcrumb } from "../../components/ui/breadcrumb";
 import { Button } from "../../components/ui/button";
 import { EmptyState } from "../../components/ui/empty-state";
 import { Hero } from "../../components/ui/hero";
-import { Icon, type IconName } from "../../components/ui/icons";
-import { IconTile } from "../../components/ui/icon-tile";
+import { Icon } from "../../components/ui/icons";
 import { Notice } from "../../components/ui/notice";
+import { Route } from "../../components/ui/route-line";
 import { Section } from "../../components/ui/section";
 import { formatDate, formatMoney } from "../../lib/country-format";
 import { comparePublicOffers, listPublicProducts } from "../../lib/public-api";
@@ -31,11 +33,22 @@ type SearchParams = Record<string, string | string[] | undefined>;
 
 /** The three moves that produce a comparison, in the order the visitor makes them. */
 const HOW_STEPS = ["country", "offers", "compare"] as const;
-const HOW_ICONS: Record<(typeof HOW_STEPS)[number], IconName> = {
-  country: "map-pin",
-  offers: "list",
-  compare: "scale"
-};
+
+/**
+ * The step titles of the catalogue carry their own number ("1. Choisissez..."); the route stops
+ * already print it in their dot, so the number is not read twice.
+ */
+function withoutLeadingNumber(title: string): string {
+  return title.replace(/^\s*\d+\s*[.)]\s*/, "");
+}
+
+/** Country and product of the list the selection came from, when the offers page passed them. */
+const ISO_CODE = /^[A-Za-z]{2}$/;
+const PRODUCT_KEY = /^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$/;
+
+function firstOf(value: string | string[] | undefined): string | undefined {
+  return Array.isArray(value) ? value[0] : value;
+}
 
 function idsFrom(value: string | string[] | undefined): string[] {
   const raw = Array.isArray(value) ? value : value ? [value] : [];
@@ -115,6 +128,10 @@ export default async function PublicComparePage({
   const query = searchParams ? await searchParams : {};
   const ids = idsFrom(query.ids);
   const priority = Array.isArray(query.priority) ? query.priority[0] : query.priority;
+  const countryParam = firstOf(query.country);
+  const productParam = firstOf(query.product);
+  const countryCode = countryParam && ISO_CODE.test(countryParam) ? countryParam : undefined;
+  const productKey = countryCode && productParam && PRODUCT_KEY.test(productParam) ? productParam : undefined;
   const selectionValid = ids.length >= 2 && ids.length <= 4;
   // No ids at all is the landing state of the main call to action; ids that do not make a valid
   // selection are a real error and keep their own message.
@@ -160,10 +177,11 @@ export default async function PublicComparePage({
   return (
     <>
       <Hero
-        kicker={t("kicker")}
         title={entryState ? t("start.title") : t("title")}
         lead={entryState ? t("start.lead") : t("lead")}
         size="sm"
+        /* The landing (no selection yet) keeps its trail: no stop of the journey has been passed. */
+        {...(entryState ? {} : { route: <JourneyRoute current="offers" countryCode={countryCode} productKey={productKey} /> })}
         breadcrumb={breadcrumb}
         {...(entryState && selectable.length > 0
           ? {
@@ -185,17 +203,13 @@ export default async function PublicComparePage({
 
       {entryState ? (
         <Section title={t("how.title")} lead={t("how.lead")} tone="muted">
-          <ol className="am-j-features">
-            {HOW_STEPS.map((step) => (
-              <li className="am-j-feature" key={step}>
-                <IconTile name={HOW_ICONS[step]} size="sm" />
-                <div>
-                  <p className="am-j-feature__title">{t(`how.${step}.title`)}</p>
-                  <p className="am-j-feature__detail">{t(`how.${step}.description`)}</p>
-                </div>
-              </li>
-            ))}
-          </ol>
+          <Route
+            stops={HOW_STEPS.map((step) => ({
+              key: step,
+              title: withoutLeadingNumber(t(`how.${step}.title`)),
+              body: t(`how.${step}.description`)
+            }))}
+          />
           {selectable.length === 0 ? (
             <div className="am-cluster am-j-tail">
               <Button href="/countries" icon={<Icon name="globe" size={18} />}>
@@ -255,7 +269,7 @@ export default async function PublicComparePage({
               <div className="am-j-compare-desktop">
                 <p className="am-j-scroll-hint">{t("scrollHint")}</p>
                 <div className="am-table-wrap">
-                  <table className="am-table am-table--striped am-j-compare" aria-label={t("tableLabel")}>
+                  <table className="am-table am-j-compare" aria-label={t("tableLabel")}>
                     <thead>
                       <tr>
                         <th scope="col">{t("criterion")}</th>
@@ -306,9 +320,9 @@ export default async function PublicComparePage({
                   const bestIds = highlightKey ? highlightedOfferIds(row, HIGHLIGHT_DIRECTION[highlightKey]) : new Set<string>();
                   return (
                     <div className="am-j-comparecard" key={row.key}>
-                      <p className="am-j-comparecard__title">
+                      <h3 className="am-j-comparecard__title">
                         <BackendText>{row.label}</BackendText>
-                      </p>
+                      </h3>
                       {explanationKey ? <p className="am-j-comparecard__hint">{t(`rowExplanations.${explanationKey}`)}</p> : null}
                       <ul className="am-j-comparecard__rows">
                         {items.map((offer) => (
@@ -348,7 +362,11 @@ export default async function PublicComparePage({
                   <div className="am-cluster">
                     <Button
                       variant="secondary"
-                      href={{ pathname: "/offers/[offerId]", params: { offerId: offer.id } }}
+                      href={{
+                        pathname: "/offers/[offerId]",
+                        params: { offerId: offer.id },
+                        ...(countryCode && productKey ? { query: { country: countryCode, product: productKey } } : {})
+                      }}
                       iconAfter={<Icon name="arrow-right" size={18} />}
                     >
                       {common("seeDetail")}
@@ -360,11 +378,12 @@ export default async function PublicComparePage({
           </Section>
 
           <Section ariaLabel={t("journeyLabel")} spacing="compact">
-            <div className="am-cluster">
-              <Button variant="secondary" href="/countries" icon={<Icon name="globe" size={18} />}>
+            <p className="am-j-morelink">
+              <Link href="/countries">
                 {t("seeCountries")}
-              </Button>
-            </div>
+                <Icon name="arrow-right" size={18} />
+              </Link>
+            </p>
           </Section>
         </>
       ) : null}

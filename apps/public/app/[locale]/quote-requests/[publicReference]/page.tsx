@@ -13,6 +13,7 @@ import {
 import { toLocale } from "../../../../i18n/routing";
 import { ConsentWithdrawal } from "../../../components/forms/consent-withdrawal";
 import { CopyReference } from "../../../components/journey/copy-reference";
+import { JourneyRoute } from "../../../components/journey/journey-route";
 import { IndicativeOfferNotice } from "../../../components/public-journey";
 import { QuoteDocumentUpload } from "../../../components/quote-document-upload";
 import { QuoteProposalCard, type QuoteProposalCardLabels } from "../../../components/tracking/quote-proposal-card";
@@ -55,7 +56,7 @@ const SCAN_VISUALS: Record<ScanKey, { icon: IconName; tone: IconTileTone }> = {
   pending: { icon: "clock", tone: "neutral" },
   clean: { icon: "file-check", tone: "success" },
   infected: { icon: "alert-triangle", tone: "danger" },
-  failed: { icon: "refresh", tone: "warning" }
+  failed: { icon: "refresh", tone: "neutral" }
 };
 
 /** Status headline visuals; green only for the one outcome the visitor is waiting for. */
@@ -64,9 +65,11 @@ const STATUS_VISUALS: Record<PublicQuoteStatus, { icon: IconName; tone: IconTile
   in_review: { icon: "clock", tone: "neutral" },
   transmitted: { icon: "handshake", tone: "neutral" },
   in_progress: { icon: "user-check", tone: "neutral" },
-  proposal_available: { icon: "file-check", tone: "success" },
+  // Palette law: a proposal confirms nothing (green is for what a broker confirmed) and nothing here
+  // is sponsored (orange), so these two states use the navy-family tiles.
+  proposal_available: { icon: "file-check", tone: "navy" },
   closed: { icon: "list", tone: "neutral" },
-  not_transmitted: { icon: "info", tone: "warning" }
+  not_transmitted: { icon: "info", tone: "neutral" }
 };
 
 const TIMELINE_ICONS: Record<PublicTimelineStep, IconName> = {
@@ -145,7 +148,8 @@ export default async function PublicQuoteTrackingPage({
 
   const hero = (
     <Hero
-      kicker={t("kicker")}
+      // « Vous êtes ici »: the broker stop is current only once the status names a broker.
+      route={<JourneyRoute current={view && view.brokers.length > 0 ? "broker" : "request"} />}
       title={view ? t("title", { reference: publicReference }) : t("breadcrumb")}
       lead={t("intro")}
       size="sm"
@@ -310,7 +314,7 @@ export default async function PublicQuoteTrackingPage({
 
       <Section title={t("statusTitle")} ariaLabel={t("journeyLabel")}>
         <div className="am-stack am-stack--xl am-j-column">
-          <div className="am-j-reference">
+          <div className="am-j-reference am-sign">
             <p className="am-j-reference__label">{t("referenceLabel")}</p>
             <div className="am-j-reference__row">
               <p className="am-j-reference__value am-tabular">{publicReference}</p>

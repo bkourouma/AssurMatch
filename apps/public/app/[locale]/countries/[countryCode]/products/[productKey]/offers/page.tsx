@@ -3,8 +3,10 @@ import { getPathname } from "../../../../../../../i18n/navigation";
 import { toLocale } from "../../../../../../../i18n/routing";
 import { OFFER_CAP_HINT_ID, OfferComparisonBar, SelectionAssist } from "../../../../../../components/forms/offer-comparison-bar";
 import { AutoSubmit } from "../../../../../../components/journey/auto-submit";
+import { JourneyRoute } from "../../../../../../components/journey/journey-route";
 import { OfferCard } from "../../../../../../components/offer-cards";
 import { JourneyHeroNotice } from "../../../../../../components/public-journey";
+import { BackendText } from "../../../../../../components/ui/backend-text";
 import { Badge } from "../../../../../../components/ui/badge";
 import { Breadcrumb } from "../../../../../../components/ui/breadcrumb";
 import { Button } from "../../../../../../components/ui/button";
@@ -13,6 +15,7 @@ import { Field, fieldControlProps } from "../../../../../../components/ui/field"
 import { Hero } from "../../../../../../components/ui/hero";
 import { Icon } from "../../../../../../components/ui/icons";
 import { Notice } from "../../../../../../components/ui/notice";
+import { Pictogram, productPictogram } from "../../../../../../components/ui/pictogram";
 import { Section } from "../../../../../../components/ui/section";
 import { listCountryDirectory, listPublicOffers, listPublicProducts } from "../../../../../../lib/public-api";
 import { buildMetadata, localeUrl } from "../../../../../../lib/seo";
@@ -149,10 +152,10 @@ export default async function PublicOffersPage({
   return (
     <>
       <Hero
-        kicker={t("kicker", { product: productName, country: countryName })}
         title={t("title")}
         lead={t("lead")}
         size="sm"
+        route={<JourneyRoute current="offers" countryCode={countryCode} productKey={productKey} />}
         breadcrumb={
           <Breadcrumb
             label={common("breadcrumbLabel")}
@@ -172,10 +175,15 @@ export default async function PublicOffersPage({
           />
         }
       >
+        {/* Which list this is: the product and the country, next to the product's pictogram. */}
+        <p className="am-j-context">
+          <Pictogram name={productPictogram(productKey)} tile tone="light" size={24} />
+          <BackendText>{t("kicker", { product: productName, country: countryName })}</BackendText>
+        </p>
         <JourneyHeroNotice />
       </Hero>
 
-      <Section spacing="compact">
+      <Section spacing="compact" tone="muted" className="am-j-filters">
         {/*
          * D-Filtres (`content/02`): the 4 primary filters stay always visible, never folded away;
          * only the secondary ones live under the "Plus de filtres" disclosure. Both fieldsets belong
@@ -327,6 +335,10 @@ export default async function PublicOffersPage({
         {/* The offer checkboxes live inside the cards and post to this form through `form=`. */}
         <form id={COMPARE_FORM_ID} method="get" action={compareAction} aria-label={t("compareFormLabel")}>
           {priority ? <input type="hidden" name="priority" value={priority} /> : null}
+          {/* The comparison page reads only `ids` and `priority` for the comparison itself; the
+              country and the product let its journey strip link back to this list. */}
+          <input type="hidden" name="country" value={countryCode} />
+          <input type="hidden" name="product" value={productKey} />
         </form>
 
         {offers.data.length > 0 ? (

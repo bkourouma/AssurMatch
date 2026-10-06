@@ -148,6 +148,9 @@
   },
   "Home": {
     "breadcrumb": "Accueil",
+    "changeCountry": "Changer de pays",
+    "productsTitle": "Choisissez un produit",
+    "entryOther": "Un autre pays ou un autre produit",
     "kicker": "Comparaison indicative, pays par pays",
     "title": "Comparez d'abord. Soyez accompagné ensuite.",
     "lead": "AssurMatch compare des offres indicatives et vous met en relation avec un courtier autorisé. Nous ne vendons pas d'assurance, nous ne signons pas de contrat et nous ne recevons pas votre prime.",
@@ -164,7 +167,11 @@
       "partners": "Courtiers partenaires actifs",
       "offers": "Offres validées",
       "updatedAt": "Chiffres arrêtés au {date}.",
-      "indicative": "Ces chiffres sont indicatifs et décrivent l'état des activations publiques, pas une donnée auditée."
+      "indicative": "Ces chiffres sont indicatifs et décrivent l'état des activations publiques, pas une donnée auditée.",
+      "lineLabel": "AssurMatch aujourd'hui :",
+      "countriesCount": "{count, plural, one {# pays ouvert} other {# pays ouverts}}",
+      "partnersCount": "{count, plural, one {# courtier partenaire actif} other {# courtiers partenaires actifs}}",
+      "offersCount": "{count, plural, one {# offre validée} other {# offres validées}}"
     },
     "statusTitle": "Notre rôle",
     "statusLead": "Ce qu'AssurMatch fait, et ce qu'AssurMatch ne fait pas.",
@@ -280,10 +287,10 @@
     "lead": "Les produits visibles dépendent des activations publiques par pays et par produit. Le prix indicatif reste à confirmer par le courtier partenaire.",
     "variants": {
       "CI": {
-        "lead": "Comparez des offres indicatives d'assurance auto, santé, habitation et voyage en Côte d'Ivoire, puis faites confirmer le devis et les garanties par un courtier autorisé par l'autorité compétente."
+        "lead": "Comparez des offres indicatives d'assurance en Côte d'Ivoire, puis faites confirmer le devis et les garanties par un courtier autorisé par l'autorité compétente."
       },
       "SN": {
-        "lead": "Comparez des offres indicatives d'assurance auto, santé, habitation et voyage au Sénégal, puis faites confirmer le devis et les garanties par un courtier autorisé par l'autorité compétente."
+        "lead": "Comparez des offres indicatives d'assurance au Sénégal, puis faites confirmer le devis et les garanties par un courtier autorisé par l'autorité compétente."
       }
     },
     "pilotNotice": "Ce pays est en phase pilote : le nombre de courtiers partenaires et d'offres comparables y est encore limité.",
@@ -1193,8 +1200,7 @@
     },
     "portal": {
       "title": "Le portail courtier",
-      "lead": "Un espace dédié pour accepter un lead, suivre son dossier et, selon la formule, piloter un pipeline commercial.",
-      "caption": "Illustration du portail courtier partenaire. Aucune capture d'écran réelle n'est disponible pour le moment."
+      "lead": "Un espace dédié pour accepter un lead, suivre son dossier et, selon la formule, piloter un pipeline commercial."
     },
     "expectations": {
       "title": "Ce qu'AssurMatch attend d'un partenaire"
@@ -1419,6 +1425,7 @@
     "received": {
       "title": "Candidature reçue",
       "referencePrefix": "Référence de votre candidature :",
+      "nextStepsTitle": "Prochaines étapes",
       "steps": {
         "review": "Notre équipe conformité étudie votre dossier.",
         "licenceCheck": "Elle vérifie votre licence auprès de l'autorité que vous avez indiquée.",
@@ -1435,6 +1442,15 @@
       "body": "Si vous venez d'envoyer une candidature, revenez au formulaire pour recommencer l'envoi.",
       "cta": "Revenir au formulaire de candidature"
     }
+  },
+  "Route": {
+    "label": "Votre parcours",
+    "current": "(vous êtes ici)",
+    "country": "Pays",
+    "product": "Produit",
+    "offers": "Offres",
+    "request": "Demande",
+    "broker": "Courtier"
   },
   "Tracking": {
     "kicker": "Suivi de demande",

@@ -4,6 +4,7 @@ import { useLocale, useMessages, useTranslations } from "next-intl";
 import { useEffect, useRef, useState, type FormEvent, type RefObject } from "react";
 import { Link } from "../../i18n/navigation";
 import { submitPublicQuoteRequest, type PublicPhoneRule, type PublicQuoteFormField, type PublicQuoteFormState, type PublicQuoteLanguage } from "../lib/public-api";
+import { InitialsTile } from "./journey/tiles";
 import { IndicativeOfferNotice } from "./public-journey";
 import { VisitorAiAssistant } from "./visitor-ai-assistant";
 import { BackendText } from "./ui/backend-text";
@@ -165,29 +166,33 @@ interface ResponsibleBrokerBlockProps {
 /**
  * D4 (spec 050) + FR-018 (spec 052): the offer's broker is named before the consent box when the
  * server serves its name (it does so only when that broker is eligible for the request), with its
- * licence when the public directory resolves it. The wording stays conditional: routing may still
- * hand the request to another eligible broker, which the confirmation then says.
+ * initials plate as the broker directories show it, and its licence when the public directory
+ * resolves it. The wording stays conditional: routing may still hand the request to another eligible
+ * broker, which the confirmation then says.
  */
 function ResponsibleBrokerBlock({ broker, hasSelectedOffer, productName, countryName }: ResponsibleBrokerBlockProps) {
   const t = useTranslations("QuoteForm");
   if (!hasSelectedOffer) {
-    return <p>{t("brokerConfirm.routing", { product: productName, country: countryName })}</p>;
+    return <p className="am-quote-broker__text">{t("brokerConfirm.routing", { product: productName, country: countryName })}</p>;
   }
   if (broker?.name) {
     return (
-      <>
-        <p>
-          <BackendText>{t("offerPartner", { partner: broker.name })}</BackendText>
-        </p>
-        {broker.licenceNumber && broker.issuingAuthority ? (
+      <div className="am-quote-broker__named">
+        <InitialsTile name={broker.name} />
+        <div className="am-quote-broker__text">
           <p>
-            <BackendText>{t("brokerLicence", { licence: broker.licenceNumber, authority: broker.issuingAuthority })}</BackendText>
+            <BackendText>{t("offerPartner", { partner: broker.name })}</BackendText>
           </p>
-        ) : null}
-      </>
+          {broker.licenceNumber && broker.issuingAuthority ? (
+            <p>
+              <BackendText>{t("brokerLicence", { licence: broker.licenceNumber, authority: broker.issuingAuthority })}</BackendText>
+            </p>
+          ) : null}
+        </div>
+      </div>
     );
   }
-  return <p>{t("preselected")}</p>;
+  return <p className="am-quote-broker__text">{t("preselected")}</p>;
 }
 
 export function QuoteFormShell({
@@ -264,7 +269,12 @@ export function QuoteFormShell({
     setJsEnabled(true);
   }, []);
 
+  // Focus follows the visitor from step to step, never on arrival: moving focus on the first render
+  // would scroll a phone past the page sign and announce a heading nobody asked for.
+  const shownStep = useRef(step);
   useEffect(() => {
+    if (shownStep.current === step) return;
+    shownStep.current = step;
     const target = step === 1 ? needHeadingRef.current : step === 2 ? contactHeadingRef.current : verifyHeadingRef.current;
     target?.focus();
   }, [step]);
@@ -448,7 +458,7 @@ export function QuoteFormShell({
         <section className="am-j-sent" aria-label={t("successTitle")}>
           <IconTile name="check-circle" tone="success" size="lg" />
           <h2 className="am-j-sent__title">{t("successTitle")}</h2>
-          <div className="am-j-reference">
+          <div className="am-j-reference am-sign">
             <p className="am-j-reference__label">{t("successPrefix")}</p>
             <p className="am-j-reference__value am-tabular">{result.publicReference}</p>
           </div>
@@ -505,6 +515,7 @@ export function QuoteFormShell({
       <form
         ref={formRef}
         className="am-j-form am-quote-form"
+        data-enhanced={jsEnabled ? "true" : undefined}
         onSubmit={submit}
         {...(formAction ? { action: formAction } : {})}
       >
@@ -653,7 +664,7 @@ export function QuoteFormShell({
           ) : null}
 
           {/* D4: the responsible broker is named before consent whenever the offer makes it knowable. */}
-          <div className="am-j-block">
+          <div className="am-quote-broker">
             <h3 className="am-quote-broker__title">{t("brokerTitle")}</h3>
             <ResponsibleBrokerBlock
               broker={responsibleBroker}
@@ -670,7 +681,7 @@ export function QuoteFormShell({
             </p>
           </Notice>
 
-          <div className="am-stack">
+          <div className="am-quote-consent">
             <h3 className="am-quote-broker__title">{t("consentLegend")}</h3>
             <p className="am-j-panel__lead">{t("consentIntro")}</p>
             {/* Consent boxes are never pre-ticked: consent is given, never withdrawn. */}
@@ -729,11 +740,8 @@ export function QuoteFormShell({
       {/* Optional assistance, deliberately outside the form: it never blocks or gates the request.
           `am-j-optional` folds the whole panel away while no assistant is available for this
           country and product, so the heading never sits above an empty box. */}
-      <section className="am-j-panel am-j-optional" aria-label={t("assistanceTitle")}>
-        <div className="am-j-panel__head">
-          <IconTile name="bot" size="lg" />
-          <h2 className="am-j-panel__title">{t("assistanceTitle")}</h2>
-        </div>
+      <section className="am-quote-assist am-j-optional" aria-label={t("assistanceTitle")}>
+        <h2 className="am-quote-assist__title">{t("assistanceTitle")}</h2>
         <p className="am-j-panel__lead">{t("assistanceLead")}</p>
         <div className="am-j-assist">
           <VisitorAiAssistant countryCode={countryCode} productKey={productKey} mode="summary" answers={{}} />

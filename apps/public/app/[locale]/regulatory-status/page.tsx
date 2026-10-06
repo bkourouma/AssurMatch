@@ -1,15 +1,14 @@
 import { getTranslations, setRequestLocale } from "next-intl/server";
 import { toLocale, type AppLocale } from "../../../i18n/routing";
 import { getRegulatoryStatusContent, type RegulatoryStatusSection } from "../../content/institutional";
+import type { ContentSection } from "../../content/types";
 import { Breadcrumb } from "../../components/ui/breadcrumb";
 import { Button } from "../../components/ui/button";
-import { Card, CardBody } from "../../components/ui/card";
+import { Directory } from "../../components/ui/directory";
 import { Hero } from "../../components/ui/hero";
 import { Icon, type IconName } from "../../components/ui/icons";
 import { IconTile } from "../../components/ui/icon-tile";
-import { Notice } from "../../components/ui/notice";
 import { Section } from "../../components/ui/section";
-import { Reveal } from "../../components/motion/reveal";
 import { buildMetadata, localeUrl } from "../../lib/seo";
 import type { PageMetadata } from "../../lib/seo";
 import "../../styles/pages/institutional.css";
@@ -21,54 +20,52 @@ export async function generateMetadata({ params }: { params: Promise<{ locale: s
 }
 
 /**
- * One regulated topic, rendered as a card inside its own band. The `id` of the editorial section is
- * kept on the band: `#remuneration`, `#classement`, `#offres-sponsorisees` and `#prix-indicatif` are
- * stable anchors that the footer, the FAQ and external links point at.
+ * One regulated topic in its own band: the heading and its one-line answer in the margin, the detail
+ * and "Comment vérifier" beside it. The `id` of the editorial section is kept on the band:
+ * `#remuneration`, `#classement`, `#offres-sponsorisees` and `#prix-indicatif` are stable anchors that
+ * the footer, the FAQ and external links point at.
  */
-function RegulatorySection({
+function RegulatoryTopic({
   section,
   icon,
   tone,
   verifyLabel
 }: {
-  section: RegulatoryStatusSection;
+  section: RegulatoryStatusSection | ContentSection;
   icon: IconName;
   tone?: "muted";
-  verifyLabel: string;
+  verifyLabel?: string;
 }) {
+  const summary = "summary" in section ? section.summary : undefined;
+  const howToVerify = "howToVerify" in section ? section.howToVerify : undefined;
   return (
-    <Section id={section.id} className="am-inst-anchor" {...(tone ? { tone } : {})}>
-      <Reveal>
-        <Card padding="lg" className="am-inst-card">
-          <div className="am-inst-card__head">
-            <IconTile name={icon} size="lg" />
-            <h2 className="am-inst-card__title">{section.heading}</h2>
-          </div>
-          <CardBody>
-            <p>
-              <strong>{section.summary}</strong>
-            </p>
-            {section.body.map((paragraph, index) => (
-              <p key={index}>{paragraph}</p>
-            ))}
-            {section.bullets ? (
-              <ul className="am-bullets">
-                {section.bullets.map((bullet) => (
-                  <li key={bullet}>
-                    <Icon name="check" size={18} />
-                    <span>{bullet}</span>
-                  </li>
-                ))}
-              </ul>
-            ) : null}
-            <p>
-              <em>
-                {verifyLabel} {section.howToVerify}
-              </em>
-            </p>
-          </CardBody>
-        </Card>
-      </Reveal>
+    <Section id={section.id} {...(tone ? { tone } : {})}>
+      <div className="am-topic">
+        <div className="am-topic__head">
+          <IconTile name={icon} />
+          <h2 className="am-topic__title">{section.heading}</h2>
+          {summary ? <p className="am-topic__summary">{summary}</p> : null}
+        </div>
+        <div className="am-topic__body">
+          {section.body.map((paragraph, index) => (
+            <p key={index}>{paragraph}</p>
+          ))}
+          {section.bullets ? (
+            <ul className="am-ruled" data-mark="dot">
+              {section.bullets.map((bullet) => (
+                <li key={bullet}>{bullet}</li>
+              ))}
+            </ul>
+          ) : null}
+          {howToVerify && verifyLabel ? (
+            <div className="am-topic__verify">
+              <p>
+                <strong>{verifyLabel}</strong> {howToVerify}
+              </p>
+            </div>
+          ) : null}
+        </div>
+      </div>
     </Section>
   );
 }
@@ -90,7 +87,6 @@ export default async function RegulatoryStatusPage({ params }: { params: Promise
   return (
     <>
       <Hero
-        kicker={t("kicker")}
         title={t("title")}
         lead={t("lead")}
         breadcrumb={
@@ -102,25 +98,24 @@ export default async function RegulatoryStatusPage({ params }: { params: Promise
             ]}
           />
         }
-      />
-
-      <nav className="am-inpagenav" aria-label={t("navLabel")}>
-        <div className="am-container">
-          <ul className="am-inpagenav__list">
-            {sections.map((entry) => (
-              <li key={entry.section.id}>
-                <a className="am-inpagenav__link" href={`#${entry.section.id}`}>
-                  <Icon name={entry.icon} size={16} />
-                  {entry.section.heading}
-                </a>
-              </li>
-            ))}
-          </ul>
-        </div>
-      </nav>
+      >
+        {/* The four topics of the page, as directory rows on the sign: where each answer is. */}
+        <nav className="am-reg-index" aria-label={t("navLabel")}>
+          <Directory
+            surface="plate"
+            columns={2}
+            items={sections.map((entry) => ({
+              key: entry.section.id,
+              title: entry.section.heading,
+              icon: entry.icon,
+              externalHref: `#${entry.section.id}`
+            }))}
+          />
+        </nav>
+      </Hero>
 
       {sections.map((entry, index) => (
-        <RegulatorySection
+        <RegulatoryTopic
           key={entry.section.id}
           section={entry.section}
           icon={entry.icon}
@@ -129,15 +124,7 @@ export default async function RegulatoryStatusPage({ params }: { params: Promise
         />
       ))}
 
-      <Section id={content.regionalFramework.id} className="am-inst-anchor">
-        <Reveal>
-          <Notice tone="info" title={content.regionalFramework.heading}>
-            {content.regionalFramework.body.map((paragraph, index) => (
-              <p key={index}>{paragraph}</p>
-            ))}
-          </Notice>
-        </Reveal>
-      </Section>
+      <RegulatoryTopic section={content.regionalFramework} icon="landmark" />
 
       <Section tone="muted" lead={t("footerLead")}>
         <div className="am-cluster">

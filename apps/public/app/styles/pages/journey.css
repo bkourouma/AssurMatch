@@ -1,25 +1,21 @@
 /*
- * Visitor comparison journey: countries, country, product, offers, offer detail, comparator,
- * quote request and request tracking.
+ * Visitor journey, "La signalétique": countries, country, product, offers, offer detail,
+ * comparator, broker and insurer directories, quote request and request tracking.
  *
  * Loaded by `app/[locale]/countries/layout.tsx` and by the three journey pages that live outside
  * that route group (`offers/[offerId]`, `compare`, `quote-requests/[publicReference]`), which puts
- * it after tokens/base/motion/pages/components/chrome in the cascade.
+ * it after the foundation sheets in the cascade. The quote form's own pieces live in `quote.css`.
  *
- * House rules: green is validation only (an included guarantee, a done step), sponsored is orange,
- * nothing renders below 14px, notices are never closable, and no primitive of `components.css` is
- * duplicated here - only journey-specific composition.
+ * It only composes the `.am-*` primitives of `components.css`: ruled lists rather than cards, the
+ * navy sign for "where you are", blue for actions, green for an included guarantee or a done step
+ * only, orange for the sponsored label only, a dashed rule for what is indicative. Phones first.
  */
 
 /* ==========================================================================
    1. Shared journey pieces
    ========================================================================== */
 
-/**
- * The `.am-notice` primitive still carries `margin-bottom: 16px` for the legacy flow layouts. Inside
- * a grid stack that margin is added to the grid gap, so two notices ended up 32px apart. Every
- * journey container lays its children out with `gap`, so the notice contributes none of its own.
- */
+/* Every journey container lays its children out with `gap`: a notice adds no margin of its own. */
 .am-stack > .am-notice,
 .am-hero__inner > .am-notice,
 .am-hero__aside > .am-notice,
@@ -28,10 +24,7 @@
   margin: 0;
 }
 
-/**
- * Combined regulatory notice of a journey hero: both sentences stay visible, as two lines of one
- * compact notice rather than two stacked boxes.
- */
+/* The two regulatory sentences of a journey sign, as two lines of one dashed notice. */
 .am-j-heronotice .am-notice__body {
   display: grid;
   gap: var(--am-space-6);
@@ -41,187 +34,318 @@
   margin: 0;
 }
 
-/*
- * Entry selector of the comparator landing. Same reason as the home hero: the panel is one hero
- * column, not the page width, so the primitive's three-column row from 900px would squeeze both
- * selects down to a few characters. The selects keep a column each and the button spans underneath.
- */
-@media (min-width: 560px) {
-  .am-j-entry .am-entry__row {
-    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-    align-items: end;
-  }
+/* Context line on a sign: the product pictogram and what the page is about. */
+.am-j-context {
+  display: flex;
+  gap: var(--am-space-12);
+  align-items: center;
+  margin: 0;
+  color: var(--am-heading);
+  font-size: var(--am-body-size);
+  font-weight: 700;
+  line-height: 1.35;
+}
 
-  .am-j-entry .am-entry__row > .am-button {
-    grid-column: 1 / -1;
+.am-j-context .am-pictogram--tile {
+  width: 40px;
+  height: 40px;
+}
+
+.am-j-signbadges {
+  margin: 0;
+}
+
+/* Code plate of a directory row: ISO code of a country, initials of a broker or an insurer. */
+.am-j-codetile {
+  display: inline-flex;
+  width: var(--am-tile);
+  height: var(--am-tile);
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--am-radius-sm);
+  background: var(--am-primary-800);
+  color: var(--am-neutral-0);
+  font-size: var(--am-small-size);
+  font-variant-numeric: tabular-nums;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  line-height: 1;
+}
+
+/* A directory row's line can hold several short lines (licence, products, validity). */
+.am-j-rowline {
+  display: block;
+}
+
+.am-directory__title > .am-badge {
+  margin-left: var(--am-space-4);
+  vertical-align: 1px;
+}
+
+/* Reading measures. */
+.am-j-measure {
+  max-width: 76ch;
+}
+
+.am-j-column {
+  width: 100%;
+  max-width: 880px;
+}
+
+.am-j-intro {
+  margin: 0 0 var(--am-space-32);
+}
+
+/* Small print under a block: still 14px, still 4.5:1. */
+.am-j-note,
+.am-j-fineprint {
+  max-width: 76ch;
+  margin: 0;
+  color: var(--am-text-muted);
+  font-size: var(--am-caption-size);
+  line-height: var(--am-caption-line);
+}
+
+.am-j-note--after {
+  margin-top: var(--am-space-24);
+}
+
+/* A plain statement with a navy glyph: "Rien n'est transmis...", "Licence valable jusqu'au...". */
+.am-j-statement {
+  display: grid;
+  max-width: 76ch;
+  gap: var(--am-space-12);
+  align-items: start;
+  margin: 0;
+  color: var(--am-text);
+  font-weight: 700;
+  grid-template-columns: auto minmax(0, 1fr);
+}
+
+.am-j-statement > .am-icon {
+  margin-top: 3px;
+  color: var(--am-heading);
+}
+
+/* "Voir tous les courtiers", "Retour aux pays": a link with weight after a block. */
+.am-j-morelink {
+  margin: var(--am-space-24) 0 0;
+}
+
+.am-j-morelink:first-child {
+  margin-top: 0;
+}
+
+.am-j-morelink a {
+  display: inline-flex;
+  min-height: 44px;
+  gap: var(--am-space-6);
+  align-items: center;
+  font-weight: 700;
+}
+
+.am-j-morelink a > .am-icon:last-child {
+  transition: transform var(--am-duration-base) var(--am-ease-out);
+}
+
+.am-j-morelink a:hover > .am-icon:last-child,
+.am-j-morelink a:focus-visible > .am-icon:last-child {
+  transform: translateX(4px);
+}
+
+/* Ruled list with a glyph per row: guarantees, documents, next steps, mentions. */
+.am-j-ticks {
+  margin: 0;
+  padding: 0;
+  border-top: 1px solid var(--am-rule);
+  list-style: none;
+}
+
+.am-j-ticks > li {
+  display: grid;
+  gap: var(--am-space-12);
+  align-items: start;
+  margin: 0;
+  padding: var(--am-space-12) 0;
+  border-bottom: 1px solid var(--am-rule);
+  color: var(--am-text);
+  grid-template-columns: auto minmax(0, 1fr);
+}
+
+.am-j-ticks > li > .am-icon {
+  margin-top: 3px;
+  color: var(--am-heading);
+}
+
+/* Green means included or done, and only that. */
+.am-j-ticks > li[data-included="true"] > .am-icon {
+  color: var(--am-success-700);
+}
+
+.am-j-ticks > li[data-included="false"],
+.am-j-ticks[data-tone="muted"] > li {
+  color: var(--am-text-muted);
+}
+
+.am-j-ticks > li[data-included="false"] > .am-icon,
+.am-j-ticks[data-tone="muted"] > li > .am-icon {
+  color: var(--am-text-muted);
+}
+
+.am-j-ticks[data-size="sm"] > li {
+  padding: var(--am-space-8) 0;
+  font-size: var(--am-small-size);
+  line-height: var(--am-small-line);
+}
+
+.am-j-ticks__detail {
+  display: block;
+  color: var(--am-text-muted);
+  font-size: var(--am-small-size);
+  line-height: var(--am-small-line);
+}
+
+/* Two ruled lists side by side from 900px (guarantees / exclusions), headed like the home role. */
+.am-j-columns {
+  display: grid;
+  gap: var(--am-space-32);
+}
+
+@media (min-width: 900px) {
+  .am-j-columns {
+    gap: var(--am-space-48);
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 
-/** Panel with a heading and a soft surface: score explainer, assistance, next steps. */
+.am-j-columns__title,
+.am-j-part__title {
+  margin: 0;
+  padding-bottom: var(--am-space-8);
+  border-bottom: 2px solid var(--am-primary-800);
+  color: var(--am-heading);
+  font-size: var(--am-h3-size);
+  font-weight: 700;
+  line-height: var(--am-h3-line);
+}
+
+.am-j-columns__title + .am-j-ticks,
+.am-j-part__title + .am-j-ticks,
+.am-j-part__title + .am-j-criteria {
+  border-top: 0;
+}
+
+/*
+ * A headed panel of the tracking space, the tracking-link, feedback and unsubscribe pages and a broker
+ * proposal: no box, a pale tile and a title over a 2px navy rule, then its content. `--muted` sets
+ * the panel on the band (the consent withdrawal).
+ */
 .am-j-panel {
   display: grid;
-  gap: var(--am-space-12);
-  padding: var(--am-space-24);
-  border: 1px solid var(--am-border);
-  border-radius: var(--am-radius-panel);
-  background: var(--am-surface);
-  box-shadow: var(--am-shadow-sm);
+  gap: var(--am-space-16);
+  align-content: start;
+  min-width: 0;
 }
 
 .am-j-panel--muted {
-  border-color: var(--am-border-strong);
-  background: var(--am-neutral-50);
-  box-shadow: none;
-}
-
-.am-j-panel--brand {
-  border-color: var(--am-border-brand);
-  background: var(--am-surface-brand);
-  box-shadow: none;
+  padding: var(--am-space-20);
+  border-radius: var(--am-radius-sm);
+  background: var(--am-band);
 }
 
 .am-j-panel__head {
   display: flex;
   gap: var(--am-space-12);
   align-items: center;
+  padding-bottom: var(--am-space-8);
+  border-bottom: 2px solid var(--am-primary-800);
 }
 
 .am-j-panel__title {
   margin: 0;
-  font-family: var(--am-font-heading);
+  color: var(--am-heading);
   font-size: var(--am-h3-size);
   font-weight: 700;
-  letter-spacing: var(--am-tracking-snug);
   line-height: var(--am-h3-line);
 }
 
-.am-j-panel__lead {
-  max-width: 68ch;
+.am-j-panel > p {
   margin: 0;
-  color: var(--am-text-muted);
 }
 
-/** Icon + text row used for short factual lists (next steps, what the score weighs). */
-.am-j-points {
-  display: grid;
-  gap: var(--am-space-12);
+/* Ruled list with a leading glyph per row (brokers, timeline, proposal details). */
+.am-j-list {
   margin: 0;
   padding: 0;
   list-style: none;
 }
 
-.am-j-points > li {
+.am-j-list > li {
   display: grid;
   gap: var(--am-space-12);
   align-items: start;
-  grid-template-columns: auto minmax(0, 1fr);
-  color: var(--am-text-muted);
-  font-size: var(--am-small-size);
-  line-height: var(--am-small-line);
-}
-
-.am-j-points > li > .am-icon {
-  margin-top: 2px;
-  color: var(--am-primary-600);
-}
-
-/** Meta row: small icon + label pairs under a title. */
-.am-j-meta {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--am-space-8) var(--am-space-16);
   margin: 0;
-  color: var(--am-text-subtle);
-  font-size: var(--am-caption-size);
-  line-height: var(--am-caption-line);
+  padding: var(--am-space-12) 0;
+  border-bottom: 1px solid var(--am-rule);
+  grid-template-columns: auto minmax(0, 1fr);
 }
 
-.am-j-meta > span {
-  display: inline-flex;
-  gap: var(--am-space-6);
-  align-items: center;
+.am-j-list > li > .am-icon {
+  margin-top: 3px;
+  color: var(--am-heading);
+}
+
+/* A headed part of a page column (offer detail, broker profile, next steps). */
+.am-j-part {
+  display: grid;
+  gap: var(--am-space-16);
+  align-content: start;
   min-width: 0;
 }
 
-.am-j-meta .am-icon {
-  flex: none;
-  color: var(--am-neutral-400);
+.am-j-part > p {
+  margin: 0;
 }
 
-/** Guarantee pill: green tick when included, neutral minus when not. */
-.am-j-guarantee[data-included="true"] {
-  border-color: var(--am-success-100);
-  background: var(--am-success-50);
-  color: var(--am-success-700);
+/* A broker's licence line in a narrow column: the glyph stays beside its text, not above it. */
+.am-j-part .am-broker__meta {
+  flex-wrap: nowrap;
+  align-items: flex-start;
 }
 
-.am-j-guarantee[data-included="true"] .am-icon {
-  color: var(--am-success-600);
+.am-j-part .am-broker__meta > .am-icon {
+  margin-top: 3px;
 }
 
-.am-j-guarantee[data-included="false"] {
-  background: var(--am-neutral-50);
-  color: var(--am-text-subtle);
-}
-
-/** Icon grid of guarantees, criteria or steps. */
-.am-j-features {
+/* The criteria the indicative score weighs: a ruled list, two columns from 640px. */
+.am-j-criteria-list {
   display: grid;
-  gap: var(--am-space-16);
   margin: 0;
   padding: 0;
-  grid-template-columns: repeat(auto-fit, minmax(min(100%, 260px), 1fr));
+  border-top: 1px solid var(--am-rule);
   list-style: none;
 }
 
-.am-j-feature {
-  display: grid;
-  gap: var(--am-space-12);
-  align-items: start;
-  grid-template-columns: auto minmax(0, 1fr);
-  padding: var(--am-space-16);
-  border: 1px solid var(--am-border);
-  border-radius: var(--am-radius-md);
-  background: var(--am-surface);
-  box-shadow: var(--am-shadow-xs);
-  transition:
-    border-color var(--am-transition),
-    box-shadow var(--am-transition);
-}
-
-.am-j-feature:hover {
-  border-color: var(--am-primary-200);
-  box-shadow: var(--am-shadow-sm);
-}
-
-.am-j-feature__title {
+.am-j-criteria-list > li {
   margin: 0;
-  color: var(--am-text);
-  font-size: var(--am-small-size);
+  padding: var(--am-space-12) 0;
+  border-bottom: 1px solid var(--am-rule);
+  color: var(--am-heading);
   font-weight: 700;
-  line-height: var(--am-small-line);
 }
 
-.am-j-feature__detail {
-  margin: var(--am-space-4) 0 0;
-  color: var(--am-text-muted);
-  font-size: var(--am-caption-size);
-  line-height: var(--am-caption-line);
+@media (min-width: 640px) {
+  .am-j-criteria-list {
+    column-gap: var(--am-space-32);
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 
-/** Collapsible "everything else" disclosure inside a card. */
+/* "Plus de filtres", "Garanties détaillées": a ruled disclosure, plus turning into a minus. */
 .am-j-more {
-  border: 1px solid var(--am-border);
-  border-radius: var(--am-radius-md);
-  background: var(--am-neutral-50);
-  transition:
-    border-color var(--am-transition),
-    background-color var(--am-transition);
-}
-
-.am-j-more[open] {
-  border-color: var(--am-border-strong);
-  background: var(--am-surface);
+  border-top: 1px solid var(--am-rule);
+  border-bottom: 1px solid var(--am-rule);
 }
 
 .am-j-more > summary {
@@ -229,12 +353,9 @@
   min-height: 48px;
   gap: var(--am-space-12);
   align-items: center;
-  justify-content: space-between;
-  padding: var(--am-space-10) var(--am-space-16);
-  border-radius: var(--am-radius-md);
-  color: var(--am-text);
+  padding: var(--am-space-8) 0;
+  color: var(--am-action);
   cursor: pointer;
-  font-size: var(--am-small-size);
   font-weight: 700;
   list-style: none;
 }
@@ -244,92 +365,90 @@
 }
 
 .am-j-more > summary::after {
-  width: 20px;
-  height: 20px;
+  width: 22px;
+  height: 22px;
   flex: none;
+  margin-left: auto;
   background: currentColor;
-  color: var(--am-primary-600);
   content: "";
-  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E") center / contain no-repeat;
-  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E") center / contain no-repeat;
-  transition: transform var(--am-transition);
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.5' stroke-linecap='round'%3E%3Cpath d='M5 12h14M12 5v14'/%3E%3C/svg%3E") center / contain no-repeat;
+  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.5' stroke-linecap='round'%3E%3Cpath d='M5 12h14M12 5v14'/%3E%3C/svg%3E") center / contain no-repeat;
 }
 
 .am-j-more[open] > summary::after {
-  transform: rotate(180deg);
+  mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.5' stroke-linecap='round'%3E%3Cpath d='M5 12h14'/%3E%3C/svg%3E");
+  -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.5' stroke-linecap='round'%3E%3Cpath d='M5 12h14'/%3E%3C/svg%3E");
+}
+
+.am-j-more > summary:hover {
+  color: var(--am-action-hover);
 }
 
 .am-j-more__body {
   display: grid;
   gap: var(--am-space-16);
-  padding: 0 var(--am-space-16) var(--am-space-16);
+  padding: 0 0 var(--am-space-16);
 }
 
-/** Key/value list with dividers: the criteria of an offer. Replaces the legacy `.pub-criteria`. */
+/* Criteria of an offer: a ruled definition list, label above value on a phone, beside it from 560px. */
 .am-j-criteria {
   display: grid;
-  gap: 0;
   margin: 0;
-  grid-template-columns: minmax(180px, 32%) minmax(0, 1fr);
+  border-top: 1px solid var(--am-rule);
+}
+
+.am-j-criteria > div {
+  display: grid;
+  gap: var(--am-space-2) var(--am-space-24);
+  padding: var(--am-space-12) 0;
+  border-bottom: 1px solid var(--am-rule);
+}
+
+@media (min-width: 560px) {
+  .am-j-criteria > div {
+    grid-template-columns: minmax(150px, 34%) minmax(0, 1fr);
+  }
 }
 
 .am-j-criteria dt {
-  padding: var(--am-space-12) var(--am-space-16) var(--am-space-12) 0;
-  border-top: 1px solid var(--am-border);
-  color: var(--am-text-subtle);
+  color: var(--am-text-muted);
   font-size: var(--am-small-size);
   font-weight: 700;
+  line-height: var(--am-small-line);
 }
 
 .am-j-criteria dd {
   margin: 0;
-  padding: var(--am-space-12) 0;
-  border-top: 1px solid var(--am-border);
   color: var(--am-text);
-  font-size: var(--am-small-size);
 }
 
-/* One column under 520px: the label sits above its value instead of squeezing both side by side. */
-@media (max-width: 519px) {
-  .am-j-criteria {
-    grid-template-columns: minmax(0, 1fr);
-  }
-
-  .am-j-criteria dt {
-    padding-bottom: var(--am-space-4);
-  }
-
-  .am-j-criteria dd {
-    padding-top: 0;
-    border-top: 0;
-  }
+.am-j-criteria dd > .am-j-ticks {
+  border-top: 0;
 }
 
-/** Plain bullet list inside a criteria value. Replaces the legacy `.pub-list`. */
-.am-j-bullets {
-  margin: 0;
-  padding-left: var(--am-space-16);
-  display: grid;
-  gap: var(--am-space-4);
+.am-j-criteria dd > .am-j-ticks > li:first-child {
+  padding-top: 0;
 }
 
-/** Score disclosure. Replaces the legacy `.pub-score`. */
+.am-j-criteria dd > .am-j-ticks > li:last-child {
+  padding-bottom: 0;
+  border-bottom: 0;
+}
+
+/* Score breakdown: a ruled disclosure and a plain table that stacks under 680px. */
 .am-j-score {
-  padding: var(--am-space-16);
-  border: 1px solid var(--am-border);
-  border-radius: var(--am-radius-md);
-  background: var(--am-neutral-50);
+  border-top: 1px solid var(--am-rule);
+  border-bottom: 1px solid var(--am-rule);
 }
 
 .am-j-score > summary {
   display: flex;
-  min-height: 44px;
-  gap: var(--am-space-8);
+  min-height: 48px;
+  gap: var(--am-space-12);
   align-items: center;
-  justify-content: space-between;
-  color: var(--am-text);
+  padding: var(--am-space-8) 0;
+  color: var(--am-action);
   cursor: pointer;
-  font-size: var(--am-small-size);
   font-weight: 700;
   list-style: none;
 }
@@ -339,33 +458,39 @@
 }
 
 .am-j-score > summary::after {
-  width: 20px;
-  height: 20px;
+  width: 22px;
+  height: 22px;
   flex: none;
-  background: var(--am-primary-600);
+  margin-left: auto;
+  background: currentColor;
   content: "";
-  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E") center / contain no-repeat;
-  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E") center / contain no-repeat;
-  transition: transform var(--am-transition);
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.5' stroke-linecap='round'%3E%3Cpath d='M5 12h14M12 5v14'/%3E%3C/svg%3E") center / contain no-repeat;
+  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.5' stroke-linecap='round'%3E%3Cpath d='M5 12h14M12 5v14'/%3E%3C/svg%3E") center / contain no-repeat;
 }
 
 .am-j-score[open] > summary::after {
-  transform: rotate(180deg);
+  mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.5' stroke-linecap='round'%3E%3Cpath d='M5 12h14'/%3E%3C/svg%3E");
+  -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.5' stroke-linecap='round'%3E%3Cpath d='M5 12h14'/%3E%3C/svg%3E");
+}
+
+.am-j-score__body {
+  display: grid;
+  gap: var(--am-space-12);
+  padding: 0 0 var(--am-space-16);
 }
 
 .am-j-score__label {
-  margin: var(--am-space-12) 0;
+  margin: 0;
   color: var(--am-text-muted);
   font-size: var(--am-small-size);
   line-height: var(--am-small-line);
 }
 
-/**
- * Score breakdown. The shared `.am-table` carries `min-width: 560px`, which forces a sideways
- * scroll inside an offer card on a phone. Here the same four columns stack into one labelled block
- * per criterion under 680px; the explicit ARIA roles keep the table semantics that `display: block`
- * would otherwise strip away.
- */
+/* Inside a disclosure that already draws its rules, the nested one only keeps its bottom rule. */
+.am-j-more__body > .am-j-score {
+  border-top: 0;
+}
+
 .am-j-scoretable {
   width: 100%;
   border-collapse: collapse;
@@ -374,32 +499,17 @@
 
 .am-j-scoretable th,
 .am-j-scoretable td {
-  padding: var(--am-space-12) var(--am-space-16);
-  border-bottom: 1px solid var(--am-border);
+  padding: var(--am-space-10) var(--am-space-12) var(--am-space-10) 0;
+  border-bottom: 1px solid var(--am-rule);
   text-align: left;
   vertical-align: top;
 }
 
 .am-j-scoretable thead th {
-  background: var(--am-neutral-50);
-  color: var(--am-text-muted);
-  font-size: var(--am-caption-size);
-  font-weight: 800;
-  letter-spacing: var(--am-tracking-wide);
-  line-height: var(--am-caption-line);
-  text-transform: uppercase;
-}
-
-.am-j-scoretable tbody tr:last-child td {
-  border-bottom: 0;
-}
-
-@media (min-width: 680px) {
-  .am-j-scoretable {
-    border: 1px solid var(--am-border);
-    border-radius: var(--am-radius-md);
-    overflow: hidden;
-  }
+  border-bottom: 2px solid var(--am-primary-800);
+  color: var(--am-heading);
+  font-size: var(--am-small-size);
+  font-weight: 700;
 }
 
 @media (max-width: 679px) {
@@ -423,25 +533,31 @@
   }
 
   .am-j-scoretable tbody tr {
-    margin-bottom: var(--am-space-12);
-    padding: var(--am-space-12);
-    border: 1px solid var(--am-border);
-    border-radius: var(--am-radius-md);
-    background: var(--am-surface);
-  }
-
-  .am-j-scoretable tbody tr:last-child {
-    margin-bottom: 0;
+    display: grid;
+    gap: var(--am-space-4) var(--am-space-16);
+    padding: var(--am-space-12) 0;
+    border-bottom: 1px solid var(--am-rule);
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .am-j-scoretable td {
-    padding: var(--am-space-4) 0;
+    padding: 0;
     border-bottom: 0;
   }
 
-  .am-j-scoretable td::before {
+  .am-j-scoretable td:first-child,
+  .am-j-scoretable td:last-child {
+    grid-column: 1 / -1;
+  }
+
+  .am-j-scoretable td:first-child {
+    color: var(--am-heading);
+    font-weight: 700;
+  }
+
+  .am-j-scoretable td:not(:first-child)::before {
     display: block;
-    color: var(--am-text-subtle);
+    color: var(--am-text-muted);
     content: attr(data-label);
     font-size: var(--am-caption-size);
     font-weight: 700;
@@ -449,368 +565,268 @@
   }
 }
 
-/** Progressive enhancement: hidden as soon as a client boundary has mounted. */
+/* Guarantee labels on an offer card: green tick when included, neutral minus otherwise. */
+.am-j-guarantee[data-included="true"] .am-icon {
+  color: var(--am-success-700);
+}
+
+.am-j-guarantee[data-included="false"] {
+  border-color: var(--am-neutral-200);
+  background: var(--am-band);
+  color: var(--am-text-muted);
+}
+
+/* Progressive enhancement: hidden as soon as a client boundary has mounted. */
 html[data-js="true"] .am-j-nojs {
   display: none;
 }
 
 /**
- * Optional AI assistance. The assistant renders nothing at all when the assist type is disabled for
- * the country and the product, so its heading and lead must disappear with it rather than leave an
- * empty panel behind. The server HTML never contains an `.am-aibox`, so the block starts hidden and
- * only appears once the availability check has answered yes.
+ * Optional assistance. The assistant renders nothing at all when its assist type is disabled for the
+ * country and the product, so its heading and lead disappear with it rather than leave an empty block.
+ * The server HTML never contains an `.am-aibox`, so the block starts hidden and only appears once the
+ * availability check has answered yes.
  */
 .am-j-optional:not(:has(.am-aibox)) {
   display: none;
 }
 
+.am-j-assist {
+  display: grid;
+  gap: var(--am-space-16);
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 360px), 1fr));
+}
+
+/* Entry selector of the comparator landing: one sign column, so the selects keep a column each. */
+@media (min-width: 560px) {
+  .am-j-entry .am-entry__row {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    align-items: end;
+  }
+
+  .am-j-entry .am-entry__row > .am-button {
+    grid-column: 1 / -1;
+  }
+}
+
+.am-j-tail {
+  display: grid;
+  gap: var(--am-space-16);
+  margin-top: var(--am-space-32);
+}
+
 /* ==========================================================================
-   2. Country directory and country page
+   2. Country and product signs: the products as directory rows on the sign
    ========================================================================== */
 
-.am-j-countries {
-  display: grid;
+.am-j-sign .am-hero__inner {
   gap: var(--am-space-20);
-  margin: 0;
-  padding: 0;
-  grid-template-columns: repeat(auto-fill, minmax(min(100%, 280px), 1fr));
-  list-style: none;
 }
 
-.am-j-country {
-  position: relative;
+@media (min-width: 980px) {
+  .am-j-sign .am-hero__title {
+    max-width: 24ch;
+  }
+
+  .am-j-sign .am-hero__lead {
+    max-width: 64ch;
+  }
+}
+
+.am-j-signlist {
   display: grid;
   gap: var(--am-space-12);
-  align-content: start;
-  padding: var(--am-space-20);
-  border: 1px solid var(--am-border);
-  border-radius: var(--am-radius-card);
-  background: var(--am-surface);
-  box-shadow: var(--am-shadow-sm);
-  transition:
-    transform var(--am-transition),
-    box-shadow var(--am-transition),
-    border-color var(--am-transition);
+  margin-top: var(--am-space-12);
 }
 
-.am-j-country:hover,
-.am-j-country:focus-within {
-  border-color: var(--am-primary-300);
-  box-shadow: var(--am-shadow-lg);
-  transform: translateY(-2px);
-}
-
-.am-j-country__head {
-  display: grid;
-  gap: var(--am-space-12);
-  align-items: center;
-  grid-template-columns: auto minmax(0, 1fr) auto;
-}
-
-.am-j-flag {
-  display: inline-flex;
-  width: 48px;
-  height: 48px;
-  flex: none;
-  align-items: center;
-  justify-content: center;
-  border-radius: var(--am-radius-md);
-  background: var(--am-surface-brand);
-  font-size: 26px;
-  line-height: 1;
-}
-
-.am-j-flag[data-size="lg"] {
-  width: 72px;
-  height: 72px;
-  border-radius: var(--am-radius-lg);
-  font-size: 40px;
-}
-
-.am-j-country__name {
+.am-j-signlist__title {
   margin: 0;
-  font-family: var(--am-font-heading);
+  color: var(--am-sign-ink);
   font-size: var(--am-h4-size);
   font-weight: 700;
-  letter-spacing: var(--am-tracking-snug);
-  line-height: var(--am-h4-line);
+  letter-spacing: 0;
 }
 
-/* The whole card is the link target; the arrow is the affordance. */
-.am-j-country__name a {
-  color: inherit;
-  text-decoration: none;
-}
-
-.am-j-country__name a::after {
-  position: absolute;
-  inset: 0;
-  border-radius: var(--am-radius-card);
-  content: "";
-}
-
-.am-j-country__name a:hover {
-  color: var(--am-link-hover);
-}
-
-.am-j-country__name a:focus-visible {
-  outline: none;
-}
-
-.am-j-country:has(a:focus-visible) {
-  box-shadow: var(--am-ring);
-}
-
-.am-j-country__arrow {
-  display: inline-flex;
-  flex: none;
-  align-items: center;
-  justify-content: center;
-  color: var(--am-primary-600);
-  transition: transform var(--am-transition);
-}
-
-.am-j-country:hover .am-j-country__arrow {
-  transform: translateX(3px);
-}
-
-/** Hero aside of a country page: flag, name, availability, currency. */
-.am-j-countrycard {
-  display: grid;
-  gap: var(--am-space-16);
-  padding: var(--am-space-24);
-  border: 1px solid var(--am-border);
-  border-radius: var(--am-radius-panel);
-  background: var(--am-surface);
-  box-shadow: var(--am-shadow-xl);
-}
-
-.am-j-countrycard__head {
-  display: grid;
-  gap: var(--am-space-16);
-  align-items: center;
-  grid-template-columns: auto minmax(0, 1fr);
-}
-
-.am-j-countrycard__name {
+.am-j-signlist__lead {
+  max-width: 70ch;
   margin: 0;
-  font-family: var(--am-font-heading);
-  font-size: var(--am-h3-size);
-  font-weight: 800;
-  letter-spacing: var(--am-tracking-tight);
-  line-height: var(--am-h3-line);
+  color: var(--am-sign-ink-muted);
+  font-size: var(--am-small-size);
+  line-height: var(--am-small-line);
 }
 
-/* ==========================================================================
-   3. Product cards of a country
-   ========================================================================== */
+/* On a phone the sign's two actions share one width, one under the other. */
+@media (max-width: 519px) {
+  .am-j-sign .am-hero__actions > .am-button {
+    width: 100%;
+  }
+}
 
-.am-j-products {
+/* The product rows are the page's main action: a bigger tap target and a bigger name. */
+.am-j-signlist .am-directory__row {
+  min-height: 72px;
+}
+
+.am-j-signlist .am-directory__title {
+  font-size: 19px;
+}
+
+/* The direct shortcuts under the rows: "Comparer les offres  Assurance auto  Assurance voyage". */
+.am-j-shortcuts {
   display: grid;
-  gap: var(--am-space-20);
+  gap: 0;
   margin: 0;
   padding: 0;
-  grid-template-columns: repeat(auto-fit, minmax(min(100%, 320px), 1fr));
   list-style: none;
+  font-size: var(--am-small-size);
+  line-height: var(--am-small-line);
 }
 
-.am-j-product {
-  display: grid;
-  gap: var(--am-space-16);
-  align-content: start;
-  padding: var(--am-space-24);
-  border: 1px solid var(--am-border);
-  border-radius: var(--am-radius-card);
-  background: var(--am-surface);
-  box-shadow: var(--am-shadow-sm);
-  transition:
-    transform var(--am-transition),
-    box-shadow var(--am-transition),
-    border-color var(--am-transition);
-}
-
-.am-j-product:hover,
-.am-j-product:focus-within {
-  border-color: var(--am-primary-200);
-  box-shadow: var(--am-shadow-lg);
-  transform: translateY(-2px);
-}
-
-.am-j-product__head {
-  display: grid;
-  gap: var(--am-space-16);
+.am-j-shortcuts > li {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0 var(--am-space-20);
   align-items: center;
-  grid-template-columns: auto minmax(0, 1fr);
+  margin: 0;
 }
 
-.am-j-product__title {
-  margin: 0;
-  font-family: var(--am-font-heading);
-  font-size: var(--am-h3-size);
+.am-j-shortcuts__label {
+  flex-basis: 100%;
+  padding-top: var(--am-space-8);
+  color: var(--am-text-muted);
   font-weight: 700;
-  letter-spacing: var(--am-tracking-snug);
-  line-height: var(--am-h3-line);
 }
 
-.am-j-product__title a {
-  color: inherit;
-  text-decoration: none;
+@media (min-width: 640px) {
+  .am-j-shortcuts__label {
+    flex-basis: auto;
+    min-width: 12em;
+    padding-top: 0;
+  }
 }
 
-.am-j-product__title a:hover {
-  color: var(--am-link-hover);
-  text-decoration: underline;
-}
-
-.am-j-product__actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--am-space-12);
+.am-j-shortcuts a {
+  display: inline-flex;
+  min-height: 44px;
   align-items: center;
-  margin-top: auto;
+  color: var(--am-link);
+  font-weight: 700;
 }
 
-.am-j-product__hint {
+/* The way to the next stops, as directory rows. */
+.am-j-next {
+  display: grid;
+  gap: var(--am-space-16);
+}
+
+.am-j-next__title {
   margin: 0;
-  color: var(--am-text-subtle);
-  font-size: var(--am-caption-size);
-  line-height: var(--am-caption-line);
+  font-size: var(--am-h2-size);
+  line-height: var(--am-h2-line);
+}
+
+/* Waiting-list subscription plate on the sign. */
+.am-j-waitlist .am-field {
+  margin-bottom: 0;
 }
 
 /* ==========================================================================
-   4. Broker and insurer cards of a country
+   3. Insurer directory: one ruled row per insurer, one link per product
    ========================================================================== */
 
-.am-j-cardgrid {
-  display: grid;
-  gap: var(--am-space-20);
+.am-j-insurers {
   margin: 0;
   padding: 0;
-  grid-template-columns: repeat(auto-fill, minmax(min(100%, 300px), 1fr));
+  border-top: 1px solid var(--am-rule);
   list-style: none;
 }
 
-.am-j-cardgrid > li {
+@media (min-width: 900px) {
+  .am-j-insurers {
+    display: grid;
+    column-gap: var(--am-space-32);
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+.am-j-insurer {
   display: grid;
-  gap: var(--am-space-16);
-  align-content: start;
-  padding: var(--am-space-20);
-  border: 1px solid var(--am-border);
-  border-radius: var(--am-radius-card);
-  background: var(--am-surface);
-  box-shadow: var(--am-shadow-sm);
-  transition:
-    transform var(--am-transition),
-    box-shadow var(--am-transition),
-    border-color var(--am-transition);
+  gap: var(--am-space-4) var(--am-space-16);
+  align-items: start;
+  margin: 0;
+  padding: var(--am-space-16) var(--am-space-4) var(--am-space-8);
+  border-bottom: 1px solid var(--am-rule);
+  grid-template-columns: auto minmax(0, 1fr);
 }
 
-.am-j-cardgrid > li:hover,
-.am-j-cardgrid > li:focus-within {
-  border-color: var(--am-primary-200);
-  box-shadow: var(--am-shadow-lg);
-  transform: translateY(-2px);
-}
-
-/* The broker block carries its own frame: flatten it whenever it already sits inside a card. */
-.am-j-cardgrid .am-broker[data-variant="card"],
-.am-j-block > .am-broker,
-.am-j-detail__card .am-broker {
-  padding: 0;
-  border: 0;
-  background: none;
-  box-shadow: none;
-}
-
-.am-j-cardgrid__actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--am-space-12);
-  margin-top: auto;
+.am-j-insurer__text {
+  display: grid;
+  gap: var(--am-space-2);
+  min-width: 0;
 }
 
 .am-j-insurer__name {
   margin: 0;
-  font-family: var(--am-font-heading);
-  font-size: var(--am-h4-size);
+  color: var(--am-heading);
+  font-size: 18px;
   font-weight: 700;
-  letter-spacing: var(--am-tracking-snug);
-  line-height: var(--am-h4-line);
+  letter-spacing: 0;
+  line-height: 1.3;
 }
 
-.am-j-initials {
+.am-j-insurer__meta {
+  margin: 0;
+  color: var(--am-text-muted);
+  font-size: var(--am-small-size);
+  line-height: var(--am-small-line);
+}
+
+.am-j-insurer__links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0 var(--am-space-24);
+  align-items: center;
+  margin: var(--am-space-4) 0 0;
+  font-size: var(--am-small-size);
+}
+
+.am-j-insurer__label {
+  flex-basis: 100%;
+  color: var(--am-text-muted);
+  font-weight: 700;
+}
+
+.am-j-insurer__links a {
   display: inline-flex;
-  width: 44px;
-  height: 44px;
-  flex: none;
+  min-height: 44px;
+  gap: var(--am-space-6);
   align-items: center;
-  justify-content: center;
-  border-radius: var(--am-radius-md);
-  background: var(--am-surface-brand);
-  color: var(--am-primary-700);
-  font-family: var(--am-font-heading);
-  font-size: var(--am-caption-size);
-  font-weight: 800;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
+  font-weight: 700;
 }
 
-.am-j-insurer__head {
-  display: grid;
-  gap: var(--am-space-12);
+.am-j-insurer__links a > .am-icon {
+  transition: transform var(--am-duration-base) var(--am-ease-out);
+}
+
+.am-j-insurer__links a:hover > .am-icon,
+.am-j-insurer__links a:focus-visible > .am-icon {
+  transform: translateX(4px);
+}
+
+.am-j-insurer__plain {
+  display: inline-flex;
+  min-height: 44px;
   align-items: center;
-  grid-template-columns: auto minmax(0, 1fr);
+  color: var(--am-text-muted);
 }
 
 /* ==========================================================================
-   5. Offers list: filters, results header, offer card
+   4. Offers list: filters band, results header, the offer card, the bar
    ========================================================================== */
-
-.am-j-filters {
-  border: 1px solid var(--am-border);
-  border-radius: var(--am-radius-panel);
-  background: var(--am-surface);
-  box-shadow: var(--am-shadow-sm);
-  transition: box-shadow var(--am-transition);
-}
-
-.am-j-filters[open] {
-  box-shadow: var(--am-shadow-md);
-}
-
-.am-j-filters > summary {
-  display: flex;
-  min-height: 60px;
-  gap: var(--am-space-12);
-  align-items: center;
-  padding: var(--am-space-16) var(--am-space-24);
-  border-radius: var(--am-radius-panel);
-  color: var(--am-text);
-  cursor: pointer;
-  font-family: var(--am-font-heading);
-  font-size: var(--am-h4-size);
-  font-weight: 700;
-  list-style: none;
-}
-
-.am-j-filters > summary::-webkit-details-marker {
-  display: none;
-}
-
-.am-j-filters__chevron {
-  margin-left: auto;
-  color: var(--am-primary-600);
-  transition: transform var(--am-transition);
-}
-
-.am-j-filters[open] .am-j-filters__chevron {
-  transform: rotate(180deg);
-}
 
 .am-j-filters__form {
   display: grid;
-  gap: var(--am-space-24);
-  padding: 0 var(--am-space-24) var(--am-space-24);
+  gap: var(--am-space-4);
 }
 
 .am-j-filters__form fieldset {
@@ -821,43 +837,35 @@ html[data-js="true"] .am-j-nojs {
 }
 
 .am-j-filters__legend {
-  margin: 0 0 var(--am-space-12);
+  margin: 0 0 var(--am-space-4);
   padding: 0;
-  color: var(--am-primary-600);
-  font-size: var(--am-caption-size);
-  font-weight: 800;
-  letter-spacing: var(--am-tracking-wide);
-  line-height: var(--am-caption-line);
-  text-transform: uppercase;
+  color: var(--am-heading);
+  font-size: var(--am-h3-size);
+  font-weight: 700;
+  line-height: var(--am-h3-line);
 }
 
-/**
- * D-Filtres: the 4 primary filters are no longer folded behind a `<details>` - the panel itself is a
- * plain card around the form. `.am-j-filters__form` still supplies the grid/gap/fieldset rules above
- * (its selectors are written as descendants of that class); this rule only adds the card's own
- * padding and surface, later in the cascade so it wins over the asymmetric padding meant for the
- * former collapsed layout.
- */
-.am-j-filterspanel {
-  padding: var(--am-space-24);
-  border: 1px solid var(--am-border);
-  border-radius: var(--am-radius-panel);
-  background: var(--am-surface);
-  box-shadow: var(--am-shadow-sm);
+/* Under "Plus de filtres" the disclosure itself names the group: its legend stays for AT only. */
+.am-j-more__body .am-j-filters__legend {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
 }
 
 .am-j-filters__hint {
+  max-width: 68ch;
   margin: 0 0 var(--am-space-16);
-  color: var(--am-text-subtle);
-  font-size: var(--am-caption-size);
-  line-height: var(--am-caption-line);
+  color: var(--am-text-muted);
+  font-size: var(--am-small-size);
+  line-height: var(--am-small-line);
 }
 
-/**
- * "Plus de filtres" / "Moins de filtres" toggle text (charte 5): both spans render so the label still
- * makes sense without `:has()` support, and only the one matching the disclosure's own `[open]`
- * state is shown, the same technique as the "Ajouter/Retirer de la comparaison" chip below.
- */
+/* "Plus de filtres" / "Moins de filtres": the label matching the disclosure's own state. */
 .am-j-filters-more__open {
   display: none;
 }
@@ -870,9 +878,11 @@ html[data-js="true"] .am-j-nojs {
   display: inline;
 }
 
+/* `start`: a field never stretches to the height of a neighbour with a longer hint. */
 .am-j-fieldgrid {
   display: grid;
-  gap: var(--am-space-16);
+  gap: 0 var(--am-space-20);
+  align-items: start;
   grid-template-columns: minmax(0, 1fr);
 }
 
@@ -886,30 +896,36 @@ html[data-js="true"] .am-j-nojs {
   .am-j-fieldgrid {
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
-
-  .am-j-fieldgrid[data-columns="2"] {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
 }
 
 .am-j-filters__actions {
   display: flex;
   flex-wrap: wrap;
-  gap: var(--am-space-12);
+  gap: var(--am-space-8) var(--am-space-24);
   align-items: center;
-  padding-top: var(--am-space-8);
-  border-top: 1px solid var(--am-border);
+  margin-top: var(--am-space-16);
 }
 
+@media (max-width: 479px) {
+  .am-j-filters__actions > .am-button:not([data-variant="tertiary"]) {
+    width: 100%;
+  }
+}
+
+/* Results header: the count, then the order you read them in; a navy rule under it. */
 .am-j-results {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--am-space-8) var(--am-space-20);
-  align-items: baseline;
-  justify-content: space-between;
+  display: grid;
+  gap: var(--am-space-16);
   margin-bottom: var(--am-space-20);
-  padding-bottom: var(--am-space-12);
-  border-bottom: 1px solid var(--am-border);
+  padding-bottom: var(--am-space-16);
+  border-bottom: 2px solid var(--am-primary-800);
+}
+
+@media (min-width: 900px) {
+  .am-j-results {
+    align-items: end;
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
 }
 
 .am-j-results__lead {
@@ -919,216 +935,291 @@ html[data-js="true"] .am-j-nojs {
 
 .am-j-results__count {
   margin: 0;
-  font-family: var(--am-font-heading);
-  font-size: var(--am-h4-size);
+  color: var(--am-heading);
+  font-size: var(--am-h3-size);
   font-weight: 700;
+  line-height: var(--am-h3-line);
 }
 
-/** 1-selection helper text next to the results count (D-Comparaison); an `aria-live` region. */
+/* 1-selection helper next to the count (D-Comparaison), an `aria-live` region. */
 .am-j-selection-assist {
+  max-width: 60ch;
   margin: 0;
-  color: var(--am-primary-700);
-  font-size: var(--am-caption-size);
+  color: var(--am-heading);
+  font-size: var(--am-small-size);
   font-weight: 700;
-  line-height: var(--am-caption-line);
-}
-
-.am-j-results__sort {
-  margin: 0;
-  color: var(--am-text-subtle);
-  font-size: var(--am-caption-size);
-  line-height: var(--am-caption-line);
-}
-
-/**
- * Sorting sits in the results header, not inside the collapsed filter panel: it answers "in which
- * order am I reading these offers", which only makes sense next to the count. It is a plain GET
- * form carrying the active filters as hidden inputs, so it works with JavaScript switched off.
- */
-.am-j-results:has(.am-j-sortform) {
-  align-items: end;
+  line-height: var(--am-small-line);
 }
 
 .am-j-sortform {
-  display: flex;
-  flex-wrap: wrap;
+  display: grid;
   gap: var(--am-space-12);
   align-items: end;
-  margin-left: auto;
+}
+
+@media (min-width: 600px) {
+  .am-j-sortform {
+    grid-template-columns: repeat(2, minmax(200px, 1fr)) auto;
+  }
 }
 
 .am-j-sortform .am-field {
-  min-width: 180px;
   margin: 0;
-}
-
-.am-j-sortform .am-field__label {
-  font-size: var(--am-caption-size);
-}
-
-.am-j-sortform .am-field__control {
-  min-height: 44px;
-  padding-top: var(--am-space-8);
-  padding-bottom: var(--am-space-8);
-  font-size: var(--am-caption-size);
-}
-
-@media (max-width: 599px) {
-  .am-j-sortform {
-    width: 100%;
-    margin-left: 0;
-  }
-
-  .am-j-sortform .am-field {
-    flex: 1 1 100%;
-    min-width: 0;
-  }
 }
 
 .am-j-offers {
   display: grid;
-  gap: var(--am-space-20);
+  gap: var(--am-space-16);
 }
 
+/**
+ * One indicative offer. Every card has the same structure in the same order, and the fact grid
+ * has a fixed template, so on a list of cards of the same width the columns read across.
+ */
 .am-j-offer {
   display: grid;
   gap: var(--am-space-16);
-  padding: var(--am-space-20);
-  border: 1px solid var(--am-border);
+  padding: var(--am-space-16);
+  border: 1px solid var(--am-border-strong);
   border-radius: var(--am-radius-card);
   background: var(--am-surface);
-  box-shadow: var(--am-shadow-sm);
-  transition:
-    box-shadow var(--am-transition),
-    border-color var(--am-transition);
-}
-
-.am-j-offer:hover,
-.am-j-offer:focus-within {
-  border-color: var(--am-primary-200);
-  box-shadow: var(--am-shadow-md);
-}
-
-.am-j-offer:has(input[name="ids"]:checked) {
-  border-color: var(--am-primary-500);
-  box-shadow: var(--am-shadow-glow-soft);
 }
 
 @media (min-width: 768px) {
   .am-j-offer {
+    gap: var(--am-space-20);
     padding: var(--am-space-24);
   }
 }
 
-.am-j-offer__top {
-  display: grid;
-  gap: var(--am-space-12) var(--am-space-20);
-  align-items: start;
-  grid-template-columns: minmax(0, 1fr);
+/* Sponsored: the orange of the palette outlines the card, the label says the word. */
+.am-j-offer[data-sponsored="true"] {
+  border-color: var(--am-warning-600);
 }
 
-@media (min-width: 680px) {
-  .am-j-offer__top {
-    grid-template-columns: minmax(0, 1fr) auto;
-  }
+.am-j-offer:has(input[name="ids"]:checked) {
+  border-color: var(--am-action);
+  box-shadow: inset 0 0 0 1px var(--am-action);
+}
+
+.am-j-offer__head {
+  display: grid;
+  gap: var(--am-space-12) var(--am-space-16);
+  align-items: start;
+  grid-template-columns: minmax(0, 1fr) auto;
 }
 
 .am-j-offer__ident {
   display: grid;
-  gap: var(--am-space-8);
+  gap: var(--am-space-6);
+  justify-items: start;
   min-width: 0;
-}
-
-.am-j-offer__titlerow {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--am-space-8) var(--am-space-12);
-  align-items: center;
 }
 
 .am-j-offer__name {
   margin: 0;
-  font-family: var(--am-font-heading);
+  color: var(--am-heading);
   font-size: var(--am-h3-size);
-  font-weight: 700;
-  letter-spacing: var(--am-tracking-snug);
   line-height: var(--am-h3-line);
 }
 
-.am-j-offer__side {
-  display: flex;
-  flex-wrap: wrap;
+.am-j-offer__updated {
+  margin: 0;
+  color: var(--am-text-muted);
+  font-size: var(--am-caption-size);
+  line-height: var(--am-caption-line);
+}
+
+.am-j-offer__body {
+  display: grid;
+  gap: var(--am-space-16);
+}
+
+@media (min-width: 768px) {
+  .am-j-offer__body {
+    gap: var(--am-space-24);
+    align-items: start;
+    grid-template-columns: minmax(220px, 260px) minmax(0, 1fr);
+  }
+}
+
+/* The dashed indicative price: amount, the offer's own label, who confirms it. */
+.am-j-price {
+  display: grid;
+  gap: var(--am-space-4);
+  align-content: start;
+  padding: var(--am-space-16);
+  border: 1px dashed var(--am-primary-800);
+  border-radius: var(--am-radius-sm);
+  background: var(--am-surface);
+}
+
+.am-j-price__label {
+  margin: 0;
+  color: var(--am-heading);
+  font-size: var(--am-small-size);
+  font-weight: 700;
+  line-height: var(--am-small-line);
+}
+
+.am-j-price__amount {
+  margin: 0;
+  color: var(--am-heading);
+  font-size: clamp(22px, 1.1rem + 0.9vw, 28px);
+  font-weight: 800;
+  letter-spacing: var(--am-tracking-tight);
+  line-height: 1.15;
+}
+
+.am-j-price__note {
+  margin: 0;
+  color: var(--am-text-muted);
+  font-size: var(--am-caption-size);
+  line-height: var(--am-caption-line);
+}
+
+.am-j-price__notice {
+  margin: var(--am-space-8) 0 0;
+  padding-top: var(--am-space-8);
+  border-top: 1px dashed var(--am-neutral-300);
+  color: var(--am-text);
+  font-size: var(--am-caption-size);
+  font-weight: 700;
+  line-height: var(--am-caption-line);
+}
+
+/* The fixed label grid: two columns on a phone, three from 1000px. */
+.am-j-offer__grid {
+  display: grid;
+  margin: 0;
+  border-top: 1px solid var(--am-rule);
+  column-gap: var(--am-space-16);
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+@media (min-width: 1000px) {
+  .am-j-offer__grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+.am-j-offer__cell {
+  min-width: 0;
+  padding: var(--am-space-10) 0;
+  border-bottom: 1px solid var(--am-rule);
+}
+
+.am-j-offer__cell dt {
+  color: var(--am-text-muted);
+  font-size: var(--am-caption-size);
+  font-weight: 700;
+  line-height: var(--am-caption-line);
+}
+
+.am-j-offer__cell dd {
+  margin: var(--am-space-2) 0 0;
+  color: var(--am-text);
+  font-size: var(--am-small-size);
+  font-weight: 700;
+  line-height: var(--am-small-line);
+  overflow-wrap: break-word;
+}
+
+.am-j-offer__summary {
+  max-width: 76ch;
+  margin: 0;
+  color: var(--am-text-muted);
+}
+
+.am-j-offer__disclaimer {
+  margin: 0;
+  color: var(--am-text-muted);
+  font-size: var(--am-caption-size);
+  line-height: var(--am-caption-line);
+}
+
+.am-j-offer__foot {
+  display: grid;
   gap: var(--am-space-12);
-  align-items: center;
+  padding-top: var(--am-space-16);
+  border-top: 1px solid var(--am-rule);
 }
 
 @media (min-width: 680px) {
-  .am-j-offer__side {
+  .am-j-offer__foot {
+    align-items: center;
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+}
+
+.am-j-offer__actions {
+  display: grid;
+  gap: var(--am-space-12);
+}
+
+@media (min-width: 480px) {
+  .am-j-offer__actions {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (min-width: 680px) {
+  .am-j-offer__actions {
+    display: flex;
+    flex-wrap: wrap;
     justify-content: flex-end;
   }
 }
 
-/** Checkbox dressed as a selection chip; it stays a real checkbox for keyboard and no-JS use. */
+/* The compare checkbox, dressed as a selection control; still a real checkbox without JS. */
 .am-j-pick {
   display: inline-flex;
-  min-height: 44px;
-  gap: var(--am-space-8);
+  min-height: 48px;
+  gap: var(--am-space-10);
   align-items: center;
   padding: var(--am-space-8) var(--am-space-16);
-  border: 1px solid var(--am-border-strong);
-  border-radius: var(--am-radius-pill);
+  border: 1px solid var(--am-neutral-500);
+  border-radius: var(--am-radius-field);
   background: var(--am-surface);
-  color: var(--am-text-muted);
+  color: var(--am-text);
   cursor: pointer;
-  font-size: var(--am-caption-size);
+  font-size: var(--am-small-size);
   font-weight: 700;
-  line-height: var(--am-caption-line);
+  line-height: var(--am-small-line);
   transition:
     border-color var(--am-transition),
-    background-color var(--am-transition),
-    color var(--am-transition);
+    background-color var(--am-transition);
 }
 
 .am-j-pick:hover {
-  border-color: var(--am-primary-300);
-  background: var(--am-primary-50);
-  color: var(--am-primary-700);
+  border-color: var(--am-action);
 }
 
 .am-j-pick:has(input:checked) {
-  border-color: var(--am-primary-600);
+  border-color: var(--am-action);
   background: var(--am-primary-50);
+  box-shadow: inset 0 0 0 1px var(--am-action);
   color: var(--am-primary-700);
 }
 
 .am-j-pick:has(input:focus-visible) {
-  box-shadow: var(--am-ring);
+  outline: 3px solid var(--am-primary-600);
+  outline-offset: 2px;
 }
 
-/** 4-offer cap (D-Comparaison): the remaining, unchecked chips grey out rather than disappear. */
+/* 4-offer cap (D-Comparaison): the free boxes grey out, readable, rather than disappear. */
 .am-j-pick:has(input:disabled) {
+  border-color: var(--am-neutral-300);
+  background: var(--am-neutral-100);
+  color: var(--am-neutral-600);
   cursor: not-allowed;
-  opacity: 0.55;
-}
-
-.am-j-pick:has(input:disabled):hover {
-  border-color: var(--am-border-strong);
-  background: var(--am-surface);
-  color: var(--am-text-muted);
 }
 
 .am-j-pick > input {
-  width: 18px;
-  height: 18px;
-  flex: none;
   margin: 0;
-  accent-color: var(--am-primary-600);
 }
 
-/**
- * One chip, two words: "Ajouter a la comparaison" while it is free, "Selectionnee" once it is
- * ticked. Both labels are rendered so a browser without `:has()` still shows a usable chip.
- */
+/* One control, two words: "Ajouter à la comparaison" / "Retirer de la comparaison". */
 .am-j-pick__on {
   display: none;
 }
@@ -1141,179 +1232,20 @@ html[data-js="true"] .am-j-nojs {
   display: inline;
 }
 
-@media (max-width: 479px) {
+@media (max-width: 679px) {
   .am-j-pick {
     width: 100%;
   }
 }
 
-.am-j-offer__summary {
-  max-width: 76ch;
-  margin: 0;
-  color: var(--am-text-muted);
-}
-
-/** Last-update line at the card's first level (FR-011), outside the "Voir plus" drawer. */
-.am-j-updated {
-  display: flex;
-  gap: var(--am-space-6);
-  align-items: center;
-  margin: 0;
-  color: var(--am-text-subtle);
-  font-size: var(--am-caption-size);
-  line-height: var(--am-caption-line);
-}
-
-.am-j-updated .am-icon {
-  flex: none;
-  color: var(--am-neutral-400);
-}
-
-.am-j-offer__body {
-  display: grid;
-  gap: var(--am-space-16);
-  grid-template-columns: minmax(0, 1fr);
-}
-
-@media (min-width: 768px) {
-  .am-j-offer__body {
-    /* Both columns stretch: the four fact tiles fill the height of the price panel. */
-    align-items: stretch;
-    grid-template-columns: minmax(220px, 280px) minmax(0, 1fr);
-  }
-}
-
-.am-j-price {
-  display: grid;
-  gap: var(--am-space-8);
-  align-content: start;
-  padding: var(--am-space-16);
-  border: 1px solid var(--am-border-brand);
-  border-radius: var(--am-radius-md);
-  background: var(--am-surface-brand);
-}
-
-.am-j-price__label {
-  margin: 0;
-  color: var(--am-primary-700);
-  font-size: var(--am-caption-size);
-  font-weight: 700;
-  letter-spacing: var(--am-tracking-wide);
-  line-height: var(--am-caption-line);
-  text-transform: uppercase;
-}
-
-.am-j-price__amount {
-  margin: 0;
-  color: var(--am-primary-800);
-  font-family: var(--am-font-heading);
-  font-size: clamp(22px, 1.1rem + 1vw, 28px);
-  font-weight: 800;
-  letter-spacing: var(--am-tracking-tight);
-  line-height: 1.15;
-  overflow-wrap: anywhere;
-}
-
-.am-j-price__note {
-  margin: 0;
-  color: var(--am-text-muted);
-  font-size: var(--am-caption-size);
-  line-height: var(--am-caption-line);
-}
-
 /**
- * Two by two at every width, so the block lines up with the price panel beside it. The rows stretch
- * rather than sit at the top: next to a taller price panel the four tiles fill the same height
- * instead of leaving a gap underneath.
- */
-.am-j-facts {
-  display: grid;
-  gap: var(--am-space-12);
-  align-content: stretch;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-}
-
-/* Under 400px two columns leave about 110px per tile: an amount no longer fits on one line. */
-@media (max-width: 399px) {
-  .am-j-facts {
-    grid-template-columns: minmax(0, 1fr);
-  }
-}
-
-.am-j-fact {
-  display: grid;
-  gap: var(--am-space-4);
-  align-content: center;
-  padding: var(--am-space-12);
-  border: 1px solid var(--am-border);
-  border-radius: var(--am-radius-md);
-  background: var(--am-neutral-50);
-}
-
-.am-j-fact__label {
-  display: flex;
-  gap: var(--am-space-6);
-  align-items: center;
-  margin: 0;
-  color: var(--am-text-subtle);
-  font-size: var(--am-caption-size);
-  line-height: var(--am-caption-line);
-}
-
-.am-j-fact__label .am-icon {
-  flex: none;
-  color: var(--am-neutral-400);
-}
-
-.am-j-fact__value {
-  margin: 0;
-  color: var(--am-text);
-  font-size: var(--am-small-size);
-  font-weight: 700;
-  line-height: var(--am-small-line);
-  /*
-   * An amount breaks at a space or not at all: "1 500 000" split mid-number ("1 500 0" / "00")
-   * reads as a different figure. The tile stacks to one column under 400px instead.
-   */
-  overflow-wrap: normal;
-  word-break: normal;
-  hyphens: none;
-}
-
-.am-j-offer__disclaimer {
-  margin: 0;
-  color: var(--am-text-subtle);
-  font-size: var(--am-caption-size);
-  line-height: var(--am-caption-line);
-}
-
-.am-j-offer__actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--am-space-12);
-  align-items: center;
-  padding-top: var(--am-space-16);
-  border-top: 1px solid var(--am-border);
-}
-
-@media (min-width: 680px) {
-  .am-j-offer__actions {
-    justify-content: flex-end;
-  }
-}
-
-/**
- * Floating comparison bar.
- *
- * The primitive is `position: sticky`, and a sticky box can only float inside its own parent. The
- * bar is wrapped in a container so it lines up with the page grid, so the container carries the
- * stickiness - its parent is `main`, which spans the whole list - and the bar itself goes back to
- * the normal flow inside it. `am-j-pad-bottom` on the last section reserves the room underneath so
- * the bar never covers the last card's actions.
+ * Docked comparison bar. A sticky box only floats inside its own parent, so the container that lines
+ * the bar up with the page grid carries the stickiness and the bar goes back to the normal flow
+ * inside it; `am-j-pad-bottom` keeps the room under the last card.
  */
 .am-j-barwrap {
   position: sticky;
-  bottom: var(--am-space-16);
+  bottom: var(--am-space-12);
   z-index: var(--am-z-sticky);
 }
 
@@ -1321,51 +1253,60 @@ html[data-js="true"] .am-j-nojs {
   position: static;
 }
 
+/* While the bar is docked, a control that receives focus scrolls clear of it (WCAG 2.4.11). */
+html:has(.am-j-barwrap .am-comparebar) {
+  scroll-padding-bottom: calc(140px + var(--am-space-24));
+}
+
+@media (min-width: 681px) {
+  html:has(.am-j-barwrap .am-comparebar) {
+    scroll-padding-bottom: calc(80px + var(--am-space-24));
+  }
+}
+
 .am-j-pad-bottom {
   padding-bottom: var(--am-space-80);
 }
 
-.am-j-tail {
-  display: grid;
-  gap: var(--am-space-16);
-  margin-top: var(--am-space-32);
-}
-
-/** Reading column for the form-driven pages: wider than `--narrow`, far from full bleed. */
-.am-j-column {
-  width: 100%;
-  max-width: 880px;
-  margin-inline: auto;
-}
-
 /* ==========================================================================
-   6. Offer detail
+   5. Offer detail and broker profile: a facts column and a side column
    ========================================================================== */
 
 .am-j-detail {
   display: grid;
-  gap: var(--am-space-24);
+  gap: var(--am-space-40);
   align-items: start;
-  grid-template-columns: minmax(0, 1fr);
 }
 
 @media (min-width: 980px) {
   .am-j-detail {
-    gap: var(--am-space-32);
+    gap: var(--am-space-56);
     grid-template-columns: minmax(0, 1fr) minmax(300px, 360px);
+  }
+
+  /* The offer detail prints its side column first (price and quote before the facts on a phone). */
+  .am-j-detail > .am-j-detail__aside:first-child {
+    grid-column: 2;
+    grid-row: 1;
+  }
+
+  .am-j-detail > .am-j-detail__aside:first-child + .am-j-detail__main {
+    grid-column: 1;
+    grid-row: 1;
   }
 }
 
 .am-j-detail__main {
   display: grid;
-  gap: var(--am-space-24);
+  gap: var(--am-space-48);
   min-width: 0;
 }
 
 .am-j-detail__aside {
   display: grid;
-  gap: var(--am-space-16);
+  gap: var(--am-space-20);
   align-content: start;
+  min-width: 0;
 }
 
 @media (min-width: 980px) {
@@ -1373,16 +1314,6 @@ html[data-js="true"] .am-j-nojs {
     position: sticky;
     top: calc(var(--am-header) + var(--am-space-20));
   }
-}
-
-.am-j-detail__card {
-  display: grid;
-  gap: var(--am-space-16);
-  padding: var(--am-space-24);
-  border: 1px solid var(--am-border);
-  border-radius: var(--am-radius-panel);
-  background: var(--am-surface);
-  box-shadow: var(--am-shadow-lg);
 }
 
 .am-j-detail__actions {
@@ -1394,56 +1325,22 @@ html[data-js="true"] .am-j-nojs {
   width: 100%;
 }
 
-.am-j-block {
-  display: grid;
-  gap: var(--am-space-12);
-  padding: var(--am-space-20);
-  border: 1px solid var(--am-border);
-  border-radius: var(--am-radius-card);
-  background: var(--am-surface);
-  box-shadow: var(--am-shadow-xs);
+.am-j-detail__broker {
+  margin-top: var(--am-space-16);
 }
 
-.am-j-block__title {
+.am-j-detail__brokername {
   margin: 0;
-  font-family: var(--am-font-heading);
+  color: var(--am-heading);
   font-size: var(--am-h4-size);
   font-weight: 700;
-  letter-spacing: var(--am-tracking-snug);
-  line-height: var(--am-h4-line);
-}
-
-.am-j-list {
-  display: grid;
-  gap: var(--am-space-8);
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-
-.am-j-list > li {
-  display: grid;
-  gap: var(--am-space-10);
-  align-items: start;
-  grid-template-columns: auto minmax(0, 1fr);
-  color: var(--am-text-muted);
-  font-size: var(--am-small-size);
-  line-height: var(--am-small-line);
-}
-
-.am-j-list > li > .am-icon {
-  margin-top: 2px;
-  flex: none;
-  color: var(--am-primary-600);
 }
 
 /* ==========================================================================
-   7. Comparator table
+   6. Comparator: desktop table, phone criteria blocks, score cards
    ========================================================================== */
 
 .am-j-compare {
-  border-collapse: separate;
-  border-spacing: 0;
   min-width: 720px;
 }
 
@@ -1453,22 +1350,20 @@ html[data-js="true"] .am-j-nojs {
 }
 
 .am-j-compare thead th {
-  white-space: normal;
-  text-transform: none;
-  letter-spacing: var(--am-tracking-snug);
+  color: var(--am-heading);
   font-size: var(--am-small-size);
-  color: var(--am-text);
   vertical-align: bottom;
+  white-space: normal;
 }
 
-/* First column stays visible while the offer columns scroll sideways. */
+/* The criterion column stays put while the offer columns scroll sideways. */
 .am-j-compare thead th:first-child,
 .am-j-compare tbody th {
   position: sticky;
   left: 0;
   z-index: var(--am-z-raised);
   min-width: 190px;
-  background: var(--am-neutral-50);
+  background: var(--am-surface);
   box-shadow: 1px 0 0 var(--am-border);
 }
 
@@ -1483,8 +1378,7 @@ html[data-js="true"] .am-j-nojs {
 }
 
 .am-j-compare__name {
-  margin: 0;
-  font-family: var(--am-font-heading);
+  color: var(--am-heading);
   font-size: var(--am-body-size);
   font-weight: 700;
   line-height: 1.3;
@@ -1493,27 +1387,25 @@ html[data-js="true"] .am-j-nojs {
 .am-j-compare__rowhint {
   max-width: 32ch;
   margin: var(--am-space-4) 0 0;
-  color: var(--am-text-subtle);
+  color: var(--am-text-muted);
   font-size: var(--am-caption-size);
   font-weight: 400;
   line-height: var(--am-caption-line);
-  text-transform: none;
-  letter-spacing: normal;
 }
 
 /**
- * The most favourable value of a numeric row (lowest price/deductible, highest ceiling, shortest
- * delay) is highlighted (`content/02`): the brand tint, never the success/green reserved for
- * validation, since this is a factual comparison, not an approval.
+ * The most favourable value of a numeric row (lowest price or deductible, highest ceiling, shortest
+ * delay): a factual comparison, never an approval, so the pale band and bold navy, never green.
  */
 .am-j-compare td[data-highlight="true"] {
-  background: var(--am-surface-brand);
-  font-weight: 700;
+  background: var(--am-band);
+  color: var(--am-heading);
+  font-weight: 800;
 }
 
 .am-j-scroll-hint {
   margin: 0 0 var(--am-space-12);
-  color: var(--am-text-subtle);
+  color: var(--am-text-muted);
   font-size: var(--am-caption-size);
   line-height: var(--am-caption-line);
 }
@@ -1524,10 +1416,7 @@ html[data-js="true"] .am-j-nojs {
   }
 }
 
-/**
- * FR-013: below 768px the table is replaced by one card per criterion, offers stacked inside with no
- * horizontal scroll at all; both structures are rendered, only one is ever visible.
- */
+/* FR-013: under 768px the table gives way to one ruled block per criterion, no sideways scroll. */
 .am-j-compare-mobile {
   display: none;
 }
@@ -1539,38 +1428,34 @@ html[data-js="true"] .am-j-nojs {
 
   .am-j-compare-mobile {
     display: grid;
-    gap: var(--am-space-16);
+    gap: var(--am-space-32);
   }
 }
 
 .am-j-comparecard {
   display: grid;
-  gap: var(--am-space-12);
-  padding: var(--am-space-16);
-  border: 1px solid var(--am-border);
-  border-radius: var(--am-radius-card);
-  background: var(--am-surface);
-  box-shadow: var(--am-shadow-xs);
+  gap: var(--am-space-8);
 }
 
 .am-j-comparecard__title {
   margin: 0;
-  font-family: var(--am-font-heading);
+  padding-bottom: var(--am-space-8);
+  border-bottom: 2px solid var(--am-primary-800);
+  color: var(--am-heading);
   font-size: var(--am-h4-size);
   font-weight: 700;
+  letter-spacing: 0;
   line-height: var(--am-h4-line);
 }
 
 .am-j-comparecard__hint {
   margin: 0;
-  color: var(--am-text-subtle);
+  color: var(--am-text-muted);
   font-size: var(--am-caption-size);
   line-height: var(--am-caption-line);
 }
 
 .am-j-comparecard__rows {
-  display: grid;
-  gap: 0;
   margin: 0;
   padding: 0;
   list-style: none;
@@ -1579,21 +1464,18 @@ html[data-js="true"] .am-j-nojs {
 .am-j-comparecard__row {
   display: flex;
   flex-wrap: wrap;
-  gap: var(--am-space-8) var(--am-space-12);
+  gap: var(--am-space-4) var(--am-space-12);
   align-items: baseline;
   justify-content: space-between;
+  margin: 0;
   padding: var(--am-space-10) 0;
-  border-top: 1px solid var(--am-border);
-}
-
-.am-j-comparecard__row:first-child {
-  border-top: 0;
+  border-bottom: 1px solid var(--am-rule);
 }
 
 .am-j-comparecard__row[data-highlight="true"] {
-  padding-inline: var(--am-space-12);
-  border-radius: var(--am-radius-sm);
-  background: var(--am-surface-brand);
+  margin-inline: calc(var(--am-space-8) * -1);
+  padding-inline: var(--am-space-8);
+  background: var(--am-band);
 }
 
 .am-j-comparecard__name {
@@ -1608,33 +1490,39 @@ html[data-js="true"] .am-j-nojs {
 
 .am-j-comparecard__value {
   color: var(--am-text);
-  font-weight: 700;
   font-size: var(--am-small-size);
+  font-weight: 700;
   text-align: right;
 }
 
 .am-j-comparecard__row[data-highlight="true"] .am-j-comparecard__value {
-  color: var(--am-primary-800);
+  color: var(--am-heading);
+  font-weight: 800;
 }
 
 .am-j-scorecards {
   display: grid;
-  gap: var(--am-space-20);
+  gap: var(--am-space-16);
   margin: 0;
   padding: 0;
   grid-template-columns: repeat(auto-fit, minmax(min(100%, 320px), 1fr));
   list-style: none;
 }
 
+/* One offer's score: a genuine object, so a plain bordered panel. */
 .am-j-scorecard {
   display: grid;
-  gap: var(--am-space-16);
+  gap: var(--am-space-12);
   align-content: start;
+  margin: 0;
   padding: var(--am-space-20);
-  border: 1px solid var(--am-border);
+  border: 1px solid var(--am-border-strong);
   border-radius: var(--am-radius-card);
   background: var(--am-surface);
-  box-shadow: var(--am-shadow-sm);
+}
+
+.am-j-scorecard > .am-badge {
+  justify-self: start;
 }
 
 .am-j-scorecard__head {
@@ -1647,69 +1535,24 @@ html[data-js="true"] .am-j-nojs {
 
 .am-j-scorecard__title {
   margin: 0;
-  font-family: var(--am-font-heading);
   font-size: var(--am-h4-size);
-  font-weight: 700;
-  line-height: var(--am-h4-line);
+  letter-spacing: 0;
 }
 
 /* ==========================================================================
-   8. Quote form
+   7. Forms shared by the journey (quote, waiting list, document upload)
    ========================================================================== */
 
-.am-j-form {
-  display: grid;
-  gap: var(--am-space-32);
-  padding: var(--am-space-24);
-  border: 1px solid var(--am-border);
-  border-radius: var(--am-radius-panel);
-  background: var(--am-surface);
-  box-shadow: var(--am-shadow-md);
-}
-
-@media (min-width: 768px) {
-  .am-j-form {
-    padding: var(--am-space-32);
-  }
-}
-
-.am-j-form fieldset {
-  min-width: 0;
+.am-j-panel__lead {
+  max-width: 68ch;
   margin: 0;
-  padding: 0;
-  border: 0;
-}
-
-.am-j-form__legend {
-  display: flex;
-  gap: var(--am-space-12);
-  align-items: center;
-  width: 100%;
-  margin: 0 0 var(--am-space-16);
-  padding: 0;
-  font-family: var(--am-font-heading);
-  font-size: var(--am-h4-size);
-  font-weight: 700;
-  letter-spacing: var(--am-tracking-snug);
-}
-
-.am-j-form__step {
-  display: inline-flex;
-  width: 32px;
-  height: 32px;
-  flex: none;
-  align-items: center;
-  justify-content: center;
-  border-radius: var(--am-radius-pill);
-  background: var(--am-surface-brand);
-  color: var(--am-primary-700);
-  font-size: var(--am-caption-size);
-  font-weight: 800;
+  color: var(--am-text-muted);
 }
 
 .am-j-form__grid {
   display: grid;
-  gap: var(--am-space-16);
+  gap: 0 var(--am-space-20);
+  align-items: start;
   grid-template-columns: minmax(0, 1fr);
 }
 
@@ -1724,238 +1567,160 @@ html[data-js="true"] .am-j-nojs {
   gap: var(--am-space-12);
 }
 
-/** Consent row as a card: a 44px tap target, never pre-ticked. */
+/* A consent row: a 44px+ tap target, never pre-ticked; ticking it is an action, so blue. */
 .am-j-consent {
   display: grid;
   gap: var(--am-space-12);
   align-items: start;
-  grid-template-columns: auto minmax(0, 1fr);
-  padding: var(--am-space-16);
-  border: 1px solid var(--am-border-strong);
-  border-radius: var(--am-radius-md);
-  background: var(--am-neutral-50);
-  color: var(--am-text-muted);
+  margin: 0;
+  padding: var(--am-space-12) var(--am-space-16);
+  border: 1px solid var(--am-neutral-500);
+  border-radius: var(--am-radius-sm);
+  background: var(--am-surface);
+  color: var(--am-text);
   cursor: pointer;
   font-size: var(--am-small-size);
+  font-weight: 400;
   line-height: var(--am-small-line);
-  transition:
-    border-color var(--am-transition),
-    background-color var(--am-transition);
+  grid-template-columns: auto minmax(0, 1fr);
+  transition: border-color var(--am-transition);
 }
 
 .am-j-consent:hover {
-  border-color: var(--am-primary-300);
-  background: var(--am-primary-50);
+  border-color: var(--am-action);
 }
 
 .am-j-consent:has(input:checked) {
-  border-color: var(--am-primary-500);
-  background: var(--am-surface-brand);
-  color: var(--am-text);
+  border-color: var(--am-action);
+  box-shadow: inset 0 0 0 1px var(--am-action);
 }
 
 .am-j-consent:has(input:focus-visible) {
-  box-shadow: var(--am-ring);
+  outline: 3px solid var(--am-primary-600);
+  outline-offset: 2px;
 }
 
 .am-j-consent > input {
-  width: 20px;
-  height: 20px;
-  margin: 2px 0 0;
-  accent-color: var(--am-primary-600);
+  margin: 1px 0 0;
 }
 
-.am-j-form__footer {
-  display: grid;
-  gap: var(--am-space-12);
-  padding-top: var(--am-space-20);
-  border-top: 1px solid var(--am-border);
-}
-
-.am-j-form__footer .am-button {
-  justify-self: start;
-}
-
-@media (max-width: 520px) {
-  .am-j-form__footer .am-button {
-    width: 100%;
-  }
-}
-
-.am-j-fineprint {
-  max-width: 76ch;
-  margin: 0;
-  color: var(--am-text-subtle);
-  font-size: var(--am-caption-size);
-  line-height: var(--am-caption-line);
-}
-
-.am-j-assist {
+/* Optional document upload: a plain form under its heading, on the page band. */
+.am-j-upload {
   display: grid;
   gap: var(--am-space-16);
+  padding-top: var(--am-space-24);
+  border-top: 1px solid var(--am-rule);
 }
 
-/**
- * Confirmation panel of a sent quote request. It replaces the form rather than sitting under it:
- * a form left on screen next to "demande recue" invites a second, identical request.
- */
-.am-j-sent {
-  display: grid;
-  gap: var(--am-space-16);
-  justify-items: start;
-  padding: var(--am-space-24);
-  border: 1px solid var(--am-border);
-  border-radius: var(--am-radius-panel);
-  background: var(--am-surface);
-  box-shadow: var(--am-shadow-md);
-}
-
-@media (min-width: 768px) {
-  .am-j-sent {
-    padding: var(--am-space-32);
-  }
-}
-
-.am-j-sent__title {
+.am-j-upload__title {
   margin: 0;
-  font-family: var(--am-font-heading);
   font-size: var(--am-h3-size);
-  font-weight: 800;
-  letter-spacing: var(--am-tracking-tight);
-  line-height: var(--am-h3-line);
 }
 
-.am-j-sent > .am-j-reference {
-  width: 100%;
+.am-j-upload .am-field {
+  margin-bottom: var(--am-space-16);
 }
 
-.am-j-sent__actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--am-space-12);
-  align-items: center;
+.am-j-upload__actions {
+  gap: var(--am-space-12) var(--am-space-24);
 }
 
 /* ==========================================================================
-   9. Request tracking and consent withdrawal
+   8. Public reference plate and request tracking
    ========================================================================== */
 
+/* The public reference on its own small navy sign (the element also carries `.am-sign`). */
 .am-j-reference {
   display: grid;
-  gap: var(--am-space-12);
-  padding: var(--am-space-24);
-  border: 1px solid var(--am-border-brand);
-  border-radius: var(--am-radius-panel);
-  background: var(--am-surface-brand);
+  gap: var(--am-space-8);
+  padding: var(--am-space-20);
+  border-radius: var(--am-radius-sm);
+  background: var(--am-sign);
+  color: var(--am-sign-ink);
+}
+
+@media (min-width: 768px) {
+  .am-j-reference {
+    padding: var(--am-space-24) var(--am-space-28);
+  }
 }
 
 .am-j-reference__label {
   margin: 0;
-  color: var(--am-primary-700);
-  font-size: var(--am-caption-size);
-  font-weight: 800;
-  letter-spacing: var(--am-tracking-wide);
-  line-height: var(--am-caption-line);
-  text-transform: uppercase;
+  color: var(--am-sign-ink-muted);
+  font-size: var(--am-small-size);
+  font-weight: 700;
+  line-height: var(--am-small-line);
 }
 
 .am-j-reference__row {
   display: flex;
   flex-wrap: wrap;
-  gap: var(--am-space-12);
+  gap: var(--am-space-12) var(--am-space-24);
   align-items: center;
 }
 
 .am-j-reference__value {
   margin: 0;
-  color: var(--am-primary-900);
-  font-family: var(--am-font-heading);
-  font-size: clamp(22px, 1.1rem + 1vw, 28px);
+  color: var(--am-sign-ink);
+  font-size: clamp(24px, 1.2rem + 1.2vw, 34px);
   font-weight: 800;
-  letter-spacing: 0.02em;
-  word-break: break-all;
+  letter-spacing: 0.04em;
+  line-height: 1.15;
+  overflow-wrap: anywhere;
+}
+
+.am-j-copy {
+  display: inline-flex;
+  min-height: 44px;
+  gap: var(--am-space-8);
+  align-items: center;
+  padding: var(--am-space-8) var(--am-space-16);
+  border: 2px solid var(--am-sign-ink);
+  border-radius: var(--am-radius-field);
+  background: transparent;
+  color: var(--am-sign-ink);
+  cursor: pointer;
+  font-family: inherit;
+  font-size: var(--am-small-size);
+  font-weight: 700;
+  transition: background-color var(--am-transition);
+}
+
+.am-j-copy:hover {
+  background: var(--am-sign-rule);
+}
+
+/* Copied: done, so filled; the tick is the one green of the plate. */
+.am-j-copy[data-copied="true"] {
+  background: var(--am-neutral-0);
+  color: var(--am-success-700);
 }
 
 .am-j-documents {
-  display: grid;
-  gap: var(--am-space-12);
   margin: 0;
   padding: 0;
+  border-top: 1px solid var(--am-rule);
   list-style: none;
 }
 
 .am-j-document {
   display: grid;
   gap: var(--am-space-12);
-  align-items: start;
+  align-items: center;
+  margin: 0;
+  padding: var(--am-space-12) 0;
+  border-bottom: 1px solid var(--am-rule);
   grid-template-columns: auto minmax(0, 1fr);
-  padding: var(--am-space-16);
-  border: 1px solid var(--am-border);
-  border-radius: var(--am-radius-md);
-  background: var(--am-surface);
-  box-shadow: var(--am-shadow-xs);
 }
 
 .am-j-document__text {
   margin: 0;
   font-size: var(--am-small-size);
   line-height: var(--am-small-line);
+  overflow-wrap: anywhere;
 }
 
-.am-j-copy {
-  display: inline-flex;
-  min-height: 40px;
-  gap: var(--am-space-8);
-  align-items: center;
-  padding: var(--am-space-8) var(--am-space-16);
-  border: 1px solid var(--am-border-strong);
-  border-radius: var(--am-radius-pill);
-  background: var(--am-surface);
-  color: var(--am-primary-700);
-  cursor: pointer;
-  font-family: inherit;
-  font-size: var(--am-caption-size);
-  font-weight: 700;
-  transition:
-    border-color var(--am-transition),
-    background-color var(--am-transition);
-}
-
-.am-j-copy:hover {
-  border-color: var(--am-primary-300);
-  background: var(--am-primary-50);
-}
-
-.am-j-copy[data-copied="true"] {
-  border-color: var(--am-success-500);
-  background: var(--am-success-50);
-  color: var(--am-success-700);
-}
-
-/* ==========================================================================
-   10. Waiting-list country
-   ========================================================================== */
-
-.am-j-waitlist {
-  display: grid;
-  gap: var(--am-space-24);
-  align-items: start;
-  grid-template-columns: minmax(0, 1fr);
-}
-
-@media (min-width: 900px) {
-  .am-j-waitlist {
-    gap: var(--am-space-32);
-    grid-template-columns: minmax(0, 1fr) minmax(320px, 420px);
-  }
-}
-
-.am-j-waitlist__form {
-  display: grid;
-  gap: var(--am-space-16);
-  padding: var(--am-space-24);
-  border: 1px solid var(--am-border);
-  border-radius: var(--am-radius-panel);
-  background: var(--am-surface);
-  box-shadow: var(--am-shadow-lg);
+.am-j-withdrawal {
+  max-width: 76ch;
 }

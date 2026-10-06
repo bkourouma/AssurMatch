@@ -33,7 +33,6 @@ export default async function CookiesPage({ params }: { params: Promise<{ locale
         { name: page.title, url: localeUrl(locale, HREF) }
       ]}
       page={page}
-      kicker={t("kicker")}
       lastUpdatedLabel={t("lastUpdated", { date: formatDate(page.updatedAt, { locale }) })}
       tocTitle={t("tocTitle")}
       summaryTitle={t("summaryTitle")}

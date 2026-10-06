@@ -1,17 +1,65 @@
-/* ==========================================================================
-   Quote form - progressive 4-step journey (spec 050, decisions D4 and D6)
-   Owned by the quote form / quote confirmation slice. Reuses the tokens and
-   the `.am-j-*` primitives already defined in `journey.css`; only the new
-   review-summary and step-navigation pieces get their own `.am-quote-*`
-   classes, kept in this file so ownership stays unambiguous.
-   ========================================================================== */
+/*
+ * Quote request form, "La signalétique" (spec 050, decisions D4 and D6).
+ *
+ * Imported by `components/quote-form.tsx`. The form is not set in a card: its numbered steps sit on
+ * the white page, separated by rules, the number printed in a navy dot like a route stop. Without
+ * JavaScript the three steps stack on one page; with it, one step shows at a time. The shared journey
+ * pieces it uses (`.am-j-form__grid`, `.am-j-consent`, `.am-j-reference`) live in `journey.css`.
+ */
 
-/* Focus outline on the heading and the "Modifier" buttons comes from the global
-   `[tabindex]:focus-visible` / `button:focus-visible` rules in base.css. */
+.am-quote-form {
+  display: grid;
+  gap: var(--am-space-40);
+}
+
+.am-quote-step {
+  display: grid;
+  gap: var(--am-space-16);
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+/*
+ * Without JavaScript every step is on screen: a rule separates them. It is drawn on the legend, not
+ * on the fieldset, whose top border a rendered legend would sit on and hide.
+ */
+.am-quote-step:not([hidden]) ~ .am-quote-step:not([hidden]) > .am-j-form__legend {
+  padding-top: var(--am-space-32);
+  border-top: 1px solid var(--am-rule);
+}
+
+.am-j-form__legend {
+  display: flex;
+  width: 100%;
+  gap: var(--am-space-12);
+  align-items: center;
+  margin: 0 0 var(--am-space-16);
+  padding: 0;
+}
+
+.am-j-form__step {
+  display: inline-flex;
+  width: 36px;
+  height: 36px;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--am-radius-pill);
+  background: var(--am-primary-800);
+  color: var(--am-neutral-0);
+  font-size: var(--am-small-size);
+  font-weight: 800;
+}
+
+/* Focus lands on this heading after "Continuer"; its ring comes from base.css. */
 .am-quote-step__title {
   margin: 0;
-  font: inherit;
-  color: inherit;
+  color: var(--am-heading);
+  font-size: var(--am-h3-size);
+  font-weight: 800;
+  line-height: var(--am-h3-line);
 }
 
 .am-quote-nav {
@@ -26,79 +74,180 @@
   justify-content: flex-end;
 }
 
-.am-quote-broker__title {
-  margin: 0 0 var(--am-space-8);
-  font-family: var(--am-font-heading);
-  font-size: var(--am-body-size);
-  font-weight: 700;
+@media (max-width: 519px) {
+  .am-quote-nav .am-button {
+    width: 100%;
+  }
 }
 
+/* Review step: two ruled definition lists, each with its "Modifier" link. */
 .am-quote-review {
   display: grid;
-  gap: var(--am-space-20);
-  padding: var(--am-space-20);
-  border: 1px solid var(--am-border);
-  border-radius: var(--am-radius-card);
-  background: var(--am-surface-muted, var(--am-surface));
+  gap: var(--am-space-24);
 }
 
 .am-quote-review__section {
   display: grid;
-  gap: var(--am-space-8);
 }
 
 .am-quote-review__head {
   display: flex;
-  align-items: baseline;
-  justify-content: space-between;
   gap: var(--am-space-12);
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 2px solid var(--am-primary-800);
 }
 
 .am-quote-review__head h3 {
   margin: 0;
-  font-family: var(--am-font-heading);
-  font-size: var(--am-body-size);
-  font-weight: 700;
+  font-size: var(--am-h4-size);
+  letter-spacing: 0;
 }
 
 .am-quote-review__edit {
+  min-width: 44px;
+  min-height: 44px;
+  padding: 0;
   border: 0;
   background: none;
-  padding: 0;
-  color: var(--am-primary-700);
-  font-weight: 600;
-  text-decoration: underline;
+  color: var(--am-link);
   cursor: pointer;
-  min-height: 44px;
-  min-width: 44px;
+  font-weight: 700;
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 0.2em;
+}
+
+.am-quote-review__edit:hover {
+  color: var(--am-link-hover);
+  text-decoration-thickness: 2px;
 }
 
 .am-quote-review__list {
-  display: grid;
-  gap: var(--am-space-8);
   margin: 0;
 }
 
 .am-quote-review__row {
   display: grid;
+  gap: var(--am-space-2) var(--am-space-16);
+  padding: var(--am-space-10) 0;
+  border-bottom: 1px solid var(--am-rule);
   grid-template-columns: minmax(0, 1fr);
-  gap: var(--am-space-2, 2px);
-}
-
-.am-quote-review__row dt {
-  margin: 0;
-  color: var(--am-text-muted, var(--am-neutral-500));
-  font-size: var(--am-caption-size);
-}
-
-.am-quote-review__row dd {
-  margin: 0;
-  font-weight: 600;
 }
 
 @media (min-width: 560px) {
   .am-quote-review__row {
-    grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr);
     align-items: baseline;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr);
   }
+}
+
+.am-quote-review__row dt {
+  margin: 0;
+  color: var(--am-text-muted);
+  font-size: var(--am-small-size);
+  font-weight: 700;
+}
+
+.am-quote-review__row dd {
+  margin: 0;
+  color: var(--am-text);
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+
+/* D4: the responsible broker, named before the consent box. */
+.am-quote-broker,
+.am-quote-consent {
+  display: grid;
+  gap: var(--am-space-12);
+}
+
+.am-quote-broker__title {
+  margin: 0;
+  color: var(--am-heading);
+  font-size: var(--am-h4-size);
+  font-weight: 700;
+  letter-spacing: 0;
+}
+
+.am-quote-broker__named {
+  display: grid;
+  gap: var(--am-space-12);
+  align-items: center;
+  grid-template-columns: auto minmax(0, 1fr);
+}
+
+.am-quote-broker__text {
+  max-width: 68ch;
+  margin: 0;
+}
+
+.am-j-form__footer {
+  display: grid;
+  gap: var(--am-space-12);
+  padding-top: var(--am-space-20);
+  border-top: 1px solid var(--am-rule);
+}
+
+.am-j-form__footer > .am-button,
+.am-j-form__footer .am-quote-nav--send {
+  justify-self: start;
+}
+
+@media (max-width: 519px) {
+  .am-j-form__footer > .am-button,
+  .am-j-form__footer .am-quote-nav--send {
+    justify-self: stretch;
+  }
+
+  .am-j-form__footer > .am-button {
+    width: 100%;
+  }
+}
+
+/* Optional assistance, outside the form: it never blocks or gates the request. */
+.am-quote-assist {
+  display: grid;
+  gap: var(--am-space-12);
+  padding-top: var(--am-space-32);
+  border-top: 1px solid var(--am-rule);
+}
+
+.am-quote-assist__title {
+  margin: 0;
+  font-size: var(--am-h3-size);
+}
+
+/* Sent: the form gives way to the confirmation, so it cannot be sent twice by accident. */
+.am-j-sent {
+  display: grid;
+  gap: var(--am-space-16);
+  justify-items: start;
+}
+
+.am-j-sent__title {
+  margin: 0;
+  font-size: var(--am-h2-size);
+  line-height: var(--am-h2-line);
+}
+
+.am-j-sent > .am-j-reference {
+  width: 100%;
+}
+
+.am-j-sent > p {
+  margin: 0;
+}
+
+.am-j-sent__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--am-space-12);
+  align-items: center;
+}
+
+/* With JavaScript one step shows at a time and the progress line above numbers it already. */
+.am-quote-form[data-enhanced="true"] .am-j-form__step {
+  display: none;
 }

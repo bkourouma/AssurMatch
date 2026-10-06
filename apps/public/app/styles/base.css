@@ -1,10 +1,10 @@
 /*
- * Reset, fluid typography, focus and layout utilities for the AssurMatch public site.
+ * Reset, typography, browser surfaces and layout utilities for the AssurMatch public site
+ * ("La signalétique"). One face, three weights (400 text, 700 labels and headings, 800 sign titles).
  *
- * No global `button {}`, `label {}` or `[role="alert"] {}` box lives here: those rules used to style
- * every element that merely carried the role or the tag. Unclassed `button`/`label`/`input` keep a
- * sane appearance through `:not([class])` safety nets at the end of components.css, which pages are
- * free to opt out of simply by adding a class.
+ * No global `button {}`, `label {}` or `[role="alert"] {}` box lives here: unclassed `button`,
+ * `label` and `input` keep a sane appearance through `:not([class])` safety nets at the end of
+ * components.css, which pages opt out of simply by adding a class.
  */
 
 *,
@@ -15,9 +15,7 @@
 
 /*
  * `overflow-x: clip` (not `hidden`): `hidden` would turn the root into a scroll container and break
- * `position: sticky` / `scroll-padding-top`. `clip` only trims the overflow. It absorbs the few
- * pixels a `Reveal from="left|right"` pre-state pushes past the viewport before it animates in,
- * which otherwise flashed a horizontal scrollbar on every page load below 1024px.
+ * `position: sticky` / `scroll-padding-top`. A settled page must still fit on its own.
  */
 html,
 body {
@@ -34,6 +32,9 @@ html {
   scroll-padding-top: calc(var(--am-header) + var(--am-space-16));
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  accent-color: var(--am-action);
+  caret-color: var(--am-action);
+  scrollbar-color: var(--am-neutral-400) var(--am-neutral-100);
 }
 
 body {
@@ -44,7 +45,7 @@ body {
   font-family: var(--am-font-body);
   font-size: var(--am-body-size);
   line-height: var(--am-body-line);
-  text-rendering: optimizeLegibility;
+  font-feature-settings: "kern" 1;
 }
 
 img,
@@ -61,7 +62,7 @@ video {
   height: auto;
 }
 
-/* ---------- Headings ---------- */
+/* ---------- Headings: navy, like the lettering of a sign ---------- */
 
 h1,
 h2,
@@ -70,7 +71,7 @@ h4,
 h5,
 h6 {
   margin: 0 0 var(--am-space-12);
-  color: var(--am-text);
+  color: var(--am-heading);
   font-family: var(--am-font-heading);
   font-weight: 800;
   letter-spacing: var(--am-tracking-tight);
@@ -99,7 +100,7 @@ h5,
 h6 {
   font-size: var(--am-h4-size);
   font-weight: 700;
-  letter-spacing: var(--am-tracking-snug);
+  letter-spacing: 0;
   line-height: var(--am-h4-line);
 }
 
@@ -118,19 +119,21 @@ b {
   font-weight: 700;
 }
 
-/* ---------- Links ---------- */
+/* ---------- Links: blue, always underlined in running text ---------- */
 
 a {
   color: var(--am-link);
   text-decoration: underline;
   text-decoration-thickness: 1px;
-  text-underline-offset: 3px;
-  transition: color var(--am-transition), text-decoration-color var(--am-transition);
+  text-underline-offset: 0.2em;
+  transition:
+    color var(--am-transition),
+    text-decoration-thickness var(--am-transition);
 }
 
 a:hover {
   color: var(--am-link-hover);
-  text-decoration-color: currentColor;
+  text-decoration-thickness: 2px;
 }
 
 /* ---------- Lists ---------- */
@@ -138,14 +141,19 @@ a:hover {
 ul,
 ol {
   margin: 0 0 var(--am-space-12);
+  padding-left: 1.25em;
+}
+
+li + li {
+  margin-top: var(--am-space-4);
 }
 
 li::marker {
-  color: var(--am-primary-500);
+  color: var(--am-primary-800);
 }
 
 ol li::marker {
-  color: var(--am-neutral-500);
+  color: var(--am-primary-800);
   font-weight: 700;
 }
 
@@ -164,39 +172,59 @@ textarea {
   color: inherit;
 }
 
-/* ---------- Focus ---------- */
+/* ---------- Focus: a blue ring with a white gap, never removed ---------- */
 
 :focus-visible {
-  outline: 2px solid var(--am-ring-color);
+  outline: 3px solid var(--am-ring-color);
   outline-offset: 2px;
-  border-radius: var(--am-radius-xs);
 }
 
 a:focus-visible,
 button:focus-visible,
 summary:focus-visible,
 [tabindex]:focus-visible {
-  outline: 2px solid var(--am-ring-color);
-  outline-offset: 3px;
+  outline: 3px solid var(--am-primary-600);
+  outline-offset: 2px;
 }
 
 input:focus-visible,
 select:focus-visible,
 textarea:focus-visible {
-  outline: 2px solid var(--am-ring-color);
+  outline: 3px solid var(--am-primary-600);
   outline-offset: 1px;
 }
 
 ::selection {
-  background: var(--am-primary-200);
+  background: var(--am-selection);
   color: var(--am-primary-900);
+}
+
+/* ---------- Scrollbars (Chromium / WebKit) ---------- */
+
+::-webkit-scrollbar {
+  width: 12px;
+  height: 12px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--am-neutral-100);
+}
+
+::-webkit-scrollbar-thumb {
+  border: 3px solid var(--am-neutral-100);
+  border-radius: var(--am-radius-pill);
+  background: var(--am-neutral-400);
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--am-neutral-500);
 }
 
 /* ---------- Misc elements ---------- */
 
 hr {
   border: 0;
-  border-top: 1px solid var(--am-border);
+  border-top: 1px solid var(--am-rule);
   margin: var(--am-space-24) 0;
 }
 
@@ -204,10 +232,21 @@ hr {
   display: none !important;
 }
 
-/* neutral-400 was 2.46:1 on a white control; neutral-500 reaches 4.97:1. */
 ::placeholder {
   color: var(--am-neutral-500);
   opacity: 1;
+}
+
+abbr[title] {
+  text-decoration: underline dotted;
+  text-underline-offset: 0.2em;
+}
+
+code,
+kbd,
+samp {
+  font-family: ui-monospace, "Cascadia Mono", Consolas, monospace;
+  font-size: 0.92em;
 }
 
 /* ---------- Layout utilities ---------- */
@@ -262,7 +301,7 @@ hr {
 /** Responsive grid: set `--min` (default 260px) for the smallest acceptable column. */
 .am-grid {
   display: grid;
-  gap: var(--gap, var(--am-space-20));
+  gap: var(--gap, var(--am-space-16));
   grid-template-columns: repeat(auto-fit, minmax(min(100%, var(--min, 260px)), 1fr));
 }
 
@@ -280,21 +319,28 @@ hr {
 
 /* ---------- Text utilities ---------- */
 
-/** Uppercase brand kicker above a title. Never below 14px. */
+/**
+ * A small bold label in front of a value or a block of text ("Ce que cela veut dire", "Limite").
+ * Sentence case, navy, never tracked capitals, and never used as an eyebrow above a heading.
+ */
 .am-eyebrow {
   display: block;
-  margin: 0 0 var(--am-space-8);
-  color: var(--am-primary-600);
+  margin: 0 0 var(--am-space-4);
+  color: var(--am-heading);
   font-family: var(--am-font-body);
-  font-size: var(--am-caption-size);
-  font-weight: 800;
-  letter-spacing: var(--am-tracking-wide);
-  line-height: var(--am-caption-line);
-  text-transform: uppercase;
+  font-size: var(--am-small-size);
+  font-weight: 700;
+  letter-spacing: 0;
+  line-height: var(--am-small-line);
+  text-transform: none;
 }
 
+/*
+ * Prose measures are set in `em`, not `ch`: Atkinson's zero is wide, so `68ch` ran to about 97
+ * characters a line. 34em holds a line near 75 characters.
+ */
 .am-lead {
-  max-width: 68ch;
+  max-width: 34em;
   color: var(--am-text-muted);
   font-size: var(--am-lead-size);
   line-height: var(--am-lead-line);

@@ -6,8 +6,7 @@ test("the locale layout loads the fonts and renders the skip link, header and fo
   const layout = readSources([publicFile("[locale]/layout.tsx")]);
 
   expect(layout).toContain('from "../fonts"');
-  expect(layout).toContain("headingFont.variable");
-  expect(layout).toContain("bodyFont.variable");
+  expect(layout).toContain("signFont.variable");
   expect(layout).toContain("<SkipLink");
   expect(layout).toContain("<SiteHeader");
   expect(layout).toContain("<SiteFooter");
