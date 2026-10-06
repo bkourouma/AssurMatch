@@ -8,7 +8,6 @@ import { EmptyState } from "../../../components/ui/empty-state";
 import { Hero } from "../../../components/ui/hero";
 import { Notice } from "../../../components/ui/notice";
 import { Section } from "../../../components/ui/section";
-import { Reveal } from "../../../components/motion/reveal";
 import { brokerPlans } from "../../../content/brokers";
 import { listCountryDirectory, listPublicProducts, submitPartnerApplication, type PartnerApplicationSubmission } from "../../../lib/public-api";
 import { buildMetadata, localePath, localeUrl } from "../../../lib/seo";
@@ -52,6 +51,7 @@ export default async function BrokerApplyPage({
   const t = await getTranslations("BrokerApply");
   const common = await getTranslations("Common");
   const api = await getTranslations("Api");
+  const brokers = await getTranslations("Brokers");
 
   const query = searchParams ? await searchParams : {};
   const formuleRaw = Array.isArray(query.formule) ? query.formule[0] : query.formule;
@@ -252,6 +252,7 @@ export default async function BrokerApplyPage({
   return (
     <>
       <Hero
+        className="am-brokers-sign"
         title={t("title")}
         lead={t("lead")}
         breadcrumb={
@@ -259,22 +260,24 @@ export default async function BrokerApplyPage({
             label={common("breadcrumbLabel")}
             items={[
               { name: common("home"), url: localeUrl(locale, "/") },
+              { name: brokers("breadcrumb"), url: localeUrl(locale, "/brokers") },
               { name: t("breadcrumb"), url: localeUrl(locale, "/brokers/apply") }
             ]}
           />
         }
       />
 
-      <Section width="narrow">
-        {formErrorText ? (
-          <Notice tone="error" role="alert">
-            {formErrorText}
-          </Notice>
-        ) : null}
-        {eligibleCountries.length === 0 ? (
-          <EmptyState title={t("noCountries.title")} description={t("noCountries.description")} />
-        ) : (
-          <Reveal as="div">
+      {/* One plain form panel, the page's one object, on the same left edge as the sign. */}
+      <Section>
+        <div className="am-applyform">
+          {formErrorText ? (
+            <Notice tone="error" role="alert">
+              {formErrorText}
+            </Notice>
+          ) : null}
+          {eligibleCountries.length === 0 ? (
+            <EmptyState title={t("noCountries.title")} description={t("noCountries.description")} />
+          ) : (
             <PartnerApplicationForm
               countries={eligibleCountries.map((country) => ({ isoCode: country.isoCode, name: country.name }))}
               productsByCountry={productsByCountry}
@@ -284,8 +287,8 @@ export default async function BrokerApplyPage({
               {...(defaultCountry ? { defaultCountry } : {})}
               {...(defaultPlan ? { defaultPlan } : {})}
             />
-          </Reveal>
-        )}
+          )}
+        </div>
       </Section>
     </>
   );

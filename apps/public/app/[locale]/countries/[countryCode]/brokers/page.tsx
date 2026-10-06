@@ -1,12 +1,14 @@
 import { getTranslations, setRequestLocale } from "next-intl/server";
 import { toLocale } from "../../../../../i18n/routing";
+import { InitialsTile } from "../../../../components/journey/tiles";
+import { BackendText } from "../../../../components/ui/backend-text";
+import { Badge } from "../../../../components/ui/badge";
 import { Breadcrumb } from "../../../../components/ui/breadcrumb";
-import { BrokerBlock } from "../../../../components/ui/broker-block";
 import { Button } from "../../../../components/ui/button";
+import { Directory, type DirectoryItem } from "../../../../components/ui/directory";
 import { EmptyState } from "../../../../components/ui/empty-state";
 import { Hero } from "../../../../components/ui/hero";
 import { Icon } from "../../../../components/ui/icons";
-import { Reveal } from "../../../../components/motion/reveal";
 import { Section } from "../../../../components/ui/section";
 import { listCountryDirectory, listCountryPartners, listPublicProducts } from "../../../../lib/public-api";
 import { formatDate } from "../../../../lib/country-format";
@@ -15,9 +17,12 @@ import type { PageMetadata } from "../../../../lib/seo";
 
 /**
  * Broker directory of a country (SITE-404). Every partner shown here holds a valid licence: the
- * intro sentence above the grid states the broker's role (Constitution I and II) so a visitor never
+ * intro sentence on the sign states the broker's role (Constitution I and II) so a visitor never
  * mistakes a directory listing for a binding offer. An API error or an empty catalogue always renders
  * `EmptyState`, never an invented broker.
+ *
+ * Each broker is one directory row leading to its profile: the initials plate, the name with the
+ * green "Agréé" label (green means approved), the licence line, the products and the licence end.
  */
 
 type PageParams = { locale: string; countryCode: string };
@@ -54,18 +59,55 @@ export default async function CountryBrokersPage({ params }: { params: Promise<P
   const countryName = await resolveCountryName(countryCode);
   const partners = await listCountryPartners(countryCode);
   const countryProducts = await listPublicProducts(countryCode);
-  const brokerLabels = {
-    licenceNumber: common("licenceNumber"),
-    issuingAuthority: common("issuingAuthority"),
-    city: common("city"),
-    products: common("products"),
-    approved: common("approved")
-  };
+  const rows: DirectoryItem[] = partners.data.map((partner) => {
+    const productLabels = partner.productKeys.map((key) => {
+      const match = countryProducts.data.find((candidate) => candidate.key.toLowerCase() === key.toLowerCase());
+      return match ? match.name : key;
+    });
+    return {
+      key: partner.id,
+      tile: <InitialsTile name={partner.displayName} />,
+      title: (
+        <>
+          <BackendText>{partner.displayName}</BackendText>{" "}
+          <Badge tone="approved" icon={<Icon name="badge-check" size={16} />}>
+            {common("approved")}
+          </Badge>
+          <span className="am-visually-hidden">{` - ${t("viewBroker")}`}</span>
+        </>
+      ),
+      meta: (
+        <>
+          <span className="am-j-rowline">
+            {common("licenceNumber")} <BackendText>{partner.licenseNumber}</BackendText>
+            {" - "}
+            {common("issuingAuthority")} <BackendText>{partner.issuingAuthority}</BackendText>
+            {partner.city ? (
+              <>
+                {" - "}
+                {common("city")} <BackendText>{partner.city}</BackendText>
+              </>
+            ) : null}
+          </span>
+          {productLabels.length > 0 ? (
+            <span className="am-j-rowline">
+              <strong>{common("products")}</strong> <BackendText>{productLabels.join(", ")}</BackendText>
+            </span>
+          ) : null}
+          {partner.licenseExpiresAt ? (
+            <span className="am-j-rowline">
+              {t("validUntil", { date: formatDate(partner.licenseExpiresAt, { locale, countryIso: countryCode }) })}
+            </span>
+          ) : null}
+        </>
+      ),
+      href: { pathname: "/countries/[countryCode]/brokers/[partnerId]", params: { countryCode, partnerId: partner.id } }
+    };
+  });
 
   return (
     <>
       <Hero
-        kicker={countries("breadcrumb")}
         title={t("heading", { countryCode: countryName })}
         lead={t("intro")}
         size="sm"
@@ -82,13 +124,12 @@ export default async function CountryBrokersPage({ params }: { params: Promise<P
         }
       />
 
-      {/* No section heading: the hero's H1 already names this list, and the cards carry no heading
+      {/* No section heading: the sign's H1 already names this list, and the rows carry no heading
           of their own, so there is no level to skip over. */}
       <Section ariaLabel={t("listLabel")}>
         {partners.status === "error" ? (
           <EmptyState
             icon="wifi-off"
-            tone="muted"
             align="center"
             title={t("error.title")}
             description={t("error.description")}
@@ -103,7 +144,6 @@ export default async function CountryBrokersPage({ params }: { params: Promise<P
         {partners.status !== "error" && partners.data.length === 0 ? (
           <EmptyState
             icon="users"
-            tone="muted"
             align="center"
             title={t("empty.title")}
             description={t("empty.description")}
@@ -115,45 +155,7 @@ export default async function CountryBrokersPage({ params }: { params: Promise<P
           />
         ) : null}
 
-        {partners.status !== "error" && partners.data.length > 0 ? (
-          <Reveal as="ul" stagger className="am-j-cardgrid">
-            {partners.data.map((partner) => {
-              const productLabels = partner.productKeys.map((key) => {
-                const match = countryProducts.data.find((candidate) => candidate.key.toLowerCase() === key.toLowerCase());
-                return match ? match.name : key;
-              });
-              return (
-                <li key={partner.id}>
-                  <BrokerBlock
-                    displayName={partner.displayName}
-                    licenceNumber={partner.licenseNumber}
-                    issuingAuthority={partner.issuingAuthority}
-                    labels={brokerLabels}
-                    approved
-                    {...(partner.city ? { city: partner.city } : {})}
-                    {...(productLabels.length > 0 ? { products: productLabels } : {})}
-                    {...(partner.licenseExpiresAt
-                      ? {
-                          validityLabel: t("validUntil", {
-                            date: formatDate(partner.licenseExpiresAt, { locale, countryIso: countryCode })
-                          })
-                        }
-                      : {})}
-                  />
-                  <div className="am-j-cardgrid__actions">
-                    <Button
-                      variant="secondary"
-                      href={{ pathname: "/countries/[countryCode]/brokers/[partnerId]", params: { countryCode, partnerId: partner.id } }}
-                      iconAfter={<Icon name="arrow-right" size={18} />}
-                    >
-                      {t("viewBroker")}
-                    </Button>
-                  </div>
-                </li>
-              );
-            })}
-          </Reveal>
-        ) : null}
+        {partners.status !== "error" && rows.length > 0 ? <Directory items={rows} label={t("listLabel")} columns={2} /> : null}
       </Section>
     </>
   );

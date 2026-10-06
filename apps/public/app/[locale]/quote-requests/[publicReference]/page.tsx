@@ -1,19 +1,19 @@
 import { getTranslations, setRequestLocale } from "next-intl/server";
+import { Link } from "../../../../i18n/navigation";
 import { toLocale } from "../../../../i18n/routing";
 import { ConsentWithdrawal } from "../../../components/forms/consent-withdrawal";
 import { CopyReference } from "../../../components/journey/copy-reference";
+import { JourneyRoute } from "../../../components/journey/journey-route";
 import { IndicativeOfferNotice } from "../../../components/public-journey";
 import { QuoteDocumentUpload } from "../../../components/quote-document-upload";
 import { BackendText } from "../../../components/ui/backend-text";
 import { Breadcrumb } from "../../../components/ui/breadcrumb";
-import { Button } from "../../../components/ui/button";
 import { EmptyState } from "../../../components/ui/empty-state";
 import { Hero } from "../../../components/ui/hero";
 import { Icon } from "../../../components/ui/icons";
 import { IconTile, type IconTileTone } from "../../../components/ui/icon-tile";
 import type { IconName } from "../../../components/ui/icons";
 import { Notice } from "../../../components/ui/notice";
-import { ProgressBar } from "../../../components/ui/progress-bar";
 import { Section } from "../../../components/ui/section";
 import { listQuoteDocuments } from "../../../lib/public-api";
 import { buildMetadata, localeUrl } from "../../../lib/seo";
@@ -23,6 +23,9 @@ import "../../../styles/pages/journey.css";
 /**
  * Tracking page of a quote request. It is never indexed, is reachable only with the verification
  * token handed out at the end of the request, and carries the consent withdrawal (SITE-316, 317).
+ *
+ * Its sign says where the request stands (« Vous êtes ici : Demande »): the request is recorded;
+ * the broker stop stays ahead, because routing to a partner broker is not known to this page. The public reference is printed on a small navy plate of its own.
  */
 
 type SearchParams = Record<string, string | string[] | undefined>;
@@ -31,12 +34,15 @@ type PageParams = { locale: string; publicReference: string };
 const scanKeys = ["pending", "clean", "infected", "failed"] as const;
 type ScanKey = (typeof scanKeys)[number];
 
-/** Visual state of a scanned document; green is reserved for the one validating outcome. */
+/**
+ * Visual state of a scanned document. Green is reserved for the one validating outcome, red for the
+ * refused file; orange means "sponsored" on this site, so a scan to retry stays neutral.
+ */
 const SCAN_VISUALS: Record<ScanKey, { icon: IconName; tone: IconTileTone }> = {
   pending: { icon: "clock", tone: "neutral" },
   clean: { icon: "file-check", tone: "success" },
   infected: { icon: "alert-triangle", tone: "danger" },
-  failed: { icon: "refresh", tone: "warning" }
+  failed: { icon: "refresh", tone: "neutral" }
 };
 
 function scanKeyOf(status: string): ScanKey | null {
@@ -68,27 +74,19 @@ export default async function PublicQuoteConfirmationPage({
   const locale = toLocale(rawLocale);
   setRequestLocale(locale);
   const t = await getTranslations("QuoteRequest");
-  const quote = await getTranslations("QuoteForm");
   const common = await getTranslations("Common");
   const query = searchParams ? await searchParams : {};
   const tokenParam = Array.isArray(query.token) ? query.token[0] : query.token;
   const token = tokenParam && /^[A-Za-z0-9_-]{16,}$/.test(tokenParam) ? tokenParam : undefined;
   const documents = token ? await listQuoteDocuments(publicReference, token) : undefined;
 
-  const steps = [
-    { label: quote("steps.contact") },
-    { label: quote("steps.need") },
-    { label: quote("steps.consent") },
-    { label: quote("steps.confirmation") }
-  ];
-
   return (
     <>
       <Hero
-        kicker={t("kicker")}
         title={t("title", { reference: publicReference })}
         lead={t("intro")}
         size="sm"
+        route={<JourneyRoute current="request" />}
         breadcrumb={
           <Breadcrumb
             label={common("breadcrumbLabel")}
@@ -107,14 +105,7 @@ export default async function PublicQuoteConfirmationPage({
 
       <Section ariaLabel={t("journeyLabel")}>
         <div className="am-stack am-stack--xl am-j-column">
-          <ProgressBar
-            steps={steps}
-            current={4}
-            label={quote("progressLabel")}
-            stepLabel={quote("stepStatus", { current: 4, total: steps.length })}
-          />
-
-          <div className="am-j-reference">
+          <div className="am-j-reference am-sign">
             <p className="am-j-reference__label">{t("referenceLabel")}</p>
             <div className="am-j-reference__row">
               <p className="am-j-reference__value am-tabular">{publicReference}</p>
@@ -122,28 +113,30 @@ export default async function PublicQuoteConfirmationPage({
             </div>
           </div>
 
-          <div className="am-j-panel">
-            <div className="am-j-panel__head">
-              <IconTile name="list" size="lg" />
-              <h2 className="am-j-panel__title">{t("nextSteps.title")}</h2>
-            </div>
-            <ul className="am-j-points">
-              <li>
-                <Icon name="check-circle" size={18} />
-                {t("nextSteps.one")}
+          <section className="am-j-part" aria-labelledby="am-request-next">
+            <h2 className="am-j-part__title" id="am-request-next">
+              {t("nextSteps.title")}
+            </h2>
+            {/* Green only for what is done: the request is recorded. The rest is still to come. */}
+            <ul className="am-j-ticks">
+              <li data-included="true">
+                <Icon name="check-circle" size={20} />
+                <span>{t("nextSteps.one")}</span>
               </li>
               <li>
-                <Icon name="handshake" size={18} />
-                {t("nextSteps.two")}
+                <Icon name="handshake" size={20} />
+                <span>{t("nextSteps.two")}</span>
               </li>
               <li>
-                <Icon name="paperclip" size={18} />
-                {t("nextSteps.three")}
+                <Icon name="paperclip" size={20} />
+                <span>{t("nextSteps.three")}</span>
               </li>
             </ul>
-          </div>
-
-          <Notice tone="info">{t("fineprint")}</Notice>
+            <p className="am-j-statement">
+              <Icon name="info" size={20} />
+              <span>{t("fineprint")}</span>
+            </p>
+          </section>
         </div>
       </Section>
 
@@ -206,7 +199,7 @@ export default async function PublicQuoteConfirmationPage({
       {/* Consent withdrawal: clearly separated from the rest of the tracking page. */}
       <Section title={t("withdrawal.title")} lead={t("withdrawal.lead")}>
         <div className="am-j-column">
-          <div className="am-j-panel am-j-panel--muted">
+          <div className="am-j-withdrawal">
             {token ? (
               <ConsentWithdrawal
                 publicReference={publicReference}
@@ -232,11 +225,12 @@ export default async function PublicQuoteConfirmationPage({
       </Section>
 
       <Section spacing="compact">
-        <div className="am-cluster am-j-column">
-          <Button variant="secondary" href="/countries" icon={<Icon name="globe" size={18} />}>
+        <p className="am-j-morelink am-j-column">
+          <Link href="/countries">
+            <Icon name="arrow-left" size={18} />
             {t("backToCountries")}
-          </Button>
-        </div>
+          </Link>
+        </p>
       </Section>
     </>
   );

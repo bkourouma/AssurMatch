@@ -3,11 +3,9 @@ import { toLocale, type AppLocale } from "../../../i18n/routing";
 import { getCommitmentContent } from "../../content/commitment";
 import { Breadcrumb } from "../../components/ui/breadcrumb";
 import { Button } from "../../components/ui/button";
-import { Card, CardBody, CardFooter, CardTitle } from "../../components/ui/card";
 import { Hero } from "../../components/ui/hero";
 import { Icon } from "../../components/ui/icons";
 import { Section } from "../../components/ui/section";
-import { Reveal } from "../../components/motion/reveal";
 import { buildMetadata, localeUrl } from "../../lib/seo";
 import type { PageMetadata } from "../../lib/seo";
 import "../../styles/pages/institutional.css";
@@ -18,6 +16,11 @@ export async function generateMetadata({ params }: { params: Promise<{ locale: s
   return buildMetadata({ title: t("title"), description: t("description"), href: "/our-commitment", locale });
 }
 
+/**
+ * Our commitment: five commitments as ruled rows. Each one states the promise in the margin and,
+ * beside it, what it means, how the visitor can check it and where it stops. The limits that follow
+ * are a ruled list; the page ends on what to do when a commitment does not seem to be kept.
+ */
 export default async function OurCommitmentPage({ params }: { params: Promise<{ locale: string }> }) {
   const locale: AppLocale = toLocale((await params).locale);
   setRequestLocale(locale);
@@ -28,7 +31,6 @@ export default async function OurCommitmentPage({ params }: { params: Promise<{ 
   return (
     <>
       <Hero
-        kicker={t("kicker")}
         title={t("title")}
         lead={t("subtitle")}
         breadcrumb={
@@ -47,70 +49,65 @@ export default async function OurCommitmentPage({ params }: { params: Promise<{ 
         }
       />
 
-      <Section width="narrow" spacing="compact">
-        <p>{content.intro}</p>
-      </Section>
+      <Section>
+        <p className="am-commit-intro">{content.intro}</p>
 
-      <Section kicker={t("commitmentsKicker")} title={t("commitmentsHeading")}>
-        <Reveal as="ul" stagger className="am-grid am-grid--2">
+        <h2 className="am-commit-heading">{t("commitmentsHeading")}</h2>
+        <ul className="am-commitments">
           {content.commitments.map((item) => (
-            <Card as="li" padding="lg" key={item.id} id={item.id}>
-              <CardTitle as="h3">{item.heading}</CardTitle>
-              <CardBody>
-                <p>
-                  <strong>{item.statement}</strong>
-                </p>
-                <p className="am-eyebrow">{t("whatItMeansLabel")}</p>
-                {item.whatItMeans.map((paragraph, index) => (
-                  <p key={index}>{paragraph}</p>
-                ))}
-                <p className="am-eyebrow">{t("howToVerifyLabel")}</p>
-                <p>{item.howToVerify}</p>
-                <p className="am-eyebrow">{t("limitLabel")}</p>
-                <p>{item.limit}</p>
-              </CardBody>
-            </Card>
+            <li className="am-commitment" key={item.id} id={item.id}>
+              <div>
+                <h3 className="am-commitment__title">{item.heading}</h3>
+                <p className="am-commitment__statement">{item.statement}</p>
+              </div>
+              <dl className="am-commitment__facts">
+                <div>
+                  <dt className="am-eyebrow">{t("whatItMeansLabel")}</dt>
+                  <dd>
+                    {item.whatItMeans.map((paragraph, index) => (
+                      <p key={index}>{paragraph}</p>
+                    ))}
+                  </dd>
+                </div>
+                <div>
+                  <dt className="am-eyebrow">{t("howToVerifyLabel")}</dt>
+                  <dd>{item.howToVerify}</dd>
+                </div>
+                <div>
+                  <dt className="am-eyebrow">{t("limitLabel")}</dt>
+                  <dd>{item.limit}</dd>
+                </div>
+              </dl>
+            </li>
           ))}
-        </Reveal>
+        </ul>
       </Section>
 
-      <Section tone="muted" kicker={t("notDoneKicker")} title={content.notDone.heading} id={content.notDone.id}>
-        <Reveal>
-          <Card padding="lg">
-            <CardBody>
-              {content.notDone.body.map((paragraph, index) => (
-                <p key={index}>{paragraph}</p>
+      <Section tone="muted" title={content.notDone.heading} id={content.notDone.id}>
+        <div className="am-scope">
+          {content.notDone.body.map((paragraph, index) => (
+            <p key={index}>{paragraph}</p>
+          ))}
+          {content.notDone.bullets ? (
+            <ul className="am-ruled" data-mark="minus">
+              {content.notDone.bullets.map((bullet) => (
+                <li key={bullet}>
+                  <Icon name="minus" size={20} />
+                  <span>{bullet}</span>
+                </li>
               ))}
-              {content.notDone.bullets ? (
-                <ul className="am-xlist">
-                  {content.notDone.bullets.map((bullet) => (
-                    <li key={bullet}>
-                      <Icon name="x-circle" size={18} />
-                      <span>{bullet}</span>
-                    </li>
-                  ))}
-                </ul>
-              ) : null}
-            </CardBody>
-          </Card>
-        </Reveal>
+            </ul>
+          ) : null}
+        </div>
       </Section>
 
-      <Section title={content.ifSomethingIsWrong.heading} id={content.ifSomethingIsWrong.id}>
-        <Reveal>
-          <Card padding="lg">
-            <CardBody>
-              {content.ifSomethingIsWrong.body.map((paragraph, index) => (
-                <p key={index}>{paragraph}</p>
-              ))}
-            </CardBody>
-            <CardFooter>
-              <Button href="/contact" variant="secondary" iconAfter={<Icon name="arrow-right" size={18} />}>
-                {t("writeToUs")}
-              </Button>
-            </CardFooter>
-          </Card>
-        </Reveal>
+      <Section title={content.ifSomethingIsWrong.heading} id={content.ifSomethingIsWrong.id} className="am-commit-write">
+        {content.ifSomethingIsWrong.body.map((paragraph, index) => (
+          <p key={index}>{paragraph}</p>
+        ))}
+        <Button href="/contact" variant="secondary" iconAfter={<Icon name="arrow-right" size={18} />}>
+          {t("writeToUs")}
+        </Button>
       </Section>
     </>
   );

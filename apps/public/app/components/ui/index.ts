@@ -41,3 +41,6 @@ export { WhatsAppButton, type WhatsAppButtonProps } from "./whatsapp-button";
 /* Motion primitives live in components/motion but are re-exported here so a page has one import. */
 export { CountUp, type CountUpProps } from "../motion/count-up";
 export { Reveal, type RevealProps } from "../motion/reveal";
+export { Directory, type DirectoryItem, type DirectoryProps } from "./directory";
+export { Pictogram, productPictogram, type PictogramName, type PictogramProps } from "./pictogram";
+export { Route, RouteStrip, type RouteProps, type RouteStop, type RouteStripProps, type RouteStripStop } from "./route-line";

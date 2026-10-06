@@ -6,7 +6,6 @@ import { toLocale, type AppLocale } from "../../../i18n/routing";
 import { ContactForm, type ContactFormLabels } from "../../components/forms/contact-form";
 import { Breadcrumb } from "../../components/ui/breadcrumb";
 import { Button } from "../../components/ui/button";
-import { Card, CardFooter, CardTitle } from "../../components/ui/card";
 import { Hero } from "../../components/ui/hero";
 import { Icon } from "../../components/ui/icons";
 import { Notice } from "../../components/ui/notice";
@@ -179,7 +178,6 @@ export default async function ContactPage({
   return (
     <>
       <Hero
-        kicker={t("kicker")}
         title={t("title")}
         lead={t("lead")}
         breadcrumb={
@@ -193,10 +191,11 @@ export default async function ContactPage({
         }
       />
 
+      {/* The form is the page's one object: a plain panel from 768px, the full width on a phone. */}
       <Section>
         <div className="am-contact-layout">
-          <Card padding="lg">
-            <CardTitle as="h2">{t("formTitle")}</CardTitle>
+          <div className="am-contact-form">
+            <h2 className="am-contact-form__title">{t("formTitle")}</h2>
             {sent ? (
               <Notice tone="success" title={t("successTitle")} role="status">
                 <p>{t("successBody")}</p>
@@ -214,41 +213,41 @@ export default async function ContactPage({
                 <ContactForm labels={labels} countries={countries} formAction={boundSubmitContactAction} />
               </>
             )}
-          </Card>
+          </div>
 
-          <aside className="am-contact-aside" aria-label={t("asideTitle")}>
-            <Card tone="muted" padding="lg">
-              <CardTitle as="h2">{t("asideTitle")}</CardTitle>
-              <ul className="am-contact-aside__list">
-                <li>
-                  <Icon name="clock" size={18} />
-                  <span>{t("asideResponse")}</span>
-                </li>
-                <li>
-                  <Icon name="scale" size={18} />
-                  <span>{t("asideNoAdvice")}</span>
-                </li>
-                <li>
-                  <Icon name="lock" size={18} />
-                  <span>{t("asidePrivacy")}</span>
-                </li>
-                <li>
-                  <Icon name="shield-check" size={18} />
-                  <span>
-                    {t("asideCommitment")} <Link href="/our-commitment">{t("asideCommitmentLink")}</Link>.
-                  </span>
-                </li>
-                <li>
-                  <Icon name="help-circle" size={18} />
-                  <span>{t("asideFaq")}</span>
-                </li>
-              </ul>
-              <CardFooter>
-                <Button href="/faq" variant="secondary" iconAfter={<Icon name="arrow-right" size={18} />}>
-                  {t("asideFaqLink")}
-                </Button>
-              </CardFooter>
-            </Card>
+          <aside className="am-contact-aside" aria-labelledby="contact-avant">
+            <h2 className="am-ruled-title" id="contact-avant">
+              {t("asideTitle")}
+            </h2>
+            <ul className="am-ruled">
+              <li>
+                <Icon name="clock" size={20} />
+                <span>{t("asideResponse")}</span>
+              </li>
+              <li>
+                <Icon name="scale" size={20} />
+                <span>{t("asideNoAdvice")}</span>
+              </li>
+              <li>
+                <Icon name="lock" size={20} />
+                <span>{t("asidePrivacy")}</span>
+              </li>
+              <li>
+                <Icon name="shield-check" size={20} />
+                <span>
+                  {t("asideCommitment")} <Link href="/our-commitment">{t("asideCommitmentLink")}</Link>.
+                </span>
+              </li>
+              <li>
+                <Icon name="help-circle" size={20} />
+                <span>{t("asideFaq")}</span>
+              </li>
+            </ul>
+            <div>
+              <Button href="/faq" variant="secondary" iconAfter={<Icon name="arrow-right" size={18} />}>
+                {t("asideFaqLink")}
+              </Button>
+            </div>
           </aside>
         </div>
       </Section>

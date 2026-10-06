@@ -7,7 +7,6 @@ import { toLocale } from "../../../i18n/routing";
 import { track } from "../../lib/analytics";
 import { submitPartnerApplication, type PartnerApplicationSubmission } from "../../lib/public-api";
 import { Button } from "../ui/button";
-import { Divider } from "../ui/divider";
 import { Field, fieldControlProps } from "../ui/field";
 import { Icon } from "../ui/icons";
 import { Notice } from "../ui/notice";
@@ -395,9 +394,6 @@ export function PartnerApplicationForm({ countries, productsByCountry, plans, la
 
       <fieldset className="am-formstepper__panel" data-step-panel="1" data-step-active={String(currentStep === 1)}>
         <legend className="am-formsection__legend" tabIndex={-1}>
-          <span className="am-formsection__index" aria-hidden="true">
-            1
-          </span>
           {labels.identityLegend}
         </legend>
         <div className="am-formcard__grid">
@@ -449,13 +445,8 @@ export function PartnerApplicationForm({ countries, productsByCountry, plans, la
         </div>
       </fieldset>
 
-      <Divider />
-
       <fieldset className="am-formstepper__panel" data-step-panel="2" data-step-active={String(currentStep === 2)}>
         <legend className="am-formsection__legend" tabIndex={-1}>
-          <span className="am-formsection__index" aria-hidden="true">
-            2
-          </span>
           {labels.contactLegend}
         </legend>
         <div className="am-formcard__grid">
@@ -525,13 +516,8 @@ export function PartnerApplicationForm({ countries, productsByCountry, plans, la
         </div>
       </fieldset>
 
-      <Divider />
-
       <fieldset className="am-formstepper__panel" data-step-panel="3" data-step-active={String(currentStep === 3)}>
         <legend className="am-formsection__legend" tabIndex={-1}>
-          <span className="am-formsection__index" aria-hidden="true">
-            3
-          </span>
           {labels.licenceLegend}
         </legend>
         <p className="am-field__hint">{labels.licenceIntro}</p>
@@ -629,13 +615,8 @@ export function PartnerApplicationForm({ countries, productsByCountry, plans, la
         </div>
       </fieldset>
 
-      <Divider />
-
       <fieldset className="am-formstepper__panel" data-step-panel="4" data-step-active={String(currentStep === 4)}>
         <legend className="am-formsection__legend" tabIndex={-1}>
-          <span className="am-formsection__index" aria-hidden="true">
-            4
-          </span>
           {labels.messageLegend}
         </legend>
 

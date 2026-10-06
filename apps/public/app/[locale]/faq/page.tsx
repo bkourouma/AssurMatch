@@ -5,7 +5,6 @@ import { Breadcrumb } from "../../components/ui/breadcrumb";
 import { Hero } from "../../components/ui/hero";
 import { JsonLd } from "../../components/ui/json-ld";
 import { Section } from "../../components/ui/section";
-import { Reveal } from "../../components/motion/reveal";
 import { getEntrySelectorData } from "../../content/entry-selector-data";
 import { listFaq } from "../../content/faq";
 import type { FaqItem } from "../../content/types";
@@ -37,6 +36,10 @@ export async function generateMetadata({ params }: { params: Promise<{ locale: s
   return buildMetadata({ title: t("title"), description: t("description"), href: "/faq", locale });
 }
 
+/**
+ * FAQ: one ruled accordion per theme. The questions are native `<details>`, so every answer opens
+ * without JavaScript; from 1024px the theme sits in the margin beside its questions.
+ */
 export default async function FaqPage({ params }: { params: Promise<{ locale: string }> }) {
   const locale: AppLocale = toLocale((await params).locale);
   setRequestLocale(locale);
@@ -49,7 +52,6 @@ export default async function FaqPage({ params }: { params: Promise<{ locale: st
   return (
     <>
       <Hero
-        kicker={t("kicker")}
         title={t("title")}
         lead={t("lead")}
         breadcrumb={
@@ -63,12 +65,12 @@ export default async function FaqPage({ params }: { params: Promise<{ locale: st
         }
       />
 
-      <Section width="narrow">
+      <Section className="am-faq-page">
         <p className="am-faq-meta">{t("questionCount", { count: items.length })}</p>
         {groups.map(([theme, themeItems]) => (
           <section className="am-faq-group" key={theme || "_"}>
             {theme ? <h2 className="am-faq-group__title">{theme}</h2> : null}
-            <Reveal stagger className="am-faq">
+            <div className="am-faq">
               {themeItems.map((item) => (
                 <details className="am-faq__item" key={item.question}>
                   <summary>{item.question}</summary>
@@ -78,13 +80,13 @@ export default async function FaqPage({ params }: { params: Promise<{ locale: st
                   </div>
                 </details>
               ))}
-            </Reveal>
+            </div>
           </section>
         ))}
       </Section>
 
       {selector.countries.length > 0 ? (
-        <Section tone="muted" title={common("compareOffers")} lead={t("selectorLead")} width="narrow">
+        <Section tone="muted" title={common("compareOffers")} lead={t("selectorLead")} width="narrow" className="am-inst-compare">
           <EntrySelector countries={selector.countries} products={selector.products} defaultCountry={selector.defaultCountry} />
         </Section>
       ) : null}

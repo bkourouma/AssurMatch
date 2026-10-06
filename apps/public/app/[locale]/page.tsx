@@ -1,18 +1,16 @@
 import { getTranslations, setRequestLocale } from "next-intl/server";
 import { toLocale } from "../../i18n/routing";
-import { OfferPreview } from "../components/home/offer-preview";
-import { GuideCard } from "../components/institutional/guide-card";
+import { Link } from "../../i18n/navigation";
 import { EntrySelector, type EntrySelectorProduct } from "../components/site/entry-selector";
 import { PlatformStatusNotice } from "../components/site/platform-status-notice";
-import { Button } from "../components/ui/button";
-import { Card } from "../components/ui/card";
+import { BackendText } from "../components/ui/backend-text";
+import { Directory, type DirectoryItem } from "../components/ui/directory";
 import { Hero } from "../components/ui/hero";
-import { Icon, type IconName } from "../components/ui/icons";
-import { IconTile } from "../components/ui/icon-tile";
+import { Icon } from "../components/ui/icons";
 import { Notice } from "../components/ui/notice";
+import { productPictogram } from "../components/ui/pictogram";
+import { Route } from "../components/ui/route-line";
 import { Section } from "../components/ui/section";
-import { Stat } from "../components/ui/stat";
-import { Reveal } from "../components/motion/reveal";
 import { listGuides } from "../content/guides";
 import { formatDate } from "../lib/country-format";
 import { getPublicStats, listPublicProducts } from "../lib/public-api";
@@ -23,14 +21,13 @@ import { readVisitorCountry } from "../lib/visitor-country";
 import "../styles/pages/home.css";
 
 /**
- * Public home page (SITE-101 to SITE-106).
+ * Public home page (SITE-101 to SITE-106), "La signalétique".
  *
- * The visitor country is a default, never a redirection: it pre-selects the entry form and the page
- * says so in as many words. Every figure comes from `GET /public-stats`; nothing is hard-coded.
- *
- * There is no breadcrumb here on purpose: a single "Accueil" crumb on the home page itself says
- * nothing a visitor does not already know, and the BreadcrumbList it emitted described a trail of
- * one. Every other page keeps its breadcrumb and its structured data.
+ * The page opens on a navy sign: the visitor's country (a default, never a redirection, and the page
+ * says so), the headline (the brand signature, spec 050 D3, in the visitor's imperative), the
+ * positioning sentence, then the products open in that country as directory rows, which are the
+ * main action. The page ends on the guides: no closing band repeats the headline. Every figure comes from `GET /public-stats`; nothing is
+ * hard-coded. There is no breadcrumb on the home page: the location line takes its place.
  */
 
 export async function generateMetadata({ params }: { params: Promise<{ locale: string }> }): Promise<PageMetadata> {
@@ -40,9 +37,8 @@ export async function generateMetadata({ params }: { params: Promise<{ locale: s
 }
 
 /**
- * The counters come straight from `GET /public-stats`, whose shape is fixed by the shared contract.
  * A value is rendered only when the endpoint really sent a finite number, so a partial or degraded
- * response shows fewer counters rather than a zero the catalogue never reported.
+ * response shows fewer figures rather than a zero the catalogue never reported.
  */
 function statValue(source: PublicStats | null, key: "openCountries" | "activeBrokers" | "validatedOffers"): number | undefined {
   const value = source?.[key];
@@ -53,21 +49,16 @@ function statDate(source: PublicStats | null): string | undefined {
   return typeof source?.computedAt === "string" ? source.computedAt : undefined;
 }
 
-/**
- * D-Chiffres: a successful call whose three retained counters are all zero hides the whole block,
- * rather than showing a triplet of zeros as if it were a real state of the platform.
- */
+/** D-Chiffres: three zeros hide the whole block rather than pass for a real state of the platform. */
 function allCountersZero(source: PublicStats | null): boolean {
-  const countries = statValue(source, "openCountries");
-  const partners = statValue(source, "activeBrokers");
-  const offers = statValue(source, "validatedOffers");
-  return countries === 0 && partners === 0 && offers === 0;
+  return statValue(source, "openCountries") === 0 && statValue(source, "activeBrokers") === 0 && statValue(source, "validatedOffers") === 0;
 }
 
 export default async function PublicHomePage({ params }: { params: Promise<{ locale: string }> }) {
   const locale = toLocale((await params).locale);
   setRequestLocale(locale);
   const t = await getTranslations("Home");
+  const countriesT = await getTranslations("Countries");
 
   const visitor = await readVisitorCountry();
   const selectable = visitor.directory.filter((country) => country.availability !== "waitlist");
@@ -79,43 +70,76 @@ export default async function PublicHomePage({ params }: { params: Promise<{ loc
     ...(preselected ? { countryIso: preselected.isoCode } : {})
   }));
 
+  const productRows: DirectoryItem[] = preselected
+    ? products.map((product) => {
+        const capabilities = [
+          product.comparisonEnabled ? countriesT("capability.comparison") : null,
+          product.quoteEnabled ? countriesT("capability.quote") : null
+        ].filter((line): line is string => line !== null);
+        return {
+          key: product.key,
+          title: <BackendText>{product.name}</BackendText>,
+          meta: capabilities.length > 0 ? capabilities.join(" · ") : undefined,
+          pictogram: productPictogram(product.key),
+          href: {
+            pathname: "/countries/[countryCode]/products/[productKey]",
+            params: { countryCode: preselected.isoCode, productKey: product.key }
+          }
+        };
+      })
+    : [];
+
+  // The figures are one information line, not a row of metric cards: each count is spelled with its
+  // own plural ("1 pays ouvert", "3 courtiers partenaires actifs") and the line lists only the counts
+  // the endpoint really sent.
   const stats = await getPublicStats();
-  const counters =
+  const figureParts =
     stats.status === "success" && !allCountersZero(stats.data)
       ? [
-          { key: "countries", icon: "globe" as IconName, label: t("stats.countries"), value: statValue(stats.data, "openCountries") },
-          { key: "partners", icon: "handshake" as IconName, label: t("stats.partners"), value: statValue(stats.data, "activeBrokers") },
-          { key: "offers", icon: "badge-check" as IconName, label: t("stats.offers"), value: statValue(stats.data, "validatedOffers") }
-        ].filter((counter): counter is { key: string; icon: IconName; label: string; value: number } => counter.value !== undefined)
+          { key: "countriesCount", value: statValue(stats.data, "openCountries") },
+          { key: "partnersCount", value: statValue(stats.data, "activeBrokers") },
+          { key: "offersCount", value: statValue(stats.data, "validatedOffers") }
+        ]
+          .filter((figure): figure is { key: "countriesCount" | "partnersCount" | "offersCount"; value: number } => figure.value !== undefined)
+          .map((figure) => t(`stats.${figure.key}`, { count: figure.value }))
       : [];
+  const figuresLine = figureParts.length > 0 ? new Intl.ListFormat(locale, { type: "conjunction" }).format(figureParts) : null;
   const computedAt = stats.status === "success" ? statDate(stats.data) : undefined;
-
-  const steps = [
-    { key: "compare", icon: "search" as IconName, title: t("steps.compare.title"), body: t("steps.compare.description") },
-    { key: "quote", icon: "file-text" as IconName, title: t("steps.quote.title"), body: t("steps.quote.description") },
-    { key: "broker", icon: "handshake" as IconName, title: t("steps.broker.title"), body: t("steps.broker.description") }
-  ];
 
   const does = [t("role.does.compare"), t("role.does.explain"), t("role.does.transmit"), t("role.does.flag")];
   const doesNot = [t("role.doesNot.sell"), t("role.doesNot.issue"), t("role.doesNot.collect"), t("role.doesNot.advise")];
 
   const guides = listGuides(locale).slice(0, 3);
+  const guideRows: DirectoryItem[] = guides.map((guide) => ({
+    key: guide.slug,
+    title: guide.title,
+    meta: guide.description,
+    icon: "book-open",
+    href: { pathname: "/guides/[slug]", params: { slug: guide.slug } }
+  }));
+
+  const location = (
+    <p className="am-home-location">
+      <Icon name="map-pin" size={20} />
+      {preselected ? (
+        <strong>
+          <BackendText>{preselected.name}</BackendText>
+        </strong>
+      ) : null}
+      <Link href="/countries">{t("changeCountry")}</Link>
+    </p>
+  );
 
   return (
     <>
-      <Hero
-        className="am-home-hero"
-        size="lg"
-        kicker={t("kicker")}
-        title={t("title")}
-        lead={t("lead")}
-        aside={<OfferPreview />}
-      >
-        <p className="am-home-hero__place">
-          <Icon name="map-pin" size={18} />
-          <span>{preselected ? t("preselected", { country: preselected.name }) : t("preselectedNone")}</span>
-        </p>
-        {selectable.length > 0 ? (
+      <Hero className="am-home-sign" size="lg" title={t("title")} lead={t("lead")} breadcrumb={location}>
+        {productRows.length > 0 ? (
+          <div className="am-home-products">
+            <h2 className="am-home-products__title">{t("productsTitle")}</h2>
+            <Directory items={productRows} label={t("productsTitle")} columns={2} surface="plate" />
+            <p className="am-home-products__note">{preselected ? t("preselected", { country: preselected.name }) : t("preselectedNone")}</p>
+          </div>
+        ) : selectable.length > 0 ? (
           <EntrySelector
             title={t("entryTitle")}
             countries={selectable.map((country) => ({ isoCode: country.isoCode, name: country.name }))}
@@ -127,137 +151,98 @@ export default async function PublicHomePage({ params }: { params: Promise<{ loc
         )}
       </Hero>
 
-      {counters.length > 0 ? (
-        <Section tone="muted" kicker={t("statsKicker")} title={t("stats.title")} lead={t("stats.lead")}>
-          <Reveal as="ul" stagger className="am-home-stats">
-            {counters.map((counter) => (
-              <li key={counter.key}>
-                <Card tone="muted" padding="lg">
-                  <Stat icon={counter.icon} label={counter.label} value={counter.value} locale={locale} />
-                </Card>
-              </li>
-            ))}
-          </Reveal>
-          <div className="am-home-stats__notes">
-            {computedAt ? <p>{t("stats.updatedAt", { date: formatDate(computedAt, { locale }) })}</p> : null}
-            <p>{t("stats.indicative")}</p>
+      {productRows.length > 0 && selectable.length > 0 ? (
+        <section className="am-home-entry" aria-label={t("entryOther")}>
+          <div className="am-container">
+            <EntrySelector
+              title={t("entryOther")}
+              countries={selectable.map((country) => ({ isoCode: country.isoCode, name: country.name }))}
+              products={entryProducts}
+              defaultCountry={preselected?.isoCode ?? null}
+            />
           </div>
-        </Section>
+        </section>
       ) : null}
 
-      <Section kicker={t("stepsKicker")} title={t("stepsTitle")} lead={t("stepsLead")}>
-        <Reveal as="ol" stagger className="am-home-steps">
-          {steps.map((step, index) => (
-            <Card as="li" key={step.key} className="am-home-step" padding="lg">
-              <div className="am-home-step__head">
-                <IconTile name={step.icon} size="lg" />
-                <span className="am-home-step__index am-tabular" aria-hidden="true">
-                  {index + 1}
-                </span>
-              </div>
-              <h3 className="am-home-step__title">{step.title}</h3>
-              <p className="am-home-step__body">{step.body}</p>
-            </Card>
-          ))}
-        </Reveal>
-        <div className="am-cluster">
-          <Button href="/how-it-works" variant="secondary" iconAfter={<Icon name="arrow-right" size={18} />}>
+      <Section tone="muted" title={t("stepsTitle")} lead={t("stepsLead")}>
+        <Route
+          stops={[
+            { key: "compare", title: t("steps.compare.title"), body: t("steps.compare.description") },
+            { key: "quote", title: t("steps.quote.title"), body: t("steps.quote.description") },
+            { key: "broker", title: t("steps.broker.title"), body: t("steps.broker.description"), state: "confirm" }
+          ]}
+        />
+        <p className="am-home-more">
+          <Link href="/how-it-works">
             {t("stepsLink")}
-          </Button>
-        </div>
+            <Icon name="arrow-right" size={18} />
+          </Link>
+        </p>
       </Section>
 
-      <Section tone="muted" kicker={t("roleKicker")} title={t("statusTitle")} lead={t("statusLead")}>
+      <Section title={t("statusTitle")} lead={t("statusLead")}>
         <div className="am-home-role">
-          <Reveal className="am-home-role__intro" from="left">
-            <PlatformStatusNotice />
-            <p className="am-home-role__detail">{t("statusDetail")}</p>
-            <div className="am-cluster">
-              <Button href="/regulatory-status" variant="secondary" iconAfter={<Icon name="arrow-right" size={18} />}>
-                {t("regulatoryLink")}
-              </Button>
-              <Button href="/our-commitment" variant="tertiary" iconAfter={<Icon name="arrow-right" size={18} />}>
-                {t("commitmentLink")}
-              </Button>
-            </div>
-            <p className="am-home-role__note">{t("regulatoryLead")}</p>
-          </Reveal>
-
-          <Reveal from="right">
-            <Card padding="lg" className="am-home-role__lists">
-              <div className="am-home-role__group" data-tone="does">
-                <h3 className="am-home-role__grouptitle">
-                  <Icon name="check-circle" size={20} />
-                  {t("role.does.title")}
-                </h3>
-                <ul className="am-checklist" data-tone="does">
-                  {does.map((line) => (
-                    <li key={line}>
-                      <Icon name="check-circle" size={18} />
-                      <span>{line}</span>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-              <div className="am-home-role__group" data-tone="doesnot">
-                <h3 className="am-home-role__grouptitle">
-                  <Icon name="x-circle" size={20} />
-                  {t("role.doesNot.title")}
-                </h3>
-                <ul className="am-checklist" data-tone="doesnot">
-                  {doesNot.map((line) => (
-                    <li key={line}>
-                      <Icon name="x-circle" size={18} />
-                      <span>{line}</span>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            </Card>
-          </Reveal>
+          <div className="am-home-role__group">
+            <h3 className="am-home-role__title">{t("role.does.title")}</h3>
+            <ul className="am-home-role__list" data-tone="does">
+              {does.map((line) => (
+                <li key={line}>
+                  <Icon name="check" size={20} />
+                  <span>{line}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+          <div className="am-home-role__group">
+            <h3 className="am-home-role__title">{t("role.doesNot.title")}</h3>
+            <ul className="am-home-role__list" data-tone="doesnot">
+              {doesNot.map((line) => (
+                <li key={line}>
+                  <Icon name="minus" size={20} />
+                  <span>{line}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
         </div>
+
+        <div className="am-home-status">
+          <PlatformStatusNotice />
+          <p className="am-home-status__note">{t("fineprint")}</p>
+          <ul className="am-home-status__links">
+            <li>
+              <Link href="/regulatory-status">{t("regulatoryLink")}</Link>
+            </li>
+            <li>
+              <Link href="/our-commitment">{t("commitmentLink")}</Link>
+            </li>
+          </ul>
+        </div>
+
+        {figuresLine ? (
+          <p className="am-home-figures">
+            <strong>{t("stats.lineLabel")}</strong> <span className="am-tabular">{figuresLine}.</span>{" "}
+            <span className="am-home-figures__note">
+              {`${t("stats.lead")} `}
+              {computedAt ? `${t("stats.updatedAt", { date: formatDate(computedAt, { locale }) })} ` : null}
+              {t("stats.indicative")}
+            </span>
+          </p>
+        ) : null}
       </Section>
 
-      {guides.length > 0 ? (
-        <Section kicker={t("guides.kicker")} title={t("guides.title")} lead={t("guides.lead")}>
-          <Reveal as="ul" stagger className="am-home-guides">
-            {guides.map((guide) => (
-              <GuideCard
-                key={guide.slug}
-                slug={guide.slug}
-                title={guide.title}
-                description={guide.description}
-                meta={t("guides.updated", { date: formatDate(guide.updatedAt, { locale }) })}
-                readLabel={t("guides.read")}
-              />
-            ))}
-          </Reveal>
-          <div className="am-cluster">
-            <Button href="/guides" variant="secondary" iconAfter={<Icon name="arrow-right" size={18} />}>
+      {guideRows.length > 0 ? (
+        <Section tone="muted" title={t("guides.title")} lead={t("guides.lead")}>
+          <Directory items={guideRows} label={t("guides.title")} />
+          <p className="am-home-more">
+            <Link href="/guides">
               {t("guides.all")}
-            </Button>
-          </div>
+              <Icon name="arrow-right" size={18} />
+            </Link>
+          </p>
         </Section>
       ) : null}
 
-      {/* Brand signature: the home page is the only surface that carries it. */}
-      <Section
-        tone="navy"
-        align="center"
-        className="am-home-signature"
-        kicker={t("signatureKicker")}
-        title={t("signature")}
-        lead={t("signatureLead")}
-        actions={
-          <Button href="/countries" size="lg" icon={<Icon name="search" size={20} />}>
-            {t("compare")}
-          </Button>
-        }
-      >
-        <Notice tone="indicative" className="am-home-signature__notice">
-          {t("fineprint")}
-        </Notice>
-      </Section>
     </>
   );
 }

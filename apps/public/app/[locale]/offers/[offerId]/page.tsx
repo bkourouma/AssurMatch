@@ -1,15 +1,8 @@
 import { getTranslations, setRequestLocale } from "next-intl/server";
+import { Link } from "../../../../i18n/navigation";
 import { toLocale } from "../../../../i18n/routing";
-import {
-  OfferCriteria,
-  OfferFacts,
-  OfferGuarantees,
-  OfferParties,
-  OfferPrice,
-  OfferScore,
-  ScoreBreakdown,
-  SponsoredBadge
-} from "../../../components/offer-cards";
+import { JourneyRoute } from "../../../components/journey/journey-route";
+import { OfferCriteria, OfferPrice, OfferScore, ScoreBreakdown, SponsoredBadge } from "../../../components/offer-cards";
 import { JourneyHeroNotice } from "../../../components/public-journey";
 import { BackendText } from "../../../components/ui/backend-text";
 import { Breadcrumb } from "../../../components/ui/breadcrumb";
@@ -22,12 +15,17 @@ import { JsonLd } from "../../../components/ui/json-ld";
 import { Notice } from "../../../components/ui/notice";
 import { Section } from "../../../components/ui/section";
 import { countryCurrency, formatDate } from "../../../lib/country-format";
-import { getPublicOffer, listCountryPartners } from "../../../lib/public-api";
+import { findOfferContext, getPublicOffer, listCountryPartners } from "../../../lib/public-api";
 import { buildMetadata, localeUrl, offerJsonLd } from "../../../lib/seo";
 import type { PageMetadata } from "../../../lib/seo";
 import "../../../styles/pages/journey.css";
 
-/** Detail of one indicative offer: guarantees, limits, validity and responsible partner broker. */
+/**
+ * Detail of one indicative offer: guarantees, limits, validity and responsible partner broker.
+ *
+ * The facts are one ruled definition list (the canonical reference of the offer); the dashed price,
+ * the quote request and the responsible broker sit in the side column, sticky on wide screens.
+ */
 
 type SearchParams = Record<string, string | string[] | undefined>;
 type PageParams = { locale: string; offerId: string };
@@ -64,10 +62,16 @@ export default async function PublicOfferDetailPage({
   const t = await getTranslations("OfferDetail");
   const common = await getTranslations("Common");
   const query = searchParams ? await searchParams : {};
-  const countryCode = first(query.country);
-  const productKey = first(query.product);
   const offer = await getPublicOffer(offerId);
   const detail = offer.status === "success" ? offer.data : null;
+  // The offer cards link here with their country and product. A shared or bookmarked link carries
+  // neither, so they are looked up: the route strip stays a way back and "Demander un devis" stays
+  // the primary action instead of falling back to the country picker.
+  const queryCountry = first(query.country);
+  const queryProduct = first(query.product);
+  const context = queryCountry && queryProduct ? null : detail ? await findOfferContext(offerId) : null;
+  const countryCode = queryCountry && queryProduct ? queryCountry : (context?.countryCode ?? queryCountry);
+  const productKey = queryCountry && queryProduct ? queryProduct : (context?.productKey ?? queryProduct);
   const canonical = localeUrl(locale, "/offers/[offerId]", { offerId });
 
   // The offer itself carries only the partner's display name. When the visitor arrived with a
@@ -91,10 +95,10 @@ export default async function PublicOfferDetailPage({
   return (
     <>
       <Hero
-        kicker={t("kicker")}
         title={detail ? detail.name : t("title")}
         lead={t("description")}
         size="sm"
+        route={<JourneyRoute current="offers" countryCode={countryCode} productKey={productKey} />}
         breadcrumb={
           <Breadcrumb
             label={common("breadcrumbLabel")}
@@ -105,17 +109,15 @@ export default async function PublicOfferDetailPage({
           />
         }
       >
-        <div className="am-stack">
-          {/* The public detail endpoint does not always carry a score: an empty badge row would
-              just be a gap under the title. */}
-          {detail && (detail.score || detail.isSponsored) ? (
-            <div className="am-cluster">
-              {detail.score ? <OfferScore score={detail.score} size="lg" /> : null}
-              <SponsoredBadge offer={detail} />
-            </div>
-          ) : null}
-          <JourneyHeroNotice />
-        </div>
+        {/* The public detail endpoint does not always carry a score: an empty badge row would just
+            be a gap under the title. */}
+        {detail && (detail.score || detail.isSponsored) ? (
+          <div className="am-cluster am-j-signbadges">
+            {detail.score ? <OfferScore score={detail.score} size="lg" /> : null}
+            <SponsoredBadge offer={detail} />
+          </div>
+        ) : null}
+        <JourneyHeroNotice />
       </Hero>
 
       {!detail ? (
@@ -130,7 +132,6 @@ export default async function PublicOfferDetailPage({
            */}
           <EmptyState
             icon="search"
-            tone="muted"
             align="center"
             title={t("unavailable.title")}
             description={
@@ -163,111 +164,48 @@ export default async function PublicOfferDetailPage({
         <>
           <Section ariaLabel={t("criteriaTitle")}>
             <div className="am-j-detail">
-              <div className="am-j-detail__main">
-                <div className="am-j-block">
-                  <h2 className="am-j-block__title">{t("criteriaTitle")}</h2>
-                  <OfferParties offer={detail} />
-                  {detail.shortDescription ? (
-                    <p className="am-lead">
-                      <BackendText>{detail.shortDescription}</BackendText>
-                    </p>
-                  ) : null}
-                  {detail.guaranteeSummary ? (
-                    <p>
-                      <BackendText>{detail.guaranteeSummary}</BackendText>
-                    </p>
-                  ) : null}
-                  <OfferFacts offer={detail} countryCode={countryCode} />
-                  <OfferGuarantees offer={detail} />
-                  <details className="am-j-more">
-                    <summary>{t("allCriteria")}</summary>
-                    <div className="am-j-more__body">
-                      <OfferCriteria offer={detail} countryCode={countryCode} />
-                      {detail.score ? <ScoreBreakdown score={detail.score} /> : null}
-                    </div>
-                  </details>
-                  <p className="am-j-fineprint">
-                    {t("validity", { date: formatDate(detail.validUntil, { locale, ...(countryCode ? { countryIso: countryCode } : {}) }) })}
-                    {detail.sourceOfInformation ? ` ${t("source", { source: detail.sourceOfInformation })}` : ""}
-                  </p>
-                </div>
-
-                {detail.exclusionsSummary ? (
-                  <div className="am-j-block">
-                    <h2 className="am-j-block__title">{t("exclusionsTitle")}</h2>
-                    <p>
-                      <BackendText>{detail.exclusionsSummary}</BackendText>
-                    </p>
-                  </div>
-                ) : null}
-
-                {detail.requiredDocuments.length > 0 ? (
-                  <div className="am-j-block">
-                    <h2 className="am-j-block__title">{t("documentsTitle")}</h2>
-                    <ul className="am-j-list">
-                      {detail.requiredDocuments.map((document) => (
-                        <li key={document}>
-                          <Icon name="file-check" size={18} />
-                          <BackendText>{document}</BackendText>
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                ) : null}
-
-                <div className="am-j-block">
-                  <h2 className="am-j-block__title">{t("disclaimersTitle")}</h2>
-                  <ul className="am-j-list">
-                    {detail.publicDisclaimers.map((disclaimer) => (
-                      <li key={disclaimer}>
-                        <Icon name="info" size={18} />
-                        <BackendText>{disclaimer}</BackendText>
-                      </li>
-                    ))}
-                  </ul>
-                  <Notice tone="indicative">{t("fineprint")}</Notice>
-                </div>
-              </div>
-
+              {/* The side column comes first in the reading order: on a phone the dashed price, the
+                  quote request and the responsible broker come before the facts; from 980px it
+                  moves to the right-hand column (journey.css). */}
               <aside className="am-j-detail__aside" aria-label={t("actionsLabel")}>
-                <div className="am-j-detail__card">
-                  {/* The price block carries its own indicative notice: the full-width one lives in
-                      the hero so the same sentence is not printed twice next to each other. */}
-                  <OfferPrice offer={detail} countryCode={countryCode} />
-                  <div className="am-j-detail__actions">
-                    {countryCode && productKey ? (
-                      <>
-                        <Button
-                          href={{
-                            pathname: "/countries/[countryCode]/products/[productKey]/quote",
-                            params: { countryCode, productKey },
-                            query: { offerId: detail.id }
-                          }}
-                          size="lg"
-                        >
-                          {t("quote")}
-                        </Button>
-                        <Button
-                          variant="secondary"
-                          href={{
-                            pathname: "/countries/[countryCode]/products/[productKey]/offers",
-                            params: { countryCode, productKey }
-                          }}
-                          icon={<Icon name="scale" size={18} />}
-                        >
-                          {t("compare")}
-                        </Button>
-                      </>
-                    ) : (
-                      <Button variant="secondary" href="/countries" icon={<Icon name="globe" size={18} />}>
-                        {t("backToCountries")}
+                {/* The price carries its own "à confirmer" line: the full regulatory notice lives on
+                    the sign, so the same sentence is not printed twice next to each other. */}
+                <OfferPrice offer={detail} countryCode={countryCode} />
+                <div className="am-j-detail__actions">
+                  {countryCode && productKey ? (
+                    <>
+                      <Button
+                        href={{
+                          pathname: "/countries/[countryCode]/products/[productKey]/quote",
+                          params: { countryCode, productKey },
+                          query: { offerId: detail.id }
+                        }}
+                        size="lg"
+                      >
+                        {t("quote")}
                       </Button>
-                    )}
-                  </div>
+                      <Button
+                        variant="secondary"
+                        href={{
+                          pathname: "/countries/[countryCode]/products/[productKey]/offers",
+                          params: { countryCode, productKey }
+                        }}
+                        icon={<Icon name="scale" size={18} />}
+                      >
+                        {t("compare")}
+                      </Button>
+                    </>
+                  ) : (
+                    <Button variant="secondary" href="/countries" icon={<Icon name="globe" size={18} />}>
+                      {t("backToCountries")}
+                    </Button>
+                  )}
                 </div>
 
-                <div className="am-j-block">
-                  <h2 className="am-j-block__title">{t("brokerTitle")}</h2>
+                <section className="am-j-part am-j-detail__broker" aria-labelledby="am-offer-broker">
+                  <h2 className="am-j-part__title" id="am-offer-broker">
+                    {t("brokerTitle")}
+                  </h2>
                   {partner ? (
                     <BrokerBlock
                       variant="full"
@@ -279,22 +217,91 @@ export default async function PublicOfferDetailPage({
                       {...(partner.city ? { city: partner.city } : {})}
                     />
                   ) : (
-                    <p>
+                    <p className="am-j-detail__brokername">
                       <BackendText>{responsibleName ?? common("notProvided")}</BackendText>
                     </p>
                   )}
                   {countryCode ? (
-                    <Button
-                      variant="tertiary"
-                      size="sm"
-                      href={{ pathname: "/countries/[countryCode]/brokers", params: { countryCode } }}
-                      iconAfter={<Icon name="arrow-right" size={16} />}
-                    >
-                      {t("brokerDirectory")}
-                    </Button>
+                    <p className="am-j-morelink">
+                      <Link href={{ pathname: "/countries/[countryCode]/brokers", params: { countryCode } }}>
+                        {t("brokerDirectory")}
+                        <Icon name="arrow-right" size={18} />
+                      </Link>
+                    </p>
                   ) : null}
-                </div>
+                </section>
               </aside>
+
+              <div className="am-j-detail__main">
+                <section className="am-j-part" aria-labelledby="am-offer-criteria">
+                  <h2 className="am-j-part__title" id="am-offer-criteria">
+                    {t("criteriaTitle")}
+                  </h2>
+                  {detail.shortDescription ? (
+                    <p className="am-lead">
+                      <BackendText>{detail.shortDescription}</BackendText>
+                    </p>
+                  ) : null}
+                  {detail.guaranteeSummary ? (
+                    <p className="am-j-measure">
+                      <BackendText>{detail.guaranteeSummary}</BackendText>
+                    </p>
+                  ) : null}
+                  <OfferCriteria offer={detail} countryCode={countryCode} />
+                  {detail.score ? <ScoreBreakdown score={detail.score} /> : null}
+                  <p className="am-j-note">
+                    {t("validity", { date: formatDate(detail.validUntil, { locale, ...(countryCode ? { countryIso: countryCode } : {}) }) })}
+                    {detail.sourceOfInformation ? ` ${t("source", { source: detail.sourceOfInformation })}` : ""}
+                  </p>
+                </section>
+
+                {detail.exclusionsSummary ? (
+                  <section className="am-j-part" aria-labelledby="am-offer-exclusions">
+                    <h2 className="am-j-part__title" id="am-offer-exclusions">
+                      {t("exclusionsTitle")}
+                    </h2>
+                    <p className="am-j-measure">
+                      <BackendText>{detail.exclusionsSummary}</BackendText>
+                    </p>
+                  </section>
+                ) : null}
+
+                {detail.requiredDocuments.length > 0 ? (
+                  <section className="am-j-part" aria-labelledby="am-offer-documents">
+                    <h2 className="am-j-part__title" id="am-offer-documents">
+                      {t("documentsTitle")}
+                    </h2>
+                    <ul className="am-j-ticks">
+                      {detail.requiredDocuments.map((document) => (
+                        <li key={document}>
+                          <Icon name="file-check" size={20} />
+                          <span>
+                            <BackendText>{document}</BackendText>
+                          </span>
+                        </li>
+                      ))}
+                    </ul>
+                  </section>
+                ) : null}
+
+                <section className="am-j-part" aria-labelledby="am-offer-disclaimers">
+                  <h2 className="am-j-part__title" id="am-offer-disclaimers">
+                    {t("disclaimersTitle")}
+                  </h2>
+                  <ul className="am-j-ticks" data-tone="muted">
+                    {detail.publicDisclaimers.map((disclaimer) => (
+                      <li key={disclaimer}>
+                        <Icon name="info" size={20} />
+                        <span>
+                          <BackendText>{disclaimer}</BackendText>
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                  <Notice tone="indicative">{t("fineprint")}</Notice>
+                </section>
+              </div>
+
             </div>
           </Section>
 

@@ -2,11 +2,14 @@ import { getTranslations, setRequestLocale } from "next-intl/server";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { toLocale, type AppLocale } from "../../../../../../../i18n/routing";
+import { JourneyRoute } from "../../../../../../components/journey/journey-route";
 import { QuoteBlockedState, QuoteFormShell, type ResponsibleBrokerInfo } from "../../../../../../components/quote-form";
 import { TechnicalRoleNotice } from "../../../../../../components/public-journey";
+import { BackendText } from "../../../../../../components/ui/backend-text";
 import { Breadcrumb } from "../../../../../../components/ui/breadcrumb";
 import { Hero } from "../../../../../../components/ui/hero";
 import { Notice } from "../../../../../../components/ui/notice";
+import { Pictogram, productPictogram } from "../../../../../../components/ui/pictogram";
 import { Section } from "../../../../../../components/ui/section";
 import {
   getPublicOffer,
@@ -185,10 +188,10 @@ export default async function PublicQuotePage({
   return (
     <>
       <Hero
-        kicker={t("kicker", { product: productName, country: countryName })}
         title={t("title")}
         lead={t("lead")}
         size="sm"
+        route={<JourneyRoute current="request" countryCode={countryCode} productKey={productKey} />}
         breadcrumb={
           <Breadcrumb
             label={common("breadcrumbLabel")}
@@ -208,6 +211,11 @@ export default async function PublicQuotePage({
           />
         }
       >
+        {/* Which request this is: the product and the country, next to the product's pictogram. */}
+        <p className="am-j-context">
+          <Pictogram name={productPictogram(productKey)} tile tone="light" size={24} />
+          <BackendText>{t("kicker", { product: productName, country: countryName })}</BackendText>
+        </p>
         <TechnicalRoleNotice />
       </Hero>
 
