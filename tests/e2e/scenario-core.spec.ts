@@ -408,7 +408,9 @@ test("SC-05 le visiteur compare, choisit l'offre du courtier, consent nommément
   const visitor = await (await newAppContext(browser, e2eEnv.publicUrl)).newPage();
 
   await visitor.goto("/pays/CI");
-  await visitor.getByRole("link", { name: "Comparer les offres" }).nth(1).click();
+  // The country page lists its products as rows; "Comparer les offres" is the shortcut line under
+  // them, one link per comparable product.
+  await visitor.locator(".am-j-shortcuts li").filter({ hasText: "Comparer les offres" }).getByRole("link", { name: "Assurance auto" }).click();
   await visitor.waitForURL(/\/pays\/CI\/produits\/auto\/offres/u);
   // The validated offer is public, marked indicative, with its responsible broker.
   const offer = visitor.locator("article, li, section").filter({ hasText: offerTitle }).filter({ hasText: "Courtier partenaire responsable" }).first();
