@@ -42,6 +42,13 @@ export interface WaitlistFormProps {
   countryIso: string;
   labels: WaitlistFormLabels;
   products?: readonly WaitlistProductOption[];
+  /**
+   * Server action bound in `countries/[countryCode]/page.tsx` (spec 050, decision D6): the browser's
+   * native submission of this form invokes it, so a visitor without JavaScript still sends a real
+   * request instead of a GET carrying their e-mail in the URL. When JavaScript runs, `submit` below
+   * calls `preventDefault()` before the browser gets to use it.
+   */
+  formAction?: ((formData: FormData) => Promise<void>) | undefined;
 }
 
 /**
@@ -63,7 +70,7 @@ type FormState =
  * and `sessionId` is a per-form identifier used by the backend abuse guard. Nothing here leads to a
  * quote: the country has no eligible partner broker yet.
  */
-export function WaitlistForm({ countryIso, labels, products = [] }: WaitlistFormProps) {
+export function WaitlistForm({ countryIso, labels, products = [], formAction }: WaitlistFormProps) {
   // Generated once per mounted form, so a reload is a new session for the abuse guard.
   const [sessionId] = useState(() => (typeof crypto !== "undefined" ? crypto.randomUUID() : ""));
   const [state, setState] = useState<FormState>({ status: "idle" });
@@ -127,7 +134,7 @@ export function WaitlistForm({ countryIso, labels, products = [] }: WaitlistForm
   const formError = state.status === "error" && state.field === "form" ? state.message : undefined;
 
   return (
-    <form className="am-stack" onSubmit={submit} aria-label={labels.legend} noValidate>
+    <form className="am-stack" onSubmit={submit} aria-label={labels.legend} noValidate {...(formAction ? { action: formAction } : {})}>
       <Field
         id="am-waitlist-email"
         label={labels.email}

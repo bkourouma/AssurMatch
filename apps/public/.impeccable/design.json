@@ -1,0 +1,196 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-10-05T00:00:00Z",
+  "title": "Design System: AssurMatch public site",
+  "extensions": {
+    "colorMeta": {
+      "sign-navy": { "role": "primary", "displayName": "Sign Navy", "canonical": "#0b2a5c", "tonalRamp": ["#071c40", "#0b2a5c", "#123e86", "#1650b8", "#6b95e0", "#a6c0ee", "#cbd9f5", "#f1f5fd"] },
+      "sign-navy-deep": { "role": "primary", "displayName": "Sign Navy Deep", "canonical": "#071c40", "tonalRamp": ["#071c40", "#0b2a5c", "#123e86", "#1650b8", "#6b95e0", "#a6c0ee", "#cbd9f5", "#f1f5fd"] },
+      "action-blue": { "role": "primary", "displayName": "Action Blue", "canonical": "#1650b8", "tonalRamp": ["#071c40", "#0b2a5c", "#123e86", "#1650b8", "#2a66d1", "#6b95e0", "#cbd9f5", "#f1f5fd"] },
+      "action-blue-pressed": { "role": "primary", "displayName": "Action Blue Pressed", "canonical": "#123e86", "tonalRamp": ["#071c40", "#0b2a5c", "#123e86", "#1650b8", "#2a66d1", "#6b95e0", "#cbd9f5", "#f1f5fd"] },
+      "focus-blue": { "role": "primary", "displayName": "Focus Blue", "canonical": "#2a66d1", "tonalRamp": ["#071c40", "#0b2a5c", "#123e86", "#1650b8", "#2a66d1", "#6b95e0", "#cbd9f5", "#f1f5fd"] },
+      "route-tint": { "role": "primary", "displayName": "Route Tint", "canonical": "#f1f5fd", "tonalRamp": ["#071c40", "#0b2a5c", "#123e86", "#1650b8", "#6b95e0", "#a6c0ee", "#cbd9f5", "#f1f5fd"] },
+      "route-tint-rule": { "role": "primary", "displayName": "Route Tint Rule", "canonical": "#cbd9f5", "tonalRamp": ["#071c40", "#0b2a5c", "#123e86", "#1650b8", "#6b95e0", "#a6c0ee", "#cbd9f5", "#f1f5fd"] },
+      "sign-ink-muted": { "role": "neutral", "displayName": "Sign Ink Muted", "canonical": "#c7d3ea", "tonalRamp": ["#1d2a40", "#34435d", "#4d5e7c", "#6a7b9a", "#8999b6", "#a9b7d0", "#c7d3ea", "#e9eef7"] },
+      "sign-focus-yellow": { "role": "neutral", "displayName": "Sign Focus Yellow", "canonical": "#ffd75e", "tonalRamp": ["#3d2f00", "#5e4a00", "#826700", "#a88600", "#cfa71c", "#f2c641", "#ffd75e", "#fff3cc"] },
+      "ground-white": { "role": "neutral", "displayName": "Ground White", "canonical": "#ffffff", "tonalRamp": ["#12161d", "#222934", "#373f4c", "#4e5868", "#98a2b3", "#c9d0da", "#eef1f4", "#ffffff"] },
+      "band-grey": { "role": "neutral", "displayName": "Band Grey", "canonical": "#eef1f4", "tonalRamp": ["#12161d", "#222934", "#373f4c", "#4e5868", "#98a2b3", "#c9d0da", "#eef1f4", "#f7f8fa"] },
+      "rule-grey": { "role": "neutral", "displayName": "Rule Grey", "canonical": "#e1e5eb", "tonalRamp": ["#12161d", "#222934", "#373f4c", "#4e5868", "#98a2b3", "#c9d0da", "#e1e5eb", "#f7f8fa"] },
+      "rule-grey-strong": { "role": "neutral", "displayName": "Rule Grey Strong", "canonical": "#c9d0da", "tonalRamp": ["#12161d", "#222934", "#373f4c", "#4e5868", "#98a2b3", "#c9d0da", "#e1e5eb", "#f7f8fa"] },
+      "ink": { "role": "neutral", "displayName": "Ink", "canonical": "#12161d", "tonalRamp": ["#12161d", "#222934", "#373f4c", "#4e5868", "#5f6a7c", "#98a2b3", "#c9d0da", "#eef1f4"] },
+      "ink-muted": { "role": "neutral", "displayName": "Ink Muted", "canonical": "#4e5868", "tonalRamp": ["#12161d", "#222934", "#373f4c", "#4e5868", "#5f6a7c", "#98a2b3", "#c9d0da", "#eef1f4"] },
+      "ink-subtle": { "role": "neutral", "displayName": "Ink Subtle", "canonical": "#5f6a7c", "tonalRamp": ["#12161d", "#222934", "#373f4c", "#4e5868", "#5f6a7c", "#98a2b3", "#c9d0da", "#eef1f4"] },
+      "confirm-green": { "role": "secondary", "displayName": "Confirm Green", "canonical": "#237a35", "tonalRamp": ["#0f3417", "#1b5e29", "#237a35", "#2e8f40", "#4fb832", "#9fd6a6", "#dcefde", "#eef7ef"] },
+      "confirm-green-tint": { "role": "secondary", "displayName": "Confirm Green Tint", "canonical": "#eef7ef", "tonalRamp": ["#0f3417", "#1b5e29", "#237a35", "#2e8f40", "#4fb832", "#9fd6a6", "#dcefde", "#eef7ef"] },
+      "logo-green": { "role": "secondary", "displayName": "Logo Green", "canonical": "#4fb832", "tonalRamp": ["#0f3417", "#1b5e29", "#237a35", "#2e8f40", "#4fb832", "#9fd6a6", "#dcefde", "#eef7ef"] },
+      "sponsored-orange": { "role": "tertiary", "displayName": "Sponsored Orange", "canonical": "#c2610a", "tonalRamp": ["#4a2401", "#8a4303", "#a4530a", "#c2610a", "#e07b12", "#f4b672", "#fdebd3", "#fff6eb"] },
+      "sponsored-ink": { "role": "tertiary", "displayName": "Sponsored Ink", "canonical": "#8a4303", "tonalRamp": ["#4a2401", "#8a4303", "#a4530a", "#c2610a", "#e07b12", "#f4b672", "#fdebd3", "#fff6eb"] },
+      "sponsored-tint": { "role": "tertiary", "displayName": "Sponsored Tint", "canonical": "#fff6eb", "tonalRamp": ["#4a2401", "#8a4303", "#a4530a", "#c2610a", "#e07b12", "#f4b672", "#fdebd3", "#fff6eb"] },
+      "error-red": { "role": "tertiary", "displayName": "Error Red", "canonical": "#b42318", "tonalRamp": ["#4a0c08", "#8f1c13", "#b42318", "#d93a2b", "#e8776c", "#f3b3ac", "#fadcd8", "#fdf3f2"] },
+      "error-ink": { "role": "tertiary", "displayName": "Error Ink", "canonical": "#8f1c13", "tonalRamp": ["#4a0c08", "#8f1c13", "#b42318", "#d93a2b", "#e8776c", "#f3b3ac", "#fadcd8", "#fdf3f2"] },
+      "error-tint": { "role": "tertiary", "displayName": "Error Tint", "canonical": "#fdf3f2", "tonalRamp": ["#4a0c08", "#8f1c13", "#b42318", "#d93a2b", "#e8776c", "#f3b3ac", "#fadcd8", "#fdf3f2"] },
+      "whatsapp-green": { "role": "neutral", "displayName": "WhatsApp Green (channel exception)", "canonical": "#25d366", "tonalRamp": ["#06331a", "#0d5a2e", "#138043", "#1da851", "#25d366", "#6fe49b", "#b5f2cb", "#e7fbef"] },
+      "whatsapp-ink": { "role": "neutral", "displayName": "WhatsApp Ink", "canonical": "#06331a", "tonalRamp": ["#06331a", "#0d5a2e", "#138043", "#1da851", "#25d366", "#6fe49b", "#b5f2cb", "#e7fbef"] }
+    },
+    "typographyMeta": {
+      "display": { "displayName": "Display", "purpose": "The large page sign (home and acquisition heroes) only." },
+      "headline": { "displayName": "Headline", "purpose": "Page titles on standard navy signs, capped near 22ch." },
+      "section": { "displayName": "Section", "purpose": "Section titles on white or grey bands." },
+      "title": { "displayName": "Title", "purpose": "Card titles, offer names, route stop titles." },
+      "row-title": { "displayName": "Row Title", "purpose": "The bold name in a directory row." },
+      "lead": { "displayName": "Lead", "purpose": "The one sentence under a title; measure 34em." },
+      "body": { "displayName": "Body", "purpose": "Running text; prose measures in em, not ch." },
+      "label": { "displayName": "Label", "purpose": "Field labels, fact labels, small buttons; sentence case, no tracking." },
+      "caption": { "displayName": "Caption", "purpose": "Meta lines, hints, fine print; the 14px floor." },
+      "figure": { "displayName": "Figure", "purpose": "Counters and stats in tabular figures." }
+    },
+    "shadows": [
+      { "name": "overlay", "value": "0 12px 32px rgba(7, 28, 64, 0.18)", "purpose": "The menu drawer and the sticky comparison bar only; nothing on the page casts a shadow." },
+      { "name": "selection-inset", "value": "inset 0 0 0 1px #1650b8", "purpose": "Thickens the border of a focused field, selected radio card or selected offer card." },
+      { "name": "current-stop-halo", "value": "0 0 0 4px rgba(255, 255, 255, 0.22)", "purpose": "Ring around the current stop of the route strip on a navy sign." },
+      { "name": "focus-ring", "value": "outline: 3px solid #1650b8; outline-offset: 2px", "purpose": "Every focusable element on light ground; #ffd75e inside navy panels." }
+    ],
+    "motion": [
+      { "name": "transition", "value": "160ms cubic-bezier(0.22, 1, 0.36, 1)", "purpose": "Colour and border state changes on buttons, links, fields, rows." },
+      { "name": "arrow-nudge", "value": "transform translateX(4px) 220ms cubic-bezier(0.22, 1, 0.36, 1)", "purpose": "The only authored move: a directory arrow nudging toward its destination on hover and focus." },
+      { "name": "drawer-in", "value": "am-slide-in-right 220ms cubic-bezier(0.22, 1, 0.36, 1)", "purpose": "The menu drawer opening." },
+      { "name": "reduced-motion", "value": "all animation and transition durations 0.01ms", "purpose": "Single kill switch under prefers-reduced-motion." }
+    ],
+    "breakpoints": [
+      { "name": "route-strip-compact", "value": "max-width 359px" },
+      { "name": "header-compact", "value": "max-width 479px" },
+      { "name": "gutter-tablet", "value": "600px" },
+      { "name": "offer-card-wide", "value": "768px" },
+      { "name": "two-columns", "value": "900px" },
+      { "name": "hero-two-columns", "value": "980px" },
+      { "name": "offer-grid-three", "value": "1000px" },
+      { "name": "desktop-header", "value": "1100px" }
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "The one primary action of a page or card: blue fill, bold label, 48px high.",
+      "html": "<button class=\"ds-btn-primary\">Comparer les offres</button>",
+      "css": ".ds-btn-primary { display: inline-flex; min-height: 48px; align-items: center; justify-content: center; gap: 8px; padding: 10px 20px; border: 2px solid var(--am-action, #1650b8); border-radius: 4px; background: var(--am-action, #1650b8); color: #fff; font-family: var(--am-font-body, 'Atkinson Hyperlegible Next', system-ui, sans-serif); font-size: 16px; font-weight: 700; line-height: 1.2; cursor: pointer; transition: background-color 160ms cubic-bezier(0.22,1,0.36,1), border-color 160ms cubic-bezier(0.22,1,0.36,1); } .ds-btn-primary:hover { background: #123e86; border-color: #123e86; } .ds-btn-primary:focus-visible { outline: 3px solid #1650b8; outline-offset: 2px; } .ds-btn-primary:active { transform: translateY(1px); }"
+    },
+    {
+      "name": "Secondary Button",
+      "kind": "button",
+      "refersTo": "button-secondary",
+      "description": "A second action beside a primary: white with the blue 2px stroke.",
+      "html": "<button class=\"ds-btn-secondary\">Voir le détail</button>",
+      "css": ".ds-btn-secondary { display: inline-flex; min-height: 48px; align-items: center; justify-content: center; padding: 10px 20px; border: 2px solid #1650b8; border-radius: 4px; background: #fff; color: #1650b8; font-family: var(--am-font-body, 'Atkinson Hyperlegible Next', system-ui, sans-serif); font-size: 16px; font-weight: 700; line-height: 1.2; cursor: pointer; transition: background-color 160ms cubic-bezier(0.22,1,0.36,1), color 160ms cubic-bezier(0.22,1,0.36,1); } .ds-btn-secondary:hover { background: #f1f5fd; border-color: #123e86; color: #123e86; } .ds-btn-secondary:focus-visible { outline: 3px solid #1650b8; outline-offset: 2px; }"
+    },
+    {
+      "name": "Button on a Sign",
+      "kind": "button",
+      "refersTo": "button-on-sign",
+      "description": "Inside a navy panel the primary inverts to white with navy text; focus turns yellow.",
+      "html": "<div class=\"ds-sign-demo\"><button class=\"ds-btn-onsign\">Demander un devis</button></div>",
+      "css": ".ds-sign-demo { padding: 24px; background: #0b2a5c; } .ds-btn-onsign { min-height: 48px; padding: 10px 20px; border: 2px solid #fff; border-radius: 4px; background: #fff; color: #0b2a5c; font-family: var(--am-font-body, 'Atkinson Hyperlegible Next', system-ui, sans-serif); font-size: 16px; font-weight: 700; cursor: pointer; transition: background-color 160ms ease-out; } .ds-btn-onsign:hover { background: #e3ebfa; border-color: #e3ebfa; color: #071c40; } .ds-btn-onsign:focus-visible { outline: 3px solid #ffd75e; outline-offset: 2px; }"
+    },
+    {
+      "name": "Field",
+      "kind": "input",
+      "refersTo": "field",
+      "description": "Label above, 48px control with a 1px stroke, hint below.",
+      "html": "<label class=\"ds-field\"><span class=\"ds-field__label\">Pays</span><input class=\"ds-field__control\" value=\"Côte d'Ivoire\"><span class=\"ds-field__hint\">Les offres dépendent du pays.</span></label>",
+      "css": ".ds-field { display: grid; gap: 6px; font-family: var(--am-font-body, 'Atkinson Hyperlegible Next', system-ui, sans-serif); } .ds-field__label { color: #12161d; font-size: 15px; font-weight: 700; line-height: 1.5; } .ds-field__control { min-height: 48px; padding: 10px 12px; border: 1px solid #5f6a7c; border-radius: 4px; background: #fff; color: #12161d; font: inherit; font-size: 16px; transition: border-color 160ms ease-out, box-shadow 160ms ease-out; } .ds-field__control:hover { border-color: #222934; } .ds-field__control:focus { border-color: #1650b8; box-shadow: inset 0 0 0 1px #1650b8; } .ds-field__control:focus-visible { outline: 3px solid #1650b8; outline-offset: 1px; } .ds-field__hint { color: #4e5868; font-size: 14px; line-height: 1.45; }"
+    },
+    {
+      "name": "Header Navigation",
+      "kind": "nav",
+      "refersTo": "navigation",
+      "description": "White sticky strip; navy links; the current page is a 4px navy bar on the lower edge.",
+      "html": "<nav class=\"ds-nav\"><a class=\"ds-nav__link\" href=\"#\">Comment ça marche</a><a class=\"ds-nav__link\" href=\"#\" aria-current=\"page\">Pays</a><a class=\"ds-nav__link\" href=\"#\">Guides</a><a class=\"ds-nav__link\" href=\"#\">Courtiers</a></nav>",
+      "css": ".ds-nav { display: flex; min-height: 68px; align-items: stretch; gap: 4px; border-bottom: 1px solid #e1e5eb; background: #fff; font-family: var(--am-font-body, 'Atkinson Hyperlegible Next', system-ui, sans-serif); } .ds-nav__link { position: relative; display: inline-flex; align-items: center; padding: 0 12px; color: #0b2a5c; font-size: 16px; font-weight: 700; text-decoration: none; white-space: nowrap; } .ds-nav__link:hover { color: #1650b8; text-decoration: underline; text-decoration-thickness: 2px; text-underline-offset: 0.3em; } .ds-nav__link:focus-visible { outline: 3px solid #1650b8; outline-offset: 2px; } .ds-nav__link[aria-current=page]::after { content: ''; position: absolute; left: 12px; right: 12px; bottom: -1px; height: 4px; background: #0b2a5c; }"
+    },
+    {
+      "name": "Badges",
+      "kind": "chip",
+      "refersTo": "badge-confirmed",
+      "description": "Rectangular stamped labels: solid green confirmed, orange sponsored with the word, dashed navy pilot.",
+      "html": "<span class=\"ds-badge ds-badge--confirmed\">Confirmé par le courtier</span> <span class=\"ds-badge ds-badge--sponsored\">Sponsorisé</span> <span class=\"ds-badge ds-badge--pilot\">Pays pilote</span>",
+      "css": ".ds-badge { display: inline-flex; min-height: 26px; align-items: center; padding: 2px 8px; border: 1px solid #c9d0da; border-radius: 2px; background: #eef1f4; color: #373f4c; font-family: var(--am-font-body, 'Atkinson Hyperlegible Next', system-ui, sans-serif); font-size: 14px; font-weight: 700; line-height: 1.25; white-space: nowrap; } .ds-badge--confirmed { border-color: #237a35; background: #237a35; color: #fff; } .ds-badge--sponsored { border-color: #c2610a; background: #fff6eb; color: #8a4303; } .ds-badge--pilot { border: 1px dashed #0b2a5c; background: #fff; color: #0b2a5c; }"
+    },
+    {
+      "name": "Directory Row",
+      "kind": "custom",
+      "refersTo": "directory-row",
+      "description": "The signature list: 64px ruled rows with a navy pictogram tile, bold name, muted line and a nudging blue arrow.",
+      "html": "<ul class=\"ds-dir\"><li><a class=\"ds-dir__row\" href=\"#\"><span class=\"ds-dir__tile\"><svg width=\"24\" height=\"24\" viewBox=\"0 0 24 24\" fill=\"currentColor\" aria-hidden=\"true\"><path d=\"M21.6 15.6v-2.1l-8.1-5.1V3.9c0-.8-.7-1.5-1.5-1.5s-1.5.7-1.5 1.5v4.5l-8.1 5.1v2.1l8.1-2.5v5.1l-2.1 1.5v1.6l3.6-1 3.6 1v-1.6l-2.1-1.5v-5.1l8.1 2.5Z\"/></svg></span><span class=\"ds-dir__text\"><span class=\"ds-dir__title\">Assurance voyage</span><span class=\"ds-dir__meta\">Comparaison indicative · Demande de devis</span></span><svg class=\"ds-dir__arrow\" width=\"22\" height=\"22\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M5 12h14M13 6l6 6-6 6\"/></svg></a></li></ul>",
+      "css": ".ds-dir { margin: 0; padding: 0; list-style: none; border-top: 1px solid #e1e5eb; font-family: var(--am-font-body, 'Atkinson Hyperlegible Next', system-ui, sans-serif); } .ds-dir > li { border-bottom: 1px solid #e1e5eb; } .ds-dir__row { display: grid; min-height: 64px; grid-template-columns: auto minmax(0,1fr) auto; gap: 4px 16px; align-items: center; padding: 10px 4px; color: #0b2a5c; text-decoration: none; transition: background-color 160ms cubic-bezier(0.22,1,0.36,1); } .ds-dir__row:hover { background: #f1f5fd; } .ds-dir__row:focus-visible { outline: 3px solid #1650b8; outline-offset: -3px; } .ds-dir__tile { display: inline-flex; width: 44px; height: 44px; align-items: center; justify-content: center; border-radius: 4px; background: #0b2a5c; color: #fff; } .ds-dir__text { display: grid; gap: 2px; } .ds-dir__title { font-size: 18px; font-weight: 700; line-height: 1.3; } .ds-dir__meta { color: #4e5868; font-size: 15px; line-height: 1.5; } .ds-dir__arrow { color: #1650b8; transition: transform 220ms cubic-bezier(0.22,1,0.36,1); } .ds-dir__row:hover .ds-dir__arrow, .ds-dir__row:focus-visible .ds-dir__arrow { transform: translateX(4px); }"
+    },
+    {
+      "name": "Route Strip (Vous êtes ici)",
+      "kind": "custom",
+      "refersTo": "sign-panel",
+      "description": "Five equal stops on a navy journey sign; the current stop is a solid white disc with a halo.",
+      "html": "<ol class=\"ds-strip\"><li data-state=\"done\"><span class=\"ds-strip__mark\"></span><a href=\"#\">Pays</a></li><li data-state=\"done\"><span class=\"ds-strip__mark\"></span><a href=\"#\">Produit</a></li><li data-state=\"current\"><span class=\"ds-strip__mark\"></span><span>Offres</span></li><li><span class=\"ds-strip__mark\"></span><span>Demande</span></li><li><span class=\"ds-strip__mark\"></span><span>Courtier</span></li></ol>",
+      "css": ".ds-strip { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0,1fr); margin: 0; padding: 24px 8px; list-style: none; background: #0b2a5c; color: #c7d3ea; font-family: var(--am-font-body, 'Atkinson Hyperlegible Next', system-ui, sans-serif); font-size: 14px; } .ds-strip > li { position: relative; display: grid; grid-template-rows: 22px auto; gap: 6px; justify-items: center; text-align: center; } .ds-strip > li:not(:last-child)::after { content: ''; position: absolute; top: 10px; left: 50%; width: 100%; height: 2px; background: rgba(255,255,255,0.22); } .ds-strip > li[data-state=done]:not(:last-child)::after { background: #c7d3ea; } .ds-strip__mark { position: relative; z-index: 1; align-self: center; width: 10px; height: 10px; border: 2px solid #c7d3ea; border-radius: 999px; background: #0b2a5c; } .ds-strip > li[data-state=done] .ds-strip__mark { background: #c7d3ea; } .ds-strip > li[data-state=current] .ds-strip__mark { width: 22px; height: 22px; border: 0; background: #fff; box-shadow: 0 0 0 4px rgba(255,255,255,0.22); } .ds-strip > li[data-state=current] span:last-child { color: #fff; font-weight: 700; } .ds-strip a { color: #c7d3ea; } .ds-strip a:hover { color: #fff; } .ds-strip a:focus-visible { outline: 3px solid #ffd75e; outline-offset: 2px; }"
+    },
+    {
+      "name": "Indicative Price Plate",
+      "kind": "card",
+      "refersTo": "price-plate",
+      "description": "The dashed plate on every offer card: the amount and who confirms it.",
+      "html": "<div class=\"ds-price\"><p class=\"ds-price__label\">Prix indicatif</p><p class=\"ds-price__amount\">à partir de 45 000 FCFA</p><p class=\"ds-price__note\">prix à confirmer</p><p class=\"ds-price__notice\">Prix indicatif, à confirmer par le courtier partenaire</p></div>",
+      "css": ".ds-price { display: grid; gap: 4px; max-width: 260px; padding: 16px; border: 1px dashed #0b2a5c; border-radius: 4px; background: #fff; font-family: var(--am-font-body, 'Atkinson Hyperlegible Next', system-ui, sans-serif); } .ds-price p { margin: 0; } .ds-price__label { color: #0b2a5c; font-size: 15px; font-weight: 700; } .ds-price__amount { color: #0b2a5c; font-size: 26px; font-weight: 800; letter-spacing: -0.012em; line-height: 1.15; font-variant-numeric: tabular-nums; } .ds-price__note { color: #4e5868; font-size: 14px; } .ds-price__notice { margin-top: 8px !important; padding-top: 8px; border-top: 1px dashed #c9d0da; color: #12161d; font-size: 14px; font-weight: 700; }"
+    },
+    {
+      "name": "Card",
+      "kind": "card",
+      "refersTo": "card",
+      "description": "A plain flat panel: 1px rule, 4px corners, never nested, never a shadow.",
+      "html": "<article class=\"ds-card\"><h3 class=\"ds-card__title\">Notre rôle</h3><p class=\"ds-card__body\">AssurMatch compare des offres indicatives et transmet votre demande à un courtier partenaire autorisé.</p></article>",
+      "css": ".ds-card { display: grid; gap: 12px; padding: 20px; border: 1px solid #e1e5eb; border-radius: 4px; background: #fff; color: #12161d; font-family: var(--am-font-body, 'Atkinson Hyperlegible Next', system-ui, sans-serif); transition: border-color 160ms ease-out, background-color 160ms ease-out; } .ds-card:hover { border-color: #1650b8; background: #f1f5fd; } .ds-card__title { margin: 0; color: #0b2a5c; font-size: 20px; font-weight: 700; line-height: 1.3; } .ds-card__body { margin: 0; color: #4e5868; font-size: 16px; line-height: 1.6; }"
+    }
+  ],
+  "narrative": {
+    "northStar": "La signalétique",
+    "overview": "The public site is a wayfinding sign system for an insurance decision, drawn after airport and bus-station signage rather than after a comparator landing page. Every page opens on a flat navy sign that says where you are; every list is a directory of ruled rows you walk; every price says who confirms it. The visitor is an adult making a money decision on a phone in daylight, so the system is built for legibility first: one hyperlegible face, large tap targets, high-contrast pairs, and nothing that moves on its own.\n\nDensity is moderate and phone-led (designed at 390px, then widened). Surfaces are a white ground, pale cool-grey bands and navy signs; structure comes from 1px rules and near-square 4px corners, never from shadow, gradient or glass. Colour is a law, not a mood: each hue carries one meaning on every page. The state language is literal: what is indicative is outlined with a dashed line, what a broker confirmed is filled solid.\n\nThe world is deliberately plain. The confirmed anti-reference is a themed costume site (painted metaphors, condensed all-caps display, rendered metal plates): the signage here is the honest municipal kind, not a stage set.",
+    "keyCharacteristics": [
+      "Navy sign panel at the top of every page, carrying the location line, the title and one lead.",
+      "Directories of 64px ruled rows (tile, bold name, short line, arrow) instead of icon-card grids.",
+      "The « Vous êtes ici » route strip on journey signs: Pays, Produit, Offres, Demande, Courtier.",
+      "One family, Atkinson Hyperlegible Next, at 400 / 700 / 800.",
+      "Flat: 1px rules, 4px corners, no page shadows, no gradients.",
+      "Dashed = indicative, solid = confirmed, everywhere.",
+      "Almost no motion: the only authored move is the directory arrow nudging 4px."
+    ],
+    "rules": [
+      { "name": "The Palette Law Rule", "body": "Navy = where you are, blue = what you can do, green = confirmed or done, orange = sponsored, red = error. Nothing is decorative; a colour that appears must carry its meaning.", "section": "colors" },
+      { "name": "The Green Is Earned Rule", "body": "Green appears only where a broker confirmed something or a step is done. A high score is a heavier navy outline, never green.", "section": "colors" },
+      { "name": "The Inverting Sign Rule", "body": "Inside a navy panel the same components invert: headings, links and primary buttons turn white, rules turn translucent white (22%), the focus ring turns yellow. A light plate set on a sign (card, notice, field, plated directory) returns to the light-page colours.", "section": "colors" },
+      { "name": "The Sentence Case Sign Rule", "body": "Headings and labels are sentence case at zero or negative tracking. No uppercase tracked labels and nothing set above a heading as an eyebrow; a status that needs saying above a title is a Badge.", "section": "typography" },
+      { "name": "The Fourteen Floor Rule", "body": "No text below 14px, anywhere, including legal fine print.", "section": "typography" },
+      { "name": "The Columns Never Move Rule", "body": "Every offer card has the same structure in the same order and the same label grid; a missing fact stays in its cell as \"not provided\", it never collapses the grid.", "section": "layout" },
+      { "name": "The Flat Sign Rule", "body": "Nothing on the page casts a shadow. If an element seems to need lift, give it a rule, a band or a navy panel instead.", "section": "elevation" },
+      { "name": "The Dashed Means Indicative Rule", "body": "A dashed outline says \"à confirmer\"; a solid fill says \"confirmé\". Never use a dashed line for decoration or a solid green fill for something the broker has not confirmed.", "section": "shapes" }
+    ],
+    "dos": [
+      "Do open every page on a navy sign panel with the location line, one title and one lead.",
+      "Do present lists of destinations as Directory rows (64px, tile, name, arrow), not as card grids.",
+      "Do put the « Vous êtes ici » route strip on every journey page, with passed stops linking back.",
+      "Do mark every indicative price or guarantee with a dashed outline and say who confirms it; fill solid only what a broker confirmed.",
+      "Do keep each colour to its single meaning (navy where you are, blue action, green confirmed, orange sponsored, red error).",
+      "Do use 4px corners, 1px rules, 48px buttons and fields, and 44px minimum tap targets.",
+      "Do set every number in tabular figures and every prose measure in em (34em).",
+      "Do invert components inside navy panels and switch the focus ring to yellow there."
+    ],
+    "donts": [
+      "Don't use shadows, gradients or glass on the page; the overlay shadow is for the menu drawer and the comparison bar only.",
+      "Don't set an eyebrow or kicker above a heading, or any uppercase tracked label.",
+      "Don't use green for a high score, a decoration or anything not confirmed; don't use the WhatsApp or logo green anywhere else.",
+      "Don't build a soft gradient hero, a split hero on the home sign, a form-in-a-card hero, or rows of icon cards.",
+      "Don't nest cards or close notices.",
+      "Don't render text below 14px.",
+      "Don't add entrance animation, scroll reveals, staggers or count-ups; the arrow nudge is the only authored move.",
+      "Don't put a stroke icon on a navy tile or a flat-plane pictogram on a pale tile.",
+      "Don't theme the signage into a costume (condensed all-caps display, painted or metal textures)."
+    ]
+  }
+}

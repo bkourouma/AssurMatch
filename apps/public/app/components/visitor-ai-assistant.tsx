@@ -22,12 +22,13 @@ const MODE_CONFIG: Record<Mode, { assistType: string; hasInput: boolean }> = {
 /**
  * Public AI assistance: hidden entirely when the assist type is disabled for the country/product
  * (Constitution: no AI proposed when flags are off), asynchronous (queue + poll), always framed by
- * the `AiBox` primitive so the "genere par IA" label and the disclaimer are permanently on screen.
+ * the `AiBox` primitive so the D2 transparency label ("Reponse generee automatiquement par un outil
+ * d'IA. Aide a la lecture, pas un conseil.") stays permanently on screen. Everywhere else in this
+ * component the function is called "l'assistant de lecture", never "IA", per decision D2 of spec 050.
  * It is never required to move forward: nothing here blocks a quote request.
  */
 export function VisitorAiAssistant({ countryCode, productKey, mode, answers = {} }: { countryCode: string; productKey?: string; mode: Mode; answers?: Record<string, unknown> }) {
   const t = useTranslations("VisitorAi");
-  const common = useTranslations("Common");
   const config = MODE_CONFIG[mode];
   const title = t(`modes.${mode}.title`);
   const buttonLabel = t(`modes.${mode}.button`);
@@ -86,7 +87,7 @@ export function VisitorAiAssistant({ countryCode, productKey, mode, answers = {}
 
   return (
     <div data-visitor-ai={mode}>
-      <AiBox generatedLabel={common("aiGenerated")} disclaimer={common("aiDisclaimer")} title={title} ariaLabel={title}>
+      <AiBox generatedLabel={t("disclosureLabel")} disclaimer={t("disclaimer")} title={title} ariaLabel={title}>
         <p className="am-field__hint">{t("note", { label: interaction?.assistanceLabel ?? t("defaultLabel") })}</p>
         <p className="am-field__hint">{t("optional")}</p>
         {config.hasInput ? (

@@ -1,0 +1,13 @@
+The mobile home page of AssurMatch, an insurance comparison website for Côte d'Ivoire, rendered edge to edge as the page itself at phone proportions: no phone frame, no browser bar, no desk. It follows what insurance comparison sites usually ship, executed cleanly. Regions from top to bottom:
+
+1. A white header: a small flat logo mark (an umbrella over a shield, blue and green) with the wordmark "AssurMatch" on the left, a rounded blue search button and a hamburger menu on the right.
+
+2. A very pale blue hero area: a small blue uppercase kicker "Comparaison indicative", the headline in bold dark navy sans on three lines "Comparez d'abord. Soyez accompagné ensuite.", and a short grey lead "Des offres indicatives, confirmées par un courtier partenaire autorisé."
+
+3. Inside the hero, a white card with rounded corners and a soft shadow, titled "Choisissez votre pays et votre produit", holding two rounded selects ("Côte d'Ivoire" with a pin icon, "Assurance auto" with a shield icon) and a full-width rounded blue (#1B4FBF) button "Comparer les offres".
+
+4. A white section headed "Nos produits" with a two-column grid of rounded tiles, each with a blue line icon and a label: "Auto", "Moto", "Santé", "Habitation", "Voyage".
+
+5. The start of a section "Comment ça marche" with the first of three numbered rounded cards visible.
+
+Style: clean modern comparator, blue primary, rounded corners, light shadows, friendly sans-serif, generous spacing. No photos. Every word in French, spelled exactly as given.
