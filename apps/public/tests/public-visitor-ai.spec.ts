@@ -20,8 +20,12 @@ test("visitor AI assistant is flag-gated, asynchronous and labelled as indicativ
   expect(form).toContain('mode="summary"');
 
   // Copy: the assistance label and the "no personal data" warning now live in the French catalogue.
+  // D2 (spec 050): "IA" only names the function on its permanent transparency label
+  // (`VisitorAi.disclaimer`); everywhere else in the running text it is "l'assistant de lecture" - so
+  // the mode titles and the default label no longer read "Assistant IA d'aide à la compréhension".
   const visitorAi = messagesText("fr", "VisitorAi");
-  expect(visitorAi).toContain("Assistance IA d'aide à la compréhension");
+  expect(visitorAi).toContain("Assistant de lecture");
+  expect(visitorAi).toContain("Réponse générée automatiquement par un outil d'IA. Aide à la lecture, pas un conseil.");
   expect(visitorAi).toContain("Ne saisissez pas de données personnelles");
 });
 

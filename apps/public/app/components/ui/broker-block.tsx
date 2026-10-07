@@ -20,6 +20,12 @@ export interface BrokerBlockProps {
   products?: readonly string[];
   approved?: boolean;
   description?: string;
+  /**
+   * "Licence valable jusqu'au {date}" (spec 050 content/05: the list card states the licence
+   * validity that today only appears on the detail page), already formatted for the locale/country -
+   * never a raw ISO string.
+   */
+  validityLabel?: string;
 }
 
 /** Two letters standing in for a partner logo, e.g. "Assur Plus" -> "AP". */
@@ -46,7 +52,8 @@ export function BrokerBlock({
   city,
   products,
   approved,
-  description
+  description,
+  validityLabel
 }: BrokerBlockProps) {
   return (
     <div className="am-broker" data-variant={variant}>
@@ -100,6 +107,7 @@ export function BrokerBlock({
           <BackendText>{description}</BackendText>
         </p>
       ) : null}
+      {validityLabel ? <p className="am-broker__meta">{validityLabel}</p> : null}
     </div>
   );
 }

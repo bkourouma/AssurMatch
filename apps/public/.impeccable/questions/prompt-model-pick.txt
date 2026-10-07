@@ -1,0 +1,13 @@
+The mobile home page of AssurMatch, an insurance comparison website for Côte d'Ivoire, rendered edge to edge as the page itself at phone proportions: no phone frame, no browser bar, no desk. Regions from top to bottom, in this order and at these scales:
+
+1. A white top bar with a thin black rule under it: on the left a small FLAT logo mark (an umbrella over a shield, two colours only: blue and green, no 3D) next to the wordmark "AssurMatch"; on the right "FR | EN" and the word "Menu" underlined.
+
+2. A large left-aligned black headline in a sturdy plain sans, on three lines: "Comparez d'abord. Soyez accompagné ensuite." Then a paragraph in dark grey at comfortable reading size: "AssurMatch compare des offres indicatives et vous met en relation avec un courtier autorisé. Nous ne vendons pas d'assurance."
+
+3. A simple form with no card or box around it, directly on the white page: the bold label "Votre pays" above a full-width rectangular select showing "Côte d'Ivoire" (2px black border, square corners, a small chevron), the bold label "Produit" above a select showing "Assurance auto", then a full-width solid blue (#1F4FB8) button with square corners and white bold text "Comparer les offres".
+
+4. An inset panel on very pale grey (#F3F5F8) with a thick blue rule down its left edge, titled in bold "Bon à savoir", with the text: "Rien n'est transmis tant que vous n'avez pas coché la case de consentement et envoyé votre demande."
+
+5. The heading "Comment ça marche" followed by a numbered list: large bold numerals 1, 2, 3 with the step titles "Comparez", "Demandez un devis", "Le courtier confirme", each with one short sentence, and a blue underlined link "Voir le parcours en détail".
+
+Style: plain public-service web style in the spirit of GOV.UK or service-public.fr, but with no government insignia, no flag, no coat of arms: black text on white, one blue for links and the button, square corners, no shadows, no gradients, no icons, no illustrations, no photos. Calm, serious, highly legible. Every word in French, spelled exactly as given.
