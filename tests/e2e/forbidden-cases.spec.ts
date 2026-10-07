@@ -19,16 +19,26 @@ async function page(browser: Browser, baseURL: string): Promise<Page> {
   return (await newAppContext(browser, baseURL)).newPage();
 }
 
+/**
+ * Spec 050 D6: the quote request is a three-step form. Fills the need, then the contact details,
+ * and stops on the review step, where the consent box and the send button are.
+ */
+async function fillQuoteSteps(visitor: Page, email: string, phone: string, city: string): Promise<void> {
+  await visitor.locator("#am-answer-vehicle_use").selectOption("prive");
+  await visitor.locator("#am-answer-city").fill(city);
+  await visitor.locator("#am-answer-contact_preference").selectOption("email");
+  await visitor.getByRole("button", { name: "Continuer" }).click();
+  await visitor.locator("#am-quote-email").fill(email);
+  await visitor.locator("#am-quote-phone").fill(phone);
+  await visitor.getByRole("button", { name: "Vérifier ma demande" }).click();
+}
+
 /** Fills the CI x Auto quote form for the visible offer and captures the JSON the browser posts. */
 async function captureQuotePayload(visitor: Page, email: string): Promise<Record<string, unknown>> {
   await visitor.goto("/pays/CI/produits/auto/offres");
   await visitor.getByRole("link", { name: "Demander un devis" }).first().click();
   await visitor.waitForURL(/\/devis\?offerId=/u);
-  await visitor.locator("#am-quote-email").fill(email);
-  await visitor.locator("#am-quote-phone").fill("+2250102030406");
-  await visitor.locator("#am-answer-vehicle_use").selectOption("prive");
-  await visitor.locator("#am-answer-city").fill("Bouaké");
-  await visitor.locator("#am-answer-contact_preference").selectOption("email");
+  await fillQuoteSteps(visitor, email, "+2250102030406", "Bouaké");
   await visitor.locator("#am-quote-consent").check();
   let captured: Record<string, unknown> | undefined;
   await visitor.route(`${e2eEnv.apiUrl}/quote-requests`, async (route) => {
@@ -39,7 +49,7 @@ async function captureQuotePayload(visitor: Page, email: string): Promise<Record
     }
     await route.continue();
   });
-  await visitor.getByRole("button", { name: "Demander un devis" }).click();
+  await visitor.getByRole("button", { name: "Envoyer ma demande" }).click();
   await expect.poll(() => captured !== undefined, { message: "quote payload captured" }).toBe(true);
   await visitor.unroute(`${e2eEnv.apiUrl}/quote-requests`);
   return captured as Record<string, unknown>;
@@ -92,12 +102,9 @@ test("SC-09c sans consentement : le formulaire bloque et l'API refuse, aucune tr
   // UI: the submit is blocked while the named consent is not ticked.
   await visitor.goto("/pays/CI/produits/auto/offres");
   await visitor.getByRole("link", { name: "Demander un devis" }).first().click();
-  await visitor.locator("#am-quote-email").fill(email);
-  await visitor.locator("#am-quote-phone").fill("+2250102030407");
-  await visitor.locator("#am-answer-vehicle_use").selectOption("prive");
-  await visitor.locator("#am-answer-city").fill("Yamoussoukro");
-  await visitor.locator("#am-answer-contact_preference").selectOption("email");
-  await visitor.getByRole("button", { name: "Demander un devis" }).click();
+  await visitor.waitForURL(/\/devis\?offerId=/u);
+  await fillQuoteSteps(visitor, email, "+2250102030407", "Yamoussoukro");
+  await visitor.getByRole("button", { name: "Envoyer ma demande" }).click();
   await expect(visitor.getByText(/QR-\d{4}-/u)).toHaveCount(0);
 
   // API: the same payload with `accepted: false` (a bypassed form) is refused.

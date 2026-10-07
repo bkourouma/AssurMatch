@@ -65,11 +65,21 @@ export function HeaderScrollShadow({ targetId, menuId }: HeaderScrollShadowProps
       if (target instanceof Element && target.closest("[data-menu-close]")) close();
     };
 
+    // While the drawer is open, the page it covers leaves the tab order, so Tab cycles through the
+    // drawer, the header strip and the browser chrome only.
+    const behind = () => Array.from(document.querySelectorAll<HTMLElement>("#contenu, .am-localcontact, .am-footer"));
+    const onToggle = () => {
+      for (const element of behind()) element.inert = menu.open;
+    };
+
     document.addEventListener("keydown", onKeyDown);
     menu.addEventListener("click", onClick);
+    menu.addEventListener("toggle", onToggle);
     return () => {
       document.removeEventListener("keydown", onKeyDown);
       menu.removeEventListener("click", onClick);
+      menu.removeEventListener("toggle", onToggle);
+      for (const element of behind()) element.inert = false;
     };
   }, [menuId]);
 

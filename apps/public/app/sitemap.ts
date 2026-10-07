@@ -31,6 +31,7 @@ const STATIC_ROUTES: StaticRoute[] = [
   { href: "/countries", priority: 0.9, changeFrequency: "daily" },
   { href: "/how-it-works", priority: 0.5, changeFrequency: "monthly" },
   { href: "/regulatory-status", priority: 0.3, changeFrequency: "monthly" },
+  { href: "/our-commitment", priority: 0.4, changeFrequency: "monthly" },
   { href: "/legal-notice", priority: 0.2, changeFrequency: "yearly" },
   { href: "/privacy", priority: 0.2, changeFrequency: "yearly" },
   { href: "/cookies", priority: 0.2, changeFrequency: "yearly" },

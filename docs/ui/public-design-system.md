@@ -1,344 +1,128 @@
-# AssurMatch public design system (`apps/public`)
+# AssurMatch public design system (`apps/public`): "La signalétique"
 
-Wave 0 foundation. Everything below already exists in the repository; pages compose it, they do not
-re-invent it. Source: `apps/public/app/styles/*.css` and `apps/public/app/components/ui|motion/*`.
+Redesign of 2026-10-05 (branch `051-public-redesign-plain`). It replaces the 2026-09-20 "premium"
+system (gradients, glows, scroll reveals, count-ups), which is retired. The owner's brief was a
+complete redesign that is *not fancy*; the anti-reference is a heavily themed site. The chosen
+direction is a wayfinding sign system.
 
-**Import once:** `import { Button, Card, Section, ... } from "../components/ui";` (the barrel
-re-exports `Reveal` and `CountUp` too). Plain CSS, no Tailwind, no CSS modules.
+Durable record for design tooling: `apps/public/DESIGN.md` (+ `apps/public/.impeccable/design.json`).
+Product truth: `apps/public/PRODUCT.md`. Direction contract: `apps/public/.impeccable/surfaces/`.
+This file is the developer guide. Source: `apps/public/app/styles/*.css`, `apps/public/app/components/ui/*`.
 
-## 0. Non-negotiables
+## 0. The idea in one paragraph
+
+Every page opens on a **navy sign** that says where you are (the `Hero`). Every list is a
+**directory** of rows you walk (`Directory`). Journeys are **routes** with numbered stops (`Route`,
+`RouteStrip`). Every price says who confirms it. White ground, pale cool-grey bands, 1px rules,
+4px corners, one typeface. No shadows on the page, no gradients, no glass, no entrance animation.
+
+## 1. Non-negotiables
 
 | Rule | Why |
 | --- | --- |
-| Green (`--am-success-*`) = validation only | Never a page/section background, never a primary button. Only ticks, the `approved` badge, a score >= 75, a done step. One documented exception: the WhatsApp green (`--am-whatsapp`), which is a *channel* colour, not a validation signal — see 3.bis. |
-| Sponsored = `warning-800` on `warning-50`, border and icon `warning-600` | `<Badge tone="sponsored">`. Never green, never the brand blue. |
-| Every text/background pair >= 4.5:1 | Measured, not guessed. The checked pairs are listed in 3.bis. |
-| Nothing below 14px | `--am-caption-size` (14px) is the floor. Body 16-17px, small 15px. |
-| Notices are never closable | `<Notice>` has no close affordance and must not be given one. |
-| No global `button {}`, `label {}`, `[role="alert"] {}` | They are gone. Unclassed elements get a `:not([class])` safety net; add `.am-button` / `.am-field__control` to opt into the real thing. |
-| Reduced motion kills everything | `base.css` and `motion.css` both carry the switch. Never re-enable an animation past it. |
-| The page never scrolls sideways | `base.css` sets `html, body { overflow-x: clip }` (see 2). |
+| **Palette law**: navy = where you are; blue = what you can do; green = confirmed or done; orange = sponsored; red = error | Colour is information. A colour used for decoration stops meaning anything. |
+| **State language**: solid fill = confirmed; dashed 1px outline = indicative / to be confirmed | "Offre indicative" and "à confirmer" are constitutional; the line says it too. |
+| Sponsored = `warning-800` on `warning-50`, border/icon `warning-600`, always with the word | Constitution VIII: sponsorship clearly indicated. |
+| Every text/background pair >= 4.5:1 (measured in section 4) | WCAG 2.2 AA. |
+| Nothing below 14px; tap targets >= 44px | Phones first (390px). |
+| No eyebrow/kicker above a heading | `Hero`/`Section` ignore their `kicker` prop now. |
+| No card grids of icon + title + text as page structure; never nested cards | Use `Directory`, ruled lists, `Route`, tables. |
+| No coloured `border-left/right` > 1px on cards, callouts or list items | |
+| Notices are never closable | Unchanged. |
+| Reduced motion kills everything | `base.css` keeps the single switch. |
+| The page never scrolls sideways | `html, body { overflow-x: clip }`. |
+| No `route.ts(x)` file under `app/` | Next treats it as an API route; the route component is `route-line.tsx`. |
 
-## 1. Tokens (`styles/tokens.css`)
+## 2. Tokens (`styles/tokens.css`)
 
 The shared back-office socle `@assurmatch/ui/tokens.css` is imported and **never edited**; the public
-file extends it. Old names still resolve.
+file re-declares or extends it. Historical names keep resolving: the gradient names now hold flat
+colours and the glow/shadow names `none`, so a page written before the redesign renders flat.
 
-**Colour scales** — `--am-primary-50…900` (600 = brand, 700 = deep, 750 `#10336f` — the last stop of
-`--am-gradient-navy`, 800 `#0d2a63`, 900 `#081b45` navy), `--am-neutral-0…900`,
-`--am-success-50/100/500/600/700/800`, `--am-warning-50/100/500/600/700/800`, `--am-danger-*`,
-`--am-info-*`, `--am-whatsapp` / `--am-whatsapp-dark` / `--am-whatsapp-ink`.
+- **Navy/blue** `--am-primary-50…900`: `600 #1650b8` action blue, `700 #123e86` action hover,
+  `800 #0b2a5c` sign navy, `900 #071c40`.
+- **Neutrals** (cool, tinted from the navy) `--am-neutral-0…900`; `100 #eef1f4` is the band.
+- **Green** `--am-success-*`: `700 #237a35` text and solid confirmations; `500 #4fb832` logo only.
+- **Orange** `--am-warning-*` sponsored only. **Red** `--am-danger-*` errors only.
+- **Semantic aliases (prefer these)**: `--am-canvas` (white), `--am-band`, `--am-surface`,
+  `--am-sign`, `--am-sign-ink`, `--am-sign-ink-muted`, `--am-sign-rule`, `--am-rule`, `--am-border`,
+  `--am-border-strong`, `--am-text`, `--am-text-muted`, `--am-text-subtle`, `--am-heading`,
+  `--am-link`, `--am-link-hover`, `--am-action`, `--am-action-hover`.
+- **Radii**: 2px (`xs`), 4px (`sm`, `md`, `lg`, `field`, `card`), 6px (`xl`, `panel`), `pill` for dots.
+- **Elevation**: none on the page. `--am-shadow-overlay` for things that float (drawer, compare bar).
+- **Type**: one family, **Atkinson Hyperlegible Next** (`app/fonts.ts`, variable, exposed as
+  `--font-am-sign` behind `--am-font-heading` and `--am-font-body`). Weights 400 / 700 / 800.
+  Fluid sizes `--am-display-size … --am-caption-size` (14px floor).
+- **Layout**: `--am-content 1180`, `--am-content-wide 1280`, `--am-content-narrow 740`,
+  `--am-gutter` 16/24/32, `--am-header` 60/68, `--am-row 64px` (directory row), `--am-tile` 44/48.
+- **Motion**: durations 100-320ms, `--am-ease-out` exponential. Used for state changes only.
 
-`--am-success-800` `#256718` and `--am-warning-800` `#8a4303` are **text** steps: they exist so the
-approved and sponsored badges clear 4.5:1 (600/700 on a 100 background did not). No raw hex outside
-this file — if a component needs a shade that is not here, add the token rather than inlining it.
+### Inside a navy panel
 
-**Semantic aliases — prefer these:** `--am-canvas` `#f6f8fc` (page), `--am-surface` (white card),
-`--am-surface-muted`, `--am-surface-brand`, `--am-surface-navy`, `--am-border` `#e3e8f0`,
-`--am-border-strong` `#cfd7e3`, `--am-text`, `--am-text-muted`, `--am-text-subtle`,
-`--am-text-invert`, `--am-link`, `--am-link-hover`.
-
-**Gradients** — `--am-gradient-brand` (buttons), `--am-gradient-brand-strong` (hover),
-`--am-gradient-navy` (dark bands), `--am-gradient-hero`, `--am-gradient-mesh` /
-`--am-gradient-mesh-navy` (radial glows behind a hero), `--am-gradient-sheen`.
-
-**Elevation** — `--am-shadow-xs|sm|md|lg|xl`, `--am-shadow-glow` (primary-tinted, CTA hover),
-`--am-shadow-glow-soft`, `--am-ring` (focus ring: white gap + primary-500), `--am-ring-invert`.
-
-**Radii** — `--am-radius-xs 4`, `-sm 8`, `-md 12`, `-lg 16`, `-xl 24`, `-pill`; aliases
-`--am-radius-field` (10, inputs/buttons), `--am-radius-card` (16), `--am-radius-panel` (24).
-
-**Spacing** — `--am-space-2…128` (2,4,6,8,10,12,16,20,24,28,32,40,48,56,64,80,96,112,128).
-
-**Type** — fluid `clamp()`: `--am-display-size`, `--am-h1-size`, `--am-h2-size`, `--am-h3-size`,
-`--am-h4-size`, `--am-lead-size`, `--am-body-size`, `--am-small-size` (15), `--am-caption-size` (14),
-`--am-stat-size`; matching `*-line` are unitless line-heights. Tracking:
-`--am-tracking-tight` (-0.02em, headings), `--am-tracking-snug`, `--am-tracking-wide` (kickers).
-
-**Motion** — `--am-duration-instant 120ms`, `-fast 200ms`, `-base 320ms`, `-slow 520ms`;
-`--am-ease-out cubic-bezier(.2,.8,.2,1)`, `--am-ease-in-out`, `--am-ease-spring`; `--am-transition`
-(= fast + ease-out), `--am-stagger 70ms`.
-
-**Layout / z-index** — `--am-content 1200`, `--am-content-wide 1320`, `--am-content-narrow 760`,
-`--am-gutter`, `--am-header 72px`, `--am-section` / `--am-section-compact` (fluid);
-`--am-z-base|raised|sticky|header|overlay|modal|toast|skip`.
-
-## 2. Layout and text utilities (`styles/base.css`)
-
-| Class | Purpose |
-| --- | --- |
-| `.am-container` | Centred 1200px column with the gutter. `--wide` (1320) and `--narrow` (760) modifiers. |
-| `.am-stack` | Vertical grid; override `--gap`, or use `--lg` / `--xl`. |
-| `.am-cluster` | Wrapping horizontal row (buttons, badges); `--between`, `--end`. |
-| `.am-grid` | `auto-fit` grid; set `--min` (default 260px) or use `--2` / `--3` / `--4`. |
-| `.am-eyebrow` | Uppercase brand kicker above a title (14px). |
-| `.am-lead` | 68ch intro paragraph, `--am-lead-size`, muted. |
-| `.am-muted` `.am-subtle` `.am-small` `.am-caption` | Text colour / size helpers. |
-| `.am-tabular` | Tabular figures — use on every number. |
-| `.am-balance` | `text-wrap: balance`. |
-| `.am-visually-hidden` | Screen-reader-only text. |
-| `.am-skip-link` | The layout's skip link. |
-
-**`html, body { overflow-x: clip }`** — `clip`, deliberately, not `hidden`: `hidden` would make the
-root a scroll container and break `position: sticky` and `scroll-padding-top`. It absorbs the few
-pixels a `Reveal from="left|right"` pre-state pushes past the viewport (the offset is 16px), which
-used to flash a horizontal scrollbar on load below 1024px. It is a safety net for that transient
-state, not a licence to ship a too-wide element: a settled page must still fit its container on its
-own.
+`.am-sign`, `.am-hero`, `Section tone="navy"` and `Card tone="navy"` remap the text tokens to the
+sign inks. Plates placed on a sign (`Card`, `Notice`, `.am-entry`, `Directory surface="plate"`,
+fields, empty states, tables) automatically get the light-page tokens back. Buttons on a sign invert
+(primary = white fill, navy text; secondary = white outline). Focus rings on navy are yellow
+`#ffd75e` (10:1).
 
 ## 3. Components
 
-### Button — `variant` `size` `loading` `iconOnly`
-```tsx
-<Button href="/comparer" icon={<Icon name="search" />}>Comparer les offres</Button>
-<Button variant="secondary" size="lg" iconAfter={<Icon name="arrow-right" />}>Voir le detail</Button>
-<Button type="submit" loading={pending} fullWidth>Envoyer la demande</Button>
-<Button variant="ghost" iconOnly icon={<Icon name="close" />} aria-label="Fermer">Fermer</Button>
-```
-Props: `variant` `primary|secondary|tertiary|ghost|whatsapp`, `size` `sm|md|lg`, `href` (typed i18n
-route), `externalHref`, `type`, `icon`, `iconAfter`, `fullWidth`, `disabled`, `iconOnly`, `loading`,
-`onClick` (honoured only on the `<button>` rendering, i.e. without `href`/`externalHref`), `name`
-`value` `form` `title` `rel` `target` `aria-label` `className`. A client form uses the primitive —
-never a hand-written `<button className="am-button">`.
-CSS: `.am-button` + `[data-variant]` `[data-size]` `[data-full]` `[data-icon-only]` `[data-loading]`,
-`.am-button__spinner`. Primary = brand gradient, hover lifts 1px onto `--am-shadow-glow`.
+All in `app/components/ui/`, exported from `components/ui/index.ts`.
 
-### Card — `CardHeader` `CardTitle` `CardBody` `CardFooter` `CardMeta`
-```tsx
-<Card as="li" tone="surface" interactive>
-  <CardHeader><CardTitle>Assurance auto</CardTitle><Badge tone="new">Nouveau</Badge></CardHeader>
-  <CardBody><p>Couverture indicative, confirmee par le courtier partenaire.</p></CardBody>
-  <CardFooter><Button size="sm" href="/pays/CI">Voir</Button></CardFooter>
-</Card>
-```
-Props: `as`, `tone` `surface|muted|brand|navy|outline|dashed`, `interactive`, `raised`, `featured`,
-`padding` `sm|md|lg`, `className`, `id`.
-CSS: `.am-card` + `--muted --brand --navy --outline --dashed --flat --raised --featured
---interactive --pad-sm --pad-lg`, `.am-card__header|__title|__body|__footer|__meta`.
+| Component | Role in the sign system |
+| --- | --- |
+| `Hero` | The page sign. `breadcrumb` = the location line; `route` = the journey strip (it replaces the breadcrumb on screen; the breadcrumb stays for AT and JSON-LD). `kicker`, `tone` ignored. `size` sm/md/lg. |
+| `Section` | White, `muted` (band), `brand` (primary-50), `navy` (a sign). Two white sections in a row share a 1px rule. `kicker` ignored. |
+| `Directory` *(new)* | Rows of destinations: tile (pictogram, icon or free), title, one line, aside, arrow that nudges 4px on hover/focus. `columns={2}`, `surface="plate"`. The list component of the site. |
+| `Route` *(new, `route-line.tsx`)* | Numbered stops on a 4px navy line; vertical on phones, a row from 900px. `state: "confirm"` paints the stop green (the broker confirms). |
+| `RouteStrip` *(new, `route-line.tsx`)* | « Vous êtes ici » on journey signs: Pays, Produit, Offres, Demande, Courtier. Done stops link back. Messages: `Route` namespace. |
+| `Pictogram`, `productPictogram()` *(new)* | Flat product pictograms (auto, moto, santé, habitation, voyage, vie, generic), `tile` = navy tile. Stroke icons (`Icon`) stay for interface glyphs. |
+| `Logo` | Flat SVG mark (umbrella, shield, person) + wordmark set in type, `variant="white"` on navy. The retired tagline is gone. The PNG logos in `public/` remain for e-mails. |
+| `Button` | Primary solid blue, secondary blue outline (2px), tertiary underlined link, ghost, whatsapp. 40/48/56px. |
+| `Card` | A plain bordered panel for one real object. `muted`, `brand`, `navy`, `outline`, `dashed` (indicative), `featured` (2px navy), `interactive`. No shadow. |
+| `Notice` | `indicative` = white with dashed navy outline; `info` = primary-50; `success`; `error`. |
+| `Badge` | Rectangular label: `approved` solid green, `sponsored` orange, `pilot` dashed, `new`, `soon`, `neutral`. |
+| `ScorePill` | Outlined (a score is indicative): green outline >= 75, blue >= 50, grey below. |
+| `Field`, `RadioCards`, `.am-checkline`, `.am-switch` | 48px controls, 1px `neutral-500` border (5.5:1), blue focus. |
+| `ProgressBar` | Form steps as route stops; labels collapse to the current one under 480px. |
+| `EmptyState` | Dashed outline: nothing confirmed here yet. |
+| `.am-faq` | Ruled accordion with a plus/minus. |
+| `.am-table` | Navy 2px header rule, scroll-shadow hints. |
+| `Stat` | A plain figure (icon hidden). Prefer a figures line (see the home page) to a row of metric cards. |
+| `Reveal`, `CountUp` | Inert since the redesign: they render their content as is. New code should not use them. |
 
-### Stat (count-up)
-```tsx
-<Stat icon="globe" label="Pays ouverts" value={12} locale={locale} hint="Au 20 septembre 2026" />
-```
-Props: `label`, `value` (a `number` animates; a string/node does not), `icon`, `iconTone`, `hint`,
-`locale`, `format` (`Intl.NumberFormatOptions`), `tone` `default|invert`, `className`.
-CSS: `.am-stat`, `__icon __value __label __hint`, `[data-tone="invert"]` on navy.
-
-### IconTile
-```tsx
-<IconTile name="shield-check" tone="success" size="lg" />
-```
-`tone` `brand|success|warning|danger|neutral|navy|invert`, `size` `sm|md|lg` (36/44/56px).
-CSS: `.am-icontile[data-tone][data-size]`.
-
-### Badge
-```tsx
-<Badge tone="approved" icon={<Icon name="badge-check" size={16} />}>Agree</Badge>
-<Badge tone="sponsored">Sponsorise</Badge>
-<Badge dot tone="pilot" size="lg">Pilote</Badge>
-```
-`tone` `approved|sponsored|new|pilot|soon|neutral`, `icon`, `dot`, `size` `sm|lg`, `title`,
-`className`. CSS: `.am-badge[data-tone][data-size]`, `.am-badge__dot`.
-
-### Notice (auto icon per tone, never closable)
-```tsx
-<Notice tone="indicative">Offre indicative, prix indicatif, a confirmer par le courtier partenaire.</Notice>
-<Notice tone="error" role="alert" title="Envoi impossible">{message}</Notice>
-```
-`tone` `indicative|info|success|error`, `title`, `role` `alert|status|note`, `icon` (override),
-`compact`, `className`. CSS: `.am-notice[data-tone][data-compact]`, `__icon __title __body`.
-A standalone notice keeps a 16px bottom margin; inside a parent that already owns the rhythm
-(`.am-stack`, `.am-cluster`, `.am-grid`, `.am-hero__inner`, any `*__stack`) and as the last child of
-its container, that margin is cancelled — never add a wrapper just to fix the spacing.
-
-### Field + `fieldControlProps` (unchanged API)
-```tsx
-<Field id="email" label={t("email")} hint={t("emailHint")} error={errors.email} required requiredLabel={forms("required")} leading="mail">
-  <input {...fieldControlProps("email", { hint, error, required: true })} name="email" type="email" />
-</Field>
-```
-`leading` (optional `IconName`) and `className` are the only additions. CSS: `.am-field`,
-`__label __required __control __wrap __leading __hint __error`. `select.am-field__control` gets the
-design-system chevron. Checkbox rows: `.am-checkline` (44px tap target) — or leave the `<label>`
-unclassed and the same style applies. Optional `.am-switch`, `.am-fieldset`, `.am-legend`.
-
-### RadioCards
-```tsx
-<RadioCards name="profile" legend={t("legend")} options={[{ value: "visitor", label: t("visitor"), description: t("visitorHint"), icon: "user" }]} />
-```
-CSS: `.am-radiocards`, `__legend __list`, `.am-radiocard`, `__icon __body __label __description`
-(checked = primary ring + primary-50).
-
-### Table
-```tsx
-<div className="am-table-wrap"><table className="am-table am-table--striped">…</table></div>
-```
-Rounded frame, scroll-shadow hints, sticky uppercase header, hover row.
-
-### FAQ / accordion
-```tsx
-<div className="am-faq">
-  <details className="am-faq__item"><summary>{q}</summary><p className="am-faq__answer">{a}</p></details>
-</div>
-```
-CSS-drawn chevron rotates on open; `::details-content` animates the height where supported.
-`.pub-score` (score/FAQ disclosures already in the pages) gets the same treatment.
-
-### EmptyState
-```tsx
-<EmptyState icon="search" align="center" tone="muted" title={t("noneTitle")} description={t("noneLead")} action={<Button href="/pays">{t("browse")}</Button>} />
-```
-`icon`, `tone` `default|muted|brand`, `align` `start|center`. One action at most — never repeat a
-button already on the page. CSS: `.am-empty[data-tone][data-align]`, `__icon __title __description`.
-
-### Skeleton
-```tsx
-<Skeleton shape="title" width="60%" />
-<Skeleton lines={3} />
-```
-`shape` `text|title|block|circle`, `width`, `height`, `lines`. CSS: `.am-skeleton[data-shape]`.
-
-### ProgressBar (stepper)
-```tsx
-<ProgressBar steps={steps} current={2} label={t("progressLabel")} stepLabel={t("stepOf", { n: 2 })} />
-```
-Circles joined by a connector: done = green tick, current = brand gradient + glow, upcoming =
-neutral. Stacks vertically under 680px. CSS: `.am-progress`, `__list __step __index __label`,
-`[data-state="done|current|todo"]`.
-
-### ScorePill
-`<ScorePill score={82} label={t("scoreAria", { score: 82 })} size="lg" />` — bands
-`high` (>=75, green) / `mid` (>=50, blue) / `low` (neutral). `scoreBand(score)` is exported.
-
-### Hero
-```tsx
-<Hero
-  tone="light" size="lg" kicker={t("kicker")} title={t("title")} lead={t("lead")}
-  breadcrumb={<Breadcrumb items={items} label={label} />}
-  actions={<Button href="/comparer">{t("compare")}</Button>}
-  aside={<Card raised>…formulaire d'entree…</Card>}
-/>
-```
-`tone` `light|brand|navy`, `size` `sm|md|lg`, `breadcrumb`, `actions`, `children` (text column),
-`aside` (second column, 2 columns from 980px). CSS: `.am-hero[data-tone][data-size]`,
-`__layout[data-columns] __inner __kicker __title __lead __actions __aside __breadcrumb`.
-
-**The `breadcrumb` prop is the standard placement of a breadcrumb.** Not
-`<div class="am-container"><Breadcrumb/></div>` above the hero: that glued the trail to the header
-and gave it a different left edge on every page. On navy the trail inverts automatically. A page with
-no hero at all (only the broker sign-in today) wraps its trail in
-`<div className="am-breadcrumbbar am-container">` (chrome.css), which supplies the top offset.
-
-### Section
-```tsx
-<Section tone="muted" kicker={t("kicker")} title={t("title")} lead={t("lead")} align="center" width="wide" spacing="compact" actions={<Button variant="secondary" href="/guides">{t("all")}</Button>}>
-```
-`tone` `default|muted|brand|navy|canvas` (muted = white band over the canvas — the main rhythm
-device; navy = dark band with inverted text), `align`, `width` `default|wide|narrow`, `spacing`
-`default|compact`, `headingLevel`, `id`, `ariaLabel`. CSS: `.am-section[data-tone][data-spacing]`,
-`__header[data-align] __kicker __title __lead __actions`.
-
-### Others
-`Breadcrumb` (chevrons, bold current), `BrokerBlock` (initials tile + licence line with a shield
-icon; `variant` `card|line|full`), `AiBox` (sparkles pill + soft gradient panel + permanent
-disclaimer), `ComparisonBar` (floating blurred pill, slides up, hidden under 2 selections),
-`WhatsAppButton`, `Logo`, `LanguageSwitcher`, `BackendText`, `JsonLd`, `Divider`
-(`.am-divider[data-spacing][data-orientation]`), plus the standalone classes `.am-pill-list` /
-`.am-pill` (guarantee pills) and `.am-kbd`.
-
-## 3.bis Colour pairs that were measured
-
-Every pair below was checked with the WCAG 2.x relative-luminance formula. Re-measure before you
-change any of them.
+## 4. Measured contrast pairs
 
 | Pair | Ratio |
 | --- | --- |
-| `Badge tone="sponsored"` — `warning-800` on `warning-50` (border/icon `warning-600`) | 6.95:1 |
-| `Badge tone="approved"` — `success-800` on `success-50` | 6.44:1 |
-| `.am-score[data-band="high"]` — `success-800` on `success-100` (the green band the PRD asks for) | 5.92:1 |
-| `.am-score[data-band="mid"]` — `primary-700` on `primary-100` | 9.33:1 |
-| `::placeholder` — `neutral-500` on a white control | 4.97:1 |
-| Navy hero breadcrumb — `primary-200` on `--am-gradient-navy` | 8.45:1 at the lightest stop |
-| WhatsApp button — `--am-whatsapp-ink` on `--am-whatsapp` | 7.08:1 |
+| White on sign navy `#0b2a5c` | 14.0:1 |
+| `--am-sign-ink-muted #c7d3ea` on navy | 9.3:1 |
+| Action blue `#1650b8` on white (and white on it) | 7.3:1 |
+| Text `#12161d` on white | 18.1:1 |
+| Muted `#4e5868` on white / on band | 7.2:1 / 6.3:1 |
+| Subtle `#5f6a7c` on white / on band (also input borders) | 5.5:1 / 4.8:1 |
+| White on `success-700` (approved badge) | 5.4:1 |
+| `success-700` on `success-50` | 4.9:1 |
+| `warning-800` on `warning-50` (sponsored) | 6.8:1 |
+| `danger-700` on `danger-50` | 8.2:1 |
+| Navy on primary-50 (info notice, row hover) | 12.8:1 |
+| Focus yellow `#ffd75e` on navy | 10.1:1 |
+| WhatsApp ink on WhatsApp green | 7.1:1 |
 
-**WhatsApp is the one brand exception to the green rule.** `--am-whatsapp` / `--am-whatsapp-dark` /
-`--am-whatsapp-ink` identify a *contact channel*, not a validated state, and they are confined to
-`Button variant="whatsapp"`, `WhatsAppButton` and the WhatsApp glyph. Everything around such a glyph
-stays neutral — the example lead ticket's "canal de rappel" row is `neutral-50` / `--am-text` with
-only the icon in the brand green, precisely so the row is not read as a validation.
+## 5. Stylesheet order (`app/globals.css`)
 
-### Icon
-`lucide-react` behind the historical API: `<Icon name="shield-check" size={24} />` — decorative
-(`aria-hidden`), `currentColor`, stroke 2 (1.75 at 32px+), default size 20, class `am-icon`.
-`iconNames` exports the full list (~110 names), `IconName` its type. The 21 original names still
-work; `whatsapp` keeps its hand-drawn path. Useful additions: `arrow-left` `arrow-up-right`
-`chevron-left` `chevron-up` `car` `plane` `heart-pulse` `home` `briefcase` `shield-check`
-`badge-check` `sparkles` `bot` `lock` `eye` `clock` `calendar` `map-pin` `flag` `filter` `sliders`
-`list` `layout-grid` `table` `scale` `calculator` `coins` `wallet` `receipt` `percent` `trending-up`
-`bar-chart` `pie-chart` `users` `user-check` `handshake` `message-circle` `send` `paperclip`
-`upload` `download` `file-text` `file-check` `check-circle` `x-circle` `alert-triangle`
-`help-circle` `lightbulb` `book-open` `graduation-cap` `newspaper` `quote` `link` `share` `copy`
-`settings` `refresh` `loader` `minus` `plus` `x` `more-horizontal` `sun` `moon` `zap` `award`
-`target` `compass` `headphones` `building-2` `landmark` `git-branch` `workflow` `layers` `box`
-`package` `thumbs-up` `smile` `banknote` `wifi-off` `database` `server` `cpu` `key` `fingerprint`
-`life-buoy` `siren` `stethoscope`.
+`tokens` → `base` → `motion` → `components` → `chrome`. Page sheets (`styles/pages/home.css`,
+`journey.css`, `institutional.css`, `quote.css`, `styles/brokers.css`) are imported by their page or
+layout module, after everything above.
 
-## 4. Motion (`styles/motion.css`, `components/motion/*`)
+## 6. Do / don't
 
-```tsx
-<Reveal><Section …>…</Section></Reveal>
-<Reveal as="ul" stagger className="am-grid">{items.map(…)}</Reveal>
-<Reveal delay={120} from="right"><Card raised>…</Card></Reveal>
-<CountUp value={1240} locale={locale} />            {/* or <Stat value={1240} /> */}
-```
-- `Reveal` props: `as`, `delay` (ms), `stagger`, `from` `up|left|right|scale`, `once`, `className`,
-  `style`, `id`. Client component, `IntersectionObserver` at threshold 0.15 / `-10%` bottom margin.
-- **Content is visible by default.** The hidden pre-state applies only under `html[data-js="true"]`,
-  which `Reveal` sets on mount — no JS, no hidden content. A 1200ms timeout and
-  `prefers-reduced-motion` both force the revealed state, and an element already on screen at
-  hydration is revealed at once (no flash). Never write your own `opacity: 0`.
-- Stagger: `[data-reveal-stagger] > *` delays each child by `--am-stagger` (`--i` or `:nth-child`
-  up to 12). Pass `stagger` on the parent, nothing on the children.
-- `CountUp` props: `value`, `locale`, `duration` (1400ms), `format`, `prefix`, `suffix`,
-  `className`. The **server renders the final formatted value** (SEO); the animation only replaces
-  it in the browser, and never under reduced motion. Output is wrapped in `.am-tabular`.
-- Entrance utilities for above-the-fold content (no observer): `.am-animate-in`, `.am-animate-fade`,
-  `.am-animate-scale`, `.am-animate-float`; set `style={{ "--i": 1 }}` to stagger them.
-- Keyframes available: `am-fade-up`, `am-fade-in`, `am-scale-in`, `am-slide-in-right`, `am-slide-up`,
-  `am-shimmer`, `am-spin`, `am-float`, `am-pulse-soft`.
+**Do**: open every page on a `Hero` with its breadcrumb · use `Directory` for any list of
+destinations · use `Route` for any sequence the visitor goes through · keep `Notice
+tone="indicative"` wherever prices are shown · put every number in `.am-tabular` · keep one primary
+action per page.
 
-## 5. The legacy `.pub-*` layer is gone
-
-Section 26 of `components.css` (97 selectors, ~13 KB) has been **deleted**: every page now renders
-design-system classes, and `grep -rn "pub-" apps/public/app --include=*.tsx` returns nothing. Do not
-reintroduce a `pub-*` class; the replacements are `Card`, `Badge`, `Notice`, `Button`, `.am-table`,
-`.am-grid`, `.am-form-grid` (institutional pages), `.am-formcard__grid` / `.am-steplist` (broker
-pages) and `.am-criteria*` / `.am-score*` (journey pages).
-
-Also living in `components.css`: `am-countrygrid`, `am-countrycard`, `am-countrycard__flag`,
-`am-entry`, `am-entry__row` (the former `pages.css` has been deleted). `am-countryselect*`, `am-localcontact*`, `am-header*`,
-`am-menu*`, `am-langswitch*`, `am-footer*`, `am-main`, `am-breadcrumbbar` belong to the chrome agent
-(`styles/chrome.css`) — `am-langswitch*` in particular moved there out of `components.css`, whose
-section 24 is now only a pointer.
-
-## 6. Stylesheet order (`app/globals.css`)
-
-`tokens` → `base` → `motion` → `components` → `chrome`. A new page stylesheet
-(`styles/pages/home.css`, `styles/brokers.css`, …) is imported from its own page/layout module,
-which puts it after everything above.
-
-## 7. Do / don't
-
-**Do** — use `Section tone="muted"` to alternate white bands over the canvas · put every number in
-`.am-tabular` or `Stat` · give each card one action · wrap below-the-fold blocks in `Reveal`,
-lists in `<Reveal stagger>` · use `IconTile` rather than a bare icon as a visual anchor · keep
-`Notice tone="indicative"` wherever prices are shown · pass the breadcrumb through `Hero breadcrumb`
-· give every `Section` a title, or the page skips a heading level · keep interactive controls at
-40px minimum (44px on a phone).
-
-**Don't** — no green background or green CTA · no sponsored badge in any colour but orange · no font
-size under 14px · no close button on a notice · no `opacity: 0` outside the `Reveal` contract · no
-new global element selector (`button`, `label`, `[role=…]`) · no raw hex outside `tokens.css` · no
-element that *looks* like a control but is a `<p>` (the drawer's "Fermer le menu" used to be one) ·
-don't edit `packages/ui/styles/tokens.css` · don't duplicate a primitive's CSS in a page sheet — add
-a modifier here instead.
+**Don't**: no gradient, glow, glass, shadow on page content · no eyebrow · no green that is not a
+confirmation, no orange that is not a sponsorship · no font size under 14px · no raw hex outside
+`tokens.css` · don't edit `packages/ui/styles/tokens.css` · don't duplicate a primitive's CSS in a page
+sheet: add a modifier to `components.css` instead.

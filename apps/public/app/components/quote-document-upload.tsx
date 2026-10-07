@@ -7,7 +7,6 @@ import { uploadQuoteDocument, type PublicQuoteDocumentUploadState } from "../lib
 import { Button } from "./ui/button";
 import { Field, fieldControlProps } from "./ui/field";
 import { Icon } from "./ui/icons";
-import { IconTile } from "./ui/icon-tile";
 import { Notice } from "./ui/notice";
 
 const kindKeys = [
@@ -20,6 +19,10 @@ const kindKeys = [
   "other"
 ] as const;
 
+/**
+ * Optional document upload of the tracking page: a plain form under its own heading, on the page's
+ * band, not a form set in a card. The hint says what happens to a file before anything is sent.
+ */
 export function QuoteDocumentUpload({ publicReference, token, remainingSlots }: { publicReference: string; token: string; remainingSlots: number }) {
   const t = useTranslations("DocumentUpload");
   const router = useRouter();
@@ -52,12 +55,9 @@ export function QuoteDocumentUpload({ publicReference, token, remainingSlots }: 
   }
 
   return (
-    <form className="am-j-panel" onSubmit={submit} aria-label={t("formLabel")}>
-      <div className="am-j-panel__head">
-        <IconTile name="upload" size="lg" />
-        <h3 className="am-j-panel__title">{t("formLabel")}</h3>
-      </div>
-      <Notice tone="info">{t("hint")}</Notice>
+    <form className="am-j-upload" onSubmit={submit} aria-label={t("formLabel")}>
+      <h3 className="am-j-upload__title">{t("formLabel")}</h3>
+      <p className="am-j-panel__lead">{t("hint")}</p>
       <div className="am-j-form__grid">
         <Field id="am-document-kind" label={t("kindLabel")}>
           <select {...fieldControlProps("am-document-kind", {})} name="documentKind" defaultValue="other">
@@ -100,7 +100,7 @@ export function QuoteDocumentUpload({ publicReference, token, remainingSlots }: 
           {state.publicMessage}
         </Notice>
       ) : null}
-      <div className="am-cluster">
+      <div className="am-cluster am-j-upload__actions">
         <Button type="submit" loading={state.status === "submitting"} icon={<Icon name="paperclip" size={18} />}>
           {t("submit")}
         </Button>

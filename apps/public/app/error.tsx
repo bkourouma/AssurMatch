@@ -1,10 +1,21 @@
 "use client";
 
 import { useEffect } from "react";
-import { IconTile } from "./components/ui/icon-tile";
-import { bodyFont, headingFont } from "./fonts";
+import { Directory, type DirectoryItem } from "./components/ui/directory";
+import { Hero } from "./components/ui/hero";
+import { Icon } from "./components/ui/icons";
+import { signFont } from "./fonts";
 import "./globals.css";
 import "./styles/pages/institutional.css";
+
+/**
+ * Plain anchors to the French URLs: this boundary sits above the `[locale]` segment and has no
+ * locale context for typed routes. A full page load is also the surest way out of an error state.
+ */
+const DESTINATIONS: DirectoryItem[] = [
+  { key: "home", title: "Retour à l'accueil", icon: "home", externalHref: "/" },
+  { key: "compare", title: "Comparer les offres", icon: "search", externalHref: "/pays" }
+];
 
 /**
  * Root error boundary. It sits above the `[locale]` segment, which owns `<html>` and `<body>`, so it
@@ -16,27 +27,22 @@ export default function RootError({ error, reset }: { error: Error & { digest?: 
   }, [error]);
 
   return (
-    <html lang="fr" className={`${headingFont.variable} ${bodyFont.variable}`}>
+    <html lang="fr" className={signFont.variable}>
       <body>
         <main className="am-main" id="contenu">
-          <section className="am-section">
-            <div className="am-container">
-              <div className="am-errorpage">
-                <span className="am-errorpage__icon">
-                  <IconTile name="alert-triangle" size="lg" tone="warning" />
-                </span>
-                <h1 className="am-errorpage__title">Une erreur est survenue</h1>
-                <p className="am-errorpage__lead">
-                  Le service public est momentanement indisponible. Reessayez dans quelques instants.
-                </p>
-                <p className="am-errorpage__actions">
-                  <button className="am-button" data-variant="primary" type="button" onClick={reset}>
-                    <span>Reessayer</span>
-                  </button>
-                </p>
-              </div>
-            </div>
-          </section>
+          <Hero
+            className="am-errorsign am-errorsign--bare"
+            title="Une erreur est survenue"
+            lead="Le service public est momentanément indisponible. Réessayez dans quelques instants."
+            actions={
+              <button className="am-button" data-variant="primary" type="button" onClick={reset}>
+                <Icon name="refresh" size={20} />
+                <span>Réessayer</span>
+              </button>
+            }
+          >
+            <Directory items={DESTINATIONS} surface="plate" columns={2} />
+          </Hero>
         </main>
       </body>
     </html>

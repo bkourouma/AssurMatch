@@ -105,6 +105,9 @@ export async function SiteFooter({ locale }: { locale: AppLocale }) {
                 <li>
                   <Link href="/how-it-works">{layout("nav.howItWorks")}</Link>
                 </li>
+                <li>
+                  <Link href="/our-commitment">{t("commitment")}</Link>
+                </li>
               </ul>
             </div>
 
