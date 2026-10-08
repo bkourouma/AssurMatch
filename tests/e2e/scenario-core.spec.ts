@@ -315,7 +315,8 @@ test("SC-04a le courtier crée une offre CI x Auto et la soumet à validation", 
   await form.locator("textarea[name='shortDescription']").fill("Responsabilité civile, défense recours et assistance 24h/24.");
   await form.locator("textarea[name='guaranteeSummary']").fill("RC obligatoire, défense recours, assistance");
   await form.locator("select[name='guaranteeLevel']").selectOption("3");
-  await form.getByRole("button", { name: "Ajouter une garantie" }).click();
+  // The editor opens with one empty row; "Ajouter une garantie" adds the next ones.
+  await expect(form.locator("input[name='guaranteeLabel']")).toHaveCount(1);
   await form.locator("input[name='guaranteeLabel']").first().fill("Responsabilité civile");
   await form.getByRole("button", { name: "Ajouter une garantie" }).click();
   await form.locator("input[name='guaranteeLabel']").nth(1).fill("Assistance 24h/24");
