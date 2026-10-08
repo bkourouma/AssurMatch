@@ -4,7 +4,6 @@ import { EntrySelector } from "../../components/site/entry-selector";
 import { Breadcrumb } from "../../components/ui/breadcrumb";
 import { Hero } from "../../components/ui/hero";
 import { Section } from "../../components/ui/section";
-import { Reveal } from "../../components/motion/reveal";
 import { getEntrySelectorData } from "../../content/entry-selector-data";
 import { listGlossary } from "../../content/glossary";
 import type { GlossaryEntry } from "../../content/types";
@@ -39,6 +38,11 @@ function groupByLetter(entries: readonly GlossaryEntry[]): Array<[string, Glossa
   return [...groups.entries()];
 }
 
+/**
+ * Glossary: an alphabetical definition list. The letter rail stays under the header; each letter is
+ * a heading over ruled rows, the term in the margin and its definition beside it from 768px. Every
+ * term keeps its anchor, so a « Voir aussi » link lands on the row it names.
+ */
 export default async function GlossaryPage({ params }: { params: Promise<{ locale: string }> }) {
   const locale: AppLocale = toLocale((await params).locale);
   setRequestLocale(locale);
@@ -51,7 +55,6 @@ export default async function GlossaryPage({ params }: { params: Promise<{ local
   return (
     <>
       <Hero
-        kicker={t("kicker")}
         title={t("title")}
         lead={t("lead")}
         breadcrumb={
@@ -65,7 +68,6 @@ export default async function GlossaryPage({ params }: { params: Promise<{ local
         }
       />
 
-      {/* Alphabet rail: it stays under the header while the visitor scrolls the definitions. */}
       <nav className="am-glossary-index" aria-label={t("indexLabel")}>
         <div className="am-container">
           <ul className="am-glossary-index__list">
@@ -83,17 +85,17 @@ export default async function GlossaryPage({ params }: { params: Promise<{ local
       <Section>
         <p className="am-faq-meta">{t("termCount", { count: entries.length })}</p>
         {groups.map(([letter, letterEntries]) => (
-          <section className="am-glossary-group am-inst-anchor" key={letter} id={`lettre-${letter}`} aria-labelledby={`lettre-${letter}-titre`}>
+          <section className="am-glossary-group" key={letter} id={`lettre-${letter}`} aria-labelledby={`lettre-${letter}-titre`}>
             <h2 className="am-glossary-group__letter" id={`lettre-${letter}-titre`}>
               {letter}
             </h2>
-            <Reveal stagger className="am-glossary-list">
+            <dl className="am-glossary-list">
               {letterEntries.map((entry) => (
-                <article className="am-glossary-entry" key={entry.term} id={termId(entry.term)}>
-                  <h3 className="am-glossary-entry__term">{entry.term}</h3>
-                  <p className="am-glossary-entry__definition">{entry.definition}</p>
+                <div className="am-glossary-entry" key={entry.term} id={termId(entry.term)}>
+                  <dt className="am-glossary-entry__term">{entry.term}</dt>
+                  <dd className="am-glossary-entry__definition">{entry.definition}</dd>
                   {entry.seeAlso && entry.seeAlso.length > 0 ? (
-                    <p className="am-glossary-entry__see">
+                    <dd className="am-glossary-entry__see">
                       {t("seeAlso")} :{" "}
                       {entry.seeAlso.map((related, index) => (
                         <span key={related}>
@@ -101,17 +103,17 @@ export default async function GlossaryPage({ params }: { params: Promise<{ local
                           <a href={`#${termId(related)}`}>{related}</a>
                         </span>
                       ))}
-                    </p>
+                    </dd>
                   ) : null}
-                </article>
+                </div>
               ))}
-            </Reveal>
+            </dl>
           </section>
         ))}
       </Section>
 
       {selector.countries.length > 0 ? (
-        <Section tone="muted" title={common("compareOffers")} lead={t("selectorLead")} width="narrow">
+        <Section tone="muted" title={common("compareOffers")} lead={t("selectorLead")} width="narrow" className="am-inst-compare">
           <EntrySelector countries={selector.countries} products={selector.products} defaultCountry={selector.defaultCountry} />
         </Section>
       ) : null}

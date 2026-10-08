@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { publicFile, readSources } from "./helpers/public-sources";
+import { publicFile, publicPage, readSources } from "./helpers/public-sources";
 
 const FORMS = [
   "components/forms/waitlist-form.tsx",
@@ -22,5 +22,18 @@ test("the three public forms send the page locale with their submission", () => 
     expect(source, form).toContain("toLocale(useLocale())");
     expect(source, form).toContain("locale,");
     expect(source, form).not.toContain("navigator.language");
+  }
+});
+
+/** The no-JavaScript server actions answer in the page language too, not in the default locale. */
+test("the no-JavaScript server actions send the bound page locale", () => {
+  const pages = [
+    "contact/page.tsx",
+    "brokers/apply/page.tsx",
+    "countries/[countryCode]/page.tsx"
+  ];
+  for (const page of pages) {
+    const source = readSources([publicPage(page)]);
+    expect(source, page).toContain("locale: boundLocale,");
   }
 });

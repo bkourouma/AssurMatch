@@ -31,6 +31,12 @@ export interface LegalPage {
    * Rendered visibly on the page via `LegalPlaceholder`, never silently omitted.
    */
   placeholders?: string[];
+  /**
+   * "L'essentiel en 5 lignes": a short plain-language summary shown in a `Notice` right under the
+   * page's last-updated meta line, before the table of contents. Optional so a future legal page can
+   * be added without one; every page in this spec provides five lines.
+   */
+  summary?: string[];
 }
 
 /** A practical guide (auto insurance, travel insurance, reading an indicative price, ...). */
@@ -42,6 +48,12 @@ export interface Guide {
   /** Product this guide relates to, used to embed the matching EntrySelector. */
   productKey?: string;
   sections: ContentSection[];
+  /** 3 to 5 short bullets, "Points clés". Reading time is derived from `sections`, never typed. */
+  keyPoints: string[];
+  /** 3 to 5 short bullets, "Erreurs à éviter", phrased in the infinitive. */
+  mistakes: string[];
+  /** Targeted lead for the bottom "Comparer les offres" block; falls back to the generic lead. */
+  compareCta?: string;
 }
 
 /** One glossary term. */
@@ -58,4 +70,6 @@ export interface FaqItem {
   answer: string;
   /** Product this question relates to, used to embed the matching EntrySelector. */
   productKey?: string;
+  /** Editorial theme used to group the FAQ page ("Le service", "Les offres et le score", ...). */
+  theme?: string;
 }

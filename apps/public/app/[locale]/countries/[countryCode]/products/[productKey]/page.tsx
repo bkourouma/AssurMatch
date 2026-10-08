@@ -1,18 +1,17 @@
 import { getTranslations, setRequestLocale } from "next-intl/server";
 import { toLocale } from "../../../../../../i18n/routing";
 import { productContent } from "../../../../../content/products";
+import { JourneyRoute } from "../../../../../components/journey/journey-route";
 import { JourneyHeroNotice, PublicJourneyActions } from "../../../../../components/public-journey";
-import { productIcon } from "../../../../../components/journey/product-icon";
 import { VisitorAiAssistant } from "../../../../../components/visitor-ai-assistant";
 import { BackendText } from "../../../../../components/ui/backend-text";
 import { Breadcrumb } from "../../../../../components/ui/breadcrumb";
 import { Button } from "../../../../../components/ui/button";
 import { Hero } from "../../../../../components/ui/hero";
 import { Icon } from "../../../../../components/ui/icons";
-import { IconTile } from "../../../../../components/ui/icon-tile";
 import { JsonLd } from "../../../../../components/ui/json-ld";
 import { Notice } from "../../../../../components/ui/notice";
-import { Reveal } from "../../../../../components/motion/reveal";
+import { Pictogram, productPictogram } from "../../../../../components/ui/pictogram";
 import { Section } from "../../../../../components/ui/section";
 import { WhatsAppButton } from "../../../../../components/ui/whatsapp-button";
 import { uniqueStrings } from "../../../../../lib/format";
@@ -33,6 +32,9 @@ import type { PageMetadata } from "../../../../../lib/seo";
  * The product is read from `GET /countries/:code/products/:key` so the page shows the catalogue name
  * rather than the raw key, and the "documents to prepare" section is built from what the published
  * offers actually require, with the editorial list of `app/content/products.ts` as a fallback.
+ *
+ * The page opens on the journey sign (« Vous êtes ici : Produit ») with its one primary action,
+ * "Comparer les offres", and the quote request beside it. Facts below are ruled lists, not cards.
  */
 
 type PageParams = { locale: string; countryCode: string; productKey: string };
@@ -42,13 +44,25 @@ const OFFERS_SAMPLED_FOR_DOCUMENTS = 4;
 
 /** Criteria the indicative score weighs, in the order the score explainer lists them. */
 const SCORE_CRITERIA = [
-  { key: "price", icon: "coins" },
-  { key: "guaranteeLevel", icon: "shield-check" },
-  { key: "deductible", icon: "wallet" },
-  { key: "processingSpeed", icon: "clock" },
-  { key: "paymentFlexibility", icon: "calendar" },
-  { key: "informationQuality", icon: "file-check" }
+  "price",
+  "guaranteeLevel",
+  "deductible",
+  "processingSpeed",
+  "paymentFlexibility",
+  "informationQuality",
+  "userPreferences"
 ] as const;
+
+/**
+ * Grammatical preposition preceding the country name ("Assurance auto en Côte d'Ivoire", "Assurance
+ * auto au Sénégal"). Defaults to "en" for every country not listed here; kept in sync with the same
+ * map on the country page.
+ */
+const COUNTRY_PREPOSITIONS: Record<string, string> = { SN: "au" };
+
+function countryPreposition(isoCode: string): string {
+  return COUNTRY_PREPOSITIONS[isoCode.trim().toUpperCase()] ?? "en";
+}
 
 /**
  * The public country directory exposes no WhatsApp or phone number today, so both the section and
@@ -81,10 +95,13 @@ export async function generateMetadata({ params }: { params: Promise<PageParams>
   const locale = toLocale(rawLocale);
   const t = await getTranslations({ locale, namespace: "Product" });
   const { country, product } = await resolveNames(countryCode, productKey);
-  const title = product ? t("title", { product, country }) : t("titleFallback", { productKey, country });
+  const preposition = countryPreposition(countryCode);
+  const title = product
+    ? t("title", { product, country, preposition })
+    : t("titleFallback", { productKey, country, preposition });
   return buildMetadata({
     title,
-    description: t("description", { product: product ?? productKey, country }),
+    description: t("description", { product: product ?? productKey, country, preposition }),
     href: "/countries/[countryCode]/products/[productKey]",
     params: { countryCode, productKey },
     locale
@@ -111,7 +128,10 @@ export default async function PublicProductPage({ params }: { params: Promise<Pa
   const summaries = product ? null : await listPublicProducts(countryCode);
   const summary = summaries?.data.find((item) => item.key === productKey);
   const productName = product?.name ?? summary?.name;
-  const heading = productName ? t("title", { product: productName, country: countryName }) : t("titleFallback", { productKey, country: countryName });
+  const preposition = countryPreposition(countryCode);
+  const heading = productName
+    ? t("title", { product: productName, country: countryName, preposition })
+    : t("titleFallback", { productKey, country: countryName, preposition });
 
   // Documents actually required by the published offers of this product, then the editorial list.
   const offers = await listPublicOffers(countryCode, productKey);
@@ -126,6 +146,8 @@ export default async function PublicProductPage({ params }: { params: Promise<Pa
   const documents = documentsFromOffers.length > 0 ? documentsFromOffers : editorial?.documents ?? [];
   const documentsFromApi = documentsFromOffers.length > 0;
   const hasLocalContact = countryContactOf(entry) !== null;
+  const guarantees = product?.guarantees ?? [];
+  const exclusions = product?.exclusions ?? [];
 
   const canonical = localeUrl(locale, "/countries/[countryCode]/products/[productKey]", productParams);
   const productJsonLd = {
@@ -141,9 +163,10 @@ export default async function PublicProductPage({ params }: { params: Promise<Pa
   return (
     <>
       <Hero
-        kicker={t("kicker")}
+        className="am-j-sign"
         title={heading}
         lead={t("lead")}
+        route={<JourneyRoute current="product" countryCode={countryCode} productKey={productKey} />}
         breadcrumb={
           <Breadcrumb
             label={common("breadcrumbLabel")}
@@ -173,31 +196,11 @@ export default async function PublicProductPage({ params }: { params: Promise<Pa
             </Button>
           </>
         }
-        aside={
-          <div className="am-j-countrycard">
-            <div className="am-j-countrycard__head">
-              <IconTile name={productIcon(productKey)} size="lg" />
-              <div>
-                <p className="am-j-countrycard__name">
-                  <BackendText>{productName ?? productKey}</BackendText>
-                </p>
-                <p className="am-j-meta">
-                  <span>
-                    <Icon name="map-pin" size={16} />
-                    <BackendText>{countryName}</BackendText>
-                  </span>
-                </p>
-              </div>
-            </div>
-            <ul className="am-pill-list">
-              <li className="am-pill">
-                <Icon name="list" size={16} />
-                {t("offersCount", { count: offers.data.length })}
-              </li>
-            </ul>
-          </div>
-        }
       >
+        <p className="am-j-context">
+          <Pictogram name={productPictogram(productKey)} tile tone="light" size={24} />
+          <span>{t("offersCount", { count: offers.data.length })}</span>
+        </p>
         {/* Both regulatory sentences, in one compact notice rather than two stacked boxes. */}
         <JourneyHeroNotice />
       </Hero>
@@ -210,50 +213,54 @@ export default async function PublicProductPage({ params }: { params: Promise<Pa
         </Section>
       ) : null}
 
-      {product?.summary || (product?.guarantees && product.guarantees.length > 0) || (product?.exclusions && product.exclusions.length > 0) ? (
+      {product?.summary || guarantees.length > 0 || exclusions.length > 0 ? (
         <Section title={t("summaryTitle")}>
-          <div className="am-stack am-stack--xl">
-            {product?.summary ? (
-              <p className="am-lead">
-                <BackendText>{product.summary}</BackendText>
-              </p>
-            ) : null}
-            {product?.guarantees && product.guarantees.length > 0 ? (
-              <div className="am-stack">
-                <h3>{t("guaranteesTitle")}</h3>
-                <Reveal as="ul" stagger className="am-j-features">
-                  {product.guarantees.map((guarantee) => (
-                    <li className="am-j-feature" key={guarantee.key}>
-                      <IconTile name="shield-check" tone="success" size="sm" />
-                      <div>
-                        <p className="am-j-feature__title">
-                          <BackendText>{guarantee.label}</BackendText>
-                        </p>
-                        {guarantee.detail ? (
-                          <p className="am-j-feature__detail">
-                            <BackendText>{guarantee.detail}</BackendText>
-                          </p>
-                        ) : null}
-                      </div>
-                    </li>
-                  ))}
-                </Reveal>
-              </div>
-            ) : null}
-            {product?.exclusions && product.exclusions.length > 0 ? (
-              <div className="am-stack">
-                <h3>{t("exclusionsTitle")}</h3>
-                <ul className="am-j-list">
-                  {product.exclusions.map((exclusion) => (
-                    <li key={exclusion}>
-                      <Icon name="minus" size={18} />
-                      <BackendText>{exclusion}</BackendText>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            ) : null}
-          </div>
+          {product?.summary ? (
+            <p className="am-lead am-j-intro">
+              <BackendText>{product.summary}</BackendText>
+            </p>
+          ) : null}
+          {guarantees.length > 0 || exclusions.length > 0 ? (
+            <div className="am-j-columns">
+              {guarantees.length > 0 ? (
+                <div>
+                  <h3 className="am-j-columns__title">{t("guaranteesTitle")}</h3>
+                  <ul className="am-j-ticks">
+                    {guarantees.map((guarantee) => (
+                      <li key={guarantee.key}>
+                        <Icon name="check" size={20} />
+                        <span>
+                          <strong>
+                            <BackendText>{guarantee.label}</BackendText>
+                          </strong>
+                          {guarantee.detail ? (
+                            <span className="am-j-ticks__detail">
+                              <BackendText>{guarantee.detail}</BackendText>
+                            </span>
+                          ) : null}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ) : null}
+              {exclusions.length > 0 ? (
+                <div>
+                  <h3 className="am-j-columns__title">{t("exclusionsTitle")}</h3>
+                  <ul className="am-j-ticks" data-tone="muted">
+                    {exclusions.map((exclusion) => (
+                      <li key={exclusion}>
+                        <Icon name="minus" size={20} />
+                        <span>
+                          <BackendText>{exclusion}</BackendText>
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ) : null}
+            </div>
+          ) : null}
         </Section>
       ) : null}
 
@@ -263,41 +270,31 @@ export default async function PublicProductPage({ params }: { params: Promise<Pa
         {...(documents.length > 0 ? { lead: documentsFromApi ? t("documentsLead") : t("documentsFallbackLead") } : {})}
       >
         {documents.length > 0 ? (
-          <ul className="am-j-list">
+          <ul className="am-j-ticks am-j-measure">
             {documents.map((document) => (
               <li key={document}>
-                <Icon name="file-check" size={18} />
-                {documentsFromApi ? <BackendText>{document}</BackendText> : document}
+                <Icon name="file-check" size={20} />
+                <span>{documentsFromApi ? <BackendText>{document}</BackendText> : document}</span>
               </li>
             ))}
           </ul>
         ) : (
-          <p>{t("documentsUnknown")}</p>
+          <p className="am-j-measure">{t("documentsUnknown")}</p>
         )}
       </Section>
 
-      <Section spacing="compact">
-        <div className="am-j-panel">
-          <div className="am-j-panel__head">
-            <IconTile name="calculator" size="lg" />
-            <h2 className="am-j-panel__title">{t("scoreTitle")}</h2>
-          </div>
-          <p className="am-j-panel__lead">{t("scoreLead")}</p>
-          <ul className="am-j-points">
-            {SCORE_CRITERIA.map((criterion) => (
-              <li key={criterion.key}>
-                <Icon name={criterion.icon} size={18} />
-                {offerCards(`criterionLabels.${criterion.key}`)}
-              </li>
-            ))}
-          </ul>
-          <p className="am-j-fineprint">{t("scoreFineprint")}</p>
-        </div>
+      <Section title={t("scoreTitle")} lead={t("scoreLead")}>
+        <ul className="am-j-criteria-list">
+          {SCORE_CRITERIA.map((criterion) => (
+            <li key={criterion}>{offerCards(`criterionLabels.${criterion}`)}</li>
+          ))}
+        </ul>
+        <p className="am-j-note am-j-note--after">{t("scoreFineprint")}</p>
       </Section>
 
       {editorial && editorial.faq.length > 0 ? (
         <Section title={t("faqTitle")} tone="muted">
-          <div className="am-faq">
+          <div className="am-faq am-j-measure">
             {editorial.faq.map((entryFaq) => (
               <details className="am-faq__item" key={entryFaq.question}>
                 <summary>{entryFaq.question}</summary>
@@ -309,12 +306,6 @@ export default async function PublicProductPage({ params }: { params: Promise<Pa
         </Section>
       ) : null}
 
-      {hasLocalContact ? (
-        <Section title={t("contactTitle")}>
-          <ProductContact entry={entry} whatsappLabel={t("whatsapp")} callLabel={(phone) => t("call", { phone })} />
-        </Section>
-      ) : null}
-
       {/* Hidden by CSS until the availability check has confirmed at least one assistant. */}
       <Section title={t("assistantTitle")} lead={t("assistantLead")} className="am-j-optional">
         <div className="am-j-assist">
@@ -323,9 +314,20 @@ export default async function PublicProductPage({ params }: { params: Promise<Pa
         </div>
       </Section>
 
-      <Section spacing="compact">
-        <div className="am-stack am-stack--lg">
+      {hasLocalContact ? (
+        <Section title={t("contactTitle")}>
+          <ProductContact entry={entry} whatsappLabel={t("whatsapp")} callLabel={(phone) => t("call", { phone })} />
+        </Section>
+      ) : null}
+
+      <Section>
+        <div className="am-stack am-stack--lg am-j-measure">
           <PublicJourneyActions countryCode={countryCode} productKey={productKey} />
+          {/* D-Cookies: a permanent information line, not a cookie banner - it never closes. */}
+          <p className="am-j-statement">
+            <Icon name="lock" size={20} />
+            <span>{t("consentNotice")}</span>
+          </p>
           <Notice tone="indicative">{t("fineprint")}</Notice>
         </div>
       </Section>
