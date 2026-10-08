@@ -20,7 +20,7 @@ export function PageHeader({ title, description, actions, breadcrumb, breadcrumb
   return (
     <header className="bo-page-header">
       <div className="bo-page-header__text">
-        {breadcrumb && breadcrumb.length > 0 ? (
+        {breadcrumb && breadcrumb.some((item, index) => item.href && index < breadcrumb.length - 1) ? (
           <nav aria-label={breadcrumbLabel}>
             <ol className="bo-breadcrumb">
               {breadcrumb.map((item, index) => (

@@ -19,10 +19,10 @@ export function AuthShell({ children, scope, homeHref, footer, dataAttributes }:
         <div className="bo-auth__brand">
           {homeHref ? (
             <a href={homeHref}>
-              <Logo variant="color" height={30} priority />
+              <Logo variant="white" height={30} priority />
             </a>
           ) : (
-            <Logo variant="color" height={30} priority />
+            <Logo variant="white" height={30} priority />
           )}
           <span className="bo-auth__scope">{scope}</span>
         </div>

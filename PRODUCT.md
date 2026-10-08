@@ -83,10 +83,11 @@ professional responsibility. A broker is a partner, not a customer-facing seller
   (« Le patron »: indigo cloth, pattern sheet, yellow tape). The back-offices must not borrow its
   indigo/yellow identity, its cut-paper devices or its display face.
 - One shared system for both back-offices, with a distinguishing accent per app.
-- Standing preference (product owner, 2026-10-08): after being offered a distinctive visual world, the
-  owner chose the category standard played straight for the back-offices: a refined, familiar SaaS
-  back-office with no concept or costume. Peer bar: Linear, Stripe Dashboard, HubSpot/Pipedrive (for the
-  broker CRM) and Vercel/GitHub. Craft level of those products is the finish bar.
+- Direction (product owner, 2026-10-08, second round): the first build, the category standard played
+  straight, was rejected as too sober and banal (colours, layout and typography all disliked). The owner
+  chose the radical dealt direction « Raie d'émission »: a dark charcoal working plate, bone text, one
+  grotesque, colour only as emission lines whose form (solid, dashed, half-height, struck, doubled)
+  carries the state. The standard SaaS look is no longer the target.
 - Anti-references named by the owner for the public site and held here too: `D:\APP\MedicProWeb`
   (themed costume site). Back-offices must read as tools, not as a concept piece.
 

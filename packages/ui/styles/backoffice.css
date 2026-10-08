@@ -1,74 +1,76 @@
 /*
  * AssurMatch back-office stylesheet (admin + courtier).
  *
- * Direction: the category standard, played straight (Linear / Stripe / HubSpot / Vercel level of
- * craft). One calm neutral surface, hairline structure, one action colour per app. Every class is
- * prefixed `bo-` so it never collides with the public design system, and nothing here reads the
- * public `--am-*` tokens: the back-offices own their palette.
+ * Direction "Raie d'emission": a spectrogram on a viewing box. A charcoal continuum, bone legends and
+ * colour that exists only as thin emission lines. State is carried by the FORM of the line (solid,
+ * dashed, half-height, struck, doubled) so it reads without the hue; the hue is a redundancy.
  *
- * Accent: each app sets `data-app="admin"` or `data-app="broker"` on <html>. The accent carries
- * primary buttons, the selected nav entry, links and the focus ring, and nothing else. Status colours
- * (green, amber, red, slate) are shared by both apps and always travel with a label.
+ * Every class is prefixed `bo-` so it never collides with the public design system, and nothing here
+ * reads the public `--am-*` tokens. Each app sets `data-app="admin"` or `data-app="broker"` on <html>:
+ * the lead wavelength (cyan or violet) lights the open nav tick, links, focus and the scale mark.
  *
- * Import order in an app layout:
- *   import "@assurmatch/ui/backoffice.css";
+ * Import in an app layout:  import "@assurmatch/ui/backoffice.css";
  */
 
 /* ---------- Tokens ---------- */
 
 :root {
-  --bo-font: var(--font-bo-sans), "Geist", system-ui, "Segoe UI", Arial, sans-serif;
-  --bo-mono: var(--font-bo-mono), "Geist Mono", ui-monospace, "Cascadia Mono", Consolas, monospace;
+  color-scheme: dark;
 
-  /* Neutrals (cool, nearly chroma-less) */
-  --bo-ground: oklch(0.976 0.002 260);
-  --bo-surface: oklch(1 0 0);
-  --bo-surface-2: oklch(0.984 0.002 260);
-  --bo-rail: oklch(0.966 0.003 260);
-  --bo-hover: oklch(0.953 0.004 260);
-  --bo-line: oklch(0.918 0.004 260);
-  --bo-line-strong: oklch(0.85 0.006 260);
-  --bo-ink: oklch(0.2 0.012 260);
-  --bo-ink-2: oklch(0.38 0.012 260);
-  --bo-ink-3: oklch(0.5 0.012 260);
+  --bo-font: var(--font-bo-sans), "Archivo", system-ui, "Segoe UI", Arial, sans-serif;
+  --bo-mono: var(--font-bo-mono), "Spline Sans Mono", ui-monospace, "Cascadia Mono", Consolas, monospace;
 
-  /* Status (shared by both apps) */
-  --bo-success: oklch(0.42 0.12 150);
-  --bo-success-soft: oklch(0.965 0.035 150);
-  --bo-success-line: oklch(0.88 0.06 150);
-  --bo-success-dot: oklch(0.62 0.16 150);
-  --bo-warning: oklch(0.44 0.1 65);
-  --bo-warning-soft: oklch(0.97 0.045 85);
-  --bo-warning-line: oklch(0.9 0.08 85);
-  --bo-warning-dot: oklch(0.74 0.15 75);
-  --bo-danger: oklch(0.45 0.17 27);
-  --bo-danger-soft: oklch(0.965 0.025 25);
-  --bo-danger-line: oklch(0.88 0.06 25);
-  --bo-danger-dot: oklch(0.58 0.2 27);
-  --bo-info: oklch(0.42 0.1 235);
-  --bo-info-soft: oklch(0.965 0.02 235);
-  --bo-info-line: oklch(0.89 0.04 235);
-  --bo-info-dot: oklch(0.6 0.12 235);
+  /* The continuum: charcoal ground, ash plates, bone legends */
+  --bo-ground: oklch(0.175 0.004 250);
+  --bo-surface: oklch(0.225 0.005 250);
+  --bo-surface-2: oklch(0.2 0.005 250);
+  --bo-rail: oklch(0.15 0.004 250);
+  --bo-inset: oklch(0.145 0.004 250);
+  --bo-hover: oklch(0.275 0.006 250);
+  --bo-line: oklch(0.31 0.006 250);
+  --bo-line-strong: oklch(0.43 0.008 250);
+  --bo-control-line: oklch(0.6 0.01 250);
+  --bo-ink: oklch(0.93 0.012 95);
+  --bo-ink-2: oklch(0.8 0.012 95);
+  --bo-ink-3: oklch(0.67 0.012 95);
 
-  /* Accent: admin azure (default) */
-  --bo-accent: oklch(0.54 0.2 258);
-  --bo-accent-hover: oklch(0.47 0.2 258);
-  --bo-accent-soft: oklch(0.962 0.025 258);
-  --bo-accent-line: oklch(0.88 0.06 258);
-  --bo-accent-ink: oklch(0.4 0.17 258);
+  /* Emission lines: the only colour in the system. Text variants are lifted for AA on the plates. */
+  --bo-success: oklch(0.82 0.16 150);
+  --bo-success-soft: oklch(0.26 0.045 150);
+  --bo-success-line: oklch(0.45 0.09 150);
+  --bo-success-dot: oklch(0.8 0.18 150);
+  --bo-warning: oklch(0.88 0.15 95);
+  --bo-warning-soft: oklch(0.27 0.045 95);
+  --bo-warning-line: oklch(0.5 0.09 95);
+  --bo-warning-dot: oklch(0.87 0.17 95);
+  --bo-danger: oklch(0.75 0.17 25);
+  --bo-danger-soft: oklch(0.26 0.05 25);
+  --bo-danger-line: oklch(0.5 0.11 25);
+  --bo-danger-dot: oklch(0.7 0.2 25);
+  --bo-info: oklch(0.78 0.11 250);
+  --bo-info-soft: oklch(0.26 0.04 250);
+  --bo-info-line: oklch(0.47 0.08 250);
+  --bo-info-dot: oklch(0.75 0.13 250);
+
+  /* Lead wavelength: admin cyan (486nm) */
+  --bo-accent: oklch(0.82 0.12 210);
+  --bo-accent-hover: oklch(0.88 0.1 210);
+  --bo-accent-soft: oklch(0.27 0.045 210);
+  --bo-accent-line: oklch(0.5 0.09 210);
+  --bo-accent-ink: oklch(0.86 0.1 210);
 
   /* Scale */
   --bo-fs: 14px;
   --bo-fs-body: 15px;
   --bo-fs-card: 16px;
   --bo-fs-section: 20px;
-  --bo-fs-title: 24px;
-  --bo-fs-stat: 28px;
+  --bo-fs-title: 36px;
+  --bo-fs-stat: 40px;
 
-  /* Shape */
-  --bo-r-panel: 8px;
-  --bo-r-control: 6px;
-  --bo-r-dialog: 12px;
+  /* Shape: nothing is round except avatars and counters */
+  --bo-r-panel: 3px;
+  --bo-r-control: 2px;
+  --bo-r-dialog: 4px;
 
   --bo-s1: 4px;
   --bo-s2: 8px;
@@ -77,18 +79,19 @@
   --bo-s5: 24px;
   --bo-s6: 32px;
 
-  --bo-sidebar: 248px;
+  --bo-sidebar: 256px;
   --bo-topbar: 52px;
-  --bo-pop-shadow: 0 8px 24px oklch(0.2 0.012 260 / 0.14), 0 1px 3px oklch(0.2 0.012 260 / 0.1);
+  --bo-pop-shadow: 0 10px 28px oklch(0.05 0.004 250 / 0.6), 0 0 0 1px oklch(0.43 0.008 250);
   --bo-ease: cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 [data-app="broker"] {
-  --bo-accent: oklch(0.5 0.16 345);
-  --bo-accent-hover: oklch(0.43 0.16 345);
-  --bo-accent-soft: oklch(0.965 0.02 345);
-  --bo-accent-line: oklch(0.88 0.05 345);
-  --bo-accent-ink: oklch(0.4 0.14 345);
+  /* Lead wavelength: broker violet (405nm, lifted for contrast) */
+  --bo-accent: oklch(0.78 0.13 295);
+  --bo-accent-hover: oklch(0.85 0.11 295);
+  --bo-accent-soft: oklch(0.27 0.05 295);
+  --bo-accent-line: oklch(0.52 0.11 295);
+  --bo-accent-ink: oklch(0.84 0.11 295);
 }
 
 /* ---------- Reset ---------- */
@@ -104,7 +107,7 @@ html {
   color: var(--bo-ink);
   font-family: var(--bo-font);
   -webkit-text-size-adjust: 100%;
-  scrollbar-color: var(--bo-line-strong) transparent;
+  scrollbar-color: var(--bo-line-strong) var(--bo-ground);
 }
 
 body {
@@ -114,9 +117,9 @@ body {
   color: var(--bo-ink);
   font-family: var(--bo-font);
   font-size: var(--bo-fs-body);
+  font-stretch: 96%;
   line-height: 1.5;
   -webkit-font-smoothing: antialiased;
-  font-feature-settings: "cv11", "ss01";
 }
 
 h1,
@@ -126,7 +129,7 @@ h4 {
   color: var(--bo-ink);
   font-family: var(--bo-font);
   font-weight: 600;
-  letter-spacing: -0.011em;
+  letter-spacing: -0.005em;
   text-wrap: balance;
 }
 
@@ -156,12 +159,12 @@ code,
 kbd,
 samp {
   font-family: var(--bo-mono);
-  font-size: 0.93em;
+  font-size: inherit;
 }
 
 ::selection {
-  background: var(--bo-accent-soft);
-  color: var(--bo-accent-ink);
+  background: var(--bo-accent-line);
+  color: var(--bo-ink);
 }
 
 :focus-visible {
@@ -198,8 +201,9 @@ samp {
 
 .bo-sidebar__brand {
   display: grid;
-  gap: var(--bo-s2);
-  padding: var(--bo-s4) var(--bo-s4) var(--bo-s3);
+  gap: var(--bo-s3);
+  padding: var(--bo-s5) var(--bo-s4) var(--bo-s4);
+  border-bottom: 1px solid var(--bo-line);
 }
 
 .bo-sidebar__brand-row {
@@ -213,29 +217,26 @@ samp {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: var(--bo-s2);
+  gap: var(--bo-s2) var(--bo-s3);
 }
 
+/* The app tag is a legend: its wavelength underlines it, nothing is filled. */
 .bo-sidebar__brand-scope {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  min-height: 24px;
-  padding: 0 var(--bo-s2);
-  border: 1px solid var(--bo-accent-line);
-  border-radius: var(--bo-r-control);
-  background: var(--bo-accent-soft);
-  color: var(--bo-accent-ink);
+  min-height: 22px;
+  padding: 0 0 3px;
+  border-bottom: 2px solid var(--bo-accent);
+  color: var(--bo-ink);
   font-size: var(--bo-fs);
   font-weight: 600;
+  font-stretch: 90%;
+  letter-spacing: 0.08em;
   line-height: 1;
+  text-transform: uppercase;
 }
 
 .bo-sidebar__brand-meta {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: var(--bo-s2);
   color: var(--bo-ink-3);
   font-size: var(--bo-fs);
 }
@@ -244,7 +245,7 @@ samp {
   flex: 1;
   min-height: 0;
   overflow-y: auto;
-  padding: var(--bo-s2) var(--bo-s2) var(--bo-s4);
+  padding: var(--bo-s4) 0;
 }
 
 .bo-sidebar__footer {
@@ -256,34 +257,50 @@ samp {
 
 .bo-nav {
   display: grid;
-  gap: var(--bo-s4);
+  gap: var(--bo-s5);
 }
 
 .bo-nav__group {
   display: grid;
-  gap: 2px;
+  gap: 1px;
 }
 
 .bo-nav__group-title {
-  margin: var(--bo-s2) 0 var(--bo-s1);
-  padding: 0 var(--bo-s3);
+  margin: 0 0 var(--bo-s1);
+  padding: 0 var(--bo-s4);
   color: var(--bo-ink-3);
   font-size: var(--bo-fs);
-  font-weight: 500;
+  font-weight: 600;
+  font-stretch: 88%;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
 }
 
+/* Every entry owns a tick on the rail; the open one extends into a long lit line. */
 .bo-nav__link {
   position: relative;
   display: flex;
   align-items: center;
   gap: 10px;
   min-height: 34px;
-  padding: 6px var(--bo-s3);
-  border-radius: var(--bo-r-control);
+  padding: 6px var(--bo-s4) 6px 44px;
   color: var(--bo-ink-2);
   font-size: var(--bo-fs);
   font-weight: 500;
   transition: background-color 0.12s var(--bo-ease), color 0.12s var(--bo-ease);
+}
+
+.bo-nav__link::before {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 0;
+  width: 34px;
+  height: 1px;
+  background: var(--bo-line-strong);
+  transform: scaleX(0.3);
+  transform-origin: left center;
+  transition: transform 0.2s var(--bo-ease), background-color 0.12s var(--bo-ease);
 }
 
 .bo-nav__link svg {
@@ -307,14 +324,22 @@ samp {
   text-decoration: none;
 }
 
-.bo-nav__link:hover svg {
-  color: var(--bo-ink-2);
+.bo-nav__link:hover::before {
+  transform: scaleX(0.55);
+  background: var(--bo-ink-3);
 }
 
 .bo-nav__link[aria-current="page"] {
-  background: var(--bo-accent-soft);
-  color: var(--bo-accent-ink);
+  background: var(--bo-surface);
+  color: var(--bo-ink);
   font-weight: 600;
+}
+
+.bo-nav__link[aria-current="page"]::before {
+  transform: scaleX(1);
+  height: 2px;
+  margin-top: -0.5px;
+  background: var(--bo-accent);
 }
 
 .bo-nav__link[aria-current="page"] svg {
@@ -323,7 +348,7 @@ samp {
 
 .bo-nav__link[aria-disabled="true"] {
   color: var(--bo-ink-3);
-  opacity: 0.62;
+  opacity: 0.6;
   cursor: not-allowed;
 }
 
@@ -332,21 +357,24 @@ samp {
   color: var(--bo-ink-3);
 }
 
+.bo-nav__link[aria-disabled="true"]::before,
+.bo-nav__link[aria-disabled="true"]:hover::before {
+  transform: scaleX(0.3);
+  background: repeating-linear-gradient(90deg, var(--bo-line-strong) 0 2px, transparent 2px 4px);
+}
+
 .bo-nav__sublinks {
   display: grid;
   gap: 1px;
-  margin: 2px 0 var(--bo-s1) 21px;
-  padding-left: var(--bo-s2);
-  border-left: 1px solid var(--bo-line-strong);
+  margin: 2px 0 var(--bo-s1);
 }
 
 .bo-nav__sublink {
   display: flex;
   align-items: center;
   min-height: 30px;
-  padding: 4px var(--bo-s3);
-  border-radius: var(--bo-r-control);
-  color: var(--bo-ink-2);
+  padding: 4px var(--bo-s4) 4px 72px;
+  color: var(--bo-ink-3);
   font-size: var(--bo-fs);
 }
 
@@ -357,7 +385,6 @@ samp {
 }
 
 .bo-nav__sublink[aria-current="page"] {
-  background: var(--bo-accent-soft);
   color: var(--bo-accent-ink);
   font-weight: 600;
 }
@@ -370,7 +397,6 @@ samp {
   padding: 0 6px;
   border: 1px solid var(--bo-line-strong);
   border-radius: var(--bo-r-control);
-  background: var(--bo-surface);
   color: var(--bo-ink-2);
   font-size: var(--bo-fs);
   font-weight: 500;
@@ -385,6 +411,56 @@ samp {
   flex-direction: column;
 }
 
+/* The graduated scale: a ruler across the top of every page, the open section's tick lit. */
+.bo-scale {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  flex: none;
+  background-color: var(--bo-ground);
+  height: 22px;
+  border-bottom: 1px solid var(--bo-line);
+  background-image:
+    repeating-linear-gradient(90deg, var(--bo-line-strong) 0 1px, transparent 1px 8px),
+    repeating-linear-gradient(90deg, var(--bo-ink-3) 0 1px, transparent 1px 64px);
+  background-position: left bottom, left bottom;
+  background-size: 100% 6px, 100% 12px;
+  background-repeat: no-repeat;
+}
+
+.bo-scale__mark {
+  position: absolute;
+  bottom: 0;
+  left: calc(var(--bo-pos, 0) * 100%);
+  width: 2px;
+  height: 22px;
+  margin-left: -1px;
+  background: var(--bo-accent);
+}
+
+/* Where the browser supports scroll-driven animation the lit tick tracks the reading position on
+   the page; elsewhere it rests at the open section's place on the ruler. */
+@supports (animation-timeline: scroll()) {
+  .bo-scale__mark {
+    left: 0;
+    animation: bo-scale-travel linear both;
+    animation-timeline: scroll(root block);
+  }
+
+  @keyframes bo-scale-travel {
+    to {
+      left: 100%;
+    }
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bo-scale__mark {
+    animation: none;
+    left: calc(var(--bo-pos, 0) * 100%);
+  }
+}
+
 /* The topbar only exists where the sidebar is a drawer; on desktop the account lives in the rail. */
 .bo-topbar {
   position: sticky;
@@ -396,7 +472,7 @@ samp {
   height: var(--bo-topbar);
   padding: 0 var(--bo-s4);
   border-bottom: 1px solid var(--bo-line);
-  background: var(--bo-surface);
+  background: var(--bo-rail);
 }
 
 .bo-topbar__title {
@@ -420,7 +496,7 @@ samp {
   padding: 0;
   border: 1px solid var(--bo-line-strong);
   border-radius: var(--bo-r-control);
-  background: var(--bo-surface);
+  background: transparent;
   color: var(--bo-ink-2);
   cursor: pointer;
 }
@@ -431,7 +507,7 @@ samp {
 
 .bo-breadcrumb {
   min-width: 0;
-  margin: 0 0 var(--bo-s2);
+  margin: 0 0 var(--bo-s3);
   padding: 0;
   list-style: none;
   display: flex;
@@ -447,9 +523,11 @@ samp {
 }
 
 .bo-breadcrumb li + li::before {
-  content: "/";
+  content: "";
+  width: 12px;
+  height: 1px;
   margin: 0 var(--bo-s2);
-  color: var(--bo-line-strong);
+  background: var(--bo-line-strong);
 }
 
 .bo-breadcrumb li:last-child {
@@ -502,12 +580,13 @@ samp {
   justify-content: center;
   width: 30px;
   height: 30px;
+  border: 1px solid var(--bo-accent);
   border-radius: 999px;
-  background: var(--bo-accent);
-  color: oklch(1 0 0);
+  color: var(--bo-accent);
+  font-family: var(--bo-mono);
   font-size: var(--bo-fs);
   font-weight: 600;
-  letter-spacing: 0.01em;
+  letter-spacing: 0.02em;
 }
 
 .bo-user-menu__identity {
@@ -528,6 +607,7 @@ samp {
 .bo-user-menu__role {
   overflow: hidden;
   color: var(--bo-ink-3);
+  font-family: var(--bo-mono);
   font-size: var(--bo-fs);
   line-height: 1.3;
   text-overflow: ellipsis;
@@ -543,7 +623,6 @@ samp {
   display: grid;
   gap: 2px;
   padding: var(--bo-s1);
-  border: 1px solid var(--bo-line);
   border-radius: var(--bo-r-panel);
   background: var(--bo-surface);
   box-shadow: var(--bo-pop-shadow);
@@ -584,9 +663,9 @@ samp {
 
 .bo-content {
   width: 100%;
-  max-width: 1360px;
+  max-width: 1440px;
   margin: 0 auto;
-  padding: var(--bo-s6) var(--bo-s6) 64px;
+  padding: var(--bo-s6) var(--bo-s6) 72px;
 }
 
 .bo-scrim {
@@ -608,7 +687,7 @@ samp {
   display: grid;
   gap: var(--bo-s4);
   padding: var(--bo-s6);
-  border: 1px solid var(--bo-line);
+  border: 1px solid var(--bo-line-strong);
   border-radius: var(--bo-r-dialog);
   background: var(--bo-surface);
 }
@@ -623,19 +702,23 @@ samp {
 .bo-auth__scope {
   display: inline-flex;
   align-items: center;
-  min-height: 24px;
-  padding: 0 var(--bo-s2);
-  border: 1px solid var(--bo-accent-line);
-  border-radius: var(--bo-r-control);
-  background: var(--bo-accent-soft);
-  color: var(--bo-accent-ink);
+  min-height: 22px;
+  padding: 0 0 3px;
+  border-bottom: 2px solid var(--bo-accent);
+  color: var(--bo-ink);
   font-size: var(--bo-fs);
   font-weight: 600;
+  font-stretch: 90%;
+  letter-spacing: 0.08em;
+  line-height: 1;
+  text-transform: uppercase;
 }
 
 .bo-auth__title {
   margin: 0;
   font-size: var(--bo-fs-section);
+  font-weight: 400;
+  font-stretch: 108%;
   line-height: 28px;
 }
 
@@ -662,7 +745,7 @@ samp {
   align-items: flex-start;
   justify-content: space-between;
   gap: var(--bo-s4);
-  padding-bottom: var(--bo-s2);
+  padding-bottom: var(--bo-s3);
 }
 
 .bo-page-header__text {
@@ -682,17 +765,19 @@ samp {
   display: none;
 }
 
+/* The open page blooms: light, semi-wide, large. */
 .bo-title {
   margin: 0;
   font-size: var(--bo-fs-title);
-  font-weight: 600;
-  line-height: 32px;
-  letter-spacing: -0.02em;
+  font-stretch: 114%;
+  font-weight: 300;
+  line-height: 1.1;
+  letter-spacing: -0.015em;
 }
 
 .bo-description {
   max-width: 68ch;
-  margin: var(--bo-s1) 0 0;
+  margin: var(--bo-s2) 0 0;
   color: var(--bo-ink-3);
   font-size: var(--bo-fs-body);
   line-height: 1.5;
@@ -700,9 +785,12 @@ samp {
 
 .bo-section-title {
   margin: 0;
-  font-size: var(--bo-fs-card);
+  font-size: var(--bo-fs);
+  font-stretch: 90%;
   font-weight: 600;
+  letter-spacing: 0.08em;
   line-height: 24px;
+  text-transform: uppercase;
 }
 
 .bo-grid {
@@ -742,7 +830,7 @@ samp {
   align-content: start;
 }
 
-/* ---------- Card ---------- */
+/* ---------- Card: an ash plate ---------- */
 
 .bo-card {
   min-width: 0;
@@ -804,8 +892,65 @@ samp {
   padding: var(--bo-s3) var(--bo-s4);
   border-top: 1px solid var(--bo-line);
   background: var(--bo-surface-2);
-  border-bottom-left-radius: var(--bo-r-panel);
-  border-bottom-right-radius: var(--bo-r-panel);
+}
+
+/* ---------- Emission marks: state as the form of a line ---------- */
+/* solid = live/confirmed, dashed = pending/attention, double = do first, half = informational,
+   struck = disabled. The hue repeats the form; it never replaces it. */
+
+.bo-badge::before,
+.bo-kpi__label::before,
+.bo-stats__dot,
+.bo-attention__line {
+  --mark: var(--bo-ink-3);
+  content: "";
+  flex: none;
+  width: 3px;
+  height: 14px;
+  background: var(--mark);
+}
+
+[data-tone="success"] {
+  --mark: var(--bo-success-dot);
+}
+
+[data-tone="warning"] {
+  --mark: var(--bo-warning-dot);
+}
+
+[data-tone="danger"] {
+  --mark: var(--bo-danger-dot);
+}
+
+[data-tone="info"] {
+  --mark: var(--bo-info-dot);
+}
+
+/* dashed: pending, caution */
+.bo-badge[data-tone="warning"]::before,
+.bo-kpi[data-tone="warning"] .bo-kpi__label::before,
+.bo-stats__cell[data-tone="warning"] .bo-stats__dot,
+.bo-attention__item[data-tone="warning"] .bo-attention__line {
+  background: repeating-linear-gradient(180deg, var(--mark) 0 4px, transparent 4px 6px);
+}
+
+/* double: urgent, blocked */
+.bo-badge[data-tone="danger"]::before,
+.bo-kpi[data-tone="danger"] .bo-kpi__label::before,
+.bo-stats__cell[data-tone="danger"] .bo-stats__dot,
+.bo-attention__item[data-tone="danger"] .bo-attention__line {
+  width: 7px;
+  background: linear-gradient(90deg, var(--mark) 0 3px, transparent 3px 4px, var(--mark) 4px 7px);
+}
+
+/* half-height: informational, neutral */
+.bo-badge[data-tone="info"]::before,
+.bo-badge:not([data-tone])::before,
+.bo-badge[data-tone="neutral"]::before,
+.bo-kpi[data-tone="info"] .bo-kpi__label::before,
+.bo-stats__cell[data-tone="info"] .bo-stats__dot,
+.bo-attention__item[data-tone="info"] .bo-attention__line {
+  height: 8px;
 }
 
 /* ---------- KPI (single card) ---------- */
@@ -831,38 +976,14 @@ samp {
   font-weight: 500;
 }
 
-.bo-kpi__label::before {
-  content: "";
-  flex: none;
-  width: 8px;
-  height: 8px;
-  border-radius: 999px;
-  background: var(--bo-line-strong);
-}
-
-.bo-kpi[data-tone="success"] .bo-kpi__label::before {
-  background: var(--bo-success-dot);
-}
-
-.bo-kpi[data-tone="warning"] .bo-kpi__label::before {
-  background: var(--bo-warning-dot);
-}
-
-.bo-kpi[data-tone="danger"] .bo-kpi__label::before {
-  background: var(--bo-danger-dot);
-}
-
-.bo-kpi[data-tone="info"] .bo-kpi__label::before {
-  background: var(--bo-info-dot);
-}
-
 .bo-kpi__value {
   margin: 0;
+  font-family: var(--bo-mono);
   font-size: var(--bo-fs-stat);
   font-variant-numeric: tabular-nums;
-  font-weight: 600;
-  letter-spacing: -0.02em;
-  line-height: 1.15;
+  font-weight: 300;
+  letter-spacing: -0.03em;
+  line-height: 1.1;
 }
 
 .bo-kpi__helper {
@@ -890,7 +1011,7 @@ samp {
   color: var(--bo-danger);
 }
 
-/* ---------- Stat strip: several figures in one panel ---------- */
+/* ---------- Stat strip: several figures in one plate ---------- */
 
 .bo-stats {
   display: grid;
@@ -910,8 +1031,8 @@ samp {
   display: grid;
   align-content: start;
   gap: var(--bo-s1);
-  padding: var(--bo-s4);
-  /* Hairlines between cells, drawn as a grid gap so wrapped rows stay aligned. */
+  padding: var(--bo-s4) var(--bo-s4) var(--bo-s5);
+  /* Hairlines between cells, drawn as a shadow so wrapped rows stay aligned. */
   box-shadow: 1px 0 0 0 var(--bo-line), 0 1px 0 0 var(--bo-line);
 }
 
@@ -925,37 +1046,14 @@ samp {
   font-weight: 500;
 }
 
-.bo-stats__dot {
-  flex: none;
-  width: 8px;
-  height: 8px;
-  border-radius: 999px;
-  background: var(--bo-line-strong);
-}
-
-.bo-stats__cell[data-tone="success"] .bo-stats__dot {
-  background: var(--bo-success-dot);
-}
-
-.bo-stats__cell[data-tone="warning"] .bo-stats__dot {
-  background: var(--bo-warning-dot);
-}
-
-.bo-stats__cell[data-tone="danger"] .bo-stats__dot {
-  background: var(--bo-danger-dot);
-}
-
-.bo-stats__cell[data-tone="info"] .bo-stats__dot {
-  background: var(--bo-info-dot);
-}
-
 .bo-stats__value {
   margin: 0;
+  font-family: var(--bo-mono);
   font-size: var(--bo-fs-stat);
   font-variant-numeric: tabular-nums;
-  font-weight: 600;
-  letter-spacing: -0.02em;
-  line-height: 1.15;
+  font-weight: 300;
+  letter-spacing: -0.03em;
+  line-height: 1.1;
 }
 
 .bo-stats__helper {
@@ -971,10 +1069,10 @@ samp {
 }
 
 .bo-stats__cell:has(.bo-stats__link:hover) {
-  background: var(--bo-surface-2);
+  background: var(--bo-hover);
 }
 
-/* ---------- Attention list: what needs doing now ---------- */
+/* ---------- Attention list: queues on one shared scale ---------- */
 
 .bo-attention {
   margin: 0;
@@ -985,39 +1083,16 @@ samp {
 .bo-attention__item {
   position: relative;
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto auto;
+  grid-template-columns: minmax(0, 1.1fr) minmax(120px, 1fr) 5ch auto;
   align-items: center;
-  gap: var(--bo-s3);
-  min-height: 56px;
+  gap: var(--bo-s4);
+  min-height: 64px;
   padding: var(--bo-s3) var(--bo-s4);
   border-top: 1px solid var(--bo-line);
 }
 
 .bo-attention__item:first-child {
   border-top: 0;
-}
-
-.bo-attention__dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 999px;
-  background: var(--bo-line-strong);
-}
-
-.bo-attention__item[data-tone="warning"] .bo-attention__dot {
-  background: var(--bo-warning-dot);
-}
-
-.bo-attention__item[data-tone="danger"] .bo-attention__dot {
-  background: var(--bo-danger-dot);
-}
-
-.bo-attention__item[data-tone="success"] .bo-attention__dot {
-  background: var(--bo-success-dot);
-}
-
-.bo-attention__item[data-tone="info"] .bo-attention__dot {
-  background: var(--bo-info-dot);
 }
 
 .bo-attention__text {
@@ -1027,8 +1102,8 @@ samp {
 }
 
 .bo-attention__label {
-  font-weight: 600;
   font-size: var(--bo-fs-body);
+  font-weight: 600;
 }
 
 .bo-attention__helper {
@@ -1036,12 +1111,33 @@ samp {
   font-size: var(--bo-fs);
 }
 
+/* One scale per row, graduated like the page ruler; the line stands at the queue's share of the
+   largest queue, so the rows compare at a glance. */
+.bo-attention__scale {
+  position: relative;
+  height: 28px;
+  border-bottom: 1px solid var(--bo-line-strong);
+  background: repeating-linear-gradient(90deg, var(--bo-line-strong) 0 1px, transparent 1px 25%) left bottom / 100% 6px no-repeat;
+}
+
+.bo-attention__scale .bo-attention__line {
+  position: absolute;
+  bottom: 0;
+  left: calc(var(--bo-share, 0) * 100%);
+  height: 24px;
+  margin-left: -1px;
+}
+
+.bo-attention__item[data-tone="info"] .bo-attention__scale .bo-attention__line,
+.bo-attention__item[data-tone="neutral"] .bo-attention__scale .bo-attention__line {
+  height: 14px;
+}
+
 .bo-attention__count {
-  min-width: 2ch;
+  font-family: var(--bo-mono);
   font-size: var(--bo-fs-section);
   font-variant-numeric: tabular-nums;
-  font-weight: 600;
-  letter-spacing: -0.02em;
+  font-weight: 400;
   text-align: right;
 }
 
@@ -1052,6 +1148,7 @@ samp {
   color: var(--bo-accent);
   font-size: var(--bo-fs);
   font-weight: 600;
+  letter-spacing: 0.02em;
 }
 
 .bo-attention__go::after {
@@ -1081,99 +1178,48 @@ samp {
   text-decoration-color: var(--bo-line-strong);
 }
 
-/* ---------- Badge ---------- */
+/* ---------- Badge: a mark and a label, no fill ---------- */
 
 .bo-badge {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
   max-width: 100%;
   min-height: 24px;
-  padding: 0 var(--bo-s2);
-  border: 1px solid var(--bo-line);
-  border-radius: var(--bo-r-control);
-  background: var(--bo-surface-2);
-  color: var(--bo-ink-2);
+  padding: 0;
+  color: var(--bo-ink);
   font-size: var(--bo-fs);
+  font-stretch: 94%;
   font-weight: 500;
-  line-height: 1.2;
-  white-space: nowrap;
-}
-
-/* Every badge carries a status dot: a state is never colour alone. */
-.bo-badge::before {
-  content: "";
-  flex: none;
-  width: 6px;
-  height: 6px;
-  border-radius: 999px;
-  background: var(--bo-ink-3);
+  line-height: 1.25;
+  white-space: normal;
+  overflow-wrap: anywhere;
 }
 
 .bo-badge__dot {
   display: none;
 }
 
-.bo-badge[data-tone="success"] {
-  border-color: var(--bo-success-line);
-  background: var(--bo-success-soft);
-  color: var(--bo-success);
-}
-
-.bo-badge[data-tone="success"]::before {
-  background: var(--bo-success-dot);
-}
-
-.bo-badge[data-tone="warning"] {
-  border-color: var(--bo-warning-line);
-  background: var(--bo-warning-soft);
-  color: var(--bo-warning);
-}
-
-.bo-badge[data-tone="warning"]::before {
-  background: var(--bo-warning-dot);
-}
-
-.bo-badge[data-tone="danger"] {
-  border-color: var(--bo-danger-line);
-  background: var(--bo-danger-soft);
-  color: var(--bo-danger);
-}
-
-.bo-badge[data-tone="danger"]::before {
-  background: var(--bo-danger-dot);
-}
-
-.bo-badge[data-tone="info"] {
-  border-color: var(--bo-info-line);
-  background: var(--bo-info-soft);
-  color: var(--bo-info);
-}
-
-.bo-badge[data-tone="info"]::before {
-  background: var(--bo-info-dot);
-}
-
 .bo-badge[data-tone="disabled"] {
-  border-style: dashed;
-  border-color: var(--bo-line-strong);
-  background: transparent;
   color: var(--bo-ink-3);
+  text-decoration: line-through;
+  text-decoration-color: var(--bo-ink-3);
 }
 
 .bo-badge[data-tone="disabled"]::before {
-  background: transparent;
-  border: 1px solid var(--bo-ink-3);
+  height: 1px;
+  width: 10px;
+  background: var(--bo-ink-3);
 }
 
-/* ---------- Notice ---------- */
+/* ---------- Notice: a plate with a ruled edge ---------- */
 
 .bo-notice {
   display: flex;
   align-items: flex-start;
   gap: var(--bo-s3);
   padding: var(--bo-s3) var(--bo-s4);
-  border: 1px solid var(--bo-line);
+  border: 1px solid var(--bo-line-strong);
   border-radius: var(--bo-r-panel);
   background: var(--bo-surface-2);
   color: var(--bo-ink);
@@ -1200,8 +1246,7 @@ samp {
 }
 
 .bo-notice[data-tone="info"] {
-  border-color: var(--bo-info-line);
-  background: var(--bo-info-soft);
+  border-color: var(--bo-line-strong);
 }
 
 .bo-notice[data-tone="info"] .bo-notice__icon {
@@ -1209,8 +1254,7 @@ samp {
 }
 
 .bo-notice[data-tone="success"] {
-  border-color: var(--bo-success-line);
-  background: var(--bo-success-soft);
+  border-color: var(--bo-line-strong);
 }
 
 .bo-notice[data-tone="success"] .bo-notice__icon {
@@ -1218,8 +1262,7 @@ samp {
 }
 
 .bo-notice[data-tone="warning"] {
-  border-color: var(--bo-warning-line);
-  background: var(--bo-warning-soft);
+  border-color: var(--bo-line-strong);
 }
 
 .bo-notice[data-tone="warning"] .bo-notice__icon {
@@ -1227,8 +1270,7 @@ samp {
 }
 
 .bo-notice[data-tone="danger"] {
-  border-color: var(--bo-danger-line);
-  background: var(--bo-danger-soft);
+  border-color: var(--bo-line-strong);
 }
 
 .bo-notice[data-tone="danger"] .bo-notice__icon {
@@ -1269,7 +1311,7 @@ samp {
   margin-top: var(--bo-s1);
 }
 
-/* ---------- Button ---------- */
+/* ---------- Button: the primary action is a solid bone plate ---------- */
 
 .bo-button {
   display: inline-flex;
@@ -1277,13 +1319,15 @@ samp {
   justify-content: center;
   gap: var(--bo-s2);
   min-height: 36px;
-  padding: 0 14px;
-  border: 1px solid var(--bo-accent);
+  padding: 0 16px;
+  border: 1px solid var(--bo-ink);
   border-radius: var(--bo-r-control);
-  background: var(--bo-accent);
-  color: oklch(1 0 0);
+  background: var(--bo-ink);
+  color: var(--bo-ground);
   font-size: var(--bo-fs);
   font-weight: 600;
+  font-stretch: 94%;
+  letter-spacing: 0.02em;
   line-height: 1.2;
   cursor: pointer;
   text-align: center;
@@ -1292,9 +1336,9 @@ samp {
 }
 
 .bo-button:hover {
-  border-color: var(--bo-accent-hover);
-  background: var(--bo-accent-hover);
-  color: oklch(1 0 0);
+  border-color: oklch(1 0 0);
+  background: oklch(1 0 0);
+  color: var(--bo-ground);
   text-decoration: none;
 }
 
@@ -1304,12 +1348,12 @@ samp {
 
 .bo-button[data-variant="secondary"] {
   border-color: var(--bo-line-strong);
-  background: var(--bo-surface);
+  background: transparent;
   color: var(--bo-ink);
 }
 
 .bo-button[data-variant="secondary"]:hover {
-  border-color: var(--bo-line-strong);
+  border-color: var(--bo-ink-3);
   background: var(--bo-hover);
   color: var(--bo-ink);
 }
@@ -1317,24 +1361,24 @@ samp {
 .bo-button[data-variant="tertiary"] {
   border-color: transparent;
   background: transparent;
-  color: var(--bo-ink-2);
+  color: var(--bo-accent);
 }
 
 .bo-button[data-variant="tertiary"]:hover {
   border-color: transparent;
   background: var(--bo-hover);
-  color: var(--bo-ink);
+  color: var(--bo-accent-hover);
 }
 
 .bo-button[data-variant="danger"] {
-  border-color: var(--bo-danger);
-  background: var(--bo-danger);
+  border-color: oklch(0.55 0.2 25);
+  background: oklch(0.55 0.2 25);
   color: oklch(1 0 0);
 }
 
 .bo-button[data-variant="danger"]:hover {
-  border-color: oklch(0.38 0.17 27);
-  background: oklch(0.38 0.17 27);
+  border-color: oklch(0.49 0.2 25);
+  background: oklch(0.49 0.2 25);
   color: oklch(1 0 0);
 }
 
@@ -1350,7 +1394,7 @@ samp {
 .bo-button:disabled,
 .bo-button[aria-disabled="true"] {
   cursor: not-allowed;
-  opacity: 0.5;
+  opacity: 0.45;
   pointer-events: none;
 }
 
@@ -1388,6 +1432,7 @@ samp {
   width: 100%;
   border-collapse: collapse;
   font-size: var(--bo-fs);
+  font-stretch: 92%;
   font-variant-numeric: tabular-nums;
 }
 
@@ -1403,12 +1448,15 @@ samp {
   top: 0;
   z-index: 1;
   padding: 10px var(--bo-s4);
-  border-bottom: 1px solid var(--bo-line);
+  border-bottom: 1px solid var(--bo-line-strong);
   background: var(--bo-surface-2);
   color: var(--bo-ink-3);
   font-size: var(--bo-fs);
-  font-weight: 500;
+  font-stretch: 88%;
+  font-weight: 600;
+  letter-spacing: 0.08em;
   text-align: left;
+  text-transform: uppercase;
   white-space: nowrap;
 }
 
@@ -1429,7 +1477,7 @@ samp {
 }
 
 .bo-table tbody tr:hover {
-  background: var(--bo-surface-2);
+  background: var(--bo-hover);
 }
 
 .bo-table th[data-align="right"],
@@ -1443,6 +1491,8 @@ samp {
 }
 
 .bo-table td[data-numeric="true"] {
+  font-family: var(--bo-mono);
+  font-size: var(--bo-fs);
   font-variant-numeric: tabular-nums;
 }
 
@@ -1474,6 +1524,8 @@ samp {
   background: transparent;
   color: inherit;
   font: inherit;
+  letter-spacing: inherit;
+  text-transform: inherit;
   cursor: pointer;
   text-decoration: none;
 }
@@ -1532,11 +1584,10 @@ samp {
   gap: var(--bo-s2);
 }
 
-/* Identifiers and references read as data: mono, selectable, never wrapped mid-token. */
+/* Identifiers and references read as data: mono, never wrapped mid-token. */
 .bo-ref {
   font-family: var(--bo-mono);
-  font-size: 0.93em;
-  letter-spacing: -0.01em;
+  font-size: var(--bo-fs);
   white-space: nowrap;
 }
 
@@ -1565,14 +1616,15 @@ samp {
   align-items: center;
   min-height: 22px;
   padding: 0 var(--bo-s2);
+  border: 1px solid var(--bo-accent-line);
   border-radius: 999px;
-  background: var(--bo-accent-soft);
   color: var(--bo-accent-ink);
+  font-family: var(--bo-mono);
   font-size: var(--bo-fs);
   font-weight: 600;
 }
 
-/* ---------- Forms ---------- */
+/* ---------- Forms: inset fields in an ash plate ---------- */
 
 .bo-form {
   display: grid;
@@ -1632,6 +1684,8 @@ samp {
 .bo-field__label {
   font-size: var(--bo-fs);
   font-weight: 600;
+  font-stretch: 94%;
+  letter-spacing: 0.02em;
 }
 
 .bo-field__required {
@@ -1655,9 +1709,9 @@ samp {
   width: 100%;
   min-height: 38px;
   padding: 0 var(--bo-s3);
-  border: 1px solid var(--bo-line-strong);
+  border: 1px solid var(--bo-control-line);
   border-radius: var(--bo-r-control);
-  background: var(--bo-surface);
+  background: var(--bo-inset);
   color: var(--bo-ink);
   font-size: var(--bo-fs-body);
   transition: border-color 0.12s var(--bo-ease), box-shadow 0.12s var(--bo-ease);
@@ -1669,7 +1723,7 @@ samp {
 }
 
 .bo-field__control:hover:not(:disabled) {
-  border-color: var(--bo-ink-3);
+  border-color: var(--bo-ink-2);
 }
 
 .bo-field__control:focus {
@@ -1702,7 +1756,7 @@ select.bo-field__control {
   appearance: none;
   padding-right: var(--bo-s6);
   /* The chevron colour must be literal: a data URI cannot read a CSS custom property. */
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23697079' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9.5 6 6 6-6'/%3E%3C/svg%3E");
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23a8a595' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9.5 6 6 6-6'/%3E%3C/svg%3E");
   background-repeat: no-repeat;
   background-position: right 10px center;
   background-size: 18px 18px;
@@ -1747,14 +1801,15 @@ select.bo-field__control {
   width: 36px;
   height: 20px;
   padding: 0;
-  border: 0;
+  border: 1px solid var(--bo-control-line);
   border-radius: 999px;
-  background: var(--bo-line-strong);
+  background: var(--bo-inset);
   cursor: pointer;
-  transition: background-color 0.15s var(--bo-ease);
+  transition: background-color 0.15s var(--bo-ease), border-color 0.15s var(--bo-ease);
 }
 
 .bo-switch[aria-checked="true"] {
+  border-color: var(--bo-accent);
   background: var(--bo-accent);
 }
 
@@ -1763,14 +1818,15 @@ select.bo-field__control {
   position: absolute;
   top: 2px;
   left: 2px;
-  width: 16px;
-  height: 16px;
+  width: 14px;
+  height: 14px;
   border-radius: 999px;
-  background: oklch(1 0 0);
-  transition: transform 0.15s var(--bo-ease);
+  background: var(--bo-ink-2);
+  transition: transform 0.15s var(--bo-ease), background-color 0.15s var(--bo-ease);
 }
 
 .bo-switch[aria-checked="true"]::after {
+  background: var(--bo-ground);
   transform: translateX(16px);
 }
 
@@ -1796,7 +1852,7 @@ select.bo-field__control {
   display: inline-flex;
   align-items: center;
   padding: 0 var(--bo-s3);
-  border: 1px solid var(--bo-line-strong);
+  border: 1px solid var(--bo-control-line);
   background: var(--bo-surface-2);
   color: var(--bo-ink-3);
   font-size: var(--bo-fs);
@@ -1838,7 +1894,10 @@ select.bo-field__control {
 .bo-dl dt {
   color: var(--bo-ink-3);
   font-size: var(--bo-fs);
-  font-weight: 500;
+  font-stretch: 90%;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
 }
 
 .bo-dl dd {
@@ -1867,8 +1926,8 @@ select.bo-field__control {
 .bo-tabs {
   display: flex;
   flex-wrap: wrap;
-  gap: var(--bo-s4);
-  border-bottom: 1px solid var(--bo-line);
+  gap: var(--bo-s5);
+  border-bottom: 1px solid var(--bo-line-strong);
 }
 
 .bo-tabs__link {
@@ -1901,7 +1960,7 @@ select.bo-field__control {
   width: min(100%, 480px);
   max-width: 480px;
   padding: var(--bo-s5);
-  border: 1px solid var(--bo-line);
+  border: 0;
   border-radius: var(--bo-r-dialog);
   background: var(--bo-surface);
   color: var(--bo-ink);
@@ -1909,13 +1968,14 @@ select.bo-field__control {
 }
 
 .bo-dialog::backdrop {
-  background: oklch(0.2 0.012 260 / 0.45);
+  background: oklch(0.08 0.004 250 / 0.72);
 }
 
 .bo-dialog__title {
   margin: 0 0 var(--bo-s2);
   font-size: var(--bo-fs-section);
-  font-weight: 600;
+  font-stretch: 108%;
+  font-weight: 400;
 }
 
 .bo-dialog__description {
@@ -1940,7 +2000,7 @@ select.bo-field__control {
 
 .bo-skeleton__line {
   height: 12px;
-  border-radius: 999px;
+  border-radius: var(--bo-r-control);
   background: var(--bo-line);
   animation: bo-pulse 1.4s ease-in-out infinite;
 }
@@ -1963,6 +2023,7 @@ select.bo-field__control {
   }
 
   .bo-nav__link,
+  .bo-nav__link::before,
   .bo-button,
   .bo-switch,
   .bo-switch::after,
@@ -1998,24 +2059,69 @@ select.bo-field__control {
 }
 
 .bo-badge--dot {
-  padding-left: var(--bo-s2);
+  padding-left: 0;
 }
 
 .bo-check-group--single {
   grid-template-columns: 1fr;
 }
 
+.bo-ref--wrap {
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
 .bo-env-badge {
   display: inline-flex;
   align-items: center;
-  min-height: 24px;
+  min-height: 22px;
   padding: 0 var(--bo-s2);
   border: 1px solid var(--bo-warning-line);
   border-radius: var(--bo-r-control);
-  background: var(--bo-warning-soft);
   color: var(--bo-warning);
   font-size: var(--bo-fs);
   font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+/* Row action disclosure (native <details>): a quiet button that opens an inline panel. */
+.bo-table details > summary {
+  display: inline-flex;
+  align-items: center;
+  min-height: 30px;
+  padding: 0 var(--bo-s3);
+  border: 1px solid var(--bo-line-strong);
+  border-radius: var(--bo-r-control);
+  background: transparent;
+  color: var(--bo-ink);
+  font-size: var(--bo-fs);
+  font-weight: 600;
+  cursor: pointer;
+  list-style: none;
+}
+
+.bo-table details > summary::-webkit-details-marker {
+  display: none;
+}
+
+.bo-table details > summary:hover {
+  background: var(--bo-hover);
+}
+
+.bo-table details[open] > summary {
+  border-color: var(--bo-accent-line);
+  color: var(--bo-accent-ink);
+}
+
+.bo-notice details {
+  margin-top: var(--bo-s1);
+}
+
+.bo-notice summary {
+  color: var(--bo-ink-2);
+  font-weight: 600;
+  cursor: pointer;
 }
 
 /* ---------- Responsive ---------- */
@@ -2037,9 +2143,7 @@ select.bo-field__control {
   .bo-grid--three {
     grid-template-columns: 1fr;
   }
-}
 
-@media (max-width: 1100px) {
   .bo-content {
     padding: var(--bo-s5) var(--bo-s5) 48px;
   }
@@ -2077,11 +2181,15 @@ select.bo-field__control {
     height: 100%;
     border: 0;
     padding: 0;
-    background: oklch(0.2 0.012 260 / 0.45);
+    background: oklch(0.08 0.004 250 / 0.72);
   }
 
   .bo-topbar {
     display: flex;
+  }
+
+  .bo-scale {
+    top: var(--bo-topbar);
   }
 
   .bo-content {
@@ -2094,6 +2202,11 @@ select.bo-field__control {
 
   .bo-nav__link {
     min-height: 40px;
+  }
+
+  :root {
+    --bo-fs-title: 30px;
+    --bo-fs-stat: 34px;
   }
 }
 
@@ -2117,7 +2230,13 @@ select.bo-field__control {
   }
 
   .bo-attention__item {
-    grid-template-columns: auto minmax(0, 1fr) auto;
+    grid-template-columns: minmax(0, 1fr) 5ch;
+    gap: var(--bo-s2) var(--bo-s3);
+  }
+
+  .bo-attention__scale {
+    grid-column: 1 / -1;
+    grid-row: 2;
   }
 
   .bo-attention__go {
@@ -2147,6 +2266,14 @@ select.bo-field__control {
   }
 }
 
+/* Any plain wrapper around a table must not widen the page on a narrow screen. */
+.bo-page > *,
+.bo-stack > *,
+.bo-grid > *,
+.bo-split > * {
+  min-width: 0;
+}
+
 /* A filter bar or a table placed directly in a card body inherits the card frame instead of adding
    its own, so lists never show a double border. */
 .bo-card__body > .bo-filters,
@@ -2160,9 +2287,7 @@ select.bo-field__control {
   padding: 0;
 }
 
-/* The table runs edge to edge of the card (card body padding is 16px). It only cancels the padding
-   on the sides that touch the card: a table followed by a form keeps the card padding as its gap,
-   and a table that follows other content does not climb over it. */
+/* The table runs edge to edge of the card (card body padding is 16px). */
 .bo-card__body > .bo-table-wrap {
   margin-inline: calc(-1 * var(--bo-s4));
   width: calc(100% + 2 * var(--bo-s4));
@@ -2174,10 +2299,6 @@ select.bo-field__control {
 
 .bo-card__body > .bo-table-wrap:last-child {
   margin-bottom: calc(-1 * var(--bo-s4));
-}
-
-.bo-card__body > .bo-table-wrap:first-child .bo-table th:first-child {
-  border-top-left-radius: var(--bo-r-panel);
 }
 
 /* An attention list fills the card edge to edge: its rows draw their own hairlines. */
@@ -2192,61 +2313,16 @@ select.bo-field__control {
   border-radius: 0;
 }
 
-/* Any plain wrapper around a table must not widen the page on a narrow screen. */
-.bo-page > *,
-.bo-stack > *,
-.bo-grid > *,
-.bo-split > * {
-  min-width: 0;
+/* Overlay links cover their whole cell or row inside an overflow-hidden plate: the ring sits inside. */
+.bo-stats__link:focus-visible {
+  outline-offset: -3px;
 }
 
-/* Long identifiers and badge text wrap instead of pushing the layout. */
-.bo-ref--wrap {
-  white-space: normal;
-  overflow-wrap: anywhere;
+.bo-attention__go:focus-visible {
+  outline: none;
 }
 
-.bo-badge {
-  white-space: normal;
-  overflow-wrap: anywhere;
-}
-
-/* Row action disclosure (native <details>): a quiet button that opens an inline panel. */
-.bo-table details > summary {
-  display: inline-flex;
-  align-items: center;
-  min-height: 30px;
-  padding: 0 var(--bo-s3);
-  border: 1px solid var(--bo-line-strong);
-  border-radius: var(--bo-r-control);
-  background: var(--bo-surface);
-  color: var(--bo-ink);
-  font-size: var(--bo-fs);
-  font-weight: 600;
-  cursor: pointer;
-  list-style: none;
-}
-
-.bo-table details > summary::-webkit-details-marker {
-  display: none;
-}
-
-.bo-table details > summary:hover {
-  background: var(--bo-hover);
-}
-
-.bo-table details[open] > summary {
-  border-color: var(--bo-accent-line);
-  background: var(--bo-accent-soft);
-  color: var(--bo-accent-ink);
-}
-
-.bo-notice details {
-  margin-top: var(--bo-s1);
-}
-
-.bo-notice summary {
-  color: var(--bo-ink-2);
-  font-weight: 600;
-  cursor: pointer;
+.bo-attention__item:has(.bo-attention__go:focus-visible) {
+  outline: 2px solid var(--bo-accent);
+  outline-offset: -2px;
 }

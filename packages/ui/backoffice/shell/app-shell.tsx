@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import type { ReactNode } from "react";
+import type { CSSProperties, ReactNode } from "react";
 import { Icon } from "../icons";
 import { Logo } from "../logo";
 import { UserMenu } from "./user-menu";
@@ -81,6 +81,9 @@ export function AppShell({
   // On desktop the account menu lives at the foot of the rail and the page header carries the
   // breadcrumb.
   const currentLabel = active?.child?.label ?? active?.item.label;
+  // Position of the open section on the page ruler: its place among every destination of the app.
+  const destinations = navigation.flatMap((group) => group.items);
+  const position = active ? (destinations.indexOf(active.item) + 0.5) / Math.max(1, destinations.length) : 0;
 
   return (
     <div className="bo-shell" data-nav-open={navOpen ? "true" : "false"} {...dataAttributes}>
@@ -88,7 +91,7 @@ export function AppShell({
         <div className="bo-sidebar__brand">
           <div className="bo-sidebar__brand-row">
             <a href={brand.homeHref} aria-label={brand.scope}>
-              <Logo variant="color" height={28} priority />
+              <Logo variant="white" height={28} priority />
             </a>
             {envBadge ? <span className="bo-env-badge">{envBadge}</span> : null}
           </div>
@@ -182,6 +185,9 @@ export function AppShell({
           <span className="bo-topbar__spacer" />
         </header>
 
+        <div className="bo-scale" aria-hidden="true" style={{ "--bo-pos": position } as CSSProperties}>
+          <span className="bo-scale__mark" />
+        </div>
         <main className="bo-content" id="bo-content" tabIndex={-1}>
           {children}
         </main>
