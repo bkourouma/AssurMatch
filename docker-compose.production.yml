@@ -155,7 +155,7 @@ services:
   nginx:
     <<: [*restart, *logging]
     profiles: ["edge"]
-    image: nginx:1.27-alpine
+    image: nginx:1.31-alpine
     container_name: assurmatch-prod-nginx
     depends_on:
       - api
