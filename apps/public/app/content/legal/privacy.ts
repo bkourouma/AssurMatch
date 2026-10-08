@@ -5,17 +5,24 @@ const fr: LegalPage = {
   title: "Politique de confidentialité",
   description: "Les données personnelles traitées par AssurMatch, leurs finalités et vos droits.",
   updatedAt: "2026-09-19",
+  summary: [
+    "Nous collectons vos données seulement quand vous demandez un devis ou nous écrivez.",
+    "Elles servent à vous mettre en relation avec le bon courtier partenaire, jamais à être revendues.",
+    "Une demande de devis part vers le courtier responsable de votre pays et de votre produit, jamais publiée.",
+    "Vous pouvez retirer votre consentement à tout moment depuis la page de suivi de votre demande.",
+    "Pour toute autre question sur vos données, la page Contact permet d'écrire à l'équipe AssurMatch."
+  ],
   sections: [
     {
       id: "responsable-traitement",
-      heading: "Responsable du traitement",
+      heading: "Qui gère vos données",
       body: [
         "Les données personnelles décrites ci-dessous sont traitées par la société éditrice d'AssurMatch. Son identité complète est listée dans la section « À compléter avant mise en ligne » en bas de cette page."
       ]
     },
     {
       id: "donnees-collectees",
-      heading: "Données collectées",
+      heading: "Ce que nous collectons",
       body: ["Selon les pages utilisées, AssurMatch peut collecter :"],
       bullets: [
         "l'identité et les coordonnées communiquées dans une demande de devis ou un message de contact (nom, e-mail, téléphone) ;",
@@ -27,19 +34,19 @@ const fr: LegalPage = {
     },
     {
       id: "finalites",
-      heading: "Finalités du traitement",
+      heading: "Pourquoi nous les utilisons",
       body: ["Ces données sont utilisées pour :"],
       bullets: [
         "mettre en relation le visiteur avec le ou les courtiers partenaires autorisés pertinents pour son pays et son produit ;",
         "transmettre la demande de devis et permettre son suivi ;",
-        "produire, lorsque le visiteur le demande, une assistance indicative générée par IA (résumé de besoin, aide à la compréhension), toujours signalée comme telle et sans conseil personnalisé engageant ;",
+        "produire, lorsque le visiteur le demande, une assistance indicative générée par l'assistant de lecture (résumé de besoin, aide à la compréhension), toujours signalée comme telle et sans conseil personnalisé engageant ;",
         "prévenir les demandes en doublon ou frauduleuses ;",
         "établir la facturation entre AssurMatch et les courtiers partenaires (frais par lead qualifié), sans jamais transmettre de coordonnées bancaires du visiteur ni lui facturer quoi que ce soit."
       ]
     },
     {
       id: "base-legale",
-      heading: "Base légale",
+      heading: "Pourquoi nous avons le droit de les utiliser",
       body: [
         "La transmission d'une demande de devis repose sur le consentement explicite du visiteur, recueilli par une case à cocher non pré-cochée avant tout envoi.",
         "La prévention de la fraude et des doublons repose sur l'intérêt légitime d'AssurMatch et de ses courtiers partenaires à ne traiter que des demandes réelles."
@@ -47,7 +54,7 @@ const fr: LegalPage = {
     },
     {
       id: "destinataires",
-      heading: "Destinataires des données",
+      heading: "Qui reçoit vos données",
       body: [
         "Les données d'une demande de devis sont transmises au courtier partenaire (ou, si le visiteur l'accepte explicitement, aux courtiers partenaires) responsable du pays et du produit concernés.",
         "L'hébergeur technique du site, listé dans les mentions légales, héberge les données mais n'y accède pas pour ses propres finalités.",
@@ -56,7 +63,7 @@ const fr: LegalPage = {
     },
     {
       id: "duree-conservation",
-      heading: "Durée de conservation",
+      heading: "Combien de temps nous les gardons",
       body: [
         "Les données sont conservées pour la durée strictement nécessaire aux finalités décrites ci-dessus, puis supprimées ou anonymisées.",
         "Les durées précises par catégorie de donnée sont listées dans la section « À compléter avant mise en ligne »."
@@ -73,7 +80,7 @@ const fr: LegalPage = {
     },
     {
       id: "autorite-controle",
-      heading: "Autorité de contrôle",
+      heading: "Où porter réclamation",
       body: [
         "Le visiteur dispose du droit d'introduire une réclamation auprès de l'autorité de protection des données personnelles compétente. Le nom de cette autorité, qui dépend du pays du visiteur, est listé dans la section « À compléter avant mise en ligne »."
       ]
@@ -92,17 +99,24 @@ const en: LegalPage = {
   title: "Privacy policy",
   description: "The personal data AssurMatch processes, its purposes and your rights.",
   updatedAt: "2026-09-19",
+  summary: [
+    "We collect your data only when you request a quote or write to us.",
+    "It is used to introduce you to the right partner broker, never to be resold.",
+    "A quote request goes to the broker responsible for your country and product, never published.",
+    "You can withdraw your consent at any time from your request's tracking page.",
+    "For any other question about your data, the Contact page lets you write to the AssurMatch team."
+  ],
   sections: [
     {
       id: "responsable-traitement",
-      heading: "Data controller",
+      heading: "Who controls your data",
       body: [
         "The personal data described below is processed by the company that publishes AssurMatch. Its full identity is listed in the \"To be completed before launch\" section at the bottom of this page."
       ]
     },
     {
       id: "donnees-collectees",
-      heading: "Data collected",
+      heading: "What we collect",
       body: ["Depending on the pages used, AssurMatch may collect:"],
       bullets: [
         "identity and contact details given in a quote request or a contact message (name, e-mail, phone);",
@@ -114,19 +128,19 @@ const en: LegalPage = {
     },
     {
       id: "finalites",
-      heading: "Purposes",
+      heading: "Why we use it",
       body: ["This data is used to:"],
       bullets: [
         "introduce the visitor to the relevant authorised partner broker(s) for their country and product;",
         "transmit the quote request and allow it to be tracked;",
-        "produce, when the visitor asks for it, an indicative AI-generated assistance (need summary, help understanding), always labelled as such and never a binding personal recommendation;",
+        "produce, when the visitor asks for it, an indicative assistance generated by the reading assistant (need summary, help understanding), always labelled as such and never a binding personal recommendation;",
         "prevent duplicate or fraudulent requests;",
         "support billing between AssurMatch and partner brokers (a fee per qualified lead), without ever transmitting the visitor's payment details or charging the visitor anything."
       ]
     },
     {
       id: "base-legale",
-      heading: "Legal basis",
+      heading: "Why we are allowed to use it",
       body: [
         "Transmitting a quote request relies on the visitor's explicit consent, collected through an unchecked checkbox before anything is sent.",
         "Preventing fraud and duplicates relies on the legitimate interest of AssurMatch and its partner brokers in only processing genuine requests."
@@ -134,7 +148,7 @@ const en: LegalPage = {
     },
     {
       id: "destinataires",
-      heading: "Data recipients",
+      heading: "Who receives your data",
       body: [
         "A quote request's data is transmitted to the partner broker (or, if the visitor explicitly accepts it, brokers) responsible for the relevant country and product.",
         "The site's technical host, listed in the legal notice, hosts the data but does not access it for its own purposes.",
@@ -143,7 +157,7 @@ const en: LegalPage = {
     },
     {
       id: "duree-conservation",
-      heading: "Retention period",
+      heading: "How long we keep it",
       body: [
         "Data is kept for no longer than strictly necessary for the purposes described above, then deleted or anonymised.",
         "The precise retention period per data category is listed in the \"To be completed before launch\" section."
@@ -160,7 +174,7 @@ const en: LegalPage = {
     },
     {
       id: "autorite-controle",
-      heading: "Supervisory authority",
+      heading: "Where to complain",
       body: [
         "Every visitor may lodge a complaint with the competent personal data protection authority. The name of that authority, which depends on the visitor's country, is listed in the \"To be completed before launch\" section."
       ]

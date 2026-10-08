@@ -1,0 +1,13 @@
+The mobile home page of AssurMatch, an insurance comparison website for Côte d'Ivoire, rendered edge to edge as the page itself at phone proportions: no phone frame, no browser bar, no desk. Regions from top to bottom, in this order and at these scales:
+
+1. A slim white top bar (about 7% of the height): on the left a small FLAT logo mark (an umbrella over a shield with three simple person shapes, two colours only: blue and green, no 3D, no gloss) next to the wordmark "AssurMatch" in a sturdy humanist sans; on the right "FR | EN" and a square menu button with three lines.
+
+2. A full-width deep navy sign panel (#0E2F63), about 38% of the height, designed exactly like a modern airport wayfinding sign: flat, matte, white type only. Top line: a small white location pictogram and the text "Côte d'Ivoire · changer de pays". Then the headline, large white bold humanist sans (Frutiger-like), left aligned, on three lines: "Comparez d'abord. Soyez accompagné ensuite." Under it, one short white line in regular weight: "Offres indicatives. Le prix et les conditions sont confirmés par un courtier partenaire autorisé."
+
+3. Directly attached below the navy panel, a white directory sign: a small dark label "Choisissez un produit", then five full-width rows separated by thin grey rules, each row about 64px tall: on the left a square navy tile holding a white pictogram drawn from a few flat geometric planes (a car, a motorbike, a medical cross, a house, a plane), then the product name in bold near-black text ("Assurance auto", "Assurance moto", "Assurance santé", "Assurance habitation", "Assurance voyage"), and a bold navy arrow pointing right at the far right edge. These rows are the main action of the page.
+
+4. Below, a pale grey band (#EEF1F4) with the heading "Comment ça marche" and a vertical route line: a thick navy line linking three numbered circular stops, like a transit line diagram: "1 Comparez" (navy circle), "2 Demandez un devis" (navy circle), "3 Le courtier confirme" (solid green circle), each followed by one short grey sentence.
+
+5. At the very bottom, the start of the next section: a white area with a thick navy bar on its left edge and the heading "Ce qu'AssurMatch ne fait pas".
+
+Style: plain, calm, credible public signage. Flat colour fields only. Humanist sans everywhere, high contrast, large tap targets, body text clearly legible. No gradients, no shadows, no glow, no glass, no photos, no illustrations beyond the flat pictograms, no rounded bubbly cards, no decorative textures. Every word in French, spelled exactly as given, crisp and readable.

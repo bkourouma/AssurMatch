@@ -6,7 +6,7 @@ export interface SectionProps {
   children: ReactNode;
   title?: string;
   lead?: string;
-  /** Uppercase line above the title. */
+  /** Kept for API compatibility and no longer rendered: no eyebrow above a heading. */
   kicker?: string;
   /** Buttons or links under the lead, inside the header block. */
   actions?: ReactNode;
@@ -26,7 +26,6 @@ export function Section({
   children,
   title,
   lead,
-  kicker,
   actions,
   tone = "default",
   id,
@@ -50,9 +49,8 @@ export function Section({
       aria-label={ariaLabel}
     >
       <div className={container}>
-        {title || lead || kicker || actions ? (
+        {title || lead || actions ? (
           <div className="am-section__header" data-align={align === "center" ? "center" : undefined}>
-            {kicker ? <p className="am-section__kicker">{kicker}</p> : null}
             {title ? <Heading className="am-section__title">{title}</Heading> : null}
             {lead ? <p className="am-section__lead">{lead}</p> : null}
             {actions ? <div className="am-section__actions">{actions}</div> : null}

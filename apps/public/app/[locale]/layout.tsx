@@ -4,7 +4,7 @@ import { getMessages, getTranslations, setRequestLocale } from "next-intl/server
 import { notFound } from "next/navigation";
 import { pickMessages } from "../../i18n/messages";
 import { routing } from "../../i18n/routing";
-import { bodyFont, headingFont } from "../fonts";
+import { signFont } from "../fonts";
 import { SiteFooter } from "../components/site/site-footer";
 import { SiteHeader } from "../components/site/site-header";
 import { LocalContactBlock } from "../components/site/local-contact-block";
@@ -16,7 +16,7 @@ import { siteUrl } from "../lib/site-config";
 import "../globals.css";
 
 /** Namespaces the client boundaries actually need; nothing else is shipped to the browser. */
-const CLIENT_NAMESPACES = ["QuoteForm", "VisitorAi", "DocumentUpload", "Journey", "Api", "Common", "Forms"] as const;
+const CLIENT_NAMESPACES = ["QuoteForm", "VisitorAi", "DocumentUpload", "Journey", "Api", "Common", "Forms", "Offers"] as const;
 
 export function generateStaticParams() {
   return routing.locales.map((locale) => ({ locale }));
@@ -42,7 +42,7 @@ export default async function LocaleLayout({ children, params }: { children: Rea
   const t = await getTranslations("Layout");
 
   return (
-    <html lang={locale} className={`${headingFont.variable} ${bodyFont.variable}`}>
+    <html lang={locale} className={signFont.variable}>
       <body>
         <NextIntlClientProvider locale={locale} messages={pickMessages(messages, CLIENT_NAMESPACES)}>
           <div className="am-shell">

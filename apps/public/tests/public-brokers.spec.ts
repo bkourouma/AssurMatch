@@ -41,6 +41,40 @@ test("the application form has the honeypot, an unchecked consent box and no fil
   expect(form).not.toContain('type="file"');
 });
 
+test("the application form is rendered with a no-JavaScript server action", () => {
+  const page = readSources([publicPage("brokers/apply/page.tsx")]);
+  const form = readSources([publicFile("components/forms/partner-application-form.tsx")]);
+
+  // Structural: `brokers/apply/page.tsx` defines an inline server action (spec 050 D6) and binds it to
+  // the client form's `formAction` prop, so a visitor without JavaScript still posts through it instead
+  // of a GET that would put their name, e-mail, phone and licence number in the URL.
+  expect(page).toContain('"use server"');
+  expect(page).toContain("async function submitApplicationAction");
+  expect(page).toContain("formAction={boundSubmitApplicationAction}");
+
+  // The client component forwards that action onto the actual `<form>` element and keeps every field
+  // name the action reads: with JavaScript, `onSubmit`'s `preventDefault()` still owns the interaction.
+  expect(form).toContain("formAction");
+  expect(form).toContain("{...(formAction ? { action: formAction } : {})}");
+  expect(form).toContain("event.preventDefault()");
+});
+
+test("the application confirmation page exists, is noindex and reads only the public reference from the URL", () => {
+  const page = readSources([publicPage("brokers/apply/confirmation/page.tsx")]);
+
+  // Structural: the page exists and asks for `noindex` (spec 050 D7 - a URL carrying someone else's
+  // reference is not one search engines should list).
+  expect(page).toContain("noindex: true");
+
+  // It reads a `reference` query parameter and nothing else that could carry personal data: no name,
+  // e-mail, phone or company field is ever read from `searchParams`.
+  expect(page).toContain("query.reference");
+  expect(page).not.toMatch(/query\.(name|email|phone|legalName|contactName|contactEmail|contactPhone)/i);
+  expect(page).not.toContain("contactEmail");
+  expect(page).not.toContain("contactPhone");
+  expect(page).not.toContain("legalName");
+});
+
 test("the login page composes the portal URL from the environment and never writes a back-office route literal", () => {
   const page = readSources([publicPage("brokers/login/page.tsx")]);
   const siteConfig = readSources([publicFile("lib/site-config.ts")]);

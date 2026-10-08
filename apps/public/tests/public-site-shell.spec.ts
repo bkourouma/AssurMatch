@@ -6,8 +6,7 @@ test("the locale layout loads the fonts and renders the skip link, header and fo
   const layout = readSources([publicFile("[locale]/layout.tsx")]);
 
   expect(layout).toContain('from "../fonts"');
-  expect(layout).toContain("headingFont.variable");
-  expect(layout).toContain("bodyFont.variable");
+  expect(layout).toContain("signFont.variable");
   expect(layout).toContain("<SkipLink");
   expect(layout).toContain("<SiteHeader");
   expect(layout).toContain("<SiteFooter");
@@ -33,6 +32,7 @@ test("the footer links to the regulatory status page, the four legal pages, the 
   expect(footer).toContain('href="/brokers/pricing"');
   expect(footer).toContain("brokerLoginUrl");
   expect(footer).toContain('href="/contact"');
+  expect(footer).toContain('href="/our-commitment"');
 });
 
 test("next.config.ts declares every legacy redirect from the pre-bilingual site", () => {

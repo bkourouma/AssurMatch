@@ -1,10 +1,10 @@
 import { useLocale, useTranslations } from "next-intl";
+import type { ReactNode } from "react";
 import type { OfferDetail, OfferSummary } from "../../../../packages/shared/contracts/quote.contracts";
 import { BackendText } from "./ui/backend-text";
 import { Badge } from "./ui/badge";
 import { Button } from "./ui/button";
-import { Icon, type IconName } from "./ui/icons";
-import { Notice } from "./ui/notice";
+import { Icon } from "./ui/icons";
 import { ScorePill } from "./ui/score-pill";
 import { formatDate, formatMoney } from "../lib/country-format";
 
@@ -32,7 +32,8 @@ function criterionKeyOf(value: string): CriterionKey | null {
 
 /**
  * Sponsorship must always be visible next to the offer name (Constitution VIII), and it wears the
- * warning tone: green is a validation colour and never signals a paid placement.
+ * orange of the palette: orange means "sponsored" and nothing else, green never signals a paid
+ * placement.
  */
 export function SponsoredBadge({ offer }: { offer: Pick<OfferSummary, "isSponsored" | "sponsorLabel"> }) {
   const t = useTranslations("OfferCards");
@@ -44,7 +45,7 @@ export function SponsoredBadge({ offer }: { offer: Pick<OfferSummary, "isSponsor
   );
 }
 
-/** Indicative score out of 100, with the per-criterion explanation folded underneath. */
+/** Indicative score out of 100: outlined, because it is indicative. */
 export function OfferScore({ score, size }: { score: NonNullable<OfferSummary["score"]>; size?: "md" | "lg" }) {
   const t = useTranslations("OfferCards");
   return <ScorePill score={score.total} label={t("scoreAria", { total: score.total })} size={size ?? "md"} />;
@@ -62,59 +63,88 @@ export function ScoreBreakdown({ score }: { score: NonNullable<OfferSummary["sco
   return (
     <details className="am-j-score">
       <summary>{t("scoreSummary", { total: score.total })}</summary>
-      <p className="am-j-score__label">
-        <BackendText>{score.label}</BackendText>
-      </p>
-      <table className="am-j-scoretable" role="table">
-        <thead role="rowgroup">
-          <tr role="row">
-            <th scope="col" role="columnheader">
-              {t("table.criterion")}
-            </th>
-            <th scope="col" role="columnheader">
-              {t("table.weight")}
-            </th>
-            <th scope="col" role="columnheader">
-              {t("table.points")}
-            </th>
-            <th scope="col" role="columnheader">
-              {t("table.explanation")}
-            </th>
-          </tr>
-        </thead>
-        <tbody role="rowgroup">
-          {score.breakdown.map((line) => {
-            const key = criterionKeyOf(line.criterion);
-            return (
-              <tr key={line.criterion} role="row">
-                <td role="cell" data-label={t("table.criterion")}>
-                  {key ? t(`criterionLabels.${key}`) : line.criterion}
-                </td>
-                <td role="cell" className="am-tabular" data-label={t("table.weight")}>
-                  {line.weight}%
-                </td>
-                <td role="cell" className="am-tabular" data-label={t("table.points")}>
-                  {line.points}
-                </td>
-                <td role="cell" data-label={t("table.explanation")}>
-                  <BackendText>{line.explanation}</BackendText>
-                </td>
-              </tr>
-            );
-          })}
-        </tbody>
-      </table>
+      <div className="am-j-score__body">
+        <p className="am-j-score__label">
+          <BackendText>{score.label}</BackendText>
+        </p>
+        <table className="am-j-scoretable" role="table">
+          <thead role="rowgroup">
+            <tr role="row">
+              <th scope="col" role="columnheader">
+                {t("table.criterion")}
+              </th>
+              <th scope="col" role="columnheader">
+                {t("table.weight")}
+              </th>
+              <th scope="col" role="columnheader">
+                {t("table.points")}
+              </th>
+              <th scope="col" role="columnheader">
+                {t("table.explanation")}
+              </th>
+            </tr>
+          </thead>
+          <tbody role="rowgroup">
+            {score.breakdown.map((line) => {
+              const key = criterionKeyOf(line.criterion);
+              return (
+                <tr key={line.criterion} role="row">
+                  <td role="cell" data-label={t("table.criterion")}>
+                    {key ? t(`criterionLabels.${key}`) : line.criterion}
+                  </td>
+                  <td role="cell" className="am-tabular" data-label={t("table.weight")}>
+                    {line.weight}%
+                  </td>
+                  <td role="cell" className="am-tabular" data-label={t("table.points")}>
+                    {line.points}
+                  </td>
+                  <td role="cell" data-label={t("table.explanation")}>
+                    <BackendText>{line.explanation}</BackendText>
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
     </details>
   );
 }
 
 /**
- * Criteria of an offer as a key/value list.
+ * Guarantees as a ruled list: a green tick for an included guarantee (green means "included" and
+ * nothing else), a neutral minus otherwise. The word itself stays for assistive technology.
+ */
+export function GuaranteeList({ offer }: { offer: OfferSummary | OfferDetail }) {
+  const t = useTranslations("OfferCards");
+  if (offer.guarantees.length === 0) return null;
+  return (
+    <ul className="am-j-ticks" data-size="sm">
+      {offer.guarantees.map((guarantee) => (
+        <li key={guarantee.key} data-included={guarantee.included ? "true" : "false"}>
+          <Icon name={guarantee.included ? "check" : "minus"} size={20} />
+          <span>
+            <span className="am-visually-hidden">{`${guarantee.included ? t("included") : t("notIncluded")} : `}</span>
+            <BackendText>{guarantee.label}</BackendText>
+            {guarantee.detail ? (
+              <span className="am-j-ticks__detail">
+                <BackendText>{guarantee.detail}</BackendText>
+              </span>
+            ) : null}
+          </span>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+/**
+ * Criteria of an offer as a ruled definition list.
  *
- * `variant="card"` drops everything the card already prints above the disclosure - the price panel,
- * the four fact tiles and the insurer/partner line - so "tous les criteres" adds information rather
- * than repeating it a second time three centimetres lower. `variant="full"` keeps the complete list
- * for the offer detail page, which is the canonical reference of an offer.
+ * `variant="card"` drops everything the card already prints above the disclosure - the price, the
+ * fact grid and the update date - so "Garanties détaillées" adds information rather than repeating
+ * it. `variant="full"` keeps the complete list for the offer detail page, which is the canonical
+ * reference of an offer.
  */
 export function OfferCriteria({
   offer,
@@ -139,91 +169,76 @@ export function OfferCriteria({
     <dl className="am-j-criteria">
       {repeated ? null : (
         <>
-          <dt>{t("criteria.price")}</dt>
-          <dd>
-            {offer.indicativePriceMin !== undefined ? t("fromAmount", { amount: money(offer.indicativePriceMin) }) : t("priceToConfirm")} (
-            <BackendText>{offer.indicativePriceLabel}</BackendText>)
-          </dd>
-          <dt>{t("criteria.partner")}</dt>
-          <dd>
-            <BackendText>{offer.partnerName ?? offer.brokerName ?? t("defaultPartner")}</BackendText>
-          </dd>
-          <dt>{t("criteria.insurer")}</dt>
-          <dd>
-            <BackendText>{offer.insurerName ?? t("notProvided")}</BackendText>
-          </dd>
+          <div>
+            <dt>{t("criteria.price")}</dt>
+            <dd>
+              {offer.indicativePriceMin !== undefined ? t("fromAmount", { amount: money(offer.indicativePriceMin) }) : t("priceToConfirm")} (
+              <BackendText>{offer.indicativePriceLabel}</BackendText>)
+            </dd>
+          </div>
+          <div>
+            <dt>{t("criteria.partner")}</dt>
+            <dd>
+              <BackendText>{offer.partnerName ?? offer.brokerName ?? t("defaultPartner")}</BackendText>
+            </dd>
+          </div>
+          <div>
+            <dt>{t("criteria.insurer")}</dt>
+            <dd>
+              <BackendText>{offer.insurerName ?? t("notProvided")}</BackendText>
+            </dd>
+          </div>
         </>
       )}
-      <dt>{t("criteria.guaranteeLevel")}</dt>
-      <dd>{offer.guaranteeLevel !== undefined ? t("guaranteeLevelValue", { level: offer.guaranteeLevel }) : t("notProvided")}</dd>
+      <div>
+        <dt>{t("criteria.guaranteeLevel")}</dt>
+        <dd>{offer.guaranteeLevel !== undefined ? t("guaranteeLevelValue", { level: offer.guaranteeLevel }) : t("notProvided")}</dd>
+      </div>
       {repeated ? null : (
         <>
-          <dt>{t("criteria.deductible")}</dt>
-          <dd>{money(offer.deductibleAmount)}</dd>
-          <dt>{t("criteria.ceiling")}</dt>
-          <dd>{money(offer.coverageCeiling)}</dd>
-          <dt>{t("criteria.processing")}</dt>
-          <dd>{offer.processingDelayDays !== undefined ? t("processingDays", { days: offer.processingDelayDays }) : t("notProvided")}</dd>
-          <dt>{t("criteria.payment")}</dt>
-          <dd>{paymentKey ? t(`payment.${paymentKey}`) : offer.paymentFlexibility ?? t("notProvided")}</dd>
+          <div>
+            <dt>{t("criteria.deductible")}</dt>
+            <dd className="am-tabular">{money(offer.deductibleAmount)}</dd>
+          </div>
+          <div>
+            <dt>{t("criteria.ceiling")}</dt>
+            <dd className="am-tabular">{money(offer.coverageCeiling)}</dd>
+          </div>
+          <div>
+            <dt>{t("criteria.processing")}</dt>
+            <dd>{offer.processingDelayDays !== undefined ? t("processingDays", { days: offer.processingDelayDays }) : t("notProvided")}</dd>
+          </div>
+          <div>
+            <dt>{t("criteria.payment")}</dt>
+            <dd>{paymentKey ? t(`payment.${paymentKey}`) : offer.paymentFlexibility ?? t("notProvided")}</dd>
+          </div>
         </>
       )}
       {offer.guarantees.length > 0 ? (
-        <>
+        <div>
           <dt>{t("criteria.guarantees")}</dt>
           <dd>
-            <ul className="am-j-bullets">
-              {offer.guarantees.map((guarantee) => (
-                <li key={guarantee.key}>
-                  {guarantee.included ? t("included") : t("notIncluded")}:{" "}
-                  <BackendText>
-                    {guarantee.label}
-                    {guarantee.detail ? ` (${guarantee.detail})` : ""}
-                  </BackendText>
-                </li>
-              ))}
-            </ul>
+            <GuaranteeList offer={offer} />
           </dd>
-        </>
+        </div>
       ) : null}
-      {offer.updatedAt ? (
-        <>
+      {/* On the card, the update date sits at first level (FR-011, `content/02`), outside this
+          drawer; the detail page's full criteria list shows it here. */}
+      {!repeated && offer.updatedAt ? (
+        <div>
           <dt>{t("criteria.updatedAt")}</dt>
           <dd>{formatDate(offer.updatedAt, { locale, ...(countryCode ? { countryIso: countryCode } : {}) })}</dd>
-        </>
+        </div>
       ) : null}
     </dl>
   );
 }
 
 /**
- * Identity line of an offer: who carries the risk and who is responsible for the quote. The label of
- * each role is only exposed to assistive technology; the icon carries it visually.
+ * Indicative price block. Dashed, like everything that is still to be confirmed: the amount, the
+ * offer's own price label and the "à confirmer par le courtier partenaire" sentence travel together
+ * and are never closable.
  */
-export function OfferParties({ offer }: { offer: OfferSummary | OfferDetail }) {
-  const t = useTranslations("OfferCards");
-  const partner = offer.partnerName ?? offer.brokerName;
-  return (
-    <p className="am-j-meta">
-      {offer.insurerName ? (
-        <span>
-          <Icon name="building-2" size={16} />
-          <span className="am-visually-hidden">{`${t("criteria.insurer")} `}</span>
-          <BackendText>{offer.insurerName}</BackendText>
-        </span>
-      ) : null}
-      {partner ? (
-        <span>
-          <Icon name="handshake" size={16} />
-          <span className="am-visually-hidden">{`${t("criteria.partner")} `}</span>
-          <BackendText>{partner}</BackendText>
-        </span>
-      ) : null}
-    </p>
-  );
-}
-
-/** Indicative price block. The indicative notice travels with the amount and is never closable. */
 export function OfferPrice({
   offer,
   countryCode,
@@ -244,73 +259,19 @@ export function OfferPrice({
   return (
     <div className="am-j-price">
       <p className="am-j-price__label">{t("criteria.price")}</p>
-      <p className="am-j-price__amount am-tabular">
-        {amount ? t("fromAmount", { amount }) : t("priceToConfirm")}
-      </p>
+      <p className="am-j-price__amount am-tabular">{amount ? t("fromAmount", { amount }) : t("priceToConfirm")}</p>
       <p className="am-j-price__note">
         <BackendText>{offer.indicativePriceLabel}</BackendText>
       </p>
-      <Notice tone="indicative" compact>
-        {t("priceNotice")}
-      </Notice>
+      <p className="am-j-price__notice">{t("priceNotice")}</p>
     </div>
   );
 }
 
-const FACT_ICONS: Record<"deductible" | "ceiling" | "processing" | "payment", IconName> = {
-  deductible: "coins",
-  ceiling: "shield-check",
-  processing: "clock",
-  payment: "calendar"
-};
-
-/** Four mini statistics: franchise, plafond, delai de traitement, flexibilite de paiement. */
-export function OfferFacts({
-  offer,
-  countryCode,
-  currency
-}: {
-  offer: OfferSummary | OfferDetail;
-  countryCode?: string | undefined;
-  currency?: string | undefined;
-}) {
-  const t = useTranslations("OfferCards");
-  const locale = useLocale();
-  const money = (value: number | undefined) =>
-    formatMoney(value, { locale, ...(countryCode ? { iso: countryCode } : {}), ...(currency ? { currency } : {}) }) ?? t("notProvided");
-  const paymentKey = paymentKeyOf(offer.paymentFlexibility);
-
-  const facts: Array<{ key: keyof typeof FACT_ICONS; label: string; value: string }> = [
-    { key: "deductible", label: t("criteria.deductible"), value: money(offer.deductibleAmount) },
-    { key: "ceiling", label: t("criteria.ceiling"), value: money(offer.coverageCeiling) },
-    {
-      key: "processing",
-      label: t("criteria.processing"),
-      value: offer.processingDelayDays !== undefined ? t("processingDays", { days: offer.processingDelayDays }) : t("notProvided")
-    },
-    {
-      key: "payment",
-      label: t("criteria.payment"),
-      value: paymentKey ? t(`payment.${paymentKey}`) : offer.paymentFlexibility ?? t("notProvided")
-    }
-  ];
-
-  return (
-    <div className="am-j-facts">
-      {facts.map((fact) => (
-        <div className="am-j-fact" key={fact.key}>
-          <p className="am-j-fact__label">
-            <Icon name={FACT_ICONS[fact.key]} size={16} />
-            {fact.label}
-          </p>
-          <p className="am-j-fact__value am-tabular">{fact.value}</p>
-        </div>
-      ))}
-    </div>
-  );
-}
-
-/** Guarantees as pills: a green tick when included, a neutral minus when it is not. */
+/**
+ * Guarantees as small labels on the card: a green tick when included, a neutral minus when not. The
+ * full list with details lives in the card's disclosure and on the detail page.
+ */
 export function OfferGuarantees({ offer, limit }: { offer: OfferSummary | OfferDetail; limit?: number }) {
   const t = useTranslations("OfferCards");
   if (offer.guarantees.length === 0) return null;
@@ -338,6 +299,22 @@ export function OfferGuarantees({ offer, limit }: { offer: OfferSummary | OfferD
 
 const GUARANTEES_ON_CARD = 6;
 
+/** One cell of the card's fixed label grid: the label is always printed, the value or "non renseigné". */
+function GridCell({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <div className="am-j-offer__cell">
+      <dt>{label}</dt>
+      <dd>{children}</dd>
+    </div>
+  );
+}
+
+/**
+ * One indicative offer of the list. Every card has the same structure, in the same order, whatever
+ * the offer carries: name (and the sponsored label when there is one), score, update date, the dashed
+ * indicative price, then a fixed grid of six labelled facts, so the columns read across the cards.
+ * A missing value prints "non renseigné" in its cell rather than collapsing the grid.
+ */
 export function OfferCard({
   offer,
   countryCode,
@@ -350,34 +327,50 @@ export function OfferCard({
   currency?: string;
 }) {
   const t = useTranslations("OfferCards");
+  const locale = useLocale();
   const params = { countryCode, productKey };
+  const money = (value: number | undefined) =>
+    formatMoney(value, { locale, iso: countryCode, ...(currency ? { currency } : {}) }) ?? t("notProvided");
+  const paymentKey = paymentKeyOf(offer.paymentFlexibility);
 
   return (
     <article className="am-j-offer" aria-label={offer.name} data-sponsored={offer.isSponsored ? "true" : undefined}>
-      <div className="am-j-offer__top">
+      <header className="am-j-offer__head">
         <div className="am-j-offer__ident">
-          <div className="am-j-offer__titlerow">
-            <h3 className="am-j-offer__name">
-              <BackendText>{offer.name}</BackendText>
-            </h3>
-            <SponsoredBadge offer={offer} />
-          </div>
-          <OfferParties offer={offer} />
+          <h3 className="am-j-offer__name">
+            <BackendText>{offer.name}</BackendText>
+          </h3>
+          <SponsoredBadge offer={offer} />
+          <p className="am-j-offer__updated">
+            {t("criteria.updatedAt")} :{" "}
+            {offer.updatedAt ? formatDate(offer.updatedAt, { locale, countryIso: countryCode }) : t("notProvided")}
+          </p>
         </div>
-        <div className="am-j-offer__side">
-          {offer.score ? <OfferScore score={offer.score} size="lg" /> : null}
-          {/* The checkbox is attached to the comparison form through `form=`, so the list still
-              submits a selection without any JavaScript. The accessible name is the visible word
-              plus the offer name, so it stays unique in the list. */}
-          <label className="am-j-pick" title={t("selectLabel")}>
-            <input type="checkbox" name="ids" value={offer.id} form="compare-form" />
-            <span className="am-j-pick__off">{t("pick")}</span>
-            <span className="am-j-pick__on">{t("picked")}</span>
-            <span className="am-visually-hidden">
-              <BackendText>{offer.name}</BackendText>
-            </span>
-          </label>
-        </div>
+        {offer.score ? <OfferScore score={offer.score} size="lg" /> : null}
+      </header>
+
+      <div className="am-j-offer__body">
+        <OfferPrice offer={offer} countryCode={countryCode} currency={currency} />
+        <dl className="am-j-offer__grid">
+          <GridCell label={t("criteria.insurer")}>
+            <BackendText>{offer.insurerName ?? t("notProvided")}</BackendText>
+          </GridCell>
+          <GridCell label={t("criteria.partner")}>
+            <BackendText>{offer.partnerName ?? offer.brokerName ?? t("defaultPartner")}</BackendText>
+          </GridCell>
+          <GridCell label={t("criteria.deductible")}>
+            <span className="am-tabular">{money(offer.deductibleAmount)}</span>
+          </GridCell>
+          <GridCell label={t("criteria.ceiling")}>
+            <span className="am-tabular">{money(offer.coverageCeiling)}</span>
+          </GridCell>
+          <GridCell label={t("criteria.processing")}>
+            {offer.processingDelayDays !== undefined ? t("processingDays", { days: offer.processingDelayDays }) : t("notProvided")}
+          </GridCell>
+          <GridCell label={t("criteria.payment")}>
+            {paymentKey ? t(`payment.${paymentKey}`) : offer.paymentFlexibility ?? t("notProvided")}
+          </GridCell>
+        </dl>
       </div>
 
       {offer.guaranteeSummary ? (
@@ -386,15 +379,10 @@ export function OfferCard({
         </p>
       ) : null}
 
-      <div className="am-j-offer__body">
-        <OfferPrice offer={offer} countryCode={countryCode} currency={currency} />
-        <OfferFacts offer={offer} countryCode={countryCode} currency={currency} />
-      </div>
-
       <OfferGuarantees offer={offer} limit={GUARANTEES_ON_CARD} />
 
       {/* Only what the card has not already shown: guarantee level, the full guarantees with their
-          details, the update date and the score breakdown. */}
+          details and the score breakdown. */}
       <details className="am-j-more">
         <summary>{t("detailsSummary")}</summary>
         <div className="am-j-more__body">
@@ -407,24 +395,41 @@ export function OfferCard({
         <BackendText>{offer.disclaimer}</BackendText>
       </p>
 
-      <nav className="am-j-offer__actions" aria-label={t("actionsLabel", { name: offer.name })}>
-        <Button
-          variant="secondary"
-          href={{ pathname: "/offers/[offerId]", params: { offerId: offer.id }, query: { country: countryCode, product: productKey } }}
-          iconAfter={<Icon name="arrow-right" size={18} />}
-        >
-          {t("detail")}
-        </Button>
-        <Button
-          href={{
-            pathname: "/countries/[countryCode]/products/[productKey]/quote",
-            params,
-            query: { offerId: offer.id }
-          }}
-        >
-          {t("quote")}
-        </Button>
-      </nav>
+      <footer className="am-j-offer__foot">
+        {/* The checkbox is attached to the comparison form through `form=`, so the list still
+            submits a selection without any JavaScript. The accessible name is the visible word
+            plus the offer name, so it stays unique in the list. */}
+        <label className="am-j-pick" title={t("selectLabel")}>
+          <input type="checkbox" name="ids" value={offer.id} form="compare-form" />
+          <span className="am-j-pick__off">{t("pick")}</span>
+          <span className="am-j-pick__on">{t("picked")}</span>
+          {/* Comma-separated so the accessible name reads "Ajouter a la comparaison, {name}" /
+              "Retirer de la comparaison, {name}" (charte 5), never the two run together. */}
+          <span className="am-visually-hidden">
+            {", "}
+            <BackendText>{offer.name}</BackendText>
+          </span>
+        </label>
+
+        <nav className="am-j-offer__actions" aria-label={t("actionsLabel", { name: offer.name })}>
+          <Button
+            variant="secondary"
+            href={{ pathname: "/offers/[offerId]", params: { offerId: offer.id }, query: { country: countryCode, product: productKey } }}
+            iconAfter={<Icon name="arrow-right" size={18} />}
+          >
+            {t("detail")}
+          </Button>
+          <Button
+            href={{
+              pathname: "/countries/[countryCode]/products/[productKey]/quote",
+              params,
+              query: { offerId: offer.id }
+            }}
+          >
+            {t("quote")}
+          </Button>
+        </nav>
+      </footer>
     </article>
   );
 }
