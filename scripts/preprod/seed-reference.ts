@@ -129,10 +129,11 @@ async function main(): Promise<void> {
       });
     }
 
-    const cimaRegime = await prisma.regulatoryRegime.findUnique({ where: { key: "cima" } });
+    const regimeByKey = new Map((await prisma.regulatoryRegime.findMany()).map((regime) => [regime.key, regime.id]));
     for (const country of countries) {
       const regulatoryFamily = country.regulatoryFamily as RegulatoryFamily;
-      const regime = country.regulatoryFamily === "cima" && cimaRegime ? { regulatoryRegimeId: cimaRegime.id } : {};
+      const regimeId = regimeByKey.get(country.regulatoryFamily);
+      const regime = regimeId ? { regulatoryRegimeId: regimeId } : {};
       const existing = await prisma.country.findUnique({ where: { isoCode: country.isoCode } });
       if (existing) {
         // Rerun: descriptive data only. Flags and status belong to the admin from now on.
