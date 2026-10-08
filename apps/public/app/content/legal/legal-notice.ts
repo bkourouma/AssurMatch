@@ -4,7 +4,7 @@ const fr: LegalPage = {
   slug: "legal-notice",
   title: "Mentions légales",
   description: "Éditeur, hébergeur et nature de l'activité du site AssurMatch.",
-  updatedAt: "2026-10-07",
+  updatedAt: "2026-10-08",
   summary: [
     "AssurMatch est une plateforme technique de comparaison indicative, pas un assureur ni un courtier.",
     "Le site est édité par Alliance Consultants (Alliance Computer Consultants), basée à Abidjan, Côte d'Ivoire.",
@@ -18,10 +18,10 @@ const fr: LegalPage = {
       heading: "Qui publie ce site",
       body: [
         "Le site AssurMatch est édité par Alliance Consultants (Alliance Computer Consultants), société en activité depuis 2003.",
-        "Siège : Abidjan, Côte d'Ivoire. [À COMPLÉTER : adresse postale complète du siège social]",
-        "Forme juridique et capital social : [À COMPLÉTER : forme juridique et montant du capital]",
-        "Immatriculation (registre du commerce) : [À COMPLÉTER : numéro d'immatriculation]",
-        "Directeur ou directrice de la publication : [À COMPLÉTER : nom et fonction]",
+        "Siège : Abidjan, Côte d'Ivoire. Adresse postale : 23 BP 882 Abidjan 23, Côte d'Ivoire. [À COMPLÉTER : adresse physique du siège]",
+        "Forme juridique et capital social : SARL au capital de 3 000 000 FCFA",
+        "Immatriculation (registre du commerce) : RCCM CI-ABJ-2014-B-20956",
+        "Directeur de la publication : Baba Kourouma",
         "Les informations encore à compléter sont aussi listées dans la section « À compléter avant mise en ligne » en bas de cette page."
       ]
     },
@@ -29,7 +29,7 @@ const fr: LegalPage = {
       id: "hebergement",
       heading: "Qui héberge techniquement le site",
       body: [
-        "Hébergeur du site : [À COMPLÉTER : raison sociale et adresse de l'hébergeur]"
+        "Hébergeur du site : Hostinger International Limited (Hostinger), société de droit chypriote, 61 Lordou Vironos str., 6023 Larnaca, Chypre."
       ]
     },
     {
@@ -66,11 +66,7 @@ const fr: LegalPage = {
     }
   ],
   placeholders: [
-    "Forme juridique et capital social",
-    "Numéro d'immatriculation (registre du commerce)",
-    "Adresse postale complète du siège social",
-    "Directeur ou directrice de la publication",
-    "Hébergeur du site (raison sociale et adresse)"
+    "Adresse physique du siège social"
   ]
 };
 
@@ -78,7 +74,7 @@ const en: LegalPage = {
   slug: "legal-notice",
   title: "Legal notice",
   description: "Publisher, host and nature of activity of the AssurMatch site.",
-  updatedAt: "2026-10-07",
+  updatedAt: "2026-10-08",
   summary: [
     "AssurMatch is a technical platform for indicative comparison, not an insurer or a broker.",
     "The site is published by Alliance Consultants (Alliance Computer Consultants), based in Abidjan, Côte d'Ivoire.",
@@ -92,17 +88,17 @@ const en: LegalPage = {
       heading: "Who publishes this site",
       body: [
         "The AssurMatch site is published by Alliance Consultants (Alliance Computer Consultants), a company active since 2003.",
-        "Registered office: Abidjan, Côte d'Ivoire. [À COMPLÉTER: full postal address of the registered office]",
-        "Legal form and share capital: [À COMPLÉTER: legal form and amount of share capital]",
-        "Registration (commercial register): [À COMPLÉTER: registration number]",
-        "Publication director: [À COMPLÉTER: name and position]",
+        "Registered office: Abidjan, Côte d'Ivoire. Postal address: 23 BP 882 Abidjan 23, Côte d'Ivoire. [À COMPLÉTER: physical address of the registered office]",
+        "Legal form and share capital: limited liability company (SARL) with share capital of FCFA 3,000,000",
+        "Registration (commercial register): RCCM CI-ABJ-2014-B-20956",
+        "Publication director: Baba Kourouma",
         "Details still to be completed are also listed in the \"To be completed before launch\" section at the bottom of this page."
       ]
     },
     {
       id: "hebergement",
       heading: "Who technically hosts the site",
-      body: ["Site host: [À COMPLÉTER: company name and address of the host]"]
+      body: ["Site host: Hostinger International Limited (Hostinger), a Cypriot company, 61 Lordou Vironos str., 6023 Larnaca, Cyprus."]
     },
     {
       id: "activite",
@@ -138,11 +134,7 @@ const en: LegalPage = {
     }
   ],
   placeholders: [
-    "Legal form and share capital",
-    "Registration number (commercial register)",
-    "Full postal address of the registered office",
-    "Publication director",
-    "Site host (company name and address)"
+    "Physical address of the registered office"
   ]
 };
 
