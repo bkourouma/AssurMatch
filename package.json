@@ -47,9 +47,9 @@
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.124.0",
-    "@nestjs/common": "11.1.19",
-    "@nestjs/core": "11.1.19",
-    "@nestjs/platform-express": "11.2.5",
+    "@nestjs/common": "12.1.2",
+    "@nestjs/core": "12.1.2",
+    "@nestjs/platform-express": "12.1.2",
     "@prisma/adapter-pg": "^7.8.0",
     "@prisma/client": "7.8.0",
     "argon2": "^0.44.0",
@@ -62,13 +62,13 @@
     "prisma": "7.8.0",
     "react": "19.2.5",
     "react-dom": "19.2.5",
-    "redis": "5.12.1",
+    "redis": "6.3.0",
     "zod": "4.3.6"
   },
   "devDependencies": {
     "@eslint/js": "10.0.1",
     "@playwright/test": "1.59.1",
-    "@types/node": "25.6.0",
+    "@types/node": "26.6.3",
     "eslint": "10.0.1",
     "tsx": "4.21.0",
     "typescript": "6.0.3",
