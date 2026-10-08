@@ -11,6 +11,35 @@ describe("billing foundation runtime HTTP", () => {
     harness = undefined;
   });
 
+  it("still counts a lead the broker accepted and then closed as accepted", async () => {
+    harness = await createRuntimeHttpHarness();
+    const admin = { actorId: "finance", roles: ["finance_admin" as const], mfaVerified: true, countryScopes: ["CI"], productScopes: ["auto"] };
+    const partner = await harness.runtime.partners.service.create({
+      legalName: "Closing Broker",
+      plan: "starter",
+      primaryEmail: "closing@broker.example",
+      primaryWhatsApp: "+2250102030405",
+      status: "active",
+      quotaMonthlyLeads: 10
+    }, admin);
+    const broker = { ...admin, partnerTenantId: partner.id, partnerPlan: "starter" as const, roles: ["broker_owner_starter" as const] };
+    const assignment = await harness.runtime.leads.assignments.create({
+      quoteRequestId: "billing-q-closed",
+      partnerTenantId: partner.id,
+      assignmentReason: "routing",
+      publicReference: "BILL-CLOSED",
+      countryCode: "CI",
+      productKey: "auto"
+    }, broker);
+    await harness.runtime.leads.assignments.updateStatus(assignment.id, "accepted", broker, "lead_quality");
+    await harness.runtime.leads.assignments.updateStatus(assignment.id, "closed", broker, "lead_quality");
+
+    const response = await harness.request("/admin/billing/foundation?page=1&pageSize=10", { headers: actorHeaders(admin) });
+    expect(response.status).toBe(200);
+    const billing = billingFoundationResponseSchema.parse(await readJson<BillingFoundationResponse>(response));
+    expect(billing.partners[0]).toMatchObject({ partnerId: partner.id, acceptedLeadCount: 1 });
+  });
+
   it("returns draft lead-count billing foundation without payment collection", async () => {
     harness = await createRuntimeHttpHarness();
     const admin = { actorId: "finance", roles: ["finance_admin" as const], mfaVerified: true, countryScopes: ["CI"], productScopes: ["auto"] };
