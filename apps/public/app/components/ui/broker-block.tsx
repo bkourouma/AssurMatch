@@ -1,6 +1,7 @@
 import { Badge } from "./badge";
 import { BackendText } from "./backend-text";
 import { Icon } from "./icons";
+import { publicIssuingAuthority } from "../../../../../packages/shared/contracts/licence-issuer";
 
 export interface BrokerBlockLabels {
   licenceNumber: string;
@@ -78,8 +79,12 @@ export function BrokerBlock({
         <Icon name="shield-check" size={16} />
         <span>
           {labels.licenceNumber} <BackendText>{licenceNumber}</BackendText>
-          {" - "}
-          {labels.issuingAuthority} <BackendText>{issuingAuthority}</BackendText>
+          {publicIssuingAuthority(issuingAuthority) ? (
+            <>
+              {" - "}
+              {labels.issuingAuthority} <BackendText>{publicIssuingAuthority(issuingAuthority)}</BackendText>
+            </>
+          ) : null}
           {city ? (
             <>
               {" - "}

@@ -642,6 +642,7 @@
     "offerPartnerRetained": "Your request has been sent to {partner}.",
     "offerPartnerNotRetained": "The broker of the selected offer was not available: your request has been directed to another approved partner broker.",
     "trackLink": "Follow my request and add documents (optional)",
+    "trackLinkOnly": "Follow my request",
     "backToOffers": "Back to the offers",
     "blocked": {
       "title": "Quote request unavailable",

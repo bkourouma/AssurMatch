@@ -14,6 +14,7 @@ import { listCountryDirectory, listCountryPartners, listPublicProducts } from ".
 import { formatDate } from "../../../../lib/country-format";
 import { buildMetadata, localeUrl } from "../../../../lib/seo";
 import type { PageMetadata } from "../../../../lib/seo";
+import { publicIssuingAuthority } from "../../../../../../../packages/shared/contracts/licence-issuer";
 
 /**
  * Broker directory of a country (SITE-404). Every partner shown here holds a valid licence: the
@@ -80,8 +81,12 @@ export default async function CountryBrokersPage({ params }: { params: Promise<P
         <>
           <span className="am-j-rowline">
             {common("licenceNumber")} <BackendText>{partner.licenseNumber}</BackendText>
-            {" - "}
-            {common("issuingAuthority")} <BackendText>{partner.issuingAuthority}</BackendText>
+            {publicIssuingAuthority(partner.issuingAuthority) ? (
+              <>
+                {" - "}
+                {common("issuingAuthority")} <BackendText>{publicIssuingAuthority(partner.issuingAuthority)}</BackendText>
+              </>
+            ) : null}
             {partner.city ? (
               <>
                 {" - "}

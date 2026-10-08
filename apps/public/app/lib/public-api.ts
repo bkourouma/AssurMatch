@@ -167,6 +167,21 @@ export function listQuoteDocuments(publicReference: string, token: string) {
   return readPublic<QuoteDocumentsResponse | null>(`/quote-requests/${encodeURIComponent(publicReference)}/documents?${params.toString()}`, null);
 }
 
+/**
+ * Whether the product of this request accepts optional documents (`uploadEnabled`). Any failure
+ * answers `false`: the confirmation then offers the tracking link without promising an upload.
+ */
+export async function quoteDocumentUploadEnabled(publicReference: string, token: string): Promise<boolean> {
+  try {
+    const params = new URLSearchParams({ token });
+    const response = await fetch(`${PUBLIC_API_BASE_URL}/quote-requests/${encodeURIComponent(publicReference)}/documents?${params.toString()}`, { cache: "no-store" });
+    if (!response.ok) return false;
+    return ((await response.json()) as { uploadEnabled?: unknown }).uploadEnabled === true;
+  } catch {
+    return false;
+  }
+}
+
 export async function uploadQuoteDocument(publicReference: string, token: string, formData: FormData): Promise<PublicQuoteDocumentUploadState> {
   try {
     const params = new URLSearchParams({ token });
