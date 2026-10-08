@@ -1,14 +1,15 @@
 import { notFound } from "next/navigation";
 import { getTranslations, setRequestLocale } from "next-intl/server";
+import { Link } from "../../../../../../i18n/navigation";
 import { toLocale } from "../../../../../../i18n/routing";
 import { BackendText } from "../../../../../components/ui/backend-text";
 import { Breadcrumb } from "../../../../../components/ui/breadcrumb";
 import { BrokerBlock } from "../../../../../components/ui/broker-block";
-import { Button } from "../../../../../components/ui/button";
+import { Directory } from "../../../../../components/ui/directory";
 import { Hero } from "../../../../../components/ui/hero";
 import { Icon } from "../../../../../components/ui/icons";
 import { JsonLd } from "../../../../../components/ui/json-ld";
-import { Notice } from "../../../../../components/ui/notice";
+import { productPictogram } from "../../../../../components/ui/pictogram";
 import { Section } from "../../../../../components/ui/section";
 import { getCountryPartner, listCountryDirectory, type PublicPartnerDetail, type PublicPartnerSummary } from "../../../../../lib/public-api";
 import { formatDate } from "../../../../../lib/country-format";
@@ -88,7 +89,6 @@ export default async function CountryBrokerDetailPage({ params }: { params: Prom
   return (
     <>
       <Hero
-        kicker={brokers("breadcrumb")}
         title={displayName}
         lead={t("fineprint")}
         size="sm"
@@ -109,7 +109,7 @@ export default async function CountryBrokerDetailPage({ params }: { params: Prom
       <Section ariaLabel={displayName}>
         <div className="am-j-detail">
           <div className="am-j-detail__main">
-            <div className="am-j-block">
+            <section className="am-j-part" aria-label={displayName}>
               <BrokerBlock
                 variant="full"
                 displayName={displayName}
@@ -119,50 +119,49 @@ export default async function CountryBrokerDetailPage({ params }: { params: Prom
                 approved
                 {...(city ? { city } : {})}
               />
-              <p className="am-j-meta">
+              <p className="am-j-statement">
+                <Icon name="calendar" size={20} />
                 <span>
-                  <Icon name="calendar" size={16} />
-                  {t("licenseExpiresAt")} : {formatDate(licenseExpiresAt, { locale, countryIso: countryCode })}
+                  {t("licenseExpiresAt")} {formatDate(licenseExpiresAt, { locale, countryIso: countryCode })}
                 </span>
               </p>
-            </div>
+            </section>
 
-            <div className="am-j-block">
-              <h2 className="am-j-block__title">{t("disclaimerTitle")}</h2>
-              <p>
+            {/* The sign's lead already carries the indicative sentence of this page. */}
+            <section className="am-j-part" aria-labelledby="am-broker-disclaimer">
+              <h2 className="am-j-part__title" id="am-broker-disclaimer">
+                {t("disclaimerTitle")}
+              </h2>
+              <p className="am-j-measure">
                 <BackendText>{disclaimer}</BackendText>
               </p>
-              <Notice tone="indicative">{t("fineprint")}</Notice>
-            </div>
+            </section>
           </div>
 
           <aside className="am-j-detail__aside" aria-label={t("productsTitle")}>
             {products.length > 0 ? (
-              <div className="am-j-block">
-                <h2 className="am-j-block__title">{t("productsTitle")}</h2>
-                <div className="am-j-detail__actions">
-                  {products.map((product) => (
-                    <Button
-                      key={product.key}
-                      variant="secondary"
-                      href={{ pathname: "/countries/[countryCode]/products/[productKey]", params: { countryCode, productKey: product.key } }}
-                      iconAfter={<Icon name="arrow-right" size={18} />}
-                    >
-                      <BackendText>{product.name}</BackendText>
-                    </Button>
-                  ))}
-                </div>
-              </div>
+              <section className="am-j-part" aria-labelledby="am-broker-products">
+                <h2 className="am-j-part__title" id="am-broker-products">
+                  {t("productsTitle")}
+                </h2>
+                <Directory
+                  items={products.map((product) => ({
+                    key: product.key,
+                    title: <BackendText>{product.name}</BackendText>,
+                    meta: t("viewProduct"),
+                    pictogram: productPictogram(product.key),
+                    href: { pathname: "/countries/[countryCode]/products/[productKey]", params: { countryCode, productKey: product.key } }
+                  }))}
+                  label={t("productsTitle")}
+                />
+              </section>
             ) : null}
-            <div className="am-cluster">
-              <Button
-                variant="tertiary"
-                href={{ pathname: "/countries/[countryCode]/brokers", params: { countryCode } }}
-                icon={<Icon name="arrow-left" size={18} />}
-              >
+            <p className="am-j-morelink">
+              <Link href={{ pathname: "/countries/[countryCode]/brokers", params: { countryCode } }}>
+                <Icon name="arrow-left" size={18} />
                 {t("back", { countryCode: countryName })}
-              </Button>
-            </div>
+              </Link>
+            </p>
           </aside>
         </div>
       </Section>

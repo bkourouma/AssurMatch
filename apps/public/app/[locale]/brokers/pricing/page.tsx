@@ -7,10 +7,10 @@ import { Breadcrumb } from "../../../components/ui/breadcrumb";
 import { Button } from "../../../components/ui/button";
 import { EmptyState } from "../../../components/ui/empty-state";
 import { Hero } from "../../../components/ui/hero";
+import { Icon } from "../../../components/ui/icons";
 import { Notice } from "../../../components/ui/notice";
 import { Section } from "../../../components/ui/section";
-import { Reveal } from "../../../components/motion/reveal";
-import { billableLeadCriteria, brokerPlan, type BrokerPlanKey } from "../../../content/brokers";
+import { billableLeadCriteria, billingFaq, brokerPlan, neverIncludedFeatures, type BrokerPlanKey } from "../../../content/brokers";
 import { formatMoney } from "../../../lib/country-format";
 import { listPartnerPlans } from "../../../lib/public-api";
 import { buildMetadata, localeUrl } from "../../../lib/seo";
@@ -23,6 +23,9 @@ import { readVisitorCountry } from "../../../lib/visitor-country";
  * AssurMatch, not an insurance price - so the page states instead that prices are indicative,
  * excluding tax and specific to each country. Every number comes from `GET /partners/plans`; when the
  * API has no row for a plan, that plan shows "sur devis" / "on request" rather than an invented figure.
+ *
+ * The country choice sits on the navy sign: a plain GET form that reloads this page with `?pays=XX`,
+ * so it needs no client JavaScript.
  */
 
 type SearchParams = Record<string, string | string[] | undefined>;
@@ -46,6 +49,7 @@ export default async function BrokerPricingPage({
   setRequestLocale(locale);
   const t = await getTranslations("BrokerPricing");
   const common = await getTranslations("Common");
+  const brokers = await getTranslations("Brokers");
 
   const visitor = await readVisitorCountry();
   const eligibleCountries = visitor.directory.filter((country) => country.availability !== "waitlist");
@@ -71,6 +75,7 @@ export default async function BrokerPricingPage({
   return (
     <>
       <Hero
+        className="am-brokers-sign"
         title={t("title")}
         lead={t("lead")}
         breadcrumb={
@@ -78,54 +83,68 @@ export default async function BrokerPricingPage({
             label={common("breadcrumbLabel")}
             items={[
               { name: common("home"), url: localeUrl(locale, "/") },
+              { name: brokers("breadcrumb"), url: localeUrl(locale, "/brokers") },
               { name: t("breadcrumb"), url: localeUrl(locale, "/brokers/pricing") }
             ]}
           />
         }
-      />
-
-      {eligibleCountries.length > 0 ? (
-        <Section spacing="compact">
-          {/* A plain GET form posting back to this same page with ?pays=XX: no client JavaScript needed. */}
-          <form className="am-pricepill" method="get">
-            <label className="am-pricepill__label" htmlFor="am-pricing-country">
+      >
+        {eligibleCountries.length > 0 ? (
+          <form className="am-pricing-country" method="get">
+            <label className="am-pricing-country__label" htmlFor="am-pricing-country">
               {t("countrySelector.label")}
             </label>
-            <select id="am-pricing-country" className="am-field__control" name="pays" defaultValue={selected}>
-              {eligibleCountries.map((country) => (
-                <option key={country.isoCode} value={country.isoCode}>
-                  {country.name}
-                </option>
-              ))}
-            </select>
-            <Button type="submit" variant="secondary" size="sm">
-              {t("countrySelector.submit")}
-            </Button>
+            <div className="am-pricing-country__row">
+              <select id="am-pricing-country" className="am-field__control" name="pays" defaultValue={selected}>
+                {eligibleCountries.map((country) => (
+                  <option key={country.isoCode} value={country.isoCode}>
+                    {country.name}
+                  </option>
+                ))}
+              </select>
+              <Button type="submit" variant="secondary" iconAfter={<Icon name="arrow-right" size={18} />}>
+                {t("countrySelector.submit")}
+              </Button>
+            </div>
           </form>
-        </Section>
-      ) : null}
+        ) : null}
+      </Hero>
 
-      {/* The title is what stops the page skipping from the hero's h1 straight to the plan cards' h3. */}
+      {/* The title is what stops the page skipping from the sign's h1 straight to the plans' h3. */}
       <Section title={t("plansTitle")}>
+        {/* Who these prices bind, read before the prices themselves; shown in every state. */}
+        <Notice tone="indicative" className="am-pricing-notice">
+          {t("notice")}
+        </Notice>
         {eligibleCountries.length === 0 || noPrices ? (
           <EmptyState title={t("empty.title")} description={t("empty.description")} action={contactAction} />
         ) : (
-          <Reveal as="ul" stagger className="am-pricing-grid">
+          <ul className="am-planpanels">
             {PLAN_ORDER.map((key) => {
               const planContent = brokerPlan(locale, key);
               if (!planContent) return null;
+              const base = planContent.includesPlan ? brokerPlan(locale, planContent.includesPlan) : undefined;
               const price = priceByPlan.get(key);
               return (
                 <PlanPricingCard
                   key={key}
                   planName={planContent.name}
                   positioning={planContent.positioning}
+                  audience={planContent.audience}
+                  features={planContent.features}
+                  {...(base ? { includesNote: brokers("plans.includesPrefix", { plan: base.name }) } : {})}
                   highlighted={key === "pro"}
+                  notIncluded={planContent.notIncluded}
+                  applyHref={{ pathname: "/brokers/apply", query: { formule: key } }}
                   labels={{
                     monthlySubscription: t("pricing.monthlySubscription"),
                     perLead: t("pricing.perLead"),
                     setupFee: t("pricing.setupFee"),
-                    onRequest: t("pricing.onRequest")
+                    onRequest: t("pricing.onRequest"),
+                    notIncludedTitle: t("pricing.notIncludedTitle"),
+                    applyCta: t("pricing.applyCta"),
+                    audience: brokers("plans.audience"),
+                    featuresTitle: brokers("plans.features")
                   }}
                   {...(price
                     ? {
@@ -137,22 +156,46 @@ export default async function BrokerPricingPage({
                 />
               );
             })}
-          </Reveal>
+          </ul>
         )}
 
-        <Notice tone="indicative">{t("notice")}</Notice>
         {notice ? (
-          <Notice tone="info">
+          <Notice tone="info" className="am-pricing-notice">
             <BackendText>{notice}</BackendText>
           </Notice>
         ) : null}
       </Section>
 
-      <Reveal as="div">
-        <Section title={t("criteria.title")} lead={t("criteria.lead")} tone="muted">
+      <Section className="am-brokers-split" tone="muted" title={t("criteria.title")} lead={t("criteria.lead")}>
+        <div className="am-brokers-split__body">
           <BillableCriteriaList criteria={billableLeadCriteria(locale)} />
-        </Section>
-      </Reveal>
+          <p className="am-brokers-note">{t("criteria.neverBillable")}</p>
+        </div>
+      </Section>
+
+      <Section className="am-brokers-split" title={t("neverIncluded.title")}>
+        <div className="am-brokers-split__body">
+          <ul className="am-brokerlist am-brokerlist--excluded">
+            {neverIncludedFeatures(locale).map((item) => (
+              <li key={item}>
+                <Icon name="minus" size={20} />
+                <span>{item}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      </Section>
+
+      <Section className="am-brokers-split" title={t("billingFaq.title")}>
+        <div className="am-brokers-split__body am-faq">
+          {billingFaq(locale).map((item) => (
+            <details className="am-faq__item" key={item.id}>
+              <summary>{item.question}</summary>
+              <p className="am-faq__answer">{item.answer}</p>
+            </details>
+          ))}
+        </div>
+      </Section>
     </>
   );
 }

@@ -21,15 +21,22 @@ export interface ContactFormLabels {
   audienceLegend: string;
   audienceOptions: readonly RadioCardOption[];
   name: string;
+  /** Why this field is asked, shown under the control. */
+  nameHint: string;
   email: string;
+  emailHint: string;
   phone: string;
+  phoneHint: string;
   country: string;
+  countryHint: string;
   /** Empty option of the country select: the field stays optional. */
   countryUnspecified: string;
   /** Shown in the summary notice, and only when more than one control is invalid. */
   errorSummary: string;
   subject: string;
+  subjectHint: string;
   message: string;
+  messageHint: string;
   honeypot: string;
   consent: string;
   consentRequired: string;
@@ -57,6 +64,13 @@ export interface ContactFormProps {
   labels: ContactFormLabels;
   /** Open and upcoming countries, read server-side from the public directory. */
   countries: readonly ContactFormCountry[];
+  /**
+   * Server action bound in `contact/page.tsx` (spec 050, decision D6): the browser's native submission
+   * of this form invokes it, so a visitor without JavaScript still sends a real request instead of a
+   * GET carrying their name, e-mail and message in the URL. When JavaScript runs, `handleSubmit` below
+   * calls `preventDefault()` before the browser gets to use it.
+   */
+  formAction?: ((formData: FormData) => Promise<void>) | undefined;
 }
 
 type FormStatus = "idle" | "submitting" | "success" | "error";
@@ -96,7 +110,7 @@ function focusFirstInvalid(form: HTMLFormElement, errors: FieldErrors, consentMi
   if (consentBox instanceof HTMLElement) consentBox.focus();
 }
 
-export function ContactForm({ labels, countries }: ContactFormProps) {
+export function ContactForm({ labels, countries, formAction }: ContactFormProps) {
   const [sessionId] = useState(newSessionId);
   const [status, setStatus] = useState<FormStatus>("idle");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -201,21 +215,47 @@ export function ContactForm({ labels, countries }: ContactFormProps) {
   }
 
   return (
-    <form className="am-stack" onSubmit={handleSubmit} noValidate>
+    <form className="am-stack" onSubmit={handleSubmit} noValidate {...(formAction ? { action: formAction } : {})}>
       <RadioCards name="audience" legend={labels.audienceLegend} options={labels.audienceOptions} defaultValue="visitor" required />
 
       {/* Short identity fields side by side from 768px; the subject and the message keep a full row. */}
       <div className="am-form-grid">
-        <Field id="contact-name" label={labels.name} required requiredLabel={labels.requiredMark} leading="user" {...(fieldErrors.name ? { error: fieldErrors.name } : {})}>
-          <input {...fieldControlProps("contact-name", { required: true, ...(fieldErrors.name ? { error: fieldErrors.name } : {}) })} name="name" type="text" autoComplete="name" />
+        <Field
+          id="contact-name"
+          label={labels.name}
+          hint={labels.nameHint}
+          required
+          requiredLabel={labels.requiredMark}
+          leading="user"
+          {...(fieldErrors.name ? { error: fieldErrors.name } : {})}
+        >
+          <input
+            {...fieldControlProps("contact-name", { hint: labels.nameHint, required: true, ...(fieldErrors.name ? { error: fieldErrors.name } : {}) })}
+            name="name"
+            type="text"
+            autoComplete="name"
+          />
         </Field>
 
-        <Field id="contact-email" label={labels.email} required requiredLabel={labels.requiredMark} leading="mail" {...(fieldErrors.email ? { error: fieldErrors.email } : {})}>
-          <input {...fieldControlProps("contact-email", { required: true, ...(fieldErrors.email ? { error: fieldErrors.email } : {}) })} name="email" type="email" autoComplete="email" />
+        <Field
+          id="contact-email"
+          label={labels.email}
+          hint={labels.emailHint}
+          required
+          requiredLabel={labels.requiredMark}
+          leading="mail"
+          {...(fieldErrors.email ? { error: fieldErrors.email } : {})}
+        >
+          <input
+            {...fieldControlProps("contact-email", { hint: labels.emailHint, required: true, ...(fieldErrors.email ? { error: fieldErrors.email } : {}) })}
+            name="email"
+            type="email"
+            autoComplete="email"
+          />
         </Field>
 
-        <Field id="contact-phone" label={labels.phone} leading="phone">
-          <input {...fieldControlProps("contact-phone", {})} name="phone" type="tel" autoComplete="tel" />
+        <Field id="contact-phone" label={labels.phone} hint={labels.phoneHint} leading="phone">
+          <input {...fieldControlProps("contact-phone", { hint: labels.phoneHint })} name="phone" type="tel" autoComplete="tel" />
         </Field>
 
         {/*
@@ -223,8 +263,8 @@ export function ContactForm({ labels, countries }: ContactFormProps) {
           an ISO code ("Côte d'Ivoire", "CIV", "225"), so the visitor thought the value had been sent.
           The empty option keeps the field optional; the submitted value is the ISO code.
         */}
-        <Field id="contact-country" label={labels.country} leading="map-pin">
-          <select {...fieldControlProps("contact-country", {})} name="countryCode" defaultValue="" autoComplete="country">
+        <Field id="contact-country" label={labels.country} hint={labels.countryHint} leading="map-pin">
+          <select {...fieldControlProps("contact-country", { hint: labels.countryHint })} name="countryCode" defaultValue="" autoComplete="country">
             <option value="">{labels.countryUnspecified}</option>
             {countries.map((country) => (
               <option key={country.isoCode} value={country.isoCode}>
@@ -237,23 +277,33 @@ export function ContactForm({ labels, countries }: ContactFormProps) {
         <Field
           id="contact-subject"
           label={labels.subject}
+          hint={labels.subjectHint}
           required
           requiredLabel={labels.requiredMark}
           className="am-form-grid__full"
           {...(fieldErrors.subject ? { error: fieldErrors.subject } : {})}
         >
-          <input {...fieldControlProps("contact-subject", { required: true, ...(fieldErrors.subject ? { error: fieldErrors.subject } : {}) })} name="subject" type="text" />
+          <input
+            {...fieldControlProps("contact-subject", { hint: labels.subjectHint, required: true, ...(fieldErrors.subject ? { error: fieldErrors.subject } : {}) })}
+            name="subject"
+            type="text"
+          />
         </Field>
 
         <Field
           id="contact-message"
           label={labels.message}
+          hint={labels.messageHint}
           required
           requiredLabel={labels.requiredMark}
           className="am-form-grid__full"
           {...(fieldErrors.message ? { error: fieldErrors.message } : {})}
         >
-          <textarea {...fieldControlProps("contact-message", { required: true, ...(fieldErrors.message ? { error: fieldErrors.message } : {}) })} name="message" rows={6} />
+          <textarea
+            {...fieldControlProps("contact-message", { hint: labels.messageHint, required: true, ...(fieldErrors.message ? { error: fieldErrors.message } : {}) })}
+            name="message"
+            rows={6}
+          />
         </Field>
       </div>
 

@@ -12,7 +12,7 @@ test.describe("local app launcher browser smoke", () => {
 
   test("public app and quote form render", async ({ page }) => {
     await page.goto(publicUrl);
-    await expect(page.getByRole("heading", { name: "Comparez les offres d'assurance de votre pays" })).toBeVisible();
+    await expect(page.getByRole("heading", { level: 1, name: "Comparez d'abord. Soyez accompagné ensuite." })).toBeVisible();
 
     // The public site moved every page under `[locale]` and localised its routes: French is
     // unprefixed and uses the French route words (spec 045).
@@ -53,7 +53,7 @@ test.describe("local app launcher browser smoke", () => {
     await expect(main.getByRole("link", { name: "Côte d'Ivoire" }).first()).toBeVisible();
     await expect(main.getByRole("link", { name: "Sénégal" }).first()).toBeVisible();
     await expect(main.getByText("Ouvert", { exact: true }).first()).toBeVisible();
-    await expect(main.getByText("Bientôt", { exact: true }).first()).toBeVisible();
+    await expect(main.getByText("Pas encore ouvert", { exact: true }).first()).toBeVisible();
   });
 
   test("/comment-ca-marche renders", async ({ page }) => {
@@ -69,7 +69,7 @@ test.describe("local app launcher browser smoke", () => {
   test("/en renders in English with lang=\"en\"", async ({ page }) => {
     await page.goto(`${publicUrl}/en`);
     await expect(page.locator("html")).toHaveAttribute("lang", "en");
-    await expect(page.getByRole("heading", { name: "Compare insurance offers in your country" })).toBeVisible();
+    await expect(page.getByRole("heading", { level: 1, name: "Compare first. Get support next." })).toBeVisible();
   });
 
   test("at a 375 pixel viewport the header still shows the comparison call to action", async ({ page }) => {

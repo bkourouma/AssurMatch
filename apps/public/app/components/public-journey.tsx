@@ -1,7 +1,5 @@
 import { useTranslations } from "next-intl";
-import { Button } from "./ui/button";
-import { Icon } from "./ui/icons";
-import { IconTile } from "./ui/icon-tile";
+import { Directory } from "./ui/directory";
 import { Notice } from "./ui/notice";
 
 /** Technical-platform positioning, repeated in every public journey (Constitution I). */
@@ -17,12 +15,11 @@ export function IndicativeOfferNotice() {
 }
 
 /**
- * The two regulatory sentences of a journey hero, in one compact notice.
+ * The two regulatory sentences of a journey sign, in one compact notice.
  *
  * Both stay visible word for word (Constitution I and II) and neither is closable; stacking them as
  * two separate boxes only pushed the page content down and read as two warnings where there is one
- * regulatory frame. The per-price compact notice inside the cards and the bottom fineprint are
- * unchanged.
+ * regulatory frame. The notice is dashed: what it describes is indicative, to be confirmed.
  */
 export function JourneyHeroNotice() {
   const t = useTranslations("Journey");
@@ -35,42 +32,40 @@ export function JourneyHeroNotice() {
 }
 
 /**
- * Visitor journey shortcuts. The country and product default to the first publicly activated pair,
- * but every caller that knows its own scope passes it so the links never dead-end elsewhere.
+ * Visitor journey shortcuts, as directory rows: one row, one destination. The country and product
+ * default to the first publicly activated pair, but every caller that knows its own scope passes it
+ * so the links never dead-end elsewhere.
  */
 export function PublicJourneyActions({ countryCode = "CI", productKey = "auto" }: { countryCode?: string; productKey?: string }) {
   const t = useTranslations("Journey");
   const params = { countryCode, productKey };
 
   return (
-    <nav className="am-j-panel am-j-panel--brand" aria-label={t("label")}>
-      <div className="am-j-panel__head">
-        <IconTile name="compass" size="lg" />
-        <h2 className="am-j-panel__title">{t("title")}</h2>
-      </div>
-      <div className="am-cluster">
-        <Button
-          variant="secondary"
-          href={{ pathname: "/countries/[countryCode]/products/[productKey]/offers", params }}
-          icon={<Icon name="scale" size={18} />}
-        >
-          {t("compare")}
-        </Button>
-        <Button
-          href={{ pathname: "/countries/[countryCode]/products/[productKey]/quote", params }}
-          icon={<Icon name="file-text" size={18} />}
-        >
-          {t("quote")}
-        </Button>
-        <Button
-          variant="secondary"
-          href={{ pathname: "/countries/[countryCode]/products/[productKey]/quote", params }}
-          icon={<Icon name="phone" size={18} />}
-        >
-          {t("callback")}
-        </Button>
-      </div>
-      <p className="am-j-fineprint">{t("fineprint")}</p>
+    <nav className="am-j-next" aria-label={t("label")}>
+      <h2 className="am-j-next__title">{t("title")}</h2>
+      <Directory
+        items={[
+          {
+            key: "compare",
+            title: t("compare"),
+            icon: "scale",
+            href: { pathname: "/countries/[countryCode]/products/[productKey]/offers", params }
+          },
+          {
+            key: "quote",
+            title: t("quote"),
+            icon: "file-text",
+            href: { pathname: "/countries/[countryCode]/products/[productKey]/quote", params }
+          },
+          {
+            key: "callback",
+            title: t("callback"),
+            icon: "phone",
+            href: { pathname: "/countries/[countryCode]/products/[productKey]/quote", params }
+          }
+        ]}
+      />
+      <p className="am-j-note">{t("fineprint")}</p>
     </nav>
   );
 }

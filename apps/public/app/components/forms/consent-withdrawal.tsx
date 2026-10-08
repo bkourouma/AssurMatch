@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { withdrawQuoteConsent } from "../../lib/public-api";
+import { BackendText } from "../ui/backend-text";
 import { Icon } from "../ui/icons";
 import { Notice } from "../ui/notice";
 
@@ -17,6 +18,8 @@ export interface ConsentWithdrawalLabels {
   cancel: string;
   submitting: string;
   successTitle: string;
+  /** Content/02: a visitor who reopens an already-cancelled request reads a distinct title. */
+  successTitleAlready: string;
   successDescription: string;
   error: string;
 }
@@ -55,9 +58,13 @@ export function ConsentWithdrawal({ publicReference, token, labels }: ConsentWit
   }
 
   if (state.status === "success") {
+    // The backend answers a different, already-French sentence for a request that was already
+    // cancelled (content/02): the visible title follows it rather than always announcing a fresh
+    // withdrawal, without requiring a dedicated field on the API response.
+    const already = /d[ée]j[aà]/i.test(state.message);
     return (
-      <Notice tone="success" title={labels.successTitle} role="status">
-        {labels.successDescription}
+      <Notice tone="success" title={already ? labels.successTitleAlready : labels.successTitle} role="status">
+        <BackendText>{state.message || labels.successDescription}</BackendText>
       </Notice>
     );
   }

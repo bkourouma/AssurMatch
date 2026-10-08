@@ -1,548 +1,532 @@
 /*
- * Institutional pages: how it works, regulatory status, FAQ, glossary, guides, contact, the four
- * legal pages (and their country variants) and the localised 404. Imported by each of those page
- * modules, so it lands after globals.css in the cascade. Every rule composes the design-system
- * primitives; none of them is redefined here.
+ * Reading pages, "La signalétique": how it works, guides, FAQ, glossary, contact, our commitment,
+ * regulatory status, the four legal pages (and their country variants) and the 404 / error pages.
+ *
+ * Imported by each of those page modules, so it lands after globals.css. Next keeps a route's CSS
+ * loaded after a client-side navigation, so every rule here is scoped to a class these pages own and
+ * never restyles a primitive on another page.
+ *
+ * Grammar: a navy sign, then a reading column; lists are ruled rows, headings of a list carry a 2px
+ * navy rule, numbers only where the order matters.
+ *
+ * Measure: the reading column is 34em, about 75 characters of running French text in Atkinson
+ * Hyperlegible Next. It is set in em, not ch: the face draws a wide zero, so 68ch came out near 97
+ * characters a line.
  */
 
 /* ==========================================================================
-   1. Vertical timeline (how it works)
+   1. Shared reading pieces
    ========================================================================== */
 
-.am-timeline {
-  position: relative;
-  display: grid;
-  gap: var(--am-space-24);
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-
-/* The rail the nodes sit on: left of the cards on a phone, centred from 900px. */
-.am-timeline::before {
-  position: absolute;
-  top: 12px;
-  bottom: 12px;
-  left: 21px;
-  width: 2px;
-  border-radius: var(--am-radius-pill);
-  background: linear-gradient(180deg, var(--am-primary-200) 0%, var(--am-primary-100) 100%);
-  content: "";
-}
-
-.am-timeline__item {
-  position: relative;
-  display: grid;
-  gap: var(--am-space-16);
-  align-items: start;
-  grid-template-columns: 44px minmax(0, 1fr);
-}
-
-.am-timeline__marker {
-  position: relative;
-  z-index: var(--am-z-base);
-  display: inline-flex;
-  width: 44px;
-  height: 44px;
-  align-items: center;
-  justify-content: center;
-  border: 2px solid var(--am-surface);
-  border-radius: var(--am-radius-pill);
-  background: var(--am-gradient-brand);
-  box-shadow: var(--am-shadow-glow-soft);
-  color: var(--am-text-invert);
-  font-family: var(--am-font-heading);
-  font-size: var(--am-small-size);
-  font-variant-numeric: tabular-nums;
-  font-weight: 800;
-}
-
-.am-timeline__card {
-  min-width: 0;
-}
-
-.am-timeline__head {
+/* Facts printed on the sign under the lead: updated date, reading time. */
+.am-signmeta {
   display: flex;
-  gap: var(--am-space-12);
+  flex-wrap: wrap;
+  gap: var(--am-space-4) var(--am-space-20);
+  margin: 0;
+  color: var(--am-sign-ink-muted);
+  font-size: var(--am-small-size);
+  line-height: var(--am-small-line);
+}
+
+.am-signmeta > span {
+  display: inline-flex;
+  gap: var(--am-space-8);
   align-items: center;
 }
 
-.am-timeline__title {
+.am-signmeta .am-icon {
+  color: var(--am-sign-ink);
+}
+
+/* The heading of a list: a 2px navy rule under it, the rows then follow with 1px rules. */
+.am-ruled-title {
   margin: 0;
+  padding-bottom: var(--am-space-8);
+  border-bottom: 2px solid var(--am-primary-800);
+  font-size: var(--am-h3-size);
+  line-height: var(--am-h3-line);
 }
 
-@media (min-width: 900px) {
-  .am-timeline {
-    gap: var(--am-space-32);
-  }
-
-  .am-timeline::before {
-    left: calc(50% - 1px);
-  }
-
-  .am-timeline__item {
-    gap: 0;
-    grid-template-columns: minmax(0, 1fr) 88px minmax(0, 1fr);
-  }
-
-  .am-timeline__marker {
-    grid-column: 2;
-    grid-row: 1;
-    justify-self: center;
-    margin-top: var(--am-space-16);
-  }
-
-  .am-timeline__item:nth-child(odd) .am-timeline__card {
-    grid-column: 1;
-    grid-row: 1;
-  }
-
-  .am-timeline__item:nth-child(even) .am-timeline__card {
-    grid-column: 3;
-    grid-row: 1;
-  }
-}
-
-/* ==========================================================================
-   2. "Ne fait pas" checklist and link cards
-   ========================================================================== */
-
-.am-xlist {
-  display: grid;
-  gap: var(--am-space-12);
+/* A ruled list. `data-mark`: tick (navy check), minus (neutral, what is not done), dot (navy square). */
+.am-ruled {
   margin: 0;
   padding: 0;
   list-style: none;
 }
 
-.am-xlist li {
+.am-ruled > li {
   display: grid;
   gap: var(--am-space-12);
-  align-items: start;
+  margin: 0;
+  padding: var(--am-space-12) 0;
+  border-bottom: 1px solid var(--am-rule);
   grid-template-columns: 20px minmax(0, 1fr);
-  color: var(--am-text-muted);
 }
 
-.am-xlist li .am-icon {
+.am-ruled > li > .am-icon {
   margin-top: 3px;
+  color: var(--am-primary-800);
+}
+
+.am-ruled[data-mark="minus"] > li > .am-icon {
   color: var(--am-neutral-500);
 }
 
-.am-linkcards {
-  display: grid;
-  gap: var(--am-space-20);
-  margin: 0;
-  padding: 0;
-  grid-template-columns: minmax(0, 1fr);
-  list-style: none;
+.am-ruled[data-mark="dot"] > li::before {
+  width: 8px;
+  height: 8px;
+  margin: 0.62em 0 0 6px;
+  border-radius: 1px;
+  background: var(--am-primary-800);
+  content: "";
 }
 
-@media (min-width: 768px) {
-  .am-linkcards {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+/* A block of text and its ruled list, kept to the reading measure. */
+.am-scope {
+  display: grid;
+  gap: var(--am-space-16);
+  max-width: 34em;
+}
+
+.am-scope > p {
+  margin: 0;
+}
+
+/* The compare entry at the bottom of a reading page sits in the 740px column: the two selects keep a
+   column each and the button spans the panel under them, so a country name is never cut. */
+@media (min-width: 560px) {
+  .am-inst-compare .am-entry__row {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    align-items: end;
+  }
+
+  .am-inst-compare .am-entry__row > .am-button {
+    grid-column: 1 / -1;
   }
 }
 
 /* ==========================================================================
-   3. Sticky in-page navigation (regulatory status, legal pages)
+   2. Article: guide detail and legal pages
+   --------------------------------------------------------------------------
+   One reading column (34em). From 1024px the table of contents
+   moves into a rail on the right and stays in view while the article scrolls.
    ========================================================================== */
 
-.am-inpagenav {
-  position: sticky;
-  z-index: var(--am-z-sticky);
-  top: var(--am-header);
-  border-bottom: 1px solid var(--am-border);
-  background: rgba(255, 255, 255, 0.86);
-  backdrop-filter: blur(10px);
-}
-
-.am-inpagenav__list {
-  display: flex;
-  gap: var(--am-space-8);
-  margin: 0;
-  padding: var(--am-space-12) 0;
-  overflow-x: auto;
-  list-style: none;
-  scrollbar-width: thin;
-}
-
-/* Wide enough for the chips to sit on one or two lines: no hidden horizontal scroll. */
-@media (min-width: 900px) {
-  .am-inpagenav__list {
-    flex-wrap: wrap;
-    overflow-x: visible;
-  }
-}
-
-.am-inpagenav__link {
-  display: inline-flex;
-  min-height: 40px;
-  gap: var(--am-space-8);
-  align-items: center;
-  padding: var(--am-space-6) var(--am-space-16);
-  border: 1px solid var(--am-border);
-  border-radius: var(--am-radius-pill);
-  background: var(--am-surface);
-  color: var(--am-text-muted);
-  font-size: var(--am-caption-size);
-  font-weight: 700;
-  text-decoration: none;
-  white-space: nowrap;
-  transition:
-    border-color var(--am-transition),
-    background-color var(--am-transition),
-    color var(--am-transition);
-}
-
-.am-inpagenav__link:hover {
-  border-color: var(--am-primary-300);
-  background: var(--am-primary-50);
-  color: var(--am-primary-700);
-}
-
-.am-inpagenav__link .am-icon {
-  color: var(--am-primary-600);
-}
-
-/* ==========================================================================
-   4. Regulatory sections as cards
-   ========================================================================== */
-
-/* A band the sticky in-page nav links to: it must not land under that nav when the browser jumps. */
-.am-inst-anchor {
-  scroll-margin-top: calc(var(--am-header) + var(--am-space-64));
-}
-
-.am-inst-card__head {
-  display: flex;
-  gap: var(--am-space-16);
-  align-items: center;
-  margin-bottom: var(--am-space-4);
-}
-
-.am-inst-card__title {
-  margin: 0;
-}
-
-.am-inst-card p {
-  margin: 0;
-}
-
-.am-inst-card .am-card__body {
-  gap: var(--am-space-16);
-}
-
-.am-bullets {
+.am-article {
   display: grid;
-  gap: var(--am-space-10);
-  margin: 0;
-  padding: 0;
-  list-style: none;
+  grid-template-columns: minmax(0, 34em);
 }
 
-.am-bullets li {
-  display: grid;
-  gap: var(--am-space-12);
-  align-items: start;
-  grid-template-columns: 20px minmax(0, 1fr);
-  color: var(--am-text-muted);
+.am-article > * {
+  min-width: 0;
 }
 
-.am-bullets li .am-icon {
-  margin-top: 3px;
-  color: var(--am-primary-500);
-}
-
-/* ==========================================================================
-   5. Glossary
-   ========================================================================== */
-
-.am-glossary-index {
-  position: sticky;
-  z-index: var(--am-z-sticky);
-  top: var(--am-header);
-  padding: var(--am-space-12) 0;
-  border-bottom: 1px solid var(--am-border);
-  background: rgba(255, 255, 255, 0.88);
-  backdrop-filter: blur(10px);
-}
-
-.am-glossary-index__list {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--am-space-6);
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-
-.am-glossary-index__link {
-  display: inline-flex;
-  width: 40px;
-  height: 40px;
-  align-items: center;
-  justify-content: center;
-  border: 1px solid var(--am-border);
-  border-radius: var(--am-radius-sm);
-  background: var(--am-surface);
-  color: var(--am-primary-700);
-  font-family: var(--am-font-heading);
-  font-size: var(--am-small-size);
-  font-weight: 800;
-  text-decoration: none;
-  transition:
-    border-color var(--am-transition),
-    background-color var(--am-transition),
-    transform var(--am-transition);
-}
-
-.am-glossary-index__link:hover {
-  border-color: var(--am-primary-300);
-  background: var(--am-primary-50);
-  transform: translateY(-1px);
-}
-
-.am-glossary-group {
-  display: grid;
-  gap: var(--am-space-16);
-}
-
-.am-glossary-group + .am-glossary-group {
+.am-article > * + * {
   margin-top: var(--am-space-40);
 }
 
-.am-glossary-group__letter {
-  display: flex;
-  gap: var(--am-space-16);
-  align-items: center;
-  margin: 0;
-  color: var(--am-primary-700);
-  font-family: var(--am-font-heading);
-  font-size: var(--am-h2-size);
-  font-weight: 800;
-  line-height: 1;
-}
+@media (min-width: 1024px) {
+  .am-article > * {
+    grid-column: 1;
+  }
 
-.am-glossary-group__letter::after {
-  height: 1px;
-  flex: 1;
-  background: var(--am-border);
-  content: "";
-}
+  .am-article[data-toc="true"] {
+    grid-template-columns: minmax(0, 34em) minmax(220px, 280px);
+    column-gap: var(--am-space-64);
+  }
 
-.am-glossary-list {
-  display: grid;
-  gap: var(--am-space-16);
-  margin: 0;
-  grid-template-columns: minmax(0, 1fr);
-}
-
-@media (min-width: 900px) {
-  .am-glossary-list {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+  .am-article[data-toc="true"] > .am-article__toc {
+    position: sticky;
+    top: calc(var(--am-header) + var(--am-space-24));
+    grid-column: 2;
+    grid-row: 1 / span 12;
+    align-self: start;
+    margin-top: 0;
   }
 }
 
-.am-glossary-entry {
-  display: grid;
-  gap: var(--am-space-8);
-  align-content: start;
-  padding: var(--am-space-20);
-  border: 1px solid var(--am-border);
-  border-radius: var(--am-radius-card);
-  background: var(--am-surface);
-  box-shadow: var(--am-shadow-xs);
-  transition:
-    border-color var(--am-transition),
-    box-shadow var(--am-transition);
-}
-
-.am-glossary-entry:hover,
-.am-glossary-entry:target {
-  border-color: var(--am-primary-300);
-  box-shadow: var(--am-shadow-md);
-}
-
-.am-glossary-entry__term {
+.am-toc__title {
   margin: 0;
-  color: var(--am-text);
-  font-family: var(--am-font-heading);
-  font-size: var(--am-h4-size);
-  font-weight: 800;
-  letter-spacing: var(--am-tracking-snug);
-  line-height: var(--am-h4-line);
-  scroll-margin-top: calc(var(--am-header) + var(--am-space-64));
-}
-
-.am-glossary-entry__definition {
-  margin: 0;
-  color: var(--am-text-muted);
+  padding-bottom: var(--am-space-8);
+  border-bottom: 2px solid var(--am-primary-800);
+  color: var(--am-heading);
   font-size: var(--am-small-size);
-  line-height: 1.6;
+  font-weight: 700;
+  line-height: var(--am-small-line);
 }
 
-.am-glossary-entry__see {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--am-space-6);
-  align-items: center;
-  margin: 0;
-  color: var(--am-text-subtle);
-  font-size: var(--am-caption-size);
-  line-height: var(--am-caption-line);
-}
-
-/* ==========================================================================
-   6. Guides
-   ========================================================================== */
-
-.am-guidecards {
-  display: grid;
-  gap: var(--am-space-20);
+.am-toc__list {
   margin: 0;
   padding: 0;
-  grid-template-columns: minmax(0, 1fr);
   list-style: none;
 }
 
-@media (min-width: 680px) {
-  .am-guidecards {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
+.am-toc__list > li {
+  margin: 0;
+  border-bottom: 1px solid var(--am-rule);
 }
 
-@media (min-width: 900px) {
-  .am-guidecards--three {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-  }
-}
-
-/*
- * Card whose title is the link: the pseudo-element stretches the hit area to the whole card, so the
- * visitor can click anywhere while the accessible name stays the title alone.
- */
-.am-guidecard .am-card__title a,
-.am-linkcard .am-card__title a {
-  color: inherit;
+.am-toc__list a {
+  display: flex;
+  min-height: 44px;
+  align-items: center;
+  padding: var(--am-space-8) 0;
+  font-size: var(--am-small-size);
+  line-height: 1.35;
   text-decoration: none;
 }
 
-.am-guidecard .am-card__title a::after,
-.am-linkcard .am-card__title a::after {
-  position: absolute;
-  inset: 0;
-  border-radius: inherit;
-  content: "";
+.am-toc__list a:hover {
+  text-decoration: underline;
 }
 
-.am-guidecard:hover .am-card__title a,
-.am-linkcard:hover .am-card__title a {
-  color: var(--am-primary-700);
+.am-article__section + .am-article__section {
+  margin-top: var(--am-space-40);
 }
 
-/** The "go there" affordance of a linked card: label plus arrow, pinned to the right. */
-.am-cardgo {
-  display: inline-flex;
-  gap: var(--am-space-6);
-  align-items: center;
-  margin-left: auto;
-  color: var(--am-primary-600);
-  font-size: var(--am-caption-size);
+.am-article__section h2 {
+  margin: 0 0 var(--am-space-12);
+  font-size: clamp(22px, 1.2rem + 0.45vw, 26px);
+  line-height: 1.25;
+}
+
+.am-article__section p {
+  margin: 0 0 var(--am-space-16);
+  line-height: 1.7;
+}
+
+.am-article__section ul {
+  margin: 0 0 var(--am-space-16);
+  padding-left: 1.25em;
+  line-height: 1.6;
+  list-style: square;
+}
+
+.am-article__section li + li {
+  margin-top: var(--am-space-8);
+}
+
+.am-article__section > :last-child {
+  margin-bottom: 0;
+}
+
+/* "Ce que ce guide ne remplace pas": a fixed note, set apart on the pale band. */
+.am-article__note {
+  padding: var(--am-space-20);
+  border-radius: var(--am-radius-sm);
+  background: var(--am-band);
+}
+
+.am-article__note-title {
+  margin: 0 0 var(--am-space-6);
+  color: var(--am-heading);
   font-weight: 700;
 }
 
-.am-cardgo .am-icon {
-  transition: transform var(--am-transition);
+.am-article__note p:last-child {
+  margin: 0;
+  color: var(--am-text-muted);
 }
 
-.am-guidecard:hover .am-cardgo .am-icon,
-.am-linkcard:hover .am-cardgo .am-icon {
-  transform: translateX(3px);
+.am-article__note .am-button {
+  margin-top: var(--am-space-12);
 }
 
-/* ---------- Guide detail: a reading column ---------- */
+/* ==========================================================================
+   3. How it works
+   ========================================================================== */
 
-.am-reading {
+/* The stops share the height of the tallest one: keep each stop's rows at the top, so a shorter
+   stop does not centre its title lower than its neighbours'. */
+.am-hiw-route .am-route__stop {
+  align-content: start;
+}
+
+/* A stop of the route carries two paragraphs: each one is a block inside the stop's text. */
+.am-hiw-route .am-route__body > span {
+  display: block;
+}
+
+.am-hiw-route .am-route__body > span + span {
+  margin-top: var(--am-space-8);
+}
+
+/* Who does what: a table from 900px, one ruled block per step on a phone. */
+.am-roles__table {
+  display: none;
+}
+
+.am-roles__steps {
   display: grid;
   gap: var(--am-space-32);
 }
 
-.am-reading__section {
-  display: grid;
-  gap: var(--am-space-12);
-  scroll-margin-top: calc(var(--am-header) + var(--am-space-32));
+@media (min-width: 900px) {
+  .am-roles__table {
+    display: block;
+  }
+
+  .am-roles__steps {
+    display: none;
+  }
 }
 
-.am-reading__section h2 {
+.am-roles__table .am-table {
+  font-size: var(--am-small-size);
+}
+
+.am-roles__step dl {
+  margin: 0;
+}
+
+.am-roles__step dl > div {
+  display: grid;
+  gap: var(--am-space-2);
+  padding: var(--am-space-12) 0;
+  border-bottom: 1px solid var(--am-rule);
+}
+
+.am-roles__step dt {
+  color: var(--am-heading);
+  font-size: var(--am-small-size);
+  font-weight: 700;
+}
+
+.am-roles__step dd {
+  margin: 0;
+}
+
+/* ==========================================================================
+   4. Guides index
+   ========================================================================== */
+
+.am-guides-dir .am-directory__meta > span {
+  display: block;
+}
+
+.am-guides-dir .am-directory__facts {
+  margin-top: var(--am-space-4);
+  color: var(--am-text-subtle);
+  font-size: var(--am-caption-size);
+}
+
+.am-guides-dir .am-directory__row {
+  padding-top: var(--am-space-16);
+  padding-bottom: var(--am-space-16);
+}
+
+/* ==========================================================================
+   5. FAQ
+   ========================================================================== */
+
+.am-faq-meta {
+  margin: 0 0 var(--am-space-24);
+  color: var(--am-text-subtle);
+  font-size: var(--am-caption-size);
+}
+
+.am-faq-group {
+  display: grid;
+  gap: var(--am-space-12);
+}
+
+.am-faq-group + .am-faq-group {
+  margin-top: var(--am-space-48);
+}
+
+.am-faq-group__title {
   margin: 0;
   font-size: var(--am-h3-size);
   line-height: var(--am-h3-line);
 }
 
-.am-reading__section p {
-  margin: 0;
-  color: var(--am-text-muted);
-  line-height: 1.7;
+/* From 1024px the theme sits in the margin, its questions in a reading column beside it. */
+@media (min-width: 1024px) {
+  .am-faq-group {
+    gap: var(--am-space-64);
+    grid-template-columns: minmax(0, 1fr) minmax(0, 40em);
+  }
+
+  .am-faq-group__title {
+    padding-top: var(--am-space-16);
+  }
+
+  /* A theme-less group has no margin heading: its questions take the reading column alone. */
+  .am-faq-group > .am-faq:only-child {
+    grid-column: 2;
+  }
 }
 
-.am-reading__meta {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--am-space-8);
-  align-items: center;
-  margin: 0 0 var(--am-space-24);
-  color: var(--am-text-subtle);
-  font-size: var(--am-caption-size);
-  line-height: var(--am-caption-line);
+.am-faq-page .am-faq__answer {
+  max-width: 34em;
 }
 
-.am-reading__meta .am-icon {
-  color: var(--am-primary-600);
+.am-faq-page .am-faq__answer p {
+  margin: 0 0 var(--am-space-8);
+}
+
+.am-faq-page .am-faq__answer > :last-child {
+  margin-bottom: 0;
 }
 
 /* ==========================================================================
-   7. FAQ
+   6. Glossary
    ========================================================================== */
 
-.am-faq-meta {
-  margin: 0 0 var(--am-space-16);
-  color: var(--am-text-subtle);
-  font-size: var(--am-caption-size);
-  line-height: var(--am-caption-line);
+/* The letter rail stays under the header while the definitions scroll. */
+.am-glossary-index {
+  position: sticky;
+  z-index: var(--am-z-sticky);
+  top: var(--am-header);
+  border-bottom: 1px solid var(--am-rule);
+  background: var(--am-canvas);
 }
 
-/* The answer holds a paragraph and, when the question is product-specific, a caption under it. */
-.am-faq__answer {
-  display: grid;
-  gap: var(--am-space-8);
+.am-glossary-index__list {
+  display: flex;
+  gap: var(--am-space-2);
+  margin: 0;
+  padding: var(--am-space-6) 0;
+  overflow-x: auto;
+  list-style: none;
+  scrollbar-width: thin;
 }
 
-.am-faq__answer p {
+.am-glossary-index__list > li {
+  flex: none;
   margin: 0;
 }
 
+@media (min-width: 768px) {
+  .am-glossary-index__list {
+    flex-wrap: wrap;
+    overflow-x: visible;
+  }
+}
+
+.am-glossary-index__link {
+  display: inline-flex;
+  width: 44px;
+  height: 44px;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--am-radius-sm);
+  font-size: 18px;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.am-glossary-index__link:hover {
+  background: var(--am-primary-50);
+}
+
+/* The rail is about 56px high: a jump to a letter or a term lands under it, not behind it. The
+   root's scroll-padding already clears the header, so the margin only adds the rail. */
+.am-glossary-group,
+.am-glossary-entry {
+  scroll-margin-top: var(--am-space-64);
+}
+
+.am-glossary-group + .am-glossary-group {
+  margin-top: var(--am-space-48);
+}
+
+.am-glossary-group__letter {
+  margin: 0;
+  padding-bottom: var(--am-space-8);
+  border-bottom: 2px solid var(--am-primary-800);
+  font-size: var(--am-h2-size);
+  line-height: 1.1;
+}
+
+.am-glossary-list {
+  margin: 0;
+}
+
+.am-glossary-entry {
+  display: grid;
+  gap: var(--am-space-4);
+  padding: var(--am-space-16) 0;
+  border-bottom: 1px solid var(--am-rule);
+}
+
+@media (min-width: 768px) {
+  .am-glossary-entry {
+    column-gap: var(--am-space-32);
+    grid-template-columns: minmax(0, 15rem) minmax(0, 34em);
+  }
+
+  .am-glossary-entry__see {
+    grid-column: 2;
+  }
+}
+
+/* A term reached from a "Voir aussi" link is marked where it lands. The tint runs 12px past the
+   text on both sides, behind the row, so the rules stay aligned with the letter heading. */
+.am-glossary-entry:target {
+  position: relative;
+  isolation: isolate;
+}
+
+.am-glossary-entry:target::before {
+  position: absolute;
+  z-index: -1;
+  inset: 0 calc(var(--am-space-12) * -1);
+  background: var(--am-primary-50);
+  content: "";
+}
+
+.am-glossary-entry__term {
+  color: var(--am-heading);
+  font-size: 18px;
+  font-weight: 700;
+  line-height: 1.35;
+}
+
+.am-glossary-entry__definition {
+  margin: 0;
+}
+
+.am-glossary-entry__see {
+  margin: var(--am-space-4) 0 0;
+  color: var(--am-text-muted);
+  font-size: var(--am-small-size);
+}
+
 /* ==========================================================================
-   8. Contact
+   7. Contact
    ========================================================================== */
 
 .am-contact-layout {
   display: grid;
-  gap: var(--am-space-24);
+  gap: var(--am-space-48);
   align-items: start;
-  grid-template-columns: minmax(0, 1fr);
 }
 
 @media (min-width: 1024px) {
   .am-contact-layout {
-    gap: var(--am-space-32);
+    gap: var(--am-space-48);
     grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr);
   }
 }
 
-.am-contact-aside {
-  display: grid;
-  gap: var(--am-space-16);
-  align-content: start;
+/* The form is the one object of the page: a plain panel from 768px, the full width on a phone. */
+.am-contact-form__title {
+  margin: 0 0 var(--am-space-20);
+  font-size: var(--am-h3-size);
+}
+
+@media (min-width: 768px) {
+  .am-contact-form {
+    padding: var(--am-space-32);
+    border: 1px solid var(--am-border);
+    border-radius: var(--am-radius-sm);
+  }
+}
+
+.am-contact-aside > div {
+  margin-top: var(--am-space-20);
 }
 
 @media (min-width: 1024px) {
@@ -552,27 +536,14 @@
   }
 }
 
-.am-contact-aside__list {
-  display: grid;
-  gap: var(--am-space-12);
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-
-.am-contact-aside__list li {
-  display: grid;
-  gap: var(--am-space-12);
-  align-items: start;
-  grid-template-columns: 20px minmax(0, 1fr);
+.am-contact-aside .am-ruled > li {
   color: var(--am-text-muted);
   font-size: var(--am-small-size);
   line-height: var(--am-small-line);
 }
 
-.am-contact-aside__list li .am-icon {
-  margin-top: 2px;
-  color: var(--am-primary-600);
+.am-contact-aside .am-ruled > li > .am-icon {
+  margin-top: 1px;
 }
 
 /** Two columns of short fields from 768px; the subject and the message always span the row. */
@@ -594,11 +565,10 @@
 
 .am-form-consent {
   display: grid;
-  gap: var(--am-space-8);
-  padding: var(--am-space-16) var(--am-space-20);
-  border: 1px solid var(--am-border);
-  border-radius: var(--am-radius-card);
-  background: var(--am-neutral-50);
+  gap: var(--am-space-6);
+  padding: var(--am-space-12) var(--am-space-16) var(--am-space-16);
+  border-radius: var(--am-radius-sm);
+  background: var(--am-band);
 }
 
 .am-form-consent .am-checkline {
@@ -606,222 +576,212 @@
 }
 
 /* ==========================================================================
-   8b. Entry selector inside a reading column
+   8. Our commitment
    ========================================================================== */
 
-/*
- * The primitive puts the two selects and the button on one row from 900px. In the 760px reading
- * column of these pages that leaves each select about 170px, which truncates a country name. The
- * selects keep a column each and the button spans the panel underneath.
- */
-@media (min-width: 560px) {
-  .am-entry__row {
-    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-    align-items: end;
-  }
-
-  .am-entry__row > .am-button {
-    grid-column: 1 / -1;
-  }
-}
-
-/* ==========================================================================
-   9. Legal pages
-   ========================================================================== */
-
-.am-legal-toc {
-  display: grid;
-  gap: var(--am-space-12);
-  margin-bottom: var(--am-space-32);
-  padding: var(--am-space-20) var(--am-space-24);
-  border: 1px solid var(--am-border);
-  border-radius: var(--am-radius-card);
-  background: var(--am-surface);
-  box-shadow: var(--am-shadow-xs);
-}
-
-.am-legal-toc__title {
-  display: flex;
-  gap: var(--am-space-8);
-  align-items: center;
+.am-commit-intro {
+  max-width: 34em;
   margin: 0;
-  color: var(--am-text);
-  font-family: var(--am-font-heading);
-  font-size: var(--am-small-size);
-  font-weight: 800;
-  letter-spacing: var(--am-tracking-wide);
-  text-transform: uppercase;
+  font-size: var(--am-lead-size);
+  line-height: var(--am-lead-line);
 }
 
-.am-legal-toc__title .am-icon {
-  color: var(--am-primary-600);
+.am-commit-heading {
+  margin: var(--am-space-48) 0 0;
+  padding-bottom: var(--am-space-12);
+  border-bottom: 2px solid var(--am-primary-800);
 }
 
-.am-legal-toc__list {
-  display: grid;
-  gap: var(--am-space-8);
+.am-commitments {
   margin: 0;
   padding: 0;
-  counter-reset: am-toc;
   list-style: none;
 }
 
-.am-legal-toc__list li {
-  counter-increment: am-toc;
+.am-commitment {
+  display: grid;
+  gap: var(--am-space-20);
+  margin: 0;
+  padding: var(--am-space-28) 0;
+  border-bottom: 1px solid var(--am-rule);
 }
 
-.am-legal-toc__list a {
-  display: inline-flex;
-  gap: var(--am-space-10);
-  align-items: baseline;
-  color: var(--am-link);
-  font-size: var(--am-small-size);
-  text-decoration: none;
+.am-commitment + .am-commitment {
+  margin-top: 0;
 }
 
-.am-legal-toc__list a::before {
-  color: var(--am-text-subtle);
-  content: counter(am-toc, decimal-leading-zero);
-  font-family: var(--am-font-heading);
-  font-size: var(--am-caption-size);
-  font-variant-numeric: tabular-nums;
-  font-weight: 800;
+@media (min-width: 900px) {
+  .am-commitment {
+    gap: var(--am-space-48);
+    padding: var(--am-space-40) 0;
+    grid-template-columns: minmax(0, 5fr) minmax(0, 7fr);
+  }
 }
 
-.am-legal-toc__list a:hover {
-  color: var(--am-link-hover);
-  text-decoration: underline;
+.am-commitment__title {
+  margin: 0 0 var(--am-space-8);
 }
 
-.am-legal-meta {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--am-space-8);
-  align-items: center;
-  margin: 0 0 var(--am-space-24);
-  color: var(--am-text-subtle);
-  font-size: var(--am-caption-size);
-  line-height: var(--am-caption-line);
+.am-commitment__statement {
+  margin: 0;
+  font-size: var(--am-lead-size);
+  line-height: var(--am-lead-line);
 }
 
-.am-legal-meta + .am-notice {
-  margin-bottom: var(--am-space-32);
+.am-commitment__facts {
+  display: grid;
+  gap: var(--am-space-20);
+  max-width: 34em;
+  margin: 0;
 }
 
-.am-legal-meta .am-icon {
-  color: var(--am-primary-600);
+.am-commitment__facts dd {
+  margin: 0;
 }
 
-.am-legal-section {
+.am-commitment__facts dd p {
+  margin: 0 0 var(--am-space-8);
+}
+
+.am-commitment__facts dd > :last-child {
+  margin-bottom: 0;
+}
+
+.am-commit-write .am-container > p {
+  max-width: 34em;
+}
+
+.am-commit-write .am-button {
+  margin-top: var(--am-space-8);
+}
+
+/* ==========================================================================
+   9. Regulatory status
+   ========================================================================== */
+
+/* One topic per band: the heading and its one-line answer in the margin, the detail beside it. */
+.am-topic {
+  display: grid;
+  gap: var(--am-space-24);
+}
+
+@media (min-width: 1024px) {
+  .am-topic {
+    gap: var(--am-space-64);
+    grid-template-columns: minmax(0, 1fr) minmax(0, 34em);
+  }
+}
+
+.am-topic__head {
   display: grid;
   gap: var(--am-space-12);
-  scroll-margin-top: calc(var(--am-header) + var(--am-space-32));
+  align-content: start;
+  justify-items: start;
 }
 
-.am-legal-section p {
+/* Set below the h2 size: the heading sits in the margin column and must not stack word by word. */
+.am-topic__title {
   margin: 0;
-  color: var(--am-text-muted);
+  font-size: clamp(24px, 1.3rem + 0.5vw, 28px);
+  line-height: 1.2;
+}
+
+.am-topic__summary {
+  margin: 0;
+  color: var(--am-heading);
+  font-size: var(--am-lead-size);
+  font-weight: 700;
+  line-height: var(--am-lead-line);
+}
+
+.am-topic__body p {
+  margin: 0 0 var(--am-space-16);
   line-height: 1.7;
 }
 
-.am-legal-body {
-  display: grid;
-  gap: var(--am-space-32);
+.am-topic__body .am-ruled {
+  margin-bottom: var(--am-space-16);
 }
+
+.am-topic__body > :last-child {
+  margin-bottom: 0;
+}
+
+/* "Comment vérifier": something the visitor can do on the site, framed as one plain panel. */
+.am-topic__verify {
+  margin-top: var(--am-space-24);
+  padding: var(--am-space-16) var(--am-space-20);
+  border: 1px solid var(--am-border-strong);
+  border-radius: var(--am-radius-sm);
+  background: var(--am-surface);
+}
+
+.am-topic__verify p {
+  margin: 0;
+  line-height: var(--am-body-line);
+}
+
+.am-topic__verify strong {
+  color: var(--am-heading);
+}
+
+/* The page index on the sign. */
+.am-reg-index {
+  margin-top: var(--am-space-8);
+}
+
+/* ==========================================================================
+   10. Legal pages
+   ========================================================================== */
 
 .am-legal-notice__action {
   margin-top: var(--am-space-12);
 }
 
+/* "À compléter avant mise en ligne": each missing fact on its own line, marked by its dashed outline. */
 .am-legal-placeholders {
   display: grid;
-  gap: var(--am-space-8);
+  gap: var(--am-space-10);
+  justify-items: start;
+  max-width: 34em;
   margin: 0;
   padding: 0;
   list-style: none;
+}
+
+.am-legal-placeholders > li {
+  margin: 0;
+}
+
+.am-legal-placeholders .am-legal-placeholder {
+  padding: var(--am-space-4) var(--am-space-8);
+  line-height: var(--am-caption-line);
 }
 
 /* ==========================================================================
-   10. 404 and error pages
+   11. 404 and error pages
    ========================================================================== */
 
-.am-errorpage {
-  display: grid;
-  gap: var(--am-space-16);
-  justify-items: center;
-  max-width: 56ch;
-  margin: 0 auto;
-  padding: var(--am-space-40) 0;
-  text-align: center;
+/* An open country is named by its ISO code on a navy tile, like a destination code. */
+.am-iso-tile {
+  font-size: 15px;
+  font-weight: 800;
+  letter-spacing: 0.02em;
 }
 
-.am-errorpage__icon {
-  position: relative;
+.am-errorsign .am-directory {
+  margin-top: var(--am-space-12);
+}
+
+/* The root 404 and error documents have no header or footer: the sign fills the screen. */
+.am-errorsign--bare {
+  min-height: 100vh;
+  min-height: 100dvh;
+}
+
+.am-errorsign__home {
   display: inline-flex;
+  min-height: 44px;
   align-items: center;
-  justify-content: center;
-  margin-bottom: var(--am-space-4);
-  /* Own stacking context, so the glow below sits behind the tile but above the page background. */
-  isolation: isolate;
-}
-
-.am-errorpage__icon::before {
-  position: absolute;
-  z-index: -1;
-  width: 128px;
-  height: 128px;
-  border-radius: 50%;
-  background: radial-gradient(50% 50% at 50% 50%, rgba(46, 107, 214, 0.22), rgba(46, 107, 214, 0) 70%);
-  content: "";
-}
-
-.am-errorpage__title {
-  margin: 0;
-}
-
-.am-errorpage__lead {
-  margin: 0;
-  color: var(--am-text-muted);
-  font-size: var(--am-lead-size);
-  line-height: var(--am-lead-line);
-}
-
-.am-errorpage__actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--am-space-12);
-  justify-content: center;
-  margin-top: var(--am-space-8);
-}
-
-.am-errorpage-countries {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--am-space-8);
-  justify-content: center;
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-
-.am-errorpage-countries a {
-  display: inline-flex;
-  min-height: 40px;
-  align-items: center;
-  padding: var(--am-space-6) var(--am-space-16);
-  border: 1px solid var(--am-border);
-  border-radius: var(--am-radius-pill);
-  background: var(--am-surface);
-  color: var(--am-text-muted);
-  font-size: var(--am-caption-size);
-  font-weight: 700;
   text-decoration: none;
-  transition:
-    border-color var(--am-transition),
-    color var(--am-transition);
-}
-
-.am-errorpage-countries a:hover {
-  border-color: var(--am-primary-300);
-  color: var(--am-primary-700);
 }
