@@ -40,8 +40,8 @@ describe("PublicFormEmailTemplateService (spec 047)", () => {
     expect(email.purpose).toBe("public_contact_confirmation");
     expect(email.subject).toContain("CM-2026-ABCDEF12");
     expect(email.body).toContain("Bonjour Awa,");
-    expect(email.body).toContain("Votre reference: CM-2026-ABCDEF12");
-    expect(email.body).toContain("ne constitue pas une reponse");
+    expect(email.body).toContain("Votre référence: CM-2026-ABCDEF12");
+    expect(email.body).toContain("ne constitue pas une réponse");
   });
 
   it("acknowledges a broker application without accepting it and announces the licence request", () => {

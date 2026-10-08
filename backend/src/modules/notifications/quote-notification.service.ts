@@ -121,8 +121,8 @@ export class QuoteNotificationService {
     await this.inApp?.publishInApp({
       scopeId: assignment.partnerTenantId,
       template: type,
-      title: options.reassigned ? "Lead reaffecte a votre cabinet" : "Nouveau lead assigne",
-      body: `Un lead ${assignment.productKey ?? "assurance"} (${assignment.countryCode ?? "-"}) vous a ete ${options.reassigned ? "reaffecte" : "assigne"}. Notification operationnelle, aucun engagement contractuel.`,
+      title: options.reassigned ? "Lead réaffecté à votre cabinet" : "Nouveau lead assigné",
+      body: `Un lead ${assignment.productKey ?? "assurance"} (${assignment.countryCode ?? "-"}) vous a été ${options.reassigned ? "réaffecté" : "assigné"}. Notification opérationnelle, aucun engagement contractuel.`,
       targetType: "LeadAssignment",
       targetId: assignment.id
     });
@@ -169,8 +169,8 @@ export class QuoteNotificationService {
     await this.inApp?.publishInApp({
       scopeId: event.partnerTenantId,
       template: "broker_visitor_response",
-      title: "Reponse du visiteur a votre proposition",
-      body: `Le visiteur a repondu a votre proposition pour la demande ${quote.publicReference}. Le statut du lead n'est pas modifie automatiquement.`,
+      title: "Réponse du visiteur à votre proposition",
+      body: `Le visiteur a répondu à votre proposition pour la demande ${quote.publicReference}. Le statut du lead n'est pas modifié automatiquement.`,
       targetType: "LeadAssignment",
       targetId: event.assignmentId
     }).catch(() => undefined);

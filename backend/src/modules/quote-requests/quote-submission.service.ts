@@ -870,8 +870,8 @@ export class QuoteSubmissionService {
       await this.deps.inApp?.publishInApp({
         scopeId: assignment.partnerTenantId,
         template: "lead_consent_withdrawn",
-        title: "Consentement retire par le visiteur",
-        body: `Le visiteur a retire son consentement pour la demande ${quote.publicReference}. Ce lead ne doit plus etre travaille ni recontacte.`,
+        title: "Consentement retiré par le visiteur",
+        body: `Le visiteur a retiré son consentement pour la demande ${quote.publicReference}. Ce lead ne doit plus être travaillé ni recontacté.`,
         targetType: "LeadAssignment",
         targetId: assignment.id
       });

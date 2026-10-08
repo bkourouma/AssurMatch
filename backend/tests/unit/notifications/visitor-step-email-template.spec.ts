@@ -52,9 +52,9 @@ describe("visitor step e-mails (spec 054 R10)", () => {
   });
 
   it("names the broker of the step", () => {
-    expect(render("transmitted", "fr", "Courtier X").body).toContain("transmise a Courtier X");
+    expect(render("transmitted", "fr", "Courtier X").body).toContain("transmise à Courtier X");
     expect(render("accepted", "en", "Courtier X").body).toContain("Courtier X has taken on");
-    expect(render("reassigned", "fr", "Courtier Y").body).toContain("reaffectee a Courtier Y");
+    expect(render("reassigned", "fr", "Courtier Y").body).toContain("réaffectée à Courtier Y");
   });
 
   it("never announces a request in manual review, not transmitted or received as transmitted (FR-010)", () => {
@@ -62,7 +62,7 @@ describe("visitor step e-mails (spec 054 R10)", () => {
       expect(render(step, "fr").body.toLowerCase(), step).not.toMatch(/a ete transmise|ete transmise a/);
       expect(render(step, "en").body.toLowerCase(), step).not.toMatch(/has been forwarded/);
     }
-    expect(render("in_review", "fr").body).toContain("en cours de verification");
+    expect(render("in_review", "fr").body).toContain("en cours de vérification");
     expect(render("in_review", "en").body).toContain("checking it");
   });
 

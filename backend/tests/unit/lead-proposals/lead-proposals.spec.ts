@@ -73,7 +73,7 @@ describe("spec 055 proposal e-mails", () => {
     const mail = templates.brokerVisitorResponse({ to: "b@example.com", partnerLegalName: "Cabinet Kone", publicReference: "QR-2026-ABC", countryCode: "CI", productKey: "auto" });
     expect(mail.purpose).toBe("quote_broker_visitor_response");
     expect(mail.body).toContain("http://broker.test/leads");
-    expect(mail.body).toContain("n'est pas modifie automatiquement");
+    expect(mail.body).toContain("n'est pas modifié automatiquement");
   });
 });
 

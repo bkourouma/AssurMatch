@@ -559,7 +559,7 @@ test("SC-08 le courtier Starter clôture le lead « gagné », le visiteur est i
   await broker.context().close();
 
   // 2. Spec 054: the visitor is told the request is closed (without the commercial outcome).
-  const closed = await waitForMail({ to: visitorEmail, exclude: seenByVisitor, subject: new RegExp(`${escapeRegExp(quoteReference)} est cloturee`, "u") });
+  const closed = await waitForMail({ to: visitorEmail, exclude: seenByVisitor, subject: new RegExp(`${escapeRegExp(quoteReference)} est clôturée`, "u") });
   expect(`${closed.Text}`).toContain(partnerName);
   // The commercial outcome stays between the broker and AssurMatch.
   expect(closed.Text).not.toMatch(/\bgagn[ée]\b/iu);
