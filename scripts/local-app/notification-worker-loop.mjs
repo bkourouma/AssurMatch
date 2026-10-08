@@ -26,6 +26,7 @@ const pidFile = path.join(logDir, `${NAME}.pid`);
 
 const QUOTE_NOTIFICATION_WORKER = "scripts/quote-notification-delivery-worker.ts";
 const PARTNER_WEBHOOK_WORKER = "scripts/partner-webhook-delivery-worker.ts";
+const SURVEY_WORKER = "scripts/satisfaction-survey-delivery-worker.ts";
 
 // Refusing here rather than in the launcher: this file can be started by hand, and an accidental
 // unattended mailer loop against a regulated environment is exactly what must not be possible.
@@ -56,6 +57,11 @@ const runTimeoutSeconds = readPositiveIntEnv("ASSURMATCH_LOCAL_WORKER_RUN_TIMEOU
 // `webhook.delivery.refused` audit entry on every single run, so polling it every few seconds
 // would bury the local audit log in noise for no delivery. Opt in when testing webhooks.
 const partnerWebhooksEnabled = (process.env.ASSURMATCH_LOCAL_WORKER_PARTNER_WEBHOOKS ?? "").trim().toLowerCase() === "true";
+
+// On by default: surveys (spec 048) are created at lead closure but only leave when this worker runs
+// (production schedules `npm run satisfaction-surveys:deliver-due`). With the flag off the run finds
+// nothing due and sends nothing. Opt out with ASSURMATCH_LOCAL_WORKER_SURVEYS=false.
+const surveysEnabled = (process.env.ASSURMATCH_LOCAL_WORKER_SURVEYS ?? "true").trim().toLowerCase() !== "false";
 
 mkdirSync(logDir, { recursive: true });
 try {
@@ -212,6 +218,32 @@ async function runPartnerWebhooks() {
   });
 }
 
+async function runSurveys() {
+  const result = await runWorker(SURVEY_WORKER);
+  if (result.spawnError || result.timedOut || result.code !== 0) {
+    if (stopping) return;
+    logRun("satisfaction-surveys", {
+      status: result.spawnError ? "spawn_failed" : result.timedOut ? "timeout" : "error",
+      exit: result.code ?? "none",
+      ms: result.durationMs,
+      detail: JSON.stringify(lastLine(result.stderr))
+    });
+    return;
+  }
+  const summary = summarize(result.stdout);
+  if (!summary) {
+    logRun("satisfaction-surveys", { status: "no_summary", ms: result.durationMs });
+    return;
+  }
+  logRun("satisfaction-surveys", {
+    due: summary.totalDue ?? 0,
+    sent: summary.sent ?? 0,
+    skipped: summary.skipped ?? 0,
+    failed: summary.failed ?? 0,
+    ms: result.durationMs
+  });
+}
+
 function sleep(ms) {
   return new Promise((resolve) => {
     wakeSleep = resolve;
@@ -250,13 +282,14 @@ process.on("SIGTERM", () => shutdown("SIGTERM"));
 process.on("SIGBREAK", () => shutdown("SIGBREAK"));
 
 console.log(
-  `[${NAME}] ${stamp()} started interval=${intervalSeconds}s partnerWebhooks=${partnerWebhooksEnabled ? "on" : "off"} pid=${process.pid}`
+  `[${NAME}] ${stamp()} started interval=${intervalSeconds}s partnerWebhooks=${partnerWebhooksEnabled ? "on" : "off"} surveys=${surveysEnabled ? "on" : "off"} pid=${process.pid}`
 );
 
 while (!stopping) {
   const cycleStartedAt = Date.now();
   await runQuoteNotifications();
   if (!stopping && partnerWebhooksEnabled) await runPartnerWebhooks();
+  if (!stopping && surveysEnabled) await runSurveys();
   if (stopping) break;
   // The interval is the cadence, not the gap: the worker's own runtime is part of it, so a slow
   // run does not push the next delivery further and further away from the submission.

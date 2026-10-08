@@ -90,7 +90,7 @@ export class AuthEmailTemplateService {
   private link(user: UserAccount, path: string, token: string): string {
     const base = (isBrokerAccount(user)
       ? this.options.brokerAppUrl ?? process.env.BROKER_APP_URL ?? "http://127.0.0.1:3603"
-      : this.options.appBaseUrl ?? process.env.APP_BASE_URL ?? "http://127.0.0.1:3702").replace(/\/$/, "");
+      : this.options.appBaseUrl ?? process.env.APP_BASE_URL ?? "http://127.0.0.1:3602").replace(/\/$/, "");
     return `${base}${path}?token=${encodeURIComponent(token)}`;
   }
 }

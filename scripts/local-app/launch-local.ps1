@@ -37,6 +37,7 @@ $BrokerUrl = "http://127.0.0.1:$BrokerPort"
 $MailpitUrl = "http://127.0.0.1:$MailpitHttpPort"
 $DatabaseUrl = "postgresql://assurmatch:assurmatch@127.0.0.1:$PostgresPort/assurmatch"
 $RedisUrl = "redis://127.0.0.1:$RedisPort"
+$SurveyDelayMinutes = Read-EnvText "ASSURMATCH_LOCAL_SURVEY_DELAY_MINUTES" "0"
 $CommonEnv = @(
   'set "APP_ENV=local"',
   'set "NODE_ENV=development"',
@@ -48,8 +49,22 @@ $CommonEnv = @(
   'set "EMAIL_SMTP_HOST=127.0.0.1"',
   "set `"EMAIL_SMTP_PORT=$MailpitSmtpPort`"",
   "set `"ASSURMATCH_LOCAL_LOG_DIR=$LogDir`"",
-  'set "ASSURMATCH_BROKER_CRM_ENABLED=false"'
+  'set "ASSURMATCH_BROKER_CRM_ENABLED=false"',
+  # Links written in e-mails (activation, tracking, back-office pointers) follow the launcher ports.
+  "set `"APP_BASE_URL=$AdminUrl`"",
+  "set `"BACKOFFICE_APP_URL=$AdminUrl`"",
+  "set `"BROKER_APP_URL=$BrokerUrl`"",
+  "set `"PUBLIC_APP_URL=$PublicUrl`"",
+  # Spec 048: the survey leaves at once locally (24 h in production); the API re-reads flags every 5 s.
+  "set `"ASSURMATCH_SATISFACTION_SURVEY_DELAY_MINUTES=$SurveyDelayMinutes`"",
+  'set "ASSURMATCH_FEATURE_FLAG_REFRESH_SECONDS=5"'
 )
+# Spec 060: issuer legal mentions, VAT and payment terms come from ASSURMATCH_INVOICE_* variables of
+# the launching shell (e.g. ASSURMATCH_INVOICE_CI_ISSUER_LEGAL_NAME). Without them an invoice is
+# issued with "[A COMPLETER]" placeholders, which is accepted locally.
+Get-ChildItem Env: | Where-Object { $_.Name -like 'ASSURMATCH_INVOICE_*' -and $_.Value -notmatch '["%&|<>^]' } | ForEach-Object {
+  $CommonEnv += "set `"$($_.Name)=$($_.Value)`""
+}
 
 function Test-PortFree([int] $Port) {
   $listener = Get-NetTCPConnection -LocalPort $Port -State Listen -ErrorAction SilentlyContinue
@@ -178,7 +193,7 @@ try {
   Start-LocalProcess "broker-$BrokerPort" (Join-Path $Root "apps\broker") ($CommonEnv + @("set `"NEXT_PUBLIC_ASSURMATCH_API_URL=$ApiUrl`"", "set `"NEXT_PUBLIC_ASSURMATCH_BROKER_API_URL=$ApiUrl`"")) "npx next dev --hostname 127.0.0.1 --port $BrokerPort"
 
   Write-Host "Waiting for local app URLs..."
-  Wait-Http "$ApiUrl/countries" @(200)
+  Wait-Http "$ApiUrl/countries" @(200) 180
 
   # The API only queues quote notifications; this loop is what actually delivers them locally,
   # so a demo submission reaches Mailpit within seconds instead of waiting for a manual run.
