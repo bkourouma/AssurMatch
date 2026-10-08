@@ -4,10 +4,10 @@ const fr: LegalPage = {
   slug: "legal-notice",
   title: "Mentions légales",
   description: "Éditeur, hébergeur et nature de l'activité du site AssurMatch.",
-  updatedAt: "2026-09-19",
+  updatedAt: "2026-10-07",
   summary: [
     "AssurMatch est une plateforme technique de comparaison indicative, pas un assureur ni un courtier.",
-    "L'identité complète de l'éditeur et de l'hébergeur est en cours de finalisation, listée plus bas.",
+    "Le site est édité par Alliance Consultants (Alliance Computer Consultants), basée à Abidjan, Côte d'Ivoire.",
     "AssurMatch ne vend pas d'assurance, n'émet aucun contrat et ne collecte aucune prime.",
     "Les prix affichés sont indicatifs et confirmés par le courtier partenaire responsable.",
     "Pour toute question sur ces mentions légales, la page Contact permet d'écrire à l'équipe AssurMatch."
@@ -17,14 +17,19 @@ const fr: LegalPage = {
       id: "editeur",
       heading: "Qui publie ce site",
       body: [
-        "Le site AssurMatch est édité par la société décrite ci-dessous. Les informations d'identification complètes de l'éditeur (dénomination sociale, numéro d'immatriculation, adresse du siège social et directeur ou directrice de la publication) sont listées dans la section « À compléter avant mise en ligne » en bas de cette page : elles seront affichées ici dès qu'elles auront été validées par l'équipe compétente."
+        "Le site AssurMatch est édité par Alliance Consultants (Alliance Computer Consultants), société en activité depuis 2003.",
+        "Siège : Abidjan, Côte d'Ivoire. [À COMPLÉTER : adresse postale complète du siège social]",
+        "Forme juridique et capital social : [À COMPLÉTER : forme juridique et montant du capital]",
+        "Immatriculation (registre du commerce) : [À COMPLÉTER : numéro d'immatriculation]",
+        "Directeur ou directrice de la publication : [À COMPLÉTER : nom et fonction]",
+        "Les informations encore à compléter sont aussi listées dans la section « À compléter avant mise en ligne » en bas de cette page."
       ]
     },
     {
       id: "hebergement",
       heading: "Qui héberge techniquement le site",
       body: [
-        "Le site est hébergé par un prestataire technique dont la raison sociale et l'adresse sont également listées dans la section « À compléter avant mise en ligne »."
+        "Hébergeur du site : [À COMPLÉTER : raison sociale et adresse de l'hébergeur]"
       ]
     },
     {
@@ -54,12 +59,16 @@ const fr: LegalPage = {
     {
       id: "contact",
       heading: "Pour nous écrire",
-      body: ["Pour toute question relative au site ou à ces mentions légales, la page Contact permet d'écrire à l'équipe AssurMatch."]
+      body: [
+        "Pour toute question relative au site ou à ces mentions légales, la page Contact permet d'écrire à l'équipe AssurMatch.",
+        "Vous pouvez aussi joindre l'éditeur par e-mail à assurmatch@allianceconsultants.net, ou par téléphone au +225 01 01 51 01 36 ou au +225 07 07 66 41 05."
+      ]
     }
   ],
   placeholders: [
-    "Dénomination sociale et numéro d'immatriculation (registre du commerce)",
-    "Adresse du siège social",
+    "Forme juridique et capital social",
+    "Numéro d'immatriculation (registre du commerce)",
+    "Adresse postale complète du siège social",
     "Directeur ou directrice de la publication",
     "Hébergeur du site (raison sociale et adresse)"
   ]
@@ -69,10 +78,10 @@ const en: LegalPage = {
   slug: "legal-notice",
   title: "Legal notice",
   description: "Publisher, host and nature of activity of the AssurMatch site.",
-  updatedAt: "2026-09-19",
+  updatedAt: "2026-10-07",
   summary: [
     "AssurMatch is a technical platform for indicative comparison, not an insurer or a broker.",
-    "The full identity of the publisher and the host is being finalised, listed below.",
+    "The site is published by Alliance Consultants (Alliance Computer Consultants), based in Abidjan, Côte d'Ivoire.",
     "AssurMatch does not sell insurance, does not issue a contract and does not collect a premium.",
     "Prices shown are indicative and confirmed by the responsible partner broker.",
     "For any question about this legal notice, the Contact page lets you write to the AssurMatch team."
@@ -82,13 +91,18 @@ const en: LegalPage = {
       id: "editeur",
       heading: "Who publishes this site",
       body: [
-        "The AssurMatch site is published by the company described below. The publisher's full identification details (company name, registration number, registered office address, and publication director) are listed in the \"To be completed before launch\" section at the bottom of this page: they will appear here once validated by the relevant team."
+        "The AssurMatch site is published by Alliance Consultants (Alliance Computer Consultants), a company active since 2003.",
+        "Registered office: Abidjan, Côte d'Ivoire. [À COMPLÉTER: full postal address of the registered office]",
+        "Legal form and share capital: [À COMPLÉTER: legal form and amount of share capital]",
+        "Registration (commercial register): [À COMPLÉTER: registration number]",
+        "Publication director: [À COMPLÉTER: name and position]",
+        "Details still to be completed are also listed in the \"To be completed before launch\" section at the bottom of this page."
       ]
     },
     {
       id: "hebergement",
       heading: "Who technically hosts the site",
-      body: ["The site is hosted by a technical provider whose company name and address are also listed in the \"To be completed before launch\" section."]
+      body: ["Site host: [À COMPLÉTER: company name and address of the host]"]
     },
     {
       id: "activite",
@@ -117,12 +131,16 @@ const en: LegalPage = {
     {
       id: "contact",
       heading: "Writing to us",
-      body: ["For any question about the site or this legal notice, the Contact page lets you write to the AssurMatch team."]
+      body: [
+        "For any question about the site or this legal notice, the Contact page lets you write to the AssurMatch team.",
+        "You can also reach the publisher by e-mail at assurmatch@allianceconsultants.net, or by phone on +225 01 01 51 01 36 or +225 07 07 66 41 05."
+      ]
     }
   ],
   placeholders: [
-    "Company name and registration number (commercial register)",
-    "Registered office address",
+    "Legal form and share capital",
+    "Registration number (commercial register)",
+    "Full postal address of the registered office",
     "Publication director",
     "Site host (company name and address)"
   ]
