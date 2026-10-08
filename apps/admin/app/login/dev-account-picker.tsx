@@ -13,8 +13,7 @@ export function DevAccountPicker({ returnTo }: DevAccountPickerProps) {
   const formRef = useRef<HTMLFormElement>(null);
 
   return (
-    <Card as="section" aria-label="Connexion locale demo" muted>
-      <p className="bo-kicker">Mode local</p>
+    <Card as="section" aria-label="Connexion locale demo" title="Mode local" muted>
       <Form ref={formRef} action={devDemoLoginAction}>
         <input type="hidden" name="returnTo" value={returnTo} />
         <Field

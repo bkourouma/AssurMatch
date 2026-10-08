@@ -5,6 +5,7 @@ import { adminReadErrorMessage, canApprovePublicActivation, formatDate } from ".
 import {
   Badge,
   Button,
+  Cluster,
   Card,
   DescriptionList,
   Grid,
@@ -47,7 +48,12 @@ export default async function ConsentTextDetailPage({ params, searchParams }: Co
         <PageHeader
           breadcrumb={[{ label: "Catalogue", href: "/catalog" }, { label: "Consentements", href: "/consent-texts" }, { label: "Detail" }]}
           title="Texte indisponible"
-          actions={<Button href="/consent-texts" variant="secondary">Retour aux textes</Button>}
+          actions={
+          <Cluster>
+            <StatusBadge status={text.status} tones={consentTextStatusTones} />
+            <Button href="/consent-texts" variant="secondary">Retour aux textes</Button>
+          </Cluster>
+        }
         />
         <StateMessage tone="danger">
           {result.forbidden ? "Accès aux textes de consentement réservé à la conformité (compliance_admin, super_admin)." : adminReadErrorMessage(result.error)}
@@ -63,10 +69,14 @@ export default async function ConsentTextDetailPage({ params, searchParams }: Co
     <PageStack>
       <PageHeader
         breadcrumb={[{ label: "Catalogue", href: "/catalog" }, { label: "Consentements", href: "/consent-texts" }, { label: text.version }]}
-        kicker="Texte de consentement"
         title={`${text.purpose} · ${country?.isoCode ?? text.countryId.slice(0, 8)} · ${text.language} · ${text.version}`}
         description="L'empreinte porte sur le modèle (variables non résolues) ; c'est elle qui est conservée avec chaque preuve de consentement."
-        actions={<Button href="/consent-texts" variant="secondary">Retour aux textes</Button>}
+        actions={
+          <Cluster>
+            <StatusBadge status={text.status} tones={consentTextStatusTones} />
+            <Button href="/consent-texts" variant="secondary">Retour aux textes</Button>
+          </Cluster>
+        }
       />
 
       {created ? <Notice tone="success">Brouillon créé. Il n&apos;est utilisé par aucun formulaire tant qu&apos;il n&apos;est pas publié.</Notice> : null}
@@ -90,10 +100,10 @@ export default async function ConsentTextDetailPage({ params, searchParams }: Co
             { term: "Destinataire", value: text.recipientCategory },
             { term: "Langue", value: text.language },
             { term: "Version", value: text.version },
-            { term: "Empreinte (sha256)", value: <code>{text.contentHash}</code> },
+            { term: "Empreinte (sha256)", value: <code className="bo-break">{text.contentHash}</code> },
             { term: "Publié le", value: formatDate(text.publishedAt) },
             { term: "Retiré le", value: formatDate(text.retiredAt) },
-            { term: "Remplacé par", value: text.supersededBy ? <a href={`/consent-texts/${encodeURIComponent(text.supersededBy)}`}><code>{text.supersededBy}</code></a> : "-" }
+            { term: "Remplacé par", value: text.supersededBy ? <a className="bo-break" href={`/consent-texts/${encodeURIComponent(text.supersededBy)}`}><code>{text.supersededBy}</code></a> : "-" }
           ]}
         />
       </Card>
@@ -101,7 +111,18 @@ export default async function ConsentTextDetailPage({ params, searchParams }: Co
       <Grid columns="two">
         <Card title="Contenu (modèle)">
           {text.content ? (
-            <pre className="bo-description" style={{ whiteSpace: "pre-wrap" }}>{text.content}</pre>
+            <div className="bo-stack bo-break">
+              {text.content.split(/\n{2,}/).map((paragraph, index) => (
+                <p key={index}>
+                  {paragraph.split("\n").map((line, lineIndex) => (
+                    <span key={lineIndex}>
+                      {lineIndex > 0 ? <br /> : null}
+                      {line}
+                    </span>
+                  ))}
+                </p>
+              ))}
+            </div>
           ) : (
             <Notice tone="danger">Texte sans contenu : il ne peut pas être publié. Créez une nouvelle version avec son contenu complet.</Notice>
           )}

@@ -9,18 +9,24 @@ import {
   Card,
   Cluster,
   DataTable,
-  Grid,
-  KpiCard,
+  DescriptionList,
   Notice,
   PageHeader,
   PageStack,
   Split,
+  StatStrip,
   TenantWriteGuard
 } from "../lib/ui/broker-ui";
+import type { StatItem } from "../lib/ui/broker-ui";
 import { TENANT_SUSPENDED_MESSAGE, isTenantReadOnly } from "../lib/broker-permissions";
-import { crmKpis, dashboardKpis } from "../lib/ui/broker-view-models";
+import { crmKpis, dashboardStats } from "../lib/ui/broker-view-models";
+import styles from "../lib/ui/broker-screens.module.css";
 
 const BREADCRUMB = [{ label: "CRM" }, { label: "Pipeline" }];
+
+function signed(value: number): string {
+  return `${value >= 0 ? "+" : ""}${value}`;
+}
 
 export default async function BrokerCrmPage({ searchParams }: { searchParams: Promise<{ ai?: string }> }) {
   const { ai: aiNotice } = await searchParams;
@@ -33,7 +39,6 @@ export default async function BrokerCrmPage({ searchParams }: { searchParams: Pr
         <PageStack>
           <PageHeader
             breadcrumb={BREADCRUMB}
-            kicker="CRM"
             title="Acces CRM refuse"
             description="Le CRM courtier exige un courtier authentifie, la MFA verifiee et les permissions CRM."
           />
@@ -48,7 +53,6 @@ export default async function BrokerCrmPage({ searchParams }: { searchParams: Pr
       <PageStack>
         <PageHeader
           breadcrumb={BREADCRUMB}
-          kicker="CRM"
           title="CRM complet indisponible"
           description="Le portail Starter reste centre sur les leads recus et leurs actions autorisees."
           actions={<Badge tone="disabled">Module indisponible</Badge>}
@@ -69,7 +73,6 @@ export default async function BrokerCrmPage({ searchParams }: { searchParams: Pr
       <PageStack>
         <PageHeader
           breadcrumb={BREADCRUMB}
-          kicker="CRM"
           title="Acces dashboard refuse"
           description="Le dashboard courtier exige un courtier authentifie, la MFA verifiee et le flag broker_dashboard_enabled actif."
         />
@@ -83,38 +86,56 @@ export default async function BrokerCrmPage({ searchParams }: { searchParams: Pr
   const crm = dashboard.data.crm;
   const starterBlocked = dashboard.data.plan === "starter";
   const comparison = dashboard.data.comparison;
+  const comparisonStats: StatItem[] = comparison
+    ? [
+        { label: "Leads recus (precedent)", value: comparison.previous.received, helper: `Ecart: ${signed(comparison.delta.received)}` },
+        { label: "Leads acceptes (precedent)", value: comparison.previous.accepted, helper: `Ecart: ${signed(comparison.delta.accepted)}` },
+        { label: "Refus/contestations (precedent)", value: comparison.previous.refused, helper: `Ecart: ${signed(comparison.delta.refused)}` }
+      ]
+    : [];
 
   return (
     <PageStack>
       <PageHeader
         breadcrumb={BREADCRUMB}
-        kicker="CRM Pro/Enterprise"
         title="Pipeline commercial"
-        description="Indicateurs operationnels internes. Aucune action CRM ne change les regles de routage, consentement, licence ou tenant."
+        description="Indicateurs operationnels internes du CRM Pro/Enterprise. Aucune action CRM ne change les regles de routage, consentement, licence ou tenant."
         actions={
           crm ? (
-            <Button href="/crm/leads" variant="secondary">Vue tableau</Button>
+            <Cluster>
+              <Button href="/crm/kanban" variant="secondary">Vue Kanban</Button>
+              <Button href="/crm/leads">Vue tableau</Button>
+            </Cluster>
           ) : (
             <Badge tone="disabled">Module indisponible</Badge>
           )
         }
       />
 
-      <section aria-label="Indicateurs Starter">
-        <Grid columns="kpi">
-          {dashboardKpis(dashboard.data).map((card) => (
-            <KpiCard key={card.label} label={card.label} value={card.value} helper={card.helper} tone={card.tone} />
-          ))}
-        </Grid>
+      {dashboard.data.licenseAlerts.length > 0 ? (
+        <Notice tone="warning" title="Alertes licence">
+          <ul className="bo-list">
+            {dashboard.data.licenseAlerts.map((alert) => (
+              <li key={alert.licenseId}>
+                {alert.countryCode} - {alert.status === "expired" ? "expiree" : "expirante"} (
+                {new Date(alert.expiresAt).toISOString().slice(0, 10)}) - <a href="/licenses">Ouvrir les licences</a>
+              </li>
+            ))}
+          </ul>
+        </Notice>
+      ) : null}
+
+      <section aria-label="Indicateurs Starter" className="bo-stack">
+        <h2 className="bo-section-title">Leads</h2>
+        <StatStrip items={dashboardStats(dashboard.data)} label="Volumes de leads" />
       </section>
 
-      <section aria-label="Indicateurs CRM">
-        <Grid columns="kpi">
-          {crmKpis(dashboard.data).map((card) => (
-            <KpiCard key={card.label} label={card.label} value={card.value} helper={card.helper} tone={card.tone} />
-          ))}
-        </Grid>
-      </section>
+      {crm ? (
+        <section aria-label="Indicateurs CRM" className="bo-stack">
+          <h2 className="bo-section-title">Activite CRM</h2>
+          <StatStrip items={crmKpis(dashboard.data)} label="Activite CRM" />
+        </section>
+      ) : null}
 
       {crm ? (
         <Split>
@@ -153,35 +174,20 @@ export default async function BrokerCrmPage({ searchParams }: { searchParams: Pr
       )}
 
       {comparison ? (
-        <Card
-          title="Comparaison avec la periode precedente"
-          actions={<Button href="/reports/export" variant="secondary" size="sm">Exporter le rapport d'activite indicatif (CSV)</Button>}
-        >
-          <Grid columns="kpi">
-            <KpiCard
-              label="Leads recus (precedent)"
-              value={comparison.previous.received}
-              helper={`Ecart: ${comparison.delta.received >= 0 ? "+" : ""}${comparison.delta.received}`}
-            />
-            <KpiCard
-              label="Leads acceptes (precedent)"
-              value={comparison.previous.accepted}
-              helper={`Ecart: ${comparison.delta.accepted >= 0 ? "+" : ""}${comparison.delta.accepted}`}
-            />
-            <KpiCard
-              label="Refus/contestations (precedent)"
-              value={comparison.previous.refused}
-              helper={`Ecart: ${comparison.delta.refused >= 0 ? "+" : ""}${comparison.delta.refused}`}
-            />
-          </Grid>
-        </Card>
+        <section aria-label="Comparaison avec la periode precedente" className="bo-stack">
+          <div className={styles.sectionHead}>
+            <h2 className="bo-section-title">Comparaison avec la periode precedente</h2>
+            <Button href="/reports/export" variant="secondary" size="sm">Exporter le rapport d'activite indicatif (CSV)</Button>
+          </div>
+          <StatStrip items={comparisonStats} label="Comparaison avec la periode precedente" />
+        </section>
       ) : null}
 
       {advisors.status === "success" && advisors.data.length > 0 ? (
         <Card title="Performance par conseiller">
           <DataTable
             columns={[
-              { key: "advisor", header: "Conseiller", render: (row) => row.advisorId },
+              { key: "advisor", header: "Conseiller", render: (row) => <span className="bo-ref">{row.advisorId}</span> },
               { key: "received", header: "Recus", numeric: true, align: "right", render: (row) => row.received },
               { key: "accepted", header: "Acceptes", numeric: true, align: "right", render: (row) => row.accepted },
               { key: "won", header: "Gagnes", numeric: true, align: "right", render: (row) => row.won },
@@ -205,33 +211,42 @@ export default async function BrokerCrmPage({ searchParams }: { searchParams: Pr
       ) : null}
 
       {statement.status === "success" ? (
-        <Card title="Consommation et facturation">
-          <Grid columns="kpi">
-            <KpiCard label="Leads recus (mois)" value={statement.data.leadsReceived} />
-            <KpiCard label="Leads factures (brouillon)" value={statement.data.billableLeadCount} tone="info" />
-            <KpiCard label="Leads non facturables" value={statement.data.nonBillableLeadCount} />
-            <KpiCard label="Contestations creditees" value={statement.data.disputeCreditCount} tone="warning" />
-            <KpiCard label="Credits pack restants" value={statement.data.packCreditsRemaining} />
-            <KpiCard label="Montant estime" value={`${statement.data.estimatedAmount} ${statement.data.currency}`} helper="Estimation indicative" />
-          </Grid>
+        <section aria-label="Consommation et facturation" className="bo-stack">
+          <div className={styles.sectionHead}>
+            <h2 className="bo-section-title">Consommation et facturation</h2>
+            <Button href="/billing" variant="secondary" size="sm">Voir les factures, le solde et les packs du cabinet</Button>
+          </div>
+          <StatStrip
+            label="Consommation du mois"
+            items={[
+              { label: "Leads recus (mois)", value: statement.data.leadsReceived },
+              { label: "Leads factures (brouillon)", value: statement.data.billableLeadCount, tone: "info" },
+              { label: "Leads non facturables", value: statement.data.nonBillableLeadCount },
+              { label: "Contestations creditees", value: statement.data.disputeCreditCount, tone: statement.data.disputeCreditCount > 0 ? "warning" : "neutral" },
+              { label: "Credits pack restants", value: statement.data.packCreditsRemaining },
+              { label: "Montant estime", value: `${statement.data.estimatedAmount.toLocaleString("fr-FR").replace(/\u202f|\u00a0/g, " ")} ${statement.data.currency}`, helper: "Estimation indicative" }
+            ]}
+          />
           <Cluster>
-            <Badge tone={statement.data.billingEnabled ? "info" : "disabled"}>billing_enabled: {String(statement.data.billingEnabled)}</Badge>
-            <Badge tone="disabled">paiement: desactive</Badge>
-            {statement.data.draft ? <Badge tone="disabled">{statement.data.draft.status}</Badge> : null}
+            <Badge tone={statement.data.billingEnabled ? "info" : "disabled"}>{statement.data.billingEnabled ? "Facturation active" : "Facturation inactive"}</Badge>
+            <Badge tone="disabled">Paiement en ligne desactive</Badge>
+            {statement.data.draft ? <Badge tone="disabled">{`Brouillon ${statement.data.draft.status}`}</Badge> : null}
+            <span className={styles.muted}>{statement.data.notice || "Brouillon non facturable: estimation du mois en cours, aucun encaissement en ligne."}</span>
           </Cluster>
-          <p>{statement.data.notice || "Brouillon non facturable: estimation du mois en cours, aucun encaissement en ligne."}</p>
-          <p><a href="/billing">Voir les factures, le solde et les packs du cabinet</a></p>
-        </Card>
+        </section>
       ) : null}
 
       {aiAssistance.status === "success" ? (
         <Card title="Assistance IA">
-          <Cluster>
-            <Badge tone={aiAssistance.data.enabled ? "success" : "disabled"}>enabled: {String(aiAssistance.data.enabled)}</Badge>
-            <Badge tone={aiAssistance.data.modelCall ? "info" : "disabled"}>modelCall: {String(aiAssistance.data.modelCall)}</Badge>
-            <Badge tone="warning">validation humaine obligatoire</Badge>
-          </Cluster>
-          <p>{aiAssistance.data.message}</p>
+          <DescriptionList
+            columns={2}
+            items={[
+              { term: "Assistance", value: <Badge tone={aiAssistance.data.enabled ? "success" : "disabled"}>{aiAssistance.data.enabled ? "Activee" : "Desactivee"}</Badge> },
+              { term: "Appel a un modele", value: <Badge tone={aiAssistance.data.modelCall ? "info" : "disabled"}>{aiAssistance.data.modelCall ? "Oui" : "Non"}</Badge> },
+              { term: "Decision", value: <Badge tone="warning">validation humaine obligatoire</Badge> }
+            ]}
+          />
+          <p className={styles.muted}>{aiAssistance.data.message}</p>
           {aiOptOut.status === "success" ? (
             <TenantWriteGuard readOnly={isTenantReadOnly(session.profile)}>
             <form action={setAiOptOutAction}>
@@ -255,19 +270,6 @@ export default async function BrokerCrmPage({ searchParams }: { searchParams: Pr
           {aiNotice === "optout_saved" ? <Notice tone="success">Preference IA du cabinet enregistree et auditee.</Notice> : null}
           {aiNotice === "suspended" ? <Notice tone="warning">{TENANT_SUSPENDED_MESSAGE}</Notice> : null}
           {aiNotice === "forbidden" ? <Notice tone="danger">Seul le proprietaire du cabinet peut modifier la preference IA.</Notice> : null}
-        </Card>
-      ) : null}
-
-      {dashboard.data.licenseAlerts.length > 0 ? (
-        <Card title="Alertes licence">
-          <ul>
-            {dashboard.data.licenseAlerts.map((alert) => (
-              <li key={alert.licenseId}>
-                {alert.countryCode} - {alert.status === "expired" ? "expiree" : "expirante"} (
-                {new Date(alert.expiresAt).toISOString().slice(0, 10)})
-              </li>
-            ))}
-          </ul>
         </Card>
       ) : null}
     </PageStack>

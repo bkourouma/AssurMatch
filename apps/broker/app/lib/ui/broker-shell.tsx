@@ -51,7 +51,7 @@ function brokerNavigation(plan?: BrokerPlan | undefined): NavGroup[] {
 
   return [
     {
-      title: "Activite",
+      title: "Activité",
       items: [
         { label: "Dashboard", href: "/", icon: "dashboard", match: ["/"] },
         { label: "Leads", href: "/leads", icon: "leads", match: ["/leads"] },
@@ -74,7 +74,7 @@ function brokerNavigation(plan?: BrokerPlan | undefined): NavGroup[] {
         // Spec 053 (G-01..G-04): company profile, licences and team are open to every plan.
         { label: "Société", href: "/company", icon: "partners", match: ["/company"] },
         { label: "Licences", href: "/licenses", icon: "shield", match: ["/licenses"] },
-        { label: "Equipe", href: "/team", icon: "team", match: ["/team"] },
+        { label: "Équipe", href: "/team", icon: "team", match: ["/team"] },
         { label: "Entreprise", href: "/enterprise", icon: "building", match: ["/enterprise"], badge: organisationBadge }
       ]
     },

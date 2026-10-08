@@ -22,9 +22,8 @@ export default async function ConsentRecordsPage() {
     <PageStack>
       <PageHeader
         breadcrumb={[{ label: "Pilotage" }, { label: "Conformite", href: "/compliance" }, { label: "Preuves de consentement" }]}
-        kicker="Conformite"
         title="Preuves de consentement"
-        description="Retrouver la preuve d'un consentement : texte accepte (version et empreinte), finalite, destinataire prevu, dates d'accord et de retrait. Chaque recherche est journalisee."
+        description="Retrouvez la preuve d'un consentement : texte accepte, finalite, destinataire prevu et dates. Chaque recherche est journalisee."
       />
       {session.status !== "authenticated" ? <StateMessage tone="danger">Session admin requise.</StateMessage> : null}
       {session.status === "authenticated" && !allowed ? (

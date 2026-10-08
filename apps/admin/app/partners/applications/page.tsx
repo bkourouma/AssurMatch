@@ -15,7 +15,6 @@ import {
 } from "../../lib/partner-messages";
 import {
   Button,
-  Card,
   DataTable,
   Field,
   FilterBar,
@@ -69,7 +68,7 @@ export default async function PartnerApplicationsPage({
       render: (application) => (
         <>
           <a href={`/partners/applications/${encodeURIComponent(application.id)}`}><strong>{application.tradeName || application.legalName}</strong></a>
-          <div>{application.publicReference}</div>
+          <div className="bo-ref">{application.publicReference}</div>
         </>
       ),
       sortable: true,
@@ -106,53 +105,51 @@ export default async function PartnerApplicationsPage({
     <PageStack>
       <PageHeader
         breadcrumb={[{ label: "Partenaires" }, { label: "Courtiers", href: "/partners" }, { label: "Candidatures" }]}
-        kicker="Conformite partenaires"
         title="Candidatures courtiers"
         description="Candidatures déposées depuis le site public. Une candidature n'active jamais un courtier : la conversion crée un Prospect à compléter."
         actions={<Button href="/partners" variant="secondary">Annuaire des courtiers</Button>}
       />
-      <Card title="Candidatures">
-        <FilterBar
-          action="/partners/applications"
-          label="Filtres candidatures"
-          submitLabel="Filtrer"
-          resetLabel="Reinitialiser"
-          resetHref="/partners/applications"
-          activeCount={activeFilters}
-          autoSubmit
-        >
-          <Field id="applications-status" label="Statut">
-            <Select {...fieldControlProps("applications-status")} name="status" defaultValue={status ?? ""}>
-              <option value="">Tous</option>
-              {APPLICATION_STATUS_OPTIONS.map((option) => <option key={option} value={option}>{APPLICATION_STATUS_LABELS[option]}</option>)}
-            </Select>
-          </Field>
-          <Field id="applications-country" label="Pays">
-            <Select {...fieldControlProps("applications-country")} name="countryId" defaultValue={countryId ?? ""}>
-              <option value="">Tous</option>
-              {countries.data.map((country) => <option key={country.id} value={country.id}>{`${country.name} (${country.isoCode})`}</option>)}
-            </Select>
-          </Field>
-        </FilterBar>
-        {applications.forbidden ? <StateMessage tone="danger">{adminReadErrorMessage("access_denied")}</StateMessage> : null}
-        {applications.status === "error" ? <StateMessage tone="danger">{adminReadErrorMessage(applications.error)}</StateMessage> : null}
-        <DataTable
-          columns={columns}
-          items={rows}
-          getKey={(application) => application.id}
-          emptyLabel="Aucune candidature pour ces filtres."
-          aria-label="Candidatures courtiers"
-          sort={table.sort}
-          sortHref={table.sortHref}
-          pagination={{
-            page: table.page,
-            pageSize: table.pageSize,
-            total: applications.data.length,
-            hrefFor: table.pageHref,
-            label: (from, to, total) => `${from}-${to} sur ${total} candidatures`
-          }}
-        />
-      </Card>
+      <FilterBar
+        action="/partners/applications"
+        label="Filtres candidatures"
+        submitLabel="Filtrer"
+        resetLabel="Reinitialiser"
+        resetHref="/partners/applications"
+        activeCount={activeFilters}
+        autoSubmit
+      >
+        <Field id="applications-status" label="Statut">
+          <Select {...fieldControlProps("applications-status")} name="status" defaultValue={status ?? ""}>
+            <option value="">Tous</option>
+            {APPLICATION_STATUS_OPTIONS.map((option) => <option key={option} value={option}>{APPLICATION_STATUS_LABELS[option]}</option>)}
+          </Select>
+        </Field>
+        <Field id="applications-country" label="Pays">
+          <Select {...fieldControlProps("applications-country")} name="countryId" defaultValue={countryId ?? ""}>
+            <option value="">Tous</option>
+            {countries.data.map((country) => <option key={country.id} value={country.id}>{`${country.name} (${country.isoCode})`}</option>)}
+          </Select>
+        </Field>
+      </FilterBar>
+      {applications.forbidden ? <StateMessage tone="danger">{adminReadErrorMessage("access_denied")}</StateMessage> : null}
+      {applications.status === "error" ? <StateMessage tone="danger">{adminReadErrorMessage(applications.error)}</StateMessage> : null}
+      <DataTable
+        columns={columns}
+        items={rows}
+        getKey={(application) => application.id}
+        emptyLabel="Aucune candidature pour ces filtres."
+        emptyDescription={activeFilters > 0 ? "Reinitialisez les filtres pour revoir toutes les candidatures." : "Les candidatures deposees depuis le site public apparaissent ici."}
+        aria-label="Candidatures courtiers"
+        sort={table.sort}
+        sortHref={table.sortHref}
+        pagination={{
+          page: table.page,
+          pageSize: table.pageSize,
+          total: applications.data.length,
+          hrefFor: table.pageHref,
+          label: (from, to, total) => `${from}-${to} sur ${total} candidatures`
+        }}
+      />
     </PageStack>
   );
 }

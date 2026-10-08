@@ -4,7 +4,8 @@ import { isAdminProfile, loginRedirect, readBackOfficeSession } from "../../lib/
 import { adminReadErrorMessage, flagLabel } from "../../lib/catalog-messages";
 import {
   Badge,
-  Card,
+  Button,
+  Cluster,
   DataTable,
   PageHeader,
   PageStack,
@@ -39,7 +40,7 @@ export default async function CatalogCountriesPage({
     {
       key: "iso",
       header: "ISO",
-      render: (country) => <a href={`/catalog/countries/${encodeURIComponent(country.id)}`}><strong>{country.isoCode}</strong></a>,
+      render: (country) => <a className="bo-ref" href={`/catalog/countries/${encodeURIComponent(country.id)}`}>{country.isoCode}</a>,
       sortable: true,
       sortValue: (country) => country.isoCode
     },
@@ -66,11 +67,11 @@ export default async function CatalogCountriesPage({
       key: "flags",
       header: "Flags clés",
       render: (country) => (
-        <>
+        <Cluster>
           {KEY_FLAGS.map((key) => (
             <Badge key={key} tone={country.flags[key] ? "warning" : "disabled"}>{`${flagLabel(key)} : ${country.flags[key] ? "ouvert" : "fermé"}`}</Badge>
           ))}
-        </>
+        </Cluster>
       )
     }
   ];
@@ -83,36 +84,35 @@ export default async function CatalogCountriesPage({
     <PageStack>
       <PageHeader
         breadcrumb={[{ label: "Catalogue", href: "/catalog" }, { label: "Pays" }]}
-        kicker="Catalogue"
         title="Pays"
         description="Pays administrés dans votre périmètre. Un pays créé reste en brouillon, fermé au public, jusqu'à une ouverture validée par la conformité."
+        actions={countries.status === "success" ? <Button href="#creer-pays">Créer un pays</Button> : null}
       />
 
       {countries.forbidden ? <StateMessage tone="danger">{adminReadErrorMessage("access_denied")}</StateMessage> : null}
       {countries.status === "error" ? <StateMessage tone="danger">{adminReadErrorMessage(countries.error)}</StateMessage> : null}
 
       {countries.status === "success" ? (
-        <Card title="Pays">
-          <DataTable
-            columns={columns}
-            items={rows}
-            getKey={(country) => country.id}
-            emptyLabel="Aucun pays dans votre périmètre."
-            aria-label="Pays du catalogue"
-            sort={table.sort}
-            sortHref={table.sortHref}
-            pagination={{
-              page: table.page,
-              pageSize: table.pageSize,
-              total: countries.data.length,
-              hrefFor: table.pageHref,
-              label: (from, to, total) => `${from}-${to} sur ${total} pays`
-            }}
-          />
-        </Card>
+        <DataTable
+          columns={columns}
+          items={rows}
+          getKey={(country) => country.id}
+          emptyLabel="Aucun pays dans votre périmètre."
+          emptyDescription="Créez un pays avec le formulaire ci-dessous ; il restera fermé au public."
+          aria-label="Pays du catalogue"
+          sort={table.sort}
+          sortHref={table.sortHref}
+          pagination={{
+            page: table.page,
+            pageSize: table.pageSize,
+            total: countries.data.length,
+            hrefFor: table.pageHref,
+            label: (from, to, total) => `${from}-${to} sur ${total} pays`
+          }}
+        />
       ) : null}
 
-      {countries.status === "success" ? <CreateCountryForm regimes={regimeChoices} /> : null}
+      {countries.status === "success" ? <div id="creer-pays"><CreateCountryForm regimes={regimeChoices} /></div> : null}
     </PageStack>
   );
 }

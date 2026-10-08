@@ -24,7 +24,7 @@ export const adminNavigation: NavGroup[] = [
     items: [
       { label: "Dashboard", href: "/", icon: "dashboard", match: ["/", "/dashboard"] },
       {
-        label: "Operations",
+        label: "Opérations",
         href: "/operations",
         icon: "operations",
         match: ["/operations", "/lead-assignments", "/prospects", "/quote-requests"],
@@ -38,14 +38,14 @@ export const adminNavigation: NavGroup[] = [
         ]
       },
       {
-        label: "Conformite",
+        label: "Conformité",
         href: "/compliance",
         icon: "shield",
         match: ["/compliance", "/dashboard/compliance-alerts"],
         children: [
           { label: "Alertes", href: "/dashboard/compliance-alerts" },
           // Spec 046: retention policies, anonymization batches and erasure requests.
-          { label: "Conservation des donnees", href: "/compliance/retention" },
+          { label: "Conservation des données", href: "/compliance/retention" },
           // Spec 056 (H-05): audit-log search and restricted export.
           { label: "Journaux d'audit", href: "/compliance/audit-logs" },
           // Spec 059 follow-up: consent-proof search (compliance_admin, super_admin).
@@ -80,7 +80,7 @@ export const adminNavigation: NavGroup[] = [
         match: ["/routing"],
         // Spec 056 (H-06): screens of the spec 049 anomaly routes and the decision history.
         children: [
-          { label: "Regles", href: "/routing" },
+          { label: "Règles", href: "/routing" },
           { label: "Anomalies", href: "/routing/anomalies" },
           { label: "Historique", href: "/routing/history" }
         ]
@@ -101,7 +101,7 @@ export const adminNavigation: NavGroup[] = [
           { label: "Candidatures", href: "/partners/applications" }
         ]
       },
-      { label: "Integrations", href: "/partner-integrations", icon: "plug", match: ["/partner-integrations"] },
+      { label: "Intégrations", href: "/partner-integrations", icon: "plug", match: ["/partner-integrations"] },
       { label: "Facturation", href: "/billing", icon: "receipt", match: ["/billing"] },
       { label: "Messagerie", href: "/messaging", icon: "message", match: ["/messaging"] }
     ]

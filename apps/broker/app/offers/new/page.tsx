@@ -18,7 +18,6 @@ export default async function NewBrokerOfferPage() {
   const header = (
     <PageHeader
       breadcrumb={BREADCRUMB}
-      kicker="Offres"
       title="Nouvelle offre"
       description="Offre indicative : prix à confirmer par le courtier partenaire. Elle n'est publiée qu'après validation par AssurMatch."
     />
@@ -31,7 +30,9 @@ export default async function NewBrokerOfferPage() {
         <Notice tone="warning">
           {suspended ? TENANT_SUSPENDED_MESSAGE : "Création réservée au propriétaire et aux managers du cabinet. Les agents et les comptes en lecture seule consultent uniquement."}
         </Notice>
-        <Button href="/offers" variant="secondary">Retour à mes offres</Button>
+        <div>
+          <Button href="/offers" variant="secondary">Retour à mes offres</Button>
+        </div>
       </PageStack>
     );
   }

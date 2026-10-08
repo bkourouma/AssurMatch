@@ -1,7 +1,8 @@
 import type { BrokerAiInteraction } from "../../../lib/broker-api";
 import { requestLeadAiAction, validateLeadAiAction } from "../../../lib/crm-ai-actions";
 import { TENANT_SUSPENDED_MESSAGE } from "../../../lib/broker-permissions";
-import { Badge, Button, Card, Cluster, Notice, Stack, TenantWriteGuard } from "../../../lib/ui/broker-ui";
+import { Badge, Button, Card, Cluster, Notice, TenantWriteGuard } from "../../../lib/ui/broker-ui";
+import styles from "../../../lib/ui/broker-screens.module.css";
 
 const ASSIST_LABELS: Record<string, string> = {
   lead_summary: "Resume du lead",
@@ -38,10 +39,10 @@ export function LeadAiPanel({ leadAssignmentId, enabled, availableAssistTypes, i
   if (assistTypes.length === 0) return null;
 
   return (
-    <Card title="Assistance IA d'aide a la comprehension">
-      <p>
-        Suggestions IA a valider: le courtier decide, aucune decision automatique sur le lead, donnees de contact jamais transmises au modele.
-      </p>
+    <Card
+      title="Assistance IA d'aide a la comprehension"
+      description="Suggestions IA a valider: le courtier decide, aucune decision automatique sur le lead, donnees de contact jamais transmises au modele."
+    >
       {notice && NOTICES[notice] ? <Notice tone={notice === "error" ? "danger" : "info"}>{NOTICES[notice]}</Notice> : null}
       <TenantWriteGuard readOnly={readOnly}>
       <Cluster>
@@ -55,20 +56,20 @@ export function LeadAiPanel({ leadAssignmentId, enabled, availableAssistTypes, i
       </Cluster>
       </TenantWriteGuard>
       {interactions.length === 0 ? (
-        <p>Aucune suggestion IA pour ce lead.</p>
+        <p className={styles.muted}>Aucune suggestion IA pour ce lead. Choisissez une aide ci-dessus : la suggestion apparait ici, a valider ou ecarter.</p>
       ) : (
-        <Stack>
+        <ul className="bo-list">
           {interactions.map((interaction) => (
-            <Card key={interaction.id} muted>
-              <Cluster>
-                <strong>{ASSIST_LABELS[interaction.assistType] ?? interaction.assistType}</strong>
+            <li key={interaction.id} className={styles.entry}>
+              <div className={styles.entryHead}>
+                <h3 className={styles.entryTitle}>{ASSIST_LABELS[interaction.assistType] ?? interaction.assistType}</h3>
                 <Badge tone={statusTone(interaction.status)}>{interaction.status}</Badge>
                 {interaction.fallback ? <Badge tone="neutral">mode simplifie</Badge> : null}
                 {interaction.humanValidationStatus !== "not_required" ? <Badge tone={interaction.humanValidationStatus === "pending" ? "warning" : "info"}>validation: {interaction.humanValidationStatus}</Badge> : null}
-              </Cluster>
-              {interaction.status === "completed" && interaction.outputText ? <p>{interaction.outputText}</p> : null}
-              {interaction.status === "refused" ? <p>Suggestion retenue par les garde-fous ou assistance desactivee ({interaction.refusalReason ?? "refus"}).</p> : null}
-              {interaction.status === "queued" ? <p>Suggestion en cours de preparation.</p> : null}
+              </div>
+              {interaction.status === "completed" && interaction.outputText ? <p className={styles.message}>{interaction.outputText}</p> : null}
+              {interaction.status === "refused" ? <p className={styles.muted}>Suggestion retenue par les garde-fous ou assistance desactivee ({interaction.refusalReason ?? "refus"}).</p> : null}
+              {interaction.status === "queued" ? <p className={styles.muted}>Suggestion en cours de preparation.</p> : null}
               {interaction.status === "completed" && interaction.humanValidationStatus === "pending" ? (
                 <TenantWriteGuard readOnly={readOnly}>
                 <Cluster>
@@ -83,9 +84,9 @@ export function LeadAiPanel({ leadAssignmentId, enabled, availableAssistTypes, i
                 </Cluster>
                 </TenantWriteGuard>
               ) : null}
-            </Card>
+            </li>
           ))}
-        </Stack>
+        </ul>
       )}
     </Card>
   );

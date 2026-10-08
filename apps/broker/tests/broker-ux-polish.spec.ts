@@ -24,7 +24,7 @@ test("broker shell exposes broker-only navigation and keeps auth routes simple",
   expect(layout).toContain("BrokerShell");
   expect(layout).toContain("@assurmatch/ui/backoffice.css");
   expect(shell).toContain("Back-office Courtier");
-  for (const label of ["Dashboard", "Leads", "CRM", "Equipe", "Compte"]) {
+  for (const label of ["Dashboard", "Leads", "CRM", "Équipe", "Compte"]) {
     expect(shell).toContain(`label: "${label}"`);
   }
   // Les ecrans d'authentification restent hors du shell applicatif.
@@ -46,8 +46,9 @@ test("broker dashboard and account surfaces use polished primitives", () => {
   const team = source("apps/broker/app/team/page.tsx");
 
   expect(home).toContain("PageHeader");
-  expect(home).toContain("dashboardKpis");
-  expect(home).toContain("Notifications");
+  // The dashboard figures are one StatStrip fed by the view model (no grid of equal KPI cards).
+  expect(home).toContain("dashboardStats");
+  expect(home).toContain("Leads à traiter");
   expect(account).toContain("Securite du compte");
   expect(account).toContain("DescriptionList");
   // Spec 053: the team page is functional (no more "Module indisponible" placeholder).

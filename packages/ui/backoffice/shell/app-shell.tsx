@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import { Icon } from "../icons";
 import { Logo } from "../logo";
@@ -63,27 +63,41 @@ export function AppShell({
   dataAttributes
 }: AppShellProps) {
   const [navOpen, setNavOpen] = useState(false);
+  const menuButtonRef = useRef<HTMLButtonElement>(null);
+
+  // The drawer closes on Escape and hands focus back to the button that opened it.
+  useEffect(() => {
+    if (!navOpen) return;
+    function onKeyDown(event: KeyboardEvent) {
+      if (event.key !== "Escape") return;
+      setNavOpen(false);
+      menuButtonRef.current?.focus();
+    }
+    document.addEventListener("keydown", onKeyDown);
+    return () => document.removeEventListener("keydown", onKeyDown);
+  }, [navOpen]);
   const active = findActive(navigation, pathname);
-  // The topbar names the current screen only where the sidebar is hidden (mobile drawer); the page
-  // header carries the linked breadcrumb, so the topbar never repeats it.
+  // The topbar only exists where the sidebar is a drawer (under 900px): it names the current screen.
+  // On desktop the account menu lives at the foot of the rail and the page header carries the
+  // breadcrumb.
   const currentLabel = active?.child?.label ?? active?.item.label;
 
   return (
     <div className="bo-shell" data-nav-open={navOpen ? "true" : "false"} {...dataAttributes}>
       <aside className="bo-sidebar">
         <div className="bo-sidebar__brand">
-          <a href={brand.homeHref} aria-label={brand.scope}>
-            <Logo variant="white" height={30} priority />
-          </a>
-          <span className="bo-sidebar__brand-scope">{brand.scope}</span>
-          {brand.plan || brand.tenant ? (
-            <span className="bo-sidebar__brand-meta">
-              {brand.plan ? <span className="bo-nav__badge">{brand.plan}</span> : null}
-              {brand.tenant ? <span>{brand.tenant}</span> : null}
-            </span>
-          ) : null}
+          <div className="bo-sidebar__brand-row">
+            <a href={brand.homeHref} aria-label={brand.scope}>
+              <Logo variant="color" height={28} priority />
+            </a>
+            {envBadge ? <span className="bo-env-badge">{envBadge}</span> : null}
+          </div>
+          <div className="bo-sidebar__brand-tags">
+            <span className="bo-sidebar__brand-scope">{brand.scope}</span>
+            {brand.plan ? <span className="bo-nav__badge">{brand.plan}</span> : null}
+            {brand.tenant ? <span className="bo-sidebar__brand-meta">{brand.tenant}</span> : null}
+          </div>
         </div>
-
         <nav className="bo-sidebar__nav" aria-label={navLabel}>
           <div className="bo-nav">
             {navigation.map((group, groupIndex) => (
@@ -131,7 +145,19 @@ export function AppShell({
             ))}
           </div>
         </nav>
-
+        {user ? (
+          <div className="bo-sidebar__footer">
+            <UserMenu
+              label={user.label}
+              role={user.role}
+              initials={user.initials}
+              menuLabel={userMenuLabel}
+              logoutLabel={logoutLabel}
+              logoutAction={logoutAction}
+              placement="up"
+            />
+          </div>
+        ) : null}
       </aside>
 
       {navOpen ? (
@@ -142,6 +168,7 @@ export function AppShell({
         <header className="bo-topbar">
           <button
             className="bo-topbar__menu"
+            ref={menuButtonRef}
             type="button"
             aria-label={navOpen ? menuCloseLabel : menuOpenLabel}
             aria-expanded={navOpen}
@@ -153,17 +180,6 @@ export function AppShell({
           {currentLabel ? <span className="bo-topbar__title">{currentLabel}</span> : null}
 
           <span className="bo-topbar__spacer" />
-          {envBadge ? <span className="bo-env-badge">{envBadge}</span> : null}
-          {user ? (
-            <UserMenu
-              label={user.label}
-              role={user.role}
-              initials={user.initials}
-              menuLabel={userMenuLabel}
-              logoutLabel={logoutLabel}
-              logoutAction={logoutAction}
-            />
-          ) : null}
         </header>
 
         <main className="bo-content" id="bo-content" tabIndex={-1}>

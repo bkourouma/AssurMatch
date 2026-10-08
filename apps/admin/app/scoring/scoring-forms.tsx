@@ -6,6 +6,7 @@ import {
   ActionNotice,
   Button,
   Card,
+  ConfirmDialog,
   Field,
   Form,
   FormActions,
@@ -131,7 +132,7 @@ export function UpdateScoringRuleForm({ ruleIds }: { ruleIds: string[] }) {
 
 export function OfferDecisionForm({ offerId, offerName }: { offerId: string; offerName: string }) {
   const [validateState, validateAction, validating] = useActionState(validateOfferAction, initialState);
-  const [suspendState, suspendAction, suspending] = useActionState(suspendOfferAction, initialState);
+  const [suspendState, suspendAction] = useActionState(suspendOfferAction, initialState);
   const base = useId();
   const ids = {
     decision: `${base}-decision`,
@@ -163,16 +164,26 @@ export function OfferDecisionForm({ offerId, offerName }: { offerId: string; off
           <Button type="submit" size="sm" pending={validating} pendingLabel="...">Appliquer la decision</Button>
         </FormActions>
       </Form>
-      <Form action={suspendAction} data-scoring-form="suspend-offer">
-        <ActionNotice state={suspendState} />
-        <input type="hidden" name="offerId" value={offerId} />
-        <Field id={ids.suspendReason} label="Motif de suspension (audite)" required>
-          <Input {...fieldControlProps(ids.suspendReason, { required: true })} name="reason" placeholder="Motif de suspension (audite)" />
-        </Field>
-        <FormActions>
-          <Button type="submit" variant="danger" size="sm" pending={suspending} pendingLabel="...">Suspendre (retrait public)</Button>
-        </FormActions>
-      </Form>
+      <ActionNotice state={suspendState} />
+      <FormActions>
+        <ConfirmDialog
+          triggerLabel="Suspendre (retrait public)"
+          triggerVariant="danger"
+          title={`Suspendre ${offerName}`}
+          description="L'offre est retiree immediatement du comparateur public. La suspension est auditee avec son motif."
+          confirmLabel="Suspendre"
+          cancelLabel="Annuler"
+          tone="danger"
+          formAction={suspendAction}
+          dataAttributes={{ "data-scoring-form": "suspend-offer" }}
+        >
+          <ActionNotice state={suspendState} />
+          <input type="hidden" name="offerId" value={offerId} />
+          <Field id={ids.suspendReason} label="Motif de suspension (audite)" required>
+            <Input {...fieldControlProps(ids.suspendReason, { required: true })} name="reason" placeholder="Motif de suspension (audite)" />
+          </Field>
+        </ConfirmDialog>
+      </FormActions>
     </Stack>
   );
 }

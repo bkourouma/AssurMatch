@@ -5,6 +5,7 @@ import {
   ActionNotice,
   Button,
   Card,
+  ConfirmDialog,
   Field,
   Form,
   FormActions,
@@ -115,29 +116,42 @@ export function PublishQuoteFormDefinitionForm({ formIds }: { formIds: string[] 
 }
 
 export function RetireQuoteFormDefinitionForm({ formIds }: { formIds: string[] }) {
-  const [state, formAction, pending] = useActionState(retireQuoteFormDefinitionAction, initialState);
+  const [state, formAction] = useActionState(retireQuoteFormDefinitionAction, initialState);
   const base = useId();
   const ids = { formId: `${base}-form`, reason: `${base}-reason` };
 
   return (
-    <Card title="Retirer une version">
-      <Form action={formAction} data-quote-form="retire">
-        <ActionNotice state={state} />
-        <Field id={ids.formId} label="Formulaire" required>
-          <Select
-            {...fieldControlProps(ids.formId, { required: true })}
-            name="formId"
-            options={formIds.map((id) => ({ value: id, label: id }))}
-          />
-        </Field>
-        <Field id={ids.reason} label="Motif (audite)" required>
-          <Input {...fieldControlProps(ids.reason, { required: true })} name="reason" />
-        </Field>
-        <p className="bo-description">Retirer coupe l'exposition publique du formulaire; l'historique des versions est conserve.</p>
+    <Card title="Retirer une version" description="Retirer coupe l'exposition publique du formulaire; l'historique des versions est conserve.">
+      <ActionNotice state={state} />
+      {formIds.length === 0 ? (
+        <p className="bo-description">Aucune version a retirer.</p>
+      ) : (
         <FormActions>
-          <Button type="submit" pending={pending} pendingLabel="Retrait..." disabled={formIds.length === 0}>Retirer</Button>
+          <ConfirmDialog
+            triggerLabel="Retirer"
+            triggerVariant="danger"
+            title="Retirer une version de formulaire"
+            description="Le formulaire choisi n'est plus expose au public. L'historique des versions est conserve."
+            confirmLabel="Retirer"
+            cancelLabel="Annuler"
+            tone="danger"
+            formAction={formAction}
+            dataAttributes={{ "data-quote-form": "retire" }}
+          >
+            <ActionNotice state={state} />
+            <Field id={ids.formId} label="Formulaire" required>
+              <Select
+                {...fieldControlProps(ids.formId, { required: true })}
+                name="formId"
+                options={formIds.map((id) => ({ value: id, label: id }))}
+              />
+            </Field>
+            <Field id={ids.reason} label="Motif (audite)" required>
+              <Input {...fieldControlProps(ids.reason, { required: true })} name="reason" />
+            </Field>
+          </ConfirmDialog>
         </FormActions>
-      </Form>
+      )}
     </Card>
   );
 }

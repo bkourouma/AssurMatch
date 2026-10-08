@@ -2,8 +2,9 @@ import { redirect } from "next/navigation";
 import { isBrokerProfile, loginRedirect, readBackOfficeSession } from "../lib/backoffice-auth";
 import { readBrokerBillingAccount, readBrokerBillingStatement, type BrokerInvoiceData } from "../lib/broker-api";
 import { canReadBrokerBilling } from "../lib/broker-permissions";
-import { Badge, Card, Cluster, DataTable, Grid, KpiCard, Notice, PageHeader, PageStack } from "../lib/ui/broker-ui";
+import { Badge, Card, Cluster, DataTable, Notice, PageHeader, PageStack, StatStrip } from "../lib/ui/broker-ui";
 import type { DataTableColumn } from "../lib/ui/broker-ui";
+import styles from "../lib/ui/broker-screens.module.css";
 
 const BREADCRUMB = [{ label: "Compte" }, { label: "Facturation" }];
 
@@ -20,7 +21,7 @@ function xof(amount: number): string {
 }
 
 const invoiceColumns: Array<DataTableColumn<BrokerInvoiceData>> = [
-  { key: "number", header: "Facture", render: (invoice) => <code>{invoice.number}</code> },
+  { key: "number", header: "Facture", render: (invoice) => <span className="bo-ref">{invoice.number}</span> },
   { key: "period", header: "Periode", render: (invoice) => invoice.periodFrom.slice(0, 7) },
   { key: "issuedAt", header: "Emise le", render: (invoice) => invoice.issuedAt.slice(0, 10) },
   { key: "total", header: "Total TTC", render: (invoice) => xof(invoice.totalAmount), numeric: true, align: "right" },
@@ -53,7 +54,7 @@ export default async function BrokerBillingPage() {
   if (!canReadBrokerBilling(session.profile)) {
     return (
       <PageStack>
-        <PageHeader breadcrumb={BREADCRUMB} kicker="Facturation" title="Acces reserve" description="La facturation du cabinet est consultable par le responsable du compte, les managers et les membres en lecture seule." />
+        <PageHeader breadcrumb={BREADCRUMB} title="Acces reserve" description="La facturation du cabinet est consultable par le responsable du compte, les managers et les membres en lecture seule." />
       </PageStack>
     );
   }
@@ -64,33 +65,27 @@ export default async function BrokerBillingPage() {
     <PageStack>
       <PageHeader
         breadcrumb={BREADCRUMB}
-        kicker="Facturation"
         title="Facturation du cabinet"
-        description="Consommation du mois, factures AssurMatch, solde et packs de leads. Le reglement se fait par virement bancaire ou mobile money, hors plateforme, en rappelant le numero de facture."
+        description="Factures AssurMatch, solde, consommation du mois et packs de leads. Le reglement se fait par virement bancaire ou mobile money, hors plateforme, en rappelant le numero de facture."
       />
+
+      <Notice tone="neutral">
+        {account.data.notice || "Facturation manuelle: aucun paiement en ligne, aucune prime d'assurance encaissee par AssurMatch."}
+      </Notice>
 
       {account.status !== "success" ? <Notice tone="warning">Etat des comptes temporairement indisponible.</Notice> : null}
 
       {account.status === "success" ? (
-        <Grid columns="kpi" as="section" aria-label="Solde du cabinet">
-          <KpiCard label="Solde a regler" value={xof(account.data.totals.balanceDue)} tone={account.data.totals.balanceDue > 0 ? "warning" : "neutral"} />
-          <KpiCard label="Total facture" value={xof(account.data.totals.invoiced)} />
-          <KpiCard label="Reglements constates" value={xof(account.data.totals.paid)} tone="success" />
-          <KpiCard label="Avoirs" value={xof(account.data.totals.credited)} />
-          <KpiCard label="Credits pack restants" value={account.data.packCreditsRemaining} />
-        </Grid>
-      ) : null}
-
-      {statement.status === "success" ? (
-        <Card title="Consommation du mois en cours" description="Estimation indicative issue du brouillon mensuel; la facture du mois est emise ensuite par la finance AssurMatch.">
-          <Grid columns="kpi">
-            <KpiCard label="Leads recus (mois)" value={statement.data.leadsReceived} />
-            <KpiCard label="Leads facturables" value={statement.data.billableLeadCount} tone="info" />
-            <KpiCard label="Leads non facturables" value={statement.data.nonBillableLeadCount} />
-            <KpiCard label="Contestations creditees" value={statement.data.disputeCreditCount} tone="warning" />
-            <KpiCard label="Montant estime HT" value={xof(statement.data.estimatedAmount)} helper="Estimation indicative" />
-          </Grid>
-        </Card>
+        <StatStrip
+          label="Solde du cabinet"
+          items={[
+            { label: "Solde a regler", value: xof(account.data.totals.balanceDue), tone: account.data.totals.balanceDue > 0 ? "warning" : "neutral" },
+            { label: "Total facture", value: xof(account.data.totals.invoiced) },
+            { label: "Reglements constates", value: xof(account.data.totals.paid), tone: "success" },
+            { label: "Avoirs", value: xof(account.data.totals.credited) },
+            { label: "Credits pack restants", value: account.data.packCreditsRemaining }
+          ]}
+        />
       ) : null}
 
       <Card title="Factures et avoirs">
@@ -99,9 +94,29 @@ export default async function BrokerBillingPage() {
           items={account.data.invoices}
           getKey={(invoice) => invoice.id}
           emptyLabel="Aucune facture emise pour votre cabinet."
+          emptyDescription="La facture du mois est emise par la finance AssurMatch apres la cloture du brouillon mensuel."
           aria-label="Factures du cabinet"
         />
       </Card>
+
+      {statement.status === "success" ? (
+        <section aria-label="Consommation du mois en cours" className="bo-stack">
+          <div>
+            <h2 className="bo-section-title">Consommation du mois en cours</h2>
+            <p className={styles.muted}>Estimation indicative issue du brouillon mensuel; la facture du mois est emise ensuite par la finance AssurMatch.</p>
+          </div>
+          <StatStrip
+            label="Consommation du mois en cours"
+            items={[
+              { label: "Leads recus (mois)", value: statement.data.leadsReceived },
+              { label: "Leads facturables", value: statement.data.billableLeadCount, tone: "info" },
+              { label: "Leads non facturables", value: statement.data.nonBillableLeadCount },
+              { label: "Contestations creditees", value: statement.data.disputeCreditCount, tone: statement.data.disputeCreditCount > 0 ? "warning" : "neutral" },
+              { label: "Montant estime HT", value: xof(statement.data.estimatedAmount), helper: "Estimation indicative" }
+            ]}
+          />
+        </section>
+      ) : null}
 
       <Card title="Releve de compte" description="Facture au debit, avoir et reglement au credit.">
         <DataTable
@@ -133,10 +148,6 @@ export default async function BrokerBillingPage() {
           aria-label="Packs de leads du cabinet"
         />
       </Card>
-
-      <Notice tone="info">
-        {account.data.notice || "Facturation manuelle: aucun paiement en ligne, aucune prime d'assurance encaissee par AssurMatch."}
-      </Notice>
     </PageStack>
   );
 }

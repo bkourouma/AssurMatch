@@ -11,8 +11,9 @@ import {
   VISITOR_RESPONSE_LABELS,
   formatPremium
 } from "../proposal-vocabulary";
-import { Badge, Button, Card, Cluster, ConfirmDialog, DescriptionList, Field, FormActions, Input, Notice, Select, Stack, Textarea, TenantWriteGuard } from "./broker-ui";
+import { Badge, Button, ConfirmDialog, DescriptionList, Field, FormActions, FormRow, Input, Notice, Select, Stack, Textarea, TenantWriteGuard } from "./broker-ui";
 import { formatDate } from "./broker-view-models";
+import styles from "./broker-screens.module.css";
 
 const STATUS_TONES: Record<string, "info" | "success" | "warning" | "neutral" | "disabled"> = {
   sent: "info",
@@ -39,50 +40,57 @@ function documentHref(channel: "starter" | "crm", leadAssignmentId: string, prop
     : `/leads/${leadAssignmentId}/proposals/${proposalId}/document`;
 }
 
+/** One sent proposal: an entry of the panel list, never a card nested in the panel card. */
 function ProposalItem({ proposal, channel, leadAssignmentId, canWithdraw }: { proposal: BrokerProposalData; channel: "starter" | "crm"; leadAssignmentId: string; canWithdraw: boolean }) {
   return (
-    <Card as="article" muted title={`Proposition du ${formatDate(proposal.sentAt)}`} actions={<Badge tone={STATUS_TONES[proposal.status] ?? "neutral"}>{PROPOSAL_STATUS_LABELS[proposal.status] ?? proposal.status}</Badge>}>
-      <Stack>
-        <p style={{ whiteSpace: "pre-wrap" }}>{proposal.message}</p>
-        <DescriptionList
-          items={[
-            { term: "Prime indicative", value: formatPremium(proposal.priceMin, proposal.priceMax, proposal.currency) },
-            { term: "Valable jusqu'au", value: formatDate(proposal.validUntil) },
-            { term: "Garanties principales", value: proposal.guarantees.length > 0 ? proposal.guarantees.join(", ") : "Non precisees" },
-            {
-              term: "Document",
-              value: proposal.document
-                ? <a href={documentHref(channel, leadAssignmentId, proposal.id)}>{proposal.document.fileName}</a>
-                : "Aucun"
-            },
-            ...(proposal.viewedAt ? [{ term: "Vue par le visiteur", value: formatDate(proposal.viewedAt) }] : []),
-            ...(proposal.withdrawnAt ? [{ term: "Retiree le", value: `${formatDate(proposal.withdrawnAt)}${proposal.withdrawReason ? ` - ${proposal.withdrawReason}` : ""}` }] : [])
-          ]}
-        />
-        <p><small>{proposal.nonContractualNotice}</small></p>
-        {proposal.responses.length > 0 ? (
-          <div>
-            <h3 className="bo-section-title">Reponses du visiteur</h3>
-            <ol>
-              {proposal.responses.map((response) => (
-                <li key={response.id}>
-                  {formatDate(response.createdAt)} - {VISITOR_RESPONSE_LABELS[response.type] ?? response.type}
-                  {response.callbackSlot ? ` (creneau : ${response.callbackSlot})` : ""}
-                  {response.declineReason ? ` (motif : ${DECLINE_REASON_LABELS[response.declineReason] ?? response.declineReason})` : ""}
-                  {response.question ? ` : « ${response.question} »` : ""}
-                </li>
-              ))}
-            </ol>
-            <p><small>La derniere reponse fait foi. Repondez par une nouvelle proposition ou hors plateforme.</small></p>
-          </div>
-        ) : null}
-        {canWithdraw && proposal.status !== "withdrawn" ? (
+    <article className={styles.entry} aria-label={`Proposition du ${formatDate(proposal.sentAt)}`}>
+      <div className={styles.entryHead}>
+        <h3 className={styles.entryTitle}>{`Proposition du ${formatDate(proposal.sentAt)}`}</h3>
+        <Badge tone={STATUS_TONES[proposal.status] ?? "neutral"}>{PROPOSAL_STATUS_LABELS[proposal.status] ?? proposal.status}</Badge>
+      </div>
+      <p className={styles.message}>{proposal.message}</p>
+      <DescriptionList
+        columns={2}
+        items={[
+          { term: "Prime indicative", value: formatPremium(proposal.priceMin, proposal.priceMax, proposal.currency) },
+          { term: "Valable jusqu'au", value: formatDate(proposal.validUntil) },
+          { term: "Garanties principales", value: proposal.guarantees.length > 0 ? proposal.guarantees.join(", ") : "Non precisees" },
+          {
+            term: "Document",
+            value: proposal.document
+              ? <a href={documentHref(channel, leadAssignmentId, proposal.id)}>{proposal.document.fileName}</a>
+              : "Aucun"
+          },
+          ...(proposal.viewedAt ? [{ term: "Vue par le visiteur", value: formatDate(proposal.viewedAt) }] : []),
+          ...(proposal.withdrawnAt ? [{ term: "Retiree le", value: `${formatDate(proposal.withdrawnAt)}${proposal.withdrawReason ? ` - ${proposal.withdrawReason}` : ""}` }] : [])
+        ]}
+      />
+      <p className={styles.muted}>{proposal.nonContractualNotice}</p>
+      {proposal.responses.length > 0 ? (
+        <div className={styles.entry}>
+          <h4 className={styles.entryTitle}>Reponses du visiteur</h4>
+          <ol className="bo-list">
+            {proposal.responses.map((response) => (
+              <li key={response.id}>
+                <span className="bo-ref">{formatDate(response.createdAt)}</span> - {VISITOR_RESPONSE_LABELS[response.type] ?? response.type}
+                {response.callbackSlot ? ` (creneau : ${response.callbackSlot})` : ""}
+                {response.declineReason ? ` (motif : ${DECLINE_REASON_LABELS[response.declineReason] ?? response.declineReason})` : ""}
+                {response.question ? ` : « ${response.question} »` : ""}
+              </li>
+            ))}
+          </ol>
+          <p className={styles.muted}>La derniere reponse fait foi. Repondez par une nouvelle proposition ou hors plateforme.</p>
+        </div>
+      ) : null}
+      {canWithdraw && proposal.status !== "withdrawn" ? (
+        <div>
           <ConfirmDialog
             triggerLabel="Retirer cette proposition"
             title="Retirer la proposition"
             description="Une proposition envoyee n'est jamais modifiee. Retirez-la puis envoyez-en une nouvelle si besoin. Le visiteur ne la verra plus."
             confirmLabel="Retirer"
             cancelLabel="Annuler"
+            tone="danger"
             formAction={withdrawProposalAction}
           >
             <input type="hidden" name="leadAssignmentId" value={leadAssignmentId} />
@@ -92,9 +100,9 @@ function ProposalItem({ proposal, channel, leadAssignmentId, canWithdraw }: { pr
               <Input id={`withdraw-reason-${proposal.id}`} name="reason" maxLength={500} placeholder="Optionnel" aria-label="Motif du retrait" />
             </Field>
           </ConfirmDialog>
-        ) : null}
-      </Stack>
-    </Card>
+        </div>
+      ) : null}
+    </article>
   );
 }
 
@@ -119,49 +127,61 @@ export function ProposalPanel({ channel, leadAssignmentId, data, canMutate, tena
       {data.blockers.map((blocker) => (
         <Notice key={blocker} tone="warning">{PROPOSAL_BLOCKER_LABELS[blocker] ?? blocker}</Notice>
       ))}
-      <p>Propositions actives : {data.activeCount} / {data.maxActive}</p>
+      <div className={styles.entryHead}>
+        <h3 className={styles.entryTitle}>Propositions envoyees</h3>
+        <Badge tone={data.activeCount >= data.maxActive ? "warning" : "neutral"}>{`Propositions actives : ${data.activeCount} / ${data.maxActive}`}</Badge>
+      </div>
       {data.items.length > 0 ? (
-        data.items.map((proposal) => (
-          <ProposalItem key={proposal.id} proposal={proposal} channel={channel} leadAssignmentId={leadAssignmentId} canWithdraw={canMutate} />
-        ))
+        <ul className="bo-list">
+          {data.items.map((proposal) => (
+            <li key={proposal.id}>
+              <ProposalItem proposal={proposal} channel={channel} leadAssignmentId={leadAssignmentId} canWithdraw={canMutate} />
+            </li>
+          ))}
+        </ul>
       ) : (
-        <p>Aucune proposition envoyee pour ce lead.</p>
+        <p className={styles.muted}>Aucune proposition envoyee pour ce lead. Le visiteur la retrouve dans son espace de suivi des l&apos;envoi.</p>
       )}
       {canMutate || tenantReadOnly ? (
         <TenantWriteGuard readOnly={tenantReadOnly || !data.canSend}>
-          <form action={action} method="post" encType="multipart/form-data" className="bo-form" aria-label="Nouvelle proposition au visiteur">
-            <Field id={`${channel}-proposal-message`} label="Message au visiteur" required requiredLabel="obligatoire" hint={`${PROPOSAL_MESSAGE_MAX} caracteres au maximum. Aucune promesse de souscription.`}>
-              <Textarea id={`${channel}-proposal-message`} name="message" required maxLength={PROPOSAL_MESSAGE_MAX} rows={5} aria-label="Message de la proposition" />
+          <form action={action} method="post" encType="multipart/form-data" className={`bo-form bo-form--two ${styles.subsection}`} aria-label="Nouvelle proposition au visiteur">
+            <FormRow full>
+              <h3 className={styles.entryTitle}>Nouvelle proposition</h3>
+            </FormRow>
+            <FormRow full>
+              <Field id={`${channel}-proposal-message`} label="Message au visiteur" required requiredLabel="obligatoire" hint={`${PROPOSAL_MESSAGE_MAX} caracteres au maximum. Aucune promesse de souscription.`}>
+                <Textarea id={`${channel}-proposal-message`} name="message" required maxLength={PROPOSAL_MESSAGE_MAX} rows={5} aria-label="Message de la proposition" />
+              </Field>
+            </FormRow>
+            <Field id={`${channel}-proposal-min`} label="Prime indicative (ou minimum)">
+              <Input id={`${channel}-proposal-min`} name="priceMin" type="number" min={0} step="any" inputMode="decimal" aria-label="Prime indicative minimum" />
             </Field>
-            <Cluster>
-              <Field id={`${channel}-proposal-min`} label="Prime indicative (ou minimum)">
-                <Input id={`${channel}-proposal-min`} name="priceMin" type="number" min={0} step="any" inputMode="decimal" aria-label="Prime indicative minimum" />
-              </Field>
-              <Field id={`${channel}-proposal-max`} label="Maximum de la fourchette">
-                <Input id={`${channel}-proposal-max`} name="priceMax" type="number" min={0} step="any" inputMode="decimal" aria-label="Prime indicative maximum" />
-              </Field>
-              <Field id={`${channel}-proposal-currency`} label="Devise" required requiredLabel="obligatoire">
-                <Select id={`${channel}-proposal-currency`} name="currency" defaultValue="XOF" aria-label="Devise" options={PROPOSAL_CURRENCIES.map((currency) => ({ value: currency, label: currency }))} />
-              </Field>
-            </Cluster>
-            <Field id={`${channel}-proposal-guarantees`} label="Principales garanties" hint={`Une garantie par ligne, ${PROPOSAL_GUARANTEES_MAX} au maximum.`}>
-              <Textarea id={`${channel}-proposal-guarantees`} name="guarantees" rows={4} aria-label="Principales garanties" />
+            <Field id={`${channel}-proposal-max`} label="Maximum de la fourchette">
+              <Input id={`${channel}-proposal-max`} name="priceMax" type="number" min={0} step="any" inputMode="decimal" aria-label="Prime indicative maximum" />
             </Field>
-            <Cluster>
-              <Field id={`${channel}-proposal-valid`} label="Valable jusqu'au" required requiredLabel="obligatoire">
-                <Input id={`${channel}-proposal-valid`} name="validUntil" type="date" required min={minDate} aria-label="Date de validite" />
+            <Field id={`${channel}-proposal-currency`} label="Devise" required requiredLabel="obligatoire">
+              <Select id={`${channel}-proposal-currency`} name="currency" defaultValue="XOF" aria-label="Devise" options={PROPOSAL_CURRENCIES.map((currency) => ({ value: currency, label: currency }))} />
+            </Field>
+            <Field id={`${channel}-proposal-valid`} label="Valable jusqu'au" required requiredLabel="obligatoire">
+              <Input id={`${channel}-proposal-valid`} name="validUntil" type="date" required min={minDate} aria-label="Date de validite" />
+            </Field>
+            <FormRow full>
+              <Field id={`${channel}-proposal-guarantees`} label="Principales garanties" hint={`Une garantie par ligne, ${PROPOSAL_GUARANTEES_MAX} au maximum.`}>
+                <Textarea id={`${channel}-proposal-guarantees`} name="guarantees" rows={4} aria-label="Principales garanties" />
               </Field>
+            </FormRow>
+            <FormRow full>
               <Field id={`${channel}-proposal-file`} label="PDF facultatif" hint="PDF, 5 Mo au maximum, analyse par l'antivirus.">
                 <Input id={`${channel}-proposal-file`} name="file" type="file" accept="application/pdf" aria-label="Document PDF de la proposition" />
               </Field>
-            </Cluster>
+            </FormRow>
             <FormActions>
               <Button type="submit">Envoyer la proposition au visiteur</Button>
             </FormActions>
           </form>
         </TenantWriteGuard>
       ) : (
-        <Notice tone="info" title="Lecture seule">Votre role ne permet pas d'envoyer de proposition.</Notice>
+        <Notice tone="info" title="Lecture seule">Votre role ne permet pas d&apos;envoyer de proposition.</Notice>
       )}
     </Stack>
   );

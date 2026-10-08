@@ -22,12 +22,14 @@ import {
   Badge,
   Button,
   Card,
+  Cluster,
   DataTable,
   DescriptionList,
   Grid,
   Notice,
   PageHeader,
   PageStack,
+  Split,
   StateMessage,
   StatusBadge,
   catalogStatusTones
@@ -95,43 +97,49 @@ export default async function CatalogCountryDetailPage({ params }: CountryDetail
     <PageStack>
       <PageHeader
         breadcrumb={[{ label: "Catalogue", href: "/catalog" }, { label: "Pays", href: "/catalog/countries" }, { label: country.isoCode }]}
-        kicker="Fiche pays"
         title={`${country.name} (${country.isoCode})`}
         description="Chaque modification est auditée avec son motif. Une désactivation est immédiate ; une activation est soumise aux conditions de la checklist."
-        actions={<Button href={`/activation-checklist?country=${encodeURIComponent(country.isoCode)}`} variant="secondary">Checklist du pays</Button>}
+        actions={
+          <Cluster>
+            <StatusBadge status={country.status} tones={catalogStatusTones} />
+            <Button href={`/activation-checklist?country=${encodeURIComponent(country.isoCode)}`} variant="secondary">Checklist du pays</Button>
+          </Cluster>
+        }
       />
 
-      <Card title="Synthese">
-        <DescriptionList
-          columns={2}
-          items={[
-            { term: "Statut", value: <StatusBadge status={country.status} tones={catalogStatusTones} /> },
-            { term: "Régime", value: regimeName ?? <Badge tone="warning">Non renseigné</Badge> },
-            { term: "Famille réglementaire", value: country.regulatoryFamily },
-            { term: "Langues", value: country.languages.join(", ") },
-            { term: "Devise", value: country.currency },
-            { term: "Fuseau", value: country.timezone },
-            { term: "Téléphone", value: country.phoneDialCode ? `${country.phoneDialCode}, ${country.phoneNationalLengths.join(" ou ") || "?"} chiffres` : "Normalisation générique" },
-            { term: "Public depuis", value: formatDate(country.publicSince) },
-            { term: "Mis à jour", value: formatDate(country.updatedAt) }
-          ]}
-        />
-      </Card>
+      <Split>
+        <Card title="Synthese">
+          <DescriptionList
+            columns={2}
+            items={[
+              { term: "Statut", value: <StatusBadge status={country.status} tones={catalogStatusTones} /> },
+              { term: "Régime", value: regimeName ?? <Badge tone="warning">Non renseigné</Badge> },
+              { term: "Famille réglementaire", value: country.regulatoryFamily },
+              { term: "Langues", value: country.languages.join(", ") },
+              { term: "Devise", value: country.currency },
+              { term: "Fuseau", value: country.timezone },
+              { term: "Téléphone", value: country.phoneDialCode ? `${country.phoneDialCode}, ${country.phoneNationalLengths.join(" ou ") || "?"} chiffres` : "Normalisation générique" },
+              { term: "Public depuis", value: formatDate(country.publicSince) },
+              { term: "Mis à jour", value: formatDate(country.updatedAt) }
+            ]}
+          />
+        </Card>
 
-      <Card title="Checklist d'activation du pays" description="Contrôles bloquants pour une ouverture au public. La liste est recalculée à chaque chargement.">
-        {checklist ? (
-          checklist.ready ? (
-            <Notice tone="success">Aucun contrôle bloquant : l&apos;ouverture reste soumise au go/no-go conformité.</Notice>
+        <Card title="Checklist d'activation du pays" description="Contrôles bloquants pour une ouverture au public. La liste est recalculée à chaque chargement.">
+          {checklist ? (
+            checklist.ready ? (
+              <Notice tone="success">Aucun contrôle bloquant : l&apos;ouverture reste soumise au go/no-go conformité.</Notice>
+            ) : (
+              <>
+                <Notice tone="warning">{`${checklist.blockers.length} contrôle(s) bloquant(s) avant toute ouverture au public.`}</Notice>
+                <BlockersList blockers={checklist.blockers} scope={{ countryId: country.id }} />
+              </>
+            )
           ) : (
-            <>
-              <Notice tone="warning">{`${checklist.blockers.length} contrôle(s) bloquant(s) avant toute ouverture au public.`}</Notice>
-              <BlockersList blockers={checklist.blockers} scope={{ countryId: country.id }} />
-            </>
-          )
-        ) : (
-          <StateMessage>Résumé indisponible : consultez la checklist technique d&apos;activation.</StateMessage>
-        )}
-      </Card>
+            <StateMessage>Résumé indisponible : consultez la checklist technique d&apos;activation.</StateMessage>
+          )}
+        </Card>
+      </Split>
 
       <Grid columns="two">
         <EditCountryForm country={country} regimes={regimeChoices} />
@@ -141,7 +149,7 @@ export default async function CatalogCountryDetailPage({ params }: CountryDetail
       <Card title="Flags du pays" description="Un formulaire par flag. Désactiver n'a aucune condition ; activer vérifie les conditions de la checklist.">
         <DataTable
           columns={[
-            { key: "flag", header: "Flag", render: (key: string) => <><strong>{flagLabel(key)}</strong><div><code>{key}</code></div></> },
+            { key: "flag", header: "Flag", render: (key: string) => <><strong>{flagLabel(key)}</strong><div className="bo-ref">{key}</div></> },
             { key: "value", header: "État", render: (key: string) => <FlagBadge value={country.flags[key as keyof typeof country.flags] === true} /> },
             {
               key: "action",
@@ -165,7 +173,7 @@ export default async function CatalogCountryDetailPage({ params }: CountryDetail
             <ul className="bo-list">
               {readOnlyFlags.map((key) => (
                 <li key={key}>
-                  <code>{key}</code> : {country.flags[key as keyof typeof country.flags] ? "ouvert" : "fermé"}. {SENSITIVE_FLAG_EXPLANATION}
+                  <span className="bo-ref">{key}</span> : {country.flags[key as keyof typeof country.flags] ? "ouvert" : "fermé"}. {SENSITIVE_FLAG_EXPLANATION}
                 </li>
               ))}
             </ul>
@@ -187,17 +195,18 @@ export default async function CatalogCountryDetailPage({ params }: CountryDetail
                 key: "effective",
                 header: "Flags effectifs",
                 render: (link: AdminCountryProductLinkData) => (
-                  <>
+                  <Cluster>
                     {PRODUCT_TOGGLEABLE_FLAGS.map((key) => (
                       <Badge key={key} tone={link.effectiveFlags[key] ? "warning" : "disabled"}>{`${flagLabel(key)} : ${link.effectiveFlags[key] ? "oui" : "non"}`}</Badge>
                     ))}
-                  </>
+                  </Cluster>
                 )
               }
             ]}
             items={links}
             getKey={(link) => link.productId}
             emptyLabel="Aucun produit lié : le pays ne propose aucun parcours."
+            emptyDescription="Liez un produit avec le formulaire en bas de page ; la liaison se crée fermée."
             aria-label="Liaisons pays produit"
           />
         </Card>

@@ -39,21 +39,21 @@ export default async function FeatureFlagsPage() {
     <PageStack>
       <PageHeader
         breadcrumb={[{ label: "Plateforme" }, { label: "Feature flags" }]}
-        kicker="Activation progressive"
         title="Feature flags"
-        description="Vue de pilotage des flags globaux, pays, produits, partenaires et modules. Les modules sensibles restent fail-closed et auditables."
+        description="Flags globaux, pays, produits, partenaires et modules. Les modules sensibles restent fail-closed et auditables."
       />
+      <StateMessage tone="warning">Cette interface ne cree aucun bouton d&apos;activation pour les modules reglementes.</StateMessage>
 
       {flags.forbidden ? <StateMessage tone="danger">{adminReadErrorMessage("access_denied")}</StateMessage> : null}
       {flags.status === "error" ? <StateMessage tone="danger">{adminReadErrorMessage(flags.error)}</StateMessage> : null}
 
       <Card
         title="Desactivation rapide"
-        description="Les flags globaux, pays, produits, partenaires et modules restent auditables et fail-closed. Seuls les flags globaux non sensibles se basculent ici, avec un motif audite."
+        description="Seuls les flags globaux non sensibles se basculent ici, avec un motif audite."
       >
         <DataTable
           columns={[
-            { key: "flag", header: "Flag", render: (flag) => <code>{flag.key}</code> },
+            { key: "flag", header: "Flag", render: (flag) => <span className="bo-ref">{flag.key}</span> },
             { key: "value", header: "Etat", render: (flag) => <ValueBadge value={flag.value} /> },
             { key: "changed", header: "Modifie le", render: (flag) => formatDate(flag.changedAt) },
             { key: "reason", header: "Dernier motif", render: (flag) => flag.reason ?? "-" },
@@ -69,7 +69,7 @@ export default async function FeatureFlagsPage() {
       <Card title="Modules sensibles (lecture seule)" description="Flags reglementes, IA, paiement, signature, sinistres, assureurs et webhooks : aucune bascule depuis cette interface.">
         <DataTable
           columns={[
-            { key: "flag", header: "Flag", render: (flag) => <code>{flag.key}</code> },
+            { key: "flag", header: "Flag", render: (flag) => <span className="bo-ref">{flag.key}</span> },
             { key: "value", header: "Etat", render: (flag) => <ValueBadge value={flag.value} /> },
             { key: "control", header: "Controle", render: () => "Aucune activation par cette interface : procedure de conformite" }
           ]}
@@ -88,8 +88,8 @@ export default async function FeatureFlagsPage() {
       <Card title="Flags pays et produits (lecture seule)" description="Historique ecrit par le catalogue. Ils se modifient depuis les fiches pays et produits, ou leurs conditions d'activation s'appliquent.">
         <DataTable
           columns={[
-            { key: "flag", header: "Flag", render: (flag) => <code>{flag.key}</code> },
-            { key: "scope", header: "Portee", render: (flag) => `${flag.scopeType}${flag.scopeId ? ` ${flag.scopeId.slice(0, 8)}` : ""}` },
+            { key: "flag", header: "Flag", render: (flag) => <span className="bo-ref">{flag.key}</span> },
+            { key: "scope", header: "Portee", render: (flag) => <>{flag.scopeType}{flag.scopeId ? <> <span className="bo-ref">{flag.scopeId.slice(0, 8)}</span></> : null}</> },
             { key: "value", header: "Etat", render: (flag) => <ValueBadge value={flag.value} /> },
             { key: "link", header: "", render: (flag) => <Button href={scopeHref(flag)} size="sm" variant="secondary">Ouvrir dans le catalogue</Button> }
           ]}
@@ -99,8 +99,6 @@ export default async function FeatureFlagsPage() {
           aria-label="Flags pays et produits"
         />
       </Card>
-
-      <StateMessage tone="warning">Cette interface ne cree aucun bouton d&apos;activation pour les modules reglementes.</StateMessage>
     </PageStack>
   );
 }

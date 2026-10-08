@@ -1,7 +1,7 @@
 import Image from "next/image";
 
 export interface LogoProps {
-  /** `white` is the monochrome asset used on the primary-700 sidebar, `symbol` the mark alone. */
+  /** `white` is the monochrome asset for a dark ground, `symbol` the mark alone. */
   variant?: "color" | "white" | "symbol" | undefined;
   /** Rendered height in pixels; the width follows the intrinsic ratio of the asset. */
   height?: number | undefined;

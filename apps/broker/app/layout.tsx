@@ -1,6 +1,5 @@
-import "@assurmatch/ui/tokens.css";
 import "@assurmatch/ui/backoffice.css";
-import { bodyFont, headingFont } from "@assurmatch/ui/fonts";
+import { monoFont, uiFont } from "@assurmatch/ui/backoffice-fonts";
 import { initialsOf } from "@assurmatch/ui/backoffice";
 import { readBackOfficeSession } from "./lib/backoffice-auth";
 import { TENANT_SUSPENDED_MESSAGE, isTenantReadOnly } from "./lib/broker-permissions";
@@ -30,7 +29,7 @@ export default async function BrokerLayout({ children }: { children: React.React
   const suspendedBanner = isTenantReadOnly(profile) ? TENANT_SUSPENDED_MESSAGE : undefined;
 
   return (
-    <html lang="fr" className={`${headingFont.variable} ${bodyFont.variable}`}>
+    <html lang="fr" data-app="broker" className={`${uiFont.variable} ${monoFont.variable}`}>
       <body>
         <BrokerShell user={user} plan={plan} envBadge={envBadge} suspendedBanner={suspendedBanner}>
           {children}

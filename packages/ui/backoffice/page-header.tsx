@@ -6,6 +6,7 @@ export interface BreadcrumbItem {
 }
 
 export interface PageHeaderProps {
+  /** Retired: the heading carries its own weight. Accepted so existing screens keep compiling. */
   kicker?: string | undefined;
   title: string;
   description?: string | undefined;
@@ -15,7 +16,7 @@ export interface PageHeaderProps {
   breadcrumbLabel?: string | undefined;
 }
 
-export function PageHeader({ kicker, title, description, actions, breadcrumb, breadcrumbLabel = "Fil d'Ariane" }: PageHeaderProps) {
+export function PageHeader({ title, description, actions, breadcrumb, breadcrumbLabel = "Fil d'Ariane" }: PageHeaderProps) {
   return (
     <header className="bo-page-header">
       <div className="bo-page-header__text">
@@ -30,7 +31,6 @@ export function PageHeader({ kicker, title, description, actions, breadcrumb, br
             </ol>
           </nav>
         ) : null}
-        {kicker ? <p className="bo-kicker">{kicker}</p> : null}
         <h1 className="bo-title">{title}</h1>
         {description ? <p className="bo-description">{description}</p> : null}
       </div>

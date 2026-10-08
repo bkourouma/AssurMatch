@@ -3,6 +3,7 @@ import { readAdminCountries, readRegulatoryRegimes } from "../../lib/admin-api";
 import { isAdminProfile, loginRedirect, readBackOfficeSession } from "../../lib/backoffice-auth";
 import { adminReadErrorMessage, formatDate } from "../../lib/catalog-messages";
 import {
+  Button,
   Card,
   DataTable,
   PageHeader,
@@ -27,9 +28,9 @@ export default async function CatalogRegimesPage() {
     <PageStack>
       <PageHeader
         breadcrumb={[{ label: "Catalogue", href: "/catalog" }, { label: "Regimes" }]}
-        kicker="Catalogue"
         title="Regimes reglementaires"
         description="Régimes référencés par les pays. Un régime référencé par un pays ne peut pas être retiré ; un pays sans régime reste bloqué par la checklist."
+        actions={regimes.status === "success" ? <Button href="#creer-regime">Créer un régime</Button> : null}
       />
 
       {regimes.forbidden ? <StateMessage tone="danger">{adminReadErrorMessage("access_denied")}</StateMessage> : null}
@@ -37,25 +38,23 @@ export default async function CatalogRegimesPage() {
 
       {regimes.status === "success" ? (
         <>
-          <Card title="Regimes">
-            <DataTable
-              columns={[
-                { key: "key", header: "Clé", render: (regime) => <code>{regime.key}</code> },
-                { key: "name", header: "Nom", render: (regime) => regime.name },
-                { key: "status", header: "Statut", render: (regime) => <StatusBadge status={regime.status} tones={regimeStatusTones} /> },
-                { key: "retention", header: "Conservation", render: (regime) => (regime.retentionOverrideYears ? `${regime.retentionOverrideYears} ans` : "Par défaut") },
-                { key: "review", header: "Revue avant activation", render: (regime) => (regime.requiresManualActivationReview ? "Oui" : "Non") },
-                { key: "countries", header: "Pays", render: (regime) => referencedBy(regime.id).join(", ") || "-" },
-                { key: "updated", header: "Mis à jour", render: (regime) => formatDate(regime.updatedAt) }
-              ]}
-              items={regimes.data}
-              getKey={(regime) => regime.id}
-              emptyLabel="Aucun régime : les pays ne peuvent pas passer la checklist d'activation."
-              aria-label="Regimes reglementaires"
-            />
-          </Card>
+          <DataTable
+            columns={[
+              { key: "key", header: "Clé", render: (regime) => <span className="bo-ref">{regime.key}</span> },
+              { key: "name", header: "Nom", render: (regime) => regime.name },
+              { key: "status", header: "Statut", render: (regime) => <StatusBadge status={regime.status} tones={regimeStatusTones} /> },
+              { key: "retention", header: "Conservation", render: (regime) => (regime.retentionOverrideYears ? `${regime.retentionOverrideYears} ans` : "Par défaut") },
+              { key: "review", header: "Revue avant activation", render: (regime) => (regime.requiresManualActivationReview ? "Oui" : "Non") },
+              { key: "countries", header: "Pays", render: (regime) => referencedBy(regime.id).join(", ") || "-" },
+              { key: "updated", header: "Mis à jour", render: (regime) => formatDate(regime.updatedAt) }
+            ]}
+            items={regimes.data}
+            getKey={(regime) => regime.id}
+            emptyLabel="Aucun régime : les pays ne peuvent pas passer la checklist d'activation."
+            aria-label="Regimes reglementaires"
+          />
 
-          <CreateRegimeForm />
+          <div id="creer-regime"><CreateRegimeForm /></div>
 
           {regimes.data.filter((regime) => regime.status !== "retired").map((regime) => (
             <Card key={regime.id} title={`Modifier ${regime.name}`} description={`Clé ${regime.key} (non modifiable).`}>

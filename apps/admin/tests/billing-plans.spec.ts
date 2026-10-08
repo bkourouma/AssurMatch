@@ -29,7 +29,7 @@ test("broker CRM page shows lead consumption without payment wording (DASH-B-008
   expect(page).toContain("Consommation et facturation");
   expect(page).toContain("Leads factures (brouillon)");
   expect(page).toContain("Credits pack restants");
-  expect(page).toContain("paiement: desactive");
+  expect(page).toContain("Paiement en ligne desactive");
 });
 
 // Spec 060: issuing invoices is now legitimate (manual invoicing, decision D-8); online payment and

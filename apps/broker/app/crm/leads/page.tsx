@@ -3,7 +3,7 @@ import { loginRedirect } from "../../lib/backoffice-auth";
 import { listCrmLeads } from "../../lib/broker-api";
 import { crmStatusLabel } from "../../lib/lead-vocabulary";
 import {
-  Badge,
+  Button,
   DataTable,
   Field,
   FilterBar,
@@ -40,7 +40,7 @@ function optionsOf(
 }
 
 const columns: Array<DataTableColumn<LeadSummaryViewModel>> = [
-  { key: "reference", header: "Reference", render: (lead) => lead.reference, sortable: true, sortValue: (lead) => lead.reference },
+  { key: "reference", header: "Reference", render: (lead) => <span className="bo-ref">{lead.reference}</span>, sortable: true, sortValue: (lead) => lead.reference },
   { key: "country", header: "Pays", render: (lead) => lead.country },
   { key: "product", header: "Produit", render: (lead) => lead.product, sortable: true, sortValue: (lead) => lead.product },
   {
@@ -51,7 +51,7 @@ const columns: Array<DataTableColumn<LeadSummaryViewModel>> = [
     sortValue: (lead) => crmStatusLabel(lead.status)
   },
   { key: "date", header: "Date", render: (lead) => lead.assignedAt, sortable: true, sortValue: (lead) => lead.assignedAt },
-  { key: "advisor", header: "Conseiller", render: (lead) => lead.advisor ?? "-" },
+  { key: "advisor", header: "Conseiller", render: (lead) => (lead.advisor ? <span className="bo-ref">{lead.advisor}</span> : "-") },
   { key: "urgency", header: "Urgence", render: (lead) => lead.urgency ?? "-" },
   { key: "source", header: "Source", render: (lead) => lead.source ?? "-" }
 ];
@@ -63,6 +63,7 @@ export default async function BrokerCrmLeadsPage({ searchParams }: { searchParam
   if (apiLeads.forbidden) {
     return (
       <PageStack>
+        <PageHeader breadcrumb={[{ label: "CRM", href: "/crm" }, { label: "Vue tableau" }]} title="Leads CRM" />
         <Notice tone="danger" title="Acces CRM refuse">
           Acces CRM refuse, verifiez le plan, la MFA et le flag broker_crm_enabled. Aucune donnee CRM n'est affichee.
         </Notice>
@@ -101,10 +102,9 @@ export default async function BrokerCrmLeadsPage({ searchParams }: { searchParam
     <PageStack>
       <PageHeader
         breadcrumb={[{ label: "CRM", href: "/crm" }, { label: "Vue tableau" }]}
-        kicker="CRM Pro/Enterprise"
         title="Leads CRM"
-        description="Vue tableau des leads autorises selon role, tenant, conseiller et permissions PII."
-        actions={<Badge tone="info">Export controle par permission et audit</Badge>}
+        description="Vue tableau des leads autorises selon role, tenant, conseiller et permissions PII. Export controle par permission et audit."
+        actions={<Button href="/crm/kanban" variant="secondary">Vue Kanban</Button>}
       />
 
       <FilterBar
@@ -156,6 +156,12 @@ export default async function BrokerCrmLeadsPage({ searchParams }: { searchParam
         getKey={(lead) => lead.id}
         aria-label="Leads CRM"
         emptyLabel="Aucun lead CRM autorise a afficher."
+        emptyDescription={
+          activeCount > 0
+            ? "Aucun lead ne correspond a ces filtres ou a cette recherche. Reinitialisez-les pour revoir le pipeline."
+            : "Les leads qui vous sont assignes, a vous ou a votre equipe selon votre role, apparaissent ici."
+        }
+        emptyAction={activeCount > 0 ? <Button href="/crm/leads" variant="secondary" size="sm">Reinitialiser les filtres</Button> : undefined}
         getRowHref={(lead) => `/crm/leads/${lead.id}`}
         sort={table.sort}
         sortHref={table.sortHref}

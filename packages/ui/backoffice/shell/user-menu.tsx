@@ -16,9 +16,11 @@ export interface UserMenuProps {
   logoutAction?: ((formData: FormData) => void | Promise<void>) | undefined;
   /** Extra `.bo-menu__item` entries rendered above the logout form. */
   children?: ReactNode;
+  /** `up` opens the menu above the button, for a menu placed at the foot of the sidebar. */
+  placement?: "down" | "up" | undefined;
 }
 
-export function UserMenu({ label, role, initials, menuLabel, logoutLabel, logoutAction, children }: UserMenuProps) {
+export function UserMenu({ label, role, initials, menuLabel, logoutLabel, logoutAction, children, placement = "down" }: UserMenuProps) {
   const [open, setOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -40,7 +42,7 @@ export function UserMenu({ label, role, initials, menuLabel, logoutLabel, logout
   }, [open]);
 
   return (
-    <div className="bo-user-menu" ref={containerRef}>
+    <div className="bo-user-menu" data-placement={placement} ref={containerRef}>
       <button
         className="bo-user-menu__button"
         type="button"
@@ -56,7 +58,7 @@ export function UserMenu({ label, role, initials, menuLabel, logoutLabel, logout
           <span className="bo-user-menu__label">{label}</span>
           {role ? <span className="bo-user-menu__role">{role}</span> : null}
         </span>
-        <Icon name="chevronDown" size={16} />
+        <Icon name={placement === "up" ? "chevronUpDown" : "chevronDown"} size={16} />
       </button>
       {open ? (
         <div className="bo-menu" role="menu">
