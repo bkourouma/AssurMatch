@@ -18,11 +18,10 @@ const fr: LegalPage = {
       heading: "Qui publie ce site",
       body: [
         "Le site AssurMatch est édité par Alliance Consultants (Alliance Computer Consultants), société en activité depuis 2003.",
-        "Siège : Abidjan, Côte d'Ivoire. Adresse postale : 23 BP 882 Abidjan 23, Côte d'Ivoire. [À COMPLÉTER : adresse physique du siège]",
+        "Adresse postale : 23 BP 882 Abidjan 23, Côte d'Ivoire.",
         "Forme juridique et capital social : SARL au capital de 3 000 000 FCFA",
         "Immatriculation (registre du commerce) : RCCM CI-ABJ-2014-B-20956",
-        "Directeur de la publication : Baba Kourouma",
-        "Les informations encore à compléter sont aussi listées dans la section « À compléter avant mise en ligne » en bas de cette page."
+        "Directeur de la publication : Baba Kourouma"
       ]
     },
     {
@@ -64,9 +63,6 @@ const fr: LegalPage = {
         "Vous pouvez aussi joindre l'éditeur par e-mail à assurmatch@allianceconsultants.net, ou par téléphone au +225 01 01 51 01 36 ou au +225 07 07 66 41 05."
       ]
     }
-  ],
-  placeholders: [
-    "Adresse physique du siège social"
   ]
 };
 
@@ -88,11 +84,10 @@ const en: LegalPage = {
       heading: "Who publishes this site",
       body: [
         "The AssurMatch site is published by Alliance Consultants (Alliance Computer Consultants), a company active since 2003.",
-        "Registered office: Abidjan, Côte d'Ivoire. Postal address: 23 BP 882 Abidjan 23, Côte d'Ivoire. [À COMPLÉTER: physical address of the registered office]",
+        "Postal address: 23 BP 882 Abidjan 23, Côte d'Ivoire.",
         "Legal form and share capital: limited liability company (SARL) with share capital of FCFA 3,000,000",
         "Registration (commercial register): RCCM CI-ABJ-2014-B-20956",
-        "Publication director: Baba Kourouma",
-        "Details still to be completed are also listed in the \"To be completed before launch\" section at the bottom of this page."
+        "Publication director: Baba Kourouma"
       ]
     },
     {
@@ -132,9 +127,6 @@ const en: LegalPage = {
         "You can also reach the publisher by e-mail at assurmatch@allianceconsultants.net, or by phone on +225 01 01 51 01 36 or +225 07 07 66 41 05."
       ]
     }
-  ],
-  placeholders: [
-    "Physical address of the registered office"
   ]
 };
 
