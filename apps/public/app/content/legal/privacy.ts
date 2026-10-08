@@ -7,8 +7,8 @@ const fr: LegalPage = {
   updatedAt: "2026-09-19",
   summary: [
     "Nous collectons vos données seulement quand vous demandez un devis ou nous écrivez.",
-    "Elles servent à vous mettre en relation avec le bon courtier partenaire, jamais à être revendues.",
-    "Une demande de devis part vers le courtier responsable de votre pays et de votre produit, jamais publiée.",
+    "Elles servent à vous mettre en relation avec le bon courtier partenaire. Nous ne vendons pas vos données.",
+    "Une demande de devis part vers le courtier responsable de votre pays et de votre produit ; elle n'est pas publiée.",
     "Vous pouvez retirer votre consentement à tout moment depuis la page de suivi de votre demande.",
     "Pour toute autre question sur vos données, la page Contact permet d'écrire à l'équipe AssurMatch."
   ],
@@ -58,7 +58,7 @@ const fr: LegalPage = {
       body: [
         "Les données d'une demande de devis sont transmises au courtier partenaire (ou, si le visiteur l'accepte explicitement, aux courtiers partenaires) responsable du pays et du produit concernés.",
         "L'hébergeur technique du site, listé dans les mentions légales, héberge les données mais n'y accède pas pour ses propres finalités.",
-        "Les données ne sont jamais vendues à des tiers à des fins commerciales."
+        "Nous ne vendons pas vos données."
       ]
     },
     {
@@ -101,8 +101,8 @@ const en: LegalPage = {
   updatedAt: "2026-09-19",
   summary: [
     "We collect your data only when you request a quote or write to us.",
-    "It is used to introduce you to the right partner broker, never to be resold.",
-    "A quote request goes to the broker responsible for your country and product, never published.",
+    "It is used to introduce you to the right partner broker. We do not sell your data.",
+    "A quote request goes to the broker responsible for your country and product; it is not published.",
     "You can withdraw your consent at any time from your request's tracking page.",
     "For any other question about your data, the Contact page lets you write to the AssurMatch team."
   ],
@@ -152,7 +152,7 @@ const en: LegalPage = {
       body: [
         "A quote request's data is transmitted to the partner broker (or, if the visitor explicitly accepts it, brokers) responsible for the relevant country and product.",
         "The site's technical host, listed in the legal notice, hosts the data but does not access it for its own purposes.",
-        "Data is never sold to third parties for marketing purposes."
+        "We do not sell your data."
       ]
     },
     {
