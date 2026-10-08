@@ -31,8 +31,9 @@ export function publicFile(relativePath: string): string {
 }
 
 /** Reads one source file as text. */
+// Line endings follow the checkout (CRLF on Windows): specs match multi-line markers with `\n`.
 export function readSource(path: string): string {
-  return readFileSync(path, "utf8");
+  return readFileSync(path, "utf8").replace(/\r\n/g, "\n");
 }
 
 /** Reads several source files and joins them, so a spec can assert across a small set of files at once. */
