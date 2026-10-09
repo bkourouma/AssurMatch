@@ -3,8 +3,9 @@
 import { usePathname } from "next/navigation";
 import type { ReactNode } from "react";
 import { AppShell, AuthShell, Notice } from "@assurmatch/ui/backoffice";
-import type { AppShellUser, NavGroup } from "@assurmatch/ui/backoffice";
+import type { AppShellUser, NavGroup, ThemeValue } from "@assurmatch/ui/backoffice";
 import { logoutAction } from "../backoffice-session-actions";
+import { BROKER_THEME_COOKIE } from "../theme-cookie";
 
 export type BrokerPlan = "starter" | "pro" | "enterprise";
 
@@ -15,6 +16,8 @@ export interface BrokerShellProps {
   envBadge?: string | undefined;
   /** Spec 051 R12: persistent banner of a suspended partner (computed by the layout from the session). */
   suspendedBanner?: string | undefined;
+  /** Current theme, read from the cookie by the layout. */
+  theme?: ThemeValue | undefined;
 }
 
 /** Ecrans d'authentification: rendus hors du shell applicatif, sans navigation ni session. */
@@ -91,7 +94,7 @@ function brokerNavigation(plan?: BrokerPlan | undefined): NavGroup[] {
 }
 
 /** Enveloppe mince autour du design system back-office partage: aucune logique de session ici. */
-export function BrokerShell({ children, user, plan, envBadge, suspendedBanner }: BrokerShellProps) {
+export function BrokerShell({ children, user, plan, envBadge, suspendedBanner, theme }: BrokerShellProps) {
   const pathname = usePathname() || "/";
 
   if (isAuthRoute(pathname)) {
@@ -115,6 +118,7 @@ export function BrokerShell({ children, user, plan, envBadge, suspendedBanner }:
       menuOpenLabel="Ouvrir le menu courtier"
       menuCloseLabel="Fermer le menu courtier"
       userMenuLabel="Menu du compte courtier"
+      themePicker={{ cookieName: BROKER_THEME_COOKIE, current: theme ?? "clair", label: "Theme" }}
       breadcrumbLabel="Fil d'Ariane"
       dataAttributes={{ "data-broker-shell": "true" }}
     >

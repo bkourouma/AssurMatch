@@ -1,9 +1,11 @@
 import "@assurmatch/ui/backoffice.css";
 import { monoFont, uiFont } from "@assurmatch/ui/backoffice-fonts";
-import { initialsOf } from "@assurmatch/ui/backoffice";
+import { initialsOf, themeByValue } from "@assurmatch/ui/backoffice";
+import { cookies } from "next/headers";
 import { readBackOfficeSession } from "./lib/backoffice-auth";
 import { TENANT_SUSPENDED_MESSAGE, isTenantReadOnly } from "./lib/broker-permissions";
 import { BrokerShell } from "./lib/ui/broker-shell";
+import { BROKER_THEME_COOKIE } from "./lib/theme-cookie";
 
 export const metadata = {
   title: "AssurMatch Courtier",
@@ -12,6 +14,8 @@ export const metadata = {
 
 export default async function BrokerLayout({ children }: { children: React.ReactNode }) {
   const session = await readBackOfficeSession();
+  // The chosen theme lives in a cookie so the server renders it: no flash of the default theme.
+  const theme = themeByValue((await cookies()).get(BROKER_THEME_COOKIE)?.value);
   const profile = session.status === "authenticated" || session.status === "mfa_required" ? session.profile : undefined;
   const label = profile?.displayName ?? profile?.actorId ?? "Courtier connecte";
   const user = profile
@@ -29,9 +33,9 @@ export default async function BrokerLayout({ children }: { children: React.React
   const suspendedBanner = isTenantReadOnly(profile) ? TENANT_SUSPENDED_MESSAGE : undefined;
 
   return (
-    <html lang="fr" data-app="broker" className={`${uiFont.variable} ${monoFont.variable}`}>
+    <html lang="fr" data-app="broker" data-theme={theme.value} data-mode={theme.mode} className={`${uiFont.variable} ${monoFont.variable}`}>
       <body>
-        <BrokerShell user={user} plan={plan} envBadge={envBadge} suspendedBanner={suspendedBanner}>
+        <BrokerShell theme={theme.value} user={user} plan={plan} envBadge={envBadge} suspendedBanner={suspendedBanner}>
           {children}
         </BrokerShell>
       </body>

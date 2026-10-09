@@ -7,6 +7,7 @@ import { Logo } from "../logo";
 import { UserMenu } from "./user-menu";
 import { findActive, isActive } from "./navigation";
 import type { NavGroup } from "./navigation";
+import type { ThemeValue } from "../themes";
 
 export interface AppShellBrand {
   /** Name of the surface under the logo, e.g. "Back-office Admin". */
@@ -37,6 +38,8 @@ export interface AppShellProps {
   menuOpenLabel: string;
   menuCloseLabel: string;
   userMenuLabel: string;
+  /** Theme chooser for the account menu; the layout reads the cookie and passes the current theme. */
+  themePicker?: { cookieName: string; current: ThemeValue; label: string } | undefined;
   /** Kept for API compatibility: the page header owns the breadcrumb, the topbar no longer repeats it. */
   breadcrumbLabel?: string | undefined;
   /** `data-*` attributes the surface needs for its own static tests. */
@@ -60,6 +63,7 @@ export function AppShell({
   menuOpenLabel,
   menuCloseLabel,
   userMenuLabel,
+  themePicker,
   dataAttributes
 }: AppShellProps) {
   const [navOpen, setNavOpen] = useState(false);
@@ -91,7 +95,7 @@ export function AppShell({
         <div className="bo-sidebar__brand">
           <div className="bo-sidebar__brand-row">
             <a href={brand.homeHref} aria-label={brand.scope}>
-              <Logo variant="white" height={28} priority />
+              <Logo variant="auto" height={28} priority />
             </a>
             {envBadge ? <span className="bo-env-badge">{envBadge}</span> : null}
           </div>
@@ -158,6 +162,7 @@ export function AppShell({
               logoutLabel={logoutLabel}
               logoutAction={logoutAction}
               placement="up"
+              themePicker={themePicker}
             />
           </div>
         ) : null}

@@ -3,8 +3,9 @@
 import { usePathname } from "next/navigation";
 import type { ReactNode } from "react";
 import { AppShell, AuthShell } from "@assurmatch/ui/backoffice";
-import type { NavGroup } from "@assurmatch/ui/backoffice";
+import type { NavGroup, ThemeValue } from "@assurmatch/ui/backoffice";
 import { logoutAction } from "../backoffice-session-actions";
+import { ADMIN_THEME_COOKIE } from "../theme-cookie";
 
 export interface AdminShellUser {
   label: string;
@@ -124,11 +125,14 @@ function isAuthRoute(pathname: string): boolean {
 export function AdminShell({
   children,
   user,
-  envBadge
+  envBadge,
+  theme
 }: {
   children: ReactNode;
   user?: AdminShellUser | undefined;
   envBadge?: string | undefined;
+  /** Current theme, read from the cookie by the layout. */
+  theme?: ThemeValue | undefined;
 }) {
   const pathname = usePathname() || "/";
   const badge = envBadge ?? (process.env.NEXT_PUBLIC_APP_ENV === "local" ? "Local" : undefined);
@@ -154,6 +158,7 @@ export function AdminShell({
       menuOpenLabel="Ouvrir la navigation admin"
       menuCloseLabel="Fermer la navigation admin"
       userMenuLabel="Utilisateur connecte"
+      themePicker={{ cookieName: ADMIN_THEME_COOKIE, current: theme ?? "clair", label: "Theme" }}
       breadcrumbLabel="Fil d'Ariane admin"
       dataAttributes={{ "data-admin-shell": "true" }}
     >

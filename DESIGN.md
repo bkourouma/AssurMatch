@@ -281,3 +281,18 @@ Tabs: a strong hairline rail, 2px lead-wavelength underline on the active tab. D
 - **Don't** add a second type family, or set prose in mono.
 - **Don't** mix both lead wavelengths on one screen, or use the lead wavelength to signal state.
 - **Don't** read the public site's tokens or styles; the back-office stylesheet is `bo-` scoped and self-contained.
+
+## Themes
+
+The system ships six themes, chosen per person from the account menu (foot of the rail) and stored in a per-app cookie (`assurmatch_admin_theme`, `assurmatch_broker_theme`) that the layout reads, so the server renders the chosen theme with no flash. `<html>` carries `data-app`, `data-theme` and `data-mode`.
+
+| Theme | Mode | Continuum |
+| --- | --- | --- |
+| Clair (default) | light | cool paper ground, white plates, near-black ink |
+| Sable | light | warm sand ground, brown ink |
+| Sombre | dark | charcoal, bone ink (the original « raie d'émission » look) |
+| Bleu nuit | dark | deep navy |
+| Vert forêt | dark | very dark green |
+| Prune | dark | dark aubergine |
+
+A theme only sets the continuum (grounds, plates, hairlines, ink). Mode sets the status set (darkened text on light, lifted on dark) and the lightness of the lead wavelength. The lead wavelength of each app keeps its hue in every theme (admin cyan, courtier violet), so the two apps stay distinguishable. The logo switches ink with the mode (colour mark on light, white mark on dark). New themes are added in `packages/ui/styles/backoffice.css` and `packages/ui/backoffice/themes.ts` only.

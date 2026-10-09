@@ -13,51 +13,61 @@
  */
 
 /* ---------- Tokens ---------- */
+/*
+ * Themes. `<html data-theme="…" data-mode="light|dark">` selects one; no attribute means "clair".
+ * A theme only sets the continuum (grounds, plates, lines, ink) and the mode (light or dark status
+ * set). The lead wavelength of each app stays the same in every theme: `data-app` sets its hue and
+ * the mode sets its lightness, so admin and courtier are told apart in all six themes.
+ */
 
 :root {
-  color-scheme: dark;
+  color-scheme: light;
 
   --bo-font: var(--font-bo-sans), "Archivo", system-ui, "Segoe UI", Arial, sans-serif;
   --bo-mono: var(--font-bo-mono), "Spline Sans Mono", ui-monospace, "Cascadia Mono", Consolas, monospace;
 
-  /* The continuum: charcoal ground, ash plates, bone legends */
-  --bo-ground: oklch(0.175 0.004 250);
-  --bo-surface: oklch(0.225 0.005 250);
-  --bo-surface-2: oklch(0.2 0.005 250);
-  --bo-rail: oklch(0.15 0.004 250);
-  --bo-inset: oklch(0.145 0.004 250);
-  --bo-hover: oklch(0.275 0.006 250);
-  --bo-line: oklch(0.31 0.006 250);
-  --bo-line-strong: oklch(0.43 0.008 250);
-  --bo-control-line: oklch(0.6 0.01 250);
-  --bo-ink: oklch(0.93 0.012 95);
-  --bo-ink-2: oklch(0.8 0.012 95);
-  --bo-ink-3: oklch(0.67 0.012 95);
+  /* Clair (default): cool paper, white plates, near-black ink */
+  --bo-ground: oklch(0.968 0.003 250);
+  --bo-surface: oklch(1 0 0);
+  --bo-surface-2: oklch(0.982 0.003 250);
+  --bo-rail: oklch(0.94 0.004 250);
+  --bo-inset: oklch(0.99 0.002 250);
+  --bo-hover: oklch(0.93 0.005 250);
+  --bo-line: oklch(0.89 0.005 250);
+  --bo-line-strong: oklch(0.8 0.007 250);
+  --bo-control-line: oklch(0.58 0.01 250);
+  --bo-ink: oklch(0.21 0.01 250);
+  --bo-ink-2: oklch(0.38 0.012 250);
+  --bo-ink-3: oklch(0.5 0.012 250);
+  --bo-primary-hover: oklch(0 0 0);
 
-  /* Emission lines: the only colour in the system. Text variants are lifted for AA on the plates. */
-  --bo-success: oklch(0.82 0.16 150);
-  --bo-success-soft: oklch(0.26 0.045 150);
-  --bo-success-line: oklch(0.45 0.09 150);
-  --bo-success-dot: oklch(0.8 0.18 150);
-  --bo-warning: oklch(0.88 0.15 95);
-  --bo-warning-soft: oklch(0.27 0.045 95);
-  --bo-warning-line: oklch(0.5 0.09 95);
-  --bo-warning-dot: oklch(0.87 0.17 95);
-  --bo-danger: oklch(0.75 0.17 25);
-  --bo-danger-soft: oklch(0.26 0.05 25);
-  --bo-danger-line: oklch(0.5 0.11 25);
-  --bo-danger-dot: oklch(0.7 0.2 25);
-  --bo-info: oklch(0.78 0.11 250);
-  --bo-info-soft: oklch(0.26 0.04 250);
-  --bo-info-line: oklch(0.47 0.08 250);
-  --bo-info-dot: oklch(0.75 0.13 250);
+  /* Emission lines, light-mode set: text variants are darkened for AA on white plates */
+  --bo-success: oklch(0.4 0.12 150);
+  --bo-success-soft: oklch(0.96 0.04 150);
+  --bo-success-line: oklch(0.8 0.08 150);
+  --bo-success-dot: oklch(0.58 0.17 150);
+  --bo-warning: oklch(0.42 0.1 80);
+  --bo-warning-soft: oklch(0.97 0.05 95);
+  --bo-warning-line: oklch(0.84 0.1 95);
+  --bo-warning-dot: oklch(0.74 0.16 85);
+  --bo-danger: oklch(0.45 0.17 27);
+  --bo-danger-soft: oklch(0.965 0.03 25);
+  --bo-danger-line: oklch(0.85 0.08 25);
+  --bo-danger-dot: oklch(0.56 0.2 27);
+  --bo-info: oklch(0.42 0.1 250);
+  --bo-info-soft: oklch(0.96 0.02 250);
+  --bo-info-line: oklch(0.86 0.05 250);
+  --bo-info-dot: oklch(0.58 0.13 250);
 
-  /* Lead wavelength: admin cyan (486nm) */
-  --bo-accent: oklch(0.82 0.12 210);
-  --bo-accent-hover: oklch(0.88 0.1 210);
-  --bo-accent-soft: oklch(0.27 0.045 210);
-  --bo-accent-line: oklch(0.5 0.09 210);
-  --bo-accent-ink: oklch(0.86 0.1 210);
+  /* Lead wavelength: hue per app, lightness and chroma per mode */
+  --bo-hue: 215;
+  --bo-accent-l: 0.5;
+  --bo-accent-c: 0.12;
+  --bo-accent: oklch(var(--bo-accent-l) var(--bo-accent-c) var(--bo-hue));
+  --bo-accent-hover: oklch(calc(var(--bo-accent-l) - 0.07) var(--bo-accent-c) var(--bo-hue));
+  --bo-accent-soft: oklch(0.955 0.03 var(--bo-hue));
+  --bo-accent-line: oklch(0.78 0.08 var(--bo-hue));
+  --bo-accent-ink: oklch(0.4 var(--bo-accent-c) var(--bo-hue));
 
   /* Scale */
   --bo-fs: 14px;
@@ -81,17 +91,136 @@
 
   --bo-sidebar: 256px;
   --bo-topbar: 52px;
-  --bo-pop-shadow: 0 10px 28px oklch(0.05 0.004 250 / 0.6), 0 0 0 1px oklch(0.43 0.008 250);
+  --bo-pop-shadow: 0 10px 28px oklch(0.2 0.01 250 / 0.22), 0 0 0 1px var(--bo-line-strong);
+  --bo-scrim: oklch(0.2 0.01 250 / 0.5);
+  --bo-chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23596068' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9.5 6 6 6-6'/%3E%3C/svg%3E");
   --bo-ease: cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 [data-app="broker"] {
-  /* Lead wavelength: broker violet (405nm, lifted for contrast) */
-  --bo-accent: oklch(0.78 0.13 295);
-  --bo-accent-hover: oklch(0.85 0.11 295);
-  --bo-accent-soft: oklch(0.27 0.05 295);
-  --bo-accent-line: oklch(0.52 0.11 295);
-  --bo-accent-ink: oklch(0.84 0.11 295);
+  --bo-hue: 295;
+  --bo-accent-c: 0.16;
+}
+
+/* Sable: a warm light theme, brown ink */
+[data-theme="sable"] {
+  --bo-ground: oklch(0.95 0.014 80);
+  --bo-surface: oklch(0.985 0.008 80);
+  --bo-surface-2: oklch(0.968 0.011 80);
+  --bo-rail: oklch(0.92 0.018 78);
+  --bo-inset: oklch(0.99 0.006 80);
+  --bo-hover: oklch(0.91 0.02 78);
+  --bo-line: oklch(0.87 0.02 78);
+  --bo-line-strong: oklch(0.77 0.03 75);
+  --bo-control-line: oklch(0.55 0.04 70);
+  --bo-ink: oklch(0.24 0.03 55);
+  --bo-ink-2: oklch(0.4 0.035 55);
+  --bo-ink-3: oklch(0.5 0.035 60);
+  --bo-primary-hover: oklch(0.15 0.03 55);
+  --bo-chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%236b5a47' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9.5 6 6 6-6'/%3E%3C/svg%3E");
+}
+
+/* Dark themes share the dark status set; each one only sets its continuum */
+[data-mode="dark"] {
+  color-scheme: dark;
+
+  --bo-success: oklch(0.82 0.16 150);
+  --bo-success-soft: oklch(0.26 0.045 150);
+  --bo-success-line: oklch(0.45 0.09 150);
+  --bo-success-dot: oklch(0.8 0.18 150);
+  --bo-warning: oklch(0.88 0.15 95);
+  --bo-warning-soft: oklch(0.27 0.045 95);
+  --bo-warning-line: oklch(0.5 0.09 95);
+  --bo-warning-dot: oklch(0.87 0.17 95);
+  --bo-danger: oklch(0.75 0.17 25);
+  --bo-danger-soft: oklch(0.26 0.05 25);
+  --bo-danger-line: oklch(0.5 0.11 25);
+  --bo-danger-dot: oklch(0.7 0.2 25);
+  --bo-info: oklch(0.78 0.11 250);
+  --bo-info-soft: oklch(0.26 0.04 250);
+  --bo-info-line: oklch(0.47 0.08 250);
+  --bo-info-dot: oklch(0.75 0.13 250);
+
+  --bo-accent-l: 0.8;
+  --bo-accent-c: 0.12;
+  --bo-accent-hover: oklch(calc(var(--bo-accent-l) + 0.07) var(--bo-accent-c) var(--bo-hue));
+  --bo-accent-soft: oklch(0.27 0.045 var(--bo-hue));
+  --bo-accent-line: oklch(0.5 0.09 var(--bo-hue));
+  --bo-accent-ink: oklch(0.86 0.1 var(--bo-hue));
+
+  --bo-primary-hover: oklch(1 0 0);
+  --bo-pop-shadow: 0 10px 28px oklch(0.05 0.004 250 / 0.6), 0 0 0 1px var(--bo-line-strong);
+  --bo-scrim: oklch(0.08 0.004 250 / 0.72);
+  --bo-chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23a8a595' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9.5 6 6 6-6'/%3E%3C/svg%3E");
+}
+
+[data-mode="dark"][data-app="broker"] {
+  --bo-accent-l: 0.78;
+  --bo-accent-c: 0.13;
+}
+
+/* Sombre: charcoal continuum, bone ink */
+[data-theme="sombre"] {
+  --bo-ground: oklch(0.175 0.004 250);
+  --bo-surface: oklch(0.225 0.005 250);
+  --bo-surface-2: oklch(0.2 0.005 250);
+  --bo-rail: oklch(0.15 0.004 250);
+  --bo-inset: oklch(0.145 0.004 250);
+  --bo-hover: oklch(0.275 0.006 250);
+  --bo-line: oklch(0.31 0.006 250);
+  --bo-line-strong: oklch(0.43 0.008 250);
+  --bo-control-line: oklch(0.6 0.01 250);
+  --bo-ink: oklch(0.93 0.012 95);
+  --bo-ink-2: oklch(0.8 0.012 95);
+  --bo-ink-3: oklch(0.67 0.012 95);
+}
+
+/* Bleu nuit: deep navy */
+[data-theme="bleu"] {
+  --bo-ground: oklch(0.2 0.04 262);
+  --bo-surface: oklch(0.255 0.045 262);
+  --bo-surface-2: oklch(0.228 0.042 262);
+  --bo-rail: oklch(0.17 0.04 262);
+  --bo-inset: oklch(0.16 0.04 262);
+  --bo-hover: oklch(0.305 0.05 262);
+  --bo-line: oklch(0.34 0.05 262);
+  --bo-line-strong: oklch(0.47 0.06 262);
+  --bo-control-line: oklch(0.64 0.07 262);
+  --bo-ink: oklch(0.95 0.015 250);
+  --bo-ink-2: oklch(0.83 0.025 250);
+  --bo-ink-3: oklch(0.72 0.03 250);
+}
+
+/* Vert forêt: very dark green */
+[data-theme="foret"] {
+  --bo-ground: oklch(0.2 0.032 160);
+  --bo-surface: oklch(0.25 0.036 160);
+  --bo-surface-2: oklch(0.225 0.034 160);
+  --bo-rail: oklch(0.165 0.03 160);
+  --bo-inset: oklch(0.155 0.03 160);
+  --bo-hover: oklch(0.3 0.04 160);
+  --bo-line: oklch(0.33 0.04 160);
+  --bo-line-strong: oklch(0.46 0.05 160);
+  --bo-control-line: oklch(0.63 0.06 160);
+  --bo-ink: oklch(0.94 0.02 110);
+  --bo-ink-2: oklch(0.82 0.025 120);
+  --bo-ink-3: oklch(0.71 0.03 130);
+}
+
+/* Prune: dark aubergine */
+[data-theme="prune"] {
+  --bo-ground: oklch(0.2 0.04 330);
+  --bo-surface: oklch(0.255 0.045 330);
+  --bo-surface-2: oklch(0.228 0.042 330);
+  --bo-rail: oklch(0.17 0.04 330);
+  --bo-inset: oklch(0.16 0.04 330);
+  --bo-hover: oklch(0.305 0.05 330);
+  --bo-line: oklch(0.34 0.05 330);
+  --bo-line-strong: oklch(0.47 0.06 330);
+  --bo-control-line: oklch(0.64 0.07 330);
+  --bo-ink: oklch(0.95 0.015 340);
+  --bo-ink-2: oklch(0.83 0.025 340);
+  --bo-ink-3: oklch(0.72 0.03 340);
 }
 
 /* ---------- Reset ---------- */
@@ -1336,8 +1465,8 @@ samp {
 }
 
 .bo-button:hover {
-  border-color: oklch(1 0 0);
-  background: oklch(1 0 0);
+  border-color: var(--bo-primary-hover);
+  background: var(--bo-primary-hover);
   color: var(--bo-ground);
   text-decoration: none;
 }
@@ -1756,7 +1885,7 @@ select.bo-field__control {
   appearance: none;
   padding-right: var(--bo-s6);
   /* The chevron colour must be literal: a data URI cannot read a CSS custom property. */
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23a8a595' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9.5 6 6 6-6'/%3E%3C/svg%3E");
+  background-image: var(--bo-chevron);
   background-repeat: no-repeat;
   background-position: right 10px center;
   background-size: 18px 18px;
@@ -1968,7 +2097,7 @@ select.bo-field__control {
 }
 
 .bo-dialog::backdrop {
-  background: oklch(0.08 0.004 250 / 0.72);
+  background: var(--bo-scrim);
 }
 
 .bo-dialog__title {
@@ -2056,6 +2185,76 @@ select.bo-field__control {
 .bo-logo {
   display: inline-flex;
   align-items: center;
+}
+
+/* The logo comes in two inks: the white mark on dark themes, the colour mark on light ones. */
+.bo-logo--auto .bo-logo__dark {
+  display: none;
+}
+
+[data-mode="dark"] .bo-logo--auto .bo-logo__light {
+  display: none;
+}
+
+[data-mode="dark"] .bo-logo--auto .bo-logo__dark {
+  display: inline;
+}
+
+/* Theme picker inside the account menu */
+.bo-themes {
+  margin: var(--bo-s1) 0 0;
+  padding: var(--bo-s2) var(--bo-s2) var(--bo-s1);
+  border: 0;
+  border-bottom: 1px solid var(--bo-line);
+}
+
+.bo-themes legend {
+  padding: 0 0 var(--bo-s2);
+  color: var(--bo-ink-3);
+  font-size: var(--bo-fs);
+  font-stretch: 88%;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.bo-themes__list {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--bo-s1);
+}
+
+.bo-theme-option {
+  display: flex;
+  align-items: center;
+  gap: var(--bo-s2);
+  min-height: 34px;
+  padding: 0 var(--bo-s2);
+  border: 1px solid transparent;
+  border-radius: var(--bo-r-control);
+  background: transparent;
+  color: var(--bo-ink);
+  font-size: var(--bo-fs);
+  cursor: pointer;
+  text-align: left;
+}
+
+.bo-theme-option:hover {
+  background: var(--bo-hover);
+}
+
+.bo-theme-option[aria-pressed="true"] {
+  border-color: var(--bo-accent);
+  font-weight: 600;
+}
+
+.bo-theme-option__swatch {
+  flex: none;
+  width: 18px;
+  height: 18px;
+  border: 1px solid var(--bo-control-line);
+  border-radius: var(--bo-r-control);
+  background: linear-gradient(135deg, var(--swatch-ground) 0 60%, var(--swatch-plate) 60% 100%);
 }
 
 .bo-badge--dot {
@@ -2181,7 +2380,7 @@ select.bo-field__control {
     height: 100%;
     border: 0;
     padding: 0;
-    background: oklch(0.08 0.004 250 / 0.72);
+    background: var(--bo-scrim);
   }
 
   .bo-topbar {

@@ -33,6 +33,9 @@ export type { CardProps } from "./card";
 export { KpiCard } from "./kpi-card";
 export type { KpiCardProps, KpiTrend } from "./kpi-card";
 
+export { THEMES, DEFAULT_THEME, themeByValue } from "./themes";
+export type { ThemeDefinition, ThemeMode, ThemeValue } from "./themes";
+
 export { StatStrip } from "./stat-strip";
 export type { StatItem, StatStripProps } from "./stat-strip";
 
