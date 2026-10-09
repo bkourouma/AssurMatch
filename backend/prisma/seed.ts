@@ -29,13 +29,18 @@ const disabledFlags = [
   "ai_broker_assistant_enabled"
 ];
 
+// The launcher runs this seed on every start. Rows that already exist keep what the back-office set
+// (flags, country and product status), so restarting the local stack never closes a journey that was
+// opened on purpose. `ASSURMATCH_SEED_RESET=1` brings every row back to the safe closed defaults.
+const resetExisting = process.env.ASSURMATCH_SEED_RESET === "1";
+
 async function main(): Promise<void> {
   for (const key of disabledFlags) {
     const existingFlag = await prisma.featureFlag.findFirst({
       where: { key, scopeType: "global", scopeId: null }
     });
     if (existingFlag) {
-      await prisma.featureFlag.update({
+      if (resetExisting) await prisma.featureFlag.update({
         where: { id: existingFlag.id },
         data: {
           value: false,
@@ -72,14 +77,14 @@ async function main(): Promise<void> {
         country_comparison_enabled: false
       }
     },
-    update: {
+    update: resetExisting ? {
       status: "internal",
       flags: {
         country_public_enabled: false,
         country_quote_enabled: false,
         country_comparison_enabled: false
       }
-    }
+    } : {}
   });
 
   await prisma.product.upsert({
@@ -98,14 +103,14 @@ async function main(): Promise<void> {
         product_comparison_enabled: false
       }
     },
-    update: {
+    update: resetExisting ? {
       status: "internal",
       flags: {
         product_public_enabled: false,
         product_quote_enabled: false,
         product_comparison_enabled: false
       }
-    }
+    } : {}
   });
 }
 

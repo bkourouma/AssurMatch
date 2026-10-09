@@ -982,7 +982,8 @@ html[data-js="true"] .am-j-nojs {
   padding: var(--am-space-16);
   border: 1px solid var(--am-border-strong);
   border-radius: var(--am-radius-card);
-  background: var(--am-surface);
+  /* One notch bitten into the left edge: the offer is a cut pattern piece. */
+  background: var(--am-surface) var(--am-notch-left) 0 52px no-repeat;
 }
 
 @media (min-width: 768px) {
@@ -1065,6 +1066,7 @@ html[data-js="true"] .am-j-nojs {
 .am-j-price__amount {
   margin: 0;
   color: var(--am-heading);
+  font-family: var(--am-font-heading);
   font-size: clamp(22px, 1.1rem + 0.9vw, 28px);
   font-weight: 800;
   letter-spacing: var(--am-tracking-tight);

@@ -82,7 +82,9 @@ export class BillingFoundationService {
       .filter((partner) => inScope(partner.id));
     const allPartnerSummaries = scopedPartners.map((partner) => {
       const partnerAssignments = scopedAssignments.filter((assignment) => assignment.partnerTenantId === partner.id);
-      const acceptedLeadCount = partnerAssignments.filter((assignment) => assignment.status === "accepted").length;
+      // A lead the broker accepted and then closed is still an accepted lead of the month: only
+      // `accepted` would drop it to zero the moment the broker closes it.
+      const acceptedLeadCount = partnerAssignments.filter((assignment) => assignment.status === "accepted" || (assignment.status === "closed" && assignment.acceptedAt !== undefined)).length;
       const disputedLeadCount = partnerAssignments.filter((assignment) => assignment.status === "disputed").length;
       return {
         partnerId: partner.id,

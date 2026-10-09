@@ -122,3 +122,11 @@ test("spec 059 follow-up: a Starter broker closes an accepted lead with its outc
   // Still no CRM wording on the Starter page.
   expect(detail).not.toContain("Kanban</");
 });
+
+test("Starter lead page hides « Accepter » once accepted and labels the visitor answer", async () => {
+  const detail = readFileSync("apps/broker/app/leads/[leadAssignmentId]/page.tsx", "utf8");
+  expect(detail).toContain("const canAccept = showActions && Boolean(lead && (STARTER_ACCEPTABLE_STATUSES as readonly string[]).includes(lead.status));");
+  expect(detail).toContain("{canAccept ? (");
+  expect(detail).toContain('event.eventType === "visitor_responded" ? VISITOR_RESPONSE_LABELS[event.comment] ?? event.comment : event.comment');
+  expect(readFileSync("apps/broker/app/lib/lead-vocabulary.ts", "utf8")).toContain('STARTER_ACCEPTABLE_STATUSES = ["assigned", "broker_notified", "seen"]');
+});

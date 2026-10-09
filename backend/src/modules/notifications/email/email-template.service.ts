@@ -36,11 +36,11 @@ export class AuthEmailTemplateService {
   constructor(private readonly options: TemplateOptions = {}) {}
 
   activation(user: UserAccount, token: string, expiresAt: Date, now: Date = new Date()): AuthEmailPayload {
-    return this.render(user, token, "auth_activation", "Activation de votre acces AssurMatch", "activer votre acces", "/activate", formatTokenValidity(expiresAt, now));
+    return this.render(user, token, "auth_activation", "Activation de votre accès AssurMatch", "activer votre accès", "/activate", formatTokenValidity(expiresAt, now));
   }
 
   passwordReset(user: UserAccount, token: string, expiresAt: Date, now: Date = new Date()): AuthEmailPayload {
-    return this.render(user, token, "auth_password_reset", "Reinitialisation de votre mot de passe AssurMatch", "reinitialiser votre mot de passe", "/password-reset", formatTokenValidity(expiresAt, now));
+    return this.render(user, token, "auth_password_reset", "Réinitialisation de votre mot de passe AssurMatch", "réinitialiser votre mot de passe", "/password-reset", formatTokenValidity(expiresAt, now));
   }
 
   private render(
@@ -56,13 +56,13 @@ export class AuthEmailTemplateService {
     const lines = [
       `Bonjour ${user.displayName},`,
       "",
-      "Une action de securite a ete initiee pour votre compte AssurMatch.",
+      "Une action de sécurité a été initiée pour votre compte AssurMatch.",
       `Utilisez ce lien pour ${actionLabel}: ${link}`,
       `Jeton temporaire: ${token}`,
       "",
       `Ce lien et ce jeton expirent dans ${validity}.`,
       "AssurMatch est une plateforme technique de mise en relation et de comparaison indicative.",
-      "Ignorez ce message si vous n'etes pas a l'origine de cette demande."
+      "Ignorez ce message si vous n'êtes pas à l'origine de cette demande."
     ];
 
     return {
@@ -74,12 +74,12 @@ export class AuthEmailTemplateService {
         "<html>",
         "<body>",
         `<p>Bonjour ${escapeHtml(user.displayName)},</p>`,
-        "<p>Une action de securite a ete initiee pour votre compte AssurMatch.</p>",
+        "<p>Une action de sécurité a été initiée pour votre compte AssurMatch.</p>",
         `<p><a href="${escapeHtml(link)}">Continuer</a></p>`,
         `<p>Jeton temporaire: <strong>${escapeHtml(token)}</strong></p>`,
         `<p>Ce lien et ce jeton expirent dans ${escapeHtml(validity)}.</p>`,
         "<p>AssurMatch est une plateforme technique de mise en relation et de comparaison indicative.</p>",
-        "<p>Ignorez ce message si vous n'etes pas a l'origine de cette demande.</p>",
+        "<p>Ignorez ce message si vous n'êtes pas à l'origine de cette demande.</p>",
         "</body>",
         "</html>"
       ].join(""),
@@ -90,7 +90,7 @@ export class AuthEmailTemplateService {
   private link(user: UserAccount, path: string, token: string): string {
     const base = (isBrokerAccount(user)
       ? this.options.brokerAppUrl ?? process.env.BROKER_APP_URL ?? "http://127.0.0.1:3603"
-      : this.options.appBaseUrl ?? process.env.APP_BASE_URL ?? "http://127.0.0.1:3702").replace(/\/$/, "");
+      : this.options.appBaseUrl ?? process.env.APP_BASE_URL ?? "http://127.0.0.1:3602").replace(/\/$/, "");
     return `${base}${path}?token=${encodeURIComponent(token)}`;
   }
 }

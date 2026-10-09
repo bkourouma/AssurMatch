@@ -219,8 +219,8 @@ export default async function PublicQuotePage({
         <TechnicalRoleNotice />
       </Hero>
 
-      <Section>
-        <div className="am-stack am-stack--xl am-j-column">
+      <Section tone="muted">
+        <div className="am-stack am-stack--xl am-j-column am-sheet">
           {quoteErrorText ? (
             <Notice tone="error" role="alert">
               {quoteErrorText}

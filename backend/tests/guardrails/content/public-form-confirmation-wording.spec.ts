@@ -58,7 +58,7 @@ describe("public form confirmation wording (spec 047)", () => {
     expect(fr.body).toContain("plateforme technique");
     expect(en.body).toContain("technical platform");
     // A waiting-list entry is not a quote request and compares nothing (constitution I).
-    expect(fr.body).toContain("aucune offre n'a ete comparee");
+    expect(fr.body).toContain("aucune offre n'a été comparée");
     expect(en.body).toContain("no offer has been compared");
   });
 
@@ -71,7 +71,7 @@ describe("public form confirmation wording (spec 047)", () => {
     const contact = templates.contact({ to: "a@example.test", name: "Awa", publicReference: "CM-2026-ABCDEF12" });
 
     expect(application.body).toContain("ni acceptation ni refus");
-    expect(application.body).toContain("Aucun compte partenaire n'existe a ce stade.");
-    expect(contact.body).toContain("ne constitue pas une reponse");
+    expect(application.body).toContain("Aucun compte partenaire n'existe à ce stade.");
+    expect(contact.body).toContain("ne constitue pas une réponse");
   });
 });

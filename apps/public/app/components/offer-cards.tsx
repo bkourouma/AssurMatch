@@ -22,6 +22,11 @@ const criterionKeys = [
 ] as const;
 type CriterionKey = (typeof criterionKeys)[number];
 
+/** Lower-case words without accents, to compare two short phrases regardless of spelling. */
+function wordsOf(value: string): string[] {
+  return value.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().match(/[a-z0-9]+/g) ?? [];
+}
+
 function paymentKeyOf(value: string | undefined): PaymentKey | null {
   return value && (paymentKeys as readonly string[]).includes(value) ? (value as PaymentKey) : null;
 }
@@ -256,14 +261,23 @@ export function OfferPrice({
     ...(currency ? { currency } : {})
   });
 
+  // The API label ("prix à confirmer") and the standing notice ("prix indicatif, à confirmer par le
+  // courtier partenaire") say the same thing: the label is printed only when it adds words.
+  const notice = t("priceNotice");
+  const label = offer.indicativePriceLabel;
+  const noticeWords = new Set(wordsOf(notice));
+  const labelAddsNothing = wordsOf(label).every((word) => noticeWords.has(word));
+
   return (
     <div className="am-j-price">
       <p className="am-j-price__label">{t("criteria.price")}</p>
-      <p className="am-j-price__amount am-tabular">{amount ? t("fromAmount", { amount }) : t("priceToConfirm")}</p>
-      <p className="am-j-price__note">
-        <BackendText>{offer.indicativePriceLabel}</BackendText>
-      </p>
-      <p className="am-j-price__notice">{t("priceNotice")}</p>
+      <p className="am-j-price__amount">{amount ? t("fromAmount", { amount }) : t("priceToConfirm")}</p>
+      {labelAddsNothing ? null : (
+        <p className="am-j-price__note">
+          <BackendText>{label}</BackendText>
+        </p>
+      )}
+      <p className="am-j-price__notice">{notice}</p>
     </div>
   );
 }

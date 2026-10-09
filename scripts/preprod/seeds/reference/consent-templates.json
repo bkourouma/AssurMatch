@@ -5,8 +5,8 @@
     "language": "fr",
     "status": "draft",
     "mode": "template",
-    "bodyTemplate": "En cochant cette case, vous acceptez que vos coordonnees ({{contactFields}}) soient transmises au destinataire suivant : {{brokerName}}, pour le pays {{countryName}} et le produit {{productName}}. AssurMatch est une plateforme technique de comparaison; elle n'est ni courtier ni assureur.",
-    "notes": "Modele non sensible. La version legale finale est publiee par la conformite par pays/produit avant activation publique."
+    "bodyTemplate": "En cochant cette case, vous acceptez que vos coordonnées ({{contactFields}}) soient transmises au destinataire suivant : {{brokerName}}, pour le pays {{countryName}} et le produit {{productName}}. AssurMatch est une plateforme technique de comparaison ; elle n'est ni courtier ni assureur.",
+    "notes": "Modèle non sensible. La version légale finale est publiée par la conformité par pays/produit avant activation publique."
   },
   {
     "templateKey": "lead-transmission-en",

@@ -62,8 +62,8 @@ export default async function TrackingLinkPage({ params }: { params: Promise<{ l
           />
         }
       />
-      <Section>
-        <div className="am-stack am-stack--lg am-j-column">
+      <Section tone="muted">
+        <div className="am-stack am-stack--lg am-j-column am-sheet">
           <div className="am-j-panel">
             <TrackingLinkForm labels={labels} />
           </div>

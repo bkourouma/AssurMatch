@@ -221,8 +221,8 @@ describe("visitor tracking space runtime HTTP (spec 054)", () => {
     }
     await runtime.partnerWebhookEvents.publish("lead.status_changed", seed.partner.id, { leadAssignmentId: assignment.id, status: "gagne", previousStatus: "negociation" });
     await runtime.partnerWebhookEvents.publish("lead.status_changed", seed.partner.id, { leadAssignmentId: assignment.id, status: "perdu", previousStatus: "gagne" });
-    await runtime.partnerWebhookEvents.publish("lead.reassigned", "partner-y", { leadAssignmentId: assignment.id, previousPartnerTenantId: seed.partner.id, routingDecisionId: "decision-1" });
-    await runtime.partnerWebhookEvents.publish("lead.reassigned", "partner-y", { leadAssignmentId: assignment.id, previousPartnerTenantId: seed.partner.id, routingDecisionId: "decision-1" });
+    await runtime.partnerWebhookEvents.publish("lead.reassigned", "partner-y", { leadAssignmentId: assignment.id, previousPartnerTenantId: seed.partner.id, routingDecisionId: "décision-1" });
+    await runtime.partnerWebhookEvents.publish("lead.reassigned", "partner-y", { leadAssignmentId: assignment.id, previousPartnerTenantId: seed.partner.id, routingDecisionId: "décision-1" });
 
     expect(await visitorTypes(runtime)).toEqual([
       "visitor_quote_received",
@@ -268,7 +268,7 @@ describe("visitor tracking space runtime HTTP (spec 054)", () => {
     const [received, transmitted] = visitorEmails;
     expect(received?.purpose).toBe("quote_visitor_received");
     expect(transmitted?.purpose).toBe("quote_visitor_transmitted");
-    expect(transmitted?.body).toContain(`transmise a ${seed.partner.legalName}`);
+    expect(transmitted?.body).toContain(`transmise à ${seed.partner.legalName}`);
     expect(received?.body).toContain(`http://public.test/demandes-de-devis/${confirmation.publicReference}?token=`);
     expect(tokenFrom(received!)).not.toBe(tokenFrom(transmitted!));
     for (const email of visitorEmails) {
@@ -308,7 +308,7 @@ describe("visitor tracking space runtime HTTP (spec 054)", () => {
 
     const mailer = new RecordingMailer();
     await delivery(harness.runtime, mailer).processDueNotifications();
-    expect(mailer.sent[0]?.body).toContain("en cours de verification");
+    expect(mailer.sent[0]?.body).toContain("en cours de vérification");
     expect(mailer.sent[0]?.body).not.toMatch(/a ete transmise/);
   });
 });

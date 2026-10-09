@@ -226,7 +226,7 @@ export class QuoteDocumentsService {
         type: "broker_document_received",
         dedupeKey: `broker_document_received:${document.id}:${assignment.id}`,
         title: "Nouveau document d'un visiteur",
-        body: `Le visiteur a ajoute un document (${document.documentKind}) a son dossier. Il est consultable dans la fiche du lead.`,
+        body: `Le visiteur a ajouté un document (${document.documentKind}) à son dossier. Il est consultable dans la fiche du lead.`,
         targetType: "LeadAssignment",
         targetId: assignment.id
       });

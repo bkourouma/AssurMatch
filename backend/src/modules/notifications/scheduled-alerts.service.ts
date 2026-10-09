@@ -151,8 +151,8 @@ export class ScheduledAlertsService {
         partnerTenantId: license.partnerTenantId,
         type: "broker_license_expiring",
         dedupeKey: `broker_license_expiring:${occurrence}`,
-        title: "Licence bientot expiree",
-        body: `Votre licence${license.licenseNumber ? ` ${license.licenseNumber}` : ""} expire le ${formatDate(license.expirationDate)} (J-${bucket}). Transmettez son renouvellement depuis votre espace licences pour rester eligible au routage.`,
+        title: "Licence bientôt expirée",
+        body: `Votre licence${license.licenseNumber ? ` ${license.licenseNumber}` : ""} expire le ${formatDate(license.expirationDate)} (J-${bucket}). Transmettez son renouvellement depuis votre espace licences pour rester éligible au routage.`,
         targetType: "PartnerLicense",
         targetId: license.id
       }));
@@ -196,7 +196,7 @@ export class ScheduledAlertsService {
         dedupeKey: `broker_offer_expiring:${offer.versionId}:${formatDate(validUntil)}`,
         // Kept from spec 052 R9 so the inbox entries of both generations read the same.
         inAppTemplate: "offer_expiring",
-        title: "Offre bientot expiree",
+        title: "Offre bientôt expirée",
         body: `Votre offre "${offer.name}" expire dans ${days} jour(s). Renouvelez-la pour qu'elle reste visible.`,
         targetType: "OfferVersion",
         targetId: offer.versionId
@@ -212,8 +212,8 @@ export class ScheduledAlertsService {
         partnerTenantId: task.partnerTenantId,
         type: "broker_task_due",
         dedupeKey: `broker_task_due:task:${task.id}:${new Date(task.dueAt).toISOString()}`,
-        title: "Tache CRM a echeance",
-        body: `La tache "${task.title}" arrive a echeance le ${formatDate(task.dueAt)}.`,
+        title: "Tâche CRM à échéance",
+        body: `La tâche "${task.title}" arrive à échéance le ${formatDate(task.dueAt)}.`,
         targetType: "LeadAssignment",
         targetId: task.leadAssignmentId
       }));
@@ -224,7 +224,7 @@ export class ScheduledAlertsService {
         type: "broker_task_due",
         dedupeKey: `broker_task_due:reminder:${reminder.id}`,
         title: "Rappel CRM",
-        body: `Un rappel CRM programme le ${formatDate(reminder.remindAt)} est arrive a echeance.`,
+        body: `Un rappel CRM programmé le ${formatDate(reminder.remindAt)} est arrivé à échéance.`,
         targetType: "LeadAssignment",
         targetId: reminder.leadAssignmentId
       }));
@@ -242,10 +242,10 @@ export class ScheduledAlertsService {
         partnerTenantId: quota.partnerTenantId,
         type: "broker_quota_threshold",
         dedupeKey: `broker_quota_threshold:${quota.partnerTenantId}:${month}:${threshold}`,
-        title: threshold === 100 ? "Quota mensuel de leads atteint" : `Quota mensuel de leads a ${threshold} %`,
+        title: threshold === 100 ? "Quota mensuel de leads atteint" : `Quota mensuel de leads à ${threshold} %`,
         body: threshold === 100
-          ? `Vous avez recu ${quota.used} leads pour un quota mensuel de ${quota.quota}. De nouveaux leads peuvent ne plus vous etre attribues avant le mois prochain.`
-          : `Vous avez recu ${quota.used} leads pour un quota mensuel de ${quota.quota} (${percent} %).`,
+          ? `Vous avez reçu ${quota.used} leads pour un quota mensuel de ${quota.quota}. De nouveaux leads peuvent ne plus vous être attribués avant le mois prochain.`
+          : `Vous avez reçu ${quota.used} leads pour un quota mensuel de ${quota.quota} (${percent} %).`,
         targetType: "PartnerTenant",
         targetId: quota.partnerTenantId
       }));

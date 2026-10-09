@@ -3,7 +3,7 @@
 import { useLocale, useMessages, useTranslations } from "next-intl";
 import { useEffect, useRef, useState, type FormEvent, type RefObject } from "react";
 import { Link } from "../../i18n/navigation";
-import { submitPublicQuoteRequest, type PublicPhoneRule, type PublicQuoteFormField, type PublicQuoteFormState, type PublicQuoteLanguage } from "../lib/public-api";
+import { quoteDocumentUploadEnabled, submitPublicQuoteRequest, type PublicPhoneRule, type PublicQuoteFormField, type PublicQuoteFormState, type PublicQuoteLanguage } from "../lib/public-api";
 import { InitialsTile } from "./journey/tiles";
 import { IndicativeOfferNotice } from "./public-journey";
 import { VisitorAiAssistant } from "./visitor-ai-assistant";
@@ -15,6 +15,7 @@ import { Icon } from "./ui/icons";
 import { IconTile } from "./ui/icon-tile";
 import { Notice } from "./ui/notice";
 import { ProgressBar } from "./ui/progress-bar";
+import { publicIssuingAuthority } from "../../../../packages/shared/contracts/licence-issuer";
 import "../styles/pages/quote.css";
 
 /** Identity of the broker resolved for a preselected offer (spec 050, decision D4). */
@@ -183,9 +184,9 @@ function ResponsibleBrokerBlock({ broker, hasSelectedOffer, productName, country
           <p>
             <BackendText>{t("offerPartner", { partner: broker.name })}</BackendText>
           </p>
-          {broker.licenceNumber && broker.issuingAuthority ? (
+          {broker.licenceNumber && publicIssuingAuthority(broker.issuingAuthority) ? (
             <p>
-              <BackendText>{t("brokerLicence", { licence: broker.licenceNumber, authority: broker.issuingAuthority })}</BackendText>
+              <BackendText>{t("brokerLicence", { licence: broker.licenceNumber, authority: publicIssuingAuthority(broker.issuingAuthority) ?? "" })}</BackendText>
             </p>
           ) : null}
         </div>
@@ -262,6 +263,8 @@ export function QuoteFormShell({
     message?: string;
     publicReference?: string;
     verificationToken?: string;
+    /** The product accepts optional documents: only then does the tracking link say so. */
+    documentsEnabled?: boolean;
     selectedOfferPartnerRetained?: boolean | null;
   }>({ status: "idle" });
 
@@ -409,11 +412,15 @@ export function QuoteFormShell({
     if (response.status === "success") {
       // No `form.reset()`: the form is replaced by the confirmation panel below, and emptying a form
       // that stays on screen next to "demande recue" reads as an invitation to send it again.
+      const documentsEnabled = response.verificationToken && response.publicReference
+        ? await quoteDocumentUploadEnabled(response.publicReference, response.verificationToken)
+        : false;
       setResult({
         status: "success",
         message: response.publicMessage,
         publicReference: response.publicReference ?? "",
         ...(response.verificationToken ? { verificationToken: response.verificationToken } : {}),
+        documentsEnabled,
         selectedOfferPartnerRetained: response.selectedOfferPartnerRetained ?? null
       });
       return;
@@ -481,7 +488,7 @@ export function QuoteFormShell({
                   query: { token: result.verificationToken }
                 }}
               >
-                {t("trackLink")}
+                {result.documentsEnabled ? t("trackLink") : t("trackLinkOnly")}
               </Link>
             </p>
           ) : null}

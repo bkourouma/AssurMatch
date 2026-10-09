@@ -1,70 +1,42 @@
 {
   "schemaVersion": 2,
-  "generatedAt": "2026-10-05T00:00:00Z",
+  "generatedAt": "2026-10-09T12:00:00Z",
   "title": "Design System: AssurMatch public site",
   "extensions": {
     "colorMeta": {
-      "sign-navy": { "role": "primary", "displayName": "Sign Navy", "canonical": "#0b2a5c", "tonalRamp": ["#071c40", "#0b2a5c", "#123e86", "#1650b8", "#6b95e0", "#a6c0ee", "#cbd9f5", "#f1f5fd"] },
-      "sign-navy-deep": { "role": "primary", "displayName": "Sign Navy Deep", "canonical": "#071c40", "tonalRamp": ["#071c40", "#0b2a5c", "#123e86", "#1650b8", "#6b95e0", "#a6c0ee", "#cbd9f5", "#f1f5fd"] },
-      "action-blue": { "role": "primary", "displayName": "Action Blue", "canonical": "#1650b8", "tonalRamp": ["#071c40", "#0b2a5c", "#123e86", "#1650b8", "#2a66d1", "#6b95e0", "#cbd9f5", "#f1f5fd"] },
-      "action-blue-pressed": { "role": "primary", "displayName": "Action Blue Pressed", "canonical": "#123e86", "tonalRamp": ["#071c40", "#0b2a5c", "#123e86", "#1650b8", "#2a66d1", "#6b95e0", "#cbd9f5", "#f1f5fd"] },
-      "focus-blue": { "role": "primary", "displayName": "Focus Blue", "canonical": "#2a66d1", "tonalRamp": ["#071c40", "#0b2a5c", "#123e86", "#1650b8", "#2a66d1", "#6b95e0", "#cbd9f5", "#f1f5fd"] },
-      "route-tint": { "role": "primary", "displayName": "Route Tint", "canonical": "#f1f5fd", "tonalRamp": ["#071c40", "#0b2a5c", "#123e86", "#1650b8", "#6b95e0", "#a6c0ee", "#cbd9f5", "#f1f5fd"] },
-      "route-tint-rule": { "role": "primary", "displayName": "Route Tint Rule", "canonical": "#cbd9f5", "tonalRamp": ["#071c40", "#0b2a5c", "#123e86", "#1650b8", "#6b95e0", "#a6c0ee", "#cbd9f5", "#f1f5fd"] },
-      "sign-ink-muted": { "role": "neutral", "displayName": "Sign Ink Muted", "canonical": "#c7d3ea", "tonalRamp": ["#1d2a40", "#34435d", "#4d5e7c", "#6a7b9a", "#8999b6", "#a9b7d0", "#c7d3ea", "#e9eef7"] },
-      "sign-focus-yellow": { "role": "neutral", "displayName": "Sign Focus Yellow", "canonical": "#ffd75e", "tonalRamp": ["#3d2f00", "#5e4a00", "#826700", "#a88600", "#cfa71c", "#f2c641", "#ffd75e", "#fff3cc"] },
-      "ground-white": { "role": "neutral", "displayName": "Ground White", "canonical": "#ffffff", "tonalRamp": ["#12161d", "#222934", "#373f4c", "#4e5868", "#98a2b3", "#c9d0da", "#eef1f4", "#ffffff"] },
-      "band-grey": { "role": "neutral", "displayName": "Band Grey", "canonical": "#eef1f4", "tonalRamp": ["#12161d", "#222934", "#373f4c", "#4e5868", "#98a2b3", "#c9d0da", "#eef1f4", "#f7f8fa"] },
-      "rule-grey": { "role": "neutral", "displayName": "Rule Grey", "canonical": "#e1e5eb", "tonalRamp": ["#12161d", "#222934", "#373f4c", "#4e5868", "#98a2b3", "#c9d0da", "#e1e5eb", "#f7f8fa"] },
-      "rule-grey-strong": { "role": "neutral", "displayName": "Rule Grey Strong", "canonical": "#c9d0da", "tonalRamp": ["#12161d", "#222934", "#373f4c", "#4e5868", "#98a2b3", "#c9d0da", "#e1e5eb", "#f7f8fa"] },
-      "ink": { "role": "neutral", "displayName": "Ink", "canonical": "#12161d", "tonalRamp": ["#12161d", "#222934", "#373f4c", "#4e5868", "#5f6a7c", "#98a2b3", "#c9d0da", "#eef1f4"] },
-      "ink-muted": { "role": "neutral", "displayName": "Ink Muted", "canonical": "#4e5868", "tonalRamp": ["#12161d", "#222934", "#373f4c", "#4e5868", "#5f6a7c", "#98a2b3", "#c9d0da", "#eef1f4"] },
-      "ink-subtle": { "role": "neutral", "displayName": "Ink Subtle", "canonical": "#5f6a7c", "tonalRamp": ["#12161d", "#222934", "#373f4c", "#4e5868", "#5f6a7c", "#98a2b3", "#c9d0da", "#eef1f4"] },
-      "confirm-green": { "role": "secondary", "displayName": "Confirm Green", "canonical": "#237a35", "tonalRamp": ["#0f3417", "#1b5e29", "#237a35", "#2e8f40", "#4fb832", "#9fd6a6", "#dcefde", "#eef7ef"] },
-      "confirm-green-tint": { "role": "secondary", "displayName": "Confirm Green Tint", "canonical": "#eef7ef", "tonalRamp": ["#0f3417", "#1b5e29", "#237a35", "#2e8f40", "#4fb832", "#9fd6a6", "#dcefde", "#eef7ef"] },
-      "logo-green": { "role": "secondary", "displayName": "Logo Green", "canonical": "#4fb832", "tonalRamp": ["#0f3417", "#1b5e29", "#237a35", "#2e8f40", "#4fb832", "#9fd6a6", "#dcefde", "#eef7ef"] },
-      "sponsored-orange": { "role": "tertiary", "displayName": "Sponsored Orange", "canonical": "#c2610a", "tonalRamp": ["#4a2401", "#8a4303", "#a4530a", "#c2610a", "#e07b12", "#f4b672", "#fdebd3", "#fff6eb"] },
-      "sponsored-ink": { "role": "tertiary", "displayName": "Sponsored Ink", "canonical": "#8a4303", "tonalRamp": ["#4a2401", "#8a4303", "#a4530a", "#c2610a", "#e07b12", "#f4b672", "#fdebd3", "#fff6eb"] },
-      "sponsored-tint": { "role": "tertiary", "displayName": "Sponsored Tint", "canonical": "#fff6eb", "tonalRamp": ["#4a2401", "#8a4303", "#a4530a", "#c2610a", "#e07b12", "#f4b672", "#fdebd3", "#fff6eb"] },
-      "error-red": { "role": "tertiary", "displayName": "Error Red", "canonical": "#b42318", "tonalRamp": ["#4a0c08", "#8f1c13", "#b42318", "#d93a2b", "#e8776c", "#f3b3ac", "#fadcd8", "#fdf3f2"] },
-      "error-ink": { "role": "tertiary", "displayName": "Error Ink", "canonical": "#8f1c13", "tonalRamp": ["#4a0c08", "#8f1c13", "#b42318", "#d93a2b", "#e8776c", "#f3b3ac", "#fadcd8", "#fdf3f2"] },
-      "error-tint": { "role": "tertiary", "displayName": "Error Tint", "canonical": "#fdf3f2", "tonalRamp": ["#4a0c08", "#8f1c13", "#b42318", "#d93a2b", "#e8776c", "#f3b3ac", "#fadcd8", "#fdf3f2"] },
-      "whatsapp-green": { "role": "neutral", "displayName": "WhatsApp Green (channel exception)", "canonical": "#25d366", "tonalRamp": ["#06331a", "#0d5a2e", "#138043", "#1da851", "#25d366", "#6fe49b", "#b5f2cb", "#e7fbef"] },
-      "whatsapp-ink": { "role": "neutral", "displayName": "WhatsApp Ink", "canonical": "#06331a", "tonalRamp": ["#06331a", "#0d5a2e", "#138043", "#1da851", "#25d366", "#6fe49b", "#b5f2cb", "#e7fbef"] }
+      "cloth-indigo": { "role": "primary", "displayName": "Cloth Indigo", "canonical": "#25207a", "tonalRamp": ["#181456", "#25207a", "#2b2590", "#3730a8", "#5249c4", "#7d77d6", "#a9a4e8", "#e6e4fa"] },
+      "link-indigo": { "role": "primary", "displayName": "Link Indigo", "canonical": "#3730a8", "tonalRamp": ["#181456", "#25207a", "#2b2590", "#3730a8", "#5249c4", "#7d77d6", "#cdcaf3", "#f3f2fd"] },
+      "tape-yellow": { "role": "secondary", "displayName": "Measuring-Tape Yellow", "canonical": "#f2c230", "tonalRamp": ["#8a6a06", "#b88d0a", "#e3ae0e", "#f2c230", "#f6d462", "#f9e28f", "#fff1c0", "#fff8dc"] },
+      "confirm-green": { "role": "tertiary", "displayName": "Confirmation Green", "canonical": "#237a35", "tonalRamp": ["#1b5e29", "#237a35", "#2e8f40", "#4fb832", "#7fcf6d", "#b0e0a6", "#dcefde", "#eef7ef"] },
+      "sponsored-orange": { "role": "tertiary", "displayName": "Sponsored Orange", "canonical": "#c2610a", "tonalRamp": ["#8a4303", "#a4530a", "#c2610a", "#e07b12", "#eb9b4a", "#f4bf86", "#fdebd3", "#fff6eb"] },
+      "error-red": { "role": "tertiary", "displayName": "Error Red", "canonical": "#b42318", "tonalRamp": ["#8f1c13", "#b42318", "#d93a2b", "#e66a5e", "#ef9a92", "#f5bfb9", "#fadcd8", "#fdf3f2"] },
+      "pattern-sheet": { "role": "neutral", "displayName": "Cold Pattern Paper", "canonical": "#fafbff", "tonalRamp": ["#14132a", "#3a3950", "#646380", "#9c9cb5", "#cbcbdd", "#e3e3ef", "#f1f1f8", "#fafbff"] },
+      "logo-accent-on-cloth": { "role": "tertiary", "displayName": "Logo Accent on Cloth", "canonical": "#9fdc8c", "tonalRamp": ["#4fb832", "#6cc656", "#7fcf6d", "#9fdc8c", "#b0e0a6", "#c8ebc0", "#dcefde", "#eef7ef"] },
+      "ink": { "role": "neutral", "displayName": "Ink", "canonical": "#14132a", "tonalRamp": ["#14132a", "#25243a", "#3a3950", "#4f4e69", "#646380", "#9c9cb5", "#cbcbdd", "#e3e3ef"] }
     },
     "typographyMeta": {
-      "display": { "displayName": "Display", "purpose": "The large page sign (home and acquisition heroes) only." },
-      "headline": { "displayName": "Headline", "purpose": "Page titles on standard navy signs, capped near 22ch." },
-      "section": { "displayName": "Section", "purpose": "Section titles on white or grey bands." },
-      "title": { "displayName": "Title", "purpose": "Card titles, offer names, route stop titles." },
-      "row-title": { "displayName": "Row Title", "purpose": "The bold name in a directory row." },
-      "lead": { "displayName": "Lead", "purpose": "The one sentence under a title; measure 34em." },
-      "body": { "displayName": "Body", "purpose": "Running text; prose measures in em, not ch." },
-      "label": { "displayName": "Label", "purpose": "Field labels, fact labels, small buttons; sentence case, no tracking." },
-      "caption": { "displayName": "Caption", "purpose": "Meta lines, hints, fine print; the 14px floor." },
-      "figure": { "displayName": "Figure", "purpose": "Counters and stats in tabular figures." }
+      "display": { "displayName": "Display", "purpose": "The home headline on the pattern sheet." },
+      "headline": { "displayName": "Headline", "purpose": "h1 of page openings." },
+      "title": { "displayName": "Title", "purpose": "Section h2." },
+      "piece-title": { "displayName": "Piece title", "purpose": "Directory rows, route titles, h3." },
+      "price-figure": { "displayName": "Price figure", "purpose": "The offer price amount, in the heading face, no tabular numerals." },
+      "reference-mono": { "displayName": "Code and reference", "purpose": "kbd and code only, Cascadia Mono stack." },
+      "body": { "displayName": "Body", "purpose": "All prose, in Atkinson Hyperlegible Next." },
+      "label": { "displayName": "Label", "purpose": "Badges, captions, tape labels; 14px floor." }
     },
     "shadows": [
-      { "name": "overlay", "value": "0 12px 32px rgba(7, 28, 64, 0.18)", "purpose": "The menu drawer and the sticky comparison bar only; nothing on the page casts a shadow." },
-      { "name": "selection-inset", "value": "inset 0 0 0 1px #1650b8", "purpose": "Thickens the border of a focused field, selected radio card or selected offer card." },
-      { "name": "current-stop-halo", "value": "0 0 0 4px rgba(255, 255, 255, 0.22)", "purpose": "Ring around the current stop of the route strip on a navy sign." },
-      { "name": "focus-ring", "value": "outline: 3px solid #1650b8; outline-offset: 2px", "purpose": "Every focusable element on light ground; #ffd75e inside navy panels." }
+      { "name": "overlay", "value": "0 12px 32px rgba(24, 20, 86, 0.2)", "purpose": "Floating overlays such as the docked comparison bar only; page surfaces have none. Scrim (0.45) and table-scroll shade (0.14) use the same rgba(24, 20, 86, *)." },
+      { "name": "ring", "value": "0 0 0 2px #ffffff, 0 0 0 4px #3730a8", "purpose": "Focus ring on light pages; on cloth it is 0 0 0 2px #25207a, 0 0 0 4px #f2c230." }
     ],
     "motion": [
-      { "name": "transition", "value": "160ms cubic-bezier(0.22, 1, 0.36, 1)", "purpose": "Colour and border state changes on buttons, links, fields, rows." },
-      { "name": "arrow-nudge", "value": "transform translateX(4px) 220ms cubic-bezier(0.22, 1, 0.36, 1)", "purpose": "The only authored move: a directory arrow nudging toward its destination on hover and focus." },
-      { "name": "drawer-in", "value": "am-slide-in-right 220ms cubic-bezier(0.22, 1, 0.36, 1)", "purpose": "The menu drawer opening." },
-      { "name": "reduced-motion", "value": "all animation and transition durations 0.01ms", "purpose": "Single kill switch under prefers-reduced-motion." }
+      { "name": "ease-out", "value": "cubic-bezier(0.22, 1, 0.36, 1)", "purpose": "The only easing; 160ms for state changes, 220ms for the row arrow nudge (4px) and the 2px row lift (hover and focus-visible, prefers-reduced-motion: no-preference only)." },
+      { "name": "press", "value": "translateY(1px)", "purpose": "Button active state." }
     ],
     "breakpoints": [
-      { "name": "route-strip-compact", "value": "max-width 359px" },
-      { "name": "header-compact", "value": "max-width 479px" },
-      { "name": "gutter-tablet", "value": "600px" },
-      { "name": "offer-card-wide", "value": "768px" },
-      { "name": "two-columns", "value": "900px" },
-      { "name": "hero-two-columns", "value": "980px" },
-      { "name": "offer-grid-three", "value": "1000px" },
-      { "name": "desktop-header", "value": "1100px" }
+      { "name": "gutter-24", "value": "600px" },
+      { "name": "two-column", "value": "900px" },
+      { "name": "hero-split", "value": "980px" },
+      { "name": "header-full", "value": "1100px" }
     ]
   },
   "components": [
@@ -72,125 +44,123 @@
       "name": "Primary Button",
       "kind": "button",
       "refersTo": "button-primary",
-      "description": "The one primary action of a page or card: blue fill, bold label, 48px high.",
-      "html": "<button class=\"ds-btn-primary\">Comparer les offres</button>",
-      "css": ".ds-btn-primary { display: inline-flex; min-height: 48px; align-items: center; justify-content: center; gap: 8px; padding: 10px 20px; border: 2px solid var(--am-action, #1650b8); border-radius: 4px; background: var(--am-action, #1650b8); color: #fff; font-family: var(--am-font-body, 'Atkinson Hyperlegible Next', system-ui, sans-serif); font-size: 16px; font-weight: 700; line-height: 1.2; cursor: pointer; transition: background-color 160ms cubic-bezier(0.22,1,0.36,1), border-color 160ms cubic-bezier(0.22,1,0.36,1); } .ds-btn-primary:hover { background: #123e86; border-color: #123e86; } .ds-btn-primary:focus-visible { outline: 3px solid #1650b8; outline-offset: 2px; } .ds-btn-primary:active { transform: translateY(1px); }"
+      "description": "The action: tape yellow, indigo ink and outline.",
+      "html": "<button class=\"ds-btn\">Comparer les offres</button>",
+      "css": ".ds-btn { min-height: 48px; padding: 10px 20px; border: 2px solid #25207a; border-radius: 2px; background: #f2c230; color: #25207a; font-weight: 800; font-size: 17px; cursor: pointer; transition: background-color 160ms cubic-bezier(0.22,1,0.36,1); } .ds-btn:hover { background: #e3ae0e; } .ds-btn:active { transform: translateY(1px); } .ds-btn:focus-visible { outline: 3px solid #3730a8; outline-offset: 2px; }"
     },
     {
       "name": "Secondary Button",
       "kind": "button",
       "refersTo": "button-secondary",
-      "description": "A second action beside a primary: white with the blue 2px stroke.",
-      "html": "<button class=\"ds-btn-secondary\">Voir le détail</button>",
-      "css": ".ds-btn-secondary { display: inline-flex; min-height: 48px; align-items: center; justify-content: center; padding: 10px 20px; border: 2px solid #1650b8; border-radius: 4px; background: #fff; color: #1650b8; font-family: var(--am-font-body, 'Atkinson Hyperlegible Next', system-ui, sans-serif); font-size: 16px; font-weight: 700; line-height: 1.2; cursor: pointer; transition: background-color 160ms cubic-bezier(0.22,1,0.36,1), color 160ms cubic-bezier(0.22,1,0.36,1); } .ds-btn-secondary:hover { background: #f1f5fd; border-color: #123e86; color: #123e86; } .ds-btn-secondary:focus-visible { outline: 3px solid #1650b8; outline-offset: 2px; }"
+      "description": "Outlined indigo on a light page.",
+      "html": "<button class=\"ds-btn-2\">Changer de pays</button>",
+      "css": ".ds-btn-2 { min-height: 48px; padding: 10px 20px; border: 2px solid #25207a; border-radius: 2px; background: #fff; color: #25207a; font-weight: 800; font-size: 17px; cursor: pointer; } .ds-btn-2:hover { background: #f3f2fd; } .ds-btn-2:focus-visible { outline: 3px solid #3730a8; outline-offset: 2px; }"
     },
     {
-      "name": "Button on a Sign",
-      "kind": "button",
-      "refersTo": "button-on-sign",
-      "description": "Inside a navy panel the primary inverts to white with navy text; focus turns yellow.",
-      "html": "<div class=\"ds-sign-demo\"><button class=\"ds-btn-onsign\">Demander un devis</button></div>",
-      "css": ".ds-sign-demo { padding: 24px; background: #0b2a5c; } .ds-btn-onsign { min-height: 48px; padding: 10px 20px; border: 2px solid #fff; border-radius: 4px; background: #fff; color: #0b2a5c; font-family: var(--am-font-body, 'Atkinson Hyperlegible Next', system-ui, sans-serif); font-size: 16px; font-weight: 700; cursor: pointer; transition: background-color 160ms ease-out; } .ds-btn-onsign:hover { background: #e3ebfa; border-color: #e3ebfa; color: #071c40; } .ds-btn-onsign:focus-visible { outline: 3px solid #ffd75e; outline-offset: 2px; }"
+      "name": "Directory Piece",
+      "kind": "custom",
+      "refersTo": "directory-piece",
+      "description": "A list row cut as a pattern piece: 2px indigo outline, name, one line, arrow; lifts 2px on hover and focus-visible when motion is allowed.",
+      "html": "<div class=\"ds-piece\"><a class=\"ds-piece-row\" href=\"#\"><span class=\"ds-piece-text\"><span class=\"ds-piece-title\">Assurance auto</span><span class=\"ds-piece-meta\">Comparaison indicative</span></span><svg class=\"ds-arrow\" width=\"24\" height=\"24\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"#25207a\" stroke-width=\"2.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M5 12h14M13 6l6 6-6 6\"/></svg></a></div>",
+      "css": ".ds-piece { border: 2px solid #25207a; border-radius: 2px; background: #fff; } .ds-piece-row { display: grid; grid-template-columns: minmax(0,1fr) auto; align-items: center; gap: 4px 16px; min-height: 64px; padding: 12px 16px; text-decoration: none; color: #25207a; } .ds-piece-row:hover { background: #fff8dc; } @media (prefers-reduced-motion: no-preference) { .ds-piece-row { transition: background-color 160ms cubic-bezier(0.22,1,0.36,1), transform 220ms cubic-bezier(0.22,1,0.36,1); } .ds-piece-row:hover, .ds-piece-row:focus-visible { transform: translateY(-2px); } } .ds-piece-text { display: grid; gap: 2px; } .ds-piece-title { font-family: 'Bricolage Grotesque', system-ui, sans-serif; font-weight: 750; font-size: 20px; letter-spacing: -0.01em; } .ds-piece-meta { color: #4f4e69; font-size: 15px; } .ds-arrow { transition: transform 220ms cubic-bezier(0.22,1,0.36,1); } .ds-piece-row:hover .ds-arrow { transform: translateX(4px); } .ds-piece-row:focus-visible { outline: 3px solid #3730a8; outline-offset: -3px; }"
     },
     {
-      "name": "Field",
-      "kind": "input",
-      "refersTo": "field",
-      "description": "Label above, 48px control with a 1px stroke, hint below.",
-      "html": "<label class=\"ds-field\"><span class=\"ds-field__label\">Pays</span><input class=\"ds-field__control\" value=\"Côte d'Ivoire\"><span class=\"ds-field__hint\">Les offres dépendent du pays.</span></label>",
-      "css": ".ds-field { display: grid; gap: 6px; font-family: var(--am-font-body, 'Atkinson Hyperlegible Next', system-ui, sans-serif); } .ds-field__label { color: #12161d; font-size: 15px; font-weight: 700; line-height: 1.5; } .ds-field__control { min-height: 48px; padding: 10px 12px; border: 1px solid #5f6a7c; border-radius: 4px; background: #fff; color: #12161d; font: inherit; font-size: 16px; transition: border-color 160ms ease-out, box-shadow 160ms ease-out; } .ds-field__control:hover { border-color: #222934; } .ds-field__control:focus { border-color: #1650b8; box-shadow: inset 0 0 0 1px #1650b8; } .ds-field__control:focus-visible { outline: 3px solid #1650b8; outline-offset: 1px; } .ds-field__hint { color: #4e5868; font-size: 14px; line-height: 1.45; }"
-    },
-    {
-      "name": "Header Navigation",
+      "name": "Measuring Tape Strip",
       "kind": "nav",
-      "refersTo": "navigation",
-      "description": "White sticky strip; navy links; the current page is a 4px navy bar on the lower edge.",
-      "html": "<nav class=\"ds-nav\"><a class=\"ds-nav__link\" href=\"#\">Comment ça marche</a><a class=\"ds-nav__link\" href=\"#\" aria-current=\"page\">Pays</a><a class=\"ds-nav__link\" href=\"#\">Guides</a><a class=\"ds-nav__link\" href=\"#\">Courtiers</a></nav>",
-      "css": ".ds-nav { display: flex; min-height: 68px; align-items: stretch; gap: 4px; border-bottom: 1px solid #e1e5eb; background: #fff; font-family: var(--am-font-body, 'Atkinson Hyperlegible Next', system-ui, sans-serif); } .ds-nav__link { position: relative; display: inline-flex; align-items: center; padding: 0 12px; color: #0b2a5c; font-size: 16px; font-weight: 700; text-decoration: none; white-space: nowrap; } .ds-nav__link:hover { color: #1650b8; text-decoration: underline; text-decoration-thickness: 2px; text-underline-offset: 0.3em; } .ds-nav__link:focus-visible { outline: 3px solid #1650b8; outline-offset: 2px; } .ds-nav__link[aria-current=page]::after { content: ''; position: absolute; left: 12px; right: 12px; bottom: -1px; height: 4px; background: #0b2a5c; }"
+      "refersTo": "route-tag",
+      "description": "Journey steps on a full-width yellow tape with ticks; current step printed in reverse (the home marks Pays).",
+      "html": "<ol class=\"ds-tape\"><li><a href=\"#\">Pays</a></li><li><a href=\"#\">Produit</a></li><li class=\"ds-cur\">Offres</li><li>Demande</li><li>Courtier</li></ol>",
+      "css": ".ds-tape { display: flex; justify-content: space-between; gap: 2px; margin: 0; padding: 8px 4px 18px; list-style: none; background-color: #f2c230; background-image: url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='40' height='12'%3E%3Cpath d='M.5 12V1M4.5 12V8M8.5 12V8M12.5 12V8M16.5 12V8M20.5 12V5M24.5 12V8M28.5 12V8M32.5 12V8M36.5 12V8' stroke='%2325207a' stroke-opacity='.55' fill='none'/%3E%3C/svg%3E\"); background-position: left bottom; background-repeat: repeat-x; border-radius: 2px; font-size: 14px; color: #25207a; } .ds-tape li { padding: 2px 4px; border-radius: 2px; } .ds-tape a { color: #25207a; font-weight: 700; } .ds-tape .ds-cur { background: #25207a; color: #f2c230; font-weight: 800; }"
+    },
+    {
+      "name": "Pattern Sheet",
+      "kind": "card",
+      "refersTo": "pattern-sheet",
+      "description": "Pale paper laid on the cloth with a dotted cut line and a notch; holds the headline.",
+      "html": "<div class=\"ds-cloth\"><div class=\"ds-sheet\"><h1>Comparez d'abord. Soyez accompagné ensuite.</h1><p>Comparaison indicative, le courtier confirme.</p></div></div>",
+      "css": ".ds-cloth { padding: 24px 16px; background: #25207a; } .ds-sheet { position: relative; padding: 32px 24px; border-radius: 2px; background-color: #fafbff; background-image: url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='20'%3E%3Cpath d='M0 0 12 10 0 20Z' fill='%2325207a'/%3E%3C/svg%3E\"); background-position: 0 26%; background-repeat: no-repeat; color: #14132a; } .ds-sheet::before { position: absolute; inset: 8px; border: 2px dotted #8f89d8; content: ''; pointer-events: none; } .ds-sheet h1 { margin: 0 0 12px; color: #25207a; font-family: 'Bricolage Grotesque', system-ui, sans-serif; font-weight: 800; font-size: 34px; line-height: 1.02; letter-spacing: -0.022em; } .ds-sheet p { margin: 0; color: #4f4e69; }"
+    },
+    {
+      "name": "Pattern Sheet (body)",
+      "kind": "card",
+      "refersTo": "pattern-sheet-body",
+      "description": "Paper with dotted cut line and two notches on a muted grey band; holds a whole form, whose card is frameless.",
+      "html": "<div class=\"ds-band\"><div class=\"ds-bsheet\"><h2>Votre demande</h2><label>Nom<input value=\"Awa Traor\u00e9\"></label></div></div>",
+      "css": ".ds-band { padding: 24px 16px; background: #f1f1f8; } .ds-bsheet { position: relative; max-width: 920px; margin: 0 auto; padding: 32px 20px; border: 1px solid #e6e4fa; border-radius: 2px; background-color: #fafbff; background-image: url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='20'%3E%3Cpath d='M0 0 12 10 0 20Z' fill='%2325207a'/%3E%3C/svg%3E\"), url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='20'%3E%3Cpath d='M12 0 0 10 12 20Z' fill='%2325207a'/%3E%3C/svg%3E\"); background-position: 0 72px, 100% 180px; background-repeat: no-repeat; color: #14132a; } .ds-bsheet::before { position: absolute; inset: 8px; border: 2px dotted #8f89d8; content: ''; pointer-events: none; } .ds-bsheet h2 { margin: 0 0 12px; color: #25207a; font-family: 'Bricolage Grotesque', system-ui, sans-serif; font-weight: 800; font-size: 26px; letter-spacing: -0.022em; } .ds-bsheet label { display: grid; gap: 6px; font-weight: 700; font-size: 15px; } .ds-bsheet input { min-height: 48px; padding: 10px 12px; border: 1px solid #646380; border-radius: 2px; background: #fff; font-size: 17px; font-weight: 400; }"
+    },
+    {
+      "name": "Offer Card",
+      "kind": "card",
+      "refersTo": "offer-piece",
+      "description": "White card with one notch bitten into the left edge and a dashed indicative price in the heading face.",
+      "html": "<article class=\"ds-offer\"><h3>Assurance auto tous risques</h3><div class=\"ds-price\"><p class=\"ds-price-l\">Prix indicatif</p><p class=\"ds-price-a\">120 000 FCFA / an</p></div></article>",
+      "css": ".ds-offer { display: grid; gap: 16px; padding: 16px; border: 1px solid #cbcbdd; border-radius: 2px; background-color: #fff; background-image: url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='20'%3E%3Cpath d='M0 0 12 10 0 20Z' fill='%2325207a'/%3E%3C/svg%3E\"); background-position: 0 52px; background-repeat: no-repeat; } .ds-offer h3 { margin: 0; color: #25207a; font-family: 'Bricolage Grotesque', system-ui, sans-serif; font-weight: 750; font-size: 20px; letter-spacing: -0.01em; } .ds-price { display: grid; gap: 4px; padding: 16px; border: 1px dashed #25207a; border-radius: 2px; } .ds-price-l { margin: 0; color: #25207a; font-size: 15px; font-weight: 700; } .ds-price-a { margin: 0; color: #25207a; font-family: 'Bricolage Grotesque', system-ui, sans-serif; font-weight: 800; font-size: 24px; letter-spacing: -0.022em; line-height: 1.15; }"
     },
     {
       "name": "Badges",
       "kind": "chip",
       "refersTo": "badge-confirmed",
-      "description": "Rectangular stamped labels: solid green confirmed, orange sponsored with the word, dashed navy pilot.",
-      "html": "<span class=\"ds-badge ds-badge--confirmed\">Confirmé par le courtier</span> <span class=\"ds-badge ds-badge--sponsored\">Sponsorisé</span> <span class=\"ds-badge ds-badge--pilot\">Pays pilote</span>",
-      "css": ".ds-badge { display: inline-flex; min-height: 26px; align-items: center; padding: 2px 8px; border: 1px solid #c9d0da; border-radius: 2px; background: #eef1f4; color: #373f4c; font-family: var(--am-font-body, 'Atkinson Hyperlegible Next', system-ui, sans-serif); font-size: 14px; font-weight: 700; line-height: 1.25; white-space: nowrap; } .ds-badge--confirmed { border-color: #237a35; background: #237a35; color: #fff; } .ds-badge--sponsored { border-color: #c2610a; background: #fff6eb; color: #8a4303; } .ds-badge--pilot { border: 1px dashed #0b2a5c; background: #fff; color: #0b2a5c; }"
+      "description": "Rectangular labels: confirmed (solid green), sponsored (orange, with the word), pilot (dashed).",
+      "html": "<span class=\"ds-b ds-b-ok\">Confirmé par le courtier</span> <span class=\"ds-b ds-b-sp\">Sponsorisé</span> <span class=\"ds-b ds-b-pilot\">Pilote</span>",
+      "css": ".ds-b { display: inline-flex; min-height: 26px; align-items: center; padding: 2px 8px; border: 1px solid #cbcbdd; border-radius: 2px; font-size: 14px; font-weight: 700; } .ds-b-ok { border-color: #237a35; background: #237a35; color: #fff; } .ds-b-sp { border-color: #c2610a; background: #fff6eb; color: #8a4303; } .ds-b-pilot { border: 1px dashed #25207a; background: #fff; color: #25207a; }"
     },
     {
-      "name": "Directory Row",
+      "name": "Field",
+      "kind": "input",
+      "refersTo": "field",
+      "description": "48px field, 1px border, link-indigo focus with inset line.",
+      "html": "<label class=\"ds-l\">Pays<input class=\"ds-f\" value=\"Côte d'Ivoire\"></label>",
+      "css": ".ds-l { display: grid; gap: 6px; color: #14132a; font-size: 15px; font-weight: 700; } .ds-f { min-height: 48px; padding: 10px 12px; border: 1px solid #646380; border-radius: 2px; background: #fff; color: #14132a; font-size: 17px; font-weight: 400; } .ds-f:hover { border-color: #25243a; } .ds-f:focus { border-color: #3730a8; box-shadow: inset 0 0 0 1px #3730a8; outline: none; }"
+    },
+    {
+      "name": "Notice",
       "kind": "custom",
-      "refersTo": "directory-row",
-      "description": "The signature list: 64px ruled rows with a navy pictogram tile, bold name, muted line and a nudging blue arrow.",
-      "html": "<ul class=\"ds-dir\"><li><a class=\"ds-dir__row\" href=\"#\"><span class=\"ds-dir__tile\"><svg width=\"24\" height=\"24\" viewBox=\"0 0 24 24\" fill=\"currentColor\" aria-hidden=\"true\"><path d=\"M21.6 15.6v-2.1l-8.1-5.1V3.9c0-.8-.7-1.5-1.5-1.5s-1.5.7-1.5 1.5v4.5l-8.1 5.1v2.1l8.1-2.5v5.1l-2.1 1.5v1.6l3.6-1 3.6 1v-1.6l-2.1-1.5v-5.1l8.1 2.5Z\"/></svg></span><span class=\"ds-dir__text\"><span class=\"ds-dir__title\">Assurance voyage</span><span class=\"ds-dir__meta\">Comparaison indicative · Demande de devis</span></span><svg class=\"ds-dir__arrow\" width=\"22\" height=\"22\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M5 12h14M13 6l6 6-6 6\"/></svg></a></li></ul>",
-      "css": ".ds-dir { margin: 0; padding: 0; list-style: none; border-top: 1px solid #e1e5eb; font-family: var(--am-font-body, 'Atkinson Hyperlegible Next', system-ui, sans-serif); } .ds-dir > li { border-bottom: 1px solid #e1e5eb; } .ds-dir__row { display: grid; min-height: 64px; grid-template-columns: auto minmax(0,1fr) auto; gap: 4px 16px; align-items: center; padding: 10px 4px; color: #0b2a5c; text-decoration: none; transition: background-color 160ms cubic-bezier(0.22,1,0.36,1); } .ds-dir__row:hover { background: #f1f5fd; } .ds-dir__row:focus-visible { outline: 3px solid #1650b8; outline-offset: -3px; } .ds-dir__tile { display: inline-flex; width: 44px; height: 44px; align-items: center; justify-content: center; border-radius: 4px; background: #0b2a5c; color: #fff; } .ds-dir__text { display: grid; gap: 2px; } .ds-dir__title { font-size: 18px; font-weight: 700; line-height: 1.3; } .ds-dir__meta { color: #4e5868; font-size: 15px; line-height: 1.5; } .ds-dir__arrow { color: #1650b8; transition: transform 220ms cubic-bezier(0.22,1,0.36,1); } .ds-dir__row:hover .ds-dir__arrow, .ds-dir__row:focus-visible .ds-dir__arrow { transform: translateX(4px); }"
-    },
-    {
-      "name": "Route Strip (Vous êtes ici)",
-      "kind": "custom",
-      "refersTo": "sign-panel",
-      "description": "Five equal stops on a navy journey sign; the current stop is a solid white disc with a halo.",
-      "html": "<ol class=\"ds-strip\"><li data-state=\"done\"><span class=\"ds-strip__mark\"></span><a href=\"#\">Pays</a></li><li data-state=\"done\"><span class=\"ds-strip__mark\"></span><a href=\"#\">Produit</a></li><li data-state=\"current\"><span class=\"ds-strip__mark\"></span><span>Offres</span></li><li><span class=\"ds-strip__mark\"></span><span>Demande</span></li><li><span class=\"ds-strip__mark\"></span><span>Courtier</span></li></ol>",
-      "css": ".ds-strip { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0,1fr); margin: 0; padding: 24px 8px; list-style: none; background: #0b2a5c; color: #c7d3ea; font-family: var(--am-font-body, 'Atkinson Hyperlegible Next', system-ui, sans-serif); font-size: 14px; } .ds-strip > li { position: relative; display: grid; grid-template-rows: 22px auto; gap: 6px; justify-items: center; text-align: center; } .ds-strip > li:not(:last-child)::after { content: ''; position: absolute; top: 10px; left: 50%; width: 100%; height: 2px; background: rgba(255,255,255,0.22); } .ds-strip > li[data-state=done]:not(:last-child)::after { background: #c7d3ea; } .ds-strip__mark { position: relative; z-index: 1; align-self: center; width: 10px; height: 10px; border: 2px solid #c7d3ea; border-radius: 999px; background: #0b2a5c; } .ds-strip > li[data-state=done] .ds-strip__mark { background: #c7d3ea; } .ds-strip > li[data-state=current] .ds-strip__mark { width: 22px; height: 22px; border: 0; background: #fff; box-shadow: 0 0 0 4px rgba(255,255,255,0.22); } .ds-strip > li[data-state=current] span:last-child { color: #fff; font-weight: 700; } .ds-strip a { color: #c7d3ea; } .ds-strip a:hover { color: #fff; } .ds-strip a:focus-visible { outline: 3px solid #ffd75e; outline-offset: 2px; }"
-    },
-    {
-      "name": "Indicative Price Plate",
-      "kind": "card",
-      "refersTo": "price-plate",
-      "description": "The dashed plate on every offer card: the amount and who confirms it.",
-      "html": "<div class=\"ds-price\"><p class=\"ds-price__label\">Prix indicatif</p><p class=\"ds-price__amount\">à partir de 45 000 FCFA</p><p class=\"ds-price__note\">prix à confirmer</p><p class=\"ds-price__notice\">Prix indicatif, à confirmer par le courtier partenaire</p></div>",
-      "css": ".ds-price { display: grid; gap: 4px; max-width: 260px; padding: 16px; border: 1px dashed #0b2a5c; border-radius: 4px; background: #fff; font-family: var(--am-font-body, 'Atkinson Hyperlegible Next', system-ui, sans-serif); } .ds-price p { margin: 0; } .ds-price__label { color: #0b2a5c; font-size: 15px; font-weight: 700; } .ds-price__amount { color: #0b2a5c; font-size: 26px; font-weight: 800; letter-spacing: -0.012em; line-height: 1.15; font-variant-numeric: tabular-nums; } .ds-price__note { color: #4e5868; font-size: 14px; } .ds-price__notice { margin-top: 8px !important; padding-top: 8px; border-top: 1px dashed #c9d0da; color: #12161d; font-size: 14px; font-weight: 700; }"
-    },
-    {
-      "name": "Card",
-      "kind": "card",
-      "refersTo": "card",
-      "description": "A plain flat panel: 1px rule, 4px corners, never nested, never a shadow.",
-      "html": "<article class=\"ds-card\"><h3 class=\"ds-card__title\">Notre rôle</h3><p class=\"ds-card__body\">AssurMatch compare des offres indicatives et transmet votre demande à un courtier partenaire autorisé.</p></article>",
-      "css": ".ds-card { display: grid; gap: 12px; padding: 20px; border: 1px solid #e1e5eb; border-radius: 4px; background: #fff; color: #12161d; font-family: var(--am-font-body, 'Atkinson Hyperlegible Next', system-ui, sans-serif); transition: border-color 160ms ease-out, background-color 160ms ease-out; } .ds-card:hover { border-color: #1650b8; background: #f1f5fd; } .ds-card__title { margin: 0; color: #0b2a5c; font-size: 20px; font-weight: 700; line-height: 1.3; } .ds-card__body { margin: 0; color: #4e5868; font-size: 16px; line-height: 1.6; }"
+      "refersTo": "notice",
+      "description": "Never closable; the indicative variant is dashed.",
+      "html": "<div class=\"ds-n\"><strong>Prix indicatif.</strong> Le courtier confirme l'offre finale.</div>",
+      "css": ".ds-n { padding: 16px; border: 1px dashed #25207a; border-radius: 2px; background: #fff; color: #14132a; font-size: 15px; line-height: 1.5; }"
     }
   ],
   "narrative": {
-    "northStar": "La signalétique",
-    "overview": "The public site is a wayfinding sign system for an insurance decision, drawn after airport and bus-station signage rather than after a comparator landing page. Every page opens on a flat navy sign that says where you are; every list is a directory of ruled rows you walk; every price says who confirms it. The visitor is an adult making a money decision on a phone in daylight, so the system is built for legibility first: one hyperlegible face, large tap targets, high-contrast pairs, and nothing that moves on its own.\n\nDensity is moderate and phone-led (designed at 390px, then widened). Surfaces are a white ground, pale cool-grey bands and navy signs; structure comes from 1px rules and near-square 4px corners, never from shadow, gradient or glass. Colour is a law, not a mood: each hue carries one meaning on every page. The state language is literal: what is indicative is outlined with a dashed line, what a broker confirmed is filled solid.\n\nThe world is deliberately plain. The confirmed anti-reference is a themed costume site (painted metaphors, condensed all-caps display, rendered metal plates): the signage here is the honest municipal kind, not a stage set.",
+    "northStar": "Le patron",
+    "overview": "The public site is a tailor's pattern. You choose the cloth first (compare), then the broker takes your measurements (quote). Every page opens on saturated indigo cloth. A pale pattern sheet is laid on it, drawn with a dotted cut line and notches bitten out of its edge. A yellow measuring tape counts the journey steps and marks the action. Pieces are cut square, outlined or ruled, never rounded and never shadowed. The footer closes the page on the same cloth, hemmed with a strip of tape.\n\nThe register is plain and credible on price and consent, but allowed some character: the one expressive device is the cut paper and the tape, and the display face carries the rest. Flat colour only; the retired gradient and glow names still resolve to flat values or none. A solid line means cut (confirmed); a dashed line means only marked (indicative, to be confirmed).",
     "keyCharacteristics": [
-      "Navy sign panel at the top of every page, carrying the location line, the title and one lead.",
-      "Directories of 64px ruled rows (tile, bold name, short line, arrow) instead of icon-card grids.",
-      "The « Vous êtes ici » route strip on journey signs: Pays, Produit, Offres, Demande, Courtier.",
-      "One family, Atkinson Hyperlegible Next, at 400 / 700 / 800.",
-      "Flat: 1px rules, 4px corners, no page shadows, no gradients.",
-      "Dashed = indicative, solid = confirmed, everywhere.",
-      "Almost no motion: the only authored move is the directory arrow nudging 4px."
+      "Indigo cloth (with a barely visible lozenge weave) opens and closes every page.",
+      "Pale pattern sheet with a 2px dotted cut line and four triangular notches carries the headline, one lead and the main action. The same sheet, with two notches, carries the quote, apply and track forms on a grey band.",
+      "Cut pieces (offer cards, home role groups) carry one notch on the left edge.",
+      "Yellow is the action and the tape; nothing else is yellow-filled.",
+      "Square corners (2px), 1px or 2px lines, no shadows on the page.",
+      "Two faces (plus a mono stack for code and references): Bricolage Grotesque for headings and figures, Atkinson Hyperlegible Next for every sentence.",
+      "Nothing renders below 14px; text pairs are at least 4.5:1."
     ],
     "rules": [
-      { "name": "The Palette Law Rule", "body": "Navy = where you are, blue = what you can do, green = confirmed or done, orange = sponsored, red = error. Nothing is decorative; a colour that appears must carry its meaning.", "section": "colors" },
-      { "name": "The Green Is Earned Rule", "body": "Green appears only where a broker confirmed something or a step is done. A high score is a heavier navy outline, never green.", "section": "colors" },
-      { "name": "The Inverting Sign Rule", "body": "Inside a navy panel the same components invert: headings, links and primary buttons turn white, rules turn translucent white (22%), the focus ring turns yellow. A light plate set on a sign (card, notice, field, plated directory) returns to the light-page colours.", "section": "colors" },
-      { "name": "The Sentence Case Sign Rule", "body": "Headings and labels are sentence case at zero or negative tracking. No uppercase tracked labels and nothing set above a heading as an eyebrow; a status that needs saying above a title is a Badge.", "section": "typography" },
-      { "name": "The Fourteen Floor Rule", "body": "No text below 14px, anywhere, including legal fine print.", "section": "typography" },
-      { "name": "The Columns Never Move Rule", "body": "Every offer card has the same structure in the same order and the same label grid; a missing fact stays in its cell as \"not provided\", it never collapses the grid.", "section": "layout" },
-      { "name": "The Flat Sign Rule", "body": "Nothing on the page casts a shadow. If an element seems to need lift, give it a rule, a band or a navy panel instead.", "section": "elevation" },
-      { "name": "The Dashed Means Indicative Rule", "body": "A dashed outline says \"à confirmer\"; a solid fill says \"confirmé\". Never use a dashed line for decoration or a solid green fill for something the broker has not confirmed.", "section": "shapes" }
+      { "name": "The One Meaning Rule", "body": "Each colour keeps one meaning everywhere: indigo = cloth and structure, link indigo = followable, yellow = doable, green = confirmed, orange = sponsored, red = error.", "section": "colors" },
+      { "name": "The Cut-or-Marked Rule", "body": "Confirmed things get a solid line; indicative or to-be-confirmed things get a dashed line.", "section": "colors" },
+      { "name": "The Yellow Is Action Rule", "body": "Do not use yellow as decoration or as a highlight; a yellow fill must be a button, the tape, or a number on a route tag.", "section": "colors" },
+      { "name": "The Two Faces Rule", "body": "Headings, figures and the numbers on route tags use the display face; everything a person reads as a sentence uses the body face.", "section": "typography" },
+      { "name": "The 14px Floor Rule", "body": "Nothing renders below 14px.", "section": "typography" },
+      { "name": "The Tabular Where Aligned Rule", "body": "Tabular numerals only where figures line up in a column or a code (table cells, scores, references, ceilings); a single display figure such as the price is set in the heading face without them.", "section": "typography" },
+      { "name": "The No Shadow On The Page Rule", "body": "Cards, pieces, buttons and sheets never carry a shadow; a piece lifts by a change of border or wash, not by shadow.", "section": "elevation" },
+      { "name": "The Cut Corner Rule", "body": "Corners stay at 2px (1px only for the tape tick and the square list dot); round shapes are reserved for dots and switches.", "section": "shapes" },
+      { "name": "The Notch Rule", "body": "The cut line and multiple notches belong to pattern sheets. The only other notch is the single left-edge notch on offer cards and home role groups; never on rows, buttons, badges or fields.", "section": "shapes" }
     ],
     "dos": [
-      "Do open every page on a navy sign panel with the location line, one title and one lead.",
-      "Do present lists of destinations as Directory rows (64px, tile, name, arrow), not as card grids.",
-      "Do put the « Vous êtes ici » route strip on every journey page, with passed stops linking back.",
-      "Do mark every indicative price or guarantee with a dashed outline and say who confirms it; fill solid only what a broker confirmed.",
-      "Do keep each colour to its single meaning (navy where you are, blue action, green confirmed, orange sponsored, red error).",
-      "Do use 4px corners, 1px rules, 48px buttons and fields, and 44px minimum tap targets.",
-      "Do set every number in tabular figures and every prose measure in em (34em).",
-      "Do invert components inside navy panels and switch the focus ring to yellow there."
+      "Do open every page on the cloth with the pattern sheet laid on it, and close it on the cloth footer with the tape hem.",
+      "Do keep yellow for the one real action per view, the tape and the route numbers.",
+      "Do use a dashed 1px outline for anything indicative, a solid line for what is confirmed.",
+      "Do build list items as 2px-indigo-outlined pieces at least 64px tall.",
+      "Do set headings and figures in Bricolage Grotesque and sentences in Atkinson Hyperlegible Next, 14px minimum.",
+      "Do respect reduced motion: the 2px row lift is the one authored movement and exists only under no-preference.",
+      "Do print \"sponsored\" in words with the orange label, and green only on what the broker confirmed."
     ],
     "donts": [
-      "Don't use shadows, gradients or glass on the page; the overlay shadow is for the menu drawer and the comparison bar only.",
-      "Don't set an eyebrow or kicker above a heading, or any uppercase tracked label.",
-      "Don't use green for a high score, a decoration or anything not confirmed; don't use the WhatsApp or logo green anywhere else.",
-      "Don't build a soft gradient hero, a split hero on the home sign, a form-in-a-card hero, or rows of icon cards.",
-      "Don't nest cards or close notices.",
-      "Don't render text below 14px.",
-      "Don't add entrance animation, scroll reveals, staggers or count-ups; the arrow nudge is the only authored move.",
-      "Don't put a stroke icon on a navy tile or a flat-plane pictogram on a pale tile.",
-      "Don't theme the signage into a costume (condensed all-caps display, painted or metal textures)."
+      "Don't add shadows, gradients, glass or glows to page surfaces.",
+      "Don't round corners beyond 2px (4px for panels) or nest cards in cards.",
+      "Don't reuse the previous system: navy sign panels with a directory of icon rows, or the comparator default of a blue hero over a search box with icon cards and trust-badge strips.",
+      "Don't make the site read as a themed costume (the MedicProWeb anti-reference): the pattern devices stay on the sheet, the tape and the route.",
+      "Don't use the logo blue or green outside the logo, or WhatsApp green outside the WhatsApp button.",
+      "Don't set tabular numerals on a lone display figure, or add notches to rows and controls.",
+      "Don't put text over the cloth weave other than headings and short lines; body copy sits on the sheet or white."
     ]
   }
 }

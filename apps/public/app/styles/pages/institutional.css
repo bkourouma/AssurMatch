@@ -174,11 +174,13 @@
   padding: var(--am-space-8) 0;
   font-size: var(--am-small-size);
   line-height: 1.35;
-  text-decoration: none;
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 0.2em;
 }
 
 .am-toc__list a:hover {
-  text-decoration: underline;
+  text-decoration-thickness: 2px;
 }
 
 .am-article__section + .am-article__section {

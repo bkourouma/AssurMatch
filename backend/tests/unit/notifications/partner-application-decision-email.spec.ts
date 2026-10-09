@@ -12,7 +12,7 @@ describe("partner application decision e-mail (spec 051 FR-017)", () => {
     expect(email.purpose).toBe("partner_application_decision");
     expect(email.subject).toContain("PA-2026-abcd1234");
     expect(email.body).toContain("partenariat technique");
-    expect(email.body).toContain("ne constitue pas un agrement");
+    expect(email.body).toContain("ne constitue pas un agrément");
     expect(email.body).toContain("http://public.test/confidentialite");
     expect(findForbiddenWording(`${email.subject}\n${email.body}`)).toEqual([]);
   });

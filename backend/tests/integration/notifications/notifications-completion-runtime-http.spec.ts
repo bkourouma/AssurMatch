@@ -72,7 +72,7 @@ describe("spec 061 notifications completion runtime HTTP", () => {
     email.send = async (payload) => { delivered.push(payload); return { status: "sent" }; };
     await harness.runtime.quoteNotificationDelivery.processDueNotifications({ limit: 50 });
     const brokerMail = delivered.find((mail) => mail.to === "runtime@broker.example");
-    expect(brokerMail?.subject).toBe("Licence bientot expiree");
+    expect(brokerMail?.subject).toBe("Licence bientôt expirée");
     expect(brokerMail?.body).toContain("/licenses");
     expect(brokerMail?.body).not.toContain("LIC-SOON");
     const complianceMail = delivered.find((mail) => mail.to === "conformite@assurmatch.example");

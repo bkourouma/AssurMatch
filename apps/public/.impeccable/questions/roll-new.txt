@@ -1,0 +1,141 @@
+DIRECTION CONCEPT SEED (key: 530b6f9e; mode: persuade; source: api; approved pool: c3b204a1eed6; 306/564 human-approved; rerun with --scope direction --mode persuade --from 530b6f9e --candidate-count 7 to reproduce this roll against this catalog revision)
+ASSIGNED INDEX: 6
+  After ordering the grounded directions by resonance, build candidate
+  6 of your own grounded list; the assignment never points at a
+  challenger. The assignment is the roll, not a suggestion: your top-ranked
+  direction is what every run would ship, so the script decides which grounded
+  direction gets built. Each direction joins a durable visual system to a
+  concrete expression for the requested first surface, decided as one. It must
+  survive the current task plus navigation, quiet and dense content,
+  interaction and state, and a substantially different future surface. In an
+  attended run, present the assigned direction fully committed and offer
+  re-roll. You may add ONE card for your top-ranked grounded candidate when
+  it is not the assigned direction, kicker IMPECCABLE’S PICK, with an honest risk line
+  naming its familiarity; one pick card, never a ranked lineup, and the pick
+  never takes the lead position. When the assignment IS your top candidate,
+  there is no pick card. Re-roll yourself only
+  on named factual grounds, when the assignment cannot carry the product's
+  truth or task; taste is never grounds.
+  The assignment exists to refuse the model's ranking rut, never to outrank
+  the user or the brief. Never expose assignment metadata in user-facing labels.
+CHALLENGERS:
+  1. a factory records catalog identity, every artifact given a fac number including the nightclub, a pulsar plot in white lines on matte black, industrial color codes standing in for words
+     SOURCE ID: brand-identity-canon-saville-catalog-sleeve
+     CREATIVE SPARK: you hold a matte black sleeve with no band name anywhere, only a stacked pulse of white lines and a small fac number, and a strip of colored blocks you slowly realize spells the title
+     SYSTEM GRAMMAR:
+       - Palette/material: matte black ground, white hairline plot as body ink, names replaced by a coded strip of hue blocks, the active item alone decoded to full color
+       - Type/composition: small engraved-feel caps used sparingly, the fac number as the only headline, vast unprinted black, one plot owning the field
+       - Topology/navigation: everything is a catalog entry, you navigate by fac number in strict sequence and the index page is the only map
+       - Controls/state: state speaks in code, hover translates a color strip to text, selection lifts one white line of the pulse to double weight, nothing is labeled twice
+       - Responsive/motion: the plot compresses its line count on narrow screens and the fac index becomes the whole surface; motion is a slow pulse traverse
+     WEB LEVERAGE: canvas redraws the pulsar line stack from live data; css color blocks encode labels the legend decodes on hover
+     QUALITY BAR: board https://impeccable.style/worlds/cards/brand-identity-canon-saville-catalog-sleeve.webp · hero https://impeccable.style/worlds/cards/brand-identity-canon-saville-catalog-sleeve-hero.webp
+  2. a full-bleed vertical media surface where one item owns the entire viewport, a right rail of stacked action affordances, an author line and caption anchored low, and the next item already waiting one snap away
+     SOURCE ID: pop-culture-shelf-vertical-video-feed-surface
+     CREATIVE SPARK: One thing fills the whole screen, four glyphs stacked down the right, and the next one is exactly one flick away and already loaded.
+     SYSTEM GRAMMAR:
+       - Palette/material: media fills the frame edge to edge with a soft bottom scrim carrying the text, and pure white glyphs as the only interface color
+       - Type/composition: an author line and caption anchored to the lower left, a vertical stack of action glyphs on the right, and nothing in the center
+       - Topology/navigation: one item at a time occupies everything, so navigation is a single vertical snap between complete states
+       - Controls/state: controls are rail glyphs, an engaged one fills and counts up, and the caption expands in place when truncated
+       - Responsive/motion: the item always fills the viewport whatever its aspect, and motion is a hard snap with no partial scroll position
+     WEB LEVERAGE: scroll-snap paging with preloading, engagement counts in live state, and full-viewport media fitting at any aspect
+     QUALITY BAR: board https://impeccable.style/worlds/cards/pop-culture-shelf-vertical-video-feed-surface.webp · hero https://impeccable.style/worlds/cards/pop-culture-shelf-vertical-video-feed-surface-hero.webp
+  3. an algorave floor, where projected live code edits the music mid-dance and every thrown bracket changes what a hundred bodies do next
+     SOURCE ID: medium-native-algorave-source-floor
+     CREATIVE SPARK: The coder deletes half a line and the kick drops out; the crowd howls, the line comes back wrong on purpose, and the room lifts.
+     SYSTEM GRAMMAR:
+       - Palette/material: phosphor green and magenta syntax on projector black, the code buffer as ground; the pattern about to change flashes amber before it sounds
+       - Type/composition: monospaced terminal type at stage scale with hard line breaks as musical bars, the composition one code buffer whose cursor line is the downbeat
+       - Topology/navigation: the source is the stage; sections of code map to audible layers you can follow live.
+       - Controls/state: edits apply on the next cycle boundary; upcoming changes are visible before they sound.
+       - Responsive/motion: code and visuals share one clock; small screens follow a single highlighted pattern lane.
+     WEB LEVERAGE: Web Audio scheduling ties editable patterns to a shared clock with live evaluation in the page.
+     QUALITY BAR: board https://impeccable.style/worlds/cards/medium-native-algorave-source-floor.webp · hero https://impeccable.style/worlds/cards/medium-native-algorave-source-floor-hero.webp
+  4. a nixie-tube laboratory counter, where stacked digits glow orange inside glass envelopes and every count arrives as visible plasma
+     SOURCE ID: signals-instruments-nixie-laboratory-counter
+     CREATIVE SPARK: Inside each glass tube ten metal numerals nest; the lit one hovers orange, and a count change is a tiny change of physical depth.
+     SYSTEM GRAMMAR:
+       - Palette/material: neon orange digit glow inside clear glass envelopes, blackened steel chassis as ground, hairline anode mesh gray; the lit digit is the only warm accent
+       - Type/composition: stacked metal numerals of one engineered digit form, each tube a fixed decimal place; labels sit as engraved caps on the panel below the banks
+       - Topology/navigation: quantities are the interface; each metric owns a tube bank with fixed digit positions.
+       - Controls/state: value changes cross-fade between physical digit layers; overflow and reset are visible mechanical events.
+       - Responsive/motion: banks drop to essential digits on phones; digit transitions are single cross-fades under
+     WEB LEVERAGE: Layered DOM digits with depth-true cross-fades render tube physics in pure CSS.
+     QUALITY BAR: board https://impeccable.style/worlds/cards/signals-instruments-nixie-laboratory-counter.webp · hero https://impeccable.style/worlds/cards/signals-instruments-nixie-laboratory-counter-hero.webp
+  5. a seamless cyclorama passing from black night through cobalt and rose into white day, where light alone creates an infinite horizon behind the actors
+     SOURCE ID: stagecraft-theater-lighting-cyclorama-dawn
+     CREATIVE SPARK: The curved wall begins as depthless black; a low cobalt band appears, rose gathers above it, and the actors acquire shadows before the stage becomes day.
+     SYSTEM GRAMMAR:
+       - Palette/material: depthless cyc black as ground, a low cobalt horizon band as structure, rose gathering above it, white-day wash reserved for the fully active state
+       - Type/composition: lighting-plot stencil caps for cue names with tabular numerals, content held in horizontal horizon bands stacked from dark to light
+       - Topology/navigation: Organize atmosphere by horizon band, time phase, subject relation, and transition interval.
+       - Controls/state: Raise, blend, hold, and compare with night, first light, dawn, day, and blackout states.
+       - Responsive/motion: Offer discrete atmospheric phases with labels and patterns so color is never the sole signal.
+     WEB LEVERAGE: A scrubbable cue timeline binds horizon bands to actor and scene state, making each light transition inspectable while named cue states remain deep-linkable and text-equivalent.
+     QUALITY BAR: board https://impeccable.style/worlds/cards/stagecraft-theater-lighting-cyclorama-dawn.webp · hero https://impeccable.style/worlds/cards/stagecraft-theater-lighting-cyclorama-dawn-hero.webp
+  6. a pickling brine calendar, where salt, acidity, spice, vegetable, vessel, temperature, and crunch mature through bright seasonal jars
+     SOURCE ID: food-fermentation-culinary-theater-pickling-brine-calendar
+     CREATIVE SPARK: Spring radishes tint one jar coral, summer cucumbers cloud another with dill, and a winter cabbage crock slowly turns ruby as bubbles climb its stone weight.
+     SYSTEM GRAMMAR:
+       - Palette/material: clear jar glass and pale brine haze as ground, radish coral and cabbage ruby as seasonal accents, dill green for fresh states, labels in kraft brown
+       - Type/composition: hand-lettered jar-label script over stamped date caps, jars ranked on shelf lines, each label banded with harvest, brine, and day count
+       - Topology/navigation: Browse jars by harvest, brine, fermentation stage, sensory change, and safe storage.
+       - Controls/state: Mix a brine, log a taste, vent or chill a vessel, and compare batches over days.
+       - Responsive/motion: Arrange jars as a vertical seasonal shelf on phones with safety thresholds stated in text.
+     WEB LEVERAGE: Batch timers, optional pH and temperature input, and photo comparison connect daily observation to safe, sensory maturation.
+     QUALITY BAR: board https://impeccable.style/worlds/cards/food-fermentation-culinary-theater-pickling-brine-calendar.webp · hero https://impeccable.style/worlds/cards/food-fermentation-culinary-theater-pickling-brine-calendar-hero.webp
+Fuse each challenger before judging it: the challenger supplies the form
+  and its system grammar, the product supplies every fact, and clarity wins
+  conflicts. Weigh the fused result against the assigned direction on exactly
+  two axes, audience identification and product clarity. Losing to strong
+  grounded material is a valid outcome; beating a thin or tool-monoculture
+  list is the point. A fused challenger that wins both axes becomes the build.
+  Close the weighing with a verdict per challenger, decided before any
+  borrowing is considered: wins (beats the assigned direction on both axes),
+  competitive (holds one axis), or declined (loses both). A declined
+  challenger is not spent: name the one discipline of its system the assigned
+  direction lacks, and raise the assigned direction to match before
+  presenting it. A donation transfers ambition and system discipline, never
+  the challenger's clothes; one world owns the page. Write each raise as its
+  own named line on the presented direction, and carry every verdict, kept
+  line, and raise into the decision page payload.
+When you can view images, open the QUALITY BAR board and hero for any
+challenger you weigh seriously and for the world you build. They exist as a
+craft bar, the finish level and commitment the build is expected to reach,
+never as a mockup to copy; your surface serves this product, not that render.
+PRODUCT.md and explicit incumbent brand commitments constrain every direction.
+The seed never chooses exact colors, fonts, tokens, or a user preference, and
+it never permits the world and first surface to be selected independently.
+The CREATIVE SPARK is a complete visual system, not a theme or decorative
+reference. Translate every supplied system rule into the product: palette and
+material, type and composition, topology, controls and states, and adaptation.
+Keep the source's visible character, scale, rhythm, and interaction instead of
+reducing vivid grammar to generic nouns. Keep a literal carrier only when it
+becomes functional.
+Ambitious motion, spatial media, or interaction is welcome when it strengthens
+the product without weakening semantics, performance, or fallback behavior.
+MODE RULES (persuade, from C:\Users\BABA\.claude\plugins\cache\impeccable\impeccable\4.5.0\skills\impeccable\reference\mode-persuade.md). They govern this surface's directions and every comp you write or judge for it, the decision comps included; where shared guidance conflicts, these win.
+DIRECTIONS
+When a catalog world's source is itself an interface language, the surface may carry its native grammar across navigation, content, controls, and states, within the platform conventions a native app keeps.
+
+For **Persuade**, the opening must make the offer intelligible and desirable, expose a clear action, and demonstrate something only this product can prove. The action is the one the category's visitors came to take, in its working form: an airline's route-and-dates search, a clinic's open appointment slots, a store's add to cart. A decorative link pointing at it elsewhere does not count. Conversion lives inside the form's own vocabulary: a hook that lands in one line, a visible primary action, a legible reading order. A committed form that hides the offer or the action has not finished translating. For **Experience**, the work itself leads from the first viewport.
+COMPS
+The world may be the carrier of the page, never a picture of it: a facade, a shutter or a book can be what the page is built on, while a viewport painted whole as a facade, a book cover or a travel poster, with no working parts in it, is a picture of the world, not its website. Material coverage is wanted: the world's material is the ground and the major surfaces, its type sets the headlines, and a world reduced to an accent on a neutral template is the category default with a sticker on it. Coverage is not performance: how many regions act out the concept is limited by the depth rule in visualize.md, and the rest stay in the world's material without performing it. Both ends erase the direction: the painted poster, and the generic product page (a headline over subcopy and a button, a row of equal cards below). The dealt composition sets the skeleton, and the compositions you write for comps two and three answer to the same test: a split hero (copy on one side, the product on the other, a badge row under it) or a centred headline over a row of cards is the template whatever world paints it.
+
+The world carries the page's parts and never absorbs them, so wherever it puts one, the page still works as a page: navigation set into a facade reads as links, copy on a shutter as set text a visitor reads, an action on a door plaque as plainly clickable, text reads against whatever sits behind it, the sections keep a steady vertical rhythm, the primary action is unmistakable, and the section below starts as a section rather than more painting. Fix a poster by making its parts work where the world put them, never by moving them into a standard layout on the world's colour: a cover that becomes copy beside a device on marigold has lost the cover.
+
+When the world is an object, the page is that one object seen once, at one scale and from one point of view, and the object keeps its real form: a book opens to two pages on one gutter, never a third panel, and a spine that carries the navigation belongs to the book on the page, never a second book beside it. More content goes on the object's own surfaces or on the next spread below, never on extra copies or impossible folds.
+
+Comps two and three each go further than the first, never cleaner: a bolder use of the same world, where the world's material carries more of the page's structure (still one dominant move, per the depth rule), a larger or stranger focal move, or a composition the category would not attempt.
+TELEMETRY: after the user's choice resolves, rerun this script once with
+  --kind <assigned|pick|challenger|canon> --from 530b6f9e --scope direction --mode persuade,
+  adding --chosen <challenger-id> when a dealt challenger won and keeping
+  --register <safer|bolder> when the resolved round came from a steered hand.
+  One ping per resolved attended round. The ping is anonymous, the card kind
+  plus the catalog id when one won; your grounded candidates' names never
+  leave the machine, and the ping is skipped automatically when DO_NOT_TRACK
+  or IMPECCABLE_NO_TELEMETRY is set.
+A user- or brief-pinned decision beats the roll, always.
+ASSIGNED INDEX (restated for truncated readers): 6. Build candidate
+6 of your own grounded list; seed key 530b6f9e.

@@ -22,8 +22,8 @@ export function PageHeader({ kicker, title, description, actions, breadcrumb, br
         {breadcrumb && breadcrumb.length > 0 ? (
           <nav aria-label={breadcrumbLabel}>
             <ol className="bo-breadcrumb">
-              {breadcrumb.map((item) => (
-                <li key={`${item.label}-${item.href ?? ""}`}>
+              {breadcrumb.map((item, index) => (
+                <li key={`${index}-${item.label}-${item.href ?? ""}`}>
                   {item.href ? <a href={item.href}>{item.label}</a> : <span>{item.label}</span>}
                 </li>
               ))}

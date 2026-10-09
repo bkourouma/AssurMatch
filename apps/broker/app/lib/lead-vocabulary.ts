@@ -68,6 +68,9 @@ export const STARTER_CLOSE_OUTCOME_LABELS: Record<StarterCloseOutcome, string> =
 };
 
 /** Statuts Starter a partir desquels le courtier peut cloturer: le lead doit avoir ete accepte. */
+/** Statuts d'un lead qui n'a pas encore ete accepte : seuls ceux-la proposent « Accepter ». */
+export const STARTER_ACCEPTABLE_STATUSES = ["assigned", "broker_notified", "seen"] as const;
+
 export const STARTER_CLOSABLE_STATUSES = ["accepted", "received", "contacted"] as const;
 
 export function isStarterCloseOutcome(value: string): value is StarterCloseOutcome {
