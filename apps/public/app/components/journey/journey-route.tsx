@@ -11,7 +11,8 @@ const ISO_CODE = /^[A-Za-z]{2}$/;
 const PRODUCT_KEY = /^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$/;
 
 export interface JourneyRouteProps {
-  current: JourneyStop;
+  /** `start` = no step taken yet (the home page): the tape shows the way ahead with no current stop. */
+  current: JourneyStop | "start";
   /** Known country of the journey: the stops before the current one link back to it. */
   countryCode?: string | undefined;
   /** Known product of the journey (needs the country). */
@@ -39,7 +40,7 @@ export async function JourneyRoute({ current, countryCode, productKey }: Journey
     hrefs.request = { pathname: "/countries/[countryCode]/products/[productKey]/quote", params };
   }
 
-  const currentIndex = ORDER.indexOf(current);
+  const currentIndex = current === "start" ? -1 : ORDER.indexOf(current);
   const stops: RouteStripStop[] = ORDER.map((key, index) => {
     const state = index < currentIndex ? "done" : index === currentIndex ? "current" : "todo";
     const href = hrefs[key];

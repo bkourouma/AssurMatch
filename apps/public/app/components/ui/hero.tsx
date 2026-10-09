@@ -16,7 +16,7 @@ export interface HeroProps {
   children?: ReactNode;
   /** Second column on wide screens: an entry plate, an identity card. */
   aside?: ReactNode;
-  /** Kept for API compatibility: every hero is the navy page sign. */
+  /** Kept for API compatibility: every hero is indigo cloth with a pattern sheet. */
   tone?: HeroTone;
   size?: "sm" | "md" | "lg";
   /** The location line of the sign. */
@@ -30,9 +30,9 @@ export interface HeroProps {
 }
 
 /**
- * The page sign: every public page opens on one. Navy panel, white type, the location line on top,
- * then the title, one lead and what the page needs. Children that are plates (cards, notices, the
- * entry form) keep their light surface on it.
+ * The page opening: every public page starts on indigo cloth. The location line (or the journey tape)
+ * sits on the cloth; the title, one lead and what the page needs sit on a pale pattern sheet laid on
+ * it. Children that are plates (cards, notices, the entry form) keep their light surface.
  */
 export function Hero({ title, lead, actions, children, aside, size = "md", breadcrumb, route, className }: HeroProps) {
   return (
@@ -50,14 +50,16 @@ export function Hero({ title, lead, actions, children, aside, size = "md", bread
             <div className="am-hero__breadcrumb">{breadcrumb}</div>
           )
         ) : null}
-        <div className="am-hero__layout" data-columns={aside ? "2" : "1"}>
-          <div className="am-hero__inner">
-            <h1 className="am-hero__title">{title}</h1>
-            {lead ? <p className="am-hero__lead">{lead}</p> : null}
-            {actions ? <div className="am-hero__actions am-cluster">{actions}</div> : null}
-            {children}
+        <div className="am-hero__sheet">
+          <div className="am-hero__layout" data-columns={aside ? "2" : "1"}>
+            <div className="am-hero__inner">
+              <h1 className="am-hero__title">{title}</h1>
+              {lead ? <p className="am-hero__lead">{lead}</p> : null}
+              {actions ? <div className="am-hero__actions am-cluster">{actions}</div> : null}
+              {children}
+            </div>
+            {aside ? <div className="am-hero__aside">{aside}</div> : null}
           </div>
-          {aside ? <div className="am-hero__aside">{aside}</div> : null}
         </div>
       </div>
     </section>

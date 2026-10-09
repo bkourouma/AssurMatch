@@ -266,8 +266,8 @@ export default async function BrokerApplyPage({
       />
 
       {/* One plain form panel, the page's one object, on the same left edge as the sign. */}
-      <Section>
-        <div className="am-applyform">
+      <Section tone="muted">
+        <div className="am-applyform am-sheet">
           {formErrorText ? (
             <Notice tone="error" role="alert">
               {formErrorText}

@@ -331,7 +331,7 @@ export class PublicOfferCatalogService {
       ...(offer.insurerName ? { insurerName: offer.insurerName } : {}),
       ...(offer.indicativePriceMin !== undefined ? { indicativePriceMin: offer.indicativePriceMin } : {}),
       ...(offer.indicativePriceMax !== undefined ? { indicativePriceMax: offer.indicativePriceMax } : {}),
-      indicativePriceLabel: "prix a confirmer",
+      indicativePriceLabel: "prix à confirmer",
       ...(offer.guaranteeSummary ? { guaranteeSummary: offer.guaranteeSummary } : {}),
       ...(offer.guaranteeLevel !== undefined ? { guaranteeLevel: offer.guaranteeLevel } : {}),
       ...(offer.deductibleAmount !== undefined ? { deductibleAmount: offer.deductibleAmount } : {}),
