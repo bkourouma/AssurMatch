@@ -19,3 +19,4 @@ Adding or updating a country in `scripts/preprod/seeds/reference/countries.json`
 
 - The seed is idempotent.
 - Adding a hors-CIMA country requires creating a `RegulatoryRegime` entry first (via the admin tools or via a separate spec).
+- Waitlist-only countries (Mali, Guinea, Senegal) carry `country_waitlist_enabled: true` and every other flag `false`; the seed overwrites `flags` on existing rows, so re-running it resets manual flag changes.

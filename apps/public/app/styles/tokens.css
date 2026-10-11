@@ -1,59 +1,64 @@
 /*
- * Public site design tokens: "La signalétique".
+ * Public site design tokens: "Le patron".
  *
- * The public site is a wayfinding sign system: flat navy sign panels with white type on a white
- * ground, pale cool-grey bands, 1px rules, 4px corners, no shadows and no gradients.
+ * The public site is a tailor's pattern. You choose the cloth first (compare), then the broker takes
+ * your measurements (quote). Every page opens on saturated indigo cloth, with a pale pattern sheet laid
+ * on it (a dashed cut line, notches bitten out of its edge) and a yellow measuring tape that counts the
+ * steps. Pieces are cut with square corners and small notches, never rounded, never shadowed.
  *
  * The shared back-office socle (`@assurmatch/ui/tokens.css`, used by apps/admin and apps/broker) is
  * imported as-is and NEVER edited. Everything below re-declares or extends it for the public site
- * only. Historical variable names keep resolving (pages built before the redesign still compile);
- * the gradient and glow names now hold flat colours or `none` on purpose.
+ * only. Historical variable names keep resolving: `--am-primary-800` is now the indigo cloth (it was
+ * the navy sign), `--am-primary-600` is the indigo link colour, and the gradient and glow names still
+ * hold flat colours or `none` on purpose.
  *
  * PALETTE LAW: each colour has one meaning, everywhere.
- *   navy  (primary-800)    where you are: sign panels, header strip, footer, page headings
- *   blue  (primary-600)    what you can do: links, buttons, focus
- *   green (success-*)      confirmed or done: ticks, "confirmé par le courtier", a done route stop
+ *   indigo (primary-800)   the cloth: page openings, the footer, headings, structure
+ *   indigo link (600)      what you can follow: underlined links, focus, selected rows
+ *   tape yellow (--am-tape) what you can do: primary buttons, the tape, the row arrow chip
+ *   green (success-*)      confirmed or done: ticks, "confirmé par le courtier", a done step
  *   orange (warning-*)     sponsored: the sponsored label and nothing else
- *   red   (danger-*)       errors
- *   The logo green (success-500) appears only inside the logo mark.
+ *   red (danger-*)         errors
+ *   The logo blue and logo green appear only inside the logo mark.
  *
- * STATE LANGUAGE: solid fill = confirmed; dashed outline = indicative / to be confirmed.
- * Nothing renders below 14px. Every text/background pair below is >= 4.5:1 (see DESIGN.md).
+ * STATE LANGUAGE: a solid line is cut (confirmed); a dashed line is only marked (indicative / to be
+ * confirmed). Nothing renders below 14px. Every text/background pair below is >= 4.5:1.
  */
 
 @import "@assurmatch/ui/tokens.css";
 
 :root {
-  /* ---------- Navy and blue (one hue family) ---------- */
-  --am-primary-50: #f1f5fd;
-  --am-primary-100: #e3ebfa;
-  --am-primary-200: #cbd9f5;
-  --am-primary-300: #a6c0ee;
-  --am-primary-400: #6b95e0;
-  --am-primary-500: #2a66d1;
-  /* Action blue: links and buttons. 7.3:1 on white. */
-  --am-primary-600: #1650b8;
-  /* Action blue, pressed / hover. */
-  --am-primary-700: #123e86;
-  --am-primary-750: #0e3370;
-  /* Sign navy: the panels. White on it is 14:1. */
-  --am-primary-800: #0b2a5c;
-  --am-primary-900: #071c40;
+  /* ---------- Indigo (one hue family): the cloth and the links ---------- */
+  --am-primary-50: #f3f2fd;
+  --am-primary-100: #e6e4fa;
+  --am-primary-200: #cdcaf3;
+  --am-primary-300: #a9a4e8;
+  --am-primary-400: #7d77d6;
+  --am-primary-500: #5249c4;
+  /* Links and selected states: 9.7:1 on white. */
+  --am-primary-600: #3730a8;
+  /* Links pressed / hover. */
+  --am-primary-700: #2b2590;
+  --am-primary-750: #29238a;
+  /* The cloth. White on it is 13.4:1. */
+  --am-primary-800: #25207a;
+  /* The cloth in shadow: footer base, text on yellow. */
+  --am-primary-900: #181456;
 
-  /* ---------- Cool neutrals, tinted from the navy ---------- */
+  /* ---------- Cool neutrals, tinted from the indigo ---------- */
   --am-neutral-0: #ffffff;
-  --am-neutral-50: #f7f8fa;
-  --am-neutral-100: #eef1f4;
-  --am-neutral-200: #e1e5eb;
-  --am-neutral-300: #c9d0da;
-  --am-neutral-400: #98a2b3;
-  /* 5.5:1 on white, 4.8:1 on neutral-100. */
-  --am-neutral-500: #5f6a7c;
-  /* 7.2:1 on white, 6.3:1 on neutral-100. */
-  --am-neutral-600: #4e5868;
-  --am-neutral-700: #373f4c;
-  --am-neutral-800: #222934;
-  --am-neutral-900: #12161d;
+  --am-neutral-50: #f8f8fc;
+  --am-neutral-100: #f1f1f8;
+  --am-neutral-200: #e3e3ef;
+  --am-neutral-300: #cbcbdd;
+  --am-neutral-400: #9c9cb5;
+  /* 5.8:1 on white, 5.2:1 on neutral-100. */
+  --am-neutral-500: #646380;
+  /* 7.4:1 on white, 6.7:1 on neutral-100. */
+  --am-neutral-600: #4f4e69;
+  --am-neutral-700: #3a3950;
+  --am-neutral-800: #25243a;
+  --am-neutral-900: #14132a;
 
   /* ---------- Green: confirmed or done ---------- */
   --am-success-50: #eef7ef;
@@ -82,12 +87,26 @@
   --am-danger-600: #b42318;
   --am-danger-700: #8f1c13;
 
-  /* ---------- Information shares the navy family (it is "where you are", not a new colour) ---------- */
+  /* ---------- Information shares the indigo family (it is "the cloth", not a new colour) ---------- */
   --am-info-50: var(--am-primary-50);
   --am-info-100: var(--am-primary-100);
   --am-info-500: var(--am-primary-500);
   --am-info-600: var(--am-primary-600);
   --am-info-700: var(--am-primary-800);
+
+  /* ---------- The tape: measuring-tape yellow, the colour of the action ---------- */
+  --am-tape: #f2c230;
+  /* Hover / pressed. */
+  --am-tape-deep: #e3ae0e;
+  /* Light yellow for a row hover wash. */
+  --am-tape-wash: #fff8dc;
+  /* Ink on the tape: indigo cloth (8.1:1) or the deep cloth (11.9:1). */
+  --am-tape-ink: var(--am-primary-800);
+
+  /* ---------- The sheet: pale pattern paper laid on the cloth ---------- */
+  --am-sheet: #fafbff;
+  /* The dashed cut line drawn inside the sheet. */
+  --am-cut: #8f89d8;
 
   /* ---------- Semantic aliases: prefer these in components ---------- */
   --am-canvas: var(--am-neutral-0);
@@ -98,11 +117,12 @@
   --am-surface-muted: var(--am-neutral-100);
   --am-surface-brand: var(--am-primary-50);
   --am-surface-navy: var(--am-primary-800);
+  /* `--am-sign*` names are kept from the previous system: the cloth surface and its inks. */
   --am-sign: var(--am-primary-800);
   --am-sign-ink: var(--am-neutral-0);
-  /* Secondary text on a navy sign: 9.3:1. */
-  --am-sign-ink-muted: #c7d3ea;
-  --am-sign-rule: rgba(255, 255, 255, 0.22);
+  /* Secondary text on the cloth: 8.4:1. */
+  --am-sign-ink-muted: #cfcdf2;
+  --am-sign-rule: rgba(255, 255, 255, 0.24);
   --am-border: var(--am-neutral-200);
   --am-border-strong: var(--am-neutral-300);
   --am-border-brand: var(--am-primary-200);
@@ -116,7 +136,7 @@
   --am-link-hover: var(--am-primary-700);
   --am-action: var(--am-primary-600);
   --am-action-hover: var(--am-primary-700);
-  --am-selection: var(--am-primary-200);
+  --am-selection: var(--am-tape);
 
   /* ---------- Channels ----------
    * Brand exception: WhatsApp owns this green. It is a channel colour, never the confirmation green,
@@ -125,6 +145,10 @@
   --am-whatsapp-dark: #1da851;
   /* Ink on the WhatsApp green: 7.08:1 on --am-whatsapp, 4.53:1 on --am-whatsapp-dark. */
   --am-whatsapp-ink: #06331a;
+
+  /* ---------- Logo: the mark keeps its own blue and green wherever it is drawn ---------- */
+  --am-logo-blue: #1650b8;
+  --am-logo-green: #4fb832;
 
   /* ---------- Retired gradients: kept as names, flat on purpose ---------- */
   --am-gradient-brand: var(--am-primary-600);
@@ -139,27 +163,27 @@
   --am-shadow-xs: none;
   --am-shadow-sm: none;
   --am-shadow-md: none;
-  --am-shadow-lg: 0 12px 32px rgba(7, 28, 64, 0.16);
-  --am-shadow-xl: 0 16px 40px rgba(7, 28, 64, 0.2);
-  --am-shadow-overlay: 0 12px 32px rgba(7, 28, 64, 0.18);
+  --am-shadow-lg: 0 12px 32px rgba(24, 20, 86, 0.18);
+  --am-shadow-xl: 0 16px 40px rgba(24, 20, 86, 0.22);
+  --am-shadow-overlay: 0 12px 32px rgba(24, 20, 86, 0.2);
   --am-shadow-glow: none;
   --am-shadow-glow-soft: none;
   --am-shadow-inset: none;
 
   /* ---------- Focus ring ---------- */
-  --am-ring-color: var(--am-primary-500);
+  --am-ring-color: var(--am-primary-600);
   --am-ring: 0 0 0 2px var(--am-neutral-0), 0 0 0 4px var(--am-primary-600);
-  --am-ring-invert: 0 0 0 2px var(--am-primary-800), 0 0 0 4px #ffd75e;
+  --am-ring-invert: 0 0 0 2px var(--am-primary-800), 0 0 0 4px var(--am-tape);
 
-  /* ---------- Radii: sign panels are nearly square ---------- */
+  /* ---------- Radii: pieces are cut square; a hair of rounding only so ink does not look torn ---------- */
   --am-radius-xs: 2px;
-  --am-radius-sm: 4px;
-  --am-radius-md: 4px;
-  --am-radius-lg: 4px;
-  --am-radius-xl: 6px;
-  --am-radius-field: 4px;
-  --am-radius-card: 4px;
-  --am-radius-panel: 6px;
+  --am-radius-sm: 2px;
+  --am-radius-md: 2px;
+  --am-radius-lg: 2px;
+  --am-radius-xl: 4px;
+  --am-radius-field: 2px;
+  --am-radius-card: 2px;
+  --am-radius-panel: 4px;
   --am-radius-pill: 999px;
 
   /* ---------- Spacing ---------- */
@@ -183,20 +207,20 @@
   --am-space-112: 112px;
   --am-space-128: 128px;
 
-  /* ---------- Type: one family, Atkinson Hyperlegible Next ---------- */
-  --am-font-heading: var(--font-am-sign), "Atkinson Hyperlegible Next", system-ui, "Segoe UI", Arial, sans-serif;
+  /* ---------- Type: Bricolage Grotesque for headings and figures, Atkinson for sentences ---------- */
+  --am-font-heading: var(--font-am-display), "Bricolage Grotesque", var(--font-am-sign), "Atkinson Hyperlegible Next", system-ui, "Segoe UI", Arial, sans-serif;
   --am-font-body: var(--font-am-sign), "Atkinson Hyperlegible Next", system-ui, "Segoe UI", Arial, sans-serif;
 
-  --am-display-size: clamp(34px, 1.55rem + 2.5vw, 58px);
-  --am-display-line: 1.06;
-  --am-h1-size: clamp(30px, 1.45rem + 1.7vw, 46px);
-  --am-h1-line: 1.1;
-  --am-h2-size: clamp(24px, 1.25rem + 0.95vw, 34px);
-  --am-h2-line: 1.18;
-  --am-h3-size: clamp(19px, 1.12rem + 0.2vw, 21px);
-  --am-h3-line: 1.3;
+  --am-display-size: clamp(34px, 1.35rem + 3.3vw, 68px);
+  --am-display-line: 1.02;
+  --am-h1-size: clamp(32px, 1.55rem + 2vw, 52px);
+  --am-h1-line: 1.06;
+  --am-h2-size: clamp(26px, 1.3rem + 1.1vw, 38px);
+  --am-h2-line: 1.12;
+  --am-h3-size: clamp(20px, 1.15rem + 0.25vw, 23px);
+  --am-h3-line: 1.25;
   --am-h4-size: 18px;
-  --am-h4-line: 1.4;
+  --am-h4-line: 1.35;
   --am-lead-size: clamp(17px, 1rem + 0.3vw, 19px);
   --am-lead-line: 1.55;
   --am-body-size: clamp(16px, 0.98rem + 0.12vw, 17px);
@@ -205,13 +229,13 @@
   --am-small-line: 1.5;
   --am-caption-size: 14px;
   --am-caption-line: 1.45;
-  --am-stat-size: clamp(28px, 1.4rem + 1vw, 36px);
+  --am-stat-size: clamp(30px, 1.5rem + 1.1vw, 40px);
 
-  --am-tracking-tight: -0.012em;
-  --am-tracking-snug: -0.006em;
+  --am-tracking-tight: -0.022em;
+  --am-tracking-snug: -0.01em;
   --am-tracking-wide: 0.04em;
 
-  /* ---------- Motion: almost none. One move: the directory arrow nudge. ---------- */
+  /* ---------- Motion: almost none. One move: the yellow bar under a row. ---------- */
   --am-duration-instant: 100ms;
   --am-duration-fast: 160ms;
   --am-duration-base: 220ms;
@@ -238,7 +262,7 @@
   --am-content-narrow: 740px;
   --am-gutter: 16px;
   --am-header: 56px;
-  --am-section: clamp(48px, 4.6vw, 96px);
+  --am-section: clamp(52px, 5vw, 104px);
   --am-section-compact: clamp(36px, 3vw, 56px);
   /* Height of a directory row: one tap target and a half. */
   --am-row: 64px;

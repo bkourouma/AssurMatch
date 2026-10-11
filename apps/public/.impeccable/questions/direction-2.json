@@ -1,0 +1,383 @@
+{
+  "title": "Choisir le nouveau monde visuel du site public",
+  "question": "Le tirage a assigné « L'ardoise ». Gardez-la, prenez le choix d'Impeccable ou une alternative, ou relancez. Les maquettes d'image sont indisponibles (clé OpenAI désactivée) : la construction se fait en code et chaque carte montre un schéma de la page sur téléphone.",
+  "options": [
+    {
+      "id": "assigned",
+      "label": "L'ardoise",
+      "kicker": "LE TIRAGE",
+      "lineage": "Le tableau des prix du maquis et du kiosque d'Abidjan : ardoise vert sombre, lignes à points de conduite, prix alignés à droite, mise à jour à la craie",
+      "thesis": "Les prix sont écrits au tableau : une ardoise nette, un produit par ligne, le prix indicatif à droite, et qui le confirme juste dessous.",
+      "palette": [
+        "#14302B",
+        "#F6F4EC",
+        "#FFD23F",
+        "#4FB832",
+        "#1650B8"
+      ],
+      "materials": [
+        "ardoise vert sombre plate, sans texture de craie",
+        "lignes à points de conduite entre produit et prix",
+        "chiffres de prix très grands, tabulaires",
+        "barre blanche de marque en haut, pages de formulaire sur fond clair"
+      ],
+      "viewport": "Téléphone : barre blanche logo + menu, puis une ardoise pleine largeur : « Comparez d'abord. Soyez accompagné ensuite. », le pays en craie jaune, puis cinq lignes de produits à points de conduite avec « dès 45 000 FCFA » à droite, le bouton bleu « Comparer les offres » sous l'ardoise.",
+      "risk": "Si la craie, le manuscrit ou le vert tableau d'école sont poussés, on tombe dans le costume de maquis ; ici tout reste net, plat et lisible, et le fond sombre ne couvre que les surfaces de prix.",
+      "raised": [
+        {
+          "from": "challenger-nixie",
+          "raise": "Le prix est toujours le plus gros objet de l'écran : chiffres tabulaires de 36 à 48 px, avec « à confirmer par le courtier » juste dessous."
+        },
+        {
+          "from": "challenger-saville",
+          "raise": "Chaque produit a un code couleur unique (auto, moto, santé, habitation, voyage), décodé par son nom, jamais utilisé comme décoration."
+        },
+        {
+          "from": "challenger-feed",
+          "raise": "Sur le détail d'une offre, les actions (demander un devis, WhatsApp, comparer) sont ancrées en bas de l'écran, à portée de pouce."
+        },
+        {
+          "from": "challenger-algorave",
+          "raise": "La formule du score est montrée en clair sous chaque classement : le code est visible, pas caché."
+        },
+        {
+          "from": "challenger-pickling",
+          "raise": "Chaque ardoise porte sa date de calcul, comme un bocal sa date de mise en conserve."
+        }
+      ],
+      "wireframe": {
+        "cols": 4,
+        "rows": 16,
+        "regions": [
+          {
+            "label": "barre blanche : logo + menu",
+            "x": 0,
+            "y": 0,
+            "w": 4,
+            "h": 1
+          },
+          {
+            "label": "ardoise : titre + pays",
+            "x": 0,
+            "y": 1,
+            "w": 4,
+            "h": 4,
+            "accent": true
+          },
+          {
+            "label": "lignes produit à points + prix",
+            "x": 0,
+            "y": 5,
+            "w": 4,
+            "h": 6,
+            "accent": true
+          },
+          {
+            "label": "Comparer les offres",
+            "x": 0,
+            "y": 11,
+            "w": 4,
+            "h": 1
+          },
+          {
+            "label": "comment ça marche : 3 lignes",
+            "x": 0,
+            "y": 12,
+            "w": 4,
+            "h": 3
+          },
+          {
+            "label": "mentions et pied de page",
+            "x": 0,
+            "y": 15,
+            "w": 4,
+            "h": 1
+          }
+        ]
+      }
+    },
+    {
+      "id": "model-pick",
+      "label": "Le patron",
+      "kicker": "LE CHOIX D'IMPECCABLE",
+      "lineage": "La fiche de mesures et le patron du couturier : papier de patron, lignes de coupe en pointillé, encoches, ruban jaune",
+      "thesis": "On compare d'abord le tissu, puis le courtier prend les mesures : chaque parcours est un patron avec ses repères, jusqu'à la coupe finale chez le courtier.",
+      "palette": [
+        "#1B2A6B",
+        "#F4F6FB",
+        "#FF6A2B",
+        "#F2C230",
+        "#1650B8"
+      ],
+      "materials": [
+        "fond indigo (bazin) en grands aplats",
+        "papier de patron blanc-bleuté avec lignes de coupe en pointillé",
+        "ruban de couturier jaune gradué comme barre d'étapes",
+        "craie de tailleur orange pour les annotations"
+      ],
+      "viewport": "Téléphone : indigo plein, un patron blanc posé dessus avec le titre sur la ligne de coupe, le pays en annotation à la craie, quatre produits en pièces de patron numérotées ; un ruban jaune gradué court en bas et marque les étapes Pays, Produit, Offres, Devis.",
+      "risk": "Le papier clair chaud est la pente naturelle de ce monde ; on reste sur indigo saturé et blanc froid, et le ruban ne doit jamais devenir un décor.",
+      "case": "Le métier de couturier est central en Afrique de l'Ouest : on choisit l'étoffe, puis on se fait prendre les mesures. Très lisible pour « comparer d'abord, être accompagné ensuite ».",
+      "wireframe": {
+        "cols": 4,
+        "rows": 16,
+        "regions": [
+          {
+            "label": "barre : logo + menu",
+            "x": 0,
+            "y": 0,
+            "w": 4,
+            "h": 1
+          },
+          {
+            "label": "indigo : patron + titre sur la ligne de coupe",
+            "x": 0,
+            "y": 1,
+            "w": 4,
+            "h": 6,
+            "accent": true
+          },
+          {
+            "label": "4 pièces de patron : produits",
+            "x": 0,
+            "y": 7,
+            "w": 4,
+            "h": 5,
+            "accent": true
+          },
+          {
+            "label": "ruban jaune : étapes",
+            "x": 0,
+            "y": 12,
+            "w": 4,
+            "h": 1
+          },
+          {
+            "label": "comment ça marche",
+            "x": 0,
+            "y": 13,
+            "w": 4,
+            "h": 2
+          },
+          {
+            "label": "pied de page",
+            "x": 0,
+            "y": 15,
+            "w": 4,
+            "h": 1
+          }
+        ]
+      }
+    },
+    {
+      "id": "challenger-feed",
+      "label": "Une offre par écran",
+      "verdict": "competitive",
+      "lineage": "Les fils verticaux plein écran des applications que le public utilise tous les jours",
+      "thesis": "Une offre occupe tout l'écran, la suivante est à un glissement, les actions sont empilées à droite.",
+      "palette": [
+        "#0B0F1A",
+        "#FFFFFF",
+        "#1650B8",
+        "#4FB832"
+      ],
+      "materials": [
+        "plein écran vertical",
+        "rail d'actions à droite",
+        "ligne d'auteur ancrée en bas"
+      ],
+      "viewport": "Une offre à la fois en plein écran, prix et courtier en bas, rail Comparer / Devis / WhatsApp à droite.",
+      "risk": "On ne peut pas comparer côte à côte ; il faut un mode comparaison à part.",
+      "case": "Gagne sur l'identification du public (téléphone d'abord), perd sur la clarté pour comparer. Reste en alternative complète.",
+      "wireframe": {
+        "cols": 4,
+        "rows": 16,
+        "regions": [
+          {
+            "label": "barre fine",
+            "x": 0,
+            "y": 0,
+            "w": 4,
+            "h": 1
+          },
+          {
+            "label": "offre plein écran : prix + assureur",
+            "x": 0,
+            "y": 1,
+            "w": 3,
+            "h": 13,
+            "accent": true
+          },
+          {
+            "label": "rail : devis, WhatsApp, comparer",
+            "x": 3,
+            "y": 6,
+            "w": 1,
+            "h": 5,
+            "accent": true
+          },
+          {
+            "label": "courtier + bouton",
+            "x": 0,
+            "y": 14,
+            "w": 4,
+            "h": 2
+          }
+        ]
+      }
+    },
+    {
+      "id": "challenger-nixie",
+      "label": "Le compteur nixie",
+      "verdict": "declined",
+      "lineage": "Compteur de laboratoire à tubes nixie",
+      "palette": [
+        "#0B0B0F",
+        "#FF7A1A",
+        "#C9C9CF"
+      ],
+      "materials": [
+        "tubes de verre",
+        "chiffres orange lumineux"
+      ],
+      "case": "Perd sur les deux axes : costume d'instrument, peu de reconnaissance pour ce public.",
+      "kept": "Le prix est l'objet le plus grand de l'écran. Repris dans L'ardoise."
+    },
+    {
+      "id": "challenger-saville",
+      "label": "Catalogue d'usine",
+      "verdict": "declined",
+      "lineage": "Pochettes de catalogue Factory",
+      "palette": [
+        "#0A0A0A",
+        "#FFFFFF",
+        "#E4572E"
+      ],
+      "materials": [
+        "noir mat",
+        "traits blancs",
+        "bandes de couleur codées"
+      ],
+      "case": "Perd sur les deux axes : trop abstrait pour une décision d'argent.",
+      "kept": "Un code couleur par produit, décodé par son nom. Repris dans L'ardoise."
+    },
+    {
+      "id": "challenger-cyclorama",
+      "label": "Cyclorama de théâtre",
+      "verdict": "declined",
+      "lineage": "Horizon de lumière noir, cobalt, rose, blanc",
+      "palette": [
+        "#06070C",
+        "#2745A8",
+        "#E88BA8",
+        "#FFFFFF"
+      ],
+      "materials": [
+        "lumière en dégradés",
+        "horizon continu"
+      ],
+      "case": "Perd sur les deux axes : repose sur des dégradés et une ambiance, peu de preuve produit.",
+      "kept": "Un seul changement de lumière par étape du parcours, jamais de dégradé décoratif."
+    },
+    {
+      "id": "challenger-pickling",
+      "label": "Calendrier de saumure",
+      "verdict": "declined",
+      "lineage": "Bocaux de conserve de saison",
+      "palette": [
+        "#C4452D",
+        "#F2C14E",
+        "#2E6B4F"
+      ],
+      "materials": [
+        "bocaux colorés",
+        "étiquettes de date"
+      ],
+      "case": "Perd sur les deux axes : l'assurance n'a rien de saisonnier ni de gourmand.",
+      "kept": "La date de calcul visible sur chaque liste. Repris dans L'ardoise."
+    },
+    {
+      "id": "challenger-algorave",
+      "label": "Algorave",
+      "verdict": "declined",
+      "lineage": "Code projeté en direct sur la piste",
+      "palette": [
+        "#000000",
+        "#00FF9C",
+        "#FF2E93"
+      ],
+      "materials": [
+        "code en direct",
+        "néon"
+      ],
+      "case": "Perd sur les deux axes : l'ambiance prend la place de l'information.",
+      "kept": "Le code visible : la formule du score est montrée en clair. Repris dans L'ardoise."
+    }
+  ],
+  "reroll": {
+    "registers": [
+      "safer",
+      "bolder"
+    ]
+  },
+  "canon": true,
+  "canonCard": {
+    "label": "Le comparateur classique",
+    "thesis": "Ce que la catégorie livre, exécuté proprement : bandeau bleu, moteur de recherche, cartes d'offres, logos de confiance.",
+    "palette": [
+      "#FFFFFF",
+      "#0F172A",
+      "#1650B8"
+    ],
+    "materials": [
+      "grille nette",
+      "cartes blanches",
+      "pictogrammes simples"
+    ],
+    "viewport": "Un grand titre, un sélecteur pays et produit, un bouton, puis une rangée de cartes.",
+    "risk": "Indiscernable des concurrents, par construction.",
+    "wireframe": {
+      "cols": 4,
+      "rows": 16,
+      "regions": [
+        {
+          "label": "barre : logo + menu",
+          "x": 0,
+          "y": 0,
+          "w": 4,
+          "h": 1
+        },
+        {
+          "label": "titre + sélecteur",
+          "x": 0,
+          "y": 1,
+          "w": 4,
+          "h": 5,
+          "accent": true
+        },
+        {
+          "label": "cartes de produits",
+          "x": 0,
+          "y": 6,
+          "w": 4,
+          "h": 6
+        },
+        {
+          "label": "avis et confiance",
+          "x": 0,
+          "y": 12,
+          "w": 4,
+          "h": 3
+        },
+        {
+          "label": "pied de page",
+          "x": 0,
+          "y": 15,
+          "w": 4,
+          "h": 1
+        }
+      ]
+    }
+  },
+  "steer": true
+}

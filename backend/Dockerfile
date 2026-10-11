@@ -4,7 +4,7 @@
 # (database + Redis). The same image runs the worker container with
 #   CMD ["node", "--import", "tsx", "scripts/worker/assurmatch-worker.ts"]
 
-FROM node:24-alpine AS deps
+FROM node:26-alpine AS deps
 WORKDIR /app
 COPY package.json package-lock.json ./
 COPY backend/package.json backend/package.json
@@ -14,7 +14,7 @@ COPY apps/public/package.json apps/public/package.json
 COPY packages packages
 RUN npm ci
 
-FROM node:24-alpine AS build
+FROM node:26-alpine AS build
 WORKDIR /app
 # Placeholder DATABASE_URL satisfies prisma.config.ts at build time.
 # The real DATABASE_URL is injected at runtime via the env file.
@@ -24,7 +24,7 @@ COPY . .
 RUN npx prisma generate --schema backend/prisma/schema.prisma
 RUN npm run build
 
-FROM node:24-alpine AS runtime
+FROM node:26-alpine AS runtime
 ENV NODE_ENV=production
 ENV PORT=3600
 WORKDIR /app

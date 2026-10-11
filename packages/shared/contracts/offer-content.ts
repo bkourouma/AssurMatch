@@ -17,7 +17,7 @@ export const offerContentGuaranteeSchema = z.object({
 export const offerContentPaymentFlexibilitySchema = z.enum(["annual", "semiannual", "quarterly", "monthly"]);
 
 /** Mentions every public offer carries (publication policy requires "offre indicative"). */
-export const OFFER_INDICATIVE_DISCLAIMERS = ["offre indicative", "prix a confirmer par le courtier partenaire"] as const;
+export const OFFER_INDICATIVE_DISCLAIMERS = ["offre indicative", "prix à confirmer par le courtier partenaire"] as const;
 export const OFFER_INDICATIVE_MARKER = "offre indicative";
 export const OFFER_MAX_GUARANTEES = 50;
 

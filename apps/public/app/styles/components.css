@@ -1,12 +1,15 @@
 /*
- * The `.am-*` primitives of the public site, "La signalétique".
+ * The `.am-*` primitives of the public site, "Le patron".
  *
- * Grammar: flat panels, 1px rules, 4px corners, no shadow on the page. Navy sign panels carry
- * location and headings, blue carries every action, green only confirms, orange only marks a
- * sponsorship. Indicative things are outlined with a dashed rule; confirmed things are filled.
+ * Grammar: pieces cut from cloth and paper. Indigo cloth opens every page and closes it; a pale pattern
+ * sheet (dashed cut line, notches) is laid on the cloth; a yellow measuring tape counts the steps and
+ * marks the action. Corners are square, lines are 1px or dashed, nothing has a shadow. A solid line is
+ * cut (confirmed); a dashed line is only marked (indicative). Green only confirms, orange only marks a
+ * sponsorship.
  *
- * Inside a navy panel (`.am-sign`, the Hero, a navy Section or Card) the same components invert:
- * buttons turn white, links turn white, rules turn translucent white.
+ * On the cloth (`.am-sign`, the Hero, a navy Section or Card, the footer) text and rules turn light and
+ * the buttons switch to the cloth palette through the `--am-btn-*` variables; the pattern sheet and the
+ * plates set on it return to the light-page values.
  */
 
 /* ==========================================================================
@@ -32,8 +35,33 @@
 }
 
 /* ==========================================================================
-   2. Navy sign surface (shared by Hero, navy Section, navy Card, footer)
+   2. The cloth (Hero, navy Section, navy Card) and the light plates set on it
    ========================================================================== */
+
+:root {
+  /* Tape ticks: one pattern, reused by the route strip, the footer hem and `.am-tape`. */
+  --am-tape-ticks: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='40' height='12'%3E%3Cpath d='M.5 12V1M4.5 12V8M8.5 12V8M12.5 12V8M16.5 12V8M20.5 12V5M24.5 12V8M28.5 12V8M32.5 12V8M36.5 12V8' stroke='%2325207a' stroke-opacity='.55' fill='none'/%3E%3C/svg%3E");
+  /* Notches bitten out of the pattern sheet's edge: they show the cloth underneath. */
+  --am-notch-left: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='20'%3E%3Cpath d='M0 0 12 10 0 20Z' fill='%2325207a'/%3E%3C/svg%3E");
+  --am-notch-right: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='20'%3E%3Cpath d='M12 0 0 10 12 20Z' fill='%2325207a'/%3E%3C/svg%3E");
+  --am-notch-top: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='20' height='12'%3E%3Cpath d='M0 0 10 12 20 0Z' fill='%2325207a'/%3E%3C/svg%3E");
+  --am-notch-bottom: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='20' height='12'%3E%3Cpath d='M0 12 10 0 20 12Z' fill='%2325207a'/%3E%3C/svg%3E");
+
+  /* The cloth: a tone-on-tone lattice, a few percent lighter than the indigo, never behind body text. */
+  --am-cloth-weave: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12'%3E%3Cpath d='M0 6 6 0 12 6 6 12Z' fill='none' stroke='%23ffffff' stroke-opacity='.05'/%3E%3C/svg%3E");
+
+  /* Button palette on a light page. */
+  --am-btn-primary-bg: var(--am-tape);
+  --am-btn-primary-ink: var(--am-primary-800);
+  --am-btn-primary-border: var(--am-primary-800);
+  --am-btn-primary-bg-hover: var(--am-tape-deep);
+  --am-btn-secondary-bg: var(--am-surface);
+  --am-btn-secondary-ink: var(--am-primary-800);
+  --am-btn-secondary-border: var(--am-primary-800);
+  --am-btn-secondary-bg-hover: var(--am-primary-50);
+  --am-btn-ghost-ink: var(--am-text);
+  --am-btn-ghost-bg-hover: var(--am-neutral-100);
+}
 
 .am-sign,
 .am-hero,
@@ -45,15 +73,30 @@
   --am-text-muted: var(--am-sign-ink-muted);
   --am-text-subtle: var(--am-sign-ink-muted);
   --am-rule: var(--am-sign-rule);
-  --am-ring-color: #ffd75e;
+  --am-ring-color: var(--am-tape);
+  /* Buttons on the cloth: the tape keeps its colour, the outline button turns white. */
+  --am-btn-primary-border: var(--am-tape);
+  --am-btn-secondary-bg: transparent;
+  --am-btn-secondary-ink: var(--am-neutral-0);
+  --am-btn-secondary-border: var(--am-neutral-0);
+  --am-btn-secondary-bg-hover: rgba(255, 255, 255, 0.14);
+  --am-btn-ghost-ink: var(--am-neutral-0);
+  --am-btn-ghost-bg-hover: rgba(255, 255, 255, 0.14);
   background: var(--am-sign);
   color: var(--am-sign-ink);
 }
 
-/* Controls sitting directly on a sign keep the light-page tokens they were drawn with. */
-.am-sign :is(.am-card, .am-notice, .am-entry, .am-field__control, .am-empty, .am-table-wrap, .am-directory[data-surface="plate"]),
-.am-hero :is(.am-card, .am-notice, .am-entry, .am-field__control, .am-empty, .am-table-wrap, .am-directory[data-surface="plate"]),
-.am-section[data-tone="navy"] :is(.am-card:not(.am-card--navy), .am-notice, .am-entry, .am-field__control, .am-empty, .am-table-wrap, .am-directory[data-surface="plate"]) {
+.am-hero,
+.am-section[data-tone="navy"],
+.am-card--navy {
+  background-image: var(--am-cloth-weave);
+}
+
+/* The sheet and every plate set on the cloth return to the light-page values they were drawn with. */
+.am-hero__sheet,
+.am-sign :is(.am-card, .am-notice, .am-entry, .am-field__control, .am-empty, .am-table-wrap),
+.am-hero :is(.am-card, .am-notice, .am-entry, .am-field__control, .am-empty, .am-table-wrap),
+.am-section[data-tone="navy"] :is(.am-card:not(.am-card--navy), .am-notice, .am-entry, .am-field__control, .am-empty, .am-table-wrap) {
   --am-heading: var(--am-primary-800);
   --am-link: var(--am-primary-600);
   --am-link-hover: var(--am-primary-700);
@@ -61,6 +104,17 @@
   --am-text-subtle: var(--am-neutral-500);
   --am-rule: var(--am-neutral-200);
   --am-ring-color: var(--am-primary-600);
+  /* Page CSS that prints on "the sign" with the cloth inks gets the light-page inks on a light plate. */
+  --am-sign-ink: var(--am-primary-800);
+  --am-sign-ink-muted: var(--am-neutral-600);
+  --am-sign-rule: var(--am-neutral-200);
+  --am-btn-primary-border: var(--am-primary-800);
+  --am-btn-secondary-bg: var(--am-surface);
+  --am-btn-secondary-ink: var(--am-primary-800);
+  --am-btn-secondary-border: var(--am-primary-800);
+  --am-btn-secondary-bg-hover: var(--am-primary-50);
+  --am-btn-ghost-ink: var(--am-text);
+  --am-btn-ghost-bg-hover: var(--am-neutral-100);
   color: var(--am-text);
 }
 
@@ -71,8 +125,20 @@
   outline-color: var(--am-ring-color);
 }
 
+/* The tape as a standalone band (footer hem, section rule): yellow with the ticks along its lower edge. */
+.am-tape {
+  height: 22px;
+  background-color: var(--am-tape);
+  background-image: var(--am-tape-ticks);
+  background-position: left bottom;
+  background-repeat: repeat-x;
+}
+
 /* ==========================================================================
-   3. Button
+   3. Button: the action is always tape yellow
+   --------------------------------------------------------------------------
+   Colours come from the `--am-btn-*` variables, so the same markup is right on a light page, on the
+   cloth and inside the pattern sheet.
    ========================================================================== */
 
 .am-button {
@@ -82,14 +148,14 @@
   justify-content: center;
   gap: var(--am-space-8);
   padding: var(--am-space-10) var(--am-space-20);
-  border: 2px solid var(--am-action);
+  border: 2px solid var(--am-btn-primary-border);
   border-radius: var(--am-radius-field);
-  background: var(--am-action);
-  color: var(--am-neutral-0);
+  background: var(--am-btn-primary-bg);
+  color: var(--am-btn-primary-ink);
   cursor: pointer;
   font-family: var(--am-font-body);
   font-size: var(--am-body-size);
-  font-weight: 700;
+  font-weight: 800;
   line-height: 1.2;
   text-align: center;
   text-decoration: none;
@@ -101,9 +167,8 @@
 }
 
 .am-button:hover {
-  border-color: var(--am-action-hover);
-  background: var(--am-action-hover);
-  color: var(--am-neutral-0);
+  background: var(--am-btn-primary-bg-hover);
+  color: var(--am-btn-primary-ink);
   text-decoration: none;
 }
 
@@ -115,16 +180,16 @@
   flex: none;
 }
 
-/* Secondary: outlined, same blue. */
+/* Secondary: outlined. */
 .am-button[data-variant="secondary"] {
-  background: var(--am-surface);
-  color: var(--am-action);
+  border-color: var(--am-btn-secondary-border);
+  background: var(--am-btn-secondary-bg);
+  color: var(--am-btn-secondary-ink);
 }
 
 .am-button[data-variant="secondary"]:hover {
-  border-color: var(--am-action-hover);
-  background: var(--am-primary-50);
-  color: var(--am-action-hover);
+  background: var(--am-btn-secondary-bg-hover);
+  color: var(--am-btn-secondary-ink);
 }
 
 /* Tertiary: a link with weight. */
@@ -150,13 +215,13 @@
 .am-button[data-variant="ghost"] {
   border-color: transparent;
   background: transparent;
-  color: var(--am-text);
+  color: var(--am-btn-ghost-ink);
 }
 
 .am-button[data-variant="ghost"]:hover {
   border-color: transparent;
-  background: var(--am-neutral-100);
-  color: var(--am-primary-800);
+  background: var(--am-btn-ghost-bg-hover);
+  color: var(--am-btn-ghost-ink);
 }
 
 /* WhatsApp: the one channel colour (see tokens.css). */
@@ -225,53 +290,6 @@
 .am-button__spinner {
   display: inline-flex;
   animation: am-spin 0.9s linear infinite;
-}
-
-/* On a navy sign, actions invert: white fill, navy text. */
-:is(.am-sign, .am-hero, .am-section[data-tone="navy"], .am-card--navy) .am-button:not([data-variant]),
-:is(.am-sign, .am-hero, .am-section[data-tone="navy"], .am-card--navy) .am-button[data-variant="primary"] {
-  border-color: var(--am-neutral-0);
-  background: var(--am-neutral-0);
-  color: var(--am-primary-800);
-}
-
-:is(.am-sign, .am-hero, .am-section[data-tone="navy"], .am-card--navy) .am-button[data-variant="primary"]:hover {
-  border-color: var(--am-primary-100);
-  background: var(--am-primary-100);
-  color: var(--am-primary-900);
-}
-
-:is(.am-sign, .am-hero, .am-section[data-tone="navy"], .am-card--navy) .am-button[data-variant="secondary"] {
-  border-color: var(--am-neutral-0);
-  background: transparent;
-  color: var(--am-neutral-0);
-}
-
-:is(.am-sign, .am-hero, .am-section[data-tone="navy"], .am-card--navy) .am-button[data-variant="secondary"]:hover {
-  background: rgba(255, 255, 255, 0.12);
-  color: var(--am-neutral-0);
-}
-
-:is(.am-sign, .am-hero, .am-section[data-tone="navy"], .am-card--navy) .am-button[data-variant="ghost"] {
-  color: var(--am-neutral-0);
-}
-
-:is(.am-sign, .am-hero, .am-section[data-tone="navy"], .am-card--navy) .am-button[data-variant="ghost"]:hover {
-  background: rgba(255, 255, 255, 0.12);
-}
-
-/* Controls inside a light plate on a sign return to the light-page buttons. */
-:is(.am-sign, .am-hero, .am-section[data-tone="navy"]) :is(.am-card:not(.am-card--navy), .am-entry, .am-notice, .am-empty) .am-button[data-variant="primary"],
-:is(.am-sign, .am-hero, .am-section[data-tone="navy"]) :is(.am-card:not(.am-card--navy), .am-entry, .am-notice, .am-empty) .am-button:not([data-variant]) {
-  border-color: var(--am-action);
-  background: var(--am-action);
-  color: var(--am-neutral-0);
-}
-
-:is(.am-sign, .am-hero, .am-section[data-tone="navy"]) :is(.am-card:not(.am-card--navy), .am-entry, .am-notice, .am-empty) .am-button[data-variant="secondary"] {
-  border-color: var(--am-action);
-  background: var(--am-surface);
-  color: var(--am-action);
 }
 
 /* ==========================================================================
@@ -464,7 +482,7 @@
 }
 
 /* ==========================================================================
-   6. Pictogram (flat product sign)
+   6. Pictogram (flat product sign): yellow planes on an indigo tile
    ========================================================================== */
 
 .am-pictogram {
@@ -484,7 +502,7 @@
   justify-content: center;
   border-radius: var(--am-radius-sm);
   background: var(--am-primary-800);
-  color: var(--am-neutral-0);
+  color: var(--am-tape);
 }
 
 .am-pictogram--tile[data-tone="light"] {
@@ -510,7 +528,6 @@
   color: var(--am-heading);
   font-size: var(--am-stat-size);
   font-weight: 800;
-  font-variant-numeric: tabular-nums;
   letter-spacing: var(--am-tracking-tight);
   line-height: 1.05;
 }
@@ -626,7 +643,6 @@
   background: var(--am-surface);
   color: var(--am-neutral-700);
   font-size: var(--am-small-size);
-  font-variant-numeric: tabular-nums;
   font-weight: 800;
   white-space: nowrap;
 }
@@ -889,7 +905,7 @@ textarea.am-field__control {
 
 select.am-field__control {
   padding-right: var(--am-space-40);
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='20' height='20' viewBox='0 0 24 24' fill='none' stroke='%230b2a5c' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='20' height='20' viewBox='0 0 24 24' fill='none' stroke='%2325207a' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
   background-repeat: no-repeat;
   background-position: right var(--am-space-12) center;
   background-size: 20px 20px;
@@ -1131,8 +1147,8 @@ label:has(> input[type="radio"]):not([class]) > input {
   background-image:
     linear-gradient(90deg, var(--am-surface) 30%, rgba(255, 255, 255, 0)),
     linear-gradient(90deg, rgba(255, 255, 255, 0), var(--am-surface) 70%),
-    linear-gradient(90deg, rgba(7, 28, 64, 0.14), rgba(7, 28, 64, 0)),
-    linear-gradient(270deg, rgba(7, 28, 64, 0.14), rgba(7, 28, 64, 0));
+    linear-gradient(90deg, rgba(24, 20, 86, 0.14), rgba(24, 20, 86, 0)),
+    linear-gradient(270deg, rgba(24, 20, 86, 0.14), rgba(24, 20, 86, 0));
   background-position: 0 0, 100% 0, 0 0, 100% 0;
   background-repeat: no-repeat;
   background-size: 40px 100%, 40px 100%, 12px 100%, 12px 100%;
@@ -1357,16 +1373,20 @@ label:has(> input[type="radio"]):not([class]) > input {
 /* The line toward the next stop. */
 .am-progress__step:not(:last-child)::after {
   position: absolute;
-  top: 15px;
+  top: 12px;
   left: 32px;
   right: 0;
-  height: 3px;
-  background: var(--am-neutral-300);
+  height: 8px;
+  border-top: 1.5px solid var(--am-neutral-300);
+  border-bottom: 1.5px solid var(--am-neutral-300);
+  background: var(--am-neutral-100);
   content: "";
 }
 
+/* Steps already taken are tape: the same yellow strip as the journey tape and the route. */
 .am-progress__step[data-state="done"]:not(:last-child)::after {
-  background: var(--am-primary-800);
+  border-color: var(--am-primary-800);
+  background: var(--am-tape);
 }
 
 .am-progress__index {
@@ -1378,7 +1398,7 @@ label:has(> input[type="radio"]):not([class]) > input {
   align-items: center;
   justify-content: center;
   border: 2px solid var(--am-neutral-400);
-  border-radius: var(--am-radius-pill);
+  border-radius: var(--am-radius-xs);
   background: var(--am-surface);
   color: var(--am-neutral-600);
   font-size: var(--am-small-size);
@@ -1395,7 +1415,7 @@ label:has(> input[type="radio"]):not([class]) > input {
 .am-progress__step[data-state="current"] .am-progress__index {
   border-color: var(--am-primary-800);
   background: var(--am-primary-800);
-  color: var(--am-neutral-0);
+  color: var(--am-tape);
 }
 
 .am-progress__label {
@@ -1611,18 +1631,20 @@ label:has(> input[type="radio"]):not([class]) > input {
 }
 
 .am-comparebar .am-button {
-  border-color: var(--am-neutral-0);
-  background: var(--am-neutral-0);
+  border-color: var(--am-tape);
+  background: var(--am-tape);
   color: var(--am-primary-800);
 }
 
 .am-comparebar .am-button:hover {
-  background: var(--am-primary-100);
+  border-color: var(--am-tape-deep);
+  background: var(--am-tape-deep);
 }
 
 .am-comparebar .am-button[data-variant="secondary"],
 .am-comparebar .am-button[data-variant="ghost"],
 .am-comparebar .am-button[data-variant="tertiary"] {
+  border-color: var(--am-neutral-0);
   background: transparent;
   color: var(--am-neutral-0);
 }
@@ -1634,43 +1656,34 @@ label:has(> input[type="radio"]):not([class]) > input {
 }
 
 /* ==========================================================================
-   23. Hero: the page sign
+   23. Hero: the cloth and the pattern sheet
    --------------------------------------------------------------------------
-   Every page opens on a navy sign: the location line (breadcrumb) on top,
-   the title, one lead, then what the page needs (actions, a form, notices).
-   `tone` no longer changes the colour: a sign is a sign.
+   Every page opens on indigo cloth. The location line (breadcrumb) or the
+   tape of the journey sits on the cloth; the title, one lead and what the
+   page needs sit on a pale pattern sheet laid on it, with a dashed cut line
+   and notches bitten out of its edge. `tone` no longer changes the colour.
    ========================================================================== */
 
 .am-hero {
-  padding: var(--am-space-24) 0 var(--am-space-40);
-}
-
-.am-hero[data-size="sm"] {
-  padding: var(--am-space-20) 0 var(--am-space-32);
+  padding: var(--am-space-16) 0 var(--am-space-32);
 }
 
 .am-hero[data-size="lg"] {
-  padding: var(--am-space-28) 0 var(--am-space-48);
+  padding: var(--am-space-16) 0 var(--am-space-40);
 }
 
 @media (min-width: 900px) {
   .am-hero {
-    padding: var(--am-space-32) 0 var(--am-space-56);
-  }
-
-  .am-hero[data-size="sm"] {
-    padding: var(--am-space-28) 0 var(--am-space-40);
+    padding: var(--am-space-24) 0 var(--am-space-48);
   }
 
   .am-hero[data-size="lg"] {
-    padding: var(--am-space-40) 0 var(--am-space-64);
+    padding: var(--am-space-32) 0 var(--am-space-64);
   }
 }
 
 .am-hero__breadcrumb {
-  margin: 0 0 var(--am-space-20);
-  padding-bottom: var(--am-space-12);
-  border-bottom: 1px solid var(--am-sign-rule);
+  margin: 0 0 var(--am-space-12);
 }
 
 .am-hero .am-breadcrumb__item,
@@ -1684,6 +1697,56 @@ label:has(> input[type="radio"]):not([class]) > input {
 
 .am-hero .am-breadcrumb__item [aria-current="page"] {
   color: var(--am-sign-ink);
+}
+
+/* The pattern sheet. */
+.am-hero__sheet {
+  position: relative;
+  padding: var(--am-space-32) var(--am-space-24) var(--am-space-32);
+  background-color: var(--am-sheet);
+  background-image: var(--am-notch-left), var(--am-notch-right), var(--am-notch-top), var(--am-notch-bottom);
+  background-position:
+    0 26%,
+    100% 68%,
+    34% 0,
+    78% 100%;
+  background-repeat: no-repeat;
+  border-radius: var(--am-radius-xs);
+}
+
+/* The cut line: dashed, inset from the edge, drawn over the paper and never over the content. */
+.am-hero__sheet::before {
+  position: absolute;
+  inset: var(--am-space-8);
+  border: 2px dotted var(--am-cut);
+  content: "";
+  pointer-events: none;
+}
+
+.am-hero[data-size="sm"] .am-hero__sheet {
+  padding-top: var(--am-space-28);
+  padding-bottom: var(--am-space-28);
+}
+
+@media (min-width: 900px) {
+  .am-hero__sheet {
+    padding: var(--am-space-48) var(--am-space-48) var(--am-space-48);
+  }
+
+  .am-hero[data-size="sm"] .am-hero__sheet {
+    padding-top: var(--am-space-40);
+    padding-bottom: var(--am-space-40);
+  }
+
+  .am-hero__sheet::before {
+    inset: var(--am-space-12);
+  }
+}
+
+.am-hero__sheet .am-entry {
+  padding: 0;
+  border: 0;
+  background: transparent;
 }
 
 .am-hero__layout {
@@ -1707,9 +1770,9 @@ label:has(> input[type="radio"]):not([class]) > input {
 }
 
 .am-hero__title {
-  max-width: 22ch;
+  max-width: 20ch;
   margin: 0;
-  color: var(--am-sign-ink);
+  color: var(--am-heading);
   font-size: var(--am-h1-size);
   font-weight: 800;
   line-height: var(--am-h1-line);
@@ -1722,13 +1785,13 @@ label:has(> input[type="radio"]):not([class]) > input {
 
 .am-hero[data-size="sm"] .am-hero__title {
   max-width: 28ch;
-  font-size: clamp(28px, 1.35rem + 1.3vw, 40px);
+  font-size: clamp(30px, 1.45rem + 1.4vw, 44px);
 }
 
 .am-hero__lead {
   max-width: 34em;
   margin: 0;
-  color: var(--am-sign-ink-muted);
+  color: var(--am-text-muted);
   font-size: var(--am-lead-size);
   line-height: var(--am-lead-line);
 }
@@ -1805,52 +1868,66 @@ label:has(> input[type="radio"]):not([class]) > input {
 }
 
 /* ==========================================================================
-   25. Directory: rows of destinations (products, countries, guides, brokers)
+   25. Directory: pieces laid in a list (products, countries, guides, brokers)
    --------------------------------------------------------------------------
-   The main list component of the sign system. Each row is one link: a tile,
-   a name, a short line, and the arrow that nudges toward its destination.
+   Each row is one pattern piece: a 2px indigo outline, a tile, a name, a
+   short line and an arrow that nudges toward the destination. The piece
+   takes a pale tape wash on hover; yellow is kept for real actions.
    ========================================================================== */
 
 .am-directory {
+  display: grid;
+  gap: var(--am-space-8);
   margin: 0;
   padding: 0;
   list-style: none;
-  border-top: 1px solid var(--am-rule);
+}
+
+.am-directory {
+  counter-reset: am-piece;
 }
 
 .am-directory > li {
+  position: relative;
   margin: 0;
-  border-bottom: 1px solid var(--am-rule);
+  border: 2px solid var(--am-primary-800);
+  border-radius: var(--am-radius-xs);
+  background-color: var(--am-surface);
+  counter-increment: am-piece;
+}
+
+/* The piece number: a small indigo tag on the top-right corner, like the mark on a cut pattern piece.
+   Decorative (empty alternative text), so a screen reader hears the list, not the counter. */
+.am-directory > li::before {
+  position: absolute;
+  top: -2px;
+  right: -2px;
+  display: inline-flex;
+  min-width: 24px;
+  height: 22px;
+  align-items: center;
+  justify-content: center;
+  padding: 0 var(--am-space-6);
+  background: var(--am-primary-800);
+  color: var(--am-tape);
+  content: counter(am-piece);
+  content: counter(am-piece) / "";
+  font-family: var(--am-font-heading);
+  font-size: var(--am-caption-size);
+  font-variant-numeric: tabular-nums;
+  font-weight: 800;
+  line-height: 1;
+  pointer-events: none;
 }
 
 .am-directory[data-surface="plate"] {
-  border: 1px solid var(--am-border);
-  border-radius: var(--am-radius-sm);
-  background: var(--am-surface);
-  overflow: hidden;
-}
-
-.am-directory[data-surface="plate"] > li:last-child {
-  border-bottom: 0;
+  background: transparent;
 }
 
 @media (min-width: 900px) {
   .am-directory[data-columns="2"] {
-    display: grid;
-    column-gap: var(--am-space-32);
+    column-gap: var(--am-space-16);
     grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
-  .am-directory[data-columns="2"][data-surface="plate"] {
-    column-gap: 0;
-  }
-
-  .am-directory[data-columns="2"][data-surface="plate"] > li:nth-child(odd) {
-    border-right: 1px solid var(--am-border);
-  }
-
-  .am-directory[data-columns="2"][data-surface="plate"] > li:nth-last-child(2):nth-child(odd) {
-    border-bottom: 0;
   }
 }
 
@@ -1859,16 +1936,11 @@ label:has(> input[type="radio"]):not([class]) > input {
   min-height: var(--am-row);
   gap: var(--am-space-4) var(--am-space-16);
   align-items: center;
-  padding: var(--am-space-10) var(--am-space-4);
+  padding: var(--am-space-12) var(--am-space-16);
   color: var(--am-heading);
   grid-template-columns: auto minmax(0, 1fr) auto;
   text-decoration: none;
   transition: background-color var(--am-transition);
-}
-
-.am-directory[data-surface="plate"] .am-directory__row {
-  padding-left: var(--am-space-16);
-  padding-right: var(--am-space-16);
 }
 
 .am-directory__row:not(:has(.am-directory__tile)) {
@@ -1876,8 +1948,22 @@ label:has(> input[type="radio"]):not([class]) > input {
 }
 
 a.am-directory__row:hover {
-  background: var(--am-primary-50);
+  background: var(--am-tape-wash);
   color: var(--am-heading);
+}
+
+/* The one authored lift: a pattern piece rises 2px under the finger or the pointer. */
+@media (prefers-reduced-motion: no-preference) {
+  a.am-directory__row {
+    transition:
+      background-color var(--am-transition),
+      transform var(--am-duration-base) var(--am-ease-out);
+  }
+
+  a.am-directory__row:hover,
+  a.am-directory__row:focus-visible {
+    transform: translateY(-2px);
+  }
 }
 
 .am-directory__text {
@@ -1888,9 +1974,11 @@ a.am-directory__row:hover {
 
 .am-directory__title {
   color: var(--am-heading);
-  font-size: 18px;
-  font-weight: 700;
-  line-height: 1.3;
+  font-family: var(--am-font-heading);
+  font-size: 20px;
+  font-weight: 750;
+  letter-spacing: var(--am-tracking-snug);
+  line-height: 1.2;
 }
 
 .am-directory__meta {
@@ -1908,7 +1996,7 @@ a.am-directory__row:hover {
 }
 
 .am-directory__arrow {
-  color: var(--am-action);
+  color: var(--am-primary-800);
   transition: transform var(--am-duration-base) var(--am-ease-out);
 }
 
@@ -1922,11 +2010,11 @@ a.am-directory__row:focus-visible {
 }
 
 /* ==========================================================================
-   26. Route: numbered stops on a line ("Comment ça marche", journey steps)
+   26. Route: numbered stops on a tape ("Comment ça marche", journey steps)
    ========================================================================== */
 
 .am-route {
-  --am-route-dot: 40px;
+  --am-route-dot: 44px;
   display: grid;
   gap: 0;
   margin: 0;
@@ -1952,17 +2040,20 @@ a.am-directory__row:focus-visible {
   padding-bottom: 0;
 }
 
-/* The line: from this stop's centre down to the next one. */
+/* The tape: from this stop's tag down to the next one. */
 .am-route__stop:not(:last-child)::before {
   position: absolute;
   top: var(--am-route-dot);
   bottom: 0;
-  left: calc(var(--am-route-dot) / 2 - 2px);
-  width: 4px;
-  background: var(--am-primary-800);
+  left: calc(var(--am-route-dot) / 2 - 6px);
+  width: 12px;
+  border-right: 1.5px solid var(--am-primary-800);
+  border-left: 1.5px solid var(--am-primary-800);
+  background: var(--am-tape);
   content: "";
 }
 
+/* The tag: a square of cloth with the step number in tape yellow. */
 .am-route__dot {
   display: inline-flex;
   width: var(--am-route-dot);
@@ -1970,10 +2061,11 @@ a.am-directory__row:focus-visible {
   align-items: center;
   justify-content: center;
   grid-row: span 2;
-  border-radius: var(--am-radius-pill);
+  border-radius: var(--am-radius-xs);
   background: var(--am-primary-800);
-  color: var(--am-neutral-0);
-  font-size: 18px;
+  color: var(--am-tape);
+  font-family: var(--am-font-heading);
+  font-size: 22px;
   font-variant-numeric: tabular-nums;
   font-weight: 800;
 }
@@ -1981,6 +2073,7 @@ a.am-directory__row:focus-visible {
 /* The stop where the broker confirms is the green one: confirmation is green. */
 .am-route__stop[data-state="confirm"] .am-route__dot {
   background: var(--am-success-700);
+  color: var(--am-neutral-0);
 }
 
 .am-route__title {
@@ -1991,7 +2084,7 @@ a.am-directory__row:focus-visible {
   margin: 0;
   color: var(--am-heading);
   font-size: var(--am-h3-size);
-  font-weight: 700;
+  font-weight: 750;
   line-height: var(--am-h3-line);
 }
 
@@ -2026,37 +2119,44 @@ a.am-directory__row:focus-visible {
   }
 
   .am-route[data-orientation="auto"] .am-route__stop:not(:last-child)::before {
-    top: calc(var(--am-route-dot) / 2 - 2px);
+    top: calc(var(--am-route-dot) / 2 - 6px);
     bottom: auto;
     left: var(--am-route-dot);
     right: calc(var(--am-space-24) * -1);
     width: auto;
-    height: 4px;
+    height: 12px;
+    border-right: 0;
+    border-left: 0;
+    border-top: 1.5px solid var(--am-primary-800);
+    border-bottom: 1.5px solid var(--am-primary-800);
   }
 }
 
 /* ==========================================================================
-   27. Route strip: "Vous êtes ici" on the journey signs
+   27. Route strip: the measuring tape of the journey pages
    --------------------------------------------------------------------------
-   Equal columns, each stop centred on its own column, the line running from
-   centre to centre. The current stop is the strongest mark on the strip (a
-   large solid white disc and a bold label); passed stops are small and muted,
-   stops ahead are small open rings.
+   A yellow tape with ticks along its lower edge. Each stop is a label on the
+   tape; the current stop is the label printed in reverse (cloth with yellow
+   type), stops already passed are links back, stops ahead are plain.
    ========================================================================== */
 
 .am-routestrip {
-  --am-strip-mark: 22px;
   margin: 0;
   font-size: var(--am-caption-size);
   line-height: var(--am-caption-line);
 }
 
 .am-routestrip__list {
-  display: grid;
+  display: flex;
+  justify-content: space-between;
+  gap: var(--am-space-2);
   margin: 0;
-  padding: 0;
-  grid-auto-columns: minmax(0, 1fr);
-  grid-auto-flow: column;
+  padding: var(--am-space-8) var(--am-space-4) 18px;
+  background-color: var(--am-tape);
+  background-image: var(--am-tape-ticks);
+  background-position: left bottom;
+  background-repeat: repeat-x;
+  border-radius: var(--am-radius-xs);
   list-style: none;
 }
 
@@ -2064,10 +2164,9 @@ a.am-directory__row:focus-visible {
   position: relative;
   display: grid;
   min-width: 0;
-  gap: var(--am-space-6);
+  flex: 0 1 auto;
   justify-items: center;
   margin: 0;
-  grid-template-rows: var(--am-strip-mark) auto;
   text-align: center;
 }
 
@@ -2075,49 +2174,17 @@ a.am-directory__row:focus-visible {
   margin-top: 0;
 }
 
-/* The line toward the next stop, from the centre of this column to the centre of the next. */
-.am-routestrip__stop:not(:last-child)::after {
-  position: absolute;
-  top: calc(var(--am-strip-mark) / 2 - 1px);
-  left: 50%;
-  width: 100%;
-  height: 2px;
-  background: var(--am-sign-rule);
-  content: "";
-}
-
-.am-routestrip__stop[data-state="done"]:not(:last-child)::after {
-  background: var(--am-sign-ink-muted);
-}
-
+/* The tape itself is the line: the marks of the previous system are not drawn. */
 .am-routestrip__mark {
-  position: relative;
-  z-index: 1;
-  align-self: center;
-  width: 10px;
-  height: 10px;
-  border: 2px solid var(--am-sign-ink-muted);
-  border-radius: var(--am-radius-pill);
-  background: var(--am-sign);
-}
-
-.am-routestrip__stop[data-state="done"] .am-routestrip__mark {
-  border-color: var(--am-sign-ink-muted);
-  background: var(--am-sign-ink-muted);
-}
-
-.am-routestrip__stop[data-state="current"] .am-routestrip__mark {
-  width: var(--am-strip-mark);
-  height: var(--am-strip-mark);
-  border: 0;
-  background: var(--am-sign-ink);
-  box-shadow: 0 0 0 4px rgba(255, 255, 255, 0.22);
+  display: none;
 }
 
 .am-routestrip__label {
   max-width: 100%;
   overflow: hidden;
-  color: var(--am-sign-ink-muted);
+  padding: 2px var(--am-space-4);
+  border-radius: var(--am-radius-xs);
+  color: var(--am-tape-ink);
   font-weight: 400;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -2125,16 +2192,18 @@ a.am-directory__row:focus-visible {
 
 .am-routestrip__label a {
   position: relative;
-  color: var(--am-sign-ink-muted);
+  color: var(--am-tape-ink);
+  font-weight: 700;
 }
 
 .am-routestrip__label a:hover {
-  color: var(--am-sign-ink);
+  color: var(--am-primary-900);
 }
 
 .am-routestrip__stop[data-state="current"] .am-routestrip__label {
-  color: var(--am-sign-ink);
-  font-weight: 700;
+  background: var(--am-primary-800);
+  color: var(--am-tape);
+  font-weight: 800;
 }
 
 /* Under 360px five labels cannot share the width: only the current stop keeps its label on screen. */
@@ -2154,7 +2223,7 @@ a.am-directory__row:focus-visible {
 }
 
 .am-hero__routestrip {
-  margin: 0 0 var(--am-space-24);
+  margin: 0 0 var(--am-space-12);
 }
 
 /* ==========================================================================
@@ -2268,11 +2337,11 @@ a.am-directory__row:focus-visible {
 
 .am-logo__tip,
 .am-logo__canopy {
-  fill: var(--am-primary-600);
+  fill: var(--am-logo-blue);
 }
 
 .am-logo__shield {
-  fill: var(--am-success-500);
+  fill: var(--am-logo-green);
 }
 
 .am-logo__person {
@@ -2331,7 +2400,7 @@ textarea:not([class]) {
 
 select:not([class]) {
   padding-right: var(--am-space-40);
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='20' height='20' viewBox='0 0 24 24' fill='none' stroke='%230b2a5c' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='20' height='20' viewBox='0 0 24 24' fill='none' stroke='%2325207a' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
   background-repeat: no-repeat;
   background-position: right var(--am-space-12) center;
   background-size: 20px 20px;
@@ -2410,4 +2479,47 @@ form legend:not([class]) {
   color: var(--am-heading);
   font-size: var(--am-h4-size);
   font-weight: 700;
+}
+
+/* ==========================================================================
+   The pattern sheet in the body: a form or a piece of content laid on a grey table band.
+   Same grammar as the hero sheet (notches, dotted cut line), on paper instead of cloth.
+   ========================================================================== */
+
+.am-sheet {
+  position: relative;
+  padding: var(--am-space-32) var(--am-space-20);
+  border: 1px solid var(--am-primary-100);
+  border-radius: var(--am-radius-xs);
+  background-color: var(--am-sheet);
+  background-image: var(--am-notch-left), var(--am-notch-right);
+  background-position:
+    0 72px,
+    100% 180px;
+  background-repeat: no-repeat;
+}
+
+.am-sheet::before {
+  position: absolute;
+  inset: var(--am-space-8);
+  border: 2px dotted var(--am-cut);
+  content: "";
+  pointer-events: none;
+}
+
+@media (min-width: 768px) {
+  .am-sheet {
+    padding: var(--am-space-48) var(--am-space-48);
+  }
+
+  .am-sheet::before {
+    inset: var(--am-space-12);
+  }
+}
+
+/* A sheet inside a column that already sets its own width keeps that width. */
+.am-sheet.am-j-column,
+.am-applyform.am-sheet {
+  max-width: 920px;
+  margin-inline: auto;
 }

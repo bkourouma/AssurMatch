@@ -1,17 +1,34 @@
-import { Atkinson_Hyperlegible_Next } from "next/font/google";
+import { Atkinson_Hyperlegible_Next, Bricolage_Grotesque } from "next/font/google";
 
 /**
- * One family for the whole public site: Atkinson Hyperlegible Next, a face drawn for legibility
- * (distinct letterforms, open counters), which is what a sign system read on a phone in daylight
- * needs. Variable weight; the CSS uses 400, 700 and 800. Exposed as `--font-am-sign`, which
- * `styles/tokens.css` puts behind both `--am-font-heading` and `--am-font-body`.
+ * Two faces for the public site ("Le patron").
  *
- * The back-offices keep their own Nunito/Inter pair from `@assurmatch/ui/fonts`; the public site no
- * longer shares it.
+ *  - Atkinson Hyperlegible Next carries every sentence: a face drawn for legibility (distinct
+ *    letterforms, open counters), read on a phone in daylight. Exposed as `--font-am-sign`, behind
+ *    `--am-font-body`. Weights 400 / 700 / 800.
+ *  - Bricolage Grotesque sets the headings and the large figures: a grotesque with a little
+ *    tailoring in its joins, enough character to be recognised without turning into a costume.
+ *    Variable weight and optical size. Exposed as `--font-am-display`, behind `--am-font-heading`.
+ *
+ * The back-offices keep their own Nunito/Inter pair from `@assurmatch/ui/fonts`; the public site
+ * does not share it.
  */
-export const signFont = Atkinson_Hyperlegible_Next({
+const bodyFont = Atkinson_Hyperlegible_Next({
   subsets: ["latin", "latin-ext"],
   display: "swap",
   variable: "--font-am-sign",
   fallback: ["system-ui", "Segoe UI", "Arial"]
 });
+
+const displayFont = Bricolage_Grotesque({
+  subsets: ["latin", "latin-ext"],
+  display: "swap",
+  variable: "--font-am-display",
+  axes: ["opsz"],
+  fallback: ["system-ui", "Segoe UI", "Arial"]
+});
+
+/** `variable` is the class that defines both CSS font variables; put it on `<html>`. */
+export const signFont = {
+  variable: `${bodyFont.variable} ${displayFont.variable}`
+};

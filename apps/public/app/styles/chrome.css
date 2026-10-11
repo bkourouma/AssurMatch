@@ -1,9 +1,10 @@
 /*
- * Site chrome of "La signalétique": the shell, the header strip, the main navigation, the country and
- * language controls, the mobile drawer, the local contact band and the navy footer.
+ * Site chrome of "Le patron": the shell, the header strip, the main navigation, the country and
+ * language controls, the mobile drawer, the local contact band and the indigo footer.
  *
- * The header is a plain white strip with one rule under it; the current section is marked by a navy
- * bar on the strip's lower edge, the way a sign marks "you are here". No glass, no shadow on scroll.
+ * The header is a plain white strip with one rule under it; the current section is marked by an indigo
+ * bar on the strip's lower edge. The footer is the cloth again, hemmed with a strip of measuring tape.
+ * No glass, no shadow on scroll.
  */
 
 /* ==========================================================================
@@ -103,10 +104,13 @@
     gap: var(--am-space-8);
   }
 
+  /* Icon-only on a phone: outlined, so the page's yellow stays with its one real action. */
   .am-header__cta.am-button {
     width: 44px;
     min-width: 44px;
     padding: 0;
+    border-color: var(--am-primary-800);
+    background: var(--am-surface);
   }
 
   .am-header__cta.am-button > span {
@@ -511,7 +515,7 @@
 .am-menu[open]::before {
   position: fixed;
   inset: var(--am-header) 0 0 0;
-  background: rgba(7, 28, 64, 0.45);
+  background: rgba(24, 20, 86, 0.45);
   content: "";
   pointer-events: none;
   animation: am-fade-in var(--am-duration-fast) var(--am-ease-out) both;
@@ -748,18 +752,39 @@ html[data-js="true"] .am-menu__close {
    8. Footer: the last sign
    ========================================================================== */
 
+/* The hem: a strip of measuring tape along the top edge of the cloth. */
 .am-footer {
   --am-heading: var(--am-sign-ink);
   --am-rule: var(--am-sign-rule);
-  padding: var(--am-space-48) 0 var(--am-space-24);
+  --am-btn-secondary-bg: transparent;
+  --am-btn-secondary-ink: var(--am-neutral-0);
+  --am-btn-secondary-border: var(--am-neutral-0);
+  --am-btn-secondary-bg-hover: rgba(255, 255, 255, 0.14);
+  --am-btn-primary-border: var(--am-tape);
+  position: relative;
+  padding: calc(var(--am-space-48) + 22px) 0 var(--am-space-24);
   background: var(--am-primary-800);
+  background-image: var(--am-cloth-weave);
   color: var(--am-sign-ink-muted);
   font-size: var(--am-small-size);
   line-height: var(--am-small-line);
 }
 
+.am-footer::before {
+  position: absolute;
+  top: 0;
+  right: 0;
+  left: 0;
+  height: 22px;
+  background-color: var(--am-tape);
+  background-image: var(--am-tape-ticks);
+  background-position: left bottom;
+  background-repeat: repeat-x;
+  content: "";
+}
+
 .am-footer :focus-visible {
-  outline-color: #ffd75e;
+  outline-color: var(--am-tape);
 }
 
 .am-footer h2,

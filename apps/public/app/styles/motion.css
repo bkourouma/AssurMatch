@@ -1,10 +1,11 @@
 /*
- * Motion for the sign system: almost none, on purpose.
+ * Motion for "Le patron": almost none, on purpose.
  *
- * Signs do not animate in. Content is visible from the first paint: there is no scroll reveal, no
+ * Cut paper does not animate in. Content is visible from the first paint: there is no scroll reveal, no
  * stagger and no count-up. What remains is functional: the loading spinner, the skeleton shimmer,
- * short fades for things that open (the menu, the comparison bar), and one authored move, the
- * directory arrow that nudges toward its destination on hover and focus (components.css).
+ * short fades for things that open (the menu, the comparison bar), and one authored move, a
+ * directory row that lifts 2px and nudges its arrow toward the destination on hover and focus
+ * (components.css, only when the visitor has not asked for reduced motion).
  *
  * `[data-reveal]` is kept as a no-op so markup written for the former Reveal component stays visible.
  */

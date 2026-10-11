@@ -123,7 +123,7 @@ services:
 
   clamav:
     <<: [*restart, *logging]
-    image: clamav/clamav:1.4
+    image: clamav/clamav:1.5
     container_name: assurmatch-prod-clamav
     # Signature download + daemon start take several minutes on first boot; the API only needs it
     # once an upload feature is enabled (ASSURMATCH_ANTIVIRUS=clamav, host `clamav`, port 3310).
@@ -155,7 +155,7 @@ services:
   nginx:
     <<: [*restart, *logging]
     profiles: ["edge"]
-    image: nginx:1.27-alpine
+    image: nginx:1.31-alpine
     container_name: assurmatch-prod-nginx
     depends_on:
       - api

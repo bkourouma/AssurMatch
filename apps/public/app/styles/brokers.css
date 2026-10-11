@@ -337,6 +337,30 @@
   padding: 0;
 }
 
+/* When one plan is marked, it alone carries the yellow: a strip of tape across its top edge and the
+   yellow button; the other plans take the outlined button. */
+.am-planpanel.am-card--featured {
+  position: relative;
+}
+
+.am-planpanel.am-card--featured::before {
+  position: absolute;
+  top: -2px;
+  right: -2px;
+  left: -2px;
+  height: 16px;
+  background-color: var(--am-tape);
+  background-image: var(--am-tape-ticks);
+  background-position: left bottom;
+  background-repeat: repeat-x;
+  content: "";
+}
+
+.am-planpanels:has(.am-card--featured) .am-planpanel:not(.am-card--featured) {
+  --am-btn-primary-bg: var(--am-surface);
+  --am-btn-primary-bg-hover: var(--am-primary-50);
+}
+
 .am-planpanel > * {
   min-width: 0;
   padding: var(--am-space-20);
@@ -844,4 +868,11 @@ html[data-js="true"] .am-formstepper__navitem[data-role="submit"][data-step-acti
   min-height: 44px;
   align-items: center;
   font-weight: 700;
+}
+
+/* A form card set on a pattern sheet is the sheet's own surface: no second frame inside it. */
+.am-sheet .am-formcard {
+  padding: 0;
+  border: 0;
+  background: transparent;
 }

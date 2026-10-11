@@ -12,7 +12,7 @@ same sha256 hash the API computes. Publishing them stays a compliance act in the
 
 | File | Role |
 |------|------|
-| `countries.json` | Catalog of 9 CIMA countries with default flags fail-closed |
+| `countries.json` | Catalog of 10 countries (9 CIMA + Guinea under FANAF); ML, GN and SN are waitlist-only, all others fail-closed |
 | `currencies.json` | Currencies referenced by the countries |
 | `languages.json` | Language codes used by countries / texts |
 | `regulatory-regimes.json` | CIMA / FANAF / national-template generic regimes |

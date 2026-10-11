@@ -8,7 +8,7 @@
 #     --build-arg NEXT_PUBLIC_ASSURMATCH_BROKER_URL=https://pro.<domain> \
 #     -t assurmatch-public:local .
 
-FROM node:24-alpine AS deps
+FROM node:26-alpine AS deps
 WORKDIR /app
 COPY package.json package-lock.json ./
 COPY backend/package.json backend/package.json
@@ -18,7 +18,7 @@ COPY apps/public/package.json apps/public/package.json
 COPY packages packages
 RUN npm ci
 
-FROM node:24-alpine AS build
+FROM node:26-alpine AS build
 WORKDIR /app
 ARG NEXT_PUBLIC_ASSURMATCH_API_URL
 ARG NEXT_PUBLIC_ASSURMATCH_PUBLIC_URL
@@ -30,7 +30,7 @@ COPY . .
 WORKDIR /app/apps/public
 RUN sh /app/scripts/ops/next-build.sh
 
-FROM node:24-alpine AS runtime
+FROM node:26-alpine AS runtime
 ENV NODE_ENV=production
 ENV PORT=3601
 WORKDIR /app/apps/public

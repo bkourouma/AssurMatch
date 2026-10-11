@@ -1,6 +1,6 @@
 /*
  * Reset, typography, browser surfaces and layout utilities for the AssurMatch public site
- * ("La signalétique"). One face, three weights (400 text, 700 labels and headings, 800 sign titles).
+ * ("Le patron"). Two faces: Bricolage Grotesque for headings, Atkinson Hyperlegible Next for text.
  *
  * No global `button {}`, `label {}` or `[role="alert"] {}` box lives here: unclassed `button`,
  * `label` and `input` keep a sane appearance through `:not([class])` safety nets at the end of
@@ -34,7 +34,7 @@ html {
   -moz-osx-font-smoothing: grayscale;
   accent-color: var(--am-action);
   caret-color: var(--am-action);
-  scrollbar-color: var(--am-neutral-400) var(--am-neutral-100);
+  scrollbar-color: var(--am-primary-400) var(--am-neutral-100);
 }
 
 body {
@@ -62,7 +62,7 @@ video {
   height: auto;
 }
 
-/* ---------- Headings: navy, like the lettering of a sign ---------- */
+/* ---------- Headings: indigo, set in the display face ---------- */
 
 h1,
 h2,
@@ -73,6 +73,7 @@ h6 {
   margin: 0 0 var(--am-space-12);
   color: var(--am-heading);
   font-family: var(--am-font-heading);
+  font-optical-sizing: auto;
   font-weight: 800;
   letter-spacing: var(--am-tracking-tight);
   text-wrap: balance;
@@ -90,7 +91,7 @@ h2 {
 
 h3 {
   font-size: var(--am-h3-size);
-  font-weight: 700;
+  font-weight: 750;
   letter-spacing: var(--am-tracking-snug);
   line-height: var(--am-h3-line);
 }
@@ -98,6 +99,7 @@ h3 {
 h4,
 h5,
 h6 {
+  font-family: var(--am-font-body);
   font-size: var(--am-h4-size);
   font-weight: 700;
   letter-spacing: 0;
@@ -194,6 +196,7 @@ textarea:focus-visible {
   outline-offset: 1px;
 }
 
+/* Browser surfaces: the selection is a strip of tape, the caret and the form accents are the link indigo. */
 ::selection {
   background: var(--am-selection);
   color: var(--am-primary-900);
@@ -213,11 +216,11 @@ textarea:focus-visible {
 ::-webkit-scrollbar-thumb {
   border: 3px solid var(--am-neutral-100);
   border-radius: var(--am-radius-pill);
-  background: var(--am-neutral-400);
+  background: var(--am-primary-400);
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: var(--am-neutral-500);
+  background: var(--am-primary-500);
 }
 
 /* ---------- Misc elements ---------- */
