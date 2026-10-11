@@ -2,8 +2,9 @@ import { redirect } from "next/navigation";
 import { isStarterCrmDenied, loginRedirect, readBackOfficeSession } from "../../lib/backoffice-auth";
 import { readCrmKanban } from "../../lib/broker-api";
 import { CRM_PIPELINE_STATUSES, CRM_STATUS_LABELS } from "../../lib/lead-vocabulary";
-import { Badge, Card, Notice, PageHeader, PageStack } from "../../lib/ui/broker-ui";
+import { Badge, Button, Notice, PageHeader, PageStack } from "../../lib/ui/broker-ui";
 import { leadSummary } from "../../lib/ui/broker-view-models";
+import styles from "../../lib/ui/broker-screens.module.css";
 
 /**
  * Spec 055 FR-010: vue Kanban du CRM Pro/Enterprise (GET /broker/crm/leads/kanban). Une colonne par
@@ -16,7 +17,7 @@ export default async function BrokerCrmKanbanPage() {
   if (session.status !== "authenticated" || isStarterCrmDenied(session.profile)) {
     return (
       <PageStack>
-        <PageHeader breadcrumb={[{ label: "CRM", href: "/crm" }, { label: "Vue Kanban" }]} kicker="CRM Pro/Enterprise" title="Acces CRM refuse" description="La vue Kanban exige un plan Pro/Enterprise, la MFA verifiee et les permissions CRM." />
+        <PageHeader breadcrumb={[{ label: "CRM", href: "/crm" }, { label: "Vue Kanban" }]} title="Acces CRM refuse" description="La vue Kanban exige un plan Pro/Enterprise, la MFA verifiee et les permissions CRM." />
         <Notice tone="info">Le CRM complet est disponible avec le plan Pro.</Notice>
       </PageStack>
     );
@@ -28,32 +29,36 @@ export default async function BrokerCrmKanbanPage() {
     <PageStack>
       <PageHeader
         breadcrumb={[{ label: "CRM", href: "/crm" }, { label: "Vue Kanban" }]}
-        kicker="CRM Pro/Enterprise"
         title="Vue Kanban"
-        description="Leads autorises regroupes par statut pipeline, selon votre role, votre tenant et votre conseiller."
-        actions={<Badge tone="info">Lecture : changez le statut depuis la fiche</Badge>}
+        description="Leads autorises regroupes par statut pipeline. Lecture : changez le statut depuis la fiche du lead, avec motif et historique."
+        actions={<Button href="/crm/leads" variant="secondary">Vue tableau</Button>}
       />
       {kanban.forbidden ? <Notice tone="danger" title="Acces CRM refuse">Verifiez le plan, la MFA et le flag broker_crm_enabled. Aucune donnee CRM n'est affichee.</Notice> : null}
       {kanban.status === "error" ? <Notice tone="warning">Vue Kanban temporairement indisponible.</Notice> : null}
       {kanban.status === "success" ? (
-        <div style={{ display: "grid", gridAutoFlow: "column", gridAutoColumns: "minmax(220px, 1fr)", gap: "var(--bo-space-4, 16px)", overflowX: "auto" }} aria-label="Colonnes du pipeline CRM">
+        <div className={styles.board} role="region" aria-label="Colonnes du pipeline CRM" tabIndex={0}>
           {CRM_PIPELINE_STATUSES.map((status) => {
             const leads = (kanban.data[status] ?? []).map(leadSummary);
             return (
-              <Card key={status} title={`${CRM_STATUS_LABELS[status]} (${leads.length})`} as="section">
+              <section key={status} className={styles.column} aria-label={`${CRM_STATUS_LABELS[status]} (${leads.length})`}>
+                <h2 className={styles.columnHead}>
+                  <span>{CRM_STATUS_LABELS[status]}</span>
+                  <Badge tone={leads.length > 0 ? "info" : "neutral"}>{String(leads.length)}</Badge>
+                </h2>
                 {leads.length > 0 ? (
-                  <ul>
+                  <ul className={styles.columnList}>
                     {leads.map((lead) => (
-                      <li key={lead.id}>
-                        <a href={`/crm/leads/${lead.id}`}>{lead.reference}</a> - {lead.product} / {lead.country}
-                        {lead.advisor ? ` - ${lead.advisor}` : ""}
+                      <li key={lead.id} className={styles.ticket}>
+                        <a className="bo-ref" href={`/crm/leads/${lead.id}`}>{lead.reference}</a>
+                        <span>{lead.product} / {lead.country}</span>
+                        {lead.advisor ? <span className={styles.entryMeta}>Conseiller <span className="bo-ref">{lead.advisor}</span></span> : null}
                       </li>
                     ))}
                   </ul>
                 ) : (
-                  <p>Aucun lead.</p>
+                  <p className={styles.columnEmpty}>Aucun lead.</p>
                 )}
-              </Card>
+              </section>
             );
           })}
         </div>

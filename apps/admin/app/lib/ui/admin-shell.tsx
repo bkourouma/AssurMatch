@@ -3,8 +3,9 @@
 import { usePathname } from "next/navigation";
 import type { ReactNode } from "react";
 import { AppShell, AuthShell } from "@assurmatch/ui/backoffice";
-import type { NavGroup } from "@assurmatch/ui/backoffice";
+import type { NavGroup, ThemeValue } from "@assurmatch/ui/backoffice";
 import { logoutAction } from "../backoffice-session-actions";
+import { ADMIN_THEME_COOKIE } from "../theme-cookie";
 
 export interface AdminShellUser {
   label: string;
@@ -24,7 +25,7 @@ export const adminNavigation: NavGroup[] = [
     items: [
       { label: "Dashboard", href: "/", icon: "dashboard", match: ["/", "/dashboard"] },
       {
-        label: "Operations",
+        label: "Opérations",
         href: "/operations",
         icon: "operations",
         match: ["/operations", "/lead-assignments", "/prospects", "/quote-requests"],
@@ -38,14 +39,14 @@ export const adminNavigation: NavGroup[] = [
         ]
       },
       {
-        label: "Conformite",
+        label: "Conformité",
         href: "/compliance",
         icon: "shield",
         match: ["/compliance", "/dashboard/compliance-alerts"],
         children: [
           { label: "Alertes", href: "/dashboard/compliance-alerts" },
           // Spec 046: retention policies, anonymization batches and erasure requests.
-          { label: "Conservation des donnees", href: "/compliance/retention" },
+          { label: "Conservation des données", href: "/compliance/retention" },
           // Spec 056 (H-05): audit-log search and restricted export.
           { label: "Journaux d'audit", href: "/compliance/audit-logs" },
           // Spec 059 follow-up: consent-proof search (compliance_admin, super_admin).
@@ -80,7 +81,7 @@ export const adminNavigation: NavGroup[] = [
         match: ["/routing"],
         // Spec 056 (H-06): screens of the spec 049 anomaly routes and the decision history.
         children: [
-          { label: "Regles", href: "/routing" },
+          { label: "Règles", href: "/routing" },
           { label: "Anomalies", href: "/routing/anomalies" },
           { label: "Historique", href: "/routing/history" }
         ]
@@ -101,7 +102,7 @@ export const adminNavigation: NavGroup[] = [
           { label: "Candidatures", href: "/partners/applications" }
         ]
       },
-      { label: "Integrations", href: "/partner-integrations", icon: "plug", match: ["/partner-integrations"] },
+      { label: "Intégrations", href: "/partner-integrations", icon: "plug", match: ["/partner-integrations"] },
       { label: "Facturation", href: "/billing", icon: "receipt", match: ["/billing"] },
       { label: "Messagerie", href: "/messaging", icon: "message", match: ["/messaging"] }
     ]
@@ -124,11 +125,14 @@ function isAuthRoute(pathname: string): boolean {
 export function AdminShell({
   children,
   user,
-  envBadge
+  envBadge,
+  theme
 }: {
   children: ReactNode;
   user?: AdminShellUser | undefined;
   envBadge?: string | undefined;
+  /** Current theme, read from the cookie by the layout. */
+  theme?: ThemeValue | undefined;
 }) {
   const pathname = usePathname() || "/";
   const badge = envBadge ?? (process.env.NEXT_PUBLIC_APP_ENV === "local" ? "Local" : undefined);
@@ -154,6 +158,7 @@ export function AdminShell({
       menuOpenLabel="Ouvrir la navigation admin"
       menuCloseLabel="Fermer la navigation admin"
       userMenuLabel="Utilisateur connecte"
+      themePicker={{ cookieName: ADMIN_THEME_COOKIE, current: theme ?? "clair", label: "Theme" }}
       breadcrumbLabel="Fil d'Ariane admin"
       dataAttributes={{ "data-admin-shell": "true" }}
     >

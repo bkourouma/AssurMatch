@@ -31,7 +31,7 @@ export default async function BrokerCompanyPage() {
   if (!canReadAccount(session.profile)) {
     return (
       <PageStack>
-        <PageHeader breadcrumb={BREADCRUMB} kicker="Profil société" title="Acces refuse" description="La consultation du profil société exige un rôle courtier." />
+        <PageHeader breadcrumb={BREADCRUMB} title="Acces refuse" description="La consultation du profil société exige un rôle courtier." />
       </PageStack>
     );
   }
@@ -44,7 +44,7 @@ export default async function BrokerCompanyPage() {
   if (!account) {
     return (
       <PageStack>
-        <PageHeader breadcrumb={BREADCRUMB} kicker="Profil société" title="Profil indisponible" />
+        <PageHeader breadcrumb={BREADCRUMB} title="Profil indisponible" />
         <StateMessage tone="danger">Le profil société n&apos;a pas pu être chargé. Réessayez dans quelques instants.</StateMessage>
       </PageStack>
     );
@@ -70,7 +70,6 @@ export default async function BrokerCompanyPage() {
     <PageStack>
       <PageHeader
         breadcrumb={BREADCRUMB}
-        kicker="Profil société"
         title={account.tradeName || account.legalName}
         description="Les données réglementaires (raison sociale, RCCM, pays, licences) ne changent qu'après vérification par AssurMatch, plateforme technique de mise en relation."
         actions={<Button href="/licenses" variant="secondary">Mes licences</Button>}
@@ -85,7 +84,7 @@ export default async function BrokerCompanyPage() {
             items={[
               { term: "Raison sociale", value: account.legalName },
               { term: "Nom commercial", value: account.tradeName ?? "-" },
-              { term: "RCCM", value: account.registrationNumber ?? "-" },
+              { term: "RCCM", value: account.registrationNumber ? <span className="bo-ref">{account.registrationNumber}</span> : "-" },
               { term: "Pays principal", value: account.countryName ?? "-" },
               { term: "Ville", value: account.city ?? "-" }
             ]}
@@ -179,7 +178,7 @@ export default async function BrokerCompanyPage() {
                 )
               },
               { key: "status", header: "Statut", render: (request: PartnerChangeRequestView) => <StatusBadge status={request.status} labels={REQUEST_STATUS_LABELS} tones={REQUEST_STATUS_TONES} /> },
-              { key: "date", header: "Déposée le", render: (request: PartnerChangeRequestView) => selfServiceFormatDate(request.createdAt) },
+              { key: "date", header: "Déposée le", render: (request: PartnerChangeRequestView) => <span className="bo-ref">{selfServiceFormatDate(request.createdAt)}</span> },
               { key: "decision", header: "Décision", render: (request: PartnerChangeRequestView) => (request.decisionReason ? `${selfServiceFormatDate(request.decidedAt)} : ${request.decisionReason}` : "-") },
               {
                 key: "actions",
@@ -190,6 +189,7 @@ export default async function BrokerCompanyPage() {
             items={requests}
             getKey={(request) => request.id}
             emptyLabel="Aucune demande déposée."
+            emptyDescription="Une modification d'identité ou une extension de couverture se demande avec les formulaires ci-dessus ; AssurMatch l'examine."
             aria-label="Demandes du courtier"
           />
         </Card>

@@ -1,8 +1,8 @@
 import { redirect } from "next/navigation";
 import { isAdminProfile, loginRedirect, readBackOfficeSession } from "../lib/backoffice-auth";
 import { readAdminDashboard } from "../lib/admin-api";
-import { Badge, Button, Card, Cluster, DataTable, Grid, KpiCard, PageHeader, PageStack, StateMessage } from "../lib/ui/admin-ui";
-import { dashboardKpis, flagTone, sensitiveFeatureFlagKeys } from "../lib/ui/admin-view-models";
+import { AttentionList, Badge, Button, Card, Cluster, DataTable, Grid, PageHeader, PageStack, StateMessage, StatStrip } from "../lib/ui/admin-ui";
+import { dashboardAttention, dashboardStats, flagTone, sensitiveFeatureFlagKeys } from "../lib/ui/admin-view-models";
 
 const breadcrumb = [{ label: "Pilotage" }, { label: "Dashboard" }];
 
@@ -45,14 +45,16 @@ export default async function AdminDashboardPage() {
     <PageStack>
       <PageHeader
         breadcrumb={breadcrumb}
-        kicker="Back-office plateforme"
         title="Dashboard plateforme"
         description="Indicateurs internes operationnels et conformite. Les chiffres restent des signaux de pilotage et ne modifient aucune regle de routage."
         actions={<Button href="/reports/export" variant="secondary">Exporter le rapport plateforme (CSV)</Button>}
       />
-      <Grid columns="kpi" as="section" aria-label="Volumes de leads">
-        {dashboardKpis(data).map((kpi) => <KpiCard key={kpi.label} label={kpi.label} value={kpi.value} helper={kpi.helper} tone={kpi.tone} />)}
-      </Grid>
+      <section aria-label="Volumes de leads" className="bo-stack">
+        <Card title="À traiter" description="Les files qui attendent une décision, les plus urgentes en premier.">
+          <AttentionList items={dashboardAttention(data)} />
+        </Card>
+        <StatStrip items={dashboardStats(data)} label="Volumes et scope" />
+      </section>
       <Grid columns="two" as="section" aria-label="Raisons et repartition">
         <Card title="Raisons de non-routage">
           {data.nonRoutedReasons.length === 0 ? <StateMessage>Aucune raison enregistree dans la fenetre.</StateMessage> : (
@@ -106,12 +108,15 @@ export default async function AdminDashboardPage() {
         title="Alertes conformite"
         footer={<a href="/dashboard/compliance-alerts">Voir le detail des alertes</a>}
       >
-        <Grid columns="kpi">
-          <KpiCard label="Consentement absent" value={data.complianceAlertCounts.consentMissing} tone={data.complianceAlertCounts.consentMissing > 0 ? "danger" : "success"} />
-          <KpiCard label="CRM ferme" value={data.complianceAlertCounts.crmFlagClosed} tone={data.complianceAlertCounts.crmFlagClosed > 0 ? "warning" : "success"} />
-          <KpiCard label="RBAC refuses" value={data.complianceAlertCounts.rbacDenied} tone={data.complianceAlertCounts.rbacDenied > 0 ? "warning" : "success"} />
-          <KpiCard label="Tentatives inter-tenant" value={data.complianceAlertCounts.crossTenantAttempt} tone={data.complianceAlertCounts.crossTenantAttempt > 0 ? "danger" : "success"} />
-        </Grid>
+        <StatStrip
+          label="Alertes par categorie"
+          items={[
+            { label: "Consentement absent", value: data.complianceAlertCounts.consentMissing, tone: data.complianceAlertCounts.consentMissing > 0 ? "danger" : "success" },
+            { label: "CRM ferme", value: data.complianceAlertCounts.crmFlagClosed, tone: data.complianceAlertCounts.crmFlagClosed > 0 ? "warning" : "success" },
+            { label: "RBAC refuses", value: data.complianceAlertCounts.rbacDenied, tone: data.complianceAlertCounts.rbacDenied > 0 ? "warning" : "success" },
+            { label: "Tentatives inter-tenant", value: data.complianceAlertCounts.crossTenantAttempt, tone: data.complianceAlertCounts.crossTenantAttempt > 0 ? "danger" : "success" }
+          ]}
+        />
       </Card>
       <Card as="section" aria-label="Feature flags sensibles" title="Feature flags sensibles (lecture seule)">
         <Cluster>

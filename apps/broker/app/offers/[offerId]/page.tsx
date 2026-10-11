@@ -28,6 +28,7 @@ import {
   TenantWriteGuard
 } from "../../lib/ui/broker-ui";
 import type { DataTableColumn } from "../../lib/ui/broker-ui";
+import styles from "../../lib/ui/broker-screens.module.css";
 import {
   CompletenessChecklist,
   EditBrokerOfferForm,
@@ -74,7 +75,7 @@ function VersionDetails({ version }: { version: OfferVersionView }) {
 }
 
 const versionColumns: Array<DataTableColumn<OfferVersionView>> = [
-  { key: "number", header: "Version", render: (version) => `v${version.versionNumber}`, numeric: true },
+  { key: "number", header: "Version", render: (version) => <span className="bo-ref">{`v${version.versionNumber}`}</span>, numeric: true },
   { key: "status", header: "Statut", render: (version) => <StatusBadge status={version.status} labels={OFFER_VERSION_STATUS_LABELS} tones={OFFER_VERSION_STATUS_TONES} /> },
   { key: "author", header: "Auteur", render: (version) => (version.authorRole === "admin" ? "AssurMatch" : "Cabinet") },
   { key: "submitted", header: "Soumise le", render: (version) => offerFormatDate(version.submittedAt) },
@@ -92,7 +93,7 @@ export default async function BrokerOfferPage({ params, searchParams }: BrokerOf
   if (session.status !== "authenticated" || !canReadOffers(session.profile)) {
     return (
       <PageStack>
-        <PageHeader breadcrumb={breadcrumb} kicker="Offres" title="Acces refuse" description="La consultation des offres exige une session courtier authentifiee et la MFA verifiee." />
+        <PageHeader breadcrumb={breadcrumb} title="Acces refuse" description="La consultation des offres exige une session courtier authentifiee et la MFA verifiee." />
       </PageStack>
     );
   }
@@ -106,8 +107,12 @@ export default async function BrokerOfferPage({ params, searchParams }: BrokerOf
   if (!offer) {
     return (
       <PageStack>
-        <PageHeader breadcrumb={breadcrumb} kicker="Offres" title="Offre introuvable" description="Cette offre n'existe pas ou n'appartient pas à votre cabinet." />
-        <Button href="/offers" variant="secondary">Retour à mes offres</Button>
+        <PageHeader
+          breadcrumb={breadcrumb}
+          title="Offre introuvable"
+          description="Cette offre n'existe pas ou n'appartient pas à votre cabinet."
+          actions={<Button href="/offers" variant="secondary">Retour à mes offres</Button>}
+        />
       </PageStack>
     );
   }
@@ -123,11 +128,11 @@ export default async function BrokerOfferPage({ params, searchParams }: BrokerOf
     <PageStack>
       <PageHeader
         breadcrumb={[{ label: "Activite" }, { label: "Mes offres", href: "/offers" }, { label: offerDisplayName(offer) }]}
-        kicker={offer.offerType === "partner" ? "Offre partenaire" : "Offre indicative"}
         title={offerDisplayName(offer)}
         description={`${scope ? `${scope.countryLabel} · ${scope.productLabel}` : OFFER_SCOPE_OUTSIDE_COVERAGE}. Offre indicative : prix à confirmer par le courtier partenaire.`}
         actions={
           <Cluster>
+            <Badge tone="neutral">{offer.offerType === "partner" ? "Offre partenaire" : "Offre indicative"}</Badge>
             <StatusBadge status={offer.status} labels={OFFER_STATUS_LABELS} tones={OFFER_STATUS_TONES} />
             {offer.expiringSoon && !expired ? <Badge tone="warning">{`Expire dans ${offer.expiresInDays ?? 0} jours`}</Badge> : null}
             {offer.isSponsored ? <Badge tone="warning">Sponsorisé</Badge> : null}
@@ -143,7 +148,7 @@ export default async function BrokerOfferPage({ params, searchParams }: BrokerOf
 
       <Grid columns="two">
         <Card title="Version publiée" description="Visible du public tant qu'aucune nouvelle version n'est validée. Lecture seule.">
-          {published ? <VersionDetails version={published} /> : <p>Aucune version publiée.</p>}
+          {published ? <VersionDetails version={published} /> : <p className={styles.muted}>Aucune version publiée : l&apos;offre n&apos;est pas encore visible du public.</p>}
         </Card>
         <Card
           title="Version en cours"
@@ -154,7 +159,7 @@ export default async function BrokerOfferPage({ params, searchParams }: BrokerOf
               <VersionDetails version={pending} />
               <CompletenessChecklist completeness={pending.completeness} />
             </>
-          ) : <p>Aucune version en cours.</p>}
+          ) : <p className={styles.muted}>{writer && !withdrawn ? "Aucune version en cours. Modifiez l'offre ci-dessous pour en créer une." : "Aucune version en cours."}</p>}
         </Card>
       </Grid>
 

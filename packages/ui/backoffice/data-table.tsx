@@ -30,6 +30,9 @@ export interface TablePagination {
   hrefFor: (page: number) => string;
   /** Surface wording for "x to y of z"; the package ships no French default sentence. */
   label?: ((from: number, to: number, total: number) => string) | undefined;
+  /** Accessible names of the two icon-only links; default to French wording. */
+  previousLabel?: string | undefined;
+  nextLabel?: string | undefined;
 }
 
 export interface DataTableProps<T> {
@@ -154,7 +157,7 @@ export function DataTable<T>(props: DataTableProps<T>) {
 }
 
 function TableFooter({ pagination }: { pagination: TablePagination }) {
-  const { page, pageSize, total, hrefFor, label } = pagination;
+  const { page, pageSize, total, hrefFor, label, previousLabel = "Page précédente", nextLabel = "Page suivante" } = pagination;
   const lastPage = Math.max(1, Math.ceil(total / Math.max(1, pageSize)));
   const from = total === 0 ? 0 : (page - 1) * pageSize + 1;
   const to = Math.min(total, page * pageSize);
@@ -167,7 +170,8 @@ function TableFooter({ pagination }: { pagination: TablePagination }) {
           className="bo-button"
           data-variant="secondary"
           data-size="sm"
-          href={hrefFor(Math.max(1, page - 1))}
+          href={page <= 1 ? undefined : hrefFor(page - 1)}
+          aria-label={previousLabel}
           aria-disabled={page <= 1 ? true : undefined}
         >
           <Icon name="chevronLeft" size={16} />
@@ -177,7 +181,8 @@ function TableFooter({ pagination }: { pagination: TablePagination }) {
           className="bo-button"
           data-variant="secondary"
           data-size="sm"
-          href={hrefFor(Math.min(lastPage, page + 1))}
+          href={page >= lastPage ? undefined : hrefFor(page + 1)}
+          aria-label={nextLabel}
           aria-disabled={page >= lastPage ? true : undefined}
         >
           <Icon name="chevronRight" size={16} />

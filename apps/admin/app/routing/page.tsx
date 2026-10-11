@@ -3,10 +3,10 @@ import {
   Card,
   DataTable,
   Grid,
-  KpiCard,
   PageHeader,
   PageStack,
   StateMessage,
+  StatStrip,
   StatusBadge,
   ruleStatusTones
 } from "../lib/ui/admin-ui";
@@ -33,10 +33,10 @@ export default async function RoutingPage() {
     <PageStack>
       <PageHeader
         breadcrumb={[{ label: "Catalogue" }, { label: "Routage" }]}
-        kicker="Routage des leads"
         title="Regles de routage"
-        description="Regles configurables et auditees par pays/produit. Chaque mode classe uniquement des courtiers partenaires deja juges eligibles: licence valide, autorisations pays/produit, capacite et quota mensuel."
+        description="Regles auditees par pays et produit. Chaque mode classe uniquement des courtiers partenaires deja juges eligibles: licence valide, autorisations pays/produit, capacite et quota mensuel."
       />
+      <StateMessage>Le mode multi-envoi ne s'applique que si le flag est ouvert et si le visiteur l'accepte: sinon la demande part a un seul courtier partenaire, avec un motif audite. Le routage assiste par IA n'est pas propose: l'IA ne decide jamais de l'eligibilite.</StateMessage>
 
       {unauthenticated ? <StateMessage tone="danger">Session admin requise.</StateMessage> : null}
       {forbidden ? <StateMessage tone="danger">Acces routage refuse pour ce role admin.</StateMessage> : null}
@@ -44,22 +44,25 @@ export default async function RoutingPage() {
 
       {rules.status === "success" ? (
         <>
-          <Grid columns="kpi" as="section" aria-label="Synthese routage">
-            <KpiCard label="Regles actives" value={activeRules.length} tone="success" />
-            <KpiCard label="Regles desactivees" value={rules.data.total - activeRules.length} tone="disabled" />
-            <KpiCard label="Demandes en attente d'assignation" value={pending.status === "success" ? pending.data.total : "-"} tone={pending.data.total > 0 ? "warning" : "neutral"} />
-          </Grid>
+          <StatStrip
+            label="Synthese routage"
+            items={[
+              { label: "Regles actives", value: activeRules.length, tone: "success" },
+              { label: "Regles desactivees", value: rules.data.total - activeRules.length, tone: "disabled" },
+              { label: "Demandes en attente d'assignation", value: pending.status === "success" ? pending.data.total : "-", tone: pending.data.total > 0 ? "warning" : "neutral", href: "#assignation-manuelle" }
+            ]}
+          />
 
           <Card title="Regles">
             <DataTable
               columns={[
-                { key: "country", header: "Pays", render: (rule) => <code>{rule.countryId.slice(0, 8)}</code> },
-                { key: "product", header: "Produit", render: (rule) => (rule.productId ? <code>{rule.productId.slice(0, 8)}</code> : "Tous") },
+                { key: "country", header: "Pays", render: (rule) => <span className="bo-ref">{rule.countryId.slice(0, 8)}</span> },
+                { key: "product", header: "Produit", render: (rule) => (rule.productId ? <span className="bo-ref">{rule.productId.slice(0, 8)}</span> : "Tous") },
                 { key: "mode", header: "Mode", render: (rule) => modeLabels[rule.mode] },
                 { key: "status", header: "Statut", render: (rule) => <StatusBadge status={rule.status} tones={ruleStatusTones} /> },
                 { key: "version", header: "Version", render: (rule) => rule.version, numeric: true, align: "right" },
                 { key: "parameters", header: "Parametres", render: (rule) => rule.mode === "priority" ? `${rule.priorities.length} priorite(s)` : rule.mode === "exclusive" ? `exclusif ${rule.exclusivePartnerTenantId?.slice(0, 8) ?? "-"}` : rule.mode === "multi_send" ? `jusqu'a ${rule.maxRecipients} courtiers, si le visiteur l'accepte` : rule.description ?? "-" },
-                { key: "id", header: "Identifiant", render: (rule) => <code>{rule.id}</code> }
+                { key: "id", header: "Identifiant", render: (rule) => <span className="bo-ref">{rule.id}</span> }
               ]}
               items={rules.data.items}
               getKey={(rule) => rule.id}
@@ -73,6 +76,7 @@ export default async function RoutingPage() {
             <UpdateRoutingRuleForm ruleIds={rules.data.items.map((rule) => rule.id)} />
           </Grid>
 
+          <div id="assignation-manuelle">
           <Card
             title="Assignation manuelle"
             description="Demandes consenties parquees par une regle en mode manuel. Seuls les courtiers partenaires eligibles sont proposes; l'assignation est auditee et notifie le courtier."
@@ -80,7 +84,7 @@ export default async function RoutingPage() {
             {pending.status === "forbidden" ? <StateMessage tone="warning">File d'assignation non accessible pour ce role.</StateMessage> : null}
             <DataTable
               columns={[
-                { key: "reference", header: "Reference", render: (quote) => <code>{quote.publicReference}</code> },
+                { key: "reference", header: "Reference", render: (quote) => <span className="bo-ref">{quote.publicReference}</span> },
                 { key: "scope", header: "Scope", render: (quote) => `${quote.countryCode} / ${quote.productKey}` },
                 { key: "createdAt", header: "Recue le", render: (quote) => new Date(quote.createdAt).toISOString().slice(0, 16).replace("T", " ") },
                 { key: "candidates", header: "Candidats eligibles", render: (quote) => `${quote.candidates.filter((candidate) => candidate.eligible).length} / ${quote.candidates.length}` },
@@ -92,10 +96,9 @@ export default async function RoutingPage() {
               aria-label="Demandes en attente d'assignation manuelle"
             />
           </Card>
+          </div>
 
           <ReassignLeadForm />
-
-          <StateMessage>Le mode multi-envoi ne s'applique que si le flag est ouvert et si le visiteur l'accepte: sinon la demande part a un seul courtier partenaire, avec un motif audite. Le routage assiste par IA n'est pas propose: l'IA ne decide jamais de l'eligibilite.</StateMessage>
         </>
       ) : null}
     </PageStack>

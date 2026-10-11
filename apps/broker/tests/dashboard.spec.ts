@@ -17,7 +17,7 @@ test("broker home page consumes readBrokerDashboard and renders refusal/empty st
   expect(home).toContain("readBrokerDashboard");
   expect(home).toContain("Acces dashboard refuse");
   expect(home).toContain("Alertes licence");
-  expect(home).toContain("dashboardKpis");
+  expect(home).toContain("dashboardStats");
 });
 
 test("broker CRM page consumes readBrokerDashboard and gates the CRM section", () => {

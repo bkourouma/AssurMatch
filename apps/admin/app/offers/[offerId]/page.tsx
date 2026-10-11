@@ -120,7 +120,7 @@ export default async function AdminOfferPage({ params, searchParams }: OfferPage
   if (!offer) {
     return (
       <PageStack>
-        <PageHeader breadcrumb={breadcrumb} kicker="Catalogue" title="Offre introuvable" />
+        <PageHeader breadcrumb={breadcrumb} title="Offre introuvable" />
         <StateMessage tone="danger">{adminReadErrorMessage(offerResult.forbidden ? "access_denied" : offerResult.error ?? "api_404")}</StateMessage>
       </PageStack>
     );
@@ -139,11 +139,11 @@ export default async function AdminOfferPage({ params, searchParams }: OfferPage
     <PageStack>
       <PageHeader
         breadcrumb={breadcrumb}
-        kicker={OFFER_TYPE_LABELS[offer.offerType] ?? "Offre indicative"}
         title={offerTitle(offer)}
         description={`${offer.partnerName ?? "Aucun courtier rattaché"} · ${country ? `${country.name} (${country.isoCode})` : "Pays inconnu"} · ${product?.name ?? "Produit inconnu"}. Offre indicative : prix à confirmer par le courtier partenaire.`}
         actions={
           <Cluster>
+            <Badge tone="neutral">{OFFER_TYPE_LABELS[offer.offerType] ?? "Offre indicative"}</Badge>
             <StatusBadge status={offer.status} labels={OFFER_STATUS_LABELS} tones={OFFER_STATUS_TONES} />
             {offer.isSponsored ? <Badge tone="warning">Sponsorisé</Badge> : null}
             {offer.expiringSoon ? <Badge tone="warning">{`Expire dans ${offer.expiresInDays ?? 0} j`}</Badge> : null}
@@ -166,7 +166,7 @@ export default async function AdminOfferPage({ params, searchParams }: OfferPage
 
       <Grid columns="two">
         <Card title="Version publiée" description="Seule cette version est visible du public.">
-          {published ? <VersionSummary version={published} /> : <p>Aucune version publiée.</p>}
+          {published ? <VersionSummary version={published} /> : <p className="bo-description">Aucune version publiée.</p>}
         </Card>
         <Card title="Version en cours" description="Brouillon ou version soumise ; elle ne change rien au public avant validation.">
           {pending ? (
@@ -174,7 +174,7 @@ export default async function AdminOfferPage({ params, searchParams }: OfferPage
               <VersionSummary version={pending} />
               <CompletenessChecklist completeness={pending.completeness} />
             </>
-          ) : <p>Aucune version en cours.</p>}
+          ) : <p className="bo-description">Aucune version en cours.</p>}
         </Card>
       </Grid>
 

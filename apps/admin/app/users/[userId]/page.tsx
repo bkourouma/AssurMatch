@@ -8,6 +8,7 @@ import {
   Button,
   Card,
   CheckboxGroup,
+  Cluster,
   ConfirmDialog,
   DescriptionList,
   Field,
@@ -18,9 +19,12 @@ import {
   PageStack,
   StateMessage,
   Stack,
+  StatusBadge,
   Tabs,
   Textarea,
-  fieldControlProps
+  fieldControlProps,
+  mfaStatusTones,
+  userStatusTones
 } from "../../lib/ui/admin-ui";
 
 interface UserDetailPageProps {
@@ -74,10 +78,15 @@ export default async function UserDetailPage({ params, searchParams }: UserDetai
     <PageStack>
       <PageHeader
         breadcrumb={[{ label: "Plateforme" }, { label: "Utilisateurs", href: "/users" }, { label: user.displayName }]}
-        kicker="Detail utilisateur"
         title={user.displayName}
         description={user.email}
-        actions={<Button href="/users" variant="secondary">Retour liste</Button>}
+        actions={
+          <Cluster>
+            <StatusBadge status={user.status} tones={userStatusTones} />
+            <StatusBadge status={user.mfaStatus} tones={mfaStatusTones} />
+            <Button href="/users" variant="secondary">Retour liste</Button>
+          </Cluster>
+        }
       />
 
       {notice ? <StateMessage>Action terminee: {notice}.</StateMessage> : null}
@@ -88,10 +97,10 @@ export default async function UserDetailPage({ params, searchParams }: UserDetai
         <DescriptionList
           columns={2}
           items={[
-            { term: "Statut", value: user.status },
-            { term: "MFA", value: user.mfaStatus },
+            { term: "Statut", value: <StatusBadge status={user.status} tones={userStatusTones} /> },
+            { term: "MFA", value: <StatusBadge status={user.mfaStatus} tones={mfaStatusTones} /> },
             { term: "Echecs login", value: String(user.failedLoginCount ?? 0) },
-            { term: "Tenant", value: user.partnerTenantId ?? "-" }
+            { term: "Tenant", value: user.partnerTenantId ? <code className="bo-break">{user.partnerTenantId}</code> : "-" }
           ]}
         />
       </Card>

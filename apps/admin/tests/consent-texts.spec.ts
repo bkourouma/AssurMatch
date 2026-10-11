@@ -53,7 +53,8 @@ test("the detail screen shows hash, preview and supersession, and publication go
   expect(detail).toContain("canApprovePublicActivation(session.profile.roles)");
   expect(forms).toContain("ConfirmDialog");
   expect(forms).toContain("data-consent-form\": \"publish\"");
-  expect(forms).toContain("data-consent-form=\"retire\"");
+  // Retiring a text is irreversible, so it now goes through the confirmation dialog like publishing.
+  expect(forms).toContain("data-consent-form\": \"retire\"");
 });
 
 test("a refused publication lists the failing consent controls in French", () => {

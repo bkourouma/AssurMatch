@@ -1,4 +1,4 @@
-import type { Tone } from "./broker-ui";
+import type { AttentionItem, StatItem, Tone } from "./broker-ui";
 import type { BrokerDashboardData } from "../broker-api";
 
 export interface KpiViewModel {
@@ -38,17 +38,6 @@ export function statusTone(status: string): Tone {
   return "neutral";
 }
 
-export function dashboardKpis(data: BrokerDashboardData): KpiViewModel[] {
-  const starter = data.starter;
-  return [
-    { label: "Leads recus", value: starter.received, helper: "Leads visibles pour ce tenant", tone: "info" },
-    { label: "Acceptes", value: starter.accepted, helper: "Actions courtier historisees", tone: "success" },
-    { label: "Rejetes", value: starter.rejected, helper: "Avec motif lorsque requis", tone: "danger" },
-    { label: "Contestes", value: starter.disputed, helper: "Traitement selon workflow existant", tone: "warning" },
-    { label: "En attente", value: starter.pendingAction, helper: "Leads sans action recente", tone: "neutral" }
-  ];
-}
-
 export function crmKpis(data: BrokerDashboardData): KpiViewModel[] {
   const crm = data.crm;
   if (!crm) return [
@@ -56,10 +45,10 @@ export function crmKpis(data: BrokerDashboardData): KpiViewModel[] {
   ];
 
   return [
-    { label: "Taches a venir", value: crm.upcomingTasks, helper: "Activites CRM existantes", tone: "info" },
-    { label: "Rappels a venir", value: crm.upcomingReminders, helper: "Relances configurees", tone: "warning" },
+    { label: "Taches a venir", value: crm.upcomingTasks, helper: "Activites CRM existantes", tone: crm.upcomingTasks > 0 ? "info" : "neutral" },
+    { label: "Rappels a venir", value: crm.upcomingReminders, helper: "Relances configurees", tone: crm.upcomingReminders > 0 ? "warning" : "neutral" },
     { label: "Statuts pipeline", value: crm.pipeline.length, helper: "Groupes visibles selon permissions", tone: "neutral" },
-    { label: "Produits suivis", value: crm.conversionByProduct.length, helper: "Conversions indicatives internes", tone: "success" }
+    { label: "Produits suivis", value: crm.conversionByProduct.length, helper: "Conversions indicatives internes", tone: "neutral" }
   ];
 }
 
@@ -79,4 +68,49 @@ export function leadSummary(lead: Record<string, unknown>): LeadSummaryViewModel
     urgency: lead.urgency ? String(lead.urgency) : undefined,
     source: lead.source ? String(lead.source) : undefined
   };
+}
+
+/** What a broker should open first: leads waiting for an action, then disputed ones. */
+export function dashboardAttention(data: BrokerDashboardData): AttentionItem[] {
+  const starter = data.starter;
+  return [
+    {
+      label: "Leads en attente d'action",
+      helper: "Aucune action récente du courtier",
+      count: starter.pendingAction,
+      tone: starter.pendingAction > 0 ? "warning" : "neutral",
+      quiet: starter.pendingAction === 0,
+      href: "/leads",
+      actionLabel: "Ouvrir les leads"
+    },
+    {
+      label: "Leads contestés",
+      helper: "Traitement selon le workflow existant",
+      count: starter.disputed,
+      tone: starter.disputed > 0 ? "danger" : "neutral",
+      quiet: starter.disputed === 0,
+      href: "/leads",
+      actionLabel: "Ouvrir les leads"
+    },
+    {
+      label: "Alertes licence",
+      helper: "Licences expirées ou proches de l'expiration",
+      count: data.licenseAlerts.length,
+      tone: data.licenseAlerts.length > 0 ? "danger" : "neutral",
+      quiet: data.licenseAlerts.length === 0,
+      href: "/licenses",
+      actionLabel: "Ouvrir les licences"
+    }
+  ];
+}
+
+export function dashboardStats(data: BrokerDashboardData): StatItem[] {
+  const starter = data.starter;
+  return [
+    { label: "Leads reçus", value: starter.received, helper: "Visibles pour ce tenant", tone: "info" },
+    { label: "Acceptés", value: starter.accepted, helper: "Actions historisées", tone: "success" },
+    { label: "Rejetés", value: starter.rejected, helper: "Avec motif lorsque requis", tone: starter.rejected > 0 ? "danger" : "neutral" },
+    { label: "Contestés", value: starter.disputed, helper: "Selon le workflow existant", tone: starter.disputed > 0 ? "warning" : "neutral" },
+    { label: "En attente", value: starter.pendingAction, helper: "Sans action récente", tone: starter.pendingAction > 0 ? "warning" : "neutral" }
+  ];
 }

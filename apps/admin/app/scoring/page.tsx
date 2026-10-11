@@ -3,10 +3,10 @@ import {
   Card,
   DataTable,
   Grid,
-  KpiCard,
   PageHeader,
   PageStack,
   StateMessage,
+  StatStrip,
   StatusBadge,
   offerStatusTones,
   ruleStatusTones
@@ -28,9 +28,8 @@ export default async function ScoringPage() {
     <PageStack>
       <PageHeader
         breadcrumb={[{ label: "Catalogue" }, { label: "Scoring" }]}
-        kicker="Comparateur public"
         title="Score indicatif et offres"
-        description="Ponderation configurable et auditee du score indicatif (PRD §15). Le score est explicable ligne par ligne et ne designe jamais une meilleure offre; la sponsorisation reste signalee."
+        description="Ponderation auditee du score indicatif (PRD §15). Le score est explicable ligne par ligne et ne designe jamais une meilleure offre; la sponsorisation reste signalee."
       />
 
       {rules.unauthenticated ? <StateMessage tone="danger">Session admin requise.</StateMessage> : null}
@@ -39,21 +38,24 @@ export default async function ScoringPage() {
 
       {rules.status === "success" ? (
         <>
-          <Grid columns="kpi" as="section" aria-label="Synthese scoring">
-            <KpiCard label="Regles actives" value={rules.data.items.filter((rule) => rule.status === "active").length} tone="success" />
-            <KpiCard label="Poids par defaut" value="30/25/15/10/10/5/5" helper="garantie / prix / franchise / delai / paiement / infos / preferences" />
-            <KpiCard label="Offres en catalogue" value={offers.status === "success" ? offers.data.length : "-"} tone="info" />
-          </Grid>
+          <StatStrip
+            label="Synthese scoring"
+            items={[
+              { label: "Regles actives", value: rules.data.items.filter((rule) => rule.status === "active").length, tone: "success" },
+              { label: "Poids par defaut", value: "30/25/15/10/10/5/5", helper: "garantie / prix / franchise / delai / paiement / infos / preferences" },
+              { label: "Offres en catalogue", value: offers.status === "success" ? offers.data.length : "-", href: "/offers" }
+            ]}
+          />
 
           <Card title="Regles de scoring">
             <DataTable
               columns={[
-                { key: "country", header: "Pays", render: (rule) => (rule.countryId ? <code>{rule.countryId.slice(0, 8)}</code> : "Tous") },
-                { key: "product", header: "Produit", render: (rule) => (rule.productId ? <code>{rule.productId.slice(0, 8)}</code> : "Tous") },
+                { key: "country", header: "Pays", render: (rule) => (rule.countryId ? <span className="bo-ref">{rule.countryId.slice(0, 8)}</span> : "Tous") },
+                { key: "product", header: "Produit", render: (rule) => (rule.productId ? <span className="bo-ref">{rule.productId.slice(0, 8)}</span> : "Tous") },
                 { key: "weights", header: "Poids", render: (rule) => weightsLabel(rule.weights) },
                 { key: "status", header: "Statut", render: (rule) => <StatusBadge status={rule.status} tones={ruleStatusTones} /> },
                 { key: "version", header: "Version", render: (rule) => rule.version, numeric: true, align: "right" },
-                { key: "id", header: "Identifiant", render: (rule) => <code>{rule.id}</code> }
+                { key: "id", header: "Identifiant", render: (rule) => <span className="bo-ref">{rule.id}</span> }
               ]}
               items={rules.data.items}
               getKey={(rule) => rule.id}
@@ -87,9 +89,8 @@ export default async function ScoringPage() {
               emptyLabel="Aucune offre en catalogue."
               aria-label="Offres indicatives"
             />
+            <p className="bo-description">Les criteres detailles des offres (garanties, franchise, plafond, delai, assureur) sont saisis via l'API admin des offres; ils alimentent les filtres et le score indicatif du comparateur public.</p>
           </Card>
-
-          <StateMessage>Les criteres detailles des offres (garanties, franchise, plafond, delai, assureur) sont saisis via l'API admin des offres; ils alimentent les filtres et le score indicatif du comparateur public.</StateMessage>
         </>
       ) : null}
     </PageStack>

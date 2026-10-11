@@ -18,7 +18,6 @@ export default async function MfaPage({ searchParams }: PageProps) {
   if (session.status === "authenticated") redirect(returnTo);
   return (
     <>
-      <p className="bo-kicker">Verification forte</p>
       <h1 className="bo-auth__title">MFA requise</h1>
       <MfaPanel returnTo={returnTo} />
     </>

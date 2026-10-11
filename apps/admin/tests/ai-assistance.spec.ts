@@ -31,8 +31,8 @@ test("broker CRM page surfaces the computed AI assistance status and the partner
   expect(api).toContain("readBrokerAIAssistance");
   expect(api).toContain("/broker/crm/ai-assistance");
   expect(page).toContain("Assistance IA");
-  expect(page).toContain("enabled: {String(aiAssistance.data.enabled)}");
-  expect(page).toContain("modelCall: {String(aiAssistance.data.modelCall)}");
+  expect(page).toContain("aiAssistance.data.enabled ? \"Activee\" : \"Desactivee\"");
+  expect(page).toContain("aiAssistance.data.modelCall ? \"Oui\" : \"Non\"");
   expect(page).toContain("validation humaine obligatoire");
 });
 

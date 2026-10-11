@@ -6,7 +6,6 @@ import { CreateUserForm } from "./user-action-forms";
 import { adminRoleOptions, userStatusOptions } from "./user-options";
 import {
   Button,
-  Card,
   DataTable,
   Field,
   FilterBar,
@@ -14,8 +13,6 @@ import {
   PageHeader,
   PageStack,
   Select,
-  Split,
-  Stack,
   StateMessage,
   StatusBadge,
   fieldControlProps,
@@ -52,9 +49,9 @@ const columns: Array<DataTableColumn<AdminUser>> = [
     header: "Utilisateur",
     render: (user) => (
       <>
-        <strong>{user.displayName}</strong>
-        <div>{user.email}</div>
-        {user.partnerTenantId ? <div>Tenant {user.partnerTenantId}</div> : null}
+        <a href={`/users/${encodeURIComponent(user.id)}`}><strong>{user.displayName}</strong></a>
+        <div className="bo-description">{user.email}</div>
+        {user.partnerTenantId ? <div className="bo-description">Tenant <span className="bo-ref">{user.partnerTenantId}</span></div> : null}
       </>
     ),
     sortable: true,
@@ -70,7 +67,7 @@ const columns: Array<DataTableColumn<AdminUser>> = [
     sortable: true,
     sortValue: (user) => user.lastLoginAt ?? null
   },
-  { key: "detail", header: "Detail", render: (user) => <a href={`/users/${encodeURIComponent(user.id)}`}>Ouvrir</a> }
+  { key: "detail", header: "", align: "right", render: (user) => <Button href={`/users/${encodeURIComponent(user.id)}`} size="sm" variant="tertiary">Ouvrir</Button> }
 ];
 
 export default async function UserManagementPage({ searchParams }: UsersPageProps) {
@@ -109,68 +106,62 @@ export default async function UserManagementPage({ searchParams }: UsersPageProp
     <PageStack>
       <PageHeader
         breadcrumb={[{ label: "Plateforme" }, { label: "Utilisateurs" }]}
-        kicker="Back-office plateforme"
         title="Utilisateurs et roles"
-        description="Gestion persistee des comptes, roles, scopes, statuts, MFA et actions sensibles. Les changements sont valides et audites cote API."
-        actions={<Button href="/" variant="secondary">Retour admin</Button>}
+        description="Comptes, roles, scopes, statuts et MFA. Chaque changement est valide et audite cote API."
+        actions={<Button href="#creer-utilisateur">Creer un utilisateur</Button>}
       />
 
       {notice ? <StateMessage>Action terminee: {notice}.</StateMessage> : null}
       {users.forbidden ? <StateMessage tone="danger">Acces refuse: votre role ne permet pas de lire les utilisateurs.</StateMessage> : null}
       {users.status === "error" ? <StateMessage tone="danger">Liste indisponible: {users.error}.</StateMessage> : null}
 
-      <Split>
-        <Stack>
-          <Card>
-            <FilterBar
-              action="/users"
-              label="Filtres utilisateurs"
-              submitLabel="Filtrer"
-              resetLabel="Reinitialiser"
-              resetHref="/users"
-              activeCount={activeFilters}
-              autoSubmit
-            >
-              <Field id="users-search" label="Recherche">
-                <Input {...fieldControlProps("users-search")} name="search" defaultValue={search} placeholder="Email, nom, tenant, role" />
-              </Field>
-              <Field id="users-status" label="Statut">
-                <Select {...fieldControlProps("users-status")} name="status" defaultValue={status}>
-                  <option value="">Tous</option>
-                  {userStatusOptions.map((option) => <option key={option} value={option}>{option}</option>)}
-                </Select>
-              </Field>
-              <Field id="users-role" label="Role">
-                <Select {...fieldControlProps("users-role")} name="role" defaultValue={role}>
-                  <option value="">Tous</option>
-                  {adminRoleOptions.map((option) => <option key={option} value={option}>{option}</option>)}
-                </Select>
-              </Field>
-            </FilterBar>
-          </Card>
+      <FilterBar
+        action="/users"
+        label="Filtres utilisateurs"
+        submitLabel="Filtrer"
+        resetLabel="Reinitialiser"
+        resetHref="/users"
+        activeCount={activeFilters}
+        autoSubmit
+      >
+        <Field id="users-search" label="Recherche">
+          <Input {...fieldControlProps("users-search")} name="search" defaultValue={search} placeholder="Email, nom, tenant, role" />
+        </Field>
+        <Field id="users-status" label="Statut">
+          <Select {...fieldControlProps("users-status")} name="status" defaultValue={status}>
+            <option value="">Tous</option>
+            {userStatusOptions.map((option) => <option key={option} value={option}>{option}</option>)}
+          </Select>
+        </Field>
+        <Field id="users-role" label="Role">
+          <Select {...fieldControlProps("users-role")} name="role" defaultValue={role}>
+            <option value="">Tous</option>
+            {adminRoleOptions.map((option) => <option key={option} value={option}>{option}</option>)}
+          </Select>
+        </Field>
+      </FilterBar>
 
-          <Card as="section" aria-label="Liste utilisateurs">
-            <DataTable
-              columns={columns}
-              items={rows}
-              getKey={(user) => user.id}
-              emptyLabel="Aucun utilisateur pour ces filtres."
-              aria-label="Liste utilisateurs"
-              sort={table.sort}
-              sortHref={table.sortHref}
-              pagination={{
-                page: table.page,
-                pageSize: table.pageSize,
-                total: filtered.length,
-                hrefFor: table.pageHref,
-                label: (from, to, total) => `${from}-${to} sur ${total} utilisateurs`
-              }}
-            />
-          </Card>
-        </Stack>
+      <DataTable
+        columns={columns}
+        items={rows}
+        getKey={(user) => user.id}
+        emptyLabel="Aucun utilisateur pour ces filtres."
+        emptyDescription={activeFilters > 0 ? "Reinitialisez les filtres pour revoir tous les comptes." : "Creez le premier compte avec le formulaire ci-dessous."}
+        aria-label="Liste utilisateurs"
+        sort={table.sort}
+        sortHref={table.sortHref}
+        pagination={{
+          page: table.page,
+          pageSize: table.pageSize,
+          total: filtered.length,
+          hrefFor: table.pageHref,
+          label: (from, to, total) => `${from}-${to} sur ${total} utilisateurs`
+        }}
+      />
 
+      <div id="creer-utilisateur">
         <CreateUserForm partners={partnerChoices} />
-      </Split>
+      </div>
     </PageStack>
   );
 }

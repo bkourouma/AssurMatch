@@ -17,7 +17,8 @@ import {
 } from "../lib/catalog-messages";
 import {
   Badge,
-  Card,
+  Button,
+  Cluster,
   DataTable,
   Field,
   FilterBar,
@@ -75,7 +76,7 @@ export default async function ConsentTextsPage({
     {
       key: "version",
       header: "Version",
-      render: (text) => <a href={`/consent-texts/${encodeURIComponent(text.id)}`}><strong>{text.version}</strong></a>,
+      render: (text) => <a className="bo-ref" href={`/consent-texts/${encodeURIComponent(text.id)}`}>{text.version}</a>,
       sortable: true,
       sortValue: (text) => text.version
     },
@@ -87,16 +88,16 @@ export default async function ConsentTextsPage({
       key: "status",
       header: "Statut",
       render: (text) => (
-        <>
+        <Cluster>
           <StatusBadge status={text.status} tones={consentTextStatusTones} />
           {text.supersededBy ? <Badge tone="warning">Remplacé</Badge> : null}
           {!text.content ? <Badge tone="danger">Sans contenu</Badge> : null}
-        </>
+        </Cluster>
       ),
       sortable: true,
       sortValue: (text) => text.status
     },
-    { key: "hash", header: "Empreinte", render: (text) => <code>{text.contentHash.slice(0, 12)}</code> },
+    { key: "hash", header: "Empreinte", render: (text) => <span className="bo-ref">{text.contentHash.slice(0, 12)}</span> },
     { key: "publishedAt", header: "Publié le", render: (text) => formatDate(text.publishedAt), sortable: true, sortValue: (text) => text.publishedAt ?? null }
   ];
 
@@ -107,9 +108,9 @@ export default async function ConsentTextsPage({
     <PageStack>
       <PageHeader
         breadcrumb={[{ label: "Catalogue", href: "/catalog" }, { label: "Consentements" }]}
-        kicker="Conformité"
         title="Textes de consentement"
         description="Textes versionnés par finalité, pays, produit et langue. L'empreinte est calculée par le serveur à partir du contenu ; un texte publié est immuable."
+        actions={texts.status === "success" ? <Button href="#creer-texte">Créer un texte</Button> : null}
       />
 
       {texts.forbidden ? (
@@ -118,68 +119,68 @@ export default async function ConsentTextsPage({
       {texts.status === "error" ? <StateMessage tone="danger">{adminReadErrorMessage(texts.error)}</StateMessage> : null}
 
       {texts.status === "success" ? (
-        <Card title="Versions">
-          <FilterBar
-            action="/consent-texts"
-            label="Filtres textes de consentement"
-            submitLabel="Filtrer"
-            resetLabel="Reinitialiser"
-            resetHref="/consent-texts"
-            activeCount={activeCount}
-            autoSubmit
-          >
-            <Field id="consent-country" label="Pays">
-              <Select {...fieldControlProps("consent-country")} name="countryId" defaultValue={filters.countryId}>
-                <option value="">Tous</option>
-                {countryChoices.map((choice) => <option key={choice.value} value={choice.value}>{choice.label}</option>)}
-              </Select>
-            </Field>
-            <Field id="consent-product" label="Produit">
-              <Select {...fieldControlProps("consent-product")} name="productId" defaultValue={filters.productId}>
-                <option value="">Tous</option>
-                {productChoices.map((choice) => <option key={choice.value} value={choice.value}>{choice.label}</option>)}
-              </Select>
-            </Field>
-            <Field id="consent-purpose" label="Finalité">
-              <Select {...fieldControlProps("consent-purpose")} name="purpose" defaultValue={filters.purpose}>
-                <option value="">Toutes</option>
-                {CONSENT_PURPOSE_OPTIONS.map((option) => <option key={option} value={option}>{option}</option>)}
-              </Select>
-            </Field>
-            <Field id="consent-language" label="Langue">
-              <Select {...fieldControlProps("consent-language")} name="language" defaultValue={filters.language}>
-                <option value="">Toutes</option>
-                {LANGUAGE_OPTIONS.map((option) => <option key={option} value={option}>{option}</option>)}
-              </Select>
-            </Field>
-            <Field id="consent-status" label="Statut">
-              <Select {...fieldControlProps("consent-status")} name="status" defaultValue={filters.status}>
-                <option value="">Tous</option>
-                {CONSENT_STATUS_OPTIONS.map((option) => <option key={option} value={option}>{option}</option>)}
-              </Select>
-            </Field>
-          </FilterBar>
+        <>
+        <FilterBar
+          action="/consent-texts"
+          label="Filtres textes de consentement"
+          submitLabel="Filtrer"
+          resetLabel="Reinitialiser"
+          resetHref="/consent-texts"
+          activeCount={activeCount}
+          autoSubmit
+        >
+          <Field id="consent-country" label="Pays">
+            <Select {...fieldControlProps("consent-country")} name="countryId" defaultValue={filters.countryId}>
+              <option value="">Tous</option>
+              {countryChoices.map((choice) => <option key={choice.value} value={choice.value}>{choice.label}</option>)}
+            </Select>
+          </Field>
+          <Field id="consent-product" label="Produit">
+            <Select {...fieldControlProps("consent-product")} name="productId" defaultValue={filters.productId}>
+              <option value="">Tous</option>
+              {productChoices.map((choice) => <option key={choice.value} value={choice.value}>{choice.label}</option>)}
+            </Select>
+          </Field>
+          <Field id="consent-purpose" label="Finalité">
+            <Select {...fieldControlProps("consent-purpose")} name="purpose" defaultValue={filters.purpose}>
+              <option value="">Toutes</option>
+              {CONSENT_PURPOSE_OPTIONS.map((option) => <option key={option} value={option}>{option}</option>)}
+            </Select>
+          </Field>
+          <Field id="consent-language" label="Langue">
+            <Select {...fieldControlProps("consent-language")} name="language" defaultValue={filters.language}>
+              <option value="">Toutes</option>
+              {LANGUAGE_OPTIONS.map((option) => <option key={option} value={option}>{option}</option>)}
+            </Select>
+          </Field>
+          <Field id="consent-status" label="Statut">
+            <Select {...fieldControlProps("consent-status")} name="status" defaultValue={filters.status}>
+              <option value="">Tous</option>
+              {CONSENT_STATUS_OPTIONS.map((option) => <option key={option} value={option}>{option}</option>)}
+            </Select>
+          </Field>
+        </FilterBar>
           <DataTable
-            columns={columns}
-            items={rows}
-            getKey={(text) => text.id}
-            emptyLabel="Aucun texte pour ces filtres : un produit sans consentement de transmission publié ne peut pas être ouvert au public."
-            aria-label="Textes de consentement"
-            sort={table.sort}
-            sortHref={table.sortHref}
-            pagination={{
-              page: table.page,
-              pageSize: table.pageSize,
-              total: texts.data.length,
-              hrefFor: table.pageHref,
-              label: (from, to, total) => `${from}-${to} sur ${total} textes`
-            }}
+          columns={columns}
+          items={rows}
+          getKey={(text) => text.id}
+          emptyLabel="Aucun texte pour ces filtres : un produit sans consentement de transmission publié ne peut pas être ouvert au public."
+          aria-label="Textes de consentement"
+          sort={table.sort}
+          sortHref={table.sortHref}
+          pagination={{
+            page: table.page,
+            pageSize: table.pageSize,
+            total: texts.data.length,
+            hrefFor: table.pageHref,
+            label: (from, to, total) => `${from}-${to} sur ${total} textes`
+          }}
           />
-        </Card>
+        </>
       ) : null}
 
       {texts.status === "success" ? (
-        <CreateConsentTextForm
+        <div id="creer-texte"><CreateConsentTextForm
           templates={templates.data.map((template) => ({
             templateKey: template.templateKey,
             purpose: template.purpose,
@@ -189,7 +190,7 @@ export default async function ConsentTextsPage({
           }))}
           countries={countryChoices}
           products={productChoices}
-        />
+        /></div>
       ) : null}
     </PageStack>
   );

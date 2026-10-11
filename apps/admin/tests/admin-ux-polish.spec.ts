@@ -23,7 +23,7 @@ test("admin shell exposes sidebar, header, logout and required navigation", () =
   expect(shell).toContain("logoutAction");
   expect(shell).toContain("logoutLabel=\"Deconnexion\"");
   expect(shell).toContain("Back-office Admin");
-  for (const label of ["Dashboard", "Catalogue", "Partenaires", "Utilisateurs", "Feature flags", "Conformite", "Operations"]) {
+  for (const label of ["Dashboard", "Catalogue", "Partenaires", "Utilisateurs", "Feature flags", "Conformité", "Opérations"]) {
     expect(shell).toContain(label);
   }
   // The logout button of the sidebar footer is gone: the user menu of the topbar is the only exit,
@@ -57,9 +57,12 @@ test("auth routes keep simplified presentation outside the admin shell", () => {
 test("back-office css includes responsive shell and visible focus treatment", () => {
   // The admin stylesheet was replaced by the shared, `bo-` prefixed back-office stylesheet; the
   // layout imports it, so the responsive shell and the focus treatment are asserted there.
+  // Since the 2026-10 back-office redesign the stylesheet carries its own `--bo-*` tokens: the public
+  // site's `tokens.css` must not leak into the admin any more, and the back-office fonts are loaded.
   const layout = source("apps/admin/app/layout.tsx");
-  expect(layout).toContain("@assurmatch/ui/tokens.css");
+  expect(layout).not.toContain("@assurmatch/ui/tokens.css");
   expect(layout).toContain("@assurmatch/ui/backoffice.css");
+  expect(layout).toContain("@assurmatch/ui/backoffice-fonts");
 
   const css = source("packages/ui/styles/backoffice.css");
   expect(css).toContain(".bo-shell");
@@ -73,11 +76,15 @@ test("dashboard pages render KPI cards and sensitive flag disabled states", () =
   const home = source("apps/admin/app/page.tsx");
   const dashboard = source("apps/admin/app/dashboard/page.tsx");
   const viewModels = source("apps/admin/app/lib/ui/admin-view-models.ts");
-  for (const label of ["Leads recus", "Leads transmis", "Leads refuses", "Leads non routes", "Licences expirees", "Licences < 30 jours", "Pays actifs", "Produits actifs", "Partenaires actifs", "Offres expirees"]) {
+  for (const label of ["Leads reçus", "Leads transmis", "Leads refusés", "Leads non routés", "Licences expirées", "Licences à moins de 30 jours", "Pays actifs", "Produits actifs", "Partenaires actifs", "Offres expirées"]) {
     expect(viewModels).toContain(label);
   }
-  expect(home).toContain("KpiCard");
-  expect(dashboard).toContain("KpiCard");
+  // The grid of equal KPI cards became one stat strip, with the actionable queues listed above it.
+  expect(home).toContain("StatStrip");
+  expect(home).toContain("AttentionList");
+  expect(dashboard).toContain("StatStrip");
+  expect(home).not.toContain("KpiCard");
+  expect(dashboard).not.toContain("KpiCard");
   expect(viewModels).toContain("payments_enabled");
   expect(viewModels).toContain("ai_recommendation_enabled");
   expect(viewModels).toContain("disabled");
