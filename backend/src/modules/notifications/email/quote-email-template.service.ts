@@ -85,11 +85,11 @@ export type BrokerAlertEmailType =
   | "broker_offer_expiring";
 
 const BROKER_ALERT_COPY: Record<BrokerAlertEmailType, { subject: string; line: string; path: string }> = {
-  broker_document_received: { subject: "Nouveau document d'un visiteur", line: "Un visiteur a ajoute un document a l'un de vos leads.", path: "/leads" },
-  broker_task_due: { subject: "Rappel de tache CRM", line: "Une tache ou un rappel de votre CRM arrive a echeance.", path: "/crm" },
+  broker_document_received: { subject: "Nouveau document d'un visiteur", line: "Un visiteur a ajouté un document à l'un de vos leads.", path: "/leads" },
+  broker_task_due: { subject: "Rappel de tâche CRM", line: "Une tâche ou un rappel de votre CRM arrive à échéance.", path: "/crm" },
   broker_quota_threshold: { subject: "Quota mensuel de leads", line: "Votre quota mensuel de leads atteint un seuil d'alerte.", path: "/account" },
-  broker_license_expiring: { subject: "Licence bientot expiree", line: "Une licence de votre cabinet arrive bientot a expiration. Pensez a transmettre son renouvellement.", path: "/licenses" },
-  broker_offer_expiring: { subject: "Offre bientot expiree", line: "Une de vos offres publiees arrive bientot a la fin de sa periode de validite.", path: "/offers" }
+  broker_license_expiring: { subject: "Licence bientôt expirée", line: "Une licence de votre cabinet arrive bientôt à expiration. Pensez à transmettre son renouvellement.", path: "/licenses" },
+  broker_offer_expiring: { subject: "Offre bientôt expirée", line: "Une de vos offres publiées arrive bientôt à la fin de sa période de validité.", path: "/offers" }
 };
 
 /** Spec 061 FR-004: pointer e-mail to the compliance team; the alert itself stays in the center. */
@@ -104,7 +104,7 @@ interface TemplateOptions {
   adminAppUrl?: string;
 }
 
-const PLATFORM_DISCLAIMER = "AssurMatch est une plateforme technique de comparaison indicative et de mise en relation avec des courtiers partenaires autorises.";
+const PLATFORM_DISCLAIMER = "AssurMatch est une plateforme technique de comparaison indicative et de mise en relation avec des courtiers partenaires autorisés.";
 
 const DISCLAIMER: Record<VisitorEmailLocale, string> = {
   fr: PLATFORM_DISCLAIMER,
@@ -112,7 +112,7 @@ const DISCLAIMER: Record<VisitorEmailLocale, string> = {
 };
 
 const NO_COMMITMENT: Record<VisitorEmailLocale, string> = {
-  fr: "Aucun montant, aucune garantie et aucun engagement contractuel ne resulte de ce message. Le devis et toute decision relevent exclusivement du courtier partenaire.",
+  fr: "Aucun montant, aucune garantie et aucun engagement contractuel ne résulte de ce message. Le devis et toute décision relèvent exclusivement du courtier partenaire.",
   en: "This message sets no amount, no cover and no contractual commitment. The quote and any decision rest solely with the partner broker."
 };
 
@@ -178,12 +178,12 @@ export class QuoteEmailTemplateService {
     const greeting = locale === "en"
       ? (context.displayName ? `Hello ${context.displayName},` : "Hello,")
       : (context.displayName ? `Bonjour ${context.displayName},` : "Bonjour,");
-    const reference = locale === "en" ? `Your request reference: ${context.publicReference}` : `Reference de votre demande: ${context.publicReference}`;
+    const reference = locale === "en" ? `Your request reference: ${context.publicReference}` : `Référence de votre demande: ${context.publicReference}`;
     const follow = locale === "en" ? `Follow your request: ${link}` : `Suivre votre demande: ${link}`;
     const validity = context.tokenExpiresAt
       ? locale === "en"
         ? `This personal link is valid until ${formatDate(context.tokenExpiresAt)}. Do not share it. You can ask for a new one at any time from the tracking page.`
-        : `Ce lien personnel est valable jusqu'au ${formatDate(context.tokenExpiresAt)}. Ne le partagez pas. Vous pouvez en demander un nouveau a tout moment depuis la page de suivi.`
+        : `Ce lien personnel est valable jusqu'au ${formatDate(context.tokenExpiresAt)}. Ne le partagez pas. Vous pouvez en demander un nouveau à tout moment depuis la page de suivi.`
       : undefined;
     const lines = [
       greeting,
@@ -216,29 +216,29 @@ export class QuoteEmailTemplateService {
   brokerLead(context: BrokerLeadEmailContext): AuthEmailPayload {
     // Spec 061: a lead moved to this cabinet by a reassignment says so.
     const headline = context.reassigned
-      ? `Un lead a ete reaffecte a votre cabinet: ${context.publicReference} (${context.productKey}, ${context.countryCode}).`
-      : `Un nouveau lead vous a ete assigne: ${context.publicReference} (${context.productKey}, ${context.countryCode}).`;
+      ? `Un lead a été réaffecté à votre cabinet: ${context.publicReference} (${context.productKey}, ${context.countryCode}).`
+      : `Un nouveau lead vous a été assigné: ${context.publicReference} (${context.productKey}, ${context.countryCode}).`;
     const lines = [
       `Bonjour ${context.partnerLegalName},`,
       "",
       headline,
       "",
       `Les informations consenties sont consultables dans votre back-office: ${this.brokerLink()}`,
-      "Elles ne sont pas reprises dans cet email: leur consultation est tracee et limitee a votre cabinet.",
+      "Elles ne sont pas reprises dans cet email: leur consultation est tracée et limitée à votre cabinet.",
       "",
-      "Notification operationnelle. Aucun engagement contractuel ne resulte de ce message.",
+      "Notification opérationnelle. Aucun engagement contractuel ne resulte de ce message.",
       PLATFORM_DISCLAIMER
     ];
     return this.assertSafe({
       to: context.to,
-      subject: context.reassigned ? `Lead reaffecte ${context.publicReference}` : `Nouveau lead assigne ${context.publicReference}`,
+      subject: context.reassigned ? `Lead réaffecté ${context.publicReference}` : `Nouveau lead assigné ${context.publicReference}`,
       body: lines.join("\n"),
       html: this.html([
         `<p>Bonjour ${escapeHtml(context.partnerLegalName)},</p>`,
         `<p>${escapeHtml(headline)}</p>`,
         `<p><a href="${escapeHtml(this.brokerLink())}">Consulter le lead dans votre back-office</a></p>`,
-        "<p>Les informations consenties ne sont pas reprises dans cet email: leur consultation est tracee et limitee a votre cabinet.</p>",
-        "<p>Notification operationnelle. Aucun engagement contractuel ne resulte de ce message.</p>",
+        "<p>Les informations consenties ne sont pas reprises dans cet email: leur consultation est tracée et limitée à votre cabinet.</p>",
+        "<p>Notification opérationnelle. Aucun engagement contractuel ne resulte de ce message.</p>",
         `<p>${escapeHtml(PLATFORM_DISCLAIMER)}</p>`
       ]),
       purpose: "quote_broker_lead"
@@ -253,18 +253,18 @@ export class QuoteEmailTemplateService {
     const lines = [
       `Bonjour ${context.partnerLegalName},`,
       "",
-      `Le visiteur a repondu a votre proposition pour la demande ${context.publicReference} (${context.productKey}, ${context.countryCode}).`,
+      `Le visiteur a répondu à votre proposition pour la demande ${context.publicReference} (${context.productKey}, ${context.countryCode}).`,
       "",
-      `Consultez sa reponse dans votre back-office: ${this.brokerLink()}`,
-      "Elle n'est pas reprise dans cet email: sa consultation est tracee et limitee a votre cabinet.",
-      "Le statut du lead n'est pas modifie automatiquement: c'est a vous de le faire evoluer.",
+      `Consultez sa réponse dans votre back-office: ${this.brokerLink()}`,
+      "Elle n'est pas reprise dans cet email: sa consultation est tracée et limitée à votre cabinet.",
+      "Le statut du lead n'est pas modifié automatiquement: c'est à vous de le faire évoluer.",
       "",
-      "Notification operationnelle. Aucun engagement contractuel ne resulte de ce message.",
+      "Notification opérationnelle. Aucun engagement contractuel ne resulte de ce message.",
       PLATFORM_DISCLAIMER
     ];
     return this.assertSafe({
       to: context.to,
-      subject: `Reponse du visiteur ${context.publicReference}`,
+      subject: `Réponse du visiteur ${context.publicReference}`,
       body: lines.join("\n"),
       html: this.html(lines.filter((line) => line !== "").map((line) => `<p>${escapeHtml(line)}</p>`)),
       purpose: "quote_broker_visitor_response"
@@ -280,9 +280,9 @@ export class QuoteEmailTemplateService {
       "",
       copy.line,
       "",
-      `Consultez le detail dans votre back-office: ${link}`,
+      `Consultez le détail dans votre back-office: ${link}`,
       "",
-      "Notification operationnelle. Aucun engagement contractuel ne resulte de ce message.",
+      "Notification opérationnelle. Aucun engagement contractuel ne resulte de ce message.",
       PLATFORM_DISCLAIMER
     ];
     return this.assertSafe({
@@ -292,8 +292,8 @@ export class QuoteEmailTemplateService {
       html: this.html([
         `<p>Bonjour ${escapeHtml(context.partnerLegalName)},</p>`,
         `<p>${escapeHtml(copy.line)}</p>`,
-        `<p><a href="${escapeHtml(link)}">Consulter le detail dans votre back-office</a></p>`,
-        "<p>Notification operationnelle. Aucun engagement contractuel ne resulte de ce message.</p>",
+        `<p><a href="${escapeHtml(link)}">Consulter le détail dans votre back-office</a></p>`,
+        "<p>Notification opérationnelle. Aucun engagement contractuel ne resulte de ce message.</p>",
         `<p>${escapeHtml(PLATFORM_DISCLAIMER)}</p>`
       ]),
       purpose: "broker_alert"
@@ -311,7 +311,7 @@ export class QuoteEmailTemplateService {
       "",
       `Consultez-la et acquittez-la dans le back-office: ${link}`,
       "",
-      "Message interne. Le detail de l'alerte n'est pas repris dans cet email."
+      "Message interne. Le détail de l'alerte n'est pas repris dans cet email."
     ];
     return this.assertSafe({
       to: context.to,
@@ -321,7 +321,7 @@ export class QuoteEmailTemplateService {
         "<p>Bonjour,</p>",
         `<p>Une nouvelle alerte est ouverte dans le centre d'alertes AssurMatch: <strong>${escapeHtml(context.label)}</strong>.</p>`,
         `<p><a href="${escapeHtml(link)}">Ouvrir le centre d'alertes</a></p>`,
-        "<p>Message interne. Le detail de l'alerte n'est pas repris dans cet email.</p>"
+        "<p>Message interne. Le détail de l'alerte n'est pas repris dans cet email.</p>"
       ]),
       purpose: "admin_alert"
     });
@@ -342,29 +342,29 @@ export class QuoteEmailTemplateService {
         return {
           subject: `Votre demande de devis ${context.publicReference} est bien recue`,
           lines: [
-            `Nous avons bien recu votre demande de devis ${scope}.`,
-            "Nous recherchons un courtier partenaire eligible pour ce pays et ce produit. Vous serez prevenu par e-mail a chaque etape.",
+            `Nous avons bien reçu votre demande de devis ${scope}.`,
+            "Nous recherchons un courtier partenaire éligible pour ce pays et ce produit. Vous serez prévenu par e-mail à chaque étape.",
             ""
           ]
         };
       case "in_review":
         return {
-          subject: `Votre demande de devis ${context.publicReference} est en cours de verification`,
+          subject: `Votre demande de devis ${context.publicReference} est en cours de vérification`,
           lines: [
-            `Nous avons bien recu votre demande de devis ${scope}.`,
-            "Elle est en cours de verification par notre equipe, avant toute transmission a un courtier partenaire.",
-            "Vous recevrez un nouveau message lorsque le courtier partenaire sera designe.",
+            `Nous avons bien reçu votre demande de devis ${scope}.`,
+            "Elle est en cours de vérification par notre équipe, avant toute transmission à un courtier partenaire.",
+            "Vous recevrez un nouveau message lorsque le courtier partenaire sera désigné.",
             ""
           ]
         };
       case "transmitted":
         return {
-          subject: `Votre demande de devis ${context.publicReference} a ete transmise`,
+          subject: `Votre demande de devis ${context.publicReference} a été transmise`,
           lines: [
             broker
-              ? `Votre demande de devis ${scope} a ete transmise a ${broker}, courtier partenaire eligible pour ce pays et ce produit.`
-              : `Votre demande de devis ${scope} a ete transmise a un courtier partenaire eligible pour ce pays et ce produit.`,
-            "Le courtier partenaire etudie votre demande et peut vous contacter pour la preciser.",
+              ? `Votre demande de devis ${scope} a été transmise à ${broker}, courtier partenaire éligible pour ce pays et ce produit.`
+              : `Votre demande de devis ${scope} a été transmise à un courtier partenaire éligible pour ce pays et ce produit.`,
+            "Le courtier partenaire étudie votre demande et peut vous contacter pour la préciser.",
             ""
           ]
         };
@@ -373,29 +373,29 @@ export class QuoteEmailTemplateService {
           subject: `Votre demande de devis ${context.publicReference} est prise en charge`,
           lines: [
             `${broker ?? "Le courtier partenaire"} a pris en charge votre demande de devis ${scope}.`,
-            "Le courtier partenaire peut vous contacter pour preciser votre besoin.",
+            "Le courtier partenaire peut vous contacter pour préciser votre besoin.",
             ""
           ]
         };
       case "reassigned":
         return {
-          subject: `Votre demande de devis ${context.publicReference} a ete reaffectee`,
+          subject: `Votre demande de devis ${context.publicReference} a été réaffectée`,
           lines: [
             broker
-              ? `Votre demande de devis ${scope} a ete reaffectee a ${broker}, courtier partenaire eligible pour ce pays et ce produit.`
-              : `Votre demande de devis ${scope} a ete reaffectee a un autre courtier partenaire eligible pour ce pays et ce produit.`,
-            "Le courtier precedent n'a plus acces a votre demande.",
+              ? `Votre demande de devis ${scope} a été réaffectée à ${broker}, courtier partenaire éligible pour ce pays et ce produit.`
+              : `Votre demande de devis ${scope} a été réaffectée à un autre courtier partenaire éligible pour ce pays et ce produit.`,
+            "Le courtier précédent n'a plus accès à votre demande.",
             ""
           ]
         };
       case "closed":
         return {
-          subject: `Votre demande de devis ${context.publicReference} est cloturee`,
+          subject: `Votre demande de devis ${context.publicReference} est clôturée`,
           lines: [
             broker
-              ? `Le suivi de votre demande de devis ${scope} par ${broker} est cloture.`
-              : `Le suivi de votre demande de devis ${scope} est cloture.`,
-            "Si vous avez encore besoin d'un devis, vous pouvez deposer une nouvelle demande sur AssurMatch.",
+              ? `Le suivi de votre demande de devis ${scope} par ${broker} est clôturé.`
+              : `Le suivi de votre demande de devis ${scope} est clôturé.`,
+            "Si vous avez encore besoin d'un devis, vous pouvez déposer une nouvelle demande sur AssurMatch.",
             ""
           ]
         };
@@ -403,9 +403,9 @@ export class QuoteEmailTemplateService {
         return {
           subject: `Votre demande de devis ${context.publicReference}`,
           lines: [
-            `Nous avons bien recu votre demande de devis ${scope}.`,
-            "Votre demande a bien ete enregistree. Aucun courtier partenaire eligible n'est disponible pour ce pays et ce produit pour le moment: elle n'a ete communiquee a aucun courtier.",
-            "Vous pouvez comparer d'autres offres indicatives ou deposer une nouvelle demande plus tard.",
+            `Nous avons bien reçu votre demande de devis ${scope}.`,
+            "Votre demande a bien été enregistrée. Aucun courtier partenaire éligible n'est disponible pour ce pays et ce produit pour le moment: elle n'a été communiquée à aucun courtier.",
+            "Vous pouvez comparer d'autres offres indicatives ou déposer une nouvelle demande plus tard.",
             ""
           ]
         };
@@ -414,7 +414,7 @@ export class QuoteEmailTemplateService {
           subject: `Retrait de votre consentement confirme (${context.publicReference})`,
           lines: [
             `Nous confirmons le retrait de votre consentement pour votre demande de devis ${scope}.`,
-            "La demande est cloturee et chaque courtier partenaire concerne a ete informe qu'il ne doit plus la traiter.",
+            "La demande est clôturée et chaque courtier partenaire concerné a été informé qu'il ne doit plus la traiter.",
             ""
           ]
         };
@@ -422,9 +422,9 @@ export class QuoteEmailTemplateService {
         return {
           subject: `Une proposition est disponible pour votre demande ${context.publicReference}`,
           lines: [
-            `${broker ?? "Le courtier partenaire"} vous a adresse une proposition pour votre demande de devis ${scope}.`,
-            "Consultez-la dans votre espace de suivi: vous pourrez demander a etre rappele, poser une question ou indiquer que vous ne donnez pas suite.",
-            "Proposition indicative non contractuelle, a confirmer par le courtier.",
+            `${broker ?? "Le courtier partenaire"} vous a adressé une proposition pour votre demande de devis ${scope}.`,
+            "Consultez-la dans votre espace de suivi: vous pourrez demander à être rappelé, poser une question ou indiquer que vous ne donnez pas suite.",
+            "Proposition indicative non contractuelle, à confirmer par le courtier.",
             ""
           ]
         };
@@ -433,7 +433,7 @@ export class QuoteEmailTemplateService {
           subject: `Votre lien de suivi (${context.publicReference})`,
           lines: [
             "Vous avez demande un nouveau lien pour suivre votre demande de devis.",
-            "Si vous n'etes pas a l'origine de cette demande, ignorez simplement ce message.",
+            "Si vous n'êtes pas à l'origine de cette demande, ignorez simplement ce message.",
             ""
           ]
         };

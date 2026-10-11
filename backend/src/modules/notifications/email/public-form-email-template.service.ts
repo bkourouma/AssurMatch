@@ -46,7 +46,7 @@ const PRIVACY_PATH: Record<PublicLocale, string> = {
 };
 
 const DISCLAIMER: Record<PublicLocale, string> = {
-  fr: "AssurMatch est une plateforme technique de comparaison indicative et de mise en relation avec des courtiers partenaires autorises.",
+  fr: "AssurMatch est une plateforme technique de comparaison indicative et de mise en relation avec des courtiers partenaires autorisés.",
   en: "AssurMatch is a technical platform for indicative comparison and for connecting you with authorised partner brokers."
 };
 
@@ -93,15 +93,15 @@ export class PublicFormEmailTemplateService {
             ]
           }
         : {
-            subject: "Votre inscription a la liste d'attente AssurMatch",
+            subject: "Votre inscription à la liste d'attente AssurMatch",
             lines: [
               "Bonjour,",
               "",
-              `Votre adresse e-mail a bien ete ajoutee a la liste d'attente AssurMatch pour ${country}.`,
-              "Nous vous ecrirons a l'ouverture de la plateforme dans ce pays.",
+              `Votre adresse e-mail a bien été ajoutée à la liste d'attente AssurMatch pour ${country}.`,
+              "Nous vous écrirons à l'ouverture de la plateforme dans ce pays.",
               "",
-              "Cette inscription n'engage ni vous ni nous: il ne s'agit pas d'une demande de devis et aucune offre n'a ete comparee pour vous.",
-              `Vous pouvez demander le retrait de votre adresse a tout moment en repondant a ce message. Notre politique de confidentialite: ${privacy}`,
+              "Cette inscription n'engage ni vous ni nous: il ne s'agit pas d'une demande de devis et aucune offre n'a été comparée pour vous.",
+              `Vous pouvez demander le retrait de votre adresse à tout moment en répondant à ce message. Notre politique de confidentialité: ${privacy}`,
               "",
               DISCLAIMER.fr
             ]
@@ -131,17 +131,17 @@ export class PublicFormEmailTemplateService {
             ]
           }
         : {
-            subject: `Votre message a AssurMatch ${context.publicReference}`,
+            subject: `Votre message à AssurMatch ${context.publicReference}`,
             lines: [
               `Bonjour ${context.name},`,
               "",
-              "Nous avons bien recu votre message et notre equipe va le lire.",
-              `Votre reference: ${context.publicReference}`,
+              "Nous avons bien reçu votre message et notre équipe va le lire.",
+              `Votre référence: ${context.publicReference}`,
               "",
-              "Citez-la si vous nous reecrivez au sujet de la meme demande. Votre message lui-meme n'est pas repris ici.",
-              `Notre politique de confidentialite: ${privacy}`,
+              "Citez-la si vous nous réécrivez au sujet de la même demande. Votre message lui-même n'est pas repris ici.",
+              `Notre politique de confidentialité: ${privacy}`,
               "",
-              "Cet accuse de reception ne constitue pas une reponse a votre demande et n'emporte aucun engagement.",
+              "Cet accusé de réception ne constitue pas une réponse à votre demande et n'emporte aucun engagement.",
               DISCLAIMER.fr
             ]
           };
@@ -175,14 +175,14 @@ export class PublicFormEmailTemplateService {
             lines: [
               `Bonjour ${context.contactName},`,
               "",
-              "Nous avons bien recu votre candidature de courtier partenaire.",
-              `Votre reference: ${context.publicReference}`,
+              "Nous avons bien reçu votre candidature de courtier partenaire.",
+              `Votre référence: ${context.publicReference}`,
               "",
-              "Notre equipe conformite l'examine avant toute autre etape. Aucun compte partenaire n'existe a ce stade.",
-              "Nous vous ecrirons pour demander une copie de votre licence: le formulaire public n'accepte aucun depot de fichier.",
-              `Notre politique de confidentialite: ${privacy}`,
+              "Notre équipe conformité l'examine avant toute autre étape. Aucun compte partenaire n'existe à ce stade.",
+              "Nous vous écrirons pour demander une copie de votre licence: le formulaire public n'accepte aucun dépôt de fichier.",
+              `Notre politique de confidentialité: ${privacy}`,
               "",
-              "Cet accuse de reception ne vaut ni acceptation ni refus de votre candidature.",
+              "Cet accusé de réception ne vaut ni acceptation ni refus de votre candidature.",
               DISCLAIMER.fr
             ]
           };
@@ -229,17 +229,17 @@ export class PublicFormEmailTemplateService {
               `Bonjour ${context.contactName},`,
               "",
               accepted
-                ? "Notre equipe conformite a examine votre candidature de courtier partenaire et l'a acceptee."
-                : "Notre equipe conformite a examine votre candidature de courtier partenaire et ne peut pas y donner suite a ce stade.",
-              `Votre reference: ${context.publicReference}`,
+                ? "Notre équipe conformité a examiné votre candidature de courtier partenaire et l'a acceptée."
+                : "Notre équipe conformité a examiné votre candidature de courtier partenaire et ne peut pas y donner suite à ce stade.",
+              `Votre référence: ${context.publicReference}`,
               "",
               ...(accepted
                 ? [
-                    "Cette acceptation ouvre un partenariat technique avec AssurMatch. Elle ne constitue pas un agrement et ne remplace pas celui delivre par votre autorite de controle.",
-                    "Nous vous contacterons pour completer votre dossier avant toute activation: aucune demande ne vous est transmise a ce stade."
+                    "Cette acceptation ouvre un partenariat technique avec AssurMatch. Elle ne constitue pas un agrément et ne remplace pas celui délivré par votre autorité de contrôle.",
+                    "Nous vous contacterons pour compléter votre dossier avant toute activation: aucune demande ne vous est transmise à ce stade."
                   ]
-                : ["Cette decision ne constitue pas un avis sur votre agrement ni sur votre activite."]),
-              `Notre politique de confidentialite: ${privacy}`,
+                : ["Cette décision ne constitue pas un avis sur votre agrément ni sur votre activité."]),
+              `Notre politique de confidentialité: ${privacy}`,
               "",
               DISCLAIMER.fr
             ]

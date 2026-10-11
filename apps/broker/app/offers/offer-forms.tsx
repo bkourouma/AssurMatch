@@ -119,26 +119,29 @@ function GuaranteesEditor({ base, initial, onChange }: { base: string; initial: 
     counter.current += 1;
     return counter.current;
   };
-  const [rows, setRows] = useState<GuaranteeRowState[]>(() =>
-    (initial ?? []).map((guarantee) => ({
+  // A new offer starts with one empty row so the field is visible: an empty list read as "no
+  // guarantee field". Empty rows are dropped when the form is read (`offerContentFromForm`).
+  const [rows, setRows] = useState<GuaranteeRowState[]>(() => {
+    const saved = (initial ?? []).map((guarantee) => ({
       rowId: nextId(),
       key: guarantee.key,
       label: guarantee.label,
       included: guarantee.included,
       detail: guarantee.detail ?? ""
-    }))
-  );
+    }));
+    return saved.length > 0 ? saved : [{ rowId: nextId(), key: "", label: "", included: true, detail: "" }];
+  });
   useEffect(() => {
     onChange();
   }, [rows, onChange]);
   return (
-    <FormSection legend="Garanties" description="Une ligne par garantie (50 au maximum). La clé est déduite du libellé si elle est vide.">
+    <FormSection legend="Garanties (liste détaillée)" description="Au moins une garantie est exigée pour soumettre l'offre. Une ligne par garantie (50 au maximum) ; la clé est déduite du libellé si elle est vide.">
       {rows.length === 0 ? <p>Aucune garantie : ajoutez-en au moins une avant de soumettre.</p> : null}
       {rows.map((row, index) => (
         <div key={row.rowId} data-offer-guarantee-row="true">
           <Cluster>
-            <Field id={`${base}-g-label-${row.rowId}`} label={`Garantie ${index + 1} : libellé`} required>
-              <Input {...fieldControlProps(`${base}-g-label-${row.rowId}`, { required: true })} name="guaranteeLabel" maxLength={120} defaultValue={row.label} />
+            <Field id={`${base}-g-label-${row.rowId}`} label={`Garantie ${index + 1} : libellé`}>
+              <Input {...fieldControlProps(`${base}-g-label-${row.rowId}`)} name="guaranteeLabel" maxLength={120} defaultValue={row.label} />
             </Field>
             <Field id={`${base}-g-key-${row.rowId}`} label="Clé">
               <Input {...fieldControlProps(`${base}-g-key-${row.rowId}`)} name="guaranteeKey" maxLength={64} defaultValue={row.key} />
@@ -189,8 +192,8 @@ function OfferContentFields({ base, content, onChange }: { base: string; content
         <Field id={`${base}-description`} label="Description">
           <Textarea {...fieldControlProps(`${base}-description`)} name="shortDescription" rows={3} maxLength={1000} defaultValue={content?.shortDescription ?? ""} />
         </Field>
-        <Field id={`${base}-summary`} label="Résumé des garanties">
-          <Textarea {...fieldControlProps(`${base}-summary`)} name="guaranteeSummary" rows={2} maxLength={1000} defaultValue={content?.guaranteeSummary ?? ""} />
+        <Field id={`${base}-summary`} label="Résumé des garanties" hint="Texte libre. La liste des garanties se saisit dans la section « Garanties » plus bas.">
+          <Textarea {...fieldControlProps(`${base}-summary`, { hint: "x" })} name="guaranteeSummary" rows={2} maxLength={1000} defaultValue={content?.guaranteeSummary ?? ""} />
         </Field>
         <Field id={`${base}-level`} label="Niveau de garantie (1 à 5)">
           <Select {...fieldControlProps(`${base}-level`)} name="guaranteeLevel" defaultValue={content?.guaranteeLevel !== undefined ? String(content.guaranteeLevel) : ""}>

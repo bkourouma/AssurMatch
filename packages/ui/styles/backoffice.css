@@ -1705,7 +1705,22 @@ select.bo-field__control {
   padding: 0;
 }
 
+/* The table runs edge to edge of the card (card body padding is 20px). It only cancels the padding on
+   the sides that touch the card: a table followed by a form keeps the card padding as its gap, and a
+   table that follows other content does not climb over it. */
 .bo-card__body > .bo-table-wrap {
-  margin: -20px;
+  margin-inline: -20px;
   width: calc(100% + 40px);
+}
+
+.bo-card__body > .bo-table-wrap:first-child {
+  margin-top: -20px;
+}
+
+.bo-card__body > .bo-table-wrap:last-child {
+  margin-bottom: -20px;
+}
+
+.bo-card__body > .bo-table-wrap:not(:last-child) {
+  margin-bottom: 20px;
 }

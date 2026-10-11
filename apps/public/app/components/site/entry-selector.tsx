@@ -21,6 +21,8 @@ export interface EntrySelectorProps {
   defaultCountry?: string | null;
   /** Optional heading rendered above the two selects, e.g. on the home page. */
   title?: string;
+  /** `secondary` when the selector is a way to look elsewhere and the page already has its main action. */
+  emphasis?: "primary" | "secondary";
 }
 
 /**
@@ -30,7 +32,7 @@ export interface EntrySelectorProps {
  * It is still a plain GET form targeting /aller, which resolves the pair server-side and redirects to
  * the localised product page, so it works without JavaScript.
  */
-export function EntrySelector({ countries, products, defaultCountry, title }: EntrySelectorProps) {
+export function EntrySelector({ countries, products, defaultCountry, title, emphasis = "primary" }: EntrySelectorProps) {
   const t = useTranslations("Layout.entrySelector");
   if (countries.length === 0) return null;
 
@@ -56,7 +58,7 @@ export function EntrySelector({ countries, products, defaultCountry, title }: En
             ))}
           </select>
         </Field>
-        <Button type="submit" size="lg" fullWidth icon={<Icon name="search" size={20} />}>
+        <Button type="submit" size="lg" fullWidth variant={emphasis} icon={<Icon name="search" size={20} />}>
           {t("submit")}
         </Button>
       </div>

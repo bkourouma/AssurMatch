@@ -27,6 +27,7 @@ import {
 } from "../../../lib/public-api";
 import { buildMetadata, localePath, localeUrl } from "../../../lib/seo";
 import type { PageMetadata } from "../../../lib/seo";
+import { publicIssuingAuthority } from "../../../../../../packages/shared/contracts/licence-issuer";
 
 /**
  * Country page (SITE-108) and its waiting-list variant (SITE-109).
@@ -219,8 +220,12 @@ async function OpenCountry({ locale, country, countryCode }: VariantProps) {
         <>
           <span className="am-j-rowline">
             {common("licenceNumber")} <BackendText>{partner.licenseNumber}</BackendText>
-            {" - "}
-            {common("issuingAuthority")} <BackendText>{partner.issuingAuthority}</BackendText>
+            {publicIssuingAuthority(partner.issuingAuthority) ? (
+              <>
+                {" - "}
+                {common("issuingAuthority")} <BackendText>{publicIssuingAuthority(partner.issuingAuthority)}</BackendText>
+              </>
+            ) : null}
             {partner.city ? (
               <>
                 {" - "}

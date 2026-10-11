@@ -315,7 +315,8 @@ test("SC-04a le courtier crée une offre CI x Auto et la soumet à validation", 
   await form.locator("textarea[name='shortDescription']").fill("Responsabilité civile, défense recours et assistance 24h/24.");
   await form.locator("textarea[name='guaranteeSummary']").fill("RC obligatoire, défense recours, assistance");
   await form.locator("select[name='guaranteeLevel']").selectOption("3");
-  await form.getByRole("button", { name: "Ajouter une garantie" }).click();
+  // The editor opens with one empty row; "Ajouter une garantie" adds the next ones.
+  await expect(form.locator("input[name='guaranteeLabel']")).toHaveCount(1);
   await form.locator("input[name='guaranteeLabel']").first().fill("Responsabilité civile");
   await form.getByRole("button", { name: "Ajouter une garantie" }).click();
   await form.locator("input[name='guaranteeLabel']").nth(1).fill("Assistance 24h/24");
@@ -558,7 +559,7 @@ test("SC-08 le courtier Starter clôture le lead « gagné », le visiteur est i
   await broker.context().close();
 
   // 2. Spec 054: the visitor is told the request is closed (without the commercial outcome).
-  const closed = await waitForMail({ to: visitorEmail, exclude: seenByVisitor, subject: new RegExp(`${escapeRegExp(quoteReference)} est cloturee`, "u") });
+  const closed = await waitForMail({ to: visitorEmail, exclude: seenByVisitor, subject: new RegExp(`${escapeRegExp(quoteReference)} est clôturée`, "u") });
   expect(`${closed.Text}`).toContain(partnerName);
   // The commercial outcome stays between the broker and AssurMatch.
   expect(closed.Text).not.toMatch(/\bgagn[ée]\b/iu);

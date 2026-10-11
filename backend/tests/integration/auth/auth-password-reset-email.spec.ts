@@ -50,7 +50,7 @@ describe("password reset email fallback", () => {
     });
 
     await expect(service.deliverPasswordReset(user, "sent-token", expiresAt)).resolves.toEqual({ emailStatus: "sent" });
-    expect(sent[0]).toMatchObject({ to: user.email, subject: expect.stringContaining("Reinitialisation") });
+    expect(sent[0]).toMatchObject({ to: user.email, subject: expect.stringContaining("Réinitialisation") });
     expect(sent[0]?.body).toContain("sent-token");
     expect(sent[0]?.purpose).toBe("auth_password_reset");
   });

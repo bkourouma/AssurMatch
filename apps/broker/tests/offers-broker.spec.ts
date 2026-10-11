@@ -115,6 +115,49 @@ test("no sponsorship field ever reaches the broker portal (FR-013)", () => {
   expect(offerCompleteness(content).missing).toEqual(["insurerName", "guarantees", "indicativePrice", "sourceOfInformation"]);
 });
 
+test("guarantee rows typed in the form reach the content and satisfy the minimum completeness", () => {
+  const form = new FormData();
+  form.set("name", "Auto Tiers Plus");
+  form.set("insurerName", "Assureur Atlantique CI");
+  form.set("indicativePriceMin", "85000");
+  form.set("indicativePriceMax", "120000");
+  form.set("validFrom", "2026-01-01");
+  form.set("validUntil", "2099-12-31");
+  form.set("sourceOfInformation", "Grille tarifaire du courtier");
+  // The free-text summary alone never counts as a guarantee list.
+  form.set("guaranteeSummary", "Responsabilité civile\nAssistance 24h/24");
+  expect(offerCompleteness(offerContentFromForm(form)).missing).toContain("guarantees");
+
+  // Rows of the editor: the empty one shown by default is dropped, the key comes from the label.
+  form.append("guaranteeLabel", "Responsabilité civile");
+  form.append("guaranteeKey", "");
+  form.append("guaranteeIncluded", "true");
+  form.append("guaranteeDetail", "");
+  form.append("guaranteeLabel", "Assistance 24h/24");
+  form.append("guaranteeKey", "");
+  form.append("guaranteeIncluded", "false");
+  form.append("guaranteeDetail", "Dépannage");
+  form.append("guaranteeLabel", "   ");
+  form.append("guaranteeKey", "");
+  form.append("guaranteeIncluded", "true");
+  form.append("guaranteeDetail", "");
+  const content = offerContentFromForm(form);
+  expect(content.guarantees).toEqual([
+    { key: "responsabilite_civile", label: "Responsabilité civile", included: true },
+    { key: "assistance_24h_24", label: "Assistance 24h/24", included: false, detail: "Dépannage" }
+  ]);
+  expect(offerCompleteness(content).missing).not.toContain("guarantees");
+  expect(brokerOfferUpdateSchema.safeParse(content).success).toBe(true);
+});
+
+test("the guarantee editor shows a field from the start, so the list is never invisible", () => {
+  const forms = source("apps/broker/app/offers/offer-forms.tsx");
+  expect(forms).toContain("saved.length > 0 ? saved : [{ rowId: nextId(), key: \"\", label: \"\", included: true, detail: \"\" }]");
+  // An empty row must not block saving a draft: the label is not a native required control.
+  expect(forms).not.toMatch(/g-label-\$\{row\.rowId\}`, \{ required: true \}/u);
+  expect(source("apps/broker/app/offers/[offerId]/page.tsx")).toContain("{ term: \"Garanties\", value: content.guarantees.length ? formatDiffValue(content.guarantees) : \"-\" }");
+});
+
 test("refusals are translated to French, including the uncovered scope", () => {
   expect(offerWriteErrorMessage({ status: 422, code: ErrorCodes.OFFER_SCOPE_NOT_COVERED })).toBe(OFFER_ERROR_MESSAGES.OFFER_SCOPE_NOT_COVERED);
   expect(offerWriteErrorMessage({ status: 422, code: ErrorCodes.OFFER_INCOMPLETE })).toContain("complétude minimale");

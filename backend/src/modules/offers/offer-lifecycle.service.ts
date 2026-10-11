@@ -67,10 +67,10 @@ export interface OfferCreateInput {
 }
 
 const NOTIFICATIONS = {
-  offer_validated: { title: "Offre validee", body: (name: string) => `Votre offre "${name}" a ete validee et publiee. Elle reste indicative et a confirmer par votre cabinet.` },
-  offer_rejected: { title: "Offre refusee", body: (name: string, reason?: string) => `La version soumise de votre offre "${name}" a ete refusee. Motif : ${reason ?? "non precise"}.` },
-  offer_suspended: { title: "Offre suspendue", body: (name: string, reason?: string) => `Votre offre "${name}" a ete suspendue et n'est plus visible du public. Motif : ${reason ?? "non precise"}.` },
-  offer_expiring: { title: "Offre bientot expiree", body: (name: string, days?: string) => `Votre offre "${name}" expire dans ${days ?? "quelques"} jour(s). Renouvelez-la pour qu'elle reste visible.` }
+  offer_validated: { title: "Offre validée", body: (name: string) => `Votre offre "${name}" a été validée et publiée. Elle reste indicative et à confirmer par votre cabinet.` },
+  offer_rejected: { title: "Offre refusée", body: (name: string, reason?: string) => `La version soumise de votre offre "${name}" a été refusée. Motif : ${reason ?? "non précisé"}.` },
+  offer_suspended: { title: "Offre suspendue", body: (name: string, reason?: string) => `Votre offre "${name}" a été suspendue et n'est plus visible du public. Motif : ${reason ?? "non précisé"}.` },
+  offer_expiring: { title: "Offre bientôt expirée", body: (name: string, days?: string) => `Votre offre "${name}" expire dans ${days ?? "quelques"} jour(s). Renouvelez-la pour qu'elle reste visible.` }
 } as const;
 export type OfferNotificationType = keyof typeof NOTIFICATIONS;
 

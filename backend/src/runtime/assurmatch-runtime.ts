@@ -554,7 +554,7 @@ readonly enterprise = new EnterpriseService({
       const notificationId = await this.quoteRequests.submissions.notifyBrokerForAssignment(assignment, actor);
       // Spec 061 FR-003: the pointer e-mail and in-app entry come with the notification above;
       // SMS / WhatsApp only reach a tenant that opted in.
-      if (notificationId) await this.brokerAlerts.optionalChannels({ partnerTenantId: assignment.partnerTenantId, type: "broker_lead_reassigned", title: "Lead reaffecte a votre cabinet" }, actor).catch(() => 0);
+      if (notificationId) await this.brokerAlerts.optionalChannels({ partnerTenantId: assignment.partnerTenantId, type: "broker_lead_reassigned", title: "Lead réaffecté à votre cabinet" }, actor).catch(() => 0);
       await this.quoteDocuments.shareForAssignment(assignment.quoteRequestId, assignment);
       return notificationId;
     }

@@ -472,9 +472,15 @@ export class PrismaLeadAssignmentsRepository implements LeadAssignmentsRepositor
     return contact && typeof contact === "object" && !Array.isArray(contact) ? contact as Record<string, unknown> : {};
   }
 
+  /**
+   * A submitted quote request stores the visitor's answers as the whole payload (`payload: parsed.answers`
+   * in the submission service). A payload that wraps them in `answers` is read the same way; without
+   * this fallback every lead looked empty and failed the "minimum information" billing criterion.
+   */
   private answersFromPayload(payload: Record<string, unknown>): Record<string, unknown> {
     const answers = payload.answers;
-    return answers && typeof answers === "object" && !Array.isArray(answers) ? answers as Record<string, unknown> : {};
+    if (answers && typeof answers === "object" && !Array.isArray(answers)) return answers as Record<string, unknown>;
+    return "contact" in payload ? {} : payload;
   }
 
   private toHistory(row: unknown): LeadAssignmentHistoryRecord {

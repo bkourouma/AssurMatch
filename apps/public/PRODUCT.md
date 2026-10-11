@@ -74,9 +74,12 @@ receive. Sponsorship is always labelled and never changes the score.
 - Voice: the editorial charter `specs/050-public-editorial-rewrite/content/00-charte-editoriale.md`
   (vouvoiement, short sentences, concrete before abstract, a limit is worth more than a promise, no
   exclamation marks, sentence case).
-- Not fancy (product owner, 2026-10-05): the site must stay plain and credible. Anti-reference:
+- Credible first, expressive allowed (product owner, 2026-10-05, loosened 2026-10-08): the site must
+  stay credible and clear on price and consent, but a distinct visual identity is welcome. Anti-references:
   `D:\APP\MedicProWeb`, a heavily themed site (painted freight-container metaphor, condensed all-caps
-  display, rendered metal plates). AssurMatch must not look like a costume or a concept piece.
+  display, rendered metal plates), and the retired navy-sign world « La signalétique ». AssurMatch must
+  not look like a costume or a concept piece. Current world: « Le patron » (indigo cloth, pattern sheet,
+  yellow measuring tape).
 
 ## Evidence on Hand
 

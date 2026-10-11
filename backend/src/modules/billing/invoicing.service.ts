@@ -233,8 +233,8 @@ export class InvoicingService {
       }
     });
     await this.notifyBroker(actor, invoice.partnerId, "invoice_issued", "Nouvelle facture disponible",
-      `Facture ${invoice.number} (periode ${invoice.periodFrom.toISOString().slice(0, 7)}) : ${formatXof(invoice.totalAmount)} TTC, echeance le ${invoice.dueDate}. ` +
-      "Reglement par virement bancaire ou mobile money hors plateforme. Detail et PDF dans Facturation.",
+      `Facture ${invoice.number} (période ${invoice.periodFrom.toISOString().slice(0, 7)}) : ${formatXof(invoice.totalAmount)} TTC, échéance le ${invoice.dueDate}. ` +
+      "Règlement par virement bancaire ou mobile money hors plateforme. Détail et PDF dans Facturation.",
       "IssuedInvoice", invoice.id);
     return this.toDetail(invoice);
   }
@@ -360,8 +360,8 @@ export class InvoicingService {
       reason: parsed.reason,
       context: { number: result.creditNote.number, invoiceNumber: invoice.number, totalAmount: result.creditNote.totalAmount, documentSha256: result.creditNote.documentSha256 }
     });
-    await this.notifyBroker(actor, invoice.partnerId, "credit_note_issued", "Avoir emis",
-      `L'avoir ${result.creditNote.number} annule la facture ${invoice.number} (${formatXof(invoice.totalAmount)} TTC). Detail et PDF dans Facturation.`,
+    await this.notifyBroker(actor, invoice.partnerId, "credit_note_issued", "Avoir émis",
+      `L'avoir ${result.creditNote.number} annule la facture ${invoice.number} (${formatXof(invoice.totalAmount)} TTC). Détail et PDF dans Facturation.`,
       "CreditNote", result.creditNote.id);
     return this.toDetail(result.invoice);
   }

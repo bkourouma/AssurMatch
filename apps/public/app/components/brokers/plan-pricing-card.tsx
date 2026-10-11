@@ -82,7 +82,7 @@ export function PlanPricingCard({
       {hasPrice ? (
         <div className="am-planpanel__price">
           <p className="am-planpanel__amount">
-            <span className="am-tabular">{monthlySubscription}</span>
+            <span>{monthlySubscription}</span>
             <span className="am-planpanel__per">{labels.monthlySubscription}</span>
           </p>
           <dl className="am-planpanel__fees">

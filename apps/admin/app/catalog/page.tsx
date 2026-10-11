@@ -30,7 +30,7 @@ export default async function CatalogFoundationPage() {
   return (
     <PageStack>
       <PageHeader
-        breadcrumb={[{ label: "Catalogue" }, { label: "Catalogue" }]}
+        breadcrumb={[{ label: "Configuration" }, { label: "Catalogue" }]}
         kicker="Configuration"
         title="Catalogue socle"
         description="Pilotage interne des pays, regimes et produits avec exposition publique desactivee par defaut et controlee par les flags existants."

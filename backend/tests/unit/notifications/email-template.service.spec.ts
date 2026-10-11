@@ -40,7 +40,7 @@ describe("auth email templates", () => {
 
     expect(email).toMatchObject({
       to: user.email,
-      subject: "Activation de votre acces AssurMatch",
+      subject: "Activation de votre accès AssurMatch",
       purpose: "auth_activation"
     });
     expect(email.body).toContain("activation-token");
@@ -48,7 +48,7 @@ describe("auth email templates", () => {
     expect(email.html).toContain("activation-token");
     expect(email.body.toLowerCase()).not.toContain("souscrire maintenant");
     expect(email.body.toLowerCase()).not.toContain("contrat valide");
-    expect(email.body.toLowerCase()).not.toContain("garantie acceptee");
+    expect(email.body.toLowerCase()).not.toContain("garantie acceptée");
   });
 
   it("renders reset link with encoded token", () => {
@@ -57,7 +57,7 @@ describe("auth email templates", () => {
 
     expect(email.purpose).toBe("auth_password_reset");
     expect(email.body).toContain("https://admin.assurmatch.test/password-reset?token=reset%20token");
-    expect(email.subject).toContain("Reinitialisation");
+    expect(email.subject).toContain("Réinitialisation");
   });
 
   it("sends broker users to the broker back-office, never to the admin one", () => {

@@ -176,8 +176,8 @@ export class AnonymizationService {
         await this.deps.inApp.publishInApp({
           scopeId: partnerTenantId,
           template: "lead_data_anonymized",
-          title: "Donnees personnelles anonymisees",
-          body: `Les donnees personnelles de ${count} demande${count > 1 ? "s" : ""} (${shown.join(", ")}${more > 0 ? ` et ${more} autre${more > 1 ? "s" : ""}` : ""}) ont ete anonymisees selon la politique de conservation de la plateforme. Les statuts, historiques et montants sont conserves.`,
+          title: "Données personnelles anonymisées",
+          body: `Les données personnelles de ${count} demande${count > 1 ? "s" : ""} (${shown.join(", ")}${more > 0 ? ` et ${more} autre${more > 1 ? "s" : ""}` : ""}) ont été anonymisées selon la politique de conservation de la plateforme. Les statuts, historiques et montants sont conservés.`,
           targetType: "AnonymizationBatch",
           targetId: batch.id
         });

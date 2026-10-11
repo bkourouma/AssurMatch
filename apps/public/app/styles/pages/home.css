@@ -4,10 +4,10 @@
  */
 
 /* ==========================================================================
-   1. The sign: location line, headline, product rows
+   1. The opening: location line on the cloth, headline and product pieces on the sheet
    ========================================================================== */
 
-/* The location line replaces the breadcrumb on the home sign. */
+/* The location line replaces the breadcrumb above the home sheet. */
 .am-home-location {
   display: flex;
   flex-wrap: wrap;
@@ -35,7 +35,7 @@
 }
 
 .am-home-sign .am-hero__title {
-  max-width: 16ch;
+  max-width: none;
 }
 
 .am-home-sign .am-hero__inner {
@@ -50,26 +50,27 @@
 
 .am-home-products__title {
   margin: 0;
-  color: var(--am-sign-ink);
-  font-size: var(--am-h4-size);
-  font-weight: 700;
-  letter-spacing: 0;
+  color: var(--am-heading);
+  font-family: var(--am-font-heading);
+  font-size: var(--am-h3-size);
+  font-weight: 750;
+  letter-spacing: var(--am-tracking-snug);
 }
 
 .am-home-products__note {
   max-width: 40em;
   margin: 0;
-  color: var(--am-sign-ink-muted);
+  color: var(--am-text-muted);
   font-size: var(--am-small-size);
 }
 
 /* The product rows are the page's main action: a bigger tap target and a bigger name. */
 .am-home-products .am-directory__row {
-  min-height: 72px;
+  min-height: 76px;
 }
 
 .am-home-products .am-directory__title {
-  font-size: 19px;
+  font-size: 22px;
 }
 
 /* On wide screens the text column spans the sign; the rows sit under the headline. */
@@ -140,6 +141,19 @@
   .am-home-role {
     gap: var(--am-space-48);
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+.am-home-role__group {
+  padding: var(--am-space-24) var(--am-space-20);
+  border: 1px solid var(--am-primary-100);
+  border-radius: var(--am-radius-xs);
+  background: var(--am-sheet) var(--am-notch-left) 0 36px no-repeat;
+}
+
+@media (min-width: 900px) {
+  .am-home-role__group {
+    padding: var(--am-space-32) var(--am-space-32);
   }
 }
 

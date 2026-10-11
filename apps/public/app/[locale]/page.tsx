@@ -2,6 +2,7 @@ import { getTranslations, setRequestLocale } from "next-intl/server";
 import { toLocale } from "../../i18n/routing";
 import { Link } from "../../i18n/navigation";
 import { EntrySelector, type EntrySelectorProduct } from "../components/site/entry-selector";
+import { JourneyRoute } from "../components/journey/journey-route";
 import { PlatformStatusNotice } from "../components/site/platform-status-notice";
 import { BackendText } from "../components/ui/backend-text";
 import { Directory, type DirectoryItem } from "../components/ui/directory";
@@ -114,7 +115,7 @@ export default async function PublicHomePage({ params }: { params: Promise<{ loc
     key: guide.slug,
     title: guide.title,
     meta: guide.description,
-    icon: "book-open",
+    ...(guide.productKey ? { pictogram: productPictogram(guide.productKey) } : { icon: "book-open" as const }),
     href: { pathname: "/guides/[slug]", params: { slug: guide.slug } }
   }));
 
@@ -132,12 +133,13 @@ export default async function PublicHomePage({ params }: { params: Promise<{ loc
 
   return (
     <>
-      <Hero className="am-home-sign" size="lg" title={t("title")} lead={t("lead")} breadcrumb={location}>
+      <Hero className="am-home-sign" size="lg" title={t("title")} lead={t("lead")} route={<JourneyRoute current="country" />}>
         {productRows.length > 0 ? (
           <div className="am-home-products">
+            {location}
             <h2 className="am-home-products__title">{t("productsTitle")}</h2>
             <Directory items={productRows} label={t("productsTitle")} columns={2} surface="plate" />
-            <p className="am-home-products__note">{preselected ? t("preselected", { country: preselected.name }) : t("preselectedNone")}</p>
+            {preselected ? null : <p className="am-home-products__note">{t("preselectedNone")}</p>}
           </div>
         ) : selectable.length > 0 ? (
           <EntrySelector
@@ -155,6 +157,7 @@ export default async function PublicHomePage({ params }: { params: Promise<{ loc
         <section className="am-home-entry" aria-label={t("entryOther")}>
           <div className="am-container">
             <EntrySelector
+              emphasis="secondary"
               title={t("entryOther")}
               countries={selectable.map((country) => ({ isoCode: country.isoCode, name: country.name }))}
               products={entryProducts}

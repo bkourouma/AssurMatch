@@ -29,6 +29,7 @@ import type { PartnerLicense, PartnerLicensesService } from "../partner-licenses
 import { partnerConflict, partnerForbidden, partnerNotFound, partnerUnprocessable } from "../partners/partner-errors";
 import type { PartnersService, PartnerTenant } from "../partners/partners.module";
 import type { Product } from "../products/products.module";
+import { UNKNOWN_ISSUING_AUTHORITY } from "../../../../packages/shared/contracts/licence-issuer";
 import type { ProspectIdentityService } from "../prospects/prospect-identity.service";
 import {
   MemoryPartnerApplicationsRepository,
@@ -46,8 +47,6 @@ const ADMIN_READ_ROLES = new Set<AssurMatchRole>(["super_admin", "admin_pays", "
 /** Spec 051 R10 / R13: conversion and refusal are reserved to these roles (explicit role check). */
 const DECISION_ROLES = new Set<AssurMatchRole>(["super_admin", "compliance_admin"]);
 const DECIDED_STATUSES = new Set<PartnerApplicationStatus>(["accepted", "rejected"]);
-/** Issuing authority of a draft licence whose application left it blank; compliance completes it. */
-const UNKNOWN_ISSUING_AUTHORITY = "A completer (non declaree dans la candidature)";
 
 export interface PartnerApplicationsDependencies {
   findCountryByCode: (countryCode: string) => Country | undefined | Promise<Country | undefined>;

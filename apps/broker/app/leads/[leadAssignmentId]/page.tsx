@@ -1,12 +1,13 @@
 import { redirect } from "next/navigation";
 import { loginRedirect, readBackOfficeSession } from "../../lib/backoffice-auth";
 import { isNotFoundState, readLeadProposals, readStarterLeadDetail, readStarterLeadHistory } from "../../lib/broker-api";
-import { PROPOSAL_NOTICES } from "../../lib/proposal-vocabulary";
+import { PROPOSAL_NOTICES, VISITOR_RESPONSE_LABELS } from "../../lib/proposal-vocabulary";
 import { ProposalPanel } from "../../lib/ui/proposal-panel";
 import { acceptStarterLeadAction, closeStarterLeadAction, disputeStarterLeadAction, rejectStarterLeadAction } from "../../lib/lead-actions";
 import { TENANT_SUSPENDED_MESSAGE, canMutateStarterLead, isTenantReadOnly } from "../../lib/broker-permissions";
 import {
   STARTER_ACTION_REASONS,
+  STARTER_ACCEPTABLE_STATUSES,
   STARTER_CLOSABLE_STATUSES,
   STARTER_CLOSE_OUTCOMES,
   STARTER_CLOSE_OUTCOME_LABELS,
@@ -112,6 +113,8 @@ export default async function BrokerLeadDetailPage({
   const isFinal = Boolean(lead && (STARTER_FINAL_STATUSES as readonly string[]).includes(lead.status));
   const showActions = Boolean(lead) && canMutate && !isFinal;
   // Spec 059 (suite): cloture d'un lead accepte (cycle de vie minimal Starter, constitution 1.3.0).
+  // « Accepter » n'a de sens que tant que le lead n'est pas accepte.
+  const canAccept = showActions && Boolean(lead && (STARTER_ACCEPTABLE_STATUSES as readonly string[]).includes(lead.status));
   const canClose = showActions && Boolean(lead && (STARTER_CLOSABLE_STATUSES as readonly string[]).includes(lead.status));
   const noticeEntry = notice ? NOTICES[notice] : undefined;
   const proposalNoticeEntry = proposalNotice ? PROPOSAL_NOTICES[proposalNotice] : undefined;
@@ -196,13 +199,15 @@ export default async function BrokerLeadDetailPage({
         <Card title="Actions Starter">
           {showActions ? (
             <>
-              <form action={acceptStarterLeadAction}>
-                <input type="hidden" name="leadAssignmentId" value={lead.leadAssignmentId} />
-                <Cluster>
-                  <Button type="submit">Accepter</Button>
-                  <span>Le courtier reste responsable de la prise de contact et du suivi commercial.</span>
-                </Cluster>
-              </form>
+              {canAccept ? (
+                <form action={acceptStarterLeadAction}>
+                  <input type="hidden" name="leadAssignmentId" value={lead.leadAssignmentId} />
+                  <Cluster>
+                    <Button type="submit">Accepter</Button>
+                    <span>Le courtier reste responsable de la prise de contact et du suivi commercial.</span>
+                  </Cluster>
+                </form>
+              ) : null}
 
               <Cluster>
                 <ConfirmDialog
@@ -344,7 +349,7 @@ export default async function BrokerLeadDetailPage({
                   : ""}
                 {event.reason ? ` - motif: ${starterReasonLabel(event.reason)}` : ""}
                 {event.outcome ? ` - issue: ${starterCloseOutcomeLabel(event.outcome)}` : ""}
-                {event.comment ? ` - ${event.comment}` : ""}
+                {event.comment ? ` - ${event.eventType === "visitor_responded" ? VISITOR_RESPONSE_LABELS[event.comment] ?? event.comment : event.comment}` : ""}
               </li>
             ))}
           </ol>

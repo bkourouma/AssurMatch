@@ -11,62 +11,54 @@ Scope: the whole public site, home first; every route inherits the world. Mode: 
 product and broker-acquisition pages; Operate on offers, compare and quote; Read on guides, FAQ,
 glossary and legal pages.
 
-Audience and job: see PRODUCT.md. Phones first (390px), desktop second. Constraint from the owner:
-"not fancy"; anti-reference D:\APP\MedicProWeb (themed costume world).
+Audience and job: see PRODUCT.md. Phones first (390px), desktop second. 2026-10-08: the owner asked
+for a new visual world and allows more expressivity than the "not fancy" brief of 2026-10-05, while
+the site must still read as credible and plain on price and consent. Anti-references: D:\APP\MedicProWeb
+(themed costume site) and the previous world "La signalétique" (navy sign panels, directory rows).
 
-Build path: code-led (the OpenAI key is deactivated, so no comps exist; the owner's recorded default
-is comp-first and stays in .impeccable/config.json).
+Build path: code-led (the OpenAI key is deactivated; no comps can be made). The decision round was
+presented through the structured question tool because the decision page closed unanswered.
 
 ## Direction contract
 
-THESIS: The public site is a wayfinding sign system for an insurance decision. Every page opens on a
-navy sign that says where you are; every list is a directory of rows you walk; every price says who
-confirms it. It refuses the comparator default: soft gradient hero, form-in-a-card, rows of
-icon cards, eyebrow labels.
+THESIS: The site is a tailor's pattern. You pick the cloth first (compare), then the broker takes your
+measurements (quote). Each page is a pattern sheet laid on indigo cloth with cut lines, notches and a
+yellow measuring tape that counts the steps. It refuses the comparator default: blue hero over a
+search box, rows of icon cards, trust-badge strips, and the previous navy sign panel plus directory.
 
-OWN-WORLD: White ground and pale cool-grey bands; flat navy sign panels with white Atkinson
-Hyperlegible Next. Palette law: navy = where you are, logo blue = what you can do (links, buttons),
-green = confirmed or done, orange = sponsored, red = error; nothing decorative. 4px corners, 1px
-rules, no shadows, no gradients, no glass. Navy pictogram tiles drawn from flat planes. Indicative
-is outlined, confirmed is solid.
+OWN-WORLD: Saturated indigo bazin cloth (#25207A family) as the ground of every page opening and the
+footer; cold white pattern paper laid on it with a dashed cut line, notches and a grain-line arrow;
+measuring-tape yellow (#F2C230) for the action and the tape that carries the steps, black ticks drawn
+as SVG; one display grotesque with character (Bricolage Grotesque) over the legible body face
+(Atkinson Hyperlegible Next). Palette law: indigo = the cloth, structure and headings; yellow = the
+action; brand blue = links; green = confirmed by the broker; orange = sponsored; red = error. Flat,
+no gradients, no glass; pieces are cut with notches, not rounded.
 
-STORY: The visitor sees their country and the products open there, understands that offers are
-indicative and confirmed by an authorised broker, walks Pays, Produit, Offres, Demande, Courtier
-along a visible route, and sends a request only after consent.
+STORY: The visitor sees their country and the products open there as pieces cut from the cloth,
+understands that the broker confirms the final fit, follows the tape Pays, Produit,
+Offres, Demande, Courtier, and sends a request only after consent.
 
-FIRST VIEWPORT: 390px: 56px white bar (flat mark + wordmark, compare icon, menu). Navy sign about
-40% high: location line with the country and a change link, h1 « Comparez d'abord. Soyez
-accompagné ensuite. » at 34-38px bold white, one indicative sentence. Attached white directory:
-« Choisissez un produit », 64px rows (navy pictogram tile, bold name, arrow): the primary action.
-1440px: the sign spans the container; headline over a two-column product directory inside the same
-frame; never a split hero.
+FIRST VIEWPORT: 390px: white bar (flat mark + wordmark, search, menu), then full indigo cloth; the
+location line (country and "Changer de pays") in white on the cloth, then a pattern sheet laid on it with a
+dashed cut line and notches; on the sheet the h1 « Comparez d'abord. Soyez accompagné ensuite. » at 38px
+display, one indicative sentence, then the product pieces as ruled rows (indigo tile with yellow
+pictogram, name, capabilities, indigo arrow, 2px indigo outline): the product rows are the one primary action. Journey
+pages carry the yellow measuring tape above the sheet. 1440px: the sheet spans the container on the cloth,
+the product pieces in two columns under the headline; never a centred hero.
 
-FORM: airport and bus-station wayfinding signage, position 4 of 7 on the ordered list, seed key
-dab26c12. Signature interaction: the « Vous êtes ici » route strip on every journey page, stops are
-links back, current stop the strongest solid mark (a white disc on the navy sign). Motion: no entrance animation; directory arrows nudge 4px on
-hover and focus. Raises: fixed label grid on every offer card; solid confirmed / outlined
-indicative; palette law; owned navy; flat-plane pictograms; offer columns never move.
+FORM: tailor's pattern and measure card (pattern paper, cut lines, notches, grain line, tape), position
+1 of 7 on the ordered list, pick card; seed key 530b6f9e. Signature interaction: the yellow tape strip
+on every journey page; stops are links back, the current stop is a solid indigo marker on the tape.
+Motion: none on entry; directory rows lift 2px on hover and focus (reduced motion off only).
 
 FINISH: unreviewed and undocumented is unfinished; this build ends with the finish review, the verdict, DESIGN.md, and every shipping raster carrying its provenance
 
 ## Roll record
 
-Seed key dab26c12 (concept-seed, scope direction, mode persuade, catalog pool c3b204a1eed6). The
-roll is reproduced in `.impeccable/questions/roll-dab26c12.txt` (assigned index 4, six challengers);
-the decision payload with verdicts and raises is `.impeccable/questions/direction.json`; the owner
-chose the assigned card on 2026-10-05.
+Seed key 530b6f9e (concept-seed, scope direction, mode persuade, catalog pool c3b204a1eed6). The roll
+assigned index 6 (L'ardoise); the owner chose Impeccable's pick, "Le patron" (candidate 1), on
+2026-10-08. Roll text in `.impeccable/questions/roll-new.txt`; payload in `direction-2.json`.
 
-Grounded candidates, ordered by resonance before the roll (the roll assigned number 4):
-1. Le guichet: plain public-service web writing (offered as Impeccable's pick).
-2. Le banc d'essai: consumer-magazine comparison tables with explained scores.
-3. La page services: newspaper service listings (pharmacies de garde, columns by commune).
-4. La signalétique: airport and bus-station wayfinding signage (built).
-5. Le récépissé: carbon-copy receipt book of a request filed.
-6. Le fil de messages: the request as a WhatsApp-style message thread.
-7. Le parapluie: the logo's umbrella and shield as page geometry (the literal reading).
-Replaced before the roll on truth grounds: the insurance attestation document grammar (AssurMatch
-issues no attestation, constitution I) and the mobile-money receipt (AssurMatch collects no premium).
-
-## Unresolved
-
-- The simplified logo (flat SVG mark) is a brand change: show it to the owner before shipping.
+Grounded candidates, ordered: 1 Le patron du couturier, 2 le reçu mobile money (Wave / Orange Money),
+3 la carte brune CEDEAO et la vignette, 4 l'affiche de santé publique, 5 le catalogue de pagnes
+imprimés, 6 l'ardoise du maquis, 7 le gbaka peint.

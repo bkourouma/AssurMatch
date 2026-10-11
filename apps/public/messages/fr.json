@@ -642,6 +642,7 @@
     "offerPartnerRetained": "Votre demande a été transmise à {partner}.",
     "offerPartnerNotRetained": "Le courtier de l'offre choisie n'était pas disponible : votre demande a été orientée vers un autre courtier partenaire agréé.",
     "trackLink": "Suivre ma demande et ajouter des documents (optionnel)",
+    "trackLinkOnly": "Suivre ma demande",
     "backToOffers": "Retour aux offres",
     "blocked": {
       "title": "Demande de devis indisponible",

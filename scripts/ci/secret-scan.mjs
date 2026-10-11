@@ -20,6 +20,9 @@ const files = pathsIndex >= 0
   ? args.slice(pathsIndex + 1)
   : execFileSync("git", ["ls-files", "-z"], { encoding: "utf8" }).split("\0").filter(Boolean);
 
+// The path patterns below use `/`; `--paths` on Windows hands over backslashes.
+const toPosix = (path) => path.replaceAll("\\", "/");
+
 const SKIPPED_FILES = /(^|\/)(package-lock\.json|.*\.(png|jpe?g|gif|ico|webp|pdf|woff2?|ttf|otf|zip|gz))$/i;
 const TEST_FILE = /(^|\/)(backend\/tests|apps\/[^/]+\/tests)\//;
 
@@ -69,7 +72,7 @@ function isPlaceholderValue(value) {
 export function scanContent(file, content) {
   const findings = [];
   const lines = content.split(/\r?\n/);
-  const isTest = TEST_FILE.test(file);
+  const isTest = TEST_FILE.test(toPosix(file));
   lines.forEach((line, index) => {
     if (line.includes("secret-scan:allow")) return;
     const at = `${file}:${index + 1}`;
@@ -86,7 +89,7 @@ export function scanContent(file, content) {
       const smtp = line.match(/^\s*(?:export\s+)?EMAIL_SMTP_PASS\s*[:=]\s*(.*)$/);
       if (smtp && !safeEmailPassValues.has(normalizeAssignmentValue(smtp[1] ?? ""))) {
         findings.push(`${at}: EMAIL_SMTP_PASS must be empty, REDACTED, or an explicit runtime placeholder`);
-      } else if (!smtp && ASSIGNMENT_FILE.test(file)) {
+      } else if (!smtp && ASSIGNMENT_FILE.test(toPosix(file))) {
         const assignment = line.match(SECRET_ASSIGNMENT);
         if (assignment && !isPlaceholderValue(normalizeAssignmentValue(assignment[2] ?? ""))) {
           findings.push(`${at}: literal value assigned to ${assignment[1]}`);
@@ -99,7 +102,7 @@ export function scanContent(file, content) {
 
 const findings = [];
 for (const file of files) {
-  if (SKIPPED_FILES.test(file)) continue;
+  if (SKIPPED_FILES.test(toPosix(file))) continue;
   let content;
   try {
     content = readFileSync(file, "utf8");
