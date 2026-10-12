@@ -46,7 +46,7 @@
     "satisfaction-surveys:deliver-due": "node --import tsx scripts/satisfaction-survey-delivery-worker.ts"
   },
   "dependencies": {
-    "@anthropic-ai/sdk": "^0.131.0",
+    "@anthropic-ai/sdk": "^0.133.0",
     "@nestjs/common": "12.1.2",
     "@nestjs/core": "12.1.2",
     "@nestjs/platform-express": "12.1.2",
@@ -54,8 +54,8 @@
     "@prisma/client": "7.10.0",
     "argon2": "^0.45.1",
     "bullmq": "5.76.2",
-    "lucide-react": "^1.52.0",
-    "next": "16.3.8",
+    "lucide-react": "^1.54.0",
+    "next": "16.4.0",
     "next-intl": "^4.14.9",
     "otplib": "^13.5.0",
     "pg": "^8.23.1",
@@ -67,12 +67,12 @@
   },
   "devDependencies": {
     "@eslint/js": "10.0.1",
-    "@playwright/test": "1.63.0",
+    "@playwright/test": "1.64.0",
     "@types/node": "26.6.4",
     "eslint": "10.12.0",
     "tsx": "4.23.15",
     "typescript": "6.0.3",
-    "typescript-eslint": "8.71.0",
+    "typescript-eslint": "8.71.1",
     "vitest": "5.0.3"
   },
   "overrides": {
