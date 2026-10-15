@@ -4,6 +4,7 @@ import { useActionState } from "react";
 import {
   Button,
   Card,
+  Checkbox,
   Field,
   Form,
   FormActions,
@@ -12,7 +13,15 @@ import {
   Select,
   Stack
 } from "./lib/ui/broker-ui";
-import { activateAction, enrollMfaAction, passwordChangeAction, passwordResetConsumeAction, verifyMfaAction, type AuthFlowState } from "./lib/auth-flow-actions";
+import {
+  activateAction,
+  enrollMfaAction,
+  passwordChangeAction,
+  passwordResetConsumeAction,
+  revokeTrustedDevicesAction,
+  verifyMfaAction,
+  type AuthFlowState
+} from "./lib/auth-flow-actions";
 
 const initialAuthFlowState: AuthFlowState = { status: "idle" };
 
@@ -54,21 +63,30 @@ export function ActivationForm({ returnTo, token }: { returnTo: string; token: s
   );
 }
 
-export function MfaPanel({ returnTo }: { returnTo: string }) {
+/**
+ * MFA enrolment + verification. Spec 063 (FR-A11): once a secret is enrolled and the session is not MFA-verified,
+ * only the verification form is offered (the API refuses re-enrolment to such a session). A verified user who
+ * manages the account passes `showEnrollment` to keep the re-enrolment form.
+ */
+export function MfaPanel({ returnTo, mfaEnrolled = false, showEnrollment }: { returnTo: string; mfaEnrolled?: boolean; showEnrollment?: boolean }) {
   const [enrollState, enrollAction, enrollPending] = useActionState(enrollMfaAction, initialAuthFlowState);
   const [verifyState, verifyAction, verifyPending] = useActionState(verifyMfaAction, initialAuthFlowState);
+  // Keep the form mounted once an enrolment was attempted so the one-time secret stays visible.
+  const enrollmentVisible = (showEnrollment ?? !mfaEnrolled) || enrollState.status !== "idle";
   return (
     <Stack>
-      <Card title="Enrolement MFA">
-        <Form action={enrollAction}>
-          <FlowNotice state={enrollState} />
-          <FormActions>
-            <Button type="submit" variant="secondary" pending={enrollPending} pendingLabel="Generation...">
-              Generer secret et codes de secours
-            </Button>
-          </FormActions>
-        </Form>
-      </Card>
+      {enrollmentVisible ? (
+        <Card title="Enrolement MFA">
+          <Form action={enrollAction}>
+            <FlowNotice state={enrollState} />
+            <FormActions>
+              <Button type="submit" variant="secondary" pending={enrollPending} pendingLabel="Generation...">
+                Generer secret et codes de secours
+              </Button>
+            </FormActions>
+          </Form>
+        </Card>
+      ) : null}
       <Card title="Verification MFA">
         <Form action={verifyAction}>
           <input type="hidden" name="returnTo" value={returnTo} />
@@ -87,6 +105,12 @@ export function MfaPanel({ returnTo }: { returnTo: string }) {
               ]}
             />
           </Field>
+          <Checkbox
+            id="mfa-trust-device"
+            name="trustDevice"
+            label="Faire confiance à cet appareil pendant 30 jours"
+            hint="Le code ne vous sera plus demandé sur cet appareil pendant 30 jours. Ne cochez pas sur un ordinateur partagé."
+          />
           <FormActions>
             <Button type="submit" pending={verifyPending} pendingLabel="Verification...">
               Verifier MFA
@@ -95,6 +119,21 @@ export function MfaPanel({ returnTo }: { returnTo: string }) {
         </Form>
       </Card>
     </Stack>
+  );
+}
+
+/** "Révoquer tous les appareils de confiance" (spec 063, FR-A06). */
+export function RevokeTrustedDevicesForm() {
+  const [state, formAction, pending] = useActionState(revokeTrustedDevicesAction, initialAuthFlowState);
+  return (
+    <Form action={formAction}>
+      <FlowNotice state={state} />
+      <FormActions>
+        <Button type="submit" variant="secondary" pending={pending} pendingLabel="Révocation...">
+          Révoquer tous les appareils de confiance
+        </Button>
+      </FormActions>
+    </Form>
   );
 }
 

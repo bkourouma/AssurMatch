@@ -1,5 +1,7 @@
 import type { Tone } from "./broker-ui";
 import type { BrokerDashboardData } from "../broker-api";
+import { DISPUTE_WINDOW_DAYS } from "../lead-vocabulary";
+import { TENANT_SUSPENDED_MESSAGE } from "../broker-permissions";
 
 export interface KpiViewModel {
   label: string;
@@ -79,4 +81,54 @@ export function leadSummary(lead: Record<string, unknown>): LeadSummaryViewModel
     urgency: lead.urgency ? String(lead.urgency) : undefined,
     source: lead.source ? String(lead.source) : undefined
   };
+}
+
+export function formatXof(amount: number): string {
+  return `${amount.toLocaleString("fr-FR").replace(/\u202f|\u00a0/g, " ")} XOF`;
+}
+
+/** Spec 063: « 14 novembre 2026 à 22:15 UTC », la limite exacte de la fenêtre de contestation. */
+export function formatDeadline(value?: string | null): string {
+  if (!value) return "-";
+  const date = new Date(value);
+  if (Number.isNaN(date.valueOf())) return String(value);
+  const day = date.toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric", timeZone: "UTC" });
+  const time = date.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit", timeZone: "UTC" });
+  return `${day} à ${time} UTC`;
+}
+
+export function disputeStatusTone(status: string): Tone {
+  if (status === "accepted") return "success";
+  if (status === "rejected") return "danger";
+  if (status === "opened" || status === "under_review") return "warning";
+  return "neutral";
+}
+
+export interface DisputeAvailability {
+  /** The « Contester » action may be shown and used. */
+  canDispute: boolean;
+  /** Always-visible sentence: deadline when open, explanation when the action is unavailable. */
+  message: string;
+}
+
+/**
+ * Spec 063 FR-B01/FR-B02/FR-B09: the « Contester » action is offered while the 30-day window is open,
+ * when no dispute exists yet on the lead and when the role may write. The API re-checks all three
+ * (409 DISPUTE_WINDOW_EXPIRED, 409 DISPUTE_ALREADY_EXISTS, 403) and audits every refusal.
+ */
+export function disputeAvailability(input: {
+  window: { deadline: string; open: boolean } | undefined;
+  hasDispute: boolean;
+  canMutate: boolean;
+  tenantReadOnly: boolean;
+}): DisputeAvailability {
+  const { window, hasDispute, canMutate, tenantReadOnly } = input;
+  if (hasDispute) return { canDispute: false, message: "Ce lead a déjà fait l'objet d'une contestation : un lead ne peut être contesté qu'une seule fois." };
+  if (window && !window.open) {
+    return { canDispute: false, message: `La contestation n'est plus possible : la fenêtre de ${DISPUTE_WINDOW_DAYS} jours est close depuis le ${formatDeadline(window.deadline)}.` };
+  }
+  if (tenantReadOnly) return { canDispute: false, message: TENANT_SUSPENDED_MESSAGE };
+  const until = window ? `Contestation possible jusqu'au ${formatDeadline(window.deadline)}.` : `Contestation possible dans les ${DISPUTE_WINDOW_DAYS} jours suivant la réception du lead.`;
+  if (!canMutate) return { canDispute: false, message: `${until} Votre rôle ne permet pas de contester ce lead.` };
+  return { canDispute: true, message: until };
 }

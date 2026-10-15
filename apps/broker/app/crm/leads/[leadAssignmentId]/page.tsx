@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 import { isStarterCrmDenied, loginRedirect, readBackOfficeSession } from "../../../lib/backoffice-auth";
 import { isNotFoundState, listLeadAiInteractions, readBrokerAIAssistance, readCrmLeadDetail, readLeadProposals } from "../../../lib/broker-api";
 import { TENANT_SUSPENDED_MESSAGE, canAssignCrmLead, canMutateCrmLead, isTenantReadOnly } from "../../../lib/broker-permissions";
-import { addCrmLeadNoteAction, addCrmLeadReminderAction, addCrmLeadTaskAction, changeCrmLeadStatusAction } from "../../../lib/lead-actions";
+import { addCrmLeadNoteAction, addCrmLeadReminderAction, addCrmLeadTaskAction, changeCrmLeadStatusAction, disputeCrmLeadAction } from "../../../lib/lead-actions";
 import { assignCrmAdvisorAction } from "../../../lib/proposal-actions";
 import { PROPOSAL_NOTICES } from "../../../lib/proposal-vocabulary";
 import { ProposalPanel } from "../../../lib/ui/proposal-panel";
@@ -22,6 +22,7 @@ import {
   Button,
   Card,
   Cluster,
+  ConfirmDialog,
   DescriptionList,
   Field,
   Form,
@@ -36,7 +37,8 @@ import {
   Tabs,
   TenantWriteGuard
 } from "../../../lib/ui/broker-ui";
-import { formatDate } from "../../../lib/ui/broker-view-models";
+import { DisputeStatusCard } from "../../../lib/ui/dispute-status-card";
+import { disputeAvailability, formatDate } from "../../../lib/ui/broker-view-models";
 import { LeadAiPanel } from "./lead-ai-panel";
 
 const NOTICES: Record<string, { tone: "info" | "warning" | "danger"; message: string }> = {
@@ -45,6 +47,10 @@ const NOTICES: Record<string, { tone: "info" | "warning" | "danger"; message: st
   task_created: { tone: "info", message: "Tache commerciale creee pour votre cabinet." },
   reminder_created: { tone: "info", message: "Rappel programme pour votre cabinet." },
   reason_required: { tone: "warning", message: "Un motif allowliste est obligatoire pour un statut de perte ou de contestation." },
+  // Spec 063 (CRM-012): contestation d'un lead.
+  disputed: { tone: "info", message: "Contestation enregistrée et historisée. La finance AssurMatch statuera ; vous serez notifié de la décision." },
+  dispute_window_expired: { tone: "warning", message: "Contestation refusée : la fenêtre de 30 jours suivant la réception du lead est close." },
+  dispute_exists: { tone: "warning", message: "Contestation refusée : ce lead a déjà fait l'objet d'une contestation." },
   forbidden: { tone: "warning", message: "Action refusee par vos permissions CRM, votre tenant ou votre MFA." },
   // Spec 051 FR-021: 403 PARTNER_SUSPENDED.
   suspended: { tone: "warning", message: TENANT_SUSPENDED_MESSAGE },
@@ -123,6 +129,8 @@ export default async function BrokerCrmLeadDetailPage({ params, searchParams }: 
   const tasks = lead?.tasks ?? [];
   const reminders = lead?.reminders ?? [];
   const history = lead?.history ?? [];
+  const disputes = lead?.disputes ?? [];
+  const availability = disputeAvailability({ window: lead?.disputeWindow, hasDispute: disputes.length > 0, canMutate, tenantReadOnly });
   const reasonRequiredLabels = CRM_REASON_REQUIRED_STATUSES.map((status) => CRM_STATUS_LABELS[status]).join(", ");
   const currentTab: TabKey = TABS.some((item) => item.key === tab) ? (tab as TabKey) : "synthese";
   const tabHref = (key: TabKey) => (key === "synthese" ? `/crm/leads/${leadAssignmentId}` : `/crm/leads/${leadAssignmentId}?tab=${key}`);
@@ -262,6 +270,43 @@ export default async function BrokerCrmLeadDetailPage({ params, searchParams }: 
                   <p>
                     Un motif allowliste est obligatoire pour les statuts suivants: {reasonRequiredLabels}. Le changement de statut est historise avec acteur, date et motif.
                   </p>
+                </Card>
+              ) : null}
+
+              {lead ? <DisputeStatusCard disputes={disputes} /> : null}
+
+              {lead ? (
+                <Card
+                  title="Contester ce lead"
+                  description="Un lead se conteste une seule fois, dans les 30 jours suivant sa réception. La finance AssurMatch statue ; si la contestation est acceptée, le lead est crédité sur votre prochain brouillon de facture ou par un avoir partiel."
+                >
+                  <Notice tone={availability.canDispute ? "info" : "warning"}>{availability.message}</Notice>
+                  {availability.canDispute ? (
+                    <ConfirmDialog
+                      triggerLabel="Contester"
+                      title="Contester ce lead"
+                      description="Le motif est obligatoire. La contestation est historisée avec acteur, date et motif, puis transmise à la finance AssurMatch."
+                      confirmLabel="Contester le lead"
+                      cancelLabel="Annuler"
+                      formAction={disputeCrmLeadAction}
+                    >
+                      <input type="hidden" name="leadAssignmentId" value={lead.leadAssignmentId} />
+                      <Field id="crm-dispute-reason" label="Motif de la contestation" required requiredLabel="obligatoire">
+                        <Select
+                          id="crm-dispute-reason"
+                          name="reason"
+                          required
+                          defaultValue=""
+                          aria-label="Motif de la contestation"
+                          placeholder="Choisir un motif"
+                          options={CRM_OUTCOME_REASONS.map((reason) => ({ value: reason, label: CRM_REASON_LABELS[reason] }))}
+                        />
+                      </Field>
+                      <Field id="crm-dispute-comment" label="Commentaire">
+                        <Input id="crm-dispute-comment" name="comment" maxLength={500} placeholder="Facultatif" aria-label="Commentaire de la contestation" />
+                      </Field>
+                    </ConfirmDialog>
+                  ) : null}
                 </Card>
               ) : null}
 

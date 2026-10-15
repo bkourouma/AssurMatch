@@ -16,11 +16,11 @@ export const STARTER_ACTION_REASONS = ["lead_quality", "wrong_scope", "unreachab
 export type StarterActionReason = (typeof STARTER_ACTION_REASONS)[number];
 
 export const STARTER_REASON_LABELS: Record<StarterActionReason, string> = {
-  lead_quality: "Qualite du lead insuffisante",
-  wrong_scope: "Hors perimetre pays ou produit",
+  lead_quality: "Qualité du lead insuffisante",
+  wrong_scope: "Hors périmètre pays ou produit",
   unreachable_prospect: "Prospect injoignable",
   duplicate: "Doublon",
-  compliance_concern: "Point de conformite"
+  compliance_concern: "Point de conformité"
 };
 
 export const STARTER_STATUS_LABELS: Record<string, string> = {
@@ -143,11 +143,11 @@ export const CRM_REASON_LABELS: Record<CrmOutcomeReason, string> = {
   coverage: "Garanties attendues",
   unreachable: "Prospect injoignable",
   duplicate: "Doublon",
-  wrong_scope: "Hors perimetre pays ou produit",
+  wrong_scope: "Hors périmètre pays ou produit",
   out_of_target: "Hors cible commerciale",
   invalid_lead: "Lead invalide",
   client_abandoned: "Abandon du prospect",
-  compliance_concern: "Point de conformite"
+  compliance_concern: "Point de conformité"
 };
 
 export const CRM_EVENT_LABELS: Record<string, string> = {
@@ -211,4 +211,37 @@ export function crmReasonLabel(value?: string | undefined): string {
 export function crmEventLabel(value?: string | undefined): string {
   if (!value) return "-";
   return CRM_EVENT_LABELS[value] ?? value;
+}
+
+/**
+ * Spec 063 (CRM-012): contestation d'un lead. Le courtier conteste dans les 30 jours suivant la
+ * reception du lead ; la finance AssurMatch tranche (acceptee ou rejetee) avec un motif et, si elle
+ * accepte, le lead est credite sur le prochain brouillon ou par un avoir partiel. Aucune prime
+ * d'assurance n'est concernee. Les statuts et modes de credit reproduisent
+ * `packages/shared/contracts/lead-disputes.contracts.ts`.
+ */
+export const DISPUTE_WINDOW_DAYS = 30;
+
+export const DISPUTE_STATUS_LABELS: Record<string, string> = {
+  opened: "Ouverte",
+  under_review: "En cours d'examen",
+  accepted: "Acceptée",
+  rejected: "Rejetée"
+};
+
+export const DISPUTE_CREDIT_MODE_LABELS: Record<string, string> = {
+  draft_invoice: "Crédité sur le prochain brouillon de facture",
+  credit_note: "Avoir partiel émis",
+  none: "Aucun crédit automatique : la finance AssurMatch traite ce cas avec votre cabinet"
+};
+
+/** Motif d'une contestation : motif Starter ou motif de sortie CRM selon l'origine. */
+export function disputeReasonLabel(value?: string | undefined): string {
+  if (!value) return "-";
+  return STARTER_REASON_LABELS[value as StarterActionReason] ?? CRM_REASON_LABELS[value as CrmOutcomeReason] ?? value;
+}
+
+export function disputeStatusLabel(value?: string | undefined): string {
+  if (!value) return "-";
+  return DISPUTE_STATUS_LABELS[value] ?? value;
 }

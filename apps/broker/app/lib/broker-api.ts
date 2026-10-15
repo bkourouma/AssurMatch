@@ -1,4 +1,5 @@
 import { backOfficeApiBaseUrl, getBackOfficeToken } from "./backoffice-auth";
+import type { BrokerLeadDisputeView, LeadDisputeWindow } from "../../../../packages/shared/contracts/lead-disputes.contracts";
 
 export const BROKER_AUTH_SOURCE_MARKER = "broker-auth-client:014";
 
@@ -6,14 +7,17 @@ export interface BackOfficeLoginResult {
   status: "success" | "mfa_required" | "activation_required" | "locked" | "suspended" | "validation_error" | "invalid_credentials" | "error";
   accessToken?: string;
   mfaRequired?: boolean;
+  /** Spec 063 (FR-A04): the API refused the presented trusted-device token; the app clears its cookie. */
+  trustedDeviceRejected?: boolean;
+  trustedDeviceUsed?: boolean;
   error?: string;
 }
 
-export async function loginBackOffice(email: string, password: string): Promise<BackOfficeLoginResult> {
+export async function loginBackOffice(email: string, password: string, trustedDeviceToken?: string): Promise<BackOfficeLoginResult> {
   const response = await fetch(`${backOfficeApiBaseUrl()}/auth/login`, {
     method: "POST",
     headers: { "content-type": "application/json" },
-    body: JSON.stringify({ email, password }),
+    body: JSON.stringify(trustedDeviceToken ? { email, password, trustedDeviceToken } : { email, password }),
     cache: "no-store"
   });
   if (response.status === 400 || response.status === 422) return { status: "validation_error", error: `api_${response.status}` };
@@ -22,7 +26,7 @@ export async function loginBackOffice(email: string, password: string): Promise<
   if (response.status === 428) return { status: "activation_required", error: "activation_required" };
   if (response.status === 401) return { status: "invalid_credentials", error: "invalid_credentials" };
   if (!response.ok) return { status: "error", error: `api_${response.status}` };
-  const session = await response.json() as { accessToken?: string; mfaRequired?: boolean };
+  const session = await response.json() as { accessToken?: string; mfaRequired?: boolean; trustedDeviceRejected?: boolean; trustedDeviceUsed?: boolean };
   if (!session.accessToken) return { status: "error", error: "invalid_session" };
   return session.mfaRequired ? { status: "mfa_required", ...session } : { status: "success", ...session };
 }
@@ -50,17 +54,70 @@ export async function enrollMfa() {
   return response.json() as Promise<{ secret: string; otpauthUri: string; backupCodes: string[] }>;
 }
 
-export async function verifyMfa(code: string, kind: "totp" | "backup" = "totp") {
+/** Spec 063: `trustedDevice` is returned once, only when `trustDevice` was requested. */
+export interface VerifyMfaResult {
+  accessToken?: string;
+  mfaRequired?: boolean;
+  trustedDevice?: { token: string; expiresAt: string };
+}
+
+export async function verifyMfa(
+  code: string,
+  kind: "totp" | "backup" = "totp",
+  options: { trustDevice?: boolean; deviceLabel?: string } = {}
+): Promise<VerifyMfaResult> {
   const token = await getBackOfficeToken();
   if (!token) throw new Error("session_required");
   const response = await fetch(`${backOfficeApiBaseUrl()}/auth/mfa/verify`, {
     method: "POST",
     headers: { Authorization: `Bearer ${token}`, "content-type": "application/json" },
-    body: JSON.stringify({ code, kind }),
+    body: JSON.stringify(options.trustDevice ? { code, kind, trustDevice: true, deviceLabel: options.deviceLabel } : { code, kind }),
     cache: "no-store"
   });
   if (!response.ok) throw new Error(`api_${response.status}`);
-  return response.json();
+  return response.json() as Promise<VerifyMfaResult>;
+}
+
+/** Spec 063 (FR-A06): active trusted devices of the signed-in user (MFA-verified token required). */
+export interface TrustedDeviceView {
+  id: string;
+  label: string | null;
+  createdAt: string;
+  lastUsedAt: string | null;
+  expiresAt: string;
+}
+
+export async function listTrustedDevices(): Promise<{ ok: true; devices: TrustedDeviceView[] } | { ok: false; error: string }> {
+  const token = await getBackOfficeToken();
+  if (!token) return { ok: false, error: "session_required" };
+  try {
+    const response = await fetch(`${backOfficeApiBaseUrl()}/auth/trusted-devices`, {
+      headers: { Authorization: `Bearer ${token}` },
+      cache: "no-store"
+    });
+    if (!response.ok) return { ok: false, error: `api_${response.status}` };
+    const body = (await response.json()) as TrustedDeviceView[] | { devices?: TrustedDeviceView[] };
+    return { ok: true, devices: Array.isArray(body) ? body : body.devices ?? [] };
+  } catch {
+    return { ok: false, error: "api_unavailable" };
+  }
+}
+
+export async function revokeTrustedDevices(): Promise<{ ok: true; revoked: number } | { ok: false; error: string }> {
+  const token = await getBackOfficeToken();
+  if (!token) return { ok: false, error: "session_required" };
+  try {
+    const response = await fetch(`${backOfficeApiBaseUrl()}/auth/trusted-devices`, {
+      method: "DELETE",
+      headers: { Authorization: `Bearer ${token}` },
+      cache: "no-store"
+    });
+    if (!response.ok) return { ok: false, error: `api_${response.status}` };
+    const body = (await response.json()) as { revoked?: number };
+    return { ok: true, revoked: typeof body.revoked === "number" ? body.revoked : 0 };
+  } catch {
+    return { ok: false, error: "api_unavailable" };
+  }
 }
 
 export async function changePassword(oldPassword: string, newPassword: string): Promise<void> {
@@ -210,6 +267,24 @@ export function readBrokerDashboard() {
   return readBroker<BrokerDashboardData>("/broker/dashboard", emptyDashboard);
 }
 
+/**
+ * Spec 063: dispute of a lead as the lead detail payloads carry it. Mirrors `brokerCrmDisputeSchema`
+ * (CRM) and the `dispute` object of `brokerStarterLeadDetailSchema` (Starter).
+ */
+export interface BrokerLeadDisputeData {
+  id: string;
+  status: "opened" | "under_review" | "accepted" | "rejected";
+  reason: string;
+  comment?: string;
+  createdAt: string;
+  decidedAt?: string;
+  decisionReason?: string;
+  creditMode?: "draft_invoice" | "credit_note" | "none";
+  creditNoteId?: string;
+  creditNoteNumber?: string;
+  creditAmount?: number;
+}
+
 export interface BrokerCrmLeadDetailData {
   leadAssignmentId: string;
   publicReference: string;
@@ -236,7 +311,10 @@ export interface BrokerCrmLeadDetailData {
   /** Spec 055 FR-001: coordonnees completes pour le courtier affecte, masquees apres retrait. */
   contactVisibility?: "full" | "masked";
   reminders?: Array<Record<string, unknown>>;
-  disputes?: Array<Record<string, unknown>>;
+  /** Spec 063 FR-B09: disputes of this lead with their finance decision and credit outcome. */
+  disputes?: BrokerLeadDisputeData[];
+  /** Spec 063 FR-B01: dispute window (30 days after reception). */
+  disputeWindow?: LeadDisputeWindow;
   advisorId?: string;
 }
 
@@ -408,6 +486,11 @@ export function readBrokerBillingAccount() {
   return readBroker<BrokerAccountData>("/broker/billing/account", emptyAccount);
 }
 
+/** Spec 063 FR-B09: disputes of the own cabinet (GET /broker/billing/disputes, billing:read_own). */
+export function readBrokerDisputes() {
+  return readBroker<{ items: BrokerLeadDisputeView[] }>("/broker/billing/disputes", { items: [] });
+}
+
 export function readBrokerAiOptOut() {
   return readBroker<BrokerAiOptOutData>("/broker/crm/ai/opt-out", { partnerTenantId: "", optedOut: false, updatedAt: null });
 }
@@ -514,6 +597,9 @@ export interface BrokerStarterLeadDetailData {
   contactVisibility?: "full" | "masked";
   answers: Record<string, unknown>;
   history: BrokerStarterLeadHistoryEventData[];
+  /** Spec 063 FR-B01/FR-B09: dispute window and dispute of this lead, when any. */
+  disputeWindow?: LeadDisputeWindow;
+  dispute?: BrokerLeadDisputeData;
 }
 
 const emptyStarterLeadDetail: BrokerStarterLeadDetailData = {
