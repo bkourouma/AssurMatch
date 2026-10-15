@@ -4,6 +4,7 @@ import { useLocale, useMessages, useTranslations } from "next-intl";
 import { useEffect, useRef, useState, type FormEvent, type RefObject } from "react";
 import { Link } from "../../i18n/navigation";
 import { quoteDocumentUploadEnabled, submitPublicQuoteRequest, type PublicPhoneRule, type PublicQuoteFormField, type PublicQuoteFormState, type PublicQuoteLanguage } from "../lib/public-api";
+import { visitorAiAnswers } from "../lib/visitor-ai-answers";
 import { InitialsTile } from "./journey/tiles";
 import { IndicativeOfferNotice } from "./public-journey";
 import { VisitorAiAssistant } from "./visitor-ai-assistant";
@@ -258,6 +259,9 @@ export function QuoteFormShell({
   const [needErrors, setNeedErrors] = useState<Record<string, string>>({});
   const [contactErrors, setContactErrors] = useState<Record<string, string>>({});
   const [review, setReview] = useState<{ need: ReviewRow[]; name: string; email: string; phone: string } | null>(null);
+  // Product answers (allow-listed, no contact or consent data) handed to the optional reading
+  // assistants. They only read it when the visitor presses their button, so tracking it costs no API call.
+  const [assistAnswers, setAssistAnswers] = useState<Record<string, unknown>>({});
   const [result, setResult] = useState<{
     status: "idle" | "submitting" | "success" | "error";
     message?: string;
@@ -281,6 +285,13 @@ export function QuoteFormShell({
     const target = step === 1 ? needHeadingRef.current : step === 2 ? contactHeadingRef.current : verifyHeadingRef.current;
     target?.focus();
   }, [step]);
+
+  /** Re-reads the rendered fields; the state only changes (and re-renders) when the allow-listed answers do. */
+  function syncAssistAnswers() {
+    if (!formRef.current) return;
+    const next = visitorAiAnswers(collectAnswers(new FormData(formRef.current), quoteForm.fields), quoteForm.fields);
+    setAssistAnswers((current) => (JSON.stringify(current) === JSON.stringify(next) ? current : next));
+  }
 
   /** Returns the fresh error map (never the possibly-stale state) so a caller can branch on it immediately. */
   function validateNeed(): Record<string, string> {
@@ -524,6 +535,7 @@ export function QuoteFormShell({
         className="am-j-form am-quote-form"
         data-enhanced={jsEnabled ? "true" : undefined}
         onSubmit={submit}
+        onChange={syncAssistAnswers}
         {...(formAction ? { action: formAction } : {})}
       >
         {/* Step 1 - Votre besoin */}
@@ -751,8 +763,8 @@ export function QuoteFormShell({
         <h2 className="am-quote-assist__title">{t("assistanceTitle")}</h2>
         <p className="am-j-panel__lead">{t("assistanceLead")}</p>
         <div className="am-j-assist">
-          <VisitorAiAssistant countryCode={countryCode} productKey={productKey} mode="summary" answers={{}} />
-          <VisitorAiAssistant countryCode={countryCode} productKey={productKey} mode="consistency" answers={{}} />
+          <VisitorAiAssistant countryCode={countryCode} productKey={productKey} mode="summary" answers={assistAnswers} />
+          <VisitorAiAssistant countryCode={countryCode} productKey={productKey} mode="consistency" answers={assistAnswers} />
         </div>
       </section>
     </div>

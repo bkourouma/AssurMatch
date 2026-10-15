@@ -25,6 +25,8 @@ describe("dashboard audit payloads", () => {
 
   it("records admin and broker refusals with structured reasons", async () => {
     harness = await createRuntimeHttpHarness();
+    // Spec 063: broker_dashboard_enabled is on by default; an admin switches it off explicitly.
+    await harness.runtime.featureFlags.service.setFlag({ key: "broker_dashboard_enabled", scopeType: "global", value: false, reason: "test switches the broker dashboard off" }, { actorId: "test-admin", roles: ["super_admin"], mfaVerified: true });
     const broker = {
       actorId: "broker",
       roles: ["broker_owner_starter" as const],

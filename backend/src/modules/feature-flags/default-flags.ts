@@ -1,9 +1,15 @@
 export const GLOBAL_FEATURE_FLAG_DEFAULTS = {
   public_comparator_enabled: false,
   quote_request_enabled: false,
-  starter_portal_enabled: false,
-  broker_crm_enabled: false,
-  broker_dashboard_enabled: false,
+  /**
+   * Spec 063 (PRD section 9.1): the three broker back-office modules are ON by default. They are not
+   * regulated modules: Starter keeps no CRM through its plan gating, and an admin can still switch
+   * them off from the feature flags screen (audited). Existing rows in an initialised database are
+   * never rewritten by the seeds.
+   */
+  starter_portal_enabled: true,
+  broker_crm_enabled: true,
+  broker_dashboard_enabled: true,
   billing_enabled: false,
   ai_lead_scoring_enabled: false,
   ai_summary_enabled: false,

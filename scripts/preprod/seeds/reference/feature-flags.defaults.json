@@ -2,9 +2,9 @@
   "global": {
     "public_comparator_enabled": false,
     "quote_request_enabled": false,
-    "starter_portal_enabled": false,
-    "broker_crm_enabled": false,
-    "broker_dashboard_enabled": false,
+    "starter_portal_enabled": true,
+    "broker_crm_enabled": true,
+    "broker_dashboard_enabled": true,
     "billing_enabled": false,
     "ai_lead_scoring_enabled": false,
     "ai_summary_enabled": false,

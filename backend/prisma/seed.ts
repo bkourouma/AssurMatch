@@ -9,9 +9,6 @@ const prisma = new PrismaClient({ adapter: new PrismaPg(databaseUrl) });
 const disabledFlags = [
   "public_comparator_enabled",
   "quote_request_enabled",
-  "starter_portal_enabled",
-  "broker_crm_enabled",
-  "broker_dashboard_enabled",
   "billing_enabled",
   "payments_enabled",
   "e_signature_enabled",
@@ -29,12 +26,31 @@ const disabledFlags = [
   "ai_broker_assistant_enabled"
 ];
 
+// Spec 063 (PRD 9.1): the three broker back-office modules are ON by default (an admin can switch
+// them off from the flags screen; existing rows are never rewritten unless ASSURMATCH_SEED_RESET=1).
+const enabledByDefaultFlags = ["starter_portal_enabled", "broker_crm_enabled", "broker_dashboard_enabled"];
+
 // The launcher runs this seed on every start. Rows that already exist keep what the back-office set
 // (flags, country and product status), so restarting the local stack never closes a journey that was
 // opened on purpose. `ASSURMATCH_SEED_RESET=1` brings every row back to the safe closed defaults.
 const resetExisting = process.env.ASSURMATCH_SEED_RESET === "1";
 
 async function main(): Promise<void> {
+  for (const key of enabledByDefaultFlags) {
+    const existingFlag = await prisma.featureFlag.findFirst({
+      where: { key, scopeType: "global", scopeId: null }
+    });
+    if (existingFlag) {
+      if (resetExisting) await prisma.featureFlag.update({
+        where: { id: existingFlag.id },
+        data: { value: true, defaultValue: true, reason: "PRD 9.1 default for local development seed" }
+      });
+    } else {
+      await prisma.featureFlag.create({
+        data: { key, scopeType: "global", value: true, defaultValue: true, reason: "PRD 9.1 default for local development seed" }
+      });
+    }
+  }
   for (const key of disabledFlags) {
     const existingFlag = await prisma.featureFlag.findFirst({
       where: { key, scopeType: "global", scopeId: null }
