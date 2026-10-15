@@ -1478,9 +1478,21 @@ model BrokerCrmDispute {
   createdById      String?
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
+  /// Spec 063: where the dispute was opened ("starter" | "crm") and the lead country, for admin filters.
+  source           String   @default("crm")
+  countryCode      String?
+  /// Spec 063: finance decision (accept | reject) with its mandatory reason, and the resulting credit.
+  decidedAt        DateTime?
+  decidedById      String?
+  decisionReason   String?
+  /// "draft_invoice" | "credit_note" | "none" - set when the dispute is accepted.
+  creditMode       String?
+  creditNoteId     String?
+  creditAmount     Int?
 
   @@index([leadAssignmentId, createdAt])
   @@index([partnerTenantId, status])
+  @@index([status, createdAt])
 }
 
 model BrokerCrmAiAssistRequest {
@@ -1774,7 +1786,9 @@ model CreditNote {
   countryCode        String
   year               Int
   sequence           Int
-  invoiceId          String   @unique
+  /// Spec 063: no longer unique - a partial dispute credit note can precede the cancellation one
+  /// (unique per invoice for kind = 'cancellation' through a partial index, see migration 0030).
+  invoiceId          String
   invoiceNumber      String
   partnerId          String
   currency           String   @default("XOF")
@@ -1786,7 +1800,12 @@ model CreditNote {
   documentSha256     String
   issuedById         String?
   issuedAt           DateTime
+  /// Spec 063: "cancellation" (total, spec 060) | "dispute" (partial, one per accepted dispute).
+  kind               String   @default("cancellation")
+  disputeId          String?  @unique
+  leadAssignmentId   String?
 
+  @@index([invoiceId])
   @@unique([countryCode, year, sequence])
   @@index([partnerId, issuedAt])
 }
@@ -2100,4 +2119,20 @@ model NotificationUnsubscribe {
   createdAt   DateTime @default(now())
 
   @@unique([subjectHash, purpose])
+}
+
+/// Spec 063: device the user chose to trust after a valid MFA code, for 30 days. The token is a
+/// 256-bit random value kept by the browser; only its SHA-256 is stored here.
+model TrustedDevice {
+  id            String    @id @default(uuid())
+  userId        String
+  tokenHash     String    @unique
+  label         String?
+  createdAt     DateTime  @default(now())
+  expiresAt     DateTime
+  lastUsedAt    DateTime?
+  revokedAt     DateTime?
+  revokedReason String?
+
+  @@index([userId, revokedAt])
 }

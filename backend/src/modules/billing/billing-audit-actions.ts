@@ -19,7 +19,15 @@ export const BillingAuditActions = {
   paymentRefused: "billing.payment.refused",
   creditNoteIssued: "billing.credit_note.issued",
   creditNoteRefused: "billing.credit_note.refused",
-  accountRead: "billing.account.read"
+  accountRead: "billing.account.read",
+  // Spec 063 - lead disputes (CRM-012).
+  disputeOpened: "billing.dispute.opened",
+  disputeOpenRefused: "billing.dispute.open_refused",
+  disputeRead: "billing.dispute.read",
+  disputeDecided: "billing.dispute.decided",
+  disputeDecisionRefused: "billing.dispute.decision_refused",
+  disputeCreditNoteIssued: "billing.dispute.credit_note_issued",
+  disputeNotificationFailed: "billing.dispute.notification_failed"
 } as const;
 
 export type BillingAuditAction = (typeof BillingAuditActions)[keyof typeof BillingAuditActions];

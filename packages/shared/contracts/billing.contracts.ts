@@ -240,7 +240,11 @@ export const creditNoteSchema = z.object({
   vatAmount: xofAmountSchema,
   totalAmount: xofAmountSchema,
   reason: nonEmptyStringSchema,
-  issuedAt: dateTimeStringSchema
+  issuedAt: dateTimeStringSchema,
+  /** Spec 063: "cancellation" = total credit note of spec 060, "dispute" = partial credit of one accepted dispute. */
+  kind: z.enum(["cancellation", "dispute"]).default("cancellation"),
+  disputeId: z.string().optional(),
+  leadAssignmentId: z.string().optional()
 });
 
 export const issuedInvoiceSchema = z.object({

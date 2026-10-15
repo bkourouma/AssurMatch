@@ -364,7 +364,21 @@ export const brokerStarterLeadDetailSchema = brokerStarterLeadSummarySchema.exte
   contact: z.record(z.string(), z.unknown()).default({}),
   contactVisibility: leadContactVisibilitySchema.optional(),
   answers: z.record(z.string(), z.unknown()).default({}),
-  history: z.array(brokerStarterLeadHistoryEventSchema).default([])
+  history: z.array(brokerStarterLeadHistoryEventSchema).default([]),
+  /** Spec 063: dispute window (30 days after reception) and the dispute of this lead, if any. */
+  disputeWindow: z.object({ deadline: dateTimeStringSchema, open: z.boolean() }).optional(),
+  dispute: z.object({
+    id: z.string(),
+    status: z.enum(["opened", "accepted", "rejected"]),
+    reason: z.string(),
+    comment: z.string().optional(),
+    createdAt: dateTimeStringSchema,
+    decidedAt: dateTimeStringSchema.optional(),
+    decisionReason: z.string().optional(),
+    creditMode: z.enum(["draft_invoice", "credit_note", "none"]).optional(),
+    creditNoteNumber: z.string().optional(),
+    creditAmount: z.number().int().nonnegative().optional()
+  }).optional()
 });
 
 export const brokerStarterLeadActionRequestSchema = z.object({
@@ -534,10 +548,20 @@ export const brokerCrmProposalSchema = z.object({
 export const brokerCrmDisputeSchema = z.object({
   id: z.string(),
   leadAssignmentId: z.string(),
-  reason: brokerCrmOutcomeReasonSchema,
+  /** Spec 063: a Starter dispute carries a Starter reason, a CRM one a CRM outcome reason. */
+  reason: z.union([brokerCrmOutcomeReasonSchema, brokerStarterReasonSchema]),
   comment: z.string().optional(),
   status: z.enum(["opened", "under_review", "accepted", "rejected"]).default("opened"),
-  createdAt: dateTimeStringSchema
+  createdAt: dateTimeStringSchema,
+  /** Spec 063: source, finance decision and credit outcome (all optional: absent while `opened`). */
+  source: z.enum(["starter", "crm"]).optional(),
+  countryCode: z.string().optional(),
+  decidedAt: dateTimeStringSchema.optional(),
+  decidedById: z.string().optional(),
+  decisionReason: z.string().optional(),
+  creditMode: z.enum(["draft_invoice", "credit_note", "none"]).optional(),
+  creditNoteId: z.string().optional(),
+  creditAmount: z.number().int().nonnegative().optional()
 });
 
 export const brokerCrmLeadDetailSchema = brokerCrmLeadSummarySchema.extend({
@@ -550,7 +574,9 @@ export const brokerCrmLeadDetailSchema = brokerCrmLeadSummarySchema.extend({
   reminders: z.array(brokerCrmReminderSchema).default([]),
   documents: z.array(brokerCrmDocumentSchema).default([]),
   proposals: z.array(brokerCrmProposalSchema).default([]),
-  disputes: z.array(brokerCrmDisputeSchema).default([])
+  disputes: z.array(brokerCrmDisputeSchema).default([]),
+  /** Spec 063: dispute window (30 days after reception). */
+  disputeWindow: z.object({ deadline: dateTimeStringSchema, open: z.boolean() }).optional()
 });
 
 export const brokerCrmStatusUpdateSchema = z.object({
