@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { loginRedirect, readBackOfficeSession } from "../lib/backoffice-auth";
 import { readBrokerAgencies, readBrokerBranding, readBrokerCustomRoles, readBrokerSla } from "../lib/broker-api";
 import type { BrokerAgency, BrokerCustomRole } from "../lib/broker-api";
+import { formatFirstVisibleReplyLine } from "../lib/conversation-vocabulary";
 import { assignAgencyMemberAction, createAgencyAction, createCustomRoleAction, updateBrandingAction, updateSlaAction } from "../lib/enterprise-actions";
 import {
   Badge,
@@ -112,6 +113,8 @@ export default async function BrokerEnterprisePage({ searchParams }: { searchPar
   // Spec 051 FR-021: a suspended partner reads its organisation but cannot change it.
   const readOnly = isTenantReadOnly(session.profile);
   const [agencies, roles, sla, branding] = await Promise.all([readBrokerAgencies(), readBrokerCustomRoles(), readBrokerSla(), readBrokerBranding()]);
+  // Spec 062 (E-08): additive fields, nothing is rendered until the API sends them.
+  const firstVisibleReplyLine = sla.status === "success" ? formatFirstVisibleReplyLine(sla.data) : undefined;
 
   return (
     <PageStack>
@@ -219,6 +222,7 @@ export default async function BrokerEnterprisePage({ searchParams }: { searchPar
               />
               <KpiCard label="Delai moyen" value={sla.data.averageFirstActionMinutes === null ? "-" : `${sla.data.averageFirstActionMinutes} min`} />
             </Grid>
+            {firstVisibleReplyLine ? <p data-sla-first-visible-reply="true">{firstVisibleReplyLine}</p> : null}
             <TenantWriteGuard readOnly={readOnly}>
             <Form action={updateSlaAction} columns={2}>
               <Field id="sla-target" label="Objectif en minutes">

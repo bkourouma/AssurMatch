@@ -18,6 +18,7 @@ import { IndicativeOfferNotice } from "../../../components/public-journey";
 import { QuoteDocumentUpload } from "../../../components/quote-document-upload";
 import { QuoteProposalCard, type QuoteProposalCardLabels } from "../../../components/tracking/quote-proposal-card";
 import type { ProposalResponseFormLabels } from "../../../components/tracking/proposal-response-form";
+import { MessagingSections } from "../../../components/tracking/messaging-sections";
 import { hasProposals, QuoteProposalsSlot } from "../../../components/tracking/quote-proposals-slot";
 import { BackendText } from "../../../components/ui/backend-text";
 import { Breadcrumb } from "../../../components/ui/breadcrumb";
@@ -424,6 +425,15 @@ export default async function PublicQuoteTrackingPage({
           ))}
         </div>
       </QuoteProposalsSlot>
+
+      {/* Spec 062: conversations with the brokers, requested documents and the visitor's data requests. */}
+      <MessagingSections
+        publicReference={publicReference}
+        token={token}
+        locale={locale}
+        summary={view.messaging}
+        consentWithdrawn={view.consent.withdrawn}
+      />
 
       <Section title={t("documentsTitle")} tone="muted">
         <div className="am-stack am-stack--lg am-j-column">

@@ -45,7 +45,16 @@ export function dashboardKpis(data: BrokerDashboardData): KpiViewModel[] {
     { label: "Acceptes", value: starter.accepted, helper: "Actions courtier historisees", tone: "success" },
     { label: "Rejetes", value: starter.rejected, helper: "Avec motif lorsque requis", tone: "danger" },
     { label: "Contestes", value: starter.disputed, helper: "Traitement selon workflow existant", tone: "warning" },
-    { label: "En attente", value: starter.pendingAction, helper: "Leads sans action recente", tone: "neutral" }
+    { label: "En attente", value: starter.pendingAction, helper: "Leads sans action recente", tone: "neutral" },
+    // Spec 062 (E-08): only when the API sends the additive measure.
+    ...(typeof starter.firstVisibleReplyMeasured === "number"
+      ? [{
+          label: "Première réponse visible",
+          value: typeof starter.averageFirstVisibleReplyMinutes === "number" ? `${Math.round(starter.averageFirstVisibleReplyMinutes)} min` : "—",
+          helper: `${starter.firstVisibleReplyMeasured} lead(s) mesuré(s)`,
+          tone: "neutral" as const
+        }]
+      : [])
   ];
 }
 

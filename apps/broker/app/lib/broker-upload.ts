@@ -1,4 +1,5 @@
 import { backOfficeApiBaseUrl, getBackOfficeToken } from "./backoffice-auth";
+import { extractForbiddenWording } from "./conversation-vocabulary";
 
 /**
  * Spec 055: server-side relays of the broker uploads (proposal PDF, internal lead documents) and
@@ -12,6 +13,8 @@ export const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{1
 export interface BrokerRelayResult {
   status: number;
   code?: string | undefined;
+  /** Spec 062: expression(s) the wording guard refused (FORBIDDEN_WORDING only). */
+  wording?: string[] | undefined;
 }
 
 /**
@@ -40,9 +43,32 @@ export async function forwardBrokerMultipart(path: string, form: FormData): Prom
       body: form,
       cache: "no-store"
     });
-    if (response.ok) return { status: response.status };
-    const payload = await response.json().catch(() => undefined) as { code?: unknown } | undefined;
-    return { status: response.status, code: typeof payload?.code === "string" ? payload.code : undefined };
+    return await relayResult(response);
+  } catch {
+    return { status: 0 };
+  }
+}
+
+async function relayResult(response: Response): Promise<BrokerRelayResult> {
+  if (response.ok) return { status: response.status };
+  const payload = await response.json().catch(() => undefined) as { code?: unknown } | undefined;
+  const code = typeof payload?.code === "string" ? payload.code : undefined;
+  const wording = code === "FORBIDDEN_WORDING" ? extractForbiddenWording(payload) : [];
+  return { status: response.status, code, ...(wording.length > 0 ? { wording } : {}) };
+}
+
+/** Spec 062: forwards a JSON body (document request) with the session token; same result as the multipart relay. */
+export async function forwardBrokerJson(path: string, body: Record<string, unknown>): Promise<BrokerRelayResult> {
+  const token = await getBackOfficeToken();
+  if (!token) return { status: 401 };
+  try {
+    const response = await fetch(`${backOfficeApiBaseUrl()}${path}`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}`, "content-type": "application/json" },
+      body: JSON.stringify(body),
+      cache: "no-store"
+    });
+    return await relayResult(response);
   } catch {
     return { status: 0 };
   }

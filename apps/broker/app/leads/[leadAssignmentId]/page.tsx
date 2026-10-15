@@ -3,6 +3,7 @@ import { loginRedirect, readBackOfficeSession } from "../../lib/backoffice-auth"
 import { isNotFoundState, readLeadProposals, readStarterLeadDetail, readStarterLeadHistory } from "../../lib/broker-api";
 import { PROPOSAL_NOTICES, VISITOR_RESPONSE_LABELS } from "../../lib/proposal-vocabulary";
 import { ProposalPanel } from "../../lib/ui/proposal-panel";
+import { LeadConversationSection } from "../../lib/ui/conversation-panel";
 import { acceptStarterLeadAction, closeStarterLeadAction, disputeStarterLeadAction, rejectStarterLeadAction } from "../../lib/lead-actions";
 import { TENANT_SUSPENDED_MESSAGE, canMutateStarterLead, isTenantReadOnly } from "../../lib/broker-permissions";
 import {
@@ -77,10 +78,10 @@ export default async function BrokerLeadDetailPage({
   searchParams
 }: {
   params: Promise<{ leadAssignmentId: string }>;
-  searchParams: Promise<{ lead?: string; proposal?: string }>;
+  searchParams: Promise<{ lead?: string; proposal?: string; conv?: string; convw?: string }>;
 }) {
   const { leadAssignmentId } = await params;
-  const { lead: notice, proposal: proposalNotice } = await searchParams;
+  const { lead: notice, proposal: proposalNotice, conv, convw } = await searchParams;
   const session = await readBackOfficeSession();
   if (session.status === "unauthenticated" || session.status === "expired") redirect(loginRedirect(`/leads/${leadAssignmentId}`, session.status));
   if (session.status !== "authenticated") {
@@ -323,6 +324,9 @@ export default async function BrokerLeadDetailPage({
           </Card>
         </div>
       ) : null}
+
+      {/* Spec 062: messagerie et demandes de documents du visiteur (id="conversation"), sans fonction CRM. */}
+      {lead ? <LeadConversationSection channel="starter" leadAssignmentId={lead.leadAssignmentId} canMutate={canMutate} tenantReadOnly={tenantReadOnly} notice={conv} noticeWording={convw} /> : null}
 
       {lead && answerEntries.length > 0 ? (
         <Card title="Reponses consenties">
