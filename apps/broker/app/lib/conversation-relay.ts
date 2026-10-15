@@ -55,8 +55,10 @@ function answerResult(request: Request, channel: ConversationChannel, leadAssign
   }
   const outcome = conversationOutcome(result, success);
   const wording = result.wording ?? [];
+  // The refused expressions only travel in the JSON answer of the JavaScript island: the no-JavaScript
+  // redirect carries the outcome KEY only (never free text in a URL).
   if (wantsJson(request)) return jsonAnswer({ ok: isSuccessOutcome(outcome), outcome, ...(wording.length > 0 ? { wording } : {}) });
-  return seeOther(request, conversationPagePath(channel, leadAssignmentId, outcome, wording));
+  return seeOther(request, conversationPagePath(channel, leadAssignmentId, outcome));
 }
 
 /** POST /broker/{starter|crm}/leads/:leadId/conversation/messages (JSON `payload` + up to 3 `files`). */
@@ -91,13 +93,13 @@ export async function relayDocumentRequestCreate(request: Request, channel: Conv
 /** GET .../conversation/messages/:messageId/attachments/:attachmentId (audited by the API, no-store). */
 export function relayConversationAttachment(channel: ConversationChannel, leadAssignmentId: string, messageId: string, attachmentId: string): Promise<Response> {
   if (![leadAssignmentId, messageId, attachmentId].every((id) => UUID.test(id))) return Promise.resolve(new Response("not_found", { status: 404 }));
-  return relayBrokerFile(`${apiBase(channel, leadAssignmentId)}/conversation/messages/${messageId}/attachments/${attachmentId}`);
+  return relayBrokerFile(`${apiBase(channel, leadAssignmentId)}/conversation/messages/${messageId}/attachments/${attachmentId}`, { visitorProvided: true });
 }
 
 /** GET .../document-requests/:requestId/documents/:documentId/file (file provided by the visitor, audited). */
 export function relayRequestDocument(channel: ConversationChannel, leadAssignmentId: string, requestId: string, documentId: string): Promise<Response> {
   if (![leadAssignmentId, requestId, documentId].every((id) => UUID.test(id))) return Promise.resolve(new Response("not_found", { status: 404 }));
-  return relayBrokerFile(`${apiBase(channel, leadAssignmentId)}/document-requests/${requestId}/documents/${documentId}/file`);
+  return relayBrokerFile(`${apiBase(channel, leadAssignmentId)}/document-requests/${requestId}/documents/${documentId}/file`, { visitorProvided: true });
 }
 
 /** POST .../document-requests/:requestId/cancel (used by the cancel server action). */

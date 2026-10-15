@@ -16,7 +16,6 @@ import {
   attachmentHref,
   formatDateTime,
   formatFileSize,
-  formatWordingList,
   requestDocumentHref
 } from "../conversation-vocabulary";
 import type { ConversationChannel } from "../conversation-vocabulary";
@@ -35,7 +34,7 @@ export interface ConversationPanelProps {
 
 function readOnlyBanner(conversation: BrokerConversationData, canMutate: boolean, tenantReadOnly: boolean): string | undefined {
   if (tenantReadOnly) return CONVERSATION_READ_ONLY_LABELS.partner_suspended;
-  if (conversation.state === "read_only") {
+  if (conversation.state === "read_only" || !conversation.canSend) {
     return (conversation.readOnlyReason ? CONVERSATION_READ_ONLY_LABELS[conversation.readOnlyReason] : undefined) ?? "La conversation est en lecture seule.";
   }
   if (!canMutate) return "Lecture seule : votre rôle ne permet pas d'envoyer de message au visiteur.";
@@ -96,8 +95,8 @@ export function ConversationPanel({ channel, leadAssignmentId, conversation, can
       ) : (
         <p>Aucun message échangé avec le visiteur pour ce lead.</p>
       )}
-      {canMutate || tenantReadOnly ? (
-        <TenantWriteGuard readOnly={tenantReadOnly || !conversation.canSend}>
+      {tenantReadOnly || (canMutate && conversation.canSend) ? (
+        <TenantWriteGuard readOnly={tenantReadOnly}>
           <ConversationForm action={action} ariaLabel="Nouveau message au visiteur" submitLabel="Envoyer le message" pendingLabel="Envoi en cours…" idempotent>
             <Field id={`${fieldId}-body`} label="Message au visiteur" required requiredLabel="obligatoire" hint={`${LEAD_MESSAGE_BODY_MAX} caractères au maximum. Aucune promesse de couverture ni de prix ferme.`}>
               <Textarea id={`${fieldId}-body`} name="body" required maxLength={LEAD_MESSAGE_BODY_MAX} rows={5} aria-label="Texte du message" />
@@ -187,8 +186,8 @@ export function DocumentRequestsPanel({ channel, leadAssignmentId, data, canMuta
       ) : (
         <p>Aucune demande de document pour ce lead.</p>
       )}
-      {canMutate || tenantReadOnly ? (
-        <TenantWriteGuard readOnly={tenantReadOnly || !data.canCreate}>
+      {tenantReadOnly || (canMutate && data.canCreate) ? (
+        <TenantWriteGuard readOnly={tenantReadOnly}>
           <ConversationForm action={action} ariaLabel="Nouvelle demande de document" submitLabel="Demander le document au visiteur" pendingLabel="Envoi en cours…">
             <Field id={`${fieldId}-label`} label="Document demandé" required requiredLabel="obligatoire" hint={`${DOCUMENT_REQUEST_LABEL_MAX} caractères au maximum. Exemple : carte grise du véhicule.`}>
               <Input id={`${fieldId}-label`} name="label" required maxLength={DOCUMENT_REQUEST_LABEL_MAX} aria-label="Intitulé du document demandé" />
@@ -213,8 +212,6 @@ export interface LeadConversationSectionProps {
   tenantReadOnly: boolean;
   /** `conv=` outcome of a no-JavaScript post or of a server action (cancel). */
   notice?: string | undefined;
-  /** `convw=`: the expression(s) refused by the wording guard, separated by `|`. */
-  noticeWording?: string | undefined;
 }
 
 /**
@@ -223,12 +220,11 @@ export interface LeadConversationSectionProps {
  * the document requests of the CURRENT broker, records the read receipt (best effort) and renders
  * both panels. Starter never receives a CRM function from here.
  */
-export async function LeadConversationSection({ channel, leadAssignmentId, canMutate, tenantReadOnly, notice, noticeWording }: LeadConversationSectionProps) {
+export async function LeadConversationSection({ channel, leadAssignmentId, canMutate, tenantReadOnly, notice }: LeadConversationSectionProps) {
   const [conversation, requests] = await Promise.all([readLeadConversation(channel, leadAssignmentId), readLeadDocumentRequests(channel, leadAssignmentId)]);
   // Read receipt: only when the thread is really shown and the broker may write (best effort).
   if (conversation.status === "success" && conversation.data.unreadCount > 0 && canMutate) await markConversationRead(channel, leadAssignmentId);
   const noticeEntry = notice ? CONVERSATION_NOTICES[notice] : undefined;
-  const wording = notice === "forbidden_wording" && noticeWording ? noticeWording.split("|").map((item) => item.trim()).filter(Boolean).slice(0, 10) : [];
   return (
     <div id="conversation">
       <Stack>
@@ -236,7 +232,6 @@ export async function LeadConversationSection({ channel, leadAssignmentId, canMu
           {noticeEntry ? (
             <Notice tone={noticeEntry.tone}>
               {noticeEntry.message}
-              {wording.length > 0 ? <> Expression(s) refusée(s) : <strong>{formatWordingList(wording)}</strong>.</> : null}
             </Notice>
           ) : null}
           {conversation.status === "success" ? (

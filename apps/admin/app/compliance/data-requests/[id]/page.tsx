@@ -6,6 +6,7 @@ import {
   DATA_REQUEST_NOTICES,
   DATA_REQUEST_STATUS_LABELS,
   DATA_REQUEST_TYPE_LABELS,
+  COMPLETE_WITHOUT_ERASURE_WARNING,
   START_ERASURE_CONFIRMATION,
   formatDataRequestDate
 } from "../../../lib/data-request-labels";
@@ -62,6 +63,7 @@ export default async function DataRequestDetailPage({
   const isOpen = request ? OPEN_STATUSES.has(request.status) : false;
   const statusLabel = request ? DATA_REQUEST_STATUS_LABELS[request.status] : undefined;
   const history: HistoryRow[] = request?.history ?? [];
+  const completesWithoutErasure = request?.type === "erasure" && !request.erasureBatchId;
   const showErasure = request?.type === "erasure" && request.erasureAllowed !== false && isOpen && canDecide;
 
   return (
@@ -167,6 +169,13 @@ export default async function DataRequestDetailPage({
                 <Field id="dr-complete-note" label="Note interne (facultative)" hint="1 000 caractères au plus.">
                   <Textarea {...fieldControlProps("dr-complete-note", { hint: "1 000 caractères au plus." })} name="note" rows={3} maxLength={1000} />
                 </Field>
+                {completesWithoutErasure ? (
+                  <div data-data-request-marker="complete-without-erasure">
+                    <StateMessage tone="warning">{COMPLETE_WITHOUT_ERASURE_WARNING}</StateMessage>
+                    <input type="hidden" name="requireNoErasureAck" value="yes" />
+                    <Checkbox id="dr-complete-ack" name="acknowledgeNoErasure" value="yes" required label="Je confirme clôturer cette demande d'effacement sans effacement préparé ni exécuté." />
+                  </div>
+                ) : null}
                 <FormActions align="start">
                   <Button type="submit">Clôturer comme traitée</Button>
                 </FormActions>

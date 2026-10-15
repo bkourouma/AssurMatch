@@ -98,6 +98,14 @@ test("both route handler trees relay the conversation and the document requests 
   expect(relay).toContain("forwardBrokerMultipart");
   expect(relay).toContain("forwardBrokerJson");
   expect(relay).toContain("relayBrokerFile");
+  // Visitor-provided files: content-type allowlist, forced attachment with a sanitised name, sandbox.
+  expect(relay.match(/visitorProvided: true/g)).toHaveLength(2);
+  const upload = read("apps/broker/app/lib/broker-upload.ts");
+  expect(upload).toContain('VISITOR_FILE_MIME_TYPES = ["application/pdf", "image/jpeg", "image/png"]');
+  expect(upload).toContain('"content-security-policy": "sandbox"');
+  expect(upload).toContain("attachment; filename=");
+  expect(upload).toContain('"x-content-type-options": "nosniff"');
+  expect(upload).toContain("sameOriginPath(location)");
   // Token handling stays in broker-upload.ts / broker-write.ts (httpOnly cookie, server side).
   expect(relay).not.toContain("Authorization");
   expect(relay).not.toContain("use client");
@@ -143,11 +151,17 @@ test("the panel is server-rendered, write-guarded, and only the composer is a cl
   expect(panel).toContain("readLeadConversation(channel, leadAssignmentId)");
   expect(panel).toContain("readLeadDocumentRequests(channel, leadAssignmentId)");
   expect(panel).toContain("conversation.notice");
+  // The tenant guard only labels a suspended partner; another read-only reason shows its banner and no form.
+  expect(panel).toContain("<TenantWriteGuard readOnly={tenantReadOnly}>");
+  expect(panel).not.toContain("readOnly={tenantReadOnly || ");
+  expect(panel).toContain("!conversation.canSend");
 
   // The island keeps the draft: fields stay uncontrolled, the reset happens on success only.
   expect(island.startsWith('"use client"')).toBe(true);
   expect(island).toContain('accept: "application/json"');
   expect(island).toContain("preventDefault");
+  expect(island).toContain('value.includes("\\\\")');
+  expect(island).toContain("window.location.origin");
   expect(island).toContain("new FormData(form)");
   expect(island).toContain("form.reset()");
   expect(island.indexOf("isSuccessOutcome(outcome)")).toBeLessThan(island.indexOf("form.reset()"));
@@ -230,13 +244,18 @@ test("a FORBIDDEN_WORDING refusal shows the offending expression(s)", async () =
   // The expression is only carried by the wording outcome.
   expect(describeConversationOutcome("sent", ["garanti"])?.wording).toEqual([]);
   expect(describeConversationOutcome("unknown")).toBeUndefined();
-  // No-JavaScript fallback: expression travels in a short, encoded parameter.
-  expect(conversationPagePath("starter", LEAD, "forbidden_wording", ["garanti"])).toBe(`/leads/${LEAD}?conv=forbidden_wording&convw=garanti#conversation`);
+  // No-JavaScript fallback: only the outcome KEY travels in the URL, never the refused expressions.
+  expect(conversationPagePath("starter", LEAD, "forbidden_wording")).toBe(`/leads/${LEAD}?conv=forbidden_wording#conversation`);
   expect(conversationPagePath("crm", LEAD, "sent")).toBe(`/crm/leads/${LEAD}?tab=conversation&conv=sent`);
   expect(conversationPagePath("crm", LEAD)).toBe(`/crm/leads/${LEAD}?tab=conversation`);
   expect(conversationPagePath("starter", LEAD)).toBe(`/leads/${LEAD}#conversation`);
-  const long = conversationPagePath("starter", LEAD, "forbidden_wording", ["a".repeat(150), "b".repeat(150)]);
-  expect(decodeURIComponent(long.split("convw=")[1]!.split("#")[0]!).length).toBeLessThanOrEqual(200);
+  expect(conversationPagePath("starter", LEAD, "forbidden_wording")).not.toContain("convw");
+  const relaySource = read("apps/broker/app/lib/conversation-relay.ts");
+  const panelSource = read("apps/broker/app/lib/ui/conversation-panel.tsx");
+  for (const source of [relaySource, panelSource, read("apps/broker/app/leads/[leadAssignmentId]/page.tsx"), read("apps/broker/app/crm/leads/[leadAssignmentId]/page.tsx")]) {
+    expect(source).not.toContain("convw");
+    expect(source).not.toContain("noticeWording");
+  }
 });
 
 test("the relay builds the message payload without truncating the text and drops a bad idempotency key", async () => {
@@ -297,6 +316,9 @@ test("notifications of the conversation open the right portal and keep the forme
   expect(leadNotificationHref("broker_document_received", LEAD, false)).toBe(`/crm/leads/${LEAD}?tab=conversation`);
   expect(leadNotificationHref("lead_assigned", LEAD, false)).toBe(`/crm/leads/${LEAD}`);
   expect(leadNotificationHref("lead_assigned", LEAD, true)).toBe(`/crm/leads/${LEAD}`);
+  // A target that is not a UUID never builds a lead link.
+  expect(leadNotificationHref("broker_visitor_message", "../../admin?x=1", true)).toBe("/notifications");
+  expect(leadNotificationHref("lead_assigned", "not-a-uuid", false)).toBe("/notifications");
   expect(MESSAGING_NOTIFICATION_TYPE_LABELS.broker_visitor_message).toBe("Message du visiteur");
   expect(MESSAGING_NOTIFICATION_TYPE_LABELS.broker_document_received).toBe("Document reçu");
   const page = read("apps/broker/app/notifications/page.tsx");

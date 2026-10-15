@@ -900,12 +900,21 @@ export async function respondToProposal(
  * only by the `/api/quote-requests/.../document` route handler, which streams the PDF back with
  * `no-store`. Every refusal of the API is the same neutral 404.
  */
-export async function fetchProposalDocument(publicReference: string, proposalId: string, token: string): Promise<Response> {
+export async function fetchProposalDocument(publicReference: string, proposalId: string, token: string, forwardedFor?: string): Promise<Response> {
   const params = new URLSearchParams({ token });
   return fetch(
     `${PUBLIC_API_BASE_URL}/quote-requests/${encodeURIComponent(publicReference)}/proposals/${encodeURIComponent(proposalId)}/document?${params.toString()}`,
-    { cache: "no-store" }
+    { cache: "no-store", ...(forwardedFor ? { headers: { "x-forwarded-for": forwardedFor } } : {}) }
   );
+}
+
+/**
+ * Visitor address of an incoming request (spec 050 D6 convention): first `x-forwarded-for` hop, else
+ * `x-real-ip`. Forwarded by the server-side proxies so the API's per-IP limits apply per visitor
+ * and not to the server's own address.
+ */
+export function visitorForwardedFor(incoming: Headers): string | undefined {
+  return incoming.get("x-forwarded-for")?.split(",")[0]?.trim() || incoming.get("x-real-ip")?.trim() || undefined;
 }
 
 /** Same-origin path of the proposal PDF proxy; the token stays in the URL, as on the tracking page. */
@@ -1060,11 +1069,12 @@ export async function fetchVisitorMessageAttachment(
   conversationId: string,
   messageId: string,
   attachmentId: string,
-  token: string
+  token: string,
+  forwardedFor?: string
 ): Promise<Response> {
   return fetch(
     visitorUrl(publicReference, token, `/conversations/${encodeURIComponent(conversationId)}/messages/${encodeURIComponent(messageId)}/attachments/${encodeURIComponent(attachmentId)}`),
-    { cache: "no-store" }
+    { cache: "no-store", ...(forwardedFor ? { headers: { "x-forwarded-for": forwardedFor } } : {}) }
   );
 }
 

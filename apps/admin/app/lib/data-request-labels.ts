@@ -33,6 +33,7 @@ export const DATA_REQUEST_NOTICES: Record<string, { tone: NoticeTone; text: stri
   },
   note_required: { tone: "warning", text: "Une note interne est obligatoire pour rejeter une demande." },
   note_too_long: { tone: "warning", text: "Note trop longue : 1 000 caractères au plus." },
+  no_erasure_ack_required: { tone: "warning", text: "Cochez la case de confirmation : aucun effacement n'a été préparé ni exécuté pour cette demande d'effacement." },
   confirmation_required: { tone: "warning", text: "Confirmez que vous avez compris que cette action ne crée qu'un aperçu d'effacement." },
   invalid: { tone: "warning", text: "Saisie ou demande invalide : vérifiez les informations puis réessayez." },
   forbidden: { tone: "danger", text: "Action refusée : MFA vérifiée et rôle de conformité requis (refus audité)." },
@@ -40,6 +41,10 @@ export const DATA_REQUEST_NOTICES: Record<string, { tone: NoticeTone; text: stri
   conflict: { tone: "warning", text: "Transition impossible : la demande a déjà été traitée ou n'est plus dans l'état attendu." },
   error: { tone: "danger", text: "Service des demandes de données temporairement indisponible." }
 };
+
+/** Warning shown before closing an erasure request for which no erasure batch exists. */
+export const COMPLETE_WITHOUT_ERASURE_WARNING =
+  "Aucun effacement n'a été préparé ni exécuté : le visiteur sera informé que la demande est traitée.";
 
 /** Text shown before the start-erasure button: states plainly that nothing is erased by it. */
 export const START_ERASURE_CONFIRMATION =

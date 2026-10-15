@@ -78,10 +78,10 @@ export default async function BrokerLeadDetailPage({
   searchParams
 }: {
   params: Promise<{ leadAssignmentId: string }>;
-  searchParams: Promise<{ lead?: string; proposal?: string; conv?: string; convw?: string }>;
+  searchParams: Promise<{ lead?: string; proposal?: string; conv?: string }>;
 }) {
   const { leadAssignmentId } = await params;
-  const { lead: notice, proposal: proposalNotice, conv, convw } = await searchParams;
+  const { lead: notice, proposal: proposalNotice, conv } = await searchParams;
   const session = await readBackOfficeSession();
   if (session.status === "unauthenticated" || session.status === "expired") redirect(loginRedirect(`/leads/${leadAssignmentId}`, session.status));
   if (session.status !== "authenticated") {
@@ -326,7 +326,7 @@ export default async function BrokerLeadDetailPage({
       ) : null}
 
       {/* Spec 062: messagerie et demandes de documents du visiteur (id="conversation"), sans fonction CRM. */}
-      {lead ? <LeadConversationSection channel="starter" leadAssignmentId={lead.leadAssignmentId} canMutate={canMutate} tenantReadOnly={tenantReadOnly} notice={conv} noticeWording={convw} /> : null}
+      {lead ? <LeadConversationSection channel="starter" leadAssignmentId={lead.leadAssignmentId} canMutate={canMutate} tenantReadOnly={tenantReadOnly} notice={conv} /> : null}
 
       {lead && answerEntries.length > 0 ? (
         <Card title="Reponses consenties">

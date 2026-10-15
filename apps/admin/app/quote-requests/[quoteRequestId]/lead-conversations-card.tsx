@@ -23,10 +23,6 @@ function formatDateTime(value: string | null | undefined): string {
   return value ? value.slice(0, 16).replace("T", " ") : "—";
 }
 
-function formatSize(sizeBytes: number | undefined): string {
-  return typeof sizeBytes === "number" ? ` (${Math.max(1, Math.ceil(sizeBytes / 1024))} Ko)` : "";
-}
-
 function ConversationBlock({ conversation, masked }: { conversation: AdminConversationData; masked: boolean }) {
   const messages = [...conversation.messages].sort((a, b) => a.createdAt.localeCompare(b.createdAt));
   return (
@@ -49,16 +45,13 @@ function ConversationBlock({ conversation, masked }: { conversation: AdminConver
             <li key={message.id}>
               <strong>{SENDER_LABELS[message.senderType] ?? message.senderType}</strong> — {formatDateTime(message.createdAt)}
               {message.readAt ? ` — lu le ${formatDateTime(message.readAt)}` : " — non lu"}
-              {masked ? (
+              {masked || message.bodyMasked || message.body === null ? (
                 <p data-conversation-marker="body-masked">Contenu masqué pour votre rôle (support)</p>
               ) : (
                 <p className="bo-break">{message.body}</p>
               )}
-              {message.attachments && message.attachments.length > 0 ? (
-                <p>
-                  Pièces jointes (noms uniquement) :{" "}
-                  {message.attachments.map((attachment) => `${attachment.fileName}${formatSize(attachment.sizeBytes)}`).join(", ")}
-                </p>
+              {message.attachmentCount && message.attachmentCount > 0 ? (
+                <p>{message.attachmentCount === 1 ? "1 pièce jointe" : `${message.attachmentCount} pièces jointes`} (noms non affichés)</p>
               ) : null}
             </li>
           ))}
@@ -68,9 +61,26 @@ function ConversationBlock({ conversation, masked }: { conversation: AdminConver
   );
 }
 
-export async function LeadConversationsCard({ quoteRequestId }: { quoteRequestId: string }) {
+export async function LeadConversationsCard({ quoteRequestId, show }: { quoteRequestId: string; show: boolean }) {
+  if (!show) {
+    return (
+      <Card
+        title="Échanges courtier / visiteur"
+        description="Lecture seule. Les échanges ne sont pas chargés avec la fiche : chaque consultation est enregistrée dans le journal d'audit."
+      >
+        <Stack>
+          <p>Le contenu des échanges est consulté uniquement à la demande. L&apos;affichage ci-dessous est une consultation auditée.</p>
+          <p>
+            <a href={`/quote-requests/${encodeURIComponent(quoteRequestId)}?conversations=1`} data-conversation-marker="load-audited">
+              Afficher les échanges (consultation auditée)
+            </a>
+          </p>
+        </Stack>
+      </Card>
+    );
+  }
   const result = await readAdminLeadConversations(quoteRequestId);
-  const conversations = Array.isArray(result.data.items) ? result.data.items : [];
+  const conversations = Array.isArray(result.data.conversations) ? result.data.conversations : [];
   const masked = result.data.masked === true;
 
   return (
@@ -84,7 +94,7 @@ export async function LeadConversationsCard({ quoteRequestId }: { quoteRequestId
           <StateMessage tone="warning">Les échanges courtier / visiteur ne sont pas accessibles pour ce rôle admin (refus audité).</StateMessage>
         ) : null}
         {result.status === "error" ? <StateMessage tone="danger">Échanges indisponibles : {result.error}</StateMessage> : null}
-        {masked ? <StateMessage tone="info">Contenu masqué pour votre rôle (support) : seuls l&apos;expéditeur, les horodatages et les noms de pièces jointes sont visibles.</StateMessage> : null}
+        {masked ? <StateMessage tone="info">Contenu masqué pour votre rôle (support) : seuls l&apos;expéditeur, les horodatages et le nombre de pièces jointes sont visibles.</StateMessage> : null}
         {result.status === "success" && conversations.length === 0 ? <p>Aucune conversation pour cette demande.</p> : null}
         {conversations.map((conversation) => (
           <ConversationBlock key={conversation.conversationId} conversation={conversation} masked={masked} />

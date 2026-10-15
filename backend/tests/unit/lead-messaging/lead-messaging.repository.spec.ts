@@ -1,0 +1,97 @@
+import { describe, expect, it } from "vitest";
+import { MemoryLeadMessagingRepository, PrismaLeadMessagingRepository } from "../../../src/modules/lead-messaging/lead-messaging.repository";
+import { conversationIdFor, leadState } from "../../../src/modules/lead-messaging/lead-messaging.rules";
+import type { LeadAssignmentRecord } from "../../../src/modules/leads/lead-assignment.service";
+
+const base = (id: string, overrides: Record<string, unknown> = {}) => ({
+  id,
+  quoteRequestId: "q1",
+  leadAssignmentId: "a1",
+  partnerTenantId: "t1",
+  senderType: "broker" as const,
+  body: `corps ${id}`,
+  createdAt: new Date("2026-10-15T10:00:00.000Z"),
+  ...overrides
+});
+
+describe("lead messaging repository (append-only)", () => {
+  it("exposes no method that rewrites or deletes a message body", () => {
+    for (const repository of [MemoryLeadMessagingRepository.prototype, PrismaLeadMessagingRepository.prototype]) {
+      const methods = Object.getOwnPropertyNames(repository).filter((name) => name !== "constructor");
+      const forbidden = methods.filter((name) => /^(update|edit|set|patch|delete|remove|replace|upsert|save)/i.test(name) && !/Document/.test(name));
+      expect(forbidden, "a message is append-only").toEqual([]);
+      expect(methods).toEqual(expect.arrayContaining(["appendMessage", "markRead", "anonymizeForAssignments", "listForConversation"]));
+    }
+  });
+
+  it("keeps a body unchanged by every operation but the spec 046 anonymization", async () => {
+    const repository = new MemoryLeadMessagingRepository();
+    await repository.appendMessage(base("m1"), []);
+    await repository.markRead("a1", "t1", "visitor", new Date());
+    const [read] = await repository.listForConversation("a1", "t1");
+    expect(read).toMatchObject({ body: "corps m1" });
+    expect(read?.readAt).toBeInstanceOf(Date);
+    // Mutating a returned copy never reaches the store.
+    read!.body = "modifie";
+    expect((await repository.findMessage("m1"))?.body).toBe("corps m1");
+    await repository.anonymizeForAssignments(["a1"], "[anonymise]", new Date());
+    expect((await repository.findMessage("m1"))?.body).toBe("[anonymise]");
+  });
+
+  it("separates conversations by broker on the same assignment and orders by creation then id", async () => {
+    const repository = new MemoryLeadMessagingRepository();
+    await repository.appendMessage(base("b", { createdAt: new Date("2026-10-15T10:00:01.000Z") }), []);
+    await repository.appendMessage(base("a", { createdAt: new Date("2026-10-15T10:00:01.000Z") }), []);
+    await repository.appendMessage(base("c", { createdAt: new Date("2026-10-15T09:00:00.000Z") }), []);
+    await repository.appendMessage(base("other", { partnerTenantId: "t2" }), []);
+    expect((await repository.listForConversation("a1", "t1")).map((message) => message.id)).toEqual(["c", "a", "b"]);
+    expect((await repository.listForConversation("a1", "t2")).map((message) => message.id)).toEqual(["other"]);
+    expect(await repository.countForConversation("a1", "t1")).toBe(3);
+    expect(await repository.countForConversation("a1", "t3")).toBe(0);
+  });
+
+  it("marks only the other side's unread messages and finds a retry by its client request id", async () => {
+    const repository = new MemoryLeadMessagingRepository();
+    await repository.appendMessage(base("broker-1", { clientRequestId: "key-aaaaaaaa" }), []);
+    await repository.appendMessage(base("visitor-1", { senderType: "visitor" }), []);
+    expect(await repository.markRead("a1", "t1", "broker", new Date())).toBe(1);
+    expect(await repository.markRead("a1", "t1", "broker", new Date())).toBe(0);
+    const messages = await repository.listForConversation("a1", "t1");
+    expect(messages.find((message) => message.id === "broker-1")?.readAt).toBeUndefined();
+    expect(messages.find((message) => message.id === "visitor-1")?.readAt).toBeInstanceOf(Date);
+    expect((await repository.findByClientRequestId("a1", "broker", "key-aaaaaaaa"))?.id).toBe("broker-1");
+    expect(await repository.findByClientRequestId("a1", "visitor", "key-aaaaaaaa")).toBeUndefined();
+  });
+
+  it("only moves a document request from open to fulfilled or cancelled", async () => {
+    const repository = new MemoryLeadMessagingRepository();
+    const now = new Date();
+    const request = { id: "r1", quoteRequestId: "q1", leadAssignmentId: "a1", partnerTenantId: "t1", label: "Carte grise", status: "open" as const, fulfilledDocumentCount: 0, createdAt: now, updatedAt: now };
+    await repository.createDocumentRequest(request);
+    await repository.createDocumentRequest({ ...request, id: "r2" });
+    expect(await repository.transitionDocumentRequest("r1", { status: "fulfilled", fulfilledAt: now, fulfilledDocumentCount: 2 })).toMatchObject({ status: "fulfilled", fulfilledDocumentCount: 2, label: "Carte grise" });
+    await expect(repository.transitionDocumentRequest("r1", { status: "cancelled", cancelledAt: now, cancelReason: "broker" })).rejects.toThrow(/not open/);
+    expect(await repository.transitionDocumentRequest("r2", { status: "cancelled", cancelledAt: now, cancelReason: "reassigned" })).toMatchObject({ status: "cancelled", cancelReason: "reassigned" });
+    await expect(repository.transitionDocumentRequest("r2", { status: "fulfilled", fulfilledAt: now, fulfilledDocumentCount: 1 })).rejects.toThrow(/not open/);
+  });
+});
+
+describe("lead messaging rules", () => {
+  it("derives an opaque, stable conversation id from the assignment and the broker", () => {
+    const id = conversationIdFor("assignment-1", "tenant-1");
+    expect(id).toMatch(/^[a-f0-9]{32}$/);
+    expect(conversationIdFor("assignment-1", "tenant-1")).toBe(id);
+    expect(conversationIdFor("assignment-1", "tenant-2")).not.toBe(id);
+    expect(id).not.toContain("tenant");
+  });
+
+  it("reads an assignment as closed, accepted or not accepted like the proposals do", () => {
+    const assignment = (overrides: Partial<LeadAssignmentRecord>): LeadAssignmentRecord => ({ id: "a", quoteRequestId: "q", partnerTenantId: "t", status: "assigned", assignedAt: new Date(), assignmentReason: "r", createdAt: new Date(), updatedAt: new Date(), ...overrides });
+    expect(leadState(assignment({}))).toBe("not_accepted");
+    expect(leadState(assignment({ status: "accepted" }))).toBe("accepted");
+    expect(leadState(assignment({ status: "contacted" }))).toBe("accepted");
+    expect(leadState(assignment({ status: "rejected" }))).toBe("closed");
+    expect(leadState(assignment({ status: "accepted", crmStatus: "perdu" }))).toBe("closed");
+    expect(leadState(assignment({ crmStatus: "contacte" }))).toBe("accepted");
+  });
+});

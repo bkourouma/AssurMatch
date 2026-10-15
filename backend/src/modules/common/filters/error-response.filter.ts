@@ -12,6 +12,10 @@ export interface SafeErrorResponse {
   blockers?: unknown[];
   /** Spec 050: a quote form missing in the requested language names the languages that exist. */
   availableLanguages?: string[];
+  /** Spec 062: structured, non-sensitive refusal details (e.g. `{ wording: [...] }` of FORBIDDEN_WORDING). */
+  details?: Record<string, unknown>;
+  /** Spec 062: the `DR-` reference of the already-open data request (DATA_REQUEST_ALREADY_OPEN), so the visitor can find it. */
+  reference?: string;
 }
 
 const KNOWN_ERROR_CODES = new Set<string>(Object.values(ErrorCodes));
@@ -20,7 +24,7 @@ const KNOWN_ERROR_CODES = new Set<string>(Object.values(ErrorCodes));
  * Spec 050 R11: an `HttpException` built with `{ code, message, ... }` keeps its explicit code, so
  * new refusals never depend on the wording regexes below. Unknown codes are ignored.
  */
-function explicitDetails(error: unknown): { code?: ErrorCode; blockers?: unknown[]; availableLanguages?: string[] } {
+function explicitDetails(error: unknown): { code?: ErrorCode; blockers?: unknown[]; availableLanguages?: string[]; details?: Record<string, unknown>; reference?: string } {
   if (!(error instanceof HttpException)) return {};
   const body = error.getResponse();
   if (!body || typeof body !== "object") return {};
@@ -29,7 +33,9 @@ function explicitDetails(error: unknown): { code?: ErrorCode; blockers?: unknown
   return {
     ...(code ? { code } : {}),
     ...(Array.isArray(record.blockers) ? { blockers: record.blockers } : {}),
-    ...(Array.isArray(record.availableLanguages) ? { availableLanguages: record.availableLanguages.filter((value): value is string => typeof value === "string") } : {})
+    ...(Array.isArray(record.availableLanguages) ? { availableLanguages: record.availableLanguages.filter((value): value is string => typeof value === "string") } : {}),
+    ...(record.details && typeof record.details === "object" && !Array.isArray(record.details) ? { details: record.details as Record<string, unknown> } : {}),
+    ...(typeof record.reference === "string" && /^DR-[A-Z0-9]{8}$/.test(record.reference) ? { reference: record.reference } : {})
   };
 }
 
@@ -65,7 +71,9 @@ export function toSafeErrorResponse(
     message: safeMessage,
     correlationId,
     ...(details.blockers ? { blockers: details.blockers } : {}),
-    ...(details.availableLanguages ? { availableLanguages: details.availableLanguages } : {})
+    ...(details.availableLanguages ? { availableLanguages: details.availableLanguages } : {}),
+    ...(details.details ? { details: details.details } : {}),
+    ...(details.reference ? { reference: details.reference } : {})
   };
 }
 

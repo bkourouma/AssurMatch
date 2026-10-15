@@ -70,6 +70,10 @@ export async function completeDataRequest(formData: FormData): Promise<void> {
   const id = requestId(formData);
   const note = stringValue(formData.get("note"));
   if (note.length > NOTE_MAX) redirect(detailUrl(id, "note_too_long"));
+  // Erasure request closed with no erasure batch: the explicit acknowledgment is checked here, not only in the browser.
+  if (stringValue(formData.get("requireNoErasureAck")) === "yes" && stringValue(formData.get("acknowledgeNoErasure")) !== "yes") {
+    redirect(detailUrl(id, "no_erasure_ack_required"));
+  }
   await runAction(id, "complete", note ? { note } : {}, "completed");
 }
 

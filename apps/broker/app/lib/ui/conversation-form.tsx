@@ -16,8 +16,8 @@ import { Button, Notice } from "./broker-ui";
  * success and the server components are refreshed.
  *
  * Without JavaScript the form still works as a plain multipart POST: the relay then answers with a
- * 303 back to the page (`?conv=<outcome>`), and the offending expression is shown but the draft is
- * not kept. The session token never reaches this component: the relay adds it server-side.
+ * 303 back to the page (`?conv=<outcome>`), and the generic refusal notice is shown (the
+ * refused expressions only exist in the JSON answer: no free text travels in a URL) and the draft is not kept. The session token never reaches this component: the relay adds it server-side.
  */
 export interface ConversationFormProps {
   /** Same-origin route handler of the relay (never the API). */
@@ -42,8 +42,14 @@ function newRequestId(): string {
   return `req-${random}`.slice(0, 64);
 }
 
+/** Same-origin absolute path only: no `//host`, no backslash (`/evil`), nothing that resolves to another origin. */
 function safeLocation(value: unknown): string | undefined {
-  return typeof value === "string" && value.startsWith("/") && !value.startsWith("//") ? value : undefined;
+  if (typeof value !== "string" || !value.startsWith("/") || value.startsWith("//") || value.includes("\\")) return undefined;
+  try {
+    return new URL(value, window.location.origin).origin === window.location.origin ? value : undefined;
+  } catch {
+    return undefined;
+  }
 }
 
 export function ConversationForm({ action, ariaLabel, submitLabel, pendingLabel, idempotent = false, children }: ConversationFormProps) {

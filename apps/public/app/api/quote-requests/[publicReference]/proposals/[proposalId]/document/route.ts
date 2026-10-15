@@ -1,4 +1,4 @@
-import { fetchProposalDocument } from "../../../../../../lib/public-api";
+import { fetchProposalDocument, visitorForwardedFor } from "../../../../../../lib/public-api";
 
 /**
  * Spec 055 FR-005: download of a broker proposal PDF from the visitor tracking space. The browser
@@ -44,7 +44,7 @@ export async function GET(
 
   let upstream: Response;
   try {
-    upstream = await fetchProposalDocument(publicReference, proposalId, token);
+    upstream = await fetchProposalDocument(publicReference, proposalId, token, visitorForwardedFor(request.headers));
   } catch {
     return neutral(502);
   }

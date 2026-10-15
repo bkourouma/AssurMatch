@@ -115,7 +115,9 @@ test("the API client calls the contract routes with the visitor token and no ses
 test("the attachment proxy keeps the token server-side, streams no-store and answers a neutral 404", () => {
   const route = readSources([attachmentRoute]);
   expect(route).toContain("export async function GET(");
-  expect(route).toContain("fetchVisitorMessageAttachment(publicReference, conversationId, messageId, attachmentId, token)");
+  // The visitor's address is forwarded so the API's per-IP download limit applies per visitor.
+  expect(route).toContain("fetchVisitorMessageAttachment(publicReference, conversationId, messageId, attachmentId, token, visitorForwardedFor(request.headers))");
+  expect(readSources([api])).toContain('"x-forwarded-for": forwardedFor');
   expect(route).toContain('"Cache-Control": "no-store"');
   expect(route).toContain('"X-Content-Type-Options": "nosniff"');
   expect(route).toContain('"Referrer-Policy": "no-referrer"');

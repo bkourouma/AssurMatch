@@ -78,6 +78,12 @@ test("start-erasure only creates the erasure preview and says so before the clic
   expect(page).toContain("action={startDataRequestErasure}");
   // Erasure is only offered for the erasure type, and the server action demands the acknowledgment.
   expect(page).toContain('request?.type === "erasure"');
+  // Closing an erasure request with no batch: visible warning + acknowledgment checked server-side.
+  expect(page).toContain("COMPLETE_WITHOUT_ERASURE_WARNING");
+  expect(page).toContain('name="acknowledgeNoErasure"');
+  expect(page).toContain('name="requireNoErasureAck"');
+  expect(actions).toContain('stringValue(formData.get("acknowledgeNoErasure")) !== "yes"');
+  expect(source("apps/admin/app/lib/data-request-labels.ts")).toContain("Aucun effacement n'a été préparé ni exécuté : le visiteur sera informé que la demande est traitée.");
   expect(actions).toContain('stringValue(formData.get("acknowledge")) !== "yes"');
   // No approval or execution from this screen: it never calls the retention approve endpoint.
   for (const file of [ACTIONS, DETAIL_PAGE, LIST_PAGE]) {
@@ -123,9 +129,17 @@ test("conversations card is read-only, audited, masked for support and mounted o
 
   expect(card).toContain("Échanges courtier / visiteur");
   expect(card).toContain("readAdminLeadConversations(quoteRequestId)");
+  // The content (and its audit) is loaded only on an explicit action, never on a plain page view.
+  expect(card).toContain("if (!show)");
+  expect(card.indexOf("if (!show)")).toBeLessThan(card.indexOf("readAdminLeadConversations(quoteRequestId)"));
+  expect(card).toContain("Afficher les échanges (consultation auditée)");
+  expect(card).toContain("?conversations=1");
+  // Masked (support): attachment names are never shown, only the type and size.
+  expect(card).toContain('masked ? `Pièce jointe');
   expect(card).toContain("Contenu masqué pour votre rôle (support)");
   expect(card).toContain('data-conversation-marker="body-masked"');
   expect(card).toContain("noms uniquement");
+  expect(card).toContain("nom masqué");
   expect(card).toContain("journal d'audit");
   // Read-only: no form, no input, no server action, no write endpoint.
   expect(card).not.toMatch(/<(form|Form|Textarea|textarea|input|Input|Button)\b/);
@@ -133,7 +147,8 @@ test("conversations card is read-only, audited, masked for support and mounted o
   expect(card).not.toMatch(/method:\s*"(POST|PATCH|DELETE)"/);
   // Attachments: names only, no download link.
   expect(card).not.toMatch(/href=\{[^}]*attachment/);
-  expect(source("apps/admin/app/quote-requests/[quoteRequestId]/page.tsx")).toContain("<LeadConversationsCard quoteRequestId={quoteRequestId} />");
+  expect(source("apps/admin/app/quote-requests/[quoteRequestId]/page.tsx")).toContain("<LeadConversationsCard quoteRequestId={quoteRequestId} show={showConversations} />");
+  expect(source("apps/admin/app/quote-requests/[quoteRequestId]/page.tsx")).toContain('.conversations) === "1"');
   expect(source("apps/admin/app/lib/admin-api.ts")).not.toMatch(/writeAdmin[^;]*conversations/);
 });
 

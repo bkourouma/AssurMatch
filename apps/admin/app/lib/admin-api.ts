@@ -772,20 +772,16 @@ export function readDataRequest(id: string) {
  * Spec 062: read-only view of the broker/visitor conversations of one quote request. Every read is
  * audited by the API; with `masked` set, the message bodies are replaced by a placeholder.
  */
-export interface AdminConversationAttachmentData {
-  id: string;
-  fileName: string;
-  mimeType?: string;
-  sizeBytes?: number;
-}
-
 export interface AdminConversationMessageData {
   id: string;
   senderType: "broker" | "visitor" | (string & {});
-  body: string;
+  /** Null when masked (support role). */
+  body: string | null;
+  bodyMasked?: boolean;
   createdAt: string;
   readAt?: string | null;
-  attachments?: AdminConversationAttachmentData[];
+  /** Count only: file names are personal data and are never sent to the admin view. */
+  attachmentCount?: number;
 }
 
 export interface AdminConversationData {
@@ -797,12 +793,13 @@ export interface AdminConversationData {
 }
 
 export interface AdminLeadConversationsData {
+  quoteRequestId?: string;
   masked: boolean;
-  items: AdminConversationData[];
+  conversations: AdminConversationData[];
 }
 
 export function readAdminLeadConversations(quoteRequestId: string) {
-  return readAdmin<AdminLeadConversationsData>(`/admin/leads/${encodeURIComponent(quoteRequestId)}/conversations`, { masked: false, items: [] });
+  return readAdmin<AdminLeadConversationsData>(`/admin/leads/${encodeURIComponent(quoteRequestId)}/conversations`, { masked: false, conversations: [] });
 }
 
 export interface AdminAiInsight {

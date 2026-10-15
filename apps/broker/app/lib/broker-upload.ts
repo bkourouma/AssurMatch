@@ -74,13 +74,57 @@ export async function forwardBrokerJson(path: string, body: Record<string, unkno
   }
 }
 
+/** Spec 062: the only types a visitor-provided file may be served as to a broker. */
+export const VISITOR_FILE_MIME_TYPES = ["application/pdf", "image/jpeg", "image/png"] as const;
+
+/** A neutral, header-safe file name (no path, no quote, no control character, no non-ASCII). */
+export function safeAttachmentFileName(raw: string | null, fallback: string): string {
+  let name: string;
+  const star = raw?.match(/filename\*\s*=\s*(?:UTF-8'[^']*')?([^;]+)/i)?.[1];
+  const plain = raw?.match(/filename\s*=\s*(?:"([^"]*)"|([^;]+))/i);
+  const candidate = star ?? plain?.[1] ?? plain?.[2] ?? "";
+  try {
+    name = star ? decodeURIComponent(candidate.trim()) : candidate.trim();
+  } catch {
+    name = candidate.trim();
+  }
+  const separators = /^.*[\\/]/;
+  const unsafe = /["\\;<>:*?|]/g;
+  name = name.replace(separators, "").normalize("NFKD").replace(/[^\x20-\x7e]/g, "").replace(unsafe, "_").replace(/^\.+/, "").trim().slice(0, 100);
+  return name || fallback;
+}
+
+export interface RelayBrokerFileOptions {
+  /** Spec 062: serve a visitor-provided file only as PDF/JPEG/PNG, always as an attachment in a sandbox. */
+  visitorProvided?: boolean;
+}
+
 /** Streams a file from the API to the broker's browser: attachment, never cached, never sniffed. */
-export async function relayBrokerFile(path: string): Promise<Response> {
+export async function relayBrokerFile(path: string, options: RelayBrokerFileOptions = {}): Promise<Response> {
   const token = await getBackOfficeToken();
   if (!token) return new Response("session_required", { status: 401 });
   try {
     const response = await fetch(`${backOfficeApiBaseUrl()}${path}`, { headers: { Authorization: `Bearer ${token}` }, cache: "no-store" });
     if (!response.ok) return new Response(`document_unavailable_${response.status}`, { status: response.status, headers: { "cache-control": "no-store" } });
+    if (options.visitorProvided) {
+      const type = (response.headers.get("content-type") ?? "").split(";")[0]!.trim().toLowerCase();
+      if (!(VISITOR_FILE_MIME_TYPES as readonly string[]).includes(type)) {
+        await response.body?.cancel().catch(() => undefined);
+        return new Response("document_unavailable", { status: 502, headers: { "cache-control": "no-store" } });
+      }
+      const extension = type === "application/pdf" ? "pdf" : type === "image/png" ? "png" : "jpg";
+      return new Response(response.body, {
+        status: 200,
+        headers: {
+          "content-type": type,
+          "content-disposition": `attachment; filename="${safeAttachmentFileName(response.headers.get("content-disposition"), `fichier.${extension}`)}"`,
+          "cache-control": "no-store",
+          "x-content-type-options": "nosniff",
+          "content-security-policy": "sandbox",
+          "referrer-policy": "no-referrer"
+        }
+      });
+    }
     return new Response(response.body, {
       status: 200,
       headers: {
@@ -106,6 +150,15 @@ export async function relayBrokerFile(path: string): Promise<Response> {
  * stays on the origin of the request. `request` is kept for the call sites' signature.
  */
 export function seeOther(_request: Request, location: string): Response {
-  const path = location.startsWith("/") && !location.startsWith("//") ? location : "/";
-  return new Response(null, { status: 303, headers: { Location: path } });
+  return new Response(null, { status: 303, headers: { Location: sameOriginPath(location) } });
+}
+
+/** Spec 062: only a same-origin absolute path is accepted (no `//host`, no backslash, no other origin). */
+function sameOriginPath(location: string): string {
+  if (!location.startsWith("/") || location.startsWith("//") || location.includes("\\")) return "/";
+  try {
+    return new URL(location, "http://same-origin.invalid").origin === "http://same-origin.invalid" ? location : "/";
+  } catch {
+    return "/";
+  }
 }

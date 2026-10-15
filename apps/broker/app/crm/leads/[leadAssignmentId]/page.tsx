@@ -88,9 +88,9 @@ function textOf(row: Record<string, unknown>, key: string): string {
   return value === null || value === undefined ? "" : String(value);
 }
 
-export default async function BrokerCrmLeadDetailPage({ params, searchParams }: { params: Promise<{ leadAssignmentId: string }>; searchParams: Promise<{ ai?: string; crm?: string; tab?: string; proposal?: string; conv?: string; convw?: string }> }) {
+export default async function BrokerCrmLeadDetailPage({ params, searchParams }: { params: Promise<{ leadAssignmentId: string }>; searchParams: Promise<{ ai?: string; crm?: string; tab?: string; proposal?: string; conv?: string }> }) {
   const { leadAssignmentId } = await params;
-  const { ai, crm, tab, proposal, conv, convw } = await searchParams;
+  const { ai, crm, tab, proposal, conv } = await searchParams;
   const session = await readBackOfficeSession();
   if (session.status === "unauthenticated" || session.status === "expired") redirect(loginRedirect(`/crm/leads/${leadAssignmentId}`, session.status));
   if (session.status !== "authenticated" || isStarterCrmDenied(session.profile)) {
@@ -300,7 +300,7 @@ export default async function BrokerCrmLeadDetailPage({ params, searchParams }: 
           ) : null}
 
           {/* Spec 062: messagerie et demandes de documents du visiteur. */}
-          {currentTab === "conversation" && lead ? <LeadConversationSection channel="crm" leadAssignmentId={lead.leadAssignmentId} canMutate={canMutate} tenantReadOnly={tenantReadOnly} notice={conv} noticeWording={convw} /> : null}
+          {currentTab === "conversation" && lead ? <LeadConversationSection channel="crm" leadAssignmentId={lead.leadAssignmentId} canMutate={canMutate} tenantReadOnly={tenantReadOnly} notice={conv} /> : null}
 
           {currentTab === "activite" ? (
             <>

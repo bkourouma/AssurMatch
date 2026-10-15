@@ -1,4 +1,4 @@
-import { fetchVisitorMessageAttachment } from "../../../../../../../../../lib/public-api";
+import { fetchVisitorMessageAttachment, visitorForwardedFor } from "../../../../../../../../../lib/public-api";
 
 /**
  * Spec 062 FR-005: download of a message attachment (broker side) from the visitor tracking space.
@@ -60,7 +60,7 @@ export async function GET(
 
   let upstream: Response;
   try {
-    upstream = await fetchVisitorMessageAttachment(publicReference, conversationId, messageId, attachmentId, token);
+    upstream = await fetchVisitorMessageAttachment(publicReference, conversationId, messageId, attachmentId, token, visitorForwardedFor(request.headers));
   } catch {
     return neutral(502);
   }

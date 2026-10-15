@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from "vitest";
-import { retentionBatchListResponseSchema, retentionBatchSchema, retentionPoliciesResponseSchema } from "../../../../packages/shared/contracts/data-retention.contracts";
+import { RETENTION_CATEGORIES, retentionBatchListResponseSchema, retentionBatchSchema, retentionPoliciesResponseSchema } from "../../../../packages/shared/contracts/data-retention.contracts";
 import type { ActorContext } from "../../../src/modules/common/types";
 import { DataRetentionAuditActions } from "../../../src/modules/data-retention/data-retention-audit-actions";
 import { actorHeaders, createRuntimeHttpHarness, readJson, seedPublicRuntime, type RuntimeHttpHarness } from "../runtime-http-test-utils";
@@ -57,7 +57,7 @@ describe("data retention runtime HTTP (spec 046)", () => {
 
     const policies = retentionPoliciesResponseSchema.parse(await readJson(await active.request(`/admin/retention/policies?countryId=${seed.country.id}`, { headers: actorHeaders(compliance) })));
     expect(policies).toMatchObject({ countryId: seed.country.id, purgeEnabled: false });
-    expect(policies.items).toHaveLength(9);
+    expect(policies.items).toHaveLength(RETENTION_CATEGORIES.length);
     const updated = await active.request("/admin/retention/policies", {
       method: "PUT",
       headers: { ...actorHeaders(compliance), ...json },

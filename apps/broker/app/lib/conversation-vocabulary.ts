@@ -235,12 +235,10 @@ export function formatFileSize(bytes: number): string {
 // ---------------------------------------------------------------------------------------------
 
 /** Lead page of a channel: Starter has no CRM tree, the CRM conversation is a tab of the CRM page. */
-export function conversationPagePath(channel: ConversationChannel, leadAssignmentId: string, outcome?: string, wording: readonly string[] = []): string {
+export function conversationPagePath(channel: ConversationChannel, leadAssignmentId: string, outcome?: string): string {
   const params: string[] = [];
   if (channel === "crm") params.push("tab=conversation");
   if (outcome) params.push(`conv=${encodeURIComponent(outcome)}`);
-  const joined = wording.join("|").slice(0, 200);
-  if (outcome === "forbidden_wording" && joined) params.push(`convw=${encodeURIComponent(joined)}`);
   const base = channel === "crm" ? `/crm/leads/${leadAssignmentId}` : `/leads/${leadAssignmentId}`;
   const query = params.length > 0 ? `?${params.join("&")}` : "";
   return `${base}${query}${channel === "starter" ? "#conversation" : ""}`;
@@ -256,12 +254,16 @@ export function requestDocumentHref(channel: ConversationChannel, leadAssignment
   return `${base}/document-requests/${requestId}/documents/${documentId}/file`;
 }
 
+const LEAD_ID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 /**
  * Where an in-app notification leads. The visitor-message and document-received notifications
  * (`targetType = LeadAssignment`) open the conversation of the right portal: Starter brokers never
  * reach `/crm`. Every other lead notification keeps its former link.
  */
 export function leadNotificationHref(type: string, targetId: string, starterPlan: boolean): string {
+  // A target that is not a UUID never builds a lead link: the notifications page is the safe fallback.
+  if (!LEAD_ID_PATTERN.test(targetId)) return "/notifications";
   const id = encodeURIComponent(targetId);
   if (type in MESSAGING_NOTIFICATION_TYPE_LABELS) return starterPlan ? `/leads/${id}#conversation` : `/crm/leads/${id}?tab=conversation`;
   return `/crm/leads/${id}`;
