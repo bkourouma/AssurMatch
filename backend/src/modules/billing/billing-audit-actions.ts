@@ -5,6 +5,7 @@ export const BillingAuditActions = {
   planPriceChanged: "billing.plan_price.changed",
   packGranted: "billing.lead_pack.granted",
   packConsumed: "billing.lead_pack.consumed",
+  packReleased: "billing.lead_pack.released",
   draftComputed: "billing.draft_invoice.computed",
   draftRead: "billing.draft_invoice.read",
   brokerStatementRead: "billing.broker_statement.read",

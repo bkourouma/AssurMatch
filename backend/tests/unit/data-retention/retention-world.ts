@@ -186,7 +186,7 @@ export function createRetentionWorld() {
       await crm.addTask({ id: crypto.randomUUID(), leadAssignmentId: assignment.id, title: "Rappeler Ama Kouassi", createdAt });
       await crm.addReminder({ id: crypto.randomUUID(), leadAssignmentId: assignment.id, remindAt: createdAt, message: "Relancer Ama", createdAt });
       await crm.addProposal({ id: crypto.randomUUID(), leadAssignmentId: assignment.id, reference: "PROP-1", amountIndicative: 120_000, currency: "XOF", notes: "Pour Ama", nonContractual: true, createdAt });
-      await crm.addDispute({ id: crypto.randomUUID(), leadAssignmentId: assignment.id, reason: "duplicate", comment: "Ama deja cliente", status: "opened", createdAt });
+      await crm.addDispute({ id: crypto.randomUUID(), leadAssignmentId: assignment.id, partnerTenantId, reason: "duplicate", comment: "Ama deja cliente", status: "opened", createdAt });
       await crm.addDocument({ id: crypto.randomUUID(), leadAssignmentId: assignment.id, label: "Carte grise Ama", storageKey: "crm-key-1", visibility: "internal", createdAt });
       await crm.appendPipelineHistory({ id: crypto.randomUUID(), leadAssignmentId: assignment.id, partnerTenantId, eventType: "status_changed", nextStatus: "perdu", reason: "price", occurredAt: createdAt });
     }

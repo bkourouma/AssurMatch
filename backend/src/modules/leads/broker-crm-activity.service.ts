@@ -20,6 +20,7 @@ import { BrokerCrmAccessPolicy } from "./broker-crm-access-policy";
 import { BrokerCrmHistoryService } from "./broker-crm-history.service";
 import { MemoryCrmActivityRepository, type CrmActivityRepository } from "./crm-activity.repository";
 import { LeadAssignmentService, type LeadAssignmentRecord } from "./lead-assignment.service";
+import { LeadDisputesService } from "./lead-disputes.service";
 
 export class BrokerCrmActivityService {
   constructor(
@@ -27,7 +28,9 @@ export class BrokerCrmActivityService {
     private readonly access: BrokerCrmAccessPolicy,
     private readonly history: BrokerCrmHistoryService,
     private readonly audit: AuditLogWriter,
-    private readonly repository: CrmActivityRepository = new MemoryCrmActivityRepository()
+    private readonly repository: CrmActivityRepository = new MemoryCrmActivityRepository(),
+    /** Spec 063: shared dispute service (30-day window, one dispute per lead); built on the same repository when not injected. */
+    private readonly disputes: LeadDisputesService = new LeadDisputesService({ audit, assignments, repository })
   ) {}
 
   async addNote(id: string, input: unknown, actor: ActorContext): Promise<BrokerCrmNote> {
@@ -90,8 +93,7 @@ export class BrokerCrmActivityService {
   async addDispute(id: string, input: unknown, actor: ActorContext): Promise<BrokerCrmDispute> {
     const assignment = await this.requireMutable(id, actor);
     const parsed = brokerCrmDisputeCreateSchema.parse(input);
-    const dispute: BrokerCrmDispute & { partnerTenantId: string } = { id: crypto.randomUUID(), leadAssignmentId: id, partnerTenantId: assignment.partnerTenantId, reason: parsed.reason, ...(parsed.comment ? { comment: parsed.comment } : {}), status: "opened", createdAt: new Date().toISOString() };
-    await this.repository.addDispute(dispute);
+    const dispute = await this.disputes.open({ assignment, source: "crm", reason: parsed.reason, ...(parsed.comment ? { comment: parsed.comment } : {}), actor });
     await this.track(assignment, actor, "disputed", QuoteAuditActions.brokerCrmLeadDisputed, parsed.reason);
     return dispute;
   }
@@ -116,8 +118,10 @@ export class BrokerCrmActivityService {
     return this.repository.proposalsForLead(leadAssignmentId);
   }
 
-  disputesForLead(leadAssignmentId: string): Promise<BrokerCrmDispute[]> {
-    return this.repository.disputesForLead(leadAssignmentId);
+  /** Disputes of the lead (own tenant), with the decision and the credit note number (spec 063). */
+  async disputesForLead(leadAssignmentId: string): Promise<BrokerCrmDispute[]> {
+    const assignment = await this.assignments.require(leadAssignmentId);
+    return (await this.disputes.forLead(assignment)).map(({ partnerTenantId: _tenant, ...dispute }) => dispute);
   }
 
   async overdueTaskCount(actor: ActorContext): Promise<number> {

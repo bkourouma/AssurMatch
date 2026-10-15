@@ -268,13 +268,18 @@ export const issuedInvoiceSchema = z.object({
   vatAmount: xofAmountSchema,
   totalAmount: xofAmountSchema,
   amountPaid: xofAmountSchema,
+  /** Net remaining due: total minus the partial (dispute) credit notes minus what was paid. */
   amountDue: xofAmountSchema,
+  /** Spec 063: sum (incl. VAT) of the partial credit notes of accepted lead disputes; absent when none. */
+  partialCreditsTotal: xofAmountSchema.optional(),
   creditNote: creditNoteSchema.nullable(),
   paymentsEnabled: z.literal(false)
 });
 
 export const issuedInvoiceDetailSchema = issuedInvoiceSchema.extend({
-  payments: z.array(invoicePaymentSchema)
+  payments: z.array(invoicePaymentSchema),
+  /** Spec 063: partial credit notes of accepted lead disputes issued on this invoice. */
+  partialCreditNotes: z.array(creditNoteSchema).optional()
 });
 
 export const issuedInvoiceQuerySchema = z.object({

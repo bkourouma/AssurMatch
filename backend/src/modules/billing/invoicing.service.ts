@@ -23,11 +23,11 @@ import type { DocumentStoragePort } from "../quote-documents/document-storage.po
 import { BillingAuditActions } from "./billing-audit-actions";
 import { BillingAccessRefusedError, BillingDisabledError } from "./billing-foundation.service";
 import type { BillingRepository } from "./billing.repository";
-import { computeInvoiceTotals, dueDateFor, formatXof, invoiceLinesFromDraft, paymentStatus, vatRatePercent } from "./invoice-numbering";
+import { computeInvoiceTotals, disputeCreditTotals, disputeUnitAmountFromLines, dueDateFor, formatXof, invoiceLinesFromDraft, paymentStatus, vatRatePercent } from "./invoice-numbering";
 import { renderCreditNotePdf, renderInvoicePdf } from "./invoice-pdf";
 import type { InvoicingConfig } from "./invoicing.config";
 import { InvoiceConflictError, InvoiceIntegrityError, InvoiceNotFoundError, InvoicingConfigurationError } from "./invoicing-errors";
-import type { CreditNoteRecord, InvoicingRepository, IssuedInvoiceRecord } from "./invoicing.repository";
+import { isDisputeCreditNote, type CreditNoteRecord, type InvoicingRepository, type IssuedInvoiceRecord } from "./invoicing.repository";
 import type { LeadPacksService } from "./lead-packs.service";
 
 /** Minimal in-app publisher (spec 038 `MessagingDispatchService.publishInApp`). */
@@ -73,7 +73,8 @@ export class InvoicingService {
     const scope = await this.assertAdmin(actor, "billing:read");
     const parsed = issuedInvoiceQuerySchema.parse(query);
     const invoices = (await this.deps.repository.listInvoices(parsed)).filter((invoice) => this.inScope(scope, invoice.countryCode));
-    const notes = await this.creditNotesById(parsed.partnerId);
+    const allNotes = await this.deps.repository.listCreditNotes({ partnerId: parsed.partnerId });
+    const notes = new Map(allNotes.map((note) => [note.id, note]));
     this.deps.audit.write({
       actor,
       action: BillingAuditActions.invoiceRead,
@@ -83,7 +84,7 @@ export class InvoicingService {
       result: "success",
       context: { total: invoices.length, paymentsEnabled: false }
     });
-    return invoices.map((invoice) => this.toDto(invoice, invoice.creditNoteId ? notes.get(invoice.creditNoteId) : undefined));
+    return invoices.map((invoice) => this.toDto(invoice, invoice.creditNoteId ? notes.get(invoice.creditNoteId) : undefined, allNotes));
   }
 
   async detail(actor: ActorContext, id: string): Promise<IssuedInvoiceDetail> {
@@ -249,10 +250,12 @@ export class InvoicingService {
     if (invoice.status === "cancelled") refuse("invoice_cancelled");
     if (invoice.status === "paid") refuse("invoice_already_paid");
     if (parsed.receivedAt > this.now().toISOString().slice(0, 10)) refuse("payment_date_in_future");
-    const outstanding = invoice.totalAmount - invoice.amountPaid;
+    // Spec 063 FR-B07: partial dispute credit notes reduce what is still owed; payments are capped at the net remainder.
+    const netTotal = invoice.totalAmount - partialCreditsTotal(await this.deps.repository.listCreditNotes({ invoiceId: invoice.id }));
+    const outstanding = netTotal - invoice.amountPaid;
     if (parsed.amount > outstanding) refuse("amount_exceeds_balance");
     const nextPaid = invoice.amountPaid + parsed.amount;
-    const nextStatus = paymentStatus(invoice.totalAmount, nextPaid);
+    const nextStatus = paymentStatus(netTotal, nextPaid);
     let updated: IssuedInvoiceRecord;
     try {
       updated = await this.deps.repository.recordPayment({
@@ -306,15 +309,21 @@ export class InvoicingService {
     const issuedAt = this.now();
     let result: { creditNote: CreditNoteRecord; invoice: IssuedInvoiceRecord };
     try {
-      result = await this.deps.repository.issueCreditNote(invoice.id, { countryCode: invoice.countryCode, year: issuedAt.getUTCFullYear() }, async (allocated, current) => {
+      result = await this.deps.repository.issueCreditNote(invoice.id, { countryCode: invoice.countryCode, year: issuedAt.getUTCFullYear() }, async (allocated, current, existing) => {
         const noteId = crypto.randomUUID();
+        // Spec 063 FR-B07: the cancellation credits the NET remainder only; partial dispute credit notes
+        // already issued on this invoice are never credited twice.
+        const partials = existing.filter(isDisputeCreditNote);
+        const net = {
+          subtotalAmount: current.subtotalAmount - partials.reduce((sum, note) => sum + note.subtotalAmount, 0),
+          vatAmount: current.vatAmount - partials.reduce((sum, note) => sum + note.vatAmount, 0),
+          totalAmount: current.totalAmount - partials.reduce((sum, note) => sum + note.totalAmount, 0)
+        };
         const pdf = renderCreditNotePdf({
           creditNote: {
             number: allocated.number,
             invoiceNumber: current.number,
-            subtotalAmount: current.subtotalAmount,
-            vatAmount: current.vatAmount,
-            totalAmount: current.totalAmount,
+            ...net,
             reason: parsed.reason
           },
           issuedAt,
@@ -322,7 +331,8 @@ export class InvoicingService {
           // The credit note reuses the frozen issuer and customer of the invoice it cancels.
           issuer: current.issuer,
           customer: current.customer,
-          legalMentionsComplete: current.legalMentionsComplete
+          legalMentionsComplete: current.legalMentionsComplete,
+          alreadyCreditedAmount: partialCreditsTotal(partials)
         });
         const documentStorageKey = `credit-note-${noteId}.pdf`;
         await this.deps.storage.put(documentStorageKey, pdf, "application/pdf");
@@ -336,14 +346,13 @@ export class InvoicingService {
           invoiceNumber: current.number,
           partnerId: current.partnerId,
           currency: "XOF",
-          subtotalAmount: current.subtotalAmount,
-          vatAmount: current.vatAmount,
-          totalAmount: current.totalAmount,
+          ...net,
           reason: parsed.reason,
           documentStorageKey,
           documentSha256: sha256(pdf),
           issuedById: actor.actorId ?? null,
-          issuedAt
+          issuedAt,
+          kind: "cancellation" as const
         };
       });
     } catch (error) {
@@ -361,9 +370,94 @@ export class InvoicingService {
       context: { number: result.creditNote.number, invoiceNumber: invoice.number, totalAmount: result.creditNote.totalAmount, documentSha256: result.creditNote.documentSha256 }
     });
     await this.notifyBroker(actor, invoice.partnerId, "credit_note_issued", "Avoir émis",
-      `L'avoir ${result.creditNote.number} annule la facture ${invoice.number} (${formatXof(invoice.totalAmount)} TTC). Détail et PDF dans Facturation.`,
+      `L'avoir ${result.creditNote.number} annule la facture ${invoice.number} (${formatXof(result.creditNote.totalAmount)} TTC). Détail et PDF dans Facturation.`,
       "CreditNote", result.creditNote.id);
     return this.toDetail(result.invoice);
+  }
+
+  /**
+   * Spec 063 FR-B06: credits ONE accepted lead dispute, on behalf of the deciding finance admin
+   * (permission, scope and billing flag were checked by the dispute service).
+   * - no active invoice for the lead's month -> "draft_invoice" (the draft credits the lead);
+   * - active invoice -> automatic PARTIAL credit note at the frozen unit price of the lead
+   *   ("credit_note"), idempotent through the unique disputeId (a retry returns the same note);
+   * - no usable unit price (credit pack, price 0, line absent, credit above the invoice) -> "none".
+   * The invoice itself is never modified.
+   */
+  async creditAcceptedDispute(request: DisputeCreditRequest, actor: ActorContext): Promise<DisputeCreditOutcome> {
+    const already = await this.deps.repository.findCreditNoteByDispute(request.disputeId);
+    if (already) return this.disputeOutcome(already);
+    const periodFrom = new Date(Date.UTC(request.assignedAt.getUTCFullYear(), request.assignedAt.getUTCMonth(), 1));
+    const invoice = await this.deps.repository.findActiveInvoiceForPeriod(request.partnerId, periodFrom);
+    if (!invoice) return { creditMode: "draft_invoice" };
+    const unit = disputeUnitAmountFromLines(invoice.lines, request.recipientCount);
+    if (unit === undefined) return { creditMode: "none", reason: "no_unit_price_on_invoice" };
+    const totals = disputeCreditTotals(unit, invoice.vatRateBps);
+    const credited = partialCreditsTotal(await this.deps.repository.listCreditNotes({ invoiceId: invoice.id }));
+    if (credited + totals.totalAmount > invoice.totalAmount) return { creditMode: "none", reason: "credit_exceeds_invoice_total" };
+    const issuedAt = this.now();
+    const reason = `Avoir partiel - contestation de lead acceptee. ${request.decisionReason}`.slice(0, 1200);
+    const result = await this.deps.repository.issueDisputeCreditNote(invoice.id, request.disputeId, { countryCode: invoice.countryCode, year: issuedAt.getUTCFullYear() }, async (allocated, current) => {
+      const noteId = crypto.randomUUID();
+      const pdf = renderCreditNotePdf({
+        creditNote: { number: allocated.number, invoiceNumber: current.number, ...totals, reason },
+        issuedAt,
+        vatRateBps: current.vatRateBps,
+        // The partial credit note reuses the frozen issuer and customer of the invoice.
+        issuer: current.issuer,
+        customer: current.customer,
+        legalMentionsComplete: current.legalMentionsComplete,
+        variant: "dispute",
+        leadReference: request.publicReference
+      });
+      const documentStorageKey = `credit-note-${noteId}.pdf`;
+      await this.deps.storage.put(documentStorageKey, pdf, "application/pdf");
+      return {
+        id: noteId,
+        number: allocated.number,
+        countryCode: current.countryCode,
+        year: allocated.year,
+        sequence: allocated.sequence,
+        invoiceId: current.id,
+        invoiceNumber: current.number,
+        partnerId: current.partnerId,
+        currency: "XOF" as const,
+        ...totals,
+        reason,
+        documentStorageKey,
+        documentSha256: sha256(pdf),
+        issuedById: actor.actorId ?? null,
+        issuedAt,
+        kind: "dispute" as const,
+        disputeId: request.disputeId,
+        leadAssignmentId: request.leadAssignmentId
+      };
+    });
+    if (result.created) {
+      this.deps.audit.write({
+        actor,
+        action: BillingAuditActions.disputeCreditNoteIssued,
+        targetType: "CreditNote",
+        targetId: result.creditNote.id,
+        scope: { partnerId: invoice.partnerId, countryCode: invoice.countryCode, invoiceId: invoice.id },
+        result: "success",
+        reason: "dispute_accepted",
+        context: { number: result.creditNote.number, invoiceNumber: invoice.number, disputeId: request.disputeId, leadAssignmentId: request.leadAssignmentId, subtotalAmount: totals.subtotalAmount, vatAmount: totals.vatAmount, totalAmount: totals.totalAmount, documentSha256: result.creditNote.documentSha256 }
+      });
+      await this.notifyBroker(actor, invoice.partnerId, "credit_note_issued", "Avoir partiel émis",
+        `L'avoir partiel ${result.creditNote.number} (${formatXof(result.creditNote.totalAmount)} TTC) est émis sur la facture ${invoice.number} suite à une contestation acceptée. Détail et PDF dans Facturation.`,
+        "CreditNote", result.creditNote.id);
+    }
+    return this.disputeOutcome(result.creditNote);
+  }
+
+  /** Number of a credit note, for the dispute views (id only; no ownership check: callers are tenant-scoped). */
+  async creditNoteNumber(id: string): Promise<string | undefined> {
+    return (await this.deps.repository.findCreditNote(id))?.number;
+  }
+
+  private disputeOutcome(note: CreditNoteRecord): DisputeCreditOutcome {
+    return { creditMode: "credit_note", creditNoteId: note.id, creditNoteNumber: note.number, creditAmount: note.totalAmount };
   }
 
   // ---------------------------------------------------------------- broker reads (G-05)
@@ -423,7 +517,7 @@ export class InvoicingService {
     // received the day an invoice is issued settles it), then by recording time.
     const raw: Array<Omit<AccountEntry, "balance"> & { recordedAt: number }> = [
       ...visibleInvoices.map((invoice) => ({ kind: "invoice" as const, documentId: invoice.id, reference: invoice.number, date: invoice.issuedAt.toISOString(), label: `Facture ${invoice.number}`, debit: invoice.totalAmount, credit: 0, recordedAt: invoice.issuedAt.getTime() })),
-      ...visibleNotes.map((note) => ({ kind: "credit_note" as const, documentId: note.id, reference: note.number, date: note.issuedAt.toISOString(), label: `Avoir ${note.number} (annule ${note.invoiceNumber})`, debit: 0, credit: note.totalAmount, recordedAt: note.issuedAt.getTime() })),
+      ...visibleNotes.map((note) => ({ kind: "credit_note" as const, documentId: note.id, reference: note.number, date: note.issuedAt.toISOString(), label: isDisputeCreditNote(note) ? `Avoir ${note.number} (contestation, facture ${note.invoiceNumber})` : `Avoir ${note.number} (annule ${note.invoiceNumber})`, debit: 0, credit: note.totalAmount, recordedAt: note.issuedAt.getTime() })),
       ...visiblePayments.map((payment) => ({
         kind: "payment" as const,
         documentId: payment.id,
@@ -450,7 +544,7 @@ export class InvoicingService {
       generatedAt: this.now().toISOString(),
       totals: { invoiced, credited, paid, balanceDue: invoiced - credited - paid },
       entries,
-      invoices: visibleInvoices.map((invoice) => this.toDto(invoice, invoice.creditNoteId ? notesById.get(invoice.creditNoteId) : undefined)),
+      invoices: visibleInvoices.map((invoice) => this.toDto(invoice, invoice.creditNoteId ? notesById.get(invoice.creditNoteId) : undefined, visibleNotes)),
       packs,
       packCreditsRemaining: packs.reduce((sum, pack) => sum + pack.creditsRemaining, 0),
       paymentsEnabled: false,
@@ -504,17 +598,16 @@ export class InvoicingService {
     }
   }
 
-  private async creditNotesById(partnerId?: string): Promise<Map<string, CreditNoteRecord>> {
-    return new Map((await this.deps.repository.listCreditNotes({ partnerId })).map((note) => [note.id, note]));
-  }
-
   private async toDetail(invoice: IssuedInvoiceRecord): Promise<IssuedInvoiceDetail> {
-    const [payments, note] = await Promise.all([
+    const [payments, notes] = await Promise.all([
       this.deps.repository.listPayments({ invoiceId: invoice.id }),
-      invoice.creditNoteId ? this.deps.repository.findCreditNote(invoice.creditNoteId) : Promise.resolve(undefined)
+      this.deps.repository.listCreditNotes({ invoiceId: invoice.id })
     ]);
+    const note = invoice.creditNoteId ? notes.find((candidate) => candidate.id === invoice.creditNoteId) : undefined;
+    const partials = notes.filter(isDisputeCreditNote);
     return {
-      ...this.toDto(invoice, note),
+      ...this.toDto(invoice, note, notes),
+      ...(partials.length ? { partialCreditNotes: partials.map((partial) => this.toCreditNoteDto(partial)) } : {}),
       payments: payments.map((payment) => ({
         id: payment.id,
         invoiceId: payment.invoiceId,
@@ -528,7 +621,8 @@ export class InvoicingService {
     };
   }
 
-  private toDto(invoice: IssuedInvoiceRecord, note: CreditNoteRecord | undefined): IssuedInvoice {
+  private toDto(invoice: IssuedInvoiceRecord, note: CreditNoteRecord | undefined, creditNotes: CreditNoteRecord[] = []): IssuedInvoice {
+    const partialTotal = partialCreditsTotal(creditNotes.filter((candidate) => candidate.invoiceId === invoice.id));
     return {
       id: invoice.id,
       number: invoice.number,
@@ -550,7 +644,8 @@ export class InvoicingService {
       vatAmount: invoice.vatAmount,
       totalAmount: invoice.totalAmount,
       amountPaid: invoice.amountPaid,
-      amountDue: invoice.status === "cancelled" ? 0 : invoice.totalAmount - invoice.amountPaid,
+      amountDue: invoice.status === "cancelled" ? 0 : Math.max(0, invoice.totalAmount - partialTotal - invoice.amountPaid),
+      ...(partialTotal > 0 ? { partialCreditsTotal: partialTotal } : {}),
       creditNote: note ? this.toCreditNoteDto(note) : null,
       paymentsEnabled: false
     };
@@ -569,7 +664,10 @@ export class InvoicingService {
       vatAmount: note.vatAmount,
       totalAmount: note.totalAmount,
       reason: note.reason,
-      issuedAt: note.issuedAt.toISOString()
+      issuedAt: note.issuedAt.toISOString(),
+      kind: isDisputeCreditNote(note) ? "dispute" : "cancellation",
+      ...(note.disputeId ? { disputeId: note.disputeId } : {}),
+      ...(note.leadAssignmentId ? { leadAssignmentId: note.leadAssignmentId } : {})
     };
   }
 
@@ -621,6 +719,34 @@ export class InvoicingService {
   private now(): Date {
     return this.deps.now ? this.deps.now() : new Date();
   }
+}
+
+/** Spec 063: what the dispute service asks the invoicing service to credit. */
+export interface DisputeCreditRequest {
+  disputeId: string;
+  leadAssignmentId: string;
+  partnerId: string;
+  assignedAt: Date;
+  /** Exclusive lead = 1; shared lead = number of partners that received the same request. */
+  recipientCount: number;
+  /** Public reference of the lead (never contact or answers). */
+  publicReference?: string | undefined;
+  decisionReason: string;
+}
+
+export interface DisputeCreditOutcome {
+  creditMode: "draft_invoice" | "credit_note" | "none";
+  creditNoteId?: string;
+  creditNoteNumber?: string;
+  /** Credit note total, XOF including VAT. */
+  creditAmount?: number;
+  /** Why nothing was credited ("none" mode). */
+  reason?: string;
+}
+
+/** Sum (incl. VAT) of the partial dispute credit notes among `notes`. */
+export function partialCreditsTotal(notes: CreditNoteRecord[]): number {
+  return notes.filter(isDisputeCreditNote).reduce((sum, note) => sum + note.totalAmount, 0);
 }
 
 const PAYMENT_METHOD_LABELS = {

@@ -45,17 +45,18 @@ describe("auth login flow", () => {
         productIds: ["00000000-0000-4000-8000-0000000000d1"]
       }
     }, superAdminActor);
-    await users.update({ ...broker, partnerPlan: "pro", mfaStatus: "verified" });
+    await users.update({ ...broker, partnerPlan: "pro" });
     await users.setPassword(broker.id, await auth.passwordHashing.hash("valid password 123"));
 
     const session = await auth.service.login({ email: broker.email, password: "valid password 123" });
     const claims = verifyActorToken(session.accessToken);
 
-    expect(session.mfaRequired).toBe(false);
+    // Spec 063: a password-only login never carries the second factor.
+    expect(session.mfaRequired).toBe(true);
     expect(claims).toMatchObject({
       actorId: broker.id,
       roles: ["broker_owner_pro"],
-      mfaVerified: true,
+      mfaVerified: false,
       partnerTenantId: "00000000-0000-4000-8000-0000000000b1",
       partnerPlan: "pro",
       countryScopes: ["00000000-0000-4000-8000-0000000000c1"],

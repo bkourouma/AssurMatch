@@ -31,6 +31,9 @@ CREATE INDEX IF NOT EXISTS "BrokerCrmDispute_status_createdAt_idx" ON "BrokerCrm
 -- Note: "one dispute per lead" (D-B1) is enforced by the service, not by a unique index, because rows
 -- written before this migration may already hold several disputes for the same lead.
 
+-- B. Broker notification type of the dispute decision (pointer e-mail, spec 061 mechanism).
+ALTER TYPE "NotificationType" ADD VALUE IF NOT EXISTS 'broker_dispute_decided';
+
 -- B. Partial credit notes: a dispute credit note can sit next to the cancellation one of an invoice.
 ALTER TABLE "CreditNote" ADD COLUMN IF NOT EXISTS "kind" TEXT NOT NULL DEFAULT 'cancellation';
 ALTER TABLE "CreditNote" ADD COLUMN IF NOT EXISTS "disputeId" TEXT;

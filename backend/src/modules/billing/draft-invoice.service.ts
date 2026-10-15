@@ -143,15 +143,36 @@ export class DraftInvoiceService {
     return statement;
   }
 
-  private async computeForPartner(partnerId: string, partnerName: string, plan: BillingPlanKey, actor: ActorContext, reason: string): Promise<DraftInvoice> {
-    const period = this.currentMonth();
+  /**
+   * Spec 063 FR-B06: an accepted dispute in "draft_invoice" mode must reach the draft of the lead's
+   * month even when it was computed before the decision (and even for a past month, which the monthly
+   * recompute never revisits). Only an existing, not yet invoiced draft is refreshed; pack credits are
+   * applied idempotently (see computeForPartner). Returns undefined when nothing had to be done.
+   */
+  async refreshDraftForPeriod(partnerId: string, periodFrom: Date, actor: ActorContext, reason: string): Promise<DraftInvoice | undefined> {
+    if (!this.deps.featureFlags.isEnabled("billing_enabled")) return undefined;
+    if (await this.deps.isPeriodInvoiced?.(partnerId, periodFrom)) return undefined;
+    const existing = (await this.deps.repository.listDrafts(partnerId)).find((record) => record.periodFrom.getTime() === periodFrom.getTime());
+    if (!existing) return undefined;
+    const partner = (await this.deps.partners.list()).find((candidate) => candidate.id === partnerId);
+    if (!partner) return undefined;
+    const period = { from: periodFrom, to: new Date(Date.UTC(periodFrom.getUTCFullYear(), periodFrom.getUTCMonth() + 1, 0, 23, 59, 59, 999)) };
+    return this.computeForPartner(partner.id, partner.legalName, partner.plan as BillingPlanKey, actor, reason, period);
+  }
+
+  private async computeForPartner(partnerId: string, partnerName: string, plan: BillingPlanKey, actor: ActorContext, reason: string, period: { from: Date; to: Date } = this.currentMonth()): Promise<DraftInvoice> {
     const { evaluations, assignments } = await this.evaluateLeads(partnerId, period);
     const countryCode = assignments[0]?.countryCode ?? "CI";
     const price = await this.priceFor(plan, countryCode);
     const billableEvaluations = evaluations.filter((evaluation) => evaluation.billable);
     const disputeCredits = billableEvaluations.filter((evaluation) => evaluation.disputeCredited).length;
     const netBillable = billableEvaluations.length - disputeCredits;
-    const packCreditsUsed = await this.deps.packs.consume(partnerId, netBillable, actor);
+    // Spec 063: pack consumption is idempotent per draft. The draft remembers what it already consumed,
+    // so a repeated or refreshed computation only consumes (or releases) the difference.
+    const previouslyUsed = (await this.deps.repository.listDrafts(partnerId)).find((record) => record.periodFrom.getTime() === period.from.getTime())?.packCreditsUsed ?? 0;
+    const packCreditsUsed = Math.min(netBillable, previouslyUsed + (await this.deps.packs.remainingCredits(partnerId)));
+    if (packCreditsUsed > previouslyUsed) await this.deps.packs.consume(partnerId, packCreditsUsed - previouslyUsed, actor);
+    else if (packCreditsUsed < previouslyUsed) await this.deps.packs.release(partnerId, previouslyUsed - packCreditsUsed, actor);
 
     // Chargeable leads, cheapest-priced last: pack credits are applied to the most expensive leads
     // first so a granted credit is always worth the most to the partner.
@@ -250,7 +271,9 @@ export class DraftInvoiceService {
     if (!this.deps.crmActivity) return credited;
     for (const assignment of assignments) {
       const disputes = await this.deps.crmActivity.disputesForLead(assignment.id);
-      if (disputes.some((dispute) => dispute.status === "accepted")) credited.add(assignment.id);
+      // Spec 063: a dispute settled by a partial credit note ("credit_note") or by hand ("none") must not
+      // be credited a second time on the draft; legacy accepted rows (no mode) keep the draft credit.
+      if (disputes.some((dispute) => dispute.status === "accepted" && (dispute.creditMode === undefined || dispute.creditMode === "draft_invoice"))) credited.add(assignment.id);
     }
     return credited;
   }

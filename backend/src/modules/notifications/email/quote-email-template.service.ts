@@ -82,14 +82,17 @@ export type BrokerAlertEmailType =
   | "broker_task_due"
   | "broker_quota_threshold"
   | "broker_license_expiring"
-  | "broker_offer_expiring";
+  | "broker_offer_expiring"
+  | "broker_dispute_decided";
 
 const BROKER_ALERT_COPY: Record<BrokerAlertEmailType, { subject: string; line: string; path: string }> = {
   broker_document_received: { subject: "Nouveau document d'un visiteur", line: "Un visiteur a ajouté un document à l'un de vos leads.", path: "/leads" },
   broker_task_due: { subject: "Rappel de tâche CRM", line: "Une tâche ou un rappel de votre CRM arrive à échéance.", path: "/crm" },
   broker_quota_threshold: { subject: "Quota mensuel de leads", line: "Votre quota mensuel de leads atteint un seuil d'alerte.", path: "/account" },
   broker_license_expiring: { subject: "Licence bientôt expirée", line: "Une licence de votre cabinet arrive bientôt à expiration. Pensez à transmettre son renouvellement.", path: "/licenses" },
-  broker_offer_expiring: { subject: "Offre bientôt expirée", line: "Une de vos offres publiées arrive bientôt à la fin de sa période de validité.", path: "/offers" }
+  broker_offer_expiring: { subject: "Offre bientôt expirée", line: "Une de vos offres publiées arrive bientôt à la fin de sa période de validité.", path: "/offers" },
+  // Spec 063 FR-B08: pointer only; the decision itself is shown in Facturation > Contestations.
+  broker_dispute_decided: { subject: "Décision sur votre contestation", line: "Une décision est disponible dans Facturation > Contestations.", path: "/billing" }
 };
 
 /** Spec 061 FR-004: pointer e-mail to the compliance team; the alert itself stays in the center. */

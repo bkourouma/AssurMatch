@@ -207,6 +207,7 @@ enum NotificationType {
   broker_quota_threshold
   broker_license_expiring
   broker_offer_expiring
+  broker_dispute_decided
   admin_alert_raised
 }
 

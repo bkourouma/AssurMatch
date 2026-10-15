@@ -24,7 +24,9 @@ export const BROKER_ALERT_NOTIFICATION_TYPES = [
   "broker_task_due",
   "broker_quota_threshold",
   "broker_license_expiring",
-  "broker_offer_expiring"
+  "broker_offer_expiring",
+  // Spec 063 FR-B08: the finance decision on a lead dispute (pointer only, never lead content).
+  "broker_dispute_decided"
 ] as const;
 
 export type BrokerAlertNotificationType = (typeof BROKER_ALERT_NOTIFICATION_TYPES)[number];

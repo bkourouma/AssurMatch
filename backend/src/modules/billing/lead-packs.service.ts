@@ -107,6 +107,34 @@ export class LeadPacksService {
     return applied;
   }
 
+  /**
+   * Spec 063: gives back `units` credits (newest pack first) when a refreshed draft needs fewer than it
+   * already consumed (an accepted dispute removed a lead the packs had covered). Returns how many were released.
+   */
+  async release(partnerId: string, units: number, actor: ActorContext): Promise<number> {
+    if (units <= 0) return 0;
+    let remaining = units;
+    let released = 0;
+    for (const pack of [...(await this.deps.repository.listPacks(partnerId))].reverse()) {
+      if (remaining === 0) break;
+      const back = Math.min(pack.creditsConsumed, remaining);
+      if (back === 0) continue;
+      await this.deps.repository.updatePackConsumption(pack.id, pack.creditsConsumed - back);
+      remaining -= back;
+      released += back;
+      this.deps.audit.write({
+        actor,
+        action: BillingAuditActions.packReleased,
+        targetType: "LeadPack",
+        targetId: pack.id,
+        scope: { partnerId },
+        result: "success",
+        context: { released: back }
+      });
+    }
+    return released;
+  }
+
   private toDto(record: LeadPackRecord): LeadPack {
     return {
       id: record.id,

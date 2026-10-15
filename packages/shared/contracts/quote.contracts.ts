@@ -376,6 +376,7 @@ export const brokerStarterLeadDetailSchema = brokerStarterLeadSummarySchema.exte
     decidedAt: dateTimeStringSchema.optional(),
     decisionReason: z.string().optional(),
     creditMode: z.enum(["draft_invoice", "credit_note", "none"]).optional(),
+    creditNoteId: z.string().optional(),
     creditNoteNumber: z.string().optional(),
     creditAmount: z.number().int().nonnegative().optional()
   }).optional()
@@ -561,6 +562,7 @@ export const brokerCrmDisputeSchema = z.object({
   decisionReason: z.string().optional(),
   creditMode: z.enum(["draft_invoice", "credit_note", "none"]).optional(),
   creditNoteId: z.string().optional(),
+  creditNoteNumber: z.string().optional(),
   creditAmount: z.number().int().nonnegative().optional()
 });
 
