@@ -29,6 +29,9 @@ const disabledFlags = [
   "ai_broker_assistant_enabled"
 ];
 
+// Spec 062: the one non-sensitive flag that ships ON (kill switch of the broker <-> visitor messaging).
+const enabledByDefaultFlags = ["broker_visitor_messaging_enabled"];
+
 // The launcher runs this seed on every start. Rows that already exist keep what the back-office set
 // (flags, country and product status), so restarting the local stack never closes a journey that was
 // opened on purpose. `ASSURMATCH_SEED_RESET=1` brings every row back to the safe closed defaults.
@@ -57,6 +60,20 @@ async function main(): Promise<void> {
           defaultValue: false,
           reason: "Safe disabled default for local development seed"
         }
+      });
+    }
+  }
+
+  for (const key of enabledByDefaultFlags) {
+    const existingFlag = await prisma.featureFlag.findFirst({ where: { key, scopeType: "global", scopeId: null } });
+    if (existingFlag) {
+      if (resetExisting) await prisma.featureFlag.update({
+        where: { id: existingFlag.id },
+        data: { value: true, defaultValue: true, reason: "Default-on kill switch (spec 062) for local development seed" }
+      });
+    } else {
+      await prisma.featureFlag.create({
+        data: { key, scopeType: "global", value: true, defaultValue: true, reason: "Default-on kill switch (spec 062) for local development seed" }
       });
     }
   }

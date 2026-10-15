@@ -1,6 +1,6 @@
 # Scénario E2E — Courtier ajouté → société configurée → offres validées → visiteur → devis → réponse
 
-Mis à jour le 2026-10-08. Remplace la version du 2026-09, dont les écarts (onboarding du courtier, offres en libre-service, réponse au visiteur) sont comblés par les specs 051 à 055, 059 et 060.
+Mis à jour le 2026-10-15 (messagerie, documents demandés et demandes de données : spec 062). Remplace la version du 2026-09, dont les écarts (onboarding du courtier, offres en libre-service, réponse au visiteur) sont comblés par les specs 051 à 055, 059 et 060.
 
 Surfaces : Back-office Admin (3602), Broker Back-office (3603), Web Publique (3601), API (3600), Mailpit (8025).
 
@@ -68,6 +68,20 @@ cmd /c launch-local.bat
 | 26 | Visiteur | Public | Rouvrir le lien de suivi | « Une proposition de courtier est disponible », mention « non contractuelle, à confirmer par le courtier ». **Aucun** vocabulaire « souscrire / acheter / payer » |
 | 27 | Visiteur | Public | « Je suis intéressé, rappelez-moi » + créneau → « Envoyer ma réponse au courtier » | Réponse transmise |
 | 28 | Propriétaire | Broker | Fiche du lead | Réponse du visiteur dans l'historique ; le statut n'est jamais changé d'office |
+| **6 bis. Messagerie, documents demandés, demande de données (spec 062)** | | | | |
+| 28a | Propriétaire | Broker | Fiche du lead → carte « Échanger avec le visiteur » : écrire un message avec une pièce jointe PDF → « Envoyer » | Message dans le fil ; e-mail « Vous avez un nouveau message de {courtier} » au visiteur, **sans le texte du message** ; premier message = première réponse visible (SLA) |
+| 28b | Propriétaire | Broker | Même champ : saisir « contrat validé » (ou « guaranteed ») → « Envoyer » | Envoi **refusé**, l'expression fautive est affichée, le brouillon reste dans la zone de saisie |
+| 28c | Visiteur | Public | Rouvrir le lien de suivi → section « Conversation » : lire le message, télécharger la pièce, répondre (avec une pièce) | Réponse dans le fil ; accusé de lecture « Lu » visible côté courtier ; le courtier reçoit une notification dans sa boîte et un e-mail pointeur |
+| 28d | Propriétaire | Broker | `/notifications` → ouvrir la notification « Nouveau message d'un visiteur » | Ouvre la fiche du lead sur la conversation (Starter : `/leads/…#conversation` ; CRM : `/crm/leads/…?tab=conversation`) |
+| 28e | Propriétaire | Broker | Fiche du lead → « Demander un document » : intitulé « Carte grise », note, échéance → « Envoyer la demande » | Demande « ouverte » ; e-mail « {courtier} vous demande des documents » au visiteur (intitulé non repris) |
+| 28f | Visiteur | Public | Section « Documents demandés » : téléverser un PDF sain, puis (autre demande) un fichier de test antivirus (EICAR) | PDF accepté : demande « fournie ». EICAR refusé : demande toujours ouverte |
+| 28g | Propriétaire | Broker | Fiche du lead → demande « fournie » → télécharger le fichier | Fichier servi (téléchargement audité) ; notification « Document reçu d'un visiteur » |
+| 28h | Super Admin | Admin | Flags globaux : couper `broker_visitor_messaging_enabled` (motif obligatoire) | Courtier et visiteur ne peuvent plus écrire ni téléverser ; l'historique reste lisible. Rétablir ensuite le flag |
+| 28i | Visiteur | Public | Section « Mes données » : « Effacer mes données » + détail → envoyer | Référence `DR-…` affichée ; e-mail d'accusé de réception avec la référence ; **rien n'est effacé** ; une seconde demande d'effacement ouverte est refusée avec la référence existante |
+| 28j | Compliance Admin | Admin | `/compliance/data-requests` → ouvrir la demande → « Prendre en charge » → « Créer l'aperçu d'effacement » | Aperçu d'effacement (spec 046) lié à la demande ; **aucune donnée effacée** tant qu'un lot n'est pas approuvé puis exécuté dans « Conservation des données » |
+| 28k | Compliance Admin | Admin | Clôturer la demande (note) | Statut « Traitée » ; e-mail pointeur au visiteur (sans note) ; statut final visible dans son espace |
+| 28l | Compliance Admin | Admin | `/quote-requests/…` → carte « Échanges courtier / visiteur » | Lecture seule de la conversation (audité). Le support voit les corps masqués |
+| 28m | Super Admin | Admin | Réaffecter le lead à un autre courtier (action admin de réaffectation) | L'ancien courtier perd l'accès à la conversation ; le nouveau repart d'une conversation vide ; le visiteur voit l'ancienne conversation « clôturée » en lecture seule |
 | **7. Clôture, avis, facturation (SC-08)** | | | | |
 | 29 | Propriétaire | Broker | « Clôturer » → issue « Gagné » + commentaire | Lead clôturé ; le visiteur est prévenu **sans** l'issue commerciale |
 | 30 | Visiteur | Mailpit/Public | Ouvrir l'e-mail « Votre avis… » (`/avis/SF-…?token=`), noter, envoyer | « Merci pour votre avis » ; lien à usage unique |
@@ -81,9 +95,11 @@ Les flags d'avis (spec 048) et de facturation (spec 060) n'ont volontairement pa
 - Devis sans consentement : refusé.
 - Courtier suspendu : ses offres et ses leads disparaissent.
 - Isolation : un courtier ne voit jamais les leads ni les offres d'un autre.
+- Messagerie (spec 062) : un courtier non affecté, un ancien courtier ou un visiteur d'une autre demande n'accède à aucun message ni aucune pièce (404 neutre côté visiteur) ; un message à formulation interdite est refusé ; consentement retiré ou lead clôturé = conversation en lecture seule.
 
 ## Points à vérifier à l'œil (non couverts par les assertions)
 
 - Aucun e-mail ni écran ne cite une garantie ou un prix comme contractuel.
 - Rien de personnel du visiteur dans l'URL (le token seul est autorisé) ni dans les journaux.
+- Aucun e-mail de messagerie (message, documents demandés, demande de données) ne reprend le texte d'un message, un intitulé de document, un nom de fichier ou le détail d'une demande.
 - Les trois apps ne partagent aucun cookie : se connecter à l'admin ne connecte pas au portail courtier.

@@ -139,8 +139,42 @@ export function findForbiddenEditorialWordingForLocale(text: string, locale: "fr
  */
 export const FORBIDDEN_ENGLISH_WORDING = ["buy now", "subscribe now", "valid contract", "cover accepted", "best insurance on the market", "guaranteed callback", "firm price"] as const;
 
-/** Spec 055 FR-004: the French regulated list plus its English equivalents, case-insensitive. */
+/**
+ * Spec 062 R4: additional promises banned in broker-written messages and document requests, matched
+ * as whole phrases after accent folding. They only extend the guard; nothing blocked before passes now.
+ */
+export const FORBIDDEN_MESSAGING_PHRASES = ["achetez maintenant", "souscrivez maintenant", "contract validated", "validated contract"] as const;
+
+/**
+ * Spec 062 R4: stand-alone words that make a promise ("remboursement garanti", "guaranteed price").
+ * Matched on word boundaries so the neutral nouns "garantie" / "garanties" ("Les garanties incluses")
+ * are never flagged. The accent-insensitive "garantie acceptée" phrase is covered by the regulated list.
+ */
+export const FORBIDDEN_MESSAGING_WORDS = ["garanti", "garantis", "guaranteed"] as const;
+
+function foldWording(value: string): string {
+  return normalizeEditorialText(value).replace(/\s+/g, " ");
+}
+
+/**
+ * Spec 055 FR-004 + spec 062 R4: the French regulated list plus its English equivalents, case- and
+ * accent-insensitive ("contrat validé" is "contrat valide"), plus stand-alone promise words. Returns
+ * the canonical wording found (list entry or word), in a stable order.
+ */
 export function findForbiddenWordingAnyLanguage(text: string): string[] {
   const english = text.toLocaleLowerCase("en-US");
-  return [...new Set([...findForbiddenWording(text), ...FORBIDDEN_ENGLISH_WORDING.filter((phrase) => english.includes(phrase))])];
+  const found = new Set<string>([...findForbiddenWording(text), ...FORBIDDEN_ENGLISH_WORDING.filter((phrase) => english.includes(phrase))]);
+  const folded = foldWording(text);
+  const alreadyFound = new Set([...found].map(foldWording));
+  for (const phrase of [...FORBIDDEN_REGULATED_WORDING, ...FORBIDDEN_ENGLISH_WORDING, ...FORBIDDEN_MESSAGING_PHRASES]) {
+    const key = foldWording(phrase);
+    if (!alreadyFound.has(key) && folded.includes(key)) {
+      found.add(phrase);
+      alreadyFound.add(key);
+    }
+  }
+  for (const word of FORBIDDEN_MESSAGING_WORDS) {
+    if (containsWholePhrase(folded, word)) found.add(word);
+  }
+  return [...found];
 }

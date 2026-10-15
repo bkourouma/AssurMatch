@@ -27,7 +27,7 @@ Décisions techniques prises avant la phase 1. Chaque entrée : décision, raiso
 - **Comportement coupé** : écritures refusées (`MESSAGING_DISABLED`), lectures conservées.
 
 ## R6. Notifications
-- **Décision** : nouveaux types d'énumération (migration `ALTER TYPE … ADD VALUE`), traités par le worker existant (`DELIVERABLE_TYPES`), gabarits FR/EN pointeur sans contenu. Idempotence par `dedupeKey` avec tranche de 15 minutes pour limiter le volume d'e-mails (la notification in-app, elle, est créée à chaque message : clé par message, e-mail par tranche).
+- **Décision** : nouveaux types d'énumération (migration `ALTER TYPE … ADD VALUE`), traités par le worker existant (`DELIVERABLE_TYPES`), gabarits FR/EN pointeur sans contenu. Idempotence par `dedupeKey` avec tranche de 15 minutes pour limiter le volume d'e-mails (la notification in-app et l'e-mail sont regroupés par tranche, via `BrokerAlertNotifier` pour le courtier ; le compteur de non lus de l'interface reste exact).
 - `broker_document_received` (055) est réutilisé pour les pièces fournies par le visiteur.
 - Préférences de canal (spec 038) et désinscription : appliquées par le même chemin que `broker_visitor_response`.
 

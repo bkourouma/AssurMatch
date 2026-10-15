@@ -113,7 +113,7 @@ Un compliance admin ou un support admin ouvre, en lecture seule, la conversation
 - **Fichier** : > 5 Mo ou type invalide, plus de 3 pièces jointes, antivirus indisponible → envoi refusé, aucun message partiel.
 - **Plafond** : 300 messages par conversation (409 `THREAD_LIMIT_REACHED`).
 - **Concurrence** : deux envois simultanés produisent deux messages ordonnés par `createdAt` puis `id`.
-- **Spam e-mail** : au plus un e-mail pointeur par destinataire et par conversation toutes les 15 minutes ; la notification in-app, elle, est toujours créée.
+- **Spam de notifications** : les notifications de message sont regroupées par tranche de 15 minutes, par destinataire et par conversation (une notification in-app et un e-mail pointeur par tranche) ; le compteur de messages non lus de l'interface reste exact.
 - **Langue** : e-mails visiteur dans la langue de la demande ; contenu des messages tel que saisi.
 - **Drapeau coupé** : lecture seule globale, y compris pour les téléversements de pièces demandées.
 

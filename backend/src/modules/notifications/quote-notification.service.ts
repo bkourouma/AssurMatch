@@ -4,6 +4,7 @@ import { QuoteAuditActions } from "../audit-logs/quote-audit-actions";
 import type { QueueJobRecord, QueuePort } from "../common/queues/queues.module";
 import type { ActorContext } from "../common/types";
 import type { LeadAssignmentRecord } from "../leads/lead-assignment.service";
+import type { DataRequestNotificationsPort, LeadMessagingNotificationsPort } from "../lead-messaging/lead-messaging.ports";
 import type { QuoteRequestRecord } from "../quote-requests/quote-submission.service";
 import type { NotificationRecord, NotificationsService } from "./notifications.module";
 
@@ -21,6 +22,8 @@ export interface VisitorNotificationEvent {
   previousPartnerTenantId?: string | undefined;
   /** Discriminates two occurrences of the same step (a new partner, a new resend). */
   seq?: string | undefined;
+  /** Spec 062 D-10: reference, type and indicative due date of a data request (no free text). */
+  dataRequest?: { reference: string; requestType?: string | undefined; dueAt?: string | undefined } | undefined;
 }
 
 type QueuedNotification = { notification: NotificationRecord; job: QueueJobRecord };
@@ -34,7 +37,7 @@ function isUniqueViolation(error: unknown): boolean {
   return typeof error === "object" && error !== null && (error as { code?: unknown }).code === "P2002";
 }
 
-export class QuoteNotificationService {
+export class QuoteNotificationService implements LeadMessagingNotificationsPort, Pick<DataRequestNotificationsPort, "queueVisitorAcknowledgement" | "queueVisitorClosure"> {
   constructor(
     private readonly notifications: NotificationRecord[] | NotificationsService,
     private readonly queue: QueuePort,
@@ -62,7 +65,12 @@ export class QuoteNotificationService {
     const eventPayload: Record<string, string> = {
       ...(event.assignmentId ? { assignmentId: event.assignmentId } : {}),
       ...(event.partnerTenantId ? { partnerTenantId: event.partnerTenantId } : {}),
-      ...(event.previousPartnerTenantId ? { previousPartnerTenantId: event.previousPartnerTenantId } : {})
+      ...(event.previousPartnerTenantId ? { previousPartnerTenantId: event.previousPartnerTenantId } : {}),
+      ...(event.dataRequest ? {
+        dataRequestReference: event.dataRequest.reference,
+        ...(event.dataRequest.requestType ? { dataRequestType: event.dataRequest.requestType } : {}),
+        ...(event.dataRequest.dueAt ? { dataRequestDueAt: event.dataRequest.dueAt } : {})
+      } : {})
     };
     const now = new Date();
     const job = this.queue.add("visitor-quote-notifications", "visitor_quote_notification", quote.id, actor.correlationId);
@@ -182,6 +190,123 @@ export class QuoteNotificationService {
       scope: { quoteRequestId: quote.id, partnerTenantId: event.partnerTenantId },
       result: "success",
       context: { type: notification.type, responseType: event.responseType }
+    });
+    return { notification, job };
+  }
+
+  // ---------------------------------------------------------------------------------------------
+  // Spec 062: broker <-> visitor messaging, document requests and data requests. Pointers only: no
+  // message text, label, file name or visitor detail ever reaches a row, an e-mail or an inbox entry.
+  // ---------------------------------------------------------------------------------------------
+
+  /** Visitor e-mail "you have a new message from {broker}"; coalesced per 15-minute bucket (`seq`). */
+  queueVisitorBrokerMessage(
+    quote: Pick<QuoteRequestRecord, "id" | "publicReference">,
+    event: { assignmentId: string; partnerTenantId: string; bucket: string },
+    actor: ActorContext
+  ): Promise<QueuedNotification | undefined> {
+    return this.queueVisitorEvent(quote, { type: "visitor_broker_message", assignmentId: event.assignmentId, partnerTenantId: event.partnerTenantId, seq: event.bucket }, actor);
+  }
+
+  /** Visitor e-mail "{broker} asks you for documents"; one per document request. */
+  queueVisitorDocumentsRequested(
+    quote: Pick<QuoteRequestRecord, "id" | "publicReference">,
+    event: { assignmentId: string; partnerTenantId: string; requestId: string },
+    actor: ActorContext
+  ): Promise<QueuedNotification | undefined> {
+    return this.queueVisitorEvent(quote, { type: "visitor_documents_requested", assignmentId: event.assignmentId, partnerTenantId: event.partnerTenantId, seq: event.requestId }, actor);
+  }
+
+  /** Spec 062 D-10: acknowledgement of a data request, with its reference and indicative due date. */
+  queueVisitorAcknowledgement(
+    quote: Pick<QuoteRequestRecord, "id" | "publicReference">,
+    event: { dataRequestId: string; reference: string; requestType: string; dueAt: string },
+    actor: ActorContext
+  ): Promise<QueuedNotification | undefined> {
+    return this.queueVisitorEvent(quote, {
+      type: "visitor_data_request_acknowledged",
+      seq: event.dataRequestId,
+      dataRequest: { reference: event.reference, requestType: event.requestType, dueAt: event.dueAt }
+    }, actor);
+  }
+
+  /** Spec 062 D-10: the request was completed or rejected; the e-mail never carries the decision note. */
+  queueVisitorClosure(
+    quote: Pick<QuoteRequestRecord, "id" | "publicReference">,
+    event: { dataRequestId: string; reference: string },
+    actor: ActorContext
+  ): Promise<QueuedNotification | undefined> {
+    return this.queueVisitorEvent(quote, { type: "visitor_data_request_closed", seq: event.dataRequestId, dataRequest: { reference: event.reference } }, actor);
+  }
+
+  /** In-app entry + pointer e-mail for the assigned broker: the visitor wrote to them (coalesced per bucket). */
+  queueBrokerVisitorMessage(
+    quote: Pick<QuoteRequestRecord, "id" | "publicReference">,
+    event: { assignmentId: string; partnerTenantId: string; bucket: string },
+    actor: ActorContext
+  ): Promise<QueuedNotification | undefined> {
+    return this.queueBrokerPointer(quote, event, actor, {
+      type: "broker_visitor_message",
+      dedupeKey: `broker_visitor_message:${quote.id}:${event.assignmentId}:${event.bucket}`,
+      title: "Nouveau message d'un visiteur",
+      body: `Un visiteur vous a écrit au sujet de la demande ${quote.publicReference}. Lisez et répondez depuis la fiche du lead.`
+    });
+  }
+
+  /** In-app entry + pointer e-mail for the assigned broker: the visitor provided a requested document. */
+  queueBrokerDocumentReceived(
+    quote: Pick<QuoteRequestRecord, "id" | "publicReference">,
+    event: { assignmentId: string; partnerTenantId: string; requestId: string; bucket: string },
+    actor: ActorContext
+  ): Promise<QueuedNotification | undefined> {
+    return this.queueBrokerPointer(quote, event, actor, {
+      type: "broker_document_received",
+      dedupeKey: `broker_document_received:${quote.id}:${event.assignmentId}:${event.requestId}:${event.bucket}`,
+      title: "Document reçu d'un visiteur",
+      body: `Un document demandé a été reçu pour la demande ${quote.publicReference}. Consultez-le depuis la fiche du lead.`
+    });
+  }
+
+  private async queueBrokerPointer(
+    quote: Pick<QuoteRequestRecord, "id" | "publicReference">,
+    event: { assignmentId: string; partnerTenantId: string },
+    actor: ActorContext,
+    notice: { type: "broker_visitor_message" | "broker_document_received"; dedupeKey: string; title: string; body: string }
+  ): Promise<QueuedNotification | undefined> {
+    if (await this.exists(notice.dedupeKey)) return undefined;
+    const now = new Date();
+    const job = this.queue.add("broker-lead-notifications", "broker_lead_notification", event.assignmentId, actor.correlationId);
+    const notification: NotificationRecord = {
+      id: crypto.randomUUID(),
+      type: notice.type,
+      recipientScope: `partner:${event.partnerTenantId}`,
+      whatsAppStatus: "queued",
+      emailStatus: "queued",
+      payloadReference: quote.id,
+      dedupeKey: notice.dedupeKey,
+      eventPayload: { assignmentId: event.assignmentId, partnerTenantId: event.partnerTenantId },
+      queueJobRecordId: job.id,
+      retryCount: 0,
+      createdAt: now,
+      updatedAt: now
+    };
+    if (!(await this.persist(notification))) return undefined;
+    await this.inApp?.publishInApp({
+      scopeId: event.partnerTenantId,
+      template: notice.type,
+      title: notice.title,
+      body: notice.body,
+      targetType: "LeadAssignment",
+      targetId: event.assignmentId
+    }).catch(() => undefined);
+    this.audit.write({
+      actor,
+      action: QuoteAuditActions.notificationBrokerQueued,
+      targetType: "Notification",
+      targetId: notification.id,
+      scope: { quoteRequestId: quote.id, partnerTenantId: event.partnerTenantId },
+      result: "success",
+      context: { type: notification.type }
     });
     return { notification, job };
   }

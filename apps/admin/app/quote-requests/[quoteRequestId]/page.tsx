@@ -2,6 +2,7 @@ import { readAdminQuoteDocuments } from "../../lib/admin-api";
 import { formatDateTime, readQuoteRequestDetail, readQuoteReviewQueue } from "../../lib/operations-api";
 import { Badge, Card, DataTable, DescriptionList, Grid, PageHeader, PageStack, StateMessage, documentScanTones } from "../../lib/ui/admin-ui";
 import { QuoteReviewForm } from "../../lib/ui/operations-forms";
+import { LeadConversationsCard } from "./lead-conversations-card";
 import { assignmentStatusTones, quoteStatusTones, routingResultTones } from "../../lib/ui/operations-tones";
 
 /**
@@ -154,6 +155,8 @@ export default async function AdminQuoteRequestDetailPage({ params }: { params: 
           </Card>
         </>
       ) : null}
+
+      <LeadConversationsCard quoteRequestId={quoteRequestId} />
 
       <Card title="Documents du prospect">
         {documents.unauthenticated ? <StateMessage tone="danger">Session admin requise.</StateMessage> : null}

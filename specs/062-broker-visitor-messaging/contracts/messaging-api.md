@@ -90,3 +90,21 @@ Support : liste et détail sans le champ `detail` ni l'identité (référence, t
 | `visitor_data_request_acknowledged` | visiteur | e-mail FR/EN | référence `DR-…`, type, échéance indicative |
 | `visitor_data_request_closed` | visiteur | e-mail FR/EN | pointeur : « Votre demande {référence} a été traitée » (statut dans l'espace) |
 | `admin_data_request_received` | conformité | alerte in-app | référence, type |
+
+## Formes complémentaires (source de vérité pour les fronts)
+
+### Admin — demandes de données
+`GET /admin/data-requests` → `{ "items": [{ "id": "uuid", "reference": "DR-AB12CD34", "type": "access|rectification|erasure", "status": "received|in_review|completed|rejected", "createdAt": "ISO", "dueAt": "ISO", "overdue": false, "quoteReference": "QR-…", "locale": "fr|en" }], "nextCursor": "string|null" }`
+
+`GET /admin/data-requests/:id` → liste + `{ "detail?": "texte du visiteur (absent pour le support)", "acknowledgedAt": "ISO|null", "reviewedAt?": "ISO", "decidedAt?": "ISO", "decisionNote?": "texte interne", "erasureBatchId?": "uuid", "erasureAllowed": true, "history": [{ "action": "created|taken|completed|rejected|erasure_started", "at": "ISO" }] }`
+
+Les actions renvoient la vue détail mise à jour. `start-erasure` renvoie en plus `{ "erasureBatchId": "uuid" }`. Transition invalide : **409** `DATA_REQUEST_INVALID_TRANSITION`.
+
+### Admin — conversations d'une demande (lecture seule)
+`GET /admin/leads/:quoteRequestId/conversations` → `{ "masked": true|false, "items": [conversation (vue commune), avec "messages[].body" remplacé par "[masqué]" quand masked] }`
+
+### SLA — champs additifs « première réponse visible »
+Ajoutés (optionnels, `null` si aucune mesure) aux objets SLA existants du courtier (`BrokerSla`, enterprise), de l'admin partenaires (`/admin/partners/sla`) et du tableau de bord courtier : `averageFirstVisibleReplyMinutes: number | null`, `firstVisibleReplyMeasured: number`, `firstVisibleReplyWithinTarget: number`, `firstVisibleReplyComplianceRate: number | null` (même unité que `complianceRate` existant). Les champs « premier geste » existants sont inchangés.
+
+### Notifications courtier (boîte in-app)
+Types `broker_visitor_message` et `broker_document_received` : `targetType = "LeadAssignment"`, `targetId = <leadAssignmentId>`.
