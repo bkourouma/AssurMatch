@@ -382,7 +382,7 @@ test("DR-09 l'ancien courtier ne voit plus rien : écran et API refusés, aucune
 
   // Screen: the lead page is a refusal, the list does not hold the lead any more.
   const page = await visit(browser, firm1.owner, `/leads/${assignmentId}`);
-  await expect(page.getByText(/Acces refuse|Lead introuvable|n'existe pas ou ne vous est pas assigne/u).first()).toBeVisible();
+  await expect(page.getByText(/Acces refuse|Lead introuvable|n.existe pas ou ne vous est pas assigne/u).first()).toBeVisible();
   const body = await page.locator("body").innerText();
   for (const secret of leaks) expect(body, `old broker's page must not show "${secret}"`).not.toContain(secret);
   await expect(card(page, "Contact consenti")).toHaveCount(0);
