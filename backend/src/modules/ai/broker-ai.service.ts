@@ -1,8 +1,8 @@
 import type { AiInteraction, BrokerAiOptOutStatus, BrokerLeadAssistType } from "../../../../packages/shared/contracts/ai.contracts";
 import { aiHumanValidationDecisionSchema, brokerAiOptOutSchema, brokerAiRequestSchema, brokerLeadAssistTypeSchema } from "../../../../packages/shared/contracts/ai.contracts";
 import type { BrokerCrmLeadDetail } from "../../../../packages/shared/contracts/quote.contracts";
-import { roleHasPermission } from "../../../../packages/shared/rbac/assurmatch-role-matrix";
 import type { AuditLogWriter } from "../audit-logs/audit-log-writer.service";
+import { actorHasPermission } from "../common/rbac/actor-permissions";
 import type { ActorContext } from "../common/types";
 import type { CountriesService } from "../countries/countries.module";
 import type { FeatureFlagsService } from "../feature-flags/feature-flags.module";
@@ -28,6 +28,7 @@ export interface BrokerAiDeps {
 const DRAFTING_ASSISTS: ReadonlySet<BrokerLeadAssistType> = new Set(["next_action", "relaunch_message"]);
 const DUPLICATE_WINDOW_MS = 30 * 24 * 3600 * 1000;
 const LOSS_WINDOW_MS = 90 * 24 * 3600 * 1000;
+const LOSS_ANALYSES_LIST_LIMIT = 10;
 
 /**
  * Broker CRM AI assistance (PRD §10.2). Every request first passes the CRM access policy (tenant,
@@ -77,6 +78,24 @@ export class BrokerAiService {
     return this.deps.gateway.toDto(record);
   }
 
+  /**
+   * Spec 064 (FR-003): the recent loss analyses of the caller's own tenant (newest first, at most 10).
+   * The tenant is never taken from the request: only interactions stored for the actor's partner
+   * tenant and the CRM surface are returned.
+   */
+  async listLossAnalyses(actor: ActorContext): Promise<AiInteraction[]> {
+    this.deps.access.assertCrmAccess(actor);
+    // Tenant-wide aggregates: never shown to an assigned-only agent (same rule as the sensitive search), nor to a non Enterprise plan.
+    if (!this.deps.access.canSeeSensitiveSearch(actor) || actor.partnerPlan !== "enterprise") throw new Error("Loss analysis access denied");
+    const tenant = this.tenantOf(actor);
+    const records = (await this.deps.gateway.listForTarget("PartnerTenant", tenant))
+      .filter((record) => record.assistType === "loss_analysis" && record.surface === "broker_crm" && record.partnerTenantId === tenant)
+      .sort((left, right) => right.createdAt.getTime() - left.createdAt.getTime())
+      .slice(0, LOSS_ANALYSES_LIST_LIMIT);
+    this.deps.audit.write({ actor, action: AiAuditActions.read, targetType: "AIInteraction", targetId: "loss_analysis_list", scope: { surface: "broker_crm", partnerTenantId: tenant }, result: "success", context: { assistType: "loss_analysis", count: records.length } });
+    return records.map((record) => this.deps.gateway.toDto(record));
+  }
+
   async read(id: string, actor: ActorContext): Promise<AiInteraction> {
     this.deps.access.assertCrmAccess(actor);
     const record = await this.requireTenantRecord(id, actor);
@@ -98,8 +117,8 @@ export class BrokerAiService {
     const record = await this.requireTenantRecord(id, actor);
     if (record.targetType === "LeadAssignment" && record.targetId) {
       this.deps.access.assertMutation(actor, await this.deps.assignments.require(record.targetId));
-    } else if (actor.roles.includes("broker_read_only")) {
-      throw new Error("AI validation denied for read_only role");
+    } else if (actor.roles.includes("broker_read_only") || !actorHasPermission(actor, "broker_crm:update")) {
+      throw new Error("AI decision denied: CRM update permission required");
     }
     if (record.status !== "completed") throw new Error("Invalid validation: the AI interaction is not completed");
     const updated = await this.deps.gateway.validate(id, parsed.decision, actor);
@@ -117,7 +136,7 @@ export class BrokerAiService {
   async setOptOut(actor: ActorContext, body: unknown): Promise<BrokerAiOptOutStatus> {
     this.deps.access.assertCrmAccess(actor);
     const parsed = brokerAiOptOutSchema.parse(body ?? {});
-    if (!actor.roles.some((role) => roleHasPermission(role, "broker_crm:*"))) throw new Error("AI opt-out change denied: owner permission required");
+    if (!actorHasPermission(actor, "broker_crm:*")) throw new Error("AI opt-out change denied: owner permission required");
     const tenant = this.tenantOf(actor);
     await this.deps.featureFlags.setFlag({ key: AI_PARTNER_OPT_OUT_FLAG, scopeType: "partner", scopeId: tenant, value: parsed.optOut, reason: parsed.reason }, actor);
     this.deps.audit.write({ actor, action: AiAuditActions.partnerOptOutChanged, targetType: "PartnerTenant", targetId: tenant, scope: { partnerTenantId: tenant }, result: "success", reason: parsed.reason, context: { optOut: parsed.optOut } });

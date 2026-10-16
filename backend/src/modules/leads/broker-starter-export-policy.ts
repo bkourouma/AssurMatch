@@ -3,6 +3,7 @@ import { QuoteAuditActions } from "../audit-logs/quote-audit-actions";
 import { AuditLogWriter } from "../audit-logs/audit-log-writer.service";
 import type { ActorContext } from "../common/types";
 import { BrokerStarterAccessPolicy } from "./broker-starter-access-policy";
+import { csvCell } from "./csv-cell";
 
 const CSV_COLUMNS = ["leadAssignmentId", "publicReference", "countryCode", "productKey", "status", "assignedAt", "seen"] as const;
 
@@ -36,13 +37,8 @@ export class BrokerStarterExportPolicy {
     });
     return [
       CSV_COLUMNS.join(","),
-      ...limitedRows.map((row) => CSV_COLUMNS.map((column) => this.csvValue(row[column])).join(","))
+      ...limitedRows.map((row) => CSV_COLUMNS.map((column) => csvCell(row[column])).join(","))
     ].join("\n");
-  }
-
-  private csvValue(value: unknown): string {
-    const raw = String(value ?? "");
-    return `"${raw.replaceAll('"', '""')}"`;
   }
 
   private safeFilters(query: BrokerStarterExportQuery): Record<string, unknown> {

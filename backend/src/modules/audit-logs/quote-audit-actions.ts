@@ -66,6 +66,7 @@ export const QuoteAuditActions = {
   brokerCrmProposalAdded: "broker_crm.proposal_added",
   brokerCrmLeadDisputed: "broker_crm.lead_disputed",
   brokerCrmDashboardViewed: "broker_crm.dashboard_viewed",
+  brokerCrmExportRequested: "broker_crm.export_requested",
   brokerCrmExportCompleted: "broker_crm.export_completed",
   brokerCrmExportRefused: "broker_crm.export_refused",
   brokerCrmNotificationViewed: "broker_crm.notification_viewed",

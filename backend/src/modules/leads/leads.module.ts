@@ -23,6 +23,7 @@ import { MemoryCrmActivityRepository, type CrmActivityRepository } from "./crm-a
 import { LeadAssignmentService } from "./lead-assignment.service";
 import { LeadContactPolicy, type LeadContactLookup, type LeadQuoteStateLookup } from "./lead-contact-policy";
 import { MemoryLeadAssignmentsRepository, type LeadAssignmentsRepository } from "./lead-assignments.repository";
+import type { AgencyScopePort } from "../common/agency-scope";
 import { QuoteRoutingService, type ConsentRecordResolver, type MultiBrokerPolicy, type RoutingRuleResolver } from "./quote-routing.service";
 import { RoutingDecisionService } from "./routing-decision.service";
 import type { RoutingDecisionsRepository } from "./routing-decisions.repository";
@@ -49,6 +50,8 @@ export interface LeadsModuleRoutingOptions {
   quoteState?: LeadQuoteStateLookup | undefined;
   /** Spec 055 FR-001: consented contact when the assignment record does not carry it. */
   contact?: LeadContactLookup | undefined;
+  /** Spec 064: Enterprise display filter by agency for the CRM views (resolved lazily by the runtime). */
+  agencyScope?: AgencyScopePort | undefined;
 }
 
 export class LeadsModule {
@@ -106,7 +109,7 @@ export class LeadsModule {
     this.brokerCrmHistory = new BrokerCrmHistoryService(crmActivityRepository);
     this.brokerCrmExportPolicy = new BrokerCrmExportPolicy(this.brokerCrmAccess, audit);
     this.brokerCrmActivity = new BrokerCrmActivityService(this.assignments, this.brokerCrmAccess, this.brokerCrmHistory, audit, crmActivityRepository);
-    this.brokerCrmLeads = new BrokerCrmLeadsService(this.assignments, this.brokerCrmAccess, this.brokerCrmHistory, audit, this.brokerCrmExportPolicy, this.brokerCrmActivity, this.contactPolicy);
+    this.brokerCrmLeads = new BrokerCrmLeadsService(this.assignments, this.brokerCrmAccess, this.brokerCrmHistory, audit, this.brokerCrmExportPolicy, this.brokerCrmActivity, this.contactPolicy, routingOptions.agencyScope);
     this.brokerCrmPipeline = new BrokerCrmPipelineService(this.assignments, this.brokerCrmAccess, this.brokerCrmHistory, audit, routingOptions.events);
     this.brokerCrmNotifications = new BrokerCrmNotificationsService(this.assignments, this.brokerCrmAccess, audit);
     this.brokerCrmController = new BrokerCrmController(this.brokerCrmLeads, this.brokerCrmPipeline, this.brokerCrmActivity, this.brokerCrmNotifications);

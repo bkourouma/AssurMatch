@@ -21,6 +21,8 @@ export interface PartnerCustomRoleRecord {
   partnerTenantId: string;
   name: string;
   permissions: BrokerCustomPermission[];
+  /** Spec 064: members holding this role; a member is listed in at most one role of its tenant. */
+  memberIds: string[];
   reason: string;
   createdById: string | null;
   createdAt: Date;
@@ -46,6 +48,13 @@ export interface EnterpriseRepository extends RuntimeRepository {
   listCustomRoles(partnerTenantId: string): Promise<PartnerCustomRoleRecord[]>;
   findCustomRole(id: string): Promise<PartnerCustomRoleRecord | undefined>;
   upsertCustomRole(record: PartnerCustomRoleRecord): Promise<PartnerCustomRoleRecord>;
+  /**
+   * Spec 064: changes the permission list of a role and nothing else (the members are kept as they
+   * are in the store, never overwritten with a stale copy). Undefined when the role does not exist.
+   */
+  updateCustomRolePermissions(id: string, change: { permissions: BrokerCustomPermission[]; reason: string; updatedAt: Date }): Promise<PartnerCustomRoleRecord | undefined>;
+  /** Spec 064: replaces the member list of a role and nothing else (the permissions are not touched). */
+  updateCustomRoleMembers(id: string, memberIds: string[], updatedAt: Date): Promise<PartnerCustomRoleRecord | undefined>;
   findBranding(partnerTenantId: string): Promise<PartnerBrandingRecord | undefined>;
   upsertBranding(record: PartnerBrandingRecord): Promise<PartnerBrandingRecord>;
   listBranding(): Promise<PartnerBrandingRecord[]>;
@@ -91,6 +100,24 @@ export class MemoryEnterpriseRepository implements EnterpriseRepository {
     return record;
   }
 
+  async updateCustomRolePermissions(id: string, change: { permissions: BrokerCustomPermission[]; reason: string; updatedAt: Date }): Promise<PartnerCustomRoleRecord | undefined> {
+    const index = this.roles.findIndex((role) => role.id === id);
+    const current = this.roles[index];
+    if (!current) return undefined;
+    const next = { ...current, permissions: [...change.permissions], reason: change.reason, updatedAt: change.updatedAt };
+    this.roles[index] = next;
+    return next;
+  }
+
+  async updateCustomRoleMembers(id: string, memberIds: string[], updatedAt: Date): Promise<PartnerCustomRoleRecord | undefined> {
+    const index = this.roles.findIndex((role) => role.id === id);
+    const current = this.roles[index];
+    if (!current) return undefined;
+    const next = { ...current, memberIds: [...memberIds], updatedAt };
+    this.roles[index] = next;
+    return next;
+  }
+
   async findBranding(partnerTenantId: string): Promise<PartnerBrandingRecord | undefined> {
     return this.branding.find((entry) => entry.partnerTenantId === partnerTenantId);
   }
@@ -111,6 +138,7 @@ type Delegate = {
   findMany(input?: unknown): Promise<unknown[]>;
   findFirst(input: unknown): Promise<unknown | null>;
   upsert(input: unknown): Promise<unknown>;
+  update(input: unknown): Promise<unknown>;
 };
 
 export class PrismaEnterpriseRepository implements EnterpriseRepository {
@@ -146,12 +174,22 @@ export class PrismaEnterpriseRepository implements EnterpriseRepository {
   }
 
   async upsertCustomRole(record: PartnerCustomRoleRecord): Promise<PartnerCustomRoleRecord> {
-    const data = { name: record.name, permissions: record.permissions, reason: record.reason, updatedAt: record.updatedAt };
+    const data = { name: record.name, permissions: record.permissions, memberIds: record.memberIds, reason: record.reason, updatedAt: record.updatedAt };
     return this.toRole(await this.delegate("partnerCustomRole").upsert({
       where: { id: record.id },
       create: { id: record.id, partnerTenantId: record.partnerTenantId, createdById: record.createdById, createdAt: record.createdAt, ...data },
       update: data
     }));
+  }
+
+  async updateCustomRolePermissions(id: string, change: { permissions: BrokerCustomPermission[]; reason: string; updatedAt: Date }): Promise<PartnerCustomRoleRecord | undefined> {
+    if (!(await this.delegate("partnerCustomRole").findFirst({ where: { id } }))) return undefined;
+    return this.toRole(await this.delegate("partnerCustomRole").update({ where: { id }, data: { permissions: change.permissions, reason: change.reason, updatedAt: change.updatedAt } }));
+  }
+
+  async updateCustomRoleMembers(id: string, memberIds: string[], updatedAt: Date): Promise<PartnerCustomRoleRecord | undefined> {
+    if (!(await this.delegate("partnerCustomRole").findFirst({ where: { id } }))) return undefined;
+    return this.toRole(await this.delegate("partnerCustomRole").update({ where: { id }, data: { memberIds, updatedAt } }));
   }
 
   async findBranding(partnerTenantId: string): Promise<PartnerBrandingRecord | undefined> {
@@ -189,8 +227,12 @@ export class PrismaEnterpriseRepository implements EnterpriseRepository {
   }
 
   private toRole(row: unknown): PartnerCustomRoleRecord {
-    const role = row as PartnerCustomRoleRecord & { permissions: unknown };
-    return { ...role, permissions: Array.isArray(role.permissions) ? role.permissions as BrokerCustomPermission[] : [] };
+    const role = row as PartnerCustomRoleRecord & { permissions: unknown; memberIds: unknown };
+    return {
+      ...role,
+      permissions: Array.isArray(role.permissions) ? role.permissions as BrokerCustomPermission[] : [],
+      memberIds: Array.isArray(role.memberIds) ? role.memberIds as string[] : []
+    };
   }
 }
 

@@ -1,5 +1,6 @@
-import { roleHasPermission, type AssurMatchRole } from "../../../../packages/shared/rbac/assurmatch-role-matrix";
+import type { AssurMatchRole } from "../../../../packages/shared/rbac/assurmatch-role-matrix";
 import { AuditLogWriter } from "../audit-logs/audit-log-writer.service";
+import { actorHasAnyPermission, actorHasPermission } from "../common/rbac/actor-permissions";
 import type { ActorContext } from "../common/types";
 import { DashboardAuditActions } from "./dashboard-audit-actions";
 
@@ -53,7 +54,7 @@ export class DashboardsAccessPolicy {
     if (!actor.partnerTenantId) this.refuseBroker(actor, "missing_broker_tenant");
     if (actor.mfaVerified !== true) this.refuseBroker(actor, "mfa_required");
     if (!actor.roles.some((role) => BROKER_ROLES.has(role))) this.refuseBroker(actor, "missing_broker_role");
-    if (!actor.roles.some((role) => roleHasPermission(role, "broker_leads:read"))) {
+    if (!actorHasPermission(actor, "broker_leads:read")) {
       this.refuseBroker(actor, "missing_broker_read_permission");
     }
   }
@@ -68,7 +69,7 @@ export class DashboardsAccessPolicy {
 
   /** Exporting a report needs an explicit export permission (DASH-B-005). */
   assertBrokerExport(actor: ActorContext): void {
-    if (!actor.roles.some((role) => roleHasPermission(role, "broker_leads:export") || roleHasPermission(role, "broker_crm:export") || roleHasPermission(role, "broker_crm:*"))) {
+    if (!actorHasAnyPermission(actor, ["broker_leads:export", "broker_crm:export", "broker_crm:*"])) {
       this.refuseBroker(actor, "missing_export_permission");
     }
   }
@@ -112,9 +113,7 @@ export class DashboardsAccessPolicy {
       return false;
     }
     if (actor.partnerPlan !== "pro" && actor.partnerPlan !== "enterprise") return false;
-    return actor.roles.some((role) => roleHasPermission(role, "broker_crm:read")
-      || roleHasPermission(role, "broker_crm:read_assigned")
-      || roleHasPermission(role, "broker_crm:*"));
+    return actorHasAnyPermission(actor, ["broker_crm:read", "broker_crm:read_assigned", "broker_crm:*"]);
   }
 
   resolveAdminAccess(actor: ActorContext): AdminDashboardRole {

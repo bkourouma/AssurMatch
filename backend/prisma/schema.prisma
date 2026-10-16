@@ -1854,6 +1854,8 @@ model PartnerCustomRole {
   partnerTenantId String
   name            String
   permissions     Json     @default("[]")
+  /// Spec 064: ids of the members holding this role (at most one custom role per member).
+  memberIds       Json     @default("[]")
   reason          String
   createdById     String?
   createdAt       DateTime @default(now())

@@ -35,7 +35,8 @@ describe("prisma migration fresh-base readiness", () => {
       "0026_b2b_invoicing",
       "0027_broker_response_loop",
       "0028_notifications_completion",
-      "0029_query_performance_indexes"
+      "0029_query_performance_indexes",
+      "0032_custom_role_members"
     ]);
     const schema = readFileSync(join(process.cwd(), "backend", "prisma", "schema.prisma"), "utf8").replace(/\r\n/g, "\n");
     for (const model of ["AuditLog", "FeatureFlag", "ConsentRecord", "QuoteRequest", "LeadAssignment", "BrokerCrmLeadState", "PartnerApiKey", "PartnerWebhookEndpoint", "PartnerWebhookDelivery", "PartnerWebhookAllowlistEntry", "RoutingRule", "RoutingRuleHistory"]) {
@@ -258,5 +259,10 @@ describe("prisma migration fresh-base readiness", () => {
     expect(completion).toContain('CREATE UNIQUE INDEX IF NOT EXISTS "AdminAlert_dedupeKey_key"');
     expect(completion).toContain('CREATE UNIQUE INDEX IF NOT EXISTS "NotificationUnsubscribe_subjectHash_purpose_key"');
     expect(completion).not.toMatch(/DROP|DELETE|UPDATE /);
+    // Spec 064: custom roles can be assigned to members (additive JSON column).
+    const customRoleMembers = readFileSync(join(migrationsDir, "0032_custom_role_members", "migration.sql"), "utf8");
+    expect(customRoleMembers).toContain(`ALTER TABLE "PartnerCustomRole" ADD COLUMN IF NOT EXISTS "memberIds" JSONB NOT NULL DEFAULT '[]'`);
+    expect(customRoleMembers).not.toMatch(/DROP|DELETE|UPDATE /);
+    expect(schema).toMatch(/model PartnerCustomRole \{[^}]*memberIds\s+Json\s+@default\("\[\]"\)/);
   });
 });

@@ -15,6 +15,17 @@ export interface ActorContext {
   partnerTenantStatus?: PartnerStatus;
   /** Spec 051 R12: the actor's partner is suspended; broker write routes refuse with PARTNER_SUSPENDED. */
   tenantReadOnly?: boolean;
+  /**
+   * Spec 064: the custom role of a broker member, resolved per request by the auth guard. Never read
+   * from, nor written to, a token or a header: the stored role is the only source.
+   */
+  customRole?: { id: string; name: string };
+  /**
+   * Spec 064: effective permissions of the member (base role intersected with the custom role,
+   * limited to the custom permission catalogue). Present only while a custom role restricts the
+   * member; absent means "no restriction beyond the base role".
+   */
+  customRolePermissions?: string[];
 }
 
 export interface ScopedResource {

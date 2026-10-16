@@ -8,6 +8,7 @@ import {
   reasonSchema,
   uuidSchema
 } from "../validation/common.schemas";
+import { agencyFilterSchema } from "./enterprise.contracts";
 import { adminOfferContentObjectSchema, offerContentGuaranteeSchema, offerContentPaymentFlexibilitySchema, refineOfferContent } from "./offer-content";
 
 export const quoteFeatureFlags = [
@@ -441,7 +442,9 @@ const brokerCrmLeadListQueryBaseSchema = paginationQuerySchema.extend({
   source: brokerCrmSourceSchema.optional(),
   dateFrom: dateTimeStringSchema.optional(),
   dateTo: dateTimeStringSchema.optional(),
-  search: z.string().trim().max(120).optional()
+  search: z.string().trim().max(120).optional(),
+  /** Spec 064: Enterprise display filter by agency (uuid or `none`); ignored by other plans. */
+  agencyId: agencyFilterSchema.optional()
 });
 
 export const brokerCrmLeadListQuerySchema = brokerCrmLeadListQueryBaseSchema.refine((value) => !value.dateFrom || !value.dateTo || new Date(value.dateFrom) <= new Date(value.dateTo), {

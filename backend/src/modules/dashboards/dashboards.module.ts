@@ -10,6 +10,7 @@ import type { PartnersService } from "../partners/partners.module";
 import type { ProductsService } from "../products/products.module";
 import type { QuoteSubmissionService } from "../quote-requests/quote-submission.service";
 import { AdminDashboardService } from "./admin-dashboard.service";
+import type { AgencyScopePort } from "../common/agency-scope";
 import { BrokerDashboardService } from "./broker-dashboard.service";
 import { ComplianceAlertsService } from "./compliance-alerts.service";
 import { DashboardsAccessPolicy } from "./dashboards-access-policy";
@@ -31,6 +32,8 @@ export interface DashboardsModuleDeps {
   quoteRequests: QuoteSubmissionService;
   crmActivity?: CrmActivityRepository | undefined;
   brokerCrmConfig: { brokerCrmEnabled: boolean };
+  /** Spec 064: Enterprise display filter by agency (resolved lazily by the runtime). */
+  agencyScope?: AgencyScopePort | undefined;
 }
 
 export class DashboardsModule {
@@ -47,6 +50,7 @@ export class DashboardsModule {
       partnerLicenses: deps.partnerLicenses,
       countries: deps.countries,
       crmActivity: deps.crmActivity,
+      agencyScope: deps.agencyScope,
       config: () => ({
         brokerDashboardEnabled: deps.featureFlags.isEnabled("broker_dashboard_enabled"),
         brokerCrmEnabled: deps.brokerCrmConfig.brokerCrmEnabled || deps.featureFlags.isEnabled("broker_crm_enabled")

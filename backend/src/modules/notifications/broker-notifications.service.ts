@@ -1,6 +1,7 @@
 import type { InAppNotification, MessagingDelivery, NotificationPreferences } from "../../../../packages/shared/contracts/messaging-provider.contracts";
 import { messagingTestDispatchSchema } from "../../../../packages/shared/contracts/messaging-provider.contracts";
 import type { AuditLogWriter } from "../audit-logs/audit-log-writer.service";
+import { customRoleAllows } from "../common/rbac/actor-permissions";
 import type { ActorContext } from "../common/types";
 import type { MessagingDispatchService } from "./messaging-dispatch.service";
 import { MessagingProviderAuditActions } from "./messaging-provider-audit-actions";
@@ -25,7 +26,7 @@ export class BrokerNotificationsService {
   constructor(private readonly deps: BrokerNotificationsDeps) {}
 
   async inbox(actor: ActorContext): Promise<InAppNotification[]> {
-    const scopeId = this.assertBroker(actor);
+    const scopeId = this.assertInboxAccess(actor);
     const notifications = await this.deps.dispatch.listInApp(scopeId);
     this.deps.audit.write({
       actor,
@@ -40,7 +41,7 @@ export class BrokerNotificationsService {
   }
 
   async markRead(id: string, actor: ActorContext): Promise<InAppNotification> {
-    const scopeId = this.assertBroker(actor);
+    const scopeId = this.assertInboxAccess(actor);
     return this.deps.dispatch.markInAppRead(id, scopeId);
   }
 
@@ -64,6 +65,13 @@ export class BrokerNotificationsService {
       template: "messaging_channel_test",
       body: "Notification operationnelle de test AssurMatch. Aucun engagement contractuel."
     }, actor);
+  }
+
+  /** Spec 064: a custom role that does not grant `notifications:read` closes the inbox (it only restricts). */
+  private assertInboxAccess(actor: ActorContext): string {
+    const scopeId = this.assertBroker(actor);
+    if (!customRoleAllows(actor, "notifications:read")) this.refuse(actor, "custom_role_restricted");
+    return scopeId;
   }
 
   private assertBroker(actor: ActorContext): string {

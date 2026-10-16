@@ -5,6 +5,9 @@ export const EnterpriseAuditActions = {
   agencyMemberAssigned: "enterprise.agency.member_assigned",
   customRoleCreated: "enterprise.custom_role.created",
   customRoleUpdated: "enterprise.custom_role.updated",
+  /** Spec 064: assignment of a custom role to a member (and its removal). */
+  customRoleAssigned: "enterprise.custom_role_assigned",
+  customRoleUnassigned: "enterprise.custom_role_unassigned",
   slaChanged: "enterprise.sla.changed",
   slaRead: "enterprise.sla.read",
   brandingChanged: "enterprise.branding.changed"
