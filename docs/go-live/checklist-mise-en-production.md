@@ -63,6 +63,7 @@ Légende : 🔴 bloquant pour le pilote fermé (J4) · 🟠 bloquant pour l'ouve
    - passage en « Actif test », puis en « Actif public ».
 4. 🔴 **Offres** (spec 052) : saisies par les courtiers dans « Mes offres », puis validées par la conformité.
 5. 🟠 **Flags globaux** : `public_comparator_enabled` et `quote_request_enabled`.
+   Les trois flags du back-office courtier, `starter_portal_enabled`, `broker_crm_enabled` et `broker_dashboard_enabled`, sont **activés par défaut** depuis la spec 063 (PRD §9.1). Ils ne figurent pas parmi les modules réglementés. Pour en couper un : écran « Feature flags » du back-office admin (motif obligatoire, action auditée). Sur un environnement **déjà initialisé** (préproduction, base existante), les lignes existantes à `false` ne sont jamais réécrites par les seeds : les passer à `true` depuis le même écran avant le pilote. Le plan Starter n'accède jamais au CRM, quelle que soit la valeur du flag.
 6. 🟠 **Ouverture publique** : `country_public_enabled`, une fois la checklist d'activation entièrement verte. C'est le jalon J5, réservé à la conformité.
 7. 🟢 **Facturation** : activer `billing_enabled` par le chemin de conformité audité, puis émettre les factures mensuelles (spec 060) :
    `npm run ops:apply-flag-policy -- --flag billing_enabled --value true --reference <réf. décision> --approved-by "<nom, fonction>" --reason "<motif>"`.

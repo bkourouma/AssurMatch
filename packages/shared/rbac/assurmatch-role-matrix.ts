@@ -31,7 +31,7 @@ export const RolePermissions: Record<AssurMatchRole, string[]> = {
   broker_manager: ["broker_leads:read", "broker_leads:update", "broker_crm:read", "broker_crm:update", "broker_crm:assign", "broker_crm:export", "notifications:read", "broker_offers:read", "broker_offers:write", "broker_account:read", "broker_account:write", "broker_team:read", "broker_team:write", "billing:read_own"],
   broker_agent: ["broker_leads:read", "broker_leads:update", "broker_crm:read_assigned", "broker_crm:update_assigned", "notifications:read", "broker_offers:read", "broker_account:read", "broker_team:read"],
   broker_read_only: ["broker_leads:read", "broker_crm:read", "broker_offers:read", "broker_account:read", "broker_team:read", "billing:read_own"],
-  finance_admin: ["billing:read", "billing:invoice_issue", "billing:payment_record", "billing:credit_note", "billing:pack_grant", "reports:read", "audit_logs:read"],
+  finance_admin: ["billing:read", "billing:invoice_issue", "billing:payment_record", "billing:credit_note", "billing:pack_grant", "billing:dispute_read", "billing:dispute_decide", "reports:read", "audit_logs:read"],
   content_admin: ["content:*", "offers:*", "quote_form_definitions:read", "countries:read", "products:read"],
   ai_admin: ["ai:*", "feature_flags:read", "audit_logs:read"]
 };

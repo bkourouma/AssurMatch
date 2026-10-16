@@ -22,6 +22,11 @@ export const AuthAuditActions = {
   userUnlocked: "user.unlocked",
   userDeleted: "user.deleted",
   userRoleChanged: "user.role_changed",
+  // Spec 063 - trusted devices (MFA exemption for 30 days).
+  userTrustedDeviceCreated: "user.trusted_device_created",
+  userTrustedDeviceUsed: "user.trusted_device_used",
+  userTrustedDeviceRejected: "user.trusted_device_rejected",
+  userTrustedDeviceRevoked: "user.trusted_device_revoked",
   localBootstrapAdminCreated: "local_bootstrap_admin.created",
   localBootstrapAdminRefusedInProduction: "local_bootstrap_admin.refused_in_production"
 } as const;

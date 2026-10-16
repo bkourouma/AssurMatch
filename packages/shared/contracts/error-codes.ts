@@ -53,6 +53,11 @@ export const ErrorCodes = {
   OFFER_TRANSITION_INVALID: "OFFER_TRANSITION_INVALID",
   /** Spec 054: neutral refusal of every visitor route (unknown reference, wrong, expired or revoked token). */
   VISITOR_ACCESS_DENIED: "VISITOR_ACCESS_DENIED",
+  /** Spec 063: lead disputes (CRM-012). */
+  DISPUTE_WINDOW_EXPIRED: "DISPUTE_WINDOW_EXPIRED",
+  DISPUTE_ALREADY_EXISTS: "DISPUTE_ALREADY_EXISTS",
+  DISPUTE_ALREADY_DECIDED: "DISPUTE_ALREADY_DECIDED",
+  DISPUTE_NOT_FOUND: "DISPUTE_NOT_FOUND",
   /** Spec 055: broker proposals and visitor responses. */
   LEAD_NOT_ACCEPTED: "LEAD_NOT_ACCEPTED",
   LEAD_CLOSED: "LEAD_CLOSED",

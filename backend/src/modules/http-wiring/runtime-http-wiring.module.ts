@@ -41,6 +41,9 @@ import {
 import { BillingAccessRefusedError, BillingDisabledError } from "../billing/billing-foundation.service";
 import { InvoiceConflictError, InvoiceIntegrityError, InvoiceNotFoundError, InvoicingConfigurationError } from "../billing/invoicing-errors";
 import type { InvoiceDocumentFile } from "../billing/invoicing.service";
+// Spec 063 (start)
+import { adminLeadDisputeQuerySchema } from "../../../../packages/shared/contracts/lead-disputes.contracts";
+// Spec 063 (end)
 import {
   partnerApplicationConvertSchema,
   partnerApplicationRejectSchema,
@@ -286,7 +289,8 @@ export class AuthController {
     const actor = this.runtime.auth.service.me(protectedActorFromRequest(request));
     // The back-office headers show the user's name; a missing account keeps the actor as before.
     const account = actor.actorId ? await this.runtime.users.service.require(actor.actorId).catch(() => undefined) : undefined;
-    return account?.displayName ? { ...actor, displayName: account.displayName } : actor;
+    // Spec 063 FR-A11: the MFA screen offers enrolment only when no secret exists yet (false for an unknown account).
+    return { ...actor, ...(account?.displayName ? { displayName: account.displayName } : {}), mfaEnrolled: Boolean(account?.mfaSecretEncrypted) && account?.mfaStatus === "verified" };
   }
 
   passwordChange(request: AssurMatchHttpRequest, input: PasswordChangeRequest) {
@@ -302,15 +306,26 @@ export class AuthController {
 
   async enrollMfa(request: AssurMatchHttpRequest) {
     const actor = protectedActorFromRequest(request);
-    return this.runtime.auth.service.enrollMfa(await this.runtime.users.service.require(actor.actorId ?? ""));
+    // Spec 063 FR-A08: the actor tells whether the session already passed the second factor.
+    return this.runtime.auth.service.enrollMfa(await this.runtime.users.service.require(actor.actorId ?? ""), actor);
   }
 
-  async verifyMfa(request: AssurMatchHttpRequest, input: { challengeId: string; code: string }) {
+  async verifyMfa(request: AssurMatchHttpRequest, input: unknown) {
     const actor = protectedActorFromRequest(request);
     return this.rateLimiter.run({ route: "/auth/mfa/verify", ip: clientIp(request), identifier: actor.actorId ?? undefined }, async () => {
       const parsed = parseHttpInput(mfaVerifyRequestSchema, input);
-      return this.runtime.auth.service.verifyMfa(await this.runtime.users.service.require(actor.actorId ?? ""), parsed.challengeId ?? "", parsed.code, parsed.kind);
+      return this.runtime.auth.service.verifyMfa(await this.runtime.users.service.require(actor.actorId ?? ""), parsed.challengeId ?? "", parsed.code, parsed.kind, { trustDevice: parsed.trustDevice, deviceLabel: parsed.deviceLabel });
     });
+  }
+
+  /** Spec 063: active trusted devices of the signed-in (MFA-verified) user. */
+  trustedDevices(request: AssurMatchHttpRequest) {
+    return this.runtime.auth.service.listTrustedDevices(protectedActorFromRequest(request));
+  }
+
+  /** Spec 063: "revoke all my devices". */
+  revokeTrustedDevices(request: AssurMatchHttpRequest) {
+    return this.runtime.auth.service.revokeTrustedDevices(protectedActorFromRequest(request));
   }
 }
 
@@ -1530,6 +1545,35 @@ async function invoicingCall<T>(call: () => Promise<T>): Promise<T> {
   }
 }
 
+// Spec 063 (start): lead disputes. Admin routes need `billing:dispute_read` / `billing:dispute_decide`
+// (finance_admin, super_admin) with a verified MFA; the country scope and the billing flag live in the service.
+export class AdminLeadDisputesController {
+  constructor(private readonly runtime: AssurMatchRuntime) {}
+
+  list(request: AssurMatchHttpRequest, query: Record<string, string>) {
+    return invoicingCall(() => this.runtime.leads.disputes.listForAdmin(protectedActorFromRequest(request), parseHttpInput(adminLeadDisputeQuerySchema, query ?? {})));
+  }
+
+  detail(id: string, request: AssurMatchHttpRequest) {
+    return invoicingCall(() => this.runtime.leads.disputes.detailForAdmin(protectedActorFromRequest(request), parseParam("disputeId", id, uuidSchema)));
+  }
+
+  /** The body is validated by the service after the RBAC check (an unauthorised caller gets 403, a missing reason 422). */
+  decision(id: string, input: unknown, request: AssurMatchHttpRequest) {
+    return invoicingCall(() => this.runtime.leads.disputes.decide(protectedActorFromRequest(request), parseParam("disputeId", id, uuidSchema), input));
+  }
+}
+
+/** Broker side: the disputes of the caller's own tenant (roles with `billing:read_own`; agents are refused). */
+export class BrokerLeadDisputesController {
+  constructor(private readonly runtime: AssurMatchRuntime) {}
+
+  list(request: AssurMatchHttpRequest) {
+    return invoicingCall(() => this.runtime.leads.disputes.listForBroker(protectedActorFromRequest(request)));
+  }
+}
+// Spec 063 (end)
+
 function pdfFile(file: InvoiceDocumentFile): StreamableFile {
   return new StreamableFile(file.bytes, {
     type: "application/pdf",
@@ -2071,6 +2115,8 @@ decorate(AuthController, "passwordChange", [authRoute, Post("password-change") a
 decorate(AuthController, "passwordReset", [Post("password-reset") as MethodDecoratorFactory], [[0, Body() as ParamDecoratorFactory], [1, Req() as ParamDecoratorFactory]]);
 decorate(AuthController, "enrollMfa", [authRoute, Post("mfa/enroll") as MethodDecoratorFactory], [[0, Req() as ParamDecoratorFactory]]);
 decorate(AuthController, "verifyMfa", [authRoute, Post("mfa/verify") as MethodDecoratorFactory], [[0, Req() as ParamDecoratorFactory], [1, Body() as ParamDecoratorFactory]]);
+decorate(AuthController, "trustedDevices", [protectedRoute, Get("trusted-devices") as MethodDecoratorFactory], [[0, Req() as ParamDecoratorFactory]]);
+decorate(AuthController, "revokeTrustedDevices", [protectedRoute, Delete("trusted-devices") as MethodDecoratorFactory], [[0, Req() as ParamDecoratorFactory]]);
 
 controller("countries", PublicCountriesController);
 decorate(PublicCountriesController, "list", [Get() as MethodDecoratorFactory]);
@@ -2364,6 +2410,15 @@ decorate(BrokerNotificationsController, "inbox", [Get("inbox") as MethodDecorato
 decorate(BrokerNotificationsController, "markRead", [Post("inbox/:id/read") as MethodDecoratorFactory], [[0, Param("id") as ParamDecoratorFactory], [1, Req() as ParamDecoratorFactory]]);
 decorate(BrokerNotificationsController, "preferences", [Get("preferences") as MethodDecoratorFactory], [[0, Req() as ParamDecoratorFactory]]);
 decorate(BrokerNotificationsController, "updatePreferences", [Put("preferences") as MethodDecoratorFactory], [[0, Body() as ParamDecoratorFactory], [1, Req() as ParamDecoratorFactory]]);
+// Spec 063 (start)
+controller("admin", AdminLeadDisputesController, true);
+decorate(AdminLeadDisputesController, "list", [Get("billing/disputes") as MethodDecoratorFactory], [[0, Req() as ParamDecoratorFactory], [1, Query() as ParamDecoratorFactory]]);
+decorate(AdminLeadDisputesController, "detail", [Get("billing/disputes/:disputeId") as MethodDecoratorFactory], [[0, Param("disputeId") as ParamDecoratorFactory], [1, Req() as ParamDecoratorFactory]]);
+decorate(AdminLeadDisputesController, "decision", [Post("billing/disputes/:disputeId/decision") as MethodDecoratorFactory, HttpCode(200) as MethodDecoratorFactory], [[0, Param("disputeId") as ParamDecoratorFactory], [1, Body() as ParamDecoratorFactory], [2, Req() as ParamDecoratorFactory]]);
+controller("broker/billing", BrokerLeadDisputesController, true);
+decorate(BrokerLeadDisputesController, "list", [Get("disputes") as MethodDecoratorFactory], [[0, Req() as ParamDecoratorFactory]]);
+// Spec 063 (end)
+
 controller("broker/billing", BrokerBillingController, true);
 decorate(BrokerBillingController, "statement", [Get("statement") as MethodDecoratorFactory], [[0, Req() as ParamDecoratorFactory]]);
 decorate(BrokerBillingController, "account", [Get("account") as MethodDecoratorFactory], [[0, Req() as ParamDecoratorFactory]]);
@@ -2576,6 +2631,10 @@ Module({
     AdminDataRetentionController,
     AdminConsentRecordsHttpController,
     BrokerBillingController,
+    // Spec 063 (start)
+    AdminLeadDisputesController,
+    BrokerLeadDisputesController,
+    // Spec 063 (end)
     BrokerNotificationsController,
     BrokerEnterpriseController,
     BrokerOffersController,

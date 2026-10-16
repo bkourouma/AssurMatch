@@ -4,9 +4,18 @@ import { toPatchSchema } from "../validation/patch.schemas";
 
 export const passwordSchema = z.string().min(12).max(512);
 
+/** Spec 063: trusted-device token kept by the app in an httpOnly cookie (256-bit random, base64url). */
+export const trustedDeviceTokenSchema = z.string().min(20).max(200).regex(/^[A-Za-z0-9_-]+$/);
+/** Spec 063: coarse user-agent label shown in the device list (never an identifier). */
+export const trustedDeviceLabelSchema = z.string().trim().max(120);
+export const TRUSTED_DEVICE_TTL_DAYS = 30;
+export const TRUSTED_DEVICE_MAX_ACTIVE = 10;
+
 export const loginRequestSchema = z.object({
   email: emailSchema,
-  password: passwordSchema
+  password: passwordSchema,
+  /** Spec 063: presented by the app when the browser holds a trusted-device cookie. */
+  trustedDeviceToken: trustedDeviceTokenSchema.optional()
 });
 
 export const activateRequestSchema = z.object({
@@ -27,8 +36,20 @@ export const passwordResetRequestSchema = z.object({
 export const mfaVerifyRequestSchema = z.object({
   challengeId: nonEmptyStringSchema.optional(),
   code: z.string().min(6).max(10),
-  kind: z.enum(["totp", "backup"]).default("totp")
+  kind: z.enum(["totp", "backup"]).default("totp"),
+  /** Spec 063: trust this device for 30 days after a valid code. */
+  trustDevice: z.boolean().default(false),
+  deviceLabel: trustedDeviceLabelSchema.optional()
 });
+
+export const trustedDeviceSummarySchema = z.object({
+  id: z.string(),
+  label: z.string().nullable(),
+  createdAt: z.string(),
+  lastUsedAt: z.string().nullable(),
+  expiresAt: z.string()
+});
+export type TrustedDeviceSummary = z.output<typeof trustedDeviceSummarySchema>;
 
 export const mfaEnrollResponseSchema = z.object({
   secret: nonEmptyStringSchema,

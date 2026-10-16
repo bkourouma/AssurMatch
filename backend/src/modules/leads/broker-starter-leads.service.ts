@@ -16,6 +16,7 @@ import { BrokerStarterExportPolicy } from "./broker-starter-export-policy";
 import { BrokerStarterHistoryService } from "./broker-starter-history.service";
 import { LeadAssignmentService, type LeadAssignmentRecord } from "./lead-assignment.service";
 import type { LeadContactPolicy } from "./lead-contact-policy";
+import type { LeadDisputesService } from "./lead-disputes.service";
 
 export class BrokerStarterLeadsService {
   constructor(
@@ -25,7 +26,9 @@ export class BrokerStarterLeadsService {
     private readonly audit: AuditLogWriter,
     private readonly exportPolicy: BrokerStarterExportPolicy,
     /** Spec 055 FR-001: full contact for the assigned broker (audited), masked after a withdrawal. */
-    private readonly contactPolicy?: LeadContactPolicy
+    private readonly contactPolicy?: LeadContactPolicy,
+    /** Spec 063: dispute window and decision shown on the lead detail. */
+    private readonly disputes?: LeadDisputesService
   ) {}
 
   async list(actor: ActorContext, query: BrokerStarterLeadListQuery = {}): Promise<Page<BrokerStarterLeadSummary>> {
@@ -82,7 +85,32 @@ export class BrokerStarterLeadsService {
       });
     }
     const revealed = this.contactPolicy ? await this.contactPolicy.reveal(assignment, actor, "starter") : { contact: assignment.contact ?? {}, visibility: "full" as const };
-    return { ...this.toDetail(assignment, await this.history.forLead(assignment.id)), contact: revealed.contact, contactVisibility: revealed.visibility };
+    return { ...this.toDetail(assignment, await this.history.forLead(assignment.id)), contact: revealed.contact, contactVisibility: revealed.visibility, ...(await this.disputeInfo(assignment)) };
+  }
+
+  /** Spec 063 FR-B01 / FR-B09: window of the action and the (single) dispute of the lead. */
+  private async disputeInfo(assignment: LeadAssignmentRecord): Promise<Pick<BrokerStarterLeadDetail, "disputeWindow" | "dispute">> {
+    if (!this.disputes) return {};
+    const [dispute] = await this.disputes.forLead(assignment);
+    return {
+      disputeWindow: this.disputes.windowFor(assignment),
+      ...(dispute ? {
+        dispute: {
+          id: dispute.id,
+          status: dispute.status === "accepted" || dispute.status === "rejected" ? dispute.status : "opened",
+          reason: dispute.reason,
+          ...(dispute.comment ? { comment: dispute.comment } : {}),
+          createdAt: dispute.createdAt,
+          ...(dispute.decidedAt ? { decidedAt: dispute.decidedAt } : {}),
+          ...(dispute.decisionReason ? { decisionReason: dispute.decisionReason } : {}),
+          ...(dispute.creditMode ? { creditMode: dispute.creditMode } : {}),
+          ...(dispute.creditNoteId ? { creditNoteId: dispute.creditNoteId } : {}),
+          ...(dispute.creditPackId ? { creditPackId: dispute.creditPackId } : {}),
+          ...(dispute.creditNoteNumber ? { creditNoteNumber: dispute.creditNoteNumber } : {}),
+          ...(dispute.creditAmount !== undefined ? { creditAmount: dispute.creditAmount } : {})
+        }
+      } : {})
+    };
   }
 
   async historyForLead(id: string, actor: ActorContext) {

@@ -9,6 +9,8 @@ import { backOfficeApiBaseUrl, getBackOfficeToken } from "./backoffice-auth";
 export interface BrokerWriteResult {
   status: number;
   suspended: boolean;
+  /** Spec 063: machine code of a 409 (DISPUTE_WINDOW_EXPIRED, DISPUTE_ALREADY_EXISTS), when the API sent one. */
+  code?: string;
 }
 
 export const PARTNER_SUSPENDED_CODE = "PARTNER_SUSPENDED";
@@ -23,6 +25,10 @@ export async function callBrokerWrite(path: string, method: "POST" | "PUT" | "PA
       body: JSON.stringify(body),
       cache: "no-store"
     });
+    if (response.status === 409) {
+      const conflict = await response.json().catch(() => undefined) as { code?: unknown } | undefined;
+      return typeof conflict?.code === "string" ? { status: 409, suspended: false, code: conflict.code } : { status: 409, suspended: false };
+    }
     if (response.status !== 403) return { status: response.status, suspended: false };
     const payload = await response.json().catch(() => undefined) as { code?: unknown } | undefined;
     return { status: 403, suspended: payload?.code === PARTNER_SUSPENDED_CODE };

@@ -27,6 +27,9 @@ function outcome(result: BrokerWriteResult, success: string): string {
   if (result.suspended) return "suspended";
   if (status === 200 || status === 201) return success;
   if (status === 403) return "forbidden";
+  // Spec 063 FR-B01/FR-B02: contestation hors fenetre de 30 jours ou deja deposee.
+  if (status === 409 && result.code === "DISPUTE_WINDOW_EXPIRED") return "dispute_window_expired";
+  if (status === 409 && result.code === "DISPUTE_ALREADY_EXISTS") return "dispute_exists";
   // Spec 059 (suite): 409 LEAD_NOT_ACCEPTED / LEAD_CLOSED a la cloture.
   if (status === 409) return "conflict";
   if (status === 404) return "not_found";
@@ -111,6 +114,20 @@ export async function changeCrmLeadStatusAction(formData: FormData): Promise<voi
   const reason = isCrmOutcomeReason(rawReason) ? rawReason : undefined;
   if (crmStatusRequiresReason(status) && !reason) redirect(`/crm/leads/${leadId}?crm=reason_required`);
   await finishCrm(leadId, await callBrokerApi(`/broker/crm/leads/${leadId}/status`, { status, ...(reason ? { reason } : {}) }), "status_changed");
+}
+
+/**
+ * CRM Pro/Enterprise: contestation d'un lead (spec 063 FR-B09). POST /broker/crm/leads/:leadId/disputes.
+ * Le motif est obligatoire (motifs de sortie CRM). L'API refuse hors fenetre de 30 jours (409
+ * DISPUTE_WINDOW_EXPIRED), une seconde contestation (409 DISPUTE_ALREADY_EXISTS) et audite chaque refus.
+ */
+export async function disputeCrmLeadAction(formData: FormData): Promise<void> {
+  const leadId = stringValue(formData.get("leadAssignmentId"));
+  if (!UUID.test(leadId)) redirect("/crm/leads");
+  const reason = stringValue(formData.get("reason")).trim();
+  if (!isCrmOutcomeReason(reason)) redirect(`/crm/leads/${leadId}?crm=reason_required`);
+  const comment = stringValue(formData.get("comment")).trim().slice(0, 500);
+  await finishCrm(leadId, await callBrokerApi(`/broker/crm/leads/${leadId}/disputes`, { reason, ...(comment ? { comment } : {}) }), "disputed");
 }
 
 /** CRM: note interne. POST /broker/crm/leads/:leadId/notes */

@@ -70,6 +70,7 @@ import { AdminRoutingAnomaliesController } from "../modules/routing/admin-routin
 import { SystemHealthModule } from "../modules/admin/system-health.module";
 import { UsersModule } from "../modules/users/users.module";
 import { PrismaUsersRepository } from "../modules/users/users.repository";
+import { MemoryTrustedDevicesRepository, PrismaTrustedDevicesRepository } from "../modules/auth/trusted-devices.repository";
 import { AuthModule } from "../modules/auth/auth.module";
 import { RuntimeEmailDeliveryService } from "../modules/notifications/email/email-delivery.service";
 import { QuoteEmailTemplateService } from "../modules/notifications/email/quote-email-template.service";
@@ -146,6 +147,8 @@ export class AssurMatchRuntime {
   private readonly consentRecordsRepository = this.runtimeRepository(new PrismaConsentRecordsRepository(this.prisma));
   private readonly notificationsRepository = this.runtimeRepository(new PrismaNotificationsRepository(this.prisma));
   private readonly usersRepository = this.runtimeRepository(new PrismaUsersRepository(this.prisma));
+  /** Spec 063: hashed tokens of the browsers a user trusts for 30 days. */
+  private readonly trustedDevicesRepository = this.runtimeRepository(new PrismaTrustedDevicesRepository(this.prisma)) ?? new MemoryTrustedDevicesRepository();
   private readonly partnerIntegrationsRepository = this.runtimeRepository(new PrismaPartnerIntegrationsRepository(this.prisma)) ?? new MemoryPartnerIntegrationsRepository();
   private readonly offersRepository = this.runtimeRepository(new PrismaOffersRepository(this.prisma));
   private readonly prospectsRepository = this.runtimeRepository(new PrismaProspectsRepository(this.prisma));
@@ -220,7 +223,7 @@ export class AssurMatchRuntime {
   readonly users = new UsersModule(this.audit.writer, this.usersRepository);
   /** Spec 053 R6: stored status and roles of a broker user, read by the auth guard on every request. */
   readonly userAccessStatus = new UserAccessStatusService(this.users.service);
-  readonly auth = new AuthModule(this.users.service, this.audit.writer, this.emailDelivery, this.partnerTenantStatus);
+  readonly auth = new AuthModule(this.users.service, this.audit.writer, this.emailDelivery, this.partnerTenantStatus, this.trustedDevicesRepository);
   readonly featureFlags = new FeatureFlagsModule(
     this.audit.writer,
     new FeatureFlagCacheService(this.redis.client),
@@ -385,7 +388,9 @@ export class AssurMatchRuntime {
       accreditation: (partnerTenantId: string) => this.documents.service.hasAcceptedCleanForPartner(partnerTenantId),
       // Spec 055 FR-001: contact masked once the visitor withdrew consent (resolved lazily).
       quoteState: (quoteRequestId: string) => this.quoteRequests.submissions.findById(quoteRequestId),
-      contact: (quoteRequestId: string) => this.consentedContact(quoteRequestId)
+      contact: (quoteRequestId: string) => this.consentedContact(quoteRequestId),
+      // Spec 063: lead disputes (country scopes of the finance admin, `billing_enabled` gate).
+      disputes: { countries: this.countries.service, featureFlags: this.featureFlags.service }
     }
   );
     readonly satisfactionSurveys: SatisfactionSurveysModule = new SatisfactionSurveysModule(
@@ -714,6 +719,35 @@ readonly enterprise = new EnterpriseService({
     documentStorage: this.documentStorage,
     inApp: this.notifications.dispatch
   });
+  // Spec 063 (start): the dispute service credits through the invoicing service and notifies through the broker alerts.
+  private readonly leadDisputesBound = this.bindLeadDisputes();
+  private bindLeadDisputes(): true {
+    this.leads.disputes.bindCredit({
+      creditAcceptedDispute: (request, actor) => this.billing.invoicing.creditAcceptedDispute(request, actor),
+      creditNoteNumber: (id) => this.billing.invoicing.creditNoteNumber(id),
+      existingCredit: (disputeId, partnerId) => this.billing.invoicing.existingDisputeCredit(disputeId, partnerId),
+      refreshDraft: async (partnerId, periodFrom, actor) => {
+        await this.billing.drafts.refreshDraftForPeriod(partnerId, periodFrom, actor, "dispute_credit");
+      }
+    });
+    this.leads.disputes.bindNotifier({
+      notifyDecision: async (dispute) => {
+        // In-app + pointer e-mail; neither carries lead content. The dedupe key makes a replay silent.
+        await this.brokerAlerts.notify({
+          partnerTenantId: dispute.partnerTenantId,
+          type: "broker_dispute_decided",
+          dedupeKey: `broker_dispute_decided:${dispute.id}`,
+          inAppTemplate: "dispute_decided",
+          title: "Décision sur votre contestation",
+          body: "Une décision est disponible dans Facturation > Contestations.",
+          targetType: "LeadDispute",
+          targetId: dispute.id
+        });
+      }
+    });
+    return true;
+  }
+  // Spec 063 (end)
   readonly partnerIntegrations = new PartnerIntegrationsModule({
     audit: this.audit.writer,
     featureFlags: this.featureFlags.service,

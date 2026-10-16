@@ -35,7 +35,8 @@ describe("prisma migration fresh-base readiness", () => {
       "0026_b2b_invoicing",
       "0027_broker_response_loop",
       "0028_notifications_completion",
-      "0029_query_performance_indexes"
+      "0029_query_performance_indexes",
+      "0030_critical_fixes"
     ]);
     const schema = readFileSync(join(process.cwd(), "backend", "prisma", "schema.prisma"), "utf8").replace(/\r\n/g, "\n");
     for (const model of ["AuditLog", "FeatureFlag", "ConsentRecord", "QuoteRequest", "LeadAssignment", "BrokerCrmLeadState", "PartnerApiKey", "PartnerWebhookEndpoint", "PartnerWebhookDelivery", "PartnerWebhookAllowlistEntry", "RoutingRule", "RoutingRuleHistory"]) {

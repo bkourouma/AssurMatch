@@ -58,6 +58,26 @@ export function computeInvoiceTotals(lines: IssuedInvoiceLine[], vatRateBps: num
   return { subtotalAmount, vatRateBps, vatAmount, totalAmount: subtotalAmount + vatAmount };
 }
 
+/**
+ * Spec 063: unit price (XOF, excl. VAT) of one disputed lead, read from the FROZEN lines of the
+ * invoice. An exclusive lead (one recipient) takes the billable_leads line; a shared lead takes the
+ * shared_leads line "entre N courtiers". Undefined when the lead has no usable priced line (quantity 0
+ * because credit packs covered it, price 0, line absent): the dispute then has nothing to credit.
+ */
+export function disputeUnitAmountFromLines(lines: IssuedInvoiceLine[], recipientCount: number): number | undefined {
+  const usable = (line: IssuedInvoiceLine | undefined): number | undefined => (line && !line.informational && line.quantity > 0 && roundXof(line.unitAmount) > 0 ? roundXof(line.unitAmount) : undefined);
+  if (recipientCount > 1) return usable(lines.find((line) => line.kind === "shared_leads" && line.label.includes(`entre ${recipientCount} courtiers`)));
+  return usable(lines.find((line) => line.kind === "billable_leads"));
+}
+
+/** Spec 063: partial credit note amounts for one lead: subtotal is the unit price, VAT at the invoice rate. */
+export function disputeCreditTotals(unitAmount: number, vatRateBps: number): { subtotalAmount: number; vatAmount: number; totalAmount: number } {
+  if (!Number.isInteger(vatRateBps) || vatRateBps < 0 || vatRateBps > 10_000) throw new Error(`Invalid VAT rate: ${vatRateBps}`);
+  const subtotalAmount = roundXof(unitAmount);
+  const vatAmount = roundXof((subtotalAmount * vatRateBps) / 10_000);
+  return { subtotalAmount, vatAmount, totalAmount: subtotalAmount + vatAmount };
+}
+
 export function vatRatePercent(vatRateBps: number): number {
   return vatRateBps / 100;
 }

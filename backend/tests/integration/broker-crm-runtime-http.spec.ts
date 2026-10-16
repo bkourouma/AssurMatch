@@ -14,6 +14,9 @@ describe("broker CRM runtime HTTP", () => {
   it("denies Starter and denies Pro when broker_crm_enabled is false", async () => {
     process.env.ASSURMATCH_BROKER_CRM_ENABLED = "false";
     harness = await createRuntimeHttpHarness();
+    // Spec 063: broker_crm_enabled is on by default; an admin switches it off explicitly.
+    await harness.runtime.featureFlags.service.setFlag({ key: "broker_crm_enabled", scopeType: "global", value: false, reason: "test switches the broker CRM off" }, { actorId: "test-admin", roles: ["super_admin"], mfaVerified: true });
+    await harness.runtime.reloadRuntimeFeatureFlags();
     const starter = { actorId: "starter", roles: ["broker_owner_starter" as const], partnerTenantId: "broker-a", partnerPlan: "starter" as const, mfaVerified: true };
     const pro = { actorId: "pro", roles: ["broker_owner_pro" as const], partnerTenantId: "broker-a", partnerPlan: "pro" as const, mfaVerified: true };
 

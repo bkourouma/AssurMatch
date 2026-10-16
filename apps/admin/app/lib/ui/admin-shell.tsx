@@ -114,6 +114,13 @@ export const adminNavigation: NavGroup[] = [
       { label: "Activation", href: "/activation-checklist", icon: "checklist", match: ["/activation-checklist"] },
       { label: "Assistance IA", href: "/ai-assistance", icon: "sparkles", match: ["/ai-assistance"] }
     ]
+  },
+  {
+    title: "Compte",
+    items: [
+      // Spec 063 (FR-A06): trusted devices and password change of the signed-in user.
+      { label: "Sécurité du compte", href: "/account/security", icon: "shield", match: ["/account"] }
+    ]
   }
 ];
 

@@ -89,8 +89,11 @@ export class RuntimeHttpController {
     return this.runtime.auth.service.logout();
   }
 
-  me(headers: IncomingHttpHeaders) {
-    return this.runtime.auth.service.me(actorFromProtectedHeaders(headers));
+  async me(headers: IncomingHttpHeaders) {
+    const actor = this.runtime.auth.service.me(actorFromProtectedHeaders(headers));
+    // Spec 063 FR-A11: false for an unknown account (simulated test actors).
+    const account = actor.actorId ? await this.runtime.users.service.require(actor.actorId).catch(() => undefined) : undefined;
+    return { ...actor, mfaEnrolled: Boolean(account?.mfaSecretEncrypted) && account?.mfaStatus === "verified" };
   }
 
   passwordChange(headers: IncomingHttpHeaders, input: PasswordChangeRequest) {
@@ -103,13 +106,22 @@ export class RuntimeHttpController {
 
   async enrollMfa(headers: IncomingHttpHeaders) {
     const actor = actorFromProtectedHeaders(headers);
-    return this.runtime.auth.service.enrollMfa(await this.runtime.users.service.require(actor.actorId ?? ""));
+    // Spec 063 FR-A08: an existing secret is replaced only by a session that passed the second factor.
+    return this.runtime.auth.service.enrollMfa(await this.runtime.users.service.require(actor.actorId ?? ""), actor);
   }
 
-  async verifyMfa(headers: IncomingHttpHeaders, input: { challengeId: string; code: string }) {
+  async verifyMfa(headers: IncomingHttpHeaders, input: unknown) {
     const actor = actorFromProtectedHeaders(headers);
     const parsed = parseHttpInput(mfaVerifyRequestSchema, input);
-    return this.runtime.auth.service.verifyMfa(await this.runtime.users.service.require(actor.actorId ?? ""), parsed.challengeId ?? "", parsed.code, parsed.kind);
+    return this.runtime.auth.service.verifyMfa(await this.runtime.users.service.require(actor.actorId ?? ""), parsed.challengeId ?? "", parsed.code, parsed.kind, { trustDevice: parsed.trustDevice, deviceLabel: parsed.deviceLabel });
+  }
+
+  trustedDevices(headers: IncomingHttpHeaders) {
+    return this.runtime.auth.service.listTrustedDevices(actorFromProtectedHeaders(headers));
+  }
+
+  revokeTrustedDevices(headers: IncomingHttpHeaders) {
+    return this.runtime.auth.service.revokeTrustedDevices(actorFromProtectedHeaders(headers));
   }
 
   private usersController(): AdminUsersDomainController {
@@ -395,6 +407,8 @@ decorate("passwordChange", [authRoute, Post("auth/password-change") as MethodDec
 decorate("passwordReset", [Post("auth/password-reset") as MethodDecoratorFactory], [[0, Body() as ParamDecoratorFactory]]);
 decorate("enrollMfa", [authRoute, Post("auth/mfa/enroll") as MethodDecoratorFactory], [[0, Headers() as ParamDecoratorFactory]]);
 decorate("verifyMfa", [authRoute, Post("auth/mfa/verify") as MethodDecoratorFactory], [[0, Headers() as ParamDecoratorFactory], [1, Body() as ParamDecoratorFactory]]);
+decorate("trustedDevices", [protectedRoute, Get("auth/trusted-devices") as MethodDecoratorFactory], [[0, Headers() as ParamDecoratorFactory]]);
+decorate("revokeTrustedDevices", [protectedRoute, Delete("auth/trusted-devices") as MethodDecoratorFactory], [[0, Headers() as ParamDecoratorFactory]]);
 decorate("countries", [Get("countries") as MethodDecoratorFactory]);
 decorate("countryDetail", [Get("countries/:countryCode") as MethodDecoratorFactory], [[0, Param("countryCode") as ParamDecoratorFactory], [1, Headers() as ParamDecoratorFactory]]);
 decorate("products", [Get("countries/:countryCode/products") as MethodDecoratorFactory], [[0, Param("countryCode") as ParamDecoratorFactory]]);

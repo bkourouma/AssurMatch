@@ -4,8 +4,10 @@ import { BrokerStarterAccessPolicy } from "../../../src/modules/leads/broker-sta
 import { AuditLogWriter } from "../../../src/modules/audit-logs/audit-log-writer.service";
 
 describe("broker Starter constitutional exclusions", () => {
-  it("keeps CRM Pro, AI commercial and regulated modules disabled by default", async () => {
-    expect(GLOBAL_FEATURE_FLAG_DEFAULTS.broker_crm_enabled).toBe(false);
+  it("keeps AI commercial and regulated modules disabled by default (Spec 063: the three broker modules are on, Starter stays CRM-free by plan)", async () => {
+    expect(GLOBAL_FEATURE_FLAG_DEFAULTS.starter_portal_enabled).toBe(true);
+    expect(GLOBAL_FEATURE_FLAG_DEFAULTS.broker_crm_enabled).toBe(true);
+    expect(GLOBAL_FEATURE_FLAG_DEFAULTS.broker_dashboard_enabled).toBe(true);
     expect(GLOBAL_FEATURE_FLAG_DEFAULTS.ai_broker_assistant_enabled).toBe(false);
     expect(GLOBAL_FEATURE_FLAG_DEFAULTS.payments_enabled).toBe(false);
     expect(GLOBAL_FEATURE_FLAG_DEFAULTS.policy_issuance_enabled).toBe(false);

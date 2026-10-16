@@ -17,6 +17,7 @@ import { BrokerCrmHistoryService } from "./broker-crm-history.service";
 import type { BrokerCrmActivityService } from "./broker-crm-activity.service";
 import { maskEmail, maskPhone, type LeadContactPolicy } from "./lead-contact-policy";
 import { LeadAssignmentService, type LeadAssignmentRecord } from "./lead-assignment.service";
+import type { LeadDisputesService } from "./lead-disputes.service";
 
 const CRM_STATUSES: BrokerCrmPipelineStatus[] = [
   "nouveau",
@@ -45,7 +46,9 @@ export class BrokerCrmLeadsService {
     private readonly exportPolicy: BrokerCrmExportPolicy,
     private readonly activity?: BrokerCrmActivityService,
     /** Spec 055 FR-001: full contact for the assigned broker (audited), masked after a withdrawal. */
-    private readonly contactPolicy?: LeadContactPolicy
+    private readonly contactPolicy?: LeadContactPolicy,
+    /** Spec 063: dispute window shown on the lead detail. */
+    private readonly disputes?: LeadDisputesService
   ) {}
 
   async list(actor: ActorContext, query: BrokerCrmLeadListQuery = {}): Promise<Page<BrokerCrmLeadSummary>> {
@@ -110,7 +113,8 @@ export class BrokerCrmLeadsService {
       reminders: await this.activity?.remindersForLead(id) ?? [],
       documents: await this.activity?.documentsForLead(id) ?? [],
       proposals: await this.activity?.proposalsForLead(id) ?? [],
-      disputes: await this.activity?.disputesForLead(id) ?? []
+      disputes: await this.activity?.disputesForLead(id) ?? [],
+      ...(this.disputes ? { disputeWindow: this.disputes.windowFor(assignment) } : {})
     };
   }
 

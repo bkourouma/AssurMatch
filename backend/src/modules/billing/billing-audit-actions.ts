@@ -5,6 +5,8 @@ export const BillingAuditActions = {
   planPriceChanged: "billing.plan_price.changed",
   packGranted: "billing.lead_pack.granted",
   packConsumed: "billing.lead_pack.consumed",
+  packReleased: "billing.lead_pack.released",
+  packRestored: "billing.lead_pack.restored",
   draftComputed: "billing.draft_invoice.computed",
   draftRead: "billing.draft_invoice.read",
   brokerStatementRead: "billing.broker_statement.read",
@@ -19,7 +21,15 @@ export const BillingAuditActions = {
   paymentRefused: "billing.payment.refused",
   creditNoteIssued: "billing.credit_note.issued",
   creditNoteRefused: "billing.credit_note.refused",
-  accountRead: "billing.account.read"
+  accountRead: "billing.account.read",
+  // Spec 063 - lead disputes (CRM-012).
+  disputeOpened: "billing.dispute.opened",
+  disputeOpenRefused: "billing.dispute.open_refused",
+  disputeRead: "billing.dispute.read",
+  disputeDecided: "billing.dispute.decided",
+  disputeDecisionRefused: "billing.dispute.decision_refused",
+  disputeCreditNoteIssued: "billing.dispute.credit_note_issued",
+  disputeNotificationFailed: "billing.dispute.notification_failed"
 } as const;
 
 export type BillingAuditAction = (typeof BillingAuditActions)[keyof typeof BillingAuditActions];

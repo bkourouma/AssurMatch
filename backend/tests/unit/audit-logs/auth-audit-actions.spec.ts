@@ -26,6 +26,10 @@ describe("auth audit actions", () => {
       "user.password_reset_issued",
       "user.role_changed",
       "user.suspended",
+      "user.trusted_device_created",
+      "user.trusted_device_rejected",
+      "user.trusted_device_revoked",
+      "user.trusted_device_used",
       "user.unlocked",
       "user.unsuspended",
       "user.updated"

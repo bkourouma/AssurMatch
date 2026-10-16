@@ -2,12 +2,19 @@
 
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
-import { BACKOFFICE_TOKEN_COOKIE, backOfficeApiBaseUrl, sanitizeReturnTo } from "./backoffice-auth";
+import {
+  BACKOFFICE_TOKEN_COOKIE,
+  backOfficeApiBaseUrl,
+  clearTrustedDeviceCookie,
+  readTrustedDeviceToken,
+  sanitizeReturnTo
+} from "./backoffice-auth";
 import { loginBackOffice } from "./broker-api";
 
 interface LoginResponse {
   accessToken?: string;
   mfaRequired?: boolean;
+  trustedDeviceRejected?: boolean;
 }
 
 // Source marker for auth-session tests: /auth/login
@@ -21,7 +28,10 @@ export async function loginAction(formData: FormData): Promise<void> {
   const password = stringValue(formData.get("password"));
   const returnTo = sanitizeReturnTo(stringValue(formData.get("returnTo")));
 
-  const session = await loginBackOffice(email, password) as LoginResponse & { status?: string };
+  // Spec 063 (FR-A04): the trusted-device cookie of THIS app is forwarded in the body; the API decides.
+  const trustedDeviceToken = await readTrustedDeviceToken();
+  const session = await loginBackOffice(email, password, trustedDeviceToken) as LoginResponse & { status?: string };
+  if (session.trustedDeviceRejected) await clearTrustedDeviceCookie();
   if (session.status && session.status !== "success" && session.status !== "mfa_required") {
     redirect(`/login?error=${encodeURIComponent(session.status)}&returnTo=${encodeURIComponent(returnTo)}`);
   }
@@ -56,6 +66,7 @@ export async function logoutAction(): Promise<void> {
       // Local session cleanup remains authoritative for frontend logout.
     }
   }
+  // The trusted-device cookie is kept on purpose: the 30-day trust survives logout (spec 063, FR-A04).
   cookieStore.delete(BACKOFFICE_TOKEN_COOKIE);
   redirect("/login?reason=logged_out");
 }

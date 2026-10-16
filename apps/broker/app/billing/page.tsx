@@ -1,9 +1,12 @@
 import { redirect } from "next/navigation";
 import { isBrokerProfile, loginRedirect, readBackOfficeSession } from "../lib/backoffice-auth";
-import { readBrokerBillingAccount, readBrokerBillingStatement, type BrokerInvoiceData } from "../lib/broker-api";
+import { readBrokerBillingAccount, readBrokerBillingStatement, readBrokerDisputes, type BrokerInvoiceData } from "../lib/broker-api";
 import { canReadBrokerBilling } from "../lib/broker-permissions";
+import { DISPUTE_CREDIT_MODE_LABELS, disputeReasonLabel, disputeStatusLabel } from "../lib/lead-vocabulary";
 import { Badge, Card, Cluster, DataTable, Grid, KpiCard, Notice, PageHeader, PageStack } from "../lib/ui/broker-ui";
 import type { DataTableColumn } from "../lib/ui/broker-ui";
+import { disputeStatusTone, formatDate, formatXof } from "../lib/ui/broker-view-models";
+import type { BrokerLeadDisputeView } from "../../../../packages/shared/contracts/lead-disputes.contracts";
 
 const BREADCRUMB = [{ label: "Compte" }, { label: "Facturation" }];
 
@@ -39,6 +42,53 @@ const invoiceColumns: Array<DataTableColumn<BrokerInvoiceData>> = [
   }
 ];
 
+/** Credit applied to an accepted dispute: next draft invoice, partial credit note (PDF) or manual handling. */
+function disputeCredit(dispute: BrokerLeadDisputeView) {
+  if (dispute.status !== "accepted") return "-";
+  if (dispute.creditMode === "credit_note") {
+    return (
+      <Cluster>
+        <span>
+          {DISPUTE_CREDIT_MODE_LABELS.credit_note}
+          {dispute.creditNoteNumber ? ` ${dispute.creditNoteNumber}` : ""}
+          {dispute.creditAmount !== undefined ? ` - ${formatXof(dispute.creditAmount)} TTC` : ""}
+        </span>
+        {dispute.creditNoteId ? <a href={`/billing/credit-notes/${dispute.creditNoteId}/pdf`}>Télécharger l'avoir (PDF)</a> : null}
+      </Cluster>
+    );
+  }
+  return DISPUTE_CREDIT_MODE_LABELS[dispute.creditMode ?? ""] ?? "Crédit en cours de traitement";
+}
+
+const disputeColumns: Array<DataTableColumn<BrokerLeadDisputeView>> = [
+  {
+    key: "reference",
+    header: "Lead",
+    render: (dispute) => (
+      <a href={dispute.source === "crm" ? `/crm/leads/${dispute.leadAssignmentId}` : `/leads/${dispute.leadAssignmentId}`}>
+        <code>{dispute.publicReference ?? dispute.leadAssignmentId}</code>
+      </a>
+    )
+  },
+  { key: "status", header: "Statut", render: (dispute) => <Badge tone={disputeStatusTone(dispute.status)}>{disputeStatusLabel(dispute.status)}</Badge> },
+  { key: "reason", header: "Motif", render: (dispute) => disputeReasonLabel(dispute.reason) },
+  { key: "createdAt", header: "Déposée le", render: (dispute) => formatDate(dispute.createdAt) },
+  {
+    key: "decision",
+    header: "Décision",
+    render: (dispute) =>
+      dispute.decidedAt ? (
+        <span>
+          {formatDate(dispute.decidedAt)}
+          {dispute.decisionReason ? ` - ${dispute.decisionReason}` : ""}
+        </span>
+      ) : (
+        "En attente de la finance AssurMatch"
+      )
+  },
+  { key: "credit", header: "Crédit appliqué", render: (dispute) => disputeCredit(dispute) }
+];
+
 /**
  * Spec 060 G-05: vue facturation du cabinet pour tous les plans (Starter compris). Lecture seule:
  * le reglement se fait hors plateforme (virement ou mobile money) et la finance AssurMatch le
@@ -58,7 +108,7 @@ export default async function BrokerBillingPage() {
     );
   }
 
-  const [statement, account] = await Promise.all([readBrokerBillingStatement(), readBrokerBillingAccount()]);
+  const [statement, account, disputes] = await Promise.all([readBrokerBillingStatement(), readBrokerBillingAccount(), readBrokerDisputes()]);
 
   return (
     <PageStack>
@@ -103,6 +153,20 @@ export default async function BrokerBillingPage() {
         />
       </Card>
 
+      <Card
+        title="Contestations"
+        description="Les leads que votre cabinet a contestés, la décision de la finance AssurMatch et le crédit appliqué (brouillon de facture ou avoir partiel)."
+      >
+        {disputes.status !== "success" ? <Notice tone="warning">Contestations temporairement indisponibles.</Notice> : null}
+        <DataTable
+          columns={disputeColumns}
+          items={disputes.data.items}
+          getKey={(dispute) => dispute.id}
+          emptyLabel="Aucune contestation. Vous pouvez contester un lead dans les 30 jours suivant sa réception."
+          aria-label="Contestations du cabinet"
+        />
+      </Card>
+
       <Card title="Releve de compte" description="Facture au debit, avoir et reglement au credit.">
         <DataTable
           columns={[
@@ -125,7 +189,8 @@ export default async function BrokerBillingPage() {
             { key: "grantedAt", header: "Attribue le", render: (pack) => pack.grantedAt.slice(0, 10) },
             { key: "granted", header: "Credits", render: (pack) => pack.creditsGranted, numeric: true, align: "right" },
             { key: "consumed", header: "Consommes", render: (pack) => pack.creditsConsumed, numeric: true, align: "right" },
-            { key: "remaining", header: "Restants", render: (pack) => pack.creditsRemaining, numeric: true, align: "right" }
+            { key: "remaining", header: "Restants", render: (pack) => pack.creditsRemaining, numeric: true, align: "right" },
+            { key: "reason", header: "Origine", render: (pack) => pack.reason || "-" }
           ]}
           items={account.data.packs}
           getKey={(pack) => pack.id}
