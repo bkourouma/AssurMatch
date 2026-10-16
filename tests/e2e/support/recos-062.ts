@@ -10,9 +10,30 @@ import { appPage, provisionBroker, publishOffer, requestQuote } from "./world";
 // and the API probes used to prove a refusal at the API level (the screens only show it).
 
 export const MESSAGING_FLAG = "broker_visitor_messaging_enabled";
-export const STARTER_KEY = "m062s";
-export const PRO_KEY = "m062p";
 export type Lead = "A" | "B";
+
+/**
+ * Journey-state keys of the firms of the CURRENT run. The conversations keep their history and the pointer
+ * e-mails are coalesced per 15-minute bucket, so a finished run is never resumed: the next run builds new
+ * firms. A run that did not finish (no `done` marker) is resumed on its own firms.
+ */
+export function activeRun(): { starter: string; pro: string } {
+  for (let n = 1; ; n += 1) {
+    const keys = { starter: `m062s${n}`, pro: `m062p${n}` };
+    if (loadWorld(keys.starter)?.data.done !== "1") return keys;
+  }
+}
+
+/** Marks the current run as finished (both firms) so the next run starts on new firms. */
+export function markRunDone(): void {
+  const keys = activeRun();
+  for (const key of [keys.starter, keys.pro]) {
+    const world = loadWorld(key);
+    if (!world) continue;
+    world.data.done = "1";
+    saveWorld(key, world);
+  }
+}
 
 const UUID = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/u;
 

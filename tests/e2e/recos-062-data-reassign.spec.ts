@@ -16,6 +16,9 @@ import { appPage, complianceAccount, findAssignmentId, provisionBroker, publishO
 //                 request is refused; the compliance admin processes it; the closing e-mail is a pointer.
 //   DR-06..DR-12  the admin reassigns the lead from firm 1 to firm 2: the old broker loses everything, the new one
 //                 starts from an empty conversation, the visitor keeps reading the old thread (read-only).
+// Re-run budget: the API limits the creation of data requests to 5 attempts per IP and per hour (every attempt counts,
+// refused ones too, and the e2e stack sees one address). One run of this file uses 4: a second run within the hour
+// fails on the "trop de demandes" notice of DR-02/DR-03 until the window (key rl:public:data_request:*) expires.
 // Two Starter firms, one lead (on firm 1's offer). The messaging set-up (message, document request, reply) goes
 // through the API: that feature is the object of another journey (recos-062-messaging).
 
@@ -359,8 +362,8 @@ test("DR-08 l'admin réaffecte le lead du cabinet 1 au cabinet 2 avec un motif",
   await form.locator("input[name='partnerTenantId']").fill(firm2.partnerId);
   await form.locator("input[name='reason']").fill(REASSIGN_REASON);
   await form.getByRole("button", { name: "Reaffecter" }).click();
-  await expect(row.getByText(/Lead reaffecte/u)).toBeVisible();
-  await expect(row.getByText(/L'ancien courtier perd l'acces/u)).toBeVisible();
+  // The list is filtered on firm 1: once reassigned, the row (and its success notice) leaves it.
+  await expect(page.getByRole("row").filter({ hasText: lead().reference as string })).toHaveCount(0);
 
   // The same assignment now belongs to firm 2.
   await page.goto(`/lead-assignments?partnerTenantId=${firm2.partnerId}`);

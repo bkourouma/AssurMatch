@@ -8,11 +8,11 @@ import { extractLink, messageIdsTo, searchMessages, waitForMail } from "./suppor
 import { apiCall, bearerToken } from "./support/pro-roles";
 import {
   MESSAGING_FLAG,
-  PRO_KEY,
-  STARTER_KEY,
+  activeRun,
   ensureFirm,
   leadOf,
   mailpitAttachmentCount,
+  markRunDone,
   tokenOf,
   uploadFiles,
   visitorConversationId,
@@ -80,15 +80,32 @@ async function sendFromBroker(page: Page, text: string, file?: UploadFile): Prom
   return form;
 }
 
-/** Downloads a file served by a same-origin relay with the page session and compares it with `expected`. */
+/**
+ * Downloads a file served by a same-origin relay with the page session and compares it with `expected`.
+ * The fetch runs IN the page: the session cookie is Secure, so Playwright's own request context would not send it over http.
+ */
 async function expectDownloadMatches(page: Page, href: string, expected: Buffer): Promise<void> {
-  const response = await page.context().request.get(new URL(href, page.url()).toString());
-  expect(response.status(), `download ${href}`).toBe(200);
-  const headers = response.headers();
-  expect(headers["content-disposition"] ?? "", "served as an attachment").toMatch(/attachment/iu);
-  expect(headers["cache-control"] ?? "").toContain("no-store");
-  expect(headers["x-content-type-options"] ?? "").toBe("nosniff");
-  expect(Buffer.compare(await response.body(), expected), "downloaded bytes equal the uploaded file").toBe(0);
+  const result = await page.evaluate(async (url) => {
+    const response = await fetch(url, { credentials: "same-origin", redirect: "manual" });
+    const bytes = new Uint8Array(await response.arrayBuffer());
+    let binary = "";
+    for (const byte of bytes) binary += String.fromCharCode(byte);
+    return {
+      status: response.status,
+      type: response.type,
+      disposition: response.headers.get("content-disposition") ?? "",
+      cache: response.headers.get("cache-control") ?? "",
+      sniff: response.headers.get("x-content-type-options") ?? "",
+      contentType: response.headers.get("content-type") ?? "",
+      base64: btoa(binary)
+    };
+  }, href);
+  expect(result.status, `download ${href} (${result.type})`).toBe(200);
+  expect(result.contentType, "served as a PDF").toContain("application/pdf");
+  expect(result.disposition, "served as an attachment").toMatch(/attachment/iu);
+  expect(result.cache).toContain("no-store");
+  expect(result.sniff).toBe("nosniff");
+  expect(Buffer.compare(Buffer.from(result.base64, "base64"), expected), "downloaded bytes equal the uploaded file").toBe(0);
 }
 
 async function hrefOf(link: Locator): Promise<string> {
@@ -153,8 +170,8 @@ test("MSG-00 le Super Admin ouvre la messagerie courtier-visiteur ; un cabinet S
   await expect(admin.getByRole("row").filter({ hasText: MESSAGING_FLAG }).getByRole("button", { name: "Desactiver", exact: true })).toBeVisible();
   await admin.context().close();
 
-  const starter = await ensureFirm(browser, STARTER_KEY, "starter", STARTER_LABEL);
-  const pro = await ensureFirm(browser, PRO_KEY, "pro", PRO_LABEL);
+  const starter = await ensureFirm(browser, activeRun().starter, "starter", STARTER_LABEL);
+  const pro = await ensureFirm(browser, activeRun().pro, "pro", PRO_LABEL);
   for (const world of [starter, pro]) {
     for (const lead of ["A", "B"] as const) expect(leadOf(world, lead).assignmentId).toMatch(/^[0-9a-f-]{36}$/u);
   }
@@ -256,13 +273,13 @@ async function exchangeJourney(browser: Browser, channel: Channel, world: Broker
 
 test("MSG-01 le propriétaire Starter écrit au visiteur avec un PDF ; e-mail pointeur sans contenu ; le visiteur lit, télécharge, répond ; accusé « Lu » et notification côté courtier", async ({ browser }) => {
   test.setTimeout(10 * 60_000);
-  const world = requireWorld(STARTER_KEY);
+  const world = requireWorld(activeRun().starter);
   await exchangeJourney(browser, "starter", world, leadOf(world, "A"));
 });
 
 test("MSG-02 le propriétaire Pro fait de même depuis la fiche CRM (onglet Conversation)", async ({ browser }) => {
   test.setTimeout(10 * 60_000);
-  const world = requireWorld(PRO_KEY);
+  const world = requireWorld(activeRun().pro);
   await exchangeJourney(browser, "crm", world, leadOf(world, "A"));
 });
 
@@ -300,10 +317,10 @@ async function expectWordingRefused(browser: Browser, channel: Channel, world: B
 
 test("MSG-03 une formulation interdite (« contrat validé », « guaranteed ») est refusée à l'envoi : l'expression est citée, le brouillon reste, rien n'est enregistré ni envoyé", async ({ browser }) => {
   test.setTimeout(10 * 60_000);
-  const starter = requireWorld(STARTER_KEY);
+  const starter = requireWorld(activeRun().starter);
   await expectWordingRefused(browser, "starter", starter, leadOf(starter, "B"), "Bonjour, votre contrat validé est disponible chez nous.", /«\s*contrat valid[ée]\s*»/u);
 
-  const pro = requireWorld(PRO_KEY);
+  const pro = requireWorld(activeRun().pro);
   await expectWordingRefused(browser, "crm", pro, leadOf(pro, "B"), "Hello, the price is guaranteed for you.", /«\s*guaranteed\s*»/u);
 
   // The document-request note is guarded too (Starter lead B): refused, no request created, no e-mail.
@@ -330,7 +347,7 @@ test("MSG-03 une formulation interdite (« contrat validé », « guaranteed »)
 
 test("MSG-04 le courtier demande une « Carte grise » : l'EICAR du visiteur est refusé (demande ouverte), puis son PDF sain l'honore ; le courtier télécharge le fichier", async ({ browser }) => {
   test.setTimeout(10 * 60_000);
-  const world = requireWorld(STARTER_KEY);
+  const world = requireWorld(activeRun().starter);
   const lead = leadOf(world, "B");
   const suffix = uniqueSuffix();
   const label = "Carte grise";
@@ -418,7 +435,7 @@ test("MSG-04 le courtier demande une « Carte grise » : l'EICAR du visiteur est
 
 test("MSG-05 messagerie coupée par l'admin : plus aucune écriture (courtier, visiteur, téléversement), l'historique reste lisible ; puis rétablie", async ({ browser }) => {
   test.setTimeout(10 * 60_000);
-  const world = requireWorld(STARTER_KEY);
+  const world = requireWorld(activeRun().starter);
   const leadA = leadOf(world, "A");
   const leadB = leadOf(world, "B");
   const admin = await appPage(browser, e2eEnv.adminUrl);
@@ -509,4 +526,5 @@ test("MSG-05 messagerie coupée par l'admin : plus aucune écriture (courtier, v
   await expect(visitorConversation(visitorA).locator("form[data-form='visitor-message']")).toBeVisible();
 
   for (const page of [admin, broker, visitorA, visitorB]) await page.context().close();
+  markRunDone();
 });
