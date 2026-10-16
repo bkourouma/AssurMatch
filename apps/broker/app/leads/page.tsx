@@ -1,9 +1,13 @@
 import { redirect } from "next/navigation";
 import { listStarterLeads } from "../lib/broker-api";
-import { loginRedirect } from "../lib/backoffice-auth";
+import { loginRedirect, readBackOfficeSession } from "../lib/backoffice-auth";
+import { canExportStarterLeads } from "../lib/broker-permissions";
+import { starterExportHref } from "../lib/lead-export-links";
 import { starterStatusLabel } from "../lib/lead-vocabulary";
 import {
   Badge,
+  Button,
+  Cluster,
   DataTable,
   Field,
   FilterBar,
@@ -58,6 +62,9 @@ export default async function BrokerLeadsPage({ searchParams }: { searchParams?:
   const apiLeads = await listStarterLeads();
   if (apiLeads.unauthenticated) redirect(loginRedirect("/leads", apiLeads.error ?? "session_required"));
   const leads = apiLeads.data.items.map(leadSummary);
+  // Spec 064 FR-001: the export button is shown only to roles holding broker_leads:export (API re-checks and audits).
+  const session = await readBackOfficeSession();
+  const canExport = session.status === "authenticated" && canExportStarterLeads(session.profile);
 
   const status = firstParam(params.status);
   const product = firstParam(params.product);
@@ -83,7 +90,16 @@ export default async function BrokerLeadsPage({ searchParams }: { searchParams?:
         kicker="Portail Starter"
         title="Leads assignes"
         description="Le courtier voit uniquement les leads qui lui sont assignes. Les donnees personnelles ne sont affichees qu'apres controle du tenant connecte."
-        actions={<Badge tone="info">Export controle par permission et audit</Badge>}
+        actions={
+          canExport ? (
+            <Cluster>
+              <Button href={starterExportHref({ status, product, country, date })} variant="secondary" size="sm">Exporter (CSV)</Button>
+              <Badge tone="info">Export audité</Badge>
+            </Cluster>
+          ) : (
+            <Badge tone="disabled">Export non autorisé pour votre rôle</Badge>
+          )
+        }
       />
 
       <FilterBar

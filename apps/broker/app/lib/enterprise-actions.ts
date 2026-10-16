@@ -73,3 +73,23 @@ export async function updateBrandingAction(formData: FormData): Promise<void> {
   if (result.status === 401) redirect(loginRedirect("/enterprise", "session_expired"));
   redirect(`/enterprise?ent=${outcome(result, "branding_saved")}`);
 }
+
+/**
+ * Spec 064 FR-005: assigns (or clears, with an empty `customRoleId`) the tenant custom role of a team
+ * member. The API enforces Enterprise plan, `broker_team:write`, same tenant, no owner target, no
+ * self-assignment and a non-suspended partner; this action only forwards and maps the outcome.
+ */
+export async function assignCustomRoleAction(formData: FormData): Promise<void> {
+  const userId = stringValue(formData.get("userId"));
+  const customRoleId = stringValue(formData.get("customRoleId")).trim();
+  const reason = stringValue(formData.get("reason")).trim();
+  if (!UUID.test(userId) || (customRoleId !== "" && !UUID.test(customRoleId)) || reason.length < 3) redirect("/team?role=invalid");
+  const result = await callEnterpriseApi(`/broker/enterprise/members/${encodeURIComponent(userId)}/custom-role`, "PUT", {
+    customRoleId: customRoleId === "" ? null : customRoleId,
+    reason
+  });
+  if (result.status === 401) redirect(loginRedirect("/team", "session_expired"));
+  // Only an owner may change the custom role of a manager (backend refusal `owner_required_for_manager_target`).
+  if (result.status === 403 && !result.suspended && result.reason === "owner_required_for_manager_target") redirect("/team?role=owner_required");
+  redirect(`/team?role=${outcome(result, customRoleId === "" ? "cleared" : "assigned")}`);
+}

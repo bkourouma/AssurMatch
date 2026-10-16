@@ -75,7 +75,17 @@ const agencyColumns: Array<DataTableColumn<BrokerAgency>> = [
 
 const roleColumns: Array<DataTableColumn<BrokerCustomRole>> = [
   { key: "name", header: "Role", render: (role) => role.name, sortable: true, sortValue: (role) => role.name },
-  { key: "permissions", header: "Permissions accordees", render: (role) => role.permissions.join(", ") }
+  { key: "permissions", header: "Permissions accordees", render: (role) => role.permissions.join(", ") },
+  // Spec 064 FR-007: members holding the role (assigned from the Equipe page).
+  {
+    key: "members",
+    header: "Membres",
+    numeric: true,
+    align: "right",
+    render: (role) => (role.memberIds ?? []).length,
+    sortable: true,
+    sortValue: (role) => (role.memberIds ?? []).length
+  }
 ];
 
 export default async function BrokerEnterprisePage({ searchParams }: { searchParams: Promise<{ ent?: string }> }) {

@@ -1,6 +1,7 @@
 "use client";
 
 import { useActionState, useId } from "react";
+import { assignCustomRoleAction } from "../lib/enterprise-actions";
 import { inviteTeamMemberAction, teamMemberAction, type SelfServiceActionState } from "../lib/self-service-actions";
 import { TEAM_INVITE_ROLE_OPTIONS } from "../lib/self-service-messages";
 import { Button, Card, ConfirmDialog, Field, Form, FormActions, Input, Select, fieldControlProps } from "../lib/ui/broker-ui";
@@ -77,5 +78,38 @@ export function MemberActionForm({ userId, displayName, action, currentRole }: {
         </Field>
       </ConfirmDialog>
     </div>
+  );
+}
+
+/**
+ * Spec 064 FR-005: assigns one tenant custom role (or none) to a member. The custom role only narrows
+ * the base role; the API refuses owners, oneself, other plans and suspended partners.
+ */
+export function CustomRoleForm({ userId, displayName, roles, currentRoleId }: { userId: string; displayName: string; roles: Array<{ id: string; name: string }>; currentRoleId?: string | undefined }) {
+  const base = useId();
+  return (
+    <ConfirmDialog
+      triggerLabel="Rôle personnalisé"
+      triggerVariant="secondary"
+      title={`Rôle personnalisé : ${displayName}`}
+      description="Un rôle personnalisé restreint les permissions du rôle de base, il ne les étend jamais. Il s'applique dès la prochaine requête du collaborateur."
+      confirmLabel="Attribuer"
+      cancelLabel="Annuler"
+      formAction={assignCustomRoleAction}
+      dataAttributes={{ "data-team-form": "custom-role" }}
+    >
+      <input type="hidden" name="userId" value={userId} />
+      <Field id={`${base}-custom-role`} label="Rôle personnalisé" required>
+        <Select
+          {...fieldControlProps(`${base}-custom-role`, { required: true })}
+          name="customRoleId"
+          defaultValue={currentRoleId ?? ""}
+          options={[{ value: "", label: "Aucun rôle personnalisé" }, ...roles.map((role) => ({ value: role.id, label: role.name }))]}
+        />
+      </Field>
+      <Field id={`${base}-custom-reason`} label="Motif (audité)" required hint="Au moins 3 caractères, conservé dans le journal d'audit.">
+        <Input {...fieldControlProps(`${base}-custom-reason`, { required: true, hint: "x" })} name="reason" minLength={3} maxLength={500} />
+      </Field>
+    </ConfirmDialog>
   );
 }

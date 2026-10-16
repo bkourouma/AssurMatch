@@ -130,8 +130,21 @@ export function listStarterLeads() {
   return readBroker<{ items: Array<Record<string, unknown>> }>("/broker/starter/leads", { items: [] });
 }
 
-export function listCrmLeads() {
-  return readBroker<{ items: Array<Record<string, unknown>> }>("/broker/crm/leads", { items: [] });
+/**
+ * Spec 064: optional agency DISPLAY filter (Enterprise only, ignored by the API for other plans):
+ * an agency uuid or `none`. It narrows what is listed, never what the actor may access.
+ */
+export interface BrokerAgencyQuery {
+  agencyId?: string | undefined;
+}
+
+function withAgency(path: string, query: BrokerAgencyQuery | undefined): string {
+  if (!query?.agencyId) return path;
+  return `${path}${path.includes("?") ? "&" : "?"}agencyId=${encodeURIComponent(query.agencyId)}`;
+}
+
+export function listCrmLeads(query?: BrokerAgencyQuery) {
+  return readBroker<{ items: Array<Record<string, unknown>> }>(withAgency("/broker/crm/leads", query), { items: [] });
 }
 
 export function readCrmDashboard() {
@@ -416,6 +429,11 @@ export function readBrokerAIAssistance() {
   return readBroker<BrokerAIAssistanceData>("/broker/crm/ai-assistance", emptyAIAssistance);
 }
 
+/** Spec 064 FR-003: the tenant's 10 most recent loss analyses, newest first. */
+export function readLossAnalyses() {
+  return readBroker<BrokerAiInteraction[]>("/broker/crm/ai/loss-analysis", []);
+}
+
 export interface BrokerAgency {
   id: string;
   name: string;
@@ -423,6 +441,8 @@ export interface BrokerAgency {
   city: string | null;
   status: "active" | "suspended";
   memberCount: number;
+  /** Spec 064: ids of the agency members (used by the agency display filter default). */
+  memberIds?: string[] | undefined;
 }
 
 export interface BrokerCustomRole {
@@ -430,6 +450,8 @@ export interface BrokerCustomRole {
   name: string;
   permissions: string[];
   rejectedPermissions: string[];
+  /** Spec 064: ids of the members holding this custom role (one custom role per member). */
+  memberIds?: string[] | undefined;
 }
 
 export interface BrokerSla {
@@ -475,14 +497,14 @@ export interface BrokerAdvisorRow {
   averageFirstActionMinutes: number | null;
 }
 
-export function readBrokerAdvisors() {
-  return readBroker<BrokerAdvisorRow[]>("/broker/dashboard/advisors", []);
+export function readBrokerAdvisors(query?: BrokerAgencyQuery) {
+  return readBroker<BrokerAdvisorRow[]>(withAgency("/broker/dashboard/advisors", query), []);
 }
 
 /** DASH-B-006: dashboard with the previous-period comparison section. */
-export function readBrokerDashboardWithComparison() {
+export function readBrokerDashboardWithComparison(query?: BrokerAgencyQuery) {
   return readBroker<BrokerDashboardData & { comparison?: { previous: { received: number; accepted: number; refused: number }; delta: { received: number; accepted: number; refused: number } } }>(
-    "/broker/dashboard?compare=previous",
+    withAgency("/broker/dashboard?compare=previous", query),
     emptyDashboard
   );
 }
@@ -593,6 +615,6 @@ export function readLeadProposals(channel: "starter" | "crm", leadAssignmentId: 
 }
 
 /** Spec 055 FR-010: vue Kanban CRM (colonnes = statuts pipeline). */
-export function readCrmKanban() {
-  return readBroker<Record<string, Array<Record<string, unknown>>>>("/broker/crm/leads/kanban", {});
+export function readCrmKanban(query?: BrokerAgencyQuery) {
+  return readBroker<Record<string, Array<Record<string, unknown>>>>(withAgency("/broker/crm/leads/kanban", query), {});
 }

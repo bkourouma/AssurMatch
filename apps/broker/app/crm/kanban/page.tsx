@@ -1,7 +1,10 @@
 import { redirect } from "next/navigation";
+import { AGENCY_PARAM, agencyQuery } from "../../lib/agency-filter";
+import { loadAgencyFilter } from "../../lib/agency-filter-loader";
 import { isStarterCrmDenied, loginRedirect, readBackOfficeSession } from "../../lib/backoffice-auth";
 import { readCrmKanban } from "../../lib/broker-api";
 import { CRM_PIPELINE_STATUSES, CRM_STATUS_LABELS } from "../../lib/lead-vocabulary";
+import { AgencyFilterForm } from "../../lib/ui/agency-filter-form";
 import { Badge, Card, Notice, PageHeader, PageStack } from "../../lib/ui/broker-ui";
 import { leadSummary } from "../../lib/ui/broker-view-models";
 
@@ -10,7 +13,8 @@ import { leadSummary } from "../../lib/ui/broker-view-models";
  * statut pipeline ; chaque carte ouvre la fiche CRM. Lecture seule : le statut se change depuis la
  * fiche, avec motif et historique. Jamais proposee au plan Starter (constitution 1.3.0).
  */
-export default async function BrokerCrmKanbanPage() {
+export default async function BrokerCrmKanbanPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
+  const params = await searchParams;
   const session = await readBackOfficeSession();
   if (session.status === "unauthenticated" || session.status === "expired") redirect(loginRedirect("/crm/kanban", session.status));
   if (session.status !== "authenticated" || isStarterCrmDenied(session.profile)) {
@@ -21,7 +25,9 @@ export default async function BrokerCrmKanbanPage() {
       </PageStack>
     );
   }
-  const kanban = await readCrmKanban();
+  // Spec 064: Enterprise agency DISPLAY filter (no access restriction); other plans make no extra API call.
+  const agency = await loadAgencyFilter(session.profile, params[AGENCY_PARAM]);
+  const kanban = await readCrmKanban(agencyQuery(agency));
   if (kanban.unauthenticated) redirect(loginRedirect("/crm/kanban", kanban.error ?? "session_required"));
 
   return (
@@ -33,6 +39,7 @@ export default async function BrokerCrmKanbanPage() {
         description="Leads autorises regroupes par statut pipeline, selon votre role, votre tenant et votre conseiller."
         actions={<Badge tone="info">Lecture : changez le statut depuis la fiche</Badge>}
       />
+      <AgencyFilterForm action="/crm/kanban" filter={agency} fieldId="kanban-agency" />
       {kanban.forbidden ? <Notice tone="danger" title="Acces CRM refuse">Verifiez le plan, la MFA et le flag broker_crm_enabled. Aucune donnee CRM n'est affichee.</Notice> : null}
       {kanban.status === "error" ? <Notice tone="warning">Vue Kanban temporairement indisponible.</Notice> : null}
       {kanban.status === "success" ? (
