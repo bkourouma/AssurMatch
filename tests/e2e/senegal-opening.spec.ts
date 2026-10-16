@@ -2,7 +2,7 @@ import { expect, test, type Browser, type Page } from "@playwright/test";
 import { changeStatus, createAndPublishQuoteForm, openCountry, openProduct, publishConsentText, setCatalogFlag } from "./support/admin";
 import { activateWithMfa, e2ePassword, openAs, type BackOfficeAccount } from "./support/backoffice";
 import { e2eEnv } from "./support/env";
-import { saveWorld } from "./support/journey-state";
+import { loadWorld, saveWorld } from "./support/journey-state";
 import { extractLink, waitForMail } from "./support/mailpit";
 import { onboardBrokerSenegal, publishOfferSenegal } from "./support/senegal";
 import { card, fillReason, rowWith, uniqueSuffix } from "./support/ui";
@@ -20,8 +20,8 @@ import { appPage, complianceAccount, superAdminAccount } from "./support/world";
 // of the pilot country without broker nor offer, SN-07 Senegal broker (SN licence, SN x Auto
 // coverage) and SN-08 its offer validated by compliance, SN-09 the public offer list, the quote
 // forms in both languages and the green checklist.
-// Not covered on purpose: switching SN to "public" (the stack keeps SN in pilot so the other
-// journeys stay unchanged), a visitor quote request in SN, Mali and Guinea (out of scope).
+// SN-09 finally switches SN to "public" (last journey of the suite). Not covered on purpose: a visitor
+// quote request sent in SN, Mali and Guinea (out of scope).
 
 test.describe.configure({ mode: "serial" });
 
@@ -264,10 +264,25 @@ test("SN-08 le courtier sénégalais crée une offre SN x Auto, la conformité l
   saveWorld("senegal", world);
 });
 
-test("SN-09 offre publique du Sénégal pilote, formulaires de devis FR et EN avec consentement nommé, checklist verte", async ({ browser }) => {
-  test.skip(!freshOpening || !snBroker || !snOffer, "re-run: SN already has a broker and an offer");
-  const { partnerName } = snBroker as NonNullable<typeof snBroker>;
-  const { offerTitle } = snOffer as NonNullable<typeof snOffer>;
+test("SN-09 la conformité ouvre le Sénégal au public (checklist verte) : offre sénégalaise visible, formulaires de devis FR et EN avec consentement nommé", async ({ browser }) => {
+  // Re-runnable: on a kept stack the broker and the offer come from the saved world (steps are idempotent).
+  const saved = loadWorld("senegal");
+  const partnerName = snBroker?.partnerName ?? saved?.partnerName;
+  const offerTitle = snOffer?.offerTitle ?? saved?.offerTitle;
+  test.skip(!partnerName || !offerTitle, "no Senegal broker and offer yet");
+  if (!partnerName || !offerTitle) return;
+
+  // With a public broker and a validated offer the compliance go/no-go is accepted (SC-01c for SN).
+  // Offers are only public once the country is (country_public_enabled), so this precedes the visitor.
+  const admin = await adminPage(browser);
+  await openAs(admin, complianceAccount(), "/catalog/countries");
+  const countryId = await openCountry(admin, "SN");
+  await setCatalogFlag(admin, "country_public_enabled", true, REASON);
+  await changeStatus(admin, "Statut du pays", "public", REASON);
+  await admin.goto(`/catalog/countries/${countryId}`);
+  await expect(card(admin, "Checklist d'activation du pays")).toContainText("Aucun contrôle bloquant");
+  await expect(card(admin, "Synthese")).toContainText("public");
+  await admin.context().close();
 
   const visitor = await appPage(browser, e2eEnv.publicUrl);
   await visitor.goto("/pays/SN");
@@ -277,7 +292,7 @@ test("SN-09 offre publique du Sénégal pilote, formulaires de devis FR et EN av
   const offer = visitor.getByRole("article", { name: offerTitle, exact: true });
   await expect(offer).toContainText("Courtier partenaire responsable");
   await expect(offer).toContainText(partnerName);
-  await expect(offer).toContainText("XOF");
+  await expect(offer).toContainText("F CFA");
   // Voyage has no SN offer: the explicit empty state stays.
   await visitor.goto("/pays/SN/produits/voyage/offres");
   await expect(visitor.getByText("Aucune offre indicative pour ces critères")).toBeVisible();
@@ -309,13 +324,4 @@ test("SN-09 offre publique du Sénégal pilote, formulaires de devis FR et EN av
     await expect(visitor.locator("label[for='am-quote-consent'], #am-quote-consent >> xpath=..").first()).toContainText(expected.consent);
   }
   await visitor.context().close();
-
-  // The country checklist is green: only the compliance go/no-go remains (SN stays in pilot).
-  const admin = await adminPage(browser);
-  await openAs(admin, complianceAccount(), "/catalog/countries");
-  const countryId = await openCountry(admin, "SN");
-  await admin.goto(`/catalog/countries/${countryId}`);
-  await expect(card(admin, "Checklist d'activation du pays")).toContainText("Aucun contrôle bloquant");
-  await expect(card(admin, "Synthese")).toContainText("pilot");
-  await admin.context().close();
 });
