@@ -6,7 +6,7 @@ describe("broker_visitor_messaging_enabled default (spec 062 R5)", () => {
   it("is OFF without a row (closed until the legal opinion L-08), can be opened by an admin from the regular (non-sensitive) path, and other flags stay off", async () => {
     const flags = new FeatureFlagsService(new AuditLogWriter());
     expect(flags.isEnabled("broker_visitor_messaging_enabled")).toBe(false);
-    expect(flags.isEnabled("starter_portal_enabled")).toBe(false);
+    expect(flags.isEnabled("billing_enabled")).toBe(false); // other regulated flags stay off (the three broker modules ship ON since spec 063)
     expect(flags.isEnabled("broker_visitor_messaging_enabled", "country", "ci")).toBe(false);
 
     await flags.setFlag({ key: "broker_visitor_messaging_enabled", scopeType: "global", value: true, reason: "legal opinion L-08 obtained" }, { roles: ["super_admin"], mfaVerified: true, correlationId: "t" });

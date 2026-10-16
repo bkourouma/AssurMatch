@@ -14,9 +14,9 @@ describe("regulated feature exclusions", () => {
     expect(GLOBAL_FEATURE_FLAG_DEFAULTS.retention_purge_enabled).toBe(false);
   });
 
-  it("ships every global flag OFF; the spec 062 messaging flag stays closed until the legal opinion L-08", async () => {
+  it("ships every global flag OFF except the three broker back-office modules (spec 063); the spec 062 messaging flag stays closed until the legal opinion L-08", async () => {
     const enabledByDefault = Object.entries(GLOBAL_FEATURE_FLAG_DEFAULTS).filter(([, value]) => (value as boolean) === true).map(([key]) => key);
-    expect(enabledByDefault).toEqual([]);
+    expect(enabledByDefault).toEqual(["starter_portal_enabled", "broker_crm_enabled", "broker_dashboard_enabled"]);
     expect(GLOBAL_FEATURE_FLAG_DEFAULTS.broker_visitor_messaging_enabled).toBe(false);
     // It must stay switchable from the flags screen: not sensitive, no protected listing.
     expect(isSensitiveFeatureFlagKey("broker_visitor_messaging_enabled")).toBe(false);
