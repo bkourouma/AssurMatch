@@ -17,3 +17,8 @@
 - D1 : pas de seed démo ; les courtiers sont créés par le chemin admin direct (SC-02 alternatif), plus court que la candidature publique.
 - D2 : les flags IA sont sensibles (pas de bascule UI) : ils restent fermés par défaut, le parcours IA le vérifie plutôt que de les manipuler.
 - D3 : les défauts produits sont consignés dans le rapport de lot, pas corrigés.
+
+## Résultats de la phase A
+- 65 tests verts (existants 22 + nouveaux 43) sur pile vierge, 14,2 min de Playwright.
+- Constats produit (non corrigés ici) : voir le rapport de lot — numéro de téléphone partagé entre deux visiteurs (profil visiteur réutilisé, e-mails envoyés à la première adresse) ; le middleware du courtier renvoie un Starter sur `/login?error=starter_crm_denied` pour `/crm/*` (sauf `/crm`) ; les offres d'un pays pilote ne sont publiques qu'avec `country_public_enabled` ; pas d'écran de modification d'agence ; une licence ne peut pas être antidatée par les écrans (l'exclusion est prouvée par la suspension, même règle `license_not_valid_for_scope`).
+- Environnement Windows / Docker Desktop : `docker-compose.e2e.desktop.yml` + `ASSURMATCH_E2E_COMPOSE_OVERRIDE`, `--apps=host`, `E2E_BROWSER_CHANNEL=chrome` ; les scripts `.sh` du Dockerfile exigent un checkout LF (le mode `--apps=docker` est réservé à Linux / CI).
