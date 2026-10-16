@@ -343,7 +343,8 @@ test("the Enterprise SLA shows the first reply visible by the visitor only when 
 
 test("the readers call the contract routes with safe fallbacks", async () => {
   const api = read("apps/broker/app/lib/broker-api.ts");
-  expect(api).toContain("/broker/${channel}/leads/${encodeURIComponent(leadAssignmentId)}/conversation`");
+  // The broker reads the whole thread (limit = LEAD_MESSAGE_THREAD_MAX), not only the 50 latest messages.
+  expect(api).toContain("/broker/${channel}/leads/${encodeURIComponent(leadAssignmentId)}/conversation?limit=300`");
   expect(api).toContain("/broker/${channel}/leads/${encodeURIComponent(leadAssignmentId)}/document-requests`");
   expect(api).toContain("export function readLeadConversation(");
   expect(api).toContain("export function readLeadDocumentRequests(");

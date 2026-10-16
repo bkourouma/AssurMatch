@@ -22,6 +22,7 @@ export {
   DATA_REQUESTS_REPOSITORY,
   DuplicateDataRequestReferenceError,
   MemoryDataRequestsRepository,
+  OpenDataRequestExistsError,
   PrismaDataRequestsRepository,
   type DataRequestRecord,
   type DataRequestRetentionSource,

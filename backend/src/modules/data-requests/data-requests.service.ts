@@ -32,7 +32,7 @@ import type { ActorContext } from "../common/types";
 import { RetentionAccessRefusedError } from "../data-retention/data-retention.service";
 import type { DataRequestNotificationsPort, MessagingQuote } from "../lead-messaging/lead-messaging.ports";
 import { visitorAccessDenied } from "../quote-requests/quote-submission.service";
-import { DuplicateDataRequestReferenceError, type DataRequestRecord, type DataRequestsRepository } from "./data-requests.repository";
+import { DuplicateDataRequestReferenceError, OpenDataRequestExistsError, type DataRequestRecord, type DataRequestsRepository } from "./data-requests.repository";
 
 /** The slice of `DataRetentionService` the data requests use: a preview, and the batch it created. */
 export interface DataRequestRetentionPort {
@@ -128,18 +128,7 @@ export class DataRequestsService {
     const parsed = parseHttpInput(dataRequestCreateSchema, input ?? {});
 
     const open = await this.deps.repository.findOpen(quote.id, parsed.type);
-    if (open) {
-      this.deps.audit.write({
-        actor,
-        action: DataRequestAuditActions.refused,
-        targetType: "DataRequest",
-        targetId: open.id,
-        result: "refused",
-        reason: "already_open",
-        context: { reference: open.reference, type: open.type }
-      });
-      throw conflict(ErrorCodes.DATA_REQUEST_ALREADY_OPEN, "A request of this type is already being processed", { reference: open.reference });
-    }
+    if (open) this.refuseAlreadyOpen(actor, open.id, open.reference, open.type);
 
     // Counted per request actually recorded: a refused duplicate or an invalid body costs nothing.
     if (this.deps.redis) {
@@ -148,7 +137,7 @@ export class DataRequestsService {
     }
 
     const now = this.now();
-    const record = await this.insert({
+    const record = await this.insert(actor, {
       id: crypto.randomUUID(),
       reference: randomReference(),
       quoteRequestId: quote.id,
@@ -359,11 +348,30 @@ export class DataRequestsService {
     });
   }
 
-  private async insert(record: DataRequestRecord): Promise<DataRequestRecord> {
+  /** The refusal of a second open request of the same type, with the reference of the one already open. */
+  private refuseAlreadyOpen(actor: ActorContext, targetId: string, reference: string | undefined, type: string): never {
+    this.deps.audit.write({
+      actor,
+      action: DataRequestAuditActions.refused,
+      targetType: "DataRequest",
+      targetId,
+      result: "refused",
+      reason: "already_open",
+      context: { ...(reference ? { reference } : {}), type }
+    });
+    throw conflict(ErrorCodes.DATA_REQUEST_ALREADY_OPEN, "A request of this type is already being processed", reference ? { reference } : {});
+  }
+
+  private async insert(actor: ActorContext, record: DataRequestRecord): Promise<DataRequestRecord> {
     for (let attempt = 1; ; attempt += 1) {
       try {
         return await this.deps.repository.create(record);
       } catch (error) {
+        // Two concurrent creations: the partial unique index let one through, this one gets the same refusal as a sequential duplicate.
+        if (error instanceof OpenDataRequestExistsError) {
+          const open = await this.deps.repository.findOpen(record.quoteRequestId, record.type);
+          this.refuseAlreadyOpen(actor, open?.id ?? record.quoteRequestId, open?.reference ?? error.reference, record.type);
+        }
         if (!(error instanceof DuplicateDataRequestReferenceError) || attempt >= REFERENCE_ATTEMPTS) throw error;
         record = { ...record, reference: randomReference() };
       }
@@ -413,7 +421,7 @@ export class DataRequestsService {
     return quotes;
   }
 
-  private toListItem(record: DataRequestRecord, access: DataRequestAccess, now: Date, quote: MessagingQuote | undefined): AdminDataRequestListItem & { quoteReference?: string; locale?: "fr" | "en" } {
+  private toListItem(record: DataRequestRecord, access: DataRequestAccess, now: Date, quote: MessagingQuote | undefined): AdminDataRequestListItem {
     return {
       id: record.id,
       reference: record.reference,
@@ -426,7 +434,7 @@ export class DataRequestsService {
     };
   }
 
-  private async toDetail(record: DataRequestRecord, access: DataRequestAccess, actor: ActorContext): Promise<AdminDataRequestDetail & { quoteReference?: string; erasureAllowed?: boolean }> {
+  private async toDetail(record: DataRequestRecord, access: DataRequestAccess, actor: ActorContext): Promise<AdminDataRequestDetail> {
     const now = this.now();
     if (access === "minimal") return { ...this.toListItem(record, access, now, undefined), history: [] };
     const quote = await this.deps.quotes.findById(record.quoteRequestId).catch(() => undefined);

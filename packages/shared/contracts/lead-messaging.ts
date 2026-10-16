@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { dateTimeStringSchema } from "../validation/common.schemas";
+import { stripControlCharacters } from "./content-safety";
 
 /**
  * Spec 062: broker <-> visitor messaging and document requests. Shared by the API, the broker
@@ -14,8 +15,10 @@ export const LEAD_MESSAGE_ATTACHMENT_MAX_BYTES = 5 * 1024 * 1024;
 export const LEAD_MESSAGE_ATTACHMENT_MIME_TYPES = ["application/pdf", "image/jpeg", "image/png"] as const;
 /** Hard cap of messages per assignment conversation (`THREAD_LIMIT_REACHED`). */
 export const LEAD_MESSAGE_THREAD_MAX = 300;
-/** Messages per page; the first page holds the most recent ones, `before` pages backwards. */
+/** Messages per page (default); the first page holds the most recent ones, `before` pages backwards. */
 export const LEAD_MESSAGE_PAGE_SIZE = 50;
+/** Largest `limit` a conversation read accepts: a whole thread (= the thread cap) in one page. */
+export const LEAD_MESSAGE_PAGE_SIZE_MAX = LEAD_MESSAGE_THREAD_MAX;
 /** An identical consecutive message inside this window is refused (`DUPLICATE_MESSAGE`). */
 export const LEAD_MESSAGE_DUPLICATE_WINDOW_MINUTES = 5;
 /** Pointer e-mails and broker alerts are bucketed by this window (dedupe key bucket). */
@@ -26,6 +29,9 @@ export const DOCUMENT_REQUEST_LABEL_MAX = 120;
 export const DOCUMENT_REQUEST_NOTE_MAX = 500;
 /** At most this many `open` document requests per assignment (`DOCUMENT_REQUEST_LIMIT_REACHED`). */
 export const DOCUMENT_REQUEST_MAX_OPEN = 10;
+/** At most this many document requests created per assignment and broker in a sliding window (cancelled ones included), same error code. */
+export const DOCUMENT_REQUEST_CREATE_MAX_PER_DAY = 20;
+export const DOCUMENT_REQUEST_CREATE_WINDOW_HOURS = 24;
 export const DOCUMENT_REQUEST_UPLOAD_FILES_MAX = 3;
 
 /** Visitor rate limits (per hour), enforced by the public abuse guard and Redis counters. */
@@ -68,14 +74,20 @@ export type DocumentRequestStatus = z.output<typeof documentRequestStatusSchema>
 export type DocumentRequestCancelReason = z.output<typeof documentRequestCancelReasonSchema>;
 export type DocumentRequestBlocker = z.output<typeof documentRequestBlockerSchema>;
 
-const optionalText = (max: number) => z.preprocess((value) => (typeof value === "string" && value.trim() === "" ? undefined : value), z.string().trim().max(max).optional());
+const optionalText = (max: number) => z.preprocess(
+  (value) => {
+    const text = typeof value === "string" ? stripControlCharacters(value) : value;
+    return typeof text === "string" && text.trim() === "" ? undefined : text;
+  },
+  z.string().trim().max(max).optional()
+);
 
 // ---------------------------------------------------------------------------------------------
 // Requests
 // ---------------------------------------------------------------------------------------------
 
 const clientRequestIdSchema = z.string().trim().min(8).max(LEAD_MESSAGE_CLIENT_REQUEST_ID_MAX).regex(/^[A-Za-z0-9_-]+$/, "clientRequestId must be URL-safe");
-const messageBodySchema = z.string().trim().min(1).max(LEAD_MESSAGE_BODY_MAX);
+const messageBodySchema = z.string().transform(stripControlCharacters).pipe(z.string().trim().min(1).max(LEAD_MESSAGE_BODY_MAX));
 
 /**
  * `POST .../messages` (JSON, or multipart with a `payload` JSON field and up to three `files`).
@@ -99,7 +111,7 @@ export const visitorLeadMessageCreateSchema = leadMessageCreateSchema;
 
 /** `POST /broker/{starter|crm}/leads/:leadId/document-requests`. The wording guard runs in the service. */
 export const documentRequestCreateSchema = z.object({
-  label: z.string().trim().min(1).max(DOCUMENT_REQUEST_LABEL_MAX),
+  label: z.string().transform(stripControlCharacters).pipe(z.string().trim().min(1).max(DOCUMENT_REQUEST_LABEL_MAX)),
   note: optionalText(DOCUMENT_REQUEST_NOTE_MAX),
   dueAt: z.preprocess((value) => (value === "" ? undefined : value), dateTimeStringSchema.optional())
 }).strict();
@@ -117,7 +129,7 @@ export type DocumentRequestCancel = z.output<typeof documentRequestCancelSchema>
 /** Query of the paginated conversation views (`before` is the opaque `nextCursor`). */
 export const leadConversationQuerySchema = z.object({
   before: z.string().trim().min(1).max(200).optional(),
-  limit: z.coerce.number().int().min(1).max(LEAD_MESSAGE_PAGE_SIZE).default(LEAD_MESSAGE_PAGE_SIZE)
+  limit: z.coerce.number().int().min(1).max(LEAD_MESSAGE_PAGE_SIZE_MAX).default(LEAD_MESSAGE_PAGE_SIZE)
 });
 
 export type LeadConversationQuery = z.output<typeof leadConversationQuerySchema>;
@@ -283,6 +295,8 @@ export const adminLeadConversationViewSchema = z.object({
 
 export const adminLeadConversationsViewSchema = z.object({
   quoteRequestId: z.string(),
+  /** True for the support role: every body is replaced by a placeholder. */
+  masked: z.boolean(),
   conversations: z.array(adminLeadConversationViewSchema)
 });
 

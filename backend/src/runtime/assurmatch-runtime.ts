@@ -1068,14 +1068,15 @@ readonly enterprise = new EnterpriseService({
     return {
       queueVisitorBrokerMessage: (quote, event, actor) => quoteService.queueVisitorBrokerMessage(quote, event, actor),
       queueVisitorDocumentsRequested: (quote, event, actor) => quoteService.queueVisitorDocumentsRequested(quote, event, actor),
+      // The optional channels follow the pointer notification: a coalesced repeat (nothing queued) sends no SMS / WhatsApp.
       queueBrokerVisitorMessage: async (quote, event, actor) => {
         const result = await quoteService.queueBrokerVisitorMessage(quote, event, actor);
-        await this.brokerAlerts.optionalChannels({ partnerTenantId: event.partnerTenantId, type: "broker_visitor_message", title: "Nouveau message d'un visiteur" }, actor).catch(() => 0);
+        if (result) await this.brokerAlerts.optionalChannels({ partnerTenantId: event.partnerTenantId, type: "broker_visitor_message", title: "Nouveau message d'un visiteur" }, actor).catch(() => 0);
         return result;
       },
       queueBrokerDocumentReceived: async (quote, event, actor) => {
         const result = await quoteService.queueBrokerDocumentReceived(quote, event, actor);
-        await this.brokerAlerts.optionalChannels({ partnerTenantId: event.partnerTenantId, type: "broker_document_received", title: "Un document a été reçu" }, actor).catch(() => 0);
+        if (result) await this.brokerAlerts.optionalChannels({ partnerTenantId: event.partnerTenantId, type: "broker_document_received", title: "Un document a été reçu" }, actor).catch(() => 0);
         return result;
       }
     };

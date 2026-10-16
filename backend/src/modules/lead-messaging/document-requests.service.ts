@@ -2,6 +2,8 @@ import { NotFoundException } from "@nestjs/common";
 import { findForbiddenWordingAnyLanguage } from "../../../../packages/shared/contracts/content-safety";
 import { ErrorCodes } from "../../../../packages/shared/contracts/error-codes";
 import {
+  DOCUMENT_REQUEST_CREATE_MAX_PER_DAY,
+  DOCUMENT_REQUEST_CREATE_WINDOW_HOURS,
   DOCUMENT_REQUEST_MAX_OPEN,
   DOCUMENT_REQUEST_UPLOAD_FILES_MAX,
   VISITOR_UPLOAD_RATE_LIMIT_PER_IP_PER_HOUR,
@@ -114,7 +116,7 @@ export class DocumentRequestsService {
     const items: BrokerDocumentRequest[] = [];
     for (const request of own) items.push(await this.toBroker(request));
     const openCount = own.filter((request) => request.status === "open").length;
-    const blockers = this.createBlockers(assignment, quote, actor, openCount);
+    const blockers = this.createBlockers(assignment, quote, actor, openCount, this.createdRecently(own, this.now()));
     return { items, openCount, maxOpen: DOCUMENT_REQUEST_MAX_OPEN, canCreate: blockers.length === 0, blockers };
   }
 
@@ -150,8 +152,13 @@ export class DocumentRequestsService {
     if (openCount >= DOCUMENT_REQUEST_MAX_OPEN) {
       refuse(ErrorCodes.DOCUMENT_REQUEST_LIMIT_REACHED, "open_limit_reached", conflict(ErrorCodes.DOCUMENT_REQUEST_LIMIT_REACHED, `At most ${DOCUMENT_REQUEST_MAX_OPEN} open document requests per lead`), { openCount });
     }
-
     const now = this.now();
+    // Creation cap (cancelled ones count): cancel + recreate in a loop cannot be used to flood the visitor.
+    const createdRecently = this.createdRecently(own, now);
+    if (createdRecently >= DOCUMENT_REQUEST_CREATE_MAX_PER_DAY) {
+      refuse(ErrorCodes.DOCUMENT_REQUEST_LIMIT_REACHED, "creation_limit_reached", conflict(ErrorCodes.DOCUMENT_REQUEST_LIMIT_REACHED, `At most ${DOCUMENT_REQUEST_CREATE_MAX_PER_DAY} document requests per lead in 24 hours`), { createdRecently });
+    }
+
     const request = await this.repository.createDocumentRequest({
       id: crypto.randomUUID(),
       quoteRequestId: assignment.quoteRequestId,
@@ -175,8 +182,9 @@ export class DocumentRequestsService {
       result: "success",
       context: { channel, hasNote: Boolean(request.note), hasDueDate: Boolean(request.dueAt) }
     });
-    // One pointer e-mail per request (dedupe key on the request id); it does not repeat the label.
-    await this.safely(() => this.deps.notifications?.queueVisitorDocumentsRequested(activeQuote, { assignmentId: assignment.id, partnerTenantId: assignment.partnerTenantId, requestId: request.id }, actor));
+    // One pointer e-mail per 15-minute bucket (like the messages): a burst of requests does not flood the
+    // visitor's mailbox. It does not repeat the label; the request id stays in the in-app / audit side.
+    await this.safely(() => this.deps.notifications?.queueVisitorDocumentsRequested(activeQuote, { assignmentId: assignment.id, partnerTenantId: assignment.partnerTenantId, requestId: request.id, bucket: messageNotificationBucket(now) }, actor));
     return this.toBroker(request);
   }
 
@@ -385,14 +393,23 @@ export class DocumentRequestsService {
     return this.deps.now ? this.deps.now() : new Date();
   }
 
+  /** Same scope on both channels: an agent limited to its assigned leads cannot use the Starter route to go round it (E-07). */
   private assertRead(channel: LeadMessagingChannel, actor: ActorContext, assignment: LeadAssignmentRecord): void {
-    if (channel === "crm") this.deps.crmAccess.assertLeadRead(actor, assignment);
-    else this.deps.starterAccess.assertLeadAccess(actor, assignment);
+    if (channel === "crm") {
+      this.deps.crmAccess.assertLeadRead(actor, assignment);
+      return;
+    }
+    this.deps.starterAccess.assertLeadAccess(actor, assignment);
+    this.deps.starterAccess.assertAssignedScope(actor, assignment);
   }
 
   private assertMutation(channel: LeadMessagingChannel, actor: ActorContext, assignment: LeadAssignmentRecord): void {
-    if (channel === "crm") this.deps.crmAccess.assertMutation(actor, assignment);
-    else this.deps.starterAccess.assertMutationAccess(actor, assignment);
+    if (channel === "crm") {
+      this.deps.crmAccess.assertMutation(actor, assignment);
+      return;
+    }
+    this.deps.starterAccess.assertMutationAccess(actor, assignment);
+    this.deps.starterAccess.assertAssignedScope(actor, assignment);
   }
 
   private quoteOf(quoteRequestId: string): Promise<Quote | undefined> {
@@ -414,7 +431,7 @@ export class DocumentRequestsService {
   }
 
   private async quoteAssignments(quoteRequestId: string): Promise<Map<string, LeadAssignmentRecord>> {
-    return new Map((await this.deps.assignments.list()).filter((assignment) => assignment.quoteRequestId === quoteRequestId).map((assignment) => [assignment.id, assignment]));
+    return new Map((await this.deps.assignments.listForQuote(quoteRequestId)).map((assignment) => [assignment.id, assignment]));
   }
 
   private refuseAudit(actor: ActorContext, assignment: LeadAssignmentRecord, reason: string, context: Record<string, unknown>): void {
@@ -481,13 +498,19 @@ export class DocumentRequestsService {
     return true;
   }
 
-  private createBlockers(assignment: LeadAssignmentRecord, quote: Quote | undefined, actor: ActorContext, openCount: number): DocumentRequestBlocker[] {
+  /** Requests of the current broker created in the last 24 hours, whatever their status. */
+  private createdRecently(own: readonly LeadDocumentRequestRecord[], now: Date): number {
+    const since = now.getTime() - DOCUMENT_REQUEST_CREATE_WINDOW_HOURS * 3_600_000;
+    return own.filter((request) => request.createdAt.getTime() > since).length;
+  }
+
+  private createBlockers(assignment: LeadAssignmentRecord, quote: Quote | undefined, actor: ActorContext, openCount: number, createdRecently: number): DocumentRequestBlocker[] {
     const blockers: DocumentRequestBlocker[] = [];
     const blocker = brokerWriteBlocker(assignment, quote);
     if (blocker) blockers.push(blocker);
     if (actor.tenantReadOnly) blockers.push("partner_suspended");
     if (!this.enabled()) blockers.push("messaging_disabled");
-    if (openCount >= DOCUMENT_REQUEST_MAX_OPEN) blockers.push("limit_reached");
+    if (openCount >= DOCUMENT_REQUEST_MAX_OPEN || createdRecently >= DOCUMENT_REQUEST_CREATE_MAX_PER_DAY) blockers.push("limit_reached");
     return blockers;
   }
 

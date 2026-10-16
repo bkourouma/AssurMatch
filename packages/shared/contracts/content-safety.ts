@@ -141,40 +141,118 @@ export const FORBIDDEN_ENGLISH_WORDING = ["buy now", "subscribe now", "valid con
 
 /**
  * Spec 062 R4: additional promises banned in broker-written messages and document requests, matched
- * as whole phrases after accent folding. They only extend the guard; nothing blocked before passes now.
+ * as whole phrases after normalisation. They only extend the guard; nothing blocked before passes now.
  */
 export const FORBIDDEN_MESSAGING_PHRASES = ["achetez maintenant", "souscrivez maintenant", "contract validated", "validated contract"] as const;
 
 /**
- * Spec 062 R4: stand-alone words that make a promise ("remboursement garanti", "guaranteed price").
- * Matched on word boundaries so the neutral nouns "garantie" / "garanties" ("Les garanties incluses")
- * are never flagged. The accent-insensitive "garantie acceptée" phrase is covered by the regulated list.
+ * Spec 062 R4: stand-alone English word that makes a promise ("guaranteed price"), matched on word
+ * boundaries. The French bare « garanti » is NOT listed here any more: it is also ordinary technical
+ * wording ("risques garantis", "capital garanti", "dommages garantis"), so the French promises are the
+ * closed list of phrases below instead.
  */
-export const FORBIDDEN_MESSAGING_WORDS = ["garanti", "garantis", "guaranteed"] as const;
+export const FORBIDDEN_MESSAGING_WORDS = ["guaranteed"] as const;
 
-function foldWording(value: string): string {
-  return normalizeEditorialText(value).replace(/\s+/g, " ");
+/**
+ * Spec 062 R4: French promise phrases built on « garanti » (the owner requirement: « garanti » used as a
+ * promise blocks the send). Gender and number are free ("garanti", "garantie", "garantis", "garanties"; the
+ * other words accept a plural "s"), accents and case are ignored. Ordinary technical wording such as
+ * "risques garantis", "capital garanti", "dommages garantis" or "garanties incluses" is not in the list.
+ */
+export const FORBIDDEN_MESSAGING_PROMISES_FR = [
+  "garanti à vie",
+  "100 % garanti",
+  "garanti sans condition",
+  "remboursement garanti",
+  "résultat garanti",
+  "prix garanti",
+  "tarif garanti",
+  "acceptation garantie",
+  "réponse garantie",
+  "devis garanti",
+  "contrat garanti",
+  "couverture garantie",
+  "offre garantie",
+  "approbation garantie",
+  "taux garanti"
+] as const;
+
+/**
+ * C0 control characters other than tab, line feed and carriage return (a NUL byte is refused by
+ * PostgreSQL text columns and has no place in a message). Removed from the free texts of the messaging
+ * and data-request contracts.
+ */
+// eslint-disable-next-line no-control-regex
+const C0_CONTROL_CHARACTERS = /[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g;
+
+export function stripControlCharacters(value: string): string {
+  return value.replace(C0_CONTROL_CHARACTERS, "");
+}
+
+/**
+ * Normal form every messaging wording check reads, so the usual evasions do not hide a banned phrase:
+ * compatibility folding (NFKC: full-width letters, no-break spaces), invisible format characters
+ * (zero-width space and joiners, soft hyphen, bidi marks, BOM), diacritics and other combining marks,
+ * typographic apostrophes, case, hyphens / dashes / underscores / dots between words (read as a space),
+ * then whitespace.
+ */
+export function normalizeWordingText(value: string): string {
+  return value
+    .normalize("NFKC")
+    .replace(/[\p{Cf}­]/gu, "")
+    .replace(/[‘’ʼ`´]/g, "'")
+    .normalize("NFD")
+    .replace(/\p{M}/gu, "")
+    .toLocaleLowerCase("fr-FR")
+    .replace(/[\p{Pd}\u2212_]+/gu, " ")
+    .replace(/(?<=[\p{L}\p{N}])[.·•]+(?=[\p{L}\p{N}])/gu, " ")
+    .replace(/(\d)\s*%/g, "$1 %")
+    .replace(/\s+/gu, " ")
+    .trim();
+}
+
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+/** Whole-phrase test on normalised text: the words keep their boundaries and accept a plural "s". */
+function containsPhrase(normalizedText: string, normalizedPhrase: string, promiseFr = false): boolean {
+  const words = normalizedPhrase.split(" ").map((word) => {
+    if (promiseFr && /^garanti(?:e|s|es)?$/.test(word)) return "garanti(?:e|s|es)?";
+    return /^[a-z]+$/.test(word) ? `${escapeRegExp(word)}s?` : escapeRegExp(word);
+  });
+  return new RegExp(`(?<![\\p{L}\\p{N}])${words.join(" ")}(?![\\p{L}\\p{N}])`, "u").test(normalizedText);
 }
 
 /**
  * Spec 055 FR-004 + spec 062 R4: the French regulated list plus its English equivalents, case- and
- * accent-insensitive ("contrat validé" is "contrat valide"), plus stand-alone promise words. Returns
- * the canonical wording found (list entry or word), in a stable order.
+ * accent-insensitive ("contrat validé" is "contrat valide"), robust to invisible characters, full-width
+ * letters, no-break spaces and hyphen / dot separators, plus the promise phrases. The English phrases
+ * are matched on word boundaries ("invalid contract" is not "valid contract"). Returns the canonical
+ * wording found (list entry), in a stable order.
  */
 export function findForbiddenWordingAnyLanguage(text: string): string[] {
-  const english = text.toLocaleLowerCase("en-US");
-  const found = new Set<string>([...findForbiddenWording(text), ...FORBIDDEN_ENGLISH_WORDING.filter((phrase) => english.includes(phrase))]);
-  const folded = foldWording(text);
-  const alreadyFound = new Set([...found].map(foldWording));
-  for (const phrase of [...FORBIDDEN_REGULATED_WORDING, ...FORBIDDEN_ENGLISH_WORDING, ...FORBIDDEN_MESSAGING_PHRASES]) {
-    const key = foldWording(phrase);
-    if (!alreadyFound.has(key) && folded.includes(key)) {
-      found.add(phrase);
-      alreadyFound.add(key);
-    }
+  // The legacy guard on the raw text first: whatever it blocked stays blocked, in the same form.
+  const found = new Set<string>(findForbiddenWording(text));
+  const seen = new Set([...found].map(normalizeWordingText));
+  const normalized = normalizeWordingText(text);
+  const add = (wording: string): void => {
+    const key = normalizeWordingText(wording);
+    if (seen.has(key)) return;
+    seen.add(key);
+    found.add(wording);
+  };
+  for (const phrase of FORBIDDEN_REGULATED_WORDING) {
+    if (normalized.includes(normalizeWordingText(phrase))) add(phrase);
+  }
+  for (const phrase of [...FORBIDDEN_ENGLISH_WORDING, ...FORBIDDEN_MESSAGING_PHRASES]) {
+    if (containsPhrase(normalized, normalizeWordingText(phrase))) add(phrase);
   }
   for (const word of FORBIDDEN_MESSAGING_WORDS) {
-    if (containsWholePhrase(folded, word)) found.add(word);
+    if (containsPhrase(normalized, word)) add(word);
+  }
+  for (const promise of FORBIDDEN_MESSAGING_PROMISES_FR) {
+    if (containsPhrase(normalized, normalizeWordingText(promise), true)) add(promise);
   }
   return [...found];
 }

@@ -46,3 +46,24 @@ describe("toSafeErrorResponse", () => {
     expect(toSafeErrorResponse(new ConflictException({ code: "NOT_A_CODE", message: "Product conflict" }), correlationId).code).toBe("PRODUCT_DISABLED");
   });
 });
+
+describe("toSafeErrorResponse details (spec 062)", () => {
+  const failure = (details: unknown) => new UnprocessableEntityException({ code: "FORBIDDEN_WORDING", message: "Refused", details });
+
+  it("relays only the wording list and the read-only reason", () => {
+    expect(toSafeErrorResponse(failure({ wording: ["remboursement garanti", "buy now"] }), correlationId).details).toEqual({ wording: ["remboursement garanti", "buy now"] });
+    expect(toSafeErrorResponse(new ConflictException({ code: "CONVERSATION_READ_ONLY", message: "Read-only", details: { reason: "lead_closed" } }), correlationId).details).toEqual({ reason: "lead_closed" });
+  });
+
+  it("drops every other key and every value of another shape", () => {
+    const response = toSafeErrorResponse(failure({ wording: ["ok"], reason: "lead_closed", internalId: "42", stack: "at secret.ts:1", token: "abc", nested: { wording: ["x"] } }), correlationId);
+    expect(response.details).toEqual({ wording: ["ok"], reason: "lead_closed" });
+    expect(JSON.stringify(response)).not.toMatch(/internalId|secret|token|nested/);
+    // Wrong shapes: not an array, a non-string entry, an overlong entry, too many entries, an object reason.
+    for (const details of [{ wording: "garanti" }, { wording: [1, 2] }, { wording: ["x".repeat(81)] }, { wording: Array.from({ length: 21 }, () => "a") }, { wording: { 0: "a" } }, { reason: { code: 1 } }, { reason: "x".repeat(81) }, { other: ["a"] }, [], "text", null]) {
+      expect(toSafeErrorResponse(failure(details), correlationId), JSON.stringify(details)).not.toHaveProperty("details");
+    }
+    // A valid key survives next to an invalid one.
+    expect(toSafeErrorResponse(failure({ wording: [1], reason: "consent_withdrawn" }), correlationId).details).toEqual({ reason: "consent_withdrawn" });
+  });
+});

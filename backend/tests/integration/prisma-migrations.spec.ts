@@ -271,6 +271,9 @@ describe("prisma migration fresh-base readiness", () => {
     }
     expect(messaging).toContain('CREATE UNIQUE INDEX IF NOT EXISTS "LeadMessage_leadAssignmentId_senderType_clientRequestId_key" ON "LeadMessage"("leadAssignmentId", "senderType", "clientRequestId")');
     expect(messaging).toContain('CREATE UNIQUE INDEX IF NOT EXISTS "DataRequest_reference_key" ON "DataRequest"("reference")');
+    // One open data request per quote request and type: a partial unique index (SQL only, Prisma cannot express it).
+    expect(messaging).toContain('CREATE UNIQUE INDEX IF NOT EXISTS "DataRequest_open_quote_type_key" ON "DataRequest"("quoteRequestId", "type") WHERE "status" IN (\'received\', \'in_review\')');
+    expect(schema).toContain('"DataRequest_open_quote_type_key"');
     expect(messaging).toContain('ALTER TABLE "LeadAssignment" ADD COLUMN IF NOT EXISTS "firstVisibleReplyAt" TIMESTAMP(3)');
     expect(messaging).toContain('ALTER TABLE "QuoteRequestDocument" ADD COLUMN IF NOT EXISTS "documentRequestId" TEXT');
     expect(messaging).toContain('ALTER TABLE "QuoteRequestDocument" ADD COLUMN IF NOT EXISTS "uploadedBy" TEXT');

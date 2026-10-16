@@ -1,23 +1,28 @@
-import { Body, Controller, Get, Header, HttpCode, Param, Post, Query, Req, StreamableFile, UploadedFiles, UseGuards, UseInterceptors } from "@nestjs/common";
+import { Body, CanActivate, Controller, ExecutionContext, Get, Header, HttpCode, Injectable, Param, PayloadTooLargeException, Post, Query, Req, StreamableFile, UploadedFiles, UseGuards, UseInterceptors } from "@nestjs/common";
 import { FilesInterceptor } from "@nestjs/platform-express";
 import { z } from "zod";
 import {
   LEAD_MESSAGE_ATTACHMENTS_MAX,
   LEAD_MESSAGE_ATTACHMENT_MAX_BYTES,
+  VISITOR_MESSAGE_RATE_LIMIT_PER_IP_PER_HOUR,
+  VISITOR_UPLOAD_RATE_LIMIT_PER_IP_PER_HOUR,
   brokerLeadMessageCreateSchema,
   documentRequestCancelSchema,
   documentRequestCreateSchema,
   leadConversationQuerySchema,
   visitorLeadMessageCreateSchema
 } from "../../../../packages/shared/contracts/lead-messaging";
+import { ErrorCodes } from "../../../../packages/shared/contracts/error-codes";
 import { uuidSchema } from "../../../../packages/shared/validation/common.schemas";
 import { AssurMatchRuntime } from "../../runtime/assurmatch-runtime";
 import { AuthRequiredHttpGuard, MfaRequiredHttpGuard } from "../auth/guards/http-auth.guard";
+import type { PublicAbuseScope } from "../common/abuse/public-abuse-guard.service";
 import { actorFromRequest, clientIp, protectedActorFromRequest, type AssurMatchHttpRequest } from "../common/http/request-actor";
 import { parseHttpInput } from "../common/http/zod-validation";
 import type { ActorContext } from "../common/types";
 import type { ProposalFile } from "../lead-proposals/lead-proposals.service";
 import type { UploadedLeadFile } from "../lead-proposals/scanned-upload";
+import { assertBrokerTenantWritable } from "../partners/partner-tenant-status.service";
 import type { LeadMessagingChannel } from "../lead-messaging/lead-messaging.service";
 
 /**
@@ -46,8 +51,79 @@ const body = (): ParamDecoratorFactory => Body() as ParamDecoratorFactory;
 const uploadedFiles = (): ParamDecoratorFactory => UploadedFiles() as ParamDecoratorFactory;
 const noStore = Header("Cache-Control", "no-store") as MethodDecoratorFactory;
 const fileHeaders = [noStore, Header("X-Content-Type-Options", "nosniff") as MethodDecoratorFactory, Header("Referrer-Policy", "no-referrer") as MethodDecoratorFactory];
+/**
+ * Multipart limits of every spec 062 upload route (multer, checked while the body streams): at most three
+ * files of 5 MB, one small JSON `payload` field and a handful of parts, so a crafted body cannot make the
+ * parser buffer an unbounded number of fields or one giant text field. Exceeding one is a 400 (a file over
+ * 5 MB is the 413 of multer).
+ */
+export const LEAD_MESSAGING_MULTIPART_LIMITS = {
+  fileSize: LEAD_MESSAGE_ATTACHMENT_MAX_BYTES,
+  files: LEAD_MESSAGE_ATTACHMENTS_MAX,
+  parts: LEAD_MESSAGE_ATTACHMENTS_MAX + 3,
+  fields: 3,
+  fieldSize: 16 * 1024
+} as const;
+/** Declared body size above which a public multipart request is refused before it is parsed (3 files + slack). */
+export const PUBLIC_MULTIPART_MAX_BYTES = LEAD_MESSAGE_ATTACHMENTS_MAX * LEAD_MESSAGE_ATTACHMENT_MAX_BYTES + 1024 * 1024;
 const attachmentsInterceptor = (): MethodDecoratorFactory =>
-  UseInterceptors(FilesInterceptor("files", LEAD_MESSAGE_ATTACHMENTS_MAX, { limits: { fileSize: LEAD_MESSAGE_ATTACHMENT_MAX_BYTES, files: LEAD_MESSAGE_ATTACHMENTS_MAX } })) as MethodDecoratorFactory;
+  UseInterceptors(FilesInterceptor("files", LEAD_MESSAGE_ATTACHMENTS_MAX, { limits: { ...LEAD_MESSAGING_MULTIPART_LIMITS } })) as MethodDecoratorFactory;
+
+interface GuardedRequest extends AssurMatchHttpRequest {
+  headers: Record<string, string | string[] | undefined>;
+}
+
+function firstHeader(request: GuardedRequest, name: string): string {
+  const value = request.headers[name];
+  return (Array.isArray(value) ? value[0] : value) ?? "";
+}
+
+/**
+ * Guard of a public multipart route, run before multer (a guard runs before the interceptors): a
+ * declared body larger than three files can be is refused, and so is an address that already used its
+ * whole hourly quota of the route (the same counter the service increments: this check only reads it),
+ * before a single byte of an unauthenticated body is parsed. JSON requests pass untouched. The service
+ * keeps its own checks (token, per-IP and per-conversation quotas, sizes, antivirus).
+ */
+function publicMultipartGuard(scope: PublicAbuseScope, limitPerHour: number): new (runtime: AssurMatchRuntime) => CanActivate {
+  class PublicMultipartGuard implements CanActivate {
+    constructor(private readonly runtime: AssurMatchRuntime) {}
+
+    async canActivate(context: ExecutionContext): Promise<boolean> {
+      const request = context.switchToHttp().getRequest<GuardedRequest>();
+      if (!/^multipart\/form-data/i.test(firstHeader(request, "content-type"))) return true;
+      const declared = Number(firstHeader(request, "content-length"));
+      if (Number.isFinite(declared) && declared > PUBLIC_MULTIPART_MAX_BYTES) {
+        throw new PayloadTooLargeException({ code: ErrorCodes.VALIDATION_FAILED, message: "Invalid input: request body too large" });
+      }
+      if (await this.runtime.quoteRequests.abuseGuard.isIpOverLimit(scope, clientIp(request), limitPerHour)) {
+        throw new Error("Rate limit exceeded for public submissions");
+      }
+      return true;
+    }
+  }
+  Injectable()(PublicMultipartGuard);
+  Reflect.defineMetadata("design:paramtypes", [AssurMatchRuntime], PublicMultipartGuard);
+  return PublicMultipartGuard;
+}
+
+/** The two public multipart routes: a message (with attachments) and the files of a document request. */
+const PublicMessageMultipartGuard = publicMultipartGuard("lead_message", VISITOR_MESSAGE_RATE_LIMIT_PER_IP_PER_HOUR);
+const PublicUploadMultipartGuard = publicMultipartGuard("document_request_upload", VISITOR_UPLOAD_RATE_LIMIT_PER_IP_PER_HOUR);
+
+/**
+ * Runs before multer on the broker message route, after the authentication guards of the controller:
+ * a user of a suspended partner is refused (403 PARTNER_SUSPENDED) before the body is parsed, whatever
+ * its size (same rule as `brokerWriteActor`, which the handler still applies first).
+ */
+export class BrokerWriteSuspensionGuard implements CanActivate {
+  canActivate(context: ExecutionContext): boolean {
+    assertBrokerTenantWritable(protectedActorFromRequest(context.switchToHttp().getRequest<GuardedRequest>()));
+    return true;
+  }
+}
+
+Injectable()(BrokerWriteSuspensionGuard);
 
 function decorate(target: ControllerTarget, methodName: string, methods: MethodDecoratorFactory[], params: Array<[number, ParamDecoratorFactory]> = []): void {
   const descriptor = Object.getOwnPropertyDescriptor(target.prototype, methodName);
@@ -160,7 +236,7 @@ export class BrokerMessagingRoutes {
 export function registerBrokerMessagingRoutes(controllers: ControllerTarget[]): void {
   for (const target of controllers) {
     decorate(target, "conversation", [Get("leads/:leadId/conversation") as MethodDecoratorFactory, noStore], [[0, param("leadId")], [1, query()], [2, req()]]);
-    decorate(target, "sendMessage", [Post("leads/:leadId/conversation/messages") as MethodDecoratorFactory, attachmentsInterceptor()], [[0, param("leadId")], [1, uploadedFiles()], [2, body()], [3, req()]]);
+    decorate(target, "sendMessage", [Post("leads/:leadId/conversation/messages") as MethodDecoratorFactory, UseGuards(BrokerWriteSuspensionGuard) as MethodDecoratorFactory, attachmentsInterceptor()], [[0, param("leadId")], [1, uploadedFiles()], [2, body()], [3, req()]]);
     decorate(target, "markRead", [Post("leads/:leadId/conversation/read") as MethodDecoratorFactory, HttpCode(200) as MethodDecoratorFactory], [[0, param("leadId")], [1, req()]]);
     decorate(target, "messageAttachment", [Get("leads/:leadId/conversation/messages/:messageId/attachments/:attachmentId") as MethodDecoratorFactory, ...fileHeaders], [[0, param("leadId")], [1, param("messageId")], [2, param("attachmentId")], [3, req()]]);
     decorate(target, "documentRequests", [Get("leads/:leadId/document-requests") as MethodDecoratorFactory, noStore], [[0, param("leadId")], [1, req()]]);
@@ -226,14 +302,14 @@ export class AdminLeadMessagingHttpController {
 publicController("quote-requests", PublicLeadMessagingHttpController);
 decorate(PublicLeadMessagingHttpController, "conversations", [Get(":publicReference/conversations") as MethodDecoratorFactory, noStore], [[0, param("publicReference")], [1, query("token")], [2, req()]]);
 decorate(PublicLeadMessagingHttpController, "conversation", [Get(":publicReference/conversations/:conversationId") as MethodDecoratorFactory, noStore], [[0, param("publicReference")], [1, param("conversationId")], [2, query("token")], [3, query()], [4, req()]]);
-decorate(PublicLeadMessagingHttpController, "sendMessage", [Post(":publicReference/conversations/:conversationId/messages") as MethodDecoratorFactory, noStore, attachmentsInterceptor()], [[0, param("publicReference")], [1, param("conversationId")], [2, query("token")], [3, uploadedFiles()], [4, body()], [5, req()]]);
+decorate(PublicLeadMessagingHttpController, "sendMessage", [Post(":publicReference/conversations/:conversationId/messages") as MethodDecoratorFactory, noStore, UseGuards(PublicMessageMultipartGuard) as MethodDecoratorFactory, attachmentsInterceptor()], [[0, param("publicReference")], [1, param("conversationId")], [2, query("token")], [3, uploadedFiles()], [4, body()], [5, req()]]);
 decorate(PublicLeadMessagingHttpController, "markRead", [Post(":publicReference/conversations/:conversationId/read") as MethodDecoratorFactory, HttpCode(200) as MethodDecoratorFactory, noStore], [[0, param("publicReference")], [1, param("conversationId")], [2, query("token")], [3, req()]]);
 decorate(PublicLeadMessagingHttpController, "attachment", [Get(":publicReference/conversations/:conversationId/messages/:messageId/attachments/:attachmentId") as MethodDecoratorFactory, ...fileHeaders], [[0, param("publicReference")], [1, param("conversationId")], [2, param("messageId")], [3, param("attachmentId")], [4, query("token")], [5, req()]]);
 decorate(PublicLeadMessagingHttpController, "documentRequests", [Get(":publicReference/document-requests") as MethodDecoratorFactory, noStore], [[0, param("publicReference")], [1, query("token")], [2, req()]]);
 decorate(
   PublicLeadMessagingHttpController,
   "uploadDocuments",
-  [Post(":publicReference/document-requests/:requestId/documents") as MethodDecoratorFactory, noStore, UseInterceptors(FilesInterceptor("files", LEAD_MESSAGE_ATTACHMENTS_MAX, { limits: { fileSize: LEAD_MESSAGE_ATTACHMENT_MAX_BYTES, files: LEAD_MESSAGE_ATTACHMENTS_MAX } })) as MethodDecoratorFactory],
+  [Post(":publicReference/document-requests/:requestId/documents") as MethodDecoratorFactory, noStore, UseGuards(PublicUploadMultipartGuard) as MethodDecoratorFactory, attachmentsInterceptor()],
   [[0, param("publicReference")], [1, param("requestId")], [2, query("token")], [3, uploadedFiles()], [4, req()]]
 );
 

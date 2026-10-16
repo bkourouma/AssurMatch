@@ -91,7 +91,7 @@ describe("spec 062 notification queue", () => {
   const assignmentId = crypto.randomUUID();
   const partnerTenantId = crypto.randomUUID();
 
-  it("coalesces message notifications per 15-minute bucket and keeps one row per document request", async () => {
+  it("coalesces message and document request notifications per 15-minute bucket", async () => {
     const rows: NotificationRecord[] = [];
     const inApp: Array<{ scopeId: string; template: string; title: string; body: string }> = [];
     const service = new QuoteNotificationService(rows, new InMemoryQueue(), new AuditLogWriter(), {
@@ -110,9 +110,16 @@ describe("spec 062 notification queue", () => {
     expect(await service.queueVisitorBrokerMessage(quote, { assignmentId, partnerTenantId, bucket }, superAdminActor)).toBeDefined();
     expect(await service.queueVisitorBrokerMessage(quote, { assignmentId, partnerTenantId, bucket }, superAdminActor)).toBeUndefined();
     expect(await service.queueVisitorBrokerMessage(quote, { assignmentId, partnerTenantId, bucket: messageNotificationBucket(later) }, superAdminActor)).toBeDefined();
-    expect(await service.queueVisitorDocumentsRequested(quote, { assignmentId, partnerTenantId, requestId: "req-1" }, superAdminActor)).toBeDefined();
-    expect(await service.queueVisitorDocumentsRequested(quote, { assignmentId, partnerTenantId, requestId: "req-1" }, superAdminActor)).toBeUndefined();
-    expect(await service.queueVisitorDocumentsRequested(quote, { assignmentId, partnerTenantId, requestId: "req-2" }, superAdminActor)).toBeDefined();
+    // Document requests coalesce like the messages: a second request in the same bucket (another request id) sends nothing.
+    expect(await service.queueVisitorDocumentsRequested(quote, { assignmentId, partnerTenantId, requestId: "req-1", bucket }, superAdminActor)).toBeDefined();
+    expect(await service.queueVisitorDocumentsRequested(quote, { assignmentId, partnerTenantId, requestId: "req-1", bucket }, superAdminActor)).toBeUndefined();
+    expect(await service.queueVisitorDocumentsRequested(quote, { assignmentId, partnerTenantId, requestId: "req-2", bucket }, superAdminActor)).toBeUndefined();
+    expect(await service.queueVisitorDocumentsRequested(quote, { assignmentId, partnerTenantId, requestId: "req-3", bucket: messageNotificationBucket(later) }, superAdminActor)).toBeDefined();
+    // Two brokers on the same (reassigned) assignment inside one bucket both notify the visitor, and both brokers are notified.
+    const nextPartner = crypto.randomUUID();
+    expect(await service.queueVisitorBrokerMessage(quote, { assignmentId, partnerTenantId: nextPartner, bucket }, superAdminActor)).toBeDefined();
+    expect(await service.queueVisitorDocumentsRequested(quote, { assignmentId, partnerTenantId: nextPartner, requestId: "req-4", bucket }, superAdminActor)).toBeDefined();
+    expect(await service.queueBrokerVisitorMessage(quote, { assignmentId, partnerTenantId: nextPartner, bucket }, superAdminActor)).toBeDefined();
 
     // Broker side: in-app entry + e-mail row per bucket, both targeting the assignment.
     expect(await service.queueBrokerVisitorMessage(quote, { assignmentId, partnerTenantId, bucket }, superAdminActor)).toBeDefined();
@@ -125,12 +132,15 @@ describe("spec 062 notification queue", () => {
       "visitor_broker_message",
       "visitor_documents_requested",
       "visitor_documents_requested",
+      "visitor_broker_message",
+      "visitor_documents_requested",
+      "broker_visitor_message",
       "broker_visitor_message",
       "broker_document_received"
     ]);
     expect(rows.filter((row) => row.type.startsWith("visitor_")).every((row) => row.recipientScope === `visitor:${quote.publicReference}`)).toBe(true);
-    expect(rows.filter((row) => row.type.startsWith("broker_")).every((row) => row.recipientScope === `partner:${partnerTenantId}`)).toBe(true);
-    expect(inApp.map((entry) => entry.template)).toEqual(["broker_visitor_message", "broker_document_received"]);
+    expect(rows.filter((row) => row.type.startsWith("broker_")).map((row) => row.recipientScope)).toEqual([`partner:${nextPartner}`, `partner:${partnerTenantId}`, `partner:${partnerTenantId}`]);
+    expect(inApp.map((entry) => entry.template)).toEqual(["broker_visitor_message", "broker_visitor_message", "broker_document_received"]);
     // Pointer only: nothing a visitor or a broker wrote ever reaches a row or an inbox entry.
     const serialized = JSON.stringify([rows, inApp]);
     expect(serialized).not.toContain(SECRET_BODY);

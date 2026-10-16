@@ -351,7 +351,7 @@ describe("broker <-> visitor messaging runtime HTTP (spec 062)", () => {
     const { active, assignment, actors } = await start();
     await acceptStarter(active, assignment.id, actors.starter);
     const path = `/broker/starter/leads/${assignment.id}/conversation/messages`;
-    for (const [body, expression] of [["Votre contrat validé vous attend !", "contrat valide"], ["Un remboursement garanti.", "garanti"], ["Souscrivez maintenant, c'est un contrat validé.", "souscrivez maintenant"], ["It is a guaranteed price, buy now", "guaranteed"]] as const) {
+    for (const [body, expression] of [["Votre contrat validé vous attend !", "contrat valide"], ["Un remboursement garanti.", "remboursement garanti"], ["Souscrivez maintenant, c'est un contrat validé.", "souscrivez maintenant"], ["It is a guaranteed price, buy now", "guaranteed"]] as const) {
       const response = await post(active, path, actors.starter, { body });
       expect(response.status, body).toBe(422);
       const payload = await response.json() as { code: string; message: string; details: { wording: string[] } };
@@ -619,5 +619,318 @@ describe("broker <-> visitor messaging runtime HTTP (spec 062)", () => {
     const again = new RecordingMailer();
     await delivery(active.runtime, again).processDueNotifications({ limit: 100 });
     expect(again.sent.filter((mail) => mail.purpose === "quote_visitor_broker_message")).toHaveLength(0);
+  });
+
+  // ---------------------------------------------------------------------------------------------
+  // Review fixes: scope of the Starter channel, multipart bounds, flood limits, coalescing, SLA, read-only states
+  // ---------------------------------------------------------------------------------------------
+
+  it("applies the assigned-only agent scope on the Starter routes too (E-07) and refuses read receipts to roles that cannot write", async () => {
+    const { active, assignment, actors, seed } = await start();
+    await acceptStarter(active, assignment.id, actors.starter);
+    const agentB: ActorContext = { ...actors.agentA, actorId: "agent-b" };
+    expect((await post(active, `/broker/crm/leads/${assignment.id}/assign`, actors.manager, { advisorId: actors.agentA.actorId, advisorPartnerTenantId: seed.partner.id })).status).toBe(201);
+    const base = `/broker/starter/leads/${assignment.id}`;
+
+    // The assigned agent reaches every messaging route of the Starter channel.
+    const sent = await postForm(active, `${base}/conversation/messages`, actors.agentA, filesForm({ body: "Bonjour, je suis votre conseiller." }, [pdf("devis.pdf")]));
+    expect(sent.status).toBe(201);
+    const message = leadMessageSendResultSchema.parse(await sent.json()).message;
+    const attachmentPath = `${base}/conversation/messages/${message.id}/attachments/${message.attachments[0]!.id}`;
+    expect((await get(active, `${base}/conversation`, actors.agentA)).status).toBe(200);
+    expect((await get(active, attachmentPath, actors.agentA)).status).toBe(200);
+    expect((await post(active, `${base}/conversation/read`, actors.agentA)).status).toBe(200);
+    const created = brokerDocumentRequestSchema.parse(await (await post(active, `${base}/document-requests`, actors.agentA, { label: "Carte grise" })).json());
+    expect((await get(active, `${base}/document-requests`, actors.agentA)).status).toBe(200);
+
+    // Another agent of the same tenant, not assigned to the lead, reaches none of them.
+    for (const [label, response] of [
+      ["conversation", await get(active, `${base}/conversation`, agentB)],
+      ["send", await post(active, `${base}/conversation/messages`, agentB, { body: "Je ne suis pas assigne" })],
+      ["read", await post(active, `${base}/conversation/read`, agentB)],
+      ["attachment", await get(active, attachmentPath, agentB)],
+      ["document requests", await get(active, `${base}/document-requests`, agentB)],
+      ["create request", await post(active, `${base}/document-requests`, agentB, { label: "Permis" })],
+      ["cancel request", await post(active, `${base}/document-requests/${created.id}/cancel`, agentB)]
+    ] as const) {
+      expect(response.status, label).toBe(403);
+    }
+    // The owner (whole CRM scope) still reaches the lead; the refusals wrote nothing.
+    const view = leadConversationViewSchema.parse(await readJson(await get(active, `${base}/conversation`, actors.starter)));
+    expect(view.messages.map((entry) => entry.body)).toEqual(["Bonjour, je suis votre conseiller."]);
+    expect(brokerDocumentRequestListSchema.parse(await readJson(await get(active, `${base}/document-requests`, actors.starter))).items.map((entry) => entry.id)).toEqual([created.id]);
+    expect(JSON.stringify(active.runtime.audit.writer.search({ result: "refused" }))).toContain("assigned_scope_required");
+
+    // A read receipt is a write: the read-only role cannot leave one, on either channel (it still reads).
+    expect((await post(active, `${base}/conversation/read`, actors.readOnly)).status).toBe(403);
+    expect((await post(active, `/broker/crm/leads/${assignment.id}/conversation/read`, actors.readOnly)).status).toBe(403);
+    expect((await get(active, `/broker/crm/leads/${assignment.id}/conversation`, actors.readOnly)).status).toBe(200);
+  });
+
+  it("refuses a suspended partner before the multipart body is parsed and bounds the parts and the fields of every multipart route", async () => {
+    const { active, assignment, actors, seed } = await start();
+    await acceptStarter(active, assignment.id, actors.starter);
+    const path = `/broker/starter/leads/${assignment.id}/conversation/messages`;
+    // One text field larger than the limit (16 KB), then more fields than the limit allows: 400 from multer.
+    const longField = await postForm(active, path, actors.starter, filesForm({ body: "ok", pad: "x".repeat(20_000) }));
+    expect(longField.status).toBe(400);
+    const manyFields = filesForm({ body: "ok" }, [pdf()]);
+    for (let index = 0; index < 5; index += 1) manyFields.append(`extra${index}`, "1");
+    expect((await postForm(active, path, actors.starter, manyFields)).status).toBe(400);
+    // A request exactly at the limits (3 files, the payload and 2 more fields) is unaffected.
+    const atTheLimit = filesForm({ body: "A la limite" }, [pdf("1.pdf"), pdf("2.pdf"), pdf("3.pdf")]);
+    atTheLimit.append("extra", "1");
+    atTheLimit.append("extra2", "1");
+    expect((await postForm(active, path, actors.starter, atTheLimit)).status).toBe(201);
+    expect((await postForm(active, path, actors.starter, filesForm({ body: "Bonjour" }, [pdf("1.pdf"), pdf("2.pdf"), pdf("3.pdf")]))).status).toBe(201);
+
+    // The suspended partner is refused before multer parses a 6 MB file (which alone would answer 413).
+    await active.runtime.partners.service.changeStatus(seed.partner.id, "suspended", "suspension pour controle", seed.admin);
+    const big = filesForm({ body: "Bonjour" }, [{ bytes: Buffer.concat([PDF, Buffer.alloc(6 * 1024 * 1024)]), name: "gros.pdf", type: "application/pdf" }]);
+    const refused = await postForm(active, path, actors.starter, big);
+    expect(refused.status).toBe(403);
+    expect(await refused.json()).toMatchObject({ code: "PARTNER_SUSPENDED" });
+    expect((await postForm(active, path, actors.starter, filesForm({ body: "x", pad: "x".repeat(20_000) }))).status).toBe(403);
+  });
+
+  it("refuses a public multipart body declared too large, and an address that used its quota, before parsing it", async () => {
+    const { active, confirmation, assignment, actors } = await start();
+    await acceptStarter(active, assignment.id, actors.starter);
+    await post(active, `/broker/starter/leads/${assignment.id}/conversation/messages`, actors.starter, { body: "Bonjour" });
+    const request = brokerDocumentRequestSchema.parse(await (await post(active, `/broker/starter/leads/${assignment.id}/document-requests`, actors.starter, { label: "Carte grise" })).json());
+    const summary = await conversationOf(active, confirmation.publicReference, confirmation.verificationToken);
+    const messagePath = visitorPath(confirmation.publicReference, confirmation.verificationToken, `/conversations/${summary.conversationId}/messages`);
+    const uploadPath = visitorPath(confirmation.publicReference, confirmation.verificationToken, `/document-requests/${request.id}/documents`);
+    const huge = () => filesForm({ body: "Trop" }, [{ bytes: Buffer.alloc(17 * 1024 * 1024, 1), name: "enorme.pdf", type: "application/pdf" }]);
+
+    // Content-Length above 16 MB: 413 from the guard (its message), not from the 5 MB file limit of multer.
+    for (const path of [messagePath, uploadPath]) {
+      const refused = await active.request(path, { method: "POST", headers: { "x-forwarded-for": "198.51.100.151" }, body: huge() });
+      expect(refused.status, path).toBe(413);
+      expect(await refused.json()).toMatchObject({ message: expect.stringContaining("body too large") });
+    }
+    const multer = await active.request(messagePath, { method: "POST", headers: { "x-forwarded-for": "198.51.100.151" }, body: filesForm({ body: "Un peu gros" }, [{ bytes: Buffer.concat([PDF, Buffer.alloc(6 * 1024 * 1024)]), name: "gros.pdf", type: "application/pdf" }]) });
+    expect(multer.status).toBe(413);
+    expect(await multer.json()).not.toMatchObject({ message: expect.stringContaining("body too large") });
+
+    // Upload quota (20 an hour and address): the 21st upload is a 429, and the next ones are refused
+    // before their 6 MB file is parsed (parsed, it would be a 413).
+    const flood = "198.51.100.152";
+    const wrongToken = (suffix: string, form: FormData) => active.request(visitorPath(confirmation.publicReference, "wrong-token", suffix), { method: "POST", headers: { "x-forwarded-for": flood }, body: form });
+    for (let index = 0; index < 20; index += 1) expect((await wrongToken(`/document-requests/${request.id}/documents`, uploadForm([pdf()]))).status).toBe(404);
+    expect((await wrongToken(`/document-requests/${request.id}/documents`, uploadForm([pdf()]))).status).toBe(429);
+    const bigForm = uploadForm([{ bytes: Buffer.concat([PDF, Buffer.alloc(6 * 1024 * 1024)]), name: "gros.pdf", type: "application/pdf" }]);
+    expect((await wrongToken(`/document-requests/${request.id}/documents`, bigForm)).status).toBe(429);
+
+    // Message quota (30 an hour and address), same rule.
+    const spam = "198.51.100.153";
+    const postWrong = (form: FormData) => active.request(visitorPath(confirmation.publicReference, "wrong-token", `/conversations/${summary.conversationId}/messages`), { method: "POST", headers: { "x-forwarded-for": spam }, body: form });
+    for (let index = 0; index < 30; index += 1) expect((await postWrong(filesForm({ body: `Message ${index}` }))).status).toBe(404);
+    expect((await postWrong(filesForm({ body: "Trop" }))).status).toBe(429);
+    expect((await postWrong(filesForm({ body: "Gros" }, [{ bytes: Buffer.concat([PDF, Buffer.alloc(6 * 1024 * 1024)]), name: "gros.pdf", type: "application/pdf" }]))).status).toBe(429);
+  });
+
+  it("limits the downloads of a visitor to 60 an hour and address", async () => {
+    const { active, confirmation, assignment, actors } = await start();
+    await acceptStarter(active, assignment.id, actors.starter);
+    const sent = await postForm(active, `/broker/starter/leads/${assignment.id}/conversation/messages`, actors.starter, filesForm({ body: "Voici le devis." }, [pdf("devis.pdf")]));
+    const message = leadMessageSendResultSchema.parse(await sent.json()).message;
+    const summary = await conversationOf(active, confirmation.publicReference, confirmation.verificationToken);
+    const download = (ip: string) => visitorGet(active, confirmation.publicReference, confirmation.verificationToken, `/conversations/${summary.conversationId}/messages/${message.id}/attachments/${message.attachments[0]!.id}`, ip);
+    const statuses: number[] = [];
+    for (let index = 0; index < 61; index += 1) statuses.push((await download("198.51.100.170")).status);
+    expect(statuses.slice(0, 60).every((status) => status === 200)).toBe(true);
+    expect(statuses[60]).toBe(429);
+    // Another address is not affected.
+    expect((await download("198.51.100.171")).status).toBe(200);
+  });
+
+  it("sends one SMS / WhatsApp trigger per coalesced broker notification, not one per visitor message", async () => {
+    const { active, confirmation, assignment, actors } = await start();
+    await acceptStarter(active, assignment.id, actors.starter);
+    const summary = await conversationOf(active, confirmation.publicReference, confirmation.verificationToken);
+    const path = `/conversations/${summary.conversationId}/messages`;
+    const channels = vi.spyOn(active.runtime.brokerAlerts, "optionalChannels");
+    const bucketMs = 15 * 60 * 1000;
+    const bucketStart = Math.ceil(Date.now() / bucketMs) * bucketMs + 60_000;
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(bucketStart);
+    for (let index = 0; index < 3; index += 1) {
+      expect((await visitorPost(active, confirmation.publicReference, confirmation.verificationToken, path, { body: `Message du visiteur ${index}` }, `198.51.100.${180 + index}`)).status).toBe(201);
+    }
+    expect(channels).toHaveBeenCalledTimes(1);
+    expect(channels.mock.calls[0]?.[0]).toMatchObject({ partnerTenantId: assignment.partnerTenantId, type: "broker_visitor_message" });
+    vi.setSystemTime(bucketStart + bucketMs);
+    expect((await visitorPost(active, confirmation.publicReference, confirmation.verificationToken, path, { body: "Message de la tranche suivante" }, "198.51.100.190")).status).toBe(201);
+    expect(channels).toHaveBeenCalledTimes(2);
+    expect((await active.runtime.notifications.service.list()).filter((row) => row.type === "broker_visitor_message")).toHaveLength(2);
+  });
+
+  it("coalesces the document request e-mails of a burst into one per 15-minute bucket", async () => {
+    const { active, assignment, actors } = await start();
+    await acceptStarter(active, assignment.id, actors.starter);
+    const base = `/broker/starter/leads/${assignment.id}/document-requests`;
+    const bucketMs = 15 * 60 * 1000;
+    const bucketStart = Math.ceil(Date.now() / bucketMs) * bucketMs + 60_000;
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(bucketStart);
+    for (let index = 0; index < 4; index += 1) expect((await post(active, base, actors.starter, { label: `Piece ${index}` })).status).toBe(201);
+    const pointers = async () => (await active.runtime.notifications.service.list()).filter((row) => row.type === "visitor_documents_requested");
+    expect(await pointers()).toHaveLength(1);
+    vi.setSystemTime(bucketStart + bucketMs);
+    expect((await post(active, base, actors.starter, { label: "Piece de la tranche suivante" })).status).toBe(201);
+    expect(await pointers()).toHaveLength(2);
+    // The four requests exist, and each is listed: only the e-mail is coalesced.
+    expect(brokerDocumentRequestListSchema.parse(await readJson(await get(active, base, actors.starter))).items).toHaveLength(5);
+  });
+
+  it("caps the creation of document requests at 20 in 24 hours per lead (cancelled ones count)", async () => {
+    const { active, assignment, actors } = await start();
+    await acceptStarter(active, assignment.id, actors.starter);
+    const base = `/broker/starter/leads/${assignment.id}/document-requests`;
+    for (let index = 0; index < 20; index += 1) {
+      const created = brokerDocumentRequestSchema.parse(await (await post(active, base, actors.starter, { label: `Piece ${index}` })).json());
+      expect((await post(active, `${base}/${created.id}/cancel`, actors.starter)).status).toBe(200);
+    }
+    const refused = await post(active, base, actors.starter, { label: "Une de trop" });
+    expect(refused.status).toBe(409);
+    expect(await refused.json()).toMatchObject({ code: "DOCUMENT_REQUEST_LIMIT_REACHED" });
+    expect(brokerDocumentRequestListSchema.parse(await readJson(await get(active, base, actors.starter)))).toMatchObject({ openCount: 0, canCreate: false, blockers: ["limit_reached"] });
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(Date.now() + 25 * 3_600_000);
+    expect((await post(active, base, actors.starter, { label: "Le lendemain" })).status).toBe(201);
+  });
+
+  it("lets the visitor reply and upload a requested document while the broker's partner is suspended", async () => {
+    const { active, confirmation, assignment, actors, seed } = await start();
+    await acceptStarter(active, assignment.id, actors.starter);
+    await post(active, `/broker/starter/leads/${assignment.id}/conversation/messages`, actors.starter, { body: "Bonjour" });
+    const request = brokerDocumentRequestSchema.parse(await (await post(active, `/broker/starter/leads/${assignment.id}/document-requests`, actors.starter, { label: "Carte grise" })).json());
+    const summary = await conversationOf(active, confirmation.publicReference, confirmation.verificationToken);
+    await active.runtime.partners.service.changeStatus(seed.partner.id, "suspended", "suspension pour controle", seed.admin);
+
+    expect((await post(active, `/broker/starter/leads/${assignment.id}/conversation/messages`, actors.starter, { body: "Encore" })).status).toBe(403);
+    const reply = await visitorPost(active, confirmation.publicReference, confirmation.verificationToken, `/conversations/${summary.conversationId}/messages`, { body: "Merci, voici ma reponse." });
+    expect(reply.status).toBe(201);
+    const upload = await active.request(visitorPath(confirmation.publicReference, confirmation.verificationToken, `/document-requests/${request.id}/documents`), { method: "POST", headers: { "x-forwarded-for": "198.51.100.72" }, body: uploadForm([pdf("carte-grise.pdf")]) });
+    expect(upload.status).toBe(201);
+    expect(visitorDocumentUploadResultSchema.parse(await upload.json())).toMatchObject({ status: "fulfilled", uploaded: 1 });
+    // The visitor's view stays open, the broker reads the reply (read-only for the suspended partner).
+    expect(await conversationOf(active, confirmation.publicReference, confirmation.verificationToken)).toMatchObject({ state: "open", canSend: true });
+    const brokerView = leadConversationViewSchema.parse(await readJson(await get(active, `/broker/starter/leads/${assignment.id}/conversation`, actors.starter)));
+    expect(brokerView).toMatchObject({ readOnlyReason: "partner_suspended", canSend: false });
+    expect(brokerView.messages.map((message) => message.body)).toEqual(["Bonjour", "Merci, voici ma reponse."]);
+  });
+
+  it("keeps the attachment downloads working in every read-only state: flag off, lead closed, consent withdrawn, reassigned (visitor)", async () => {
+    const { active, confirmation, assignment, actors, seed } = await start();
+    await acceptStarter(active, assignment.id, actors.starter);
+    const base = `/broker/starter/leads/${assignment.id}/conversation`;
+    const sent = await postForm(active, `${base}/messages`, actors.starter, filesForm({ body: "Voici notre devis." }, [pdf("devis.pdf")]));
+    const message = leadMessageSendResultSchema.parse(await sent.json()).message;
+    const attachmentId = message.attachments[0]!.id;
+    const summary = await conversationOf(active, confirmation.publicReference, confirmation.verificationToken);
+    const brokerDownload = () => get(active, `${base}/messages/${message.id}/attachments/${attachmentId}`, actors.starter);
+    let address = 100;
+    const visitorDownload = () => visitorGet(active, confirmation.publicReference, confirmation.verificationToken, `/conversations/${summary.conversationId}/messages/${message.id}/attachments/${attachmentId}`, `198.51.100.${address++}`);
+    const bothDownload = async (state: string) => {
+      const [fromBroker, fromVisitor] = [await brokerDownload(), await visitorDownload()];
+      expect([state, fromBroker.status], state).toEqual([state, 200]);
+      expect([state, fromVisitor.status], state).toEqual([state, 200]);
+      expect(Buffer.from(await fromVisitor.arrayBuffer()).subarray(0, 4).toString(), state).toBe("%PDF");
+    };
+    await bothDownload("open");
+
+    await active.runtime.featureFlags.service.setFlag({ key: "broker_visitor_messaging_enabled", scopeType: "global", value: false, reason: "coupure test" }, seed.admin);
+    await bothDownload("flag off");
+    await active.runtime.featureFlags.service.setFlag({ key: "broker_visitor_messaging_enabled", scopeType: "global", value: true, reason: "reprise test" }, seed.admin);
+
+    expect((await post(active, `/broker/starter/leads/${assignment.id}/close`, actors.starter, { outcome: "gagne", comment: "Contrat signe chez l'assureur" })).status).toBe(200);
+    await bothDownload("lead closed");
+
+    expect((await active.request(`/quote-requests/${confirmation.publicReference}/consent-withdrawal?token=${encodeURIComponent(confirmation.verificationToken)}`, { method: "POST", headers: { "x-forwarded-for": "198.51.100.95" } })).status).toBe(200);
+    await bothDownload("consent withdrawn");
+
+    await active.runtime.leads.assignments.reassign(assignment.id, { partnerTenantId: "00000000-0000-4000-8000-0000000062bb", routingDecisionId: "00000000-0000-4000-8000-0000000062cc", reason: "reaffectation test", previousPartnerTenantId: seed.partner.id }, seed.admin);
+    const reassigned = await visitorDownload();
+    expect(reassigned.status).toBe(200);
+    expect(Buffer.from(await reassigned.arrayBuffer()).subarray(0, 4).toString()).toBe("%PDF");
+    // The previous broker has lost the lead: it no longer downloads anything.
+    expect((await brokerDownload()).status).toBe(403);
+  });
+
+  it("feeds the SLA from the first visible reply end to end and shows the same figures on the broker dashboard, the enterprise SLA and the admin overview", async () => {
+    const { active, seed, actors, assignment: leadA, confirmation } = await start();
+    const second = await submit(active, seed, "sla-b@example.com");
+    const third = await submit(active, seed, "sla-c@example.com");
+    const leadB = (await active.runtime.leads.assignments.list()).find((candidate) => candidate.publicReference === second.publicReference)!;
+    const leadC = (await active.runtime.leads.assignments.list()).find((candidate) => candidate.publicReference === third.publicReference)!;
+    for (const lead of [leadA, leadB, leadC]) await acceptStarter(active, lead.id, actors.starter);
+    const HOURS = 3_600_000;
+    const at = (lead: { assignedAt: Date }, hours: number) => new Date(lead.assignedAt.getTime() + hours * HOURS);
+    const message = (lead: { id: string }, body: string) => post(active, `/broker/starter/leads/${lead.id}/conversation/messages`, actors.starter, { body });
+    const proposal = (lead: { id: string }) => postForm(active, `/broker/starter/leads/${lead.id}/proposals`, actors.starter, (() => {
+      const form = new FormData();
+      form.append("payload", JSON.stringify({ message: "Bonjour, voici une proposition indicative pour votre vehicule.", priceMin: 85000, priceMax: 110000, currency: "XOF", guarantees: ["Responsabilite civile"], validUntil: new Date(Date.now() + 15 * DAY).toISOString() }));
+      return form;
+    })());
+    vi.useFakeTimers({ toFake: ["Date"] });
+
+    // A: a message at +2 h, then a proposal at +5 h: the first visible reply stays the message.
+    vi.setSystemTime(at(leadA, 2));
+    expect((await message(leadA, "Bonjour, un premier message")).status).toBe(201);
+    vi.setSystemTime(at(leadA, 5));
+    expect((await proposal(leadA)).status).toBe(201);
+    // B: a proposal at +1 h, then a message at +3 h: the first visible reply is the proposal.
+    vi.setSystemTime(at(leadB, 1));
+    expect((await proposal(leadB)).status).toBe(201);
+    vi.setSystemTime(at(leadB, 3));
+    expect((await message(leadB, "Bonjour, un message apres la proposition")).status).toBe(201);
+    // C: only the visitor writes: no visible reply, so it is not measured.
+    vi.setSystemTime(at(leadC, 1));
+    const summaryC = await conversationOf(active, third.publicReference, third.verificationToken);
+    expect((await visitorPost(active, third.publicReference, third.verificationToken, `/conversations/${summaryC.conversationId}/messages`, { body: "Bonjour, ou en est ma demande ?" })).status).toBe(201);
+
+    const stored = async (lead: { id: string }) => active.runtime.leads.assignments.require(lead.id);
+    expect((await stored(leadA)).firstVisibleReplyAt?.toISOString()).toBe(at(leadA, 2).toISOString());
+    expect((await stored(leadB)).firstVisibleReplyAt?.toISOString()).toBe(at(leadB, 1).toISOString());
+    expect((await stored(leadC)).firstVisibleReplyAt ?? null).toBeNull();
+
+    // The three SLA readers agree: two leads measured, (120 + 60) / 2 = 90 minutes on average.
+    vi.setSystemTime(at(leadC, 6));
+    await active.runtime.featureFlags.service.setFlag({ key: "broker_dashboard_enabled", scopeType: "global", value: true, reason: "tableau de bord pour le test SLA" }, seed.admin);
+    const dashboard = (await readJson<{ starter: { averageFirstVisibleReplyMinutes: number | null; firstVisibleReplyMeasured: number } }>(await get(active, "/broker/dashboard", actors.starter))).starter;
+    const enterprise = await readJson<{ averageFirstVisibleReplyMinutes: number | null; firstVisibleReplyMeasured: number }>(await get(active, "/broker/enterprise/sla", actors.pro));
+    const overview = await readJson<Array<{ partnerTenantId: string; averageFirstVisibleReplyMinutes: number | null; firstVisibleReplyMeasured: number }>>(await get(active, "/admin/partners/sla", { actorId: "admin-sla", roles: ["super_admin"], mfaVerified: true }));
+    const admin = overview.find((row) => row.partnerTenantId === seed.partner.id)!;
+    for (const figures of [dashboard, enterprise, admin]) {
+      expect(figures.firstVisibleReplyMeasured).toBe(2);
+      expect(figures.averageFirstVisibleReplyMinutes).toBe(90);
+    }
+    expect(confirmation.publicReference).not.toBe(second.publicReference);
+  });
+
+  it("keeps the lead status untouched by the messages and shows no CRM vocabulary to the visitor (FR-017)", async () => {
+    const { active, confirmation, assignment, actors } = await start();
+    await acceptStarter(active, assignment.id, actors.starter);
+    await active.runtime.leads.assignments.updateCrmMetadata(assignment.id, { crmStatus: "qualifie" }, actors.pro);
+    const before = await active.runtime.leads.assignments.require(assignment.id);
+    const base = `/broker/starter/leads/${assignment.id}`;
+    await post(active, `${base}/conversation/messages`, actors.starter, { body: "Bonjour" });
+    const summary = await conversationOf(active, confirmation.publicReference, confirmation.verificationToken);
+    await visitorPost(active, confirmation.publicReference, confirmation.verificationToken, `/conversations/${summary.conversationId}/messages`, { body: "Merci" });
+    await post(active, `${base}/conversation/read`, actors.starter);
+    await post(active, `${base}/document-requests`, actors.starter, { label: "Carte grise" });
+    const after = await active.runtime.leads.assignments.require(assignment.id);
+    expect({ status: after.status, crmStatus: after.crmStatus }).toEqual({ status: before.status, crmStatus: before.crmStatus });
+    expect(before.crmStatus).toBe("qualifie");
+
+    const payloads = JSON.stringify([
+      await readJson(await visitorGet(active, confirmation.publicReference, confirmation.verificationToken, "/conversations")),
+      await readJson(await visitorGet(active, confirmation.publicReference, confirmation.verificationToken, `/conversations/${summary.conversationId}`)),
+      await readJson(await visitorGet(active, confirmation.publicReference, confirmation.verificationToken, "/document-requests")),
+      await readJson(await visitorGet(active, confirmation.publicReference, confirmation.verificationToken))
+    ]);
+    for (const forbidden of ["crmStatus", "qualifie", "assignedAdvisor", "urgency", "kanban", "pipeline", assignment.partnerTenantId]) expect(payloads, forbidden).not.toContain(forbidden);
   });
 });

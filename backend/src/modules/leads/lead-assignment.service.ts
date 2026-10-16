@@ -253,6 +253,11 @@ export class LeadAssignmentService {
     return this.repository.list();
   }
 
+  /** Assignments of one quote request without reading every lead (spec 062 conversations). */
+  listForQuote(quoteRequestId: string): Promise<LeadAssignmentRecord[]> {
+    return this.repository.listForQuote(quoteRequestId);
+  }
+
   require(id: string): Promise<LeadAssignmentRecord> {
     return this.repository.require(id);
   }

@@ -179,6 +179,24 @@ describe("data requests service (spec 062 D-10)", () => {
       expect((await create(active, { type: "access" }, { reference: "AM-000002" })).reference).toMatch(DATA_REQUEST_REFERENCE_PATTERN);
     });
 
+    it("answers two concurrent creations of the same type with the same refusal (the database index lets only one through)", async () => {
+      const active = world();
+      const first = await create(active, { type: "erasure", detail: DETAIL });
+      // The second creation passed the application check (it read no open request) but loses on the unique index.
+      const findOpen = vi.spyOn(active.repository, "findOpen");
+      findOpen.mockResolvedValueOnce(undefined);
+
+      const error = await create(active, { type: "erasure", detail: DETAIL }).catch((caught: unknown) => caught);
+
+      expect(error).toBeInstanceOf(ConflictException);
+      expect((error as ConflictException).getResponse()).toMatchObject({ code: "DATA_REQUEST_ALREADY_OPEN", reference: first.reference });
+      expect(await active.repository.listForQuote(QUOTE.id)).toHaveLength(1);
+      // Refused like a sequential duplicate: audited, no second acknowledgement, no second alert.
+      expect(active.audit.search({ action: DataRequestAuditActions.refused }).map((entry) => entry.reason)).toEqual(["already_open"]);
+      expect(active.sent.acknowledgements).toHaveLength(1);
+      expect(active.sent.alerts).toHaveLength(1);
+    });
+
     it("answers a filled honeypot with a believable success and writes and sends nothing", async () => {
       const active = world();
 

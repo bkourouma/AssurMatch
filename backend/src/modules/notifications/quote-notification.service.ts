@@ -30,6 +30,11 @@ type QueuedNotification = { notification: NotificationRecord; job: QueueJobRecor
 
 /** Spec 054 R3: `{type}:{quoteRequestId}:{assignmentId|-}:{seq}`. */
 export function visitorNotificationDedupeKey(quoteRequestId: string, event: VisitorNotificationEvent): string {
+  // Spec 062: the coalesced conversation e-mails (bucketed by `seq`) are also keyed by the broker, so two
+  // brokers of a reassigned assignment inside the same 15-minute bucket both notify the visitor.
+  if ((event.type === "visitor_broker_message" || event.type === "visitor_documents_requested") && event.partnerTenantId) {
+    return `${event.type}:${quoteRequestId}:${event.assignmentId ?? "-"}:${event.partnerTenantId}:${event.seq ?? "0"}`;
+  }
   return `${event.type}:${quoteRequestId}:${event.assignmentId ?? "-"}:${event.seq ?? event.partnerTenantId ?? "0"}`;
 }
 
@@ -208,13 +213,13 @@ export class QuoteNotificationService implements LeadMessagingNotificationsPort,
     return this.queueVisitorEvent(quote, { type: "visitor_broker_message", assignmentId: event.assignmentId, partnerTenantId: event.partnerTenantId, seq: event.bucket }, actor);
   }
 
-  /** Visitor e-mail "{broker} asks you for documents"; one per document request. */
+  /** Visitor e-mail "{broker} asks you for documents"; coalesced per assignment, broker and 15-minute bucket (`seq`). */
   queueVisitorDocumentsRequested(
     quote: Pick<QuoteRequestRecord, "id" | "publicReference">,
-    event: { assignmentId: string; partnerTenantId: string; requestId: string },
+    event: { assignmentId: string; partnerTenantId: string; requestId: string; bucket: string },
     actor: ActorContext
   ): Promise<QueuedNotification | undefined> {
-    return this.queueVisitorEvent(quote, { type: "visitor_documents_requested", assignmentId: event.assignmentId, partnerTenantId: event.partnerTenantId, seq: event.requestId }, actor);
+    return this.queueVisitorEvent(quote, { type: "visitor_documents_requested", assignmentId: event.assignmentId, partnerTenantId: event.partnerTenantId, seq: event.bucket }, actor);
   }
 
   /** Spec 062 D-10: acknowledgement of a data request, with its reference and indicative due date. */
@@ -247,7 +252,8 @@ export class QuoteNotificationService implements LeadMessagingNotificationsPort,
   ): Promise<QueuedNotification | undefined> {
     return this.queueBrokerPointer(quote, event, actor, {
       type: "broker_visitor_message",
-      dedupeKey: `broker_visitor_message:${quote.id}:${event.assignmentId}:${event.bucket}`,
+      // Keyed by the broker too: a reassignment inside the bucket must still reach the new broker.
+      dedupeKey: `broker_visitor_message:${quote.id}:${event.assignmentId}:${event.partnerTenantId}:${event.bucket}`,
       title: "Nouveau message d'un visiteur",
       body: `Un visiteur vous a écrit au sujet de la demande ${quote.publicReference}. Lisez et répondez depuis la fiche du lead.`
     });

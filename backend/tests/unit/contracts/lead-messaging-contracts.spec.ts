@@ -1,15 +1,21 @@
 import { describe, expect, it } from "vitest";
-import { findForbiddenWording, findForbiddenWordingAnyLanguage } from "../../../../packages/shared/contracts/content-safety";
+import { findForbiddenWording, findForbiddenWordingAnyLanguage, stripControlCharacters } from "../../../../packages/shared/contracts/content-safety";
 import {
   DOCUMENT_REQUEST_LABEL_MAX,
   LEAD_MESSAGE_BODY_MAX,
+  LEAD_MESSAGE_PAGE_SIZE,
+  LEAD_MESSAGE_THREAD_MAX,
+  adminLeadConversationsViewSchema,
   brokerLeadMessageCreateSchema,
   documentRequestCreateSchema,
+  leadConversationQuerySchema,
   leadMessageCreateSchema,
   leadMessagingNotice
 } from "../../../../packages/shared/contracts/lead-messaging";
 import {
   DATA_REQUEST_DETAIL_MAX,
+  adminDataRequestDetailSchema,
+  adminDataRequestListItemSchema,
   canTransitionDataRequest,
   dataRequestCompleteSchema,
   dataRequestCreateSchema,
@@ -31,14 +37,75 @@ describe("forbidden wording guard (spec 062 R4)", () => {
     expect(findForbiddenWordingAnyLanguage("Souscrivez maintenant, achetez maintenant")).toEqual(["achetez maintenant", "souscrivez maintenant"]);
   });
 
-  it("blocks the stand-alone words garanti / garantis but never the nouns garantie / garanties", () => {
-    expect(findForbiddenWordingAnyLanguage("Remboursement garanti")).toEqual(["garanti"]);
-    expect(findForbiddenWordingAnyLanguage("Tarifs GARANTIS à vie")).toEqual(["garantis"]);
-    expect(findForbiddenWordingAnyLanguage("Un prix garanti.")).toEqual(["garanti"]);
-    expect(findForbiddenWordingAnyLanguage("Les garanties incluses")).toEqual([]);
-    expect(findForbiddenWordingAnyLanguage("Voici le détail des garanties et de la garantie décès")).toEqual([]);
-    expect(findForbiddenWordingAnyLanguage("Niveau de garantie : standard")).toEqual([]);
-    expect(findForbiddenWordingAnyLanguage("garantissent")).toEqual([]);
+  it("blocks « garanti » used as a promise (closed list of phrases), whatever the gender, number and accents", () => {
+    expect(findForbiddenWordingAnyLanguage("Remboursement garanti")).toEqual(["remboursement garanti"]);
+    expect(findForbiddenWordingAnyLanguage("Tarifs GARANTIS à vie")).toEqual(["garanti à vie", "tarif garanti"]);
+    expect(findForbiddenWordingAnyLanguage("Un prix garanti.")).toEqual(["prix garanti"]);
+    expect(findForbiddenWordingAnyLanguage("Prix garantis")).toEqual(["prix garanti"]);
+    expect(findForbiddenWordingAnyLanguage("Une acceptation garantie")).toEqual(["acceptation garantie"]);
+    expect(findForbiddenWordingAnyLanguage("Réponse garantie sous 24 h")).toEqual(["réponse garantie"]);
+    expect(findForbiddenWordingAnyLanguage("reponse garantie")).toEqual(["réponse garantie"]);
+    expect(findForbiddenWordingAnyLanguage("Devis garanti, résultat garanti")).toEqual(["résultat garanti", "devis garanti"]);
+    expect(findForbiddenWordingAnyLanguage("Un contrat garanti")).toEqual(["contrat garanti"]);
+    expect(findForbiddenWordingAnyLanguage("C'est 100 % garanti")).toEqual(["100 % garanti"]);
+    expect(findForbiddenWordingAnyLanguage("100% garanti")).toEqual(["100 % garanti"]);
+    expect(findForbiddenWordingAnyLanguage("Offre garantie sans condition")).toEqual(["garanti sans condition", "offre garantie"]);
+    expect(findForbiddenWordingAnyLanguage("Garanti sans condition")).toEqual(["garanti sans condition"]);
+    expect(findForbiddenWordingAnyLanguage("Garantie à vie")).toEqual(["garanti à vie"]);
+  });
+
+  it("never blocks the ordinary technical wording or the nouns garantie / garanties", () => {
+    for (const text of [
+      "Les risques garantis sont listés ci-dessous",
+      "Capital garanti en cas de décès",
+      "Les dommages garantis incluent le vol",
+      "Voici les garanties incluses",
+      "Les garanties incluses et la garantie décès",
+      "Voici le détail des garanties et de la garantie décès",
+      "Niveau de garantie : standard",
+      "garantissent",
+      "Les événements garantis par le contrat",
+      "Le franchise garantie est précisée dans vos conditions"
+    ]) {
+      expect(findForbiddenWordingAnyLanguage(text), text).toEqual([]);
+    }
+  });
+
+  it("is not fooled by zero-width, soft-hyphen, bidi, no-break space, full-width, hyphen or dot separators", () => {
+    const evasions = [
+      "Rembour\u200Bsement gar\u200Danti",
+      "Remboursement garan\u00ADti",
+      "Prix\u00A0garanti",
+      "Prix\u202Fgaranti",
+      "Prix\u2060 garanti\uFEFF",
+      "Prix\u200E garanti",
+      "ｒｅｍｂｏｕｒｓｅｍｅｎｔ ｇａｒａｎｔｉ",
+      "remboursement-garanti",
+      "remboursement_garanti",
+      "remboursement.garanti",
+      "remboursement\u2013garanti",
+      "REMBOURSEMENT   GARANTI",
+      "Remboursement\ngaranti",
+      "garantI\u0301 à vie",
+      "g\u0336a\u0336r\u0336a\u0336n\u0336t\u0336i\u0336 à vie"
+    ];
+    for (const text of evasions) expect(findForbiddenWordingAnyLanguage(text).length, JSON.stringify(text)).toBeGreaterThan(0);
+    expect(findForbiddenWordingAnyLanguage("Con\u200Btrat val\u00ADidé")).toEqual(["contrat valide"]);
+    expect(findForbiddenWordingAnyLanguage("Souscrivez-maintenant")).toEqual(["souscrivez maintenant"]);
+    expect(findForbiddenWordingAnyLanguage("Garantie\u00A0acceptée")).toEqual(["garantie acceptee"]);
+    expect(findForbiddenWordingAnyLanguage("garantie.acceptee")).toEqual(["garantie acceptee"]);
+    expect(findForbiddenWordingAnyLanguage("ｂｕｙ ｎｏｗ")).toEqual(["buy now"]);
+    // The separators of the normalisation do not create a phrase out of unrelated words.
+    expect(findForbiddenWordingAnyLanguage("Le prix. Garanties incluses")).toEqual([]);
+  });
+
+  it("matches the English phrases on word boundaries", () => {
+    expect(findForbiddenWordingAnyLanguage("This is an invalid contract")).toEqual([]);
+    expect(findForbiddenWordingAnyLanguage("Please confirm price")).toEqual([]);
+    expect(findForbiddenWordingAnyLanguage("A valid contract")).toEqual(["valid contract"]);
+    expect(findForbiddenWordingAnyLanguage("valid contracts are binding")).toEqual(["valid contract"]);
+    expect(findForbiddenWordingAnyLanguage("Firm price today")).toEqual(["firm price"]);
+    expect(findForbiddenWordingAnyLanguage("valid-contract")).toEqual(["valid contract"]);
   });
 
   it("blocks the English equivalents", () => {
@@ -77,6 +144,37 @@ describe("lead messaging contracts (spec 062)", () => {
     expect(leadMessageCreateSchema.safeParse({ body: "ok", extra: 1 }).success).toBe(false);
     // The broker flavour has no honeypot.
     expect(brokerLeadMessageCreateSchema.safeParse({ body: "ok", website: "x" }).success).toBe(false);
+  });
+
+  it("strips control characters (a NUL byte included) from the free texts but keeps tab, line feed and carriage return", () => {
+    expect(leadMessageCreateSchema.parse({ body: "Bon\u0000jour\u0007 \u001Fmonsieur\u007F" }).body).toBe("Bonjour monsieur");
+    expect(leadMessageCreateSchema.parse({ body: "Ligne 1\r\nLigne\t2\nLigne 3" }).body).toBe("Ligne 1\r\nLigne\t2\nLigne 3");
+    // A body made of control characters only is empty once stripped.
+    expect(leadMessageCreateSchema.safeParse({ body: "\u0000\u0001" }).success).toBe(false);
+    expect(brokerLeadMessageCreateSchema.parse({ body: "A\u0000B" }).body).toBe("AB");
+    const request = documentRequestCreateSchema.parse({ label: "Carte\u0000 grise", note: "Recto\u0000 verso\u0008" });
+    expect(request).toEqual({ label: "Carte grise", note: "Recto verso" });
+    expect(documentRequestCreateSchema.parse({ label: "ok", note: "\u0000\u0001" })).toEqual({ label: "ok" });
+    expect(dataRequestCreateSchema.parse({ type: "access", detail: "Mon\u0000 dossier" })).toEqual({ type: "access", detail: "Mon dossier" });
+    expect(dataRequestRejectSchema.parse({ note: "Hors\u0000 périmètre" })).toEqual({ note: "Hors périmètre" });
+    expect(stripControlCharacters("a\u0000b\tc")).toBe("ab\tc");
+  });
+
+  it("accepts a page size up to the whole thread (300) and keeps 50 as the default", () => {
+    expect(leadConversationQuerySchema.parse({})).toEqual({ limit: LEAD_MESSAGE_PAGE_SIZE });
+    expect(LEAD_MESSAGE_PAGE_SIZE).toBe(50);
+    expect(leadConversationQuerySchema.parse({ limit: "300" }).limit).toBe(LEAD_MESSAGE_THREAD_MAX);
+    expect(leadConversationQuerySchema.safeParse({ limit: "301" }).success).toBe(false);
+    expect(leadConversationQuerySchema.safeParse({ limit: "0" }).success).toBe(false);
+  });
+
+  it("declares the masked flag of the admin conversations view and the fields the compliance console reads", () => {
+    expect(adminLeadConversationsViewSchema.parse({ quoteRequestId: "q", masked: true, conversations: [] })).toEqual({ quoteRequestId: "q", masked: true, conversations: [] });
+    expect(adminLeadConversationsViewSchema.safeParse({ quoteRequestId: "q", conversations: [] }).success).toBe(false);
+    const item = { id: "i", reference: "DR-AB12CD34", type: "access", status: "received", createdAt: "2026-10-15T10:00:00.000Z", dueAt: "2026-11-14T10:00:00.000Z" };
+    expect(adminDataRequestListItemSchema.parse({ ...item, quoteReference: "QR-1", locale: "en" })).toMatchObject({ quoteReference: "QR-1", locale: "en", overdue: false });
+    expect(adminDataRequestListItemSchema.parse(item)).not.toHaveProperty("quoteReference");
+    expect(adminDataRequestDetailSchema.parse({ ...item, erasureAllowed: true, history: [] })).toMatchObject({ erasureAllowed: true });
   });
 
   it("validates a document request", () => {

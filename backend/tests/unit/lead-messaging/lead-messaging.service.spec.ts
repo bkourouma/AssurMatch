@@ -1,4 +1,5 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
+import type { VirusScannerPort } from "../../../src/modules/quote-documents/virus-scanner.port";
 import { conversationIdFor } from "../../../src/modules/lead-messaging/lead-messaging.rules";
 import { messageNotificationBucket } from "../../../src/modules/lead-messaging/lead-messaging.ports";
 import { INFECTED_PDF, OTHER_TENANT, PDF, TENANT, actors, createKit, file, query, tickingClock, visitorToken } from "./lead-messaging-kit";
@@ -110,7 +111,7 @@ describe("lead messaging service (spec 062)", () => {
   it("blocks forbidden wording in French (accented) and English and quotes the expression, without writing", async () => {
     const kit = await createKit();
     const assignment = await kit.assign();
-    for (const [body, expression] of [["Votre contrat validé vous attend.", "contrat valide"], ["Un prix garanti pour vous.", "garanti"], ["This is a guaranteed price.", "guaranteed"], ["Please buy now before it ends", "buy now"]] as const) {
+    for (const [body, expression] of [["Votre contrat validé vous attend.", "contrat valide"], ["Un prix garanti pour vous.", "prix garanti"], ["This is a guaranteed price.", "guaranteed"], ["Please buy now before it ends", "buy now"]] as const) {
       const error = await kit.messages.brokerSend("starter", assignment.id, { body }, [], actors.starter).catch((caught: unknown) => caught as { response: { code: string; message: string; details: { wording: string[] } } });
       expect(error).toHaveProperty("response");
       const response = (error as { response: { code: string; message: string; details: { wording: string[] } } }).response;
@@ -289,5 +290,183 @@ describe("lead messaging service (spec 062)", () => {
     expect(message).toMatchObject({ body: "[anonymise]", senderType: "broker", authorId: "starter-owner" });
     expect(message?.attachments[0]).toMatchObject({ fileName: "[anonymise]" });
     expect(message?.anonymizedAt).toBeInstanceOf(Date);
+  });
+});
+
+describe("lead messaging service hardening (spec 062 review fixes)", () => {
+  async function assignedTo(kit: Awaited<ReturnType<typeof createKit>>, advisorId: string) {
+    const assignment = await kit.assign();
+    await kit.assignments.updateCrmMetadata(assignment.id, { assignedAdvisorId: advisorId }, actors.pro);
+    return assignment;
+  }
+
+  it("applies the assigned-only scope of an agent on the Starter channel too (E-07): the assigned agent works, another agent is refused and audited", async () => {
+    const kit = await createKit();
+    const assignment = await assignedTo(kit, actors.agentA.actorId!);
+    const conversationId = conversationIdFor(assignment.id, TENANT);
+    for (const channel of ["starter", "crm"] as const) {
+      const sent = await kit.messages.brokerSend(channel, assignment.id, { body: `Bonjour par ${channel}` }, [file(PDF, "devis.pdf")], actors.agentA);
+      expect((await kit.messages.brokerConversation(channel, assignment.id, query, actors.agentA)).messages.length).toBeGreaterThan(0);
+      await kit.messages.brokerAttachment(channel, assignment.id, sent.message.id, sent.message.attachments[0]!.id, actors.agentA);
+      for (const run of [
+        () => kit.messages.brokerConversation(channel, assignment.id, query, actors.agentB),
+        () => kit.messages.brokerSend(channel, assignment.id, { body: "Je ne suis pas assigne" }, [], actors.agentB),
+        () => kit.messages.brokerMarkRead(channel, assignment.id, actors.agentB),
+        () => kit.messages.brokerAttachment(channel, assignment.id, sent.message.id, sent.message.attachments[0]!.id, actors.agentB)
+      ]) {
+        await expect(run()).rejects.toThrow(/denied/);
+      }
+      expect(await kit.messages.brokerMarkRead(channel, assignment.id, actors.agentA)).toEqual({ markedRead: 0, unreadCount: 0 });
+    }
+    // Nothing was written by the refused agent.
+    expect((await kit.repository.listForConversation(assignment.id, TENANT)).every((message) => message.authorId === "agent-a")).toBe(true);
+    // The refusal of the Starter channel names the scope rule and is audited like the CRM one.
+    const refusals = JSON.stringify(kit.audit.search({ result: "refused" }));
+    expect(refusals).toContain("assigned_scope_required");
+    // The visitor is not affected by who is assigned.
+    expect((await kit.messages.visitorConversation(ref, visitorToken(), conversationId, query)).messages.length).toBeGreaterThan(0);
+    // Roles with the whole CRM read scope (owner, manager) keep reaching a lead assigned to someone else.
+    await kit.messages.brokerConversation("starter", assignment.id, query, actors.starter);
+    await kit.messages.brokerConversation("crm", assignment.id, query, actors.pro);
+  });
+
+  it("refuses to leave a read receipt to a read-only role, on both channels", async () => {
+    const kit = await createKit();
+    const assignment = await kit.assign();
+    await kit.messages.visitorSend(ref, visitorToken(), conversationIdFor(assignment.id, TENANT), { body: "Bonjour" }, [], {});
+    await expect(kit.messages.brokerMarkRead("crm", assignment.id, actors.readOnly)).rejects.toThrow(/denied/);
+    await expect(kit.messages.brokerMarkRead("starter", assignment.id, actors.readOnly)).rejects.toThrow(/denied/);
+    expect((await kit.messages.brokerConversation("crm", assignment.id, query, actors.readOnly)).unreadCount).toBe(1);
+    expect(kit.audit.search({ action: "lead_message.read" })).toEqual([]);
+    expect(await kit.messages.brokerMarkRead("crm", assignment.id, actors.pro)).toEqual({ markedRead: 1, unreadCount: 0 });
+  });
+
+  it("runs the wording guard on the names of the attachments too and stores nothing when one is refused", async () => {
+    const kit = await createKit();
+    const assignment = await kit.assign();
+    for (const name of ["remboursement-garanti.pdf", "contrat valide.pdf", "Prix_garanti.pdf", "devis garanti a vie.pdf"]) {
+      const error = await kit.messages.brokerSend("starter", assignment.id, { body: "Voici le document." }, [file(PDF, "ok.pdf"), file(PDF, name)], actors.starter).catch((caught: unknown) => caught as { response: { code: string; details: { wording: string[] } } });
+      expect((error as { response: { code: string } }).response.code, name).toBe("FORBIDDEN_WORDING");
+      expect((error as { response: { details: { wording: string[] } } }).response.details.wording.length, name).toBeGreaterThan(0);
+    }
+    expect(await kit.repository.listForQuote("q1")).toEqual([]);
+    expect(kit.storage.size()).toBe(0);
+    expect(kit.audit.search({ action: "lead_message.refused" }).every((entry) => entry.reason === "forbidden_wording" && entry.context.inFileName === true)).toBe(true);
+    // An ordinary file name goes through.
+    await kit.messages.brokerSend("starter", assignment.id, { body: "Voici le document." }, [file(PDF, "conditions-generales.pdf")], actors.starter);
+    expect(kit.storage.size()).toBe(1);
+  });
+
+  it("lets the technical wording through that the old bare « garanti » check blocked", async () => {
+    const kit = await createKit();
+    const assignment = await kit.assign();
+    for (const body of ["Les risques garantis sont detailles en page 2.", "Capital garanti en cas de deces.", "Les dommages garantis incluent le vol."]) {
+      await kit.messages.brokerSend("starter", assignment.id, { body }, [], actors.starter);
+    }
+    expect(await kit.repository.countForConversation(assignment.id, TENANT)).toBe(3);
+    await expect(kit.messages.brokerSend("starter", assignment.id, { body: "Un remboursement garanti sous 24 h." }, [], actors.starter)).rejects.toMatchObject({ response: { code: "FORBIDDEN_WORDING" } });
+    await expect(kit.messages.brokerSend("starter", assignment.id, { body: "Un remboursement​-garanti." }, [], actors.starter)).rejects.toMatchObject({ response: { code: "FORBIDDEN_WORDING" } });
+  });
+
+  it("deletes the stored objects when the write fails, for the broker and for the visitor", async () => {
+    const kit = await createKit();
+    const assignment = await kit.assign();
+    const conversationId = conversationIdFor(assignment.id, TENANT);
+    const failing = vi.spyOn(kit.repository, "appendMessage").mockRejectedValue(new Error("database unavailable"));
+    await expect(kit.messages.brokerSend("starter", assignment.id, { body: "Avec pieces" }, [file(PDF, "a.pdf"), file(PDF, "b.pdf")], actors.starter)).rejects.toThrow(/database unavailable/);
+    await expect(kit.messages.visitorSend(ref, visitorToken(), conversationId, { body: "Avec piece" }, [file(PDF, "c.pdf")], {})).rejects.toThrow(/database unavailable/);
+    expect(kit.storage.size()).toBe(0);
+    expect(kit.queued).toEqual([]);
+    expect(kit.firstReplies).toEqual([]);
+    expect(kit.audit.search({ action: "lead_message.sent" })).toEqual([]);
+    expect(kit.audit.search({ action: "lead_message.visitor_sent" })).toEqual([]);
+    failing.mockRestore();
+    await kit.messages.brokerSend("starter", assignment.id, { body: "Une fois la base revenue" }, [file(PDF, "d.pdf")], actors.starter);
+    expect(kit.storage.size()).toBe(1);
+  });
+
+  it("returns the message of a concurrent retry (same clientRequestId) without storing its files, auditing or notifying twice", async () => {
+    const kit = await createKit();
+    const assignment = await kit.assign();
+    const first = await kit.messages.brokerSend("starter", assignment.id, { body: "Bonjour", clientRequestId: "retry-key-0002" }, [], actors.starter);
+    const queuedBefore = kit.queued.length;
+    // The race: the pre-check does not see the first message yet, the repository replays it on the unique key.
+    const stored = (await kit.repository.findMessage(first.message.id))!;
+    vi.spyOn(kit.repository, "findByClientRequestId").mockResolvedValueOnce(undefined);
+    vi.spyOn(kit.repository, "appendMessage").mockResolvedValueOnce(stored);
+    const replay = await kit.messages.brokerSend("starter", assignment.id, { body: "Bonjour", clientRequestId: "retry-key-0002" }, [file(PDF, "doublon.pdf")], actors.starter);
+    expect(replay.message.id).toBe(first.message.id);
+    expect(kit.storage.size()).toBe(0);
+    expect(kit.queued).toHaveLength(queuedBefore);
+    expect(kit.audit.search({ action: "lead_message.sent" })).toHaveLength(1);
+  });
+
+  it("answers a failed or crashing antivirus with DOCUMENT_QUARANTINED and writes nothing (scan_failed)", async () => {
+    const scanners: VirusScannerPort[] = [
+      { engine: "clamav", scan: async () => ({ verdict: "failed" as const, engine: "clamav", detail: "timeout" }) },
+      { engine: "clamav", scan: async () => { throw new Error("socket hang up"); } }
+    ];
+    for (const scanner of scanners) {
+      const kit = await createKit({ scanner });
+      const assignment = await kit.assign();
+      const conversationId = conversationIdFor(assignment.id, TENANT);
+      await expect(kit.messages.brokerSend("starter", assignment.id, { body: "Avec piece" }, [file(PDF)], actors.starter)).rejects.toMatchObject({ response: { code: "DOCUMENT_QUARANTINED" } });
+      await expect(kit.messages.visitorSend(ref, visitorToken(), conversationId, { body: "Avec piece" }, [file(PDF)], {})).rejects.toMatchObject({ response: { code: "DOCUMENT_QUARANTINED" } });
+      expect(await kit.repository.listForQuote("q1")).toEqual([]);
+      expect(kit.storage.size()).toBe(0);
+      expect(kit.queued).toEqual([]);
+      expect(kit.audit.search({ action: "lead_message.attachment_quarantined" }).map((entry) => entry.reason)).toEqual(["scan_failed", "scan_failed"]);
+    }
+  });
+
+  it("reads only the assignments of the quote request, never the whole table", async () => {
+    const kit = await createKit();
+    const mine = await kit.assign("q1");
+    await kit.assign("q2");
+    const everything = vi.spyOn(kit.assignments, "list");
+    const scoped = vi.spyOn(kit.assignments, "listForQuote");
+    const list = await kit.messages.visitorList(ref, visitorToken());
+    expect(list.conversations.map((conversation) => conversation.conversationId)).toEqual([conversationIdFor(mine.id, TENANT)]);
+    expect(await kit.requests.visitorList(ref, visitorToken())).toEqual({ items: [] });
+    expect(scoped).toHaveBeenCalledWith("q1");
+    expect(everything).not.toHaveBeenCalled();
+    expect((await kit.assignments.listForQuote("q2")).map((assignment) => assignment.quoteRequestId)).toEqual(["q2"]);
+    expect(await kit.assignments.listForQuote("unknown")).toEqual([]);
+  });
+
+  it("returns the whole thread to a reader asking for limit=300 and keeps 50 as the page default", async () => {
+    const kit = await createKit();
+    const assignment = await kit.assign();
+    for (let index = 0; index < 120; index += 1) {
+      await kit.repository.appendMessage({ id: crypto.randomUUID(), quoteRequestId: "q1", leadAssignmentId: assignment.id, partnerTenantId: TENANT, senderType: index % 2 === 0 ? "broker" : "visitor", body: `m${index}`, createdAt: new Date(Date.UTC(2026, 9, 15, 10, 0, index)) }, []);
+    }
+    const defaultPage = await kit.messages.brokerConversation("starter", assignment.id, { limit: 50 }, actors.starter);
+    expect(defaultPage.messages).toHaveLength(50);
+    expect(defaultPage.nextCursor).not.toBeNull();
+    const whole = await kit.messages.brokerConversation("starter", assignment.id, { limit: 300 }, actors.starter);
+    expect(whole.messages).toHaveLength(120);
+    expect(whole.nextCursor).toBeNull();
+    expect(whole.messages[0]?.body).toBe("m0");
+  });
+
+  it("keeps the messages and the document requests from changing the status of the lead (FR-017) and never shows CRM vocabulary to the visitor", async () => {
+    const kit = await createKit();
+    const assignment = await kit.assign();
+    await kit.assignments.updateCrmMetadata(assignment.id, { assignedAdvisorId: "agent-a", crmStatus: "qualifie" }, actors.pro);
+    const before = await kit.assignments.require(assignment.id);
+    expect(before.crmStatus).toBe("qualifie");
+    const conversationId = conversationIdFor(assignment.id, TENANT);
+    await kit.messages.brokerSend("crm", assignment.id, { body: "Bonjour" }, [file(PDF, "devis.pdf")], actors.pro);
+    await kit.messages.visitorSend(ref, visitorToken(), conversationId, { body: "Merci" }, [], {});
+    await kit.messages.brokerMarkRead("crm", assignment.id, actors.pro);
+    await kit.requests.create("crm", assignment.id, { label: "Carte grise" }, actors.pro);
+    const after = await kit.assignments.require(assignment.id);
+    expect({ status: after.status, crmStatus: after.crmStatus }).toEqual({ status: before.status, crmStatus: before.crmStatus });
+    const visitorPayloads = JSON.stringify([
+      await kit.messages.visitorList(ref, visitorToken()),
+      await kit.messages.visitorConversation(ref, visitorToken(), conversationId, query),
+      await kit.requests.visitorList(ref, visitorToken())
+    ]);
+    for (const forbidden of ["crmStatus", "qualifie", "assignedAdvisor", "agent-a", "urgency", "pipeline", "kanban", TENANT]) expect(visitorPayloads, forbidden).not.toContain(forbidden);
   });
 });

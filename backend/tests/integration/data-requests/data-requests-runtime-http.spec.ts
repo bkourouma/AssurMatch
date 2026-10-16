@@ -201,9 +201,8 @@ describe("data requests runtime HTTP (spec 062 D-10)", () => {
     const list = adminDataRequestListSchema.parse(await readJson(await admin(active, "/admin/data-requests", compliance)));
     expect(list.items.map((item) => item.reference).sort()).toEqual([access.reference, rectification.reference].sort());
     expect(list.items[0]).toMatchObject({ overdue: false });
-    // The shared schema keeps the contract fields; the compliance list also carries the quote reference and the e-mail language.
-    const raw = await readJson<{ items: Array<Record<string, unknown>> }>(await admin(active, "/admin/data-requests", compliance));
-    expect(raw.items[0]).toMatchObject({ quoteReference: confirmation.publicReference, locale: "fr" });
+    // The shared schema declares the quote reference and the e-mail language of the compliance list.
+    expect(list.items[0]).toMatchObject({ quoteReference: confirmation.publicReference, locale: "fr" });
     expect((await readJson<{ items: unknown[] }>(await admin(active, "/admin/data-requests?type=access&status=received", superAdmin))).items).toHaveLength(1);
     const accessId = list.items.find((item) => item.reference === access.reference)!.id;
     const rectificationId = list.items.find((item) => item.reference === rectification.reference)!.id;
@@ -211,6 +210,7 @@ describe("data requests runtime HTTP (spec 062 D-10)", () => {
     const detail = adminDataRequestDetailSchema.parse(await readJson(await admin(active, `/admin/data-requests/${accessId}`, compliance)));
     expect(detail).toMatchObject({ status: "received", detail: DETAIL, publicReference: confirmation.publicReference });
     expect(detail.acknowledgedAt).toBeDefined();
+    expect(detail.erasureAllowed).toBe(false);
 
     const taken = await admin(active, `/admin/data-requests/${accessId}/take`, compliance, "POST", {});
     expect(taken.status).toBe(200);
@@ -395,5 +395,24 @@ describe("data requests runtime HTTP (spec 062 D-10)", () => {
 
     expect(Object.fromEntries(policies.items.filter((item) => ["lead_message_threads", "lead_document_requests", "data_requests"].includes(item.category)).map((item) => [item.category, [item.retentionDays, item.source]])))
       .toEqual({ lead_message_threads: [730, "default"], lead_document_requests: [180, "default"], data_requests: [1825, "default"] });
+  });
+
+  it("lets only one of two concurrent creations of the same type through: the other gets DATA_REQUEST_ALREADY_OPEN with the reference of the winner", async () => {
+    harness = await createRuntimeHttpHarness();
+    const active = harness;
+    const confirmation = await submitQuote(active, await seedPublicRuntime(active.runtime));
+
+    const responses = await Promise.all(Array.from({ length: 4 }, () => createRequest(active, confirmation, { type: "erasure", detail: DETAIL })));
+
+    const statuses = responses.map((response) => response.status).sort();
+    expect(statuses).toEqual([201, 409, 409, 409]);
+    const created = dataRequestCreateResultSchema.parse(await readJson(responses.find((response) => response.status === 201)!));
+    for (const refused of responses.filter((response) => response.status === 409)) {
+      expect(await refused.json()).toMatchObject({ code: "DATA_REQUEST_ALREADY_OPEN", reference: created.reference });
+    }
+    expect(await active.runtime.dataRequests.repository.listAll()).toHaveLength(1);
+    // One acknowledgement and one alert, whatever the number of attempts.
+    expect((await active.runtime.notifications.service.list()).filter((notification) => notification.type === "visitor_data_request_acknowledged")).toHaveLength(1);
+    expect((await active.runtime.adminAlerts.list(compliance, {})).items.filter((alert) => alert.type === "data_request_received")).toHaveLength(1);
   });
 });

@@ -33,10 +33,14 @@ export interface LeadMessagingNotificationsPort {
     event: { assignmentId: string; partnerTenantId: string; bucket: string },
     actor: ActorContext
   ): QueueResult;
-  /** E-mail to the visitor: pointer only ("{broker} asks you for documents"). Type `visitor_documents_requested`. One per document request. */
+  /**
+   * E-mail to the visitor: pointer only ("{broker} asks you for documents"). Type `visitor_documents_requested`.
+   * Coalesced like the messages: one per assignment, broker and 15-minute `bucket` (`requestId` is kept for
+   * the in-app / audit side, it is not part of the dedupe key).
+   */
   queueVisitorDocumentsRequested(
     quote: Pick<MessagingQuote, "id" | "publicReference">,
-    event: { assignmentId: string; partnerTenantId: string; requestId: string },
+    event: { assignmentId: string; partnerTenantId: string; requestId: string; bucket: string },
     actor: ActorContext
   ): QueueResult;
   /** In-app + pointer e-mail to the assigned broker. Type `broker_visitor_message`. */

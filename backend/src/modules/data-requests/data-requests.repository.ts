@@ -55,7 +55,11 @@ export interface DataRequestRetentionSource {
 }
 
 export interface DataRequestsRepository extends RuntimeRepository, DataRequestRetentionSource {
-  /** Throws on a reference collision (unique constraint) so the caller can retry with another one. */
+  /**
+   * Throws `DuplicateDataRequestReferenceError` on a reference collision (the caller retries with another
+   * one) and `OpenDataRequestExistsError` when an open request of this type already exists for the quote
+   * request (the concurrent creation that lost).
+   */
   create(record: DataRequestRecord): Promise<DataRequestRecord>;
   find(id: string): Promise<DataRequestRecord | undefined>;
   /** The open (`received` or `in_review`) request of this type for the quote request, if any. */
@@ -72,6 +76,18 @@ export class DuplicateDataRequestReferenceError extends Error {
   constructor() {
     super("Data request reference already exists");
     this.name = "DuplicateDataRequestReferenceError";
+  }
+}
+
+/**
+ * An open (`received` / `in_review`) request of the same type already exists for the quote request
+ * (partial unique index `DataRequest_open_quote_type_key`): two concurrent creations, only one wins.
+ * `reference` is the reference of the request that won, when the repository could read it.
+ */
+export class OpenDataRequestExistsError extends Error {
+  constructor(readonly reference?: string) {
+    super("An open data request of this type already exists");
+    this.name = "OpenDataRequestExistsError";
   }
 }
 
@@ -104,6 +120,8 @@ export class MemoryDataRequestsRepository implements DataRequestsRepository {
 
   async create(record: DataRequestRecord): Promise<DataRequestRecord> {
     if (this.records.some((candidate) => candidate.reference === record.reference)) throw new DuplicateDataRequestReferenceError();
+    const open = this.records.find((candidate) => candidate.quoteRequestId === record.quoteRequestId && candidate.type === record.type && (candidate.status === "received" || candidate.status === "in_review"));
+    if (open && (record.status === "received" || record.status === "in_review")) throw new OpenDataRequestExistsError(open.reference);
     this.records.push(copy(record));
     return copy(record);
   }
@@ -201,9 +219,15 @@ export class PrismaDataRequestsRepository implements DataRequestsRepository {
     try {
       return toDomain(await this.table().create({ data: { ...record } }));
     } catch (error) {
-      // P2002: unique constraint on `reference`.
-      if ((error as { code?: string }).code === "P2002") throw new DuplicateDataRequestReferenceError();
-      throw error;
+      if ((error as { code?: string }).code !== "P2002") throw error;
+      // P2002 is either the unique `reference` or the partial unique index of the open request
+      // (quote request + type, migration 0031): the second one means a concurrent creation won.
+      const target = (error as { meta?: { target?: unknown } }).meta?.target;
+      const onReference = Array.isArray(target) ? target.includes("reference") : typeof target === "string" && target.includes("reference");
+      if (onReference) throw new DuplicateDataRequestReferenceError();
+      const open = await this.findOpen(record.quoteRequestId, record.type);
+      if (open && open.reference !== record.reference) throw new OpenDataRequestExistsError(open.reference);
+      throw new DuplicateDataRequestReferenceError();
     }
   }
 

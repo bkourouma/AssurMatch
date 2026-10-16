@@ -32,7 +32,7 @@ import type { BrokerCrmAccessPolicy } from "../leads/broker-crm-access-policy";
 import type { BrokerStarterAccessPolicy } from "../leads/broker-starter-access-policy";
 import type { LeadAssignmentRecord, LeadAssignmentService } from "../leads/lead-assignment.service";
 import type { ProposalFile } from "../lead-proposals/lead-proposals.service";
-import type { ScannedUploadDeps, UploadedLeadFile } from "../lead-proposals/scanned-upload";
+import type { ScannedUploadDeps, StoredScannedFile, UploadedLeadFile } from "../lead-proposals/scanned-upload";
 import { assertBrokerTenantWritable } from "../partners/partner-tenant-status.service";
 import { visitorAccessDenied } from "../quote-requests/quote-submission.service";
 import {
@@ -46,6 +46,7 @@ import {
   type LeadMessageAttachmentRecord,
   type LeadMessageRecord,
   type LeadMessagingRepository,
+  type NewLeadMessage,
   type NewLeadMessageAttachment
 } from "./lead-messaging.repository";
 import {
@@ -55,6 +56,7 @@ import {
   conflict,
   consentWithdrawn,
   conversationIdFor,
+  discardStored,
   forbiddenWordingError,
   isQuarantine,
   leadState,
@@ -190,8 +192,13 @@ export class LeadMessagingService {
       const existing = await this.repository.findByClientRequestId(assignment.id, "broker", input.clientRequestId);
       if (existing && existing.partnerTenantId === assignment.partnerTenantId) return { message: this.toView(existing, "broker") };
     }
-    const wording = findForbiddenWordingAnyLanguage(input.body);
-    if (wording.length > 0) refuse(ErrorCodes.FORBIDDEN_WORDING, "forbidden_wording", forbiddenWordingError(wording), { wordingCount: wording.length });
+    // The guard reads the body and the names of the attachments (a file name is text the visitor reads too).
+    const bodyWording = findForbiddenWordingAnyLanguage(input.body);
+    const fileNameWording = files.flatMap((file) => findForbiddenWordingAnyLanguage(file.originalname));
+    const wording = [...new Set([...bodyWording, ...fileNameWording])];
+    if (wording.length > 0) {
+      refuse(ErrorCodes.FORBIDDEN_WORDING, "forbidden_wording", forbiddenWordingError(wording), { wordingCount: wording.length, ...(fileNameWording.length > 0 ? { inFileName: true } : {}) });
+    }
     if (await this.repository.countForConversation(assignment.id, assignment.partnerTenantId) >= LEAD_MESSAGE_THREAD_MAX) {
       refuse(ErrorCodes.THREAD_LIMIT_REACHED, "thread_limit_reached", conflict(ErrorCodes.THREAD_LIMIT_REACHED, `At most ${LEAD_MESSAGE_THREAD_MAX} messages per conversation`));
     }
@@ -204,7 +211,7 @@ export class LeadMessagingService {
 
     const now = this.now();
     const messageId = crypto.randomUUID();
-    const record = await this.repository.appendMessage({
+    const record = await this.appendStored({
       id: messageId,
       quoteRequestId: assignment.quoteRequestId,
       leadAssignmentId: assignment.id,
@@ -214,7 +221,9 @@ export class LeadMessagingService {
       body: input.body,
       ...(input.clientRequestId ? { clientRequestId: input.clientRequestId } : {}),
       createdAt: now
-    }, this.attachmentRecords(messageId, assignment, stored.files.map((entry) => entry.stored), now));
+    }, assignment, stored.files.map((entry) => entry.stored), now);
+    // Replay of a concurrent retry (same clientRequestId): the first send already stored, audited and notified.
+    if (record.id !== messageId) return { message: this.toView(record, "broker") };
     this.deps.audit.write({
       actor,
       action: LeadMessagingAuditActions.sent,
@@ -233,7 +242,8 @@ export class LeadMessagingService {
   async brokerMarkRead(channel: LeadMessagingChannel, leadId: string, actor: ActorContext): Promise<LeadConversationReadResult> {
     assertBrokerTenantWritable(actor);
     const assignment = await this.deps.assignments.require(leadId);
-    this.assertRead(channel, actor, assignment);
+    // A read receipt is a write: a read-only role (or a role without the update permission) cannot leave one.
+    this.assertMutation(channel, actor, assignment);
     const marked = await this.repository.markRead(assignment.id, assignment.partnerTenantId, "broker", this.now());
     if (marked > 0) {
       this.deps.audit.write({
@@ -358,7 +368,7 @@ export class LeadMessagingService {
     }
 
     const messageId = crypto.randomUUID();
-    const record = await this.repository.appendMessage({
+    const record = await this.appendStored({
       id: messageId,
       quoteRequestId: quote.id,
       leadAssignmentId: assignment.id,
@@ -367,7 +377,8 @@ export class LeadMessagingService {
       body: input.body,
       ...(input.clientRequestId ? { clientRequestId: input.clientRequestId } : {}),
       createdAt: now
-    }, this.attachmentRecords(messageId, assignment, stored.files.map((entry) => entry.stored), now));
+    }, assignment, stored.files.map((entry) => entry.stored), now);
+    if (record.id !== messageId) return { message: this.toView(record, "visitor") };
     this.deps.audit.write({
       actor,
       action: LeadMessagingAuditActions.visitorSent,
@@ -431,7 +442,7 @@ export class LeadMessagingService {
   // ---------------------------------------------------------------------------------------------
 
   /** Compliance and super admin read the bodies; support gets them masked. Every call is audited. */
-  async adminConversations(actor: ActorContext, quoteRequestId: string): Promise<AdminLeadConversationsView & { masked: boolean }> {
+  async adminConversations(actor: ActorContext, quoteRequestId: string): Promise<AdminLeadConversationsView> {
     const allowed = actor.mfaVerified === true && actor.roles.some((role) => ADMIN_ROLES.has(role));
     if (!allowed) {
       this.deps.audit.write({
@@ -499,14 +510,23 @@ export class LeadMessagingService {
     return this.deps.now ? this.deps.now() : new Date();
   }
 
+  /** Same scope on both channels: an agent limited to its assigned leads cannot use the Starter route to go round it (E-07). */
   private assertRead(channel: LeadMessagingChannel, actor: ActorContext, assignment: LeadAssignmentRecord): void {
-    if (channel === "crm") this.deps.crmAccess.assertLeadRead(actor, assignment);
-    else this.deps.starterAccess.assertLeadAccess(actor, assignment);
+    if (channel === "crm") {
+      this.deps.crmAccess.assertLeadRead(actor, assignment);
+      return;
+    }
+    this.deps.starterAccess.assertLeadAccess(actor, assignment);
+    this.deps.starterAccess.assertAssignedScope(actor, assignment);
   }
 
   private assertMutation(channel: LeadMessagingChannel, actor: ActorContext, assignment: LeadAssignmentRecord): void {
-    if (channel === "crm") this.deps.crmAccess.assertMutation(actor, assignment);
-    else this.deps.starterAccess.assertMutationAccess(actor, assignment);
+    if (channel === "crm") {
+      this.deps.crmAccess.assertMutation(actor, assignment);
+      return;
+    }
+    this.deps.starterAccess.assertMutationAccess(actor, assignment);
+    this.deps.starterAccess.assertAssignedScope(actor, assignment);
   }
 
   private quoteOf(quoteRequestId: string): Promise<MessagingQuote | undefined> {
@@ -553,8 +573,8 @@ export class LeadMessagingService {
    * assignment (so the visitor can open the exchange before the first message). Newest activity first.
    */
   private async quoteConversations(quote: MessagingQuote): Promise<QuoteConversation[]> {
-    const [messages, allAssignments] = await Promise.all([this.repository.listForQuote(quote.id), this.deps.assignments.list()]);
-    const assignments = new Map(allAssignments.filter((assignment) => assignment.quoteRequestId === quote.id).map((assignment) => [assignment.id, assignment]));
+    const [messages, quoteAssignments] = await Promise.all([this.repository.listForQuote(quote.id), this.deps.assignments.listForQuote(quote.id)]);
+    const assignments = new Map(quoteAssignments.map((assignment) => [assignment.id, assignment]));
     const byKey = new Map<string, QuoteConversation>();
     const ensure = (leadAssignmentId: string, partnerTenantId: string): QuoteConversation => {
       const id = conversationIdFor(leadAssignmentId, partnerTenantId);
@@ -582,6 +602,24 @@ export class LeadMessagingService {
 
   private unread(messages: readonly LeadMessageRecord[], reader: "broker" | "visitor"): number {
     return messages.filter((message) => message.senderType !== reader && !message.readAt).length;
+  }
+
+  /**
+   * Writes the message with its attachments (one unit in the repository). The objects were stored before:
+   * when the write fails, or when it replays the message of a concurrent retry with the same
+   * `clientRequestId` (the repository then returns that existing message), they are deleted so no
+   * orphan object stays in the storage.
+   */
+  private async appendStored(message: NewLeadMessage, assignment: LeadAssignmentRecord, stored: readonly StoredScannedFile[], now: Date): Promise<LeadMessageRecord> {
+    let record: LeadMessageRecord;
+    try {
+      record = await this.repository.appendMessage(message, this.attachmentRecords(message.id, assignment, stored, now));
+    } catch (error) {
+      await discardStored(this.deps.upload, stored);
+      throw error;
+    }
+    if (record.id !== message.id) await discardStored(this.deps.upload, stored);
+    return record;
   }
 
   private attachmentRecords(messageId: string, assignment: LeadAssignmentRecord, stored: ReadonlyArray<{ storageKey: string; fileName: string; mimeType: string; sizeBytes: number; checksum: string; scanEngine: string; scannedAt: Date }>, now: Date): NewLeadMessageAttachment[] {

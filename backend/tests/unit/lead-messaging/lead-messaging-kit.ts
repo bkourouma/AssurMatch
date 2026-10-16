@@ -10,7 +10,7 @@ import { BrokerStarterAccessPolicy } from "../../../src/modules/leads/broker-sta
 import { LeadAssignmentService, type LeadAssignmentRecord } from "../../../src/modules/leads/lead-assignment.service";
 import { MemoryDocumentStorage } from "../../../src/modules/quote-documents/document-storage.port";
 import type { QuoteDocumentRecord } from "../../../src/modules/quote-documents/quote-documents.repository";
-import { EicarSignatureScanner } from "../../../src/modules/quote-documents/virus-scanner.port";
+import { EicarSignatureScanner, type VirusScannerPort } from "../../../src/modules/quote-documents/virus-scanner.port";
 
 export const EICAR = "X5O!P%@AP[4\\PZX54(P^)7CC)7}$EICAR-STANDARD-ANTIVIRUS-TEST-FILE!$H+H*";
 export const PDF = Buffer.from("%PDF-1.4\n% piece jointe indicative\n");
@@ -53,6 +53,9 @@ export const OTHER_TENANT = "00000000-0000-4000-8000-000000000a02";
 export const actors = {
   starter: { actorId: "starter-owner", roles: ["broker_owner_starter"], partnerTenantId: TENANT, partnerPlan: "starter", mfaVerified: true } as ActorContext,
   pro: { actorId: "pro-owner", roles: ["broker_owner_pro"], partnerTenantId: TENANT, partnerPlan: "pro", mfaVerified: true } as ActorContext,
+  /** Agents limited to their assigned leads (Pro plan, CRM scope `read_assigned`). */
+  agentA: { actorId: "agent-a", roles: ["broker_agent"], partnerTenantId: TENANT, partnerPlan: "pro", mfaVerified: true } as ActorContext,
+  agentB: { actorId: "agent-b", roles: ["broker_agent"], partnerTenantId: TENANT, partnerPlan: "pro", mfaVerified: true } as ActorContext,
   readOnly: { actorId: "reader", roles: ["broker_read_only"], partnerTenantId: TENANT, partnerPlan: "pro", mfaVerified: true } as ActorContext,
   other: { actorId: "other-owner", roles: ["broker_owner_pro"], partnerTenantId: OTHER_TENANT, partnerPlan: "pro", mfaVerified: true } as ActorContext,
   compliance: { actorId: "compliance", roles: ["compliance_admin"], mfaVerified: true } as ActorContext,
@@ -63,7 +66,7 @@ export const actors = {
 export const GOOD_TOKEN = "good-token";
 
 /** Two quote requests so a visitor of one can be shown not to reach the other. */
-export async function createKit(options: { enabled?: () => boolean; now?: () => Date } = {}) {
+export async function createKit(options: { enabled?: () => boolean; now?: () => Date; scanner?: VirusScannerPort } = {}) {
   const audit = new AuditLogWriter();
   const assignments = new LeadAssignmentService(audit);
   const repository = new TestLeadMessagingRepository();
@@ -108,7 +111,7 @@ export async function createKit(options: { enabled?: () => boolean; now?: () => 
     assignments,
     crmAccess: new BrokerCrmAccessPolicy(audit, { brokerCrmEnabled: true }),
     starterAccess: new BrokerStarterAccessPolicy(audit, { starterPortalEnabled: true, brokerDashboardEnabled: true, brokerCrmEnabled: true }),
-    upload: { storage, scanner: new EicarSignatureScanner() },
+    upload: { storage, scanner: options.scanner ?? new EicarSignatureScanner() },
     partnerName: async (id: string) => (id === TENANT ? "Cabinet Kone" : "Cabinet Autre"),
     notifications,
     isMessagingEnabled: enabled,

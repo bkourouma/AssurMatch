@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { MemoryLeadMessagingRepository, PrismaLeadMessagingRepository } from "../../../src/modules/lead-messaging/lead-messaging.repository";
+import type { PrismaService } from "../../../src/modules/common/prisma/prisma.service";
 import { conversationIdFor, leadState } from "../../../src/modules/lead-messaging/lead-messaging.rules";
 import type { LeadAssignmentRecord } from "../../../src/modules/leads/lead-assignment.service";
 
@@ -93,5 +94,73 @@ describe("lead messaging rules", () => {
     expect(leadState(assignment({ status: "rejected" }))).toBe("closed");
     expect(leadState(assignment({ status: "accepted", crmStatus: "perdu" }))).toBe("closed");
     expect(leadState(assignment({ crmStatus: "contacte" }))).toBe("accepted");
+  });
+});
+
+describe("Prisma lead messaging repository (stubbed client)", () => {
+  /** A client whose `$transaction` records begin / commit / rollback, so the unit of work can be asserted. */
+  function stubbedPrisma(options: { failAttachments?: boolean; failMessage?: unknown; existing?: Record<string, unknown> } = {}) {
+    const calls: string[] = [];
+    const tx = {
+      leadMessage: {
+        create: async (input: { data: Record<string, unknown> }) => {
+          calls.push("message");
+          if (options.failMessage) throw options.failMessage;
+          return { ...input.data };
+        }
+      },
+      leadMessageAttachment: {
+        createMany: async () => {
+          calls.push("attachments");
+          if (options.failAttachments) throw new Error("attachments unavailable");
+          return { count: 1 };
+        }
+      }
+    };
+    const client = {
+      $transaction: async (callback: (transaction: typeof tx) => Promise<unknown>) => {
+        calls.push("begin");
+        try {
+          const result = await callback(tx);
+          calls.push("commit");
+          return result;
+        } catch (error) {
+          calls.push("rollback");
+          throw error;
+        }
+      },
+      leadMessage: { findFirst: async () => options.existing ?? null },
+      leadMessageAttachment: { findMany: async () => [] }
+    };
+    return { prisma: { requireRuntimeClient: () => client } as unknown as PrismaService, calls };
+  }
+
+  const attachment = {
+    id: "att-1", messageId: "m1", leadAssignmentId: "a1", quoteRequestId: "q1", fileName: "devis.pdf", mimeType: "application/pdf", sizeBytes: 10,
+    checksum: "sha256:x", storageKey: "lm-1", scanStatus: "clean" as const, createdAt: new Date("2026-10-15T10:00:00.000Z")
+  };
+
+  it("writes the message and its attachments in one transaction", async () => {
+    const { prisma, calls } = stubbedPrisma();
+    const stored = await new PrismaLeadMessagingRepository(prisma).appendMessage(base("m1"), [attachment]);
+    expect(calls).toEqual(["begin", "message", "attachments", "commit"]);
+    expect(stored).toMatchObject({ id: "m1", body: "corps m1", attachments: [expect.objectContaining({ id: "att-1" })] });
+  });
+
+  it("rolls the message back when its attachments cannot be written", async () => {
+    const { prisma, calls } = stubbedPrisma({ failAttachments: true });
+    await expect(new PrismaLeadMessagingRepository(prisma).appendMessage(base("m1"), [attachment])).rejects.toThrow(/attachments unavailable/);
+    expect(calls).toEqual(["begin", "message", "attachments", "rollback"]);
+  });
+
+  it("replays the existing message on a unique violation of (assignment, sender, clientRequestId) and rethrows any other error", async () => {
+    const existing = { ...base("m0"), clientRequestId: "key-aaaaaaaa" };
+    const replay = stubbedPrisma({ failMessage: { code: "P2002" }, existing });
+    expect(await new PrismaLeadMessagingRepository(replay.prisma).appendMessage(base("m1", { clientRequestId: "key-aaaaaaaa" }), [])).toMatchObject({ id: "m0", attachments: [] });
+    expect(replay.calls).toEqual(["begin", "message", "rollback"]);
+    // A unique violation without a client key, or without a stored twin, is not a replay.
+    await expect(new PrismaLeadMessagingRepository(stubbedPrisma({ failMessage: { code: "P2002" } }).prisma).appendMessage(base("m1"), [])).rejects.toMatchObject({ code: "P2002" });
+    await expect(new PrismaLeadMessagingRepository(stubbedPrisma({ failMessage: { code: "P2002" } }).prisma).appendMessage(base("m1", { clientRequestId: "key-bbbbbbbb" }), [])).rejects.toMatchObject({ code: "P2002" });
+    await expect(new PrismaLeadMessagingRepository(stubbedPrisma({ failMessage: new Error("connection reset"), existing }).prisma).appendMessage(base("m1", { clientRequestId: "key-aaaaaaaa" }), [])).rejects.toThrow(/connection reset/);
   });
 });

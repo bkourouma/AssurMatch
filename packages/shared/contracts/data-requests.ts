@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { stripControlCharacters } from "./content-safety";
 
 /**
  * Spec 062 (D-10): data-subject requests (access, rectification, erasure) created by the visitor
@@ -32,7 +33,14 @@ export const dataRequestReferenceSchema = z.string().regex(DATA_REQUEST_REFERENC
 export type DataRequestType = z.output<typeof dataRequestTypeSchema>;
 export type DataRequestStatus = z.output<typeof dataRequestStatusSchema>;
 
-const optionalText = (max: number) => z.preprocess((value) => (typeof value === "string" && value.trim() === "" ? undefined : value), z.string().trim().max(max).optional());
+/** Control characters (a NUL byte included) are stripped before the length check and the storage. */
+const optionalText = (max: number) => z.preprocess(
+  (value) => {
+    const text = typeof value === "string" ? stripControlCharacters(value) : value;
+    return typeof text === "string" && text.trim() === "" ? undefined : text;
+  },
+  z.string().trim().max(max).optional()
+);
 
 // ---------------------------------------------------------------------------------------------
 // Visitor (token 054)
@@ -81,7 +89,10 @@ export const adminDataRequestQuerySchema = z.object({
   limit: z.coerce.number().int().min(1).max(100).default(25)
 });
 
-/** List row: reference, type, status and deadline only, safe for the support role. */
+/**
+ * List row: reference, type, status and deadline are safe for the support role; `quoteReference` and
+ * `locale` are only sent to the compliance roles.
+ */
 export const adminDataRequestListItemSchema = z.object({
   id: z.string(),
   reference: dataRequestReferenceSchema,
@@ -89,7 +100,11 @@ export const adminDataRequestListItemSchema = z.object({
   status: dataRequestStatusSchema,
   createdAt: z.string(),
   dueAt: z.string(),
-  overdue: z.boolean().default(false)
+  overdue: z.boolean().default(false),
+  /** Public reference (`QR-…`) of the quote request; absent for the support role. */
+  quoteReference: z.string().optional(),
+  /** Language of the visitor's e-mails; absent for the support role. */
+  locale: z.enum(["fr", "en"]).optional()
 });
 
 export const adminDataRequestListSchema = z.object({
@@ -111,7 +126,6 @@ export const adminDataRequestDetailSchema = adminDataRequestListItemSchema.exten
   detail: z.string().optional(),
   quoteRequestId: z.string().optional(),
   publicReference: z.string().optional(),
-  locale: z.enum(["fr", "en"]).optional(),
   acknowledgedAt: z.string().optional(),
   reviewedById: z.string().optional(),
   reviewedAt: z.string().optional(),
@@ -119,6 +133,8 @@ export const adminDataRequestDetailSchema = adminDataRequestListItemSchema.exten
   decidedAt: z.string().optional(),
   decisionNote: z.string().optional(),
   erasureBatchId: z.string().optional(),
+  /** True while an erasure request is open, i.e. `start-erasure` can create its preview (absent for the support role). */
+  erasureAllowed: z.boolean().optional(),
   history: z.array(adminDataRequestHistoryEntrySchema).default([])
 });
 
@@ -134,7 +150,7 @@ export const dataRequestStartErasureSchema = z.object({}).strict();
 /** `POST /admin/data-requests/:id/complete`. */
 export const dataRequestCompleteSchema = z.object({ note: optionalText(DATA_REQUEST_DECISION_NOTE_MAX) }).strict();
 /** `POST /admin/data-requests/:id/reject`: the internal note is mandatory. */
-export const dataRequestRejectSchema = z.object({ note: z.string().trim().min(1).max(DATA_REQUEST_DECISION_NOTE_MAX) }).strict();
+export const dataRequestRejectSchema = z.object({ note: z.string().transform(stripControlCharacters).pipe(z.string().trim().min(1).max(DATA_REQUEST_DECISION_NOTE_MAX)) }).strict();
 
 export type DataRequestComplete = z.output<typeof dataRequestCompleteSchema>;
 export type DataRequestReject = z.output<typeof dataRequestRejectSchema>;

@@ -678,9 +678,12 @@ const emptyConversation: BrokerConversationData = {
 
 const emptyDocumentRequests: BrokerDocumentRequestListData = { items: [], openCount: 0, maxOpen: 10, canCreate: false, blockers: [] };
 
-/** GET /broker/{starter|crm}/leads/:leadId/conversation - la conversation du courtier actuel uniquement. */
+/**
+ * GET /broker/{starter|crm}/leads/:leadId/conversation - la conversation du courtier actuel uniquement.
+ * `limit=300` (= LEAD_MESSAGE_THREAD_MAX) : le courtier voit tout le fil, pas seulement les 50 derniers messages.
+ */
 export function readLeadConversation(channel: "starter" | "crm", leadAssignmentId: string) {
-  return readBroker<BrokerConversationData>(`/broker/${channel}/leads/${encodeURIComponent(leadAssignmentId)}/conversation`, emptyConversation);
+  return readBroker<BrokerConversationData>(`/broker/${channel}/leads/${encodeURIComponent(leadAssignmentId)}/conversation?limit=300`, emptyConversation);
 }
 
 /** GET /broker/{starter|crm}/leads/:leadId/document-requests */

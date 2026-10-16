@@ -119,4 +119,8 @@ CREATE TABLE IF NOT EXISTS "DataRequest" (
 
 CREATE UNIQUE INDEX IF NOT EXISTS "DataRequest_reference_key" ON "DataRequest"("reference");
 CREATE INDEX IF NOT EXISTS "DataRequest_quoteRequestId_type_status_idx" ON "DataRequest"("quoteRequestId", "type", "status");
+-- One open request per quote request and type, enforced by the database (two concurrent creations cannot
+-- both pass the application check). Partial, so closed requests (completed / rejected) never collide.
+-- Prisma cannot express a partial unique index: it lives only in this SQL (see the DataRequest model).
+CREATE UNIQUE INDEX IF NOT EXISTS "DataRequest_open_quote_type_key" ON "DataRequest"("quoteRequestId", "type") WHERE "status" IN ('received', 'in_review');
 CREATE INDEX IF NOT EXISTS "DataRequest_status_dueAt_idx" ON "DataRequest"("status", "dueAt");

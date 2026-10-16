@@ -20,6 +20,26 @@ export interface SafeErrorResponse {
 
 const KNOWN_ERROR_CODES = new Set<string>(Object.values(ErrorCodes));
 
+const DETAILS_TEXT_MAX = 80;
+const DETAILS_LIST_MAX = 20;
+
+/**
+ * Spec 062: only these non-sensitive refusal details are relayed to the client, with these shapes:
+ * `wording` (the expressions of FORBIDDEN_WORDING: an array of short strings) and `reason` (the
+ * read-only reason of CONVERSATION_READ_ONLY: a short string). Any other key, or a value of another
+ * shape, is dropped, so an exception built with a free-form `details` object can never leak through.
+ */
+function safeDetails(value: unknown): Record<string, unknown> | undefined {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return undefined;
+  const record = value as Record<string, unknown>;
+  const details: Record<string, unknown> = {};
+  if (Array.isArray(record.wording) && record.wording.length <= DETAILS_LIST_MAX && record.wording.every((entry) => typeof entry === "string" && entry.length <= DETAILS_TEXT_MAX)) {
+    details.wording = record.wording;
+  }
+  if (typeof record.reason === "string" && record.reason.length <= DETAILS_TEXT_MAX) details.reason = record.reason;
+  return Object.keys(details).length > 0 ? details : undefined;
+}
+
 /**
  * Spec 050 R11: an `HttpException` built with `{ code, message, ... }` keeps its explicit code, so
  * new refusals never depend on the wording regexes below. Unknown codes are ignored.
@@ -34,7 +54,7 @@ function explicitDetails(error: unknown): { code?: ErrorCode; blockers?: unknown
     ...(code ? { code } : {}),
     ...(Array.isArray(record.blockers) ? { blockers: record.blockers } : {}),
     ...(Array.isArray(record.availableLanguages) ? { availableLanguages: record.availableLanguages.filter((value): value is string => typeof value === "string") } : {}),
-    ...(record.details && typeof record.details === "object" && !Array.isArray(record.details) ? { details: record.details as Record<string, unknown> } : {}),
+    ...(safeDetails(record.details) ? { details: safeDetails(record.details) as Record<string, unknown> } : {}),
     ...(typeof record.reference === "string" && /^DR-[A-Z0-9]{8}$/.test(record.reference) ? { reference: record.reference } : {})
   };
 }

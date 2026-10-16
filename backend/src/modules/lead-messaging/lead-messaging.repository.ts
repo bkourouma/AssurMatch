@@ -231,6 +231,14 @@ type Delegate = {
   count(input?: unknown): Promise<number>;
 };
 
+type TransactionCapableClient = {
+  $transaction<T>(callback: (tx: { leadMessage: Delegate; leadMessageAttachment: Delegate }) => Promise<T>): Promise<T>;
+};
+
+function isUniqueViolation(error: unknown): boolean {
+  return typeof error === "object" && error !== null && (error as { code?: unknown }).code === "P2002";
+}
+
 function defined<T extends Record<string, unknown>>(value: T): T {
   return Object.fromEntries(Object.entries(value).filter(([, entry]) => entry !== null && entry !== undefined)) as T;
 }
@@ -242,10 +250,27 @@ export class PrismaLeadMessagingRepository implements LeadMessagingRepository {
 
   constructor(private readonly prisma: PrismaService) {}
 
+  /**
+   * The message and its attachments are one unit (a failed attachment insert leaves no message without
+   * its files). A unique violation on (assignment, sender, clientRequestId) is a concurrent retry of the
+   * same send: the message stored first is returned (idempotent replay), nothing else is written.
+   */
   async appendMessage(message: NewLeadMessage, attachments: readonly NewLeadMessageAttachment[]): Promise<LeadMessageRecord> {
-    const row = await this.messagesTable().create({ data: { ...message } });
-    if (attachments.length > 0) await this.attachmentsTable().createMany({ data: attachments.map((attachment) => ({ ...attachment })) });
-    return this.toMessage(row, attachments.map((attachment) => ({ ...attachment })));
+    const client = this.prisma.requireRuntimeClient() as unknown as TransactionCapableClient;
+    try {
+      const row = await client.$transaction(async (tx) => {
+        const created = await tx.leadMessage.create({ data: { ...message } });
+        if (attachments.length > 0) await tx.leadMessageAttachment.createMany({ data: attachments.map((attachment) => ({ ...attachment })) });
+        return created;
+      });
+      return this.toMessage(row, attachments.map((attachment) => ({ ...attachment })));
+    } catch (error) {
+      if (isUniqueViolation(error) && message.clientRequestId) {
+        const existing = await this.findByClientRequestId(message.leadAssignmentId, message.senderType, message.clientRequestId);
+        if (existing) return existing;
+      }
+      throw error;
+    }
   }
 
   async findMessage(id: string): Promise<LeadMessageRecord | undefined> {

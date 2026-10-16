@@ -1568,6 +1568,9 @@ model DataRequest {
 
   @@index([quoteRequestId, type, status])
   @@index([status, dueAt])
+  // Not expressible in Prisma, created by migration 0031 only: the partial unique index
+  // "DataRequest_open_quote_type_key" ON ("quoteRequestId", "type") WHERE "status" IN ('received', 'in_review')
+  // (one open data request per quote request and type). The repository maps its P2002 to DATA_REQUEST_ALREADY_OPEN.
 }
 
 model BrokerCrmProposal {

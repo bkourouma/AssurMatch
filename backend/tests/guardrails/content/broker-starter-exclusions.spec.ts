@@ -20,4 +20,18 @@ describe("broker Starter constitutional exclusions", () => {
     expect(capabilities.blocked).toContain("policy_issuance");
     expect(capabilities.allowed).not.toContain("advanced_commercial_ai");
   });
+
+  it("allows the spec 062 conversation and document requests on Starter without opening any CRM feature", async () => {
+    const capabilities = new BrokerStarterAccessPolicy(new AuditLogWriter()).capabilities();
+
+    expect(capabilities.allowed).toContain("conversation");
+    expect(capabilities.allowed).toContain("document_requests");
+    expect(capabilities.blocked).not.toContain("conversation");
+    expect(capabilities.blocked).not.toContain("document_requests");
+    // Every CRM exclusion stays: Kanban, pipeline, assignment, tasks, reminders, AI.
+    for (const excluded of ["crm_kanban", "advanced_pipeline", "team_assignment", "tasks", "reminders", "advanced_sales_notes", "advanced_commercial_ai"]) {
+      expect(capabilities.blocked, excluded).toContain(excluded);
+      expect(capabilities.allowed, excluded).not.toContain(excluded);
+    }
+  });
 });

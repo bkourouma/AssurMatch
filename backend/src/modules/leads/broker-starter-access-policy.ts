@@ -20,7 +20,10 @@ const STARTER_ALLOWED = [
   "history",
   "dashboard",
   "notifications",
-  "csv_export_if_permitted"
+  "csv_export_if_permitted",
+  // Spec 062: writing to the visitor and asking them for documents are part of the Starter plan (no CRM feature).
+  "conversation",
+  "document_requests"
 ] as const;
 
 const STARTER_BLOCKED = [
@@ -89,6 +92,19 @@ export class BrokerStarterAccessPolicy {
     this.assertLeadAccess(actor, assignment);
     if (!this.hasPermission(actor, "broker_leads:update")) {
       this.refuse(actor, "LeadAssignment", assignment.id, "missing_broker_update_permission");
+    }
+  }
+
+  /**
+   * Spec 062 (E-07): an agent who only holds the assigned CRM scope (no `broker_crm:read` / `broker_crm:*`)
+   * reaches a lead of its tenant only when the lead is assigned to it, whichever route it uses. The CRM
+   * policy applies the same rule on `/broker/crm`; the Starter routes of the messaging module apply it here
+   * so the Starter channel is not a way round it. Other roles are not restricted by this check.
+   */
+  assertAssignedScope(actor: ActorContext, assignment: LeadAssignmentRecord): void {
+    const assignedOnly = actor.roles.includes("broker_agent") && !this.hasPermission(actor, "broker_crm:read") && !this.hasPermission(actor, "broker_crm:*");
+    if (assignedOnly && assignment.assignedAdvisorId !== actor.actorId) {
+      this.refuse(actor, "LeadAssignment", assignment.id, "assigned_scope_required");
     }
   }
 

@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import type { VirusScannerPort } from "../../../src/modules/quote-documents/virus-scanner.port";
 import { OTHER_TENANT, INFECTED_PDF, PDF, TENANT, actors, createKit, file, visitorToken } from "./lead-messaging-kit";
 
 const ref = "QR-1";
@@ -11,7 +12,7 @@ describe("document requests service (spec 062)", () => {
     const created = await kit.requests.create("starter", assignment.id, request, actors.starter);
     expect(created).toMatchObject({ label: "Carte grise", status: "open", documents: [] });
     const pointers = kit.queued.filter((entry) => entry.method === "queueVisitorDocumentsRequested");
-    expect(pointers).toEqual([{ method: "queueVisitorDocumentsRequested", event: { assignmentId: assignment.id, partnerTenantId: TENANT, requestId: created.id } }]);
+    expect(pointers).toEqual([{ method: "queueVisitorDocumentsRequested", event: { assignmentId: assignment.id, partnerTenantId: TENANT, requestId: created.id, bucket: expect.stringMatching(/^[0-9]+$/) } }]);
     expect(JSON.stringify(kit.queued)).not.toContain("Carte grise");
     // A document request is not a first visible reply (only proposals and messages count).
     expect(kit.firstReplies).toEqual([]);
@@ -151,5 +152,86 @@ describe("document requests service (spec 062)", () => {
     await kit.requests.anonymizeForAssignments([assignment.id], "[anonymise]", new Date());
     expect(await kit.repository.findDocumentRequest(created.id)).toMatchObject({ label: "[anonymise]", status: "open", anonymizedAt: expect.any(Date) });
     expect((await kit.repository.findDocumentRequest(created.id))?.note).toBeUndefined();
+  });
+});
+
+describe("document requests service hardening (spec 062 review fixes)", () => {
+  it("caps the creations at 20 per lead in 24 hours, cancelled ones included, and hands the same bucket to the pointer e-mail", async () => {
+    let now = new Date("2026-10-15T10:00:00.000Z");
+    const kit = await createKit({ now: () => now });
+    const assignment = await kit.assign();
+    for (let index = 0; index < 20; index += 1) {
+      const created = await kit.requests.create("starter", assignment.id, { label: `Piece ${index}` }, actors.starter);
+      await kit.requests.cancel("starter", assignment.id, created.id, actors.starter);
+      now = new Date(now.getTime() + 60_000);
+    }
+    // Cancelling frees the open slots but not the creation budget.
+    const list = await kit.requests.listForBroker("starter", assignment.id, actors.starter);
+    expect(list).toMatchObject({ openCount: 0, canCreate: false, blockers: ["limit_reached"] });
+    await expect(kit.requests.create("starter", assignment.id, { label: "Une de trop" }, actors.starter)).rejects.toMatchObject({ response: { code: "DOCUMENT_REQUEST_LIMIT_REACHED" } });
+    expect(kit.audit.search({ action: "lead_document_request.refused" }).map((entry) => entry.reason)).toEqual(["creation_limit_reached"]);
+    expect(await kit.repository.listDocumentRequestsForAssignment(assignment.id)).toHaveLength(20);
+
+    // The pointers carry the 15-minute bucket (the notification service dedupes on it), and the request id for the in-app side.
+    const pointers = kit.queued.filter((entry) => entry.method === "queueVisitorDocumentsRequested").map((entry) => entry.event as { bucket: string; requestId: string });
+    expect(pointers).toHaveLength(20);
+    expect(new Set(pointers.map((event) => event.bucket)).size).toBeLessThanOrEqual(2);
+    expect(new Set(pointers.map((event) => event.requestId)).size).toBe(20);
+
+    // The budget slides: 24 hours after the first requests, creating works again.
+    now = new Date(now.getTime() + 24 * 3_600_000);
+    await kit.requests.create("starter", assignment.id, { label: "Le lendemain" }, actors.starter);
+    // Another lead has its own budget.
+    const other = await kit.assign("q2");
+    await kit.requests.create("starter", other.id, { label: "Autre dossier" }, actors.starter);
+  });
+
+  it("applies the assigned-only scope of an agent on the Starter channel too (E-07)", async () => {
+    const kit = await createKit();
+    const assignment = await kit.assign();
+    await kit.assignments.updateCrmMetadata(assignment.id, { assignedAdvisorId: actors.agentA.actorId! }, actors.pro);
+    for (const channel of ["starter", "crm"] as const) {
+      const created = await kit.requests.create(channel, assignment.id, { label: `Piece ${channel}` }, actors.agentA);
+      expect((await kit.requests.listForBroker(channel, assignment.id, actors.agentA)).items.length).toBeGreaterThan(0);
+      for (const run of [
+        () => kit.requests.listForBroker(channel, assignment.id, actors.agentB),
+        () => kit.requests.create(channel, assignment.id, { label: "Pas assigne" }, actors.agentB),
+        () => kit.requests.cancel(channel, assignment.id, created.id, actors.agentB),
+        () => kit.requests.brokerDocument(channel, assignment.id, created.id, crypto.randomUUID(), actors.agentB)
+      ]) {
+        await expect(run()).rejects.toThrow(/denied/);
+      }
+      await kit.requests.cancel(channel, assignment.id, created.id, actors.agentA);
+    }
+    expect((await kit.repository.listDocumentRequestsForAssignment(assignment.id)).every((entry) => entry.authorId === "agent-a")).toBe(true);
+  });
+
+  it("keeps the request open and stores nothing when the antivirus fails or crashes (scan_failed)", async () => {
+    const scanners: VirusScannerPort[] = [
+      { engine: "clamav", scan: async () => ({ verdict: "failed" as const, engine: "clamav", detail: "timeout" }) },
+      { engine: "clamav", scan: async () => { throw new Error("socket hang up"); } }
+    ];
+    for (const scanner of scanners) {
+      const kit = await createKit({ scanner });
+      const assignment = await kit.assign();
+      const created = await kit.requests.create("starter", assignment.id, request, actors.starter);
+      await expect(kit.requests.visitorUpload(ref, visitorToken(), created.id, [file(PDF)], {})).rejects.toMatchObject({ response: { code: "DOCUMENT_QUARANTINED" } });
+      expect(kit.provided).toEqual([]);
+      expect(kit.storage.size()).toBe(0);
+      expect((await kit.requests.listForBroker("starter", assignment.id, actors.starter)).items[0]).toMatchObject({ status: "open", documents: [] });
+      expect(kit.audit.search({ action: "lead_document_request.upload_quarantined" }).map((entry) => entry.reason)).toEqual(["scan_failed"]);
+      expect(kit.queued.filter((entry) => entry.method === "queueBrokerDocumentReceived")).toEqual([]);
+    }
+  });
+
+  it("catches the promise wording hidden by separators or invisible characters in the label and the note", async () => {
+    const kit = await createKit();
+    const assignment = await kit.assign();
+    for (const input of [{ label: "Remboursement-garanti" }, { label: "Carte grise", note: "Prix garanti" }, { label: "Rembour​sement garanti" }]) {
+      await expect(kit.requests.create("starter", assignment.id, input, actors.starter)).rejects.toMatchObject({ response: { code: "FORBIDDEN_WORDING" } });
+    }
+    // Ordinary technical wording is fine.
+    await kit.requests.create("starter", assignment.id, { label: "Liste des risques garantis" }, actors.starter);
+    expect(await kit.repository.listDocumentRequestsForAssignment(assignment.id)).toHaveLength(1);
   });
 });
