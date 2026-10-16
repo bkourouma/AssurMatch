@@ -276,6 +276,6 @@ describe("prisma migration fresh-base readiness", () => {
     expect(messaging).toContain('ALTER TABLE "QuoteRequestDocument" ADD COLUMN IF NOT EXISTS "uploadedBy" TEXT');
     expect(messaging).not.toMatch(/DROP|DELETE|UPDATE |TRUNCATE/);
     // Messages are append-only for the application: the schema has no edit/delete marker on the body.
-    expect(schema).not.toMatch(/model LeadMessage {[^}]*(editedAt|deletedAt|updatedAt)/);
+    expect(schema).not.toMatch(/model LeadMessage {[^}]*\b(editedAt|deletedAt|updatedAt)\b/);
   });
 });

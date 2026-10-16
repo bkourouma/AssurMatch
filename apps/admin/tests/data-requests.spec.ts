@@ -134,18 +134,19 @@ test("conversations card is read-only, audited, masked for support and mounted o
   expect(card.indexOf("if (!show)")).toBeLessThan(card.indexOf("readAdminLeadConversations(quoteRequestId)"));
   expect(card).toContain("Afficher les échanges (consultation auditée)");
   expect(card).toContain("?conversations=1");
-  // Masked (support): attachment names are never shown, only the type and size.
-  expect(card).toContain('masked ? `Pièce jointe');
+  // Masked (support): bodies are replaced; attachment names are never shown, only their count.
   expect(card).toContain("Contenu masqué pour votre rôle (support)");
   expect(card).toContain('data-conversation-marker="body-masked"');
-  expect(card).toContain("noms uniquement");
-  expect(card).toContain("nom masqué");
+  expect(card).toContain("attachmentCount");
+  expect(card).toContain("noms non affichés");
+  expect(card).not.toContain("fileName");
+  expect(source("apps/admin/app/lib/admin-api.ts")).toContain("conversations: AdminConversationData[]");
   expect(card).toContain("journal d'audit");
   // Read-only: no form, no input, no server action, no write endpoint.
   expect(card).not.toMatch(/<(form|Form|Textarea|textarea|input|Input|Button)\b/);
   expect(card).not.toContain("use server");
   expect(card).not.toMatch(/method:\s*"(POST|PATCH|DELETE)"/);
-  // Attachments: names only, no download link.
+  // Attachments: no download link.
   expect(card).not.toMatch(/href=\{[^}]*attachment/);
   expect(source("apps/admin/app/quote-requests/[quoteRequestId]/page.tsx")).toContain("<LeadConversationsCard quoteRequestId={quoteRequestId} show={showConversations} />");
   expect(source("apps/admin/app/quote-requests/[quoteRequestId]/page.tsx")).toContain('.conversations) === "1"');
