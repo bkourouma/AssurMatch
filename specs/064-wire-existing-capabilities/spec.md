@@ -2,7 +2,7 @@
 
 **Status**: Validated (lot 2 « brancher l'existant », mandaté par le superviseur du projet le 2026-10-15 ; spec standard, aucun `[NEEDS CLARIFICATION]`)
 **Input**: PRD §6.3, §10.2, §10.3, §18, §19 CRM-010, §29 ; specs 012, 035, 036, 040, 049. Dépend des specs 040, 049, 053 (équipe), 055.
-**Impacted surfaces**: Backend API (RBAC des routes courtier, assignation de rôle personnalisé, liste des analyses de pertes, durcissement CSV), Broker Back-office (listes de leads, page d'analyse des pertes, page Équipe, charte), Back-office Plateforme (page des anomalies de routage), shared packages (contrats Enterprise, RBAC), base de données (migration `0032_custom_role_members`, additive). **Web Publique Client : aucun changement** (la charte reste interne au back-office courtier).
+**Impacted surfaces**: Backend API (RBAC des routes courtier, assignation de rôle personnalisé, liste des analyses de pertes, durcissement CSV, filtre d'affichage par agence), Broker Back-office (listes de leads, page d'analyse des pertes, page Équipe, charte), Back-office Plateforme (page des anomalies de routage), shared packages (contrats Enterprise, RBAC), base de données (migration `0032_custom_role_members`, additive). **Web Publique Client : aucun changement** (la charte reste interne au back-office courtier).
 
 ## Why
 Quatre capacités existent côté backend mais restent inatteignables ou non appliquées :
@@ -17,7 +17,8 @@ Quatre capacités existent côté backend mais restent inatteignables ou non app
 2. **(P1) Courtier Enterprise.** Il lance une analyse IA des leads perdus sur 90 jours, lit le résultat étiqueté « assistance IA », puis le valide ou l'écarte. L'écran est désactivé quand les flags IA sont coupés, et indisponible hors plan Enterprise.
 3. **(P1) Admin plateforme.** Depuis la page des anomalies, il demande une « Analyse IA (assistance) », lit le résultat, le valide ou l'écarte. Rien n'est appliqué automatiquement (PRD §32.8). La liste déterministe des anomalies reste utilisable quoi qu'il arrive.
 4. **(P1) Propriétaire ou manager Enterprise.** Depuis la page Équipe, il attribue un rôle personnalisé à un manager, un agent ou un lecteur. Dès la requête suivante, les permissions de ce membre sont l'intersection de son rôle de base et du rôle personnalisé ; un agent restreint reçoit 403 sur ce qui n'est plus accordé et ne voit plus les actions interdites.
-5. **(P2) Charte.** Le libellé et la couleur de charte d'un cabinet Enterprise sont appliqués dans l'en-tête du back-office courtier, avec la mention « Plateforme technique AssurMatch » toujours visible.
+5. **(P1) Courtier Enterprise : filtre par agence.** Sur la vue tableau et Kanban du CRM et sur le tableau de bord CRM, un filtre « Agence » (affichage seulement) restreint la vue aux leads dont le conseiller assigné appartient à l'agence choisie. Par défaut : l'agence du membre s'il n'en a qu'une, sinon « Toutes les agences » ; option « Sans agence » pour les leads sans conseiller ou dont le conseiller n'a pas d'agence.
+6. **(P2) Charte.** Le libellé et la couleur de charte d'un cabinet Enterprise sont appliqués dans l'en-tête du back-office courtier, avec la mention « Plateforme technique AssurMatch » toujours visible.
 
 ## Requirements
 - **FR-001 (exports).** Gestionnaires de routes Next `GET /leads/export` et `GET /crm/leads/export` dans `apps/broker`, modélisés sur `reports/export/route.ts` (jeton en cookie httpOnly, 401 sans session, aucune fuite d'erreur), qui relaient les filtres vers l'API et renvoient `text/csv` en pièce jointe. Bouton « Exporter (CSV) » sur `/leads` et `/crm/leads`, affiché seulement si l'utilisateur a `broker_leads:export` (Starter) ou `broker_crm:export` / `broker_crm:*` (CRM) après application du rôle personnalisé. La politique backend reste l'autorité (403 audité).
@@ -29,20 +30,23 @@ Quatre capacités existent côté backend mais restent inatteignables ou non app
 - **FR-007 (rôles personnalisés : application).** Le garde d'authentification résout, à chaque requête d'un utilisateur courtier, le rôle personnalisé du membre et pose sur l'acteur `customRole` (id, nom) et `customRolePermissions` (permissions effectives = `effectivePermissions` : intersection du rôle de base et du rôle personnalisé, plafonnée au catalogue `brokerCustomPermissions`). Cache court (TTL 10 s) invalidé immédiatement à chaque assignation, modification ou retrait de rôle (effet à la requête suivante). Les politiques d'accès Starter, CRM, tableau de bord et assistance IA utilisent un helper unique `actorHasPermission` qui applique cette restriction ; les permissions hors catalogue (offres, société, équipe, facturation) restent celles du rôle de base. Jamais d'élévation : un rôle personnalisé ne fait que restreindre.
 - **FR-008 (rôles personnalisés : UI).** `GET /auth/me` expose `customRole` et `customRolePermissions` ; l'UI courtier applique la même restriction (`hasPermission`) et masque les actions interdites. Page Équipe : colonne « Rôle personnalisé » et sélecteur d'attribution pour les propriétaires et managers d'un cabinet Enterprise.
 - **FR-009 (charte).** Pour un cabinet Enterprise, l'en-tête du back-office courtier affiche le libellé de charte et la couleur principale (avec garde de contraste) tout en gardant « Plateforme technique AssurMatch » visible. Aucune lecture de la charte par l'app publique.
+- **FR-011 (filtre par agence).** Paramètre optionnel `agencyId` (uuid d'une agence du tenant ou `none`) sur `GET /broker/crm/leads`, `/leads/kanban`, `/leads/export.csv`, `/broker/crm/dashboard`, `/broker/dashboard` et `/broker/dashboard/advisors`. Filtre d'affichage appliqué après les politiques d'accès existantes : il ne peut que réduire ce que l'acteur voit déjà, jamais l'élargir (RBAC inchangé). Un lead relève d'une agence via l'appartenance (`PartnerAgency.memberIds`) de son conseiller assigné ; conseiller dans plusieurs agences : le lead apparaît sous chacune. Ignoré hors plan Enterprise ; agence inconnue ou d'un autre tenant : 404 neutre. `GET /broker/enterprise/agencies` expose `memberIds`. Côté UI (`?agence=all|none|<uuid>`), le défaut est l'agence unique du membre, sinon « Toutes les agences ». L'analyse des pertes n'utilise jamais ce filtre. Aucune migration.
 - **FR-010 (tests).** Tests unitaires (helper, intersection, CSV), intégration HTTP (assignation, 403 d'un agent restreint, effet à la requête suivante, isolation de tenant, export audité, liste des analyses de pertes), contrats, inventaire de routes, migration, et spécifications Playwright « sources » côté courtier et admin.
 
 ## Hors périmètre (documenté)
-- **Filtre CRM / tableau de bord par agence (PRD §6.3).** Les agences sont des regroupements internes sans lien avec les leads : filtrer ou borner la visibilité par agence est une décision produit (visibilité des managers, membre dans plusieurs agences, leads non assignés). Non réalisé ; **DÉCISION À CONFIRMER**.
+- **Restriction de visibilité par agence.** Le filtre d'agence est un filtre d'affichage ; borner l'accès d'un manager ou d'un agent à son agence reste une décision produit non prise.
 - Domaine personnalisé et white label public : inchangés (la charte reste interne, constitution Principe I).
 - Ancien contrôleur `backend/src/runtime/runtime-http.controller.ts` (non utilisé par l'application Nest) : non modifié.
 
 ## Décisions à confirmer
-- **D1** Export Starter : conservé tel que la politique actuelle (permission `broker_leads:export`, donc propriétaire Starter ou Pro) ; le PRD le qualifie d'« optionnel ».
+- **D1** (CONFIRMÉE par le product owner le 2026-10-15) Export Starter : conservé tel que la politique actuelle (permission `broker_leads:export`, donc propriétaire Starter ou Pro), chaque export étant audité.
 - **D2** L'assignation d'un rôle personnalisé est ouverte aux propriétaires **et** managers Enterprise (`broker_team:write`), alors que la création/modification des rôles reste réservée au propriétaire (spec 040).
 - **D3** Un rôle personnalisé ne restreint que le catalogue leads/CRM/notifications ; offres, société, équipe et facturation suivent le rôle de base.
-- **D4** Le rôle personnalisé reste appliqué si le cabinet quitte le plan Enterprise (il ne peut que restreindre).
+- **D4** (CONFIRMÉE le 2026-10-15) Le rôle personnalisé reste appliqué si le cabinet quitte le plan Enterprise (il ne peut que restreindre) ; il n'est alors plus modifiable.
 - **D5** Un seul rôle personnalisé par membre ; jamais sur un propriétaire.
-- **D6** Filtre par agence : hors périmètre (voir ci-dessus).
+- **D6** (RÉSOLUE le 2026-10-15) Filtre par agence : filtre d'affichage simple (FR-011), pas une restriction d'accès.
+- **D8** Seul un propriétaire peut attribuer ou retirer un rôle personnalisé à un manager (un manager ne cible que les agents et lecteurs), pour qu'un manager ne lève pas une restriction posée par le propriétaire. **DÉCISION À CONFIRMER**.
+- **D9** Lecture et validation de l'analyse des pertes : réservées aux rôles qui voient tout le CRM (pas les agents limités à leurs leads) et, pour la validation, à la permission `broker_crm:update`.
 - **D7** Charte appliquée au seul en-tête du back-office courtier, pour le plan Enterprise.
 
 ## Success criteria

@@ -58,6 +58,14 @@ Contrats :
 - Réponse d'assignation : `{ userId, customRole: { id, name } | null }`.
 - `ActorContext` : `customRole?: { id: string; name: string }`, `customRolePermissions?: string[]`.
 
+### 4 bis. Filtre par agence (FR-011)
+```
+Page CRM (?agence=all|none|<uuid>) ─▶ GET /broker/crm/leads|leads/kanban|leads/export.csv|dashboard , /broker/dashboard(/advisors) ?agencyId=
+   BrokerCrmLeadsService / BrokerDashboardService ─▶ politiques d'accès (inchangées) ─▶ AgencyScopePort.resolve(actor, agencyId)
+       = predicate(advisorId) : membership PartnerAgency.memberIds du conseiller assigné ; `none` = sans conseiller ou sans agence
+```
+Filtre d'affichage uniquement, ignoré hors Enterprise, 404 si l'agence n'est pas celle du tenant ; l'analyse des pertes ne l'utilise pas.
+
 ### 5. Charte (FR-009)
 `layout.tsx` lit la charte (`readBrokerBranding`) uniquement pour `partnerPlan === "enterprise"` et la passe au shell : libellé en sous-titre de marque, couleur en variable CSS locale si le contraste avec le texte est suffisant ; la mention plateforme reste affichée. Échec silencieux (charte par défaut).
 
