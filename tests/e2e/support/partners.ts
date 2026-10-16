@@ -88,6 +88,10 @@ export interface DirectBrokerInput {
   legalName: string;
   ownerEmail: string;
   licenseNumber: string;
+  /** Plan chosen on the creation form (spec 065); the form defaults to Starter. */
+  plan?: "starter" | "pro" | "enterprise";
+  /** Days between today and the licence expiry date (default 365). */
+  licenseValidDays?: number;
 }
 
 /**
@@ -103,6 +107,7 @@ export async function onboardBrokerDirect(page: Page, input: DirectBrokerInput):
   await country.selectOption(ci ?? "");
   await create.locator("input[name='primaryEmail']").fill(input.ownerEmail);
   await create.locator("input[name='primaryWhatsApp']").fill("+2250709080706");
+  if (input.plan) await create.locator("select[name='plan']").selectOption(input.plan);
   await fillReason(create, REASON);
   await create.getByRole("button", { name: "Créer le courtier" }).click();
   await page.waitForURL(/\/partners\/[0-9a-f-]{36}/u);
@@ -114,7 +119,7 @@ export async function onboardBrokerDirect(page: Page, input: DirectBrokerInput):
   await license.locator("select[name='countryId']").selectOption(ci ?? "");
   const today = new Date();
   await license.locator("input[name='effectiveDate']").fill(today.toISOString().slice(0, 10));
-  await license.locator("input[name='expirationDate']").fill(new Date(today.getTime() + 365 * 86_400_000).toISOString().slice(0, 10));
+  await license.locator("input[name='expirationDate']").fill(new Date(today.getTime() + (input.licenseValidDays ?? 365) * 86_400_000).toISOString().slice(0, 10));
   await fillReason(license, REASON);
   await license.getByRole("button", { name: "Enregistrer la licence" }).click();
   await expectActionSuccess(license, "create licence");

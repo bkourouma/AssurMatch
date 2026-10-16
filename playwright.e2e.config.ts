@@ -27,6 +27,8 @@ export default defineConfig({
     ? [["list"], ["html", { outputFolder: "playwright-report/e2e", open: "never" }], ["github"]]
     : [["list"], ["html", { outputFolder: "playwright-report/e2e", open: "never" }]],
   use: {
+    // Optional: drive an installed browser (E2E_BROWSER_CHANNEL=chrome) when the bundled Chromium is not downloaded.
+    ...(process.env.E2E_BROWSER_CHANNEL ? { channel: process.env.E2E_BROWSER_CHANNEL } : {}),
     locale: "fr-FR",
     timezoneId: "Africa/Abidjan",
     actionTimeout: 30_000,
@@ -60,6 +62,21 @@ export default defineConfig({
       testMatch: ["visitor-tracking.spec.ts"],
       use: { baseURL: publicUrl },
       dependencies: ["scenario"]
+    },
+    {
+      // Spec 065, Pro / Enterprise journeys (PRD 32.1, 32.2, 32.6, 32.7): each file provisions its own
+      // broker firms (plan set by the admin) on top of the Côte d'Ivoire opened by the scenario.
+      name: "pro-enterprise",
+      testMatch: ["pro-*.spec.ts", "enterprise-agencies-sla.spec.ts", "forbidden-cases-pro.spec.ts"],
+      use: { baseURL: adminUrl },
+      dependencies: ["scenario"]
+    },
+    {
+      // Spec 065, SC-01 for Senegal. Opens SN, so it runs after the SC-09a check that SN is closed.
+      name: "senegal",
+      testMatch: ["senegal-opening.spec.ts"],
+      use: { baseURL: adminUrl },
+      dependencies: ["backoffice"]
     }
   ]
 });
