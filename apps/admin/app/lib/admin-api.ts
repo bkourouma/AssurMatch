@@ -538,6 +538,11 @@ export interface AdminPartnerSlaRowData {
   leadsWithinTarget: number;
   complianceRate: number;
   averageFirstActionMinutes: number | null;
+  /** Spec 062 (additive, null/absent when nothing is measured): first reply visible to the visitor. */
+  averageFirstVisibleReplyMinutes?: number | null;
+  firstVisibleReplyMeasured?: number;
+  firstVisibleReplyWithinTarget?: number;
+  firstVisibleReplyComplianceRate?: number | null;
 }
 
 export function readPartnerSla() {
@@ -713,7 +718,12 @@ export const RETENTION_CATEGORY_KEYS = [
   "waitlist",
   "ai_traces",
   "webhook_payloads",
-  "messaging_references"
+  "messaging_references",
+  "satisfaction_feedback",
+  // Spec 062: provisional durations, pending legal validation.
+  "lead_message_threads",
+  "lead_document_requests",
+  "data_requests"
 ] as const;
 export type RetentionCategoryKey = (typeof RETENTION_CATEGORY_KEYS)[number];
 export type RetentionSubjectKey = RetentionCategoryKey | "prospects";
@@ -722,7 +732,7 @@ export interface RetentionPolicyItemData {
   category: RetentionCategoryKey;
   retentionDays: number;
   source: "default" | "global" | "country";
-  anchor: "last_activity" | "created_at" | "reviewed_at" | "country_public_since" | "occurred_at";
+  anchor: "last_activity" | "created_at" | "reviewed_at" | "country_public_since" | "occurred_at" | "submitted_at";
   defaultRetentionDays: number;
   globalRetentionDays: number | null;
   countryRetentionDays: number | null;
@@ -786,6 +796,97 @@ export function readRetentionPolicies(countryId?: string) {
 
 export function readRetentionBatches() {
   return readAdmin<RetentionBatchesData>("/admin/retention/batches", { purgeEnabled: false, items: [] });
+}
+
+/**
+ * Spec 062: data-subject requests (access, rectification, erasure) of the compliance queue. Mirrors
+ * `packages/shared/contracts/data-requests.ts`. The support role only receives the list fields.
+ */
+export const DATA_REQUEST_TYPE_KEYS = ["access", "rectification", "erasure"] as const;
+export const DATA_REQUEST_STATUS_KEYS = ["received", "in_review", "completed", "rejected"] as const;
+export type DataRequestTypeKey = (typeof DATA_REQUEST_TYPE_KEYS)[number];
+export type DataRequestStatusKey = (typeof DATA_REQUEST_STATUS_KEYS)[number];
+
+export interface DataRequestListItemData {
+  id: string;
+  reference: string;
+  type: DataRequestTypeKey | (string & {});
+  status: DataRequestStatusKey | (string & {});
+  createdAt: string;
+  dueAt: string;
+  overdue?: boolean;
+  quoteReference?: string;
+  locale?: string;
+}
+
+export interface DataRequestListData {
+  items: DataRequestListItemData[];
+  nextCursor: string | null;
+}
+
+export interface DataRequestHistoryEntryData {
+  action: string;
+  at: string;
+}
+
+export interface DataRequestDetailData extends DataRequestListItemData {
+  /** Personal data written by the visitor: absent for the support role. */
+  detail?: string;
+  acknowledgedAt?: string | null;
+  reviewedAt?: string;
+  decidedAt?: string;
+  decisionNote?: string;
+  erasureBatchId?: string;
+  erasureAllowed?: boolean;
+  history?: DataRequestHistoryEntryData[];
+}
+
+export function readDataRequests(filters: { status?: string; type?: string; cursor?: string; limit?: number } = {}) {
+  const params = new URLSearchParams();
+  if (filters.status) params.set("status", filters.status);
+  if (filters.type) params.set("type", filters.type);
+  if (filters.cursor) params.set("cursor", filters.cursor);
+  if (filters.limit) params.set("limit", String(filters.limit));
+  const query = params.toString();
+  return readAdmin<DataRequestListData>(`/admin/data-requests${query ? `?${query}` : ""}`, { items: [], nextCursor: null });
+}
+
+export function readDataRequest(id: string) {
+  return readAdmin<DataRequestDetailData | null>(`/admin/data-requests/${encodeURIComponent(id)}`, null);
+}
+
+/**
+ * Spec 062: read-only view of the broker/visitor conversations of one quote request. Every read is
+ * audited by the API; with `masked` set, the message bodies are replaced by a placeholder.
+ */
+export interface AdminConversationMessageData {
+  id: string;
+  senderType: "broker" | "visitor" | (string & {});
+  /** Null when masked (support role). */
+  body: string | null;
+  bodyMasked?: boolean;
+  createdAt: string;
+  readAt?: string | null;
+  /** Count only: file names are personal data and are never sent to the admin view. */
+  attachmentCount?: number;
+}
+
+export interface AdminConversationData {
+  conversationId: string;
+  partnerName: string;
+  state?: "open" | "read_only" | (string & {});
+  readOnlyReason?: string | null;
+  messages: AdminConversationMessageData[];
+}
+
+export interface AdminLeadConversationsData {
+  quoteRequestId?: string;
+  masked: boolean;
+  conversations: AdminConversationData[];
+}
+
+export function readAdminLeadConversations(quoteRequestId: string) {
+  return readAdmin<AdminLeadConversationsData>(`/admin/leads/${encodeURIComponent(quoteRequestId)}/conversations`, { masked: false, conversations: [] });
 }
 
 export interface AdminAiInsight {

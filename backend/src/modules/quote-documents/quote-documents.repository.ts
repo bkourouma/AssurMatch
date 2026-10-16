@@ -20,6 +20,10 @@ export interface QuoteDocumentRecord {
   status: QuoteDocumentStatus;
   sharedLeadAssignmentId: string | null;
   sharedAt: Date | null;
+  /** Spec 062: the broker document request this file answers (absent for a regular upload). */
+  documentRequestId?: string | null | undefined;
+  /** Spec 062: who uploaded the file (`visitor` when absent, the historical case). */
+  uploadedBy?: string | null | undefined;
   retentionUntil: Date;
   createdAt: Date;
   updatedAt: Date;

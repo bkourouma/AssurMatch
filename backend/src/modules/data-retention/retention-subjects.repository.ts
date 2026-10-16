@@ -84,6 +84,11 @@ export interface ErasureSubjectIds {
   contactMessages: string[];
   waitlist: string[];
   partnerApplications: string[];
+  /** Spec 062: threads are designated by their lead assignment id (every message of the assignment). */
+  leadMessageThreads: string[];
+  /** Spec 062: document requests are designated by their lead assignment id too. */
+  leadDocumentRequests: string[];
+  dataRequests: string[];
 }
 
 export interface QuoteCascade {
@@ -92,6 +97,8 @@ export interface QuoteCascade {
   prospectId: string;
   /** Documents of the request still holding a file. */
   documents: Array<{ id: string; storageKey: string }>;
+  /** Spec 062: files attached to the messages of the request, still holding a stored object. */
+  messageAttachments: Array<{ id: string; storageKey: string }>;
   assignments: Array<{ id: string; partnerTenantId: string }>;
 }
 
@@ -107,6 +114,8 @@ export interface RetentionSubjectsRepository extends RuntimeRepository {
   findByEmailFingerprint(emailFingerprint: string): Promise<ErasureSubjectIds>;
   loadQuoteCascade(quoteRequestId: string): Promise<QuoteCascade | undefined>;
   anonymizeLeadContent(assignmentIds: readonly string[]): Promise<void>;
+  /** Spec 062: the data requests of the quote request lose their free text; reference, type, status and dates stay. */
+  anonymizeDataRequestsForQuote(quoteRequestId: string): Promise<void>;
   anonymizeQuoteAi(quoteRequestId: string, assignmentIds: readonly string[]): Promise<void>;
   anonymizeSatisfactionSurvey?(quoteRequestId: string): Promise<void>;
   anonymizeQuoteRequestRow(id: string, stamp: AnonymizationStamp): Promise<boolean>;
@@ -120,11 +129,22 @@ export interface RetentionSubjectsRepository extends RuntimeRepository {
   anonymizeAiInteraction(id: string): Promise<boolean>;
   anonymizeWebhookPayload(id: string): Promise<boolean>;
   anonymizeMessagingReference(id: string): Promise<boolean>;
+  /** Spec 062: files still stored for the messages of one lead assignment (deleted before the rows are anonymized). */
+  findLiveThreadAttachments(leadAssignmentId: string): Promise<Array<{ id: string; storageKey: string }>>;
+  /** Spec 062: message bodies and attachment names of the assignment become the marker. False when nothing was left to anonymize. */
+  anonymizeMessageThread(leadAssignmentId: string, stamp: AnonymizationStamp): Promise<boolean>;
+  /** Spec 062: document request labels and notes of the assignment. False when nothing was left to anonymize. */
+  anonymizeDocumentRequestThread(leadAssignmentId: string, stamp: AnonymizationStamp): Promise<boolean>;
+  /** Spec 062: the free text of one data request. */
+  anonymizeDataRequest(id: string, stamp: AnonymizationStamp): Promise<boolean>;
 }
 
 function emptySubjects(): ErasureSubjectIds {
-  return { prospects: [], quoteRequests: [], quoteDocuments: [], contactMessages: [], waitlist: [], partnerApplications: [] };
+  return { prospects: [], quoteRequests: [], quoteDocuments: [], contactMessages: [], waitlist: [], partnerApplications: [], leadMessageThreads: [], leadDocumentRequests: [], dataRequests: [] };
 }
+
+/** Spec 062: only closed data requests follow the retention duration; an open one is never wiped by a retention batch. */
+const CLOSED_DATA_REQUEST_STATUSES = ["completed", "rejected"] as const;
 
 function latest(dates: ReadonlyArray<Date | null | undefined>): Date | null {
   let result: Date | null = null;
@@ -153,6 +173,29 @@ export interface MemoryCrmActivitySource {
   pipelineHistoryForLead(leadAssignmentId: string): Promise<Array<{ reason?: string | undefined }>>;
 }
 
+/**
+ * Spec 062: the messaging store as the memory adapter reads and scrubs it (`MemoryLeadMessagingRepository`
+ * satisfies it). Records are listed per quote request; the scrub is per lead assignment.
+ */
+export interface MemoryLeadMessagingSource {
+  listForQuote(quoteRequestId: string): Promise<Array<{
+    leadAssignmentId: string;
+    createdAt: Date;
+    anonymizedAt?: Date | null | undefined;
+    attachments: Array<{ id: string; storageKey: string; anonymizedAt?: Date | null | undefined }>;
+  }>>;
+  listDocumentRequestsForQuote(quoteRequestId: string): Promise<Array<{ leadAssignmentId: string; createdAt: Date; anonymizedAt?: Date | null | undefined }>>;
+  anonymizeForAssignments(leadAssignmentIds: readonly string[], marker: string, now: Date): Promise<void>;
+  anonymizeDocumentRequestsForAssignments(leadAssignmentIds: readonly string[], marker: string, now: Date): Promise<void>;
+}
+
+/** Spec 062: the data requests store as the memory adapter reads and scrubs it (`MemoryDataRequestsRepository` satisfies it). */
+export interface MemoryDataRequestsSource {
+  listAll(): Promise<Array<{ id: string; quoteRequestId: string; status: string; createdAt: Date; anonymizedAt?: Date | null | undefined }>>;
+  anonymizeById(id: string, marker: string, now: Date): Promise<boolean>;
+  anonymizeForQuote(quoteRequestId: string, marker: string, now: Date): Promise<void>;
+}
+
 export interface MemoryRetentionSources {
   countries?: () => Promise<Array<{ id: string; publicSince?: Date | null | undefined }>>;
   prospects?: () => Promise<Array<Anonymizable<ProspectRecord>>>;
@@ -163,6 +206,10 @@ export interface MemoryRetentionSources {
   crmActivity?: MemoryCrmActivitySource;
   /** Spec 055: proposals and visitor responses follow the lead content policy. */
   leadProposals?: { anonymizeForAssignments(leadAssignmentIds: readonly string[], marker: string, now: Date): Promise<void> };
+  /** Spec 062: broker <-> visitor messages, attachments and document requests. */
+  leadMessaging?: MemoryLeadMessagingSource;
+  /** Spec 062: visitor data-subject requests. */
+  dataRequests?: MemoryDataRequestsSource;
   quoteAiSummaries?: () => Promise<Array<QuoteAISummaryRecord & { aiInteractionId?: string | undefined }>>;
   aiInteractions?: () => Promise<AiInteractionRecord[]>;
   contactMessages?: () => Promise<Array<Anonymizable<ContactMessageRecord>>>;
@@ -202,6 +249,7 @@ export class MemoryRetentionSubjectsRepository implements RetentionSubjectsRepos
     const quote = (await this.list(this.sources.quoteRequests)).find((candidate) => candidate.publicReference === publicReference && !candidate.anonymizedAt);
     if (quote) {
       subjects.quoteRequests.push(quote.id);
+      await this.collectMessagingSubjects(new Set([quote.id]), subjects);
       const prospect = (await this.list(this.sources.prospects)).find((candidate) => candidate.id === quote.prospectId && !candidate.anonymizedAt);
       return { subjects, emailFingerprint: prospect?.emailFingerprint || undefined };
     }
@@ -227,6 +275,7 @@ export class MemoryRetentionSubjectsRepository implements RetentionSubjectsRepos
     subjects.quoteRequests = quotes.map((quote) => quote.id);
     subjects.prospects = prospects.filter((prospect) => !quotes.some((quote) => quote.prospectId === prospect.id)).map((prospect) => prospect.id);
     subjects.quoteDocuments = (await this.list(this.sources.quoteDocuments)).filter((document) => quoteIds.has(document.quoteRequestId) && !document.anonymizedAt).map((document) => document.id);
+    await this.collectMessagingSubjects(quoteIds, subjects);
     subjects.contactMessages = (await this.list(this.sources.contactMessages)).filter((message) => message.emailFingerprint === emailFingerprint && !message.anonymizedAt).map((message) => message.id);
     subjects.waitlist = (await this.list(this.sources.waitlistEntries)).filter((entry) => entry.emailFingerprint === emailFingerprint && !entry.anonymizedAt).map((entry) => entry.id);
     subjects.partnerApplications = (await this.list(this.sources.partnerApplications)).filter((application) => application.contactEmailFingerprint === emailFingerprint && !application.anonymizedAt).map((application) => application.id);
@@ -242,7 +291,42 @@ export class MemoryRetentionSubjectsRepository implements RetentionSubjectsRepos
     const assignments = (await this.list(this.sources.leadAssignments))
       .filter((assignment) => assignment.quoteRequestId === quoteRequestId)
       .map((assignment) => ({ id: assignment.id, partnerTenantId: assignment.partnerTenantId }));
-    return { id: quote.id, publicReference: quote.publicReference, prospectId: quote.prospectId, documents, assignments };
+    const messageAttachments = (await this.liveMessages(quoteRequestId)).flatMap((message) => message.attachments.filter((attachment) => !attachment.anonymizedAt).map((attachment) => ({ id: attachment.id, storageKey: attachment.storageKey })));
+    return { id: quote.id, publicReference: quote.publicReference, prospectId: quote.prospectId, documents, messageAttachments, assignments };
+  }
+
+  async anonymizeDataRequestsForQuote(quoteRequestId: string): Promise<void> {
+    await this.sources.dataRequests?.anonymizeForQuote(quoteRequestId, ANONYMIZED_MARKER, new Date());
+  }
+
+  async findLiveThreadAttachments(leadAssignmentId: string): Promise<Array<{ id: string; storageKey: string }>> {
+    const quoteRequestId = await this.quoteOfAssignment(leadAssignmentId);
+    if (!quoteRequestId) return [];
+    return (await this.liveMessages(quoteRequestId))
+      .filter((message) => message.leadAssignmentId === leadAssignmentId)
+      .flatMap((message) => message.attachments.filter((attachment) => !attachment.anonymizedAt).map((attachment) => ({ id: attachment.id, storageKey: attachment.storageKey })));
+  }
+
+  async anonymizeMessageThread(leadAssignmentId: string, stamp: AnonymizationStamp): Promise<boolean> {
+    const quoteRequestId = await this.quoteOfAssignment(leadAssignmentId);
+    if (!quoteRequestId || !this.sources.leadMessaging) return false;
+    const live = (await this.liveMessages(quoteRequestId)).some((message) => message.leadAssignmentId === leadAssignmentId);
+    if (!live) return false;
+    await this.sources.leadMessaging.anonymizeForAssignments([leadAssignmentId], ANONYMIZED_MARKER, stamp.now);
+    return true;
+  }
+
+  async anonymizeDocumentRequestThread(leadAssignmentId: string, stamp: AnonymizationStamp): Promise<boolean> {
+    const quoteRequestId = await this.quoteOfAssignment(leadAssignmentId);
+    if (!quoteRequestId || !this.sources.leadMessaging) return false;
+    const live = (await this.sources.leadMessaging.listDocumentRequestsForQuote(quoteRequestId)).some((request) => request.leadAssignmentId === leadAssignmentId && !request.anonymizedAt);
+    if (!live) return false;
+    await this.sources.leadMessaging.anonymizeDocumentRequestsForAssignments([leadAssignmentId], ANONYMIZED_MARKER, stamp.now);
+    return true;
+  }
+
+  async anonymizeDataRequest(id: string, stamp: AnonymizationStamp): Promise<boolean> {
+    return (await this.sources.dataRequests?.anonymizeById(id, ANONYMIZED_MARKER, stamp.now)) ?? false;
   }
 
   async anonymizeLeadContent(assignmentIds: readonly string[]): Promise<void> {
@@ -253,6 +337,9 @@ export class MemoryRetentionSubjectsRepository implements RetentionSubjectsRepos
       if (ids.has(assignment.id)) scrub(assignment, { contact: {}, answers: {}, ...(assignment.tags ? { tags: [] } : {}) }, ["actionComment"]);
     }
     await this.sources.leadProposals?.anonymizeForAssignments(assignmentIds, ANONYMIZED_MARKER, new Date());
+    // Spec 062: message bodies, attachment names and document request texts of the assignments.
+    await this.sources.leadMessaging?.anonymizeForAssignments(assignmentIds, ANONYMIZED_MARKER, new Date());
+    await this.sources.leadMessaging?.anonymizeDocumentRequestsForAssignments(assignmentIds, ANONYMIZED_MARKER, new Date());
     const crm = this.sources.crmActivity;
     for (const id of assignmentIds) {
       for (const event of this.sources.leadHistory ? await this.sources.leadHistory(id) : []) scrub(event, {}, ["comment"]);
@@ -410,6 +497,32 @@ export class MemoryRetentionSubjectsRepository implements RetentionSubjectsRepos
     switch (category) {
       case "satisfaction_feedback":
         return [];
+      // Spec 062: a message thread / document request set is one lead assignment; it becomes eligible
+      // once its LATEST live item is older than the duration, so a recent message keeps its whole thread.
+      case "lead_message_threads":
+      case "lead_document_requests": {
+        const documentRequests = category === "lead_document_requests";
+        const candidates: RetentionCandidate[] = [];
+        for (const quote of await this.list(this.sources.quoteRequests)) {
+          const items = documentRequests ? await this.liveDocumentRequests(quote.id) : await this.liveMessages(quote.id);
+          const latestByAssignment = new Map<string, Date>();
+          for (const item of items) {
+            const current = latestByAssignment.get(item.leadAssignmentId);
+            if (!current || item.createdAt > current) latestByAssignment.set(item.leadAssignmentId, item.createdAt);
+          }
+          for (const [leadAssignmentId, anchor] of latestByAssignment) {
+            if (before(anchor)) candidates.push({ id: leadAssignmentId, countryId: quote.countryId, anchor, expired: false });
+          }
+        }
+        return candidates.sort(byAnchor);
+      }
+      case "data_requests": {
+        const countries = new Map((await this.list(this.sources.quoteRequests)).map((quote) => [quote.id, quote.countryId]));
+        return (await this.sources.dataRequests?.listAll() ?? [])
+          .filter((request) => !request.anonymizedAt && (!retention || (CLOSED_DATA_REQUEST_STATUSES as readonly string[]).includes(request.status)) && before(request.createdAt))
+          .map((request) => ({ id: request.id, countryId: countries.get(request.quoteRequestId) ?? null, anchor: request.createdAt, expired: false }))
+          .sort(byAnchor);
+      }
       case "quote_requests": {
         const assignments = await this.list(this.sources.leadAssignments);
         return (await this.list(this.sources.quoteRequests))
@@ -482,6 +595,32 @@ export class MemoryRetentionSubjectsRepository implements RetentionSubjectsRepos
   private async list<T>(source: (() => Promise<T[]>) | undefined): Promise<T[]> {
     return source ? source() : [];
   }
+
+  /** Spec 062: the messages of a quote request that still carry their text. */
+  private async liveMessages(quoteRequestId: string) {
+    return (await this.sources.leadMessaging?.listForQuote(quoteRequestId) ?? []).filter((message) => !message.anonymizedAt);
+  }
+
+  private async liveDocumentRequests(quoteRequestId: string) {
+    return (await this.sources.leadMessaging?.listDocumentRequestsForQuote(quoteRequestId) ?? []).filter((request) => !request.anonymizedAt);
+  }
+
+  private async quoteOfAssignment(leadAssignmentId: string): Promise<string | undefined> {
+    return (await this.list(this.sources.leadAssignments)).find((assignment) => assignment.id === leadAssignmentId)?.quoteRequestId;
+  }
+
+  /** Spec 062: the threads, document request sets and data requests that belong to these quote requests. */
+  private async collectMessagingSubjects(quoteIds: ReadonlySet<string>, subjects: ErasureSubjectIds): Promise<void> {
+    const threads = new Set<string>();
+    const requests = new Set<string>();
+    for (const quoteRequestId of quoteIds) {
+      for (const message of await this.liveMessages(quoteRequestId)) threads.add(message.leadAssignmentId);
+      for (const request of await this.liveDocumentRequests(quoteRequestId)) requests.add(request.leadAssignmentId);
+    }
+    subjects.leadMessageThreads = [...threads];
+    subjects.leadDocumentRequests = [...requests];
+    subjects.dataRequests = (await this.sources.dataRequests?.listAll() ?? []).filter((request) => quoteIds.has(request.quoteRequestId) && !request.anonymizedAt).map((request) => request.id);
+  }
 }
 
 function isFinalNotification(notification: Pick<NotificationRecord, "emailStatus" | "whatsAppStatus">): boolean {
@@ -499,6 +638,7 @@ type Delegate = {
   count(input?: unknown): Promise<number>;
   update(input: unknown): Promise<unknown>;
   updateMany(input: unknown): Promise<{ count: number }>;
+  groupBy(input: unknown): Promise<unknown[]>;
 };
 
 type DelegateName =
@@ -526,7 +666,11 @@ type DelegateName =
   | "partnerWebhookDelivery"
   | "notification"
   | "messagingDelivery"
-  | "satisfactionSurveyRequest";
+  | "satisfactionSurveyRequest"
+  | "leadMessage"
+  | "leadMessageAttachment"
+  | "leadDocumentRequest"
+  | "dataRequest";
 
 interface IdRow { id: string }
 
@@ -651,6 +795,25 @@ export class PrismaRetentionSubjectsRepository implements RetentionSubjectsRepos
       }
       case "satisfaction_feedback":
         return [];
+      // Spec 062: one subject per lead assignment; eligible once its LATEST live message / document request is old enough.
+      case "lead_message_threads":
+        return this.threadCandidates("leadMessage", query);
+      case "lead_document_requests":
+        return this.threadCandidates("leadDocumentRequest", query);
+      case "data_requests": {
+        // Only closed requests follow the duration; the country lives on the quote request (filtered after the join).
+        const rows = await this.rows<{ id: string; quoteRequestId: string; createdAt: Date }>("dataRequest", {
+          where: { anonymizedAt: null, ...ids, ...(retention ? { status: { in: [...CLOSED_DATA_REQUEST_STATUSES] }, createdAt: { lt: query.anchorBefore } } : {}) },
+          select: { id: true, quoteRequestId: true, createdAt: true },
+          orderBy: [{ createdAt: "asc" }, { id: "asc" }],
+          ...page
+        });
+        const countries = await this.quoteCountries(rows.map((row) => row.quoteRequestId));
+        const candidates = rows
+          .map((row) => ({ id: row.id, countryId: countries.get(row.quoteRequestId) ?? null, anchor: row.createdAt, expired: false }))
+          .filter((candidate) => !query.countryId || candidate.countryId === query.countryId);
+        return { candidates, scanned: rows.length };
+      }
       case "messaging_references":
         return query.countryId ? [] : this.messagingCandidates(query);
     }
@@ -661,6 +824,7 @@ export class PrismaRetentionSubjectsRepository implements RetentionSubjectsRepos
     const quote = await this.delegate("quoteRequest").findFirst({ where: { publicReference, anonymizedAt: null }, select: { id: true, prospectId: true } }) as { id: string; prospectId: string } | null;
     if (quote) {
       subjects.quoteRequests.push(quote.id);
+      Object.assign(subjects, await this.messagingSubjects([quote.id]));
       const prospect = await this.delegate("prospect").findFirst({ where: { id: quote.prospectId, anonymizedAt: null }, select: { emailFingerprint: true } }) as { emailFingerprint: string | null } | null;
       return { subjects, emailFingerprint: prospect?.emailFingerprint ?? undefined };
     }
@@ -692,16 +856,86 @@ export class PrismaRetentionSubjectsRepository implements RetentionSubjectsRepos
       quoteDocuments: quoteIds.length === 0 ? [] : (await this.rows<IdRow>("quoteRequestDocument", { where: { quoteRequestId: { in: quoteIds }, anonymizedAt: null }, select: { id: true } })).map((row) => row.id),
       contactMessages: (await this.rows<IdRow>("contactMessage", { where: { emailFingerprint, anonymizedAt: null }, select: { id: true } })).map((row) => row.id),
       waitlist: (await this.rows<IdRow>("waitlistEntry", { where: { emailFingerprint, anonymizedAt: null }, select: { id: true } })).map((row) => row.id),
-      partnerApplications: (await this.rows<IdRow>("partnerApplication", { where: { contactEmailFingerprint: emailFingerprint, anonymizedAt: null }, select: { id: true } })).map((row) => row.id)
+      partnerApplications: (await this.rows<IdRow>("partnerApplication", { where: { contactEmailFingerprint: emailFingerprint, anonymizedAt: null }, select: { id: true } })).map((row) => row.id),
+      ...(await this.messagingSubjects(quoteIds))
     };
+  }
+
+  /** Spec 062: the threads, document request sets (by lead assignment) and data requests of these quote requests. */
+  private async messagingSubjects(quoteIds: readonly string[]): Promise<Pick<ErasureSubjectIds, "leadMessageThreads" | "leadDocumentRequests" | "dataRequests">> {
+    if (quoteIds.length === 0) return { leadMessageThreads: [], leadDocumentRequests: [], dataRequests: [] };
+    const where = { quoteRequestId: { in: [...quoteIds] }, anonymizedAt: null };
+    const assignmentsOf = async (name: DelegateName) => (await this.rows<{ leadAssignmentId: string }>(name, { where, select: { leadAssignmentId: true }, distinct: ["leadAssignmentId"] })).map((row) => row.leadAssignmentId);
+    return {
+      leadMessageThreads: await assignmentsOf("leadMessage"),
+      leadDocumentRequests: await assignmentsOf("leadDocumentRequest"),
+      dataRequests: (await this.rows<IdRow>("dataRequest", { where, select: { id: true } })).map((row) => row.id)
+    };
+  }
+
+  /**
+   * Spec 062: candidates of the per-assignment categories. The assignment is eligible when the latest
+   * live row is older than the cutoff (`having`), so the database does the grouping and the paging.
+   */
+  private async threadCandidates(name: "leadMessage" | "leadDocumentRequest", query: RetentionCandidateQuery): Promise<RetentionCandidatePage> {
+    const groups = await this.delegate(name).groupBy({
+      by: ["leadAssignmentId", "quoteRequestId"],
+      where: { anonymizedAt: null, ...(query.onlyIds ? { leadAssignmentId: { in: [...query.onlyIds] } } : {}) },
+      _max: { createdAt: true },
+      ...(query.mode === "retention" ? { having: { createdAt: { _max: { lt: query.anchorBefore } } } } : {}),
+      orderBy: [{ _max: { createdAt: "asc" } }, { leadAssignmentId: "asc" }],
+      skip: query.skip,
+      take: query.take
+    }) as Array<{ leadAssignmentId: string; quoteRequestId: string; _max: { createdAt: Date | null } }>;
+    const countries = await this.quoteCountries(groups.map((group) => group.quoteRequestId));
+    const candidates = groups
+      .map((group) => ({ id: group.leadAssignmentId, countryId: countries.get(group.quoteRequestId) ?? null, anchor: group._max.createdAt, expired: false }))
+      .filter((candidate) => !query.countryId || candidate.countryId === query.countryId);
+    return { candidates, scanned: groups.length };
   }
 
   async loadQuoteCascade(quoteRequestId: string): Promise<QuoteCascade | undefined> {
     const quote = await this.delegate("quoteRequest").findFirst({ where: { id: quoteRequestId, anonymizedAt: null }, select: { id: true, publicReference: true, prospectId: true } }) as { id: string; publicReference: string; prospectId: string } | null;
     if (!quote) return undefined;
     const documents = await this.rows<{ id: string; storageKey: string }>("quoteRequestDocument", { where: { quoteRequestId, anonymizedAt: null }, select: { id: true, storageKey: true } });
+    const messageAttachments = await this.rows<{ id: string; storageKey: string }>("leadMessageAttachment", { where: { quoteRequestId, anonymizedAt: null }, select: { id: true, storageKey: true } });
     const assignments = await this.rows<{ id: string; partnerTenantId: string }>("leadAssignment", { where: { quoteRequestId }, select: { id: true, partnerTenantId: true } });
-    return { ...quote, documents, assignments };
+    return { ...quote, documents, messageAttachments, assignments };
+  }
+
+  async anonymizeDataRequestsForQuote(quoteRequestId: string): Promise<void> {
+    await this.scrubDataRequests({ quoteRequestId, anonymizedAt: null }, new Date());
+  }
+
+  async findLiveThreadAttachments(leadAssignmentId: string): Promise<Array<{ id: string; storageKey: string }>> {
+    return this.rows<{ id: string; storageKey: string }>("leadMessageAttachment", { where: { leadAssignmentId, anonymizedAt: null }, select: { id: true, storageKey: true } });
+  }
+
+  async anonymizeMessageThread(leadAssignmentId: string, stamp: AnonymizationStamp): Promise<boolean> {
+    const live = { leadAssignmentId, anonymizedAt: null };
+    const messages = await this.delegate("leadMessage").updateMany({ where: live, data: { body: ANONYMIZED_MARKER, anonymizedAt: stamp.now } });
+    await this.delegate("leadMessageAttachment").updateMany({ where: live, data: { fileName: ANONYMIZED_MARKER, anonymizedAt: stamp.now } });
+    return messages.count > 0;
+  }
+
+  async anonymizeDocumentRequestThread(leadAssignmentId: string, stamp: AnonymizationStamp): Promise<boolean> {
+    const result = await this.delegate("leadDocumentRequest").updateMany({
+      where: { leadAssignmentId, anonymizedAt: null },
+      data: { label: ANONYMIZED_MARKER, note: null, anonymizedAt: stamp.now }
+    });
+    return result.count > 0;
+  }
+
+  async anonymizeDataRequest(id: string, stamp: AnonymizationStamp): Promise<boolean> {
+    return (await this.scrubDataRequests({ id, anonymizedAt: null }, stamp.now)) > 0;
+  }
+
+  /** `detail` and `decisionNote` are nullable: each only becomes the marker when it was written. */
+  private async scrubDataRequests(where: Record<string, unknown>, now: Date): Promise<number> {
+    const table = this.delegate("dataRequest");
+    await table.updateMany({ where: { ...where, detail: { not: null } }, data: { detail: ANONYMIZED_MARKER } });
+    await table.updateMany({ where: { ...where, decisionNote: { not: null } }, data: { decisionNote: ANONYMIZED_MARKER } });
+    return (await table.updateMany({ where, data: { anonymizedAt: now, updatedAt: now } })).count;
   }
 
   async anonymizeLeadContent(assignmentIds: readonly string[]): Promise<void> {
@@ -721,6 +955,12 @@ export class PrismaRetentionSubjectsRepository implements RetentionSubjectsRepos
     // Spec 055: the proposal text and the visitor's free answers; amounts, dates and types stay.
     await this.delegate("leadProposal").updateMany({ ...byAssignment, data: { message: ANONYMIZED_MARKER, guarantees: [], withdrawReason: null, documentFileName: ANONYMIZED_MARKER, anonymizedAt: new Date() } });
     await this.delegate("visitorProposalResponse").updateMany({ ...byAssignment, data: { callbackSlot: null, question: null } });
+    // Spec 062: message bodies, attachment names (the stored files are deleted by the caller) and document request texts.
+    const now = new Date();
+    const live = { where: { leadAssignmentId: { in: [...assignmentIds] }, anonymizedAt: null } };
+    await this.delegate("leadMessage").updateMany({ ...live, data: { body: ANONYMIZED_MARKER, anonymizedAt: now } });
+    await this.delegate("leadMessageAttachment").updateMany({ ...live, data: { fileName: ANONYMIZED_MARKER, anonymizedAt: now } });
+    await this.delegate("leadDocumentRequest").updateMany({ ...live, data: { label: ANONYMIZED_MARKER, note: null, anonymizedAt: now } });
   }
 
   async anonymizeQuoteAi(quoteRequestId: string, assignmentIds: readonly string[]): Promise<void> {

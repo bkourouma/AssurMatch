@@ -69,15 +69,25 @@ const CATEGORY_LABELS: Record<RetentionSubjectKey, string> = {
   ai_traces: "Traces IA",
   webhook_payloads: "Contenus des webhooks partenaires",
   messaging_references: "References de messagerie",
-  prospects: "Prospects sans demande"
+  prospects: "Prospects sans demande",
+  satisfaction_feedback: "Avis de satisfaction",
+  // Spec 062: provisional durations, pending legal validation (see PROVISIONAL_CATEGORIES).
+  lead_message_threads: "Fils de messages courtier/visiteur",
+  lead_document_requests: "Demandes de documents",
+  data_requests: "Demandes de données personnelles"
 };
+
+/** Spec 062: categories whose default duration is provisional until the legal review is done. */
+const PROVISIONAL_CATEGORIES = new Set<string>(["lead_message_threads", "lead_document_requests", "data_requests"]);
+const PROVISIONAL_NOTE = "durée provisoire, en attente de validation juridique";
 
 const ANCHOR_LABELS: Record<RetentionPolicyItemData["anchor"], string> = {
   last_activity: "Depuis la derniere activite du dossier (devis ou action courtier)",
   created_at: "Depuis la date de creation",
   reviewed_at: "Depuis la date de revue de la candidature",
   country_public_since: "Depuis l'ouverture publique du pays",
-  occurred_at: "Depuis la date de l'evenement IA"
+  occurred_at: "Depuis la date de l'evenement IA",
+  submitted_at: "Depuis la date de soumission"
 };
 
 const SOURCE_LABELS: Record<RetentionPolicyItemData["source"], { tone: Tone; label: string }> = {
@@ -131,7 +141,20 @@ export default async function DataRetentionPage({ searchParams }: { searchParams
   const openBatches = batchItems.filter((batch) => isApprovable(batch, now)).length;
 
   const policyColumns: Array<DataTableColumn<RetentionPolicyItemData>> = [
-    { key: "category", header: "Categorie", render: (item) => <strong>{CATEGORY_LABELS[item.category]}</strong> },
+    {
+      key: "category",
+      header: "Categorie",
+      render: (item) => (
+        <>
+          <strong>{CATEGORY_LABELS[item.category] ?? item.category}</strong>
+          {PROVISIONAL_CATEGORIES.has(item.category) ? (
+            <div data-retention-marker="provisional-duration">
+              <Badge tone="warning">Provisoire</Badge> {PROVISIONAL_NOTE}
+            </div>
+          ) : null}
+        </>
+      )
+    },
     { key: "duration", header: "Duree", render: (item) => `${item.retentionDays} jours`, numeric: true },
     { key: "source", header: "Source", render: (item) => <Badge tone={SOURCE_LABELS[item.source].tone}>{SOURCE_LABELS[item.source].label}</Badge> },
     { key: "anchor", header: "Point de depart", render: (item) => ANCHOR_LABELS[item.anchor] },
@@ -261,7 +284,12 @@ export default async function DataRetentionPage({ searchParams }: { searchParams
         kicker="Conformite"
         title="Conservation et anonymisation"
         description="Durees de conservation par categorie, previsualisation des lots d'anonymisation et effacement sur demande. Chaque lot est d'abord previsualise, puis approuve manuellement avec un motif: aucune purge automatique."
-        actions={<Button href="/compliance" variant="secondary">Retour conformite</Button>}
+        actions={
+          <>
+            <Button href="/compliance/data-requests" variant="secondary">Demandes de données des visiteurs</Button>
+            <Button href="/compliance" variant="secondary">Retour conformite</Button>
+          </>
+        }
       />
 
       {policies.unauthenticated || batches.unauthenticated ? <StateMessage tone="danger">Session admin requise.</StateMessage> : null}

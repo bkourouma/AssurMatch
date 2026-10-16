@@ -29,6 +29,12 @@ export default function ComplianceEvidencePage() {
         >
           <Button href="/compliance/retention" variant="secondary">Gerer la retention</Button>
         </Card>
+        <Card
+          title="Demandes de données des visiteurs"
+          description="Demandes d'accès, de rectification ou d'effacement déposées par les visiteurs, avec échéance indicative et historique."
+        >
+          <Button href="/compliance/data-requests" variant="secondary">Ouvrir la file des demandes</Button>
+        </Card>
       </Grid>
       <StateMessage>Aucune preuve n'est creee ou modifiee par cette page de polish UX.</StateMessage>
     </PageStack>

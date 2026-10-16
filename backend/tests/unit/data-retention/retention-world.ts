@@ -4,6 +4,8 @@ import { AuditLogWriter } from "../../../src/modules/audit-logs/audit-log-writer
 import type { ActorContext } from "../../../src/modules/common/types";
 import type { ContactMessageRecord } from "../../../src/modules/contact-messages/contact-messages.repository";
 import { DataRetentionModule } from "../../../src/modules/data-retention/data-retention.module";
+import { MemoryDataRequestsRepository, type DataRequestRecord } from "../../../src/modules/data-requests/data-requests.repository";
+import { MemoryLeadMessagingRepository } from "../../../src/modules/lead-messaging/lead-messaging.repository";
 import type { LeadAssignmentRecord } from "../../../src/modules/leads/lead-assignment.service";
 import { MemoryCrmActivityRepository } from "../../../src/modules/leads/crm-activity.repository";
 import type { MessagingDeliveryRecord } from "../../../src/modules/notifications/messaging.repository";
@@ -54,6 +56,9 @@ export function createRetentionWorld() {
   const crm = new MemoryCrmActivityRepository();
   const flags = new Map<string, boolean>();
   const clock = { now: NOW };
+  // Spec 062: the messaging store and the data requests registry the memory retention sources scrub.
+  const messaging = new MemoryLeadMessagingRepository();
+  const dataRequests = new MemoryDataRequestsRepository();
   const notices: Array<{ scopeId: string; template: string; title?: string; body: string; targetType?: string; targetId?: string }> = [];
   const data = {
     countries: [
@@ -101,6 +106,8 @@ export function createRetentionWorld() {
       leadAssignments: async () => data.assignments,
       leadHistory: async (leadAssignmentId) => data.history.filter((event) => event.leadAssignmentId === leadAssignmentId),
       crmActivity: crm,
+      leadMessaging: messaging,
+      dataRequests,
       quoteAiSummaries: async () => data.summaries,
       aiInteractions: async () => data.aiInteractions,
       contactMessages: async () => data.contactMessages,
@@ -267,6 +274,73 @@ export function createRetentionWorld() {
     } as AiInteractionRecord;
   }
 
+  /** Spec 062: a message of the conversation of one assignment, optionally with a stored attachment. */
+  async function addLeadMessage(options: { quote: QuoteRequestRecord; assignment: LeadAssignmentRecord; ageDays: number; body?: string; senderType?: "broker" | "visitor"; withAttachment?: boolean }) {
+    const id = crypto.randomUUID();
+    const createdAt = daysAgo(options.ageDays);
+    const attachments = options.withAttachment
+      ? [{
+          id: crypto.randomUUID(),
+          messageId: id,
+          leadAssignmentId: options.assignment.id,
+          quoteRequestId: options.quote.id,
+          fileName: "attestation-ama-kouassi.pdf",
+          mimeType: "application/pdf",
+          sizeBytes: 8,
+          checksum: "sha256-def",
+          storageKey: `lm-${crypto.randomUUID()}`,
+          scanStatus: "clean" as const,
+          createdAt
+        }]
+      : [];
+    for (const attachment of attachments) await storage.put(attachment.storageKey, Buffer.from("%PDF-1.4"), "application/pdf");
+    const message = await messaging.appendMessage({
+      id,
+      quoteRequestId: options.quote.id,
+      leadAssignmentId: options.assignment.id,
+      partnerTenantId: options.assignment.partnerTenantId,
+      senderType: options.senderType ?? "visitor",
+      body: options.body ?? "Bonjour, je suis Ama Kouassi, mon numero est 0102030405",
+      createdAt
+    }, attachments);
+    return { message, attachments };
+  }
+
+  /** Spec 062: a document request of one assignment. */
+  async function addLeadDocumentRequest(options: { quote: QuoteRequestRecord; assignment: LeadAssignmentRecord; ageDays: number }) {
+    const createdAt = daysAgo(options.ageDays);
+    return messaging.createDocumentRequest({
+      id: crypto.randomUUID(),
+      quoteRequestId: options.quote.id,
+      leadAssignmentId: options.assignment.id,
+      partnerTenantId: options.assignment.partnerTenantId,
+      label: "Carte grise de Ama",
+      note: "Merci d'envoyer le recto verso",
+      status: "open",
+      fulfilledDocumentCount: 0,
+      createdAt,
+      updatedAt: createdAt
+    });
+  }
+
+  /** Spec 062: a data request of the person behind a quote request. */
+  async function addDataRequest(options: { quote: QuoteRequestRecord; ageDays: number; type?: DataRequestRecord["type"]; status?: DataRequestRecord["status"]; reference?: string }) {
+    const createdAt = daysAgo(options.ageDays);
+    return dataRequests.create({
+      id: crypto.randomUUID(),
+      reference: options.reference ?? `DR-${crypto.randomUUID().replace(/-/g, "").slice(0, 8).toUpperCase()}`,
+      quoteRequestId: options.quote.id,
+      type: options.type ?? "access",
+      status: options.status ?? "completed",
+      detail: "Je suis Ama Kouassi, merci de me transmettre mes donnees",
+      locale: "fr",
+      dueAt: new Date(createdAt.getTime() + 30 * DAY_MS),
+      ...(options.status === "received" || options.status === "in_review" ? {} : { decidedAt: createdAt, decisionNote: "Dossier verifie par la conformite" }),
+      createdAt,
+      updatedAt: createdAt
+    });
+  }
+
   function addContactMessage(email: string, ageDays: number, countryId: string | undefined = CI): Anonymizable<ContactMessageRecord> {
     const message: Anonymizable<ContactMessageRecord> = {
       id: crypto.randomUUID(),
@@ -336,7 +410,7 @@ export function createRetentionWorld() {
     return application;
   }
 
-  return { audit, identity, storage, crm, flags, clock, notices, data, module, service: module.service, enablePurge, addProspect, addQuote, addContactMessage, addWaitlistEntry, addPartnerApplication, aiInteraction };
+  return { audit, identity, storage, crm, flags, clock, notices, data, module, service: module.service, enablePurge, addProspect, addQuote, addContactMessage, addWaitlistEntry, addPartnerApplication, aiInteraction, messaging, dataRequests, addLeadMessage, addLeadDocumentRequest, addDataRequest };
 }
 
 export type RetentionWorld = ReturnType<typeof createRetentionWorld>;

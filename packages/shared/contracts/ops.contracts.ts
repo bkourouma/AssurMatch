@@ -12,7 +12,12 @@ export const VISITOR_NOTIFICATION_TYPES = [
   "visitor_consent_withdrawn",
   "visitor_tracking_link",
   // Spec 055 FR-008: a broker sent a proposal.
-  "visitor_proposal_available"
+  "visitor_proposal_available",
+  // Spec 062: pointer e-mails of the broker <-> visitor messaging and of the data-subject requests.
+  "visitor_broker_message",
+  "visitor_documents_requested",
+  "visitor_data_request_acknowledged",
+  "visitor_data_request_closed"
 ] as const;
 
 export type VisitorNotificationType = (typeof VISITOR_NOTIFICATION_TYPES)[number];
@@ -26,7 +31,9 @@ export const BROKER_ALERT_NOTIFICATION_TYPES = [
   "broker_license_expiring",
   "broker_offer_expiring",
   // Spec 063 FR-B08: the finance decision on a lead dispute (pointer only, never lead content).
-  "broker_dispute_decided"
+  "broker_dispute_decided",
+  // Spec 062: the visitor wrote to the assigned broker.
+  "broker_visitor_message"
 ] as const;
 
 export type BrokerAlertNotificationType = (typeof BROKER_ALERT_NOTIFICATION_TYPES)[number];
@@ -49,6 +56,8 @@ export const notificationSchema = z.object({
     // Spec 061 FR-002: pointer e-mails of the broker alerts and of the compliance team.
     ...BROKER_ALERT_NOTIFICATION_TYPES,
     "admin_alert_raised",
+    // Spec 062: compliance in-app alert for a new visitor data request (D-10).
+    "admin_data_request_received",
     "quote_notification_failed",
     // Spec 054 R4: one notification type per public step of the visitor's request.
     ...VISITOR_NOTIFICATION_TYPES

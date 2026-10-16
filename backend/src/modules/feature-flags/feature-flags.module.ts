@@ -66,6 +66,15 @@ export class FeatureFlagsService {
     return (GLOBAL_FEATURE_FLAG_DEFAULTS as Record<string, boolean>)[key] ?? false;
   }
 
+  /**
+   * Spec 062: a flag that is ON until someone switches it off. The stored value wins when a row
+   * exists for the scope; with no row (nothing seeded yet, memory test runtime) the fallback is returned,
+   * where `isEnabled` would answer its documented default.
+   */
+  isEnabledOrDefault(key: string, fallback: boolean, scopeType: FeatureFlag["scopeType"] = "global", scopeId?: string): boolean {
+    return this.flags.find((flag) => flag.key === key && flag.scopeType === scopeType && flag.scopeId === scopeId)?.value ?? fallback;
+  }
+
   async setFlag(input: Omit<FeatureFlag, "id" | "changedAt" | "cacheVersion">, actor: ActorContext, options: FeatureFlagMutationOptions = {}): Promise<FeatureFlag> {
     const existing = this.flags.find((flag) => flag.key === input.key && flag.scopeType === input.scopeType && flag.scopeId === input.scopeId);
     const mutationDecision = evaluateFeatureFlagMutation({

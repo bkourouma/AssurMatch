@@ -33,7 +33,10 @@ export class ErasureLookupService {
       quoteDocuments: union(left.quoteDocuments, right.quoteDocuments),
       contactMessages: union(left.contactMessages, right.contactMessages),
       waitlist: union(left.waitlist, right.waitlist),
-      partnerApplications: union(left.partnerApplications, right.partnerApplications)
+      partnerApplications: union(left.partnerApplications, right.partnerApplications),
+      leadMessageThreads: union(left.leadMessageThreads, right.leadMessageThreads),
+      leadDocumentRequests: union(left.leadDocumentRequests, right.leadDocumentRequests),
+      dataRequests: union(left.dataRequests, right.dataRequests)
     };
   }
 
@@ -44,6 +47,10 @@ export class ErasureLookupService {
       contact_messages: subjects.contactMessages,
       waitlist: subjects.waitlist,
       partner_applications: subjects.partnerApplications,
+      // Spec 062: conversation, document requests (by lead assignment) and data requests of the person.
+      lead_message_threads: subjects.leadMessageThreads,
+      lead_document_requests: subjects.leadDocumentRequests,
+      data_requests: subjects.dataRequests,
       ...(subjects.prospects.length > 0 ? { prospects: subjects.prospects } : {})
     };
   }

@@ -2,6 +2,7 @@ import { readAdminQuoteDocuments } from "../../lib/admin-api";
 import { formatDateTime, readQuoteRequestDetail, readQuoteReviewQueue } from "../../lib/operations-api";
 import { Badge, Card, DataTable, DescriptionList, Grid, PageHeader, PageStack, StateMessage, documentScanTones } from "../../lib/ui/admin-ui";
 import { QuoteReviewForm } from "../../lib/ui/operations-forms";
+import { LeadConversationsCard } from "./lead-conversations-card";
 import { assignmentStatusTones, quoteStatusTones, routingResultTones } from "../../lib/ui/operations-tones";
 
 /**
@@ -9,8 +10,16 @@ import { assignmentStatusTones, quoteStatusTones, routingResultTones } from "../
  * candidates and their reasons, assignments with the partner's name, documents (metadata only) and
  * the selected offer's outcome. Support admins receive contact and answers masked by the API.
  */
-export default async function AdminQuoteRequestDetailPage({ params }: { params: Promise<{ quoteRequestId: string }> }) {
+export default async function AdminQuoteRequestDetailPage({
+  params,
+  searchParams
+}: {
+  params: Promise<{ quoteRequestId: string }>;
+  searchParams?: Promise<{ conversations?: string }>;
+}) {
   const { quoteRequestId } = await params;
+  // Conversation content is loaded (and audited by the API) only on an explicit action: `?conversations=1`.
+  const showConversations = ((searchParams ? await searchParams : {}).conversations) === "1";
   const [detailResult, documents] = await Promise.all([readQuoteRequestDetail(quoteRequestId), readAdminQuoteDocuments(quoteRequestId)]);
   const detail = detailResult.data;
   const review = detail?.reviewOpen ? await readQuoteReviewQueue() : undefined;
@@ -154,6 +163,8 @@ export default async function AdminQuoteRequestDetailPage({ params }: { params: 
           </Card>
         </>
       ) : null}
+
+      <LeadConversationsCard quoteRequestId={quoteRequestId} show={showConversations} />
 
       <Card title="Documents du prospect">
         {documents.unauthenticated ? <StateMessage tone="danger">Session admin requise.</StateMessage> : null}

@@ -19,7 +19,8 @@
     "whatsapp_enabled": false,
     "sponsored_offers_enabled": false,
     "multi_broker_routing_enabled": false,
-    "retention_purge_enabled": false
+    "retention_purge_enabled": false,
+    "broker_visitor_messaging_enabled": false
   },
   "country": {
     "country_public_enabled": false,

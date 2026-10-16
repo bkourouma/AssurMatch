@@ -23,7 +23,9 @@ const disabledFlags = [
   "ai_summary_enabled",
   "ai_duplicate_detection_enabled",
   "ai_recommendation_enabled",
-  "ai_broker_assistant_enabled"
+  "ai_broker_assistant_enabled",
+  // Spec 062: non-sensitive (admin-toggleable) but closed until the legal opinion L-08 is obtained.
+  "broker_visitor_messaging_enabled"
 ];
 
 // Spec 063 (PRD 9.1): the three broker back-office modules are ON by default (an admin can switch

@@ -11,4 +11,12 @@ describe("feature flag precedence", () => {
 
     expect(enabled).toBe(false);
   });
+
+  it("falls back to the code default when a global flag has no row (spec 062 messaging switch ships OFF)", async () => {
+    const service = new FeatureFlagPrecedenceService();
+    expect(service.resolve("broker_visitor_messaging_enabled", [], [])).toBe(false);
+    expect(service.resolve("broker_visitor_messaging_enabled", [{ key: "broker_visitor_messaging_enabled", scopeType: "global", value: true }], [])).toBe(true);
+    expect(service.resolve("starter_portal_enabled", [], [])).toBe(false);
+    expect(service.resolve("unknown_flag", [], [])).toBe(false);
+  });
 });

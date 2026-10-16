@@ -1,11 +1,14 @@
 <!--
 Sync Impact Report
-Version change: 1.2.0 -> 1.3.0
+Version change: 1.3.0 -> 1.4.0
 Modified principles:
 - Constitutional Acceptance Criteria n°1 (Courtier Starter sans CRM): le
-  courtier Starter peut repondre au visiteur par une proposition simple
-  (message et PDF facultatif, non contractuelle) sans acceder aux fonctions
-  CRM. Decision produit D-5 du 2026-10-02 (PRD v0.3).
+  courtier Starter peut en outre echanger par messages ecrits avec le
+  visiteur (pieces jointes analysees, historique en ajout seul, formulations
+  reglementees bloquees), demander des documents au visiteur et telecharger
+  ceux qu'il fournit, toujours sans acceder aux fonctions CRM. Decision
+  produit du 2026-10-15 (spec 062, levee de la decision D-9 du PRD v0.3),
+  amendement ratifie le 2026-10-16.
 Added sections:
 - none
 Removed sections:
@@ -15,19 +18,28 @@ Templates requiring updates:
 - reviewed: .specify/templates/plan-template.md
 - reviewed: .specify/templates/tasks-template.md
 Existing specs impact:
-- Specs 003, 012, 025 (portail Starter) restent valides; la spec 055 introduit
-  la reponse Starter. Le test d'acceptation constitutionnel Starter doit
-  autoriser l'action "repondre au visiteur" et continuer d'interdire Kanban,
+- Specs 003, 012, 025 (portail Starter) et 055 restent valides; la spec 062
+  introduit la messagerie et les demandes de documents pour tous les plans.
+  Le test d'acceptation constitutionnel Starter autorise "echanger avec le
+  visiteur" et "demander des documents" et continue d'interdire Kanban,
   pipeline avance, assignation equipe, taches, rappels et IA commerciale.
-Approver: utilisateur (decision D-5, 2026-10-02). Revalidation: a la revue de
-la spec 055.
-Follow-up TODOs: none
+Approver: proprietaire du produit (decision du 2026-10-15, ratification du
+2026-10-16). Revalidation: a la revue de la spec 062.
+Follow-up TODOs: avis juridique L-08 (positionnement d'intermediaire, CIMA)
+avant ouverture du drapeau broker_visitor_messaging_enabled (defaut false).
+
+Previous report (1.2.0 -> 1.3.0):
+- Constitutional Acceptance Criteria n°1 (Courtier Starter sans CRM): le
+  courtier Starter peut repondre au visiteur par une proposition simple
+  (message et PDF facultatif, non contractuelle) sans acceder aux fonctions
+  CRM. Decision produit D-5 du 2026-10-02 (PRD v0.3). Approver: utilisateur
+  (decision D-5, 2026-10-02).
 -->
 
 # AssurMatch Constitution
 
-**Version**: 1.3.0
-**Date**: 2026-10-03
+**Version**: 1.4.0
+**Date**: 2026-10-16
 **Statut**: Ratified
 
 ## Core Principles
@@ -410,8 +422,11 @@ des features concernees.
    Given un courtier en plan Starter, When il ouvre son portail, Then il voit
    uniquement ses leads recus, le detail du lead, accepter, rejeter, contester,
    repondre au visiteur par une proposition simple (message et document
-   facultatif, marquee non contractuelle), l'historique minimal, le dashboard
-   basique et les notifications configurees.
+   facultatif, marquee non contractuelle), echanger par messages ecrits avec
+   le visiteur (pieces jointes analysees, historique en ajout seul,
+   formulations reglementees bloquees), demander des documents au visiteur et
+   telecharger ceux qu'il fournit, l'historique minimal, le dashboard basique
+   et les notifications configurees.
    Then il NE voit PAS Kanban, pipeline avance, assignation equipe, taches,
    rappels ou IA commerciale non incluse.
 
@@ -591,4 +606,4 @@ Compliance review:
 - Une feature reglementee ou sensible NE DOIT PAS etre activee sans validation
   explicite de conformite.
 
-**Version**: 1.3.0 | **Ratified**: 2026-04-25 | **Last Amended**: 2026-10-03
+**Version**: 1.4.0 | **Ratified**: 2026-04-25 | **Last Amended**: 2026-10-16

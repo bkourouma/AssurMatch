@@ -98,6 +98,9 @@ export const brokerStarterDashboardSectionSchema = z.object({
   disputed: z.number().int().min(0),
   pendingAction: z.number().int().min(0),
   averageFirstActionMinutes: z.number().nullable(),
+  /** Spec 062 E-08: additive, optional. */
+  averageFirstVisibleReplyMinutes: z.number().nullable().optional(),
+  firstVisibleReplyMeasured: z.number().int().min(0).optional(),
   byProduct: z.array(z.object({ productKey: nonEmptyStringSchema, total: z.number().int().min(0) })),
   byCountry: z.array(z.object({ countryCode: isoCountrySchema, total: z.number().int().min(0) })),
   satisfaction: brokerSatisfactionSummarySchema.optional()

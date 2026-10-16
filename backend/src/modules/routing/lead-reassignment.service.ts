@@ -35,6 +35,8 @@ export interface LeadReassignmentDeps {
   events?: { publish(eventType: "lead.reassigned", partnerTenantId: string, data: Record<string, unknown>): Promise<void> } | undefined;
   /** Re-notifies the new partner; returns the notification id when one was queued. */
   notifyBroker?: (assignment: LeadAssignmentRecord, actor: ActorContext) => Promise<string | undefined>;
+  /** Spec 062: closes what belonged to the previous partner (open document requests); a failure never blocks the reassignment. */
+  onReassigned?: (assignmentId: string, previousPartnerTenantId: string, actor: ActorContext) => Promise<unknown>;
 }
 
 /** ROUTE-007: admin reassignment of an existing lead to another eligible partner. */
@@ -79,6 +81,7 @@ export class LeadReassignmentService {
       reason: parsed.reason,
       previousPartnerTenantId
     }, actor);
+    await this.deps.onReassigned?.(updated.id, previousPartnerTenantId, actor).catch(() => undefined);
     const notificationId = await this.deps.notifyBroker?.(updated, actor);
     if (notificationId) await this.deps.assignments.setBrokerNotification(updated.id, notificationId);
     await this.deps.events?.publish("lead.reassigned", updated.partnerTenantId, {

@@ -250,6 +250,8 @@ export class LeadProposalsService {
       updatedAt: now
     });
 
+    // Spec 062 E-08: the first proposal is a "first visible reply" (idempotent; a broker message may already count).
+    await this.deps.assignments.recordFirstVisibleReply(assignment.id, now, actor);
     await this.deps.leadHistory.append({ leadAssignmentId: assignment.id, partnerTenantId: assignment.partnerTenantId, actor, eventType: "proposal_sent" });
     if (channel === "crm") await this.deps.crmHistory.append({ leadAssignmentId: assignment.id, partnerTenantId: assignment.partnerTenantId, actor, eventType: "proposal_sent" });
     const progression = await this.advanceLead(channel, assignment, actor);

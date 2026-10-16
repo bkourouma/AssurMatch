@@ -26,6 +26,7 @@ Légende : 🔴 bloquant pour le pilote fermé (J4) · 🟠 bloquant pour l'ouve
 | 2.6 🔴 | Textes de consentement FR et EN par pays, validés puis publiés par la conformité | Conformité | Écran admin Consentements (spec 050) |
 | 2.7 🟠 | Durées de rétention par pays validées, qui remplacent les valeurs provisoires | Juridique | `/compliance/retention` (spec 046) |
 | 2.8 🟠 | Avis écrit sur le positionnement d'intermédiaire au regard de la CIMA, notamment pour la proposition non contractuelle relayée (spec 055) | Juridique | — |
+| 2.8 bis 🟠 | Ouvrir la messagerie courtier ↔ visiteur (flag `broker_visitor_messaging_enabled`, **fermé par défaut**) depuis l'écran des drapeaux de l'admin, **seulement une fois l'avis juridique L-08 (positionnement d'intermédiaire, CIMA) obtenu** (ligne 2.8). Le drapeau est non sensible : activable et coupable par l'admin, sans déploiement (spec 062) | Conformité, après avis juridique | `docs/scenarios/e2e-admin-courtier-devis.md` (étapes 28a à 28n) |
 | 2.9 🔴 | Mentions légales de facturation : `ASSURMATCH_INVOICE_*`, TVA CI et SN, délai de paiement | Comptabilité | Spec 060 (émission refusée en production tant que ces champs sont incomplets) |
 
 ## 3. Infrastructure (spec 057, runbooks)

@@ -148,6 +148,10 @@ import { PublicHealthController } from "../health/public-health.controller";
 import { MetricsController } from "../observability/metrics.controller";
 import { adminAuditLogQuerySchema } from "../../../../packages/shared/contracts/admin-operations.contracts";
 import { ADMIN_OPERATIONS_HTTP_CONTROLLERS } from "./admin-operations-http.controllers";
+// Spec 062 data requests
+import { DATA_REQUESTS_HTTP_CONTROLLERS } from "./data-requests-http.controllers";
+// Spec 062 messaging
+import { BrokerMessagingRoutes, LEAD_MESSAGING_HTTP_CONTROLLERS, registerBrokerMessagingRoutes } from "./lead-messaging-http.controllers";
 
 type MethodDecoratorFactory = (target: object, propertyKey: string | symbol, descriptor: PropertyDescriptor) => void;
 type ParamDecoratorFactory = (target: object, propertyKey: string | symbol | undefined, parameterIndex: number) => void;
@@ -1215,6 +1219,43 @@ export class BrokerStarterController {
   async proposalDocument(leadId: string, proposalId: string, request: AssurMatchHttpRequest) {
     return attachment(await this.runtime.leadProposals.service.brokerDocument("starter", parseParam("leadId", leadId, uuidSchema), parseParam("proposalId", proposalId, uuidSchema), protectedActorFromRequest(request)));
   }
+
+  // Spec 062 messaging: conversation with the visitor and document requests (Starter has it too; no CRM feature).
+  conversation(leadId: string, query: Record<string, string>, request: AssurMatchHttpRequest) {
+    return new BrokerMessagingRoutes(this.runtime).conversation("starter", leadId, query, request);
+  }
+
+  sendMessage(leadId: string, files: unknown, input: unknown, request: AssurMatchHttpRequest) {
+    const actor = brokerWriteActor(request);
+    return new BrokerMessagingRoutes(this.runtime).send("starter", leadId, files, input, actor);
+  }
+
+  markRead(leadId: string, request: AssurMatchHttpRequest) {
+    const actor = brokerWriteActor(request);
+    return new BrokerMessagingRoutes(this.runtime).markRead("starter", leadId, actor);
+  }
+
+  messageAttachment(leadId: string, messageId: string, attachmentId: string, request: AssurMatchHttpRequest) {
+    return new BrokerMessagingRoutes(this.runtime).attachment("starter", leadId, messageId, attachmentId, request);
+  }
+
+  documentRequests(leadId: string, request: AssurMatchHttpRequest) {
+    return new BrokerMessagingRoutes(this.runtime).documentRequests("starter", leadId, request);
+  }
+
+  createDocumentRequest(leadId: string, input: unknown, request: AssurMatchHttpRequest) {
+    const actor = brokerWriteActor(request);
+    return new BrokerMessagingRoutes(this.runtime).createDocumentRequest("starter", leadId, input, actor);
+  }
+
+  cancelDocumentRequest(leadId: string, requestId: string, input: unknown, request: AssurMatchHttpRequest) {
+    const actor = brokerWriteActor(request);
+    return new BrokerMessagingRoutes(this.runtime).cancelDocumentRequest("starter", leadId, requestId, input, actor);
+  }
+
+  documentRequestFile(leadId: string, requestId: string, documentId: string, request: AssurMatchHttpRequest) {
+    return new BrokerMessagingRoutes(this.runtime).documentFile("starter", leadId, requestId, documentId, request);
+  }
 }
 
 export class BrokerCrmController {
@@ -1297,6 +1338,43 @@ export class BrokerCrmController {
 
   async proposalDocument(leadId: string, proposalId: string, request: AssurMatchHttpRequest) {
     return attachment(await this.runtime.leadProposals.service.brokerDocument("crm", parseParam("leadId", leadId, uuidSchema), parseParam("proposalId", proposalId, uuidSchema), protectedActorFromRequest(request)));
+  }
+
+  // Spec 062 messaging: conversation with the visitor and document requests (CRM channel).
+  conversation(leadId: string, query: Record<string, string>, request: AssurMatchHttpRequest) {
+    return new BrokerMessagingRoutes(this.runtime).conversation("crm", leadId, query, request);
+  }
+
+  sendMessage(leadId: string, files: unknown, input: unknown, request: AssurMatchHttpRequest) {
+    const actor = brokerWriteActor(request);
+    return new BrokerMessagingRoutes(this.runtime).send("crm", leadId, files, input, actor);
+  }
+
+  markRead(leadId: string, request: AssurMatchHttpRequest) {
+    const actor = brokerWriteActor(request);
+    return new BrokerMessagingRoutes(this.runtime).markRead("crm", leadId, actor);
+  }
+
+  messageAttachment(leadId: string, messageId: string, attachmentId: string, request: AssurMatchHttpRequest) {
+    return new BrokerMessagingRoutes(this.runtime).attachment("crm", leadId, messageId, attachmentId, request);
+  }
+
+  documentRequests(leadId: string, request: AssurMatchHttpRequest) {
+    return new BrokerMessagingRoutes(this.runtime).documentRequests("crm", leadId, request);
+  }
+
+  createDocumentRequest(leadId: string, input: unknown, request: AssurMatchHttpRequest) {
+    const actor = brokerWriteActor(request);
+    return new BrokerMessagingRoutes(this.runtime).createDocumentRequest("crm", leadId, input, actor);
+  }
+
+  cancelDocumentRequest(leadId: string, requestId: string, input: unknown, request: AssurMatchHttpRequest) {
+    const actor = brokerWriteActor(request);
+    return new BrokerMessagingRoutes(this.runtime).cancelDocumentRequest("crm", leadId, requestId, input, actor);
+  }
+
+  documentRequestFile(leadId: string, requestId: string, documentId: string, request: AssurMatchHttpRequest) {
+    return new BrokerMessagingRoutes(this.runtime).documentFile("crm", leadId, requestId, documentId, request);
   }
 
   dispute(leadId: string, input: unknown, request: AssurMatchHttpRequest) {
@@ -2280,6 +2358,8 @@ decorate(BrokerCrmController, "aiValidate", [Post("ai/interactions/:id/validatio
 decorate(BrokerCrmController, "aiLossAnalysis", [Post("ai/loss-analysis") as MethodDecoratorFactory], [[0, Body() as ParamDecoratorFactory], [1, Req() as ParamDecoratorFactory]]);
 decorate(BrokerCrmController, "aiOptOutStatus", [Get("ai/opt-out") as MethodDecoratorFactory], [[0, Req() as ParamDecoratorFactory]]);
 decorate(BrokerCrmController, "aiSetOptOut", [Put("ai/opt-out") as MethodDecoratorFactory], [[0, Body() as ParamDecoratorFactory], [1, Req() as ParamDecoratorFactory]]);
+// Spec 062 messaging: conversation and document-request routes of the Starter and CRM controllers (see lead-messaging-http.controllers.ts).
+registerBrokerMessagingRoutes([BrokerStarterController, BrokerCrmController]);
 
 controller("broker/dashboard", BrokerDashboardController, true);
 decorate(BrokerDashboardController, "dashboard", [Get() as MethodDecoratorFactory], [[0, Req() as ParamDecoratorFactory], [1, Query() as ParamDecoratorFactory]]);
@@ -2579,8 +2659,8 @@ Reflect.defineMetadata("design:paramtypes", [AssurMatchRuntime], AuthRequiredHtt
  * every non-GET broker route is in one of the two lists.
  */
 export const BROKER_TENANT_WRITE_GUARDED: Readonly<Record<string, readonly string[]>> = {
-  BrokerStarterController: ["accept", "reject", "dispute", "close", "sendProposal", "withdrawProposal"],
-  BrokerCrmController: ["status", "note", "task", "reminder", "assign", "document", "proposal", "withdrawProposal", "dispute", "aiRequest", "aiValidate", "aiLossAnalysis", "aiSetOptOut"],
+  BrokerStarterController: ["accept", "reject", "dispute", "close", "sendProposal", "withdrawProposal", "sendMessage", "markRead", "createDocumentRequest", "cancelDocumentRequest"],
+  BrokerCrmController: ["status", "note", "task", "reminder", "assign", "document", "proposal", "withdrawProposal", "dispute", "aiRequest", "aiValidate", "aiLossAnalysis", "aiSetOptOut", "sendMessage", "markRead", "createDocumentRequest", "cancelDocumentRequest"],
   BrokerEnterpriseController: ["createAgency", "updateAgency", "assignMember", "createRole", "updateRole", "updateSla", "updateBranding"],
   BrokerNotificationsController: ["updatePreferences"],
   BrokerOffersController: ["create", "update", "submit", "withdraw", "renew"],
@@ -2664,6 +2744,10 @@ Module({
     MetricsController,
     // Spec 056: admin operations consoles (see admin-operations-http.controllers.ts).
     ...ADMIN_OPERATIONS_HTTP_CONTROLLERS,
+    // Spec 062 data requests: visitor and admin routes (see data-requests-http.controllers.ts).
+    ...DATA_REQUESTS_HTTP_CONTROLLERS,
+    // Spec 062 messaging: visitor routes and the admin read-only route (see lead-messaging-http.controllers.ts).
+    ...LEAD_MESSAGING_HTTP_CONTROLLERS,
     // Spec 051: last, after the static `partners/sla` and `partners/applications` routes.
     AdminPartnersHttpController
   ],

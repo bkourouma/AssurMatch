@@ -78,7 +78,7 @@ test("the proposal PDF is proxied server-side with the token, uncached and neutr
   const lib = readSources([api]);
   const cardSource = readSources([card]);
   expect(route).toContain("export async function GET(");
-  expect(route).toContain("fetchProposalDocument(publicReference, proposalId, token)");
+  expect(route).toContain("fetchProposalDocument(publicReference, proposalId, token, visitorForwardedFor(request.headers))");
   expect(route).toContain('"Cache-Control": "no-store"');
   expect(route).toContain('"X-Content-Type-Options": "nosniff"');
   expect(route).toContain('"Referrer-Policy": "no-referrer"');

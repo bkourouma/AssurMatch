@@ -21,6 +21,8 @@ export interface LeadAssignmentsRepository extends RuntimeRepository {
   monthlyCountForPartner(partnerTenantId: string, now: Date): Promise<number>;
   routingStatsForPartners(partnerTenantIds: string[], now: Date): Promise<Map<string, RoutingPartnerStats>>;
   list(): Promise<LeadAssignmentRecord[]>;
+  /** The assignment rows of one quote request (spec 062: the visitor's conversations), newest first. */
+  listForQuote(quoteRequestId: string): Promise<LeadAssignmentRecord[]>;
   require(id: string): Promise<LeadAssignmentRecord>;
   updateStatus(id: string, status: LeadAssignmentStatus, update: Partial<LeadAssignmentRecord>): Promise<LeadAssignmentRecord>;
   appendHistory(event: LeadAssignmentHistoryRecord): Promise<LeadAssignmentHistoryRecord>;
@@ -147,6 +149,10 @@ export class MemoryLeadAssignmentsRepository implements LeadAssignmentsRepositor
 
   async list(): Promise<LeadAssignmentRecord[]> {
     return [...this.assignments];
+  }
+
+  async listForQuote(quoteRequestId: string): Promise<LeadAssignmentRecord[]> {
+    return this.assignments.filter((assignment) => assignment.quoteRequestId === quoteRequestId);
   }
 
   async require(id: string): Promise<LeadAssignmentRecord> {
@@ -294,6 +300,10 @@ export class PrismaLeadAssignmentsRepository implements LeadAssignmentsRepositor
 
   async list(): Promise<LeadAssignmentRecord[]> {
     return this.enrichMany((await this.assignments().findMany({ orderBy: { assignedAt: "desc" } })).map((row) => this.toDomain(row)));
+  }
+
+  async listForQuote(quoteRequestId: string): Promise<LeadAssignmentRecord[]> {
+    return this.enrichMany((await this.assignments().findMany({ where: { quoteRequestId }, orderBy: { assignedAt: "desc" } })).map((row) => this.toDomain(row)));
   }
 
   async require(id: string): Promise<LeadAssignmentRecord> {

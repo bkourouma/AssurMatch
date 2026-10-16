@@ -101,6 +101,9 @@ import { PrismaLeadAssignmentsRepository } from "../modules/leads/lead-assignmen
 import { PrismaRoutingDecisionsRepository } from "../modules/leads/routing-decisions.repository";
 import { PrismaCrmActivityRepository } from "../modules/leads/crm-activity.repository";
 import { LeadProposalsModule, MemoryLeadProposalsRepository, PrismaLeadProposalsRepository } from "../modules/lead-proposals/lead-proposals.module";
+// Spec 062 messaging
+import { LeadMessagingModule, MemoryLeadMessagingRepository, PrismaLeadMessagingRepository } from "../modules/lead-messaging/lead-messaging.module";
+import type { LeadMessagingNotificationsPort } from "../modules/lead-messaging/lead-messaging.ports";
 import { PrismaNotificationsRepository } from "../modules/notifications/notifications.repository";
 import { BrokerAlertNotifier } from "../modules/notifications/broker-alert-notifier";
 import { AdminAlertsService } from "../modules/notifications/admin-alerts.service";
@@ -121,6 +124,9 @@ import { aiSurfaceSchema } from "../../../packages/shared/contracts/ai.contracts
 import type { BrokerOfferCoverageItem } from "../../../packages/shared/contracts/offer-content";
 import { maybeBootstrapAdmin } from "./local-bootstrap-admin";
 import { AdminOperationsModule } from "../modules/admin-operations/admin-operations.module";
+// Spec 062 data requests
+import { DataRequestsModule, MemoryDataRequestsRepository, PrismaDataRequestsRepository } from "../modules/data-requests/data-requests.module";
+import type { DataRequestNotificationsPort } from "../modules/lead-messaging/lead-messaging.ports";
 
 export class AssurMatchRuntime {
   readonly config = new ConfigModule();
@@ -168,6 +174,10 @@ export class AssurMatchRuntime {
    */
   /** Spec 055: proposals and visitor responses (memory instance owned here under test, see spec 046 note). */
   private readonly leadProposalsRepository = this.runtimeRepository(new PrismaLeadProposalsRepository(this.prisma)) ?? new MemoryLeadProposalsRepository();
+  // Spec 062 messaging: messages, attachments and document requests (memory instance owned here under test, see spec 046 note).
+  private readonly leadMessagingRepository = this.runtimeRepository(new PrismaLeadMessagingRepository(this.prisma)) ?? new MemoryLeadMessagingRepository();
+  // Spec 062 data requests: visitor data-subject requests (memory instance owned here under test, see spec 046 note).
+  private readonly dataRequestsRepository = this.runtimeRepository(new PrismaDataRequestsRepository(this.prisma)) ?? new MemoryDataRequestsRepository();
   private readonly contactMessagesRepository = this.runtimeRepository(new PrismaContactMessagesRepository(this.prisma)) ?? new MemoryContactMessagesRepository();
   readonly leadRepositorySet = this.leadRepositories();
   private readonly brokerCrmConfig = { brokerCrmEnabled: process.env.ASSURMATCH_BROKER_CRM_ENABLED === "true" };
@@ -463,7 +473,9 @@ readonly enterprise = new EnterpriseService({
     partnerName: (partnerTenantId: string) => this.partnerDisplayName(partnerTenantId),
     assignmentHistory: (leadAssignmentId: string) => this.leads.assignmentsRepository.historyForLead(leadAssignmentId),
     // Spec 055 FR-005: proposals of the request in the tracking space (resolved lazily).
-    proposals: { forVisitorStatus: (quote, assignments, actor) => this.leadProposals.service.forVisitorStatus(quote, assignments, actor) }
+    proposals: { forVisitorStatus: (quote, assignments, actor) => this.leadProposals.service.forVisitorStatus(quote, assignments, actor) },
+    // Spec 062 messaging: flag + unread broker messages in the tracking status (resolved lazily).
+    messaging: { summaryForVisitorStatus: (quote) => this.leadMessaging.service.summaryForVisitorStatus(quote) }
   }, this.audit.writer, this.redis.client, this.quoteRequestsRepository);
   /** Spec 055: broker proposals, visitor follow-up and internal lead documents. */
   readonly leadProposals: LeadProposalsModule = new LeadProposalsModule({
@@ -527,6 +539,32 @@ readonly enterprise = new EnterpriseService({
     autoProcess: process.env.NODE_ENV !== "test",
     requireDurableStorage: process.env.APP_ENV === "production" || process.env.APP_ENV === "preproduction"
   });
+  // Spec 062 messaging: broker <-> visitor messaging and document requests (E-03, E-05).
+  readonly leadMessaging: LeadMessagingModule = new LeadMessagingModule({
+    audit: this.audit.writer,
+    repository: this.leadMessagingRepository,
+    assignments: this.leads.assignments,
+    crmAccess: this.leads.brokerCrmAccess,
+    starterAccess: this.leads.brokerStarterAccess,
+    upload: {
+      storage: this.documentStorage,
+      scanner: this.virusScanner,
+      requireDurableStorage: process.env.APP_ENV === "production" || process.env.APP_ENV === "preproduction"
+    },
+    quotes: { findById: (id: string) => this.quoteRequests.submissions.findById(id) },
+    partnerName: async (partnerTenantId: string) => (await this.partnerDisplayName(partnerTenantId)) ?? "courtier partenaire",
+    notifications: this.leadMessagingNotifications(),
+    firstVisibleReply: this.leads.assignments,
+    visitorAccess: this.quoteRequests.submissions.visitorAccess,
+    abuseGuard: this.quoteRequests.abuseGuard,
+    redis: this.redis.client,
+    // On unless an operator switched it off: a missing flag row reads as enabled (writes only, reads stay open).
+    isMessagingEnabled: () => this.featureFlags.service.isEnabled("broker_visitor_messaging_enabled")
+  }, {
+    documents: this.quoteDocuments,
+    quotes: { findById: (id: string) => this.quoteRequests.submissions.findById(id) },
+    visitorAccess: this.quoteRequests.submissions.visitorAccess
+  });
   readonly brokerAi = new BrokerAiService({
     audit: this.audit.writer,
     gateway: this.aiGateway,
@@ -555,6 +593,8 @@ readonly enterprise = new EnterpriseService({
     products: this.products.service,
     // Spec 054 R6: internal `lead.reassigned`, consumed by the visitor notifier only.
     events: this.partnerWebhookEvents,
+    // Spec 062: the previous broker's open document requests are cancelled at once (reads also close them lazily).
+    onReassigned: (assignmentId, _previousPartnerTenantId, actor) => this.leadMessaging.documentRequests.closeForAssignment(assignmentId, "reassigned", actor),
     notifyBroker: async (assignment, actor) => {
       const notificationId = await this.quoteRequests.submissions.notifyBrokerForAssignment(assignment, actor);
       // Spec 061 FR-003: the pointer e-mail and in-app entry come with the notification above;
@@ -843,6 +883,17 @@ readonly enterprise = new EnterpriseService({
     subjects: this.retentionSubjectsRepository,
     memorySources: this.retentionSubjectsRepository ? undefined : this.memoryRetentionSources()
   });
+  // Spec 062 data requests: access / rectification / erasure requests of the visitor and their compliance workflow.
+  readonly dataRequests: DataRequestsModule = new DataRequestsModule({
+    audit: this.audit.writer,
+    repository: this.dataRequestsRepository,
+    quotes: { findById: (id: string) => this.quoteRequests.submissions.findById(id) },
+    visitorAccess: this.quoteRequests.submissions.visitorAccess,
+    abuseGuard: this.quoteRequests.abuseGuard,
+    redis: this.redis.client,
+    notifications: this.dataRequestNotifications(),
+    retention: this.dataRetention.service
+  });
 
   /**
    * The user administration entry point (`/admin/users` and the spec 051 partner invitation): the
@@ -1014,7 +1065,56 @@ readonly enterprise = new EnterpriseService({
       PartnerApplicationsRepository: this.partnerApplicationsRepository?.mode,
       ContactMessagesRepository: this.contactMessagesRepository?.mode,
       DataRetentionRepository: this.dataRetentionRepository?.mode,
-      RetentionSubjectsRepository: this.retentionSubjectsRepository?.mode
+      RetentionSubjectsRepository: this.retentionSubjectsRepository?.mode,
+      // Spec 062 messaging
+      LeadMessagingRepository: this.leadMessagingRepository.mode,
+      // Spec 062 data requests
+      DataRequestsRepository: this.dataRequestsRepository.mode
+    };
+  }
+
+  /**
+   * Spec 062 data requests: acknowledgement and closure e-mails come from `QuoteNotificationService`;
+   * the compliance alert is an admin alert (alerts center entry + compliance pointer e-mail), raised once per request.
+   */
+  private dataRequestNotifications(): DataRequestNotificationsPort {
+    const quoteService = this.notifications.quoteService;
+    return {
+      queueVisitorAcknowledgement: (quote, event, actor) => quoteService.queueVisitorAcknowledgement(quote, event, actor),
+      queueVisitorClosure: (quote, event, actor) => quoteService.queueVisitorClosure(quote, event, actor),
+      queueComplianceAlert: (event) => this.adminAlerts.raise({
+        type: "data_request_received",
+        severity: "warning",
+        conditionKey: `data_request_received:${event.dataRequestId}`,
+        targetType: "DataRequest",
+        targetId: event.dataRequestId,
+        dedupe: "once",
+        details: { reference: event.reference, requestType: event.requestType }
+      })
+    };
+  }
+
+  /**
+   * Spec 062 messaging: the notification port of the messaging services. The pointer notifications
+   * come from `QuoteNotificationService`; for the broker side the optional SMS / WhatsApp channels
+   * are triggered after it, like a reassigned lead (spec 061 FR-003).
+   */
+  private leadMessagingNotifications(): LeadMessagingNotificationsPort {
+    const quoteService = this.notifications.quoteService;
+    return {
+      queueVisitorBrokerMessage: (quote, event, actor) => quoteService.queueVisitorBrokerMessage(quote, event, actor),
+      queueVisitorDocumentsRequested: (quote, event, actor) => quoteService.queueVisitorDocumentsRequested(quote, event, actor),
+      // The optional channels follow the pointer notification: a coalesced repeat (nothing queued) sends no SMS / WhatsApp.
+      queueBrokerVisitorMessage: async (quote, event, actor) => {
+        const result = await quoteService.queueBrokerVisitorMessage(quote, event, actor);
+        if (result) await this.brokerAlerts.optionalChannels({ partnerTenantId: event.partnerTenantId, type: "broker_visitor_message", title: "Nouveau message d'un visiteur" }, actor).catch(() => 0);
+        return result;
+      },
+      queueBrokerDocumentReceived: async (quote, event, actor) => {
+        const result = await quoteService.queueBrokerDocumentReceived(quote, event, actor);
+        if (result) await this.brokerAlerts.optionalChannels({ partnerTenantId: event.partnerTenantId, type: "broker_document_received", title: "Un document a été reçu" }, actor).catch(() => 0);
+        return result;
+      }
     };
   }
 
@@ -1079,6 +1179,9 @@ readonly enterprise = new EnterpriseService({
       leadHistory: (leadAssignmentId) => this.leads.assignmentsRepository.historyForLead(leadAssignmentId),
       crmActivity: this.leads.crmActivityRepository,
       leadProposals: this.leadProposalsRepository,
+      // Spec 062: messages / attachments / document requests, and the data requests registry.
+      leadMessaging: this.leadMessagingRepository,
+      dataRequests: this.dataRequestsRepository,
       quoteAiSummaries: async () => this.quoteAiSummary.list(),
       aiInteractions: async () => (await Promise.all(aiSurfaceSchema.options.map((surface) => aiInteractions.listForSurface(surface, Number.MAX_SAFE_INTEGER)))).flat(),
       contactMessages: () => this.contactMessagesRepository.list({}),

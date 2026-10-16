@@ -10,6 +10,7 @@ import type {
 import type { ActorContext } from "../common/types";
 import type { CountriesService } from "../countries/countries.module";
 import type { CrmActivityRepository } from "../leads/crm-activity.repository";
+import { summarizeFirstVisibleReply } from "../leads/first-visible-reply";
 import type { LeadAssignmentRecord } from "../leads/lead-assignment.service";
 import type { LeadAssignmentService } from "../leads/lead-assignment.service";
 import type { PartnerLicensesService } from "../partner-licenses/partner-licenses.module";
@@ -175,6 +176,7 @@ export class BrokerDashboardService {
     const averageFirstActionMinutes = seenWithDelta.length === 0
       ? null
       : seenWithDelta.reduce((sum, assignment) => sum + (assignment.seenAt.getTime() - assignment.assignedAt.getTime()), 0) / seenWithDelta.length / 60_000;
+    const visibleReply = summarizeFirstVisibleReply(filtered, Number.MAX_SAFE_INTEGER);
     const byProduct = this.groupByCount(filtered, (assignment) => assignment.productKey ?? "unknown").map(([productKey, total]) => ({ productKey, total }));
     const byCountry = this.groupByCount(filtered, (assignment) => (assignment.countryCode ?? "ZZ").toUpperCase()).map(([countryCode, total]) => ({ countryCode, total }));
     return {
@@ -184,6 +186,9 @@ export class BrokerDashboardService {
       disputed,
       pendingAction,
       averageFirstActionMinutes: averageFirstActionMinutes === null ? null : Math.round(averageFirstActionMinutes * 100) / 100,
+      // Spec 062 E-08: shared definition of the first visible reply (proposal or broker message).
+      averageFirstVisibleReplyMinutes: visibleReply.averageFirstVisibleReplyMinutes,
+      firstVisibleReplyMeasured: visibleReply.firstVisibleReplyMeasured,
       byProduct,
       byCountry
     };

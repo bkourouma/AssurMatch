@@ -78,6 +78,11 @@ export const partnerSlaSchema = z.object({
   leadsWithinTarget: z.number().int().min(0),
   complianceRate: z.number().min(0).max(1),
   averageFirstActionMinutes: z.number().nullable(),
+  /** Spec 062 E-08: first reply the visitor sees (first proposal or first broker message); additive, optional. */
+  averageFirstVisibleReplyMinutes: z.number().nullable().optional(),
+  firstVisibleReplyMeasured: z.number().int().min(0).optional(),
+  firstVisibleReplyWithinTarget: z.number().int().min(0).optional(),
+  firstVisibleReplyComplianceRate: z.number().min(0).max(1).nullable().optional(),
   updatedAt: dateTimeStringSchema.nullable()
 });
 
@@ -109,7 +114,12 @@ export const adminPartnerSlaRowSchema = z.object({
   leadsMeasured: z.number().int().min(0),
   leadsWithinTarget: z.number().int().min(0),
   complianceRate: z.number().min(0).max(1),
-  averageFirstActionMinutes: z.number().nullable()
+  averageFirstActionMinutes: z.number().nullable(),
+  /** Spec 062 E-08: first reply the visitor sees (first proposal or first broker message); additive, optional. */
+  averageFirstVisibleReplyMinutes: z.number().nullable().optional(),
+  firstVisibleReplyMeasured: z.number().int().min(0).optional(),
+  firstVisibleReplyWithinTarget: z.number().int().min(0).optional(),
+  firstVisibleReplyComplianceRate: z.number().min(0).max(1).nullable().optional()
 });
 
 export type PartnerAgency = z.infer<typeof partnerAgencySchema>;

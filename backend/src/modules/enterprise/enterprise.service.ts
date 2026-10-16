@@ -21,6 +21,7 @@ import {
 import { roleHasPermission } from "../../../../packages/shared/rbac/assurmatch-role-matrix";
 import type { AuditLogWriter } from "../audit-logs/audit-log-writer.service";
 import type { ActorContext } from "../common/types";
+import { summarizeFirstVisibleReply } from "../leads/first-visible-reply";
 import type { LeadAssignmentRecord, LeadAssignmentService } from "../leads/lead-assignment.service";
 import type { PartnersService } from "../partners/partners.module";
 import { EnterpriseAuditActions } from "./enterprise-audit-actions";
@@ -303,7 +304,9 @@ export class EnterpriseService {
       leadsMeasured: delays.length,
       leadsWithinTarget: withinTarget,
       complianceRate: delays.length === 0 ? 0 : withinTarget / delays.length,
-      averageFirstActionMinutes: delays.length === 0 ? null : Math.round(delays.reduce((sum, minutes) => sum + minutes, 0) / delays.length)
+      averageFirstActionMinutes: delays.length === 0 ? null : Math.round(delays.reduce((sum, minutes) => sum + minutes, 0) / delays.length),
+      // Spec 062 E-08: the same window, measured to the first reply the visitor can see.
+      ...summarizeFirstVisibleReply(assignments, targetMinutes)
     };
   }
 

@@ -6,6 +6,7 @@ import { addCrmLeadNoteAction, addCrmLeadReminderAction, addCrmLeadTaskAction, c
 import { assignCrmAdvisorAction } from "../../../lib/proposal-actions";
 import { PROPOSAL_NOTICES } from "../../../lib/proposal-vocabulary";
 import { ProposalPanel } from "../../../lib/ui/proposal-panel";
+import { LeadConversationSection } from "../../../lib/ui/conversation-panel";
 import {
   CRM_OUTCOME_REASONS,
   CRM_PIPELINE_STATUSES,
@@ -69,6 +70,7 @@ const NOTICES: Record<string, { tone: "info" | "warning" | "danger"; message: st
 const TABS = [
   { key: "synthese", label: "Synthese" },
   { key: "propositions", label: "Propositions" },
+  { key: "conversation", label: "Conversation" },
   { key: "activite", label: "Activite" },
   { key: "historique", label: "Historique" }
 ] as const;
@@ -93,9 +95,9 @@ function textOf(row: Record<string, unknown>, key: string): string {
   return value === null || value === undefined ? "" : String(value);
 }
 
-export default async function BrokerCrmLeadDetailPage({ params, searchParams }: { params: Promise<{ leadAssignmentId: string }>; searchParams: Promise<{ ai?: string; crm?: string; tab?: string; proposal?: string }> }) {
+export default async function BrokerCrmLeadDetailPage({ params, searchParams }: { params: Promise<{ leadAssignmentId: string }>; searchParams: Promise<{ ai?: string; crm?: string; tab?: string; proposal?: string; conv?: string }> }) {
   const { leadAssignmentId } = await params;
-  const { ai, crm, tab, proposal } = await searchParams;
+  const { ai, crm, tab, proposal, conv } = await searchParams;
   const session = await readBackOfficeSession();
   if (session.status === "unauthenticated" || session.status === "expired") redirect(loginRedirect(`/crm/leads/${leadAssignmentId}`, session.status));
   if (session.status !== "authenticated" || isStarterCrmDenied(session.profile)) {
@@ -342,6 +344,9 @@ export default async function BrokerCrmLeadDetailPage({ params, searchParams }: 
               )}
             </Card>
           ) : null}
+
+          {/* Spec 062: messagerie et demandes de documents du visiteur. */}
+          {currentTab === "conversation" && lead ? <LeadConversationSection channel="crm" leadAssignmentId={lead.leadAssignmentId} canMutate={canMutate} tenantReadOnly={tenantReadOnly} notice={conv} /> : null}
 
           {currentTab === "activite" ? (
             <>

@@ -202,6 +202,9 @@ export interface BrokerDashboardStarter {
   disputed: number;
   pendingAction: number;
   averageFirstActionMinutes: number | null;
+  /** Spec 062 (E-08): additive, absent until the API sends it. */
+  averageFirstVisibleReplyMinutes?: number | null;
+  firstVisibleReplyMeasured?: number;
   byProduct: Array<{ productKey: string; total: number }>;
   byCountry: Array<{ countryCode: string; total: number }>;
 }
@@ -524,6 +527,11 @@ export interface BrokerSla {
   leadsWithinTarget: number;
   complianceRate: number;
   averageFirstActionMinutes: number | null;
+  /** Spec 062 (E-08): first reply visible by the visitor. Additive, absent until the API sends it. */
+  averageFirstVisibleReplyMinutes?: number | null;
+  firstVisibleReplyMeasured?: number | null;
+  firstVisibleReplyWithinTarget?: number | null;
+  firstVisibleReplyComplianceRate?: number | null;
 }
 
 export interface BrokerBrandingData {
@@ -682,4 +690,90 @@ export function readLeadProposals(channel: "starter" | "crm", leadAssignmentId: 
 /** Spec 055 FR-010: vue Kanban CRM (colonnes = statuts pipeline). */
 export function readCrmKanban() {
   return readBroker<Record<string, Array<Record<string, unknown>>>>("/broker/crm/leads/kanban", {});
+}
+
+/** Spec 062: conversation courtier <-> visiteur et demandes de documents (miroir de `lead-messaging.ts`). */
+export const BROKER_CONVERSATION_SOURCE_MARKER = "broker-conversation:062";
+
+export interface BrokerConversationAttachmentData {
+  id: string;
+  fileName: string;
+  mimeType: string;
+  sizeBytes: number;
+}
+
+export interface BrokerConversationMessageData {
+  id: string;
+  senderType: "broker" | "visitor";
+  mine: boolean;
+  body: string;
+  createdAt: string;
+  readAt: string | null;
+  attachments: BrokerConversationAttachmentData[];
+}
+
+export interface BrokerConversationData {
+  conversationId: string;
+  partnerName: string;
+  state: "open" | "read_only";
+  readOnlyReason: string | null;
+  canSend: boolean;
+  unreadCount: number;
+  notice: string;
+  messages: BrokerConversationMessageData[];
+  nextCursor: string | null;
+}
+
+export interface BrokerDocumentRequestFileData {
+  id: string;
+  fileName: string;
+  mimeType: string;
+  sizeBytes: number;
+  uploadedAt: string;
+}
+
+export interface BrokerDocumentRequestData {
+  id: string;
+  label: string;
+  note?: string;
+  dueAt?: string;
+  status: "open" | "fulfilled" | "cancelled";
+  createdAt: string;
+  fulfilledAt?: string;
+  documents: BrokerDocumentRequestFileData[];
+}
+
+export interface BrokerDocumentRequestListData {
+  items: BrokerDocumentRequestData[];
+  openCount: number;
+  maxOpen: number;
+  canCreate: boolean;
+  blockers: string[];
+}
+
+const emptyConversation: BrokerConversationData = {
+  conversationId: "",
+  partnerName: "",
+  state: "read_only",
+  readOnlyReason: null,
+  canSend: false,
+  unreadCount: 0,
+  notice: "",
+  messages: [],
+  nextCursor: null
+};
+
+const emptyDocumentRequests: BrokerDocumentRequestListData = { items: [], openCount: 0, maxOpen: 10, canCreate: false, blockers: [] };
+
+/**
+ * GET /broker/{starter|crm}/leads/:leadId/conversation - la conversation du courtier actuel uniquement.
+ * `limit=300` (= LEAD_MESSAGE_THREAD_MAX) : le courtier voit tout le fil, pas seulement les 50 derniers messages.
+ */
+export function readLeadConversation(channel: "starter" | "crm", leadAssignmentId: string) {
+  return readBroker<BrokerConversationData>(`/broker/${channel}/leads/${encodeURIComponent(leadAssignmentId)}/conversation?limit=300`, emptyConversation);
+}
+
+/** GET /broker/{starter|crm}/leads/:leadId/document-requests */
+export function readLeadDocumentRequests(channel: "starter" | "crm", leadAssignmentId: string) {
+  return readBroker<BrokerDocumentRequestListData>(`/broker/${channel}/leads/${encodeURIComponent(leadAssignmentId)}/document-requests`, emptyDocumentRequests);
 }
