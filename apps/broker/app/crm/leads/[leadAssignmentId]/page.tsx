@@ -15,6 +15,7 @@ import {
   crmEventLabel,
   crmReasonLabel,
   crmStatusLabel,
+  DISPUTE_FINAL_DECISION_NOTICE,
   renderAnswerValue
 } from "../../../lib/lead-vocabulary";
 import {
@@ -285,7 +286,7 @@ export default async function BrokerCrmLeadDetailPage({ params, searchParams }: 
                     <ConfirmDialog
                       triggerLabel="Contester"
                       title="Contester ce lead"
-                      description="Le motif est obligatoire. La contestation est historisée avec acteur, date et motif, puis transmise à la finance AssurMatch."
+                      description={`Le motif est obligatoire. La contestation est historisée avec acteur, date et motif, puis transmise à la finance AssurMatch. ${DISPUTE_FINAL_DECISION_NOTICE}`}
                       confirmLabel="Contester le lead"
                       cancelLabel="Annuler"
                       formAction={disputeCrmLeadAction}

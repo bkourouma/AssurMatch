@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { PrismaService } from "../../../src/modules/common/prisma/prisma.service";
-import { DisputeStatusConflictError, MemoryCrmActivityRepository, PrismaCrmActivityRepository, type LeadDisputeRecord } from "../../../src/modules/leads/crm-activity.repository";
+import { DisputeAlreadyExistsError, DisputeStatusConflictError, MemoryCrmActivityRepository, PrismaCrmActivityRepository, type LeadDisputeRecord } from "../../../src/modules/leads/crm-activity.repository";
 
 const base: LeadDisputeRecord = {
   id: "d-1",
@@ -42,6 +42,14 @@ describe("CRM activity repository: lead disputes (spec 063)", () => {
     await repository.updateDispute({ ...base, status: "accepted" }, "opened");
     await expect(repository.updateDispute({ ...base, status: "rejected" }, "opened")).rejects.toBeInstanceOf(DisputeStatusConflictError);
     expect((await repository.findDispute("d-1"))?.status).toBe("accepted");
+  });
+
+  it("refuses a second dispute for the same lead assignment (memory and Prisma P2002)", async () => {
+    const memory = new MemoryCrmActivityRepository();
+    await memory.addDispute(base);
+    await expect(memory.addDispute({ ...base, id: "d-dup" })).rejects.toBeInstanceOf(DisputeAlreadyExistsError);
+    const prisma = new PrismaCrmActivityRepository({ requireRuntimeClient: () => ({ brokerCrmDispute: { create: async () => { throw Object.assign(new Error("unique"), { code: "P2002" }); } } }) } as unknown as PrismaService);
+    await expect(prisma.addDispute(base)).rejects.toBeInstanceOf(DisputeAlreadyExistsError);
   });
 
   it("prisma: maps the decision columns both ways and leaves null columns out of the DTO", async () => {

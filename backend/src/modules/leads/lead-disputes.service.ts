@@ -18,13 +18,15 @@ import { BillingAuditActions } from "../billing/billing-audit-actions";
 import { BillingAccessRefusedError, BillingDisabledError } from "../billing/billing-foundation.service";
 import { countryCatalog, resolveScopeCodes } from "../common/scope/actor-scope-codes";
 import type { ActorContext } from "../common/types";
-import { DisputeStatusConflictError, MemoryCrmActivityRepository, type CrmActivityRepository, type LeadDisputeRecord } from "./crm-activity.repository";
+import { DisputeAlreadyExistsError, DisputeStatusConflictError, MemoryCrmActivityRepository, type CrmActivityRepository, type LeadDisputeRecord } from "./crm-activity.repository";
 import type { LeadAssignmentRecord, LeadAssignmentService } from "./lead-assignment.service";
 
 /** What the invoicing side answers when an accepted dispute has to be credited (spec 063 FR-B06). */
 export interface LeadDisputeCreditOutcome {
   creditMode: LeadDisputeCreditMode;
   creditNoteId?: string | undefined;
+  /** "pack_credit" mode: the lead pack row that gave one credit back. */
+  creditPackId?: string | undefined;
   creditNoteNumber?: string | undefined;
   /** Credit note total, XOF including VAT. */
   creditAmount?: number | undefined;
@@ -45,7 +47,7 @@ export interface LeadDisputeCreditPort {
   }, actor: ActorContext): Promise<LeadDisputeCreditOutcome>;
   creditNoteNumber(id: string): Promise<string | undefined>;
   /** Credit already issued for the dispute, if any (crash recovery). */
-  existingCredit?(disputeId: string): Promise<LeadDisputeCreditOutcome | undefined>;
+  existingCredit?(disputeId: string, partnerId: string): Promise<LeadDisputeCreditOutcome | undefined>;
   /**
    * "draft_invoice" mode: refreshes the not-yet-invoiced draft of the lead's UTC month so it includes
    * the credit (no-op when there is no such draft). Called after the decision is persisted.
@@ -139,7 +141,8 @@ export class LeadDisputesService {
     if (this.opening.has(key)) refuse(ErrorCodes.DISPUTE_ALREADY_EXISTS, "already_exists", "A dispute already exists for this lead");
     this.opening.add(key);
     try {
-      const existing = (await this.repository.disputesForLead(assignment.id)).some((dispute) => dispute.partnerTenantId === assignment.partnerTenantId);
+      // One dispute per lead assignment (also enforced by the repository / partial unique index).
+      const existing = (await this.repository.disputesForLead(assignment.id)).length > 0;
       if (existing) refuse(ErrorCodes.DISPUTE_ALREADY_EXISTS, "already_exists", "A dispute already exists for this lead");
       const dispute: LeadDisputeRecord = {
         id: crypto.randomUUID(),
@@ -152,7 +155,12 @@ export class LeadDisputesService {
         source,
         ...(assignment.countryCode ? { countryCode: assignment.countryCode } : {})
       };
-      await this.repository.addDispute(dispute);
+      try {
+        await this.repository.addDispute(dispute);
+      } catch (error) {
+        if (error instanceof DisputeAlreadyExistsError) refuse(ErrorCodes.DISPUTE_ALREADY_EXISTS, "already_exists", "A dispute already exists for this lead");
+        throw error;
+      }
       // A lead already closed by the Starter flow keeps its final status; every other lead is
       // marked disputed (exempt from the monthly quota, as before).
       if (assignment.status !== "closed") await this.deps.assignments.updateStatus(assignment.id, "disputed", actor, input.reason);
@@ -279,7 +287,7 @@ export class LeadDisputesService {
         throw new ConflictException({ code: ErrorCodes.DISPUTE_ALREADY_DECIDED, message: "This dispute was already decided differently" });
       }
       let outcome: LeadDisputeCreditOutcome | undefined;
-      if (decision === "reject" && this.credit?.existingCredit && await this.credit.existingCredit(dispute.id)) {
+      if (decision === "reject" && this.credit?.existingCredit && await this.credit.existingCredit(dispute.id, dispute.partnerTenantId)) {
         // An interrupted acceptance already issued the credit note: only "accept" may be replayed.
         this.audit(actor, refusedAction, dispute.id, "refused", "credit_note_already_issued", { decision });
         throw new ConflictException({ code: ErrorCodes.DISPUTE_ALREADY_DECIDED, message: "A credit note was already issued for this dispute: replay the acceptance" });
@@ -310,6 +318,7 @@ export class LeadDisputesService {
         decisionReason: reason,
         ...(outcome ? { creditMode: outcome.creditMode } : {}),
         ...(outcome?.creditNoteId ? { creditNoteId: outcome.creditNoteId } : {}),
+        ...(outcome?.creditPackId ? { creditPackId: outcome.creditPackId } : {}),
         ...(outcome?.creditAmount !== undefined ? { creditAmount: outcome.creditAmount } : {})
       };
       let saved: LeadDisputeRecord;
@@ -326,6 +335,7 @@ export class LeadDisputesService {
         partnerTenantId: saved.partnerTenantId,
         creditMode: saved.creditMode ?? null,
         creditNoteId: saved.creditNoteId ?? null,
+        creditPackId: saved.creditPackId ?? null,
         creditAmount: saved.creditAmount ?? null,
         ...(outcome?.reason ? { creditSkippedReason: outcome.reason } : {})
       });
@@ -414,6 +424,7 @@ export class LeadDisputesService {
       ...(dispute.decisionReason ? { decisionReason: dispute.decisionReason } : {}),
       ...(dispute.creditMode ? { creditMode: dispute.creditMode } : {}),
       ...(dispute.creditNoteId ? { creditNoteId: dispute.creditNoteId } : {}),
+      ...(dispute.creditPackId ? { creditPackId: dispute.creditPackId } : {}),
       ...(dispute.creditNoteNumber ? { creditNoteNumber: dispute.creditNoteNumber } : {}),
       ...(dispute.creditAmount !== undefined ? { creditAmount: dispute.creditAmount } : {})
     };

@@ -3,6 +3,7 @@ import type { IssuedInvoiceLine } from "../../../../packages/shared/contracts/bi
 import { AuditLogWriter } from "../../../src/modules/audit-logs/audit-log-writer.service";
 import { BillingAuditActions } from "../../../src/modules/billing/billing-audit-actions";
 import { MemoryBillingRepository } from "../../../src/modules/billing/billing.repository";
+import { LeadPacksService } from "../../../src/modules/billing/lead-packs.service";
 import { computeInvoiceTotals, disputeCreditTotals, disputeUnitAmountFromLines } from "../../../src/modules/billing/invoice-numbering";
 import { resolveInvoicingConfig } from "../../../src/modules/billing/invoicing.config";
 import { MemoryInvoicingRepository, type IssuedInvoiceRecord } from "../../../src/modules/billing/invoicing.repository";
@@ -12,7 +13,6 @@ import type { CountriesService } from "../../../src/modules/countries/countries.
 import type { FeatureFlagsService } from "../../../src/modules/feature-flags/feature-flags.module";
 import type { PartnersService } from "../../../src/modules/partners/partners.module";
 import { MemoryDocumentStorage } from "../../../src/modules/quote-documents/document-storage.port";
-import type { LeadPacksService } from "../../../src/modules/billing/lead-packs.service";
 
 const NOW = new Date("2026-10-15T10:00:00.000Z");
 const PARTNER = "11111111-1111-4111-8111-111111111111";
@@ -34,15 +34,19 @@ function setup() {
   const repository = new MemoryInvoicingRepository();
   const storage = new MemoryDocumentStorage();
   const notices: Array<{ template: string; title: string; body: string; scopeId: string }> = [];
+  const billing = new MemoryBillingRepository();
+  const featureFlags = { isEnabled: () => true } as unknown as FeatureFlagsService;
+  const partners = { list: async () => [] } as unknown as PartnersService;
+  const packs = new LeadPacksService({ audit, featureFlags, partners, repository: billing });
   const service = new InvoicingService({
     audit,
-    featureFlags: { isEnabled: () => true } as unknown as FeatureFlagsService,
-    partners: { list: async () => [] } as unknown as PartnersService,
+    featureFlags,
+    partners,
     countries: { listAdmin: async () => [] } as unknown as CountriesService,
-    billing: new MemoryBillingRepository(),
+    billing,
     repository,
     storage,
-    packs: { listForPartner: async () => [] } as unknown as LeadPacksService,
+    packs,
     config: resolveInvoicingConfig({}),
     inApp: { publishInApp: async (request) => { notices.push(request); } },
     now: () => NOW
@@ -91,7 +95,7 @@ function setup() {
     decisionReason: "Lead hors zone confirmé par la finance",
     ...overrides
   });
-  return { audit, repository, storage, notices, service, invoice, request };
+  return { audit, repository, storage, notices, service, invoice, request, packs, billing };
 }
 
 describe("dispute credit amount (spec 063 FR-B06)", () => {
@@ -193,6 +197,58 @@ describe("InvoicingService.creditAcceptedDispute (spec 063 FR-B06 / FR-B07)", ()
     await invoice({ lines: [line({ kind: "billable_leads", label: "Leads qualifies exclusifs (brouillon)", quantity: 1, unitAmount: 1_000 })] });
     expect(await service.creditAcceptedDispute(request(), finance)).toMatchObject({ creditMode: "credit_note", creditAmount: 1_180 });
     expect(await service.creditAcceptedDispute(request(), finance)).toEqual({ creditMode: "none", reason: "no_billed_lead_left" });
+  });
+});
+
+describe("pack_credit mode: a lead covered by a prepaid pack is given back to the pack (decision D-B3)", () => {
+  const PACK_LINES: IssuedInvoiceLine[] = [
+    STANDARD_LINES[0] as IssuedInvoiceLine,
+    line({ kind: "billable_leads", label: "Leads qualifies exclusifs (brouillon)", quantity: 3, unitAmount: 2_000 }),
+    line({ kind: "pack_credit", label: "Credits pack consommes (deja deduit)", quantity: 2, unitAmount: 0, amount: 0, informational: true })
+  ];
+
+  it("restores one credit per pack-covered lead, idempotently, without a credit note", async () => {
+    const { service, invoice, request, packs, repository, audit, notices } = setup();
+    const issued = await invoice({ lines: PACK_LINES });
+    const dispute = request();
+    const outcome = await service.creditAcceptedDispute(dispute, finance);
+    expect(outcome).toMatchObject({ creditMode: "pack_credit" });
+    expect(outcome.creditPackId).toBeTruthy();
+    expect(outcome.creditNoteId).toBeUndefined();
+    expect(await repository.listCreditNotes()).toHaveLength(0);
+    expect(await packs.remainingCredits(PARTNER)).toBe(1);
+    const [pack] = await packs.listForPartner(PARTNER);
+    expect(pack).toMatchObject({ id: outcome.creditPackId, creditsGranted: 1, creditsConsumed: 0, reason: "Restitution - contestation de lead acceptee", disputeId: dispute.disputeId });
+    expect(audit.search({ action: BillingAuditActions.packRestored })[0]).toMatchObject({ result: "success", reason: "dispute_accepted" });
+    expect(audit.search({ action: BillingAuditActions.packRestored })[0]?.context).toMatchObject({ credits: 1, sourceInvoiceNumber: issued.number });
+    expect(notices.at(-1)).toMatchObject({ template: "lead_pack_restored", scopeId: PARTNER });
+
+    // Replay (and crash recovery lookup): same pack row, no second credit.
+    expect(await service.creditAcceptedDispute(dispute, finance)).toEqual(outcome);
+    expect(await service.existingDisputeCredit(dispute.disputeId, PARTNER)).toEqual(outcome);
+    expect(await packs.remainingCredits(PARTNER)).toBe(1);
+
+    // Second pack-covered lead: restored too; the third exceeds the 2 pack credits of the invoice -> credit note.
+    expect((await service.creditAcceptedDispute(request(), finance)).creditMode).toBe("pack_credit");
+    const third = await service.creditAcceptedDispute(request(), finance);
+    expect(third).toMatchObject({ creditMode: "credit_note", creditAmount: 2_360 });
+    expect(await packs.remainingCredits(PARTNER)).toBe(2);
+  });
+
+  it("converges when two decisions restore the same dispute concurrently", async () => {
+    const { service, invoice, request, packs } = setup();
+    await invoice({ lines: PACK_LINES });
+    const same = request();
+    const [first, second] = await Promise.all([service.creditAcceptedDispute(same, finance), service.creditAcceptedDispute(same, finance)]);
+    expect(first.creditPackId).toBe(second.creditPackId);
+    expect(await packs.listForPartner(PARTNER)).toHaveLength(1);
+  });
+
+  it("keeps the credit note path when the invoice consumed no pack credit", async () => {
+    const { service, invoice, request, packs } = setup();
+    await invoice();
+    expect((await service.creditAcceptedDispute(request(), finance)).creditMode).toBe("credit_note");
+    expect(await packs.remainingCredits(PARTNER)).toBe(0);
   });
 });
 

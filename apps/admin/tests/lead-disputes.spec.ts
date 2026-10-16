@@ -3,6 +3,8 @@ import { readFileSync } from "node:fs";
 import {
   DISPUTE_CREDIT_MODE_LABELS,
   DISPUTE_DECIDER_ROLES,
+  DISPUTE_DECISION_OPTIONS,
+  DISPUTE_REJECTION_FINAL_NOTICE,
   DISPUTE_REASON_MAX_LENGTH,
   DISPUTE_REASON_MIN_LENGTH,
   DISPUTE_STATUS_LABELS,
@@ -92,6 +94,10 @@ test("an accepted dispute shows its credit outcome in French, with the credit no
   expect(DISPUTE_CREDIT_MODE_LABELS.draft_invoice).toBe("Crédité sur le prochain brouillon");
   expect(DISPUTE_CREDIT_MODE_LABELS.credit_note).toBe("Avoir partiel émis");
   expect(DISPUTE_CREDIT_MODE_LABELS.none).toBe("Aucun crédit automatique : traitement manuel par la finance");
+  // Accepted dispute on a lead covered by a prepaid pack: 1 lead is given back to the pack.
+  expect(DISPUTE_CREDIT_MODE_LABELS.pack_credit).toBe("1 lead restitué au pack de leads du cabinet");
+  expect(panel).toContain('mode === "pack_credit"');
+  expect(panel).toContain("DISPUTE_CREDIT_MODE_LABELS.pack_credit");
   expect(panel).toContain("Avoir partiel {dispute.creditNoteNumber");
   expect(panel).toContain("/billing/credit-notes/${dispute.creditNoteId}/pdf");
   expect(panel).toContain("Contestation rejetée : le lead reste facturable, aucun crédit.");
@@ -126,4 +132,13 @@ test("dispute wording never suggests a premium refund, an online payment or a pu
     }
   }
   expect(files[0]).toContain("aucune prime d'assurance n'est concernée");
+});
+
+test("the rejection is announced as final on the decision form and on a rejected dispute", () => {
+  const panel = source("apps/admin/app/billing/disputes-panel.tsx");
+  const rejectOption = DISPUTE_DECISION_OPTIONS.find((option) => option.value === "reject");
+
+  expect(DISPUTE_REJECTION_FINAL_NOTICE).toBe("Le rejet est définitif : le courtier ne pourra pas contester à nouveau ce lead.");
+  expect(rejectOption?.hint).toContain(DISPUTE_REJECTION_FINAL_NOTICE);
+  expect(panel).toContain("{DISPUTE_REJECTION_FINAL_NOTICE}");
 });

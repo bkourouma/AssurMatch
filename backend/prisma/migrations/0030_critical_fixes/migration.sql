@@ -27,9 +27,20 @@ ALTER TABLE "BrokerCrmDispute" ADD COLUMN IF NOT EXISTS "decisionReason" TEXT;
 ALTER TABLE "BrokerCrmDispute" ADD COLUMN IF NOT EXISTS "creditMode" TEXT;
 ALTER TABLE "BrokerCrmDispute" ADD COLUMN IF NOT EXISTS "creditNoteId" TEXT;
 ALTER TABLE "BrokerCrmDispute" ADD COLUMN IF NOT EXISTS "creditAmount" INTEGER;
+ALTER TABLE "BrokerCrmDispute" ADD COLUMN IF NOT EXISTS "creditPackId" TEXT;
 CREATE INDEX IF NOT EXISTS "BrokerCrmDispute_status_createdAt_idx" ON "BrokerCrmDispute"("status", "createdAt");
--- Note: "one dispute per lead" (D-B1) is enforced by the service, not by a unique index, because rows
--- written before this migration may already hold several disputes for the same lead.
+-- "One dispute per lead" (D-B1) is guaranteed by the service AND by this partial unique index. It only
+-- covers rows created from the day of the release, so legacy duplicates (possible before spec 063)
+-- cannot make the migration fail.
+CREATE UNIQUE INDEX IF NOT EXISTS "BrokerCrmDispute_leadAssignmentId_open_key" ON "BrokerCrmDispute"("leadAssignmentId") WHERE "createdAt" >= TIMESTAMP '2026-10-16 00:00:00';
+
+-- B. Prepaid lead pack given back after an accepted dispute (decision D-B3, pack_credit mode).
+-- "disputeId" makes the restore idempotent; "sourceInvoiceId" is the invoice whose pack-covered lead was
+-- re-credited (distinct from "invoiceId", the payment justification of a grant).
+ALTER TABLE "LeadPack" ADD COLUMN IF NOT EXISTS "disputeId" TEXT;
+ALTER TABLE "LeadPack" ADD COLUMN IF NOT EXISTS "sourceInvoiceId" TEXT;
+CREATE UNIQUE INDEX IF NOT EXISTS "LeadPack_disputeId_key" ON "LeadPack"("disputeId");
+CREATE INDEX IF NOT EXISTS "LeadPack_sourceInvoiceId_idx" ON "LeadPack"("sourceInvoiceId");
 
 -- B. Broker notification type of the dispute decision (pointer e-mail, spec 061 mechanism).
 ALTER TYPE "NotificationType" ADD VALUE IF NOT EXISTS 'broker_dispute_decided';

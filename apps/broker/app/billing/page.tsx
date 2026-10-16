@@ -189,7 +189,8 @@ export default async function BrokerBillingPage() {
             { key: "grantedAt", header: "Attribue le", render: (pack) => pack.grantedAt.slice(0, 10) },
             { key: "granted", header: "Credits", render: (pack) => pack.creditsGranted, numeric: true, align: "right" },
             { key: "consumed", header: "Consommes", render: (pack) => pack.creditsConsumed, numeric: true, align: "right" },
-            { key: "remaining", header: "Restants", render: (pack) => pack.creditsRemaining, numeric: true, align: "right" }
+            { key: "remaining", header: "Restants", render: (pack) => pack.creditsRemaining, numeric: true, align: "right" },
+            { key: "reason", header: "Origine", render: (pack) => pack.reason || "-" }
           ]}
           items={account.data.packs}
           getKey={(pack) => pack.id}

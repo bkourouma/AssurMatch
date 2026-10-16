@@ -128,13 +128,13 @@ Les parcours visiteur et les parcours authentifiés admin / courtier restent sé
 
 ## Décisions à confirmer
 
-- **D-B1 — DÉCISION À CONFIRMER** : une seule contestation par lead, définitive (un rejet n'est pas contestable à nouveau). Le PRD ne prévoit pas d'appel.
-- **D-B2 — DÉCISION À CONFIRMER** : après un rejet, le lead garde le statut `disputed` côté assignation (exempté du quota mensuel, comme aujourd'hui). Une réintégration au quota n'est pas spécifiée.
-- **D-B3 — DÉCISION À CONFIRMER** : crédit d'une contestation acceptée quand le lead était couvert par un crédit pack ou n'a pas de prix unitaire sur la facture : aucun avoir (`creditMode=none`), traitement manuel hors plateforme. La restitution d'un crédit pack n'est pas automatisée.
-- **D-B4 — DÉCISION À CONFIRMER** : une contestation acceptée dont la facture a déjà été payée produit un solde créditeur sur l'état des comptes ; le remboursement ou la compensation est opéré hors plateforme (aucun remboursement en ligne : `payments_enabled=false`).
-- **D-B5 — DÉCISION À CONFIRMER** : la décision exige `billing_enabled` actif (cohérence avec les autres mutations de facturation).
-- **D-A1 — DÉCISION À CONFIRMER** : pas de renouvellement glissant du jeton d'appareil (30 jours fixes) ; plafond de 10 appareils actifs par utilisateur.
-- **D-D1 — DÉCISION À CONFIRMER** : sur les environnements déjà initialisés (preprod), les lignes de flags existantes à `false` ne sont pas modifiées ; l'activation y est manuelle depuis l'écran des flags.
+- **D-B1 — CONFIRMÉE (PO 2026-10-16)** : une seule contestation par lead, rejet définitif sur la plateforme (tout désaccord relève du contrat de partenariat). Garanti en base par un index unique partiel (`createdAt >= 2026-10-16`, migration 0030) en plus du service.
+- **D-B2 — ACCEPTÉE** : après un rejet, le lead garde le statut `disputed` côté assignation (exempté du quota mensuel, comme aujourd'hui). Une réintégration au quota n'est pas spécifiée.
+- **D-B3 — CHANGÉE (PO 2026-10-16)** : acceptation sur un lead couvert par un pack de leads prépayé : 1 lead est automatiquement restitué au pack (`creditMode = pack_credit`, ligne `LeadPack` liée à la contestation, idempotente, auditée, visible courtier et admin). Lead sans prix ni pack : aucun effet automatique (`none`, traitement manuel). **DÉCISION À CONFIRMER** : on ne sait pas quel lead un pack a couvert ; heuristique : tant que la facture montre des crédits pack non restitués, la contestation acceptée restitue un crédit pack, sinon avoir partiel.
+- **D-B4 — ACCEPTÉE** : une contestation acceptée dont la facture a déjà été payée produit un solde créditeur sur l'état des comptes ; le remboursement ou la compensation est opéré hors plateforme (aucun remboursement en ligne : `payments_enabled=false`).
+- **D-B5 — ACCEPTÉE** : la décision exige `billing_enabled` actif (cohérence avec les autres mutations de facturation).
+- **D-A1 — ACCEPTÉE** : pas de renouvellement glissant du jeton d'appareil (30 jours fixes) ; plafond de 10 appareils actifs par utilisateur.
+- **D-D1 — ACCEPTÉE** : sur les environnements déjà initialisés (preprod), les lignes de flags existantes à `false` ne sont pas modifiées ; l'activation y est manuelle depuis l'écran des flags.
 
 - **DT-6** (revue sécurité) `GET /auth/me.mfaEnrolled` signifie « secret confirmé par un code valide » : un secret généré mais jamais confirmé peut être régénéré avec un jeton sans MFA (sinon l'utilisateur qui quitte l'écran d'enrôlement serait verrouillé) ; un secret confirmé ne peut être remplacé que par une session MFA vérifiée.
 - **DT-7** (revue sécurité) Le compteur d'échecs n'est pas remis à zéro au succès du mot de passe tant que le second facteur est requis (pas de contournement du verrouillage MFA) ; les réponses `/auth/login`, `/auth/mfa/verify`, `/auth/activate` n'exposent plus les hachages ni le secret MFA.

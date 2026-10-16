@@ -55,13 +55,16 @@ export function disputeReasonLabel(reason: string | undefined): string {
 
 export const DISPUTE_CREDIT_MODE_LABELS: Record<string, string> = {
   draft_invoice: "Crédité sur le prochain brouillon",
+  pack_credit: "1 lead restitué au pack de leads du cabinet",
   credit_note: "Avoir partiel émis",
   none: "Aucun crédit automatique : traitement manuel par la finance"
 };
 
+export const DISPUTE_REJECTION_FINAL_NOTICE = "Le rejet est définitif : le courtier ne pourra pas contester à nouveau ce lead.";
+
 export const DISPUTE_DECISION_OPTIONS = [
   { value: "accept", label: "Accepter la contestation", hint: "Le lead est crédité au cabinet (brouillon ou avoir partiel)." },
-  { value: "reject", label: "Rejeter la contestation", hint: "Le lead reste facturable. Aucun crédit." }
+  { value: "reject", label: "Rejeter la contestation", hint: "Le lead reste facturable, aucun crédit. Le rejet est définitif : le courtier ne pourra pas contester à nouveau ce lead." }
 ];
 
 /** Roles allowed to read the decision form: `billing:dispute_decide` of the RBAC matrix. */

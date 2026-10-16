@@ -1,7 +1,7 @@
 import { expect, test } from "@playwright/test";
 import { readFileSync } from "node:fs";
 import { disputeAvailability, disputeStatusTone, formatDeadline } from "../../app/lib/ui/broker-view-models";
-import { DISPUTE_CREDIT_MODE_LABELS, disputeReasonLabel, disputeStatusLabel } from "../../app/lib/lead-vocabulary";
+import { DISPUTE_CREDIT_MODE_LABELS, DISPUTE_FINAL_DECISION_NOTICE, disputeReasonLabel, disputeStatusLabel } from "../../app/lib/lead-vocabulary";
 
 function source(path: string): string {
   return readFileSync(path, "utf8");
@@ -90,6 +90,8 @@ test("the status card shows the status, the decision reason and the credit mode 
   expect(disputeReasonLabel("out_of_target")).toBe("Hors cible commerciale");
   expect(DISPUTE_CREDIT_MODE_LABELS.draft_invoice).toBe("Crédité sur le prochain brouillon de facture");
   expect(DISPUTE_CREDIT_MODE_LABELS.credit_note).toBe("Avoir partiel émis");
+  expect(DISPUTE_CREDIT_MODE_LABELS.pack_credit).toBe("1 lead vous a été restitué dans votre pack");
+  expect(card).toContain('dispute.creditMode === "pack_credit"');
 
   expect(card).toContain("Motif de la décision");
   expect(card).toContain("formatXof(dispute.creditAmount)");
@@ -133,4 +135,19 @@ test("broker dispute screens stay on the broker side and never use refund or pur
   // Wording from the spec: contestation and avoir, never a refund of an insurance premium.
   expect(files[0]?.text).toContain("avoir");
   expect(source("apps/broker/app/crm/leads/[leadAssignmentId]/page.tsx")).toContain("dans les 30 jours suivant sa réception");
+});
+
+test("the rejection is final on the platform: stated in both Contester dialogs and on a rejected dispute card", () => {
+  const sentence = "La décision de la finance est définitive sur la plateforme : un désaccord éventuel relève du contrat de partenariat.";
+  expect(DISPUTE_FINAL_DECISION_NOTICE).toBe(sentence);
+  expect(source("apps/broker/app/crm/leads/[leadAssignmentId]/page.tsx")).toContain("${DISPUTE_FINAL_DECISION_NOTICE}");
+  expect(source("apps/broker/app/leads/[leadAssignmentId]/page.tsx")).toContain("${DISPUTE_FINAL_DECISION_NOTICE}");
+  expect(source("apps/broker/app/lib/ui/dispute-status-card.tsx")).toContain("{DISPUTE_FINAL_DECISION_NOTICE}");
+});
+
+test("broker billing shows restored lead packs with their origin and the pack credit of a dispute", () => {
+  const page = source("apps/broker/app/billing/page.tsx");
+  expect(page).toContain('header: "Origine"');
+  expect(page).toContain("pack.reason");
+  expect(page).toContain("DISPUTE_CREDIT_MODE_LABELS[dispute.creditMode");
 });

@@ -42,6 +42,13 @@ export class DisputeStatusConflictError extends Error {
   }
 }
 
+/** Spec 063 D-B1: a dispute already exists for this lead assignment (one per lead, also guaranteed by a partial unique index). */
+export class DisputeAlreadyExistsError extends Error {
+  constructor() {
+    super("A dispute already exists for this lead");
+  }
+}
+
 export interface CrmActivityRepository extends RuntimeRepository {
   appendPipelineHistory(history: BrokerCrmPipelineHistoryRecord): Promise<BrokerCrmPipelineHistoryRecord>;
   pipelineHistoryForLead(leadAssignmentId: string): Promise<BrokerCrmPipelineHistoryRecord[]>;
@@ -128,6 +135,7 @@ export class MemoryCrmActivityRepository implements CrmActivityRepository {
   }
 
   async addDispute(dispute: LeadDisputeRecord): Promise<LeadDisputeRecord> {
+    if (this.disputes.some((item) => item.leadAssignmentId === dispute.leadAssignmentId)) throw new DisputeAlreadyExistsError();
     this.disputes.push(dispute);
     return dispute;
   }
@@ -242,7 +250,13 @@ export class PrismaCrmActivityRepository implements CrmActivityRepository {
   }
 
   async addDispute(dispute: LeadDisputeRecord): Promise<LeadDisputeRecord> {
-    return this.toDispute(await this.delegate("brokerCrmDispute").create({ data: this.disputeData(dispute) }));
+    try {
+      return this.toDispute(await this.delegate("brokerCrmDispute").create({ data: this.disputeData(dispute) }));
+    } catch (error) {
+      // Partial unique index on leadAssignmentId (migration 0030): a concurrent opening won.
+      if (typeof error === "object" && error !== null && (error as { code?: unknown }).code === "P2002") throw new DisputeAlreadyExistsError();
+      throw error;
+    }
   }
 
   async notesForLead(leadAssignmentId: string): Promise<BrokerCrmNote[]> {
@@ -367,6 +381,7 @@ export class PrismaCrmActivityRepository implements CrmActivityRepository {
       decisionReason: dispute.decisionReason ?? null,
       creditMode: dispute.creditMode ?? null,
       creditNoteId: dispute.creditNoteId ?? null,
+      creditPackId: dispute.creditPackId ?? null,
       creditAmount: dispute.creditAmount ?? null
     };
   }
@@ -391,6 +406,7 @@ export class PrismaCrmActivityRepository implements CrmActivityRepository {
       ...(text("decisionReason") ? { decisionReason: text("decisionReason") as string } : {}),
       ...(text("creditMode") ? { creditMode: text("creditMode") as NonNullable<LeadDisputeRecord["creditMode"]> } : {}),
       ...(text("creditNoteId") ? { creditNoteId: text("creditNoteId") as string } : {}),
+      ...(text("creditPackId") ? { creditPackId: text("creditPackId") as string } : {}),
       ...(typeof item.creditAmount === "number" ? { creditAmount: item.creditAmount } : {})
     };
   }

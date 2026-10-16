@@ -105,6 +105,7 @@ export class BrokerStarterLeadsService {
           ...(dispute.decisionReason ? { decisionReason: dispute.decisionReason } : {}),
           ...(dispute.creditMode ? { creditMode: dispute.creditMode } : {}),
           ...(dispute.creditNoteId ? { creditNoteId: dispute.creditNoteId } : {}),
+          ...(dispute.creditPackId ? { creditPackId: dispute.creditPackId } : {}),
           ...(dispute.creditNoteNumber ? { creditNoteNumber: dispute.creditNoteNumber } : {}),
           ...(dispute.creditAmount !== undefined ? { creditAmount: dispute.creditAmount } : {})
         }

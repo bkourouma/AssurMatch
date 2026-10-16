@@ -13,6 +13,7 @@ import {
   STARTER_CLOSE_OUTCOME_LABELS,
   STARTER_FINAL_STATUSES,
   STARTER_REASON_LABELS,
+  DISPUTE_FINAL_DECISION_NOTICE,
   renderAnswerValue,
   starterCloseOutcomeLabel,
   starterEventLabel,
@@ -244,7 +245,7 @@ export default async function BrokerLeadDetailPage({
                   <ConfirmDialog
                     triggerLabel="Contester avec motif"
                     title="Contester avec motif"
-                    description="La contestation exige un motif allowliste. Elle est transmise à la finance AssurMatch, qui statue et vous notifie."
+                    description={`La contestation exige un motif allowliste. Elle est transmise à la finance AssurMatch, qui statue et vous notifie. ${DISPUTE_FINAL_DECISION_NOTICE}`}
                     confirmLabel="Contester le lead"
                     cancelLabel="Annuler"
                     formAction={disputeStarterLeadAction}

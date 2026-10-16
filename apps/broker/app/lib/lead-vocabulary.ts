@@ -229,8 +229,12 @@ export const DISPUTE_STATUS_LABELS: Record<string, string> = {
   rejected: "Rejetée"
 };
 
+/** Spec 063: la décision de rejet est définitive sur la plateforme (une contestation par lead, pas d'appel). */
+export const DISPUTE_FINAL_DECISION_NOTICE = "La décision de la finance est définitive sur la plateforme : un désaccord éventuel relève du contrat de partenariat.";
+
 export const DISPUTE_CREDIT_MODE_LABELS: Record<string, string> = {
   draft_invoice: "Crédité sur le prochain brouillon de facture",
+  pack_credit: "1 lead vous a été restitué dans votre pack",
   credit_note: "Avoir partiel émis",
   none: "Aucun crédit automatique : la finance AssurMatch traite ce cas avec votre cabinet"
 };

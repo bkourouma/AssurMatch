@@ -280,18 +280,66 @@ describe("lead disputes runtime HTTP (spec 063, CRM-012)", () => {
     expect(paid).toMatchObject({ status: "paid", amountDue: 0 });
   });
 
-  it("settles a dispute with creditMode none when the lead has no unit price on the invoice, and never double credits on a draft", async () => {
+  it("gives one credit back to the pack for a lead covered by a prepaid pack (D-B3), idempotently, then falls back to a credit note", async () => {
     const { starter: owner, seed } = await setup();
-    const free = await lead(seed.partner.id, "AM-FREE", 0);
-    await harness!.request("/admin/billing/packs", { method: "POST", headers: { ...actorHeaders(superAdmin), ...json }, body: JSON.stringify({ partnerId: seed.partner.id, credits: 5, reason: "Pack pilote offert" }) });
+    const covered = await lead(seed.partner.id, "AM-PACK-A", 0);
+    const priced = await lead(seed.partner.id, "AM-PACK-B", 0);
+    await harness!.request("/admin/billing/packs", { method: "POST", headers: { ...actorHeaders(superAdmin), ...json }, body: JSON.stringify({ partnerId: seed.partner.id, credits: 1, reason: "Pack pilote offert" }) });
     const draft = draftInvoiceSchema.parse((await readJson<unknown[]>(await harness!.request("/admin/billing/invoices/recompute", { method: "POST", headers: { ...actorHeaders(superAdmin), ...json }, body: JSON.stringify({ partnerId: seed.partner.id, reason: "Cloture avec pack" }) })))[0]);
-    expect(draft.packCreditsUsed).toBe(1);
+    expect(draft).toMatchObject({ packCreditsUsed: 1, totalAmount: 52_000 });
+    expect((await harness!.request("/admin/billing/issued-invoices", { method: "POST", headers: { ...actorHeaders(finance), ...json }, body: JSON.stringify({ draftId: draft.id, reason: "Facture du mois" }) })).status).toBe(201);
+    const account = async () => accountStatementSchema.parse(await readJson(await harness!.request("/broker/billing/account", { headers: actorHeaders(owner) })));
+    expect((await account()).packCreditsRemaining).toBe(0);
+
+    expect((await starterDispute(covered.id, owner)).status).toBe(201);
+    const first = await firstDisputeOf(covered.id);
+    const restored = adminLeadDisputeSchema.parse(await readJson(await decide(first.id, finance, { decision: "accept", reason: "Lead couvert par le pack, credit restitue" })));
+    expect(restored).toMatchObject({ status: "accepted", creditMode: "pack_credit" });
+    expect(restored.creditPackId).toBeTruthy();
+    expect(restored.creditNoteId).toBeUndefined();
+    // The pack list of the statement shows the restored credit with its reason, and the remaining credits went up by one.
+    const afterRestore = await account();
+    expect(afterRestore.packCreditsRemaining).toBe(1);
+    expect(afterRestore.packs.find((pack) => pack.id === restored.creditPackId)).toMatchObject({ creditsGranted: 1, creditsRemaining: 1, reason: "Restitution - contestation de lead acceptee", disputeId: first.id });
+    expect(afterRestore.entries.filter((entry) => entry.kind === "credit_note")).toHaveLength(0);
+    expect(harness!.runtime.audit.writer.search({ action: BillingAuditActions.packRestored })).toHaveLength(1);
+    expect(harness!.runtime.audit.writer.search({ action: BillingAuditActions.disputeDecided })[0]?.context).toMatchObject({ creditMode: "pack_credit" });
+
+    // The broker sees it on the dispute view and on the lead detail; admin sees it too.
+    const views = (await readJson<{ items: unknown[] }>(await harness!.request("/broker/billing/disputes", { headers: actorHeaders(owner) }))).items.map((item) => brokerLeadDisputeViewSchema.parse(item));
+    expect(views[0]).toMatchObject({ creditMode: "pack_credit", creditPackId: restored.creditPackId });
+    const detail = await readJson<{ dispute: { creditMode: string; creditPackId: string } }>(await harness!.request(`/broker/starter/leads/${covered.id}`, { headers: actorHeaders(owner) }));
+    expect(detail.dispute).toMatchObject({ creditMode: "pack_credit", creditPackId: restored.creditPackId });
+    expect(adminLeadDisputeSchema.parse(await readJson(await harness!.request(`/admin/billing/disputes/${first.id}`, { headers: actorHeaders(finance) }))).creditPackId).toBe(restored.creditPackId);
+
+    // Replay: still one restored pack row.
+    expect((await decide(first.id, finance, { decision: "accept", reason: "Rejeu identique de la decision" })).status).toBe(200);
+    expect((await account()).packs.filter((pack) => pack.disputeId === first.id)).toHaveLength(1);
+    expect((await account()).packCreditsRemaining).toBe(1);
+
+    // The pack-covered quota of this invoice is exhausted: the next accepted dispute is credited in money.
+    expect((await starterDispute(priced.id, owner)).status).toBe(201);
+    const second = await firstDisputeOf(priced.id);
+    expect(adminLeadDisputeSchema.parse(await readJson(await decide(second.id, finance, { decision: "accept", reason: "Second lead hors zone aussi" })))).toMatchObject({ creditMode: "credit_note", creditAmount: 2_360 });
+    expect((await account()).packCreditsRemaining).toBe(1);
+
+    // A draft computation never credits a pack_credit dispute a second time.
+    const recomputed = draftInvoiceSchema.parse((await readJson<unknown[]>(await harness!.request("/admin/billing/invoices/recompute", { method: "POST", headers: { ...actorHeaders(superAdmin), ...json }, body: JSON.stringify({ partnerId: seed.partner.id, reason: "Recalcul" }) })))[0]);
+    expect(recomputed.disputeCreditCount).toBe(0);
+  });
+
+  it("settles a dispute with creditMode none when the lead has no price and no pack on the invoice (manual treatment)", async () => {
+    const { starter: owner, seed } = await setup();
+    await harness!.request("/admin/billing/plans", { method: "PUT", headers: { ...actorHeaders(superAdmin), ...json }, body: JSON.stringify({ plan: seed.partner.plan, countryCode: "CI", monthlySubscription: 50_000, perLeadPrice: 0, setupFee: 0, reason: "Lead offert ce mois" }) });
+    const free = await lead(seed.partner.id, "AM-FREE", 0);
+    const draft = draftInvoiceSchema.parse((await readJson<unknown[]>(await harness!.request("/admin/billing/invoices/recompute", { method: "POST", headers: { ...actorHeaders(superAdmin), ...json }, body: JSON.stringify({ partnerId: seed.partner.id, reason: "Cloture sans prix" }) })))[0]);
     expect((await harness!.request("/admin/billing/issued-invoices", { method: "POST", headers: { ...actorHeaders(finance), ...json }, body: JSON.stringify({ draftId: draft.id, reason: "Facture du mois" }) })).status).toBe(201);
     expect((await starterDispute(free.id, owner)).status).toBe(201);
     const dispute = await firstDisputeOf(free.id);
-    const none = adminLeadDisputeSchema.parse(await readJson(await decide(dispute.id, finance, { decision: "accept", reason: "Lead couvert par le pack, traitement manuel" })));
+    const none = adminLeadDisputeSchema.parse(await readJson(await decide(dispute.id, finance, { decision: "accept", reason: "Lead offert, traitement manuel" })));
     expect(none).toMatchObject({ status: "accepted", creditMode: "none" });
     expect(none.creditNoteId).toBeUndefined();
+    expect(none.creditPackId).toBeUndefined();
     expect(harness!.runtime.audit.writer.search({ action: BillingAuditActions.disputeDecided })[0]?.context).toMatchObject({ creditMode: "none", creditSkippedReason: "no_unit_price_on_invoice" });
     expect(accountStatementSchema.parse(await readJson(await harness!.request("/broker/billing/account", { headers: actorHeaders(owner) }))).entries.filter((entry) => entry.kind === "credit_note")).toHaveLength(0);
   });

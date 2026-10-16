@@ -279,7 +279,8 @@ export interface BrokerLeadDisputeData {
   createdAt: string;
   decidedAt?: string;
   decisionReason?: string;
-  creditMode?: "draft_invoice" | "credit_note" | "none";
+  creditMode?: "draft_invoice" | "credit_note" | "pack_credit" | "none";
+  creditPackId?: string;
   creditNoteId?: string;
   creditNoteNumber?: string;
   creditAmount?: number;

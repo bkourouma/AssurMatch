@@ -1490,6 +1490,8 @@ model BrokerCrmDispute {
   creditMode       String?
   creditNoteId     String?
   creditAmount     Int?
+  /// "pack_credit" mode: the LeadPack row that gave one credit back.
+  creditPackId     String?
 
   @@index([leadAssignmentId, createdAt])
   @@index([partnerTenantId, status])
@@ -1680,10 +1682,15 @@ model LeadPack {
   grantedById     String?
   /// Spec 060 J-03: invoice whose recorded payment justified the grant.
   invoiceId       String?
+  /// Spec 063: dispute that gave one credit back (unique: idempotent restore) and the invoice whose
+  /// pack-covered lead was re-credited. sourceInvoiceId is NOT the payment justification above.
+  disputeId       String?  @unique
+  sourceInvoiceId String?
   grantedAt       DateTime @default(now())
   updatedAt       DateTime @default(now())
 
   @@index([partnerId, grantedAt])
+  @@index([sourceInvoiceId])
 }
 
 model DraftInvoice {

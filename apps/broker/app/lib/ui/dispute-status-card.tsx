@@ -1,5 +1,5 @@
 import type { BrokerLeadDisputeData } from "../broker-api";
-import { DISPUTE_CREDIT_MODE_LABELS, disputeReasonLabel, disputeStatusLabel } from "../lead-vocabulary";
+import { DISPUTE_CREDIT_MODE_LABELS, DISPUTE_FINAL_DECISION_NOTICE, disputeReasonLabel, disputeStatusLabel } from "../lead-vocabulary";
 import { Badge, Card, DescriptionList, Notice } from "./broker-ui";
 import { disputeStatusTone, formatDate, formatXof } from "./broker-view-models";
 
@@ -17,6 +17,7 @@ export function DisputeCreditOutcome({ dispute }: { dispute: BrokerLeadDisputeDa
       </>
     );
   }
+  if (dispute.creditMode === "pack_credit") return <>{DISPUTE_CREDIT_MODE_LABELS.pack_credit}.</>;
   if (dispute.creditMode === "draft_invoice") return <>{DISPUTE_CREDIT_MODE_LABELS.draft_invoice}.</>;
   if (dispute.creditMode === "none") return <>{DISPUTE_CREDIT_MODE_LABELS.none}.</>;
   return <>Crédit en cours de traitement.</>;
@@ -46,7 +47,7 @@ export function DisputeStatusCard({ disputes }: { disputes: BrokerLeadDisputeDat
           {dispute.status === "opened" || dispute.status === "under_review" ? (
             <Notice tone="info">Votre contestation est en attente de la décision de la finance AssurMatch. Vous serez notifié dès qu'elle est prise.</Notice>
           ) : null}
-          {dispute.status === "rejected" ? <Notice tone="warning">Contestation rejetée : le lead reste facturable.</Notice> : null}
+          {dispute.status === "rejected" ? <Notice tone="warning">Contestation rejetée : le lead reste facturable. {DISPUTE_FINAL_DECISION_NOTICE}</Notice> : null}
           {dispute.status === "accepted" ? (
             <Notice tone="success" title="Contestation acceptée">
               <DisputeCreditOutcome dispute={dispute} />

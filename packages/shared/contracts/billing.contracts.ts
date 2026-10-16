@@ -129,6 +129,8 @@ export const leadPackSchema = z.object({
   reason: nonEmptyStringSchema,
   /** Spec 060 J-03: invoice whose recorded payment justified the grant, when there is one. */
   invoiceId: uuidSchema.nullable().optional(),
+  /** Spec 063: set when the pack row gave one credit back after an accepted lead dispute. */
+  disputeId: z.string().nullable().optional(),
   grantedAt: dateTimeStringSchema
 });
 

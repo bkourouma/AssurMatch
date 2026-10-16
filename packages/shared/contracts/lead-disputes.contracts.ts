@@ -9,8 +9,11 @@ export const LEAD_DISPUTE_WINDOW_DAYS = 30;
 
 export const leadDisputeStatusSchema = z.enum(["opened", "accepted", "rejected"]);
 export const leadDisputeSourceSchema = z.enum(["starter", "crm"]);
-/** How an accepted dispute is credited: next draft invoice, automatic partial credit note, or nothing to credit. */
-export const leadDisputeCreditModeSchema = z.enum(["draft_invoice", "credit_note", "none"]);
+/**
+ * How an accepted dispute is credited: next draft invoice, automatic partial credit note, one lead
+ * given back to the prepaid pack ("pack_credit"), or nothing to credit (manual).
+ */
+export const leadDisputeCreditModeSchema = z.enum(["draft_invoice", "credit_note", "pack_credit", "none"]);
 export const leadDisputeDecisionSchema = z.enum(["accept", "reject"]);
 
 export const leadDisputeDecisionRequestSchema = z.object({
@@ -37,6 +40,8 @@ const leadDisputeDecisionFields = {
   decisionReason: z.string().optional(),
   creditMode: leadDisputeCreditModeSchema.optional(),
   creditNoteId: z.string().optional(),
+  /** "pack_credit" mode: the lead pack row that gave one credit back. */
+  creditPackId: z.string().optional(),
   creditNoteNumber: z.string().optional(),
   /** Credited amount, XOF including VAT (credit note total); absent for the draft invoice and "none" modes. */
   creditAmount: z.number().int().nonnegative().optional()

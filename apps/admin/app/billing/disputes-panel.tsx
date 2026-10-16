@@ -19,6 +19,7 @@ import { decideLeadDisputeAction } from "../lib/billing-actions";
 import {
   DISPUTE_CREDIT_MODE_LABELS,
   DISPUTE_DECISION_OPTIONS,
+  DISPUTE_REJECTION_FINAL_NOTICE,
   DISPUTE_REASON_MAX_LENGTH,
   DISPUTE_REASON_MIN_LENGTH,
   DISPUTE_SOURCE_LABELS,
@@ -59,6 +60,9 @@ export function disputesHref(filters: DisputeTabFilters, extra: { page?: number;
 
 function creditSummary(dispute: AdminLeadDispute): string {
   if (dispute.status !== "accepted") return "-";
+  // Typed as a plain string so that a mode added to the contract (pack_credit) never breaks the screen.
+  const mode: string | undefined = dispute.creditMode;
+  if (mode === "pack_credit") return DISPUTE_CREDIT_MODE_LABELS.pack_credit ?? "-";
   if (dispute.creditMode === "credit_note") {
     return `Avoir ${dispute.creditNoteNumber ?? ""}${dispute.creditAmount !== undefined ? ` - ${xof(dispute.creditAmount)} TTC` : ""}`.trim();
   }
@@ -206,7 +210,7 @@ function DisputeDetail({ detail, canDecide, backHref }: { detail: AdminApiState<
       />
 
       {dispute.status === "accepted" ? <CreditOutcome dispute={dispute} /> : null}
-      {dispute.status === "rejected" ? <StateMessage tone="info">Contestation rejetée : le lead reste facturable, aucun crédit.</StateMessage> : null}
+      {dispute.status === "rejected" ? <StateMessage tone="info">Contestation rejetée : le lead reste facturable, aucun crédit. {DISPUTE_REJECTION_FINAL_NOTICE}</StateMessage> : null}
 
       {!decided && canDecide ? (
         <ConfirmDialog
@@ -245,6 +249,8 @@ function DisputeDetail({ detail, canDecide, backHref }: { detail: AdminApiState<
 
 /** Spec 063 FR-B06: how an accepted dispute was credited. */
 function CreditOutcome({ dispute }: { dispute: AdminLeadDispute }) {
+  const mode: string | undefined = dispute.creditMode;
+  if (mode === "pack_credit") return <StateMessage tone="success">{DISPUTE_CREDIT_MODE_LABELS.pack_credit}.</StateMessage>;
   if (dispute.creditMode === "credit_note") {
     return (
       <StateMessage tone="success">

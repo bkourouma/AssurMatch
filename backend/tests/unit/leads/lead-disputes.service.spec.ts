@@ -95,6 +95,26 @@ describe("LeadDisputesService.open (spec 063 FR-B01 / FR-B02)", () => {
     expect(audit.search({ action: BillingAuditActions.disputeOpenRefused }).map((entry) => entry.reason)).toEqual(["already_exists", "already_exists"]);
   });
 
+  it("opens exactly one dispute under concurrent requests, and maps the repository error to 409", async () => {
+    const { disputes, lead, repository } = setup();
+    const target = await lead(2);
+    const results = await Promise.allSettled([
+      disputes.open({ assignment: target, source: "starter", reason: "wrong_scope", actor: broker }),
+      disputes.open({ assignment: target, source: "crm", reason: "invalid_lead", actor: broker })
+    ]);
+    expect(results.filter((result) => result.status === "fulfilled")).toHaveLength(1);
+    expect(results.find((result) => result.status === "rejected")).toMatchObject({ reason: { status: 409, response: { code: "DISPUTE_ALREADY_EXISTS" } } });
+    expect(await repository.disputesForLead(target.id)).toHaveLength(1);
+
+    // Another instance won the race (the in-process lock and the pre-check saw nothing): the repository refuses.
+    const other = setup();
+    const racing = await other.lead(2);
+    other.repository.disputesForLead = async () => [];
+    await other.repository.addDispute({ id: "winner", leadAssignmentId: racing.id, partnerTenantId: "tenant-a", reason: "wrong_scope", status: "opened", createdAt: NOW.toISOString(), source: "starter" });
+    await expect(other.disputes.open({ assignment: racing, source: "crm", reason: "invalid_lead", actor: broker })).rejects.toMatchObject({ status: 409, response: { code: "DISPUTE_ALREADY_EXISTS" } });
+    expect(other.audit.search({ action: BillingAuditActions.disputeOpenRefused }).at(-1)).toMatchObject({ result: "refused", reason: "already_exists" });
+  });
+
   it("never writes lead contact or answers to the audit trail", async () => {
     const { disputes, lead, audit } = setup();
     await disputes.open({ assignment: await lead(1), source: "starter", reason: "wrong_scope", comment: "texte libre", actor: broker });

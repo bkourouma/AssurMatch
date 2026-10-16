@@ -35,7 +35,7 @@ cmd /c launch-local.bat
 |---|--------|-----|--------|------------------|
 | **0. Plateforme (une fois)** | | | | |
 | 1 | Super Admin | Admin | Se connecter, enrôler la MFA | Dashboard admin visible |
-| 2 | Super Admin | Admin | Ouvrir les flags globaux : `public_comparator_enabled`, `quote_request_enabled`, `starter_portal_enabled`, `broker_dashboard_enabled` | Chaque bascule demande un motif et est auditée |
+| 2 | Super Admin | Admin | Ouvrir les flags globaux `public_comparator_enabled` et `quote_request_enabled` (`starter_portal_enabled`, `broker_crm_enabled` et `broker_dashboard_enabled` sont activés par défaut depuis la spec 063 : vérifier seulement qu'ils sont à « actif ») | Chaque bascule demande un motif et est auditée |
 | 3 | Super Admin | Admin | Publier le consentement `lead_transmission` de CI en FR (et EN) | Consentement « publié » |
 | 4 | Super Admin | Admin | Ouvrir le pays CI et les produits Auto et Voyage : publier un formulaire de devis par produit et par langue, activer les flags produit (public, comparaison, devis), désactiver `product_manual_review_required`, passer les produits en `public` | Checklist du pays : plus de « formulaire/consentement manquant » |
 | 5 | Super Admin | Admin | Pays CI : statut `internal` puis `pilot`, activer les flags pays (comparaison, devis, onboarding courtier) | Le pays est proposé dans la candidature courtier |

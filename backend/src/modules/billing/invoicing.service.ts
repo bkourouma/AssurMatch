@@ -385,11 +385,25 @@ export class InvoicingService {
    * The invoice itself is never modified.
    */
   async creditAcceptedDispute(request: DisputeCreditRequest, actor: ActorContext): Promise<DisputeCreditOutcome> {
-    const already = await this.deps.repository.findCreditNoteByDispute(request.disputeId);
-    if (already) return this.disputeOutcome(already);
+    const already = await this.existingDisputeCredit(request.disputeId, request.partnerId);
+    if (already) return already;
     const periodFrom = new Date(Date.UTC(request.assignedAt.getUTCFullYear(), request.assignedAt.getUTCMonth(), 1));
     const invoice = await this.deps.repository.findActiveInvoiceForPeriod(request.partnerId, periodFrom);
     if (!invoice) return { creditMode: "draft_invoice" };
+    // Decision D-B3 (to be confirmed): a lead covered by a prepaid pack is given back to the pack, not
+    // credited in money. The invoice does not say WHICH lead a pack covered, so the first accepted
+    // disputes of an invoice that consumed P pack credits restore up to P credits; later ones take the
+    // credit note path.
+    const packCovered = invoice.lines.filter((line) => line.kind === "pack_credit").reduce((sum, line) => sum + line.quantity, 0);
+    if (packCovered > 0 && packCovered - (await this.deps.packs.restoredCountForInvoice(request.partnerId, invoice.id)) > 0) {
+      const restored = await this.deps.packs.restoreForDispute({ partnerId: request.partnerId, disputeId: request.disputeId, sourceInvoiceId: invoice.id, sourceInvoiceNumber: invoice.number }, actor);
+      if (restored.created) {
+        await this.notifyBroker(actor, invoice.partnerId, "lead_pack_restored", "Crédit de lead restitué",
+          `Un crédit de lead a été restitué à votre pack suite à une contestation acceptée (facture ${invoice.number}). Détail dans Facturation.`,
+          "LeadPack", restored.pack.id);
+      }
+      return { creditMode: "pack_credit", creditPackId: restored.pack.id };
+    }
     const unit = disputeUnitAmountFromLines(invoice.lines, request.recipientCount);
     if (unit === undefined) return { creditMode: "none", reason: "no_unit_price_on_invoice" };
     const totals = disputeCreditTotals(unit, invoice.vatRateBps);
@@ -457,9 +471,11 @@ export class InvoicingService {
   }
 
   /** Credit already issued for a dispute (crash recovery: a reject must not follow an issued credit note). */
-  async existingDisputeCredit(disputeId: string): Promise<DisputeCreditOutcome | undefined> {
+  async existingDisputeCredit(disputeId: string, partnerId?: string): Promise<DisputeCreditOutcome | undefined> {
     const note = await this.deps.repository.findCreditNoteByDispute(disputeId);
-    return note ? this.disputeOutcome(note) : undefined;
+    if (note) return this.disputeOutcome(note);
+    const pack = partnerId ? await this.deps.packs.restoredForDispute(partnerId, disputeId) : undefined;
+    return pack ? { creditMode: "pack_credit", creditPackId: pack.id } : undefined;
   }
 
   /** Number of a credit note, for the dispute views (id only; no ownership check: callers are tenant-scoped). */
@@ -746,7 +762,8 @@ export interface DisputeCreditRequest {
 }
 
 export interface DisputeCreditOutcome {
-  creditMode: "draft_invoice" | "credit_note" | "none";
+  creditMode: "draft_invoice" | "credit_note" | "pack_credit" | "none";
+  creditPackId?: string;
   creditNoteId?: string;
   creditNoteNumber?: string;
   /** Credit note total, XOF including VAT. */
