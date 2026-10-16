@@ -35,6 +35,18 @@ export async function createAgencyAction(formData: FormData): Promise<void> {
   redirect(`/enterprise?ent=${outcome(result, "agency_created")}`);
 }
 
+/** Spec 066 F3: name, city and status of an agency; the API enforces the Enterprise owner permission. */
+export async function updateAgencyAction(formData: FormData): Promise<void> {
+  const agencyId = stringValue(formData.get("agencyId"));
+  const name = stringValue(formData.get("name")).trim();
+  const status = stringValue(formData.get("status"));
+  const reason = stringValue(formData.get("reason")).trim();
+  if (!UUID.test(agencyId) || !name || name.length > 120 || reason.length < 3 || (status !== "active" && status !== "suspended")) redirect("/enterprise?ent=invalid");
+  const result = await callEnterpriseApi(`/broker/enterprise/agencies/${agencyId}`, "PATCH", { name, city: stringValue(formData.get("city")).trim(), status, reason });
+  if (result.status === 401) redirect(loginRedirect("/enterprise", "session_expired"));
+  redirect(`/enterprise?ent=${outcome(result, "agency_updated")}`);
+}
+
 export async function assignAgencyMemberAction(formData: FormData): Promise<void> {
   const agencyId = stringValue(formData.get("agencyId"));
   const memberId = stringValue(formData.get("memberId")).trim();
