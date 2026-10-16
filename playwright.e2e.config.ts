@@ -72,6 +72,15 @@ export default defineConfig({
       dependencies: ["scenario"]
     },
     {
+      // Specs 062/063/064 (recos 1-4), spec 065 phase B: MFA trusted devices, disputes, wired capabilities
+      // and broker-visitor messaging. Each file provisions its own broker firms on the CI x Auto opened by
+      // the scenario, so none depends on another journey.
+      name: "recos",
+      testMatch: ["recos-*.spec.ts"],
+      use: { baseURL: adminUrl },
+      dependencies: ["scenario"]
+    },
+    {
       // Spec 065, SC-01 for Senegal. Opens SN, so it runs after the SC-09a check that SN is closed.
       name: "senegal",
       testMatch: ["senegal-opening.spec.ts"],
