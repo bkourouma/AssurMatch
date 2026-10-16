@@ -101,7 +101,7 @@ async function changeStatus(page: Page, account: BackOfficeAccount, assignmentId
   await form.locator("#crm-new-status").selectOption(status);
   if (reason) await form.locator("#crm-status-reason").selectOption(reason);
   await submitCrmForm(page, form.getByRole("button", { name: "Enregistrer le statut" }), "status_changed");
-  await expect(page.locator(".bo-notice")).toContainText(/Statut du lead mis [aà] jour et historis/u);
+  await expect(page.locator(".bo-notice").filter({ hasText: /Statut du lead mis [aà] jour et historis/u }), "result notice").not.toHaveCount(0);
   await expect(currentStatusCell(page)).toHaveText(labelRx(STATUS_LABELS[status] ?? status));
 }
 
@@ -115,8 +115,8 @@ async function ensureNote(page: Page, account: BackOfficeAccount, assignmentId: 
   const notes = card(page, NOTES_TITLE);
   await notes.locator("#crm-note-body").fill(NOTE);
   await submitCrmForm(page, notes.getByRole("button", { name: "Ajouter une note" }), "note_created");
-  await expect(page.locator(".bo-notice")).toContainText(/Note interne ajout/u);
-  await expect(page.locator(".bo-notice")).toContainText(/invisible c[oô]t[eé] Web Publique Client/u);
+  await expect(page.locator(".bo-notice").filter({ hasText: /Note interne ajout/u }), "result notice").not.toHaveCount(0);
+  await expect(page.locator(".bo-notice").filter({ hasText: /invisible c[oô]t[eé] Web Publique Client/u }), "result notice").not.toHaveCount(0);
   expect(await activityCount(page, account, assignmentId, NOTES_TITLE, NOTE), "note listed on the activity tab").toBe(1);
 }
 
@@ -134,7 +134,7 @@ async function ensureTask(page: Page, account: BackOfficeAccount, assignmentId: 
   await tasks.locator("#crm-task-title").fill(TASK_TITLE);
   await tasks.locator("#crm-task-due").fill(due.input);
   await submitCrmForm(page, tasks.getByRole("button", { name: "Ajouter une tache" }), "task_created");
-  await expect(page.locator(".bo-notice")).toContainText(/T[aâ]che commerciale cr/u);
+  await expect(page.locator(".bo-notice").filter({ hasText: /T[aâ]che commerciale cr/u }), "result notice").not.toHaveCount(0);
   await openLead(page, account, assignmentId, "activite");
   await expect(card(page, TASKS_TITLE).getByRole("listitem").filter({ hasText: TASK_TITLE })).toContainText(due.date);
 }
@@ -146,7 +146,7 @@ async function ensureReminder(page: Page, account: BackOfficeAccount, assignment
   await reminders.locator("#crm-reminder-at").fill(due.input);
   await reminders.locator("#crm-reminder-message").fill(REMINDER_MESSAGE);
   await submitCrmForm(page, reminders.getByRole("button", { name: "Ajouter un rappel" }), "reminder_created");
-  await expect(page.locator(".bo-notice")).toContainText(/Rappel programm/u);
+  await expect(page.locator(".bo-notice").filter({ hasText: /Rappel programm/u }), "result notice").not.toHaveCount(0);
   await openLead(page, account, assignmentId, "activite");
   await expect(card(page, REMINDERS_TITLE).getByRole("listitem").filter({ hasText: REMINDER_MESSAGE })).toContainText(due.date);
 }
@@ -324,7 +324,7 @@ test("PRO-CRM-03 lead2 : le propriétaire l'assigne à l'agent de l'équipe, l'a
   if ((await assignCard.getByText(`Conseiller actuel : ${agentId}`).count()) === 0) {
     await assignCard.locator("#crm-advisor-id").fill(agentId);
     await submitCrmForm(page, assignCard.getByRole("button", { name: "Assigner au conseiller" }), "assigned");
-    await expect(page.locator(".bo-notice")).toContainText(/Lead assign/u);
+    await expect(page.locator(".bo-notice").filter({ hasText: /Lead assign/u }), "result notice").not.toHaveCount(0);
   }
   await expect(card(page, labelRx("Conseiller assigne")).getByText(`Conseiller actuel : ${agentId}`)).toBeVisible();
   await expect(page.locator("dl.bo-dl > div").filter({ has: page.locator("dt", { hasText: /^Conseiller$/u }) }).locator("dd")).toHaveText(agentId);
@@ -357,7 +357,7 @@ test("PRO-CRM-04 lead3 : marqué Perdu avec un motif obligatoire, l'historique l
     const form = card(page, labelRx("Changer le statut"));
     await form.locator("#crm-new-status").selectOption("perdu");
     await submitCrmForm(page, form.getByRole("button", { name: "Enregistrer le statut" }), "reason_required");
-    await expect(page.locator(".bo-notice")).toContainText(/motif allowlist/u);
+    await expect(page.locator(".bo-notice").filter({ hasText: /motif allowlist/u }), "result notice").not.toHaveCount(0);
     await expect(currentStatusCell(page)).toHaveText(labelRx("Nouveau"));
     await changeStatus(page, world.owner, leadId, "perdu", "price");
   }
