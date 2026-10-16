@@ -301,7 +301,7 @@ test("ENT-08 un courtier Starter n'a pas les fonctions Enterprise : la page l'ex
   await expect(page.getByText("Organisation du cabinet")).toHaveCount(0);
 
   // The API refuses the same calls with the Starter owner's own session token.
-  const cookies = await page.context().cookies(e2eEnv.brokerUrl);
+  const cookies = await page.context().cookies();
   const token = cookies.find((cookie) => cookie.name === BROKER_TOKEN_COOKIE)?.value;
   expect(token, "broker session token cookie").toBeTruthy();
   const headers = { authorization: `Bearer ${token}` };
@@ -324,7 +324,7 @@ test("ENT-08 un courtier Starter n'a pas les fonctions Enterprise : la page l'ex
   // Control: the Enterprise owner's token is accepted on the same read route.
   world = world ?? (await loadEnterpriseWorld());
   const owner = await openEnterprise(browser, "owner", world.owner);
-  const ownerToken = (await owner.context().cookies(e2eEnv.brokerUrl)).find((cookie) => cookie.name === BROKER_TOKEN_COOKIE)?.value;
+  const ownerToken = (await owner.context().cookies()).find((cookie) => cookie.name === BROKER_TOKEN_COOKIE)?.value;
   const control = await request.get(`${e2eEnv.apiUrl}/broker/enterprise/agencies`, { headers: { authorization: `Bearer ${ownerToken}` } });
   expect(control.status()).toBe(200);
 });

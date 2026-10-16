@@ -198,6 +198,7 @@ test("SC-10-WD-1 un lead est transmis puis accepté par le courtier ; la preuve 
   const quote = await requestQuote(browser, offer.offerTitle, world.partnerName, "wd");
   world.data.leadRef = quote.reference;
   world.data.leadEmail = quote.email;
+  world.data.leadPhone = quote.phone;
   world.data.trackingLink = quote.trackingLink;
   saveWorld(WITHDRAWAL_WORLD, world);
 
@@ -292,7 +293,7 @@ test("SC-10-WD-4 côté courtier : lead clôturé, coordonnées masquées, actio
   await expect(contact).toContainText("a retire son consentement");
   await expect(contact).toContainText(`${localPart.slice(0, 2)}***@${domain}`);
   await expect(contact).not.toContainText(visitorEmail);
-  await expect(contact).not.toContainText("+2250102030405");
+  await expect(contact).not.toContainText(world.data.leadPhone as string);
 
   // Closed lead: no broker action, no new proposal.
   const actions = card(broker, "Actions Starter");

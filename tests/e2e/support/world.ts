@@ -164,10 +164,13 @@ export interface VisitorQuote {
 export async function requestQuote(browser: Browser, offerTitle: string, partnerName: string, label: string): Promise<VisitorQuote> {
   const email = `visiteur.${label}.${uniqueSuffix()}@visitor.e2e.test`;
   const name = "Mariam Traoré";
-  const phone = "+2250102030405";
+  // A distinct number per visitor: the platform reuses the visitor profile of a known phone number,
+  // so a shared number would send this visitor's e-mails to the address of the earlier one (finding F1).
+  const phone = `+22501${String(Math.floor(Math.random() * 1e8)).padStart(8, "0")}`;
   const visitor = await appPage(browser, e2eEnv.publicUrl);
   await visitor.goto("/pays/CI/produits/auto/offres");
-  const offer = visitor.locator("article, li, section").filter({ hasText: offerTitle }).filter({ hasText: "Courtier partenaire responsable" }).first();
+  // One <article> per offer, named by its title (several brokers' offers are public by now).
+  const offer = visitor.getByRole("article", { name: offerTitle, exact: true });
   await expect(offer).toContainText(partnerName);
   await offer.getByRole("link", { name: "Demander un devis" }).click();
   await visitor.waitForURL(/\/devis\?offerId=/u);

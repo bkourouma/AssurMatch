@@ -271,9 +271,11 @@ test("SN-09 offre publique du Sénégal pilote, formulaires de devis FR et EN av
 
   const visitor = await appPage(browser, e2eEnv.publicUrl);
   await visitor.goto("/pays/SN");
-  await expect(visitor.getByText(partnerName).first()).toBeVisible();
+  // The country page lists products, not brokers: the responsible broker shows on the offers page.
+  await expect(visitor.getByRole("heading", { level: 1 })).toContainText("Sénégal");
   await visitor.goto("/pays/SN/produits/auto/offres");
-  const offer = visitor.locator("article, li, section").filter({ hasText: offerTitle }).filter({ hasText: "Courtier partenaire responsable" }).first();
+  const offer = visitor.getByRole("article", { name: offerTitle, exact: true });
+  await expect(offer).toContainText("Courtier partenaire responsable");
   await expect(offer).toContainText(partnerName);
   await expect(offer).toContainText("XOF");
   // Voyage has no SN offer: the explicit empty state stays.

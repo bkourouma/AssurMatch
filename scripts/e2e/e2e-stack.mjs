@@ -211,7 +211,8 @@ function startHostApps() {
   startHostProcess("api", "node", ["--import", "tsx", "scripts/local-app/api-runner.mjs"], { env: { ...api, PORT: String(ports.api) } });
   startHostProcess("worker", "node", ["--import", "tsx", "scripts/worker/assurmatch-worker.ts"], { env: api });
   for (const app of APPS) {
-    startHostProcess(app, "npx", ["next", "start", "-H", "127.0.0.1", "-p", String(ports[app])], {
+    // node + the next CLI directly: no npx shim (a .cmd shell dies with the launching console on Windows).
+    startHostProcess(app, "node", [path.join(projectRoot, "node_modules", "next", "dist", "bin", "next"), "start", "-H", "127.0.0.1", "-p", String(ports[app])], {
       cwd: path.join(projectRoot, "apps", app),
       env: { NODE_ENV: "production", APP_ENV: "staging", ASSURMATCH_PUBLIC_CACHE_SECONDS: "0" }
     });
