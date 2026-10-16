@@ -31,7 +31,7 @@ Le courtier affecté (Starter ou CRM) échange par écrit avec le visiteur : mes
 | Historique opposable (VI) | Pass | Messages en ajout seul, `createdAt`/auteur/lecture, audits horodatés, demandes de données historisées, anonymisation 046 conserve les preuves minimales (références, horodatages, types, statuts). |
 | Routage (VII) | Pass | Aucune règle de routage modifiée ; la réaffectation ferme les demandes de documents et fige la conversation de l'ancien courtier. |
 | UX et contenu (VIII) | Pass | Garde FR+EN accent-insensible sur tout texte courtier ; libellés visiteur sans « acheter/souscrire/contrat validé » (balayage de catalogue de messages) ; FR avec accents + EN. |
-| Starter (critère 1) | Pass | Le Starter écrit au visiteur et demande des documents (sous-ensemble de « répondre au visiteur ») sans Kanban, pipeline, assignation, tâches ni rappels ; tests des exclusions Starter mis à jour. |
+| Starter (critère 1) | **Conflit — amendement requis** | La liste fermée du critère n°1 (v1.3.0) ne couvre pas la messagerie bidirectionnelle ni les demandes de documents du Starter : amendement MINOR v1.4.0 proposé dans `constitution-amendment-proposal.md`, à ratifier par le propriétaire du produit (décision du 2026-10-15). Les exclusions CRM du Starter restent testées. Drapeau de coupure disponible. |
 | Discipline de tests (IX) | Pass | RBAC et isolation, non-consentement, drapeau coupé, fichier infecté, formulation interdite, rate limit, ajout seul, dérogations de rôle, e-mails sans contenu, pas d'effacement automatique (voir tasks.md). |
 | Gouvernance (XI) | Pass | Spec, plan, tâches, migration et rapport ; pas de commit sur `main`. |
 

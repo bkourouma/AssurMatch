@@ -171,3 +171,7 @@ Un compliance admin ou un support admin ouvre, en lecture seule, la conversation
 7. **Plafonds** (300 messages par conversation, 3 pièces jointes, 20/h par conversation et 30/h par IP côté visiteur, 10 demandes de documents ouvertes) : valeurs de départ.
 8. **Mise en ligne par défaut** (`true`) alors que le PRD §8 demande l'avis juridique L-08 pour E-02/E-03 : le drapeau permet de couper sans déploiement ; l'avis reste un prérequis de lancement.
 9. **E-mail de clôture** d'une demande de données : envoyé en pointeur (statut final dans l'espace), sans motif de rejet.
+10. **Conflit constitutionnel — critère d'acceptation n°1 (Starter), v1.3.0** : la liste fermée des actions du courtier Starter ne mentionne que la « proposition simple » ; la messagerie bidirectionnelle et les demandes de documents pour le Starter exigent un amendement MINOR (v1.4.0). Proposition rédigée dans `constitution-amendment-proposal.md`, **non ratifiée**. Ratification du propriétaire du produit requise avant fusion ; d'ici là le drapeau `broker_visitor_messaging_enabled` permet de couper la fonctionnalité.
+11. **Réaffectation A -> B -> A** : la conversation et les demandes de documents ouvertes d'un courtier redeviennent visibles pour lui s'il reçoit à nouveau le lead (clé de conversation = affectation + courtier). À confirmer.
+12. **SLA** : la cible contractuelle est appliquée à la « première réponse visible » dans les champs additifs `firstVisibleReply*` ; les champs « premier geste » existants sont inchangés. À confirmer.
+
