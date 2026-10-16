@@ -393,7 +393,12 @@ export class InvoicingService {
     const unit = disputeUnitAmountFromLines(invoice.lines, request.recipientCount);
     if (unit === undefined) return { creditMode: "none", reason: "no_unit_price_on_invoice" };
     const totals = disputeCreditTotals(unit, invoice.vatRateBps);
-    const credited = partialCreditsTotal(await this.deps.repository.listCreditNotes({ invoiceId: invoice.id }));
+    const notes = await this.deps.repository.listCreditNotes({ invoiceId: invoice.id });
+    // A dispute credit applies to a lead that was charged: never more partial notes than billed leads
+    // (leads covered by credit packs share the quantity of the priced lines).
+    const billedLeads = invoice.lines.filter((line) => !line.informational && (line.kind === "billable_leads" || line.kind === "shared_leads")).reduce((sum, line) => sum + line.quantity, 0);
+    if (notes.filter((note) => note.kind === "dispute").length >= billedLeads) return { creditMode: "none", reason: "no_billed_lead_left" };
+    const credited = partialCreditsTotal(notes);
     if (credited + totals.totalAmount > invoice.totalAmount) return { creditMode: "none", reason: "credit_exceeds_invoice_total" };
     const issuedAt = this.now();
     const reason = `Avoir partiel - contestation de lead acceptee. ${request.decisionReason}`.slice(0, 1200);
@@ -449,6 +454,12 @@ export class InvoicingService {
         "CreditNote", result.creditNote.id);
     }
     return this.disputeOutcome(result.creditNote);
+  }
+
+  /** Credit already issued for a dispute (crash recovery: a reject must not follow an issued credit note). */
+  async existingDisputeCredit(disputeId: string): Promise<DisputeCreditOutcome | undefined> {
+    const note = await this.deps.repository.findCreditNoteByDispute(disputeId);
+    return note ? this.disputeOutcome(note) : undefined;
   }
 
   /** Number of a credit note, for the dispute views (id only; no ownership check: callers are tenant-scoped). */

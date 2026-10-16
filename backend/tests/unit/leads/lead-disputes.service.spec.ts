@@ -26,6 +26,11 @@ class FakeCredit implements LeadDisputeCreditPort {
   async creditNoteNumber(id: string): Promise<string | undefined> {
     return id === "note-1" ? "CI-AV-2026-000001" : undefined;
   }
+  /** Set to simulate a credit note issued by an interrupted acceptance. */
+  existing: LeadDisputeCreditOutcome | undefined;
+  async existingCredit(): Promise<LeadDisputeCreditOutcome | undefined> {
+    return this.existing;
+  }
 }
 
 function setup(options: { billingEnabled?: boolean; credit?: FakeCredit; now?: Date } = {}) {
@@ -196,6 +201,24 @@ describe("LeadDisputesService.decide (spec 063 FR-B03..FR-B05)", () => {
     const decided = await context.disputes.decide(finance, context.dispute.id, { decision: "reject", reason: "Décision malgré la panne" });
     expect(decided.status).toBe("rejected");
     expect(context.audit.search({ action: BillingAuditActions.disputeNotificationFailed })[0]).toMatchObject({ result: "failed", targetId: context.dispute.id });
+  });
+
+  it("refuses a reject once an interrupted acceptance already issued a credit note, and loses a concurrent race cleanly", async () => {
+    const credit = new FakeCredit();
+    const context = await opened(setup({ credit }));
+    credit.existing = { creditMode: "credit_note", creditNoteId: "note-1", creditNoteNumber: "CI-AV-2026-000001", creditAmount: 1_180 };
+    await expect(context.disputes.decide(finance, context.dispute.id, { decision: "reject", reason: "Rejet après avoir émis" })).rejects.toMatchObject({ status: 409, response: { code: "DISPUTE_ALREADY_DECIDED" } });
+    expect((await context.repository.findDispute(context.dispute.id))?.status).toBe("opened");
+
+    // Another instance decides between our read and our conditional write: the write is refused (409).
+    credit.existing = undefined;
+    const original = context.repository.updateDispute.bind(context.repository);
+    context.repository.updateDispute = async (dispute, expected) => {
+      await original({ ...dispute, status: "rejected", decisionReason: "Autre instance" });
+      return original(dispute, expected);
+    };
+    await expect(context.disputes.decide(finance, context.dispute.id, { decision: "accept", reason: "Acceptation concurrente" })).rejects.toMatchObject({ status: 409, response: { code: "DISPUTE_ALREADY_DECIDED" } });
+    expect((await context.repository.findDispute(context.dispute.id))?.status).toBe("rejected");
   });
 
   it("converges when a retry follows a crash between the credit and the persistence", async () => {

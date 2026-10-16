@@ -261,19 +261,22 @@ export class DraftInvoiceService {
     const context = {
       countries: new Map(countries.map((country) => [country.isoCode, country])),
       products: new Map(products.map((product) => [product.key, product])),
-      creditedDisputeLeadIds: await this.acceptedDisputeLeadIds(scoped)
+      creditedDisputeLeadIds: await this.acceptedDisputeLeadIds(scoped, partnerId, period.from)
     };
     return { assignments: scoped, evaluations: scoped.map((assignment) => this.policy.evaluate(assignment, context)) };
   }
 
-  private async acceptedDisputeLeadIds(assignments: LeadAssignmentRecord[]): Promise<Set<string>> {
+  private async acceptedDisputeLeadIds(assignments: LeadAssignmentRecord[], partnerId: string, periodFrom: Date): Promise<Set<string>> {
     const credited = new Set<string>();
     if (!this.deps.crmActivity) return credited;
+    // Spec 063: a dispute settled by a partial credit note stays credited on that invoice. If the invoice
+    // was cancelled since (no active invoice for the period), the re-issued invoice must carry the credit.
+    const periodInvoiced = await this.deps.isPeriodInvoiced?.(partnerId, periodFrom) ?? false;
     for (const assignment of assignments) {
       const disputes = await this.deps.crmActivity.disputesForLead(assignment.id);
       // Spec 063: a dispute settled by a partial credit note ("credit_note") or by hand ("none") must not
       // be credited a second time on the draft; legacy accepted rows (no mode) keep the draft credit.
-      if (disputes.some((dispute) => dispute.status === "accepted" && (dispute.creditMode === undefined || dispute.creditMode === "draft_invoice"))) credited.add(assignment.id);
+      if (disputes.some((dispute) => dispute.status === "accepted" && (dispute.creditMode === undefined || dispute.creditMode === "draft_invoice" || (dispute.creditMode === "credit_note" && !periodInvoiced)))) credited.add(assignment.id);
     }
     return credited;
   }

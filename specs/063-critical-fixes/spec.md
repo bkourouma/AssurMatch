@@ -136,6 +136,17 @@ Les parcours visiteur et les parcours authentifiés admin / courtier restent sé
 - **D-A1 — DÉCISION À CONFIRMER** : pas de renouvellement glissant du jeton d'appareil (30 jours fixes) ; plafond de 10 appareils actifs par utilisateur.
 - **D-D1 — DÉCISION À CONFIRMER** : sur les environnements déjà initialisés (preprod), les lignes de flags existantes à `false` ne sont pas modifiées ; l'activation y est manuelle depuis l'écran des flags.
 
+- **DT-6** (revue sécurité) `GET /auth/me.mfaEnrolled` signifie « secret confirmé par un code valide » : un secret généré mais jamais confirmé peut être régénéré avec un jeton sans MFA (sinon l'utilisateur qui quitte l'écran d'enrôlement serait verrouillé) ; un secret confirmé ne peut être remplacé que par une session MFA vérifiée.
+- **DT-7** (revue sécurité) Le compteur d'échecs n'est pas remis à zéro au succès du mot de passe tant que le second facteur est requis (pas de contournement du verrouillage MFA) ; les réponses `/auth/login`, `/auth/mfa/verify`, `/auth/activate` n'exposent plus les hachages ni le secret MFA.
+- **DT-8** (revue sécurité) Écriture de décision conditionnelle (compare-and-set sur le statut `opened`) ; un rejet est refusé si un avoir a déjà été émis par une acceptation interrompue ; un avoir de contestation n'est jamais émis au-delà du nombre de leads facturés ; un lead crédité par avoir sur une facture ensuite annulée est crédité sur la facture ré-émise.
+
+## Risques résiduels connus
+
+- L'unicité « une contestation par lead » n'est pas garantie par la base (données existantes) : verrou en processus uniquement, risque de doublon entre deux instances API. L'avoir reste protégé par l'unicité de `disputeId`.
+- Course entre un avoir de contestation et l'annulation totale de la même facture : pas de `SELECT ... FOR UPDATE` (non testable sans PostgreSQL ici) ; à vérifier au test de charge / smoke PostgreSQL.
+- Les jetons d'accès déjà émis restent valides jusqu'à 15 minutes après une révocation.
+- Dépôts Prisma (appareils de confiance, contestations, avoirs partiels) vérifiés par types et faux délégués, pas sur une vraie base.
+
 ## Hors périmètre
 
 - Application d'un second facteur via WebAuthn / passkeys, notification de nouvel appareil par e-mail.

@@ -120,7 +120,7 @@ describe("lead disputes runtime HTTP (spec 063, CRM-012)", () => {
 
   it("lets only the finance admin decide: RBAC, reason, billing flag, idempotence and the draft invoice credit", async () => {
     const { starter: owner, seed } = await setup({ billing: false });
-    const target = await lead(seed.partner.id, "AM-DRAFT", 2);
+    const target = await lead(seed.partner.id, "AM-DRAFT", 0);
     expect((await starterDispute(target.id, owner)).status).toBe(201);
     const dispute = await firstDisputeOf(target.id);
 
@@ -178,7 +178,7 @@ describe("lead disputes runtime HTTP (spec 063, CRM-012)", () => {
 
   it("rejects a dispute: no credit, the lead stays billable and the broker sees the reason", async () => {
     const { starter: owner, pro, seed } = await setup();
-    const target = await lead(seed.partner.id, "AM-REJECT", 3);
+    const target = await lead(seed.partner.id, "AM-REJECT", 0);
     expect((await crmDispute(target.id, pro)).status).toBe(201);
     const dispute = await firstDisputeOf(target.id);
     const rejected = await decide(dispute.id, financeAll, { decision: "reject", reason: "Le lead respecte les criteres du contrat" });
@@ -296,7 +296,7 @@ describe("lead disputes runtime HTTP (spec 063, CRM-012)", () => {
     expect(accountStatementSchema.parse(await readJson(await harness!.request("/broker/billing/account", { headers: actorHeaders(owner) }))).entries.filter((entry) => entry.kind === "credit_note")).toHaveLength(0);
   });
 
-  it("credits a draft only for disputes accepted with the draft_invoice mode (or legacy accepted rows)", async () => {
+  it("credits a draft for draft_invoice disputes and for credit_note disputes whose invoice no longer exists", async () => {
     const { pro, seed } = await setup();
     const credited = await lead(seed.partner.id, "AM-DRAFT-OK", 0);
     const settled = await lead(seed.partner.id, "AM-DRAFT-NOTE", 0);
@@ -307,7 +307,9 @@ describe("lead disputes runtime HTTP (spec 063, CRM-012)", () => {
     await set(credited.id, { status: "accepted", creditMode: "draft_invoice" });
     await set(settled.id, { status: "accepted", creditMode: "credit_note" });
     const draft = draftInvoiceSchema.parse((await readJson<unknown[]>(await harness!.request("/admin/billing/invoices/recompute", { method: "POST", headers: { ...actorHeaders(superAdmin), ...json }, body: JSON.stringify({ partnerId: seed.partner.id, reason: "Recalcul brouillon" }) })))[0]);
-    expect(draft).toMatchObject({ disputeCreditCount: 1, billableLeadCount: 1 });
+    // Nothing is invoiced for the period: a dispute settled by a credit note on an invoice since cancelled must
+    // be carried by the re-issued invoice, so both accepted disputes are credited on the draft.
+    expect(draft).toMatchObject({ disputeCreditCount: 2, billableLeadCount: 0 });
   });
 });
 

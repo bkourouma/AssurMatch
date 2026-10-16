@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { PrismaService } from "../../../src/modules/common/prisma/prisma.service";
-import { MemoryCrmActivityRepository, PrismaCrmActivityRepository, type LeadDisputeRecord } from "../../../src/modules/leads/crm-activity.repository";
+import { DisputeStatusConflictError, MemoryCrmActivityRepository, PrismaCrmActivityRepository, type LeadDisputeRecord } from "../../../src/modules/leads/crm-activity.repository";
 
 const base: LeadDisputeRecord = {
   id: "d-1",
@@ -34,6 +34,14 @@ describe("CRM activity repository: lead disputes (spec 063)", () => {
     const copy = await repository.findDispute("d-2");
     if (copy) copy.status = "rejected";
     expect((await repository.findDispute("d-2"))?.status).toBe("opened");
+  });
+
+  it("memory: a conditional update refuses a dispute that was decided meanwhile (compare-and-set)", async () => {
+    const repository = new MemoryCrmActivityRepository();
+    await repository.addDispute(base);
+    await repository.updateDispute({ ...base, status: "accepted" }, "opened");
+    await expect(repository.updateDispute({ ...base, status: "rejected" }, "opened")).rejects.toBeInstanceOf(DisputeStatusConflictError);
+    expect((await repository.findDispute("d-1"))?.status).toBe("accepted");
   });
 
   it("prisma: maps the decision columns both ways and leaves null columns out of the DTO", async () => {

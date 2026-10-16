@@ -35,6 +35,13 @@ export interface LeadDisputeFilter {
   to?: Date | undefined;
 }
 
+/** Spec 063: the dispute was decided by someone else between the read and the conditional write. */
+export class DisputeStatusConflictError extends Error {
+  constructor() {
+    super("Dispute status changed concurrently");
+  }
+}
+
 export interface CrmActivityRepository extends RuntimeRepository {
   appendPipelineHistory(history: BrokerCrmPipelineHistoryRecord): Promise<BrokerCrmPipelineHistoryRecord>;
   pipelineHistoryForLead(leadAssignmentId: string): Promise<BrokerCrmPipelineHistoryRecord[]>;
@@ -53,7 +60,11 @@ export interface CrmActivityRepository extends RuntimeRepository {
   /** Spec 063: one dispute by id, with its tenant. */
   findDispute(id: string): Promise<LeadDisputeRecord | undefined>;
   /** Spec 063: persists the finance decision (status, reason, credit) of an existing dispute. */
-  updateDispute(dispute: LeadDisputeRecord): Promise<LeadDisputeRecord>;
+  /**
+   * Persists a dispute. With `expectedStatus` the write is conditional (compare-and-set): when the stored
+   * status differs (another instance decided first) it throws `DisputeStatusConflictError`.
+   */
+  updateDispute(dispute: LeadDisputeRecord, expectedStatus?: LeadDisputeRecord["status"]): Promise<LeadDisputeRecord>;
   /** Spec 063: disputes across tenants, newest first (admin list and broker billing view). */
   listDisputes(filter?: LeadDisputeFilter): Promise<LeadDisputeRecord[]>;
   /** Spec 061: open tasks due in [from, to], across tenants (scheduled-alerts job only). */
@@ -151,9 +162,10 @@ export class MemoryCrmActivityRepository implements CrmActivityRepository {
     return found ? structuredClone(found) : undefined;
   }
 
-  async updateDispute(dispute: LeadDisputeRecord): Promise<LeadDisputeRecord> {
+  async updateDispute(dispute: LeadDisputeRecord, expectedStatus?: LeadDisputeRecord["status"]): Promise<LeadDisputeRecord> {
     const index = this.disputes.findIndex((item) => item.id === dispute.id);
     if (index < 0) throw new Error("Dispute not found");
+    if (expectedStatus && this.disputes[index]?.status !== expectedStatus) throw new DisputeStatusConflictError();
     this.disputes[index] = structuredClone(dispute);
     return structuredClone(dispute);
   }
@@ -182,6 +194,7 @@ type Delegate = {
   findMany(input?: unknown): Promise<unknown[]>;
   findUnique(input: unknown): Promise<unknown>;
   update(input: unknown): Promise<unknown>;
+  updateMany(input: unknown): Promise<{ count: number }>;
 };
 
 export class PrismaCrmActivityRepository implements CrmActivityRepository {
@@ -261,9 +274,14 @@ export class PrismaCrmActivityRepository implements CrmActivityRepository {
     return row ? this.toDispute(row) : undefined;
   }
 
-  async updateDispute(dispute: LeadDisputeRecord): Promise<LeadDisputeRecord> {
+  async updateDispute(dispute: LeadDisputeRecord, expectedStatus?: LeadDisputeRecord["status"]): Promise<LeadDisputeRecord> {
     const data: Record<string, unknown> = { ...this.disputeData(dispute) };
     delete data.id;
+    if (expectedStatus) {
+      const result = await this.delegate("brokerCrmDispute").updateMany({ where: { id: dispute.id, status: expectedStatus }, data });
+      if (result.count !== 1) throw new DisputeStatusConflictError();
+      return this.toDispute(await this.delegate("brokerCrmDispute").findUnique({ where: { id: dispute.id } }));
+    }
     return this.toDispute(await this.delegate("brokerCrmDispute").update({ where: { id: dispute.id }, data }));
   }
 

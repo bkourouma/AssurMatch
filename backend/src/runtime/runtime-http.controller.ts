@@ -93,7 +93,7 @@ export class RuntimeHttpController {
     const actor = this.runtime.auth.service.me(actorFromProtectedHeaders(headers));
     // Spec 063 FR-A11: false for an unknown account (simulated test actors).
     const account = actor.actorId ? await this.runtime.users.service.require(actor.actorId).catch(() => undefined) : undefined;
-    return { ...actor, mfaEnrolled: Boolean(account?.mfaSecretEncrypted) };
+    return { ...actor, mfaEnrolled: Boolean(account?.mfaSecretEncrypted) && account?.mfaStatus === "verified" };
   }
 
   passwordChange(headers: IncomingHttpHeaders, input: PasswordChangeRequest) {

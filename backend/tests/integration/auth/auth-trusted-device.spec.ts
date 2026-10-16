@@ -279,6 +279,15 @@ describe("MFA login and trusted devices (spec 063, scenarios A1-A7)", () => {
       expect((await users.require(created.id)).mfaStatus).toBe("enrolled");
     }, 60_000);
 
+    it("lets a password-only session regenerate a secret that was never confirmed (no lock-out after an abandoned enrolment)", async () => {
+      const { auth, users } = harness();
+      const created = await users.create({ email: "abandoned-enrol@example.com", displayName: "Abandoned", roles: ["support_admin"] }, superAdminActor);
+      const first = await auth.service.enrollMfa(await users.require(created.id), { mfaVerified: false });
+      const second = await auth.service.enrollMfa(await users.require(created.id), { mfaVerified: false });
+      expect(second.secret).not.toBe(first.secret);
+      expect((await users.require(created.id)).mfaStatus).toBe("enrolled");
+    }, 60_000);
+
     it("lets an MFA-verified session re-enrol: status goes back to enrolled and devices end", async () => {
       const { auth, users, enrolledUser, trust } = harness();
       const { user, secret } = await enrolledUser();

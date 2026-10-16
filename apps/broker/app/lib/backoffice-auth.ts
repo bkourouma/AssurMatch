@@ -113,7 +113,7 @@ export function loginRedirect(returnTo: string, reason = "session_required"): st
 }
 
 export function sanitizeReturnTo(value: string | null | undefined): string {
-  if (!value || !value.startsWith("/") || value.startsWith("//") || value.includes("\n") || value.includes("\r")) return "/";
+  if (!value || !value.startsWith("/") || value.startsWith("//") || value.includes("\n") || value.includes("\r") || value.includes("\\")) return "/";
   return value;
 }
 

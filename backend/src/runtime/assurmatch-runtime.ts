@@ -725,6 +725,7 @@ readonly enterprise = new EnterpriseService({
     this.leads.disputes.bindCredit({
       creditAcceptedDispute: (request, actor) => this.billing.invoicing.creditAcceptedDispute(request, actor),
       creditNoteNumber: (id) => this.billing.invoicing.creditNoteNumber(id),
+      existingCredit: (disputeId) => this.billing.invoicing.existingDisputeCredit(disputeId),
       refreshDraft: async (partnerId, periodFrom, actor) => {
         await this.billing.drafts.refreshDraftForPeriod(partnerId, periodFrom, actor, "dispute_credit");
       }

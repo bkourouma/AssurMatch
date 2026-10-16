@@ -62,7 +62,7 @@ describe("MFA bypass fix and trusted devices over the real HTTP runtime (spec 06
     expect(enrolled.status).toBeLessThan(300);
     const { secret } = await enrolled.json() as { secret: string };
     const meAfterEnrol = await (await authed("/auth/me", passwordOnly.body.accessToken)).json() as { mfaEnrolled: boolean };
-    expect(meAfterEnrol.mfaEnrolled).toBe(true);
+    expect(meAfterEnrol.mfaEnrolled).toBe(false); // enrolled but not yet confirmed by a valid code
 
     // First code without trusting the device: no device token.
     const plain = await httpVerifyMfa(harness, passwordOnly.body.accessToken, secret);

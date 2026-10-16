@@ -206,7 +206,9 @@ export class AuthService {
    * one (that was an MFA bypass). Replacing it requires an actor that already passed the second factor.
    */
   async enrollMfa(user: UserAccount, actor?: Pick<ActorContext, "mfaVerified">) {
-    if (user.mfaSecretEncrypted && actor?.mfaVerified !== true) {
+    // A secret that was never confirmed by a valid code protects nothing yet: it can be regenerated (a user who
+    // left the screen before the first code must not be locked out). A confirmed one cannot be replaced.
+    if (user.mfaSecretEncrypted && user.mfaStatus === "verified" && actor?.mfaVerified !== true) {
       this.audit.write({ action: AuthAuditActions.userMfaEnrolled, targetType: "User", targetId: user.id, result: "refused", reason: "mfa_required", context: { email: user.email } });
       throw new ForbiddenException({ code: ErrorCodes.MFA_REQUIRED, message: "MFA required" });
     }

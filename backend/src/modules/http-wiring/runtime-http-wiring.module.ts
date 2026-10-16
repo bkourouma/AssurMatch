@@ -290,7 +290,7 @@ export class AuthController {
     // The back-office headers show the user's name; a missing account keeps the actor as before.
     const account = actor.actorId ? await this.runtime.users.service.require(actor.actorId).catch(() => undefined) : undefined;
     // Spec 063 FR-A11: the MFA screen offers enrolment only when no secret exists yet (false for an unknown account).
-    return { ...actor, ...(account?.displayName ? { displayName: account.displayName } : {}), mfaEnrolled: Boolean(account?.mfaSecretEncrypted) };
+    return { ...actor, ...(account?.displayName ? { displayName: account.displayName } : {}), mfaEnrolled: Boolean(account?.mfaSecretEncrypted) && account?.mfaStatus === "verified" };
   }
 
   passwordChange(request: AssurMatchHttpRequest, input: PasswordChangeRequest) {

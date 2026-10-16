@@ -188,11 +188,11 @@ describe("InvoicingService.creditAcceptedDispute (spec 063 FR-B06 / FR-B07)", ()
     expect(await repository.listCreditNotes()).toHaveLength(0);
   });
 
-  it("never credits more than the invoice total", async () => {
+  it("never issues more dispute credit notes than billed leads", async () => {
     const { service, invoice, request } = setup();
     await invoice({ lines: [line({ kind: "billable_leads", label: "Leads qualifies exclusifs (brouillon)", quantity: 1, unitAmount: 1_000 })] });
     expect(await service.creditAcceptedDispute(request(), finance)).toMatchObject({ creditMode: "credit_note", creditAmount: 1_180 });
-    expect(await service.creditAcceptedDispute(request(), finance)).toEqual({ creditMode: "none", reason: "credit_exceeds_invoice_total" });
+    expect(await service.creditAcceptedDispute(request(), finance)).toEqual({ creditMode: "none", reason: "no_billed_lead_left" });
   });
 });
 
