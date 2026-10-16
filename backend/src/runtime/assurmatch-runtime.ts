@@ -554,7 +554,7 @@ readonly enterprise = new EnterpriseService({
     abuseGuard: this.quoteRequests.abuseGuard,
     redis: this.redis.client,
     // On unless an operator switched it off: a missing flag row reads as enabled (writes only, reads stay open).
-    isMessagingEnabled: () => this.featureFlags.service.isEnabledOrDefault("broker_visitor_messaging_enabled", true)
+    isMessagingEnabled: () => this.featureFlags.service.isEnabled("broker_visitor_messaging_enabled")
   }, {
     documents: this.quoteDocuments,
     quotes: { findById: (id: string) => this.quoteRequests.submissions.findById(id) },
@@ -588,6 +588,8 @@ readonly enterprise = new EnterpriseService({
     products: this.products.service,
     // Spec 054 R6: internal `lead.reassigned`, consumed by the visitor notifier only.
     events: this.partnerWebhookEvents,
+    // Spec 062: the previous broker's open document requests are cancelled at once (reads also close them lazily).
+    onReassigned: (assignmentId, _previousPartnerTenantId, actor) => this.leadMessaging.documentRequests.closeForAssignment(assignmentId, "reassigned", actor),
     notifyBroker: async (assignment, actor) => {
       const notificationId = await this.quoteRequests.submissions.notifyBrokerForAssignment(assignment, actor);
       // Spec 061 FR-003: the pointer e-mail and in-app entry come with the notification above;

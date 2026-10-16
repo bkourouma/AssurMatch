@@ -12,7 +12,7 @@ description: "Task list for 062 — Messagerie courtier ↔ visiteur"
 - [x] T001 Spec, plan, research, data-model, contrats (`specs/062-…`), note datée D-9 dans le PRD v0.3.
 - [x] T002 Contrats partagés `lead-messaging.ts`, `data-requests.ts`, codes d'erreur, types de notification, catégories de rétention, garde de formulations renforcée (accents, « garanti ») + tests.
 - [x] T003 Schéma Prisma + migration `0031_broker_visitor_messaging` (4 tables, colonnes `QuoteRequestDocument.documentRequestId/uploadedBy`, `LeadAssignment.firstVisibleReplyAt`, 6 valeurs `NotificationType`) + specs de migration/schéma.
-- [x] T004 Drapeau `broker_visitor_messaging_enabled` (défaut `true`, non sensible) : défauts, seed, politique, tests d'exclusion adaptés.
+- [x] T004 Drapeau `broker_visitor_messaging_enabled` (défaut `false` depuis le 2026-10-16, non sensible) : défauts, seed, politique, tests d'exclusion adaptés.
 - [x] T005 Constantes d'audit `lead-messaging-audit-actions.ts`, `data-request-audit-actions.ts`.
 
 ## Phase 2: Backend messagerie (propriétaire A)

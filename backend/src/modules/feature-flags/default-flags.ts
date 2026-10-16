@@ -28,11 +28,12 @@ export const GLOBAL_FEATURE_FLAG_DEFAULTS = {
   /** Spec 049: AI routing anomaly detection. */
   ai_routing_anomaly_detection_enabled: false,
   /**
-   * Spec 062: broker <-> visitor messaging and document requests. The only global flag that ships
-   * ON: it is a non-sensitive kill switch (off refuses new writes with MESSAGING_DISABLED, reads stay).
-   * A missing row resolves to this default (see `FeatureFlagsService.isEnabled`).
+   * Spec 062: broker <-> visitor messaging and document requests. Ships OFF (product owner, 2026-10-16):
+   * open it from the admin flags screen only once the legal opinion L-08 (CIMA intermediary positioning)
+   * is obtained. Non-sensitive on purpose: admin-toggleable, and switching it off refuses new writes with
+   * MESSAGING_DISABLED while reads stay.
    */
-  broker_visitor_messaging_enabled: true
+  broker_visitor_messaging_enabled: false
 } as const;
 
 export const COUNTRY_FEATURE_FLAG_DEFAULTS = {

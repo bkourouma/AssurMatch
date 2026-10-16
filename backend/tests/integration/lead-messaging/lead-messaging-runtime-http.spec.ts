@@ -76,9 +76,14 @@ describe("broker <-> visitor messaging runtime HTTP (spec 062)", () => {
     process.env.ASSURMATCH_BROKER_CRM_ENABLED = previousCrmFlag;
   });
 
-  async function start(email = "echange@example.com") {
+  async function start(email = "echange@example.com", options: { openMessaging?: boolean } = {}) {
     harness = await createRuntimeHttpHarness();
     const seed = await seedPublicRuntime(harness.runtime);
+    // The flag ships closed (product owner, 2026-10-16: open only once the legal opinion L-08 is obtained):
+    // the scenarios below run with an admin having opened it from the flags screen.
+    if (options.openMessaging !== false) {
+      await harness.runtime.featureFlags.service.setFlag({ key: "broker_visitor_messaging_enabled", scopeType: "global", value: true, reason: "avis juridique L-08 obtenu" }, seed.admin);
+    }
     const confirmation = await submit(harness, seed, email);
     const assignment = (await harness.runtime.leads.assignments.list()).find((candidate) => candidate.publicReference === confirmation.publicReference);
     if (!assignment) throw new Error("assignment missing");
@@ -345,6 +350,18 @@ describe("broker <-> visitor messaging runtime HTTP (spec 062)", () => {
     // Switched back on: writes resume.
     await active.runtime.featureFlags.service.setFlag({ key: "broker_visitor_messaging_enabled", scopeType: "global", value: true, reason: "reprise test" }, seed.admin);
     expect((await post(active, `/broker/starter/leads/${assignment.id}/conversation/messages`, actors.starter, { body: "Reprise" })).status).toBe(201);
+  });
+
+  it("ships closed: without the admin opening the flag every write is refused with MESSAGING_DISABLED and reads stay possible", async () => {
+    const { active, confirmation, assignment, actors } = await start("ferme@example.com", { openMessaging: false });
+    await acceptStarter(active, assignment.id, actors.starter);
+    const response = await post(active, `/broker/starter/leads/${assignment.id}/conversation/messages`, actors.starter, { body: "Bonjour" });
+    expect(response.status).toBe(409);
+    expect(await response.json()).toMatchObject({ code: "MESSAGING_DISABLED" });
+    expect((await post(active, `/broker/starter/leads/${assignment.id}/document-requests`, actors.starter, { label: "Carte grise" })).status).toBe(409);
+    expect((await get(active, `/broker/starter/leads/${assignment.id}/conversation`, actors.starter)).status).toBe(200);
+    const list = visitorConversationListSchema.parse(await readJson(await visitorGet(active, confirmation.publicReference, confirmation.verificationToken, "/conversations")));
+    expect(list.messagingEnabled).toBe(false);
   });
 
   it("blocks forbidden wording in French and English with the expression in the message and in details.wording", async () => {

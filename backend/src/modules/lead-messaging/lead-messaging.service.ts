@@ -83,7 +83,7 @@ export interface LeadMessagingServiceDeps {
   visitorAccess?: { verify(publicReference: string, token: string, actor?: ActorContext): Promise<{ quote: MessagingQuote } | undefined> } | undefined;
   abuseGuard?: PublicAbuseGuardService | undefined;
   redis?: RedisClientPort | undefined;
-  /** Global flag `broker_visitor_messaging_enabled` (default on when no row exists), read on every call. */
+  /** Global flag `broker_visitor_messaging_enabled` (default OFF: closed until the legal opinion L-08, no row = off), read on every call. */
   isMessagingEnabled?: (() => boolean) | undefined;
   now?: () => Date;
 }

@@ -53,7 +53,7 @@ export const FLAG_LABELS: Record<string, string> = {
 /** Spec 062: one-sentence explanation shown under a global flag on the feature-flags screen. */
 export const FLAG_DESCRIPTIONS: Record<string, string> = {
   broker_visitor_messaging_enabled:
-    "Autorise l'envoi de messages et de demandes de documents ; l'historique reste lisible lorsqu'elle est coupée."
+    "Autorise l'envoi de messages et de demandes de documents ; l'historique reste lisible lorsqu'elle est coupée. Fermée par défaut : à ouvrir seulement après l'avis juridique L-08 (positionnement d'intermédiaire, CIMA)."
 };
 
 export function flagDescription(key: string): string | undefined {

@@ -22,7 +22,7 @@ Décisions techniques prises avant la phase 1. Chaque entrée : décision, raiso
 - **Risque** : faux positifs sur « garanti » ; le courtier voit l'expression et reformule.
 
 ## R5. Drapeau de fonctionnalité
-- **Décision** : `broker_visitor_messaging_enabled` dans `GLOBAL_FEATURE_FLAG_DEFAULTS` avec défaut `true` (première valeur `true` de la liste : le test d'inventaire des drapeaux et le seed sont mis à jour) ; clé non sensible (aucun fragment réglementé, absente de la liste protégée) donc modifiable depuis l'écran des drapeaux sans changement d'interface.
+- **Décision** : `broker_visitor_messaging_enabled` dans `GLOBAL_FEATURE_FLAG_DEFAULTS` avec défaut `false` (décision du 2026-10-16 : ouverture par l'admin après l'avis juridique L-08 ; aucune valeur `true` par défaut) ; clé non sensible (aucun fragment réglementé, absente de la liste protégée) donc modifiable depuis l'écran des drapeaux sans changement d'interface.
 - **Lecture** : résolveur global existant, évalué à chaque écriture (jamais en cache de processus).
 - **Comportement coupé** : écritures refusées (`MESSAGING_DISABLED`), lectures conservées.
 

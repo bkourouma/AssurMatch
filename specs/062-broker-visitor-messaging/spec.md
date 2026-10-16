@@ -14,7 +14,7 @@
 3. **Formulations interdites** : toute formulation interdite saisie par un courtier (liste partagée FR + équivalents EN : « souscrire maintenant », « contrat validé », « garanti »…) **bloque l'envoi**. Le courtier voit l'expression fautive et réécrit.
 4. **Demande de données en libre-service (D-10 de l'EPIC D)** : depuis l'espace de suivi, le visiteur peut déposer une demande d'accès, de rectification ou d'effacement. Elle est traitée par la conformité dans l'admin « Rétention ». **Jamais d'effacement automatique** : l'effacement passe par le flux « effacement sur demande » de la spec 046, après approbation de la conformité. E-mail d'accusé de réception avec une référence. Tout est audité.
 
-Décisions techniques du superviseur : drapeau global **non sensible** `broker_visitor_messaging_enabled` (défaut `true`, modifiable depuis l'écran des drapeaux) ; messages en ajout seul ; accès limité aux courtiers actuellement affectés ; conformité/support en lecture seule auditée.
+Décisions techniques du superviseur : drapeau global **non sensible** `broker_visitor_messaging_enabled` (défaut `false` depuis la décision du 2026-10-16 : ouverture par l'admin depuis l'écran des drapeaux seulement après l'avis juridique L-08 ; modifiable sans déploiement) ; messages en ajout seul ; accès limité aux courtiers actuellement affectés ; conformité/support en lecture seule auditée.
 
 ## Why this spec exists
 
@@ -30,7 +30,7 @@ La spec 055 permet au courtier de répondre par une **proposition** et au visite
 - **Technical platform role** : le courtier nommé est l'auteur de tout message. AssurMatch ne rédige, ne modère pas le fond, ne recommande ni ne classe. Un bandeau fixe rappelle dans la conversation : « Échange avec {courtier}. AssurMatch est une plateforme technique : ces messages ne constituent ni un contrat ni une garantie. » Aucune souscription, signature ni paiement.
 - **Impacted application(s)** (surfaces) : **Backend API** ; **base de données** (migration `0031_broker_visitor_messaging`) ; **packages partagés** (contrats, mots interdits, types de notification, codes d'erreur) ; **Web Publique Client** (espace de suivi : conversation, demandes de documents, formulaire de demande de données) ; **Back-office Courtier** (conversation et demandes de documents sur la fiche du lead, Starter et CRM ; notifications) ; **Back-office Plateforme** (file des demandes de données dans « Rétention » ; vue de conversation en lecture seule pour conformité/support) ; **notifications et worker**.
 - **Frontend separation** : le visiteur agit avec son jeton 054 sur des routes publiques ; courtier et admin agissent avec leur session back-office. Aucun écran, rôle ni layout back-office dans l'app publique.
-- **Required feature flags** : nouveau drapeau global non sensible `broker_visitor_messaging_enabled`, défaut `true`. Désactivé : plus aucune écriture (message, demande de documents, téléversement) ; l'historique reste lisible (valeur probante). Les demandes de données (D-10) ne dépendent pas de ce drapeau : c'est un droit du visiteur.
+- **Required feature flags** : nouveau drapeau global non sensible `broker_visitor_messaging_enabled`, défaut `false` (fermé jusqu'à l'avis juridique L-08, puis ouvert par l'admin). Fermé : plus aucune écriture (message, demande de documents, téléversement) ; l'historique reste lisible (valeur probante). Les demandes de données (D-10) ne dépendent pas de ce drapeau : c'est un droit du visiteur.
 - **Consent and transmission** : une conversation n'existe que pour une affectation acceptée dont le consentement est actif. Après un retrait du consentement ou la clôture du lead, la conversation devient **en lecture seule** ; le visiteur peut toujours la lire avec un jeton valide. Elle reste masquée pour l'ancien courtier dès la réaffectation.
 - **Partner license controls** : un courtier suspendu ne peut pas écrire (même garde que les propositions) ; en lecture seule il consulte sans écrire.
 - **Audit and data history** : messages et demandes en **ajout seul** (jamais de modification ni de suppression ; seuls l'accusé de lecture et l'anonymisation 046 changent une ligne). Audits sans contenu de message. Historique opposable.
@@ -134,7 +134,7 @@ Un compliance admin ou un support admin ouvre, en lecture seule, la conversation
 - **FR-013**: Conformité et support MUST pouvoir lire en lecture seule la conversation d'un lead depuis l'admin ; chaque lecture est auditée ; le support voit les corps masqués ; aucun autre rôle n'y accède.
 - **FR-014**: Messages, demandes de documents et demandes de données MUST être ajoutés aux catégories de rétention (spec 046) avec des durées provisoires marquées « en attente de validation juridique », et MUST être anonymisés avec la demande de devis.
 - **FR-015**: Les routes publiques d'écriture MUST être limitées par débit (Redis), protégées par un champ piège, validées strictement, et ne MUST effectuer aucun traitement lourd synchrone au-delà de l'analyse antivirus des pièces déjà utilisée par les specs 033/055.
-- **FR-016**: Le drapeau `broker_visitor_messaging_enabled` (global, non sensible, défaut `true`) MUST être déclaré, semé, visible et modifiable sur l'écran des drapeaux, audité par le mécanisme existant.
+- **FR-016**: Le drapeau `broker_visitor_messaging_enabled` (global, non sensible, défaut `false`) MUST être déclaré, semé, visible et modifiable sur l'écran des drapeaux, audité par le mécanisme existant.
 - **FR-017**: Les statuts internes CRM MUST ne jamais être exposés au visiteur (E-06) ; la conversation ne change aucun statut CRM.
 - **FR-018**: Les interfaces visiteur MUST exister en français et en anglais (`[locale]`), avec accents corrects en français ; aucune formulation interdite par la constitution VIII.
 
@@ -161,7 +161,7 @@ Un compliance admin ou un support admin ouvre, en lecture seule, la conversation
 - **Accusé de lecture** : horodatage de première lecture par le destinataire, affiché des deux côtés.
 - **Réaffectation** : le nouveau courtier repart d'une conversation vide (minimisation) ; le visiteur voit les deux.
 
-## DÉCISIONS À CONFIRMER (aucune ne bloque la livraison ; choix conservateurs appliqués)
+## DÉCISIONS À CONFIRMER (acceptées en l'état par le propriétaire du produit le 2026-10-16 ; durées de rétention toujours provisoires, à valider juridiquement)
 1. **Durées de rétention** des messages, demandes de documents et demandes de données : valeurs provisoires, en attente de validation juridique (avis L-08 et cabinet juridique).
 2. **Délai légal de réponse** à une demande de données : 30 jours affichés à la conformité comme échéance indicative, à confirmer par pays (ARTCI / CDP).
 3. **Remise des données pour une demande d'accès** : traitée hors plateforme par la conformité (aucun export automatique), vérification d'identité par l'adresse e-mail liée au jeton uniquement.
@@ -169,9 +169,9 @@ Un compliance admin ou un support admin ouvre, en lecture seule, la conversation
 5. **Ouverture de l'échange par le visiteur** avant la première réponse du courtier : autorisée dès l'acceptation du lead.
 6. **Nouveau courtier après réaffectation** : ne voit pas l'ancien échange.
 7. **Plafonds** (300 messages par conversation, 3 pièces jointes, 20/h par conversation et 30/h par IP côté visiteur, 10 demandes de documents ouvertes) : valeurs de départ.
-8. **Mise en ligne par défaut** (`true`) alors que le PRD §8 demande l'avis juridique L-08 pour E-02/E-03 : le drapeau permet de couper sans déploiement ; l'avis reste un prérequis de lancement.
+8. **Mise en ligne** : le drapeau est **fermé par défaut** (décision du 2026-10-16) ; l'admin ne l'ouvre qu'une fois l'avis juridique L-08 (positionnement d'intermédiaire, CIMA) obtenu (checklist de mise en production, ligne 2.8 bis).
 9. **E-mail de clôture** d'une demande de données : envoyé en pointeur (statut final dans l'espace), sans motif de rejet.
-10. **Conflit constitutionnel — critère d'acceptation n°1 (Starter), v1.3.0** : la liste fermée des actions du courtier Starter ne mentionne que la « proposition simple » ; la messagerie bidirectionnelle et les demandes de documents pour le Starter exigent un amendement MINOR (v1.4.0). Proposition rédigée dans `constitution-amendment-proposal.md`, **non ratifiée**. Ratification du propriétaire du produit requise avant fusion ; d'ici là le drapeau `broker_visitor_messaging_enabled` permet de couper la fonctionnalité.
+10. **Conflit constitutionnel — critère d'acceptation n°1 (Starter)** : levé. L'amendement MINOR v1.4.0 (courtier Starter : messages, demandes de documents, sans CRM) est **ratifié par le propriétaire du produit le 2026-10-16** et intégré à `.specify/memory/constitution.md`.
 11. **Réaffectation A -> B -> A** : la conversation et les demandes de documents ouvertes d'un courtier redeviennent visibles pour lui s'il reçoit à nouveau le lead (clé de conversation = affectation + courtier). À confirmer.
 12. **SLA** : la cible contractuelle est appliquée à la « première réponse visible » dans les champs additifs `firstVisibleReply*` ; les champs « premier geste » existants sont inchangés. À confirmer.
 

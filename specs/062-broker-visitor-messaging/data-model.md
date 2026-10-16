@@ -69,7 +69,7 @@ Règles : une seule demande ouverte (`received`/`in_review`) par `quoteRequestId
 Clés d'idempotence (`dedupeKey`) : `visitor_broker_message:{quoteRequestId}:{assignmentId}:{bucket15min}` ; idem côté courtier ; `visitor_documents_requested:{quoteRequestId}:{requestId}` ; `broker_document_received:{quoteRequestId}:{requestId}:{bucket15min}` ; `visitor_data_request_acknowledged:{dataRequestId}` ; `visitor_data_request_closed:{dataRequestId}` ; `admin_data_request_received:{dataRequestId}`.
 
 ## FeatureFlag
-Ligne `broker_visitor_messaging_enabled` (global, non sensible, défaut `true`).
+Ligne `broker_visitor_messaging_enabled` (global, non sensible, défaut `false` : fermé jusqu'à l'avis juridique L-08).
 
 ## Rétention (spec 046, provisoire)
 Catégories `lead_message_threads`, `lead_document_requests`, `data_requests` : durées provisoires marquées « en attente de validation juridique ». Anonymisation : `body`, `fileName`, `label`, `note`, `detail` remplacés ; `reference`, horodatages, types et statuts conservés (preuve minimale).

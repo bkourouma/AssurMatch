@@ -1,6 +1,6 @@
-# Proposition d'amendement constitutionnel (NON RATIFIÉE) — critère d'acceptation n°1 (Courtier Starter)
+# Amendement constitutionnel v1.4.0 (RATIFIÉ le 2026-10-16) — critère d'acceptation n°1 (Courtier Starter)
 
-**Statut** : proposition rédigée par le lead de la spec 062. La constitution (`.specify/memory/constitution.md`, v1.3.0) n'est PAS modifiée par cette branche : l'amendement doit être ratifié par le propriétaire du produit avant toute fusion de la messagerie pour le plan Starter.
+**Statut** : ratifié par le propriétaire du produit le 2026-10-16 et intégré à `.specify/memory/constitution.md` (v1.4.0, MINOR). Ce document conserve le raisonnement de l'amendement.
 
 ## Conflit constaté
 

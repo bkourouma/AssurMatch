@@ -2,11 +2,11 @@
 
 **Branch**: `062-broker-visitor-messaging` | **Date**: 2026-10-15 | **Spec**: [spec.md](./spec.md)
 
-**Continuous Workflow Eligibility**: Eligible. Spec validée (décisions produit du 2026-10-15), aucun marqueur `[NEEDS CLARIFICATION]` ; les points non couverts sont des « DÉCISIONS À CONFIRMER » avec un choix conservateur appliqué. Aucun conflit constitutionnel (constitution 1.3.0) : voir le Constitution Check.
+**Continuous Workflow Eligibility**: Eligible. Spec validée (décisions produit du 2026-10-15), aucun marqueur `[NEEDS CLARIFICATION]` ; les points non couverts sont des « DÉCISIONS À CONFIRMER » avec un choix conservateur appliqué. Constitution 1.4.0 (amendement Starter ratifié le 2026-10-16) : voir le Constitution Check.
 
 ## Summary
 
-Le courtier affecté (Starter ou CRM) échange par écrit avec le visiteur : messages texte + 3 pièces jointes analysées, historique en ajout seul, accusés de lecture, garde de formulations interdites qui bloque l'envoi, demandes de documents que le visiteur satisfait depuis son espace. Le visiteur utilise le lien magique de la spec 054 (aucun compte). Les e-mails ne portent qu'un pointeur. Le SLA gagne la « première réponse visible » (première proposition ou premier message). Le visiteur peut déposer une demande d'accès, de rectification ou d'effacement, traitée par la conformité dans « Rétention » ; l'effacement passe par le flux de la spec 046 et n'est jamais automatique. Un drapeau global non sensible `broker_visitor_messaging_enabled` (défaut `true`) coupe les écritures. Voir [research.md](./research.md), [data-model.md](./data-model.md), [contracts/messaging-api.md](./contracts/messaging-api.md).
+Le courtier affecté (Starter ou CRM) échange par écrit avec le visiteur : messages texte + 3 pièces jointes analysées, historique en ajout seul, accusés de lecture, garde de formulations interdites qui bloque l'envoi, demandes de documents que le visiteur satisfait depuis son espace. Le visiteur utilise le lien magique de la spec 054 (aucun compte). Les e-mails ne portent qu'un pointeur. Le SLA gagne la « première réponse visible » (première proposition ou premier message). Le visiteur peut déposer une demande d'accès, de rectification ou d'effacement, traitée par la conformité dans « Rétention » ; l'effacement passe par le flux de la spec 046 et n'est jamais automatique. Un drapeau global non sensible `broker_visitor_messaging_enabled` (défaut `false`, ouvert par l'admin après l'avis juridique L-08) bloque les écritures tant qu'il est fermé. Voir [research.md](./research.md), [data-model.md](./data-model.md), [contracts/messaging-api.md](./contracts/messaging-api.md).
 
 ## Technical Context
 
@@ -31,7 +31,7 @@ Le courtier affecté (Starter ou CRM) échange par écrit avec le visiteur : mes
 | Historique opposable (VI) | Pass | Messages en ajout seul, `createdAt`/auteur/lecture, audits horodatés, demandes de données historisées, anonymisation 046 conserve les preuves minimales (références, horodatages, types, statuts). |
 | Routage (VII) | Pass | Aucune règle de routage modifiée ; la réaffectation ferme les demandes de documents et fige la conversation de l'ancien courtier. |
 | UX et contenu (VIII) | Pass | Garde FR+EN accent-insensible sur tout texte courtier ; libellés visiteur sans « acheter/souscrire/contrat validé » (balayage de catalogue de messages) ; FR avec accents + EN. |
-| Starter (critère 1) | **Conflit — amendement requis** | La liste fermée du critère n°1 (v1.3.0) ne couvre pas la messagerie bidirectionnelle ni les demandes de documents du Starter : amendement MINOR v1.4.0 proposé dans `constitution-amendment-proposal.md`, à ratifier par le propriétaire du produit (décision du 2026-10-15). Les exclusions CRM du Starter restent testées. Drapeau de coupure disponible. |
+| Starter (critère 1) | **Conforme (v1.4.0)** | Amendement MINOR v1.4.0 ratifié par le propriétaire du produit le 2026-10-16 (voir `constitution-amendment-proposal.md`) : le Starter échange par messages, demande des documents, sans CRM. Les exclusions CRM du Starter restent testées. Drapeau fermé par défaut jusqu'à l'avis L-08. |
 | Discipline de tests (IX) | Pass | RBAC et isolation, non-consentement, drapeau coupé, fichier infecté, formulation interdite, rate limit, ajout seul, dérogations de rôle, e-mails sans contenu, pas d'effacement automatique (voir tasks.md). |
 | Gouvernance (XI) | Pass | Spec, plan, tâches, migration et rapport ; pas de commit sur `main`. |
 
