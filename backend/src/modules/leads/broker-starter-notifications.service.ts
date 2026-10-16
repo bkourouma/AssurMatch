@@ -1,6 +1,7 @@
 import type { BrokerStarterNotification } from "../../../../packages/shared/contracts/quote.contracts";
 import { QuoteAuditActions } from "../audit-logs/quote-audit-actions";
 import { AuditLogWriter } from "../audit-logs/audit-log-writer.service";
+import { customRoleAllows } from "../common/rbac/actor-permissions";
 import type { ActorContext } from "../common/types";
 import { BrokerStarterAccessPolicy } from "./broker-starter-access-policy";
 import { BrokerStarterHistoryService } from "./broker-starter-history.service";
@@ -36,6 +37,7 @@ export class BrokerStarterNotificationsService {
 
   list(actor: ActorContext): BrokerStarterNotification[] {
     this.access.assertPortalAccess(actor);
+    this.assertCustomRoleAllowsNotifications(actor, "list");
     const items = this.notifications.filter((notification) => notification.partnerTenantId === actor.partnerTenantId).map((notification) => this.toDto(notification));
     this.audit.write({
       actor,
@@ -65,6 +67,7 @@ export class BrokerStarterNotificationsService {
       throw new Error("Notification access denied");
     }
     this.access.assertPortalAccess(actor);
+    this.assertCustomRoleAllowsNotifications(actor, id);
     notification.read = true;
     this.history.append({
       leadAssignmentId: notification.leadAssignmentId,
@@ -82,6 +85,13 @@ export class BrokerStarterNotificationsService {
       context: { leadAssignmentId: notification.leadAssignmentId }
     });
     return this.toDto(notification);
+  }
+
+  /** Spec 064: a custom role without notifications:read closes the feed (it only restricts). */
+  private assertCustomRoleAllowsNotifications(actor: ActorContext, targetId: string): void {
+    if (customRoleAllows(actor, "notifications:read")) return;
+    this.audit.write({ actor, action: QuoteAuditActions.brokerStarterNotificationViewed, targetType: "Notification", targetId, scope: { partnerTenantId: actor.partnerTenantId }, result: "refused", reason: "custom_role_restricted", context: {} });
+    throw new Error("Notification access denied");
   }
 
   private toDto(notification: StoredStarterNotification): BrokerStarterNotification {

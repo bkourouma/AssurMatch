@@ -1,9 +1,15 @@
 import { redirect } from "next/navigation";
-import { loginRedirect } from "../../lib/backoffice-auth";
+import { AGENCY_DISPLAY_HINT, AGENCY_PARAM, agencyQuery, resolveAgencyFilter } from "../../lib/agency-filter";
+import { loadAgencyFilter } from "../../lib/agency-filter-loader";
+import { loginRedirect, readBackOfficeSession } from "../../lib/backoffice-auth";
 import { listCrmLeads } from "../../lib/broker-api";
+import { canExportCrmLeads } from "../../lib/broker-permissions";
+import { crmExportHref } from "../../lib/lead-export-links";
 import { crmStatusLabel } from "../../lib/lead-vocabulary";
 import {
   Badge,
+  Button,
+  Cluster,
   DataTable,
   Field,
   FilterBar,
@@ -58,7 +64,10 @@ const columns: Array<DataTableColumn<LeadSummaryViewModel>> = [
 
 export default async function BrokerCrmLeadsPage({ searchParams }: { searchParams?: Promise<QueryParams> }) {
   const params = searchParams ? await searchParams : {};
-  const apiLeads = await listCrmLeads();
+  // Spec 064: Enterprise agency DISPLAY filter (no access restriction); other plans make no extra API call.
+  const session = await readBackOfficeSession();
+  const agency = session.status === "authenticated" ? await loadAgencyFilter(session.profile, params[AGENCY_PARAM]) : resolveAgencyFilter({ agencies: [] });
+  const apiLeads = await listCrmLeads(agencyQuery(agency));
   if (apiLeads.unauthenticated) redirect(loginRedirect("/crm/leads", apiLeads.error ?? "session_required"));
   if (apiLeads.forbidden) {
     return (
@@ -71,6 +80,8 @@ export default async function BrokerCrmLeadsPage({ searchParams }: { searchParam
   }
 
   const leads = apiLeads.data.items.map(leadSummary);
+  // Spec 064 FR-002: the export button is shown only to roles holding broker_crm:export (API re-checks and audits).
+  const canExport = session.status === "authenticated" && canExportCrmLeads(session.profile);
 
   const status = firstParam(params.status);
   const product = firstParam(params.product);
@@ -80,7 +91,7 @@ export default async function BrokerCrmLeadsPage({ searchParams }: { searchParam
   const urgency = firstParam(params.urgency);
   const source = firstParam(params.source);
   const query = firstParam(params.q).trim().toLowerCase();
-  const activeCount = [status, product, country, date, advisor, urgency, source, query].filter(Boolean).length;
+  const activeCount = [status, product, country, date, advisor, urgency, source, query].filter(Boolean).length + (agency.enabled && agency.selected !== "all" ? 1 : 0);
 
   const filtered = leads.filter(
     (lead) =>
@@ -104,7 +115,16 @@ export default async function BrokerCrmLeadsPage({ searchParams }: { searchParam
         kicker="CRM Pro/Enterprise"
         title="Leads CRM"
         description="Vue tableau des leads autorises selon role, tenant, conseiller et permissions PII."
-        actions={<Badge tone="info">Export controle par permission et audit</Badge>}
+        actions={
+          canExport ? (
+            <Cluster>
+              <Button href={crmExportHref({ status, product, country, date, advisor, urgency, source, search: query, agencyId: agency.apiAgencyId })} variant="secondary" size="sm">Exporter (CSV)</Button>
+              <Badge tone="info">Export audité</Badge>
+            </Cluster>
+          ) : (
+            <Badge tone="disabled">Export non autorisé pour votre rôle</Badge>
+          )
+        }
       />
 
       <FilterBar
@@ -137,6 +157,11 @@ export default async function BrokerCrmLeadsPage({ searchParams }: { searchParam
         <Field id="crm-source" label="Source">
           <Select id="crm-source" name="source" defaultValue={source} options={optionsOf(leads, (lead) => lead.source ?? "", "Toutes")} />
         </Field>
+        {agency.enabled ? (
+          <Field id="crm-agency" label="Agence" hint={AGENCY_DISPLAY_HINT}>
+            <Select id="crm-agency" name={AGENCY_PARAM} defaultValue={agency.selected} options={agency.options} />
+          </Field>
+        ) : null}
         <Field id="crm-search" label="Recherche autorisee">
           <Input
             id="crm-search"

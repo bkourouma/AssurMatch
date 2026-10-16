@@ -1427,6 +1427,12 @@ export class BrokerCrmController {
     const actor = brokerWriteActor(request);
     return this.runtime.brokerAi.setOptOut(actor, input);
   }
+
+  // Spec 064 (FR-003) begin: recent loss analyses of the caller's own tenant.
+  aiLossAnalyses(request: AssurMatchHttpRequest) {
+    return this.runtime.brokerAi.listLossAnalyses(protectedActorFromRequest(request));
+  }
+  // Spec 064 end
 }
 
 export class BrokerDashboardController {
@@ -1814,6 +1820,13 @@ export class BrokerEnterpriseController {
     const actor = brokerWriteActor(request);
     return this.runtime.enterprise.updateBranding(input, actor);
   }
+
+  // Spec 064 (FR-006) begin: assigns (or clears) the custom role of a member of the same tenant.
+  setMemberCustomRole(userId: string, input: unknown, request: AssurMatchHttpRequest) {
+    const actor = brokerWriteActor(request);
+    return this.runtime.enterprise.assignCustomRole(parseParam("userId", userId, uuidSchema), input, actor);
+  }
+  // Spec 064 end
 }
 
 export class BrokerNotificationsController {
@@ -2360,6 +2373,9 @@ decorate(BrokerCrmController, "aiOptOutStatus", [Get("ai/opt-out") as MethodDeco
 decorate(BrokerCrmController, "aiSetOptOut", [Put("ai/opt-out") as MethodDecoratorFactory], [[0, Body() as ParamDecoratorFactory], [1, Req() as ParamDecoratorFactory]]);
 // Spec 062 messaging: conversation and document-request routes of the Starter and CRM controllers (see lead-messaging-http.controllers.ts).
 registerBrokerMessagingRoutes([BrokerStarterController, BrokerCrmController]);
+// Spec 064 begin: no parameterised GET route starts with "ai/loss-analysis", so nothing captures it.
+decorate(BrokerCrmController, "aiLossAnalyses", [Get("ai/loss-analysis") as MethodDecoratorFactory, Header("Cache-Control", "no-store") as MethodDecoratorFactory], [[0, Req() as ParamDecoratorFactory]]);
+// Spec 064 end
 
 controller("broker/dashboard", BrokerDashboardController, true);
 decorate(BrokerDashboardController, "dashboard", [Get() as MethodDecoratorFactory], [[0, Req() as ParamDecoratorFactory], [1, Query() as ParamDecoratorFactory]]);
@@ -2485,6 +2501,9 @@ decorate(BrokerEnterpriseController, "sla", [Get("sla") as MethodDecoratorFactor
 decorate(BrokerEnterpriseController, "updateSla", [Put("sla") as MethodDecoratorFactory], [[0, Body() as ParamDecoratorFactory], [1, Req() as ParamDecoratorFactory]]);
 decorate(BrokerEnterpriseController, "branding", [Get("branding") as MethodDecoratorFactory], [[0, Req() as ParamDecoratorFactory]]);
 decorate(BrokerEnterpriseController, "updateBranding", [Put("branding") as MethodDecoratorFactory], [[0, Body() as ParamDecoratorFactory], [1, Req() as ParamDecoratorFactory]]);
+// Spec 064 begin
+decorate(BrokerEnterpriseController, "setMemberCustomRole", [Put("members/:userId/custom-role") as MethodDecoratorFactory], [[0, Param("userId") as ParamDecoratorFactory], [1, Body() as ParamDecoratorFactory], [2, Req() as ParamDecoratorFactory]]);
+// Spec 064 end
 controller("broker/notifications", BrokerNotificationsController, true);
 decorate(BrokerNotificationsController, "inbox", [Get("inbox") as MethodDecoratorFactory], [[0, Req() as ParamDecoratorFactory]]);
 decorate(BrokerNotificationsController, "markRead", [Post("inbox/:id/read") as MethodDecoratorFactory], [[0, Param("id") as ParamDecoratorFactory], [1, Req() as ParamDecoratorFactory]]);
@@ -2661,7 +2680,8 @@ Reflect.defineMetadata("design:paramtypes", [AssurMatchRuntime], AuthRequiredHtt
 export const BROKER_TENANT_WRITE_GUARDED: Readonly<Record<string, readonly string[]>> = {
   BrokerStarterController: ["accept", "reject", "dispute", "close", "sendProposal", "withdrawProposal", "sendMessage", "markRead", "createDocumentRequest", "cancelDocumentRequest"],
   BrokerCrmController: ["status", "note", "task", "reminder", "assign", "document", "proposal", "withdrawProposal", "dispute", "aiRequest", "aiValidate", "aiLossAnalysis", "aiSetOptOut", "sendMessage", "markRead", "createDocumentRequest", "cancelDocumentRequest"],
-  BrokerEnterpriseController: ["createAgency", "updateAgency", "assignMember", "createRole", "updateRole", "updateSla", "updateBranding"],
+  // Spec 064: setMemberCustomRole (assignment of a custom role) is a tenant write like the other enterprise routes.
+  BrokerEnterpriseController: ["createAgency", "updateAgency", "assignMember", "createRole", "updateRole", "updateSla", "updateBranding", "setMemberCustomRole"],
   BrokerNotificationsController: ["updatePreferences"],
   BrokerOffersController: ["create", "update", "submit", "withdraw", "renew"],
   // Spec 053 FR-016: every self-service write of a suspended partner is refused.

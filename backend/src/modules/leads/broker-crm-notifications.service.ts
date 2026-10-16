@@ -1,6 +1,7 @@
 import type { BrokerCrmAiFoundations, BrokerCrmNotification } from "../../../../packages/shared/contracts/quote.contracts";
 import { QuoteAuditActions } from "../audit-logs/quote-audit-actions";
 import { AuditLogWriter } from "../audit-logs/audit-log-writer.service";
+import { customRoleAllows } from "../common/rbac/actor-permissions";
 import type { ActorContext } from "../common/types";
 import { BrokerCrmAccessPolicy } from "./broker-crm-access-policy";
 import { LeadAssignmentService } from "./lead-assignment.service";
@@ -12,6 +13,11 @@ export class BrokerCrmNotificationsService {
 
   async list(actor: ActorContext): Promise<BrokerCrmNotification[]> {
     this.access.assertCrmAccess(actor);
+    // Spec 064: a custom role that does not grant notifications:read closes the feed (it only restricts).
+    if (!customRoleAllows(actor, "notifications:read")) {
+      this.audit.write({ actor, action: QuoteAuditActions.brokerCrmAccessRefused, targetType: "BrokerCrmNotification", targetId: "list", scope: { partnerTenantId: actor.partnerTenantId }, result: "refused", reason: "custom_role_restricted", context: {} });
+      throw new Error("Broker CRM access denied");
+    }
     const notifications = (await this.assignments.list())
       .filter((assignment) => assignment.partnerTenantId === actor.partnerTenantId)
       .slice(0, 20)

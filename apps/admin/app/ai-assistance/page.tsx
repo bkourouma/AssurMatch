@@ -10,6 +10,11 @@ const INSIGHT_LABELS: Record<string, string> = {
   suspicious_leads: "Demandes suspectes"
 };
 
+/** Display-only labels: analyses requested elsewhere (spec 064: /routing/anomalies), never requestable from this page. */
+const DISPLAY_ONLY_LABELS: Record<string, string> = {
+  routing_anomaly_analysis: "Analyse des anomalies de routage (demandée depuis Routage > Anomalies)"
+};
+
 const NOTICES: Record<string, string> = {
   queued: "Insight IA demande. Rechargez la page dans quelques secondes pour le consulter.",
   validated: "Decision de validation humaine enregistree et auditee.",
@@ -79,7 +84,7 @@ export default async function AdminAIAssistancePage({ searchParams }: { searchPa
                   <li key={insight.id}>
                     <Stack>
                       <Cluster>
-                        <strong>{INSIGHT_LABELS[insight.assistType] ?? insight.assistType}</strong>
+                        <strong>{INSIGHT_LABELS[insight.assistType] ?? DISPLAY_ONLY_LABELS[insight.assistType] ?? insight.assistType}</strong>
                         <Badge tone={insight.status === "completed" ? "success" : insight.status === "queued" ? "info" : "warning"}>{insight.status}</Badge>
                         {insight.humanValidationStatus !== "not_required" ? <Badge tone={insight.humanValidationStatus === "pending" ? "warning" : "info"}>validation: {insight.humanValidationStatus}</Badge> : null}
                       </Cluster>

@@ -7,6 +7,7 @@ import type {
   DashboardScopeQuery,
   LicenseAlertItem
 } from "../../../../packages/shared/contracts/dashboard.contracts";
+import type { AdvisorAgencyPredicate, AgencyScopePort } from "../common/agency-scope";
 import type { ActorContext } from "../common/types";
 import type { CountriesService } from "../countries/countries.module";
 import type { CrmActivityRepository } from "../leads/crm-activity.repository";
@@ -28,6 +29,8 @@ export interface BrokerDashboardServiceDeps {
   partnerLicenses: PartnerLicensesService;
   countries: CountriesService;
   crmActivity?: CrmActivityRepository | undefined;
+  /** Spec 064: Enterprise display filter by agency, applied after the access policy. */
+  agencyScope?: AgencyScopePort | undefined;
   config: () => BrokerDashboardServiceConfig;
 }
 
@@ -45,7 +48,8 @@ export class BrokerDashboardService {
     const inWindow = assignments.filter((assignment) => isWithinWindow(assignment.assignedAt, window));
     const plan = this.resolvePlan(actor);
     this.deps.access.assertBrokerDashboardScope(actor, query, plan);
-    const filtered = this.applyOptionalFilters(inWindow, query);
+    const inAgency = await this.deps.agencyScope?.resolve(actor, query.agencyId);
+    const filtered = this.applyOptionalFilters(inWindow, query, inAgency);
     const licenseAlerts = await this.collectLicenseAlerts(tenantId);
     const starter = this.buildStarter(filtered);
     const includeCrm = plan !== "starter" && this.deps.access.crmSectionAllowed(actor, config.brokerCrmEnabled);
@@ -56,7 +60,7 @@ export class BrokerDashboardService {
       starter,
       licenseAlerts,
       ...(crm ? { crm } : {}),
-      ...(query.compare === "previous" ? { comparison: this.buildComparison(assignments, window, query, starter) } : {})
+      ...(query.compare === "previous" ? { comparison: this.buildComparison(assignments, window, query, starter, inAgency) } : {})
     };
     return response;
   }
@@ -66,13 +70,15 @@ export class BrokerDashboardService {
     assignments: LeadAssignmentRecord[],
     window: ResolvedDashboardWindow,
     query: DashboardScopeQuery,
-    current: BrokerStarterDashboardSection
+    current: BrokerStarterDashboardSection,
+    inAgency?: AdvisorAgencyPredicate
   ): DashboardComparison {
     const span = window.to.getTime() - window.from.getTime();
     const previousWindow = { from: new Date(window.from.getTime() - span), to: new Date(window.from.getTime()) };
     const previousRecords = this.applyOptionalFilters(
       assignments.filter((assignment) => assignment.assignedAt >= previousWindow.from && assignment.assignedAt < previousWindow.to),
-      query
+      query,
+      inAgency
     );
     const previous = {
       received: previousRecords.length,
@@ -99,9 +105,11 @@ export class BrokerDashboardService {
     if (plan === "starter") throw new Error("Broker dashboard denied: crm_plan_not_allowed");
     const assignedOnly = actor.roles.includes("broker_agent") || actor.roles.includes("broker_read_only");
     const window = resolveDashboardWindow({ from: query.from, to: query.to });
+    const inAgency = await this.deps.agencyScope?.resolve(actor, query.agencyId);
     const records = (await this.deps.assignments.list())
       .filter((assignment) => assignment.partnerTenantId === actor.partnerTenantId && isWithinWindow(assignment.assignedAt, window))
       .filter((assignment) => !assignedOnly || assignment.assignedAdvisorId === actor.actorId)
+      .filter((assignment) => !inAgency || inAgency(assignment.assignedAdvisorId))
       .filter((assignment) => Boolean(assignment.assignedAdvisorId));
     const byAdvisor = new Map<string, LeadAssignmentRecord[]>();
     for (const assignment of records) {
@@ -151,8 +159,9 @@ export class BrokerDashboardService {
     return "starter";
   }
 
-  private applyOptionalFilters(records: LeadAssignmentRecord[], query: DashboardScopeQuery): LeadAssignmentRecord[] {
+  private applyOptionalFilters(records: LeadAssignmentRecord[], query: DashboardScopeQuery, inAgency?: AdvisorAgencyPredicate): LeadAssignmentRecord[] {
     return records.filter((assignment) => {
+      if (inAgency && !inAgency(assignment.assignedAdvisorId)) return false;
       if (query.country && assignment.countryCode !== query.country) return false;
       if (query.product && assignment.productKey !== query.product) return false;
       if (query.agentId && assignment.assignedAdvisorId !== query.agentId) return false;

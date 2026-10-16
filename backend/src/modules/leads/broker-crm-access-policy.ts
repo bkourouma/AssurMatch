@@ -1,6 +1,6 @@
-import { roleHasPermission } from "../../../../packages/shared/rbac/assurmatch-role-matrix";
 import { QuoteAuditActions } from "../audit-logs/quote-audit-actions";
 import { AuditLogWriter } from "../audit-logs/audit-log-writer.service";
+import { actorHasAnyPermission } from "../common/rbac/actor-permissions";
 import type { ActorContext } from "../common/types";
 import type { LeadAssignmentRecord } from "./lead-assignment.service";
 
@@ -89,7 +89,7 @@ export class BrokerCrmAccessPolicy {
   }
 
   private hasAny(actor: ActorContext, permissions: string[]): boolean {
-    return actor.roles.some((role) => permissions.some((permission) => roleHasPermission(role, permission)));
+    return actorHasAnyPermission(actor, permissions);
   }
 
   private refuse(actor: ActorContext, targetType: string, targetId: string, reason: string): never {

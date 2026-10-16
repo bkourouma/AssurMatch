@@ -11,6 +11,8 @@ export interface BrokerWriteResult {
   suspended: boolean;
   /** Spec 063: machine code of a 409 (DISPUTE_WINDOW_EXPIRED, DISPUTE_ALREADY_EXISTS), when the API sent one. */
   code?: string;
+  /** Spec 064: machine reason of a 403 refusal when the API gives one (e.g. `owner_required_for_manager_target`). */
+  reason?: string | undefined;
 }
 
 export const PARTNER_SUSPENDED_CODE = "PARTNER_SUSPENDED";
@@ -30,9 +32,19 @@ export async function callBrokerWrite(path: string, method: "POST" | "PUT" | "PA
       return typeof conflict?.code === "string" ? { status: 409, suspended: false, code: conflict.code } : { status: 409, suspended: false };
     }
     if (response.status !== 403) return { status: response.status, suspended: false };
-    const payload = await response.json().catch(() => undefined) as { code?: unknown } | undefined;
-    return { status: 403, suspended: payload?.code === PARTNER_SUSPENDED_CODE };
+    const payload = await response.json().catch(() => undefined) as { code?: unknown; reason?: unknown; message?: unknown } | undefined;
+    return { status: 403, suspended: payload?.code === PARTNER_SUSPENDED_CODE, reason: refusalReason(payload) };
   } catch {
     return { status: 0, suspended: false };
   }
+}
+
+/** Reads the machine reason of a refusal: an explicit `reason`, or the suffix of `Enterprise access denied: <reason>`. */
+function refusalReason(payload: { reason?: unknown; message?: unknown } | undefined): string | undefined {
+  if (typeof payload?.reason === "string" && /^[a-z_]{3,80}$/.test(payload.reason)) return payload.reason;
+  if (typeof payload?.message === "string") {
+    const match = /Enterprise access denied: ([a-z_]{3,80})/.exec(payload.message);
+    if (match) return match[1];
+  }
+  return undefined;
 }

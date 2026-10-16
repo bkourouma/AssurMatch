@@ -1,6 +1,7 @@
 import type { AIAssistanceStatus, AIAssistanceSurface, AIAssistType } from "../../../../packages/shared/contracts/ai-assistance.contracts";
 import { roleHasPermission } from "../../../../packages/shared/rbac/assurmatch-role-matrix";
 import type { AuditLogWriter } from "../audit-logs/audit-log-writer.service";
+import { actorHasAnyPermission } from "../common/rbac/actor-permissions";
 import type { ActorContext } from "../common/types";
 import type { FeatureFlagsService } from "../feature-flags/feature-flags.module";
 import { AIAssistanceAuditActions } from "./ai-assistance-audit-actions";
@@ -76,7 +77,7 @@ export class AIAssistanceService {
     if (actor.mfaVerified !== true) this.refuse(actor, surface, "mfa_required");
     if (surface === "broker_crm") {
       if (!actor.partnerTenantId) this.refuse(actor, surface, "missing_broker_tenant");
-      if (!actor.roles.some((role) => roleHasPermission(role, "broker_crm:read") || roleHasPermission(role, "broker_crm:read_assigned") || roleHasPermission(role, "broker_crm:*"))) {
+      if (!actorHasAnyPermission(actor, ["broker_crm:read", "broker_crm:read_assigned", "broker_crm:*"])) {
         this.refuse(actor, surface, "missing_crm_read_permission");
       }
       return;

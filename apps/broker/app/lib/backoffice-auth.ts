@@ -32,6 +32,10 @@ export interface BackOfficeProfile {
   partnerTenantStatus?: string;
   /** Spec 051 R12: true while the partner is suspended (read-only access, writes refused 403 PARTNER_SUSPENDED). */
   tenantReadOnly?: boolean;
+  /** Spec 064: tenant custom role applied to the member (Enterprise), returned by `/auth/me`. */
+  customRole?: { id: string; name: string } | undefined;
+  /** Spec 064: effective permissions after intersecting the base role with the custom role; absent when no custom role applies. */
+  customRolePermissions?: string[] | undefined;
 }
 
 export type BackOfficeSession =

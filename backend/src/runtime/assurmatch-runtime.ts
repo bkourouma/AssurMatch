@@ -29,6 +29,8 @@ import { LeadsModule } from "../modules/leads/leads.module";
 import { NotificationsModule } from "../modules/notifications/notifications.module";
 import { MemoryMessagingRepository, PrismaMessagingRepository } from "../modules/notifications/messaging.repository";
 import { BrokerNotificationsService } from "../modules/notifications/broker-notifications.service";
+import type { ActorContext } from "../modules/common/types";
+import type { AdvisorAgencyPredicate } from "../modules/common/agency-scope";
 import { EnterpriseService } from "../modules/enterprise/enterprise.service";
 import { PrismaEnterpriseRepository } from "../modules/enterprise/enterprise.repository";
 import { OffersModule } from "../modules/offers/offers.module";
@@ -400,7 +402,9 @@ export class AssurMatchRuntime {
       quoteState: (quoteRequestId: string) => this.quoteRequests.submissions.findById(quoteRequestId),
       contact: (quoteRequestId: string) => this.consentedContact(quoteRequestId),
       // Spec 063: lead disputes (country scopes of the finance admin, `billing_enabled` gate).
-      disputes: { countries: this.countries.service, featureFlags: this.featureFlags.service }
+      disputes: { countries: this.countries.service, featureFlags: this.featureFlags.service },
+      // Spec 064: Enterprise agency display filter; the enterprise service is built after the leads, hence the lazy call.
+      agencyScope: { resolve: (actor: ActorContext, agencyId: string | undefined): Promise<AdvisorAgencyPredicate | undefined> => this.enterprise.agencyScopeFor(actor, agencyId) }
     }
   );
     readonly satisfactionSurveys: SatisfactionSurveysModule = new SatisfactionSurveysModule(
@@ -449,8 +453,11 @@ readonly enterprise = new EnterpriseService({
     audit: this.audit.writer,
     partners: this.partners.service,
     assignments: this.leads.assignments,
+    users: this.users.service,
     ...(this.enterpriseRepository ? { repository: this.enterpriseRepository } : {})
   });
+  /** Spec 064: custom role of a broker member, read by the auth guard on every request (cached 10 s, invalidated on change). */
+  readonly customRoleAccess = this.enterprise.customRoleAccess;
   readonly quoteRequests: QuoteRequestsModule = new QuoteRequestsModule({
     countries: this.countries.service,
     products: this.products.service,
@@ -637,7 +644,9 @@ readonly enterprise = new EnterpriseService({
     offers: this.offers,
     quoteRequests: this.quoteRequests.submissions,
     crmActivity: this.leadRepositorySet.crmActivity,
-    brokerCrmConfig: this.brokerCrmConfig
+    brokerCrmConfig: this.brokerCrmConfig,
+    // Spec 064: Enterprise agency display filter (lazy: the enterprise service is built after this module).
+    agencyScope: { resolve: (actor: ActorContext, agencyId: string | undefined): Promise<AdvisorAgencyPredicate | undefined> => this.enterprise.agencyScopeFor(actor, agencyId) }
   });
   /** Spec 051: partner onboarding and lifecycle behind the `/admin/partners` routes. */
   readonly partnerAdmin = new PartnerAdminService({

@@ -10,7 +10,7 @@ test("broker lead pages show only assigned lead surfaces", async () => {
   expect(dashboard).toContain("Le CRM complet est disponible avec le plan Pro.");
   expect(list).toContain("uniquement les leads qui lui sont assignes");
   expect(list).toContain("Aucun Kanban");
-  expect(list).toContain("Export controle par permission et audit");
+  expect(list).toContain("Exporter (CSV)");
   expect(detail).toContain("Detail du lead assigne");
   expect(detail).toContain("Accepter");
   expect(detail).toContain("Rejeter avec motif");

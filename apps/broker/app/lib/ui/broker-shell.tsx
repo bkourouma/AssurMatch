@@ -5,6 +5,8 @@ import type { ReactNode } from "react";
 import { AppShell, AuthShell, Notice } from "@assurmatch/ui/backoffice";
 import type { AppShellUser, NavGroup } from "@assurmatch/ui/backoffice";
 import { logoutAction } from "../backoffice-session-actions";
+import { PLATFORM_MENTION, brandAccentCss } from "../branding";
+import type { BrokerBranding } from "../branding";
 
 export type BrokerPlan = "starter" | "pro" | "enterprise";
 
@@ -12,6 +14,8 @@ export interface BrokerShellProps {
   children: ReactNode;
   user?: AppShellUser | undefined;
   plan?: BrokerPlan | undefined;
+  /** Spec 064 FR-009: Enterprise charte (label, validated colour) read by the layout; absent for other plans. */
+  branding?: BrokerBranding | undefined;
   envBadge?: string | undefined;
   /** Spec 051 R12: persistent banner of a suspended partner (computed by the layout from the session). */
   suspendedBanner?: string | undefined;
@@ -24,6 +28,7 @@ const SCOPE = "Back-office Courtier";
 const PRO_BADGE = "Pro";
 const PRO_HINT = "Disponible avec le plan Pro";
 const ENTERPRISE_BADGE = "Enterprise";
+const LOSS_ANALYSIS_LABEL = "Analyse des pertes";
 
 /**
  * Le groupe CRM porte le libelle "CRM" du menu courtier. La constante garde le libelle
@@ -48,6 +53,12 @@ function brokerNavigation(plan?: BrokerPlan | undefined): NavGroup[] {
     ? { disabled: true, badge: PRO_BADGE, disabledHint: PRO_HINT }
     : { disabled: false, badge: undefined, disabledHint: undefined };
   const organisationBadge = plan && plan !== "enterprise" ? ENTERPRISE_BADGE : undefined;
+  // Spec 064 FR-003: the loss analysis is an Enterprise option; Starter keeps the Pro restriction above.
+  const lossAnalysisRestriction = starter
+    ? crmRestriction
+    : plan && plan !== "enterprise"
+      ? { disabled: true, badge: ENTERPRISE_BADGE, disabledHint: "Disponible avec le plan Enterprise" }
+      : { disabled: false, badge: undefined, disabledHint: undefined };
 
   return [
     {
@@ -65,7 +76,9 @@ function brokerNavigation(plan?: BrokerPlan | undefined): NavGroup[] {
         { label: "Pipeline", href: "/crm", icon: "crm", match: ["/crm"], ...crmRestriction },
         { label: "Vue tableau", href: "/crm/leads", icon: "checklist", match: ["/crm/leads"], ...crmRestriction },
         // Spec 055 FR-010: the Kanban route existed without a screen.
-        { label: "Vue Kanban", href: "/crm/kanban", icon: "crm", match: ["/crm/kanban"], ...crmRestriction }
+        { label: "Vue Kanban", href: "/crm/kanban", icon: "crm", match: ["/crm/kanban"], ...crmRestriction },
+        // Spec 064 FR-003: AI assistance on lost leads (Enterprise), validated by a human.
+        { label: LOSS_ANALYSIS_LABEL, href: "/crm/loss-analysis", icon: "sparkles", match: ["/crm/loss-analysis"], ...lossAnalysisRestriction }
       ]
     },
     {
@@ -91,8 +104,12 @@ function brokerNavigation(plan?: BrokerPlan | undefined): NavGroup[] {
 }
 
 /** Enveloppe mince autour du design system back-office partage: aucune logique de session ici. */
-export function BrokerShell({ children, user, plan, envBadge, suspendedBanner }: BrokerShellProps) {
+export function BrokerShell({ children, user, plan, branding, envBadge, suspendedBanner }: BrokerShellProps) {
   const pathname = usePathname() || "/";
+  // Spec 064 FR-009: the cabinet label sits next to the plan and the platform mention is always kept.
+  // The colour only overrides the sidebar primary token, and only when it keeps a readable contrast.
+  const accentCss = branding?.color ? brandAccentCss(branding.color) : "";
+  const tenantLine = branding ? `${branding.label} · ${PLATFORM_MENTION}` : undefined;
 
   if (isAuthRoute(pathname)) {
     return (
@@ -104,7 +121,7 @@ export function BrokerShell({ children, user, plan, envBadge, suspendedBanner }:
 
   return (
     <AppShell
-      brand={{ scope: SCOPE, homeHref: "/", plan: planLabel(plan) }}
+      brand={{ scope: SCOPE, homeHref: "/", plan: planLabel(plan), tenant: tenantLine }}
       navigation={brokerNavigation(plan)}
       user={user}
       logoutAction={logoutAction}
@@ -116,8 +133,9 @@ export function BrokerShell({ children, user, plan, envBadge, suspendedBanner }:
       menuCloseLabel="Fermer le menu courtier"
       userMenuLabel="Menu du compte courtier"
       breadcrumbLabel="Fil d'Ariane"
-      dataAttributes={{ "data-broker-shell": "true" }}
+      dataAttributes={{ "data-broker-shell": "true", ...(accentCss ? { "data-broker-brand": "custom" } : {}) }}
     >
+      {accentCss ? <style>{accentCss}</style> : null}
       {suspendedBanner ? (
         <div role="status" data-tenant-suspended-banner="true">
           <Notice tone="warning" title="Compte suspendu">{suspendedBanner}</Notice>

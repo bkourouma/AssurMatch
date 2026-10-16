@@ -1,4 +1,4 @@
-import { UnprocessableEntityException } from "@nestjs/common";
+import { NotFoundException, UnprocessableEntityException } from "@nestjs/common";
 import { ErrorCodes } from "../../../../packages/shared/contracts/error-codes";
 import type {
   AdminPartnerSlaRow,
@@ -6,24 +6,31 @@ import type {
   BrokerCustomPermission,
   PartnerAgency,
   PartnerCustomRole,
+  PartnerCustomRoleAssignment,
   PartnerSla
 } from "../../../../packages/shared/contracts/enterprise.contracts";
 import {
+  AGENCY_FILTER_NONE,
   brokerBrandingUpdateSchema,
   brokerCustomPermissions,
   partnerAgencyCreateSchema,
   partnerAgencyMemberSchema,
   partnerAgencyUpdateSchema,
+  partnerCustomRoleAssignSchema,
   partnerCustomRoleCreateSchema,
   partnerCustomRoleUpdateSchema,
   partnerSlaUpdateSchema
 } from "../../../../packages/shared/contracts/enterprise.contracts";
 import { roleHasPermission } from "../../../../packages/shared/rbac/assurmatch-role-matrix";
 import type { AuditLogWriter } from "../audit-logs/audit-log-writer.service";
+import type { AdvisorAgencyPredicate } from "../common/agency-scope";
+import { actorHasPermission } from "../common/rbac/actor-permissions";
 import type { ActorContext } from "../common/types";
 import { summarizeFirstVisibleReply } from "../leads/first-visible-reply";
 import type { LeadAssignmentRecord, LeadAssignmentService } from "../leads/lead-assignment.service";
 import type { PartnersService } from "../partners/partners.module";
+import type { UsersService } from "../users/users.module";
+import { CustomRoleAccessCache, type ResolvedCustomRole } from "./custom-role-access-cache";
 import { EnterpriseAuditActions } from "./enterprise-audit-actions";
 import {
   MemoryEnterpriseRepository,
@@ -37,7 +44,11 @@ export interface EnterpriseDeps {
   audit: AuditLogWriter;
   partners: PartnersService;
   assignments: LeadAssignmentService;
+  /** Spec 064: resolves the member a custom role is assigned to (same tenant only). */
+  users: Pick<UsersService, "require">;
   repository?: EnterpriseRepository | undefined;
+  /** Spec 064: test hooks for the resolver cache. */
+  customRoleCache?: { ttlMs?: number; now?: () => number } | undefined;
 }
 
 export class EnterpriseAccessRefusedError extends Error {
@@ -57,6 +68,8 @@ function effectiveSlaTarget(brokerTarget: number | undefined, contractual: numbe
 const SLA_WINDOW_DAYS = 30;
 const PLATFORM_MENTION = "Plateforme technique AssurMatch" as const;
 const ALLOWED_PERMISSIONS = new Set<string>(brokerCustomPermissions);
+/** Spec 064 (D5): the owner role is an AssurMatch decision; an owner never carries a custom role. */
+const OWNER_ROLES: readonly string[] = ["broker_owner_starter", "broker_owner_pro"];
 
 /**
  * Enterprise capabilities for a partner tenant: agencies, custom roles, SLA target and broker-portal
@@ -65,9 +78,19 @@ const ALLOWED_PERMISSIONS = new Set<string>(brokerCustomPermissions);
  */
 export class EnterpriseService {
   private readonly repository: EnterpriseRepository;
+  /**
+   * Spec 064: read by the auth guard on every broker request. Fail-closed contract: a lookup error
+   * is rethrown (never turned into "no restriction"), the guard then answers 401.
+   */
+  readonly customRoleAccess: CustomRoleAccessCache;
 
   constructor(private readonly deps: EnterpriseDeps) {
     this.repository = deps.repository ?? new MemoryEnterpriseRepository();
+    this.customRoleAccess = new CustomRoleAccessCache(
+      (actor) => this.customRoleFor(actor),
+      deps.customRoleCache?.ttlMs,
+      deps.customRoleCache?.now
+    );
   }
 
   async listAgencies(actor: ActorContext): Promise<PartnerAgency[]> {
@@ -130,6 +153,28 @@ export class EnterpriseService {
     return this.toAgency(saved);
   }
 
+  /**
+   * Spec 064 (agency display filter). A lead belongs to an agency through the agency membership of
+   * its assigned advisor; a lead with no advisor, or an advisor in no agency, is "Sans agence"
+   * (`none`). An advisor in several agencies shows under each. This is a display filter applied by
+   * the lead and dashboard services AFTER their access policies, so it only narrows what the actor
+   * already sees (exposed to them as an `AgencyScopePort`). Undefined (no filtering) when no agency is requested or when the tenant is not
+   * Enterprise: the parameter is then ignored. An agency that does not exist in the actor's tenant
+   * (unknown or another tenant's) answers the same audited 404.
+   */
+  async agencyScopeFor(actor: ActorContext, agencyId: string | undefined): Promise<AdvisorAgencyPredicate | undefined> {
+    if (!agencyId || actor.partnerPlan !== "enterprise" || !actor.partnerTenantId) return undefined;
+    const agencies = await this.repository.listAgencies(actor.partnerTenantId);
+    if (agencyId === AGENCY_FILTER_NONE) {
+      const inAnAgency = new Set(agencies.flatMap((agency) => agency.memberIds));
+      return (advisorId) => !advisorId || !inAnAgency.has(advisorId);
+    }
+    const agency = agencies.find((entry) => entry.id === agencyId);
+    if (!agency) this.refuseNotFound(actor, "agency_not_found", agencyId, "Agency not found");
+    const members = new Set(agency.memberIds);
+    return (advisorId) => Boolean(advisorId) && members.has(advisorId as string);
+  }
+
   async listCustomRoles(actor: ActorContext): Promise<PartnerCustomRole[]> {
     const tenantId = this.assertEnterprise(actor, "read");
     return (await this.repository.listCustomRoles(tenantId)).map((record) => this.toRole(record, []));
@@ -146,6 +191,7 @@ export class EnterpriseService {
       partnerTenantId: tenantId,
       name: parsed.name,
       permissions: allowed,
+      memberIds: [],
       reason: parsed.reason,
       createdById: actor.actorId ?? null,
       createdAt: now,
@@ -162,7 +208,11 @@ export class EnterpriseService {
     if (!existing || existing.partnerTenantId !== tenantId) throw new Error("Custom role not found");
     const { allowed, rejected } = this.filterPermissions(parsed.permissions);
     if (allowed.length === 0) throw new Error("Invalid custom role: no allowed broker permission requested");
-    const saved = await this.repository.upsertCustomRole({ ...existing, permissions: allowed, reason: parsed.reason, updatedAt: new Date() });
+    // Spec 064: only the permission columns are written, so a concurrent assignment is never overwritten by a stale member list.
+    const saved = await this.repository.updateCustomRolePermissions(id, { permissions: allowed, reason: parsed.reason, updatedAt: new Date() });
+    if (!saved) throw new Error("Custom role not found");
+    // Spec 064: the members of this role are restricted by the new list from their next request.
+    this.customRoleAccess.invalidate();
     this.audit(actor, EnterpriseAuditActions.customRoleUpdated, "PartnerCustomRole", saved.id, tenantId, parsed.reason, {
       previous: existing.permissions,
       next: saved.permissions,
@@ -172,10 +222,83 @@ export class EnterpriseService {
   }
 
   /**
+   * Spec 064 (FR-006): assigns (or clears, with a null role) the custom role of a member of the
+   * actor's own tenant. Allowed to the owner and to managers (`broker_team:write`), unlike the
+   * creation of roles which stays with the owner. A member holds at most one custom role. Never on
+   * oneself, never on an owner, never across tenants (a user of another tenant answers 404 like a
+   * missing one). Only an owner may target a manager (D2): a manager acts on agents and read-only
+   * users. Every refusal is audited; success is audited as assigned / unassigned.
+   *
+   * Membership is a read-modify-write on a JSON array of the role (no lock): two simultaneous
+   * assignments on the same role could drop one of them. That is acceptable for the volume of an
+   * Enterprise administration (a handful of changes a day by a few people). A move adds the member
+   * to the new role BEFORE removing it from the old one, so an interruption in between never leaves
+   * a member unrestricted (the resolver then intersects the roles, see `customRoleFor`).
+   */
+  async assignCustomRole(userId: string, input: unknown, actor: ActorContext): Promise<PartnerCustomRoleAssignment> {
+    const tenantId = this.assertBroker(actor);
+    if (actor.partnerPlan !== "enterprise") this.refuse(actor, "plan_enterprise_required");
+    if (!actorHasPermission(actor, "broker_team:write")) this.refuse(actor, "team_write_permission_required");
+    const parsed = partnerCustomRoleAssignSchema.parse(input ?? {});
+    const target = await this.deps.users.require(userId).catch(() => undefined);
+    // A user of another tenant, a non broker user and a deleted one answer exactly like a missing one.
+    if (!target || target.partnerTenantId !== tenantId || target.status === "deleted" || !target.roles.some((role) => role.startsWith("broker_"))) {
+      this.refuseNotFound(actor, "member_not_found", userId, "Team member not found");
+    }
+    if (actor.actorId === target.id) this.refuse(actor, "self_assignment");
+    if (target.roles.some((role) => OWNER_ROLES.includes(role))) this.refuse(actor, "owner_protected");
+    if (target.roles.includes("broker_manager") && !actor.roles.some((role) => OWNER_ROLES.includes(role))) this.refuse(actor, "owner_required_for_manager_target");
+    const roles = await this.repository.listCustomRoles(tenantId);
+    const next = parsed.customRoleId === null ? undefined : roles.find((role) => role.id === parsed.customRoleId);
+    if (parsed.customRoleId !== null && !next) this.refuseNotFound(actor, "custom_role_not_found", parsed.customRoleId, "Custom role not found");
+    const previous = roles.find((role) => role.memberIds.includes(target.id));
+    const now = new Date();
+    // Add first, then remove: a failure in between leaves the member restricted by both roles, never by none.
+    if (next && !next.memberIds.includes(target.id)) await this.repository.updateCustomRoleMembers(next.id, [...next.memberIds, target.id], now);
+    for (const role of roles) {
+      if (role.id === next?.id || !role.memberIds.includes(target.id)) continue;
+      await this.repository.updateCustomRoleMembers(role.id, role.memberIds.filter((memberId) => memberId !== target.id), now);
+    }
+    this.customRoleAccess.invalidate(target.id);
+    this.audit(
+      actor,
+      next ? EnterpriseAuditActions.customRoleAssigned : EnterpriseAuditActions.customRoleUnassigned,
+      "User",
+      target.id,
+      tenantId,
+      parsed.reason,
+      {
+        before: previous ? { id: previous.id, name: previous.name } : null,
+        after: next ? { id: next.id, name: next.name } : null
+      }
+    );
+    return { userId: target.id, customRole: next ? { id: next.id, name: next.name } : null };
+  }
+
+  /**
+   * Spec 064 (FR-007): the custom role that restricts this actor, if any, with its effective
+   * permissions. Only a broker member of a tenant can carry one; an owner never does (a leftover row
+   * is ignored). Called through `customRoleAccess` (cached) by the auth guard on every request.
+   */
+  async customRoleFor(actor: ActorContext): Promise<ResolvedCustomRole | undefined> {
+    if (!actor.actorId || !actor.partnerTenantId) return undefined;
+    if (!actor.roles.some((role) => role.startsWith("broker_")) || actor.roles.some((role) => OWNER_ROLES.includes(role))) return undefined;
+    const held = (await this.repository.listCustomRoles(actor.partnerTenantId)).filter((entry) => entry.memberIds.includes(actor.actorId as string));
+    const [first] = held;
+    if (!first) return undefined;
+    // A member is meant to hold one role. If a corrupted or half-finished state lists it in several,
+    // the most restrictive answer applies: the intersection of their effective permissions.
+    const permissions = held
+      .map((role) => this.effectivePermissions(actor, role))
+      .reduce((common, list) => common.filter((permission) => list.includes(permission)));
+    return { id: first.id, name: first.name, permissions };
+  }
+
+  /**
    * Effective permissions of a member: the custom grant can only narrow or restate what the base
    * role already allows, never extend it. This keeps a tenant from minting admin capabilities.
    */
-  effectivePermissions(actor: ActorContext, customRole: PartnerCustomRole | undefined): string[] {
+  effectivePermissions(actor: ActorContext, customRole: Pick<PartnerCustomRole, "permissions"> | undefined): string[] {
     const fromRoles = new Set<string>();
     for (const permission of ALLOWED_PERMISSIONS) {
       if (actor.roles.some((role) => roleHasPermission(role, permission))) fromRoles.add(permission);
@@ -361,6 +484,7 @@ export class EnterpriseService {
       city: record.city,
       status: record.status,
       memberCount: record.memberIds.length,
+      memberIds: [...record.memberIds],
       createdAt: record.createdAt.toISOString(),
       updatedAt: record.updatedAt.toISOString()
     };
@@ -373,6 +497,7 @@ export class EnterpriseService {
       name: record.name,
       permissions: record.permissions,
       rejectedPermissions: rejected,
+      memberIds: [...record.memberIds],
       createdAt: record.createdAt.toISOString(),
       updatedAt: record.updatedAt.toISOString()
     };
@@ -403,6 +528,21 @@ export class EnterpriseService {
       ...(reason ? { reason } : {}),
       context
     });
+  }
+
+  /** Audited refusal answered 404, so that the existence of a user or role of another tenant is not revealed. */
+  private refuseNotFound(actor: ActorContext, reason: string, targetId: string, message: string): never {
+    this.deps.audit.write({
+      actor,
+      action: EnterpriseAuditActions.accessRefused,
+      targetType: "Enterprise",
+      targetId,
+      scope: { partnerTenantId: actor.partnerTenantId ?? null, roles: actor.roles, plan: actor.partnerPlan ?? null },
+      result: "refused",
+      reason,
+      context: {}
+    });
+    throw new NotFoundException({ code: ErrorCodes.NOT_FOUND, message });
   }
 
   private refuse(actor: ActorContext, reason: string): never {
