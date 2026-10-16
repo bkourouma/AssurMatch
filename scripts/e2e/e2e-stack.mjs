@@ -61,6 +61,9 @@ if (!["docker", "host"].includes(appsMode)) {
   process.exit(64);
 }
 
+// On Windows `npx` / `npm` are .cmd shims that Node only starts through a shell (Linux CI: unchanged).
+const needsShell = (command) => process.platform === "win32" && /^(npx|npm)$/u.test(command);
+
 function run(command, args, { env = {}, cwd = projectRoot, capture = false, allowFailure = false } = {}) {
   const printable = `${command} ${args.join(" ")}`;
   if (dryRun) {
@@ -72,7 +75,7 @@ function run(command, args, { env = {}, cwd = projectRoot, capture = false, allo
     env: { ...process.env, ...env },
     stdio: capture ? ["ignore", "pipe", "inherit"] : "inherit",
     encoding: "utf8",
-    shell: false,
+    shell: needsShell(command),
     maxBuffer: 64 * 1024 * 1024
   });
   if (result.error) throw new Error(`${printable}: ${result.error.message}`);
@@ -82,7 +85,9 @@ function run(command, args, { env = {}, cwd = projectRoot, capture = false, allo
 
 function compose(args, options = {}) {
   const profileArgs = appsMode === "docker" ? ["--profile", "apps"] : [];
-  return run("docker", ["compose", "-f", composeFile, "-p", composeProject, ...profileArgs, ...args], {
+  // Docker Desktop (no host networking): docker-compose.e2e.desktop.yml publishes the infrastructure ports.
+  const overrideArgs = process.env.ASSURMATCH_E2E_COMPOSE_OVERRIDE ? ["-f", path.resolve(projectRoot, process.env.ASSURMATCH_E2E_COMPOSE_OVERRIDE)] : [];
+  return run("docker", ["compose", "-f", composeFile, ...overrideArgs, "-p", composeProject, ...profileArgs, ...args], {
     ...options,
     env: { ...portEnv(), ...(options.env ?? {}) }
   });
@@ -145,6 +150,11 @@ function killHostProcesses() {
   if (dryRun) return;
   const { pids = [] } = readState();
   for (const pid of pids) {
+    if (process.platform === "win32") {
+      // No process groups on Windows: stop the whole tree of the pid.
+      spawnSync("taskkill", ["/PID", String(pid), "/T", "/F"], { stdio: "ignore" });
+      continue;
+    }
     try {
       // Negative pid: the whole process group (npx -> next -> workers).
       process.kill(-pid, "SIGTERM");
@@ -177,7 +187,8 @@ function startHostProcess(name, command, args, { cwd = projectRoot, env = {} } =
     cwd,
     env: { ...process.env, ...env },
     stdio: ["ignore", out, out],
-    detached: true
+    detached: true,
+    shell: needsShell(command)
   });
   closeSync(out);
   child.unref();

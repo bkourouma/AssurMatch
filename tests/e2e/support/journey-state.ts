@@ -8,7 +8,23 @@ import { e2eEnv } from "./env";
 // (`npm run test:e2e:stack -- --keep`, then `npm run test:e2e -- --grep "SC-05"`).
 // Throwaway values only: the stack is destroyed after the run.
 
+/** A broker firm created by a spec 065 journey (Pro, Enterprise...), with its published offer and team. */
+export interface BrokerWorld {
+  partnerId: string;
+  partnerName: string;
+  plan: "starter" | "pro" | "enterprise";
+  owner: BackOfficeAccount;
+  offerId?: string;
+  offerTitle?: string;
+  /** Team members by key (manager, agent, readOnly...). */
+  members: Record<string, BackOfficeAccount>;
+  /** Free-form values of the journey (lead references, assignment ids...). */
+  data: Record<string, string>;
+}
+
 export interface JourneyState {
+  /** Spec 065: broker firms of the Pro / Enterprise / forbidden-case journeys, by key. */
+  worlds?: Record<string, BrokerWorld>;
   superAdmin?: BackOfficeAccount;
   complianceAdmin?: BackOfficeAccount;
   countryId?: string;
@@ -47,4 +63,19 @@ export function requireState<K extends keyof JourneyState>(state: JourneyState, 
   const value = state[key];
   if (value === undefined || value === null) throw new Error(`journey state "${String(key)}" missing: run the previous scenario steps first`);
   return value as NonNullable<JourneyState[K]>;
+}
+
+export function loadWorld(key: string): BrokerWorld | undefined {
+  return loadJourneyState().worlds?.[key];
+}
+
+export function requireWorld(key: string): BrokerWorld {
+  const world = loadWorld(key);
+  if (!world) throw new Error(`broker world "${key}" missing: run the setup step of its journey first`);
+  return world;
+}
+
+/** Merges one world into the state without touching the other worlds. */
+export function saveWorld(key: string, world: BrokerWorld): void {
+  saveJourneyState({ worlds: { ...(loadJourneyState().worlds ?? {}), [key]: world } });
 }
