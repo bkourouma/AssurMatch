@@ -164,12 +164,45 @@ test("ENT-02 les saisies invalides sont refusées dans l'interface et ne créent
   await expect(owner.getByText(`Agence Refusée ${suffix}`)).toHaveCount(0);
   await expect(agenciesCard(owner).getByRole("row")).toHaveCount(rowsBefore);
 
-  // Findings kept in the report (nothing to assert, the product does not offer them):
-  // - the page has no way to rename / edit / suspend an agency (PATCH /broker/enterprise/agencies/:id exists in the API only);
-  // - a second agency with the same name is accepted by the API (no uniqueness rule).
-  const row = rowWith(agenciesCard(owner), agencyPlateau);
-  const editControls = await row.getByRole("button", { name: /Modifier|Renommer|Suspendre/u }).count();
-  test.info().annotations.push({ type: "finding", description: `agency edit controls in the UI: ${editControls} (API PATCH exists, no screen)` });
+  // A second agency with the same name is accepted by the API (no uniqueness rule): observation only.
+});
+
+test("ENT-02b le propriétaire modifie une agence avec « Modifier » (nom, ville, statut, motif), la modification est auditée et persiste", async ({ browser }) => {
+  world = world ?? (await loadEnterpriseWorld());
+  const owner = await openEnterprise(browser, "owner", world.owner);
+  const renamed = `Agence Cocody Nord ${suffix}`;
+
+  // Every agency row offers « Modifier »: the dialog carries name, city, status and the audited reason.
+  const row = rowWith(agenciesCard(owner), agencyCocody);
+  await expect(row.getByRole("button", { name: "Modifier" })).toBeVisible();
+  await confirmInDialog(owner, row, "Modifier", async (dialog) => {
+    await expect(dialog.getByRole("heading", { name: `Modifier l'agence ${agencyCocody}` })).toBeVisible();
+    await dialog.getByLabel("Nom de l'agence").fill(renamed);
+    await dialog.getByLabel("Ville de l'agence").fill("Yamoussoukro");
+    await dialog.getByLabel("Statut de l'agence").selectOption("suspended");
+    await dialog.getByLabel("Motif").fill(WORLD_REASON);
+  }, "Enregistrer");
+  await owner.waitForURL(/\/enterprise\?ent=agency_updated/u);
+  await expect(notice(owner)).toContainText("Agence modifiée et auditée.");
+  await expect(notice(owner)).toHaveAttribute("data-tone", "success");
+  const updated = rowWith(agenciesCard(owner), renamed);
+  await expect(updated).toContainText("CI - Yamoussoukro");
+  await expect(updated).toContainText(/Suspendue|suspended/iu);
+
+  // Persisted after a clean load; the country is not editable (no field for it in the dialog).
+  await openAs(owner, world.owner, ENTERPRISE_PATH);
+  await expect(rowWith(agenciesCard(owner), renamed)).toContainText("CI - Yamoussoukro");
+
+  // Restore the original name and status for the next steps of the journey.
+  await confirmInDialog(owner, rowWith(agenciesCard(owner), renamed), "Modifier", async (dialog) => {
+    await expect(dialog.getByLabel(/pays/iu)).toHaveCount(0);
+    await dialog.getByLabel("Nom de l'agence").fill(agencyCocody);
+    await dialog.getByLabel("Ville de l'agence").fill("Bouaké");
+    await dialog.getByLabel("Statut de l'agence").selectOption("active");
+    await dialog.getByLabel("Motif").fill(WORLD_REASON);
+  }, "Enregistrer");
+  await owner.waitForURL(/\/enterprise\?ent=agency_updated/u);
+  await expect(rowWith(agenciesCard(owner), agencyCocody)).toContainText("CI - Bouaké");
 });
 
 test("ENT-03 le propriétaire rattache un membre de l'équipe à une agence, le rattachement est visible et persistant", async ({ browser }) => {

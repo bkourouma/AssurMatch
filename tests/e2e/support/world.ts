@@ -161,12 +161,11 @@ export interface VisitorQuote {
  * A visitor asks for a quote on a given public offer of CI x Auto (SC-05 path), with the named
  * consent. Returns the QR- reference, the visitor's e-mail and the tracking link from the e-mail.
  */
-export async function requestQuote(browser: Browser, offerTitle: string, partnerName: string, label: string): Promise<VisitorQuote> {
+export async function requestQuote(browser: Browser, offerTitle: string, partnerName: string, label: string, options: { phone?: string } = {}): Promise<VisitorQuote> {
   const email = `visiteur.${label}.${uniqueSuffix()}@visitor.e2e.test`;
   const name = "Mariam Traoré";
-  // A distinct number per visitor: the platform reuses the visitor profile of a known phone number,
-  // so a shared number would send this visitor's e-mails to the address of the earlier one (finding F1).
-  const phone = `+22501${String(Math.floor(Math.random() * 1e8)).padStart(8, "0")}`;
+  // A distinct number per visitor by default; the shared-phone journey (spec 066 F1) passes the same number twice.
+  const phone = options.phone ?? `+22501${String(Math.floor(Math.random() * 1e8)).padStart(8, "0")}`;
   const visitor = await appPage(browser, e2eEnv.publicUrl);
   await visitor.goto("/pays/CI/produits/auto/offres");
   // One <article> per offer, named by its title (several brokers' offers are public by now).

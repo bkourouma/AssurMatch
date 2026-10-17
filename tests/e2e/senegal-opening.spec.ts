@@ -217,10 +217,14 @@ test("SN-06 le visiteur voit le Sénégal pilote sans courtier ni offre : produi
   const visitor = await appPage(browser, e2eEnv.publicUrl);
   await visitor.goto("/pays/SN");
   await expect(visitor.getByRole("heading", { level: 1 })).toContainText("Sénégal");
-  await expect(visitor.getByText("Ce pays est en phase pilote")).toBeVisible();
+  // Spec 066 F5: the pilot notice no longer promises visible offers.
+  await expect(visitor.getByText("Ce pays est en phase pilote : les offres comparables ne sont affichées qu'à l'ouverture publique du pays. En attendant, les courtiers partenaires et les produits activés sont présentés ci-dessous.")).toBeVisible();
   await expect(visitor.getByRole("link", { name: /Assurance auto/u }).first()).toBeVisible();
   await expect(visitor.getByRole("link", { name: /Assurance voyage/u }).first()).toBeVisible();
   await expect(visitor.getByText("Aucun courtier partenaire publié")).toBeVisible();
+
+  await visitor.goto("/en/countries/SN");
+  await expect(visitor.getByText("This country is in its pilot phase: comparable offers are only shown once the country opens publicly. In the meantime, the partner brokers and the products enabled are listed below.")).toBeVisible();
 
   for (const key of PRODUCTS) {
     await visitor.goto(`/pays/SN/produits/${key}`);

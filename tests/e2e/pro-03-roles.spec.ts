@@ -239,13 +239,13 @@ test("PRO-ROLES-03 le propriétaire Starter n'a aucun accès au CRM complet", as
   });
 
   await test.step("le Kanban, la liste et la fiche CRM sont refusés", async () => {
-    // The broker middleware turns every /crm/* page away for a Starter session: back to the login
-    // screen with `error=starter_crm_denied` (the /crm dashboard itself explains the plan above).
+    // Spec 066 F4: the broker middleware keeps the Starter session and sends every /crm/* page (except
+    // the /crm dashboard) to the broker dashboard with an explanatory notice.
     const page = await visit(browser, starter, "/crm/kanban");
     for (const path of ["/crm/kanban", "/crm/leads", `/crm/leads/${requireState(state, "leadAssignmentId")}`]) {
       await page.goto(path);
-      await expect(page, path).toHaveURL(/\/login\?error=starter_crm_denied/u);
-      await expect(page.getByRole("alert").filter({ hasText: "Acces refuse" })).toBeVisible();
+      await expect(page, path).toHaveURL(/\/\?notice=crm_requires_pro$/u);
+      await expect(page.getByText("Le CRM est réservé aux formules Pro et Enterprise.")).toBeVisible();
     }
     await expect(page.getByLabel("Colonnes du pipeline CRM")).toHaveCount(0);
     await expect(page.getByRole("button", { name: WRITE_CONTROLS.status })).toHaveCount(0);
