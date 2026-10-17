@@ -27,3 +27,4 @@
 - Projet Playwright `recos` (`recos-*.spec.ts`, dépend de `scenario`) : 062 messagerie (MSG-00..05), 062 demande de données et réaffectation (DR-01..14), 063 MFA et contestations (MFA-01..04, DSP-00..05), 064 capacités branchées (W064-00..06).
 - Suite complète : 103 tests verts en 25,4 min sur pile vierge (mode `--apps=host`, Docker Desktop / Windows).
 - Rappel d'exécution : la limite de 5 demandes de données par IP et par heure est partagée par tout le fichier DR ; une relance sur pile conservée ne passe qu'une fois par heure.
+- Après fusion de `fix/e2e-findings` (spec 066) : 107 tests verts en 23,5 min (`recos-066-shared-phone` F1, `ENT-02b` F3, F4 sur `/?notice=crm_requires_pro`, F5 texte pays pilote FR/EN). `next build` passe pour admin, broker et public sous le tsconfig généré par défaut (`strict: false`) grâce aux comparaisons explicites `=== false` ; les images Docker se construisent sur cette machine (`.gitattributes` LF).
