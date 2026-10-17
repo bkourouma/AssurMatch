@@ -115,7 +115,7 @@ export async function passwordResetConsumeAction(_previous: AuthFlowState, formD
 /** "Révoquer tous les appareils de confiance" (FR-A06): server-side revocation, then forget the local cookie. */
 export async function revokeTrustedDevicesAction(_previous: AuthFlowState): Promise<AuthFlowState> {
   const result = await revokeTrustedDevices();
-  if (!result.ok) return { status: "error", message: result.error === "session_required" ? "Session expirée. Reconnectez-vous." : "Révocation impossible pour le moment. Réessayez plus tard." };
+  if (result.ok === false) return { status: "error", message: result.error === "session_required" ? "Session expirée. Reconnectez-vous." : "Révocation impossible pour le moment. Réessayez plus tard." };
   await clearTrustedDeviceCookie();
   revalidatePath("/account/security");
   return {

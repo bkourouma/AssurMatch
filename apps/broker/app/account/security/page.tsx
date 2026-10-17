@@ -23,7 +23,7 @@ export default async function BrokerAccountSecurityPage() {
   if (session.status !== "authenticated" || !isBrokerProfile(session.profile)) redirect(`/login?error=access_denied&returnTo=${encodeURIComponent(SECURITY_PATH)}`);
 
   const result = await listTrustedDevices();
-  if (!result.ok && result.error === "session_required") redirect(loginRedirect(SECURITY_PATH, "session_required"));
+  if (result.ok === false && result.error === "session_required") redirect(loginRedirect(SECURITY_PATH, "session_required"));
 
   return (
     <PageStack>

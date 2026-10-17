@@ -68,9 +68,9 @@ export async function relayConversationMessage(request: Request, channel: Conver
   const form = await request.formData().catch(() => undefined);
   if (!form) return answerOutcome(request, channel, leadAssignmentId, "invalid");
   const built = buildMessagePayload(form);
-  if (!built.ok) return answerOutcome(request, channel, leadAssignmentId, built.outcome);
+  if (built.ok === false) return answerOutcome(request, channel, leadAssignmentId, built.outcome);
   const files = collectMessageFiles(form);
-  if (!files.ok) return answerOutcome(request, channel, leadAssignmentId, files.outcome);
+  if (files.ok === false) return answerOutcome(request, channel, leadAssignmentId, files.outcome);
   const upstream = new FormData();
   upstream.append("payload", JSON.stringify(built.payload));
   for (const file of files.files) upstream.append("files", file, file.name);
@@ -85,7 +85,7 @@ export async function relayDocumentRequestCreate(request: Request, channel: Conv
   const form = await request.formData().catch(() => undefined);
   if (!form) return answerOutcome(request, channel, leadAssignmentId, "invalid");
   const built = buildDocumentRequestPayload(form);
-  if (!built.ok) return answerOutcome(request, channel, leadAssignmentId, built.outcome);
+  if (built.ok === false) return answerOutcome(request, channel, leadAssignmentId, built.outcome);
   const result = await forwardBrokerJson(`${apiBase(channel, leadAssignmentId)}/document-requests`, built.payload);
   return answerResult(request, channel, leadAssignmentId, result, "request_created");
 }
