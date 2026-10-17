@@ -293,9 +293,9 @@
         "lead": "Compare indicative insurance offers in Senegal, then have the quote and the guarantees confirmed by a broker authorised by the competent authority."
       }
     },
-    "pilotNotice": "This country is in its pilot phase: the number of partner brokers and comparable offers is still limited.",
+    "pilotNotice": "This country is in its pilot phase: comparable offers are only shown once the country opens publicly. In the meantime, the partner brokers and the products enabled are listed below.",
     "productsTitle": "Comparable products",
-    "productsLead": "Each product gives access to the indicative offers and, when the activation allows it, to a quote request.",
+    "productsLead": "When public activation allows it, each product gives access to the indicative offers and to a quote request.",
     "comparisonEnabled": "Comparison enabled",
     "comparisonDisabled": "Comparison not enabled",
     "quoteEnabled": "Quote enabled",

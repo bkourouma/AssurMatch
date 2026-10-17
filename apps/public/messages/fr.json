@@ -293,9 +293,9 @@
         "lead": "Comparez des offres indicatives d'assurance au Sénégal, puis faites confirmer le devis et les garanties par un courtier autorisé par l'autorité compétente."
       }
     },
-    "pilotNotice": "Ce pays est en phase pilote : le nombre de courtiers partenaires et d'offres comparables y est encore limité.",
+    "pilotNotice": "Ce pays est en phase pilote : les offres comparables ne sont affichées qu'à l'ouverture publique du pays. En attendant, les courtiers partenaires et les produits activés sont présentés ci-dessous.",
     "productsTitle": "Produits comparables",
-    "productsLead": "Chaque produit donne accès aux offres indicatives et, lorsque l'activation le permet, à une demande de devis.",
+    "productsLead": "Lorsque l'activation publique le permet, chaque produit donne accès aux offres indicatives et à une demande de devis.",
     "comparisonEnabled": "Comparaison activée",
     "comparisonDisabled": "Comparaison non activée",
     "quoteEnabled": "Devis activé",

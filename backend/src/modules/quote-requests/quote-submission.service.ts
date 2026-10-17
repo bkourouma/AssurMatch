@@ -284,7 +284,7 @@ export class QuoteSubmissionService {
         : {})
     });
     const contactFingerprint = contact.emailFingerprint;
-    const duplicateDecision = await this.deps.duplicate?.evaluate(country.id, product.id, contactFingerprint) ?? "unique";
+    const duplicateDecision = await this.deps.duplicate?.evaluate(country.id, product.id, contactFingerprint, contact.phoneFingerprint) ?? "unique";
     if (duplicateDecision === "blocked_duplicate") {
       this.audit.write({
         actor,

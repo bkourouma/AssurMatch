@@ -23,6 +23,18 @@ test("broker enterprise page is plan-gated and covers agencies, roles, SLA and b
   expect(shell).toContain("/enterprise");
 });
 
+test("broker enterprise agencies can be edited through the PATCH endpoint (spec 066 F3)", () => {
+  const page = source("apps/broker/app/enterprise/page.tsx");
+  const actions = source("apps/broker/app/lib/enterprise-actions.ts");
+
+  expect(page).toContain('triggerLabel="Modifier"');
+  expect(page).toContain("formAction={updateAgencyAction}");
+  expect(actions).toContain("export async function updateAgencyAction");
+  expect(actions).toContain("`/broker/enterprise/agencies/${agencyId}`, \"PATCH\"");
+  // The edit control sits inside the tenant write guard, so a suspended tenant stays read-only.
+  expect(page.indexOf("<TenantWriteGuard readOnly={readOnly}>")).toBeLessThan(page.indexOf('triggerLabel="Modifier"'));
+});
+
 test("branding stays in the broker back-office and keeps the platform mention", () => {
   const page = source("apps/broker/app/enterprise/page.tsx");
   const publicApi = source("apps/public/app/lib/public-api.ts");

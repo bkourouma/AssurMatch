@@ -5,7 +5,13 @@ import { readBrokerDashboard } from "./lib/broker-api";
 import { Badge, Button, Card, Grid, KpiCard, Notice, PageHeader, PageStack, Split } from "./lib/ui/broker-ui";
 import { dashboardKpis } from "./lib/ui/broker-view-models";
 
-export default async function BrokerShellPage() {
+interface BrokerShellPageProps {
+  searchParams?: Promise<Record<string, string | string[] | undefined>>;
+}
+
+export default async function BrokerShellPage({ searchParams }: BrokerShellPageProps = {}) {
+  const params = searchParams ? await searchParams : {};
+  const notice = Array.isArray(params.notice) ? params.notice[0] : params.notice;
   const session = await readBackOfficeSession();
   if (session.status === "unauthenticated" || session.status === "expired") redirect(loginRedirect("/", session.status));
   if (session.status === "mfa_required") {
@@ -48,6 +54,8 @@ export default async function BrokerShellPage() {
         description="Suivi des leads transmis par AssurMatch. Le courtier partenaire reste responsable de la prise de contact et de la suite commerciale."
         actions={<Badge tone="info">Connecte: {session.profile.actorId ?? "profil courtier"}</Badge>}
       />
+
+      {notice === "crm_requires_pro" ? <Notice tone="warning">Le CRM est réservé aux formules Pro et Enterprise.</Notice> : null}
 
       <BrokerDashboardSection />
 

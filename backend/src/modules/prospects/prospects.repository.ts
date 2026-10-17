@@ -6,6 +6,22 @@ import type { NormalizedProspectContact } from "./prospect-identity.service";
 
 export const PROSPECTS_REPOSITORY = Symbol("PROSPECTS_REPOSITORY");
 
+function nameKey(name: string | null | undefined): string {
+  return (name ?? "").trim().replace(/\s+/g, " ").toLowerCase();
+}
+
+/**
+ * Spec 066 F1: two submissions share one prospect profile only when they carry the same e-mail,
+ * the same phone and the same name. A phone shared by two people (family, office, relay) must not
+ * route one visitor's e-mails and tracking link to the other one.
+ */
+function isSameContact(prospect: Pick<ProspectRecord, "emailFingerprint" | "phoneFingerprint" | "displayName">, contact: NormalizedProspectContact): boolean {
+  return Boolean(prospect.emailFingerprint) &&
+    prospect.emailFingerprint === contact.emailFingerprint &&
+    prospect.phoneFingerprint === contact.phoneFingerprint &&
+    nameKey(prospect.displayName) === nameKey(contact.displayName);
+}
+
 export interface ProspectsRepository extends RuntimeRepository {
   createOrLink(countryId: string, productId: string, contact: NormalizedProspectContact, consentRecordId: string): Promise<ProspectRecord>;
   /**
@@ -30,10 +46,11 @@ export class MemoryProspectsRepository implements ProspectsRepository {
   }
 
   async createOrLinkWithOutcome(countryId: string, productId: string, contact: NormalizedProspectContact, consentRecordId: string): Promise<{ prospect: ProspectRecord; created: boolean }> {
+    // Spec 066 F1: a profile is reused only for the very same contact (e-mail AND phone AND name).
     const existing = this.prospects.find((prospect) =>
       prospect.countryId === countryId &&
       prospect.productId === productId &&
-      (prospect.emailFingerprint === contact.emailFingerprint || prospect.phoneFingerprint === contact.phoneFingerprint)
+      isSameContact(prospect, contact)
     );
     if (existing) {
       if (!existing.consentRecordIds.includes(consentRecordId)) existing.consentRecordIds.push(consentRecordId);
@@ -84,16 +101,14 @@ export class PrismaProspectsRepository implements ProspectsRepository {
   }
 
   async createOrLinkWithOutcome(countryId: string, productId: string, contact: NormalizedProspectContact, consentRecordId: string): Promise<{ prospect: ProspectRecord; created: boolean }> {
-    const existing = await this.client().findFirst({
-      where: {
-        countryId,
-        productId,
-        OR: [
-          ...(contact.emailFingerprint ? [{ emailFingerprint: contact.emailFingerprint }] : []),
-          ...(contact.phoneFingerprint ? [{ phoneFingerprint: contact.phoneFingerprint }] : [])
-        ]
-      }
+    // Spec 066 F1: never merge on a phone alone. The e-mail and the phone must both match; the name
+    // is compared on the candidates (it has no fingerprint column), so a request always reaches the
+    // contact entered in that very submission.
+    const candidates = await this.client().findMany({
+      where: { countryId, productId, anonymizedAt: null, emailFingerprint: contact.emailFingerprint, phoneFingerprint: contact.phoneFingerprint },
+      orderBy: { createdAt: "asc" }
     });
+    const existing = candidates.find((row) => isSameContact(row as ProspectRecord, contact));
     if (existing) {
       const current = existing as ProspectRecord;
       const consentRecordIds = current.consentRecordIds.includes(consentRecordId) ? current.consentRecordIds : [...current.consentRecordIds, consentRecordId];

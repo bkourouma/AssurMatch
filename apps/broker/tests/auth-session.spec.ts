@@ -69,7 +69,9 @@ test("broker middleware redirects absent or invalid sessions and blocks Starter 
   expect(middlewareSource).toContain("/auth/me");
   expect(middlewareSource).toContain("session_expired");
   expect(middlewareSource).toContain("mfa_required");
-  expect(middlewareSource).toContain("starter_crm_denied");
+  expect(middlewareSource).toContain("crm_requires_pro");
+  expect(middlewareSource).not.toContain("starter_crm_denied");
+  expect(source("apps/broker/app/page.tsx")).toContain("Le CRM est réservé aux formules Pro et Enterprise.");
   expect(middlewareSource).toContain("profile.partnerPlan === \"starter\"");
   expect(middlewareSource).toContain("normalizedPathname === \"/crm\"");
   expect(middlewareSource).toContain("normalizedPathname.startsWith(\"/crm/\")");
@@ -112,8 +114,8 @@ test("broker middleware allows Starter CRM landing and blocks active CRM subrout
   expect(outcomes).toEqual([
     { path: "/crm", status: 200, next: "1", location: null },
     { path: "/crm/", status: 200, next: "1", location: null },
-    { path: "/crm/leads", status: 307, next: null, location: "http://broker.local/login?error=starter_crm_denied" },
-    { path: "/crm/leads/demo-lead", status: 307, next: null, location: "http://broker.local/login?error=starter_crm_denied" }
+    { path: "/crm/leads", status: 307, next: null, location: "http://broker.local/?notice=crm_requires_pro" },
+    { path: "/crm/leads/demo-lead", status: 307, next: null, location: "http://broker.local/?notice=crm_requires_pro" }
   ]);
 });
 
