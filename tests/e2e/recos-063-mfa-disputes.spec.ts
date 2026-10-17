@@ -460,17 +460,20 @@ test("DSP-05 les courtiers voient statut, motif de décision et crédit, la noti
   }
 
   // Pro: status, credit note and account statement.
-  await openAs(broker, pro.owner, `/crm/leads/${p.a}`);
-  const proStatus = card(broker, "Contestation de ce lead");
+  // A Starter session stays logged in on /crm/* (spec 066 F4 redirects to the dashboard), so the Pro owner gets a fresh context.
+  await broker.context().close();
+  const proPage = await brokerPage(browser);
+  await openAs(proPage, pro.owner, `/crm/leads/${p.a}`);
+  const proStatus = card(proPage, "Contestation de ce lead");
   await expect(proStatus).toContainText("Acceptée");
   await expect(proStatus).toContainText(ACCEPT_REASON);
   await expect(proStatus).toContainText(`Avoir partiel émis ${creditNote}`);
   await expect(proStatus.getByRole("link", { name: "Télécharger l'avoir (PDF)" })).toBeVisible();
-  await broker.goto(`${e2eEnv.brokerUrl}/billing`);
-  await expect(card(broker, "Contestations").getByRole("row").filter({ hasText: p.refA })).toContainText(`Avoir partiel émis`);
-  await expect(card(broker, "Releve de compte")).toContainText(`Avoir ${creditNote} (contestation, facture ${pro.data.invoiceNumber})`);
-  await expect(card(broker, "Releve de compte")).not.toContainText(/Avoir CI-AV-\d{4}-\d{5,} \(annule/u);
-  await broker.context().close();
+  await proPage.goto(`${e2eEnv.brokerUrl}/billing`);
+  await expect(card(proPage, "Contestations").getByRole("row").filter({ hasText: p.refA })).toContainText(`Avoir partiel émis`);
+  await expect(card(proPage, "Releve de compte")).toContainText(`Avoir ${creditNote} (contestation, facture ${pro.data.invoiceNumber})`);
+  await expect(card(proPage, "Releve de compte")).not.toContainText(/Avoir CI-AV-\d{4}-\d{5,} \(annule/u);
+  await proPage.context().close();
 
   // Idempotence (finance token): same decision -> same credit note; the other decision -> 409; no second note.
   const admin = await adminPage(browser);
