@@ -74,6 +74,7 @@ Légende : 🔴 bloquant pour le pilote fermé (J4) · 🟠 bloquant pour l'ouve
 
 | # | Vérification | Référence |
 |---|---|---|
+| 5.0 🔴 | Demandes antérieures au correctif F1 (spec 066) : exécuter la requête en lecture seule `scripts/ops/sql/f1-shared-prospect-detection.sql` sur la préproduction puis la production ; si elle compte des demandes, décider de leur correction ou de la remise à zéro de la base avant toute ouverture | Spec 066 |
 | 5.1 🔴 | Scénario de bout en bout réussi sur la préproduction : SC-01 à SC-08 (clôture, enquête, facture et paiement compris), avec les e-mails réels | Spec 059 (`npm run test:e2e:stack`) |
 | 5.2 🔴 | Cas interdits (SC-09) : pays fermé, absence de consentement, courtier suspendu, isolation | idem |
 | 5.2b 🔴 | Exploitation (SC-10) : sondes `/healthz` et `/readyz` et battement du worker sont automatisés (`ops-health.spec.ts`) ; restauration de sauvegarde chronométrée, alertes et exercice d'incident restent manuels | Spec 059, `docs/runbooks/backup-restore.md`, `docs/runbooks/worker.md` |
