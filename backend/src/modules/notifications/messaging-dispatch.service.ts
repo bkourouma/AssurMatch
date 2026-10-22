@@ -84,6 +84,12 @@ export class MessagingDispatchService {
   private readonly encryption: NonNullable<MessagingDispatchDeps["encryption"]>;
   private readonly maxAttempts: number;
   private readonly delaysMs: number[];
+  private deadLetterHook: MessagingDispatchDeps["onDeadLetter"];
+
+  /** Lot 12 (spec 077): attached once the admin alerts service exists; called with no personal data, errors swallowed. */
+  setDeadLetterHook(hook: MessagingDispatchDeps["onDeadLetter"]): void {
+    this.deadLetterHook = hook;
+  }
 
   constructor(private readonly deps: MessagingDispatchDeps) {
     this.repository = deps.repository ?? new MemoryMessagingRepository();
@@ -266,6 +272,11 @@ export class MessagingDispatchService {
         this.deps.onDeadLetter?.({ channel, partnerTenantId: row.partnerTenantId, template: row.template, attempts: attempt, errorClass });
       } catch {
         // A failing alert hook must never block the outbox.
+      }
+      try {
+        this.deadLetterHook?.({ channel, partnerTenantId: row.partnerTenantId, template: row.template, attempts: attempt, errorClass });
+      } catch {
+        // Same rule for the hook attached after construction (Lot 12, spec 077).
       }
       summary.deadLetter += 1;
       return;

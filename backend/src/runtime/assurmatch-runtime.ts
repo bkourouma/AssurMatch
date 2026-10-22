@@ -330,6 +330,19 @@ export class AssurMatchRuntime {
     complianceEmail: () => complianceAlertEmail(),
     workerStaleMinutes: () => readIntegerEnv(process.env, "ASSURMATCH_WORKER_STALE_MINUTES", 10, 1, 1440)
   });
+  // Lot 12 (spec 077): an SMS/WhatsApp message that reaches dead_letter raises a critical admin alert (identifiers and counters only).
+  private readonly channelDeadLetterAlert = this.notifications.dispatch.setDeadLetterHook((info) => {
+    const isUuid = info.partnerTenantId !== null && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(info.partnerTenantId);
+    void this.adminAlerts.raise({
+      type: "channel_dead_letter",
+      severity: "critical",
+      conditionKey: `channel_dead_letter:${info.channel}:${info.partnerTenantId ?? "global"}`,
+      targetType: "ChannelOutbox",
+      targetId: info.channel,
+      ...(isUuid ? { partnerTenantId: info.partnerTenantId as string } : {}),
+      details: { channel: info.channel, template: info.template, attempts: info.attempts, errorClass: info.errorClass }
+    }).catch(() => undefined);
+  });
   // Lot 3: shared with the scheduled alerts (broker first-action target), so the in-memory mode needs an explicit instance.
   private readonly enterpriseRepository = this.runtimeRepository(new PrismaEnterpriseRepository(this.prisma)) ?? new MemoryEnterpriseRepository();
   private readonly aiInteractionsRepository = this.runtimeRepository(new PrismaAiInteractionsRepository(this.prisma)) ?? new MemoryAiInteractionsRepository();
