@@ -7,8 +7,8 @@
 - [x] T001 Contrat : `visitor_guarantee_explainer` et `visitor_compare_explainer` dans `ai.contracts.ts` (types + schémas de requête).
 - [x] T002 Passerelle : flag `ai_summary_enabled`, prompts, garde-fous de non-recommandation pour `visitor_*`.
 - [x] T003 `TemplateAiProvider` : rendus FR/EN des deux types (et `visitor_form_help`).
-- [x] T004 `VisitorAiService` : port des offres publiées, résolution serveur et validation pays/produit ; branchement `// Lot 2 (spec 068)` dans `assurmatch-runtime.ts`.
-- [x] T005 Tests unitaires et d'intégration HTTP (flux complet, flag fermé sans appel fournisseur, garde-fous, minimisation, quotas, offres hors périmètre, `visitor_form_help`).
+- [x] T004 `VisitorAiService` : port des offres publiées, résolution serveur et validation pays/produit ; port `VisitorAiFormFieldSource` et `formHelpInput` (libellé tiré du formulaire publié, `fieldKey` inconnu → 404) ; branchement `// Lot 2 (spec 068)` dans `assurmatch-runtime.ts`.
+- [x] T005 Tests unitaires et d'intégration HTTP (flux complet, flag fermé sans appel fournisseur, garde-fous, minimisation, quotas, offres hors périmètre, `visitor_form_help`, `fieldKey` inconnu).
 
 ## Phase 2 — Web publique : garanties et comparaison (propriétaire : agent front A)
 
