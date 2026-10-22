@@ -39,7 +39,9 @@ describe("prisma migration fresh-base readiness", () => {
       "0030_critical_fixes",
       "0031_broker_visitor_messaging",
       "0032_custom_role_members",
-      "0033_visitor_quote_journey_gaps"
+      "0033_visitor_quote_journey_gaps",
+      // Lot 10 (spec 076)
+      "0040_channels_integrations"
     ]);
     const schema = readFileSync(join(process.cwd(), "backend", "prisma", "schema.prisma"), "utf8").replace(/\r\n/g, "\n");
     for (const model of ["AuditLog", "FeatureFlag", "ConsentRecord", "QuoteRequest", "LeadAssignment", "BrokerCrmLeadState", "PartnerApiKey", "PartnerWebhookEndpoint", "PartnerWebhookDelivery", "PartnerWebhookAllowlistEntry", "RoutingRule", "RoutingRuleHistory"]) {
@@ -294,5 +296,12 @@ describe("prisma migration fresh-base readiness", () => {
     expect(visitorQuoteJourney).toContain(`ALTER TABLE "LeadDocumentRequest" ADD COLUMN IF NOT EXISTS "reminderQueuedAt" TIMESTAMP(3)`);
     expect(visitorQuoteJourney).not.toMatch(/DROP|DELETE|UPDATE |NOT NULL/);
     expect(schema).toMatch(/model PartnerCustomRole \{[^}]*memberIds\s+Json\s+@default\("\[\]"\)/);
+    // Lot 10 (spec 076): channels and integrations, three new tables, additive only.
+    const channelsIntegrations = readFileSync(join(migrationsDir, "0040_channels_integrations", "migration.sql"), "utf8");
+    for (const table of ["ChannelOutbox", "CrmConnector", "CrmConnectorDelivery"]) {
+      expect(channelsIntegrations).toContain(`CREATE TABLE IF NOT EXISTS "${table}"`);
+      expect(schema).toContain(`model ${table} {`);
+    }
+    expect(channelsIntegrations).not.toMatch(/DROP|DELETE|UPDATE |ALTER /);
   });
 });

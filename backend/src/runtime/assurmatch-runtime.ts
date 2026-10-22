@@ -85,6 +85,9 @@ import { PartnerEligibilityService } from "../modules/partners/partner-eligibili
 import { PartnerIntegrationsModule } from "../modules/partner-integrations/partner-integrations.module";
 import { MemoryPartnerIntegrationsRepository, PrismaPartnerIntegrationsRepository } from "../modules/partner-integrations/partner-integrations.repository";
 import { PartnerWebhookEventPublisher } from "../modules/partner-integrations/partner-webhook-event-publisher";
+// Lot 10 (spec 076)
+import { CrmConnectorModule, MemoryCrmConnectorRepository, PrismaCrmConnectorRepository } from "../modules/crm-connector/crm-connector.module";
+import { resolveMessagingProviders } from "../modules/notifications/providers/messaging-provider-env";
 import { PrismaConsentRecordsRepository } from "../modules/consent/consent-records.repository";
 import { MemoryCountriesRepository, PrismaCountriesRepository, type CountriesRepository } from "../modules/countries/countries.repository";
 import { PrismaProductsRepository } from "../modules/products/products.repository";
@@ -210,6 +213,8 @@ export class AssurMatchRuntime {
       }
       // Spec 054 R6: the visitor is told of every public step (accepted, reassigned, closed).
       await this.visitorQuoteNotifier?.onLeadEvent(eventType, partnerTenantId, data);
+      // Lot 10 (spec 076): generic outbound CRM connector (fail-safe, closed unless its flag is open).
+      await this.crmConnector?.service.publish(eventType, partnerTenantId, data).catch(() => undefined);
     }
   });
   readonly regulatoryRegimes: RegulatoryRegimesModule = new RegulatoryRegimesModule(
@@ -261,12 +266,12 @@ export class AssurMatchRuntime {
     }
   });
   private readonly messagingRepository = this.runtimeRepository(new PrismaMessagingRepository(this.prisma)) ?? new MemoryMessagingRepository();
-  readonly notifications = new NotificationsModule(this.audit.writer, this.queues.notifications, this.notificationsRepository, {
-    smsProvider: process.env.ASSURMATCH_SMS_PROVIDER,
-    smsSecretConfigured: Boolean(process.env.ASSURMATCH_SMS_API_KEY),
-    whatsappProvider: process.env.ASSURMATCH_WHATSAPP_PROVIDER,
-    whatsappSecretConfigured: Boolean(process.env.ASSURMATCH_WHATSAPP_API_KEY)
-  }, this.featureFlags.service, this.messagingRepository, this.partnerWebhookEvents);
+  // Lot 10 (spec 076): real SMS / WhatsApp adapters, built only from a complete environment configuration.
+  private readonly messagingProviders = resolveMessagingProviders();
+  readonly notifications = new NotificationsModule(this.audit.writer, this.queues.notifications, this.notificationsRepository, this.messagingProviders.config, this.featureFlags.service, this.messagingRepository, this.partnerWebhookEvents, {
+    ...(this.messagingProviders.smsProvider ? { smsProvider: this.messagingProviders.smsProvider } : {}),
+    ...(this.messagingProviders.whatsappProvider ? { whatsappProvider: this.messagingProviders.whatsappProvider } : {})
+  });
   readonly brokerNotifications = new BrokerNotificationsService({ audit: this.audit.writer, dispatch: this.notifications.dispatch });
   /** Spec 061 FR-002/FR-003: broker alerts (in-app always, pointer e-mail, opted-in SMS/WhatsApp). */
   readonly brokerAlerts = new BrokerAlertNotifier({
@@ -873,6 +878,18 @@ readonly enterprise = new EnterpriseService({
     webhookDeliveryEnabled: process.env.ASSURMATCH_PARTNER_WEBHOOK_DELIVERY_ENABLED === "true",
     ...(this.partnerIntegrationsRepository ? { repository: this.partnerIntegrationsRepository } : {})
   });
+  // Lot 10 (spec 076): generic outbound CRM connector, reuses the partner webhook origin allow-list.
+  private readonly crmConnectorRepository = this.runtimeRepository(new PrismaCrmConnectorRepository(this.prisma)) ?? new MemoryCrmConnectorRepository();
+  readonly crmConnector = new CrmConnectorModule({
+    audit: this.audit.writer,
+    featureFlags: this.featureFlags.service,
+    partners: this.partners.service,
+    repository: this.crmConnectorRepository,
+    approvedOrigin: async (partnerTenantId: string, url: URL) => (await this.partnerIntegrationsRepository.listAllowlistEntries())
+      .filter((entry) => entry.partnerTenantId === partnerTenantId && entry.status === "active")
+      .some((entry) => entry.origin === url.origin && (!entry.path || entry.path === url.pathname)),
+    deliveryEnabled: () => process.env.ASSURMATCH_CRM_CONNECTOR_DELIVERY_ENABLED === "true"
+  });
   /**
    * Spec 047: the confirmation sender for the three public forms. It shares `emailDelivery` with
    * the auth messages, so a deployment that has no SMTP configured keeps answering
@@ -1161,6 +1178,7 @@ readonly enterprise = new EnterpriseService({
       NotificationsRepository: this.notificationsRepository?.mode,
       UsersRepository: this.usersRepository?.mode,
       PartnerIntegrationsRepository: this.partnerIntegrationsRepository?.mode,
+      CrmConnectorRepository: this.crmConnectorRepository?.mode, // Lot 10
       WaitlistRepository: this.waitlistRepository?.mode,
       PartnerApplicationsRepository: this.partnerApplicationsRepository?.mode,
       ContactMessagesRepository: this.contactMessagesRepository?.mode,

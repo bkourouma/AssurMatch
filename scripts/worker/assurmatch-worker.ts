@@ -8,6 +8,9 @@
 //   - scheduled alerts           (spec 061)  broker reminders + admin alerts, at most once per
 //                                            ASSURMATCH_SCHEDULED_ALERTS_INTERVAL_MINUTES (default 60);
 //                                            off with ASSURMATCH_SCHEDULED_ALERTS_ENABLED=false
+//   - channel retry queue        (lot 10, spec 076) SMS / WhatsApp retries; inert while the queue is empty
+//   - CRM connector              (lot 10, spec 076) only with ASSURMATCH_CRM_CONNECTOR_DELIVERY_ENABLED=true
+//                                            (and the crm_connector_enabled flag, opened by compliance policy only)
 // Each service keeps its own feature-flag, consent and audit checks; flags are reloaded from the
 // database before every cycle so an admin toggle takes effect without a restart.
 //
@@ -29,6 +32,10 @@ const intervalSeconds = readIntegerEnv(env, "ASSURMATCH_WORKER_INTERVAL_SECONDS"
 const shutdownTimeoutSeconds = readIntegerEnv(env, "ASSURMATCH_WORKER_SHUTDOWN_TIMEOUT_SECONDS", 25, 1, 300);
 const quoteLimit = readIntegerEnv(env, "ASSURMATCH_QUOTE_NOTIFICATION_DELIVERY_LIMIT", 25, 1, 100);
 const surveyLimit = readIntegerEnv(env, "ASSURMATCH_SATISFACTION_SURVEY_DELIVERY_LIMIT", 50, 1, 100);
+// Lot 10 (spec 076)
+const channelOutboxLimit = readIntegerEnv(env, "ASSURMATCH_CHANNEL_OUTBOX_LIMIT", 25, 1, 100);
+const crmLimit = readIntegerEnv(env, "ASSURMATCH_CRM_CONNECTOR_DELIVERY_LIMIT", 25, 1, 100);
+const crmConnectorEnabled = env.ASSURMATCH_CRM_CONNECTOR_DELIVERY_ENABLED === "true";
 const webhookLimit = readIntegerEnv(env, "ASSURMATCH_PARTNER_WEBHOOK_DELIVERY_LIMIT", 25, 1, 100);
 const heartbeatFile = env.ASSURMATCH_WORKER_HEARTBEAT_FILE?.trim() || "/tmp/assurmatch-worker.heartbeat";
 // Off unless explicitly enabled: with deliveries disabled the webhook service audits a refusal on
@@ -80,7 +87,10 @@ const loop = new DeliveryWorkerLoop({
     { name: "partner-webhooks", enabled: webhooksEnabled, run: () => runtime.partnerIntegrations.service.processDueWebhookDeliveries({ limit: webhookLimit }) },
     { name: "scheduled-alerts", enabled: scheduledAlertsEnabled, run: () => runtime.scheduledAlerts.runIfDue() },
     // Lot 1 (spec 067): single J+3 reminder of an open document request (counters only in the log).
-    { name: "document-reminders", enabled: documentRemindersEnabled, run: () => runtime.documentReminders.runIfDue() }
+    { name: "document-reminders", enabled: documentRemindersEnabled, run: () => runtime.documentReminders.runIfDue() },
+    // Lot 10 (spec 076): retries of failed SMS / WhatsApp messages (consent, flag and provider re-checked at send time).
+    { name: "channel-outbox", enabled: true, run: () => runtime.notifications.dispatch.processDueOutbox({ limit: channelOutboxLimit }) },
+    { name: "crm-connector", enabled: crmConnectorEnabled, run: () => runtime.crmConnector.service.processDue({ limit: crmLimit }) }
   ]
 });
 
