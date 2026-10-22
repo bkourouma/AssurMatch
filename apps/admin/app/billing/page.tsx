@@ -2,6 +2,7 @@ import { readAccountStatement, readBillingFoundation, readBillingPlans, readDraf
 import { readBackOfficeSession } from "../lib/backoffice-auth";
 import { DISPUTE_DECIDER_ROLES, DISPUTE_PAGE_SIZE } from "../lib/dispute-vocabulary";
 import { DisputesPanel } from "./disputes-panel";
+import { DraftLinesPanel, Lot5BillingPanels } from "./lot5-panels";
 import type { DisputeTabFilters } from "./disputes-panel";
 import {
   grantLeadPackAction,
@@ -66,6 +67,10 @@ const TABS = [
   { key: "contestations", label: "Contestations" },
   { key: "packs", label: "Packs" }
 ];
+
+/** Lot 5 (spec 071): add-on prices, assignments, subscription state and plan-change inbox (`billing:plan_manage`). */
+const PLAN_MANAGER_ROLES = new Set(["finance_admin", "super_admin"]);
+const MODULES_TAB = { key: "modules", label: "Modules et abonnements" };
 
 const SUCCESS_NOTICES = new Set(["plan_saved", "drafts_computed", "pack_granted", "invoice_issued", "payment_recorded", "credit_note_issued", "dispute_accepted", "dispute_rejected"]);
 
@@ -144,7 +149,9 @@ export default async function BillingFoundationPage({
   const params = await searchParams;
   const notice = firstParam(params.billing);
   const requestedTab = firstParam(params.tab);
-  const tab = TABS.some((entry) => entry.key === requestedTab) ? requestedTab : "suivi";
+  const tab = [...TABS, MODULES_TAB].some((entry) => entry.key === requestedTab) ? requestedTab : "suivi";
+  const lot5Session = await readBackOfficeSession();
+  const canManagePlans = lot5Session.status === "authenticated" && lot5Session.profile.roles.some((role) => PLAN_MANAGER_ROLES.has(role));
   const accountPartnerId = firstParam(params.partner);
   const [billing, plans, drafts, packs, invoices] = await Promise.all([readBillingFoundation(), readBillingPlans(), readDraftInvoices(), readLeadPacks(), readIssuedInvoices()]);
   const account = tab === "comptes" && /^[0-9a-f-]{36}$/i.test(accountPartnerId) ? await readAccountStatement(accountPartnerId) : undefined;
@@ -215,7 +222,7 @@ export default async function BillingFoundationPage({
 
           <Tabs
             label="Sections facturation"
-            items={TABS.map((entry) => ({ label: entry.label, href: hrefForTab(entry.key), current: entry.key === tab }))}
+            items={(canManagePlans ? [...TABS, MODULES_TAB] : TABS).map((entry) => ({ label: entry.label, href: hrefForTab(entry.key), current: entry.key === tab }))}
           />
 
           {tab === "suivi" ? (
@@ -307,7 +314,17 @@ export default async function BillingFoundationPage({
             </Card>
           ) : null}
 
+          {tab === "modules" && canManagePlans ? (
+            <Lot5BillingPanels
+              partners={billing.data.partners.map((partner) => ({ partnerId: partner.partnerId, partnerName: partner.partnerName }))}
+              subscriptionPartnerId={firstParam(params.abonnement)}
+              planStatus={firstParam(params.planStatus)}
+            />
+          ) : null}
+          {tab === "modules" && !canManagePlans ? <StateMessage tone="warning">Modules et abonnements : rôle Finance Admin ou Super Admin requis.</StateMessage> : null}
+
           {tab === "brouillons" ? (
+            <>
             <Card title="Brouillons mensuels non facturables">
               <DataTable
                 columns={draftColumns}
@@ -337,6 +354,8 @@ export default async function BillingFoundationPage({
                 </FormActions>
               </Form>
             </Card>
+            <DraftLinesPanel drafts={draftItems} />
+            </>
           ) : null}
 
           {tab === "factures" ? (

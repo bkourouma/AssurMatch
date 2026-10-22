@@ -4,6 +4,10 @@ import { ActivationChecklistModule } from "../modules/activation-checklist/activ
 import { AIModule } from "../modules/ai/ai.module";
 import { BillingModule } from "../modules/billing/billing.module";
 import { PrismaBillingRepository } from "../modules/billing/billing.repository";
+// Lot 5 (spec 071)
+import { PrismaPlanChangeRequestsRepository } from "../modules/billing/plan-change-requests.repository";
+import type { PartnerCommercialState } from "../modules/routing/routing-controls.ports";
+// End Lot 5
 import { PrismaInvoicingRepository } from "../modules/billing/invoicing.repository";
 import { AuditLogsModule } from "../modules/audit-logs/audit-logs.module";
 import { PrismaAuditLogRepository } from "../modules/audit-logs/audit-log-repository";
@@ -434,7 +438,13 @@ export class AssurMatchRuntime {
       // Spec 063: lead disputes (country scopes of the finance admin, `billing_enabled` gate).
       disputes: { countries: this.countries.service, featureFlags: this.featureFlags.service },
       // Spec 064: Enterprise agency display filter; the enterprise service is built after the leads, hence the lazy call.
-      agencyScope: { resolve: (actor: ActorContext, agencyId: string | undefined): Promise<AdvisorAgencyPredicate | undefined> => this.enterprise.agencyScopeFor(actor, agencyId) }
+      agencyScope: { resolve: (actor: ActorContext, agencyId: string | undefined): Promise<AdvisorAgencyPredicate | undefined> => this.enterprise.agencyScopeFor(actor, agencyId) },
+      // Lot 5 (spec 071): routing controls 9-12, quota lock and AI-assisted mode (the billing module is built later, hence the lazy calls).
+      commercialState: (partnerTenantId: string): Promise<PartnerCommercialState> => this.billing.subscriptions.commercialState(partnerTenantId),
+      leadQuality: { threshold: readIntegerEnv(process.env, "ASSURMATCH_ROUTING_LEAD_QUALITY_MIN_SCORE", 30, 0, 100) },
+      aiRouting: { isEnabled: () => this.featureFlags.service.isEnabled("ai_assisted_routing_enabled") },
+      redis: this.redis.client,
+      requireRecordedContract: process.env.ASSURMATCH_ROUTING_REQUIRE_RECORDED_CONTRACT === "true"
     }
   );
     readonly satisfactionSurveys: SatisfactionSurveysModule = new SatisfactionSurveysModule(
@@ -651,6 +661,8 @@ readonly enterprise = new EnterpriseService({
   });
   readonly manualRouting = new ManualRoutingService({
     audit: this.audit.writer,
+    // Lot 5 (spec 071): the queue shows the AI suggestion / quality score, and validation is audited.
+    decisions: this.leads.decisions,
     submissions: this.quoteRequests.submissions,
     eligibility: this.leads.eligibility,
     countries: this.countries.service,
@@ -820,6 +832,9 @@ readonly enterprise = new EnterpriseService({
   readonly adminRoutingAnomalies = new AdminRoutingAnomaliesController(this.routingAnomalies, this.adminAi);
   private readonly billingRepository = this.runtimeRepository(new PrismaBillingRepository(this.prisma));
   private readonly invoicingRepository = this.runtimeRepository(new PrismaInvoicingRepository(this.prisma));
+  // Lot 5 (spec 071)
+  private readonly planChangeRepository = this.runtimeRepository(new PrismaPlanChangeRequestsRepository(this.prisma));
+  // End Lot 5
   readonly billing = new BillingModule({
     audit: this.audit.writer,
     featureFlags: this.featureFlags.service,
@@ -833,7 +848,19 @@ readonly enterprise = new EnterpriseService({
     // Spec 060: invoice PDFs share the document storage; the broker is notified in-app.
     ...(this.invoicingRepository ? { invoicingRepository: this.invoicingRepository } : {}),
     documentStorage: this.documentStorage,
-    inApp: this.notifications.dispatch
+    inApp: this.notifications.dispatch,
+    // Lot 5 (spec 071): G-06 plan change requests and the non-duplicate billing criterion.
+    ...(this.planChangeRepository ? { planChangeRepository: this.planChangeRepository } : {}),
+    quoteDuplicates: async (quoteRequestIds: string[]) => {
+      const blocked = new Set<string>();
+      for (const id of quoteRequestIds) {
+        const quote = this.quoteRequestsRepository ? await this.quoteRequestsRepository.findById(id) : await this.quoteRequests.submissions.findById(id);
+        const record = quote as { duplicateStatus?: string; status?: string } | undefined;
+        if (record?.duplicateStatus === "blocked_duplicate" || record?.status === "duplicate") blocked.add(id);
+      }
+      return blocked;
+    }
+    // End Lot 5
   });
   // Spec 063 (start): the dispute service credits through the invoicing service and notifies through the broker alerts.
   private readonly leadDisputesBound = this.bindLeadDisputes();
