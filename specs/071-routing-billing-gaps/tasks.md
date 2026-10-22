@@ -33,6 +33,6 @@ Légende : `[ ]` à faire · `[x]` terminé. Propriétaires d'écriture : LEAD (
 
 ## Phase 4 — Câblage et validation (WR, LEAD)
 
-- [ ] T040 Câblage `billing.module.ts`, `assurmatch-runtime.ts`, routes HTTP (bloc `// Lot 5 (spec 071)`)
-- [ ] T041 Tests d'intégration (G-06 de bout en bout, add-ons, abonnement suspendu exclu)
-- [ ] T042 Validations finales : `typecheck`, `lint`, `NODE_ENV=test npm run test`, `npm run test:web`, `prisma validate`, `secret-scan`
+- [x] T040 Câblage `billing.module.ts`, `assurmatch-runtime.ts`, routes HTTP (bloc `// Lot 5 (spec 071)`)
+- [x] T041 Tests d'intégration (G-06 de bout en bout, add-ons, abonnement suspendu exclu)
+- [x] T042 Validations finales : `typecheck`, `lint`, `NODE_ENV=test npm run test`, `npm run test:web`, `prisma validate`, `secret-scan`
