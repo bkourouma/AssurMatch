@@ -108,7 +108,7 @@ describe("resolveMessagingProviders", () => {
     ASSURMATCH_WHATSAPP_PROVIDER: "whatsapp_cloud",
     ASSURMATCH_WHATSAPP_API_KEY: KEY,
     ASSURMATCH_WHATSAPP_PHONE_NUMBER_ID: "555"
-  } as NodeJS.ProcessEnv;
+  } as Record<string, string | undefined>;
 
   it("creates nothing when nothing is configured", () => {
     const r = resolveMessagingProviders({}, mockFetch(200));

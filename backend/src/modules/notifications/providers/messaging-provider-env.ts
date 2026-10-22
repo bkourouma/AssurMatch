@@ -27,7 +27,7 @@ import { WhatsAppCloudProvider } from "./whatsapp-cloud-provider";
  * The returned config never contains a key.
  */
 export function resolveMessagingProviders(
-  env: NodeJS.ProcessEnv = process.env,
+  env: Record<string, string | undefined> = process.env,
   fetcher: typeof fetch = fetch
 ): { config: MessagingProviderConfig; smsProvider?: MessagingProviderPort; whatsappProvider?: MessagingProviderPort } {
   const read = (key: string): string | undefined => {
