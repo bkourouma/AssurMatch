@@ -4,6 +4,7 @@ import { toLocale } from "../../../i18n/routing";
 import { OfferScore, ScoreBreakdown, SponsoredBadge } from "../../components/offer-cards";
 import { JourneyRoute } from "../../components/journey/journey-route";
 import { JourneyHeroNotice } from "../../components/public-journey";
+import { VisitorAiAssistant } from "../../components/visitor-ai-assistant";
 import { EntrySelector, type EntrySelectorProduct } from "../../components/site/entry-selector";
 import { BackendText } from "../../components/ui/backend-text";
 import { Breadcrumb } from "../../components/ui/breadcrumb";
@@ -15,7 +16,7 @@ import { Notice } from "../../components/ui/notice";
 import { Route } from "../../components/ui/route-line";
 import { Section } from "../../components/ui/section";
 import { formatDate, formatMoney } from "../../lib/country-format";
-import { comparePublicOffers, listPublicProducts } from "../../lib/public-api";
+import { comparePublicOffers, findOfferContext, listPublicProducts } from "../../lib/public-api";
 import { buildMetadata, localeUrl } from "../../lib/seo";
 import type { PageMetadata } from "../../lib/seo";
 import { readVisitorCountry } from "../../lib/visitor-country";
@@ -137,6 +138,11 @@ export default async function PublicComparePage({
   // selection are a real error and keep their own message.
   const entryState = ids.length === 0;
   const comparison = selectionValid ? await comparePublicOffers(ids, priority) : null;
+  // The comparison assistant needs the country and product: taken from the query, else looked up
+  // from the first offer, and only for a valid selection (no lookup, no assistance otherwise).
+  const assistContext = selectionValid && ids[0] && !(countryCode && productKey) ? await findOfferContext(ids[0]) : null;
+  const assistCountry = countryCode && productKey ? countryCode : assistContext?.countryCode;
+  const assistProduct = countryCode && productKey ? productKey : assistContext?.productKey;
 
   // Same entry point as the home page: the visitor country is a default, never a redirection.
   const visitor = entryState ? await readVisitorCountry() : null;
@@ -346,6 +352,8 @@ export default async function PublicComparePage({
               </div>
             </div>
           </Section>
+
+          {selectionValid && assistCountry && assistProduct ? <VisitorAiAssistant countryCode={assistCountry} productKey={assistProduct} offerIds={ids} mode="compare" /> : null}
 
           <Section title={t("scoresTitle")} tone="muted">
             <ul className="am-j-scorecards">

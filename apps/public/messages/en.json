@@ -1056,7 +1056,24 @@
       "consistency": {
         "title": "Consistency check by the reading assistant",
         "button": "Check my answers"
+      },
+      "guarantees": {
+        "title": "The guarantees in plain language",
+        "button": "Explain the guarantees",
+        "aiNotice": "AI-generated content, to be confirmed by the partner broker."
+      },
+      "compare": {
+        "title": "The differences between these offers",
+        "button": "Explain the differences",
+        "aiNotice": "AI-generated content, to be confirmed by the partner broker."
       }
+    },
+    "fieldHelp": {
+      "trigger": "Help for the \"{field}\" field",
+      "title": "Help for this field",
+      "close": "Hide help",
+      "note": "General explanation of the field. Your answer is not sent to the assistant; do not enter personal data.",
+      "aiNotice": "AI-generated content, to be confirmed by the partner broker."
     }
   },
   "DocumentUpload": {

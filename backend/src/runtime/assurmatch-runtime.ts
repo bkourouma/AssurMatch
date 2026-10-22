@@ -302,7 +302,32 @@ export class AssurMatchRuntime {
     gateway: this.aiGateway,
     redis: this.redis.client,
     countries: this.countries.service,
-    products: this.products.service
+    products: this.products.service,
+    // Lot 2 (spec 068): the explainers read published offers only, through the public catalogue
+    // visibility rules (lazy lambdas: `offers` and `publicOfferContext` are resolved at call time).
+    formFields: {
+      fields: async (countryId, productId, language) => {
+        const published = (await this.quoteForms.service.list()).filter((form) => form.status === "published" && form.countryId === countryId && form.productId === productId);
+        const form = published.find((candidate) => candidate.language === language) ?? published[0];
+        return (form?.fields ?? []).map((field) => ({ key: field.key, label: field.label }));
+      }
+    },
+    offers: {
+      detail: async (offerId, countryId, productId) => {
+        const context = await this.visitorAiOfferContext(countryId, productId);
+        const { offer } = await this.offers.publicCatalog.selectableOffer(offerId, countryId, productId, context);
+        if (!offer) throw new Error("Offer is not publicly available");
+        return this.offers.publicCatalog.detail(offerId, undefined, context);
+      },
+      compare: async (offerIds, countryId, productId) => {
+        const context = await this.visitorAiOfferContext(countryId, productId);
+        for (const offerId of offerIds) {
+          const { offer } = await this.offers.publicCatalog.selectableOffer(offerId, countryId, productId, context);
+          if (!offer) throw new Error("Offer is not publicly available");
+        }
+        return this.offers.publicCatalog.compare({ ids: offerIds.join(",") }, undefined, context);
+      }
+    }
   });
   readonly quoteAiSummary = new QuoteAISummaryService(this.notifications.queue, this.audit.writer, {
     id: "00000000-0000-4000-8000-000000000002",
@@ -965,6 +990,13 @@ readonly enterprise = new EnterpriseService({
       resolvePopularity: (offerIds) => this.quoteRequests.submissions.countSelectedOffers(offerIds),
       resolveScoringWeights: (countryId, productId) => this.scoringRules.resolveWeights(countryId, productId)
     };
+  }
+
+  /** Lot 2 (spec 068): visibility context of the visitor offer explainers, scoped to one country and product. */
+  private async visitorAiOfferContext(countryId: string, productId: string): Promise<PublicOfferVisibilityContext> {
+    const country = await this.countries.service.require(countryId);
+    const product = await this.products.service.require(productId);
+    return this.publicOfferContext({ countryFlags: publicCountryFlags(country), productFlags: this.products.service.effectiveFlags(product, country.id) });
   }
 
   async publicOfferPartnerEligibility(partnerTenantId: string, countryId: string, productId: string): Promise<{ eligible: boolean; reasons: string[] }> {
