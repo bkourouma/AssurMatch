@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { readAdminCountries, readAdminPartners, readAdminProducts } from "../../lib/admin-api";
 import { isAdminProfile, loginRedirect, readBackOfficeSession } from "../../lib/backoffice-auth";
+import { readAdminInsurers } from "../../lib/lot4-offers-api";
 import { canPrepareOffer } from "../../lib/offer-messages";
 import { Notice, PageHeader, PageStack } from "../../lib/ui/admin-ui";
 import { CreateOfferForm } from "../offer-forms";
@@ -20,7 +21,7 @@ export default async function NewAdminOfferPage() {
       breadcrumb={[{ label: "Catalogue" }, { label: "Offres indicatives", href: "/offers" }, { label: "Nouvelle offre" }]}
       kicker="Catalogue"
       title="Nouvelle offre"
-      description="Préparation d'une offre pour le compte d'un courtier. Offre indicative : prix à confirmer par le courtier partenaire."
+      description="Préparation d'une offre pour le compte d'un courtier (indicative, partenaire, assureur ou privée). Offre indicative : prix à confirmer par le courtier partenaire."
     />
   );
   if (!canPrepareOffer(session.profile.roles)) {
@@ -32,7 +33,12 @@ export default async function NewAdminOfferPage() {
     );
   }
 
-  const [countries, products, partners] = await Promise.all([readAdminCountries(), readAdminProducts(), readAdminPartners()]);
+  const [countries, products, partners, insurers] = await Promise.all([
+    readAdminCountries(),
+    readAdminProducts(),
+    readAdminPartners(),
+    readAdminInsurers({ status: "active" })
+  ]);
   if (countries.unauthenticated) redirect(loginRedirect(path, countries.error ?? "session_required"));
   const partnerChoices = partners.data
     .filter((partner) => partner.status !== "retired")
@@ -47,7 +53,11 @@ export default async function NewAdminOfferPage() {
   return (
     <PageStack>
       {header}
-      <CreateOfferForm partners={partnerChoices} scopes={{ countries: countryChoices, products: productChoices }} />
+      <CreateOfferForm
+        partners={partnerChoices}
+        scopes={{ countries: countryChoices, products: productChoices }}
+        insurers={insurers.data.map((insurer) => ({ id: insurer.id, name: insurer.name, countryId: insurer.countryId }))}
+      />
     </PageStack>
   );
 }

@@ -22,6 +22,15 @@ import { MemoryCrmActivityRepository, type CrmActivityRepository } from "./crm-a
 import { LeadAssignmentService, type LeadAssignmentRecord } from "./lead-assignment.service";
 import { LeadDisputesService } from "./lead-disputes.service";
 
+/** Identity of an advisor as known by the user directory (tenant and account status only). */
+export interface AdvisorIdentity {
+  partnerTenantId?: string | undefined;
+  status?: string | undefined;
+}
+
+/** A suspended, locked or deleted account can no longer work a lead. */
+const ASSIGNABLE_ADVISOR_STATUSES: ReadonlySet<string> = new Set(["active", "invited"]);
+
 export class BrokerCrmActivityService {
   constructor(
     private readonly assignments: LeadAssignmentService,
@@ -32,6 +41,16 @@ export class BrokerCrmActivityService {
     /** Spec 063: shared dispute service (30-day window, one dispute per lead); built on the same repository when not injected. */
     private readonly disputes: LeadDisputesService = new LeadDisputesService({ audit, assignments, repository })
   ) {}
+
+  private advisorDirectory: ((advisorId: string) => Promise<AdvisorIdentity | undefined>) | undefined;
+
+  /**
+   * Lot 3 (spec 069 FR-006): late port (set by the runtime) giving the partner tenant and the account status of a user id,
+   * `undefined` when unknown. Mandatory in practice: without it every assignment is refused (fail closed).
+   */
+  setAdvisorTenantResolver(resolver: ((advisorId: string) => Promise<AdvisorIdentity | undefined>) | undefined): void {
+    this.advisorDirectory = resolver;
+  }
 
   async addNote(id: string, input: unknown, actor: ActorContext): Promise<BrokerCrmNote> {
     const assignment = await this.requireMutable(id, actor);
@@ -66,6 +85,11 @@ export class BrokerCrmActivityService {
     const parsed = brokerCrmAssignRequestSchema.parse(input);
     const assignment = await this.assignments.require(id);
     this.access.assertAssignment(actor, assignment, parsed.advisorPartnerTenantId);
+    // Lot 3 (spec 069 FR-006): `advisorPartnerTenantId` is client-asserted; the advisor's real tenant comes from the user directory.
+    // Fail closed: no directory wired, a lookup error, an unknown id or a disabled/deleted account all refuse the assignment.
+    const advisor = this.advisorDirectory ? await this.advisorDirectory(parsed.advisorId).catch(() => undefined) : undefined;
+    this.access.assertAdvisorTenantResolved(actor, assignment, advisor?.partnerTenantId);
+    if (!ASSIGNABLE_ADVISOR_STATUSES.has(advisor?.status ?? "active")) this.access.refuseAdvisorUnavailable(actor, assignment);
     const updated = await this.assignments.updateCrmMetadata(id, { assignedAdvisorId: parsed.advisorId }, actor);
     await this.track(assignment, actor, "assigned", QuoteAuditActions.brokerCrmLeadAssigned);
     return updated;

@@ -1,10 +1,14 @@
 import { redirect } from "next/navigation";
+import { readAdminProductCategories, readAdminProductVersions } from "../../../lib/lot4-catalog-api";
 import { readAdminCountries, readAdminProduct } from "../../../lib/admin-api";
 import { isAdminProfile, loginRedirect, readBackOfficeSession } from "../../../lib/backoffice-auth";
 import {
   PRODUCT_TOGGLEABLE_FLAGS,
   SENSITIVE_FLAG_EXPLANATION,
   adminReadErrorMessage,
+  documentKindLabel,
+  formatVersionValue,
+  versionFieldLabel,
   canApprovePublicActivation,
   flagLabel,
   formatDate
@@ -37,7 +41,12 @@ export default async function CatalogProductDetailPage({ params }: ProductDetail
   if (session.status !== "authenticated" || !isAdminProfile(session.profile)) redirect(`/login?error=access_denied&returnTo=${encodeURIComponent(path)}`);
   const canApproveCompliance = canApprovePublicActivation(session.profile.roles);
 
-  const [productResult, countries] = await Promise.all([readAdminProduct(productId), readAdminCountries()]);
+  const [productResult, countries, categories, versions] = await Promise.all([
+    readAdminProduct(productId),
+    readAdminCountries(),
+    readAdminProductCategories(),
+    readAdminProductVersions(productId)
+  ]);
   if (productResult.unauthenticated) redirect(loginRedirect(path, productResult.error ?? "session_required"));
   const product = productResult.data;
 
@@ -57,6 +66,10 @@ export default async function CatalogProductDetailPage({ params }: ProductDetail
   const sensitive = product.sensitivity !== "standard";
   const readOnlyFlags = Object.keys(product.flags).filter((key) => !(PRODUCT_TOGGLEABLE_FLAGS as readonly string[]).includes(key));
   const linkedCountries = countries.data.filter((country) => product.countryIds.includes(country.id));
+  const activeCategories = categories.data.filter((category) => category.status === "active" || category.id === product.categoryId).map((category) => ({ value: category.id, label: category.name }));
+  const currentCategory = categories.data.find((category) => category.id === product.categoryId);
+  const legalNotice = product.legalNotice ?? {};
+  const requiredKinds = product.requiredDocumentKinds ?? [];
   const flagValue = (key: string) => product.flags[key as keyof typeof product.flags] === true;
 
   return (
@@ -76,6 +89,13 @@ export default async function CatalogProductDetailPage({ params }: ProductDetail
             { term: "Sensibilité", value: <Badge tone={sensitive ? "warning" : "neutral"}>{product.sensitivity}</Badge> },
             { term: "Documents requis", value: product.requiresDocuments ? "Oui" : "Non" },
             { term: "Revue manuelle", value: product.requiresManualReview ? "Oui" : "Non" },
+            { term: "Catégorie", value: currentCategory ? currentCategory.name : "Aucune" },
+            { term: "Version courante", value: `v${product.version ?? 1}` },
+            { term: "Types de documents demandés", value: requiredKinds.length > 0 ? requiredKinds.map(documentKindLabel).join(", ") : "Aucun" },
+            { term: "Texte légal (FR)", value: legalNotice.fr?.legalText || "Non renseigné" },
+            { term: "Avertissement (FR)", value: legalNotice.fr?.disclaimer || "Non renseigné" },
+            { term: "Texte légal (EN)", value: legalNotice.en?.legalText || "Non renseigné" },
+            { term: "Avertissement (EN)", value: legalNotice.en?.disclaimer || "Non renseigné" },
             {
               term: "Pays liés",
               value: linkedCountries.length > 0
@@ -87,7 +107,7 @@ export default async function CatalogProductDetailPage({ params }: ProductDetail
         />
       </Card>
 
-      <EditProductForm product={product} />
+      <EditProductForm product={product} categories={activeCategories} />
 
       <ProductStatusForm productId={product.id} currentStatus={product.status} canApprovePublic={canApproveCompliance} />
 
@@ -123,6 +143,32 @@ export default async function CatalogProductDetailPage({ params }: ProductDetail
             </ul>
           </Notice>
         ) : null}
+      </Card>
+
+      <Card title="Historique des conditions" description="Chaque enregistrement crée une version avec son auteur, son motif et le détail champ par champ (avant → après).">
+        {versions.status === "success" && versions.data.length === 0 ? (
+          <StateMessage>Aucune version enregistrée pour ce produit.</StateMessage>
+        ) : null}
+        {versions.status !== "success" ? <StateMessage tone="danger">{adminReadErrorMessage(versions.error)}</StateMessage> : null}
+        <ol className="bo-list" data-product-versions="true" aria-label="Versions du produit">
+          {versions.data.map((version) => (
+            <li key={version.versionNumber} data-product-version={version.versionNumber}>
+              <strong>{`Version ${version.versionNumber}`}</strong>
+              {` — ${formatDate(version.createdAt)} — ${version.authorLabel ?? (version.authorId ? version.authorId.slice(0, 8) : "système")}`}
+              <div>{version.versionNumber === 1 ? "Création" : `Motif : ${version.reason}`}</div>
+              {version.versionNumber !== 1 && version.changes.length > 0 ? (
+                <ul className="bo-list">
+                  {version.changes.map((change) => (
+                    <li key={change.field}>
+                      <strong>{versionFieldLabel(change.field)}</strong>
+                      {` : ${formatVersionValue(change.field, change.before)} → ${formatVersionValue(change.field, change.after)}`}
+                    </li>
+                  ))}
+                </ul>
+              ) : null}
+            </li>
+          ))}
+        </ol>
       </Card>
     </PageStack>
   );

@@ -334,7 +334,7 @@ test("the agency filter is a display filter on the CRM list, Kanban and dashboar
   const helper = source("apps/broker/app/lib/agency-filter.ts");
 
   expect(list).toContain("loadAgencyFilter(session.profile, params[AGENCY_PARAM])");
-  expect(list).toContain("listCrmLeads(agencyQuery(agency))");
+  expect(list).toContain("listCrmLeads(agencyQuery(agency), buildCrmLeadsApiQuery(state))");
   expect(list).toContain('id="crm-agency"');
   expect(list).toContain("name={AGENCY_PARAM}");
   expect(list).toContain("AGENCY_DISPLAY_HINT");

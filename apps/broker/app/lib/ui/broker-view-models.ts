@@ -1,5 +1,5 @@
 import type { Tone } from "./broker-ui";
-import type { BrokerDashboardData } from "../broker-api";
+import type { BrokerAgencyOverviewRow, BrokerCrmSourceRow, BrokerDashboardData } from "../broker-api";
 import { DISPUTE_WINDOW_DAYS } from "../lead-vocabulary";
 import { TENANT_SUSPENDED_MESSAGE } from "../broker-permissions";
 
@@ -22,6 +22,9 @@ export interface LeadSummaryViewModel {
   advisor?: string | undefined;
   urgency?: string | undefined;
   source?: string | undefined;
+  /** Lot 3 (spec 069 FR-004): human-approved indicative AI score (0-100), only when the API sends one. */
+  priorityScore?: number | undefined;
+  priorityLevel?: "low" | "medium" | "high" | undefined;
 }
 
 export function formatDate(value?: string | null): string {
@@ -88,7 +91,9 @@ export function leadSummary(lead: Record<string, unknown>): LeadSummaryViewModel
     seen: lead.seenAt ? "Oui" : "Non",
     advisor: lead.advisorId ? String(lead.advisorId) : lead.assignedAdvisorId ? String(lead.assignedAdvisorId) : undefined,
     urgency: lead.urgency ? String(lead.urgency) : undefined,
-    source: lead.source ? String(lead.source) : undefined
+    source: lead.source ? String(lead.source) : undefined,
+    priorityScore: typeof lead.priorityScore === "number" && Number.isFinite(lead.priorityScore) ? lead.priorityScore : undefined,
+    priorityLevel: lead.priorityLevel === "low" || lead.priorityLevel === "medium" || lead.priorityLevel === "high" ? lead.priorityLevel : undefined
   };
 }
 
@@ -140,4 +145,84 @@ export function disputeAvailability(input: {
   const until = window ? `Contestation possible jusqu'au ${formatDeadline(window.deadline)}.` : `Contestation possible dans les ${DISPUTE_WINDOW_DAYS} jours suivant la réception du lead.`;
   if (!canMutate) return { canDispute: false, message: `${until} Votre rôle ne permet pas de contester ce lead.` };
   return { canDispute: true, message: until };
+}
+
+/* ---------- Lot 3 (spec 069): KPI CRM du PRD §20 ---------- */
+
+/** Libelle de la conversion : leads gagnes / leads recus (jamais « acceptes »). */
+export const CONVERSION_LABEL = "Gagnés / reçus";
+export const LEAD_COST_LABEL = "Coût par lead (estimation)";
+export const LEAD_COST_NOTICE = "Estimation selon le plan et les tarifs de facturation : ce n'est pas une facture.";
+const MISSING = "-";
+
+function isNumber(value: unknown): value is number {
+  return typeof value === "number" && Number.isFinite(value);
+}
+
+/** Ratio [0, 1] -> « 42 % ». Une valeur absente (null/undefined) donne « - », jamais 0. */
+export function formatRate(value: number | null | undefined): string {
+  return isNumber(value) ? `${Math.round(value * 100)} %` : MISSING;
+}
+
+export function formatMinutes(value: number | null | undefined): string {
+  if (!isNumber(value)) return MISSING;
+  if (value >= 120) return `${Math.round(value / 60)} h`;
+  return `${Math.round(value)} min`;
+}
+
+export function formatCount(value: number | null | undefined): string {
+  return isNumber(value) ? String(value) : MISSING;
+}
+
+export function formatMoney(value: number | null | undefined, currency: string | undefined): string {
+  if (!isNumber(value)) return MISSING;
+  return `${value.toLocaleString("fr-FR", { maximumFractionDigits: 2 }).replace(/\u202f|\u00a0/g, " ")} ${currency ?? ""}`.trim();
+}
+
+/** « 3/10 » (gagnes / recus) d'une ligne de conversion; `-` si le nombre de gagnes n'est pas fourni. */
+export function wonOverReceived(row: { won?: number | undefined; received: number }): string {
+  return isNumber(row.won) ? `${row.won}/${row.received}` : MISSING;
+}
+
+/**
+ * Indicateurs de la section `crm` du tableau de bord courtier (Pro/Enterprise). Retourne un tableau vide
+ * sans section `crm` (Starter, flag ferme) : rien n'est affiche, aucune valeur inventee.
+ */
+export function crmPerformanceKpis(data: BrokerDashboardData): KpiViewModel[] {
+  const crm = data.crm;
+  if (!crm || data.plan === "starter") return [];
+  const kpis = crm.kpis;
+  const cards: KpiViewModel[] = [
+    { label: CONVERSION_LABEL, value: formatRate(crm.conversionRate), helper: "Part des leads reçus passés au statut gagné", tone: "success" }
+  ];
+  if (!kpis) return cards;
+  cards.push(
+    { label: "Taux de contact", value: formatRate(kpis.contactRate), helper: "Leads reçus effectivement contactés", tone: "info" },
+    { label: "Délai moyen de premier contact", value: formatMinutes(kpis.averageFirstContactMinutes), helper: "De l'attribution au premier contact", tone: "neutral" },
+    { label: "Taux de qualification", value: formatRate(kpis.qualificationRate), helper: "Leads arrivés au statut qualifié ou au-delà", tone: "info" },
+    {
+      label: "Devis / propositions envoyés",
+      value: kpis.quotesSent ? `${formatCount(kpis.quotesSent.leads)} lead(s)` : MISSING,
+      helper: kpis.quotesSent ? `${formatCount(kpis.quotesSent.proposals)} proposition(s) au total` : undefined,
+      tone: "neutral"
+    }
+  );
+  if (kpis.leadCost) {
+    cards.push({
+      label: LEAD_COST_LABEL,
+      value: formatMoney(kpis.leadCost.perLead, kpis.leadCost.currency),
+      helper: kpis.leadCost.perWonLead === null ? "Aucun lead gagné sur la période" : `${formatMoney(kpis.leadCost.perWonLead, kpis.leadCost.currency)} par lead gagné (estimation)`,
+      tone: "warning"
+    });
+  }
+  return cards;
+}
+
+export function crmTopSources(data: BrokerDashboardData): BrokerCrmSourceRow[] {
+  return data.plan === "starter" ? [] : (data.crm?.kpis?.topSources ?? []);
+}
+
+/** Texte de la ligne « Sans agence » : l'identifiant `none` n'est jamais montre tel quel. */
+export function agencyRowLabel(row: Pick<BrokerAgencyOverviewRow, "agencyId" | "agencyName">): string {
+  return row.agencyId === "none" ? "Sans agence" : row.agencyName;
 }

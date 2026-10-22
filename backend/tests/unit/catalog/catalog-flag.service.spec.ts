@@ -11,14 +11,17 @@ import { effectiveProductFlags, ProductsService } from "../../../src/modules/pro
 const superAdmin: ActorContext = { actorId: "11111111-1111-4111-8111-111111111111", roles: ["super_admin"], mfaVerified: true };
 const compliance: ActorContext = { actorId: "22222222-2222-4222-8222-222222222222", roles: ["compliance_admin"], mfaVerified: true };
 
-async function build(blockers: CatalogActivationBlocker[] = [{ section: "country:x", control: "country_active_licensed_partner", label: "Courtier", evidence: "aucun" }]) {
+async function build(blockers: CatalogActivationBlocker[] = [{ section: "country:x", control: "country_active_licensed_partner", label: "Courtier", evidence: "aucun" }], productBlockers: CatalogActivationBlocker[] = []) {
   const audit = new AuditLogWriter();
   const countries = new CountriesService(audit);
   const products = new ProductsService(audit);
   const featureFlags = new FeatureFlagsService(audit);
   const ignored: string[][] = [];
   const guard = new CatalogActivationGuard({
-    checklist: { countryActivationBlockers: async (_countryId: string, ignoredControls: string[] = []) => { ignored.push(ignoredControls); return blockers; } },
+    checklist: {
+      countryActivationBlockers: async (_countryId: string, ignoredControls: string[] = []) => { ignored.push(ignoredControls); return blockers; },
+      productActivationBlockers: async () => productBlockers
+    },
     quoteForms: { list: async () => [] },
     consentTexts: { listTexts: async () => [] }
   });

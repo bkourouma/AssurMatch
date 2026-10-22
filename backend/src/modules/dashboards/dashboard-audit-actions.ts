@@ -2,6 +2,7 @@ export const DashboardAuditActions = {
   brokerDashboardRefused: "dashboard.broker.refused",
   brokerDashboardCrmRefused: "dashboard.broker.crm_refused",
   brokerAdvisorsRead: "dashboard.broker.advisors.read",
+  brokerAgenciesRead: "dashboard.broker.agencies.read",
   brokerExported: "dashboard.broker.exported",
   adminDashboardRead: "dashboard.admin.read",
   adminDashboardRefused: "dashboard.admin.refused",

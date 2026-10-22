@@ -4,10 +4,11 @@ import {
   type BrokerOfferCoverageItem,
   type OfferBlocker
 } from "../../../../packages/shared/contracts/offer-content";
+import type { OfferType } from "../../../../packages/shared/contracts/offer-content";
 import { AuditLogWriter } from "../audit-logs/audit-log-writer.service";
 import { QuoteAuditActions } from "../audit-logs/quote-audit-actions";
 import type { ActorContext } from "../common/types";
-import { OfferErrorCodes, offerConflict, offerUnprocessable } from "./offer-errors";
+import { OfferErrorCodes, offerConflict, offerForbidden, offerUnprocessable } from "./offer-errors";
 import { OFFER_CONTENT_KEYS, pendingVersion, publishedVersion, versionContent } from "./offer-views";
 import type { OfferPatch, OfferRecord, OfferVersionContent, OfferVersionRecord } from "./offers.module";
 import type { OffersRepository } from "./offers.repository";
@@ -53,6 +54,8 @@ export interface OfferIntegrations {
   coverageCandidates?: (partnerTenantId: string) => Promise<BrokerOfferCoverageItem[]>;
   partnerName?: (partnerTenantId: string) => Promise<string | undefined>;
   partnerStatus?: (partnerTenantId: string) => Promise<string | undefined>;
+  /** Spec 070: insurer referential lookup (whatever its status); absent in bare modules, insurerId is then kept as given. */
+  insurer?: (insurerId: string) => Promise<{ id: string; name: string; countryId: string; status: string } | undefined>;
   notifier?: OfferNotifierPort;
 }
 
@@ -62,7 +65,7 @@ export interface OfferCreateInput {
   productId: string;
   partnerTenantId?: string | undefined;
   publicKey?: string | undefined;
-  offerType?: "indicative" | "partner" | undefined;
+  offerType?: OfferType | undefined;
   content: OfferVersionContent;
 }
 
@@ -119,7 +122,14 @@ export class OfferLifecycleService {
     const now = new Date();
     const offerId = input.id ?? crypto.randomUUID();
     const versionId = crypto.randomUUID();
-    const content = input.content;
+    const offerType = input.offerType ?? "indicative";
+    const content = await this.prepareContent(input.content, {
+      actor,
+      authorRole,
+      offerType,
+      scope: { id: "new", countryId: input.countryId, productId: input.productId, ...(input.partnerTenantId ? { partnerTenantId: input.partnerTenantId } : {}) },
+      operation: "create"
+    });
     const offer: OfferRecord = {
       ...this.projection(content),
       id: offerId,
@@ -129,7 +139,7 @@ export class OfferLifecycleService {
       publicKey: input.publicKey ?? await this.uniquePublicKey(input.countryId, input.productId, content.name),
       status: "draft",
       validationStatus: "pending",
-      offerType: input.offerType ?? "indicative",
+      offerType,
       pendingVersionId: versionId,
       createdAt: now,
       updatedAt: now,
@@ -167,7 +177,14 @@ export class OfferLifecycleService {
    * FR-014 / US3: edits the version in progress, or creates version N+1 from the published one. A
    * submitted version goes back to draft (the reviewer never sees content changing under review).
    */
-  async saveContent(offer: OfferRecord, content: OfferVersionContent, options: { actor: ActorContext; authorRole: OfferAuthorRole; reason: string; expectedUpdatedAt?: string | undefined }): Promise<OfferVersionRecord> {
+  async saveContent(offer: OfferRecord, rawContent: OfferVersionContent, options: { actor: ActorContext; authorRole: OfferAuthorRole; reason: string; expectedUpdatedAt?: string | undefined }): Promise<OfferVersionRecord> {
+    const content = await this.prepareContent(rawContent, {
+      actor: options.actor,
+      authorRole: options.authorRole,
+      offerType: offer.offerType ?? "indicative",
+      scope: offer,
+      operation: "write"
+    });
     const versions = await this.versions(offer);
     const pending = pendingVersion(offer, versions);
     const token = pending?.updatedAt ?? offer.updatedAt;
@@ -500,6 +517,44 @@ export class OfferLifecycleService {
     } as OfferVersionContent);
   }
 
+  /**
+   * Spec 070: rules tied to the offer type and to the insurer link, applied to every new content
+   * (creation, edition, renewal; admin and broker). An `insurer` offer is written by the admin only,
+   * a `private` one needs its owner partner and is never sponsored, an `insurer` one names its
+   * insurer, and a chosen `insurerId` must be an active insurer of the offer country (its name then
+   * becomes `insurerName`). Every refusal is audited.
+   */
+  private async prepareContent(content: OfferVersionContent, options: { actor: ActorContext; authorRole: OfferAuthorRole; offerType: OfferType; scope: Pick<OfferRecord, "id" | "countryId" | "productId" | "partnerTenantId">; operation: string }): Promise<OfferVersionContent> {
+    const { actor, authorRole, offerType, scope, operation } = options;
+    if (offerType === "insurer" && authorRole !== "admin") {
+      this.refused(actor, scope, operation, "offer_type_admin_only", { offerType });
+      throw offerForbidden("RBAC denied: insurer offers are reserved to the platform");
+    }
+    const typeBlockers: OfferBlocker[] = [];
+    if (offerType === "private") {
+      if (!scope.partnerTenantId) typeBlockers.push({ code: "partner_missing", field: "partnerTenantId" });
+      if (content.isSponsored) typeBlockers.push({ code: "private_offer_not_sponsorable", field: "isSponsored" });
+    }
+    if (offerType === "insurer" && !content.insurerId && !content.insurerName?.trim()) typeBlockers.push({ code: "insurer_missing", field: "insurerId" });
+    if (typeBlockers.length) {
+      this.refused(actor, scope, operation, "offer_type_invalid", { offerType, blockers: typeBlockers });
+      throw offerUnprocessable(OfferErrorCodes.typeInvalid, "The offer does not meet the rules of its type", typeBlockers);
+    }
+    if (!content.insurerId || !this.integrations.insurer) return content;
+    const insurer = await this.integrations.insurer(content.insurerId).catch(() => undefined);
+    const insurerBlockers: OfferBlocker[] = [];
+    if (!insurer) insurerBlockers.push({ code: "insurer_not_found", field: "insurerId" });
+    else {
+      if (insurer.status !== "active") insurerBlockers.push({ code: "insurer_not_active", field: "insurerId" });
+      if (insurer.countryId !== scope.countryId) insurerBlockers.push({ code: "insurer_country_mismatch", field: "insurerId" });
+    }
+    if (insurerBlockers.length || !insurer) {
+      this.refused(actor, scope, operation, "insurer_invalid", { blockers: insurerBlockers });
+      throw offerUnprocessable(OfferErrorCodes.insurerInvalid, "The chosen insurer cannot be used for this offer", insurerBlockers);
+    }
+    return { ...content, insurerName: insurer.name };
+  }
+
   private score(content: OfferVersionContent): number {
     return offerCompleteness(content).score;
   }
@@ -526,11 +581,14 @@ export class OfferLifecycleService {
   private async notify(offer: OfferRecord, type: OfferNotificationType, name: string, detail?: string): Promise<void> {
     if (!offer.partnerTenantId || !this.integrations.notifier) return;
     const template = NOTIFICATIONS[type];
+    const body = type === "offer_validated" && offer.offerType === "private"
+      ? `Votre offre privée "${name}" a été validée. Elle reste réservée à votre cabinet et n'est jamais affichée au public.`
+      : template.body(name, detail);
     await this.integrations.notifier.publishInApp({
       scopeId: offer.partnerTenantId,
       template: type,
       title: template.title,
-      body: template.body(name, detail),
+      body,
       targetType: "Offer",
       targetId: offer.id
     }).catch(() => undefined);

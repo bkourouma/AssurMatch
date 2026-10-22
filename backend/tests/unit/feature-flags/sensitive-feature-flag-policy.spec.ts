@@ -1,4 +1,6 @@
 import { describe, expect, it } from "vitest";
+import { GLOBAL_FEATURE_FLAG_DEFAULTS } from "../../../src/modules/feature-flags/default-flags";
+import { POLICY_ACTIVATABLE_FLAGS } from "../../../src/runtime/ops/apply-flag-policy";
 import { evaluateFeatureFlagMutation, isSensitiveFeatureFlagKey, sensitiveFeatureFlagRefusalReason } from "../../../src/modules/feature-flags/sensitive-feature-flag-policy";
 
 describe("sensitive feature flag mutation policy", () => {
@@ -21,6 +23,15 @@ describe("sensitive feature flag mutation policy", () => {
     for (const key of protectedKeys) expect(isSensitiveFeatureFlagKey(key)).toBe(true);
     expect(isSensitiveFeatureFlagKey("ai_summary_enabled")).toBe(false);
     expect(isSensitiveFeatureFlagKey("public_comparator_enabled")).toBe(false);
+  });
+
+  it("protects broker_weekly_ai_summary_enabled: sensitive, closed by default, no HTTP activation", () => {
+    expect(isSensitiveFeatureFlagKey("broker_weekly_ai_summary_enabled")).toBe(true);
+    expect(GLOBAL_FEATURE_FLAG_DEFAULTS.broker_weekly_ai_summary_enabled).toBe(false);
+    expect(evaluateFeatureFlagMutation({ key: "broker_weekly_ai_summary_enabled", scopeType: "global", value: true }).allowed).toBe(false);
+    expect(evaluateFeatureFlagMutation({ key: "broker_weekly_ai_summary_enabled", scopeType: "partner", scopeId: "t1", value: true }).allowed).toBe(false);
+    expect(evaluateFeatureFlagMutation({ key: "broker_weekly_ai_summary_enabled", scopeType: "global", value: true, allowSensitiveDisable: true }).allowed).toBe(false);
+    expect(POLICY_ACTIVATABLE_FLAGS).toContain("broker_weekly_ai_summary_enabled");
   });
 
   it("refuses generic mutations for protected flags without an explicit policy", () => {

@@ -110,6 +110,10 @@ export class CatalogFlagService {
     }
     const previous = product.flags[flag] === true;
     if (previous === value) return product;
+    if (value && flag === "product_public_enabled") {
+      // Spec 070 PRD 36: the product activation checklist gates the global public flag (deactivation is never gated).
+      await this.assertNoBlockers(actor, target, reason, key, await this.deps.guard.productPublicBlockers(productId));
+    }
     if (value && (flag === "product_quote_enabled" || flag === "product_public_enabled")) {
       // Links that inherit this flag would open with it: each of them must meet the link condition.
       const inheriting = (product.countryLinks?.length ? product.countryLinks : product.countryIds.map((countryId) => countryLinkFor(product, countryId)))
