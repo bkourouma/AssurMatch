@@ -3,7 +3,7 @@ import { dateTimeStringSchema, isoCountrySchema, nonEmptyStringSchema, uuidSchem
 
 export const aiSurfaceSchema = z.enum(["visitor", "broker_crm", "admin_platform"]);
 
-export const visitorAssistTypes = ["visitor_product_assistant", "visitor_request_summary", "visitor_form_help", "visitor_consistency_check", "visitor_faq"] as const;
+export const visitorAssistTypes = ["visitor_product_assistant", "visitor_request_summary", "visitor_form_help", "visitor_consistency_check", "visitor_faq", "visitor_guarantee_explainer", "visitor_compare_explainer"] as const;
 export const brokerAssistTypes = ["lead_summary", "lead_score", "next_action", "relaunch_message", "lead_classification", "duplicate_hint", "loss_analysis", "performance_summary", "manager_assistant"] as const;
 /** System-run assistances (the scheduled worker): in the gateway catalogue, never offered to a user interface. */
 export const systemAssistTypes = ["weekly_summary"] as const;
@@ -74,12 +74,30 @@ export const visitorFaqRequestSchema = z.object({
   language: z.enum(["fr", "en"]).default("fr")
 });
 
+/** Plain-language rewording of the guarantees of ONE published offer; the server resolves the offer from its id. */
+export const visitorGuaranteeExplainerRequestSchema = z.object({
+  countryCode: isoCountrySchema,
+  productKey: z.string().trim().min(1).max(64),
+  offerId: uuidSchema,
+  language: z.enum(["fr", "en"]).default("fr")
+});
+
+/** Neutral summary of the differences between 2 to 4 published offers (COMP-010); ids are de-duplicated. */
+export const visitorCompareExplainerRequestSchema = z.object({
+  countryCode: isoCountrySchema,
+  productKey: z.string().trim().min(1).max(64),
+  offerIds: z.array(uuidSchema).min(2).max(4).transform((ids) => [...new Set(ids)]).refine((ids) => ids.length >= 2, { message: "At least 2 distinct offers are required" }),
+  language: z.enum(["fr", "en"]).default("fr")
+});
+
 export const visitorAiRequestSchemas = {
   visitor_product_assistant: visitorProductAssistantRequestSchema,
   visitor_request_summary: visitorRequestSummaryRequestSchema,
   visitor_form_help: visitorFormHelpRequestSchema,
   visitor_consistency_check: visitorConsistencyCheckRequestSchema,
-  visitor_faq: visitorFaqRequestSchema
+  visitor_faq: visitorFaqRequestSchema,
+  visitor_guarantee_explainer: visitorGuaranteeExplainerRequestSchema,
+  visitor_compare_explainer: visitorCompareExplainerRequestSchema
 } as const;
 
 export const aiLeadScoreSchema = z.object({

@@ -14,6 +14,22 @@ const FORBIDDEN_AI_PATTERNS: Array<[string, RegExp]> = [
   ["guaranteed", /garantie\s+acceptee|nous\s+vous\s+assurons/i]
 ];
 
+/**
+ * Visitor-facing outputs must stay neutral: no personalised advice, no choice or subscription
+ * recommendation (PRD 10.1, COMP-010). Applied to every `visitor_*` assist type, French and English.
+ */
+const FORBIDDEN_VISITOR_PATTERNS: Array<[string, RegExp]> = [
+  ["advice_fr", /\b(nous|je)\s+vous\s+(conseill(?:e|ons)|recommand(?:e|ons)|suggerons|suggérons|invitons\s+à\s+(choisir|souscrire|prendre))/i],
+  ["should_choose_fr", /vous\s+devriez\s+(choisir|souscrire|prendre|opter|acheter|retenir)/i],
+  ["choose_imperative_fr", /\b(choisissez|souscrivez|optez\s+pour|privil[eé]giez|retenez)\b/i],
+  ["best_choice_fr", /le\s+meilleur\s+(choix|rapport)/i],
+  ["most_suitable_fr", /l['’]offre\s+(la\s+plus\s+(adapt[eé]e|avantageuse|int[eé]ressante|appropri[eé]e)|qui\s+vous\s+convient)/i],
+  ["advice_en", /\b(we|i)\s+(recommend|advise|suggest)\b/i],
+  ["should_choose_en", /\byou\s+should\s+(choose|buy|subscribe|take|pick|go\s+(with|for)|opt)/i],
+  ["best_offer_en", /\bbest\s+(offer|choice|option|deal|insurance)\b/i],
+  ["most_suitable_en", /\b(most\s+(suitable|advantageous)|right\s+offer)\s+for\s+you\b/i]
+];
+
 const MAX_OUTPUT_CHARS = 4000;
 
 /**
@@ -53,6 +69,9 @@ export class AiGuardrails {
       ...findForbiddenWording(text).map((word) => `forbidden_wording:${word}`),
       ...FORBIDDEN_AI_PATTERNS.filter(([, pattern]) => pattern.test(text)).map(([name]) => `forbidden_pattern:${name}`)
     ];
+    if (assistType.startsWith("visitor_")) {
+      reasons.push(...FORBIDDEN_VISITOR_PATTERNS.filter(([, pattern]) => pattern.test(text)).map(([name]) => `forbidden_pattern:${name}`));
+    }
     if (text.trim().length === 0) reasons.push("empty_output");
     if (text.length > MAX_OUTPUT_CHARS) reasons.push("output_too_long");
     if (assistType === "relaunch_message" && /https?:\/\//i.test(text)) reasons.push("links_not_allowed");

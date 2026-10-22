@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import { Icon, type IconName } from "./icons";
+import { VisitorFieldHelpSlot } from "../visitor-field-help";
 
 export interface FieldProps {
   /** Id of the control rendered inside; label, hint and error are wired to it. */
@@ -39,6 +40,7 @@ export function Field({ id, label, children, hint, error, required, requiredLabe
         ) : null}
         {required && requiredLabel ? <span className="am-visually-hidden">{` (${requiredLabel})`}</span> : null}
       </label>
+      <VisitorFieldHelpSlot fieldId={id} />
       {leading ? (
         <span className="am-field__wrap">
           <Icon name={leading} size={20} className="am-field__leading" />
@@ -47,6 +49,7 @@ export function Field({ id, label, children, hint, error, required, requiredLabe
       ) : (
         children
       )}
+      <VisitorFieldHelpSlot fieldId={id} part="panel" />
       {hint ? (
         <p className="am-field__hint" id={hintId}>
           {hint}

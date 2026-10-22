@@ -39,6 +39,9 @@ describe("prisma migration fresh-base readiness", () => {
       "0030_critical_fixes",
       "0031_broker_visitor_messaging",
       "0032_custom_role_members",
+      "0033_visitor_quote_journey_gaps",
+      // Lot 5 (spec 071)
+      "0035_routing_billing_gaps",
       "0039_broker_lead_alerts"
     ]);
     const schema = readFileSync(join(process.cwd(), "backend", "prisma", "schema.prisma"), "utf8").replace(/\r\n/g, "\n");
@@ -287,6 +290,12 @@ describe("prisma migration fresh-base readiness", () => {
     const customRoleMembers = readFileSync(join(migrationsDir, "0032_custom_role_members", "migration.sql"), "utf8");
     expect(customRoleMembers).toContain(`ALTER TABLE "PartnerCustomRole" ADD COLUMN IF NOT EXISTS "memberIds" JSONB NOT NULL DEFAULT '[]'`);
     expect(customRoleMembers).not.toMatch(/DROP|DELETE|UPDATE /);
+    // Spec 067 (lot 1): visitor quote journey gaps, additive only (new enum value, nullable or defaulted columns).
+    const visitorQuoteJourney = readFileSync(join(migrationsDir, "0033_visitor_quote_journey_gaps", "migration.sql"), "utf8");
+    expect(visitorQuoteJourney).toContain(`ALTER TYPE "NotificationType" ADD VALUE IF NOT EXISTS 'visitor_documents_reminder'`);
+    expect(visitorQuoteJourney).toContain(`ALTER TABLE "QuoteRequest" ADD COLUMN IF NOT EXISTS "additionalOfferIds" TEXT[]`);
+    expect(visitorQuoteJourney).toContain(`ALTER TABLE "LeadDocumentRequest" ADD COLUMN IF NOT EXISTS "reminderQueuedAt" TIMESTAMP(3)`);
+    expect(visitorQuoteJourney).not.toMatch(/DROP|DELETE|UPDATE |NOT NULL/);
     expect(schema).toMatch(/model PartnerCustomRole \{[^}]*memberIds\s+Json\s+@default\("\[\]"\)/);
   });
 });

@@ -36,6 +36,8 @@ const heartbeatFile = env.ASSURMATCH_WORKER_HEARTBEAT_FILE?.trim() || "/tmp/assu
 const webhooksEnabled = env.ASSURMATCH_PARTNER_WEBHOOK_DELIVERY_ENABLED === "true";
 // Spec 061 FR-001: idempotent per day and per target, so it is on by default.
 const scheduledAlertsEnabled = env.ASSURMATCH_SCHEDULED_ALERTS_ENABLED !== "false";
+// Lot 1 (spec 067): on unless an operator switches it off.
+const documentRemindersEnabled = env.ASSURMATCH_DOCUMENT_REMINDERS_ENABLED !== "false";
 // Spec 058: optional Uptime Kuma "Push" monitor URL. Its token is a credential: never logged.
 const pushUrl = env.ASSURMATCH_WORKER_PUSH_URL?.trim();
 
@@ -76,7 +78,9 @@ const loop = new DeliveryWorkerLoop({
     { name: "quote-notifications", enabled: true, run: () => runtime.quoteNotificationDelivery.processDueNotifications({ limit: quoteLimit }) },
     { name: "satisfaction-surveys", enabled: true, run: () => runtime.satisfactionSurveys.drain.deliverDue(surveyLimit) },
     { name: "partner-webhooks", enabled: webhooksEnabled, run: () => runtime.partnerIntegrations.service.processDueWebhookDeliveries({ limit: webhookLimit }) },
-    { name: "scheduled-alerts", enabled: scheduledAlertsEnabled, run: () => runtime.scheduledAlerts.runIfDue() }
+    { name: "scheduled-alerts", enabled: scheduledAlertsEnabled, run: () => runtime.scheduledAlerts.runIfDue() },
+    // Lot 1 (spec 067): single J+3 reminder of an open document request (counters only in the log).
+    { name: "document-reminders", enabled: documentRemindersEnabled, run: () => runtime.documentReminders.runIfDue() }
   ]
 });
 

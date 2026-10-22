@@ -8,7 +8,7 @@ export interface RoutingActionState {
   message?: string;
 }
 
-const modes: RoutingRuleMode[] = ["first_eligible", "round_robin", "priority", "capacity", "performance", "exclusive", "manual"];
+const modes: RoutingRuleMode[] = ["first_eligible", "round_robin", "priority", "capacity", "performance", "exclusive", "manual", "multi_send", "ai_assisted"];
 
 function stringValue(value: FormDataEntryValue | null): string {
   return typeof value === "string" ? value.trim() : "";

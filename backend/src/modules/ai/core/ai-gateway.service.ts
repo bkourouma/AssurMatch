@@ -74,6 +74,8 @@ const GLOBAL_FLAG_BY_ASSIST: Record<AiAssistTypeCatalog, string> = {
   visitor_request_summary: "ai_summary_enabled",
   visitor_form_help: "ai_summary_enabled",
   visitor_consistency_check: "ai_summary_enabled",
+  visitor_guarantee_explainer: "ai_summary_enabled",
+  visitor_compare_explainer: "ai_summary_enabled",
   lead_summary: "ai_broker_assistant_enabled",
   next_action: "ai_broker_assistant_enabled",
   relaunch_message: "ai_broker_assistant_enabled",
