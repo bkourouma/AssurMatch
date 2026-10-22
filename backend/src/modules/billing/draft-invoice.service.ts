@@ -6,6 +6,7 @@ import type {
   DraftInvoiceRecompute,
   BillingPlanKey
 } from "../../../../packages/shared/contracts/billing.contracts";
+import { BILLING_ADD_ON_LABELS } from "../../../../packages/shared/contracts/billing-addons.contracts";
 import { SHARED_LEAD_DEFAULT_MULTIPLIER, SHARED_LEAD_TOTAL_CAP, draftInvoiceQuerySchema, draftInvoiceRecomputeSchema } from "../../../../packages/shared/contracts/billing.contracts";
 import { roleHasPermission } from "../../../../packages/shared/rbac/assurmatch-role-matrix";
 import type { AuditLogWriter } from "../audit-logs/audit-log-writer.service";
@@ -19,7 +20,8 @@ import type { ProductsService } from "../products/products.module";
 import { BillableLeadPolicy } from "./billable-lead-policy";
 import { BillingAuditActions } from "./billing-audit-actions";
 import { BillingAccessRefusedError, BillingDisabledError } from "./billing-foundation.service";
-import type { BillingRepository, DraftInvoiceRecord } from "./billing.repository";
+import { addOnActiveDuring, type BillingRepository, type DraftInvoiceRecord } from "./billing.repository";
+import type { InvoicingRepository } from "./invoicing.repository";
 import type { LeadPacksService } from "./lead-packs.service";
 
 export interface DraftInvoiceDeps {
@@ -34,6 +36,24 @@ export interface DraftInvoiceDeps {
   crmActivity?: CrmActivityRepository | undefined;
   /** Spec 060: true when the partner's draft for that period already became an active invoice. */
   isPeriodInvoiced?: ((partnerId: string, periodFrom: Date) => Promise<boolean>) | undefined;
+  /**
+   * Lot 5 (spec 071) H4: true when the partner already has an ACTIVE (not cancelled by a credit note) issued
+   * invoice, whatever its lines: the setup fee belongs to the FIRST invoice only, never added retroactively
+   * to a later one. See `setupFeeInvoicedPort` for the runtime implementation.
+   */
+  hasActiveSetupFeeInvoice?: ((partnerId: string) => Promise<boolean>) | undefined;
+  /**
+   * Lot 5 (spec 071): among these quote request ids, the ones the duplicate detection blocked
+   * (duplicateStatus blocked_duplicate or status duplicate). Absent: only the CRM status `doublon` counts.
+   */
+  quoteDuplicates?: ((quoteRequestIds: string[]) => Promise<Set<string>>) | undefined;
+  /** Lot 5 (spec 071) G-06: plan effective at `at` (a plan change is effective next cycle). Absent: the current plan. */
+  effectivePlan?: ((partnerId: string, currentPlan: BillingPlanKey, at: Date) => Promise<BillingPlanKey>) | undefined;
+}
+
+/** Runtime implementation of `DraftInvoiceDeps.hasActiveSetupFeeInvoice` from the invoicing repository. */
+export function setupFeeInvoicedPort(invoicing: Pick<InvoicingRepository, "listInvoices">): (partnerId: string) => Promise<boolean> {
+  return async (partnerId) => (await invoicing.listInvoices({ partnerId })).some((invoice) => invoice.status !== "cancelled");
 }
 
 /**
@@ -108,11 +128,14 @@ export class DraftInvoiceService {
     const period = this.currentMonth();
     const { evaluations, assignments } = await this.evaluateLeads(tenantId, period);
     const billable = evaluations.filter((evaluation) => evaluation.billable && !evaluation.disputeCredited).length;
-    const plan = (actor.partnerPlan ?? "starter") as BillingPlanKey;
-    const price = await this.priceFor(plan, assignments[0]?.countryCode ?? "CI");
+    const plan = await this.resolvePlan(tenantId, (actor.partnerPlan ?? "starter") as BillingPlanKey, period.from);
+    const statementCountry = assignments[0]?.countryCode ?? "CI";
+    const price = await this.priceFor(plan, statementCountry);
     const packCreditsRemaining = await this.deps.packs.remainingCredits(tenantId);
     const chargeableUnits = Math.max(0, billable - packCreditsRemaining);
     const draft = (await this.deps.repository.listDrafts(tenantId)).find((record) => record.periodFrom.getTime() === period.from.getTime());
+    const extras = await this.extraLines({ partnerId: tenantId, plan, countryCode: statementCountry, period, setupFee: price.setupFee, existingDraft: draft });
+    const extrasAmount = [...(extras.setupFee ? [extras.setupFee] : []), ...extras.addOns].reduce((sum, line) => sum + line.amount, 0);
     const statement: BrokerBillingStatement = {
       generatedAt: new Date().toISOString(),
       partnerTenantId: tenantId,
@@ -127,7 +150,7 @@ export class DraftInvoiceService {
       nonBillableLeadCount: evaluations.filter((evaluation) => !evaluation.billable).length,
       disputeCreditCount: evaluations.filter((evaluation) => evaluation.disputeCredited).length,
       packCreditsRemaining,
-      estimatedAmount: price.monthlySubscription + chargeableUnits * price.perLeadPrice,
+      estimatedAmount: price.monthlySubscription + chargeableUnits * price.perLeadPrice + extrasAmount,
       draft: draft ? this.toDto(draft) : null,
       notice: DRAFT_NOTICE
     };
@@ -160,7 +183,8 @@ export class DraftInvoiceService {
     return this.computeForPartner(partner.id, partner.legalName, partner.plan as BillingPlanKey, actor, reason, period);
   }
 
-  private async computeForPartner(partnerId: string, partnerName: string, plan: BillingPlanKey, actor: ActorContext, reason: string, period: { from: Date; to: Date } = this.currentMonth()): Promise<DraftInvoice> {
+  private async computeForPartner(partnerId: string, partnerName: string, currentPlan: BillingPlanKey, actor: ActorContext, reason: string, period: { from: Date; to: Date } = this.currentMonth()): Promise<DraftInvoice> {
+    const plan = await this.resolvePlan(partnerId, currentPlan, period.from);
     const { evaluations, assignments } = await this.evaluateLeads(partnerId, period);
     const countryCode = assignments[0]?.countryCode ?? "CI";
     const price = await this.priceFor(plan, countryCode);
@@ -169,7 +193,8 @@ export class DraftInvoiceService {
     const netBillable = billableEvaluations.length - disputeCredits;
     // Spec 063: pack consumption is idempotent per draft. The draft remembers what it already consumed,
     // so a repeated or refreshed computation only consumes (or releases) the difference.
-    const previouslyUsed = (await this.deps.repository.listDrafts(partnerId)).find((record) => record.periodFrom.getTime() === period.from.getTime())?.packCreditsUsed ?? 0;
+    const existing = (await this.deps.repository.listDrafts(partnerId)).find((record) => record.periodFrom.getTime() === period.from.getTime());
+    const previouslyUsed = existing?.packCreditsUsed ?? 0;
     const packCreditsUsed = Math.min(netBillable, previouslyUsed + (await this.deps.packs.remainingCredits(partnerId)));
     if (packCreditsUsed > previouslyUsed) await this.deps.packs.consume(partnerId, packCreditsUsed - previouslyUsed, actor);
     else if (packCreditsUsed < previouslyUsed) await this.deps.packs.release(partnerId, previouslyUsed - packCreditsUsed, actor);
@@ -208,8 +233,12 @@ export class DraftInvoiceService {
     }
     if (packCreditsUsed > 0) lines.push({ kind: "pack_credit", label: "Credits pack consommes", quantity: packCreditsUsed, unitAmount: -price.perLeadPrice, amount: -packCreditsUsed * price.perLeadPrice });
     if (disputeCredits > 0) lines.push({ kind: "dispute_credit", label: "Leads contestes acceptes", quantity: disputeCredits, unitAmount: -price.perLeadPrice, amount: -disputeCredits * price.perLeadPrice });
-    const totalAmount = Math.round((price.monthlySubscription + chargeable.reduce((sum, entry) => sum + entry.unitAmount, 0)) * 100) / 100;
-    const existing = (await this.deps.repository.listDrafts(partnerId)).find((record) => record.periodFrom.getTime() === period.from.getTime());
+    // Lot 5 (spec 071) H4: one-time setup fee on the first invoice and optional monthly add-ons.
+    const extras = await this.extraLines({ partnerId, plan, countryCode, period, setupFee: price.setupFee, existingDraft: existing });
+    if (extras.setupFee) lines.push(extras.setupFee);
+    lines.push(...extras.addOns);
+    const extrasAmount = [...(extras.setupFee ? [extras.setupFee] : []), ...extras.addOns].reduce((sum, line) => sum + line.amount, 0);
+    const totalAmount = Math.round((price.monthlySubscription + chargeable.reduce((sum, entry) => sum + entry.unitAmount, 0) + extrasAmount) * 100) / 100;
     const record: DraftInvoiceRecord = {
       id: existing?.id ?? crypto.randomUUID(),
       partnerId,
@@ -230,6 +259,18 @@ export class DraftInvoiceService {
       computedAt: new Date()
     };
     const saved = await this.deps.repository.upsertDraft(record);
+    if (extras.setupFee && !existing?.lines.some((line) => line.kind === "setup_fee")) {
+      this.deps.audit.write({
+        actor,
+        action: BillingAuditActions.setupFeeBilled,
+        targetType: "DraftInvoice",
+        targetId: saved.id,
+        scope: { partnerId, plan, countryCode, period: { from: period.from.toISOString(), to: period.to.toISOString() } },
+        result: "success",
+        reason,
+        context: { amount: extras.setupFee.amount, paymentsEnabled: false }
+      });
+    }
     this.deps.audit.write({
       actor,
       action: BillingAuditActions.draftComputed,
@@ -261,7 +302,8 @@ export class DraftInvoiceService {
     const context = {
       countries: new Map(countries.map((country) => [country.isoCode, country])),
       products: new Map(products.map((product) => [product.key, product])),
-      creditedDisputeLeadIds: await this.acceptedDisputeLeadIds(scoped, partnerId, period.from)
+      creditedDisputeLeadIds: await this.acceptedDisputeLeadIds(scoped, partnerId, period.from),
+      duplicateQuoteRequestIds: this.deps.quoteDuplicates ? await this.deps.quoteDuplicates([...new Set(scoped.map((assignment) => assignment.quoteRequestId))]) : undefined
     };
     return { assignments: scoped, evaluations: scoped.map((assignment) => this.policy.evaluate(assignment, context)) };
   }
@@ -281,13 +323,45 @@ export class DraftInvoiceService {
     return credited;
   }
 
-  private async priceFor(plan: BillingPlanKey, countryCode: string): Promise<{ monthlySubscription: number; perLeadPrice: number; sharedLeadPriceMultiplier: number }> {
+  private async resolvePlan(partnerId: string, currentPlan: BillingPlanKey, at: Date): Promise<BillingPlanKey> {
+    return (await this.deps.effectivePlan?.(partnerId, currentPlan, at)) ?? currentPlan;
+  }
+
+  /**
+   * Lot 5 (spec 071) H4. Setup fee: billed once, on the broker's first invoice. The period's draft carries the
+   * line when setupFee > 0, the broker has NO active issued invoice yet (first invoice only; a credit-noted invoice no longer counts) and no
+   * OTHER period's draft carries it. A draft recomputed for its own period keeps its line (idempotent).
+   * Add-ons: one line per kind active during the period (assigned before its end, not ended before its start)
+   * with an ENABLED price for the effective plan and country; no enabled price means no line.
+   */
+  private async extraLines(input: { partnerId: string; plan: BillingPlanKey; countryCode: string; period: { from: Date; to: Date }; setupFee: number; existingDraft?: DraftInvoiceRecord | undefined }): Promise<{ setupFee?: DraftInvoiceLine; addOns: DraftInvoiceLine[] }> {
+    let setupFeeLine: DraftInvoiceLine | undefined;
+    if (input.setupFee > 0) {
+      const alreadyInvoiced = (await this.deps.hasActiveSetupFeeInvoice?.(input.partnerId)) ?? false;
+      const carriedByOtherDraft = (await this.deps.repository.listDrafts(input.partnerId)).some((record) => record.periodFrom.getTime() !== input.period.from.getTime() && record.lines.some((line) => line.kind === "setup_fee"));
+      if (!alreadyInvoiced && !carriedByOtherDraft) setupFeeLine = { kind: "setup_fee", label: "Frais d'installation (premiere facture)", quantity: 1, unitAmount: input.setupFee, amount: input.setupFee };
+    }
+    const [addOns, prices] = await Promise.all([this.deps.repository.listPartnerAddOns(input.partnerId), this.deps.repository.listAddOnPrices()]);
+    const addOnLines: DraftInvoiceLine[] = [];
+    const seen = new Set<string>();
+    for (const addOn of addOns) {
+      if (seen.has(addOn.kind) || !addOnActiveDuring(addOn, input.period)) continue;
+      const price = prices.find((candidate) => candidate.kind === addOn.kind && candidate.plan === input.plan && candidate.countryCode === input.countryCode && candidate.enabled);
+      if (!price) continue;
+      seen.add(addOn.kind);
+      addOnLines.push({ kind: "add_on", label: `${BILLING_ADD_ON_LABELS[addOn.kind]} (mensuel)`, quantity: 1, unitAmount: price.monthlyAmount, amount: price.monthlyAmount });
+    }
+    return { ...(setupFeeLine ? { setupFee: setupFeeLine } : {}), addOns: addOnLines };
+  }
+
+  private async priceFor(plan: BillingPlanKey, countryCode: string): Promise<{ monthlySubscription: number; perLeadPrice: number; sharedLeadPriceMultiplier: number; setupFee: number }> {
     const prices = await this.deps.repository.listPlanPrices();
     const match = prices.find((price) => price.plan === plan && price.countryCode === countryCode) ?? prices.find((price) => price.plan === plan);
     return {
       monthlySubscription: match?.monthlySubscription ?? 0,
       perLeadPrice: match?.perLeadPrice ?? 0,
-      sharedLeadPriceMultiplier: match?.sharedLeadPriceMultiplier ?? SHARED_LEAD_DEFAULT_MULTIPLIER
+      sharedLeadPriceMultiplier: match?.sharedLeadPriceMultiplier ?? SHARED_LEAD_DEFAULT_MULTIPLIER,
+      setupFee: match?.setupFee ?? 0
     };
   }
 

@@ -92,7 +92,8 @@ export const billableLeadEvaluationSchema = z.object({
 });
 
 export const draftInvoiceLineSchema = z.object({
-  kind: z.enum(["subscription", "billable_leads", "shared_leads", "pack_credit", "dispute_credit"]),
+  // Lot 5 (spec 071): `setup_fee` (one-time, first invoice) and `add_on` (optional monthly package).
+  kind: z.enum(["subscription", "billable_leads", "shared_leads", "pack_credit", "dispute_credit", "setup_fee", "add_on"]),
   label: nonEmptyStringSchema,
   quantity: z.number().min(0),
   unitAmount: z.number(),

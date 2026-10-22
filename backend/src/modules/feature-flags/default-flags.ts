@@ -34,6 +34,11 @@ export const GLOBAL_FEATURE_FLAG_DEFAULTS = {
   /** Spec 049: AI routing anomaly detection. */
   ai_routing_anomaly_detection_enabled: false,
   /**
+   * Lot 5 (spec 071, PRD 32.8): AI-assisted routing. The `ai_assisted` rule mode only attaches an
+   * advisory suggestion to a request parked for manual assignment; closed, the mode parks without one.
+   */
+  ai_assisted_routing_enabled: false,
+  /**
    * Spec 062: broker <-> visitor messaging and document requests. Ships OFF (product owner, 2026-10-16):
    * open it from the admin flags screen only once the legal opinion L-08 (CIMA intermediary positioning)
    * is obtained. Non-sensitive on purpose: admin-toggleable, and switching it off refuses new writes with

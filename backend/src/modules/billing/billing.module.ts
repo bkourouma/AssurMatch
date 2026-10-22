@@ -10,7 +10,11 @@ import { MemoryDocumentStorage, type DocumentStoragePort } from "../quote-docume
 import { BillingAccessRefusedError, BillingFoundationService } from "./billing-foundation.service";
 import { BillingPlansService } from "./billing-plans.service";
 import { MemoryBillingRepository, type BillingRepository } from "./billing.repository";
-import { DraftInvoiceService } from "./draft-invoice.service";
+import { BillingAddOnsService } from "./billing-addons.service";
+import { DraftInvoiceService, setupFeeInvoicedPort } from "./draft-invoice.service";
+import { PartnerSubscriptionsService } from "./partner-subscriptions.service";
+import { MemoryPlanChangeRequestsRepository, type PlanChangeRequestsRepository } from "./plan-change-requests.repository";
+import { PlanChangeRequestsService } from "./plan-change-requests.service";
 import { LeadPacksService } from "./lead-packs.service";
 import { resolveInvoicingConfig, type InvoicingConfig } from "./invoicing.config";
 import { MemoryInvoicingRepository, type InvoicingRepository } from "./invoicing.repository";
@@ -32,6 +36,12 @@ export interface BillingModuleDeps {
   documentStorage?: DocumentStoragePort | undefined;
   inApp?: InvoiceInAppPublisher | undefined;
   invoicingConfig?: InvoicingConfig | undefined;
+  // Lot 5 (spec 071)
+  /** G-06 plan change requests; in-memory without it. */
+  planChangeRepository?: PlanChangeRequestsRepository | undefined;
+  /** Duplicate-blocked quote requests among ids (non-duplicate billing criterion). */
+  quoteDuplicates?: ((quoteRequestIds: string[]) => Promise<Set<string>>) | undefined;
+  // End Lot 5
 }
 
 export class BillingModule {
@@ -40,6 +50,11 @@ export class BillingModule {
   readonly packs: LeadPacksService;
   readonly drafts: DraftInvoiceService;
   readonly invoicing: InvoicingService;
+  // Lot 5 (spec 071)
+  readonly addOns: BillingAddOnsService;
+  readonly subscriptions: PartnerSubscriptionsService;
+  readonly planChanges: PlanChangeRequestsService;
+  // End Lot 5
 
   constructor(deps: BillingModuleDeps) {
     const repository = deps.repository ?? new MemoryBillingRepository();
@@ -65,6 +80,24 @@ export class BillingModule {
       config: deps.invoicingConfig ?? resolveInvoicingConfig(),
       inApp: deps.inApp
     });
+    // Lot 5 (spec 071)
+    this.subscriptions = new PartnerSubscriptionsService({ audit: deps.audit, partners: deps.partners, countries: deps.countries, repository });
+    this.planChanges = new PlanChangeRequestsService({
+      audit: deps.audit,
+      partners: deps.partners,
+      countries: deps.countries,
+      repository: deps.planChangeRepository ?? new MemoryPlanChangeRequestsRepository(),
+      inApp: deps.inApp
+    });
+    this.addOns = new BillingAddOnsService({
+      audit: deps.audit,
+      featureFlags: deps.featureFlags,
+      countries: deps.countries,
+      partners: deps.partners,
+      repository,
+      effectivePlan: (partnerId, currentPlan, at) => this.planChanges.effectivePlan(partnerId, currentPlan, at)
+    });
+    // End Lot 5
     this.drafts = new DraftInvoiceService({
       audit: deps.audit,
       featureFlags: deps.featureFlags,
@@ -75,6 +108,11 @@ export class BillingModule {
       packs: this.packs,
       repository,
       isPeriodInvoiced: (partnerId, periodFrom) => this.invoicing.hasActiveInvoice(partnerId, periodFrom),
+      // Lot 5 (spec 071)
+      hasActiveSetupFeeInvoice: setupFeeInvoicedPort(invoicingRepository),
+      effectivePlan: (partnerId, currentPlan, at) => this.planChanges.effectivePlan(partnerId, currentPlan, at),
+      ...(deps.quoteDuplicates ? { quoteDuplicates: deps.quoteDuplicates } : {}),
+      // End Lot 5
       ...(deps.crmActivity ? { crmActivity: deps.crmActivity } : {})
     });
   }

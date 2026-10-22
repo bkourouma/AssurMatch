@@ -208,4 +208,6 @@ async function authorizeBroker(runtime: AssurMatchRuntime, partnerTenantId: stri
   }, admin);
   // Spec 051 R14: routing reads a persisted, accepted and clean accreditation document.
   await seedAcceptedAccreditation(runtime, partnerTenantId, license.id, admin);
+  // Lot 5 (spec 071) control 9: an active broker needs a recorded partnership contract to be routable when the control is on.
+  await runtime.partners.service.recordContract({ partnerTenantId, version: "v1", signedAt: "2026-01-15", signatoryName: "Runtime Smoke Signatory", documentId: crypto.randomUUID(), recordedById: admin.actorId ?? null }, "runtime smoke seed contract", admin);
 }
