@@ -40,6 +40,8 @@ describe("prisma migration fresh-base readiness", () => {
       "0031_broker_visitor_messaging",
       "0032_custom_role_members",
       "0033_visitor_quote_journey_gaps",
+      // Lot 5 (spec 071)
+      "0035_routing_billing_gaps",
       "0036_admin_steering" // Lot 6
     ]);
     const schema = readFileSync(join(process.cwd(), "backend", "prisma", "schema.prisma"), "utf8").replace(/\r\n/g, "\n");

@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useId } from "react";
+import { useActionState, useId, useState } from "react";
 import type { PendingManualQuoteData } from "../lib/admin-api";
 import {
   ActionNotice,
@@ -16,6 +16,7 @@ import {
   Textarea,
   fieldControlProps
 } from "../lib/ui/admin-ui";
+import { AI_ASSISTED_MODE_LABEL, AI_ASSISTED_MODE_NOTE } from "./routing-labels";
 import { assignPendingQuoteAction, createRoutingRuleAction, precheckRoutingAction, reassignLeadAction, updateRoutingRuleAction, type RoutingActionState } from "./actions";
 
 const initialState: RoutingActionState = { status: "idle" };
@@ -28,7 +29,8 @@ const modeOptions: Array<{ value: string; label: string }> = [
   { value: "performance", label: "Performance (taux d'acceptation, reactivite)" },
   { value: "exclusive", label: "Exclusif (un seul courtier partenaire)" },
   { value: "manual", label: "Manuel (assignation par un admin)" },
-  { value: "multi_send", label: "Multi-courtiers (si le flag est ouvert et si le visiteur l'accepte)" }
+  { value: "multi_send", label: "Multi-courtiers (si le flag est ouvert et si le visiteur l'accepte)" },
+  { value: "ai_assisted", label: AI_ASSISTED_MODE_LABEL }
 ];
 
 function ModeSelect({ id, name, required }: { id: string; name: string; required?: boolean }) {
@@ -69,6 +71,7 @@ export function CreateRoutingRuleForm() {
         <Field id={ids.mode} label="Mode" required>
           <ModeSelect id={ids.mode} name="mode" required />
         </Field>
+        <Notice tone="info">{AI_ASSISTED_MODE_NOTE}</Notice>
         <Field id={ids.priorities} label="Priorites (partnerId:priorite, une par ligne, mode priorite)">
           <Textarea {...fieldControlProps(ids.priorities)} name="priorities" rows={3} />
         </Field>
@@ -122,6 +125,7 @@ export function UpdateRoutingRuleForm({ ruleIds }: { ruleIds: string[] }) {
             <option value="disabled">desactivee</option>
           </Select>
         </Field>
+        <Notice tone="info">{AI_ASSISTED_MODE_NOTE}</Notice>
         <Field id={ids.priorities} label="Priorites (partnerId:priorite, une par ligne)">
           <Textarea {...fieldControlProps(ids.priorities)} name="priorities" rows={3} />
         </Field>
@@ -147,15 +151,35 @@ export function AssignPendingQuoteForm({ quote }: { quote: PendingManualQuoteDat
   const eligible = quote.candidates.filter((candidate) => candidate.eligible);
   const base = useId();
   const ids = { partner: `${base}-partner`, reason: `${base}-reason` };
+  const [selectedPartner, setSelectedPartner] = useState<string>(eligible[0]?.partnerTenantId ?? "");
+  const suggestion = quote.aiSuggestion ?? null;
+  const suggestedCandidate = suggestion ? eligible.find((candidate) => candidate.partnerTenantId === suggestion.partnerTenantId) : undefined;
 
   return (
     <Form action={formAction} data-routing-form="assign">
       <ActionNotice state={state} />
       <input type="hidden" name="quoteRequestId" value={quote.quoteRequestId} />
+      {suggestion ? (
+        <Notice tone="info">
+          <p>
+            Suggestion IA (indicative) : {suggestedCandidate?.legalName ?? suggestion.partnerTenantId.slice(0, 8)}, {suggestion.rationale}
+          </p>
+          <p>La suggestion n'affecte rien : vous validez en assignant vous-même.</p>
+          {suggestedCandidate ? (
+            <Button type="button" size="sm" variant="secondary" onClick={() => setSelectedPartner(suggestedCandidate.partnerTenantId)}>
+              Pré-sélectionner ce courtier
+            </Button>
+          ) : (
+            <p>Ce courtier n'est plus éligible : choisissez un autre courtier.</p>
+          )}
+        </Notice>
+      ) : null}
       <Field id={ids.partner} label="Courtier partenaire eligible" required>
         <Select
           {...fieldControlProps(ids.partner, { required: true })}
           name="partnerTenantId"
+          value={selectedPartner}
+          onChange={(event) => setSelectedPartner(event.target.value)}
           options={eligible.map((candidate) => ({ value: candidate.partnerTenantId, label: `${candidate.legalName} (${candidate.plan})` }))}
         />
       </Field>

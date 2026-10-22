@@ -24,7 +24,8 @@ const explicitlyProtectedFeatureFlags = new Set([
   "partner_webhooks_enabled",
   "retention_purge_enabled",
   "satisfaction_survey_enabled",
-  "ai_routing_anomaly_detection_enabled"
+  "ai_routing_anomaly_detection_enabled",
+  "ai_assisted_routing_enabled"
 ]);
 
 const regulatedFlagKeyFragments = [

@@ -8,6 +8,11 @@ export interface BillableLeadContext {
   products: Map<string, Product>;
   /** Lead ids with an admin-accepted dispute: billable but credited back. */
   creditedDisputeLeadIds: Set<string>;
+  /**
+   * Lot 5 (spec 071): quote request ids the duplicate detection blocked (duplicateStatus blocked_duplicate or
+   * request status duplicate). `possible_duplicate` is only a review alert and stays billable (disputable).
+   */
+  duplicateQuoteRequestIds?: Set<string> | undefined;
 }
 
 const MINIMUM_ANSWER_COUNT = 1;
@@ -31,7 +36,7 @@ export class BillableLeadPolicy {
     if (!product || product.status !== "public" || product.flags.product_quote_enabled !== true) failed.push("product_active");
 
     if (!assignment.consentRecordId) failed.push("consent_collected");
-    if (assignment.crmStatus === "doublon") failed.push("not_duplicate");
+    if (assignment.crmStatus === "doublon" || context.duplicateQuoteRequestIds?.has(assignment.quoteRequestId)) failed.push("not_duplicate");
     if (!assignment.partnerTenantId || assignment.status === "rejected") failed.push("broker_assigned");
     if (Object.keys(assignment.answers ?? {}).length < MINIMUM_ANSWER_COUNT) failed.push("minimum_information_complete");
 

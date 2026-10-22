@@ -1,7 +1,8 @@
 import { redirect } from "next/navigation";
 import { isBrokerProfile, loginRedirect, readBackOfficeSession } from "../lib/backoffice-auth";
 import { readBrokerBillingAccount, readBrokerBillingStatement, readBrokerDisputes, type BrokerInvoiceData } from "../lib/broker-api";
-import { canReadBrokerBilling } from "../lib/broker-permissions";
+import { canReadBrokerBilling, isBrokerOwner, isTenantReadOnly } from "../lib/broker-permissions";
+import { InvoiceLinesSection, PlanChangeSection } from "./lot5-panels";
 import { DISPUTE_CREDIT_MODE_LABELS, disputeReasonLabel, disputeStatusLabel } from "../lib/lead-vocabulary";
 import { Badge, Card, Cluster, DataTable, Grid, KpiCard, Notice, PageHeader, PageStack } from "../lib/ui/broker-ui";
 import type { DataTableColumn } from "../lib/ui/broker-ui";
@@ -198,6 +199,10 @@ export default async function BrokerBillingPage() {
           aria-label="Packs de leads du cabinet"
         />
       </Card>
+
+      <InvoiceLinesSection invoices={account.data.invoices} />
+
+      {isBrokerOwner(session.profile) ? <PlanChangeSection currentPlan={session.profile.partnerPlan} readOnly={isTenantReadOnly(session.profile)} /> : null}
 
       <Notice tone="info">
         {account.data.notice || "Facturation manuelle: aucun paiement en ligne, aucune prime d'assurance encaissee par AssurMatch."}
