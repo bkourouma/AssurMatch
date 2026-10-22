@@ -32,3 +32,11 @@ Platform back-office screen for the connector and the retry queue; admin alert o
 ## Business hypotheses (to validate)
 
 H8 env variable names and provider list; WhatsApp business-initiated messages use one pre-approved template; operational pointer text only (no marketing); 4 attempts with 1-5-30 min delays; the CRM payload excludes all contact data (the CRM fetches details through the partner API or the back-office).
+
+## Delivery semantics and residual risks
+
+- **At-least-once delivery**: an outbox row (SMS/WhatsApp) and a CRM delivery are claimed with a 10-minute lease before sending. If a worker dies after the provider or the CRM accepted the message but before the result is stored, the lease expires and the row is sent again. Receivers must deduplicate (CRM: `X-AssurMatch-Idempotency-Key`; SMS/WhatsApp: a rare duplicate is possible).
+- **Missing provider configuration**: a worker started without the `ASSURMATCH_SMS_*` / `ASSURMATCH_WHATSAPP_*` variables keeps due rows in the queue (status `retryable`, data untouched, audit reason `provider_not_configured_deferred`). Only withdrawn consent or a closed flag cancels a row and erases its encrypted data (FR-004).
+- **CRM redirects**: a 3xx response is never followed and the delivery is `failed` (not retried).
+- **DNS rebinding (residual risk)**: the connector URL is checked against the partner allow-list and resolved to public addresses at creation and again at each send, but the resolved IP is not pinned for the actual request. A hostile DNS answer between the check and the call is therefore possible, at the same level as partner webhooks. Accepted for the pilot; IP pinning is a follow-up.
+- `GET /admin/messaging/outbox` is audited (`messaging.outbox.listed`, count only), like the CRM deliveries listing.

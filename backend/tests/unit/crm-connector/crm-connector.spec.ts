@@ -28,7 +28,7 @@ interface Harness {
   worker: { enabled: boolean };
 }
 
-function harness(options: { status?: number | (() => number); delayMs?: number } = {}): Harness {
+function harness(options: { status?: number | (() => number); delayMs?: number; dns?: { lookup(hostname: string): Promise<Array<{ address: string; family: 4 | 6 }>> } } = {}): Harness {
   const audit = new AuditLogWriter();
   const repository = new MemoryCrmConnectorRepository();
   const flags = { open: true };
@@ -44,7 +44,8 @@ function harness(options: { status?: number | (() => number); delayMs?: number }
     partners: { require: async (id) => ({ id }) },
     repository,
     approvedOrigin: async (partnerTenantId, url) => partnerTenantId === PARTNER && url.origin === ORIGIN,
-    enforceDnsValidation: false,
+    enforceDnsValidation: options.dns !== undefined,
+    ...(options.dns ? { dnsResolver: options.dns } : {}),
     deliveryEnabled: () => worker.enabled,
     fetch: fetchMock as unknown as typeof fetch,
     now: () => T0
@@ -349,7 +350,23 @@ describe("CRM connector (spec 076)", () => {
       await h.service.publish("lead.assigned", PARTNER, leadData);
       await h.service.processDue({ now: T0 });
       expect(h.fetchMock).toHaveBeenCalledTimes(1);
-      expect((await h.repository.listDeliveries())[0]?.lastResponseClass).toBe("3xx_redirect_blocked");
+      const [delivery] = await h.repository.listDeliveries();
+      expect(delivery).toMatchObject({ lastResponseClass: "3xx_redirect_blocked", status: "failed", nextAttemptAt: null });
+    });
+
+    it("refuses a host name resolving to a private IP at creation and at send time (DNS validation on)", async () => {
+      let address = "10.0.0.5";
+      const h = harness({ dns: { lookup: async () => [{ address, family: 4 }] } });
+      await expect(h.service.create(admin, {
+        partnerTenantId: PARTNER, name: "Rebinding", url: URL_OK, eventTypes: ["lead.assigned"], reason: REASON
+      })).rejects.toThrow(/Invalid CRM connector URL/);
+      address = "93.184.216.34";
+      await activeConnector(h);
+      await h.service.publish("lead.assigned", PARTNER, leadData);
+      address = "10.0.0.5";
+      expect(await h.service.processDue({ now: T0 })).toMatchObject({ attempted: 1, failed: 1 });
+      expect(h.fetchMock).not.toHaveBeenCalled();
+      expect((await h.repository.listDeliveries())[0]).toMatchObject({ status: "failed", lastResponseClass: "endpoint_policy_blocked" });
     });
 
     it("blocks the call when the URL policy is violated at send time", async () => {

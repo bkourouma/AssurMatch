@@ -170,8 +170,19 @@ export class MessagingDispatchService {
     return summary;
   }
 
-  async listOutbox(limit = 50): Promise<ChannelOutboxItem[]> {
-    return (await this.repository.listOutbox(limit)).map((record) => ({
+  async listOutbox(limit = 50, actor?: ActorContext): Promise<ChannelOutboxItem[]> {
+    const records = await this.repository.listOutbox(limit);
+    if (actor) {
+      this.deps.audit.write({
+        actor,
+        action: MessagingProviderAuditActions.outboxListed,
+        targetType: "ChannelOutbox",
+        targetId: "all",
+        result: "success",
+        context: { total: records.length }
+      });
+    }
+    return records.map((record) => ({
       id: record.id,
       channel: record.channel,
       status: record.status,
@@ -201,10 +212,18 @@ export class MessagingDispatchService {
     const provider = this.providerFor(channel);
     let cancelReason: string | null = null;
     if (!this.deps.featureFlags.isEnabled(FLAG_BY_CHANNEL[channel])) cancelReason = "channel_disabled";
-    else if (!provider) cancelReason = "provider_not_configured";
     else if (!(await this.preferencesFor(row.scopeId))[channel === "sms" ? "sms" : "whatsapp"]) cancelReason = "recipient_opted_out";
+    if (!cancelReason && !provider) {
+      // A worker started without the provider variables must not destroy pending retries: keep the row
+      // (encrypted data intact, attempt count unchanged) and look again later.
+      const retryAt = new Date(now.getTime() + (this.delaysMs[this.delaysMs.length - 1] as number));
+      await this.repository.updateOutbox(row.id, { status: "retryable", nextAttemptAt: retryAt, lastErrorClass: "provider_not_configured", updatedAt: now });
+      await this.record({ ...base, recipient }, "refused", "none", "provider_not_configured_deferred", actor, { action: MessagingProviderAuditActions.retryScheduled, result: "refused", context: { outboxId: row.id, nextAttemptAt: retryAt.toISOString() } });
+      summary.retryable += 1;
+      return;
+    }
     if (cancelReason || !provider) {
-      const reason = cancelReason ?? "provider_not_configured";
+      const reason = cancelReason ?? "channel_disabled";
       await this.repository.updateOutbox(row.id, { ...erased, status: "cancelled", lastErrorClass: reason });
       await this.record({ ...base, recipient }, "refused", provider?.name ?? "none", reason, actor, { action: MessagingProviderAuditActions.cancelled, result: "refused", context: { outboxId: row.id } });
       summary.cancelled += 1;

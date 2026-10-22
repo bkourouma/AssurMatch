@@ -392,7 +392,7 @@ export class CrmConnectorService {
     const attemptCount = delivery.attemptCount + 1;
     const successful = responseClass === "2xx";
     const retryableClass = responseClass === "network_error" || responseClass === "408" || responseClass === "429"
-      || responseClass === "5xx" || responseClass === "3xx_redirect_blocked";
+      || responseClass === "5xx";
     let status: CrmConnectorDeliveryRecord["status"];
     if (successful) status = "delivered";
     else if (!retryableClass) status = "failed";

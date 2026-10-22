@@ -11,7 +11,8 @@ export const MessagingProviderAuditActions = {
   failed: "messaging.delivery.failed",
   retried: "messaging.delivery.retried",
   deadLettered: "messaging.delivery.dead_letter",
-  cancelled: "messaging.delivery.cancelled"
+  cancelled: "messaging.delivery.cancelled",
+  outboxListed: "messaging.outbox.listed"
 } as const;
 
 export type MessagingProviderAuditAction = (typeof MessagingProviderAuditActions)[keyof typeof MessagingProviderAuditActions];

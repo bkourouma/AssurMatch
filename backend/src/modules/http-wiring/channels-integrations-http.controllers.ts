@@ -54,7 +54,7 @@ export class AdminMessagingOutboxHttpController {
   outbox(request: AssurMatchHttpRequest) {
     const actor = protectedActorFromRequest(request);
     if (!actor.roles.some((role) => role === "super_admin" || roleHasPermission(role, "audit_logs:read"))) throw new ForbiddenException("Messaging outbox access denied: forbidden_role");
-    return this.runtime.notifications.dispatch.listOutbox();
+    return this.runtime.notifications.dispatch.listOutbox(50, actor);
   }
 }
 

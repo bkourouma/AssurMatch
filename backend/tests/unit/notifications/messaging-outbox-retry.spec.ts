@@ -38,13 +38,14 @@ function setup(script: Array<MessagingSendResult | "throw">, options: { flag?: b
   const provider = new ScriptedProvider(script);
   const flags = { enabled: options.flag ?? true };
   const deadLetters: unknown[] = [];
+  const encryption = new EncryptionService();
   const dispatch = new MessagingDispatchService({
     audit,
     featureFlags: { isEnabled: () => flags.enabled },
     config: { smsProvider: "scripted", smsSecretConfigured: true },
     repository,
     smsProvider: provider,
-    encryption: new EncryptionService(),
+    encryption,
     retry: { maxAttempts: options.maxAttempts ?? 4, delaysMs: [MINUTE, 5 * MINUTE, 30 * MINUTE] },
     now: () => T0,
     onDeadLetter: (info) => {
@@ -55,7 +56,7 @@ function setup(script: Array<MessagingSendResult | "throw">, options: { flag?: b
   const optIn = async (value: boolean) => { await dispatch.updatePreferences(SCOPE, { sms: value, reason: "test" }, actor); };
   const send = () => dispatch.dispatch({ channel: "sms", scopeId: SCOPE, recipient: PHONE, template: "quote_alert", body: BODY, partnerTenantId: SCOPE }, actor);
   const everything = async () => JSON.stringify({ outbox: await repository.listOutbox(50), deliveries: await repository.listDeliveries(50), audit: audit.search({}) });
-  return { repository, audit, provider, flags, deadLetters, dispatch, optIn, send, everything, optInDefault: options.optIn ?? true };
+  return { encryption, repository, audit, provider, flags, deadLetters, dispatch, optIn, send, everything, optInDefault: options.optIn ?? true };
 }
 
 async function ready(script: Array<MessagingSendResult | "throw">, options: Parameters<typeof setup>[1] = {}) {
@@ -147,6 +148,30 @@ describe("messaging outbox retries", () => {
     expect(await ctx.dispatch.processDueOutbox({ now: at(2) })).toMatchObject({ cancelled: 1 });
     expect(ctx.provider.calls).toHaveLength(1);
     expect((await ctx.repository.listOutbox(1))[0]).toMatchObject({ status: "cancelled", lastErrorClass: "channel_disabled" });
+  });
+
+  it("(f2) keeps the row queued, data intact, when the worker has no provider configured", async () => {
+    const ctx = await ready([transient, ok]);
+    await ctx.send();
+    const before = (await ctx.repository.listOutbox(1))[0];
+    const bare = new MessagingDispatchService({
+      audit: ctx.audit,
+      featureFlags: { isEnabled: () => true },
+      config: {},
+      repository: ctx.repository,
+      encryption: ctx.encryption,
+      retry: { maxAttempts: 4, delaysMs: [MINUTE, 5 * MINUTE, 30 * MINUTE] },
+      now: () => T0
+    });
+    expect(await bare.processDueOutbox({ now: at(2) })).toMatchObject({ attempted: 0, cancelled: 0, retryable: 1 });
+    const kept = (await ctx.repository.listOutbox(1))[0];
+    expect(kept).toMatchObject({ status: "retryable", lastErrorClass: "provider_not_configured", attemptCount: before?.attemptCount });
+    expect(kept?.recipientEncrypted).toBe(before?.recipientEncrypted);
+    expect(kept?.bodyEncrypted).toBe(before?.bodyEncrypted);
+    expect(kept?.nextAttemptAt?.getTime()).toBeGreaterThan(at(2).getTime());
+    expect(ctx.audit.search({}).some((entry) => entry.reason === "provider_not_configured_deferred")).toBe(true);
+    // Once the provider is back, the same row is sent.
+    expect(await ctx.dispatch.processDueOutbox({ now: at(60) })).toMatchObject({ sent: 1 });
   });
 
   it("(g) refuses without consent: no outbox row, no provider call", async () => {
