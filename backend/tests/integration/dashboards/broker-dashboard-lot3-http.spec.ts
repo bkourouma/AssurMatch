@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { aiInteractionSchema } from "../../../../packages/shared/contracts/ai.contracts";
 import type { BrokerAgencyOverviewRow, BrokerDashboardResponse } from "../../../../packages/shared/contracts/dashboard.contracts";
-import { partnerAgencySchema } from "../../../../packages/shared/contracts/enterprise.contracts";
+import { partnerAgencySchema, partnerCustomRoleSchema } from "../../../../packages/shared/contracts/enterprise.contracts";
 import { AiAuditActions } from "../../../src/modules/ai/core/ai-audit-actions";
 import type { ActorContext } from "../../../src/modules/common/types";
 import { brokerUser } from "../broker-self-service/self-service-helpers";
@@ -43,12 +43,20 @@ describe("spec 069 lot 3 broker dashboard and CRM AI runtime HTTP", () => {
     }
   }
 
-  async function setup() {
+  async function setup(options: { crmEnabled?: boolean } = {}) {
+    if (options.crmEnabled === false) process.env.ASSURMATCH_BROKER_CRM_ENABLED = "false";
     const h = await createRuntimeHttpHarness();
     harness = h;
-    await h.runtime.featureFlags.service.setFlag({ key: "broker_dashboard_enabled", scopeType: "global", value: true, reason: "spec 069 lot 3" }, { actorId: "test-admin", roles: ["super_admin"], mfaVerified: true });
+    const flagActor = { actorId: "test-admin", roles: ["super_admin"], mfaVerified: true } as ActorContext;
+    await h.runtime.featureFlags.service.setFlag({ key: "broker_dashboard_enabled", scopeType: "global", value: true, reason: "spec 069 lot 3" }, flagActor);
+    if (options.crmEnabled === false) {
+      await h.runtime.featureFlags.service.setFlag({ key: "broker_crm_enabled", scopeType: "global", value: false, reason: "spec 069 lot 3 CRM closed" }, flagActor);
+      await h.runtime.reloadRuntimeFeatureFlags();
+    }
     const owner = withPlan(await brokerUser(h, TENANT, "broker_owner_pro"), "enterprise");
     const agent = withPlan(await brokerUser(h, TENANT, "broker_agent"), "enterprise");
+    const manager = withPlan(await brokerUser(h, TENANT, "broker_manager"), "enterprise");
+    const readOnly = withPlan(await brokerUser(h, TENANT, "broker_read_only"), "enterprise");
     const otherOwner = withPlan(await brokerUser(h, OTHER_TENANT, "broker_owner_pro"), "enterprise");
     const proOwner = withPlan(await brokerUser(h, PRO_TENANT, "broker_owner_pro"), "pro");
     const starterOwner = withPlan(await brokerUser(h, STARTER_TENANT, "broker_owner_starter"), "starter");
@@ -80,7 +88,7 @@ describe("spec 069 lot 3 broker dashboard and CRM AI runtime HTTP", () => {
       pro: await create(PRO_TENANT, "L3-PRO", proOwner),
       starter: await create(STARTER_TENANT, "L3-STARTER", starterOwner)
     };
-    return { h, owner, agent, otherOwner, proOwner, starterOwner, agency, otherAgency, leads };
+    return { h, owner, agent, manager, readOnly, otherOwner, proOwner, starterOwner, agency, otherAgency, leads };
   }
 
   it("serves the agencies overview to Enterprise only, per tenant, and audits it", async () => {
@@ -97,12 +105,18 @@ describe("spec 069 lot 3 broker dashboard and CRM AI runtime HTTP", () => {
     expect(rows.map((row) => row.agencyId)).not.toContain(otherAgency.id);
     expect(rows.reduce((sum, row) => sum + row.received, 0)).toBe(3);
     expect(JSON.stringify(rows)).not.toContain("Agence ailleurs");
-    expect(h.runtime.audit.writer.search({ action: "dashboard.broker.agencies_read" }).length + h.runtime.audit.writer.search({ targetType: "BrokerDashboardAgencies" }).length).toBeGreaterThan(0);
+    // Deterministic: the real audit action, one success entry for the one successful read above.
+    const reads = h.runtime.audit.writer.search({ action: "dashboard.broker.agencies.read" });
+    expect(reads).toHaveLength(1);
+    expect(reads[0]).toMatchObject({ targetType: "BrokerDashboardAgencies", result: "success", context: { rowCount: 2 } });
 
     expect((await get(h, proOwner, "/broker/dashboard/agencies")).status).toBe(403);
     expect((await get(h, starterOwner, "/broker/dashboard/agencies")).status).toBe(403);
-    // An assigned-only advisor never gets the tenant-wide rollup.
+    // An assigned-only advisor never gets the tenant-wide rollup; the refusal is audited with its reason.
     expect((await get(h, agent, "/broker/dashboard/agencies")).status).toBe(403);
+    expect(h.runtime.audit.writer.search({ action: "dashboard.broker.refused" }).map((entry) => entry.reason)).toEqual(
+      expect.arrayContaining(["enterprise_plan_required", "agencies_view_not_allowed"])
+    );
     // The other tenant sees only its own agency.
     const otherRows = await readJson<BrokerAgencyOverviewRow[]>(await get(h, withPlan(await brokerUser(h, OTHER_TENANT, "broker_owner_pro"), "enterprise"), "/broker/dashboard/agencies"));
     expect(otherRows.map((row) => row.agencyName)).toEqual(["Agence ailleurs", "Sans agence"]);
@@ -139,6 +153,85 @@ describe("spec 069 lot 3 broker dashboard and CRM AI runtime HTTP", () => {
     for (const forbidden of ["Ama", "Kone", "example.test", "2250102030405", "L3-1", "L3-OTHER"]) expect(csv).not.toContain(forbidden);
   });
 
+  it("decides the agencies view and the CSV agency block on permissions: custom role, read-only and CRM flag", async () => {
+    const { h, owner, manager, readOnly } = await setup();
+
+    // broker_read_only holds broker_crm:read (whole tenant): allowed, like an unrestricted manager.
+    expect((await get(h, readOnly, "/broker/dashboard/agencies")).status).toBe(200);
+    expect((await get(h, manager, "/broker/dashboard/agencies")).status).toBe(200);
+    expect(await (await get(h, manager, "/broker/dashboard/export.csv")).text()).toContain("agence,Agence Plateau,");
+
+    // A custom role without broker_crm:read closes the agencies view and the CSV agency block for the manager.
+    const roleResponse = await post(h, owner, "/broker/enterprise/roles", { name: "Export sans CRM", permissions: ["broker_leads:read", "broker_crm:export"], reason: "Restriction interne" });
+    expect(roleResponse.status).toBe(201);
+    const role = partnerCustomRoleSchema.parse(await readJson(roleResponse));
+    const assign = await h.request(`/broker/enterprise/members/${manager.actorId as string}/custom-role`, { method: "PUT", headers: { ...actorHeaders(owner), ...json }, body: JSON.stringify({ customRoleId: role.id, reason: "Periode d'essai" }) });
+    expect(assign.status).toBe(200);
+
+    const refusedBefore = h.runtime.audit.writer.search({ action: "dashboard.broker.refused" }).length;
+    expect((await get(h, manager, "/broker/dashboard/agencies")).status).toBe(403);
+    const refused = h.runtime.audit.writer.search({ action: "dashboard.broker.refused" });
+    expect(refused.length).toBe(refusedBefore + 1);
+    expect(refused.at(-1)).toMatchObject({ reason: "agencies_view_not_allowed", result: "refused" });
+
+    const csvResponse = await get(h, manager, "/broker/dashboard/export.csv");
+    expect(csvResponse.status).toBe(200);
+    const csv = await csvResponse.text();
+    expect(csv).not.toContain("agence");
+    expect(csv).not.toContain("Agence Plateau");
+    expect(csv).not.toContain("kpi,contactRate");
+  });
+
+  it("closes the CRM KPIs and the agencies view in the dashboard, the agencies endpoint and the CSV when the CRM flag is off", async () => {
+    const { h, owner } = await setup({ crmEnabled: false });
+
+    const dashboard = await readJson<BrokerDashboardResponse>(await get(h, owner, "/broker/dashboard"));
+    expect(dashboard.crm).toBeUndefined();
+    expect((await get(h, owner, "/broker/dashboard/agencies")).status).toBe(403);
+    expect(h.runtime.audit.writer.search({ action: "dashboard.broker.refused" }).at(-1)).toMatchObject({ reason: "broker_crm_disabled" });
+    const csv = await (await get(h, owner, "/broker/dashboard/export.csv")).text();
+    expect(csv.split("\n")[0]).toBe("section,dimension,valeur");
+    expect(csv).toContain("volumes,received,");
+    for (const forbidden of ["kpi,", "cout,", "source,", "agence", "pipeline,"]) expect(csv).not.toContain(forbidden);
+  });
+
+  it("gives an assigned-only agent neither the lead cost nor the KPIs of the whole tenant", async () => {
+    const { h, owner, agent } = await setup();
+
+    const ownerCrm = (await readJson<BrokerDashboardResponse>(await get(h, owner, "/broker/dashboard"))).crm;
+    expect(ownerCrm?.conversionRate).toBe(0.333);
+    expect(ownerCrm?.pipeline.reduce((sum, entry) => sum + entry.total, 0)).toBe(3);
+
+    const response = await get(h, agent, "/broker/dashboard");
+    expect(response.status).toBe(200);
+    const body = await readJson<BrokerDashboardResponse>(response);
+    expect(JSON.stringify(body)).not.toContain("leadCost");
+    // 2 leads are assigned to the agent (1 won): never the 3 leads / 1 win of the tenant.
+    expect(body.crm?.pipeline.reduce((sum, entry) => sum + entry.total, 0)).toBe(2);
+    expect(body.crm?.conversionRate).toBe(0.5);
+    expect(body.crm?.kpis?.topSources).toEqual([expect.objectContaining({ received: 2, won: 1 })]);
+  });
+
+  it("writes one header row per wide CSV section, with the same column count in every row of a block", async () => {
+    const { h, owner } = await setup();
+    const csv = await (await get(h, owner, "/broker/dashboard/export.csv")).text();
+    const lines = csv.split("\n");
+    expect(lines[0]).toBe("section,dimension,valeur");
+    const headers = lines.filter((line) => line.startsWith("section,"));
+    expect(headers).toEqual([
+      "section,dimension,valeur",
+      "section,source,recus,gagnes,taux_conversion",
+      "section,agence,conseillers,recus,acceptes,gagnes,perdus,taux_contact,taux_conversion,delai_premier_contact_min"
+    ]);
+    let width = 0;
+    for (const line of lines) {
+      const cells = line.split(",");
+      if (cells[0] === "section") width = cells.length;
+      else expect(cells.length, line).toBe(width);
+    }
+    for (const line of lines.filter((entry) => entry.startsWith("agence,"))) expect(line).not.toMatch(/Ama|Kone|example\.test/);
+  });
+
   it("answers the priority scores only for approved scores, with closed flags, opt-out and Starter honoured", async () => {
     const { h, owner, otherOwner, starterOwner, leads } = await setup();
 
@@ -163,9 +256,10 @@ describe("spec 069 lot 3 broker dashboard and CRM AI runtime HTTP", () => {
     // Another tenant never sees them.
     expect(await readJson(await get(h, otherOwner, "/broker/crm/ai/priority-scores"))).toMatchObject({ enabled: true, scores: {} });
     // Starter has no CRM: refused or told that scoring is closed, never a score.
+    // The service answers 200 with scoring closed (broker-ai.service.ts priorityScores), never a score.
     const starter = await get(h, starterOwner, "/broker/crm/ai/priority-scores");
-    if (starter.status === 200) expect(await readJson(starter)).toEqual({ enabled: false, scores: {} });
-    else expect(starter.status).toBe(403);
+    expect(starter.status).toBe(200);
+    expect(await readJson(starter)).toEqual({ enabled: false, scores: {} });
 
     // Partner opt-out closes it again.
     const optOut = await h.request("/broker/crm/ai/opt-out", { method: "PUT", headers: { ...actorHeaders(owner), ...json }, body: JSON.stringify({ optOut: true, reason: "Le cabinet refuse l'IA" }) });
