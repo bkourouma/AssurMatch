@@ -5,11 +5,11 @@
 ## Phase 1 — Parties indépendantes (parallèle)
 
 ### T1 Prospects
-- [ ] T101 Contrat `admin-operations.contracts.ts` : requête / réponse liste et détail prospect.
-- [ ] T102 `AdminProspectsConsoleService` : périmètre pays / produit, masquage PII, détail en clair pour `super_admin` / `support_admin` avec audit, recherche par empreinte.
-- [ ] T103 Routes `GET /admin/operations/prospects` et `/:id` (contrôleur + enregistrement).
-- [ ] T104 Écran `/prospects` (filtres, tableau, pagination, détail) et lecteur `operations-api.ts`.
-- [ ] T105 Tests : unitaires (masquage, périmètre), intégration HTTP (refus finance / content, audit), écran.
+- [x] T101 Contrat `admin-operations.contracts.ts` : requête / réponse liste et détail prospect.
+- [x] T102 `AdminProspectsConsoleService` : périmètre pays / produit, masquage PII, détail en clair pour `super_admin` / `support_admin` avec audit, recherche par empreinte.
+- [x] T103 Routes `GET /admin/operations/prospects` et `/:id` (contrôleur + enregistrement).
+- [x] T104 Écran `/prospects` (filtres, tableau, pagination, détail) et lecteur `operations-api.ts`.
+- [x] T105 Tests : unitaires (masquage, périmètre), intégration HTTP (refus finance / content, audit), écran.
 
 ### T2 Visites
 - [ ] T201 Modèle `VisitCounter` (bloc `// Lot 6`) et migration `0036_admin_steering` ; test schéma / migration.

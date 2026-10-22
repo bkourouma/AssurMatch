@@ -689,6 +689,10 @@ readonly enterprise = new EnterpriseService({
     decisions: this.leads.decisions,
     consent: { findRecord: (id: string) => this.consent.service.findRecord(id) },
     prospects: { find: (id: string) => this.prospects.service.require(id).catch(() => undefined) },
+    // Lot 6
+    prospectsList: { list: () => this.prospects.service.list(), require: (id: string) => this.prospects.service.require(id) },
+    fingerprint: (value: string) => this.prospects.identity.fingerprint(value),
+    // Lot 6 (end)
     offers: { find: (id: string) => this.offers.repository.require(id).catch(() => undefined) },
     documents: { list: async (actor, quoteRequestId) => (await this.quoteDocuments.adminList(actor, quoteRequestId)).items },
     eligibility: this.leads.eligibility,

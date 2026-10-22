@@ -230,3 +230,49 @@ export interface AdminContactMessageStatusResult {
   status: string;
   handledAt: string | null;
 }
+
+// Lot 6 (spec 073 FR-001 to FR-005): prospects console
+const queryBooleanSchema = z.preprocess((value) => (typeof value === "string" ? ["true", "1", "on"].includes(value.toLowerCase()) : value), z.boolean());
+
+export const adminProspectsQuerySchema = z.object({
+  page: pageSchema,
+  pageSize: z.coerce.number().int().min(1).max(100).default(50),
+  country: z.string().trim().min(2).max(3).transform((value) => value.toUpperCase()).optional(),
+  product: z.string().trim().min(1).max(64).optional(),
+  /** A name fragment, or an e-mail / phone typed in full (hashed server side, never echoed or logged). */
+  search: z.string().trim().min(1).max(200).optional(),
+  includeAnonymized: queryBooleanSchema.default(false)
+});
+
+export type AdminProspectsQuery = z.output<typeof adminProspectsQuerySchema>;
+
+/** E-mail and phone are always masked in a row; anonymised prospects carry no contact at all. */
+export interface AdminProspectListItem {
+  id: string;
+  displayName: string | null;
+  email: string | null;
+  phone: string | null;
+  countryCode: string | null;
+  productKey: string | null;
+  createdAt: string;
+  consentCount: number;
+  quoteRequestCount: number;
+  anonymized: boolean;
+}
+
+export interface AdminProspectQuoteRequestRef {
+  id: string;
+  publicReference: string;
+  status: string;
+  createdAt: string;
+}
+
+export interface AdminProspectDetail extends AdminProspectListItem {
+  /** True only for `super_admin` / `support_admin` on a non-anonymised prospect: `email` and `phone` are then in clear. */
+  piiRevealed: boolean;
+  retentionUntil: string;
+  updatedAt: string;
+  anonymizedAt: string | null;
+  quoteRequests: AdminProspectQuoteRequestRef[];
+}
+// Lot 6 (end)

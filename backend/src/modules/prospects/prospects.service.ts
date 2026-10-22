@@ -9,6 +9,9 @@ export interface ProspectRecord extends NormalizedProspectContact {
   productId: string;
   consentRecordIds: string[];
   retentionUntil: Date;
+  // Lot 6
+  anonymizedAt?: Date | null;
+  // Lot 6 (end)
   createdAt: Date;
   updatedAt: Date;
 }

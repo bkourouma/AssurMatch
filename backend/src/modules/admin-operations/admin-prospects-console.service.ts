@@ -1,0 +1,173 @@
+import type {
+  AdminPage,
+  AdminProspectDetail,
+  AdminProspectListItem,
+  AdminProspectsQuery
+} from "../../../../packages/shared/contracts/admin-operations.contracts";
+import type { AssurMatchRole } from "../../../../packages/shared/rbac/assurmatch-role-matrix";
+import { ADMIN_OPERATIONS_AUDIT_ACTIONS } from "../audit-logs/admin-operations-audit-actions";
+import type { AuditLogWriter } from "../audit-logs/audit-log-writer.service";
+import type { ActorContext } from "../common/types";
+import type { QuoteRequestRecord } from "../quote-requests/quote-submission.service";
+import type { ProspectRecord } from "../prospects/prospects.service";
+import { OPERATIONS_ROLES, isoOrNull, maskEmail, maskPhone, paginate, type AdminOperationsAccess } from "./admin-operations-access";
+import { loadOperationsCatalog, type OperationsCatalog, type OperationsCatalogPorts } from "./admin-operations-catalog";
+
+/**
+ * Spec 073 (FR-001 to FR-005, FR-023): prospects console. `finance_admin` and `content_admin` are
+ * refused (audited); `admin_pays` is limited to the countries / products of its scopes. A row never
+ * carries a clear e-mail or phone; the detail does, for `super_admin` and `support_admin` only, and
+ * every detail read is audited without any contact value.
+ */
+
+/** The roles that may read the contact in clear on the detail. */
+export const PROSPECT_PII_ROLES = new Set<AssurMatchRole>(["super_admin", "support_admin"]);
+
+export interface AdminProspectsConsoleDeps extends OperationsCatalogPorts {
+  audit: AuditLogWriter;
+  access: AdminOperationsAccess;
+  prospects: { list(): Promise<ProspectRecord[]>; require(id: string): Promise<ProspectRecord> };
+  quotes: { list(): Promise<QuoteRequestRecord[]> };
+  /** Same SHA-256 fingerprint as `ProspectIdentityService.fingerprint`. */
+  fingerprint(value: string): string;
+}
+
+export class AdminProspectsConsoleService {
+  constructor(private readonly deps: AdminProspectsConsoleDeps) {}
+
+  async list(actor: ActorContext, query: AdminProspectsQuery): Promise<AdminPage<AdminProspectListItem>> {
+    this.deps.access.assert(actor, { roles: OPERATIONS_ROLES }, { type: "Prospect", id: "list" });
+    const catalog = await loadOperationsCatalog(this.deps);
+    const revealNames = this.canRevealPii(actor);
+    const searchTerm = query.search?.trim().toLowerCase();
+    const fingerprints = query.search ? this.searchFingerprints(query.search) : new Set<string>();
+    const [prospects, quotesByProspect] = await Promise.all([this.deps.prospects.list(), this.quotesByProspect()]);
+    const rows = prospects
+      .filter((prospect) => query.includeAnonymized || !prospect.anonymizedAt)
+      .filter((prospect) => this.deps.access.inScope(actor, scopeOf(prospect, catalog)))
+      .filter((prospect) => !query.country || catalog.countryCode(prospect.countryId) === query.country)
+      .filter((prospect) => !query.product || catalog.productKey(prospect.productId) === query.product)
+      .filter((prospect) => {
+        if (!searchTerm) return true;
+        if (prospect.anonymizedAt) return false;
+        if ((prospect.displayName ?? "").toLowerCase().includes(searchTerm)) return true;
+        return fingerprints.has(prospect.emailFingerprint) || fingerprints.has(prospect.phoneFingerprint);
+      })
+      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+      .map((prospect) => toListItem(prospect, catalog, quotesByProspect.get(prospect.id)?.length ?? 0, revealNames));
+    const page = paginate(rows, query.page, query.pageSize);
+    this.deps.audit.write({
+      actor,
+      action: ADMIN_OPERATIONS_AUDIT_ACTIONS.prospectsListed,
+      targetType: "Prospect",
+      targetId: "list",
+      result: "success",
+      // The searched value is never recorded: only whether a search was used.
+      context: {
+        total: page.total,
+        page: page.page,
+        filters: { country: query.country ?? null, product: query.product ?? null, search: Boolean(query.search), includeAnonymized: query.includeAnonymized }
+      }
+    });
+    return page;
+  }
+
+  async detail(actor: ActorContext, id: string): Promise<AdminProspectDetail> {
+    this.deps.access.assert(actor, { roles: OPERATIONS_ROLES }, { type: "Prospect", id });
+    const prospect = await this.deps.prospects.require(id);
+    const catalog = await loadOperationsCatalog(this.deps);
+    this.deps.access.assertInScope(actor, scopeOf(prospect, catalog), { type: "Prospect", id });
+    const quotes = [...((await this.quotesByProspect()).get(prospect.id) ?? [])];
+    const anonymized = Boolean(prospect.anonymizedAt);
+    const reveal = this.canRevealPii(actor) && !anonymized;
+    const detail: AdminProspectDetail = {
+      ...toListItem(prospect, catalog, quotes.length, this.canRevealPii(actor)),
+      email: anonymized ? null : reveal ? prospect.emailNormalized || null : maskEmail(prospect.emailNormalized),
+      phone: anonymized ? null : reveal ? prospect.phoneNormalized || null : maskPhone(prospect.phoneNormalized),
+      piiRevealed: reveal,
+      retentionUntil: isoOrNull(prospect.retentionUntil) ?? "",
+      updatedAt: isoOrNull(prospect.updatedAt) ?? "",
+      anonymizedAt: isoOrNull(prospect.anonymizedAt),
+      quoteRequests: quotes
+        .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+        .map((quote) => ({ id: quote.id, publicReference: quote.publicReference, status: quote.status, createdAt: isoOrNull(quote.createdAt) ?? "" }))
+    };
+    this.deps.audit.write({
+      actor,
+      action: ADMIN_OPERATIONS_AUDIT_ACTIONS.prospectViewed,
+      targetType: "Prospect",
+      targetId: prospect.id,
+      scope: { countryId: prospect.countryId, productId: prospect.productId },
+      result: "success",
+      // Ids and truncated fingerprints only: never an e-mail, a phone or a name.
+      context: {
+        piiRevealed: reveal,
+        anonymized,
+        scopeReason: scopeReason(actor),
+        emailFingerprint: prospect.emailFingerprint?.slice(0, 12) ?? null,
+        phoneFingerprint: prospect.phoneFingerprint?.slice(0, 12) ?? null
+      }
+    });
+    return detail;
+  }
+
+  private canRevealPii(actor: ActorContext): boolean {
+    return actor.roles.some((role) => PROSPECT_PII_ROLES.has(role));
+  }
+
+  /** The typed value as is, and without separators (phones are fingerprinted in `+<dial><digits>` form). */
+  private searchFingerprints(search: string): Set<string> {
+    const typed = search.trim();
+    const compact = typed.replace(/[\s.-]/g, "");
+    return new Set([typed, compact].map((value) => this.deps.fingerprint(value)));
+  }
+
+  /** One pass over the quote requests: no per-prospect lookup. */
+  private async quotesByProspect(): Promise<Map<string, QuoteRequestRecord[]>> {
+    const byProspect = new Map<string, QuoteRequestRecord[]>();
+    for (const quote of await this.deps.quotes.list()) {
+      if (!quote.prospectId) continue;
+      const list = byProspect.get(quote.prospectId);
+      if (list) list.push(quote);
+      else byProspect.set(quote.prospectId, [quote]);
+    }
+    return byProspect;
+  }
+}
+
+function scopeOf(prospect: ProspectRecord, catalog: OperationsCatalog) {
+  return {
+    countryId: prospect.countryId,
+    countryCode: catalog.countryCode(prospect.countryId),
+    productId: prospect.productId,
+    productKey: catalog.productKey(prospect.productId)
+  };
+}
+
+function scopeReason(actor: ActorContext): string {
+  if (actor.roles.includes("super_admin")) return "super_admin";
+  return (actor.countryScopes ?? []).length > 0 || (actor.productScopes ?? []).length > 0 ? "scoped" : "unrestricted";
+}
+
+/** `Jean Dupont` -> `J*** D***`. */
+export function maskDisplayName(value: string | null | undefined): string | null {
+  const words = (value ?? "").trim().split(/\s+/).filter(Boolean);
+  if (words.length === 0) return null;
+  return words.map((word) => `${word.slice(0, 1)}***`).join(" ");
+}
+
+function toListItem(prospect: ProspectRecord, catalog: OperationsCatalog, quoteRequestCount: number, revealName: boolean): AdminProspectListItem {
+  const anonymized = Boolean(prospect.anonymizedAt);
+  return {
+    id: prospect.id,
+    displayName: anonymized ? null : revealName ? prospect.displayName ?? null : maskDisplayName(prospect.displayName),
+    email: anonymized ? null : maskEmail(prospect.emailNormalized),
+    phone: anonymized ? null : maskPhone(prospect.phoneNormalized),
+    countryCode: catalog.countryCode(prospect.countryId) ?? null,
+    productKey: catalog.productKey(prospect.productId) ?? null,
+    createdAt: isoOrNull(prospect.createdAt) ?? "",
+    consentCount: prospect.consentRecordIds?.length ?? 0,
+    quoteRequestCount,
+    anonymized
+  };
+}
