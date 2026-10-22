@@ -94,7 +94,8 @@ import {
   partnerApiPaginationQuerySchema,
   partnerWebhookAllowlistCreateSchema,
   partnerWebhookEndpointCreateSchema,
-  partnerWebhookEndpointUpdateSchema
+  partnerWebhookEndpointUpdateSchema,
+  partnerWebhookTestSchema
 } from "../../../../packages/shared/contracts/partner-integration.contracts";
 import {
   leadReassignRequestSchema,
@@ -142,6 +143,7 @@ import { parseHttpInput } from "../common/http/zod-validation";
 import type { ActorContext } from "../common/types";
 import { RetentionAccessRefusedError, RetentionBatchConflictError, RetentionBatchNotFoundError, RetentionPurgeDisabledError } from "../data-retention/data-retention.service";
 import { PublicJourneyFlagPolicy } from "../feature-flags/public-journey-flag-policy";
+import { aiScopeFlagChangeSchema, type AiScopeFlagChangeInput } from "../../../../packages/shared/contracts/ai-scope-flags.contracts"; // Lot 7
 import { AdminUsersController as AdminUsersDomainController } from "../users/admin-users.controller";
 import { AdminUserRolesController as AdminUserRolesDomainController } from "../users/admin-user-roles.controller";
 import { PublicHealthController } from "../health/public-health.controller";
@@ -2028,6 +2030,15 @@ export class AdminAIAssistanceController {
   validateInsight(id: string, input: unknown, request: AssurMatchHttpRequest) {
     return this.runtime.adminAi.validate(parseParam("id", id, uuidSchema), input, protectedActorFromRequest(request));
   }
+
+  // Lot 7 (spec 074): audited, protected path for the country and product AI flags (never the generic flag routes).
+  scopeFlags(request: AssurMatchHttpRequest) {
+    return this.runtime.aiScopeFlags.overview(protectedActorFromRequest(request));
+  }
+
+  applyScopeFlag(input: unknown, request: AssurMatchHttpRequest) {
+    return this.runtime.aiScopeFlags.apply(protectedActorFromRequest(request), parseHttpInput(aiScopeFlagChangeSchema, input) as AiScopeFlagChangeInput);
+  }
 }
 
 export class AdminRuntimeSupportController {
@@ -2171,6 +2182,11 @@ export class AdminPartnerIntegrationsController {
 
   revokeWebhookAllowlist(id: string, input: unknown, request: AssurMatchHttpRequest) {
     return this.runtime.partnerIntegrations.service.revokeWebhookAllowlistEntry(protectedActorFromRequest(request), parseParam("id", id, uuidSchema), input);
+  }
+
+  // Lot 7 (spec 074, H-08): signed test event; the service refuses it while partner webhooks are closed.
+  testWebhookEndpoint(id: string, input: unknown, request: AssurMatchHttpRequest) {
+    return this.runtime.partnerIntegrations.service.sendTestWebhook(protectedActorFromRequest(request), parseParam("id", id, uuidSchema), parseHttpInput(partnerWebhookTestSchema, input));
   }
 }
 
@@ -2546,6 +2562,9 @@ decorate(AdminAIAssistanceController, "listInsights", [Get("ai/insights") as Met
 decorate(AdminAIAssistanceController, "readInsight", [Get("ai/insights/:id") as MethodDecoratorFactory], [[0, Param("id") as ParamDecoratorFactory], [1, Req() as ParamDecoratorFactory]]);
 decorate(AdminAIAssistanceController, "requestInsight", [Post("ai/insights/:assistType") as MethodDecoratorFactory], [[0, Param("assistType") as ParamDecoratorFactory], [1, Body() as ParamDecoratorFactory], [2, Req() as ParamDecoratorFactory]]);
 decorate(AdminAIAssistanceController, "validateInsight", [Post("ai/insights/:id/validation") as MethodDecoratorFactory], [[0, Param("id") as ParamDecoratorFactory], [1, Body() as ParamDecoratorFactory], [2, Req() as ParamDecoratorFactory]]);
+// Lot 7 (spec 074)
+decorate(AdminAIAssistanceController, "scopeFlags", [Get("ai/scope-flags") as MethodDecoratorFactory], [[0, Req() as ParamDecoratorFactory]]);
+decorate(AdminAIAssistanceController, "applyScopeFlag", [Post("ai/scope-flags") as MethodDecoratorFactory, HttpCode(200) as MethodDecoratorFactory], [[0, Body() as ParamDecoratorFactory], [1, Req() as ParamDecoratorFactory]]);
 
 controller("admin", AdminRuntimeSupportController, true);
 decorate(AdminRuntimeSupportController, "quoteRequests", [Get("quote-requests") as MethodDecoratorFactory], [[0, Req() as ParamDecoratorFactory]]);
@@ -2677,6 +2696,8 @@ decorate(AdminPartnerIntegrationsController, "webhookDeliveries", [Get("webhook-
 decorate(AdminPartnerIntegrationsController, "webhookAllowlist", [Get("webhook-allowlist") as MethodDecoratorFactory], [[0, Req() as ParamDecoratorFactory]]);
 decorate(AdminPartnerIntegrationsController, "createWebhookAllowlist", [Post("webhook-allowlist") as MethodDecoratorFactory], [[0, Req() as ParamDecoratorFactory], [1, Body() as ParamDecoratorFactory]]);
 decorate(AdminPartnerIntegrationsController, "revokeWebhookAllowlist", [Post("webhook-allowlist/:id/revoke") as MethodDecoratorFactory], [[0, Param("id") as ParamDecoratorFactory], [1, Body() as ParamDecoratorFactory], [2, Req() as ParamDecoratorFactory]]);
+// Lot 7 (spec 074)
+decorate(AdminPartnerIntegrationsController, "testWebhookEndpoint", [Post("webhook-endpoints/:id/test") as MethodDecoratorFactory, HttpCode(200) as MethodDecoratorFactory], [[0, Param("id") as ParamDecoratorFactory], [1, Body() as ParamDecoratorFactory], [2, Req() as ParamDecoratorFactory]]);
 
 controller("partner-api/v1", PartnerApiController);
 decorate(PartnerApiController, "leads", [Get("leads") as MethodDecoratorFactory], [[0, Req() as ParamDecoratorFactory], [1, Query() as ParamDecoratorFactory]]);

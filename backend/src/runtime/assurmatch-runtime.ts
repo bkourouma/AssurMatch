@@ -66,6 +66,7 @@ import { resolveAiProvider } from "../modules/ai/core/ai-provider.config";
 import { VisitorAiService } from "../modules/ai/visitor-ai.service";
 import { BrokerAiService } from "../modules/ai/broker-ai.service";
 import { AdminAiService } from "../modules/ai/admin-ai.service";
+import { AiScopeFlagPolicyService } from "../modules/ai/ai-scope-flags.service"; // Lot 7 (spec 074)
 import { LeadReassignmentService } from "../modules/routing/lead-reassignment.service";
 import { ManualRoutingService } from "../modules/routing/manual-routing.service";
 import { PrismaRoutingRulesRepository } from "../modules/routing/routing-rules.repository";
@@ -818,6 +819,14 @@ readonly enterprise = new EnterpriseService({
     routingAnomalyDetector: this.routingAnomalies
   });
   readonly adminRoutingAnomalies = new AdminRoutingAnomaliesController(this.routingAnomalies, this.adminAi);
+  /** Lot 7 (spec 074): the audited, protected path for the country and product AI flags; closes cached public reads on change. */
+  readonly aiScopeFlags = new AiScopeFlagPolicyService({
+    audit: this.audit.writer,
+    countries: this.countries.service,
+    products: this.products.service,
+    featureFlags: this.featureFlags.service,
+    onChanged: () => this.publicCountryDirectory.invalidate()
+  });
   private readonly billingRepository = this.runtimeRepository(new PrismaBillingRepository(this.prisma));
   private readonly invoicingRepository = this.runtimeRepository(new PrismaInvoicingRepository(this.prisma));
   readonly billing = new BillingModule({
