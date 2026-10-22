@@ -183,6 +183,8 @@ export async function consentAndSend(visitor: Page): Promise<string> {
 
 /** Whether the broker's lead list (own back-office session on `page`) shows the request. */
 export async function brokerSeesLead(page: Page, account: BackOfficeAccount, reference: string): Promise<boolean> {
+  // One page is reused for several brokers: drop the previous session, or openAs keeps the previous broker logged in.
+  await page.context().clearCookies();
   await openAs(page, account, "/leads");
   return (await page.getByRole("row").filter({ hasText: reference }).count()) > 0;
 }
