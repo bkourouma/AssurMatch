@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from "vitest";
-import { fingerprintTypedProspectContact } from "../../../../packages/shared/security/prospect-contact-fingerprint";
+import { legacyPiiFingerprint } from "../../../src/modules/common/security/pii-vault";
 import type { ActorContext } from "../../../src/modules/common/types";
 import { actorHeaders, createRuntimeHttpHarness, readJson, seedPublicRuntime, type RuntimeHttpHarness } from "../runtime-http-test-utils";
 
@@ -42,6 +42,16 @@ function get(harness: RuntimeHttpHarness, path: string, actor?: ActorContext) {
   return harness.request(path, actor ? { headers: actorHeaders(actor) } : undefined);
 }
 
+const CONTACT_SEARCH = "/admin/operations/prospects/contact-search";
+
+function postContact(harness: RuntimeHttpHarness, body: unknown, actor?: ActorContext) {
+  return harness.request(CONTACT_SEARCH, {
+    method: "POST",
+    headers: { "content-type": "application/json", ...(actor ? actorHeaders(actor) : {}) },
+    body: JSON.stringify(body)
+  });
+}
+
 describe("spec 073 admin prospects console (runtime HTTP)", () => {
   let harness: RuntimeHttpHarness | undefined;
 
@@ -62,6 +72,48 @@ describe("spec 073 admin prospects console (runtime HTTP)", () => {
     expect((await get(harness, "/admin/operations/prospects/not-a-uuid", SUPER_ADMIN)).status).toBe(400);
     expect((await get(harness, "/admin/operations/prospects?pageSize=101", SUPER_ADMIN)).status).toBe(400);
     expect(harness.runtime.audit.writer.search({ action: "admin_operations.access_refused", targetType: "Prospect" }).filter((entry) => entry.reason === "forbidden_role").length).toBeGreaterThanOrEqual(4);
+
+    // The POST contact search sits behind the same guards and roles.
+    expect((await postContact(harness, { contact: EMAIL })).status).toBe(401);
+    expect((await postContact(harness, { contact: EMAIL }, SUPER_ADMIN_NO_MFA)).status).toBe(403);
+    expect((await postContact(harness, { contact: EMAIL }, BROKER)).status).toBe(403);
+    expect((await postContact(harness, { contact: EMAIL }, CONTENT_ADMIN)).status).toBe(403);
+    expect((await postContact(harness, { contact: EMAIL }, FINANCE_ADMIN)).status).toBe(403);
+  });
+
+  it("searches an exact e-mail / phone from the POST body only: never in the URL, the response or the audit", async () => {
+    harness = await createRuntimeHttpHarness();
+    const seed = await seedPublicRuntime(harness.runtime);
+    await submitQuote(harness, seed);
+    const prospect = (await harness.runtime.prospects.service.list())[0]!;
+
+    for (const contact of [EMAIL, EMAIL.toUpperCase(), PHONE, "+225 01 02 03 04 11"]) {
+      const response = await postContact(harness, { contact }, SUPPORT_ADMIN);
+      expect(response.status, contact).toBe(200);
+      const raw = await response.text();
+      expect(raw, contact).not.toContain(EMAIL);
+      expect(raw, contact).not.toContain(PHONE);
+      expect(JSON.parse(raw), contact).toMatchObject({ total: 1, items: [{ id: prospect.id }] });
+    }
+    // Every operations role may search a contact, inside its scope only.
+    expect((await readJson<{ total: number }>(await postContact(harness, { contact: PHONE }, ADMIN_PAYS_CI))).total).toBe(1);
+    expect((await readJson<{ total: number }>(await postContact(harness, { contact: PHONE }, ADMIN_PAYS_SN))).total).toBe(0);
+    expect((await readJson<{ total: number }>(await postContact(harness, { contact: "autre@example.com" }, SUPER_ADMIN))).total).toBe(0);
+
+    // Invalid bodies: a name, an empty value, the former hash parameter, an unknown key.
+    expect((await postContact(harness, { contact: "Visiteur Un" }, SUPER_ADMIN)).status).toBe(400);
+    expect((await postContact(harness, {}, SUPER_ADMIN)).status).toBe(400);
+    expect((await postContact(harness, { contact: EMAIL, contactHash: legacyPiiFingerprint(EMAIL) }, SUPER_ADMIN)).status).toBe(400);
+    const invalid = await (await postContact(harness, { contact: "pas-un-contact" }, SUPER_ADMIN)).text();
+    expect(invalid).not.toContain("pas-un-contact");
+    // The GET list no longer takes any contact hash (it would travel in the URL).
+    expect((await get(harness, `/admin/operations/prospects?contactHash=${legacyPiiFingerprint(EMAIL)}`, SUPPORT_ADMIN)).status).toBe(400);
+
+    const listed = harness.runtime.audit.writer.search({ action: "admin_operations.prospects_listed" });
+    expect(listed.length).toBeGreaterThanOrEqual(7);
+    expect(listed.every((entry) => (entry.context.filters as { contactSearch: boolean }).contactSearch === true)).toBe(true);
+    const auditRaw = JSON.stringify(listed);
+    for (const forbidden of [EMAIL, PHONE, "visiteur1", "0102030411", legacyPiiFingerprint(EMAIL), legacyPiiFingerprint(PHONE)]) expect(auditRaw).not.toContain(forbidden);
   });
 
   it("lists masked, details in clear for super and support admins only, and audits without PII", async () => {
@@ -79,9 +131,6 @@ describe("spec 073 admin prospects console (runtime HTTP)", () => {
     expect(page.total).toBe(1);
     expect(page.items[0]).toMatchObject({ id: prospect.id, countryCode: "CI", productKey: "auto", quoteRequestCount: 1, anonymized: false });
 
-    // Search by exact e-mail or phone: matched through the fingerprint, never echoed.
-    expect((await readJson<{ total: number }>(await get(harness, `/admin/operations/prospects?contactHash=${fingerprintTypedProspectContact(EMAIL)}`, SUPPORT_ADMIN))).total).toBe(1);
-    expect((await readJson<{ total: number }>(await get(harness, `/admin/operations/prospects?contactHash=${fingerprintTypedProspectContact(PHONE)}`, SUPPORT_ADMIN))).total).toBe(1);
     // A clear e-mail / phone in the query string is refused (400): it would land in URLs and logs.
     expect((await get(harness, `/admin/operations/prospects?search=${encodeURIComponent(EMAIL)}`, SUPPORT_ADMIN)).status).toBe(400);
     expect((await readJson<{ total: number }>(await get(harness, "/admin/operations/prospects?search=inconnu", SUPPORT_ADMIN))).total).toBe(0);

@@ -4,8 +4,8 @@ import type { PrismaService } from "../common/prisma/prisma.service";
 import type { ProspectRecord } from "./prospects.service";
 import type { NormalizedProspectContact } from "./prospect-identity.service";
 // Lot 8 (spec 075 FR-A1/A2): column encryption and blind indexes live in common/security.
-import { prospectContactColumns, prospectContactMatch, prospectRowToDomain } from "../common/security/pii-columns";
-import { PiiVault } from "../common/security/pii-vault";
+import { prospectContactColumns, prospectContactLookup, prospectContactMatch, prospectRowToDomain } from "../common/security/pii-columns";
+import { legacyPiiFingerprint, PiiVault, type BlindIndexKind } from "../common/security/pii-vault";
 
 export const PROSPECTS_REPOSITORY = Symbol("PROSPECTS_REPOSITORY");
 
@@ -34,6 +34,11 @@ export interface ProspectsRepository extends RuntimeRepository {
   createOrLinkWithOutcome(countryId: string, productId: string, contact: NormalizedProspectContact, consentRecordId: string): Promise<{ prospect: ProspectRecord; created: boolean }>;
   list(): Promise<ProspectRecord[]>;
   require(id: string): Promise<ProspectRecord>;
+  /**
+   * Lot 6 x lot 8 (spec 073 FR-003): ids of the prospects carrying this exact e-mail or phone
+   * (normalised value), anonymised ones included (their contact is erased, so they never match).
+   */
+  findIdsByContact(kind: BlindIndexKind, normalizedValue: string): Promise<string[]>;
 }
 
 export class MemoryProspectsRepository implements ProspectsRepository {
@@ -83,6 +88,14 @@ export class MemoryProspectsRepository implements ProspectsRepository {
     const prospect = this.prospects.find((candidate) => candidate.id === id);
     if (!prospect) throw new Error(`Prospect ${id} not found`);
     return prospect;
+  }
+
+  async findIdsByContact(kind: BlindIndexKind, normalizedValue: string): Promise<string[]> {
+    // Memory records are clear (no vault): the legacy fingerprint is their only lookup key.
+    const fingerprint = legacyPiiFingerprint(normalizedValue);
+    return this.prospects
+      .filter((prospect) => (kind === "email" ? prospect.emailFingerprint : prospect.phoneFingerprint) === fingerprint)
+      .map((prospect) => prospect.id);
   }
 }
 
@@ -146,6 +159,12 @@ export class PrismaProspectsRepository implements ProspectsRepository {
     const row = await this.client().findUnique({ where: { id } });
     if (!row) throw new Error(`Prospect ${id} not found`);
     return this.toDomain(row);
+  }
+
+  async findIdsByContact(kind: BlindIndexKind, normalizedValue: string): Promise<string[]> {
+    // Lot 8: blind index for the encrypted rows OR legacy fingerprint for the clear ones; ids only.
+    const rows = await this.client().findMany({ where: prospectContactLookup(this.vault, kind, normalizedValue), select: { id: true } }) as Array<{ id: string }>;
+    return rows.map((row) => row.id);
   }
 
   private client(): ProspectDelegate {

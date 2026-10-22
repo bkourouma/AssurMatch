@@ -6,7 +6,7 @@
 
 ### T1 Prospects
 - [x] T101 Contrat `admin-operations.contracts.ts` : requête / réponse liste et détail prospect.
-- [x] T102 `AdminProspectsConsoleService` : périmètre pays / produit, masquage PII, détail en clair pour `super_admin` / `support_admin` avec audit, recherche par empreinte.
+- [x] T102 `AdminProspectsConsoleService` : périmètre pays / produit, masquage PII, détail en clair pour `super_admin` / `support_admin` avec audit, recherche exacte par e-mail / téléphone en POST via l'index aveugle du lot 8 (+ empreinte héritée).
 - [x] T103 Routes `GET /admin/operations/prospects` et `/:id` (contrôleur + enregistrement).
 - [x] T104 Écran `/prospects` (filtres, tableau, pagination, détail) et lecteur `operations-api.ts`.
 - [x] T105 Tests : unitaires (masquage, périmètre), intégration HTTP (refus finance / content, audit), écran.

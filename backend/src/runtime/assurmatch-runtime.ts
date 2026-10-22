@@ -770,8 +770,12 @@ readonly enterprise = new EnterpriseService({
     consent: { findRecord: (id: string) => this.consent.service.findRecord(id) },
     prospects: { find: (id: string) => this.prospects.service.require(id).catch(() => undefined) },
     // Lot 6
-    prospectsList: { list: () => this.prospects.service.list(), require: (id: string) => this.prospects.service.require(id) },
-    fingerprint: (value: string) => this.prospects.identity.fingerprint(value),
+    prospectsList: {
+      list: () => this.prospects.service.list(),
+      require: (id: string) => this.prospects.service.require(id),
+      // Lot 8: blind index + legacy fingerprint lookup of the admin contact search.
+      findIdsByContact: (kind, value) => this.prospects.service.findIdsByContact(kind, value)
+    },
     // Lot 6 (end)
     offers: { find: (id: string) => this.offers.repository.require(id).catch(() => undefined) },
     documents: { list: async (actor, quoteRequestId) => (await this.quoteDocuments.adminList(actor, quoteRequestId)).items },

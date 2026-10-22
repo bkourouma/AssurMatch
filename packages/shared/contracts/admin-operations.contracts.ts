@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { looksLikeProspectContact } from "../security/prospect-contact-fingerprint";
+import { looksLikeProspectContact } from "../security/prospect-contact-search";
 import { reasonSchema, uuidSchema } from "../validation/common.schemas";
 
 /**
@@ -240,14 +240,31 @@ export const adminProspectsQuerySchema = z.object({
   pageSize: z.coerce.number().int().min(1).max(100).default(50),
   country: z.string().trim().min(2).max(3).transform((value) => value.toUpperCase()).optional(),
   product: z.string().trim().min(1).max(64).optional(),
-  /** A name fragment only: an e-mail or phone typed here is refused (it would travel in clear in the URL). Use `contactHash`. */
-  search: z.string().trim().min(1).max(200).refine((value) => !looksLikeProspectContact(value), "Contact search must use contactHash").optional(),
-  /** Fingerprint (SHA-256 hex) of an e-mail or phone, computed by the admin server before the call. */
-  contactHash: z.string().trim().toLowerCase().regex(/^[0-9a-f]{64}$/).optional(),
+  /**
+   * A name fragment only. An e-mail or phone typed here is refused: it would travel in clear in the
+   * URL. Use the POST contact search (`adminProspectContactSearchSchema`).
+   */
+  search: z.string().trim().min(1).max(200).refine((value) => !looksLikeProspectContact(value), "Contact search must use POST /admin/operations/prospects/contact-search").optional(),
   includeAnonymized: queryBooleanSchema.default(false)
-});
+}).strict();
 
 export type AdminProspectsQuery = z.output<typeof adminProspectsQuerySchema>;
+
+/**
+ * Lot 6 x lot 8 (spec 073 FR-003, spec 075 FR-A2): exact e-mail / phone search, sent as a POST
+ * body only (never a URL, a query string or a log). The API matches it through the keyed blind
+ * index, with the legacy fingerprint for the rows not migrated yet, and never echoes it.
+ */
+export const adminProspectContactSearchSchema = z.object({
+  contact: z.string().trim().min(3).max(200).refine((value) => looksLikeProspectContact(value), "Expected an e-mail address or a phone number"),
+  page: pageSchema,
+  pageSize: z.coerce.number().int().min(1).max(100).default(50),
+  country: z.string().trim().min(2).max(3).transform((value) => value.toUpperCase()).optional(),
+  product: z.string().trim().min(1).max(64).optional(),
+  includeAnonymized: queryBooleanSchema.default(false)
+}).strict();
+
+export type AdminProspectContactSearch = z.output<typeof adminProspectContactSearchSchema>;
 
 /** E-mail and phone are always masked in a row; anonymised prospects carry no contact at all. */
 export interface AdminProspectListItem {

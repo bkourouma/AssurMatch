@@ -41,6 +41,11 @@ export class ProspectsService {
   require(id: string): Promise<ProspectRecord> {
     return this.repository.require(id);
   }
+
+  /** Lot 6 x lot 8: ids of the prospects carrying this exact normalised e-mail or phone. */
+  findIdsByContact(kind: "email" | "phone", normalizedValue: string): Promise<string[]> {
+    return this.repository.findIdsByContact(kind, normalizedValue);
+  }
 }
 
 export { PROSPECTS_REPOSITORY, MemoryProspectsRepository, type ProspectsRepository } from "./prospects.repository";

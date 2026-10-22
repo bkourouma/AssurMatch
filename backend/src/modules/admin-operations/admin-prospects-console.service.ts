@@ -1,15 +1,19 @@
 import type {
   AdminPage,
+  AdminProspectContactSearch,
   AdminProspectDetail,
   AdminProspectListItem,
   AdminProspectsQuery
 } from "../../../../packages/shared/contracts/admin-operations.contracts";
+import { normalizeTypedProspectContact, type ProspectContactKind } from "../../../../packages/shared/security/prospect-contact-search";
 import type { AssurMatchRole } from "../../../../packages/shared/rbac/assurmatch-role-matrix";
 import { ADMIN_OPERATIONS_AUDIT_ACTIONS } from "../audit-logs/admin-operations-audit-actions";
 import type { AuditLogWriter } from "../audit-logs/audit-log-writer.service";
 import type { ActorContext } from "../common/types";
 import type { QuoteRequestRecord } from "../quote-requests/quote-submission.service";
 import type { ProspectRecord } from "../prospects/prospects.service";
+import { BadRequestException } from "@nestjs/common";
+import { ErrorCodes } from "../../../../packages/shared/contracts/error-codes";
 import { OPERATIONS_ROLES, isoOrNull, maskEmail, maskPhone, paginate, type AdminOperationsAccess } from "./admin-operations-access";
 import { loadOperationsCatalog, type OperationsCatalog, type OperationsCatalogPorts } from "./admin-operations-catalog";
 
@@ -26,10 +30,21 @@ export const PROSPECT_PII_ROLES = new Set<AssurMatchRole>(["super_admin", "suppo
 export interface AdminProspectsConsoleDeps extends OperationsCatalogPorts {
   audit: AuditLogWriter;
   access: AdminOperationsAccess;
-  prospects: { list(): Promise<ProspectRecord[]>; require(id: string): Promise<ProspectRecord> };
+  prospects: {
+    list(): Promise<ProspectRecord[]>;
+    require(id: string): Promise<ProspectRecord>;
+    /** Lot 8: blind index (encrypted rows) OR legacy fingerprint (clear rows), computed by the repository. */
+    findIdsByContact(kind: ProspectContactKind, normalizedValue: string): Promise<string[]>;
+  };
   quotes: { list(): Promise<QuoteRequestRecord[]> };
-  /** Same SHA-256 fingerprint as `ProspectIdentityService.fingerprint`. */
-  fingerprint(value: string): string;
+}
+
+interface ListFilters {
+  country?: string | undefined;
+  product?: string | undefined;
+  includeAnonymized: boolean;
+  page: number;
+  pageSize: number;
 }
 
 export class AdminProspectsConsoleService {
@@ -37,41 +52,63 @@ export class AdminProspectsConsoleService {
 
   async list(actor: ActorContext, query: AdminProspectsQuery): Promise<AdminPage<AdminProspectListItem>> {
     this.deps.access.assert(actor, { roles: OPERATIONS_ROLES }, { type: "Prospect", id: "list" });
-    const catalog = await loadOperationsCatalog(this.deps);
-    const revealNames = this.canRevealPii(actor);
     const searchTerm = query.search?.trim().toLowerCase();
     // A name search on masked rows would be an existence oracle: only roles that may reveal the PII can use it.
     if (searchTerm) this.deps.access.assert(actor, { roles: PROSPECT_PII_ROLES }, { type: "Prospect", id: "list" });
-    const contactHash = query.contactHash?.toLowerCase();
+    const page = await this.page(actor, query, (prospect) => {
+      if (!searchTerm) return true;
+      return !prospect.anonymizedAt && (prospect.displayName ?? "").toLowerCase().includes(searchTerm);
+    });
+    await this.auditListed(actor, query, page, { search: Boolean(searchTerm), contactSearch: false });
+    return page;
+  }
+
+  /**
+   * Lot 6 x lot 8 (spec 073 FR-003, spec 075 FR-A2): exact e-mail or phone, received in a POST body.
+   * The repository matches it by keyed blind index (encrypted rows) or legacy fingerprint (rows not
+   * migrated yet). The value is never echoed, logged nor audited: the audit says `contactSearch: true`.
+   */
+  async searchByContact(actor: ActorContext, input: AdminProspectContactSearch): Promise<AdminPage<AdminProspectListItem>> {
+    this.deps.access.assert(actor, { roles: OPERATIONS_ROLES }, { type: "Prospect", id: "list" });
+    const contact = normalizeTypedProspectContact(input.contact);
+    // Generic message: never the typed value.
+    if (!contact) throw new BadRequestException({ code: ErrorCodes.VALIDATION_FAILED, message: "Invalid input: expected an e-mail address or a phone number" });
+    const ids = new Set(await this.deps.prospects.findIdsByContact(contact.kind, contact.value));
+    const page = await this.page(actor, input, (prospect) => !prospect.anonymizedAt && ids.has(prospect.id));
+    await this.auditListed(actor, input, page, { search: false, contactSearch: true });
+    return page;
+  }
+
+  private async page(actor: ActorContext, filters: ListFilters, matches: (prospect: ProspectRecord) => boolean): Promise<AdminPage<AdminProspectListItem>> {
+    const catalog = await loadOperationsCatalog(this.deps);
+    const revealNames = this.canRevealPii(actor);
     const [prospects, quotesByProspect] = await Promise.all([this.deps.prospects.list(), this.quotesByProspect()]);
     const rows = prospects
-      .filter((prospect) => query.includeAnonymized || !prospect.anonymizedAt)
+      .filter((prospect) => filters.includeAnonymized || !prospect.anonymizedAt)
       .filter((prospect) => this.deps.access.inScope(actor, scopeOf(prospect, catalog)))
-      .filter((prospect) => !query.country || catalog.countryCode(prospect.countryId) === query.country)
-      .filter((prospect) => !query.product || catalog.productKey(prospect.productId) === query.product)
-      .filter((prospect) => {
-        if (!searchTerm && !contactHash) return true;
-        if (prospect.anonymizedAt) return false;
-        if (contactHash) return prospect.emailFingerprint === contactHash || prospect.phoneFingerprint === contactHash;
-        return (prospect.displayName ?? "").toLowerCase().includes(searchTerm ?? "");
-      })
+      .filter((prospect) => !filters.country || catalog.countryCode(prospect.countryId) === filters.country)
+      .filter((prospect) => !filters.product || catalog.productKey(prospect.productId) === filters.product)
+      .filter(matches)
       .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
       .map((prospect) => toListItem(prospect, catalog, quotesByProspect.get(prospect.id)?.length ?? 0, revealNames));
-    const page = paginate(rows, query.page, query.pageSize);
-    this.deps.audit.write({
+    return paginate(rows, filters.page, filters.pageSize);
+  }
+
+  private async auditListed(actor: ActorContext, filters: ListFilters, page: AdminPage<AdminProspectListItem>, searches: { search: boolean; contactSearch: boolean }): Promise<void> {
+    // Fail-closed (lot 8 FR-B1): a prospect search that cannot be audited is not answered.
+    await this.deps.audit.writeAsync({
       actor,
       action: ADMIN_OPERATIONS_AUDIT_ACTIONS.prospectsListed,
       targetType: "Prospect",
       targetId: "list",
       result: "success",
-      // The searched value is never recorded: only whether a search was used.
+      // The searched value (name, e-mail, phone) and any hash of it are never recorded: flags only.
       context: {
         total: page.total,
         page: page.page,
-        filters: { country: query.country ?? null, product: query.product ?? null, search: Boolean(query.search), contactSearch: Boolean(query.contactHash), includeAnonymized: query.includeAnonymized }
+        filters: { country: filters.country ?? null, product: filters.product ?? null, ...searches, includeAnonymized: filters.includeAnonymized }
       }
     });
-    return page;
   }
 
   async detail(actor: ActorContext, id: string): Promise<AdminProspectDetail> {
@@ -94,7 +131,8 @@ export class AdminProspectsConsoleService {
         .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
         .map((quote) => ({ id: quote.id, publicReference: quote.publicReference, status: quote.status, createdAt: isoOrNull(quote.createdAt) ?? "" }))
     };
-    this.deps.audit.write({
+    // Fail-closed (lot 8 FR-B1): the contact is revealed only once the reading is durably audited.
+    await this.deps.audit.writeAsync({
       actor,
       action: ADMIN_OPERATIONS_AUDIT_ACTIONS.prospectViewed,
       targetType: "Prospect",

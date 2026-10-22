@@ -20,7 +20,6 @@ export interface AdminOperationsModuleDeps extends OperationsCatalogPorts {
   afterAssign?: AdminQuoteReviewDeps["afterAssign"];
   // Lot 6
   prospectsList: AdminProspectsConsoleDeps["prospects"];
-  fingerprint: AdminProspectsConsoleDeps["fingerprint"];
   // Lot 6 (end)
 }
 
@@ -76,8 +75,7 @@ export class AdminOperationsModule {
       audit: deps.audit,
       access: this.access,
       prospects: deps.prospectsList,
-      quotes: deps.submissions,
-      fingerprint: deps.fingerprint
+      quotes: deps.submissions
     });
     // Lot 6 (end)
   }
