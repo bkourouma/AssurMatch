@@ -1,4 +1,4 @@
-import { createHash } from "node:crypto";
+import { prospectContactFingerprint } from "../../../../packages/shared/security/prospect-contact-fingerprint";
 import { BadRequestException } from "@nestjs/common";
 import { ErrorCodes } from "../../../../packages/shared/contracts/error-codes";
 
@@ -33,7 +33,7 @@ export class ProspectIdentityService {
   }
 
   fingerprint(value: string): string {
-    return createHash("sha256").update(`assurmatch:${value.trim().toLowerCase()}`).digest("hex");
+    return prospectContactFingerprint(value);
   }
 
   /**

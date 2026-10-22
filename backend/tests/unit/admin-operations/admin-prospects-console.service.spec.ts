@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { adminProspectsQuerySchema } from "../../../../packages/shared/contracts/admin-operations.contracts";
+import { fingerprintTypedProspectContact } from "../../../../packages/shared/security/prospect-contact-fingerprint";
 import { AdminOperationsAccess } from "../../../src/modules/admin-operations/admin-operations-access";
 import { AdminProspectsConsoleService, maskDisplayName } from "../../../src/modules/admin-operations/admin-prospects-console.service";
 import { AuditLogWriter } from "../../../src/modules/audit-logs/audit-log-writer.service";
@@ -137,11 +138,11 @@ describe("spec 073 admin prospects console", () => {
     const { service, audit } = build();
     const admin = actor("super_admin");
     expect((await service.list(admin, query({ search: "KONE" }))).items.map((item) => item.id)).toEqual(["p-ci-auto"]);
-    expect((await service.list(admin, query({ search: "Moussa@Example.com" }))).items.map((item) => item.id)).toEqual(["p-ci-health"]);
-    expect((await service.list(admin, query({ search: "+221 77 12 34 567" }))).items.map((item) => item.id)).toEqual(["p-sn-auto"]);
+    expect((await service.list(admin, query({ contactHash: fingerprintTypedProspectContact("Moussa@Example.com") }))).items.map((item) => item.id)).toEqual(["p-ci-health"]);
+    expect((await service.list(admin, query({ contactHash: fingerprintTypedProspectContact("+221 77 12 34 567") }))).items.map((item) => item.id)).toEqual(["p-sn-auto"]);
     expect((await service.list(admin, query({ search: "moussa" }))).total).toBe(1);
     // A partial e-mail does not match: only the exact address does.
-    expect((await service.list(admin, query({ search: "moussa@example" }))).total).toBe(0);
+    expect((await service.list(admin, query({ contactHash: fingerprintTypedProspectContact("moussa@example") }))).total).toBe(0);
     const logged = JSON.stringify(audit.search({ action: "admin_operations.prospects_listed" }));
     expect(logged).not.toContain("Moussa");
     expect(logged).not.toContain("example.com");
@@ -180,5 +181,30 @@ describe("spec 073 admin prospects console", () => {
   it("rejects an unknown prospect", async () => {
     const { service } = build();
     await expect(service.detail(actor("super_admin"), "missing")).rejects.toThrow(/not found/);
+  });
+  it("refuses a clear e-mail or phone in the GET search (it would land in the URL) and accepts only the hash", () => {
+    expect(() => query({ search: "moussa@example.com" })).toThrow();
+    expect(() => query({ search: "+221 77 12 34 567" })).toThrow();
+    expect(() => query({ contactHash: "moussa@example.com" })).toThrow();
+    expect(query({ search: "Kone" }).search).toBe("Kone");
+    const hash = fingerprintTypedProspectContact("moussa@example.com");
+    expect(hash).toMatch(/^[0-9a-f]{64}$/);
+    expect(query({ contactHash: hash.toUpperCase() }).contactHash).toBe(hash);
+  });
+
+  it("never records the contact hash in the audit trail, only that a contact search was used", async () => {
+    const { service, audit } = build();
+    const hash = fingerprintTypedProspectContact("Moussa@Example.com");
+    await service.list(actor("super_admin"), query({ contactHash: hash }));
+    const logged = JSON.stringify(audit.search({ action: "admin_operations.prospects_listed" }));
+    expect(logged).not.toContain(hash);
+    expect(logged).toContain("contactSearch");
+  });
+
+  it("keeps the clear detail audited and limited to super_admin and support_admin", async () => {
+    const { service } = build();
+    const detail = await service.detail(actor("support_admin"), "p-ci-auto");
+    expect(detail.piiRevealed).toBe(true);
+    await expect(service.detail(actor("finance_admin"), "p-ci-auto")).rejects.toThrow();
   });
 });

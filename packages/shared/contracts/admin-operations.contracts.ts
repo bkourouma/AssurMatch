@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { looksLikeProspectContact } from "../security/prospect-contact-fingerprint";
 import { reasonSchema, uuidSchema } from "../validation/common.schemas";
 
 /**
@@ -239,8 +240,10 @@ export const adminProspectsQuerySchema = z.object({
   pageSize: z.coerce.number().int().min(1).max(100).default(50),
   country: z.string().trim().min(2).max(3).transform((value) => value.toUpperCase()).optional(),
   product: z.string().trim().min(1).max(64).optional(),
-  /** A name fragment, or an e-mail / phone typed in full (hashed server side, never echoed or logged). */
-  search: z.string().trim().min(1).max(200).optional(),
+  /** A name fragment only: an e-mail or phone typed here is refused (it would travel in clear in the URL). Use `contactHash`. */
+  search: z.string().trim().min(1).max(200).refine((value) => !looksLikeProspectContact(value), "Contact search must use contactHash").optional(),
+  /** Fingerprint (SHA-256 hex) of an e-mail or phone, computed by the admin server before the call. */
+  contactHash: z.string().trim().toLowerCase().regex(/^[0-9a-f]{64}$/).optional(),
   includeAnonymized: queryBooleanSchema.default(false)
 });
 

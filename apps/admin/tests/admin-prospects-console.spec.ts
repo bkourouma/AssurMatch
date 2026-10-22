@@ -17,7 +17,8 @@ test("operations API client reads the prospects console routes", () => {
 test("prospects list filters, paginates and never shows a clear contact", () => {
   const page = source("apps/admin/app/prospects/page.tsx");
   expect(page).toContain("readProspects");
-  expect(page).toContain("FilterBar");
+  expect(page).toContain("searchProspectsAction");
+  expect(page).not.toContain("method=\"get\"");
   for (const filter of ["name=\"search\"", "name=\"country\"", "name=\"product\"", "name=\"includeAnonymized\""]) {
     expect(page, filter).toContain(filter);
   }
@@ -39,4 +40,15 @@ test("prospect detail shows the reveal state, anonymised notice and linked quote
   expect(detail).toContain("Prospect anonymise");
   expect(detail).toContain("Demandes de devis liees");
   expect(detail).toContain("Prospect introuvable");
+});
+
+test("prospect search is a POST server action that hashes an e-mail / phone and never puts it in the URL", () => {
+  const action = source("apps/admin/app/prospects/search-action.ts");
+  expect(action).toContain("\"use server\"");
+  expect(action).toContain("fingerprintTypedProspectContact");
+  expect(action).toContain("params.set(\"contact\"");
+  const page = source("apps/admin/app/prospects/page.tsx");
+  expect(page).toContain("action={searchProspectsAction}");
+  expect(page).toContain("contactHash");
+  expect(source("packages/shared/contracts/admin-operations.contracts.ts")).toContain("Contact search must use contactHash");
 });

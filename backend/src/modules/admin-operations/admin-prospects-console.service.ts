@@ -40,7 +40,7 @@ export class AdminProspectsConsoleService {
     const catalog = await loadOperationsCatalog(this.deps);
     const revealNames = this.canRevealPii(actor);
     const searchTerm = query.search?.trim().toLowerCase();
-    const fingerprints = query.search ? this.searchFingerprints(query.search) : new Set<string>();
+    const contactHash = query.contactHash?.toLowerCase();
     const [prospects, quotesByProspect] = await Promise.all([this.deps.prospects.list(), this.quotesByProspect()]);
     const rows = prospects
       .filter((prospect) => query.includeAnonymized || !prospect.anonymizedAt)
@@ -48,10 +48,10 @@ export class AdminProspectsConsoleService {
       .filter((prospect) => !query.country || catalog.countryCode(prospect.countryId) === query.country)
       .filter((prospect) => !query.product || catalog.productKey(prospect.productId) === query.product)
       .filter((prospect) => {
-        if (!searchTerm) return true;
+        if (!searchTerm && !contactHash) return true;
         if (prospect.anonymizedAt) return false;
-        if ((prospect.displayName ?? "").toLowerCase().includes(searchTerm)) return true;
-        return fingerprints.has(prospect.emailFingerprint) || fingerprints.has(prospect.phoneFingerprint);
+        if (contactHash) return prospect.emailFingerprint === contactHash || prospect.phoneFingerprint === contactHash;
+        return (prospect.displayName ?? "").toLowerCase().includes(searchTerm ?? "");
       })
       .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
       .map((prospect) => toListItem(prospect, catalog, quotesByProspect.get(prospect.id)?.length ?? 0, revealNames));
@@ -66,7 +66,7 @@ export class AdminProspectsConsoleService {
       context: {
         total: page.total,
         page: page.page,
-        filters: { country: query.country ?? null, product: query.product ?? null, search: Boolean(query.search), includeAnonymized: query.includeAnonymized }
+        filters: { country: query.country ?? null, product: query.product ?? null, search: Boolean(query.search), contactSearch: Boolean(query.contactHash), includeAnonymized: query.includeAnonymized }
       }
     });
     return page;
@@ -113,13 +113,6 @@ export class AdminProspectsConsoleService {
 
   private canRevealPii(actor: ActorContext): boolean {
     return actor.roles.some((role) => PROSPECT_PII_ROLES.has(role));
-  }
-
-  /** The typed value as is, and without separators (phones are fingerprinted in `+<dial><digits>` form). */
-  private searchFingerprints(search: string): Set<string> {
-    const typed = search.trim();
-    const compact = typed.replace(/[\s.-]/g, "");
-    return new Set([typed, compact].map((value) => this.deps.fingerprint(value)));
   }
 
   /** One pass over the quote requests: no per-prospect lookup. */

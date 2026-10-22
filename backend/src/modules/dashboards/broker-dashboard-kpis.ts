@@ -73,10 +73,18 @@ export function ratio(numerator: number, denominator: number): number {
   return denominator === 0 ? 0 : Math.round((numerator / denominator) * 1000) / 1000;
 }
 
-export function averageMinutes(values: Array<number | null>): number | null {
+export function averageMinutes(values: Array<number | null>, decimals = 2): number | null {
   const present = values.filter((value): value is number => value !== null && Number.isFinite(value));
   if (present.length === 0) return null;
-  return Math.round((present.reduce((sum, value) => sum + value, 0) / present.length) * 100) / 100;
+  const factor = 10 ** decimals;
+  return Math.round((present.reduce((sum, value) => sum + value, 0) / present.length) * factor) / factor;
+}
+
+/** Minutes between the assignment and the first broker action (same definition as GET /admin/partners/sla). */
+export function firstActionMinutes(assignment: LeadAssignmentRecord): number | null {
+  const firstAction = assignment.seenAt ?? assignment.acceptedAt ?? assignment.lastBrokerActionAt ?? assignment.crmUpdatedAt;
+  if (!firstAction) return null;
+  return Math.max(0, Math.round((firstAction.getTime() - assignment.assignedAt.getTime()) / 60_000));
 }
 
 /**

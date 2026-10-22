@@ -1,6 +1,8 @@
 import { firstValue, formatDateTime, pageHref, pageNumber, readProspects, type ProspectRow } from "../lib/operations-api";
-import { Badge, Card, DataTable, Field, FilterBar, Input, PageHeader, PageStack, Select, StateMessage, fieldControlProps, type DataTableColumn } from "../lib/ui/admin-ui";
+import { Badge, Card, DataTable, Field, Input, PageHeader, PageStack, Select, StateMessage, fieldControlProps, type DataTableColumn } from "../lib/ui/admin-ui";
 import { OperationsTabs } from "../lib/ui/operations-tabs";
+import { searchProspectsAction } from "./search-action";
+import { looksLikeProspectContact } from "../../../../packages/shared/security/prospect-contact-fingerprint";
 
 /**
  * Spec 073 (FR-001 a FR-005): prospects console. A row never carries a clear e-mail or phone: the
@@ -21,14 +23,19 @@ const columns: Array<DataTableColumn<ProspectRow>> = [
 
 export default async function AdminProspectsPage({ searchParams }: { searchParams?: Promise<Record<string, string | string[] | undefined>> }) {
   const params = searchParams ? await searchParams : {};
+  // A contact typed in clear in the URL (old link) is dropped: only the hash (`contact`) is forwarded.
+  const rawSearch = firstValue(params.search);
+  const contactParam = firstValue(params.contact);
   const filters = {
     country: firstValue(params.country)?.toUpperCase(),
     product: firstValue(params.product),
-    search: firstValue(params.search),
+    search: rawSearch && !looksLikeProspectContact(rawSearch) ? rawSearch : undefined,
+    contact: contactParam && /^[0-9a-fA-F]{64}$/.test(contactParam) ? contactParam.toLowerCase() : undefined,
     includeAnonymized: firstValue(params.includeAnonymized) === "true" ? "true" : undefined
   };
   const page = pageNumber(params.page);
-  const result = await readProspects({ ...filters, page, pageSize: 50 });
+  const { contact, ...listFilters } = filters;
+  const result = await readProspects({ ...listFilters, ...(contact ? { contactHash: contact } : {}), page, pageSize: 50 });
   const activeFilters = Object.values(filters).filter(Boolean).length;
 
   return (
@@ -46,9 +53,16 @@ export default async function AdminProspectsPage({ searchParams }: { searchParam
       {result.status === "error" ? <StateMessage tone="danger">Prospects indisponibles : {result.error}</StateMessage> : null}
 
       <Card>
-        <FilterBar action="/prospects" label="Filtres prospects" submitLabel="Filtrer" resetLabel="Reinitialiser" resetHref="/prospects" activeCount={activeFilters}>
+        {/* POST (server action): an e-mail / phone is hashed server side and never lands in the URL. */}
+        <form className="bo-filters" action={searchProspectsAction} role="search" aria-label="Filtres prospects">
           <Field id="prospect-search" label="Recherche (nom, ou e-mail / telephone exact)">
-            <Input {...fieldControlProps("prospect-search")} name="search" defaultValue={filters.search ?? ""} autoComplete="off" />
+            <Input
+              {...fieldControlProps("prospect-search")}
+              name="search"
+              defaultValue={filters.search ?? ""}
+              placeholder={filters.contact ? "Recherche par e-mail / telephone active (valeur non conservee)" : undefined}
+              autoComplete="off"
+            />
           </Field>
           <Field id="prospect-country" label="Pays (code ISO)">
             <Input {...fieldControlProps("prospect-country")} name="country" defaultValue={filters.country ?? ""} maxLength={3} placeholder="CI" />
@@ -62,7 +76,12 @@ export default async function AdminProspectsPage({ searchParams }: { searchParam
               <option value="true">Inclure</option>
             </Select>
           </Field>
-        </FilterBar>
+          <div className="bo-filters__actions">
+            <button className="bo-button" data-variant="secondary" data-size="sm" type="submit">Filtrer</button>
+            <a className="bo-button" data-variant="tertiary" data-size="sm" href="/prospects">Reinitialiser</a>
+            {activeFilters > 0 ? <span className="bo-filters__count">{activeFilters}</span> : null}
+          </div>
+        </form>
       </Card>
 
       <Card as="section" aria-label="Liste des prospects">

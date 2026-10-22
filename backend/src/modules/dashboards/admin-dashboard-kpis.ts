@@ -10,6 +10,7 @@ import type { LeadDisputeRecord } from "../leads/crm-activity.repository";
 import { PublicJourneyFlagPolicy } from "../feature-flags/public-journey-flag-policy";
 import { isWithinWindow, type ResolvedDashboardWindow } from "./dashboard-time-window";
 import type { ResolvedAdminScope } from "./dashboards-access-policy";
+import { averageMinutes, firstActionMinutes } from "./broker-dashboard-kpis";
 
 /**
  * Spec 073 T302: pure helpers of the extra admin dashboard KPIs (PRD section 21). Everything here
@@ -100,20 +101,12 @@ export function countActiveProducts(
   }).length;
 }
 
-// Lot 6: duplicated minimum, dedupe after lot 3 merge
-/** Minutes between the assignment and the first broker action (same definition as GET /admin/partners/sla). */
-function firstActionMinutes(assignment: LeadAssignmentRecord): number | null {
-  const firstAction = assignment.seenAt ?? assignment.acceptedAt ?? assignment.lastBrokerActionAt ?? assignment.crmUpdatedAt;
-  if (!firstAction) return null;
-  return Math.max(0, Math.round((firstAction.getTime() - assignment.assignedAt.getTime()) / 60_000));
-}
-
-// Lot 6: duplicated minimum, dedupe after lot 3 merge
+/** Average minutes to the first broker action over the assignments that have one (shared helpers of the broker dashboard). */
 export function summarisePartnerSla(assignments: LeadAssignmentRecord[]): { averageFirstActionMinutes: number | null; measured: number } {
-  const delays = assignments.map(firstActionMinutes).filter((minutes): minutes is number => minutes !== null);
+  const delays = assignments.map(firstActionMinutes);
   return {
-    averageFirstActionMinutes: delays.length === 0 ? null : Math.round(delays.reduce((sum, minutes) => sum + minutes, 0) / delays.length),
-    measured: delays.length
+    averageFirstActionMinutes: averageMinutes(delays, 0),
+    measured: delays.filter((minutes) => minutes !== null).length
   };
 }
 
