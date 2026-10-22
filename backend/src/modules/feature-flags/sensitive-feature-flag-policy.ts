@@ -24,7 +24,11 @@ const explicitlyProtectedFeatureFlags = new Set([
   "partner_webhooks_enabled",
   "retention_purge_enabled",
   "satisfaction_survey_enabled",
-  "ai_routing_anomaly_detection_enabled"
+  "ai_routing_anomaly_detection_enabled",
+  // Lot 7: per-country and per-product AI flags follow the audited compliance path only
+  "country_ai_enabled",
+  "product_ai_scoring_enabled",
+  "product_ai_form_assistant_enabled"
 ]);
 
 const regulatedFlagKeyFragments = [

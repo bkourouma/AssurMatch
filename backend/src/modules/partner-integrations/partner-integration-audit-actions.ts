@@ -11,5 +11,8 @@ export const PartnerIntegrationAuditActions = {
   webhookDeliveryPrepared: "partner_webhook.delivery_prepared",
   webhookDeliverySkipped: "partner_webhook.delivery_skipped",
   webhookDeliveryAttemptRecorded: "partner_webhook.delivery_attempt_recorded",
-  webhookDeliveryRefused: "partner_webhook.delivery_refused"
+  webhookDeliveryRefused: "partner_webhook.delivery_refused",
+  // Lot 7 (H-08): operator-triggered test send to a partner webhook endpoint.
+  webhookTestSent: "partner_webhook.test_sent",
+  webhookTestRefused: "partner_webhook.test_refused"
 } as const;
