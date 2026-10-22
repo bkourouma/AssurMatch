@@ -117,7 +117,7 @@ describe("AiScopeFlagPolicyService (lot 7)", () => {
     const { country, featureFlags, countries, products, audit } = await build();
     await expect(featureFlags.setFlag({ key: "country_ai_enabled", scopeType: "country", scopeId: country.id, value: true, reason: "tentative directe" }, superAdmin)).rejects.toThrow();
     await expect(featureFlags.setFlag({ key: "product_ai_scoring_enabled", scopeType: "product", scopeId: country.id, value: true, reason: "tentative directe" }, superAdmin)).rejects.toThrow();
-    const guard = new CatalogActivationGuard({ checklist: { countryActivationBlockers: async () => [] }, quoteForms: { list: async () => [] }, consentTexts: { listTexts: async () => [] } });
+    const guard = new CatalogActivationGuard({ checklist: { countryActivationBlockers: async () => [], productActivationBlockers: async () => [] }, quoteForms: { list: async () => [] }, consentTexts: { listTexts: async () => [] } });
     const catalog = new CatalogFlagService({ audit, countries, products, featureFlags, guard });
     await expect(catalog.toggleCountryFlag(superAdmin, country.id, { key: "country_ai_enabled", value: true, reason: "tentative catalogue" })).rejects.toMatchObject({ status: 403 });
   });
