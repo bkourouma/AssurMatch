@@ -182,6 +182,16 @@ describe("spec 069 lot 3 CRM list sort and priority runtime HTTP", () => {
     const raw = await assign("not-a-user", TENANT);
     expect(raw.status).toBeGreaterThanOrEqual(400);
     expect(raw.status).toBeLessThan(500);
+    // A suspended or deleted advisor of the same cabinet is refused as well (FR-006).
+    for (const end of ["suspend", "softDelete"] as const) {
+      const departing = withPlan(await brokerUser(h, TENANT, "broker_agent"), "enterprise");
+      expect((await assign(departing.actorId as string, TENANT)).status).toBeLessThan(300);
+      await h.runtime.leads.assignments.updateCrmMetadata(leads.b.id, { assignedAdvisorId: agent.actorId as string }, owner);
+      await h.runtime.users.service[end](departing.actorId as string);
+      const refused = await assign(departing.actorId as string, TENANT);
+      expect(refused.status).toBeGreaterThanOrEqual(400);
+      expect(refused.status).toBeLessThan(500);
+    }
     // The lead is still assigned to the legitimate advisor.
     const detail = await readJson<{ advisorId?: string }>(await get(h, owner, `/broker/crm/leads/${leads.b.id}`));
     expect(detail.advisorId).toBe(agent.actorId);
