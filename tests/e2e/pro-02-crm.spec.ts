@@ -45,6 +45,9 @@ function labelRx(text: string): RegExp {
   return new RegExp(`^\\s*${loose(text)}\\s*$`, "u");
 }
 
+// Display name given to the team agent by pro-01-setup; the assignment picker lists advisors by name only.
+const AGENT_NAME = "Aya Agent";
+
 function statusKey(label: string): string {
   return label.normalize("NFD").replace(/\p{M}/gu, "").trim().toLowerCase().replace(/\s+/gu, "_");
 }
@@ -213,7 +216,8 @@ function total(snapshot: DashboardSnapshot): number {
 }
 
 function kanbanColumn(page: Page, label: string) {
-  return page.locator("section.bo-card").filter({ has: page.getByRole("heading", { name: new RegExp(`^${loose(label)} \\(\\d+\\)$`, "u") }) });
+  // Drag-and-drop Kanban: one <section data-kanban-column="<status key>"> per status, one <li data-kanban-card> per lead.
+  return page.locator(`[data-kanban-column='${statusKey(label)}']`);
 }
 
 test("PRO-CRM-01 le lead apparaît dans la liste CRM et dans le Kanban (colonne Nouveau) et le tableau de bord CRM est actif", async ({ browser }) => {
@@ -243,11 +247,11 @@ test("PRO-CRM-01 le lead apparaît dans la liste CRM et dans le Kanban (colonne 
       const column = kanbanColumn(page, "Nouveau");
       await expect(column.locator(`a[href='/crm/leads/${assignmentId}']`), `${reference} in column Nouveau`).toHaveText(reference);
     } else {
-      await expect(page.locator(`section.bo-card a[href='/crm/leads/${assignmentId}']`), `${reference} somewhere in the Kanban`).toHaveCount(1);
+      await expect(page.locator(`[data-kanban-card] a[href='/crm/leads/${assignmentId}']`), `${reference} somewhere in the Kanban`).toHaveCount(1);
     }
   }
   // The lead opened from the Kanban is the CRM sheet of the same lead.
-  await page.locator(`section.bo-card a[href='/crm/leads/${world.data.lead1AssignmentId}']`).click();
+  await page.locator(`[data-kanban-card] a[href='/crm/leads/${world.data.lead1AssignmentId}']`).click();
   await page.waitForURL(new RegExp(`/crm/leads/${world.data.lead1AssignmentId}`, "u"));
   await expect(page.getByRole("heading", { level: 1, name: world.data.lead1Ref as string })).toBeVisible();
 
@@ -309,7 +313,7 @@ test("PRO-CRM-03 lead2 : le propriétaire l'assigne à l'agent de l'équipe, l'a
   const agent = world.members.agent as BackOfficeAccount;
   const leadId = world.data.lead2AssignmentId as string;
 
-  // The advisor id requested by the assign form is the actor id of the user: the agent reads it on /account.
+  // The assign form is a named picker (no raw id); the agent actor id is still read on /account to check the stored assignment.
   const agentPage = await ownerPage(browser);
   await openAs(agentPage, agent, "/account");
   const actorCell = agentPage.locator("dl.bo-dl > div").filter({ has: agentPage.locator("dt", { hasText: /^Acteur$/u }) }).locator("dd");
@@ -321,18 +325,18 @@ test("PRO-CRM-03 lead2 : le propriétaire l'assigne à l'agent de l'équipe, l'a
   await openLead(page, world.owner, leadId);
   const assignCard = card(page, labelRx("Conseiller assigne"));
   await expect(assignCard.getByRole("button", { name: "Assigner au conseiller" })).toBeVisible();
-  if ((await assignCard.getByText(`Conseiller actuel : ${agentId}`).count()) === 0) {
-    await assignCard.locator("#crm-advisor-id").fill(agentId);
+  if ((await assignCard.getByText(`Conseiller actuel : ${AGENT_NAME}`).count()) === 0) {
+    await assignCard.locator("#crm-advisor-id").selectOption({ label: AGENT_NAME });
     await submitCrmForm(page, assignCard.getByRole("button", { name: "Assigner au conseiller" }), "assigned");
     await expect(page.locator(".bo-notice").filter({ hasText: /Lead assign/u }), "result notice").not.toHaveCount(0);
   }
-  await expect(card(page, labelRx("Conseiller assigne")).getByText(`Conseiller actuel : ${agentId}`)).toBeVisible();
-  await expect(page.locator("dl.bo-dl > div").filter({ has: page.locator("dt", { hasText: /^Conseiller$/u }) }).locator("dd")).toHaveText(agentId);
+  await expect(card(page, labelRx("Conseiller assigne")).getByText(`Conseiller actuel : ${AGENT_NAME}`)).toBeVisible();
+  await expect(page.locator("dl.bo-dl > div").filter({ has: page.locator("dt", { hasText: /^Conseiller$/u }) }).locator("dd")).toHaveText(AGENT_NAME);
 
   // History and list show the assignment.
   expectInOrder(await historyEntries(page, world.owner, leadId), [new RegExp(loose("Lead assigne a un conseiller"), "u")]);
   await openAs(page, world.owner, "/crm/leads");
-  await expect(page.getByRole("row").filter({ hasText: world.data.lead2Ref as string })).toContainText(agentId);
+  await expect(page.getByRole("row").filter({ hasText: world.data.lead2Ref as string })).toContainText(AGENT_NAME);
   await page.context().close();
 
   world.data.lead2AdvisorId = agentId;
@@ -416,7 +420,7 @@ test("PRO-CRM-05 historique complet de lead1 dans l'ordre chronologique et indic
   // The agent assigned to lead2 appears in the advisor performance table.
   const advisors = card(page, labelRx("Performance par conseiller"));
   await expect(advisors).toBeVisible();
-  const advisorRow = advisors.getByRole("row").filter({ hasText: world.data.lead2AdvisorId as string });
+  const advisorRow = advisors.getByRole("row").filter({ hasText: AGENT_NAME });
   await expect(advisorRow).toHaveCount(1);
   const received = Number.parseInt(((await advisorRow.locator("td").nth(1).innerText()) || "0").replace(/\D/gu, ""), 10);
   expect(received, "leads received by the assigned advisor").toBeGreaterThanOrEqual(1);
