@@ -19,6 +19,7 @@ import {
   readQuoteOptions,
   setMultiBrokerPolicy,
   VG_REASON,
+  waitForFreshQuoteRateWindow,
   waitForQuoteOptions,
   workerHeartbeatAgeSeconds,
   type VisitorIdentity
@@ -246,6 +247,7 @@ test("VG-04 plusieurs offres, flag multi-courtiers fermé : seule la première o
   const y = requireWorld(ROOT_WORLD_Y);
   const z = requireWorld(ROOT_WORLD_Z);
 
+  await waitForFreshQuoteRateWindow();
   expect((await readQuoteOptions([x.offerId, offerOf(y)])).multiBrokerAvailable, "multi-broker closed by default").toBe(false);
 
   // UI: three offers selected, no multi-broker authorisation is even offered; the form says one offer only.
@@ -276,7 +278,7 @@ test("VG-05 flag multi-courtiers ouvert par la politique conformité : jusqu'à 
   const y = requireWorld(ROOT_WORLD_Y);
   const z = requireWorld(ROOT_WORLD_Z);
   const offerIds = [x.offerId, offerOf(y), offerOf(z)];
-
+  await waitForFreshQuoteRateWindow();
   await setMultiBrokerPolicy(true, `E2E-POL-067-${uniqueSuffix()}`);
   multiBrokerOpened = true;
   await waitForQuoteOptions((options) => options.multiBrokerAvailable, "multi-broker opens after the policy", offerIds);

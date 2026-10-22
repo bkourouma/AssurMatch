@@ -172,6 +172,14 @@ export async function fillNeedAndContact(visitor: Page, identity: VisitorIdentit
   await visitor.locator("#am-quote-phone").fill(identity.phone);
 }
 
+/**
+ * The public API allows 5 quote requests per minute and per IP, country and product (PublicQuoteRateLimitService):
+ * a test that sends several requests waits for a fresh window first (all the visitors of the suite share 127.0.0.1).
+ */
+export async function waitForFreshQuoteRateWindow(): Promise<void> {
+  await new Promise((resolve) => setTimeout(resolve, 61_000));
+}
+
 /** Ticks the main consent, sends the request and returns the QR- reference of the confirmation. */
 export async function consentAndSend(visitor: Page): Promise<string> {
   await visitor.locator("#am-quote-consent").check();
