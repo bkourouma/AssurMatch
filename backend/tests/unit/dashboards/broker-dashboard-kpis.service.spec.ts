@@ -47,6 +47,9 @@ function makeService(
     agencyScope?: (advisorId: string | undefined) => boolean;
     leadPricing?: (plan: string, country: string) => Promise<Pricing | undefined>;
     agencies?: Array<{ id: string; name: string; memberIds: string[] }>;
+    crmEnabled?: boolean;
+    proposalRecords?: Map<string, Array<Record<string, unknown>>>;
+    reads?: { history: number };
   } = {}
 ) {
   const audit = new AuditLogWriter();
@@ -58,14 +61,17 @@ function makeService(
     crmActivity: {
       tasksForLead: async () => [],
       remindersForLead: async () => [],
-      pipelineHistoryForLead: async (id: string) => options.histories?.get(id) ?? [],
-      proposalsForLead: async (id: string) => Array.from({ length: options.proposals?.get(id) ?? 0 }, () => ({}))
+      pipelineHistoryForLead: async (id: string) => {
+        if (options.reads) options.reads.history += 1;
+        return options.histories?.get(id) ?? [];
+      },
+      proposalsForLead: async (id: string) => options.proposalRecords?.get(id) ?? Array.from({ length: options.proposals?.get(id) ?? 0 }, () => ({}))
     } as never,
     agencyScope: options.agencyScope ? { resolve: async () => options.agencyScope } : undefined,
     leadPricing: options.leadPricing as never,
     quotesSent: options.quotesSent,
     agencies: options.agencies ? { listForTenant: async () => options.agencies as never } : undefined,
-    config: () => ({ brokerDashboardEnabled: true, brokerCrmEnabled: true })
+    config: () => ({ brokerDashboardEnabled: true, brokerCrmEnabled: options.crmEnabled ?? true })
   });
   return { service, audit };
 }
@@ -216,6 +222,83 @@ describe("BrokerDashboardService CRM KPIs (PRD 20)", () => {
   });
 });
 
+describe("BrokerDashboardService spec 069 audit fixes", () => {
+  const pricing = async () => ({ perLeadPrice: 1000, sharedLeadPriceMultiplier: 0.6, currency: "XOF" });
+  const agencies = [{ id: agencyNorth, name: "Agence Nord", memberIds: [advisorA] }];
+
+  it("quotesSent ignore les propositions CRM retirees", async () => {
+    const withdrawnOnly = lead({});
+    const mixed = lead({});
+    const proposalRecords = new Map<string, Array<Record<string, unknown>>>([
+      [withdrawnOnly.id, [{ status: "withdrawn" }]],
+      [mixed.id, [{ status: "withdrawn" }, {}, { status: "sent" }]]
+    ]);
+    const crm = (await makeService([withdrawnOnly, mixed], { proposalRecords }).service.dashboard(actor("pro"), {})).crm;
+    expect(crm?.kpis?.quotesSent).toEqual({ leads: 1, proposals: 2 });
+  });
+
+  it("gives an assigned-only agent only its own leads and never the lead cost", async () => {
+    const mine = lead({ assignedAdvisorId: "agent-1", crmStatus: "gagne" });
+    const others = [lead({ assignedAdvisorId: advisorA, crmStatus: "gagne" }), lead({ assignedAdvisorId: advisorB })];
+    const { service } = makeService([mine, ...others], { leadPricing: pricing });
+    const agent = { ...actor("enterprise", "broker_agent"), actorId: "agent-1" } as ActorContext;
+    const crm = (await service.dashboard(agent, {})).crm;
+    expect(crm?.conversionRate).toBe(1);
+    expect(crm?.pipeline).toEqual([{ status: "gagne", total: 1 }]);
+    expect(crm?.kpis?.leadCost).toBeUndefined();
+    expect(crm?.kpis?.topSources).toEqual([{ source: "quote_request", received: 1, won: 1, conversionRate: 1 }]);
+    // A tenant-wide reader holding billing:read_own keeps the cost.
+    expect((await service.dashboard(actor("enterprise", "broker_read_only"), {})).crm?.kpis?.leadCost).toBeDefined();
+    // A custom role that is not given the CRM catalogue wildcard but keeps billing (outside the catalogue).
+    const owner = { ...actor("enterprise"), customRolePermissions: ["broker_leads:read", "broker_crm:read"] } as ActorContext;
+    expect((await service.dashboard(owner, {})).crm?.kpis?.leadCost).toBeDefined();
+  });
+
+  it("writes a consistent CSV: one header row per wide section, same column count in each block", async () => {
+    const records = [lead({ crmStatus: "gagne", assignedAdvisorId: advisorA })];
+    const { service } = makeService(records, { leadPricing: pricing, agencies });
+    const csv = await service.exportCsv(actor("enterprise"), {});
+    const lines = csv.split("\n");
+    expect(lines[0]).toBe("section,dimension,valeur");
+    let width = 3;
+    for (const line of lines) {
+      const cells = line.split(",");
+      if (cells[0] === "section") width = cells.length;
+      else expect(cells.length, line).toBe(width);
+    }
+    expect(csv).toContain("section,source,recus,gagnes,taux_conversion");
+    expect(csv).toContain("section,agence,conseillers,recus,acceptes,gagnes,perdus,taux_contact,taux_conversion,delai_premier_contact_min");
+  });
+
+  it("neutralises spreadsheet formula prefixes in labels", async () => {
+    const records = [lead({ productKey: "=cmd|calc", assignedAdvisorId: advisorA })];
+    const { service } = makeService(records, { agencies: [{ id: agencyNorth, name: "+SUM(A1)", memberIds: [advisorA] }] });
+    const csv = await service.exportCsv(actor("enterprise"), {});
+    expect(csv).toContain("produit,\"'=cmd|calc\",1");
+    expect(csv).toContain("agence,\"'+SUM(A1)\",");
+    for (const line of csv.split("\n")) expect(line).not.toMatch(/(^|,)[=+@-]/);
+  });
+
+  it("leaves the agency block and the CRM KPIs out of the CSV for the wrong actors or a closed CRM flag", async () => {
+    const records = [lead({ crmStatus: "gagne", assignedAdvisorId: advisorA })];
+    const restricted = { ...actor("enterprise", "broker_manager"), customRolePermissions: ["broker_leads:read", "broker_crm:export", "broker_crm:read_assigned"] } as ActorContext;
+    const { service } = makeService(records, { agencies });
+    expect(await service.exportCsv(restricted, {})).not.toContain("agence");
+    const off = makeService(records, { agencies, crmEnabled: false });
+    const csv = await off.service.exportCsv(actor("enterprise"), {});
+    expect(csv).not.toContain("agence");
+    expect(csv).not.toContain("kpi,");
+  });
+
+  it("reads each lead once per export, even though the dashboard and the agencies both need the facts", async () => {
+    const records = Array.from({ length: 12 }, () => lead({ assignedAdvisorId: advisorA }));
+    const reads = { history: 0 };
+    const { service } = makeService(records, { agencies, reads });
+    await service.exportCsv(actor("enterprise"), {});
+    expect(reads.history).toBe(records.length);
+  });
+});
+
 describe("BrokerDashboardService agenciesOverview (PRD 6.3)", () => {
   const agencies = [
     { id: agencyNorth, name: "Agence Nord", memberIds: [advisorA, advisorB] },
@@ -251,9 +334,25 @@ describe("BrokerDashboardService agenciesOverview (PRD 6.3)", () => {
     await expect(service.agenciesOverview(actor("starter", "broker_owner_starter"), {})).rejects.toThrow(/enterprise_plan_required/);
   });
 
-  it("refuses assigned-only roles even on Enterprise", async () => {
+  it("refuses assigned-only roles even on Enterprise, and opens the view to any tenant-wide CRM reader", async () => {
     const { service } = fixture();
     await expect(service.agenciesOverview(actor("enterprise", "broker_agent"), {})).rejects.toThrow(/agencies_view_not_allowed/);
-    await expect(service.agenciesOverview(actor("enterprise", "broker_read_only"), {})).rejects.toThrow(/agencies_view_not_allowed/);
+    // broker_read_only holds broker_crm:read (whole tenant): authorised.
+    expect(await service.agenciesOverview(actor("enterprise", "broker_read_only"), {})).toHaveLength(3);
+    expect(await service.agenciesOverview(actor("enterprise", "broker_manager"), {})).toHaveLength(3);
+  });
+
+  it("decides on permissions, not role names: a custom role without broker_crm:read is refused and audited", async () => {
+    const { service, audit } = fixture();
+    const restricted = { ...actor("enterprise", "broker_manager"), customRolePermissions: ["broker_leads:read", "broker_crm:read_assigned"] } as ActorContext;
+    await expect(service.agenciesOverview(restricted, {})).rejects.toThrow(/agencies_view_not_allowed/);
+    expect(audit.search({ action: "dashboard.broker.refused" }).at(-1)).toMatchObject({ reason: "agencies_view_not_allowed", result: "refused" });
+    const allowed = { ...restricted, customRolePermissions: ["broker_leads:read", "broker_crm:read"] } as ActorContext;
+    expect(await service.agenciesOverview(allowed, {})).toHaveLength(3);
+  });
+
+  it("refuses the agencies view when the CRM flag is off", async () => {
+    const off = makeService([lead({})], { agencies, crmEnabled: false });
+    await expect(off.service.agenciesOverview(actor("enterprise"), {})).rejects.toThrow(/broker_crm_disabled/);
   });
 });
