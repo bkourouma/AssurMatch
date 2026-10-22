@@ -81,6 +81,7 @@ const GLOBAL_FLAG_BY_ASSIST: Record<AiAssistTypeCatalog, string> = {
   admin_risk_triage: "ai_summary_enabled",
   activation_gap_summary: "ai_summary_enabled",
   offer_consistency_check: "ai_summary_enabled",
+  offer_summary: "ai_summary_enabled",
   activity_report: "ai_summary_enabled",
   suspicious_leads: "ai_summary_enabled",
   routing_anomaly_analysis: "ai_routing_anomaly_detection_enabled"

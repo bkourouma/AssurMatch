@@ -1,8 +1,20 @@
 import { redirect } from "next/navigation";
 import { loginRedirect, readBackOfficeSession } from "../lib/backoffice-auth";
 import { TENANT_SUSPENDED_MESSAGE, canMutateOffers, canReadOffers, isTenantReadOnly } from "../lib/broker-permissions";
-import { readBrokerOffers, readOfferScopeChoices, OFFER_SCOPE_OUTSIDE_COVERAGE, type BrokerOfferView, type OfferEffectiveStatus } from "../lib/offer-api";
-import { OFFER_STATUS_LABELS, OFFER_STATUS_OPTIONS, OFFER_STATUS_TONES, offerDisplayName, offerFormatDate } from "../lib/offer-messages";
+import { readOfferScopeChoices, OFFER_SCOPE_OUTSIDE_COVERAGE, type BrokerOfferView, type OfferEffectiveStatus } from "../lib/offer-api";
+import { readBrokerOffersByType } from "../lib/lot4-offers-api";
+import {
+  OFFER_STATUS_LABELS,
+  OFFER_STATUS_OPTIONS,
+  OFFER_STATUS_TONES,
+  OFFER_TYPE_FILTER_OPTIONS,
+  OFFER_TYPE_SHORT_LABELS,
+  PRIVATE_OFFER_BADGE,
+  offerDisplayName,
+  offerFormatDate,
+  offerTypeLabel
+} from "../lib/offer-messages";
+import type { OfferType } from "../../../../packages/shared/contracts/offer-content";
 import {
   Badge,
   Button,
@@ -62,7 +74,9 @@ export default async function BrokerOffersPage({
   const params = searchParams ? await searchParams : {};
   const statusParam = firstParam(params.status);
   const status = (OFFER_STATUS_OPTIONS as readonly string[]).includes(statusParam) ? statusParam as OfferEffectiveStatus : undefined;
-  const [offers, scopes] = await Promise.all([readBrokerOffers({ status }), readOfferScopeChoices()]);
+  const typeParam = firstParam(params.offerType);
+  const offerType = (OFFER_TYPE_FILTER_OPTIONS as readonly string[]).includes(typeParam) ? typeParam as OfferType : undefined;
+  const [offers, scopes] = await Promise.all([readBrokerOffersByType({ status, offerType }), readOfferScopeChoices()]);
   if (offers.status === "unauthenticated") redirect(loginRedirect("/offers", offers.error ?? "session_required"));
   const scopeLabel = new Map(scopes.map((scope) => [`${scope.countryId}:${scope.productId}`, `${scope.countryLabel} · ${scope.productLabel}`]));
 
@@ -74,6 +88,10 @@ export default async function BrokerOffersPage({
         <>
           <a href={`/offers/${encodeURIComponent(offer.id)}`}><strong>{offerDisplayName(offer)}</strong></a>
           <div>{scopeLabel.get(`${offer.countryId}:${offer.productId}`) ?? OFFER_SCOPE_OUTSIDE_COVERAGE}</div>
+          <div>
+            {offerTypeLabel(offer.offerType)}
+            {offer.offerType === "private" ? <> <Badge tone="warning">{PRIVATE_OFFER_BADGE}</Badge></> : null}
+          </div>
         </>
       ),
       sortable: true,
@@ -128,11 +146,17 @@ export default async function BrokerOffersPage({
       <Notice tone="info">Offre indicative : prix à confirmer par le courtier partenaire. Aucune offre ne vaut devis ferme ni contrat.</Notice>
 
       <Card title="Offres du cabinet">
-        <FilterBar action="/offers" label="Filtres offres" submitLabel="Filtrer" resetLabel="Reinitialiser" resetHref="/offers" activeCount={status ? 1 : 0}>
+        <FilterBar action="/offers" label="Filtres offres" submitLabel="Filtrer" resetLabel="Reinitialiser" resetHref="/offers" activeCount={(status ? 1 : 0) + (offerType ? 1 : 0)}>
           <Field id="broker-offers-status" label="Statut">
             <Select {...fieldControlProps("broker-offers-status")} name="status" defaultValue={status ?? ""}>
               <option value="">Tous</option>
               {OFFER_STATUS_OPTIONS.map((option) => <option key={option} value={option}>{OFFER_STATUS_LABELS[option]}</option>)}
+            </Select>
+          </Field>
+          <Field id="broker-offers-type" label="Type d'offre">
+            <Select {...fieldControlProps("broker-offers-type")} name="offerType" defaultValue={offerType ?? ""}>
+              <option value="">Tous</option>
+              {OFFER_TYPE_FILTER_OPTIONS.map((option) => <option key={option} value={option}>{OFFER_TYPE_SHORT_LABELS[option]}</option>)}
             </Select>
           </Field>
         </FilterBar>

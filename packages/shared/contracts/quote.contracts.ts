@@ -9,7 +9,7 @@ import {
   uuidSchema
 } from "../validation/common.schemas";
 import { agencyFilterSchema } from "./enterprise.contracts";
-import { adminOfferContentObjectSchema, offerContentGuaranteeSchema, offerContentPaymentFlexibilitySchema, refineOfferContent } from "./offer-content";
+import { adminOfferContentObjectSchema, offerContentGuaranteeSchema, offerContentPaymentFlexibilitySchema, offerTypeSchema, refineOfferContent } from "./offer-content";
 
 export const quoteFeatureFlags = [
   "public_comparator_enabled",
@@ -149,7 +149,7 @@ export const adminOfferUpsertSchema = adminOfferContentObjectSchema.extend({
   productId: uuidSchema,
   partnerTenantId: uuidSchema.optional(),
   publicKey: nonEmptyStringSchema.optional(),
-  offerType: z.enum(["indicative", "partner"]).optional(),
+  offerType: offerTypeSchema.optional(),
   expectedUpdatedAt: dateTimeStringSchema.optional(),
   reason: reasonSchema
 }).superRefine(refineOfferContent);

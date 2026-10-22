@@ -4,8 +4,11 @@ import type { ActivationChecklistService } from "../activation-checklist/activat
 /** Controls that describe the very change being requested, so they cannot block it (R4). */
 export const COUNTRY_PUBLIC_SELF_CONTROLS = ["country_status_public", "country_public_enabled"] as const;
 
+/** Spec 070: product controls that describe the public change itself, so they cannot block it. */
+export const PRODUCT_PUBLIC_SELF_CONTROLS = ["product_status_public", "product_public_enabled", "product_country_association", "product_comparison_enabled", "product_quote_enabled"] as const;
+
 export interface CatalogActivationGuardDeps {
-  checklist: Pick<ActivationChecklistService, "countryActivationBlockers">;
+  checklist: Pick<ActivationChecklistService, "countryActivationBlockers" | "productActivationBlockers">;
   quoteForms: { list(): Promise<Array<{ countryId: string; productId: string; status: string }>> };
   consentTexts: { listTexts(): Promise<Array<{ countryId: string; productId?: string | undefined; purpose: string; status?: string | undefined }>> };
 }
@@ -21,6 +24,14 @@ export class CatalogActivationGuard {
   /** `country_public_enabled=true` or status `public`: every blocking checklist control must pass. */
   countryPublicBlockers(countryId: string): Promise<CatalogActivationBlocker[]> {
     return this.deps.checklist.countryActivationBlockers(countryId, [...COUNTRY_PUBLIC_SELF_CONTROLS]);
+  }
+
+  /**
+   * Spec 070 PRD 36: `product_public_enabled=true` or status `public` on a product. Reuses the
+   * activation checklist product controls, minus those describing the change being requested.
+   */
+  productPublicBlockers(productId: string): Promise<CatalogActivationBlocker[]> {
+    return this.deps.checklist.productActivationBlockers(productId, [...PRODUCT_PUBLIC_SELF_CONTROLS]);
   }
 
   /** `country_quote_enabled=true`: at least one linked product has a published quote form. */

@@ -770,6 +770,10 @@ model ProductCategory {
   id        String                @id @default(uuid())
   key       String                @unique
   name      String
+  /// Spec 070 PROD-001: English label, free description and display order (all optional/additive).
+  nameEn      String?
+  description String?
+  sortOrder   Int                   @default(0)
   status    ProductCategoryStatus @default(draft)
   createdAt DateTime              @default(now())
   updatedAt DateTime              @updatedAt
@@ -787,9 +791,72 @@ model Product {
   requiresManualReview Boolean            @default(true)
   status               ProductStatus      @default(draft)
   flags                Json
+  /// Spec 070 PROD-007: legal text and disclaimer per language, `{ fr?: { legalText?, disclaimer? }, en?: { ... } }`.
+  legalNotice          Json               @default("{}")
+  /// Spec 070 PROD-005: kinds of documents a visitor is asked for (`quoteDocumentKinds` vocabulary).
+  requiredDocumentKinds String[]          @default([])
+  /// Spec 070 PROD-008: number of the current content version (history in `ProductVersion`).
+  version              Int                @default(1)
   createdAt            DateTime           @default(now())
   updatedAt            DateTime           @updatedAt
   createdById          String?
+}
+
+/// Spec 070 PROD-008/009: one row per change of a product's conditions, with the author, the reason
+/// and the field-level diff. `snapshot` is the full conditions after the change.
+model ProductVersion {
+  id            String   @id @default(uuid())
+  productId     String
+  versionNumber Int
+  snapshot      Json
+  changes       Json     @default("[]")
+  reason        String
+  authorId      String?
+  createdAt     DateTime @default(now())
+
+  @@unique([productId, versionNumber])
+  @@index([productId, createdAt])
+}
+
+enum InsurerStatus {
+  active
+  suspended
+  retired
+}
+
+/// Spec 070 (PRD section 8): the insurer carrying the risk, per country. Offers link to it
+/// optionally (`Offer.insurerId`); `Offer.insurerName` stays the displayed, denormalised name.
+model Insurer {
+  id             String        @id @default(uuid())
+  countryId      String
+  name           String
+  /// Short code unique within the country (for example the regulator's company code).
+  code           String
+  approvalNumber String?
+  status         InsurerStatus @default(active)
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+  createdById    String?
+
+  @@unique([countryId, code])
+  @@index([countryId, status])
+}
+
+/// Spec 070 PRD 35/36: manual attestation of one activation checklist control by compliance.
+/// `scopeType` is `country` or `product`; one live row per (scopeType, scopeId, controlKey).
+model ActivationAttestation {
+  id           String    @id @default(uuid())
+  scopeType    String
+  scopeId      String
+  controlKey   String
+  note         String
+  attestedById String
+  attestedAt   DateTime  @default(now())
+  revokedById  String?
+  revokedAt    DateTime?
+
+  @@unique([scopeType, scopeId, controlKey])
+  @@index([scopeType, scopeId])
 }
 
 model CountryProduct {
@@ -1088,8 +1155,10 @@ model Offer {
   /// Spec 052 R1: the columns above hold the published version only (or v1 of a never published offer).
   publishedVersionId  String?
   pendingVersionId    String?
-  /// Spec 052: `indicative` or `partner`.
+  /// Spec 052/070: `indicative`, `partner`, `insurer` or `private` (never public, never compared).
   offerType           String                @default("indicative")
+  /// Spec 070: optional link to the insurer referential; `insurerName` stays the displayed name.
+  insurerId           String?
   withdrawnAt         DateTime?
   createdAt           DateTime              @default(now())
   updatedAt           DateTime              @updatedAt
@@ -1120,6 +1189,7 @@ model OfferVersion {
   guaranteeSummary    String?
   exclusionsSummary   String?
   insurerName         String?
+  insurerId           String?
   guarantees          Json               @default("[]")
   guaranteeLevel      Int?
   deductibleAmount    Decimal?

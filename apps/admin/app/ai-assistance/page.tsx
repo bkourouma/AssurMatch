@@ -6,6 +6,7 @@ const INSIGHT_LABELS: Record<string, string> = {
   admin_risk_triage: "Triage des risques de conformite",
   activation_gap_summary: "Ecarts d'activation",
   offer_consistency_check: "Coherence d'une offre",
+  offer_summary: "Résumé d'une offre",
   activity_report: "Rapport d'activite",
   suspicious_leads: "Demandes suspectes"
 };
@@ -67,7 +68,7 @@ export default async function AdminAIAssistancePage({ searchParams }: { searchPa
                 {Object.entries(INSIGHT_LABELS).filter(([assistType]) => assistance.data.availableAssistTypes.includes(assistType)).map(([assistType, label]) => (
                   <Form key={assistType} action={requestAdminInsightAction}>
                     <input type="hidden" name="assistType" value={assistType} />
-                    {assistType === "offer_consistency_check" ? (
+                    {assistType === "offer_consistency_check" || assistType === "offer_summary" ? (
                       <Input name="offerId" placeholder="Identifiant de l'offre" aria-label="Identifiant de l'offre" />
                     ) : null}
                     <Button type="submit" variant="secondary">{label}</Button>

@@ -1,10 +1,13 @@
-import type {
-  ActivationChecklistControl,
-  ActivationChecklistQuery,
-  ActivationChecklistResponse,
-  ActivationChecklistSection,
-  ActivationChecklistStatus
+import {
+  ACTIVATION_ATTESTABLE_CONTROLS,
+  type ActivationAttestationScopeType,
+  type ActivationChecklistControl,
+  type ActivationChecklistQuery,
+  type ActivationChecklistResponse,
+  type ActivationChecklistSection,
+  type ActivationChecklistStatus
 } from "../../../../packages/shared/contracts/activation-checklist.contracts";
+import type { ActivationAttestationsRepository } from "./activation-attestations.repository";
 import type { AuditLogWriter } from "../audit-logs/audit-log-writer.service";
 import type { ActorContext } from "../common/types";
 import type { ConsentService } from "../consent/consent.module";
@@ -55,6 +58,23 @@ export interface ActivationChecklistDeps {
    * runtime always provides it.
    */
   partnerReadiness?: { readiness(partnerId: string): Promise<{ documentAccepted: boolean; ownerUser: boolean; contract: boolean }> } | undefined;
+  /**
+   * Spec 070 PRD 35: routing rules, for `country_routing_rules_configured`. Optional like
+   * `partnerReadiness`: absent, the control is left out. The runtime always provides it.
+   */
+  routingRules?: { listRules(): Promise<Array<{ countryId: string; productId: string | null; status: string }>> } | undefined;
+  /** Spec 070 PRD 36: scoring rules, for `product_scoring_rules_defined`. Optional, control left out when absent. */
+  scoringRules?: { listRules(): Promise<Array<{ countryId: string | null; productId: string | null; status: string }>> } | undefined;
+  /** Spec 070 PRD 35/36: manual attestations. Optional, the manual controls are left out when absent. */
+  attestations?: Pick<ActivationAttestationsRepository, "list"> | undefined;
+}
+
+type ActiveAttestations = Map<string, { attestedById: string; attestedAt: Date; note: string }>;
+
+/** Rules loaded once per checklist computation. `undefined`: dependency absent, controls left out. */
+interface RuleSnapshot {
+  routing: Array<{ countryId: string; productId: string | null; status: string }> | undefined;
+  scoring: Array<{ countryId: string | null; productId: string | null; status: string }> | undefined;
 }
 
 export class ActivationChecklistAccessRefusedError extends Error {
@@ -92,16 +112,38 @@ export class ActivationChecklistService {
       this.deps.quoteForms.list(),
       this.deps.partners.list()
     ]);
+    const rules = await this.loadRules();
     const sections: ActivationChecklistSection[] = [
-      await this.countrySection(country),
-      ...products.map((product) => this.productSection(product, countries)),
+      await this.countrySection(country, rules),
+      ...await Promise.all(products.map((product) => this.productSection(product, countries, rules))),
       ...this.quoteReadinessSections(countries, products, forms, consentTexts),
       ...await this.offerSections(offers, countries, products, partners)
     ];
+    return this.blockersOf(sections, ignoredControls);
+  }
+
+  private blockersOf(sections: ActivationChecklistSection[], ignoredControls: string[]): ActivationBlocker[] {
     const ignored = new Set(ignoredControls);
     return sections.flatMap((section) => section.controls
       .filter((control) => control.blocking && control.status === "blocked" && !ignored.has(control.key))
       .map((control) => ({ section: section.key, control: control.key, label: control.label, evidence: control.evidence })));
+  }
+
+  /**
+   * Spec 070 PRD 36: blocking controls for making ONE product public (documents, scoring rules,
+   * disclaimers, attestations ...). Controls that describe the very change being requested are
+   * ignored by the caller through `ignoredControls`. Only the product section of this product is
+   * evaluated; the flags are read on the first non retired country link.
+   */
+  async productActivationBlockers(productId: string, ignoredControls: string[] = []): Promise<ActivationBlocker[]> {
+    const product = await this.deps.products.require(productId);
+    const linkedCountryIds = product.countryLinks
+      ? product.countryLinks.filter((link) => link.status !== "retired").map((link) => link.countryId)
+      : product.countryIds;
+    const firstCountryId = linkedCountryIds[0];
+    const countries = firstCountryId ? [await this.deps.countries.require(firstCountryId)] : [];
+    const section = await this.productSection(product, countries, await this.loadRules(), new Set(linkedCountryIds));
+    return this.blockersOf([section], ignoredControls);
   }
 
   async read(actor: ActorContext, query: ActivationChecklistQuery): Promise<ActivationChecklistResponse> {
@@ -114,10 +156,11 @@ export class ActivationChecklistService {
       this.deps.consent.listTexts()
     ]);
     const forms = await this.deps.quoteForms.list();
+    const rules = await this.loadRules();
     const sections: ActivationChecklistSection[] = [
       this.globalSection(),
-      ...await Promise.all(countries.map((country) => this.countrySection(country))),
-      ...products.map((product) => this.productSection(product, countries)),
+      ...await Promise.all(countries.map((country) => this.countrySection(country, rules))),
+      ...await Promise.all(products.map((product) => this.productSection(product, countries, rules))),
       ...this.quoteReadinessSections(countries, products, forms, consentTexts),
       ...await this.partnerSections(partners, countries, products),
       ...await this.offerSections(offers, countries, products, partners)
@@ -199,8 +242,18 @@ export class ActivationChecklistService {
     ]);
   }
 
-  private async countrySection(country: Country): Promise<ActivationChecklistSection> {
+  private async loadRules(): Promise<RuleSnapshot> {
+    const [routing, scoring] = await Promise.all([
+      this.deps.routingRules ? this.deps.routingRules.listRules() : Promise.resolve(undefined),
+      this.deps.scoringRules ? this.deps.scoringRules.listRules() : Promise.resolve(undefined)
+    ]);
+    return { routing, scoring };
+  }
+
+  private async countrySection(country: Country, rules: RuleSnapshot): Promise<ActivationChecklistSection> {
     const licensedPartners = await this.activeLicensedPartnerCount(country.id);
+    const routingRules = rules.routing?.filter((rule) => rule.countryId === country.id && rule.status === "active").length;
+    const attestations = await this.activeAttestations("country", country.id);
     return this.section(`country:${country.id}`, `Pays ${country.isoCode}`, { countryId: country.id, countryCode: country.isoCode }, [
       this.control("country_status_public", "Statut pays public", country.status === "public", true, country.status),
       this.control("country_regime", "Regime reglementaire renseigne", Boolean(country.regulatoryRegimeId), true),
@@ -215,8 +268,47 @@ export class ActivationChecklistService {
         licensedPartners > 0,
         true,
         licensedPartners > 0 ? `${licensedPartners} courtier(s)` : "aucun courtier actif licencie"
-      )
+      ),
+      // Spec 070 PRD 35: routing is computed, the rest of the PRD 35 list is attested by compliance.
+      ...(routingRules === undefined ? [] : [
+        this.control(
+          "country_routing_rules_configured",
+          "Au moins une regle de routage active pour le pays",
+          routingRules > 0,
+          true,
+          routingRules > 0 ? `${routingRules} regle(s) active(s)` : "aucune regle de routage active"
+        )
+      ]),
+      ...this.attestationControls("country", country.id, attestations)
     ]);
+  }
+
+  /** Active (not revoked) attestations of one scope, by control key. `undefined`: dependency absent. */
+  private async activeAttestations(scopeType: ActivationAttestationScopeType, scopeId: string): Promise<ActiveAttestations | undefined> {
+    if (!this.deps.attestations) return undefined;
+    const rows = await this.deps.attestations.list(scopeType, scopeId);
+    return new Map(rows.filter((row) => !row.revokedAt).map((row) => [row.controlKey, row]));
+  }
+
+  private attestationControls(scopeType: ActivationAttestationScopeType, scopeId: string, attestations: ActiveAttestations | undefined): ActivationChecklistControl[] {
+    if (!attestations) return [];
+    const definitions: Record<string, { label: string }> = ACTIVATION_ATTESTABLE_CONTROLS[scopeType];
+    return Object.entries(definitions).map(([key, definition]) => {
+      const attestation = attestations.get(key);
+      const base = this.control(
+        key,
+        definition.label,
+        attestation !== undefined,
+        true,
+        attestation ? `attestation de ${attestation.attestedById} le ${attestation.attestedAt.toISOString()}` : "attestation manquante"
+      );
+      return {
+        ...base,
+        manual: true,
+        attestationTarget: { scopeType, scopeId, controlKey: key },
+        ...(attestation ? { attestation: { attestedById: attestation.attestedById, attestedAt: attestation.attestedAt.toISOString(), note: attestation.note } } : {})
+      };
+    });
   }
 
   /**
@@ -241,18 +333,50 @@ export class ActivationChecklistService {
     return count;
   }
 
-  private productSection(product: Product, countries: Country[]): ActivationChecklistSection {
+  private async productSection(product: Product, countries: Country[], rules: RuleSnapshot, scoringCountryIds?: Set<string>): Promise<ActivationChecklistSection> {
     // Spec 050 R2: flags are read per country (product flag AND link flag) for the scoped countries.
     const links = countries.map((country) => countryLinkFor(product, country.id)).filter((link) => link !== undefined && link.status !== "retired");
     const effective = links.map((link) => effectiveProductFlags(product, link));
     const anyEffective = (key: "product_public_enabled" | "product_comparison_enabled" | "product_quote_enabled"): boolean => effective.some((flags) => flags[key] === true);
+    const attestations = await this.activeAttestations("product", product.id);
+    const ruleCountryIds = scoringCountryIds ?? new Set(countries.map((country) => country.id).filter((id) => product.countryIds.includes(id)));
+    const scoringRules = rules.scoring?.filter((rule) =>
+      rule.productId === product.id && rule.status === "active" && (rule.countryId === null || ruleCountryIds.has(rule.countryId))
+    ).length;
+    const documentKinds = product.requiredDocumentKinds ?? [];
+    const missingDisclaimers = (["fr", "en"] as const).filter((language) => !product.legalNotice?.[language]?.disclaimer?.trim());
     return this.section(`product:${product.id}`, `Produit ${product.key}`, { productId: product.id, productKey: product.key }, [
       this.control("product_status_public", "Statut produit public", product.status === "public", true, product.status),
       this.control("product_country_association", "Produit associe au pays scope", links.length > 0, true),
       this.control("product_public_enabled", "Flag produit public", anyEffective("product_public_enabled"), true),
       this.control("product_comparison_enabled", "Flag comparaison produit", anyEffective("product_comparison_enabled"), true),
       this.control("product_quote_enabled", "Flag devis produit", anyEffective("product_quote_enabled"), true),
-      this.control("product_manual_review_required", "Revue manuelle explicite", product.flags.product_manual_review_required === true || product.requiresManualReview === true, false)
+      this.control("product_manual_review_required", "Revue manuelle explicite", product.flags.product_manual_review_required === true || product.requiresManualReview === true, false),
+      // Spec 070 PRD 36: computed controls, then attestations.
+      this.control(
+        "product_required_documents_defined",
+        "Documents requis definis",
+        !product.requiresDocuments || documentKinds.length > 0,
+        true,
+        product.requiresDocuments ? (documentKinds.length > 0 ? `${documentKinds.length} type(s) de document` : "documents requis non definis") : "aucun document requis"
+      ),
+      ...(scoringRules === undefined ? [] : [
+        this.control(
+          "product_scoring_rules_defined",
+          "Au moins une regle de scoring active pour le produit",
+          scoringRules > 0,
+          true,
+          scoringRules > 0 ? `${scoringRules} regle(s) active(s)` : "aucune regle de scoring active"
+        )
+      ]),
+      this.control(
+        "product_disclaimers_configured",
+        "Avertissement legal FR et EN renseigne",
+        missingDisclaimers.length === 0,
+        true,
+        missingDisclaimers.length === 0 ? "FR et EN" : `manquant : ${missingDisclaimers.join(", ")}`
+      ),
+      ...this.attestationControls("product", product.id, attestations)
     ]);
   }
 
