@@ -16,4 +16,4 @@
 - [x] T011 Tests Playwright « sources » (secrets jamais journalisés ni dans l'URL, libellés, pas de formulation interdite).
 
 ## Phase 3 — Validation (chef de lot)
-- [ ] T012 `npm run typecheck`, `npm run lint`, tests ciblés puis suite complète, `node scripts/ci/secret-scan.mjs`, documentation (runbook feature-flag-toggle, coverage map).
+- [x] T012 `npm run typecheck`, `npm run lint`, tests ciblés puis suite complète, `node scripts/ci/secret-scan.mjs`, documentation (runbook feature-flag-toggle, coverage map).
