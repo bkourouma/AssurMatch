@@ -44,6 +44,8 @@ describe("prisma migration fresh-base readiness", () => {
       // Lot 5 (spec 071)
       "0035_routing_billing_gaps",
       "0036_admin_steering", // Lot 6
+      // Lot 8 (spec 075)
+      "0037_security_hardening",
       // Lot 9 (spec 072)
       "0038_content_cms",
       "0039_broker_lead_alerts",

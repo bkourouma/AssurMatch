@@ -195,7 +195,7 @@ export class AdminDashboardService {
     // Lot 6 (spec 073 T303)
     lines.push(...this.extraCsvLines(dashboard));
     // Lot 6 (end)
-    this.deps.audit.write({
+    await this.deps.audit.writeAsync({
       actor,
       action: DashboardAuditActions.adminExported,
       targetType: "AdminDashboardExport",
@@ -263,7 +263,7 @@ export class AdminDashboardService {
         try {
           const invoices = await this.deps.invoices.list(actor, {});
           extra.revenue = summariseRevenue(invoices, window, scope);
-          this.deps.audit.write({
+          await this.deps.audit.writeAsync({
             actor,
             action: DashboardAuditActions.adminRevenueRead,
             targetType: "AdminDashboard",

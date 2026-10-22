@@ -1,6 +1,7 @@
-import { prospectContactFingerprint } from "../../../../packages/shared/security/prospect-contact-fingerprint";
 import { BadRequestException } from "@nestjs/common";
 import { ErrorCodes } from "../../../../packages/shared/contracts/error-codes";
+// Lot 8 (spec 075): one definition of the legacy fingerprint, and the blind index of the erasure lookup.
+import { legacyPiiFingerprint, PiiVault } from "../common/security/pii-vault";
 
 export interface NormalizedProspectContact {
   displayName?: string;
@@ -17,6 +18,9 @@ export interface CountryPhoneRule {
 }
 
 export class ProspectIdentityService {
+  // Lot 8: injectable vault, resolved from the environment on first use (never a module singleton).
+  constructor(private vault?: PiiVault) {}
+
   normalize(input: { displayName?: string; email: string; phone: string; countryCode?: string; phoneRule?: CountryPhoneRule }): NormalizedProspectContact {
     const emailNormalized = input.email.trim().toLowerCase();
     if (!emailNormalized.includes("@")) throw new Error("Email is invalid");
@@ -33,7 +37,13 @@ export class ProspectIdentityService {
   }
 
   fingerprint(value: string): string {
-    return prospectContactFingerprint(value);
+    return legacyPiiFingerprint(value);
+  }
+
+  /** Lot 8 (spec 075 FR-A2): keyed blind index of an e-mail; undefined without PII_BLIND_INDEX_KEY. */
+  emailBlindIndex(value: string): string | undefined {
+    this.vault ??= PiiVault.fromEnv();
+    return this.vault.blindIndex("email", value);
   }
 
   /**

@@ -3,6 +3,9 @@ import { assertRuntimeRepository } from "../common/repositories/runtime-reposito
 import type { PrismaService } from "../common/prisma/prisma.service";
 import type { ProspectRecord } from "./prospects.service";
 import type { NormalizedProspectContact } from "./prospect-identity.service";
+// Lot 8 (spec 075 FR-A1/A2): column encryption and blind indexes live in common/security.
+import { prospectContactColumns, prospectContactMatch, prospectRowToDomain } from "../common/security/pii-columns";
+import { PiiVault } from "../common/security/pii-vault";
 
 export const PROSPECTS_REPOSITORY = Symbol("PROSPECTS_REPOSITORY");
 
@@ -94,7 +97,8 @@ type ProspectDelegate = {
 export class PrismaProspectsRepository implements ProspectsRepository {
   readonly mode = "prisma-runtime" as const;
 
-  constructor(private readonly prisma: PrismaService) {}
+  // Lot 8: the vault is injectable (tests); the runtime builds it from the environment.
+  constructor(private readonly prisma: PrismaService, private readonly vault: PiiVault = PiiVault.fromEnv()) {}
 
   async createOrLink(countryId: string, productId: string, contact: NormalizedProspectContact, consentRecordId: string): Promise<ProspectRecord> {
     return (await this.createOrLinkWithOutcome(countryId, productId, contact, consentRecordId)).prospect;
@@ -104,11 +108,13 @@ export class PrismaProspectsRepository implements ProspectsRepository {
     // Spec 066 F1: never merge on a phone alone. The e-mail and the phone must both match; the name
     // is compared on the candidates (it has no fingerprint column), so a request always reaches the
     // contact entered in that very submission.
-    const candidates = await this.client().findMany({
-      where: { countryId, productId, anonymizedAt: null, emailFingerprint: contact.emailFingerprint, phoneFingerprint: contact.phoneFingerprint },
+    // Lot 8: encrypted rows match on the blind indexes, legacy clear rows on the old fingerprints (OR);
+    // candidates are decrypted first, so the F1 comparison below is unchanged.
+    const candidates = (await this.client().findMany({
+      where: { countryId, productId, anonymizedAt: null, ...prospectContactMatch(this.vault, contact) },
       orderBy: { createdAt: "asc" }
-    });
-    const existing = candidates.find((row) => isSameContact(row as ProspectRecord, contact));
+    })).map((row) => this.toDomain(row));
+    const existing = candidates.find((row) => isSameContact(row, contact));
     if (existing) {
       const current = existing as ProspectRecord;
       const consentRecordIds = current.consentRecordIds.includes(consentRecordId) ? current.consentRecordIds : [...current.consentRecordIds, consentRecordId];
@@ -120,10 +126,8 @@ export class PrismaProspectsRepository implements ProspectsRepository {
         id: crypto.randomUUID(),
         countryId,
         productId,
-        emailNormalized: contact.emailNormalized,
-        phoneNormalized: contact.phoneNormalized,
-        emailFingerprint: contact.emailFingerprint,
-        phoneFingerprint: contact.phoneFingerprint,
+        // Lot 8: envelopes + blind indexes + key id when encrypted, the clear columns otherwise.
+        ...prospectContactColumns(this.vault, contact),
         displayName: contact.displayName,
         consentRecordIds: [consentRecordId],
         retentionUntil: new Date(now.getTime() + 10 * 365 * 24 * 60 * 60 * 1000),
@@ -149,6 +153,7 @@ export class PrismaProspectsRepository implements ProspectsRepository {
   }
 
   private toDomain(row: unknown): ProspectRecord {
-    return row as ProspectRecord;
+    // Lot 8: clear contact for the domain, storage-only columns dropped.
+    return prospectRowToDomain(this.vault, row) as unknown as ProspectRecord;
   }
 }
