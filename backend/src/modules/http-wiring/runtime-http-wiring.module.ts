@@ -153,6 +153,8 @@ import { PublicHealthController } from "../health/public-health.controller";
 import { MetricsController } from "../observability/metrics.controller";
 import { adminAuditLogQuerySchema } from "../../../../packages/shared/contracts/admin-operations.contracts";
 import { ADMIN_OPERATIONS_HTTP_CONTROLLERS } from "./admin-operations-http.controllers";
+// Lot 10 (spec 076)
+import { CHANNELS_INTEGRATIONS_HTTP_CONTROLLERS } from "./channels-integrations-http.controllers";
 // Spec 062 data requests
 import { DATA_REQUESTS_HTTP_CONTROLLERS } from "./data-requests-http.controllers";
 // Lot 4 (spec 070)
@@ -2925,6 +2927,8 @@ Module({
     MetricsController,
     // Spec 056: admin operations consoles (see admin-operations-http.controllers.ts).
     ...ADMIN_OPERATIONS_HTTP_CONTROLLERS,
+    // Lot 10 (spec 076): SMS / WhatsApp retry queue and CRM connector administration.
+    ...CHANNELS_INTEGRATIONS_HTTP_CONTROLLERS,
     // Spec 062 data requests: visitor and admin routes (see data-requests-http.controllers.ts).
     ...DATA_REQUESTS_HTTP_CONTROLLERS,
     // Lot 4 (spec 070): product categories and versions, insurers, offer AI summary, activation attestations, public product requirements.

@@ -22,6 +22,7 @@ const explicitlyProtectedFeatureFlags = new Set([
   "billing_enabled",
   "sms_enabled",
   "whatsapp_enabled",
+  "crm_connector_enabled", // Lot 10 (spec 076)
   "partner_api_enabled",
   "partner_webhooks_enabled",
   "retention_purge_enabled",

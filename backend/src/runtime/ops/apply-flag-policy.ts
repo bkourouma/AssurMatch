@@ -22,6 +22,7 @@ export const POLICY_ACTIVATABLE_FLAGS = [
   "partner_webhooks_enabled", // spec 033
   "sms_enabled", // spec 038
   "whatsapp_enabled", // spec 038
+  "crm_connector_enabled", // Lot 10 (spec 076)
   "ai_summary_enabled", // spec 035 / 036
   "ai_lead_scoring_enabled",
   "ai_duplicate_detection_enabled",
