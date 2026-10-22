@@ -5,6 +5,7 @@ import type { AuditLogWriter } from "../audit-logs/audit-log-writer.service";
 import type { ActorContext } from "../common/types";
 import type { CountriesService } from "../countries/countries.module";
 import type { BrokerEligibilityPolicy } from "../leads/broker-eligibility-policy";
+import type { RoutingDecisionRecord } from "../leads/routing-decision.service";
 import type { QuoteSubmissionService } from "../quote-requests/quote-submission.service";
 import { RoutingAuditActions } from "./routing-audit-actions";
 
@@ -22,6 +23,17 @@ export interface ManualRoutingDeps {
   countries: CountriesService;
   /** Post-assignment hook (e.g. share visitor documents uploaded while the quote was parked). */
   afterAssign?: ((quoteRequestId: string, assignmentId: string) => Promise<void>) | undefined;
+  /**
+   * Lot 5 (spec 071): latest routing decision of a parked request (parked reasons, lead quality score,
+   * AI suggestion). Optional: without it the queue shows no control details and no AI audit is written.
+   */
+  decisions?: { latestForQuote(quoteRequestId: string): Promise<RoutingDecisionRecord | undefined> } | undefined;
+}
+
+/** Lot 5 (spec 071): the AI suggestion stored on a decision, when it names a broker. */
+function suggestionOf(decision: RoutingDecisionRecord | undefined): PendingManualQuote["aiSuggestion"] {
+  const suggestion = decision?.controlDetails?.aiSuggestion;
+  return suggestion?.partnerTenantId ? suggestion : null;
 }
 
 /** Admin queue for quotes parked by a `manual` routing rule. */
@@ -36,6 +48,10 @@ export class ManualRoutingService {
     const items: PendingManualQuote[] = [];
     for (const quote of pending) {
       const candidates = await this.deps.eligibility.candidates(quote.countryId, quote.productId);
+      const decision = await this.latestDecision(quote.id);
+      const details = decision?.controlDetails;
+      const degraded = new Set((details?.degradedCandidates ?? []).map((entry) => entry.partnerTenantId));
+      const qualityScore = details?.qualityScore;
       items.push({
         quoteRequestId: quote.id,
         publicReference: quote.publicReference,
@@ -49,8 +65,12 @@ export class ManualRoutingService {
           legalName: candidate.partner.legalName,
           plan: candidate.partner.plan,
           eligible: candidate.eligible,
-          reasons: candidate.reasons
-        }))
+          // Control 10: an over-SLA broker stays eligible; the reason only explains its ranking.
+          reasons: degraded.has(candidate.partner.id) ? [...candidate.reasons, "sla_overrun"] : candidate.reasons
+        })),
+        parkedReasons: details?.parkedReasons ?? [],
+        qualityScore: typeof qualityScore === "number" ? Math.min(100, Math.max(0, Math.round(qualityScore))) : null,
+        aiSuggestion: suggestionOf(decision)
       });
     }
     this.deps.audit.write({
@@ -71,6 +91,8 @@ export class ManualRoutingService {
     if (!quote) throw new Error(`Quote request ${quoteRequestId} not found`);
     const country = await this.deps.countries.require(quote.countryId).catch(() => undefined);
     if (!this.scopeAllows(actor, quote.countryId, country?.isoCode)) this.refuse(actor, "out_of_scope_country", quoteRequestId);
+    // Read BEFORE the assignment: assigning records a newer decision without the suggestion.
+    const suggestion = suggestionOf(await this.latestDecision(quoteRequestId));
     try {
       const result = await this.deps.submissions.assignManually(quoteRequestId, parsed.partnerTenantId, actor, parsed.reason);
       await this.deps.afterAssign?.(quoteRequestId, result.assignmentId);
@@ -84,6 +106,7 @@ export class ManualRoutingService {
         reason: parsed.reason,
         context: { assignmentId: result.assignmentId }
       });
+      if (suggestion) this.auditAiOutcome(actor, quoteRequestId, suggestion, parsed.partnerTenantId, result.assignmentId);
       return result;
     } catch (error) {
       this.deps.audit.write({
@@ -98,6 +121,29 @@ export class ManualRoutingService {
       });
       throw error;
     }
+  }
+
+  private async latestDecision(quoteRequestId: string): Promise<RoutingDecisionRecord | undefined> {
+    return this.deps.decisions?.latestForQuote(quoteRequestId).catch(() => undefined);
+  }
+
+  /**
+   * Lot 5 (spec 071, PRD 31 "suggestion IA acceptée/refusée"): the admin decision on an AI routing
+   * suggestion. Validated when the chosen broker is the suggested one, diverged otherwise. Metadata only.
+   */
+  private auditAiOutcome(actor: ActorContext, quoteRequestId: string, suggestion: NonNullable<PendingManualQuote["aiSuggestion"]>, chosenPartnerTenantId: string, assignmentId: string): void {
+    const validated = suggestion.partnerTenantId === chosenPartnerTenantId;
+    this.deps.audit.write({
+      actor,
+      action: validated ? RoutingAuditActions.aiSuggestionValidated : RoutingAuditActions.aiSuggestionDiverged,
+      targetType: "QuoteRequest",
+      targetId: quoteRequestId,
+      // Broker ids in the scope: the audit context masks identifiers.
+      scope: { partnerTenantId: chosenPartnerTenantId, suggestedPartnerTenantId: suggestion.partnerTenantId },
+      result: "success",
+      reason: validated ? "admin_followed_ai_suggestion" : "admin_chose_another_broker",
+      context: { assistance: true, provider: suggestion.provider, assignmentId }
+    });
   }
 
   private assertPermission(actor: ActorContext, permission: string): void {

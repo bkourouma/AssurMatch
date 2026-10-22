@@ -12,6 +12,7 @@ import {
   type OfferCompleteness,
   type OfferCompletenessField,
   type OfferEffectiveStatus,
+  type OfferType,
   type OfferVersionStatus
 } from "../../../../packages/shared/contracts/offer-content";
 import type { AdminOfferContent, AdminWriteResult } from "./admin-api";
@@ -78,10 +79,37 @@ export const OFFER_VERSION_STATUS_TONES: Record<string, "neutral" | "success" | 
   withdrawn: "disabled"
 };
 
+/** Spec 070 (PRD section 13): the four offer types. */
 export const OFFER_TYPE_LABELS: Record<string, string> = {
   indicative: "Offre indicative",
-  partner: "Offre partenaire"
+  partner: "Offre partenaire",
+  insurer: "Offre assureur (validée par un assureur, saisie par l'administration)",
+  private: "Offre privée (visible uniquement du courtier, jamais publique ni comparée)"
 };
+
+/** Short wording for list cells, badges and kickers. */
+export const OFFER_TYPE_SHORT_LABELS: Record<string, string> = {
+  indicative: "Offre indicative",
+  partner: "Offre partenaire",
+  insurer: "Offre assureur",
+  private: "Offre privée"
+};
+
+export const OFFER_TYPE_OPTIONS = ["indicative", "partner", "insurer", "private"] as const satisfies readonly OfferType[];
+
+/** What each type means for the operator; shown under the type selector. */
+export const OFFER_TYPE_DESCRIPTIONS: Record<string, string> = {
+  indicative: "Offre indicative publiée au comparateur après validation de la conformité.",
+  partner: "Offre d'un courtier partenaire, publiée au comparateur après validation de la conformité.",
+  insurer: "Offre validée par un assureur et saisie par l'administration. Choisissez l'assureur dans le référentiel (ou saisissez son nom).",
+  private: "Offre réservée au courtier propriétaire : elle n'est jamais affichée au public ni comparée. Le courtier est obligatoire et la sponsorisation est impossible."
+};
+
+export const PRIVATE_OFFER_BADGE = "Privée — jamais publique";
+
+export function offerTypeLabel(offerType: string | undefined): string {
+  return OFFER_TYPE_SHORT_LABELS[offerType ?? "indicative"] ?? "Offre indicative";
+}
 
 export const PAYMENT_FLEXIBILITY_LABELS: Record<string, string> = {
   annual: "Annuel",
@@ -93,6 +121,8 @@ export const PAYMENT_FLEXIBILITY_LABELS: Record<string, string> = {
 export const OFFER_FIELD_LABELS: Record<string, string> = {
   name: "Nom commercial",
   insurerName: "Assureur porteur",
+  insurerId: "Assureur du référentiel",
+  offerType: "Type d'offre",
   shortDescription: "Description",
   guaranteeSummary: "Résumé des garanties",
   guarantees: "Garanties (au moins une)",
@@ -135,7 +165,12 @@ export const OFFER_BLOCKER_LABELS: Record<string, string> = {
   partner_capacity_blocked: "Capacité du courtier bloquée ou pleine",
   partner_country_not_authorized: "Courtier non autorisé pour ce pays",
   partner_product_not_authorized: "Courtier non autorisé pour ce produit",
-  license_not_valid_for_scope: "Aucune licence valide du courtier pour ce pays et ce produit"
+  license_not_valid_for_scope: "Aucune licence valide du courtier pour ce pays et ce produit",
+  private_offer_not_sponsorable: "Une offre privée ne peut pas être sponsorisée",
+  insurer_missing: "Offre assureur : choisissez l'assureur (référentiel) ou saisissez son nom",
+  insurer_not_found: "Assureur introuvable dans le référentiel",
+  insurer_not_active: "Assureur suspendu ou retiré : il ne peut plus porter de nouvelle offre",
+  insurer_country_mismatch: "L'assureur choisi appartient à un autre pays que l'offre"
 };
 
 export function offerBlockerLabel(blocker: OfferBlocker): string {
@@ -151,7 +186,10 @@ export const OFFER_ERROR_MESSAGES: Record<string, string> = {
   OFFER_TRANSITION_INVALID: "Action impossible dans l'état actuel de l'offre (aucune version soumise, déjà décidée ou retirée). Rechargez la page.",
   RBAC_DENIED: "Action refusée : droits insuffisants ou hors périmètre pays.",
   NOT_FOUND: "Offre introuvable ou hors périmètre.",
-  PARTNER_SUSPENDED: "Courtier suspendu : aucune écriture n'est possible sur ses offres."
+  PARTNER_SUSPENDED: "Courtier suspendu : aucune écriture n'est possible sur ses offres.",
+  OFFER_TYPE_INVALID: "Type d'offre : les règles de ce type ne sont pas respectées (offre privée : courtier obligatoire et pas de sponsorisation ; offre assureur : assureur obligatoire). Voir la liste ci-dessous.",
+  OFFER_TYPE_IMMUTABLE: "Le type d'une offre ne peut pas changer après sa création. Créez une nouvelle offre du type voulu.",
+  OFFER_INSURER_INVALID: "Assureur refusé : il est introuvable, suspendu ou rattaché à un autre pays que l'offre. Choisissez un assureur actif du pays de l'offre ou saisissez son nom."
 };
 
 export function offerWriteErrorMessage(result: Pick<AdminWriteResult<unknown>, "status" | "code" | "message">): string {
@@ -217,6 +255,8 @@ function optionalText(formData: FormData, name: string): string | undefined {
   const value = text(formData, name);
   return value ? value : undefined;
 }
+
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 function optionalNumber(formData: FormData, name: string): number | undefined {
   const raw = text(formData, name).replace(/\s/g, "").replace(",", ".");
@@ -303,6 +343,9 @@ export function offerContentFromForm(formData: FormData): Partial<AdminOfferCont
     const value = optionalText(formData, key);
     if (value !== undefined) content[key] = value;
   }
+  // Spec 070: a chosen insurer of the referential (the API then sets the displayed name itself).
+  const insurerId = optionalText(formData, "insurerId");
+  if (insurerId !== undefined && UUID_PATTERN.test(insurerId)) content.insurerId = insurerId;
   const numberKeys = ["indicativePriceMin", "indicativePriceMax", "deductibleAmount", "coverageCeiling"] as const;
   for (const key of numberKeys) {
     const value = optionalNumber(formData, key);
@@ -337,3 +380,59 @@ export const COMPLETENESS_CHECKLIST: Array<{ field: OfferCompletenessField; labe
   { field: "validUntil", label: "Fin de validité future" },
   { field: "sourceOfInformation", label: "Source de l'information" }
 ];
+
+/* ----------------------------------------------------------------- insurers (spec 070) */
+
+export const INSURER_STATUS_LABELS: Record<string, string> = {
+  active: "Actif",
+  suspended: "Suspendu",
+  retired: "Retiré"
+};
+
+export const INSURER_STATUS_TONES: Record<string, "neutral" | "success" | "warning" | "danger" | "info" | "disabled"> = {
+  active: "success",
+  suspended: "warning",
+  retired: "disabled"
+};
+
+export const INSURER_STATUS_OPTIONS = ["active", "suspended", "retired"] as const;
+
+/** Edit form: a retired insurer is retired through the dedicated action, with a reason. */
+export const INSURER_EDIT_STATUS_OPTIONS = ["active", "suspended"] as const;
+
+export const INSURER_STATUS_HINT = "Un assureur suspendu ou retiré ne peut plus être choisi pour une nouvelle offre ; les offres existantes gardent son nom.";
+
+export function insurerWriteErrorMessage(
+  result: { status: number; code?: string | undefined; message?: string | undefined },
+  operation: "create" | "update" | "retire"
+): string {
+  if (result.status === 401 || result.code === "session_required") return "Session expirée : reconnectez-vous puis recommencez.";
+  if (result.status === 403) return "Action refusée : droits insuffisants ou hors périmètre pays.";
+  if (result.status === 404) return "Assureur introuvable ou hors de votre périmètre.";
+  if (result.status === 409) {
+    return operation === "create"
+      ? "Ce code existe déjà pour ce pays : choisissez un autre code (le couple pays + code est unique)."
+      : "Conflit : la fiche a été modifiée depuis son chargement. Rechargez la page puis recommencez.";
+  }
+  const forbidden = result.message?.match(/Forbidden regulated wording:\s*([^;]+)/i);
+  if (result.status === 400 && forbidden) return `Formulation réglementée interdite détectée : « ${forbidden[1]?.trim()} ». Reformulez le champ concerné.`;
+  if (result.status === 400 || result.status === 422) {
+    return "Données invalides : vérifiez le nom, le code (minuscules, chiffres et tirets) et le motif (8 caractères au moins).";
+  }
+  if (result.status === 0) return "API indisponible : réessayez dans quelques instants.";
+  return `Erreur inattendue de l'API (${result.status}${result.code ? ` ${result.code}` : ""}).`;
+}
+
+/* --------------------------------------------------------------- AI summary (OFFER-010) */
+
+export const OFFER_AI_SUMMARY_TITLE = "Résumé IA";
+export const OFFER_AI_DISABLED_NOTE = "Assistance IA désactivée pour cette offre";
+export const OFFER_AI_NO_SUMMARY_NOTE = "Aucun résumé validé";
+
+export const OFFER_AI_SUMMARY_NOTICES: Record<string, string> = {
+  queued: "Résumé IA demandé. Rechargez la page dans quelques secondes, puis validez-le depuis l'assistance IA pour le rendre visible.",
+  quota: "Quota quotidien d'assistance IA atteint.",
+  disabled: "Assistance IA désactivée pour cette offre.",
+  forbidden: "Action refusée : rôle AI Admin requis.",
+  error: "Assistance IA temporairement indisponible."
+};

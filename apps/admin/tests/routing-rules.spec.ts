@@ -37,6 +37,7 @@ test("routing page avoids regulated wording and never presents multi-broker send
   // saying it only applies if the flag is open AND the visitor accepted it.
   expect(forms).toContain("si le flag est ouvert et si le visiteur l'accepte");
   expect(page).toContain("si le visiteur l'accepte");
-  // AI must never appear as a routing mode: a regulated routing decision is never taken by a model.
-  expect(forms).not.toContain("ai_assisted");
+  // Lot 5 (spec 071): `ai_assisted` is selectable but only suggests a broker; the admin always decides.
+  expect(forms).toContain("ai_assisted");
+  expect(forms).toContain("AI_ASSISTED_MODE_NOTE");
 });

@@ -926,7 +926,7 @@ export async function readPartnerIntegrations(): Promise<AdminApiState<PartnerIn
   };
 }
 
-export type RoutingRuleMode = "first_eligible" | "round_robin" | "priority" | "capacity" | "performance" | "exclusive" | "manual" | "multi_send";
+export type RoutingRuleMode = "first_eligible" | "round_robin" | "priority" | "capacity" | "performance" | "exclusive" | "manual" | "multi_send" | "ai_assisted";
 
 export interface RoutingRuleData {
   id: string;
@@ -960,6 +960,12 @@ export interface PendingManualQuoteData {
   productKey: string;
   createdAt: string;
   candidates: Array<{ partnerTenantId: string; legalName: string; plan: "starter" | "pro" | "enterprise"; eligible: boolean; reasons: string[] }>;
+  /** Lot 5 (spec 071): why the request is parked (manual_rule, lead_quality_below_threshold, ai_suggestion_pending, ...). */
+  parkedReasons?: string[];
+  /** Lot 5 (spec 071): lead quality score (0-100) computed at routing time, when known. */
+  qualityScore?: number | null;
+  /** Lot 5 (spec 071): advisory AI suggestion among the eligible brokers; the admin validates by assigning. */
+  aiSuggestion?: { partnerTenantId: string; rationale: string; provider: string; generatedAt: string } | null;
 }
 
 export interface PendingManualQueueData {

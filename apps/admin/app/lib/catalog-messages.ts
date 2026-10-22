@@ -144,6 +144,9 @@ export function adminWriteErrorMessage(result: Pick<AdminWriteResult<unknown>, "
   if (partnerMessage) return partnerMessage;
   if (result.status === 413) return PARTNER_ERROR_MESSAGES.PAYLOAD_TOO_LARGE ?? "Fichier trop volumineux.";
   if (code === "CATALOG_FLAG_NOT_TOGGLEABLE") return SENSITIVE_FLAG_EXPLANATION;
+  if (code === "CATALOG_CATEGORY_IN_USE") return "Retrait refusé : des produits sont rattachés à cette catégorie. Rattachez-les à une autre catégorie puis recommencez.";
+  if (code === "PRODUCT_CATEGORY_INVALID") return "Catégorie invalide : elle doit exister et être active (une catégorie créée en brouillon doit d'abord être activée).";
+  if (code === "FORBIDDEN_WORDING") return "Texte refusé : il contient une formulation interdite (promesse, garantie ou incitation non conforme). Reformulez-le.";
   if (result.status === 403) return "Action refusée : droits insuffisants ou hors périmètre.";
   if (code === "CATALOG_UPDATE_CONFLICT") {
     return "Conflit de mise à jour : la fiche a été modifiée depuis son chargement. Rechargez la page puis recommencez.";
@@ -254,7 +257,8 @@ export const EXPLICITLY_SENSITIVE_FLAG_KEYS = [
   "partner_webhooks_enabled",
   "retention_purge_enabled",
   "satisfaction_survey_enabled",
-  "ai_routing_anomaly_detection_enabled"
+  "ai_routing_anomaly_detection_enabled",
+  "ai_assisted_routing_enabled"
 ] as const;
 
 const REGULATED_FLAG_KEY_FRAGMENTS = [
@@ -281,4 +285,86 @@ export function isSensitiveFlagKey(key: string, extraSensitiveKeys: readonly str
 
 export function formatDate(value?: string | null): string {
   return value ? new Date(value).toISOString().slice(0, 10) : "-";
+}
+
+/* ---------------------------------------------------------------------------------------------
+ * Spec 070 lot 4: categories, product content, version history and attestations.
+ * ------------------------------------------------------------------------------------------- */
+
+export const DOCUMENT_KIND_LABELS: Record<string, string> = {
+  identity: "Pièce d'identité",
+  vehicle_registration: "Carte grise",
+  driving_license: "Permis de conduire",
+  proof_of_address: "Justificatif de domicile",
+  medical_form: "Formulaire médical",
+  existing_policy: "Contrat d'assurance existant",
+  other: "Autre"
+};
+
+export function documentKindLabel(kind: string): string {
+  return DOCUMENT_KIND_LABELS[kind] ?? kind;
+}
+
+export const LEGAL_TEXT_MAX_LENGTH = 5000;
+export const DISCLAIMER_MAX_LENGTH = 1000;
+
+export const CATEGORY_STATUS_OPTIONS = [
+  { value: "draft", label: "Brouillon" },
+  { value: "active", label: "Active" },
+  { value: "retired", label: "Retirée" }
+] as const;
+
+export const CATEGORY_STATUS_LABELS: Record<string, string> = { draft: "Brouillon", active: "Active", retired: "Retirée" };
+
+const VERSION_FIELD_LABELS: Record<string, string> = {
+  name: "Nom",
+  description: "Description",
+  categoryId: "Catégorie",
+  sensitivity: "Sensibilité",
+  requiresDocuments: "Documents requis (case)",
+  requiresManualReview: "Revue manuelle requise",
+  requiredDocumentKinds: "Types de documents requis",
+  "legalNotice.fr.legalText": "Texte légal (FR)",
+  "legalNotice.fr.disclaimer": "Avertissement (FR)",
+  "legalNotice.en.legalText": "Texte légal (EN)",
+  "legalNotice.en.disclaimer": "Avertissement (EN)",
+  status: "Statut"
+};
+
+export function versionFieldLabel(field: string): string {
+  return VERSION_FIELD_LABELS[field] ?? field;
+}
+
+/** Readable form of a JSON value of a version diff (`null` or empty: "non renseigné"). */
+export function formatVersionValue(field: string, value: unknown): string {
+  if (value === null || value === undefined || value === "") return "non renseigné";
+  if (typeof value === "boolean") return value ? "Oui" : "Non";
+  if (Array.isArray(value)) {
+    if (value.length === 0) return "aucun";
+    return value.map((entry) => (field === "requiredDocumentKinds" ? documentKindLabel(String(entry)) : String(entry))).join(", ");
+  }
+  if (typeof value === "object") return JSON.stringify(value);
+  return String(value);
+}
+
+export const ATTESTATION_ROLE_MESSAGE = "Attestation réservée à la conformité (compliance_admin, super_admin), avec MFA.";
+
+/** Spec 070 PRD 35/36: French labels of the new controls (the backend labels carry no accents). */
+export const ACTIVATION_CONTROL_LABELS: Record<string, string> = {
+  country_routing_rules_configured: "Règles de routage configurées",
+  country_notifications_tested: "Notifications testées",
+  country_support_ready: "Support prêt à traiter les demandes",
+  country_deactivation_plan: "Plan de désactivation rapide documenté",
+  country_ai_decision_explicit: "Décision explicite sur les modules IA autorisés",
+  product_required_documents_defined: "Documents requis définis",
+  product_scoring_rules_defined: "Règles de scoring définies",
+  product_disclaimers_configured: "Avertissements configurés",
+  product_routing_tested: "Routage testé pour ce produit",
+  product_user_journey_tested: "Parcours utilisateur testé",
+  product_ai_guardrails_configured: "Garde-fous IA configurés",
+  product_dashboard_metrics: "Indicateurs de tableau de bord définis"
+};
+
+export function activationControlLabel(key: string, fallback: string): string {
+  return ACTIVATION_CONTROL_LABELS[key] ?? fallback;
 }

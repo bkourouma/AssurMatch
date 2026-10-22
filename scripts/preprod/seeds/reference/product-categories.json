@@ -1,7 +1,86 @@
 [
-  { "key": "personal-lines", "name": "Lignes personnelles" },
-  { "key": "commercial-lines", "name": "Lignes commerciales" },
-  { "key": "life-savings", "name": "Vie et epargne" },
-  { "key": "microassurance", "name": "Microassurance" },
-  { "key": "specialty", "name": "Specialites" }
+  {
+    "key": "auto-moto",
+    "name": "Auto / moto",
+    "nameEn": "Motor",
+    "sortOrder": 10
+  },
+  {
+    "key": "sante",
+    "name": "Santé",
+    "nameEn": "Health",
+    "sortOrder": 20
+  },
+  {
+    "key": "voyage",
+    "name": "Voyage",
+    "nameEn": "Travel",
+    "sortOrder": 30
+  },
+  {
+    "key": "habitation",
+    "name": "Habitation",
+    "nameEn": "Home",
+    "sortOrder": 40
+  },
+  {
+    "key": "vie-epargne",
+    "name": "Vie / épargne",
+    "nameEn": "Life / savings",
+    "sortOrder": 50
+  },
+  {
+    "key": "entreprise",
+    "name": "Entreprise",
+    "nameEn": "Business",
+    "sortOrder": 60
+  },
+  {
+    "key": "transport",
+    "name": "Transport",
+    "nameEn": "Transport",
+    "sortOrder": 70
+  },
+  {
+    "key": "agricole",
+    "name": "Agricole",
+    "nameEn": "Agriculture",
+    "sortOrder": 80
+  },
+  {
+    "key": "scolaire",
+    "name": "Scolaire",
+    "nameEn": "School",
+    "sortOrder": 90
+  },
+  {
+    "key": "microassurance",
+    "name": "Microassurance",
+    "nameEn": "Microinsurance",
+    "sortOrder": 100
+  },
+  {
+    "key": "credit-caution",
+    "name": "Crédit / caution",
+    "nameEn": "Credit / surety",
+    "sortOrder": 110
+  },
+  {
+    "key": "cyber",
+    "name": "Cyber",
+    "nameEn": "Cyber",
+    "sortOrder": 120
+  },
+  {
+    "key": "evenementiel",
+    "name": "Événementiel",
+    "nameEn": "Events",
+    "sortOrder": 130
+  },
+  {
+    "key": "construction",
+    "name": "Construction",
+    "nameEn": "Construction",
+    "sortOrder": 140
+  }
 ]
