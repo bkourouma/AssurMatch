@@ -27,7 +27,9 @@ export const POLICY_ACTIVATABLE_FLAGS = [
   "ai_duplicate_detection_enabled",
   "ai_recommendation_enabled",
   "ai_broker_assistant_enabled",
-  "ai_routing_anomaly_detection_enabled" // spec 049
+  "ai_routing_anomaly_detection_enabled", // spec 049
+  "ai_assisted_routing_enabled", // spec 071 (lot 5)
+  "broker_weekly_ai_summary_enabled" // spec 069 (lot 3)
 ] as const;
 
 export const NEVER_ACTIVATABLE_FLAGS = ["payments_enabled", "e_signature_enabled", "policy_issuance_enabled", "claims_enabled", "insurer_api_enabled"] as const;

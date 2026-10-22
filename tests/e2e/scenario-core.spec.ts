@@ -8,6 +8,7 @@ import {
   setCatalogFlag,
   setGlobalFlag
 } from "./support/admin";
+import { provisionActivationPrerequisites } from "./support/activation-prerequisites";
 import { activateWithMfa, e2ePassword, newAppContext, openAs, type BackOfficeAccount } from "./support/backoffice";
 import { e2eEnv } from "./support/env";
 import { loadJourneyState, requireState, saveJourneyState } from "./support/journey-state";
@@ -102,6 +103,12 @@ test("SC-01b ouvrir la Côte d'Ivoire, Auto et Voyage : consentements, formulair
       }, REASON);
     }
   }
+
+  // Spec 070 (PRD 35/36): making a product public, then opening the country, is gated by the activation
+  // checklist. Provide its prerequisites first (scoring rule, FR/EN disclaimers, routing rule, attestations
+  // posted by the super admin with MFA). The session is renewed first: the forms above took a while.
+  await openAs(page, admin, "/catalog/products");
+  await provisionActivationPrerequisites(page, { countryId, productIds: Object.values(productIds), reason: REASON });
 
   // Products: global flags, no forced manual review (routing must happen), then public status.
   for (const key of ["auto", "voyage"]) {

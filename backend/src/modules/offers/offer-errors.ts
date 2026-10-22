@@ -14,7 +14,13 @@ export const OfferErrorCodes = {
   incomplete: ErrorCodes.OFFER_INCOMPLETE,
   validationBlocked: ErrorCodes.OFFER_VALIDATION_BLOCKED,
   versionConflict: ErrorCodes.OFFER_VERSION_CONFLICT,
-  transitionInvalid: ErrorCodes.OFFER_TRANSITION_INVALID
+  transitionInvalid: ErrorCodes.OFFER_TRANSITION_INVALID,
+  /** Spec 070: the offer type rules are not met (partner required, insurer required ...). */
+  typeInvalid: "OFFER_TYPE_INVALID",
+  /** Spec 070: the type of an offer cannot change after creation. */
+  typeImmutable: "OFFER_TYPE_IMMUTABLE",
+  /** Spec 070: the chosen insurer is unknown, not active or from another country. */
+  insurerInvalid: "OFFER_INSURER_INVALID"
 } as const;
 
 export function offerForbidden(message = "RBAC denied", code: string = OfferErrorCodes.rbacDenied): ForbiddenException {

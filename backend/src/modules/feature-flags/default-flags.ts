@@ -34,12 +34,24 @@ export const GLOBAL_FEATURE_FLAG_DEFAULTS = {
   /** Spec 049: AI routing anomaly detection. */
   ai_routing_anomaly_detection_enabled: false,
   /**
+   * Lot 5 (spec 071, PRD 32.8): AI-assisted routing. The `ai_assisted` rule mode only attaches an
+   * advisory suggestion to a request parked for manual assignment; closed, the mode parks without one.
+   */
+  ai_assisted_routing_enabled: false,
+  /**
    * Spec 062: broker <-> visitor messaging and document requests. Ships OFF (product owner, 2026-10-16):
    * open it from the admin flags screen only once the legal opinion L-08 (CIMA intermediary positioning)
    * is obtained. Non-sensitive on purpose: admin-toggleable, and switching it off refuses new writes with
    * MESSAGING_DISABLED while reads stay.
    */
-  broker_visitor_messaging_enabled: false
+  broker_visitor_messaging_enabled: false,
+  /**
+   * PRD section 23: weekly summary of a Pro/Enterprise broker's activity, composed with the AI when
+   * `ai_summary_enabled`, the plan and the partner opt-out allow it (deterministic text otherwise).
+   * Ships OFF. Non-sensitive like `ai_summary_enabled`: the text is aggregates only and purely
+   * descriptive (guardrail `advice_not_allowed`), so an admin may toggle it from the flags screen.
+   */
+  broker_weekly_ai_summary_enabled: false
 } as const;
 
 export const COUNTRY_FEATURE_FLAG_DEFAULTS = {

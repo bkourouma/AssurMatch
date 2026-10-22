@@ -15,6 +15,7 @@ import type { AuthEmailDeliveryResult, AuthEmailPayload } from "../../../src/mod
 import { QuoteEmailTemplateService } from "../../../src/modules/notifications/email/quote-email-template.service";
 import { QuoteNotificationDeliveryService } from "../../../src/modules/notifications/quote-notification-delivery.service";
 import type { AssurMatchRuntime } from "../../../src/runtime/assurmatch-runtime";
+import { brokerUser } from "../broker-self-service/self-service-helpers";
 import { actorHeaders, createRuntimeHttpHarness, readJson, seedPublicRuntime, type RuntimeHttpHarness } from "../runtime-http-test-utils";
 
 type Seed = Awaited<ReturnType<typeof seedPublicRuntime>>;
@@ -88,11 +89,13 @@ describe("broker <-> visitor messaging runtime HTTP (spec 062)", () => {
     const assignment = (await harness.runtime.leads.assignments.list()).find((candidate) => candidate.publicReference === confirmation.publicReference);
     if (!assignment) throw new Error("assignment missing");
     const tenant = seed.partner.id;
+    // Lot 3 (spec 069 FR-006): an assigned advisor must be a real user of the cabinet.
+    const agentUser = await brokerUser(harness, tenant, "broker_agent");
     const actors = {
       starter: { actorId: "starter-owner", roles: ["broker_owner_starter"], partnerTenantId: tenant, partnerPlan: "starter", mfaVerified: true } as ActorContext,
       pro: { actorId: "pro-owner", roles: ["broker_owner_pro"], partnerTenantId: tenant, partnerPlan: "pro", mfaVerified: true } as ActorContext,
       manager: { actorId: "manager-1", roles: ["broker_manager"], partnerTenantId: tenant, partnerPlan: "pro", mfaVerified: true } as ActorContext,
-      agentA: { actorId: "agent-a", roles: ["broker_agent"], partnerTenantId: tenant, partnerPlan: "pro", mfaVerified: true } as ActorContext,
+      agentA: { actorId: agentUser.actorId as string, roles: ["broker_agent"], partnerTenantId: tenant, partnerPlan: "pro", mfaVerified: true } as ActorContext,
       readOnly: { actorId: "reader", roles: ["broker_read_only"], partnerTenantId: tenant, partnerPlan: "pro", mfaVerified: true } as ActorContext,
       other: { actorId: "other-owner", roles: ["broker_owner_pro"], partnerTenantId: "00000000-0000-4000-8000-0000000062aa", partnerPlan: "pro", mfaVerified: true } as ActorContext,
       compliance: { actorId: "compliance-1", roles: ["compliance_admin"], mfaVerified: true } as ActorContext,

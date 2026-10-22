@@ -109,6 +109,45 @@ export const brokerStarterDashboardSectionSchema = z.object({
   satisfaction: brokerSatisfactionSummarySchema.optional()
 });
 
+/** One source of requests (DASH-B-008). The CRM `source` of the lead is used: no UTM/marketing attribution is captured. */
+export const brokerCrmSourceRowSchema = z.object({
+  source: nonEmptyStringSchema,
+  received: z.number().int().min(0),
+  won: z.number().int().min(0),
+  /** won / received, 0 when nothing was received. */
+  conversionRate: z.number().min(0).max(1)
+});
+
+/** Estimated lead cost from the billing tariff of the plan (DASH-B-009); never an invoice amount. */
+export const brokerLeadCostSchema = z.object({
+  currency: nonEmptyStringSchema,
+  estimatedTotal: z.number().min(0),
+  perLead: z.number().min(0),
+  /** null when no lead was won in the scope. */
+  perWonLead: z.number().min(0).nullable(),
+  basis: z.literal("billing_tariff_estimate")
+});
+
+/**
+ * Pro/Enterprise CRM KPIs (PRD §20, DASH-B-001..009), computed on the same scope as the dashboard
+ * (window, filters, agency). Rates are ratios in [0, 1] over the leads received.
+ * - contactRate: leads that reached a "contacted" status (contacte, qualifie, documents_demandes,
+ *   devis_en_preparation, devis_envoye, negociation, gagne; `contact_tente` does not count).
+ * - averageFirstContactMinutes: assignment -> first transition to such a status. Distinct from
+ *   `starter.averageFirstActionMinutes` (first view) and from `averageReceptionToFirstActivityMinutes`
+ *   (first history event of any kind).
+ * - qualificationRate: leads that reached `qualifie` or a later status.
+ * - quotesSent: distinct leads with a CRM proposal or having reached `devis_envoye`, and the total of CRM proposals.
+ */
+export const brokerCrmKpisSchema = z.object({
+  contactRate: z.number().min(0).max(1),
+  averageFirstContactMinutes: z.number().nullable(),
+  qualificationRate: z.number().min(0).max(1),
+  quotesSent: z.object({ leads: z.number().int().min(0), proposals: z.number().int().min(0) }),
+  topSources: z.array(brokerCrmSourceRowSchema),
+  leadCost: brokerLeadCostSchema.optional()
+});
+
 export const brokerCrmDashboardSectionSchema = z.object({
   pipeline: z.array(z.object({ status: nonEmptyStringSchema, total: z.number().int().min(0) })),
   byAssignedAdvisor: z.array(z.object({ advisorId: nonEmptyStringSchema, total: z.number().int().min(0) })),
@@ -116,8 +155,13 @@ export const brokerCrmDashboardSectionSchema = z.object({
     productKey: nonEmptyStringSchema,
     received: z.number().int().min(0),
     accepted: z.number().int().min(0),
+    /** Leads won (crmStatus `gagne`); `rate` is won / received. */
+    won: z.number().int().min(0).optional(),
     rate: z.number().min(0).max(1)
   })),
+  /** Global conversion = leads won / leads received (0 when nothing was received). */
+  conversionRate: z.number().min(0).max(1).optional(),
+  kpis: brokerCrmKpisSchema.optional(),
   averageReceptionToFirstActivityMinutes: z.number().nullable(),
   upcomingTasks: z.number().int().min(0),
   upcomingReminders: z.number().int().min(0),
@@ -295,3 +339,23 @@ export const routingAnomalyReportSchema = z.object({
   recommendations: z.array(z.string()).optional()
 });
 export type RoutingAnomalyReport = z.infer<typeof routingAnomalyReportSchema>;
+
+/** PRD §6.3: one row of the Enterprise multi-agency view; `agencyId` is `none` for advisors in no agency. */
+export const brokerAgencyOverviewRowSchema = z.object({
+  agencyId: agencyFilterSchema,
+  agencyName: nonEmptyStringSchema,
+  advisors: z.number().int().min(0),
+  received: z.number().int().min(0),
+  accepted: z.number().int().min(0),
+  won: z.number().int().min(0),
+  lost: z.number().int().min(0),
+  contactRate: z.number().min(0).max(1),
+  /** won / received. */
+  conversionRate: z.number().min(0).max(1),
+  averageFirstContactMinutes: z.number().nullable()
+});
+
+export type BrokerCrmSourceRow = z.infer<typeof brokerCrmSourceRowSchema>;
+export type BrokerLeadCost = z.infer<typeof brokerLeadCostSchema>;
+export type BrokerCrmKpis = z.infer<typeof brokerCrmKpisSchema>;
+export type BrokerAgencyOverviewRow = z.infer<typeof brokerAgencyOverviewRowSchema>;

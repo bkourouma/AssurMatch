@@ -16,8 +16,9 @@ same sha256 hash the API computes. Publishing them stays a compliance act in the
 | `currencies.json` | Currencies referenced by the countries |
 | `languages.json` | Language codes used by countries / texts |
 | `regulatory-regimes.json` | CIMA / FANAF / national-template generic regimes |
-| `product-categories.json` | Product category enum mirror |
-| `products.json` | Catalog of 15 PRD products with default flags fail-closed |
+| `product-categories.json` | The 14 PRD section 12 product categories (spec 070): created `active` when absent, never rewritten on a rerun |
+| `insurers.json` | Reference insurers per country (`countryIsoCode`, `name`, `code`, optional `approvalNumber`); empty by default, created when absent, never rewritten |
+| `products.json` | Catalog of 15 PRD products with default flags fail-closed; the category is set only when the product has none |
 | `feature-flags.defaults.json` | Mirrors `backend/src/modules/feature-flags/default-flags.ts` for fresh-init seeding |
 | `consent-templates.json` | Parameterized consent templates (no real legal text) |
 

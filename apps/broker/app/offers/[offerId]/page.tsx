@@ -2,16 +2,19 @@ import { redirect } from "next/navigation";
 import { loginRedirect, readBackOfficeSession } from "../../lib/backoffice-auth";
 import { TENANT_SUSPENDED_MESSAGE, canMutateOffers, canReadOffers, isTenantReadOnly } from "../../lib/broker-permissions";
 import { readBrokerOffer, readOfferScopeChoices, OFFER_SCOPE_OUTSIDE_COVERAGE, type OfferVersionView } from "../../lib/offer-api";
+import { readBrokerInsurers, readBrokerOfferAiSummary } from "../../lib/lot4-offers-api";
 import {
   OFFER_STATUS_LABELS,
   OFFER_STATUS_TONES,
   OFFER_VERSION_STATUS_LABELS,
   OFFER_VERSION_STATUS_TONES,
   PAYMENT_FLEXIBILITY_LABELS,
+  PRIVATE_OFFER_BADGE,
   formatDiffValue,
   formatPriceRange,
   offerDisplayName,
-  offerFormatDate
+  offerFormatDate,
+  offerTypeLabel
 } from "../../lib/offer-messages";
 import {
   Badge,
@@ -35,6 +38,7 @@ import {
   SubmitBrokerOfferForm,
   WithdrawBrokerOfferForm
 } from "../offer-forms";
+import { OfferAiSummaryCard } from "../offer-ai-summary";
 
 /**
  * Spec 052 US1/US3/US5: one offer of the broker. The published version is shown read-only; the
@@ -54,7 +58,7 @@ function VersionDetails({ version }: { version: OfferVersionView }) {
       items={[
         { term: "Version", value: <Cluster><span>{`v${version.versionNumber}`}</span><StatusBadge status={version.status} labels={OFFER_VERSION_STATUS_LABELS} tones={OFFER_VERSION_STATUS_TONES} /></Cluster> },
         { term: "Nom commercial", value: content.name },
-        { term: "Assureur porteur", value: content.insurerName ?? "-" },
+        { term: "Assureur porteur", value: content.insurerName ? `${content.insurerName}${content.insurerId ? " (référentiel)" : ""}` : "-" },
         { term: "Description", value: content.shortDescription ?? "-" },
         { term: "Garanties", value: content.guarantees.length ? formatDiffValue(content.guarantees) : "-" },
         { term: "Exclusions", value: content.exclusionsSummary ?? "-" },
@@ -100,7 +104,7 @@ export default async function BrokerOfferPage({ params, searchParams }: BrokerOf
   // Owner or manager: the write area is rendered, disabled while the partner is suspended.
   const writer = canMutateOffers({ ...session.profile, tenantReadOnly: false, partnerTenantStatus: "active" });
 
-  const [result, scopes] = await Promise.all([readBrokerOffer(offerId), readOfferScopeChoices()]);
+  const [result, scopes, aiSummary] = await Promise.all([readBrokerOffer(offerId), readOfferScopeChoices(), readBrokerOfferAiSummary(offerId)]);
   if (result.status === "unauthenticated") redirect(loginRedirect(path, result.error ?? "session_required"));
   const offer = result.data;
   if (!offer) {
@@ -117,18 +121,20 @@ export default async function BrokerOfferPage({ params, searchParams }: BrokerOf
   const pending = offer.pending;
   const withdrawn = offer.status === "withdrawn";
   const expired = offer.status === "expired" || (offer.expiresInDays !== undefined && offer.expiresInDays < 0);
+  const insurers = writer && !withdrawn ? await readBrokerInsurers(offer.countryId) : [];
   const notice = query.notice === "created" ? "Offre créée en brouillon (version 1). Complétez-la puis soumettez-la à validation." : undefined;
 
   return (
     <PageStack>
       <PageHeader
         breadcrumb={[{ label: "Activite" }, { label: "Mes offres", href: "/offers" }, { label: offerDisplayName(offer) }]}
-        kicker={offer.offerType === "partner" ? "Offre partenaire" : "Offre indicative"}
+        kicker={offerTypeLabel(offer.offerType)}
         title={offerDisplayName(offer)}
         description={`${scope ? `${scope.countryLabel} · ${scope.productLabel}` : OFFER_SCOPE_OUTSIDE_COVERAGE}. Offre indicative : prix à confirmer par le courtier partenaire.`}
         actions={
           <Cluster>
             <StatusBadge status={offer.status} labels={OFFER_STATUS_LABELS} tones={OFFER_STATUS_TONES} />
+            {offer.offerType === "private" ? <Badge tone="warning">{PRIVATE_OFFER_BADGE}</Badge> : null}
             {offer.expiringSoon && !expired ? <Badge tone="warning">{`Expire dans ${offer.expiresInDays ?? 0} jours`}</Badge> : null}
             {offer.isSponsored ? <Badge tone="warning">Sponsorisé</Badge> : null}
           </Cluster>
@@ -140,6 +146,14 @@ export default async function BrokerOfferPage({ params, searchParams }: BrokerOf
       {offer.suspensionReason ? <Notice tone="danger" title="Offre suspendue par AssurMatch">{offer.suspensionReason}</Notice> : null}
       {offer.lastDecisionReason && !offer.suspensionReason ? <Notice tone="warning" title="Motif du dernier refus">{offer.lastDecisionReason}</Notice> : null}
       {expired && !withdrawn ? <Notice tone="warning" title="Offre expirée">Elle n&apos;est plus affichée au public. Renouvelez-la avec de nouvelles dates : une nouvelle version sera à valider.</Notice> : null}
+
+      {offer.offerType === "private" ? (
+        <Notice tone="warning" title={PRIVATE_OFFER_BADGE}>
+          Une offre privée n&apos;est jamais affichée au public ni comparée : elle reste visible de votre cabinet uniquement.
+        </Notice>
+      ) : null}
+
+      <OfferAiSummaryCard result={aiSummary} />
 
       <Grid columns="two">
         <Card title="Version publiée" description="Visible du public tant qu'aucune nouvelle version n'est validée. Lecture seule.">
@@ -174,6 +188,9 @@ export default async function BrokerOfferPage({ params, searchParams }: BrokerOf
           ) : null}
           <EditBrokerOfferForm
             offerId={offer.id}
+            offerType={offer.offerType}
+            countryId={offer.countryId}
+            insurers={insurers}
             concurrencyToken={offer.concurrencyToken}
             content={(pending ?? published)?.content}
             hasPending={Boolean(pending)}

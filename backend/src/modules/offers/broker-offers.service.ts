@@ -60,6 +60,7 @@ export class BrokerOffersService {
     for (const offer of own) {
       if (parsed.countryId && offer.countryId !== parsed.countryId) continue;
       if (parsed.productId && offer.productId !== parsed.productId) continue;
+      if (parsed.offerType && (offer.offerType ?? "indicative") !== parsed.offerType) continue;
       const versions = await this.lifecycle.versions(offer);
       if (parsed.status && effectiveOfferStatus(offer, versions, now) !== parsed.status) continue;
       views.push(toBrokerOfferView(offer, versions, { suspensionReason: await this.lifecycle.suspensionReason(offer) }, now));
@@ -92,6 +93,7 @@ export class BrokerOffersService {
   async create(input: unknown, actor: ActorContext): Promise<BrokerOfferView> {
     const partnerTenantId = this.requireBroker(actor, "broker_offers:write", "create");
     this.refuseSponsorship(input, actor, undefined);
+    this.refuseAdminOnlyType(input, actor);
     await this.requireActivePartner(partnerTenantId, actor);
     const parsed = parseOfferInput(brokerOfferCreateSchema, input);
     await this.assertCoverage(actor, partnerTenantId, parsed.countryId, parsed.productId);
@@ -99,7 +101,7 @@ export class BrokerOffersService {
       countryId: parsed.countryId,
       productId: parsed.productId,
       partnerTenantId,
-      offerType: "indicative",
+      offerType: parsed.offerType ?? "indicative",
       content: contentFromInput(parsed, { isSponsored: false })
     }, actor, "broker", parsed.reason ?? DEFAULT_BROKER_REASON);
     return this.view(offer);
@@ -109,7 +111,12 @@ export class BrokerOffersService {
     const partnerTenantId = this.requireBroker(actor, "broker_offers:write", "update");
     const offer = await this.requireOwn(id, actor, "update");
     this.refuseSponsorship(input, actor, offer);
+    this.refuseAdminOnlyType(input, actor);
     const parsed = parseOfferInput(brokerOfferUpdateSchema, input);
+    if (parsed.offerType !== undefined && parsed.offerType !== (offer.offerType ?? "indicative")) {
+      this.lifecycle.refused(actor, offer, "update", "offer_type_immutable", { from: offer.offerType ?? "indicative", to: parsed.offerType });
+      throw offerUnprocessable(OfferErrorCodes.typeImmutable, "The type of an offer cannot change after creation", [{ code: "offer_type_immutable", field: "offerType" }]);
+    }
     await this.assertCoverage(actor, partnerTenantId, offer.countryId, offer.productId, offer);
     // Sponsorship is admin-only (FR-013): a broker version keeps the sponsorship of its base.
     const versions = await this.lifecycle.versions(offer);
@@ -126,6 +133,7 @@ export class BrokerOffersService {
   async submit(id: string, input: unknown, actor: ActorContext): Promise<BrokerOfferView> {
     const partnerTenantId = this.requireBroker(actor, "broker_offers:write", "submit");
     const offer = await this.requireOwn(id, actor, "submit");
+    if (offer.offerType === "insurer") this.refuse(actor, "submit", "offer_type_admin_only", { offerId: offer.id, offerType: offer.offerType });
     const parsed = parseOfferInput(offerSubmitSchema, input ?? {});
     await this.assertCoverage(actor, partnerTenantId, offer.countryId, offer.productId, offer);
     await this.lifecycle.submit(offer, actor, parsed.reason ?? DEFAULT_BROKER_REASON);
@@ -188,6 +196,13 @@ export class BrokerOffersService {
       throw offerNotFound();
     }
     return offer;
+  }
+
+  /** Spec 070: a broker never creates (or retypes to) a `partner` or an `insurer` offer. */
+  private refuseAdminOnlyType(input: unknown, actor: ActorContext): void {
+    if (!input || typeof input !== "object") return;
+    const offerType = (input as Record<string, unknown>).offerType;
+    if (offerType === "partner" || offerType === "insurer") this.refuse(actor, "create", "offer_type_admin_only", { offerType });
   }
 
   private refuseSponsorship(input: unknown, actor: ActorContext, offer: OfferRecord | undefined): void {

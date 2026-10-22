@@ -64,11 +64,12 @@ export const adminNavigation: NavGroup[] = [
         label: "Catalogue",
         href: "/catalog",
         icon: "catalog",
-        match: ["/catalog", "/offers", "/consent-texts"],
+        match: ["/catalog", "/offers", "/insurers", "/consent-texts"],
         children: [
           { label: "Pays", href: "/catalog/countries" },
           { label: "Produits", href: "/catalog/products" },
           { label: "Régimes", href: "/catalog/regimes" },
+          { label: "Assureurs", href: "/insurers" },
           { label: "Consentements", href: "/consent-texts" }
         ]
       },

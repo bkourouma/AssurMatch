@@ -4,6 +4,10 @@ import { ActivationChecklistModule } from "../modules/activation-checklist/activ
 import { AIModule } from "../modules/ai/ai.module";
 import { BillingModule } from "../modules/billing/billing.module";
 import { PrismaBillingRepository } from "../modules/billing/billing.repository";
+// Lot 5 (spec 071)
+import { PrismaPlanChangeRequestsRepository } from "../modules/billing/plan-change-requests.repository";
+import type { PartnerCommercialState } from "../modules/routing/routing-controls.ports";
+// End Lot 5
 import { PrismaInvoicingRepository } from "../modules/billing/invoicing.repository";
 import { AuditLogsModule } from "../modules/audit-logs/audit-logs.module";
 import { PrismaAuditLogRepository } from "../modules/audit-logs/audit-log-repository";
@@ -32,7 +36,7 @@ import { BrokerNotificationsService } from "../modules/notifications/broker-noti
 import type { ActorContext } from "../modules/common/types";
 import type { AdvisorAgencyPredicate } from "../modules/common/agency-scope";
 import { EnterpriseService } from "../modules/enterprise/enterprise.service";
-import { PrismaEnterpriseRepository } from "../modules/enterprise/enterprise.repository";
+import { MemoryEnterpriseRepository, PrismaEnterpriseRepository } from "../modules/enterprise/enterprise.repository";
 import { OffersModule } from "../modules/offers/offers.module";
 import { PartnerApplicationsModule } from "../modules/partner-applications/partner-applications.module";
 import { MemoryPartnerApplicationsRepository, PrismaPartnerApplicationsRepository } from "../modules/partner-applications/partner-applications.repository";
@@ -65,6 +69,7 @@ import { MemoryAiInteractionsRepository, PrismaAiInteractionsRepository } from "
 import { resolveAiProvider } from "../modules/ai/core/ai-provider.config";
 import { VisitorAiService } from "../modules/ai/visitor-ai.service";
 import { BrokerAiService } from "../modules/ai/broker-ai.service";
+import type { PartnerPlan } from "../modules/ai/core/ai-gateway.service";
 import { AdminAiService } from "../modules/ai/admin-ai.service";
 import { AiScopeFlagPolicyService } from "../modules/ai/ai-scope-flags.service"; // Lot 7 (spec 074)
 import { LeadReassignmentService } from "../modules/routing/lead-reassignment.service";
@@ -135,6 +140,20 @@ import { AdminOperationsModule } from "../modules/admin-operations/admin-operati
 // Spec 062 data requests
 import { DataRequestsModule, MemoryDataRequestsRepository, PrismaDataRequestsRepository } from "../modules/data-requests/data-requests.module";
 import type { DataRequestNotificationsPort } from "../modules/lead-messaging/lead-messaging.ports";
+// Lot 4 (spec 070)
+import { InsurersModule, MemoryInsurersRepository, PrismaInsurersRepository } from "../modules/insurers/insurers.module";
+import { AdminProductCategoriesController } from "../modules/products/admin-product-categories.controller";
+import { MemoryProductCategoriesRepository, PrismaProductCategoriesRepository } from "../modules/products/product-categories.repository";
+import { ProductCategoriesService } from "../modules/products/product-categories.service";
+import { MemoryProductVersionsRepository, PrismaProductVersionsRepository } from "../modules/products/product-versions.repository";
+import { OfferAiSummaryController } from "../modules/offers/offer-ai-summary.controller";
+import { OfferAiSummaryService } from "../modules/offers/offer-ai-summary.service";
+import { ActivationAttestationsController } from "../modules/activation-checklist/activation-attestations.controller";
+import { MemoryActivationAttestationsRepository, PrismaActivationAttestationsRepository } from "../modules/activation-checklist/activation-attestations.repository";
+import { ActivationAttestationsService } from "../modules/activation-checklist/activation-attestations.service";
+import { MemoryRoutingRulesRepository, type RoutingRulesRepository } from "../modules/routing/routing-rules.repository";
+import { MemoryScoringRulesRepository, type ScoringRulesRepository } from "../modules/offers/scoring-rules.repository";
+// End Lot 4 (spec 070)
 
 export class AssurMatchRuntime {
   readonly config = new ConfigModule();
@@ -172,6 +191,14 @@ export class AssurMatchRuntime {
   private readonly visitorAccessTokensRepository = this.runtimeRepository(new PrismaVisitorAccessTokensRepository(this.prisma));
   private readonly routingRulesRepository = this.runtimeRepository(new PrismaRoutingRulesRepository(this.prisma));
   private readonly scoringRulesRepository = this.runtimeRepository(new PrismaScoringRulesRepository(this.prisma));
+  // Lot 4 (spec 070): memory instances owned here under test, so the checklist reads the very rules the services hold.
+  private readonly routingRulesStore: RoutingRulesRepository = this.routingRulesRepository ?? new MemoryRoutingRulesRepository();
+  private readonly scoringRulesStore: ScoringRulesRepository = this.scoringRulesRepository ?? new MemoryScoringRulesRepository();
+  private readonly productCategoriesRepository = this.runtimeRepository(new PrismaProductCategoriesRepository(this.prisma)) ?? new MemoryProductCategoriesRepository();
+  private readonly productVersionsRepository = this.runtimeRepository(new PrismaProductVersionsRepository(this.prisma)) ?? new MemoryProductVersionsRepository();
+  private readonly insurersRepository = this.runtimeRepository(new PrismaInsurersRepository(this.prisma)) ?? new MemoryInsurersRepository();
+  private readonly activationAttestationsRepository = this.runtimeRepository(new PrismaActivationAttestationsRepository(this.prisma)) ?? new MemoryActivationAttestationsRepository();
+  // End Lot 4 (spec 070)
   private readonly quoteDocumentsRepository = this.runtimeRepository(new PrismaQuoteDocumentsRepository(this.prisma)) ?? new MemoryQuoteDocumentsRepository();
   private readonly waitlistRepository = this.runtimeRepository(new PrismaWaitlistRepository(this.prisma)) ?? new MemoryWaitlistRepository();
   private readonly partnerApplicationsRepository = this.runtimeRepository(new PrismaPartnerApplicationsRepository(this.prisma)) ?? new MemoryPartnerApplicationsRepository();
@@ -222,7 +249,13 @@ export class AssurMatchRuntime {
   readonly countries: CountriesModule = new CountriesModule(this.audit.writer, this.countriesRepository, {
     find: async (id: string): Promise<{ id: string; status: string } | undefined> => this.regulatoryRegimes.service.find(id)
   });
-  readonly products = new ProductsModule(this.audit.writer, this.productsRepository);
+  // Lot 4 (spec 070): categories and content versions; the author label comes from the user directory (lazy: users are built later).
+  readonly products = new ProductsModule(this.audit.writer, this.productsRepository, {
+    categories: this.productCategoriesRepository,
+    versions: this.productVersionsRepository,
+    resolveAuthorLabel: async (authorId: string) => (await this.users.service.require(authorId).catch(() => undefined))?.displayName
+  });
+  // End Lot 4 (spec 070)
   readonly partners = new PartnersModule(this.audit.writer, this.partnersRepository);
   readonly partnerLicenses = new PartnerLicensesModule(this.audit.writer, this.partnerLicensesRepository);
   /** Spec 051 R12: partner status per request (auth guard, login), invalidated on every partner change. */
@@ -288,7 +321,8 @@ export class AssurMatchRuntime {
     complianceEmail: () => complianceAlertEmail(),
     workerStaleMinutes: () => readIntegerEnv(process.env, "ASSURMATCH_WORKER_STALE_MINUTES", 10, 1, 1440)
   });
-  private readonly enterpriseRepository = this.runtimeRepository(new PrismaEnterpriseRepository(this.prisma));
+  // Lot 3: shared with the scheduled alerts (broker first-action target), so the in-memory mode needs an explicit instance.
+  private readonly enterpriseRepository = this.runtimeRepository(new PrismaEnterpriseRepository(this.prisma)) ?? new MemoryEnterpriseRepository();
   private readonly aiInteractionsRepository = this.runtimeRepository(new PrismaAiInteractionsRepository(this.prisma)) ?? new MemoryAiInteractionsRepository();
   private readonly aiProviders = resolveAiProvider();
   readonly aiGateway = new AiGateway({
@@ -349,6 +383,9 @@ export class AssurMatchRuntime {
     countryFlags: { country_ai_enabled: false },
     productFlags: { product_ai_form_assistant_enabled: false }
   });
+  // Lot 4 (spec 070): insurer referential (offers link to it through `OfferIntegrations.insurer`).
+  readonly insurers = new InsurersModule(this.audit.writer, this.insurersRepository);
+  // End Lot 4 (spec 070)
   /** Spec 052: offer versions; the integrations are lazy (partners, licences, inbox, eligibility). */
   readonly offers: OffersModule = new OffersModule(this.audit.writer, this.redis.client, this.offersRepository, {
     partnerEligibility: (partnerTenantId: string, countryId: string, productId: string) => this.publicOfferPartnerEligibility(partnerTenantId, countryId, productId),
@@ -359,6 +396,9 @@ export class AssurMatchRuntime {
       return partner?.tradeName ?? partner?.legalName;
     },
     partnerStatus: async (partnerTenantId: string) => (await this.partners.service.require(partnerTenantId).catch(() => undefined))?.status,
+    // Lot 4 (spec 070)
+    insurer: (insurerId: string) => this.insurers.service.resolve(insurerId),
+    // End Lot 4 (spec 070)
     notifier: {
       publishInApp: (input) => this.notifications.dispatch.publishInApp(input),
       listInApp: (scopeId: string, limit?: number) => this.notifications.dispatch.listInApp(scopeId, limit)
@@ -368,7 +408,9 @@ export class AssurMatchRuntime {
     audit: this.audit.writer,
     countries: this.countries.service,
     products: this.products.service,
-    ...(this.scoringRulesRepository ? { repository: this.scoringRulesRepository } : {})
+    // Lot 4 (spec 070)
+    repository: this.scoringRulesStore
+    // End Lot 4 (spec 070)
   });
   readonly quoteForms = new QuoteFormsModule(this.audit.writer, {
     // Spec 050 T007 (C4): the real purpose, language, scope and content reach the forms service, so
@@ -413,7 +455,9 @@ export class AssurMatchRuntime {
     countries: this.countries.service,
     products: this.products.service,
     partners: this.partners.service,
-    ...(this.routingRulesRepository ? { repository: this.routingRulesRepository } : {})
+    // Lot 4 (spec 070)
+    repository: this.routingRulesStore
+    // End Lot 4 (spec 070)
   });
   readonly leads = new LeadsModule(
     this.partners.service,
@@ -435,7 +479,13 @@ export class AssurMatchRuntime {
       // Spec 063: lead disputes (country scopes of the finance admin, `billing_enabled` gate).
       disputes: { countries: this.countries.service, featureFlags: this.featureFlags.service },
       // Spec 064: Enterprise agency display filter; the enterprise service is built after the leads, hence the lazy call.
-      agencyScope: { resolve: (actor: ActorContext, agencyId: string | undefined): Promise<AdvisorAgencyPredicate | undefined> => this.enterprise.agencyScopeFor(actor, agencyId) }
+      agencyScope: { resolve: (actor: ActorContext, agencyId: string | undefined): Promise<AdvisorAgencyPredicate | undefined> => this.enterprise.agencyScopeFor(actor, agencyId) },
+      // Lot 5 (spec 071): routing controls 9-12, quota lock and AI-assisted mode (the billing module is built later, hence the lazy calls).
+      commercialState: (partnerTenantId: string): Promise<PartnerCommercialState> => this.billing.subscriptions.commercialState(partnerTenantId),
+      leadQuality: { threshold: readIntegerEnv(process.env, "ASSURMATCH_ROUTING_LEAD_QUALITY_MIN_SCORE", 30, 0, 100) },
+      aiRouting: { isEnabled: () => this.featureFlags.service.isEnabled("ai_assisted_routing_enabled") },
+      redis: this.redis.client,
+      requireRecordedContract: process.env.ASSURMATCH_ROUTING_REQUIRE_RECORDED_CONTRACT === "true"
     }
   );
     readonly satisfactionSurveys: SatisfactionSurveysModule = new SatisfactionSurveysModule(
@@ -485,7 +535,7 @@ readonly enterprise = new EnterpriseService({
     partners: this.partners.service,
     assignments: this.leads.assignments,
     users: this.users.service,
-    ...(this.enterpriseRepository ? { repository: this.enterpriseRepository } : {})
+    repository: this.enterpriseRepository
   });
   /** Spec 064: custom role of a broker member, read by the auth guard on every request (cached 10 s, invalidated on change). */
   readonly customRoleAccess = this.enterprise.customRoleAccess;
@@ -648,10 +698,26 @@ readonly enterprise = new EnterpriseService({
     assignments: this.leads.assignments,
     access: this.leads.brokerCrmAccess,
     countries: this.countries.service,
-    products: this.products.service
+    products: this.products.service,
+    // Lot 3 (spec 069 FR-004) begin: bounded dashboard aggregates (no PII) and the plan/status of a tenant for system callers.
+    performanceInput: async (actor, query) => {
+      const windowDays = Math.min(365, Math.max(1, Number(query.windowDays) || 30));
+      const now = new Date();
+      const dashboard = await this.dashboards.broker.dashboard(actor, { from: new Date(now.getTime() - windowDays * 24 * 60 * 60 * 1000).toISOString(), to: now.toISOString() });
+      // Per-advisor ids are left out: the model only needs the tenant-level counters.
+      const crm = dashboard.crm ? Object.fromEntries(Object.entries(dashboard.crm).filter(([key]) => key !== "byAssignedAdvisor")) : undefined;
+      return { starter: dashboard.starter, ...(crm ? { crm } : {}) };
+    },
+    partnerProfile: async (partnerTenantId: string) => {
+      const partner = await this.partners.service.require(partnerTenantId).catch(() => undefined);
+      return partner ? { plan: partner.plan as PartnerPlan, status: partner.status } : undefined;
+    }
+    // Lot 3 end
   });
   readonly manualRouting = new ManualRoutingService({
     audit: this.audit.writer,
+    // Lot 5 (spec 071): the queue shows the AI suggestion / quality score, and validation is audited.
+    decisions: this.leads.decisions,
     submissions: this.quoteRequests.submissions,
     eligibility: this.leads.eligibility,
     countries: this.countries.service,
@@ -714,7 +780,19 @@ readonly enterprise = new EnterpriseService({
     crmActivity: this.leadRepositorySet.crmActivity,
     brokerCrmConfig: this.brokerCrmConfig,
     // Spec 064: Enterprise agency display filter (lazy: the enterprise service is built after this module).
-    agencyScope: { resolve: (actor: ActorContext, agencyId: string | undefined): Promise<AdvisorAgencyPredicate | undefined> => this.enterprise.agencyScopeFor(actor, agencyId) }
+    agencyScope: { resolve: (actor: ActorContext, agencyId: string | undefined): Promise<AdvisorAgencyPredicate | undefined> => this.enterprise.agencyScopeFor(actor, agencyId) },
+    // Lot 3 (spec 069 FR-001/FR-003) begin: billing tariff for the estimated lead cost, agencies of the tenant, spec 055 proposals.
+    leadPricing: async (plan, countryCode) => {
+      const prices = await this.billing.plans.list({ actorId: "system:broker-dashboard", roles: ["super_admin"], mfaVerified: true });
+      // No fallback on another country's tariff (wrong currency): a lead of a country without tariff has no estimated cost.
+      const match = prices.find((price) => price.plan === plan && price.countryCode === countryCode);
+      return match && match.perLeadPrice > 0 ? { perLeadPrice: match.perLeadPrice, sharedLeadPriceMultiplier: match.sharedLeadPriceMultiplier, currency: match.currency } : undefined;
+    },
+    agencies: {
+      listForTenant: async (actor: ActorContext) => (await this.enterprise.listAgencies(actor)).map((agency) => ({ id: agency.id, name: agency.name, memberIds: agency.memberIds }))
+    },
+    quotesSent: async (assignmentId: string) => (await this.leadProposalsRepository.listForAssignment(assignmentId)).filter((proposal) => proposal.status !== "withdrawn").length
+    // Lot 3 end
   });
   /** Spec 051: partner onboarding and lifecycle behind the `/admin/partners` routes. */
   readonly partnerAdmin = new PartnerAdminService({
@@ -760,6 +838,18 @@ readonly enterprise = new EnterpriseService({
     provisionUser: (actor, input) => this.adminUsersController().createPartnerUser(actor, input),
     invalidateUserAccess: (userId: string) => this.userAccessStatus.invalidate(userId)
   });
+  // Lot 3 (spec 069 FR-004/FR-006) begin: late links (the AI service and the user directory depend on, or come after, the CRM services).
+  private readonly crmLateLinks = (() => {
+    // Approved AI priority scores of the actor's own CRM perimeter (empty when the flag, opt-out or plan closes scoring).
+    this.leads.brokerCrmLeads.setPriorityScoreSource((actor) => this.brokerAi.priorityScoreMapFor(actor));
+    // The advisor of an assignment is resolved from the user directory, never from the client-asserted tenant.
+    this.leads.brokerCrmActivity.setAdvisorTenantResolver(async (advisorId) => {
+      const user = await this.users.service.require(advisorId).catch(() => undefined);
+      return user ? { partnerTenantId: user.partnerTenantId, status: user.status } : undefined;
+    });
+    return true;
+  })();
+  // Lot 3 end
   /** Spec 053 FR-004/FR-013: admin decisions on the broker requests (applied through `partnerAdmin`). */
   readonly partnerRequestAdmin = new PartnerRequestAdminService({
     audit: this.audit.writer,
@@ -777,6 +867,11 @@ readonly enterprise = new EnterpriseService({
     offers: this.offers,
     quoteForms: this.quoteForms.service,
     consent: this.consent.service,
+    // Lot 4 (spec 070): manual attestations and the computed routing / scoring rule controls (PRD 35/36).
+    attestations: this.activationAttestationsRepository,
+    routingRules: { listRules: () => this.routingRulesStore.list() },
+    scoringRules: { listRules: () => this.scoringRulesStore.list() },
+    // End Lot 4 (spec 070)
     partnerReadiness: this.partnerAdmin
   });
   /** Spec 050: admin catalogue and controlled flag toggles; closes cached public reads on change. */
@@ -791,6 +886,34 @@ readonly enterprise = new EnterpriseService({
     consent: this.consent.service,
     onCatalogChanged: () => this.publicCountryDirectory.invalidate()
   });
+  // Lot 4 (spec 070): admin product categories, offer AI summary (closed by default) and activation attestations.
+  readonly productCategories = new ProductCategoriesService(this.audit.writer, { list: (countryId?: string) => this.products.service.listAdmin(countryId) }, this.productCategoriesRepository);
+  readonly adminProductCategories = new AdminProductCategoriesController(this.productCategories, this.audit.writer);
+  readonly offerAiSummary = new OfferAiSummaryController(new OfferAiSummaryService({
+    offers: this.offers.repository,
+    gateway: this.aiGateway,
+    audit: this.audit.writer,
+    scopeFlags: async (offer) => {
+      const [country, product] = await Promise.all([
+        this.countries.service.require(offer.countryId).catch(() => undefined),
+        this.products.service.require(offer.productId).catch(() => undefined)
+      ]);
+      return {
+        countryId: offer.countryId,
+        productId: offer.productId,
+        // A missing country or product closes the summary (an absent flag is not true).
+        countryFlags: country ? { ...publicCountryFlags(country) } : { country_ai_enabled: false },
+        productFlags: product ? { ...this.products.service.effectiveFlags(product, offer.countryId) } : {}
+      };
+    }
+  }));
+  readonly activationAttestations = new ActivationAttestationsController(new ActivationAttestationsService({
+    repository: this.activationAttestationsRepository,
+    audit: this.audit.writer,
+    countries: this.countries.service,
+    products: this.products.service
+  }));
+  // End Lot 4 (spec 070)
   readonly routingAnomalies = new RoutingAnomalyDetectorService({
     quoteRequests: {
       list: () => this.quoteRequests.submissions.list()
@@ -829,6 +952,9 @@ readonly enterprise = new EnterpriseService({
   });
   private readonly billingRepository = this.runtimeRepository(new PrismaBillingRepository(this.prisma));
   private readonly invoicingRepository = this.runtimeRepository(new PrismaInvoicingRepository(this.prisma));
+  // Lot 5 (spec 071)
+  private readonly planChangeRepository = this.runtimeRepository(new PrismaPlanChangeRequestsRepository(this.prisma));
+  // End Lot 5
   readonly billing = new BillingModule({
     audit: this.audit.writer,
     featureFlags: this.featureFlags.service,
@@ -842,7 +968,19 @@ readonly enterprise = new EnterpriseService({
     // Spec 060: invoice PDFs share the document storage; the broker is notified in-app.
     ...(this.invoicingRepository ? { invoicingRepository: this.invoicingRepository } : {}),
     documentStorage: this.documentStorage,
-    inApp: this.notifications.dispatch
+    inApp: this.notifications.dispatch,
+    // Lot 5 (spec 071): G-06 plan change requests and the non-duplicate billing criterion.
+    ...(this.planChangeRepository ? { planChangeRepository: this.planChangeRepository } : {}),
+    quoteDuplicates: async (quoteRequestIds: string[]) => {
+      const blocked = new Set<string>();
+      for (const id of quoteRequestIds) {
+        const quote = this.quoteRequestsRepository ? await this.quoteRequestsRepository.findById(id) : await this.quoteRequests.submissions.findById(id);
+        const record = quote as { duplicateStatus?: string; status?: string } | undefined;
+        if (record?.duplicateStatus === "blocked_duplicate" || record?.status === "duplicate") blocked.add(id);
+      }
+      return blocked;
+    }
+    // End Lot 5
   });
   // Spec 063 (start): the dispute service credits through the invoicing service and notifies through the broker alerts.
   private readonly leadDisputesBound = this.bindLeadDisputes();
@@ -909,8 +1047,15 @@ readonly enterprise = new EnterpriseService({
         monthlyCountForPartner: (partnerTenantId: string, now: Date) => this.leads.assignmentsRepository.monthlyCountForPartner(partnerTenantId, now)
       },
       countries: this.countries.service,
-      quotes: { list: () => this.quoteRequests.submissions.list() }
-    })
+      quotes: { list: () => this.quoteRequests.submissions.list() },
+      // Lot 3 (spec 069 D1): the broker's own first-action target (read lazily, minimum with the contractual one).
+      branding: { listBranding: () => this.enterpriseRepository.listBranding() }
+    }),
+    // Lot 3 (spec 069 FR-008, D4): weekly AI summary, flag closed by default; the text comes from the central AI gateway.
+    // The persisted dedupe key is tested before the gateway is called (one AI call per tenant and ISO week).
+    hasBeenSent: async (dedupeKey) => (await this.notifications.service.findByDedupeKey(dedupeKey)) !== undefined,
+    isWeeklySummaryEnabled: () => this.featureFlags.service.isEnabled("broker_weekly_ai_summary_enabled"),
+    composeWeeklySummary: (partnerTenantId, stats) => this.brokerAi.weeklySummaryText(partnerTenantId, { ...stats })
   });
   /** Spec 045: public-site intake (waitlist, partner applications, contact) and public read models. */
   readonly waitlist = new WaitlistModule({
@@ -1173,6 +1318,14 @@ readonly enterprise = new EnterpriseService({
       WaitlistRepository: this.waitlistRepository?.mode,
       PartnerApplicationsRepository: this.partnerApplicationsRepository?.mode,
       ContactMessagesRepository: this.contactMessagesRepository?.mode,
+      // Lot 4 (spec 070)
+      ProductCategoriesRepository: this.productCategoriesRepository.mode,
+      ProductVersionsRepository: this.productVersionsRepository.mode,
+      InsurersRepository: this.insurersRepository.mode,
+      ActivationAttestationsRepository: this.activationAttestationsRepository.mode,
+      RoutingRulesRepository: this.routingRulesStore.mode,
+      ScoringRulesRepository: this.scoringRulesStore.mode,
+      // End Lot 4 (spec 070)
       DataRetentionRepository: this.dataRetentionRepository?.mode,
       RetentionSubjectsRepository: this.retentionSubjectsRepository?.mode,
       // Spec 062 messaging

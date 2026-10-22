@@ -176,18 +176,29 @@ export class PrismaProductsRepository implements ProductsRepository {
     return (this.prisma.requireRuntimeClient() as unknown as { countryProduct: CountryProductDelegate }).countryProduct;
   }
 
+  /** Row to domain: nullable columns become absent, JSON and array columns get their domain shape. */
+  private toBase(row: unknown): Product {
+    const item = row as Product & { description?: string | null; categoryId?: string | null; legalNotice?: unknown; requiredDocumentKinds?: string[] | null; version?: number | null };
+    const { description, categoryId, legalNotice, requiredDocumentKinds, version, ...rest } = item;
+    return {
+      ...rest,
+      ...(description ? { description } : {}),
+      ...(categoryId ? { categoryId } : {}),
+      legalNotice: legalNotice && typeof legalNotice === "object" && !Array.isArray(legalNotice) ? legalNotice as Product["legalNotice"] : {},
+      requiredDocumentKinds: (requiredDocumentKinds ?? []) as Product["requiredDocumentKinds"],
+      version: version ?? 1
+    } as Product;
+  }
+
   private async withCountries(row: unknown, knownCountryIds?: string[]): Promise<Product> {
-    const item = row as Product & { description?: string | null; categoryId?: string | null };
-    const { description, categoryId, ...rest } = item;
-    const base = { ...rest, ...(description ? { description } : {}), ...(categoryId ? { categoryId } : {}) } as Product;
+    const item = row as Product;
+    const base = this.toBase(row);
     if (knownCountryIds) return { ...base, countryIds: knownCountryIds, countryLinks: [] };
     return this.assemble(row, await this.countryProducts().findMany({ where: { productId: item.id } }));
   }
 
   private assemble(row: unknown, linkRows: CountryProductRow[]): Product {
-    const item = row as Product & { description?: string | null; categoryId?: string | null };
-    const { description, categoryId, ...rest } = item;
-    const base = { ...rest, ...(description ? { description } : {}), ...(categoryId ? { categoryId } : {}) } as Product;
+    const base = this.toBase(row);
     const links = linkRows.map((link) => this.toLink(link));
     return {
       ...base,
@@ -220,6 +231,9 @@ export class PrismaProductsRepository implements ProductsRepository {
       sensitivity: product.sensitivity,
       requiresDocuments: product.requiresDocuments,
       requiresManualReview: product.requiresManualReview,
+      legalNotice: product.legalNotice,
+      requiredDocumentKinds: product.requiredDocumentKinds,
+      version: product.version,
       status: product.status,
       flags: product.flags,
       createdAt: product.createdAt,

@@ -3,7 +3,7 @@ import type { SurveySubmissionInput } from "../satisfaction-surveys/satisfaction
 import { UnsubscribeTokenInvalidError } from "../satisfaction-surveys/survey-unsubscribe.service";
 import { AdminAlertAccessRefusedError, AdminAlertConflictError, AdminAlertNotFoundError } from "../notifications/admin-alerts.service";
 import { adminAlertAcknowledgeSchema, adminAlertsQuerySchema } from "../../../../packages/shared/contracts/admin-alerts.contracts";
-import { Body, ConflictException, Controller, Delete, ForbiddenException, Get, Header, HttpCode, InternalServerErrorException, Module, NotFoundException, Param, Patch, Post, Put, Query, Req, StreamableFile, UnprocessableEntityException, UploadedFile, UseGuards, UseInterceptors } from "@nestjs/common";
+import { BadRequestException, Body, ConflictException, Controller, Delete, ForbiddenException, Get, Header, HttpCode, InternalServerErrorException, Module, NotFoundException, Param, Patch, Post, Put, Query, Req, StreamableFile, UnprocessableEntityException, UploadedFile, UseGuards, UseInterceptors } from "@nestjs/common";
 import { FileInterceptor } from "@nestjs/platform-express";
 import { z } from "zod";
 import { QUOTE_DOCUMENT_MAX_BYTES } from "../../../../packages/shared/contracts/quote-document.contracts";
@@ -41,6 +41,11 @@ import {
 import { BillingAccessRefusedError, BillingDisabledError } from "../billing/billing-foundation.service";
 import { InvoiceConflictError, InvoiceIntegrityError, InvoiceNotFoundError, InvoicingConfigurationError } from "../billing/invoicing-errors";
 import type { InvoiceDocumentFile } from "../billing/invoicing.service";
+// Lot 5 (spec 071)
+import { billingAddOnPriceUpsertSchema, partnerAddOnAssignSchema, partnerAddOnEndSchema, partnerAddOnQuerySchema } from "../../../../packages/shared/contracts/billing-addons.contracts";
+import { BillingAddOnConflictError, BillingAddOnNotFoundError } from "../billing/billing-addons.service";
+import { PlanChangeConflictError, PlanChangeNotFoundError } from "../billing/plan-change-errors";
+// End Lot 5
 // Spec 063 (start)
 import { adminLeadDisputeQuerySchema } from "../../../../packages/shared/contracts/lead-disputes.contracts";
 // Spec 063 (end)
@@ -152,6 +157,9 @@ import { adminAuditLogQuerySchema } from "../../../../packages/shared/contracts/
 import { ADMIN_OPERATIONS_HTTP_CONTROLLERS } from "./admin-operations-http.controllers";
 // Spec 062 data requests
 import { DATA_REQUESTS_HTTP_CONTROLLERS } from "./data-requests-http.controllers";
+// Lot 4 (spec 070)
+import { LOT4_CATALOG_HTTP_CONTROLLERS } from "./lot4-catalog-http.controllers";
+// End Lot 4 (spec 070)
 // Spec 062 messaging
 import { BrokerMessagingRoutes, LEAD_MESSAGING_HTTP_CONTROLLERS, registerBrokerMessagingRoutes } from "./lead-messaging-http.controllers";
 
@@ -1448,6 +1456,30 @@ export class BrokerCrmController {
     return this.runtime.brokerAi.listLossAnalyses(protectedActorFromRequest(request));
   }
   // Spec 064 end
+
+  // Lot 3 (spec 069 FR-004) begin: approved priority scores, performance summaries and manager assistant.
+  aiPriorityScores(request: AssurMatchHttpRequest) {
+    return this.runtime.brokerAi.priorityScores(protectedActorFromRequest(request));
+  }
+
+  aiPerformanceSummary(input: unknown, request: AssurMatchHttpRequest) {
+    const actor = brokerWriteActor(request);
+    return this.runtime.brokerAi.performanceSummary(actor, input);
+  }
+
+  aiPerformanceSummaries(request: AssurMatchHttpRequest) {
+    return this.runtime.brokerAi.listPerformanceSummaries(protectedActorFromRequest(request));
+  }
+
+  aiManagerAssistant(input: unknown, request: AssurMatchHttpRequest) {
+    const actor = brokerWriteActor(request);
+    return this.runtime.brokerAi.managerAssistant(actor, input);
+  }
+
+  aiManagerAnalyses(request: AssurMatchHttpRequest) {
+    return this.runtime.brokerAi.listManagerAnalyses(protectedActorFromRequest(request));
+  }
+  // Lot 3 end
 }
 
 export class BrokerDashboardController {
@@ -1460,6 +1492,11 @@ export class BrokerDashboardController {
 
   advisors(request: AssurMatchHttpRequest, query: Record<string, string>) {
     return this.runtime.dashboards.broker.advisors(protectedActorFromRequest(request), parseHttpInput(dashboardScopeQuerySchema, query));
+  }
+
+  // Lot 3 (spec 069 FR-003): per-agency rollup, Enterprise only (refused and audited by the service otherwise).
+  agencies(request: AssurMatchHttpRequest, query: Record<string, string>) {
+    return this.runtime.dashboards.broker.agenciesOverview(protectedActorFromRequest(request), parseHttpInput(dashboardScopeQuerySchema, query));
   }
 
   export(request: AssurMatchHttpRequest, query: Record<string, string>) {
@@ -1643,6 +1680,83 @@ async function invoicingCall<T>(call: () => Promise<T>): Promise<T> {
     throw error;
   }
 }
+
+// Lot 5 (spec 071): add-ons, subscription state and plan change requests (G-06). Same error mapping as invoicing,
+// plus the explicit 404 / 409 of the add-on and plan change domain errors (never inferred from a message).
+async function lot5Call<T>(call: () => Promise<T>): Promise<T> {
+  try {
+    return await invoicingCall(call);
+  } catch (error) {
+    if (error instanceof BillingAddOnNotFoundError || error instanceof PlanChangeNotFoundError) throw new NotFoundException(error.message);
+    if (error instanceof BillingAddOnConflictError || error instanceof PlanChangeConflictError) throw new ConflictException(error.message);
+    if (error instanceof z.ZodError) throw new BadRequestException("Invalid input");
+    throw error;
+  }
+}
+
+export class AdminBillingLot5Controller {
+  constructor(private readonly runtime: AssurMatchRuntime) {}
+
+  listAddOnPrices(request: AssurMatchHttpRequest) {
+    return lot5Call(() => this.runtime.billing.addOns.listPrices(protectedActorFromRequest(request)));
+  }
+
+  upsertAddOnPrice(input: unknown, request: AssurMatchHttpRequest) {
+    return lot5Call(() => this.runtime.billing.addOns.upsertPrice(parseHttpInput(billingAddOnPriceUpsertSchema, input), protectedActorFromRequest(request)));
+  }
+
+  listAddOns(request: AssurMatchHttpRequest, query: Record<string, string>) {
+    return lot5Call(() => this.runtime.billing.addOns.list(protectedActorFromRequest(request), parseHttpInput(partnerAddOnQuerySchema, query ?? {}).partnerId));
+  }
+
+  assignAddOn(input: unknown, request: AssurMatchHttpRequest) {
+    return lot5Call(() => this.runtime.billing.addOns.assign(parseHttpInput(partnerAddOnAssignSchema, input), protectedActorFromRequest(request)));
+  }
+
+  endAddOn(id: string, input: unknown, request: AssurMatchHttpRequest) {
+    return lot5Call(() => this.runtime.billing.addOns.end(parseParam("id", id, uuidSchema), parseHttpInput(partnerAddOnEndSchema, input), protectedActorFromRequest(request)));
+  }
+
+  subscription(partnerId: string, request: AssurMatchHttpRequest) {
+    return lot5Call(() => this.runtime.billing.subscriptions.get(protectedActorFromRequest(request), parseParam("partnerId", partnerId, uuidSchema)));
+  }
+
+  /** The body is validated by the service after the RBAC check (403 before 422). */
+  updateSubscription(partnerId: string, input: unknown, request: AssurMatchHttpRequest) {
+    return lot5Call(() => this.runtime.billing.subscriptions.update(protectedActorFromRequest(request), parseParam("partnerId", partnerId, uuidSchema), input as never));
+  }
+
+  planChangeRequests(request: AssurMatchHttpRequest, query: Record<string, string>) {
+    return lot5Call(() => this.runtime.billing.planChanges.list(protectedActorFromRequest(request), query ?? {}));
+  }
+
+  decidePlanChange(id: string, input: unknown, request: AssurMatchHttpRequest) {
+    return lot5Call(() => this.runtime.billing.planChanges.decide(protectedActorFromRequest(request), parseParam("id", id, uuidSchema), input));
+  }
+}
+
+/** G-06: the broker owner requests (and cancels) a plan change. Writes are refused for a suspended partner. */
+export class BrokerPlanChangeController {
+  constructor(private readonly runtime: AssurMatchRuntime) {}
+
+  list(request: AssurMatchHttpRequest) {
+    return lot5Call(async () => {
+      const items = await this.runtime.billing.planChanges.listOwn(protectedActorFromRequest(request));
+      return { items, total: items.length };
+    });
+  }
+
+  create(input: unknown, request: AssurMatchHttpRequest) {
+    const actor = brokerWriteActor(request);
+    return lot5Call(() => this.runtime.billing.planChanges.create(actor, input));
+  }
+
+  cancel(id: string, request: AssurMatchHttpRequest) {
+    const actor = brokerWriteActor(request);
+    return lot5Call(() => this.runtime.billing.planChanges.cancel(actor, parseParam("id", id, uuidSchema)));
+  }
+}
+// End Lot 5
 
 // Spec 063 (start): lead disputes. Admin routes need `billing:dispute_read` / `billing:dispute_decide`
 // (finance_admin, super_admin) with a verified MFA; the country scope and the billing flag live in the service.
@@ -2408,10 +2522,18 @@ registerBrokerMessagingRoutes([BrokerStarterController, BrokerCrmController]);
 // Spec 064 begin: no parameterised GET route starts with "ai/loss-analysis", so nothing captures it.
 decorate(BrokerCrmController, "aiLossAnalyses", [Get("ai/loss-analysis") as MethodDecoratorFactory, Header("Cache-Control", "no-store") as MethodDecoratorFactory], [[0, Req() as ParamDecoratorFactory]]);
 // Spec 064 end
+// Lot 3 (spec 069) begin: fixed paths under "ai/", none captured by a parameterised GET route.
+decorate(BrokerCrmController, "aiPriorityScores", [Get("ai/priority-scores") as MethodDecoratorFactory, Header("Cache-Control", "no-store") as MethodDecoratorFactory], [[0, Req() as ParamDecoratorFactory]]);
+decorate(BrokerCrmController, "aiPerformanceSummary", [Post("ai/performance-summary") as MethodDecoratorFactory], [[0, Body() as ParamDecoratorFactory], [1, Req() as ParamDecoratorFactory]]);
+decorate(BrokerCrmController, "aiPerformanceSummaries", [Get("ai/performance-summaries") as MethodDecoratorFactory, Header("Cache-Control", "no-store") as MethodDecoratorFactory], [[0, Req() as ParamDecoratorFactory]]);
+decorate(BrokerCrmController, "aiManagerAssistant", [Post("ai/manager-assistant") as MethodDecoratorFactory], [[0, Body() as ParamDecoratorFactory], [1, Req() as ParamDecoratorFactory]]);
+decorate(BrokerCrmController, "aiManagerAnalyses", [Get("ai/manager-analyses") as MethodDecoratorFactory, Header("Cache-Control", "no-store") as MethodDecoratorFactory], [[0, Req() as ParamDecoratorFactory]]);
+// Lot 3 end
 
 controller("broker/dashboard", BrokerDashboardController, true);
 decorate(BrokerDashboardController, "dashboard", [Get() as MethodDecoratorFactory], [[0, Req() as ParamDecoratorFactory], [1, Query() as ParamDecoratorFactory]]);
 decorate(BrokerDashboardController, "advisors", [Get("advisors") as MethodDecoratorFactory], [[0, Req() as ParamDecoratorFactory], [1, Query() as ParamDecoratorFactory]]);
+decorate(BrokerDashboardController, "agencies", [Get("agencies") as MethodDecoratorFactory, Header("Cache-Control", "no-store") as MethodDecoratorFactory], [[0, Req() as ParamDecoratorFactory], [1, Query() as ParamDecoratorFactory]]);
 decorate(BrokerDashboardController, "export", [Get("export.csv") as MethodDecoratorFactory], [[0, Req() as ParamDecoratorFactory], [1, Query() as ParamDecoratorFactory]]);
 controller("admin/dashboard", AdminDashboardExportController, true);
 decorate(AdminDashboardExportController, "export", [Get("export.csv") as MethodDecoratorFactory], [[0, Req() as ParamDecoratorFactory], [1, Query() as ParamDecoratorFactory]]);
@@ -2541,6 +2663,22 @@ decorate(BrokerNotificationsController, "inbox", [Get("inbox") as MethodDecorato
 decorate(BrokerNotificationsController, "markRead", [Post("inbox/:id/read") as MethodDecoratorFactory], [[0, Param("id") as ParamDecoratorFactory], [1, Req() as ParamDecoratorFactory]]);
 decorate(BrokerNotificationsController, "preferences", [Get("preferences") as MethodDecoratorFactory], [[0, Req() as ParamDecoratorFactory]]);
 decorate(BrokerNotificationsController, "updatePreferences", [Put("preferences") as MethodDecoratorFactory], [[0, Body() as ParamDecoratorFactory], [1, Req() as ParamDecoratorFactory]]);
+// Lot 5 (spec 071)
+controller("admin", AdminBillingLot5Controller, true);
+decorate(AdminBillingLot5Controller, "listAddOnPrices", [Get("billing/add-on-prices") as MethodDecoratorFactory], [[0, Req() as ParamDecoratorFactory]]);
+decorate(AdminBillingLot5Controller, "upsertAddOnPrice", [Put("billing/add-on-prices") as MethodDecoratorFactory], [[0, Body() as ParamDecoratorFactory], [1, Req() as ParamDecoratorFactory]]);
+decorate(AdminBillingLot5Controller, "listAddOns", [Get("billing/add-ons") as MethodDecoratorFactory], [[0, Req() as ParamDecoratorFactory], [1, Query() as ParamDecoratorFactory]]);
+decorate(AdminBillingLot5Controller, "assignAddOn", [Post("billing/add-ons") as MethodDecoratorFactory], [[0, Body() as ParamDecoratorFactory], [1, Req() as ParamDecoratorFactory]]);
+decorate(AdminBillingLot5Controller, "endAddOn", [Post("billing/add-ons/:id/end") as MethodDecoratorFactory, HttpCode(200) as MethodDecoratorFactory], [[0, Param("id") as ParamDecoratorFactory], [1, Body() as ParamDecoratorFactory], [2, Req() as ParamDecoratorFactory]]);
+decorate(AdminBillingLot5Controller, "subscription", [Get("billing/subscriptions/:partnerId") as MethodDecoratorFactory], [[0, Param("partnerId") as ParamDecoratorFactory], [1, Req() as ParamDecoratorFactory]]);
+decorate(AdminBillingLot5Controller, "updateSubscription", [Put("billing/subscriptions/:partnerId") as MethodDecoratorFactory], [[0, Param("partnerId") as ParamDecoratorFactory], [1, Body() as ParamDecoratorFactory], [2, Req() as ParamDecoratorFactory]]);
+decorate(AdminBillingLot5Controller, "planChangeRequests", [Get("billing/plan-change-requests") as MethodDecoratorFactory], [[0, Req() as ParamDecoratorFactory], [1, Query() as ParamDecoratorFactory]]);
+decorate(AdminBillingLot5Controller, "decidePlanChange", [Post("billing/plan-change-requests/:id/decision") as MethodDecoratorFactory, HttpCode(200) as MethodDecoratorFactory], [[0, Param("id") as ParamDecoratorFactory], [1, Body() as ParamDecoratorFactory], [2, Req() as ParamDecoratorFactory]]);
+controller("broker/billing", BrokerPlanChangeController, true);
+decorate(BrokerPlanChangeController, "list", [Get("plan-change-requests") as MethodDecoratorFactory], [[0, Req() as ParamDecoratorFactory]]);
+decorate(BrokerPlanChangeController, "create", [Post("plan-change-requests") as MethodDecoratorFactory], [[0, Body() as ParamDecoratorFactory], [1, Req() as ParamDecoratorFactory]]);
+decorate(BrokerPlanChangeController, "cancel", [Post("plan-change-requests/:id/cancel") as MethodDecoratorFactory, HttpCode(200) as MethodDecoratorFactory], [[0, Param("id") as ParamDecoratorFactory], [1, Req() as ParamDecoratorFactory]]);
+// End Lot 5
 // Spec 063 (start)
 controller("admin", AdminLeadDisputesController, true);
 decorate(AdminLeadDisputesController, "list", [Get("billing/disputes") as MethodDecoratorFactory], [[0, Req() as ParamDecoratorFactory], [1, Query() as ParamDecoratorFactory]]);
@@ -2716,7 +2854,7 @@ Reflect.defineMetadata("design:paramtypes", [AssurMatchRuntime], AuthRequiredHtt
  */
 export const BROKER_TENANT_WRITE_GUARDED: Readonly<Record<string, readonly string[]>> = {
   BrokerStarterController: ["accept", "reject", "dispute", "close", "sendProposal", "withdrawProposal", "sendMessage", "markRead", "createDocumentRequest", "cancelDocumentRequest"],
-  BrokerCrmController: ["status", "note", "task", "reminder", "assign", "document", "proposal", "withdrawProposal", "dispute", "aiRequest", "aiValidate", "aiLossAnalysis", "aiSetOptOut", "sendMessage", "markRead", "createDocumentRequest", "cancelDocumentRequest"],
+  BrokerCrmController: ["status", "note", "task", "reminder", "assign", "document", "proposal", "withdrawProposal", "dispute", "aiRequest", "aiValidate", "aiLossAnalysis", "aiPerformanceSummary", "aiManagerAssistant", "aiSetOptOut", "sendMessage", "markRead", "createDocumentRequest", "cancelDocumentRequest"],
   // Spec 064: setMemberCustomRole (assignment of a custom role) is a tenant write like the other enterprise routes.
   BrokerEnterpriseController: ["createAgency", "updateAgency", "assignMember", "createRole", "updateRole", "updateSla", "updateBranding", "setMemberCustomRole"],
   BrokerNotificationsController: ["updatePreferences"],
@@ -2724,7 +2862,9 @@ export const BROKER_TENANT_WRITE_GUARDED: Readonly<Record<string, readonly strin
   // Spec 053 FR-016: every self-service write of a suspended partner is refused.
   BrokerAccountController: ["updateProfile", "requestProfileChange", "requestCoverageExtension", "cancelRequest"],
   BrokerLicensesController: ["renew", "uploadProof"],
-  BrokerTeamController: ["invite", "deactivate", "reactivate", "changeRole"]
+  BrokerTeamController: ["invite", "deactivate", "reactivate", "changeRole"],
+  // Lot 5 (spec 071) G-06
+  BrokerPlanChangeController: ["create", "cancel"]
 };
 export const BROKER_TENANT_WRITE_ALLOWED_WHEN_SUSPENDED: Readonly<Record<string, readonly string[]>> = {
   BrokerStarterController: ["readNotification"],
@@ -2769,6 +2909,10 @@ Module({
     AdminDataRetentionController,
     AdminConsentRecordsHttpController,
     BrokerBillingController,
+    // Lot 5 (spec 071)
+    AdminBillingLot5Controller,
+    BrokerPlanChangeController,
+    // End Lot 5
     // Spec 063 (start)
     AdminLeadDisputesController,
     BrokerLeadDisputesController,
@@ -2804,6 +2948,9 @@ Module({
     ...ADMIN_OPERATIONS_HTTP_CONTROLLERS,
     // Spec 062 data requests: visitor and admin routes (see data-requests-http.controllers.ts).
     ...DATA_REQUESTS_HTTP_CONTROLLERS,
+    // Lot 4 (spec 070): product categories and versions, insurers, offer AI summary, activation attestations, public product requirements.
+    ...LOT4_CATALOG_HTTP_CONTROLLERS,
+    // End Lot 4 (spec 070)
     // Spec 062 messaging: visitor routes and the admin read-only route (see lead-messaging-http.controllers.ts).
     ...LEAD_MESSAGING_HTTP_CONTROLLERS,
     // Spec 051: last, after the static `partners/sla` and `partners/applications` routes.

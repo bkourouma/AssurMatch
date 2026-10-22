@@ -1,3 +1,4 @@
+import type { OfferType } from "../../../../packages/shared/contracts/offer-content";
 import type { OfferGuarantee, OfferPaymentFlexibility } from "../../../../packages/shared/contracts/quote.contracts";
 import { AuditLogWriter } from "../audit-logs/audit-log-writer.service";
 import { InMemoryRedisClient, type RedisClientPort } from "../common/redis/redis.module";
@@ -35,6 +36,8 @@ export interface OfferRecord {
   displayPriority: number;
   publicDisclaimers: string[];
   insurerName?: string;
+  /** Spec 070: optional link to the insurer referential (`insurerName` stays the displayed name). */
+  insurerId?: string;
   guaranteeLevel?: number;
   deductibleAmount?: number;
   coverageCeiling?: number;
@@ -49,7 +52,8 @@ export interface OfferRecord {
   /** Spec 052 R1: the content columns hold the published version (or v1 of a never published offer). */
   publishedVersionId?: string;
   pendingVersionId?: string;
-  offerType?: "indicative" | "partner";
+  /** Spec 070: `private` offers are never public (publication policy `offer_private`). */
+  offerType?: OfferType;
   withdrawnAt?: Date;
   createdAt: Date;
   updatedAt: Date;
@@ -68,6 +72,7 @@ export interface OfferVersionContent {
   guaranteeSummary?: string;
   exclusionsSummary?: string;
   insurerName?: string;
+  insurerId?: string;
   guarantees: OfferGuarantee[];
   guaranteeLevel?: number;
   deductibleAmount?: number;
