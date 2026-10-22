@@ -70,3 +70,9 @@ Que faire :
 - `assurmatch_audit_outbox_depth > 0` durablement, ou `audit.persist_failed` en rafale : verifier la base (`/readyz`, connexions, espace disque, verrou du trigger) ; l'outbox se vide seule des que la base repond, sans intervention ;
 - `assurmatch_audit_dropped_total` augmente : des lignes sont perdues. Rechercher la cause (base indisponible longtemps), reconstituer ce qui est possible depuis les logs applicatifs et les sauvegardes, ouvrir un incident, augmenter `ASSURMATCH_AUDIT_OUTBOX_MAX` si la panne etait courte mais intense ;
 - l'outbox est en memoire : un arret brutal (SIGKILL) la perd. L'arret normal tente un dernier envoi (`drain`).
+
+## 6. Limites du modele et durcissement des roles
+
+- `assurmatch.audit_maintenance` est un reglage de session (`SET LOCAL`) que n'importe quelle connexion SQL peut positionner, y compris celle du role applicatif. Le trigger protege donc des erreurs et des UPDATE/DELETE accidentels (bug applicatif, requete manuelle), PAS d'une compromission SQL du role applicatif.
+- Recommandation : utiliser pour l'API et le worker un role d'execution distinct du role de migration, avec `REVOKE UPDATE, DELETE, TRUNCATE ON "AuditLog"` (il ne garde que SELECT et INSERT). La purge de retention est alors executee avec un role d'exploitation separe.
+- Le HMAC (`integrityHash`) detecte la modification d'une ligne, mais pas sa suppression : il n'y a pas de chainage entre les lignes. Une ligne supprimee ne se detecte que par comparaison avec une sauvegarde ou les logs applicatifs.

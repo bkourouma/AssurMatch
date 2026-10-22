@@ -5,6 +5,7 @@ import { readJson } from "./runtime-postgres-smoke-harness";
 import { assertAuditExists, assertPrismaRuntimeRepositories, assertSensitiveFlagsFailClosed } from "./runtime-postgres-smoke-assertions";
 import { adminActor, authHeaders, proActor, starterActor, type RuntimeSmokeRun } from "./runtime-postgres-smoke-data";
 import type { RuntimeSmokePrismaClient } from "./runtime-postgres-smoke-prisma";
+import { smokeSecurityHardening } from "./runtime-postgres-smoke-security";
 import { seedRuntimeSmokeData, type RuntimeSmokeSeed } from "./runtime-postgres-smoke-seed";
 
 interface RuntimeSmokeState {
@@ -34,6 +35,7 @@ export async function runRuntimePostgresSmokeScenarios(harness: RuntimePostgresS
   await smokeDataRetention(harness, run, state);
   await smokePersistedRetentionFlagClosed(harness.prisma);
   await smokeDurableAudit(harness, run);
+  await smokeSecurityHardening(harness.prisma, run);
 }
 
 /**

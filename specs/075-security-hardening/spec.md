@@ -28,7 +28,7 @@
 
 ### D. Flag IA produit sur les assistants courtier
 - FR-D1. `AiGateway.isEnabled` applique le flag produit aux assistants courtier non-scoring (`lead_summary`, `next_action`, `relaunch_message`, `loss_analysis`, `duplicate_hint`) : `product_ai_scoring_enabled` doit etre vrai quand le scope produit est connu. Ferme par defaut ; motif `product_ai_broker_assistant_disabled`.
-- FR-D2. `AIAssistanceService.status` reflete la meme regle.
+- FR-D2. (ajuste) `AIAssistanceService.status` ne recoit pas la portee produit : portee produit inconnue = comportement inchange. Le refus s'applique a l'appel par lead (gateway, FR-D1).
 
 ### E. Donnees sensibles dans les prompts
 - FR-E1. Detection (sante, identifiants nationaux/passeport, cartes avec Luhn, IBAN, secrets/jetons/cles API/JWT, mots de passe, plaques d'immatriculation) et masquage avant envoi a un fournisseur IA ; categories comptees dans le rapport de minimisation, jamais les valeurs.
