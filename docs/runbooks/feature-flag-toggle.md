@@ -32,6 +32,14 @@ The API re-reads the flags every `ASSURMATCH_FEATURE_FLAG_REFRESH_SECONDS` (30 s
 worker before every cycle. Switching a flag off is always accepted; payments, e-signature, policy
 issuance, claims and insurer API are refused whatever the policy.
 
+## AI flags per country and product (spec 074)
+
+`country_ai_enabled`, `product_ai_scoring_enabled` and `product_ai_form_assistant_enabled` are NOT changed by the route above nor by the catalogue (both refuse them). They follow the audited, protected path of the admin screen `/ai-assistance/flags` (`POST /admin/ai/scope-flags`):
+
+- MFA is mandatory. Activation: `super_admin` or `compliance_admin` only, with a policy reference, an approver and a reason (audit `feature_flag.policy_applied`). Deactivation: also `ai_admin`, reason only.
+- A `highly_sensitive` product refuses AI activation (documented exception required).
+- Every refusal is audited (`feature_flag.change_refused`). The global AI flags stay on `npm run ops:apply-flag-policy` (read-only on the screen).
+
 ## Forbidden
 
 This runbook MUST NOT be used to flip any of the following to `true` without a separate validated spec:
