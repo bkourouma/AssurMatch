@@ -160,6 +160,8 @@ import { DATA_REQUESTS_HTTP_CONTROLLERS } from "./data-requests-http.controllers
 // Lot 4 (spec 070)
 import { LOT4_CATALOG_HTTP_CONTROLLERS } from "./lot4-catalog-http.controllers";
 // End Lot 4 (spec 070)
+// Lot 9 (spec 072): content CMS routes.
+import { CONTENT_CMS_HTTP_CONTROLLERS } from "./content-cms-http.controllers";
 // Spec 062 messaging
 import { BrokerMessagingRoutes, LEAD_MESSAGING_HTTP_CONTROLLERS, registerBrokerMessagingRoutes } from "./lead-messaging-http.controllers";
 
@@ -2934,6 +2936,8 @@ Module({
     // Lot 4 (spec 070): product categories and versions, insurers, offer AI summary, activation attestations, public product requirements.
     ...LOT4_CATALOG_HTTP_CONTROLLERS,
     // End Lot 4 (spec 070)
+    // Lot 9 (spec 072): content CMS (admin /admin/content and public /public-content).
+    ...CONTENT_CMS_HTTP_CONTROLLERS,
     // Spec 062 messaging: visitor routes and the admin read-only route (see lead-messaging-http.controllers.ts).
     ...LEAD_MESSAGING_HTTP_CONTROLLERS,
     // Spec 051: last, after the static `partners/sla` and `partners/applications` routes.

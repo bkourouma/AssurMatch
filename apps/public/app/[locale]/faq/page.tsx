@@ -6,7 +6,7 @@ import { Hero } from "../../components/ui/hero";
 import { JsonLd } from "../../components/ui/json-ld";
 import { Section } from "../../components/ui/section";
 import { getEntrySelectorData } from "../../content/entry-selector-data";
-import { listFaq } from "../../content/faq";
+import { resolveFaq } from "../../content/cms-content";
 import type { FaqItem } from "../../content/types";
 import { buildMetadata, faqJsonLd, localeUrl } from "../../lib/seo";
 import type { PageMetadata } from "../../lib/seo";
@@ -45,7 +45,7 @@ export default async function FaqPage({ params }: { params: Promise<{ locale: st
   setRequestLocale(locale);
   const t = await getTranslations("Faq");
   const common = await getTranslations("Common");
-  const items = listFaq(locale);
+  const items = await resolveFaq(locale);
   const groups = groupByTheme(items);
   const selector = await getEntrySelectorData();
 
