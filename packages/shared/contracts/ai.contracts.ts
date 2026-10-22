@@ -4,9 +4,11 @@ import { dateTimeStringSchema, isoCountrySchema, nonEmptyStringSchema, uuidSchem
 export const aiSurfaceSchema = z.enum(["visitor", "broker_crm", "admin_platform"]);
 
 export const visitorAssistTypes = ["visitor_product_assistant", "visitor_request_summary", "visitor_form_help", "visitor_consistency_check", "visitor_faq"] as const;
-export const brokerAssistTypes = ["lead_summary", "lead_score", "next_action", "relaunch_message", "lead_classification", "duplicate_hint", "loss_analysis", "performance_summary", "manager_assistant", "weekly_summary"] as const;
+export const brokerAssistTypes = ["lead_summary", "lead_score", "next_action", "relaunch_message", "lead_classification", "duplicate_hint", "loss_analysis", "performance_summary", "manager_assistant"] as const;
+/** System-run assistances (the scheduled worker): in the gateway catalogue, never offered to a user interface. */
+export const systemAssistTypes = ["weekly_summary"] as const;
 export const adminAssistTypes = ["admin_risk_triage", "activation_gap_summary", "offer_consistency_check", "activity_report", "suspicious_leads", "routing_anomaly_analysis"] as const;
-export const aiAssistTypes = [...visitorAssistTypes, ...brokerAssistTypes, ...adminAssistTypes] as const;
+export const aiAssistTypes = [...visitorAssistTypes, ...brokerAssistTypes, ...systemAssistTypes, ...adminAssistTypes] as const;
 export const aiAssistTypeCatalogSchema = z.enum(aiAssistTypes);
 export const visitorAssistTypeSchema = z.enum(visitorAssistTypes);
 

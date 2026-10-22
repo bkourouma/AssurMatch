@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { AI_ASSISTANCE_DISCLAIMER, brokerAiPriorityScoresSchema, brokerManagerAnalysisSchema } from "../../../../packages/shared/contracts/ai.contracts";
+import { AI_ASSISTANCE_DISCLAIMER, aiAssistTypes, brokerAiPriorityScoresSchema, brokerAssistTypes, brokerManagerAnalysisSchema } from "../../../../packages/shared/contracts/ai.contracts";
 import { AuditLogWriter } from "../../../src/modules/audit-logs/audit-log-writer.service";
 import { BrokerAiService, boundAggregates, type BrokerAiPartnerProfile } from "../../../src/modules/ai/broker-ai.service";
 import { AiAuditActions } from "../../../src/modules/ai/core/ai-audit-actions";
@@ -160,6 +160,18 @@ describe("broker AI performance summary (DASH-B-009)", () => {
     expect((await service.read(queued.id, manager)).id).toBe(queued.id);
     await expect(service.validate(queued.id, { decision: "approved" }, readOnly)).rejects.toThrow(/denied/);
     expect((await service.validate(queued.id, { decision: "approved" }, enterpriseOwner)).humanValidationStatus).toBe("approved");
+  });
+
+  it("refuses validation of a tenant insight to an assigned-only agent who cannot read it, even with broker_crm:update", async () => {
+    const { service, gateway } = await world();
+    const queued = await service.performanceSummary(enterpriseOwner, {});
+    await gateway.processPending();
+    // Assigned-only scope (read_assigned) combined with a custom role granting broker_crm:update.
+    const assignedOnlyUpdater: ActorContext = { ...agent, roles: ["broker_agent", "broker_manager"], customRolePermissions: ["broker_crm:read_assigned", "broker_crm:update"] };
+    await expect(service.read(queued.id, assignedOnlyUpdater)).rejects.toThrow("AI interaction not found");
+    await expect(service.validate(queued.id, { decision: "approved" }, assignedOnlyUpdater)).rejects.toThrow("AI interaction not found");
+    expect((await gateway.find(queued.id))?.humanValidationStatus).toBe("pending");
+    expect((await service.validate(queued.id, { decision: "approved" }, manager)).humanValidationStatus).toBe("approved");
   });
 
   it("withholds a steering text that decides routing, judges a person or advises a contract", async () => {
@@ -342,5 +354,34 @@ describe("boundAggregates", () => {
       list: [1, "gagne", "Ama"]
     })).toEqual({ total: 4, ratio: 0.12, ok: true, status: "devis_envoye", since: "2026-10-01T00:00:00.000Z", list: [1, "gagne"] });
     expect(boundAggregates("not an object")).toEqual({});
+  });
+
+  it("accepts ISO country / currency codes and product slugs under their own keys only", () => {
+    expect(boundAggregates({
+      countryCode: "CI",
+      currency: "XOF",
+      productKey: "assurance-auto",
+      byProduct: [{ product: "sante-groupe", received: 3 }],
+      note: "ABC",
+      contactName: "KONE",
+      label: "jean-dupont-8",
+      productFree: "Assurance Auto",
+      source: "site-web",
+      phoneLike: "assurance-0102030405"
+    })).toEqual({
+      countryCode: "CI",
+      currency: "XOF",
+      productKey: "assurance-auto",
+      byProduct: [{ product: "sante-groupe", received: 3 }],
+      source: "site-web"
+    });
+    expect(boundAggregates({ countryCode: "Cote d'Ivoire", currency: "XOFX", productKey: "Auto Plus", product: "a@b.c" })).toEqual({});
+  });
+});
+
+describe("system assist types", () => {
+  it("keeps weekly_summary in the gateway catalogue but out of the broker UI assist types", () => {
+    expect(aiAssistTypes).toContain("weekly_summary");
+    expect(brokerAssistTypes).not.toContain("weekly_summary");
   });
 });

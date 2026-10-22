@@ -258,8 +258,13 @@ export class BrokerAiService {
     const record = await this.requireTenantRecord(id, actor);
     if (record.targetType === "LeadAssignment" && record.targetId) {
       this.deps.access.assertMutation(actor, await this.deps.assignments.require(record.targetId));
-    } else if (actor.roles.includes("broker_read_only") || !actorHasPermission(actor, "broker_crm:update")) {
-      throw new Error("AI decision denied: CRM update permission required");
+    } else {
+      // A tenant-level insight is validated only by someone who may read it (same rule as `read()`): an "assigned only"
+      // agent holding `broker_crm:update` must not act on an insight it cannot see.
+      if (record.targetType === "PartnerTenant" && !this.deps.access.canSeeSensitiveSearch(actor)) throw new Error("AI interaction not found");
+      if (actor.roles.includes("broker_read_only") || !actorHasPermission(actor, "broker_crm:update")) {
+        throw new Error("AI decision denied: CRM update permission required");
+      }
     }
     if (record.status !== "completed") throw new Error("Invalid validation: the AI interaction is not completed");
     const updated = await this.deps.gateway.validate(id, parsed.decision, actor);
@@ -544,6 +549,12 @@ const AGGREGATE_KEY = /^[A-Za-z0-9_-]{1,48}$/;
 const IDENTITY_LIKE_KEY = /(name|nom|prenom|tel|contact|address|adresse|reference|token|ip)$|mail|phone|mobile|msisdn|whatsapp|iban|passport|card/i;
 /** Only lower-case codes (statuses, product keys, sources) and ISO dates survive as strings; digit runs (phones, ids) never do. */
 const AGGREGATE_CODE = /^(?!.*\d{6})[a-z0-9_]{1,40}$/;
+/** ISO 3166 country / ISO 4217 currency codes: upper case, accepted only under a country or currency key. */
+const ISO_CODE_KEY = /^(country|countryCode|country_code|currency|currencyCode|currency_code|isoCode|iso_code)$/;
+const ISO_CODE = /^[A-Z]{2,3}$/;
+/** Product-like slugs (`assurance-auto`): lower case with hyphens, accepted only under a product / source style key. */
+const SLUG_KEY = /^(product|productKey|product_key|slug|source|sourceKey|category|segment|type)$/;
+const SLUG = /^(?!.*d{6})[a-z0-9]+(?:[_-][a-z0-9]+)*$/;
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}(T\d{2}:\d{2}(:\d{2}(\.\d{1,3})?)?Z?)?$/;
 const AGGREGATE_MAX_DEPTH = 4;
 const AGGREGATE_MAX_LEAVES = 150;
@@ -559,20 +570,26 @@ export function boundAggregates(value: unknown): Record<string, unknown> {
   return bounded && typeof bounded === "object" && !Array.isArray(bounded) ? bounded as Record<string, unknown> : {};
 }
 
-function boundNode(value: unknown, depth: number, budget: { leaves: number }): unknown {
+function boundString(value: string, key: string | undefined): boolean {
+  if (AGGREGATE_CODE.test(value) || ISO_DATE.test(value)) return true;
+  if (key !== undefined && ISO_CODE_KEY.test(key) && ISO_CODE.test(value)) return true;
+  return key !== undefined && SLUG_KEY.test(key) && value.length <= 40 && SLUG.test(value);
+}
+
+function boundNode(value: unknown, depth: number, budget: { leaves: number }, key?: string): unknown {
   if (value === null || typeof value === "boolean") return takeLeaf(budget, value);
   if (typeof value === "number") return Number.isFinite(value) ? takeLeaf(budget, Math.round(value * 100) / 100) : undefined;
-  if (typeof value === "string") return AGGREGATE_CODE.test(value) || ISO_DATE.test(value) ? takeLeaf(budget, value) : undefined;
+  if (typeof value === "string") return boundString(value, key) ? takeLeaf(budget, value) : undefined;
   if (value instanceof Date) return Number.isNaN(value.getTime()) ? undefined : takeLeaf(budget, value.toISOString());
   if (depth >= AGGREGATE_MAX_DEPTH || typeof value !== "object") return undefined;
   if (Array.isArray(value)) {
-    const items = value.slice(0, AGGREGATE_MAX_ARRAY).map((item) => boundNode(item, depth + 1, budget)).filter((item) => item !== undefined);
+    const items = value.slice(0, AGGREGATE_MAX_ARRAY).map((item) => boundNode(item, depth + 1, budget, key)).filter((item) => item !== undefined);
     return items.length > 0 ? items : undefined;
   }
   const result: Record<string, unknown> = {};
   for (const [key, child] of Object.entries(value as Record<string, unknown>)) {
     if (!AGGREGATE_KEY.test(key) || IDENTITY_LIKE_KEY.test(key)) continue;
-    const bounded = boundNode(child, depth + 1, budget);
+    const bounded = boundNode(child, depth + 1, budget, key);
     if (bounded !== undefined) result[key] = bounded;
   }
   return Object.keys(result).length > 0 ? result : undefined;
