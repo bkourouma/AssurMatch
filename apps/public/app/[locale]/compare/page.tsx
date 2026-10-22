@@ -2,7 +2,7 @@ import { getTranslations, setRequestLocale } from "next-intl/server";
 import { Link, getPathname } from "../../../i18n/navigation";
 import { toLocale } from "../../../i18n/routing";
 import { OfferQuotePicker } from "../../components/forms/offer-quote-picker";
-import { OfferScore,ScoreBreakdown, SponsoredBadge } from "../../components/offer-cards";
+import { OfferScore, ScoreBreakdown, SponsoredBadge } from "../../components/offer-cards";
 import { JourneyRoute } from "../../components/journey/journey-route";
 import { JourneyHeroNotice } from "../../components/public-journey";
 import { EntrySelector, type EntrySelectorProduct } from "../../components/site/entry-selector";
@@ -43,10 +43,10 @@ function withoutLeadingNumber(title: string): string {
   return title.replace(/^\s*\d+\s*[.)]\s*/, "");
 }
 
-/** Country and product of the list the selection came from, when the offers page passed them. */
 const QUOTE_PICK_FORM_ID = "am-quote-pick-form";
 const QUOTE_PICK_HINT_ID = "am-quote-pick-limit";
-const ISO_CODE =/^[A-Za-z]{2}$/;
+/** Country and product of the list the selection came from, when the offers page passed them. */
+const ISO_CODE = /^[A-Za-z]{2}$/;
 const PRODUCT_KEY = /^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$/;
 
 function firstOf(value: string | string[] | undefined): string | undefined {
