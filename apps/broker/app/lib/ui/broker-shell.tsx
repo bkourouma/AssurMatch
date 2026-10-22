@@ -29,6 +29,8 @@ const PRO_BADGE = "Pro";
 const PRO_HINT = "Disponible avec le plan Pro";
 const ENTERPRISE_BADGE = "Enterprise";
 const LOSS_ANALYSIS_LABEL = "Analyse des pertes";
+const AGENCIES_OVERVIEW_LABEL = "Vue multi-agences";
+const AGENCIES_OVERVIEW_HREF = "/enterprise/agencies";
 
 /**
  * Le groupe CRM porte le libelle "CRM" du menu courtier. La constante garde le libelle
@@ -88,7 +90,9 @@ function brokerNavigation(plan?: BrokerPlan | undefined): NavGroup[] {
         { label: "Société", href: "/company", icon: "partners", match: ["/company"] },
         { label: "Licences", href: "/licenses", icon: "shield", match: ["/licenses"] },
         { label: "Equipe", href: "/team", icon: "team", match: ["/team"] },
-        { label: "Entreprise", href: "/enterprise", icon: "building", match: ["/enterprise"], badge: organisationBadge }
+        { label: "Entreprise", href: "/enterprise", icon: "building", match: ["/enterprise"], badge: organisationBadge },
+        // Lot 3 (spec 069 FR-003): consolidated multi-agency view, linked only for the Enterprise plan.
+        ...(plan === "enterprise" ? [{ label: AGENCIES_OVERVIEW_LABEL, href: AGENCIES_OVERVIEW_HREF, icon: "gauge" as const, match: [AGENCIES_OVERVIEW_HREF] }] : [])
       ]
     },
     {

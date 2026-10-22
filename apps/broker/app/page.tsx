@@ -3,6 +3,7 @@ import { isBrokerProfile, loginRedirect, readBackOfficeSession } from "./lib/bac
 import { logoutAction } from "./lib/backoffice-session-actions";
 import { readBrokerDashboard } from "./lib/broker-api";
 import { Badge, Button, Card, Grid, KpiCard, Notice, PageHeader, PageStack, Split } from "./lib/ui/broker-ui";
+import { CrmKpiSection } from "./lib/ui/crm-kpi-section";
 import { dashboardKpis } from "./lib/ui/broker-view-models";
 
 interface BrokerShellPageProps {
@@ -97,6 +98,9 @@ async function BrokerDashboardSection() {
           ))}
         </Grid>
       </section>
+
+      {/* Lot 3 (spec 069): PRD §20 CRM KPIs, rendered only when the API sends the `crm` section (never for Starter). */}
+      <CrmKpiSection data={dashboard.data} />
 
       {dashboard.data.licenseAlerts.length > 0 ? (
         <Card title="Alertes licence">
