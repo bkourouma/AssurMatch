@@ -36,7 +36,7 @@ import { BrokerNotificationsService } from "../modules/notifications/broker-noti
 import type { ActorContext } from "../modules/common/types";
 import type { AdvisorAgencyPredicate } from "../modules/common/agency-scope";
 import { EnterpriseService } from "../modules/enterprise/enterprise.service";
-import { PrismaEnterpriseRepository } from "../modules/enterprise/enterprise.repository";
+import { MemoryEnterpriseRepository, PrismaEnterpriseRepository } from "../modules/enterprise/enterprise.repository";
 import { OffersModule } from "../modules/offers/offers.module";
 import { PartnerApplicationsModule } from "../modules/partner-applications/partner-applications.module";
 import { MemoryPartnerApplicationsRepository, PrismaPartnerApplicationsRepository } from "../modules/partner-applications/partner-applications.repository";
@@ -69,6 +69,7 @@ import { MemoryAiInteractionsRepository, PrismaAiInteractionsRepository } from "
 import { resolveAiProvider } from "../modules/ai/core/ai-provider.config";
 import { VisitorAiService } from "../modules/ai/visitor-ai.service";
 import { BrokerAiService } from "../modules/ai/broker-ai.service";
+import type { PartnerPlan } from "../modules/ai/core/ai-gateway.service";
 import { AdminAiService } from "../modules/ai/admin-ai.service";
 import { LeadReassignmentService } from "../modules/routing/lead-reassignment.service";
 import { ManualRoutingService } from "../modules/routing/manual-routing.service";
@@ -319,7 +320,8 @@ export class AssurMatchRuntime {
     complianceEmail: () => complianceAlertEmail(),
     workerStaleMinutes: () => readIntegerEnv(process.env, "ASSURMATCH_WORKER_STALE_MINUTES", 10, 1, 1440)
   });
-  private readonly enterpriseRepository = this.runtimeRepository(new PrismaEnterpriseRepository(this.prisma));
+  // Lot 3: shared with the scheduled alerts (broker first-action target), so the in-memory mode needs an explicit instance.
+  private readonly enterpriseRepository = this.runtimeRepository(new PrismaEnterpriseRepository(this.prisma)) ?? new MemoryEnterpriseRepository();
   private readonly aiInteractionsRepository = this.runtimeRepository(new PrismaAiInteractionsRepository(this.prisma)) ?? new MemoryAiInteractionsRepository();
   private readonly aiProviders = resolveAiProvider();
   readonly aiGateway = new AiGateway({
@@ -532,7 +534,7 @@ readonly enterprise = new EnterpriseService({
     partners: this.partners.service,
     assignments: this.leads.assignments,
     users: this.users.service,
-    ...(this.enterpriseRepository ? { repository: this.enterpriseRepository } : {})
+    repository: this.enterpriseRepository
   });
   /** Spec 064: custom role of a broker member, read by the auth guard on every request (cached 10 s, invalidated on change). */
   readonly customRoleAccess = this.enterprise.customRoleAccess;
@@ -695,7 +697,21 @@ readonly enterprise = new EnterpriseService({
     assignments: this.leads.assignments,
     access: this.leads.brokerCrmAccess,
     countries: this.countries.service,
-    products: this.products.service
+    products: this.products.service,
+    // Lot 3 (spec 069 FR-004) begin: bounded dashboard aggregates (no PII) and the plan/status of a tenant for system callers.
+    performanceInput: async (actor, query) => {
+      const windowDays = Math.min(365, Math.max(1, Number(query.windowDays) || 30));
+      const now = new Date();
+      const dashboard = await this.dashboards.broker.dashboard(actor, { from: new Date(now.getTime() - windowDays * 24 * 60 * 60 * 1000).toISOString(), to: now.toISOString() });
+      // Per-advisor ids are left out: the model only needs the tenant-level counters.
+      const crm = dashboard.crm ? Object.fromEntries(Object.entries(dashboard.crm).filter(([key]) => key !== "byAssignedAdvisor")) : undefined;
+      return { starter: dashboard.starter, ...(crm ? { crm } : {}) };
+    },
+    partnerProfile: async (partnerTenantId: string) => {
+      const partner = await this.partners.service.require(partnerTenantId).catch(() => undefined);
+      return partner ? { plan: partner.plan as PartnerPlan, status: partner.status } : undefined;
+    }
+    // Lot 3 end
   });
   readonly manualRouting = new ManualRoutingService({
     audit: this.audit.writer,
@@ -763,7 +779,19 @@ readonly enterprise = new EnterpriseService({
     crmActivity: this.leadRepositorySet.crmActivity,
     brokerCrmConfig: this.brokerCrmConfig,
     // Spec 064: Enterprise agency display filter (lazy: the enterprise service is built after this module).
-    agencyScope: { resolve: (actor: ActorContext, agencyId: string | undefined): Promise<AdvisorAgencyPredicate | undefined> => this.enterprise.agencyScopeFor(actor, agencyId) }
+    agencyScope: { resolve: (actor: ActorContext, agencyId: string | undefined): Promise<AdvisorAgencyPredicate | undefined> => this.enterprise.agencyScopeFor(actor, agencyId) },
+    // Lot 3 (spec 069 FR-001/FR-003) begin: billing tariff for the estimated lead cost, agencies of the tenant, spec 055 proposals.
+    leadPricing: async (plan, countryCode) => {
+      const prices = await this.billing.plans.list({ actorId: "system:broker-dashboard", roles: ["super_admin"], mfaVerified: true });
+      // No fallback on another country's tariff (wrong currency): a lead of a country without tariff has no estimated cost.
+      const match = prices.find((price) => price.plan === plan && price.countryCode === countryCode);
+      return match && match.perLeadPrice > 0 ? { perLeadPrice: match.perLeadPrice, sharedLeadPriceMultiplier: match.sharedLeadPriceMultiplier, currency: match.currency } : undefined;
+    },
+    agencies: {
+      listForTenant: async (actor: ActorContext) => (await this.enterprise.listAgencies(actor)).map((agency) => ({ id: agency.id, name: agency.name, memberIds: agency.memberIds }))
+    },
+    quotesSent: async (assignmentId: string) => (await this.leadProposalsRepository.listForAssignment(assignmentId)).filter((proposal) => proposal.status !== "withdrawn").length
+    // Lot 3 end
   });
   /** Spec 051: partner onboarding and lifecycle behind the `/admin/partners` routes. */
   readonly partnerAdmin = new PartnerAdminService({
@@ -809,6 +837,18 @@ readonly enterprise = new EnterpriseService({
     provisionUser: (actor, input) => this.adminUsersController().createPartnerUser(actor, input),
     invalidateUserAccess: (userId: string) => this.userAccessStatus.invalidate(userId)
   });
+  // Lot 3 (spec 069 FR-004/FR-006) begin: late links (the AI service and the user directory depend on, or come after, the CRM services).
+  private readonly crmLateLinks = (() => {
+    // Approved AI priority scores of the actor's own CRM perimeter (empty when the flag, opt-out or plan closes scoring).
+    this.leads.brokerCrmLeads.setPriorityScoreSource((actor) => this.brokerAi.priorityScoreMapFor(actor));
+    // The advisor of an assignment is resolved from the user directory, never from the client-asserted tenant.
+    this.leads.brokerCrmActivity.setAdvisorTenantResolver(async (advisorId) => {
+      const user = await this.users.service.require(advisorId).catch(() => undefined);
+      return user ? { partnerTenantId: user.partnerTenantId, status: user.status } : undefined;
+    });
+    return true;
+  })();
+  // Lot 3 end
   /** Spec 053 FR-004/FR-013: admin decisions on the broker requests (applied through `partnerAdmin`). */
   readonly partnerRequestAdmin = new PartnerRequestAdminService({
     audit: this.audit.writer,
@@ -998,8 +1038,15 @@ readonly enterprise = new EnterpriseService({
         monthlyCountForPartner: (partnerTenantId: string, now: Date) => this.leads.assignmentsRepository.monthlyCountForPartner(partnerTenantId, now)
       },
       countries: this.countries.service,
-      quotes: { list: () => this.quoteRequests.submissions.list() }
-    })
+      quotes: { list: () => this.quoteRequests.submissions.list() },
+      // Lot 3 (spec 069 D1): the broker's own first-action target (read lazily, minimum with the contractual one).
+      branding: { listBranding: () => this.enterpriseRepository.listBranding() }
+    }),
+    // Lot 3 (spec 069 FR-008, D4): weekly AI summary, flag closed by default; the text comes from the central AI gateway.
+    // The persisted dedupe key is tested before the gateway is called (one AI call per tenant and ISO week).
+    hasBeenSent: async (dedupeKey) => (await this.notifications.service.findByDedupeKey(dedupeKey)) !== undefined,
+    isWeeklySummaryEnabled: () => this.featureFlags.service.isEnabled("broker_weekly_ai_summary_enabled"),
+    composeWeeklySummary: (partnerTenantId, stats) => this.brokerAi.weeklySummaryText(partnerTenantId, { ...stats })
   });
   /** Spec 045: public-site intake (waitlist, partner applications, contact) and public read models. */
   readonly waitlist = new WaitlistModule({

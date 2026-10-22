@@ -258,7 +258,8 @@ export const EXPLICITLY_SENSITIVE_FLAG_KEYS = [
   "retention_purge_enabled",
   "satisfaction_survey_enabled",
   "ai_routing_anomaly_detection_enabled",
-  "ai_assisted_routing_enabled"
+  "ai_assisted_routing_enabled",
+  "broker_weekly_ai_summary_enabled"
 ] as const;
 
 const REGULATED_FLAG_KEY_FRAGMENTS = [

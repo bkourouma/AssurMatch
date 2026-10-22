@@ -215,6 +215,8 @@ enum NotificationType {
   visitor_data_request_closed
   broker_visitor_message
   admin_data_request_received
+  broker_lead_expiring
+  broker_weekly_summary
   // Spec 067 (lot 1): single J+3 reminder of a document request left open.
   visitor_documents_reminder
 }

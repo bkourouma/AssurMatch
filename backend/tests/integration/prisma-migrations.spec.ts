@@ -42,7 +42,8 @@ describe("prisma migration fresh-base readiness", () => {
       "0033_visitor_quote_journey_gaps",
       "0034_catalog_offers_gaps",
       // Lot 5 (spec 071)
-      "0035_routing_billing_gaps"
+      "0035_routing_billing_gaps",
+      "0039_broker_lead_alerts"
     ]);
     const schema = readFileSync(join(process.cwd(), "backend", "prisma", "schema.prisma"), "utf8").replace(/\r\n/g, "\n");
     for (const model of ["AuditLog", "FeatureFlag", "ConsentRecord", "QuoteRequest", "LeadAssignment", "BrokerCrmLeadState", "PartnerApiKey", "PartnerWebhookEndpoint", "PartnerWebhookDelivery", "PartnerWebhookAllowlistEntry", "RoutingRule", "RoutingRuleHistory"]) {

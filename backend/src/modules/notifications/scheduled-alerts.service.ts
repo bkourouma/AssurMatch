@@ -26,7 +26,34 @@ export interface ScheduledAlertSources {
   unroutedLeadsSince(since: Date): Promise<number>;
   /** Per partner: leads assigned since `since` and how many of them the broker disputed. */
   disputeStats(since: Date): Promise<Array<{ partnerTenantId: string; assignments: number; disputed: number }>>;
+  /**
+   * Leads still in their initial assignment state: no seen/accepted/contacted action, no visible reply and
+   * no CRM status beyond `nouveau`. `slaTargetMinutes` is the first-action target already resolved for the
+   * tenant (contractual target, broker target, 240 min). Identifiers and product/country only, never the
+   * prospect's contact or answers.
+   */
+  unprocessedLeads(now: Date): Promise<Array<{ id: string; partnerTenantId: string; publicReference: string; productKey?: string | undefined; countryCode?: string | undefined; assignedAt: Date; slaTargetMinutes: number; plan: string }>>;
+  /** Per partner tenant: aggregate counters of the leads assigned since `since` (no prospect data). */
+  weeklyBrokerStats(since: Date): Promise<WeeklyBrokerStat[]>;
 }
+
+/** Aggregates of one tenant's week (counters only). */
+export interface WeeklyBrokerStats {
+  received: number;
+  accepted: number;
+  won: number;
+  lost: number;
+  contactedCount: number;
+  overdueTasks: number;
+}
+
+export interface WeeklyBrokerStat extends WeeklyBrokerStats {
+  partnerTenantId: string;
+  plan: string;
+}
+
+/** Plans that have the CRM and the broker alerts of PRD section 23 (never Starter: no CRM there). */
+const CRM_PLANS = new Set(["pro", "enterprise"]);
 
 export interface ScheduledAlertsConfig {
   licenseWarningDays: number[];
@@ -40,6 +67,10 @@ export interface ScheduledAlertsConfig {
   disputeMinLeads: number;
   disputeWindowDays: number;
   offerExpiredLookbackDays: number;
+  /** A still-unprocessed lead is announced once it has consumed this share of its first-action delay. */
+  leadExpiryWarningPercent: number;
+  /** A lead whose deadline passed longer ago than this is no longer announced. */
+  leadExpiryLookbackDays: number;
   /** The job runs at most once per interval, whatever the worker cycle. */
   minIntervalMinutes: number;
 }
@@ -63,6 +94,8 @@ export function readScheduledAlertsConfig(env: Record<string, string | undefined
     disputeMinLeads: readIntegerEnv(env, "ASSURMATCH_ALERT_DISPUTE_MIN_LEADS", 10, 1, 100000),
     disputeWindowDays: readIntegerEnv(env, "ASSURMATCH_ALERT_DISPUTE_WINDOW_DAYS", 30, 1, 365),
     offerExpiredLookbackDays: readIntegerEnv(env, "ASSURMATCH_ALERT_OFFER_EXPIRED_LOOKBACK_DAYS", 30, 1, 365),
+    leadExpiryWarningPercent: readIntegerEnv(env, "ASSURMATCH_ALERT_LEAD_EXPIRY_WARNING_PERCENT", 80, 1, 99),
+    leadExpiryLookbackDays: readIntegerEnv(env, "ASSURMATCH_ALERT_LEAD_EXPIRY_LOOKBACK_DAYS", 3, 0, 60),
     minIntervalMinutes: readIntegerEnv(env, "ASSURMATCH_SCHEDULED_ALERTS_INTERVAL_MINUTES", 60, 1, 1440)
   };
 }
@@ -82,6 +115,36 @@ export interface ScheduledAlertsDeps {
   broker: BrokerAlertNotifier;
   admin: AdminAlertsService;
   config: ScheduledAlertsConfig;
+  /** Global flag `broker_weekly_ai_summary_enabled` (closed by default). Absent means disabled. */
+  isWeeklySummaryEnabled?: (() => boolean) | undefined;
+  /**
+   * Optional AI composer of the weekly summary (provided by the runtime wiring). It receives aggregates
+   * only. Returning nothing (or throwing) falls back to the deterministic text.
+   */
+  composeWeeklySummary?: ((partnerTenantId: string, stats: WeeklyBrokerStats) => Promise<string | undefined>) | undefined;
+  /**
+   * Persisted dedupe check (e.g. `notifications.findByDedupeKey`), tested BEFORE the AI composer is called so the
+   * gateway is asked once per tenant and ISO week, not at every hourly pass. Absent: the per-process memory still applies.
+   */
+  hasBeenSent?: ((dedupeKey: string) => Promise<boolean>) | undefined;
+}
+
+/** ISO 8601 week label (`2026-W41`): the Thursday of the week decides the year. */
+export function isoWeekKey(date: Date): string {
+  const day = new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()));
+  const weekday = day.getUTCDay() || 7;
+  day.setUTCDate(day.getUTCDate() + 4 - weekday);
+  const yearStart = Date.UTC(day.getUTCFullYear(), 0, 1);
+  const week = Math.ceil(((day.getTime() - yearStart) / DAY_MS + 1) / 7);
+  return `${day.getUTCFullYear()}-W${String(week).padStart(2, "0")}`;
+}
+
+function formatDuration(minutes: number): string {
+  const total = Math.max(0, Math.round(minutes));
+  if (total < 60) return `${total} min`;
+  const hours = Math.floor(total / 60);
+  const rest = total % 60;
+  return rest === 0 ? `${hours} h` : `${hours} h ${String(rest).padStart(2, "0")}`;
 }
 
 /** Days left, rounded up: an expiry later today counts as J-0, tomorrow as J-1. */
@@ -107,6 +170,8 @@ function formatDate(value: Date): string {
  */
 export class ScheduledAlertsService {
   private lastRunAt: Date | undefined;
+  /** Weekly-summary keys already handled by this process (compose once even when no persisted check is wired). */
+  private readonly weeklyHandled = new Set<string>();
 
   constructor(private readonly deps: ScheduledAlertsDeps) {}
 
@@ -128,7 +193,9 @@ export class ScheduledAlertsService {
       () => this.quotas(now, run),
       () => this.countries(now, run),
       () => this.unrouted(now, run),
-      () => this.disputes(now, run)
+      () => this.disputes(now, run),
+      () => this.leadExpiry(now, run),
+      () => this.weeklySummary(now, run)
     ];
     for (const section of sections) {
       try {
@@ -228,6 +295,77 @@ export class ScheduledAlertsService {
         targetType: "LeadAssignment",
         targetId: reminder.leadAssignmentId
       }));
+    }
+  }
+
+  /**
+   * PRD section 23 "lead proche expiration". Technical definition (not in the PRD): the deadline of a lead is
+   * `assignedAt + first-action target` of its broker (contractual target, else broker target, else 240 min,
+   * see `effectiveSlaTarget` of the enterprise module). The source only returns leads still untreated.
+   * The alert fires once the lead consumed `leadExpiryWarningPercent` of its delay and stops
+   * `leadExpiryLookbackDays` after the deadline. Pro and Enterprise only. One alert per assignment.
+   * The text carries the public reference, product, country and remaining time, nothing about the prospect.
+   */
+  private async leadExpiry(now: Date, run: ScheduledAlertsRun): Promise<void> {
+    const percent = this.deps.config.leadExpiryWarningPercent;
+    for (const lead of await this.deps.sources.unprocessedLeads(now)) {
+      if (!CRM_PLANS.has(lead.plan) || lead.slaTargetMinutes <= 0) continue;
+      const delayMs = lead.slaTargetMinutes * 60_000;
+      const elapsedMs = now.getTime() - new Date(lead.assignedAt).getTime();
+      if (elapsedMs < 0 || elapsedMs * 100 < delayMs * percent) continue;
+      const overdueMs = elapsedMs - delayMs;
+      if (overdueMs > this.deps.config.leadExpiryLookbackDays * DAY_MS) continue;
+      const subject = [lead.productKey, lead.countryCode].filter(Boolean).join(", ");
+      const label = `${lead.publicReference}${subject ? ` (${subject})` : ""}`;
+      this.countBroker(run, await this.deps.broker.notify({
+        partnerTenantId: lead.partnerTenantId,
+        type: "broker_lead_expiring",
+        dedupeKey: `broker_lead_expiring:${lead.id}`,
+        title: overdueMs > 0 ? "Échéance de lead dépassée" : "Lead proche de son échéance",
+        body: overdueMs > 0
+          ? `Le lead ${label} n'a pas été traité : l'échéance de première action est dépassée de ${formatDuration(overdueMs / 60_000)}.`
+          : `Le lead ${label} n'a pas encore été traité : il reste ${formatDuration(-overdueMs / 60_000)} avant l'échéance de première action.`,
+        targetType: "LeadAssignment",
+        targetId: lead.id
+      }));
+    }
+  }
+
+  /**
+   * PRD section 23 "résumé IA hebdomadaire": first run of each ISO week, one per Pro/Enterprise tenant, only
+   * while the global flag is open. Aggregates only; the AI composer is optional and never sees a prospect.
+   */
+  private async weeklySummary(now: Date, run: ScheduledAlertsRun): Promise<void> {
+    if (!this.deps.isWeeklySummaryEnabled?.()) return;
+    const week = isoWeekKey(now);
+    for (const stat of await this.deps.sources.weeklyBrokerStats(new Date(now.getTime() - 7 * DAY_MS))) {
+      if (!CRM_PLANS.has(stat.plan)) continue;
+      const { received, accepted, won, lost, contactedCount, overdueTasks } = stat;
+      if (received + accepted + won + lost + contactedCount + overdueTasks === 0) continue;
+      const dedupeKey = `broker_weekly_summary:${stat.partnerTenantId}:${week}`;
+      if (this.weeklyHandled.has(dedupeKey)) continue;
+      // Dedupe BEFORE composing: the AI call is the expensive part and must run once per tenant and ISO week.
+      if (await this.deps.hasBeenSent?.(dedupeKey)) {
+        this.weeklyHandled.add(dedupeKey);
+        continue;
+      }
+      let body = `Résumé automatique de la semaine : ${received} lead(s) reçu(s), ${accepted} accepté(s), ${contactedCount} contacté(s), ${won} gagné(s), ${lost} perdu(s), ${overdueTasks} tâche(s) CRM en retard.`;
+      try {
+        const composed = await this.deps.composeWeeklySummary?.(stat.partnerTenantId, { received, accepted, won, lost, contactedCount, overdueTasks });
+        if (composed?.trim()) body = `Résumé IA (assistance indicative) : ${composed.trim()}`;
+      } catch {
+        // The deterministic text stays: an AI failure never blocks the alert.
+      }
+      this.countBroker(run, await this.deps.broker.notify({
+        partnerTenantId: stat.partnerTenantId,
+        type: "broker_weekly_summary",
+        dedupeKey,
+        title: "Résumé hebdomadaire de votre activité",
+        body,
+        targetType: "PartnerTenant",
+        targetId: stat.partnerTenantId
+      }));
+      this.weeklyHandled.add(dedupeKey);
     }
   }
 
