@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { listAdminAiInsights, readAdminAIAssistance } from "../lib/admin-api";
 import { requestAdminInsightAction, validateAdminInsightAction } from "../lib/ai-insight-actions";
 import { Badge, Button, Card, Cluster, DataTable, Form, Grid, Input, PageHeader, PageStack, Stack, StateMessage } from "../lib/ui/admin-ui";
@@ -58,6 +59,13 @@ export default async function AdminAIAssistancePage({ searchParams }: { searchPa
               </ul>
             </Card>
           </Grid>
+
+          <Card
+            title="Flags IA par pays et produit"
+            description="Etat et changement des flags IA par pays et par produit, par une voie de conformite auditee (MFA, reference de politique, approbateur, motif)."
+          >
+            <Link href="/ai-assistance/flags">Ouvrir les flags IA par pays et produit</Link>
+          </Card>
 
           {enabled ? (
             <Card

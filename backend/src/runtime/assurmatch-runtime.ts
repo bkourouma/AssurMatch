@@ -71,6 +71,7 @@ import { VisitorAiService } from "../modules/ai/visitor-ai.service";
 import { BrokerAiService } from "../modules/ai/broker-ai.service";
 import type { PartnerPlan } from "../modules/ai/core/ai-gateway.service";
 import { AdminAiService } from "../modules/ai/admin-ai.service";
+import { AiScopeFlagPolicyService } from "../modules/ai/ai-scope-flags.service"; // Lot 7 (spec 074)
 import { LeadReassignmentService } from "../modules/routing/lead-reassignment.service";
 import { ManualRoutingService } from "../modules/routing/manual-routing.service";
 import { PrismaRoutingRulesRepository } from "../modules/routing/routing-rules.repository";
@@ -90,6 +91,9 @@ import { PartnerEligibilityService } from "../modules/partners/partner-eligibili
 import { PartnerIntegrationsModule } from "../modules/partner-integrations/partner-integrations.module";
 import { MemoryPartnerIntegrationsRepository, PrismaPartnerIntegrationsRepository } from "../modules/partner-integrations/partner-integrations.repository";
 import { PartnerWebhookEventPublisher } from "../modules/partner-integrations/partner-webhook-event-publisher";
+// Lot 10 (spec 076)
+import { CrmConnectorModule, MemoryCrmConnectorRepository, PrismaCrmConnectorRepository } from "../modules/crm-connector/crm-connector.module";
+import { resolveMessagingProviders } from "../modules/notifications/providers/messaging-provider-env";
 import { PrismaConsentRecordsRepository } from "../modules/consent/consent-records.repository";
 import { MemoryCountriesRepository, PrismaCountriesRepository, type CountriesRepository } from "../modules/countries/countries.repository";
 import { PrismaProductsRepository } from "../modules/products/products.repository";
@@ -138,6 +142,8 @@ import { maybeBootstrapAdmin } from "./local-bootstrap-admin";
 import { AdminOperationsModule } from "../modules/admin-operations/admin-operations.module";
 // Spec 062 data requests
 import { DataRequestsModule, MemoryDataRequestsRepository, PrismaDataRequestsRepository } from "../modules/data-requests/data-requests.module";
+// Lot 9 (spec 072)
+import { ContentCmsModule, MemoryContentCmsRepository, PrismaContentCmsRepository } from "../modules/content-cms/content-cms.module";
 import type { DataRequestNotificationsPort } from "../modules/lead-messaging/lead-messaging.ports";
 // Lot 4 (spec 070)
 import { InsurersModule, MemoryInsurersRepository, PrismaInsurersRepository } from "../modules/insurers/insurers.module";
@@ -212,6 +218,8 @@ export class AssurMatchRuntime {
   private readonly leadMessagingRepository = this.runtimeRepository(new PrismaLeadMessagingRepository(this.prisma)) ?? new MemoryLeadMessagingRepository();
   // Spec 062 data requests: visitor data-subject requests (memory instance owned here under test, see spec 046 note).
   private readonly dataRequestsRepository = this.runtimeRepository(new PrismaDataRequestsRepository(this.prisma)) ?? new MemoryDataRequestsRepository();
+  // Lot 9 (spec 072): content CMS entries.
+  private readonly contentCmsRepository = this.runtimeRepository(new PrismaContentCmsRepository(this.prisma)) ?? new MemoryContentCmsRepository();
   private readonly contactMessagesRepository = this.runtimeRepository(new PrismaContactMessagesRepository(this.prisma)) ?? new MemoryContactMessagesRepository();
   readonly leadRepositorySet = this.leadRepositories();
   private readonly brokerCrmConfig = { brokerCrmEnabled: process.env.ASSURMATCH_BROKER_CRM_ENABLED === "true" };
@@ -237,6 +245,8 @@ export class AssurMatchRuntime {
       }
       // Spec 054 R6: the visitor is told of every public step (accepted, reassigned, closed).
       await this.visitorQuoteNotifier?.onLeadEvent(eventType, partnerTenantId, data);
+      // Lot 10 (spec 076): generic outbound CRM connector (fail-safe, closed unless its flag is open).
+      await this.crmConnector?.service.publish(eventType, partnerTenantId, data).catch(() => undefined);
     }
   });
   readonly regulatoryRegimes: RegulatoryRegimesModule = new RegulatoryRegimesModule(
@@ -294,12 +304,12 @@ export class AssurMatchRuntime {
     }
   });
   private readonly messagingRepository = this.runtimeRepository(new PrismaMessagingRepository(this.prisma)) ?? new MemoryMessagingRepository();
-  readonly notifications = new NotificationsModule(this.audit.writer, this.queues.notifications, this.notificationsRepository, {
-    smsProvider: process.env.ASSURMATCH_SMS_PROVIDER,
-    smsSecretConfigured: Boolean(process.env.ASSURMATCH_SMS_API_KEY),
-    whatsappProvider: process.env.ASSURMATCH_WHATSAPP_PROVIDER,
-    whatsappSecretConfigured: Boolean(process.env.ASSURMATCH_WHATSAPP_API_KEY)
-  }, this.featureFlags.service, this.messagingRepository, this.partnerWebhookEvents);
+  // Lot 10 (spec 076): real SMS / WhatsApp adapters, built only from a complete environment configuration.
+  private readonly messagingProviders = resolveMessagingProviders();
+  readonly notifications = new NotificationsModule(this.audit.writer, this.queues.notifications, this.notificationsRepository, this.messagingProviders.config, this.featureFlags.service, this.messagingRepository, this.partnerWebhookEvents, {
+    ...(this.messagingProviders.smsProvider ? { smsProvider: this.messagingProviders.smsProvider } : {}),
+    ...(this.messagingProviders.whatsappProvider ? { whatsappProvider: this.messagingProviders.whatsappProvider } : {})
+  });
   readonly brokerNotifications = new BrokerNotificationsService({ audit: this.audit.writer, dispatch: this.notifications.dispatch });
   /** Spec 061 FR-002/FR-003: broker alerts (in-app always, pointer e-mail, opted-in SMS/WhatsApp). */
   readonly brokerAlerts = new BrokerAlertNotifier({
@@ -941,6 +951,14 @@ readonly enterprise = new EnterpriseService({
     routingAnomalyDetector: this.routingAnomalies
   });
   readonly adminRoutingAnomalies = new AdminRoutingAnomaliesController(this.routingAnomalies, this.adminAi);
+  /** Lot 7 (spec 074): the audited, protected path for the country and product AI flags; closes cached public reads on change. */
+  readonly aiScopeFlags = new AiScopeFlagPolicyService({
+    audit: this.audit.writer,
+    countries: this.countries.service,
+    products: this.products.service,
+    featureFlags: this.featureFlags.service,
+    onChanged: () => this.publicCountryDirectory.invalidate()
+  });
   private readonly billingRepository = this.runtimeRepository(new PrismaBillingRepository(this.prisma));
   private readonly invoicingRepository = this.runtimeRepository(new PrismaInvoicingRepository(this.prisma));
   // Lot 5 (spec 071)
@@ -1010,6 +1028,18 @@ readonly enterprise = new EnterpriseService({
     notifications: this.notifications.service,
     webhookDeliveryEnabled: process.env.ASSURMATCH_PARTNER_WEBHOOK_DELIVERY_ENABLED === "true",
     ...(this.partnerIntegrationsRepository ? { repository: this.partnerIntegrationsRepository } : {})
+  });
+  // Lot 10 (spec 076): generic outbound CRM connector, reuses the partner webhook origin allow-list.
+  private readonly crmConnectorRepository = this.runtimeRepository(new PrismaCrmConnectorRepository(this.prisma)) ?? new MemoryCrmConnectorRepository();
+  readonly crmConnector = new CrmConnectorModule({
+    audit: this.audit.writer,
+    featureFlags: this.featureFlags.service,
+    partners: this.partners.service,
+    repository: this.crmConnectorRepository,
+    approvedOrigin: async (partnerTenantId: string, url: URL) => (await this.partnerIntegrationsRepository.listAllowlistEntries())
+      .filter((entry) => entry.partnerTenantId === partnerTenantId && entry.status === "active")
+      .some((entry) => entry.origin === url.origin && (!entry.path || entry.path === url.pathname)),
+    deliveryEnabled: () => process.env.ASSURMATCH_CRM_CONNECTOR_DELIVERY_ENABLED === "true"
   });
   /**
    * Spec 047: the confirmation sender for the three public forms. It shares `emailDelivery` with
@@ -1114,6 +1144,11 @@ readonly enterprise = new EnterpriseService({
     redis: this.redis.client,
     notifications: this.dataRequestNotifications(),
     retention: this.dataRetention.service
+  });
+  // Lot 9 (spec 072): minimal CMS of the Content Admin role (admin editing, public reading of published content).
+  readonly contentCms: ContentCmsModule = new ContentCmsModule({
+    audit: this.audit.writer,
+    repository: this.contentCmsRepository
   });
 
   /**
@@ -1308,6 +1343,7 @@ readonly enterprise = new EnterpriseService({
       NotificationsRepository: this.notificationsRepository?.mode,
       UsersRepository: this.usersRepository?.mode,
       PartnerIntegrationsRepository: this.partnerIntegrationsRepository?.mode,
+      CrmConnectorRepository: this.crmConnectorRepository?.mode, // Lot 10
       WaitlistRepository: this.waitlistRepository?.mode,
       PartnerApplicationsRepository: this.partnerApplicationsRepository?.mode,
       ContactMessagesRepository: this.contactMessagesRepository?.mode,
@@ -1324,7 +1360,9 @@ readonly enterprise = new EnterpriseService({
       // Spec 062 messaging
       LeadMessagingRepository: this.leadMessagingRepository.mode,
       // Spec 062 data requests
-      DataRequestsRepository: this.dataRequestsRepository.mode
+      DataRequestsRepository: this.dataRequestsRepository.mode,
+      // Lot 9 (spec 072)
+      ContentCmsRepository: this.contentCmsRepository.mode
     };
   }
 

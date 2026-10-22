@@ -2,7 +2,7 @@ import { notFound } from "next/navigation";
 import { getTranslations, setRequestLocale } from "next-intl/server";
 import { toLocale, type AppLocale } from "../../../../../i18n/routing";
 import { Button } from "../../../../components/ui/button";
-import { getLegalPage, hasCountryLegalOverride } from "../../../../content/legal";
+import { resolveLegalPageWithOverride } from "../../../../content/cms-content";
 import { LegalPageView } from "../../../../content/legal-page-view";
 import { formatDate } from "../../../../lib/country-format";
 import { listPublicCountries } from "../../../../lib/public-api";
@@ -19,7 +19,7 @@ export async function generateMetadata({ params }: { params: Promise<PageParams>
   const { locale: rawLocale, countryCode } = await params;
   const locale = toLocale(rawLocale);
   const iso = countryCode.toUpperCase();
-  const page = getLegalPage(SLUG, locale, iso);
+  const page = (await resolveLegalPageWithOverride(SLUG, locale, iso))?.page;
   const t = await getTranslations({ locale, namespace: "Legal" });
   return buildMetadata({ title: page?.title ?? t("title"), description: page?.description ?? t("description"), href: HREF, locale, params: { countryCode: iso } });
 }
@@ -30,14 +30,14 @@ export default async function CountryCookiesPage({ params }: { params: Promise<P
   setRequestLocale(locale);
   const iso = countryCode.toUpperCase();
 
-  const page = getLegalPage(SLUG, locale, iso);
-  if (!page) notFound();
+  const resolved = await resolveLegalPageWithOverride(SLUG, locale, iso);
+  if (!resolved) notFound();
+  const { page, hasOverride } = resolved;
 
   const t = await getTranslations("Legal");
   const common = await getTranslations("Common");
   const countries = await listPublicCountries();
   const countryName = countries.data.find((country) => country.isoCode.toUpperCase() === iso)?.name ?? iso;
-  const hasOverride = hasCountryLegalOverride(SLUG, iso);
 
   return (
     <LegalPageView

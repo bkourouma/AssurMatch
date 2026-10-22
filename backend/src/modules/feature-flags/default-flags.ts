@@ -46,10 +46,16 @@ export const GLOBAL_FEATURE_FLAG_DEFAULTS = {
    */
   broker_visitor_messaging_enabled: false,
   /**
+   * Lot 10 (spec 076): generic outbound CRM connector of a partner. Ships OFF and, like the SMS and
+   * WhatsApp flags, has no admin toggle: only the audited compliance policy path opens it.
+   */
+  crm_connector_enabled: false,
+  /**
    * PRD section 23: weekly summary of a Pro/Enterprise broker's activity, composed with the AI when
    * `ai_summary_enabled`, the plan and the partner opt-out allow it (deterministic text otherwise).
-   * Ships OFF. Non-sensitive like `ai_summary_enabled`: the text is aggregates only and purely
-   * descriptive (guardrail `advice_not_allowed`), so an admin may toggle it from the flags screen.
+   * Ships OFF. Sensitive: listed in POLICY_ACTIVATABLE_FLAGS (sensitive-feature-flag-policy.ts), so no
+   * HTTP route can turn it on; it is opened only through the audited `npm run ops:apply-flag-policy`
+   * command. The text is aggregates only and purely descriptive (guardrail `advice_not_allowed`).
    */
   broker_weekly_ai_summary_enabled: false
 } as const;
