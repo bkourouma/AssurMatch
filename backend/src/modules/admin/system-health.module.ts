@@ -1,3 +1,4 @@
+import { auditReliability, type AuditReliabilitySnapshot } from "../observability/audit-metrics";
 import type { PrismaService } from "../common/prisma/prisma.service";
 import type { RedisClientPort } from "../common/redis/redis.module";
 import type { QueuePort } from "../common/queues/queues.module";
@@ -5,6 +6,8 @@ import type { QueuePort } from "../common/queues/queues.module";
 export interface SystemHealth {
   status: "ok" | "degraded" | "down";
   checks: Record<string, "ok" | "degraded" | "down">;
+  /** Lot 8 (FR-B1): audit pipeline counters (numbers only). */
+  audit: AuditReliabilitySnapshot;
 }
 
 export class SystemHealthService {
@@ -15,16 +18,19 @@ export class SystemHealthService {
   ) {}
 
   async check(): Promise<SystemHealth> {
+    const audit = auditReliability.snapshot();
     const checks: Record<string, "ok" | "degraded" | "down"> = {
       database: await this.prisma.health(),
       redis: await this.redis.health(),
       queue: this.queue.health(),
       documents: "ok",
       auth: "ok",
-      featureFlags: "ok"
+      featureFlags: "ok",
+      // Lot 8: degraded while audit rows wait for a retry or when some were lost.
+      audit: audit.auditOutboxDepth > 0 || audit.auditDropped > 0 ? "degraded" : "ok"
     };
     const status = Object.values(checks).includes("down") ? "down" : Object.values(checks).includes("degraded") ? "degraded" : "ok";
-    return { status, checks };
+    return { status, checks, audit };
   }
 }
 

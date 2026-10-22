@@ -85,7 +85,7 @@ export class FeatureFlagsService {
       ...(options.allowSensitiveDisable ? { allowSensitiveDisable: true } : {})
     });
     if (!mutationDecision.allowed) {
-      this.audit.write({
+      await this.audit.writeAsync({
         actor,
         action: featureFlagMutationRefusedAction,
         targetType: "FeatureFlag",
@@ -161,7 +161,7 @@ export class FeatureFlagsService {
     const history = this.history.at(-1);
     if (history) await this.repository.upsert(flag, history);
     await this.cache?.put(flag);
-    this.audit.write({
+    await this.audit.writeAsync({
       actor,
       action: auditAction,
       targetType: "FeatureFlag",

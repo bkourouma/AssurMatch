@@ -58,6 +58,8 @@ for f in "$API" "$WORKER"; do
   require "$f" NODE_ENV APP_ENV DATABASE_URL REDIS_URL ASSURMATCH_AUTH_TOKEN_SECRET ENCRYPTION_KEY APP_BASE_URL PUBLIC_APP_URL BROKER_APP_URL EMAIL_SERVICE_TYPE
   min_length "$f" ASSURMATCH_AUTH_TOKEN_SECRET 32
   min_length "$f" ENCRYPTION_KEY 32
+  # Lot 8 (spec 075): PII encryption keys (format checked by the API at boot).
+  require "$f" PII_ENCRYPTION_KEYS PII_ENCRYPTION_ACTIVE_KEY_ID PII_BLIND_INDEX_KEY
   [ "$(value_of "$f" APP_ENV)" = "production" ] || fail "$(basename "$f"): APP_ENV must be production"
   forbid_present "$f" LOCAL_BOOTSTRAP_ADMIN_EMAIL LOCAL_BOOTSTRAP_ADMIN_PASSWORD ASSURMATCH_ALLOW_TEST_AUTH_HEADERS
   for mem in ASSURMATCH_PRISMA_MEMORY ASSURMATCH_REDIS_MEMORY ASSURMATCH_QUEUE_MEMORY ASSURMATCH_AUDIT_MEMORY; do
@@ -88,6 +90,8 @@ for app in public admin broker; do
   f="$ENV_DIR/$app.env"
   [ -f "$f" ] || continue
   forbid_present "$f" DATABASE_URL REDIS_URL ASSURMATCH_AUTH_TOKEN_SECRET ENCRYPTION_KEY EMAIL_SMTP_PASS ASSURMATCH_S3_SECRET_ACCESS_KEY ANTHROPIC_API_KEY LOCAL_BOOTSTRAP_ADMIN_PASSWORD
+  # Lot 8 (spec 075): the PII keys live in the API and worker env files only.
+  forbid_present "$f" PII_ENCRYPTION_KEYS PII_BLIND_INDEX_KEY
   if [ "$app" != "public" ]; then
     [ "$(value_of "$f" APP_ENV)" = "production" ] || fail "$app.env: APP_ENV must be production"
   fi

@@ -4,6 +4,9 @@ import type { BrokerStarterLeadHistoryEvent } from "../../../../packages/shared/
 import type { PrismaService } from "../common/prisma/prisma.service";
 import type { RoutingPartnerStats } from "../routing/routing-strategy";
 import type { LeadAssignmentRecord, LeadAssignmentStatus } from "./lead-assignment.service";
+// Lot 8 (spec 075): the enrichment reads encrypted prospect contacts and quote payloads.
+import { decryptProspectContact, decryptQuotePayload } from "../common/security/pii-columns";
+import { PiiVault } from "../common/security/pii-vault";
 
 export const LEAD_ASSIGNMENTS_REPOSITORY = Symbol("LEAD_ASSIGNMENTS_REPOSITORY");
 
@@ -237,7 +240,8 @@ interface CrmStateProjection {
 export class PrismaLeadAssignmentsRepository implements LeadAssignmentsRepository {
   readonly mode = "prisma-runtime" as const;
 
-  constructor(private readonly prisma: PrismaService) {}
+  // Lot 8: the vault is injectable (tests); the runtime builds it from the environment.
+  constructor(private readonly prisma: PrismaService, private readonly vault: PiiVault = PiiVault.fromEnv()) {}
 
   async create(assignment: LeadAssignmentRecord): Promise<LeadAssignmentRecord> {
     return this.enrichOne(this.toDomain(await this.assignments().create({ data: this.toPrisma(assignment) })));
@@ -407,7 +411,8 @@ export class PrismaLeadAssignmentsRepository implements LeadAssignmentsRepositor
 
     return assignments.map((assignment) => {
       const quote = quoteById.get(assignment.quoteRequestId);
-      const payload = this.payloadObject(quote?.payload);
+      // Lot 8: decrypted payload (a legacy clear payload is returned as is).
+      const payload = this.payloadObject(decryptQuotePayload(this.vault, quote?.payload));
       const contact = this.contactFromPayload(payload);
       const answers = this.answersFromPayload(payload);
       const prospect = quote ? prospects.get(quote.prospectId) : undefined;
@@ -461,7 +466,9 @@ export class PrismaLeadAssignmentsRepository implements LeadAssignmentsRepositor
     if (!delegate) return new Map();
     const ids = [...new Set(quotes.map((quote) => quote.prospectId))];
     if (ids.length === 0) return new Map();
-    const rows = (await delegate.findMany({ where: { id: { in: ids } }, select: { id: true, displayName: true, emailNormalized: true, phoneNormalized: true, preferredContactChannel: true } })).map((row) => row as ProspectProjection);
+    const rows = (await delegate.findMany({ where: { id: { in: ids } }, select: { id: true, displayName: true, emailNormalized: true, phoneNormalized: true, preferredContactChannel: true } }))
+      // Lot 8: clear contact for the broker view (legacy clear rows pass through).
+      .map((row) => decryptProspectContact(this.vault, row as ProspectProjection));
     return new Map(rows.map((row) => [row.id, row]));
   }
 

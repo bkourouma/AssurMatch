@@ -150,7 +150,7 @@ export class DataRequestsService {
       updatedAt: now
     });
     // Identifiers and the type only: never the detail text.
-    this.deps.audit.write({
+    await this.deps.audit.writeAsync({
       actor,
       action: DataRequestAuditActions.created,
       targetType: "DataRequest",
@@ -211,7 +211,7 @@ export class DataRequestsService {
     const access = this.authorize(actor, "read", id);
     const record = await this.require(id);
     if (access === "full") {
-      this.deps.audit.write({ actor, action: DataRequestAuditActions.adminViewed, targetType: "DataRequest", targetId: record.id, result: "success", context: { reference: record.reference } });
+      await this.deps.audit.writeAsync({ actor, action: DataRequestAuditActions.adminViewed, targetType: "DataRequest", targetId: record.id, result: "success", context: { reference: record.reference } });
     }
     return this.toDetail(record, access, actor);
   }
@@ -222,7 +222,7 @@ export class DataRequestsService {
     const record = await this.require(id);
     const now = this.now();
     const updated = await this.move(actor, record, ["received"], "in_review", { status: "in_review", reviewedById: actor.actorId, reviewedAt: now }, now);
-    this.audit(actor, DataRequestAuditActions.taken, updated, { from: record.status });
+    await this.auditAsync(actor, DataRequestAuditActions.taken, updated, { from: record.status });
     return this.toDetail(updated, "full", actor);
   }
 
@@ -270,7 +270,7 @@ export class DataRequestsService {
       ...(record.status === "received" ? { reviewedById: actor.actorId, reviewedAt: now } : {})
     }, now);
     if (!moved) this.refuseTransition(actor, record, "concurrent_change", "The request changed while the preview was created");
-    this.audit(actor, DataRequestAuditActions.erasureStarted, moved, { batchId: batch.id, from: record.status });
+    await this.auditAsync(actor, DataRequestAuditActions.erasureStarted, moved, { batchId: batch.id, from: record.status });
     return this.toDetail(moved, "full", actor);
   }
 
@@ -291,7 +291,7 @@ export class DataRequestsService {
     const record = await this.require(id);
     const now = this.now();
     const updated = await this.move(actor, record, OPEN_STATUSES, to, { status: to, decidedById: actor.actorId, decidedAt: now, ...(note ? { decisionNote: note } : {}) }, now);
-    this.audit(actor, action, updated, { from: record.status, hasNote: Boolean(note) });
+    await this.auditAsync(actor, action, updated, { from: record.status, hasNote: Boolean(note) });
     const quote = await this.deps.quotes.findById(record.quoteRequestId).catch(() => undefined);
     if (quote && !quote.anonymizedAt) {
       // A pointer only: no decision note and no reason travel in the e-mail.
@@ -335,6 +335,20 @@ export class DataRequestsService {
     throw new ForbiddenException({ code, message: reason === "mfa_required" ? "MFA required" : "RBAC denied" });
   }
 
+  /** Lot 8 (FR-B2): fail-closed variant for the success paths (status changes, erasure start). */
+  private async auditAsync(actor: ActorContext, action: string, record: DataRequestRecord, context: Record<string, unknown>): Promise<void> {
+    await this.deps.audit.writeAsync({
+      actor,
+      action,
+      targetType: "DataRequest",
+      targetId: record.id,
+      result: "success",
+      // Reference, type and statuses only: never the visitor's detail or the decision note.
+      context: { reference: record.reference, type: record.type, ...context }
+    });
+  }
+
+  /** Refusals stay on write(): their callers are synchronous and throw right after (outbox covers a failure). */
   private audit(actor: ActorContext, action: string, record: DataRequestRecord, context: Record<string, unknown>, result: "success" | "refused" = "success"): void {
     this.deps.audit.write({
       actor,
