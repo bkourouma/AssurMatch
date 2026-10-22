@@ -72,6 +72,7 @@ describe("lot 5 (spec 071) routing controls on the runtime", () => {
   // Control 9 is exercised for real here: the shared harness otherwise relaxes it for the other suites.
   beforeEach(() => {
     process.env.ASSURMATCH_ROUTING_REQUIRE_RECORDED_CONTRACT = "true";
+    process.env[QUALITY_ENV] = "30";
   });
 
   afterEach(async () => {
