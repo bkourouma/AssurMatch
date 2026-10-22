@@ -1,5 +1,6 @@
 import { expect, test, type Browser, type Page } from "@playwright/test";
 import { changeStatus, createAndPublishQuoteForm, openCountry, openProduct, publishConsentText, setCatalogFlag } from "./support/admin";
+import { provisionActivationPrerequisites } from "./support/activation-prerequisites";
 import { activateWithMfa, e2ePassword, openAs, type BackOfficeAccount } from "./support/backoffice";
 import { e2eEnv } from "./support/env";
 import { loadWorld, saveWorld } from "./support/journey-state";
@@ -117,6 +118,13 @@ test("SN-03 produits Auto et Voyage, statut pilote du Sénégal et flags pays et
   await openAs(admin, superAdminAccount(), "/");
   const countryId = await openCountry(admin, "SN");
 
+  // Spec 070 (PRD 35/36): activation prerequisites of the checklist (product scoring rule, FR/EN disclaimers,
+  // SN routing rule, product and country attestations by the super admin with MFA). Idempotent: the product
+  // ones already exist after scenario-core; the SN routing rule and country attestations are new here.
+  const productIds: string[] = [];
+  for (const key of PRODUCTS) productIds.push(await openProduct(admin, key));
+  await provisionActivationPrerequisites(admin, { countryId, productIds, reason: REASON });
+
   // Products are global: scenario-core already opened them for CI, so these steps are idempotent.
   for (const key of PRODUCTS) {
     await openProduct(admin, key);
@@ -160,7 +168,13 @@ test("SN-04 la checklist du Sénégal ne liste plus que le courtier actif public
 
   await expect(checklist).toContainText("Au moins un courtier actif public");
   await expect(checklist).toContainText("Au moins une offre publiable");
+  // Count of ActivationChecklistService.countryActivationBlockers for a pilot SN: broker + offer. The spec 070
+  // controls (routing rule, scoring rules, FR/EN disclaimers, 4 country and 4 product attestations per product)
+  // were provisioned in SN-03, so they are green here; had they not been, 2 + 1 + 4 + 2 x 6 = 19 would show.
   await expect(checklist).toContainText("2 contrôle(s) bloquant(s)");
+  for (const provisioned of ["Au moins une regle de routage active", "Au moins une regle de scoring active", "Avertissement legal FR et EN", "Notifications testees", "Routage teste pour ce produit"]) {
+    await expect(checklist, `${provisioned} is provisioned`).not.toContainText(provisioned);
+  }
   for (const done of ["Formulaire publie", "Consentement publie", "Flag devis pays", "Flag comparaison pays", "Statut produit public", "Flag produit public", "Flag devis produit", "Regime reglementaire renseigne"]) {
     await expect(checklist, `${done} is done`).not.toContainText(done);
   }
