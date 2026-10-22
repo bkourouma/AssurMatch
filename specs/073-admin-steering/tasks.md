@@ -32,5 +32,5 @@
 - [x] T305 Tests : agrégats, RBAC revenus, périmètre, absence d'appel IA, rendu.
 
 ## Phase 3 — Validation (chef de lot)
-- [ ] T501 `npm run typecheck`, `npm run lint`, `NODE_ENV=test npm run test`, `npm run test:web`, `node scripts/ci/secret-scan.mjs`.
-- [ ] T502 Mise à jour de `docs/prd_coverage_map.md` (ligne dashboard admin / prospects) et statut de la spec.
+- [x] T501 `npm run typecheck`, `npm run lint`, `NODE_ENV=test npm run test`, `npm run test:web`, `node scripts/ci/secret-scan.mjs`.
+- [x] T502 Mise à jour de `docs/prd_coverage_map.md` (ligne dashboard admin / prospects) et statut de la spec.

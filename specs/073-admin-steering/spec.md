@@ -1,6 +1,6 @@
 # Feature Specification: Pilotage admin (KPI PRD §21, page Prospects, visites, alertes IA, contrôleurs admin non branchés)
 
-**Status**: Validated (lot 6 « Pilotage admin » mandaté par le superviseur le 2026-10-22 ; spec standard, aucun `[NEEDS CLARIFICATION]` ; hypothèse métier H5 appliquée et signalée)
+**Status**: Implemented (lot 6 « Pilotage admin » mandaté par le superviseur le 2026-10-22 ; spec standard, aucun `[NEEDS CLARIFICATION]` ; hypothèse métier H5 appliquée et signalée)
 **Input**: PRD §21 (dashboard admin plateforme), PRD complétion v0.3 H-01, H-08, H-09 ; specs 012 (dashboard), 036 (insights IA admin), 049 (anomalies de routage), 056 (consoles d'opérations), 060 (facturation B2B manuelle), 061 (alertes planifiées), 063 (contestations de leads).
 **Impacted surfaces**: Backend API (nouveau module de comptage des visites, console Prospects, extension du dashboard admin, route de pré-contrôle de routage), shared packages (`dashboard.contracts.ts`, `admin-operations.contracts.ts`, `visit-stats.contracts.ts`), base de données / Prisma (migration réservée `0036_admin_steering`, table `VisitCounter`), Back-office Plateforme/Admin (dashboard, `/prospects`, `/messaging`, `/routing`). **Web Publique Client : un seul montage minimal** (une balise de comptage sans UI, un fichier + une ligne de layout), nécessaire pour que le KPI « visiteurs » ne reste pas à zéro ; à signaler au superviseur. Back-office courtier : aucun changement. Les parcours visiteur (anonymes) et les parcours admin restent séparés.
 
