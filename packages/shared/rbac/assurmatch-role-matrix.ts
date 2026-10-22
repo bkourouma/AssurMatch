@@ -21,7 +21,9 @@ export const RolePermissions: Record<AssurMatchRole, string[]> = {
     // Spec 051 R13: creation and preparation of the partners of the admin's own countries. Licence
     // approval, document review, activation and application decisions stay compliance-only.
     "partners:read", "partners:create", "partners:update", "licenses:read", "licenses:create", "documents:read", "documents:create", "partner_applications:review"],
-  compliance_admin: ["partners:*", "partner_applications:*", "licenses:*", "documents:*", "consent:*", "offers:read", "quote_form_definitions:*", "quote_requests:*", "prospects:read", "lead_assignments:read", "routing_rules:read", "audit_logs:read", "retention:read", "retention:*"],
+  compliance_admin: ["partners:*", "partner_applications:*", "licenses:*", "documents:*", "consent:*", "offers:read", "quote_form_definitions:*", "quote_requests:*", "prospects:read", "lead_assignments:read", "routing_rules:read", "audit_logs:read", "retention:read", "retention:*",
+    // Lot 9 (spec 072): reads and decides the content; creating, editing and submitting stay with content_admin.
+    "content:read", "content:approve"],
   support_admin: ["users:read", "partners:read", "quote_requests:read", "prospects:read", "lead_assignments:read", "routing_rules:read", "audit_logs:read"],
   // Spec 052 R4: every plan manages its offers; owners and managers write, agents and read-only read.
   // Spec 053 R7: same split for the company profile, licences, coverage requests and the team.

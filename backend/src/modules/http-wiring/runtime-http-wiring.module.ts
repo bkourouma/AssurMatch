@@ -150,6 +150,8 @@ import { adminAuditLogQuerySchema } from "../../../../packages/shared/contracts/
 import { ADMIN_OPERATIONS_HTTP_CONTROLLERS } from "./admin-operations-http.controllers";
 // Spec 062 data requests
 import { DATA_REQUESTS_HTTP_CONTROLLERS } from "./data-requests-http.controllers";
+// Lot 9 (spec 072): content CMS routes.
+import { CONTENT_CMS_HTTP_CONTROLLERS } from "./content-cms-http.controllers";
 // Spec 062 messaging
 import { BrokerMessagingRoutes, LEAD_MESSAGING_HTTP_CONTROLLERS, registerBrokerMessagingRoutes } from "./lead-messaging-http.controllers";
 
@@ -2766,6 +2768,8 @@ Module({
     ...ADMIN_OPERATIONS_HTTP_CONTROLLERS,
     // Spec 062 data requests: visitor and admin routes (see data-requests-http.controllers.ts).
     ...DATA_REQUESTS_HTTP_CONTROLLERS,
+    // Lot 9 (spec 072): content CMS (admin /admin/content and public /public-content).
+    ...CONTENT_CMS_HTTP_CONTROLLERS,
     // Spec 062 messaging: visitor routes and the admin read-only route (see lead-messaging-http.controllers.ts).
     ...LEAD_MESSAGING_HTTP_CONTROLLERS,
     // Spec 051: last, after the static `partners/sla` and `partners/applications` routes.

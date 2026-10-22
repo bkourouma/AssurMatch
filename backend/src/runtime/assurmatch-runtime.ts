@@ -128,6 +128,8 @@ import { maybeBootstrapAdmin } from "./local-bootstrap-admin";
 import { AdminOperationsModule } from "../modules/admin-operations/admin-operations.module";
 // Spec 062 data requests
 import { DataRequestsModule, MemoryDataRequestsRepository, PrismaDataRequestsRepository } from "../modules/data-requests/data-requests.module";
+// Lot 9 (spec 072)
+import { ContentCmsModule, MemoryContentCmsRepository, PrismaContentCmsRepository } from "../modules/content-cms/content-cms.module";
 import type { DataRequestNotificationsPort } from "../modules/lead-messaging/lead-messaging.ports";
 
 export class AssurMatchRuntime {
@@ -180,6 +182,8 @@ export class AssurMatchRuntime {
   private readonly leadMessagingRepository = this.runtimeRepository(new PrismaLeadMessagingRepository(this.prisma)) ?? new MemoryLeadMessagingRepository();
   // Spec 062 data requests: visitor data-subject requests (memory instance owned here under test, see spec 046 note).
   private readonly dataRequestsRepository = this.runtimeRepository(new PrismaDataRequestsRepository(this.prisma)) ?? new MemoryDataRequestsRepository();
+  // Lot 9 (spec 072): content CMS entries.
+  private readonly contentCmsRepository = this.runtimeRepository(new PrismaContentCmsRepository(this.prisma)) ?? new MemoryContentCmsRepository();
   private readonly contactMessagesRepository = this.runtimeRepository(new PrismaContactMessagesRepository(this.prisma)) ?? new MemoryContactMessagesRepository();
   readonly leadRepositorySet = this.leadRepositories();
   private readonly brokerCrmConfig = { brokerCrmEnabled: process.env.ASSURMATCH_BROKER_CRM_ENABLED === "true" };
@@ -928,6 +932,11 @@ readonly enterprise = new EnterpriseService({
     notifications: this.dataRequestNotifications(),
     retention: this.dataRetention.service
   });
+  // Lot 9 (spec 072): minimal CMS of the Content Admin role (admin editing, public reading of published content).
+  readonly contentCms: ContentCmsModule = new ContentCmsModule({
+    audit: this.audit.writer,
+    repository: this.contentCmsRepository
+  });
 
   /**
    * The user administration entry point (`/admin/users` and the spec 051 partner invitation): the
@@ -1110,7 +1119,9 @@ readonly enterprise = new EnterpriseService({
       // Spec 062 messaging
       LeadMessagingRepository: this.leadMessagingRepository.mode,
       // Spec 062 data requests
-      DataRequestsRepository: this.dataRequestsRepository.mode
+      DataRequestsRepository: this.dataRequestsRepository.mode,
+      // Lot 9 (spec 072)
+      ContentCmsRepository: this.contentCmsRepository.mode
     };
   }
 
