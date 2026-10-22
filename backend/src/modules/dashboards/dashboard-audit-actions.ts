@@ -7,6 +7,8 @@ export const DashboardAuditActions = {
   adminDashboardRead: "dashboard.admin.read",
   adminDashboardRefused: "dashboard.admin.refused",
   adminExported: "dashboard.admin.exported",
+  // Lot 6 (spec 073 FR-023): revenue figures are read by super_admin only.
+  adminRevenueRead: "dashboard.admin.revenue.read",
   adminComplianceAlertsRead: "dashboard.admin.compliance_alerts.read",
   adminComplianceAlertsRefused: "dashboard.admin.compliance_alerts.refused"
 } as const;

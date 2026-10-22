@@ -219,6 +219,20 @@ export interface AdminDashboardData {
     other: number;
   };
   sensitiveFeatureFlags: Array<{ key: string; scopeType: string; scopeId: string | null; value: boolean }>;
+  // Lot 6 (spec 073 T304): additive KPI blocks; an older API omits them, the screen then shows "Non mesure".
+  visits?: { total: number; byPage: Array<{ page: string; total: number }> } | null;
+  visitToRequestRate?: number | null;
+  activeCountries?: number;
+  activeProducts?: number;
+  partnerSla?: { averageFirstActionMinutes: number | null; measured: number };
+  leadQuality?: { transmitted: number; disputed: number; accepted: number; rejected: number; disputeRate: number | null };
+  revenue?: { byCurrency: Array<{ currency: string; subscription: number; leads: number }> } | null;
+  revenueRestricted?: boolean;
+  aiEnabled?: boolean;
+  aiRestricted?: boolean;
+  aiSummary?: { insightId: string; generatedAt: string; status: string; excerpt: string | null } | null;
+  aiAlerts?: { pendingValidation: number; items: Array<{ insightId: string; type: string; createdAt: string; status: string }> } | null;
+  // Lot 6 (end)
 }
 
 export interface AdminUser {
@@ -1770,6 +1784,21 @@ export function updateAdminOffer(offerId: string, input: AdminOfferWriteInput) {
 export function runAdminOfferDecision(offerId: string, action: "submit" | "validate" | "reject" | "suspend", reason: string) {
   return writeAdminResult<AdminOfferDetailView>(offerPath(offerId, `/${action}`), "POST", { reason });
 }
+
+// Lot 6 (spec 073 T402/T403)
+export interface RoutingPrecheckResultData {
+  result: "eligible" | "not_eligible";
+  reasons: string[];
+  notifiedBrokers: false;
+  transmittedLead: false;
+}
+
+/** Simulation only: the server notifies no broker and transmits no lead. */
+export function runRoutingPrecheck(input: { partnerTenantId: string; countryId: string; productId: string; consentRecordId?: string }) {
+  return writeAdmin<RoutingPrecheckResultData>("/admin/routing/precheck", "POST", input);
+}
+
+// Lot 6 (end)
 
 // Lot 9 (imports)
 import type {

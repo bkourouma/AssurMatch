@@ -53,6 +53,10 @@ import { AdminUsersController } from "../modules/users/admin-users.controller";
 import { PartnerTenantStatusService } from "../modules/partners/partner-tenant-status.service";
 import { ProductsModule } from "../modules/products/products.module";
 import { PublicStatsModule } from "../modules/public-stats/public-stats.module";
+// Lot 6
+import { MemoryVisitStatsRepository, PrismaVisitStatsRepository } from "../modules/visit-stats/visit-stats.repository";
+import { VisitStatsModule } from "../modules/visit-stats/visit-stats.module";
+// Lot 6 (end)
 import { WaitlistModule } from "../modules/waitlist/waitlist.module";
 import { MemoryWaitlistRepository, PrismaWaitlistRepository } from "../modules/waitlist/waitlist.repository";
 import { ProspectsModule } from "../modules/prospects/prospects.module";
@@ -778,6 +782,14 @@ readonly enterprise = new EnterpriseService({
     decisions: this.leads.decisions,
     consent: { findRecord: (id: string) => this.consent.service.findRecord(id) },
     prospects: { find: (id: string) => this.prospects.service.require(id).catch(() => undefined) },
+    // Lot 6
+    prospectsList: {
+      list: () => this.prospects.service.list(),
+      require: (id: string) => this.prospects.service.require(id),
+      // Lot 8: blind index + legacy fingerprint lookup of the admin contact search.
+      findIdsByContact: (kind, value) => this.prospects.service.findIdsByContact(kind, value)
+    },
+    // Lot 6 (end)
     offers: { find: (id: string) => this.offers.repository.require(id).catch(() => undefined) },
     documents: { list: async (actor, quoteRequestId) => (await this.quoteDocuments.adminList(actor, quoteRequestId)).items },
     eligibility: this.leads.eligibility,
@@ -803,6 +815,24 @@ readonly enterprise = new EnterpriseService({
     brokerCrmConfig: this.brokerCrmConfig,
     // Spec 064: Enterprise agency display filter (lazy: the enterprise service is built after this module).
     agencyScope: { resolve: (actor: ActorContext, agencyId: string | undefined): Promise<AdvisorAgencyPredicate | undefined> => this.enterprise.agencyScopeFor(actor, agencyId) },
+    // Lot 6 (spec 073 T302): lazy read-only ports (visit counter, billing, disputes and AI are built after this module).
+    adminVisitStats: {
+      isEnabled: () => (process.env.ASSURMATCH_VISIT_COUNTER_ENABLED ?? "true").trim().toLowerCase() !== "false",
+      totalsBetween: (from: Date, to: Date) => this.visitStats.service.totalsBetween(from, to)
+    },
+    adminInvoices: { list: (actor: ActorContext, query: Record<string, never>) => this.billing.invoicing.list(actor, query) },
+    adminLeadDisputes: { listDisputes: (filter: { from?: Date | undefined; to?: Date | undefined }) => this.leads.crmActivityRepository.listDisputes(filter) },
+    adminAiInsights: {
+      list: async () => (await this.aiGateway.listForSurface("admin_platform", 200)).map((record) => ({
+        id: record.id,
+        assistType: record.assistType,
+        humanValidationStatus: record.humanValidationStatus,
+        outputText: record.outputText,
+        createdAt: record.createdAt,
+        actorId: record.actorId
+      }))
+    },
+    // Lot 6 (end)
     // Lot 3 (spec 069 FR-001/FR-003) begin: billing tariff for the estimated lead cost, agencies of the tenant, spec 055 proposals.
     leadPricing: async (plan, countryCode) => {
       const prices = await this.billing.plans.list({ actorId: "system:broker-dashboard", roles: ["super_admin"], mfaVerified: true });
@@ -1131,6 +1161,9 @@ readonly enterprise = new EnterpriseService({
     this.offers.repository,
     this.redis.client
   );
+  // Lot 6 (spec 073 T203): aggregated page-view counter, no personal data.
+  readonly visitStats = new VisitStatsModule(this.runtimeRepository(new PrismaVisitStatsRepository(this.prisma)) ?? new MemoryVisitStatsRepository());
+  // Lot 6 (end)
   readonly publicCountryDirectory = new PublicCountryDirectoryService(this.countriesRepository, this.redis.client);
   private readonly dataRetentionRepository = this.runtimeRepository(new PrismaDataRetentionRepository(this.prisma));
   private readonly retentionSubjectsRepository = this.runtimeRepository(new PrismaRetentionSubjectsRepository(this.prisma));

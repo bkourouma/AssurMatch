@@ -5,6 +5,8 @@ import {
   adminContactMessageStatusUpdateSchema,
   adminOperationsLeadAssignmentQuerySchema,
   adminOperationsQuoteRequestQuerySchema,
+  adminProspectContactSearchSchema,
+  adminProspectsQuerySchema,
   adminQuoteReviewDecisionSchema,
   adminRoutingHistoryQuerySchema
 } from "../../../../packages/shared/contracts/admin-operations.contracts";
@@ -81,6 +83,21 @@ export class AdminOperationsHttpController {
   exportAuditLogs(request: AssurMatchHttpRequest, query: Record<string, string>) {
     return this.runtime.adminOperations.auditLogs.export(protectedActorFromRequest(request), parseHttpInput(adminAuditLogQuerySchema, query ?? {}));
   }
+
+  // Lot 6 (spec 073 FR-001): prospects console.
+  prospects(request: AssurMatchHttpRequest, query: Record<string, string>) {
+    return this.runtime.adminOperations.prospects.list(protectedActorFromRequest(request), parseHttpInput(adminProspectsQuerySchema, query ?? {}));
+  }
+
+  /** Lot 6 x lot 8: exact e-mail / phone in the POST body only (never a URL or a query string). */
+  prospectsByContact(request: AssurMatchHttpRequest, body: unknown) {
+    return this.runtime.adminOperations.prospects.searchByContact(protectedActorFromRequest(request), parseHttpInput(adminProspectContactSearchSchema, body ?? {}));
+  }
+
+  prospect(id: string, request: AssurMatchHttpRequest) {
+    return this.runtime.adminOperations.prospects.detail(protectedActorFromRequest(request), idParam(id));
+  }
+  // Lot 6 (end)
 }
 
 export class AdminRoutingHistoryHttpController {
@@ -107,6 +124,11 @@ decorate(AdminOperationsHttpController, "review", [Post("quote-requests/:id/revi
 decorate(AdminOperationsHttpController, "leadAssignments", [Get("lead-assignments") as MethodDecoratorFactory], [[0, Req() as ParamDecoratorFactory], [1, Query() as ParamDecoratorFactory]]);
 decorate(AdminOperationsHttpController, "auditLogs", [Get("audit-logs") as MethodDecoratorFactory], [[0, Req() as ParamDecoratorFactory], [1, Query() as ParamDecoratorFactory]]);
 decorate(AdminOperationsHttpController, "exportAuditLogs", [Get("audit-logs/export") as MethodDecoratorFactory], [[0, Req() as ParamDecoratorFactory], [1, Query() as ParamDecoratorFactory]]);
+// Lot 6
+decorate(AdminOperationsHttpController, "prospects", [Get("prospects") as MethodDecoratorFactory], [[0, Req() as ParamDecoratorFactory], [1, Query() as ParamDecoratorFactory]]);
+decorate(AdminOperationsHttpController, "prospectsByContact", [Post("prospects/contact-search") as MethodDecoratorFactory, HttpCode(200) as MethodDecoratorFactory], [[0, Req() as ParamDecoratorFactory], [1, Body() as ParamDecoratorFactory]]);
+decorate(AdminOperationsHttpController, "prospect", [Get("prospects/:id") as MethodDecoratorFactory], [[0, Param("id") as ParamDecoratorFactory], [1, Req() as ParamDecoratorFactory]]);
+// Lot 6 (end)
 
 protectedController("admin/routing", AdminRoutingHistoryHttpController);
 decorate(AdminRoutingHistoryHttpController, "history", [Get("history") as MethodDecoratorFactory], [[0, Req() as ParamDecoratorFactory], [1, Query() as ParamDecoratorFactory]]);

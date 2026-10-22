@@ -2442,6 +2442,18 @@ model TrustedDevice {
   @@index([userId, revokedAt])
 }
 
+// Lot 6 (spec 073 FR-006, hypothesis H5)
+/// Page-view counter per UTC day and page key. Aggregated only: no IP, user agent, referrer,
+/// visitor identifier or cookie is ever stored.
+model VisitCounter {
+  day   DateTime @db.Date
+  page  String
+  count Int      @default(0)
+
+  @@id([day, page])
+}
+// Lot 6 (end)
+
 // Lot 10 (spec 076): SMS / WhatsApp retry outbox and generic outbound CRM connector.
 /// Spec 076: one SMS / WhatsApp message waiting for a (re)try. Recipient and body are encrypted at
 /// rest and wiped (empty string) as soon as the row reaches a terminal status.

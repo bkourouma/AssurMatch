@@ -1,4 +1,4 @@
-import { legacyPiiFingerprint, type PiiField, type PiiVault } from "./pii-vault";
+import { legacyPiiFingerprint, type BlindIndexKind, type PiiField, type PiiVault } from "./pii-vault";
 
 /**
  * Lot 8 (spec 075 FR-A6): the only file that knows which Prospect and QuoteRequest columns are
@@ -60,6 +60,20 @@ export function prospectContactMatch(vault: PiiVault, contact: Pick<ProspectCont
   const phoneBlindIndex = vault.blindIndex("phone", contact.phoneNormalized);
   if (!emailBlindIndex || !phoneBlindIndex) return legacy;
   return { OR: [{ emailBlindIndex, phoneBlindIndex }, legacy] };
+}
+
+/**
+ * Lot 6 x lot 8 (spec 073 FR-003): where fragment of the rows carrying one exact e-mail, or one
+ * exact phone (admin contact search). Encrypted rows by blind index, legacy clear rows by the old
+ * fingerprint, during the whole transition; the legacy fingerprint alone without a blind index key.
+ * Both values are computed in memory and reach the database only as query parameters.
+ */
+export function prospectContactLookup(vault: PiiVault, kind: BlindIndexKind, normalizedValue: string): Record<string, unknown> {
+  const fingerprint = legacyPiiFingerprint(normalizedValue);
+  const legacy = kind === "email" ? { emailFingerprint: fingerprint } : { phoneFingerprint: fingerprint };
+  const blindIndex = vault.blindIndex(kind, normalizedValue);
+  if (!blindIndex) return legacy;
+  return { OR: [kind === "email" ? { emailBlindIndex: blindIndex } : { phoneBlindIndex: blindIndex }, legacy] };
 }
 
 /**

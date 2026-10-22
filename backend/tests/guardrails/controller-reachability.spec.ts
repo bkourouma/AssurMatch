@@ -77,8 +77,6 @@ export const INTERNAL_ONLY: Record<string, string> = {
     "Superseded: /admin/routing/anomalies and /analyze are served by AdminRoutingAnomaliesHttpController.",
   "AdminRoutingAnomaliesController.list":
     "Superseded: /admin/routing/anomalies and /analyze are served by AdminRoutingAnomaliesHttpController.",
-  "AdminRoutingPrecheckController.precheck":
-    "Internal: the routing precheck is evaluated by the routing engine itself and shown read-only in the activation checklist; no standalone admin route is planned (spec 049/056).",
   "AdminUsersController.createPartnerUser":
     "Superseded: broker users are invited from the partner record (POST /admin/partners/:id/users, spec 051) or by the owner (broker team, spec 053).",
   "AuthController.activate":
