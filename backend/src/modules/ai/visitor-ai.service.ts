@@ -20,6 +20,14 @@ export interface VisitorAiOfferSource {
   compare(offerIds: string[], countryId: string, productId: string): Promise<OfferCompareResponse>;
 }
 
+/**
+ * Lot 2 (spec 068): fields of the published quote form of a country and product, in the requested
+ * language when published, otherwise in any published language. Empty when no form is published.
+ */
+export interface VisitorAiFormFieldSource {
+  fields(countryId: string, productId: string, language: string): Promise<Array<{ key: string; label: string }>>;
+}
+
 /** Comparison rows that rank, score or identify a broker are never sent to the model. */
 const EXCLUDED_COMPARE_ROWS: ReadonlySet<string> = new Set(["partner", "score", "sponsored", "validUntil", "guaranteeLevel"]);
 
@@ -47,6 +55,8 @@ export interface VisitorAiDeps {
   countries: CountriesService;
   products: ProductsService;
   offers?: VisitorAiOfferSource | undefined;
+  /** Lot 2 (spec 068): when set, `visitor_form_help` only accepts fields of the published form. */
+  formFields?: VisitorAiFormFieldSource | undefined;
   hourlyLimit?: number | undefined;
 }
 
@@ -75,11 +85,13 @@ export class VisitorAiService {
     const offerInput = product
       ? await this.offerInput(assistType, { offerId, offerIds }, country.id, product.id, country.currency)
       : {};
+    // Lot 2 (spec 068): the label comes from the published form, never from the client.
+    const fieldInput = product && assistType === "visitor_form_help" ? await this.formHelpInput(input, country.id, product.id, language) : {};
     const record = await this.deps.gateway.run({
       assistType,
       surface: "visitor",
       actor,
-      input: { ...input, ...offerInput, countryCode: country.isoCode, ...(product ? { productKey: product.key } : {}) },
+      input: { ...input, ...offerInput, ...fieldInput, countryCode: country.isoCode, ...(product ? { productKey: product.key } : {}) },
       language,
       target: { type: "visitor_session", id: ipHash },
       scope: {
@@ -114,6 +126,14 @@ export class VisitorAiService {
       };
     }
     return {};
+  }
+
+  private async formHelpInput(input: Record<string, unknown>, countryId: string, productId: string, language: string): Promise<Record<string, unknown>> {
+    if (!this.deps.formFields) return {};
+    const fields = await this.deps.formFields.fields(countryId, productId, language);
+    const field = fields.find((candidate) => candidate.key === input.fieldKey);
+    if (!field) throw new Error("Field is not publicly available in the published form");
+    return { fieldLabel: field.label };
   }
 
   async read(id: string, actor: ActorContext): Promise<AiInteraction> {

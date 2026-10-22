@@ -305,6 +305,13 @@ export class AssurMatchRuntime {
     products: this.products.service,
     // Lot 2 (spec 068): the explainers read published offers only, through the public catalogue
     // visibility rules (lazy lambdas: `offers` and `publicOfferContext` are resolved at call time).
+    formFields: {
+      fields: async (countryId, productId, language) => {
+        const published = (await this.quoteForms.service.list()).filter((form) => form.status === "published" && form.countryId === countryId && form.productId === productId);
+        const form = published.find((candidate) => candidate.language === language) ?? published[0];
+        return (form?.fields ?? []).map((field) => ({ key: field.key, label: field.label }));
+      }
+    },
     offers: {
       detail: async (offerId, countryId, productId) => {
         const context = await this.visitorAiOfferContext(countryId, productId);

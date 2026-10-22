@@ -232,18 +232,23 @@ describe("visitor offer explainers runtime HTTP", () => {
     harness = await createRuntimeHttpHarness();
     const seed = await seedPublicRuntime(harness.runtime);
     await openAi(harness, seed);
-    const body = { countryCode: "CI", productKey: "auto", fieldKey: "vehicle_use", fieldLabel: "Usage du vehicule" };
+    const body = { countryCode: "CI", productKey: "auto", fieldKey: "vehicle_use", fieldLabel: "Libelle fourni par le client" };
     const queued = aiInteractionSchema.parse(await readJson(await post(harness, "visitor_form_help", body)));
     expect(queued.status).toBe("queued");
     await harness.runtime.aiGateway.processPending();
     const done = await readInteraction(harness, queued.id);
     expect(done.status).toBe("completed");
-    expect(done.outputText).toContain("Usage du vehicule");
+    // Lot 2: the label is the one of the published form, not the client's.
+    expect(done.outputText).toContain("Usage");
+    expect(done.outputText).not.toContain("Libelle fourni par le client");
     expect(done.outputText).toContain(done.disclaimer);
 
     const english = aiInteractionSchema.parse(await readJson(await post(harness, "visitor_form_help", { ...body, language: "en" })));
     await harness.runtime.aiGateway.processPending();
     expect((await readInteraction(harness, english.id)).outputText).toContain("helps the partner broker");
+
+    const unknown = await post(harness, "visitor_form_help", { ...body, fieldKey: "not_in_the_form" });
+    expect(unknown.status).toBe(404);
 
     const product = await harness.runtime.products.service.require(seed.product.id);
     await harness.runtime.products.service.update(product.id, { flags: { ...product.flags, product_ai_form_assistant_enabled: false }, reason: "close product ai" }, seed.admin);
