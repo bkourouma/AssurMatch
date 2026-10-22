@@ -12,14 +12,14 @@ import { superAdminAccount } from "./support/world";
 //         once, a non-https URL is refused, an origin outside the partner allow-list is refused, a
 //         second connector for the partner is a conflict, and support_admin is refused (403)
 //   CH-02 GET /admin/messaging/outbox answers with metadata only; a role without audit access is refused
-//   CH-03 sms_enabled, whatsapp_enabled and crm_connector_enabled cannot be switched on with PATCH (403)
+//   CH-03 sms_enabled, whatsapp_enabled, crm_connector_enabled, partner_api_enabled and partner_webhooks_enabled cannot be switched on with PATCH (403)
 // No channel flag is opened here.
 
 test.describe.configure({ mode: "serial" });
 
 const suffix = uniqueSuffix();
 const REASON = "Parcours E2E lot 11c - canaux";
-const SENSITIVE_CHANNEL_FLAGS = ["sms_enabled", "whatsapp_enabled", "crm_connector_enabled"] as const;
+const SENSITIVE_CHANNEL_FLAGS = ["sms_enabled", "whatsapp_enabled", "crm_connector_enabled", "partner_api_enabled", "partner_webhooks_enabled"] as const;
 
 let superAdmin: BackOfficeAccount;
 let support: BackOfficeAccount;
@@ -142,7 +142,7 @@ test("CH-02 GET /admin/messaging/outbox : métadonnées seulement, rôle sans ac
   expectStatus(await api(undefined, "GET", "/admin/messaging/outbox"), 401, "GET outbox without session");
 });
 
-test("CH-03 sms_enabled, whatsapp_enabled et crm_connector_enabled ne sont pas activables par PATCH", async ({ browser }) => {
+test("CH-03 les 5 flags de canaux et d'API partenaire ne sont pas activables par PATCH", async ({ browser }) => {
   const token = await adminToken(browser, superAdmin);
   const flagsResponse = await api(token, "GET", "/admin/feature-flags");
   expectStatus(flagsResponse, 200, "list feature flags");
@@ -164,7 +164,7 @@ test("CH-03 sms_enabled, whatsapp_enabled et crm_connector_enabled ne sont pas a
       expect(unknown.status).toBeLessThan(500);
     }
   }
-  expect(patched, "at least one channel flag is persisted and was refused by PATCH").toBeGreaterThan(0);
+  expect(patched, "every channel flag is persisted by the seed and was refused (403) by PATCH").toBe(SENSITIVE_CHANNEL_FLAGS.length);
 
   // Still closed after the refusals.
   const after = await api(token, "GET", "/admin/feature-flags");
