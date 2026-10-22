@@ -300,6 +300,8 @@ enum RoutingRuleMode {
   exclusive
   manual
   multi_send
+  /// Lot 5 (spec 071): the AI suggests one eligible broker, a human validates (never applied alone).
+  ai_assisted
 }
 
 enum RoutingRuleStatus {
@@ -1744,9 +1746,82 @@ model RoutingDecision {
   /// Spec 052 R7: offer chosen by the visitor and whether its broker was retained (`retained|unavailable|none`).
   selectedOfferId         String?
   selectedOfferOutcome    String?
+  /// Lot 5 (spec 071): outcome of checks 9-12 (lead quality score, degraded candidates, AI suggestion).
+  controlDetails          Json?
   createdAt               DateTime @default(now())
 
   @@index([quoteRequestId, createdAt])
+}
+
+/// Lot 5 (spec 071): commercial subscription state of a broker, read by routing check 11 (plan status) and
+/// check 9 (contract validity window). No row = active with no expiry (legacy partners keep routing).
+model PartnerSubscription {
+  partnerTenantId   String    @id
+  /// active | suspended | cancelled
+  status            String    @default("active")
+  /// Contract validity end set by finance; null = no expiry. A recorded PartnerContract is still required.
+  contractExpiresAt DateTime?
+  reason            String
+  updatedById       String?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @default(now())
+}
+
+/// Lot 5 (spec 071) G-06: plan change requested by the broker owner, decided by an admin, effective next cycle.
+model PlanChangeRequest {
+  id              String    @id @default(uuid())
+  partnerTenantId String
+  currentPlan     String
+  requestedPlan   String
+  /// pending | accepted | refused | cancelled
+  status          String    @default("pending")
+  justification   String
+  requestedById   String?
+  decidedById     String?
+  decidedAt       DateTime?
+  decisionReason  String?
+  /// First day (UTC) of the cycle following the acceptance.
+  effectiveAt     DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @default(now())
+
+  @@index([partnerTenantId, status])
+  @@index([status, createdAt])
+}
+
+/// Lot 5 (spec 071) H4: optional monthly add-on package (api | white_label | ai) priced per plan and country.
+/// Disabled by default: a price row only applies when `enabled` is true.
+model BillingAddOnPrice {
+  id            String   @id @default(uuid())
+  kind          String
+  plan          String
+  countryCode   String
+  monthlyAmount Float    @default(0)
+  enabled       Boolean  @default(false)
+  currency      String   @default("XOF")
+  reason        String
+  updatedById   String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @default(now())
+
+  @@unique([kind, plan, countryCode])
+}
+
+/// Lot 5 (spec 071) H4: add-on assigned to one broker by finance (audited); billed on the monthly draft while active.
+model PartnerAddOn {
+  id              String    @id @default(uuid())
+  partnerTenantId String
+  kind            String
+  /// active | ended
+  status          String    @default("active")
+  reason          String
+  assignedById    String?
+  endedById       String?
+  endedAt         DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @default(now())
+
+  @@index([partnerTenantId, status])
 }
 
 model QuoteAISummary {

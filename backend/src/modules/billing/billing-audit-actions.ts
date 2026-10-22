@@ -29,7 +29,19 @@ export const BillingAuditActions = {
   disputeDecided: "billing.dispute.decided",
   disputeDecisionRefused: "billing.dispute.decision_refused",
   disputeCreditNoteIssued: "billing.dispute.credit_note_issued",
-  disputeNotificationFailed: "billing.dispute.notification_failed"
+  disputeNotificationFailed: "billing.dispute.notification_failed",
+  // Lot 5 (spec 071) - H4 setup fee and add-ons, subscription state, G-06 plan change requests.
+  setupFeeBilled: "billing.setup_fee.billed",
+  addOnPriceChanged: "billing.add_on_price.changed",
+  addOnAssigned: "billing.add_on.assigned",
+  addOnEnded: "billing.add_on.ended",
+  addOnRefused: "billing.add_on.refused",
+  subscriptionChanged: "billing.subscription.changed",
+  subscriptionRefused: "billing.subscription.refused",
+  planChangeRequested: "billing.plan_change.requested",
+  planChangeCancelled: "billing.plan_change.cancelled",
+  planChangeDecided: "billing.plan_change.decided",
+  planChangeRefused: "billing.plan_change.refused"
 } as const;
 
 export type BillingAuditAction = (typeof BillingAuditActions)[keyof typeof BillingAuditActions];
