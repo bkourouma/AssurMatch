@@ -3,8 +3,18 @@
 import { useLocale, useMessages, useTranslations } from "next-intl";
 import { useEffect, useRef, useState, type FormEvent, type RefObject } from "react";
 import { Link } from "../../i18n/navigation";
-import { quoteDocumentUploadEnabled, submitPublicQuoteRequest, type PublicPhoneRule, type PublicQuoteFormField, type PublicQuoteFormState, type PublicQuoteLanguage } from "../lib/public-api";
+import {
+  quoteDocumentUploadEnabled,
+  submitPublicQuoteRequest,
+  uploadQuoteDocument,
+  type PublicPhoneRule,
+  type PublicQuoteFormField,
+  type PublicQuoteFormState,
+  type PublicQuoteLanguage
+} from "../lib/public-api";
+import { defaultDocumentLabel, formatNameList, joinPersonName, readMarketingSource } from "../lib/quote-journey";
 import { visitorAiAnswers } from "../lib/visitor-ai-answers";
+import { QuoteDocumentsStep, type StagedDocument } from "./forms/quote-documents-step";
 import { InitialsTile } from "./journey/tiles";
 import { IndicativeOfferNotice } from "./public-journey";
 import { VisitorAiAssistant } from "./visitor-ai-assistant";
@@ -17,6 +27,7 @@ import { IconTile } from "./ui/icon-tile";
 import { Notice } from "./ui/notice";
 import { ProgressBar } from "./ui/progress-bar";
 import { publicIssuingAuthority } from "../../../../packages/shared/contracts/licence-issuer";
+import type { QuoteOptionsResponse } from "../../../../packages/shared/contracts/quote.contracts";
 import "../styles/pages/quote.css";
 
 /** Identity of the broker resolved for a preselected offer (spec 050, decision D4). */
@@ -158,8 +169,14 @@ function StepHeading({ index, legend, headingRef }: { index: number; legend: str
 
 type ReviewRow = { label: string; value: string };
 
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+type StepId = "need" | "contact" | "documents" | "consent";
+
 interface ResponsibleBrokerBlockProps {
   broker?: ResponsibleBrokerInfo | undefined;
+  /** Spec 067 H2: name of the broker the visitor chose directly (no offer selected). */
+  chosenBrokerName?: string | undefined;
   hasSelectedOffer: boolean;
   productName: string;
   countryName: string;
@@ -172,8 +189,20 @@ interface ResponsibleBrokerBlockProps {
  * resolves it. The wording stays conditional: routing may still hand the request to another eligible
  * broker, which the confirmation then says.
  */
-function ResponsibleBrokerBlock({ broker, hasSelectedOffer, productName, countryName }: ResponsibleBrokerBlockProps) {
+function ResponsibleBrokerBlock({ broker, chosenBrokerName, hasSelectedOffer, productName, countryName }: ResponsibleBrokerBlockProps) {
   const t = useTranslations("QuoteForm");
+  if (!hasSelectedOffer && chosenBrokerName) {
+    return (
+      <div className="am-quote-broker__named">
+        <InitialsTile name={chosenBrokerName} />
+        <div className="am-quote-broker__text">
+          <p>
+            <BackendText>{t("brokerChosen", { partner: chosenBrokerName })}</BackendText>
+          </p>
+        </div>
+      </div>
+    );
+  }
   if (!hasSelectedOffer) {
     return <p className="am-quote-broker__text">{t("brokerConfirm.routing", { product: productName, country: countryName })}</p>;
   }
@@ -205,6 +234,8 @@ export function QuoteFormShell({
   language,
   quoteForm,
   selectedOfferId,
+  additionalOfferIds = [],
+  quoteOptions,
   responsibleBroker,
   formAction
 }: {
@@ -216,6 +247,10 @@ export function QuoteFormShell({
   language: PublicQuoteLanguage;
   quoteForm: PublicQuoteFormState;
   selectedOfferId?: string | undefined;
+  /** Spec 067 COMP-009: the offers after the first one (at most 2), honoured only with the visitor's explicit authorisation. */
+  additionalOfferIds?: string[] | undefined;
+  /** Spec 067: `null` or absent when the options could not be read; the form then behaves as a single-offer, no-documents form. */
+  quoteOptions?: QuoteOptionsResponse | null | undefined;
   responsibleBroker?: ResponsibleBrokerInfo | undefined;
   /**
    * Server action bound to this country/product/offer (spec 050, decision D6): the browser's native
@@ -250,15 +285,36 @@ export function QuoteFormShell({
   const formRef = useRef<HTMLFormElement>(null);
   const needHeadingRef = useRef<HTMLHeadingElement>(null);
   const contactHeadingRef = useRef<HTMLHeadingElement>(null);
+  const documentsHeadingRef = useRef<HTMLHeadingElement>(null);
   const verifyHeadingRef = useRef<HTMLHeadingElement>(null);
+
+  // Spec 067: what the server says about this request. Everything below is a convenience, the server decides.
+  const options = quoteOptions ?? null;
+  const brokerChoices = options?.brokers ?? [];
+  const offerPartnerNames = new Map<string, string>();
+  for (const offer of options?.offers ?? []) {
+    const name = offer.partnerName?.trim();
+    if (name) offerPartnerNames.set(offer.offerId.toLowerCase(), name);
+  }
+  const primaryPartnerName = selectedOfferId ? offerPartnerName ?? offerPartnerNames.get(selectedOfferId.toLowerCase()) : undefined;
+  const extraOfferIds = selectedOfferId ? additionalOfferIds.filter((id) => id.toLowerCase() !== selectedOfferId.toLowerCase()) : [];
+  // Only offers whose broker the server names can be listed in the authorisation: the visitor must read every name.
+  const namedExtraOfferIds = extraOfferIds.filter((id) => offerPartnerNames.has(id.toLowerCase()));
+  const multiOffersMode = Boolean(options?.multiBrokerAvailable) && Boolean(primaryPartnerName) && namedExtraOfferIds.length > 0;
+  const multiOfferNames = multiOffersMode
+    ? Array.from(new Set([primaryPartnerName ?? "", ...namedExtraOfferIds.map((id) => offerPartnerNames.get(id.toLowerCase()) ?? "")].filter(Boolean)))
+    : [];
+  const showPreferredBroker = !selectedOfferId && brokerChoices.length > 0;
+  const documentsEnabledForRequest = options?.documentUploadEnabled === true;
 
   // Progressive enhancement (D6): both flip to their real value only after hydration, so a visitor
   // without JavaScript sees every fieldset stacked on one page, exactly as the no-JS fallback promises.
   const [jsEnabled, setJsEnabled] = useState(false);
-  const [step, setStep] = useState<1 | 2 | 3>(1);
+  const [step, setStep] = useState<StepId>("need");
+  const [stagedDocuments, setStagedDocuments] = useState<StagedDocument[]>([]);
   const [needErrors, setNeedErrors] = useState<Record<string, string>>({});
   const [contactErrors, setContactErrors] = useState<Record<string, string>>({});
-  const [review, setReview] = useState<{ need: ReviewRow[]; name: string; email: string; phone: string } | null>(null);
+  const [review, setReview] = useState<{ need: ReviewRow[]; name: string; email: string; phone: string; chosenBrokerName?: string | undefined } | null>(null);
   // Product answers (allow-listed, no contact or consent data) handed to the optional reading
   // assistants. They only read it when the visitor presses their button, so tracking it costs no API call.
   const [assistAnswers, setAssistAnswers] = useState<Record<string, unknown>>({});
@@ -270,7 +326,17 @@ export function QuoteFormShell({
     /** The product accepts optional documents: only then does the tracking link say so. */
     documentsEnabled?: boolean;
     selectedOfferPartnerRetained?: boolean | null;
+    chosenPartnerRetained?: boolean | null;
+    requestedPartnerCount?: number;
+    retainedPartnerCount?: number;
+    additionalOffersIgnored?: boolean;
+    /** Optional documents staged in the form: how many went up after the request was saved. */
+    documentsSent?: number;
+    documentsFailed?: number;
   }>({ status: "idle" });
+
+  // The documents step exists only with JavaScript (the files live in memory) and when the server allows documents.
+  const documentsStep = jsEnabled && documentsEnabledForRequest;
 
   useEffect(() => {
     setJsEnabled(true);
@@ -282,7 +348,14 @@ export function QuoteFormShell({
   useEffect(() => {
     if (shownStep.current === step) return;
     shownStep.current = step;
-    const target = step === 1 ? needHeadingRef.current : step === 2 ? contactHeadingRef.current : verifyHeadingRef.current;
+    const target =
+      step === "need"
+        ? needHeadingRef.current
+        : step === "contact"
+          ? contactHeadingRef.current
+          : step === "documents"
+            ? documentsHeadingRef.current
+            : verifyHeadingRef.current;
     target?.focus();
   }, [step]);
 
@@ -322,7 +395,7 @@ export function QuoteFormShell({
     return errors;
   }
 
-  function buildReview(): { need: ReviewRow[]; name: string; email: string; phone: string } | null {
+  function buildReview(): { need: ReviewRow[]; name: string; email: string; phone: string; chosenBrokerName?: string | undefined } | null {
     if (!formRef.current) return null;
     const formData = new FormData(formRef.current);
     const need: ReviewRow[] = quoteForm.fields
@@ -333,11 +406,15 @@ export function QuoteFormShell({
         const shown = value && field.type === "select" ? optionLabel(optionLabels, field, value) : value;
         return { label: field.label, value: shown || t("reviewEmpty") };
       });
+    const preferredId = String(formData.get("preferredPartnerId") ?? "").trim();
+    const chosenBrokerName = showPreferredBroker && preferredId ? brokerChoices.find((broker) => broker.id === preferredId)?.displayName : undefined;
     return {
       need,
-      name: String(formData.get("displayName") ?? "").trim() || t("reviewEmpty"),
+      name:
+        joinPersonName(String(formData.get("firstName") ?? ""), String(formData.get("lastName") ?? "")) || t("reviewEmpty"),
       email: String(formData.get("email") ?? "").trim(),
-      phone: String(formData.get("phone") ?? "").trim()
+      phone: String(formData.get("phone") ?? "").trim(),
+      chosenBrokerName
     };
   }
 
@@ -359,15 +436,20 @@ export function QuoteFormShell({
       focusFirstInvalidField(Object.keys(errors).map((key) => `answer_${key}`));
       return;
     }
-    setStep(2);
+    setStep("contact");
   }
 
   function goToStep1() {
-    setStep(1);
+    setStep("need");
   }
 
   function goToStep2FromReview() {
-    setStep(2);
+    setStep("contact");
+  }
+
+  function goToConsent() {
+    setReview(buildReview());
+    setStep("consent");
   }
 
   function goToReview() {
@@ -376,8 +458,11 @@ export function QuoteFormShell({
       focusFirstInvalidField(["email", "phone"].filter((name) => name in errors));
       return;
     }
-    setReview(buildReview());
-    setStep(3);
+    if (documentsStep) {
+      setStep("documents");
+      return;
+    }
+    goToConsent();
   }
 
   async function submit(event: FormEvent<HTMLFormElement>) {
@@ -387,7 +472,7 @@ export function QuoteFormShell({
     if (Object.keys(needIssues).length > 0 || Object.keys(contactIssues).length > 0) {
       // A field left blank while the visitor jumped straight to consent (e.g. keyboard "Enter"):
       // send them back to the first step in error rather than submitting an incomplete request.
-      setStep(Object.keys(needIssues).length > 0 ? 1 : 2);
+      setStep(Object.keys(needIssues).length > 0 ? "need" : "contact");
       return;
     }
     // currentTarget is null once the event has been through an await, so the element is captured first.
@@ -399,14 +484,27 @@ export function QuoteFormShell({
       return;
     }
     setResult({ status: "submitting", message: t("submitting") });
+    const firstName = String(formData.get("firstName") ?? "").trim();
+    const lastName = String(formData.get("lastName") ?? "").trim();
+    // Spec 067: a directly chosen broker is sent only when set and one of the brokers the server listed.
+    const preferredPartnerId = String(formData.get("preferredPartnerId") ?? "").trim();
+    const sendPreferred = showPreferredBroker && UUID_PATTERN.test(preferredPartnerId) && brokerChoices.some((broker) => broker.id === preferredPartnerId);
+    // Spec 067 COMP-009: further offers travel only with the dedicated, explicit authorisation naming each broker.
+    const multiOffersAccepted = multiOffersMode && formData.get("multiBrokerOffers") === "on";
+    // Declarative marketing source, read now from the page's own address; no cookie, no browser storage.
+    const marketingSource = readMarketingSource(window.location.search, document.referrer, window.location.host);
     const response = await submitPublicQuoteRequest({
       countryCode,
       productKey,
       formDefinitionId: quoteForm.formDefinitionId,
       language,
       ...(selectedOfferId ? { selectedOfferId } : {}),
+      ...(multiOffersAccepted ? { additionalOfferIds: namedExtraOfferIds } : {}),
+      ...(sendPreferred ? { preferredPartnerId } : {}),
+      ...(marketingSource ? { marketingSource } : {}),
       contact: {
-        displayName: String(formData.get("displayName") ?? "").trim() || undefined,
+        ...(firstName ? { firstName } : {}),
+        ...(lastName ? { lastName } : {}),
         email: String(formData.get("email") ?? "").trim(),
         phone: String(formData.get("phone") ?? "").trim()
       },
@@ -417,10 +515,35 @@ export function QuoteFormShell({
         version: quoteForm.consent.version,
         contentHash: quoteForm.consent.contentHash,
         // Spec 042: unticked means a single broker, which is also the historical behaviour.
-        multiBrokerAccepted: formData.get("multiBroker") === "on"
+        multiBrokerAccepted: multiOffersMode ? multiOffersAccepted : formData.get("multiBroker") === "on"
       }
     });
     if (response.status === "success") {
+      // Spec 067: staged documents go up only now, one by one, through the same checked pipeline as the
+      // tracking page. A failure never cancels the request that was just saved.
+      let documentsSent = 0;
+      let documentsFailed = 0;
+      if (stagedDocuments.length > 0) {
+        setResult({ status: "submitting", message: t("sendingDocuments") });
+        for (const doc of stagedDocuments) {
+          if (!response.publicReference || !response.verificationToken) {
+            documentsFailed += 1;
+            continue;
+          }
+          const upload = new FormData();
+          upload.set("documentKind", doc.kind);
+          upload.set("label", doc.label.trim() || defaultDocumentLabel(doc.file.name) || doc.file.name);
+          upload.set("file", doc.file);
+          try {
+            const uploaded = await uploadQuoteDocument(response.publicReference, response.verificationToken, upload);
+            if (uploaded.status === "success") documentsSent += 1;
+            else documentsFailed += 1;
+          } catch {
+            documentsFailed += 1;
+          }
+        }
+        setStagedDocuments([]);
+      }
       // No `form.reset()`: the form is replaced by the confirmation panel below, and emptying a form
       // that stays on screen next to "demande recue" reads as an invitation to send it again.
       const documentsEnabled = response.verificationToken && response.publicReference
@@ -432,7 +555,13 @@ export function QuoteFormShell({
         publicReference: response.publicReference ?? "",
         ...(response.verificationToken ? { verificationToken: response.verificationToken } : {}),
         documentsEnabled,
-        selectedOfferPartnerRetained: response.selectedOfferPartnerRetained ?? null
+        selectedOfferPartnerRetained: response.selectedOfferPartnerRetained ?? null,
+        chosenPartnerRetained: response.chosenPartnerRetained ?? null,
+        ...(response.requestedPartnerCount !== undefined ? { requestedPartnerCount: response.requestedPartnerCount } : {}),
+        ...(response.retainedPartnerCount !== undefined ? { retainedPartnerCount: response.retainedPartnerCount } : {}),
+        additionalOffersIgnored: response.additionalOffersIgnored === true,
+        documentsSent,
+        documentsFailed
       });
       return;
     }
@@ -444,13 +573,16 @@ export function QuoteFormShell({
 
   // The stepper lives here rather than on the page: only this boundary knows the request went
   // through, and the journey is only at step 4 once it has.
+  const stepIds: StepId[] = documentsStep ? ["need", "contact", "documents", "consent"] : ["need", "contact", "consent"];
   const steps = [
     { label: t("steps.need") },
     { label: t("steps.contact") },
+    ...(documentsStep ? [{ label: t("steps.documents") }] : []),
     { label: t("steps.consent") },
     { label: t("steps.confirmation") }
   ];
-  const current = sent ? steps.length : step;
+  const stepNumber = (id: StepId) => stepIds.indexOf(id) + 1;
+  const current = sent ? steps.length : stepNumber(step);
   const stepper = (
     <ProgressBar
       steps={steps}
@@ -483,6 +615,28 @@ export function QuoteFormShell({
           {offerRouting ? (
             <Notice tone="info" role="status">
               {offerRouting}
+            </Notice>
+          ) : null}
+          {result.chosenPartnerRetained === false ? (
+            <Notice tone="info" role="status">
+              {t("chosenPartnerNotRetained")}
+            </Notice>
+          ) : null}
+          {(result.requestedPartnerCount ?? 0) > 1 && result.retainedPartnerCount !== undefined ? (
+            <Notice tone="info" role="status">
+              {t("partnersRetained", { retained: result.retainedPartnerCount, requested: result.requestedPartnerCount ?? 0 })}
+            </Notice>
+          ) : null}
+          {result.additionalOffersIgnored ? (
+            <Notice tone="info" role="status">
+              {t("additionalOffersIgnored")}
+            </Notice>
+          ) : null}
+          {(result.documentsSent ?? 0) + (result.documentsFailed ?? 0) > 0 ? (
+            <Notice tone={(result.documentsFailed ?? 0) === 0 ? "success" : "info"} role="status">
+              {(result.documentsFailed ?? 0) === 0
+                ? t("documentsAllSent", { sent: result.documentsSent ?? 0 })
+                : t("documentsSomeFailed", { sent: result.documentsSent ?? 0, failed: result.documentsFailed ?? 0 })}
             </Notice>
           ) : null}
           {result.message ? (
@@ -538,13 +692,33 @@ export function QuoteFormShell({
         onChange={syncAssistAnswers}
         {...(formAction ? { action: formAction } : {})}
       >
+        {/* No-JavaScript action (D6): the further offers travel as hidden fields and only count with the dedicated authorisation. */}
+        {multiOffersMode
+          ? namedExtraOfferIds.map((id) => <input key={id} type="hidden" name="additionalOfferIds" value={id} />)
+          : null}
         {/* Step 1 - Votre besoin */}
-        <fieldset className="am-quote-step" hidden={jsEnabled && step !== 1}>
+        <fieldset className="am-quote-step" hidden={jsEnabled && step !== "need"}>
           <StepHeading index={1} legend={t("steps.need")} headingRef={needHeadingRef} />
           <p className="am-j-panel__lead">{t("needIntro")}</p>
           <Notice tone="indicative">
             <BackendText>{preselectedNotice}</BackendText>
           </Notice>
+          {showPreferredBroker ? (
+            <Field
+              id="am-quote-preferred-broker"
+              label={withOptionalTag(t("preferredBroker"), false, t("optionalTag"))}
+              hint={t("preferredBrokerHint")}
+            >
+              <select {...fieldControlProps("am-quote-preferred-broker", { hint: t("preferredBrokerHint") })} name="preferredPartnerId" defaultValue="">
+                <option value="">{t("preferredBrokerNone")}</option>
+                {brokerChoices.map((broker) => (
+                  <option key={broker.id} value={broker.id}>
+                    {broker.displayName}
+                  </option>
+                ))}
+              </select>
+            </Field>
+          ) : null}
           {quoteForm.fields.length > 0 ? (
             <div className="am-stack">
               <p className="am-j-panel__lead">{t("fieldsIntro")}</p>
@@ -574,16 +748,20 @@ export function QuoteFormShell({
         </fieldset>
 
         {/* Step 2 - Vos coordonnees */}
-        <fieldset className="am-quote-step" hidden={jsEnabled && step !== 2}>
+        <fieldset className="am-quote-step" hidden={jsEnabled && step !== "contact"}>
           <StepHeading index={2} legend={t("steps.contact")} headingRef={contactHeadingRef} />
           <p className="am-j-panel__lead">{t("contactIntro")}</p>
           <div className="am-j-form__grid">
-            <Field id="am-quote-name" label={withOptionalTag(t("name"), false, t("optionalTag"))} hint={t("nameHint")} leading="user">
+            <Field id="am-quote-first-name" label={withOptionalTag(t("firstName"), false, t("optionalTag"))} hint={t("nameHint")} leading="user">
               <input
-                {...fieldControlProps("am-quote-name", { hint: t("nameHint") })}
-                name="displayName"
-                autoComplete="name"
+                {...fieldControlProps("am-quote-first-name", { hint: t("nameHint") })}
+                name="firstName"
+                autoComplete="given-name"
+                maxLength={80}
               />
+            </Field>
+            <Field id="am-quote-last-name" label={withOptionalTag(t("lastName"), false, t("optionalTag"))} leading="user">
+              <input {...fieldControlProps("am-quote-last-name", {})} name="lastName" autoComplete="family-name" maxLength={80} />
             </Field>
             <Field
               id="am-quote-email"
@@ -632,9 +810,25 @@ export function QuoteFormShell({
           ) : null}
         </fieldset>
 
-        {/* Step 3 - Verification et consentement */}
-        <fieldset className="am-quote-step" hidden={jsEnabled && step !== 3}>
-          <StepHeading index={3} legend={t("steps.consent")} headingRef={verifyHeadingRef} />
+        {/* Step 3 (when the product accepts documents) - Documents, optional, JavaScript only */}
+        {documentsStep ? (
+          <fieldset className="am-quote-step" hidden={step !== "documents"}>
+            <StepHeading index={stepNumber("documents")} legend={t("steps.documents")} headingRef={documentsHeadingRef} />
+            <QuoteDocumentsStep documents={stagedDocuments} onChange={setStagedDocuments} />
+            <div className="am-quote-nav">
+              <Button type="button" variant="secondary" onClick={goToStep2FromReview} icon={<Icon name="arrow-left" size={18} />}>
+                {t("backLabel")}
+              </Button>
+              <Button type="button" size="lg" onClick={goToConsent} iconAfter={<Icon name="arrow-right" size={18} />}>
+                {t("verifyLabel")}
+              </Button>
+            </div>
+          </fieldset>
+        ) : null}
+
+        {/* Last step - Verification et consentement */}
+        <fieldset className="am-quote-step" hidden={jsEnabled && step !== "consent"}>
+          <StepHeading index={stepNumber("consent")} legend={t("steps.consent")} headingRef={verifyHeadingRef} />
 
           {jsEnabled && review ? (
             <div className="am-quote-review">
@@ -666,7 +860,7 @@ export function QuoteFormShell({
                 </div>
                 <dl className="am-quote-review__list">
                   <div className="am-quote-review__row">
-                    <dt>{t("name")}</dt>
+                    <dt>{t("fullName")}</dt>
                     <dd>{review.name}</dd>
                   </div>
                   <div className="am-quote-review__row">
@@ -679,6 +873,17 @@ export function QuoteFormShell({
                   </div>
                 </dl>
               </div>
+              {documentsStep ? (
+                <div className="am-quote-review__section">
+                  <div className="am-quote-review__head">
+                    <h3>{t("reviewDocuments")}</h3>
+                    <button type="button" className="am-quote-review__edit" onClick={() => setStep("documents")}>
+                      {t("reviewEdit")}
+                    </button>
+                  </div>
+                  <p>{stagedDocuments.length > 0 ? t("reviewDocumentsValue", { count: stagedDocuments.length }) : t("reviewEmpty")}</p>
+                </div>
+              ) : null}
             </div>
           ) : null}
 
@@ -687,6 +892,7 @@ export function QuoteFormShell({
             <h3 className="am-quote-broker__title">{t("brokerTitle")}</h3>
             <ResponsibleBrokerBlock
               broker={responsibleBroker}
+              chosenBrokerName={review?.chosenBrokerName}
               hasSelectedOffer={hasSelectedOffer}
               productName={productName}
               countryName={countryName}
@@ -715,11 +921,26 @@ export function QuoteFormShell({
                   <span>{t("consentLabel")}</span>
                 )}
               </label>
-              <label className="am-j-consent" htmlFor="am-quote-multi-broker">
-                <input id="am-quote-multi-broker" name="multiBroker" type="checkbox" />
-                <span>{t("multiBrokerLabel")}</span>
-              </label>
+              {multiOffersMode ? (
+                <label className="am-j-consent" htmlFor="am-quote-multi-offers">
+                  <input id="am-quote-multi-offers" name="multiBrokerOffers" type="checkbox" />
+                  <span>
+                    {t("multiOffers.label", { partners: formatNameList(multiOfferNames, locale) })}{" "}
+                    {primaryPartnerName ? t("multiOffers.explain", { partner: primaryPartnerName }) : t("multiOffers.explainNoName")}
+                  </span>
+                </label>
+              ) : extraOfferIds.length === 0 ? (
+                <label className="am-j-consent" htmlFor="am-quote-multi-broker">
+                  <input id="am-quote-multi-broker" name="multiBroker" type="checkbox" />
+                  <span>{t("multiBrokerLabel")}</span>
+                </label>
+              ) : null}
             </div>
+            {!multiOffersMode && extraOfferIds.length > 0 ? (
+              <Notice tone="indicative" role="note">
+                {primaryPartnerName ? t("multiOffers.single", { partner: primaryPartnerName }) : t("multiOffers.singleNoName")}
+              </Notice>
+            ) : null}
             <div className="am-j-tail">
               <IndicativeOfferNotice />
             </div>
@@ -739,7 +960,12 @@ export function QuoteFormShell({
           <div className="am-j-form__footer">
             {jsEnabled ? (
               <div className="am-quote-nav am-quote-nav--send">
-                <Button type="button" variant="secondary" onClick={goToStep2} icon={<Icon name="arrow-left" size={18} />}>
+                <Button
+                  type="button"
+                  variant="secondary"
+                  onClick={() => setStep(documentsStep ? "documents" : "contact")}
+                  icon={<Icon name="arrow-left" size={18} />}
+                >
                   {t("backLabel")}
                 </Button>
                 <Button type="submit" size="lg" loading={pending} disabled={pending} icon={<Icon name="send" size={18} />}>

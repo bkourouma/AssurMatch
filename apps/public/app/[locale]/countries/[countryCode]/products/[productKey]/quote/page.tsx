@@ -15,6 +15,7 @@ import { Pictogram, productPictogram } from "../../../../../../components/ui/pic
 import { Section } from "../../../../../../components/ui/section";
 import {
   getPublicQuoteForm,
+  getQuoteOptions,
   listCountryDirectory,
   listCountryPartners,
   listPublicProducts,
@@ -22,6 +23,7 @@ import {
   type PublicQuoteFormField,
   type PublicQuoteFormState
 } from "../../../../../../lib/public-api";
+import { readQuoteOfferIds } from "../../../../../../lib/quote-journey";
 import { buildMetadata, localeUrl, localePath } from "../../../../../../lib/seo";
 import type { PageMetadata } from "../../../../../../lib/seo";
 
@@ -88,10 +90,17 @@ export default async function PublicQuotePage({
   const api = await getTranslations("Api");
 
   const query = searchParams ? await searchParams : {};
-  const offerIdParam = first(query.offerId);
-  const selectedOfferId = offerIdParam && /^[0-9a-f-]{36}$/i.test(offerIdParam) ? offerIdParam : undefined;
+  // Spec 067 COMP-009: `?offerId=` may repeat (3 valid, distinct ids at most). The first is the primary
+  // offer, the others only count with the visitor's explicit authorisation naming each broker.
+  const offerIds = readQuoteOfferIds(query.offerId);
+  const selectedOfferId = offerIds[0];
+  const additionalOfferIds = offerIds.slice(1);
   // Spec 050 R6: the form is requested in the page language; another language is offered, never served.
   const quoteForm = await getPublicQuoteForm(countryCode, productKey, locale, selectedOfferId);
+
+  // Spec 067: options besides the definition (multi-broker, documents, eligible brokers, offer brokers);
+  // `null` on any failure, in which case the form behaves as a single-offer form without extras.
+  const quoteOptions = quoteForm.status === "success" ? await getQuoteOptions(countryCode, productKey, offerIds) : null;
 
   const directory = await listCountryDirectory();
   const iso = countryCode.trim().toUpperCase();
@@ -132,7 +141,7 @@ export default async function PublicQuotePage({
     boundCountryCode: string,
     boundProductKey: string,
     boundLocale: AppLocale,
-    boundSelectedOfferId: string | undefined,
+    boundOfferIds: string[],
     boundQuoteForm: PublicQuoteFormState,
     formData: FormData
   ): Promise<void> {
@@ -140,13 +149,26 @@ export default async function PublicQuotePage({
     const quotePathname = "/countries/[countryCode]/products/[productKey]/quote" as const;
     const backToQuote = (errorKey: string): never => {
       const errorParams = new URLSearchParams({ quoteError: errorKey });
-      if (boundSelectedOfferId) errorParams.set("offerId", boundSelectedOfferId);
+      for (const offerId of boundOfferIds) errorParams.append("offerId", offerId);
       redirect(`${localePath(boundLocale, quotePathname, { countryCode: boundCountryCode, productKey: boundProductKey })}?${errorParams.toString()}`);
     };
 
     if (formData.get("consent") !== "on") {
       backToQuote("consent");
     }
+
+    // Spec 067: without JavaScript there are no documents (they are added from the tracking page) and no
+    // marketing source. Further offers count only with the dedicated authorisation checkbox.
+    const boundSelectedOfferId = boundOfferIds[0];
+    const multiOffersAccepted = formData.get("multiBrokerOffers") === "on";
+    const boundExtras = boundOfferIds.slice(1);
+    const additionalOfferIds = multiOffersAccepted
+      ? readQuoteOfferIds(formData.getAll("additionalOfferIds").map(String)).filter((id) => boundExtras.includes(id)).slice(0, 2)
+      : [];
+    const preferredIdRaw = String(formData.get("preferredPartnerId") ?? "").trim();
+    const preferredPartnerId = !boundSelectedOfferId && readQuoteOfferIds(preferredIdRaw).length === 1 ? preferredIdRaw : undefined;
+    const firstName = String(formData.get("firstName") ?? "").trim();
+    const lastName = String(formData.get("lastName") ?? "").trim();
 
     const incoming = await headers();
     const forwardedFor = incoming.get("x-forwarded-for")?.split(",")[0]?.trim() || incoming.get("x-real-ip")?.trim() || undefined;
@@ -156,8 +178,11 @@ export default async function PublicQuotePage({
       formDefinitionId: boundQuoteForm.formDefinitionId,
       language: boundLocale,
       ...(boundSelectedOfferId ? { selectedOfferId: boundSelectedOfferId } : {}),
+      ...(additionalOfferIds.length > 0 ? { additionalOfferIds } : {}),
+      ...(preferredPartnerId ? { preferredPartnerId } : {}),
       contact: {
-        displayName: String(formData.get("displayName") ?? "").trim() || undefined,
+        ...(firstName ? { firstName } : {}),
+        ...(lastName ? { lastName } : {}),
         email: String(formData.get("email") ?? "").trim(),
         phone: String(formData.get("phone") ?? "").trim()
       },
@@ -167,7 +192,7 @@ export default async function PublicQuotePage({
         consentTextId: boundQuoteForm.consent.consentTextId,
         version: boundQuoteForm.consent.version,
         contentHash: boundQuoteForm.consent.contentHash,
-        multiBrokerAccepted: formData.get("multiBroker") === "on"
+        multiBrokerAccepted: multiOffersAccepted || formData.get("multiBroker") === "on"
       }
     }, { forwardedFor });
 
@@ -182,7 +207,7 @@ export default async function PublicQuotePage({
 
   const boundSubmitAction =
     quoteForm.status === "success"
-      ? submitQuoteRequestAction.bind(null, countryCode, productKey, locale, selectedOfferId, quoteForm.data)
+      ? submitQuoteRequestAction.bind(null, countryCode, productKey, locale, offerIds, quoteForm.data)
       : undefined;
 
   return (
@@ -237,6 +262,8 @@ export default async function PublicQuotePage({
               language={locale}
               quoteForm={quoteForm.data}
               selectedOfferId={selectedOfferId}
+              additionalOfferIds={additionalOfferIds}
+              quoteOptions={quoteOptions}
               responsibleBroker={responsibleBroker}
               formAction={boundSubmitAction}
             />
@@ -257,7 +284,7 @@ export default async function PublicQuotePage({
                         href={{
                           pathname: "/countries/[countryCode]/products/[productKey]/quote",
                           params: { countryCode, productKey },
-                          ...(selectedOfferId ? { query: { offerId: selectedOfferId } } : {})
+                          ...(offerIds.length > 0 ? { query: { offerId: offerIds } } : {})
                         }}
                       >
                         {t(`languageUnavailable.link.${language}`)}

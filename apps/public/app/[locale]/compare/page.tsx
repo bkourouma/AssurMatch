@@ -1,7 +1,8 @@
 import { getTranslations, setRequestLocale } from "next-intl/server";
-import { Link } from "../../../i18n/navigation";
+import { Link, getPathname } from "../../../i18n/navigation";
 import { toLocale } from "../../../i18n/routing";
-import { OfferScore, ScoreBreakdown, SponsoredBadge } from "../../components/offer-cards";
+import { OfferQuotePicker } from "../../components/forms/offer-quote-picker";
+import { OfferScore,ScoreBreakdown, SponsoredBadge } from "../../components/offer-cards";
 import { JourneyRoute } from "../../components/journey/journey-route";
 import { JourneyHeroNotice } from "../../components/public-journey";
 import { EntrySelector, type EntrySelectorProduct } from "../../components/site/entry-selector";
@@ -43,7 +44,9 @@ function withoutLeadingNumber(title: string): string {
 }
 
 /** Country and product of the list the selection came from, when the offers page passed them. */
-const ISO_CODE = /^[A-Za-z]{2}$/;
+const QUOTE_PICK_FORM_ID = "am-quote-pick-form";
+const QUOTE_PICK_HINT_ID = "am-quote-pick-limit";
+const ISO_CODE =/^[A-Za-z]{2}$/;
 const PRODUCT_KEY = /^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$/;
 
 function firstOf(value: string | string[] | undefined): string | undefined {
@@ -161,6 +164,18 @@ export default async function PublicComparePage({
     return String(value);
   }
 
+  // Localized quote page of the country/product the list came from; the offers ticked below are
+  // carried as repeated `offerId` query values. Only known when the offers page passed both.
+  const quoteAction =
+    countryCode && productKey
+      ? getPathname({
+          locale,
+          href: {
+            pathname: "/countries/[countryCode]/products/[productKey]/quote",
+            params: { countryCode, productKey }
+          }
+        })
+      : null;
   const items = comparison?.status === "success" ? comparison.data?.items ?? [] : [];
   const compared = comparison?.status === "success" && comparison.data ? comparison.data : null;
 
@@ -376,6 +391,32 @@ export default async function PublicComparePage({
               ))}
             </ul>
           </Section>
+
+          {quoteAction && items.length >= 2 ? (
+            <Section title={t("quotePickTitle")} spacing="compact">
+              <form id={QUOTE_PICK_FORM_ID} method="get" action={quoteAction} className="am-stack">
+                <p>
+                  {t("quotePickHint")} <span id={QUOTE_PICK_HINT_ID}>{t("quotePickLimit")}</span>
+                </p>
+                <ul className="am-stack">
+                  {items.map((offer) => (
+                    <li key={offer.id}>
+                      <label className="am-cluster">
+                        <input type="checkbox" name="offerId" value={offer.id} />
+                        <span>
+                          <BackendText>{t("quotePickOption", { name: offer.name })}</BackendText>
+                        </span>
+                      </label>
+                    </li>
+                  ))}
+                </ul>
+                <div className="am-cluster">
+                  <Button type="submit">{t("quotePickSubmit")}</Button>
+                </div>
+                <OfferQuotePicker formId={QUOTE_PICK_FORM_ID} hintId={QUOTE_PICK_HINT_ID} />
+              </form>
+            </Section>
+          ) : null}
 
           <Section ariaLabel={t("journeyLabel")} spacing="compact">
             <p className="am-j-morelink">

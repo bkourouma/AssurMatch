@@ -533,7 +533,12 @@
       "deductible": "lowest deductible among the offers compared",
       "ceiling": "highest coverage ceiling among the offers compared",
       "processingDelay": "shortest processing time among the offers compared"
-    }
+    },
+    "quotePickTitle": "Request a quote for several offers",
+    "quotePickHint": "Tick up to 3 offers. Each broker concerned will be named before your agreement, which you only give at the consent step.",
+    "quotePickOption": "Include {name} in my request",
+    "quotePickSubmit": "Continue to the quote request",
+    "quotePickLimit": "3 offers maximum per request."
   },
   "OfferDetail": {
     "kicker": "Indicative offer",
@@ -569,6 +574,7 @@
     "steps": {
       "need": "Your need",
       "contact": "Your details",
+      "documents": "Documents (optional)",
       "consent": "Review and consent",
       "confirmation": "Confirmation"
     },
@@ -587,22 +593,30 @@
     "preselectedRouting": "Your request will be transmitted to a partner broker authorised for {product} in {country} (or up to 3 partner brokers if you tick the box on the next step). The name of the broker chosen will appear on your tracking page.",
     "contactLegend": "Your details",
     "contactIntro": "This information lets the partner broker answer you. It is only transmitted after your consent, on the next step.",
-    "name": "Name",
+    "firstName": "First name",
+    "lastName": "Last name",
+    "fullName": "Full name",
     "nameHint": "Optional: lets the partner broker address you by name instead of writing \"Dear Sir or Madam\".",
     "email": "E-mail address",
     "emailHint": "The partner broker writes to you at this address to detail your quote; you will also receive the confirmation of your request there.",
     "phone": "Phone",
     "phoneHint": "The partner broker calls you on this number to finalise your quote. Country code included (example: +225 07 00 00 00 00).",
+    "preferredBroker": "Preferred broker",
+    "preferredBrokerNone": "No preference: we direct you to an eligible broker",
+    "preferredBrokerHint": "Your choice is taken into account if this broker remains eligible for your request; otherwise your request is directed to another eligible broker and you are told.",
     "verifyLegend": "Review and consent",
     "verifyIntro": "Check the information below before sending your request. You can still change it.",
     "reviewNeedTitle": "Your need",
     "reviewContactTitle": "Your details",
     "reviewEdit": "Edit",
+    "reviewDocuments": "Documents",
+    "reviewDocumentsValue": "{count, plural, one {# document attached} other {# documents attached}}",
     "reviewEmpty": "not provided",
     "brokerTitle": "Responsible partner broker",
     "brokerConfirm": {
       "routing": "Your request will be transmitted to a partner broker authorised for {product} in {country} (or up to 3 partner brokers if the box below is ticked). The name of the broker chosen will appear on your tracking page after sending."
     },
+    "brokerChosen": "You asked to be directed to {partner}. Your request will be transmitted to them if they remain eligible; otherwise it will be directed to another eligible partner broker and you will be told.",
     "brokerLicence": "Licence {licence} ({authority}).",
     "transmissionNotice": "Nothing is transmitted until you have ticked the consent box and sent your request.",
     "options": {
@@ -628,6 +642,27 @@
         "other": "Other"
       }
     },
+    "documents": {
+      "intro": "Optional. You can attach up to {max} documents (PDF, JPEG or PNG, {size} MB maximum each). Files are scanned before transmission, and nothing is transmitted to the broker before your agreement, given at the consent step.",
+      "memory": "Files stay in your browser and are only sent once your request has been saved.",
+      "pick": "Choose files",
+      "remove": "Remove",
+      "listLabel": "Documents attached to your request",
+      "kind": "Document type",
+      "label": "Label",
+      "full": "Maximum number of documents reached.",
+      "errorType": "\"{name}\" is not accepted: PDF, JPEG or PNG only.",
+      "errorSize": "\"{name}\" is too large: 5 MB maximum per file.",
+      "errorCount": "\"{name}\" was not added: 5 documents maximum per request.",
+      "errorEmpty": "\"{name}\" is empty and was not added."
+    },
+    "multiOffers": {
+      "label": "I authorise the transmission of my request to: {partners}; each will receive my contact details.",
+      "explain": "Without this authorisation, only the first offer ({partner}) is kept.",
+      "explainNoName": "Without this authorisation, only the first offer is kept.",
+      "single": "Only one offer can be kept per request: {partner}.",
+      "singleNoName": "Only one offer can be kept per request: the first one."
+    },
     "consentLegend": "Consent",
     "consentIntro": "Read the text below before ticking the box.",
     "consentLabel": "I agree that my request is transmitted to a partner broker eligible for this country and this product.",
@@ -641,6 +676,12 @@
     "successPrefix": "Public reference:",
     "offerPartnerRetained": "Your request has been sent to {partner}.",
     "offerPartnerNotRetained": "The broker of the selected offer was not available: your request has been directed to another approved partner broker.",
+    "chosenPartnerNotRetained": "The broker you chose could not be kept for this request: it has been directed to another eligible broker.",
+    "partnersRetained": "Your request was transmitted to {retained, plural, one {# broker} other {# brokers}} out of {requested} requested.",
+    "additionalOffersIgnored": "Only the first offer was kept.",
+    "sendingDocuments": "Sending documents.",
+    "documentsAllSent": "{sent, plural, one {# document sent} other {# documents sent}}.",
+    "documentsSomeFailed": "{sent, plural, one {# document sent} other {# documents sent}}, {failed} not sent: you can add them from your tracking space.",
     "trackLink": "Follow my request and add documents (optional)",
     "trackLinkOnly": "Follow my request",
     "backToOffers": "Back to the offers",

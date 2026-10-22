@@ -890,6 +890,19 @@ export class AdminQuoteDocumentsController {
   }
 }
 
+// Lot 1 (spec 067): public options of the quote form (multi-broker availability, documents step, eligible brokers).
+export class PublicQuoteOptionsController {
+  constructor(private readonly runtime: AssurMatchRuntime) {}
+
+  options(countryCode: string, productKey: string, offerIds?: string) {
+    return this.runtime.quoteOptions.options(
+      parseParam("countryCode", countryCode, isoCountrySchema),
+      parseParam("productKey", productKey),
+      typeof offerIds === "string" ? offerIds : undefined
+    );
+  }
+}
+
 export class PublicQuoteRequestsController {
   constructor(private readonly runtime: AssurMatchRuntime) {}
 
@@ -2225,6 +2238,9 @@ decorate(PublicOffersController, "detail", [Get("offers/:offerId") as MethodDeco
 
 controller(undefined, PublicQuoteRequestsController);
 decorate(PublicQuoteRequestsController, "quoteForm", [Get("countries/:countryCode/products/:productKey/quote-form") as MethodDecoratorFactory], [[0, Param("countryCode") as ParamDecoratorFactory], [1, Param("productKey") as ParamDecoratorFactory], [2, Query("language") as ParamDecoratorFactory], [3, Query("offerId") as ParamDecoratorFactory]]);
+// Lot 1 (spec 067)
+controller(undefined, PublicQuoteOptionsController);
+decorate(PublicQuoteOptionsController, "options", [Get("countries/:countryCode/products/:productKey/quote-options") as MethodDecoratorFactory], [[0, Param("countryCode") as ParamDecoratorFactory], [1, Param("productKey") as ParamDecoratorFactory], [2, Query("offerIds") as ParamDecoratorFactory]]);
 decorate(PublicQuoteRequestsController, "submitQuote", [Post("quote-requests") as MethodDecoratorFactory], [[0, Body() as ParamDecoratorFactory], [1, Req() as ParamDecoratorFactory]]);
 decorate(PublicQuoteRequestsController, "quoteStatus", [Get("quote-requests/:publicReference") as MethodDecoratorFactory, Header("Cache-Control", "no-store") as MethodDecoratorFactory], [[0, Param("publicReference") as ParamDecoratorFactory], [1, Query("token") as ParamDecoratorFactory], [2, Req() as ParamDecoratorFactory]]);
 decorate(PublicQuoteRequestsController, "requestTrackingLink", [Post("quote-requests/tracking-link") as MethodDecoratorFactory, HttpCode(202) as MethodDecoratorFactory], [[0, Body() as ParamDecoratorFactory], [1, Req() as ParamDecoratorFactory]]);
@@ -2703,6 +2719,7 @@ Module({
     PublicProductsController,
     PublicOffersController,
     PublicQuoteRequestsController,
+    PublicQuoteOptionsController, // Lot 1 (spec 067)
     PublicSatisfactionSurveysController,
     PublicWaitlistController,
     PublicContactController,

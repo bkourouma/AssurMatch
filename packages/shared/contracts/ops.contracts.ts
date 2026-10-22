@@ -17,7 +17,9 @@ export const VISITOR_NOTIFICATION_TYPES = [
   "visitor_broker_message",
   "visitor_documents_requested",
   "visitor_data_request_acknowledged",
-  "visitor_data_request_closed"
+  "visitor_data_request_closed",
+  // Spec 067: the single J+3 reminder of a document request left open (pointer only).
+  "visitor_documents_reminder"
 ] as const;
 
 export type VisitorNotificationType = (typeof VISITOR_NOTIFICATION_TYPES)[number];
