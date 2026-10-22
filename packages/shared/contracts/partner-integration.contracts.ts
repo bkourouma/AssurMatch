@@ -169,6 +169,23 @@ export const partnerApiNotificationsResponseSchema = z.object({
   items: z.array(partnerApiNotificationSummarySchema)
 });
 
+// Lot 7 (H-08): operator-triggered test send. "webhook.test" is deliberately NOT part of
+// partnerWebhookEventTypeSchema: it cannot be subscribed to and never creates a delivery row.
+export const partnerWebhookTestSchema = z.object({
+  reason: reasonSchema.max(500)
+});
+
+export type PartnerWebhookTest = z.infer<typeof partnerWebhookTestSchema>;
+export type PartnerWebhookTestResponse = {
+  endpointId: string;
+  eventId: string;
+  eventType: "webhook.test";
+  outcome: "delivered" | "failed" | "refused";
+  responseClass: string;
+  durationMs: number;
+  sentAt: string;
+};
+
 export type PartnerApiScope = z.infer<typeof partnerApiScopeSchema>;
 export type PartnerWebhookEventType = z.infer<typeof partnerWebhookEventTypeSchema>;
 export type PartnerApiKeyStatus = z.infer<typeof partnerApiKeyStatusSchema>;

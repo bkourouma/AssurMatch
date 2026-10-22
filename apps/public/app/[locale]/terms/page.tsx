@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation";
 import { getTranslations, setRequestLocale } from "next-intl/server";
 import { toLocale, type AppLocale } from "../../../i18n/routing";
-import { getLegalPage } from "../../content/legal";
+import { resolveLegalPage } from "../../content/cms-content";
 import { LegalPageView } from "../../content/legal-page-view";
 import { formatDate } from "../../lib/country-format";
 import { buildMetadata, localeUrl } from "../../lib/seo";
@@ -12,7 +12,7 @@ const HREF = "/terms" as const;
 
 export async function generateMetadata({ params }: { params: Promise<{ locale: string }> }): Promise<PageMetadata> {
   const locale = toLocale((await params).locale);
-  const page = getLegalPage(SLUG, locale);
+  const page = await resolveLegalPage(SLUG, locale);
   const t = await getTranslations({ locale, namespace: "Legal" });
   return buildMetadata({ title: page?.title ?? t("title"), description: page?.description ?? t("description"), href: HREF, locale });
 }
@@ -20,7 +20,7 @@ export async function generateMetadata({ params }: { params: Promise<{ locale: s
 export default async function TermsPage({ params }: { params: Promise<{ locale: string }> }) {
   const locale: AppLocale = toLocale((await params).locale);
   setRequestLocale(locale);
-  const page = getLegalPage(SLUG, locale);
+  const page = await resolveLegalPage(SLUG, locale);
   if (!page) notFound();
   const t = await getTranslations("Legal");
   const common = await getTranslations("Common");

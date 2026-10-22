@@ -36,7 +36,12 @@ export default async function AdminMessagingPage() {
             />
           </Card>
 
-          <MessagingTestForm channels={providers.data.providers.map((provider) => provider.channel)} />
+          <Card
+            title="Envoi de test"
+            description="Verifie qu'un canal configure envoie bien un message. Un canal ferme ou sans fournisseur refuse l'envoi."
+          >
+            <MessagingTestForm channels={providers.data.providers.map((provider) => provider.channel)} />
+          </Card>
 
           <Card title="Restrictions">
             <ul className="bo-list">

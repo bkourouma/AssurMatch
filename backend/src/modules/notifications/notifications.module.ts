@@ -7,6 +7,7 @@ import { MessagingProviderAccessRefusedError, MessagingProviderService, type Mes
 import { MemoryNotificationsRepository, type NotificationsRepository } from "./notifications.repository";
 import { MessagingDispatchService } from "./messaging-dispatch.service";
 import type { MessagingRepository } from "./messaging.repository";
+import type { MessagingProviderPort } from "./messaging-provider.port";
 import { QuoteNotificationService } from "./quote-notification.service";
 
 export interface NotificationRecord extends NotificationRecordDto {
@@ -123,7 +124,9 @@ export class NotificationsModule {
     messagingProviderConfig: MessagingProviderConfig = {},
     featureFlags: MessagingFeatureFlags = { isEnabled: () => false },
     messagingRepository?: MessagingRepository,
-    events?: NotificationEventObserver
+    events?: NotificationEventObserver,
+    // Lot 10 (spec 076): concrete SMS/WhatsApp providers (env resolver); absent => logging provider.
+    messagingProviders?: { smsProvider?: MessagingProviderPort; whatsappProvider?: MessagingProviderPort }
   ) {
     this.queue = queue;
     this.service = new NotificationsService(audit, this.queue, repository, events);
@@ -132,7 +135,10 @@ export class NotificationsModule {
       audit,
       featureFlags,
       config: messagingProviderConfig,
-      ...(messagingRepository ? { repository: messagingRepository } : {})
+      ...(messagingRepository ? { repository: messagingRepository } : {}),
+      // Lot 10
+      ...(messagingProviders?.smsProvider ? { smsProvider: messagingProviders.smsProvider } : {}),
+      ...(messagingProviders?.whatsappProvider ? { whatsappProvider: messagingProviders.whatsappProvider } : {})
     });
     this.quoteService = new QuoteNotificationService(repository ? this.service : this.service.mutableList(), this.queue, audit, this.dispatch);
     this.adminController = new AdminNotificationsController(this.service);
@@ -142,6 +148,7 @@ export class NotificationsModule {
 export { NOTIFICATIONS_REPOSITORY, MemoryNotificationsRepository, type NotificationsRepository } from "./notifications.repository";
 export { MessagingProviderAuditActions } from "./messaging-provider-audit-actions";
 export { MessagingProviderAccessRefusedError, MessagingProviderService, type MessagingProviderConfig };
-export { MessagingDispatchService } from "./messaging-dispatch.service";
+// Lot 10
+export { MessagingDispatchService, type MessagingDispatchDeps, type MessagingOutboxSummary } from "./messaging-dispatch.service";
 export { LoggingMessagingProvider, type MessagingProviderPort } from "./messaging-provider.port";
-export { MESSAGING_REPOSITORY, MemoryMessagingRepository, PrismaMessagingRepository, type MessagingRepository } from "./messaging.repository";
+export { MESSAGING_REPOSITORY, MemoryMessagingRepository, PrismaMessagingRepository, type ChannelOutboxRecord, type MessagingRepository } from "./messaging.repository";

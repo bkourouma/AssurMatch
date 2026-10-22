@@ -16,10 +16,11 @@ import type {
   PartnerWebhookEndpointCreateResponse,
   PartnerWebhookEndpointsResponse,
   PartnerWebhookEndpointUpdate,
-  PartnerWebhookEventType
+  PartnerWebhookEventType,
+  PartnerWebhookTestResponse
 } from "../../../../packages/shared/contracts/partner-integration.contracts";
 import type { NotificationRecord } from "../notifications/notifications.module";
-import { partnerApiKeyCreateSchema, partnerApiKeyRevokeSchema, partnerApiPaginationQuerySchema, partnerWebhookAllowlistCreateSchema, partnerWebhookAllowlistRevokeSchema, partnerWebhookEndpointCreateSchema, partnerWebhookEndpointUpdateSchema } from "../../../../packages/shared/contracts/partner-integration.contracts";
+import { partnerApiKeyCreateSchema, partnerApiKeyRevokeSchema, partnerApiPaginationQuerySchema, partnerWebhookAllowlistCreateSchema, partnerWebhookAllowlistRevokeSchema, partnerWebhookEndpointCreateSchema, partnerWebhookEndpointUpdateSchema, partnerWebhookTestSchema } from "../../../../packages/shared/contracts/partner-integration.contracts";
 import { roleHasPermission } from "../../../../packages/shared/rbac/assurmatch-role-matrix";
 import { EncryptionService } from "../auth/encryption.service";
 import { Argon2idParameters } from "../auth/password-hashing.service";
@@ -40,6 +41,8 @@ const MAX_DELIVERY_ATTEMPTS = 5;
 const RETRY_DELAYS_MS = [5, 15, 60, 360, 1440].map((minutes) => minutes * 60 * 1000);
 const RATE_LIMIT_WINDOW_MS = 60_000;
 const RATE_LIMIT_MAX_REQUESTS = 60;
+// Lot 7: one operator test send per endpoint every 30 seconds.
+const WEBHOOK_TEST_MIN_INTERVAL_MS = 30_000;
 
 export class PartnerIntegrationAccessRefusedError extends Error {
   constructor(public readonly reason: string) {
@@ -73,6 +76,8 @@ export class PartnerIntegrationsService {
   private readonly dnsResolver: WebhookDnsResolver;
   private readonly fetcher: typeof fetch;
   private readonly rateLimitBuckets = new Map<string, { resetAt: number; count: number }>();
+  // Lot 7: last test send per endpoint id (in memory, like the API rate limit buckets).
+  private readonly webhookTestLastSentAt = new Map<string, number>();
 
   constructor(private readonly deps: PartnerIntegrationsDeps) {
     this.repository = deps.repository ?? new MemoryPartnerIntegrationsRepository();
@@ -300,6 +305,79 @@ export class PartnerIntegrationsService {
     if (requireAdmin) return this.listWebhookEndpoints(actor);
     const updated = await this.repository.requireEndpoint(id);
     return { generatedAt: new Date().toISOString(), items: [this.toEndpointSummary(updated)], total: 1 };
+  }
+
+  // Lot 7 (H-08): operator-triggered test send. Closed by default (same gates as the delivery worker),
+  // same URL policy, signature and headers as a real delivery, but no delivery row and no personal data.
+  // Endpoint status policy: "active" and "disabled" endpoints can be tested (the point is to verify an
+  // endpoint before activating it, endpoints are created "disabled"); "suspended" is refused because an
+  // operator deliberately blocked outbound traffic to it. The allow-list/DNS checks apply in every case.
+  async sendTestWebhook(actor: ActorContext, endpointId: string, input: unknown): Promise<PartnerWebhookTestResponse> {
+    this.assertAdminAccess(actor);
+    const parsed = partnerWebhookTestSchema.parse(input);
+    const endpoint = await this.repository.requireEndpoint(endpointId);
+    const eventId = `evt_${crypto.randomUUID()}`;
+    const startedAt = Date.now();
+    const sentAt = new Date(startedAt).toISOString();
+    const refuse = async (responseClass: string): Promise<PartnerWebhookTestResponse> => {
+      await this.deps.audit.writeAsync({
+        actor,
+        action: PartnerIntegrationAuditActions.webhookTestRefused,
+        targetType: "PartnerWebhookEndpoint",
+        targetId: endpoint.id,
+        scope: { partnerTenantId: endpoint.partnerTenantId },
+        result: "refused",
+        reason: responseClass,
+        context: { eventId, operatorReason: parsed.reason }
+      });
+      return { endpointId: endpoint.id, eventId, eventType: "webhook.test", outcome: "refused", responseClass, durationMs: Date.now() - startedAt, sentAt };
+    };
+    if (!this.deps.featureFlags.isEnabled("partner_webhooks_enabled") || this.deps.webhookDeliveryEnabled !== true) return refuse("feature_disabled");
+    if (endpoint.status === "suspended") return refuse("endpoint_suspended");
+    const lastSentAt = this.webhookTestLastSentAt.get(endpoint.id);
+    if (lastSentAt !== undefined && startedAt - lastSentAt < WEBHOOK_TEST_MIN_INTERVAL_MS) return refuse("rate_limited");
+    this.webhookTestLastSentAt.set(endpoint.id, startedAt);
+    try {
+      await this.assertWebhookEndpointApproved(endpoint.partnerTenantId, endpoint.url);
+      const url = assertWebhookUrlShape(endpoint.url);
+      if (this.shouldEnforceDnsValidation()) await assertWebhookDnsPublic(url, this.dnsResolver);
+    } catch {
+      return refuse("endpoint_policy_blocked");
+    }
+    const idempotencyKey = `${eventId}:${endpoint.id}:test`;
+    const body = JSON.stringify({ id: eventId, type: "webhook.test", occurredAt: sentAt, partnerTenantId: endpoint.partnerTenantId, data: { test: true } });
+    let responseClass: string;
+    try {
+      const response = await this.fetcher(endpoint.url, {
+        method: "POST",
+        redirect: "manual",
+        signal: AbortSignal.timeout(10_000),
+        headers: {
+          "content-type": "application/json",
+          "user-agent": "AssurMatch-Webhook/1.0",
+          ...this.signedWebhookHeaders(endpoint, { eventId, idempotencyKey }, body)
+        },
+        body
+      });
+      responseClass = response.status >= 300 && response.status < 400
+        ? "3xx_redirect_blocked"
+        : `${Math.floor(response.status / 100)}xx`;
+    } catch {
+      responseClass = "network_error";
+    }
+    const outcome = responseClass === "2xx" ? "delivered" : "failed";
+    const durationMs = Date.now() - startedAt;
+    await this.deps.audit.writeAsync({
+      actor,
+      action: PartnerIntegrationAuditActions.webhookTestSent,
+      targetType: "PartnerWebhookEndpoint",
+      targetId: endpoint.id,
+      scope: { partnerTenantId: endpoint.partnerTenantId },
+      result: outcome === "delivered" ? "success" : "failed",
+      reason: parsed.reason,
+      context: { responseClass, durationMs, eventId }
+    });
+    return { endpointId: endpoint.id, eventId, eventType: "webhook.test", outcome, responseClass, durationMs, sentAt };
   }
 
   async listWebhookDeliveries(actor: ActorContext): Promise<PartnerWebhookDeliveriesResponse> {
@@ -632,7 +710,7 @@ export class PartnerIntegrationsService {
     }
   }
 
-  private signedWebhookHeaders(endpoint: PartnerWebhookEndpointRecord, delivery: PartnerWebhookDeliveryRecord, rawBody: string): Record<string, string> {
+  private signedWebhookHeaders(endpoint: PartnerWebhookEndpointRecord, delivery: Pick<PartnerWebhookDeliveryRecord, "eventId" | "idempotencyKey">, rawBody: string): Record<string, string> {
     const timestamp = String(Math.floor(Date.now() / 1000));
     const secret = this.encryption.decrypt(endpoint.secretEncrypted);
     return {
