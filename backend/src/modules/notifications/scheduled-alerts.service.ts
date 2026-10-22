@@ -122,6 +122,11 @@ export interface ScheduledAlertsDeps {
    * only. Returning nothing (or throwing) falls back to the deterministic text.
    */
   composeWeeklySummary?: ((partnerTenantId: string, stats: WeeklyBrokerStats) => Promise<string | undefined>) | undefined;
+  /**
+   * Persisted dedupe check (e.g. `notifications.findByDedupeKey`), tested BEFORE the AI composer is called so the
+   * gateway is asked once per tenant and ISO week, not at every hourly pass. Absent: the per-process memory still applies.
+   */
+  hasBeenSent?: ((dedupeKey: string) => Promise<boolean>) | undefined;
 }
 
 /** ISO 8601 week label (`2026-W41`): the Thursday of the week decides the year. */
@@ -165,6 +170,8 @@ function formatDate(value: Date): string {
  */
 export class ScheduledAlertsService {
   private lastRunAt: Date | undefined;
+  /** Weekly-summary keys already handled by this process (compose once even when no persisted check is wired). */
+  private readonly weeklyHandled = new Set<string>();
 
   constructor(private readonly deps: ScheduledAlertsDeps) {}
 
@@ -335,6 +342,13 @@ export class ScheduledAlertsService {
       if (!CRM_PLANS.has(stat.plan)) continue;
       const { received, accepted, won, lost, contactedCount, overdueTasks } = stat;
       if (received + accepted + won + lost + contactedCount + overdueTasks === 0) continue;
+      const dedupeKey = `broker_weekly_summary:${stat.partnerTenantId}:${week}`;
+      if (this.weeklyHandled.has(dedupeKey)) continue;
+      // Dedupe BEFORE composing: the AI call is the expensive part and must run once per tenant and ISO week.
+      if (await this.deps.hasBeenSent?.(dedupeKey)) {
+        this.weeklyHandled.add(dedupeKey);
+        continue;
+      }
       let body = `Résumé automatique de la semaine : ${received} lead(s) reçu(s), ${accepted} accepté(s), ${contactedCount} contacté(s), ${won} gagné(s), ${lost} perdu(s), ${overdueTasks} tâche(s) CRM en retard.`;
       try {
         const composed = await this.deps.composeWeeklySummary?.(stat.partnerTenantId, { received, accepted, won, lost, contactedCount, overdueTasks });
@@ -345,12 +359,13 @@ export class ScheduledAlertsService {
       this.countBroker(run, await this.deps.broker.notify({
         partnerTenantId: stat.partnerTenantId,
         type: "broker_weekly_summary",
-        dedupeKey: `broker_weekly_summary:${stat.partnerTenantId}:${week}`,
+        dedupeKey,
         title: "Résumé hebdomadaire de votre activité",
         body,
         targetType: "PartnerTenant",
         targetId: stat.partnerTenantId
       }));
+      this.weeklyHandled.add(dedupeKey);
     }
   }
 

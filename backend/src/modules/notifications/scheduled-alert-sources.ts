@@ -1,3 +1,4 @@
+import { CONTACTED_STATUSES } from "../dashboards/broker-dashboard-kpis";
 import type { ScheduledAlertSources } from "./scheduled-alerts.service";
 
 /** Quote routing outcomes in which no broker received the request. */
@@ -168,7 +169,8 @@ export class RuntimeScheduledAlertSources implements ScheduledAlertSources {
    * (enterprise module): the contractual target caps the broker's own target, default 240 minutes.
    */
   async unprocessedLeads(_now: Date) {
-    const partners = new Map((await this.deps.partners.list()).filter((partner) => partner.status !== "retired").map((partner) => [partner.id, partner]));
+    // Only `active` partners receive real leads (`active_test` is never routed), as in `weeklyBrokerStats` and the quotas.
+    const partners = new Map((await this.deps.partners.list()).filter((partner) => partner.status === "active").map((partner) => [partner.id, partner]));
     const brokerTargets = new Map((await this.deps.branding?.listBranding() ?? []).map((entry) => [entry.partnerTenantId, entry.firstActionTargetMinutes]));
     const leads = [];
     for (const assignment of await this.deps.assignments.list()) {
@@ -209,7 +211,8 @@ export class RuntimeScheduledAlertSources implements ScheduledAlertSources {
       if (assignment.acceptedAt || assignment.status === "accepted" || assignment.crmStatus === "accepte") stat.accepted += 1;
       if (assignment.crmStatus === "gagne") stat.won += 1;
       if (assignment.crmStatus === "perdu") stat.lost += 1;
-      if (assignment.status === "contacted" || ["contact_tente", "contacte", "qualifie"].includes(assignment.crmStatus ?? "")) stat.contactedCount += 1;
+      // Same definition as the dashboard KPI (PRD section 20): `contact_tente` does not count as contacted.
+      if (assignment.status === "contacted" || CONTACTED_STATUSES.has(assignment.crmStatus ?? "")) stat.contactedCount += 1;
     }
     const now = new Date();
     const overdue = await this.deps.crm.openTasksDueBetween(new Date(0), now);

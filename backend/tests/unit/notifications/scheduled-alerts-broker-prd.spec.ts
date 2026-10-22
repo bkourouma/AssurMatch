@@ -148,6 +148,33 @@ describe("PRD 23 broker alert: weekly summary", () => {
     expect(await rows("broker_weekly_summary")).toHaveLength(4);
   });
 
+  it("composes once per tenant and ISO week across hourly passes (dedupe tested before the AI call)", async () => {
+    let calls = 0;
+    const { service } = setup({ weeklyBrokerStats: async () => [stat] }, {
+      isWeeklySummaryEnabled: () => true,
+      composeWeeklySummary: async () => { calls += 1; return "Semaine active."; }
+    });
+    for (const hours of [0, 1, 2]) await service.run(new Date(NOW.getTime() + hours * HOUR));
+    expect(calls).toBe(1);
+    // The next ISO week composes again.
+    await service.run(new Date(NOW.getTime() + 7 * DAY));
+    expect(calls).toBe(2);
+  });
+
+  it("does not compose when the persisted key already exists (new process, same week)", async () => {
+    let calls = 0;
+    const first = setup({ weeklyBrokerStats: async () => [stat] }, { isWeeklySummaryEnabled: () => true });
+    await first.service.run(NOW);
+    const sentKeys = (await first.rows("broker_weekly_summary")).map((row) => row.dedupeKey);
+    const restarted = new ScheduledAlertsService({
+      ...(first.service as unknown as { deps: ScheduledAlertsDeps }).deps,
+      composeWeeklySummary: async () => { calls += 1; return "Ne doit pas etre appele."; },
+      hasBeenSent: async (key) => sentKeys.includes(key)
+    });
+    await restarted.run(new Date(NOW.getTime() + HOUR));
+    expect(calls).toBe(0);
+  });
+
   it("uses the AI composer with the indicative prefix, aggregates only, and falls back when it fails", async () => {
     const seen: unknown[] = [];
     const ai = setup({ weeklyBrokerStats: async () => [stat] }, {
@@ -219,6 +246,30 @@ describe("RuntimeScheduledAlertSources: unprocessed leads and weekly stats", () 
     deps.branding = { listBranding: async () => [{ partnerTenantId: PRO, firstActionTargetMinutes: 300 }] };
     const leads = await new RuntimeScheduledAlertSources(deps).unprocessedLeads(NOW);
     expect(leads.find((entry) => entry.id === "fresh")?.slaTargetMinutes).toBe(120);
+  });
+
+  it("ignores active_test and suspended partners for unprocessed leads, like the weekly stats", async () => {
+    const deps = runtimeDeps();
+    const base = deps.partners.list;
+    deps.partners.list = async () => [...(await base()), { id: "tester", status: "active_test", plan: "pro" }, { id: "paused", status: "suspended", plan: "pro" }];
+    const list = deps.assignments.list;
+    deps.assignments.list = async () => [...(await list()), { id: "t1", partnerTenantId: "tester", assignedAt: new Date(NOW.getTime() - 100 * MIN), status: "assigned", publicReference: "AM-T" }, { id: "p1", partnerTenantId: "paused", assignedAt: new Date(NOW.getTime() - 100 * MIN), status: "assigned", publicReference: "AM-P" }];
+    const leads = await new RuntimeScheduledAlertSources(deps).unprocessedLeads(NOW);
+    expect(leads.map((entry) => entry.id).sort()).toEqual(["fresh", "seen", "starter"]);
+  });
+
+  it("counts contacted leads with the dashboard KPI definition (contact_tente is not contacted)", async () => {
+    const deps = runtimeDeps();
+    const at = (minutesAgo: number) => new Date(NOW.getTime() - minutesAgo * MIN);
+    deps.assignments.list = async () => [
+      { id: "a", partnerTenantId: PRO, assignedAt: at(10), status: "assigned", publicReference: "A", crmStatus: "contact_tente" },
+      { id: "b", partnerTenantId: PRO, assignedAt: at(10), status: "assigned", publicReference: "B", crmStatus: "contacte" },
+      { id: "c", partnerTenantId: PRO, assignedAt: at(10), status: "assigned", publicReference: "C", crmStatus: "devis_envoye" },
+      { id: "d", partnerTenantId: PRO, assignedAt: at(10), status: "assigned", publicReference: "D", crmStatus: "negociation" },
+      { id: "e", partnerTenantId: PRO, assignedAt: at(10), status: "contacted", publicReference: "E" }
+    ];
+    const stats = await new RuntimeScheduledAlertSources(deps).weeklyBrokerStats(new Date(NOW.getTime() - 7 * DAY));
+    expect(stats.find((entry) => entry.partnerTenantId === PRO)?.contactedCount).toBe(4);
   });
 
   it("aggregates the week per tenant, aggregates only", async () => {
