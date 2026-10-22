@@ -3,7 +3,7 @@ import type { SurveySubmissionInput } from "../satisfaction-surveys/satisfaction
 import { UnsubscribeTokenInvalidError } from "../satisfaction-surveys/survey-unsubscribe.service";
 import { AdminAlertAccessRefusedError, AdminAlertConflictError, AdminAlertNotFoundError } from "../notifications/admin-alerts.service";
 import { adminAlertAcknowledgeSchema, adminAlertsQuerySchema } from "../../../../packages/shared/contracts/admin-alerts.contracts";
-import { Body, ConflictException, Controller, Delete, ForbiddenException, Get, Header, HttpCode, InternalServerErrorException, Module, NotFoundException, Param, Patch, Post, Put, Query, Req, StreamableFile, UnprocessableEntityException, UploadedFile, UseGuards, UseInterceptors } from "@nestjs/common";
+import { BadRequestException, Body, ConflictException, Controller, Delete, ForbiddenException, Get, Header, HttpCode, InternalServerErrorException, Module, NotFoundException, Param, Patch, Post, Put, Query, Req, StreamableFile, UnprocessableEntityException, UploadedFile, UseGuards, UseInterceptors } from "@nestjs/common";
 import { FileInterceptor } from "@nestjs/platform-express";
 import { z } from "zod";
 import { QUOTE_DOCUMENT_MAX_BYTES } from "../../../../packages/shared/contracts/quote-document.contracts";
@@ -1642,6 +1642,7 @@ async function lot5Call<T>(call: () => Promise<T>): Promise<T> {
   } catch (error) {
     if (error instanceof BillingAddOnNotFoundError || error instanceof PlanChangeNotFoundError) throw new NotFoundException(error.message);
     if (error instanceof BillingAddOnConflictError || error instanceof PlanChangeConflictError) throw new ConflictException(error.message);
+    if (error instanceof z.ZodError) throw new BadRequestException("Invalid input");
     throw error;
   }
 }

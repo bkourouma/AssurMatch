@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { QuoteAuditActions } from "../../../src/modules/audit-logs/quote-audit-actions";
 import type { ActorContext } from "../../../src/modules/common/types";
 import { RoutingAuditActions } from "../../../src/modules/routing/routing-audit-actions";
@@ -69,7 +69,13 @@ const lastDecision = async (harness: RuntimeHttpHarness) => (await harness.runti
 describe("lot 5 (spec 071) routing controls on the runtime", () => {
   let harness: RuntimeHttpHarness | undefined;
 
+  // Control 9 is exercised for real here: the shared harness otherwise relaxes it for the other suites.
+  beforeEach(() => {
+    process.env.ASSURMATCH_ROUTING_REQUIRE_RECORDED_CONTRACT = "true";
+  });
+
   afterEach(async () => {
+    delete process.env.ASSURMATCH_ROUTING_REQUIRE_RECORDED_CONTRACT;
     delete process.env[QUALITY_ENV];
     await harness?.close();
     harness = undefined;
@@ -220,13 +226,8 @@ describe("lot 5 (spec 071) routing controls on the runtime", () => {
     expect(await harness.runtime.leads.assignments.list()).toHaveLength(1);
   });
 
-  /**
-   * KNOWN GAP (reported to the lot lead): `assurmatch-runtime.ts` builds `ManualRoutingService` without
-   * `decisions: this.leads.decisions`, so the admin queue carries no AI suggestion / quality score and the
-   * `routing.ai_suggestion.validated` audit is never written. `it.fails` documents the intended behaviour:
-   * once the wiring is fixed this test starts failing, and `.fails` must then be removed.
-   */
-  it.fails("mode ai_assisted: the admin queue shows the suggestion and following it is audited as validated", async () => {
+  /** The admin queue carries the AI suggestion and the quality score (ManualRoutingService receives the routing decisions). */
+  it("mode ai_assisted: the admin queue shows the suggestion and following it is audited as validated", async () => {
     harness = await createRuntimeHttpHarness();
     const seed = await seedIsolatedRuntime(harness);
     const broker = await seedBroker(harness, seed, "Solo Broker");

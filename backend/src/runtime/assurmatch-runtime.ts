@@ -6,6 +6,7 @@ import { BillingModule } from "../modules/billing/billing.module";
 import { PrismaBillingRepository } from "../modules/billing/billing.repository";
 // Lot 5 (spec 071)
 import { PrismaPlanChangeRequestsRepository } from "../modules/billing/plan-change-requests.repository";
+import type { PartnerCommercialState } from "../modules/routing/routing-controls.ports";
 // End Lot 5
 import { PrismaInvoicingRepository } from "../modules/billing/invoicing.repository";
 import { AuditLogsModule } from "../modules/audit-logs/audit-logs.module";
@@ -409,10 +410,11 @@ export class AssurMatchRuntime {
       // Spec 064: Enterprise agency display filter; the enterprise service is built after the leads, hence the lazy call.
       agencyScope: { resolve: (actor: ActorContext, agencyId: string | undefined): Promise<AdvisorAgencyPredicate | undefined> => this.enterprise.agencyScopeFor(actor, agencyId) },
       // Lot 5 (spec 071): routing controls 9-12, quota lock and AI-assisted mode (the billing module is built later, hence the lazy calls).
-      commercialState: (partnerTenantId: string) => this.billing.subscriptions.commercialState(partnerTenantId),
+      commercialState: (partnerTenantId: string): Promise<PartnerCommercialState> => this.billing.subscriptions.commercialState(partnerTenantId),
       leadQuality: { threshold: readIntegerEnv(process.env, "ASSURMATCH_ROUTING_LEAD_QUALITY_MIN_SCORE", 30, 0, 100) },
       aiRouting: { isEnabled: () => this.featureFlags.service.isEnabled("ai_assisted_routing_enabled") },
-      redis: this.redis.client
+      redis: this.redis.client,
+      requireRecordedContract: process.env.ASSURMATCH_ROUTING_REQUIRE_RECORDED_CONTRACT !== "false"
     }
   );
     readonly satisfactionSurveys: SatisfactionSurveysModule = new SatisfactionSurveysModule(
@@ -592,6 +594,8 @@ readonly enterprise = new EnterpriseService({
   });
   readonly manualRouting = new ManualRoutingService({
     audit: this.audit.writer,
+    // Lot 5 (spec 071): the queue shows the AI suggestion / quality score, and validation is audited.
+    decisions: this.leads.decisions,
     submissions: this.quoteRequests.submissions,
     eligibility: this.leads.eligibility,
     countries: this.countries.service,
