@@ -87,7 +87,7 @@ export class TrustedDeviceService implements TrustedDeviceRevoker {
       revokedAt: null,
       revokedReason: null
     });
-    this.audit.write({
+    await this.audit.writeAsync({
       action: AuthAuditActions.userTrustedDeviceCreated,
       targetType: "User",
       targetId: userId,
@@ -122,7 +122,7 @@ export class TrustedDeviceService implements TrustedDeviceRevoker {
     if (record.revokedAt) return rejected("revoked", record.id);
     if (record.expiresAt <= now) return rejected("expired", record.id);
     await this.repository.markUsed(record.id, now);
-    this.audit.write({
+    await this.audit.writeAsync({
       action: AuthAuditActions.userTrustedDeviceUsed,
       targetType: "User",
       targetId: userId,

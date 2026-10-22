@@ -46,6 +46,14 @@ const STATIC_ROUTES: StaticRoute[] = [
   { href: "/brokers/login", priority: 0.3, changeFrequency: "monthly" }
 ];
 
+/** Per-country legal pages (indexable, one set per active country). */
+const COUNTRY_LEGAL_ROUTES: AppPathname[] = [
+  "/countries/[countryCode]/legal-notice",
+  "/countries/[countryCode]/privacy",
+  "/countries/[countryCode]/cookies",
+  "/countries/[countryCode]/terms"
+];
+
 /** One sitemap entry per locale for a single route, each carrying every locale in `alternates`. */
 function localizedEntries(
   href: AppPathname,
@@ -106,6 +114,9 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       entries.push(...localizedEntries("/countries/[countryCode]", { countryCode }, 0.8, "daily"));
       entries.push(...localizedEntries("/countries/[countryCode]/brokers", { countryCode }, 0.6, "weekly"));
       entries.push(...localizedEntries("/countries/[countryCode]/insurers", { countryCode }, 0.6, "weekly"));
+      for (const legalHref of COUNTRY_LEGAL_ROUTES) {
+        entries.push(...localizedEntries(legalHref, { countryCode }, 0.2, "yearly"));
+      }
 
       const products = await listPublicProducts(countryCode);
       if (products.status === "error") continue;

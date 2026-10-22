@@ -285,7 +285,7 @@ export class BrokerAiService {
     if (!actorHasPermission(actor, "broker_crm:*")) throw new Error("AI opt-out change denied: owner permission required");
     const tenant = this.tenantOf(actor);
     await this.deps.featureFlags.setFlag({ key: AI_PARTNER_OPT_OUT_FLAG, scopeType: "partner", scopeId: tenant, value: parsed.optOut, reason: parsed.reason }, actor);
-    this.deps.audit.write({ actor, action: AiAuditActions.partnerOptOutChanged, targetType: "PartnerTenant", targetId: tenant, scope: { partnerTenantId: tenant }, result: "success", reason: parsed.reason, context: { optOut: parsed.optOut } });
+    await this.deps.audit.writeAsync({ actor, action: AiAuditActions.partnerOptOutChanged, targetType: "PartnerTenant", targetId: tenant, scope: { partnerTenantId: tenant }, result: "success", reason: parsed.reason, context: { optOut: parsed.optOut } });
     return this.optOutStatus(actor);
   }
 

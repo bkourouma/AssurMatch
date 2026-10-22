@@ -142,6 +142,7 @@ import { isoCountrySchema, languageCodeSchema, nonEmptyStringSchema, reasonSchem
 import { AssurMatchRuntime } from "../../runtime/assurmatch-runtime";
 import { AuthRequiredHttpGuard, MfaRequiredHttpGuard } from "../auth/guards/http-auth.guard";
 import { AuthRateLimiter } from "../auth/rate-limit.guard";
+import { PartnerApiRateLimiter } from "../common/rate-limit/partner-api-rate-limiter";
 import { assertBrokerTenantWritable } from "../partners/partner-tenant-status.service";
 import { actorFromRequest, clientIp, protectedActorFromRequest, type AssurMatchHttpRequest } from "../common/http/request-actor";
 import { parseHttpInput } from "../common/http/zod-validation";
@@ -2309,26 +2310,49 @@ export class AdminPartnerIntegrationsController {
 }
 
 export class PartnerApiController {
-  constructor(private readonly runtime: AssurMatchRuntime) {}
+  // Lot 8 (spec 075 FR-C1..C3): every partner-api/v1 route is rate limited before the service is called.
+  private readonly rateLimiter: PartnerApiRateLimiter;
 
-  leads(request: AssurMatchHttpRequest, query: Record<string, string>) {
+  constructor(private readonly runtime: AssurMatchRuntime) {
+    this.rateLimiter = new PartnerApiRateLimiter(runtime.redis.client);
+  }
+
+  private async limit(request: AssurMatchHttpRequest): Promise<void> {
+    await this.rateLimiter.enforce({ apiKey: optionalPartnerApiKey(request), ip: clientIp(request) }, request);
+  }
+
+  async leads(request: AssurMatchHttpRequest, query: Record<string, string>) {
+    await this.limit(request);
     return this.runtime.partnerIntegrations.service.listAssignedLeads(partnerApiKeyFromRequest(request), parseHttpInput(partnerApiPaginationQuerySchema, query ?? {}));
   }
 
-  notifications(request: AssurMatchHttpRequest, query: Record<string, string>) {
+  async notifications(request: AssurMatchHttpRequest, query: Record<string, string>) {
+    await this.limit(request);
     return this.runtime.partnerIntegrations.service.listNotifications(partnerApiKeyFromRequest(request), parseHttpInput(partnerApiPaginationQuerySchema, query ?? {}));
   }
 
-  webhookEndpoints(request: AssurMatchHttpRequest) {
+  async webhookEndpoints(request: AssurMatchHttpRequest) {
+    await this.limit(request);
     return this.runtime.partnerIntegrations.service.listWebhookEndpointsFromApiKey(partnerApiKeyFromRequest(request));
   }
 
-  createWebhookEndpoint(request: AssurMatchHttpRequest, input: unknown) {
+  async createWebhookEndpoint(request: AssurMatchHttpRequest, input: unknown) {
+    await this.limit(request);
     return this.runtime.partnerIntegrations.service.createWebhookEndpointFromApiKey(partnerApiKeyFromRequest(request), parseHttpInput(partnerWebhookEndpointCreateSchema.omit({ partnerTenantId: true }), input));
   }
 
-  updateWebhookEndpoint(id: string, request: AssurMatchHttpRequest, input: unknown) {
+  async updateWebhookEndpoint(id: string, request: AssurMatchHttpRequest, input: unknown) {
+    await this.limit(request);
     return this.runtime.partnerIntegrations.service.updateWebhookEndpointFromApiKey(partnerApiKeyFromRequest(request), parseParam("id", id, uuidSchema), parseHttpInput(partnerWebhookEndpointUpdateSchema, input));
+  }
+}
+
+/** Lot 8: key presented (valid or not) for the rate-limit bucket; never throws. */
+function optionalPartnerApiKey(request: AssurMatchHttpRequest): string | undefined {
+  try {
+    return partnerApiKeyFromRequest(request);
+  } catch {
+    return undefined;
   }
 }
 

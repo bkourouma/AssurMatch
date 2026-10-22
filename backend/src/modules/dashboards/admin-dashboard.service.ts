@@ -163,7 +163,7 @@ export class AdminDashboardService {
     for (const entry of dashboard.nonRoutedReasons) lines.push(`non_route,${entry.reason},${entry.total}`);
     lines.push(`partenaires,actifs,${dashboard.partners.active}`);
     lines.push(`partenaires,inactifs,${dashboard.partners.inactive}`);
-    this.deps.audit.write({
+    await this.deps.audit.writeAsync({
       actor,
       action: DashboardAuditActions.adminExported,
       targetType: "AdminDashboardExport",
