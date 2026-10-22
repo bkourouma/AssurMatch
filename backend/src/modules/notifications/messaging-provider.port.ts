@@ -11,6 +11,12 @@ export interface MessagingSendResult {
   provider: string;
   accepted: boolean;
   reason?: string | undefined;
+  /** Lot 10 (spec 076): a transient failure (timeout, 429, 5xx) may be retried; a permanent one (4xx) may not. */
+  retryable?: boolean | undefined;
+  /** Lot 10 (spec 076): coarse class of the failure (never the provider response body). */
+  errorClass?: string | undefined;
+  /** Lot 10 (spec 076): identifier returned by the provider for an accepted message. */
+  providerMessageId?: string | undefined;
 }
 
 export interface MessagingProviderPort {

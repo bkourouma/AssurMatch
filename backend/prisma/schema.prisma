@@ -2278,3 +2278,65 @@ model TrustedDevice {
 
   @@index([userId, revokedAt])
 }
+
+// Lot 10 (spec 076): SMS / WhatsApp retry outbox and generic outbound CRM connector.
+/// Spec 076: one SMS / WhatsApp message waiting for a (re)try. Recipient and body are encrypted at
+/// rest and wiped (empty string) as soon as the row reaches a terminal status.
+model ChannelOutbox {
+  id                 String    @id @default(uuid())
+  channel            String
+  scopeId            String
+  partnerTenantId    String?
+  template           String
+  recipientEncrypted String
+  bodyEncrypted      String
+  status             String    @default("retryable")
+  attemptCount       Int       @default(0)
+  nextAttemptAt      DateTime?
+  lastErrorClass     String?
+  providerMessageId  String?
+  correlationId      String?
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+
+  @@index([status, nextAttemptAt])
+  @@index([partnerTenantId, createdAt])
+}
+
+/// Spec 076: generic outbound REST connector of a partner CRM (one per partner, disabled by default).
+model CrmConnector {
+  id                       String   @id @default(uuid())
+  partnerTenantId          String   @unique
+  name                     String
+  url                      String
+  eventTypes               String[] @default([])
+  status                   String   @default("disabled")
+  secretEncrypted          String
+  secretHash               String
+  authHeaderName           String?
+  authHeaderValueEncrypted String?
+  createdById              String?
+  createdAt                DateTime @default(now())
+  updatedAt                DateTime @updatedAt
+}
+
+/// Spec 076: one outbound CRM call. The body is minimised (no contact data) and encrypted at rest.
+model CrmConnectorDelivery {
+  id                String    @id @default(uuid())
+  connectorId       String
+  partnerTenantId   String
+  eventId           String
+  eventType         String
+  idempotencyKey    String    @unique
+  payloadEncrypted  String
+  payloadMetadata   Json
+  status            String    @default("pending")
+  attemptCount      Int       @default(0)
+  nextAttemptAt     DateTime?
+  lastResponseClass String?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  @@index([connectorId, status, nextAttemptAt])
+  @@index([partnerTenantId, createdAt])
+}

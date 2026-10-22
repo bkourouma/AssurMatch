@@ -1,4 +1,4 @@
-import type { MessagingDeliveryStatus, NotificationChannel } from "../../../../packages/shared/contracts/messaging-provider.contracts";
+import type { MessagingDeliveryStatus, NotificationChannel, OptionalChannel } from "../../../../packages/shared/contracts/messaging-provider.contracts";
 import type { PrismaService } from "../common/prisma/prisma.service";
 import { assertRuntimeRepository, type RuntimeRepository } from "../common/repositories/runtime-repository";
 
@@ -39,6 +39,25 @@ export interface InAppNotificationRecord {
   createdAt: Date;
 }
 
+/** Lot 10 (spec 076): durable retry row. Recipient and body stay encrypted and are blanked at a terminal status. */
+export interface ChannelOutboxRecord {
+  id: string;
+  channel: OptionalChannel;
+  scopeId: string;
+  partnerTenantId: string | null;
+  template: string;
+  recipientEncrypted: string;
+  bodyEncrypted: string;
+  status: "retryable" | "sent" | "failed" | "dead_letter" | "cancelled";
+  attemptCount: number;
+  nextAttemptAt: Date | null;
+  lastErrorClass: string | null;
+  providerMessageId: string | null;
+  correlationId: string | null;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
 export interface MessagingRepository extends RuntimeRepository {
   recordDelivery(record: MessagingDeliveryRecord): Promise<MessagingDeliveryRecord>;
   listDeliveries(limit: number): Promise<MessagingDeliveryRecord[]>;
@@ -47,6 +66,17 @@ export interface MessagingRepository extends RuntimeRepository {
   createInApp(record: InAppNotificationRecord): Promise<InAppNotificationRecord>;
   listInApp(recipientScopeId: string, limit: number): Promise<InAppNotificationRecord[]>;
   markInAppRead(id: string, recipientScopeId: string): Promise<InAppNotificationRecord | undefined>;
+  createOutbox(record: ChannelOutboxRecord): Promise<ChannelOutboxRecord>;
+  updateOutbox(id: string, patch: Partial<ChannelOutboxRecord>): Promise<ChannelOutboxRecord | undefined>;
+  /** Retryable rows whose nextAttemptAt is reached, oldest first. */
+  listDueOutbox(now: Date, limit: number): Promise<ChannelOutboxRecord[]>;
+  /** Most recent first. */
+  listOutbox(limit: number): Promise<ChannelOutboxRecord[]>;
+  /**
+   * Atomic claim: if the row is still retryable and due, push nextAttemptAt to claimUntil and return true.
+   * A concurrent worker then sees the row as not due and cannot send the same message twice.
+   */
+  claimOutbox(id: string, now: Date, claimUntil: Date): Promise<boolean>;
 }
 
 export class MemoryMessagingRepository implements MessagingRepository {
@@ -54,6 +84,7 @@ export class MemoryMessagingRepository implements MessagingRepository {
   private readonly deliveries: MessagingDeliveryRecord[] = [];
   private readonly preferences: NotificationPreferenceRecord[] = [];
   private readonly inApp: InAppNotificationRecord[] = [];
+  private readonly outbox: ChannelOutboxRecord[] = [];
 
   constructor() {
     assertRuntimeRepository(this.mode, "MessagingRepository");
@@ -102,6 +133,38 @@ export class MemoryMessagingRepository implements MessagingRepository {
     notification.read = true;
     return notification;
   }
+
+  async createOutbox(record: ChannelOutboxRecord): Promise<ChannelOutboxRecord> {
+    this.outbox.push({ ...record });
+    return { ...record };
+  }
+
+  async updateOutbox(id: string, patch: Partial<ChannelOutboxRecord>): Promise<ChannelOutboxRecord | undefined> {
+    const index = this.outbox.findIndex((row) => row.id === id);
+    if (index < 0) return undefined;
+    const merged = { ...(this.outbox[index] as ChannelOutboxRecord), ...patch, id };
+    this.outbox[index] = merged;
+    return { ...merged };
+  }
+
+  async listDueOutbox(now: Date, limit: number): Promise<ChannelOutboxRecord[]> {
+    return this.outbox
+      .filter((row) => row.status === "retryable" && row.nextAttemptAt !== null && row.nextAttemptAt.getTime() <= now.getTime())
+      .sort((left, right) => left.createdAt.getTime() - right.createdAt.getTime())
+      .slice(0, limit)
+      .map((row) => ({ ...row }));
+  }
+
+  async listOutbox(limit: number): Promise<ChannelOutboxRecord[]> {
+    return [...this.outbox].sort((left, right) => right.createdAt.getTime() - left.createdAt.getTime()).slice(0, limit).map((row) => ({ ...row }));
+  }
+
+  async claimOutbox(id: string, now: Date, claimUntil: Date): Promise<boolean> {
+    const row = this.outbox.find((candidate) => candidate.id === id);
+    if (!row || row.status !== "retryable" || row.nextAttemptAt === null || row.nextAttemptAt.getTime() > now.getTime()) return false;
+    row.nextAttemptAt = claimUntil;
+    return true;
+  }
 }
 
 type Delegate = {
@@ -109,6 +172,7 @@ type Delegate = {
   findFirst(input: unknown): Promise<unknown | null>;
   findMany(input?: unknown): Promise<unknown[]>;
   update(input: unknown): Promise<unknown>;
+  updateMany(input: unknown): Promise<{ count: number }>;
   upsert(input: unknown): Promise<unknown>;
 };
 
@@ -152,7 +216,35 @@ export class PrismaMessagingRepository implements MessagingRepository {
     return await this.delegate("inAppNotification").update({ where: { id }, data: { read: true } }) as InAppNotificationRecord;
   }
 
-  private delegate(name: "messagingDelivery" | "notificationPreference" | "inAppNotification"): Delegate {
+  async createOutbox(record: ChannelOutboxRecord): Promise<ChannelOutboxRecord> {
+    return await this.delegate("channelOutbox").create({ data: record }) as ChannelOutboxRecord;
+  }
+
+  async updateOutbox(id: string, patch: Partial<ChannelOutboxRecord>): Promise<ChannelOutboxRecord | undefined> {
+    const { id: _ignored, ...data } = patch;
+    void _ignored;
+    const existing = await this.delegate("channelOutbox").findFirst({ where: { id } });
+    if (!existing) return undefined;
+    return await this.delegate("channelOutbox").update({ where: { id }, data }) as ChannelOutboxRecord;
+  }
+
+  async listDueOutbox(now: Date, limit: number): Promise<ChannelOutboxRecord[]> {
+    return await this.delegate("channelOutbox").findMany({ where: { status: "retryable", nextAttemptAt: { lte: now } }, orderBy: { createdAt: "asc" }, take: limit }) as ChannelOutboxRecord[];
+  }
+
+  async listOutbox(limit: number): Promise<ChannelOutboxRecord[]> {
+    return await this.delegate("channelOutbox").findMany({ orderBy: { createdAt: "desc" }, take: limit }) as ChannelOutboxRecord[];
+  }
+
+  async claimOutbox(id: string, now: Date, claimUntil: Date): Promise<boolean> {
+    const result = await this.delegate("channelOutbox").updateMany({
+      where: { id, status: "retryable", nextAttemptAt: { lte: now } },
+      data: { nextAttemptAt: claimUntil }
+    });
+    return result.count === 1;
+  }
+
+  private delegate(name: "messagingDelivery" | "notificationPreference" | "inAppNotification" | "channelOutbox"): Delegate {
     return (this.prisma.requireRuntimeClient() as unknown as Record<string, Delegate>)[name] as Delegate;
   }
 }

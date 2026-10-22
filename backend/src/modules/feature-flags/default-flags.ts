@@ -39,7 +39,12 @@ export const GLOBAL_FEATURE_FLAG_DEFAULTS = {
    * is obtained. Non-sensitive on purpose: admin-toggleable, and switching it off refuses new writes with
    * MESSAGING_DISABLED while reads stay.
    */
-  broker_visitor_messaging_enabled: false
+  broker_visitor_messaging_enabled: false,
+  /**
+   * Lot 10 (spec 076): generic outbound CRM connector of a partner. Ships OFF and, like the SMS and
+   * WhatsApp flags, has no admin toggle: only the audited compliance policy path opens it.
+   */
+  crm_connector_enabled: false
 } as const;
 
 export const COUNTRY_FEATURE_FLAG_DEFAULTS = {
