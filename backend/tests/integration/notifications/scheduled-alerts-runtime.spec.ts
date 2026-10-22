@@ -62,7 +62,7 @@ describe("spec 069 scheduled alerts runtime wiring (D1, FR-008)", () => {
   it("asks the AI gateway once per tenant and ISO week across hourly passes", async () => {
     harness = await createRuntimeHttpHarness();
     await seedPublicRuntime(harness.runtime);
-    await harness.runtime.featureFlags.service.setFlag({ key: "broker_weekly_ai_summary_enabled", scopeType: "global", value: true, reason: "spec 069 weekly summary" }, admin);
+    await harness.runtime.featureFlags.service.applyCompliancePolicy({ key: "broker_weekly_ai_summary_enabled", scopeType: "global", value: true, reason: "spec 069 weekly summary" }, admin, { reference: "TEST-069-WEEKLY", approvedBy: "compliance" });
     const { partner } = await enterprisePartner(harness, "Weekly Tenant");
     await harness.runtime.leads.assignments.create({ quoteRequestId: "q-weekly", partnerTenantId: partner.id, assignmentReason: "routing", countryCode: "CI", productKey: "auto", publicReference: "AM-W-1" }, admin);
     const compose = vi.spyOn(harness.runtime.brokerAi, "weeklySummaryText").mockResolvedValue(undefined);

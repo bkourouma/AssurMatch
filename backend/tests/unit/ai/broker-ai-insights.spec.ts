@@ -286,9 +286,9 @@ describe("CRM-015 priority scores", () => {
 describe("weekly AI summary for the scheduled alerts", () => {
   const stats = { received: 3, accepted: 2, won: 1, lost: 0, contactedCount: 2, overdueTasks: 1 };
 
-  it("ships the weekly flag closed and admin-toggleable", () => {
+  it("ships the weekly flag closed and protected (compliance policy only)", () => {
     expect(GLOBAL_FEATURE_FLAG_DEFAULTS.broker_weekly_ai_summary_enabled).toBe(false);
-    expect(isSensitiveFeatureFlagKey("broker_weekly_ai_summary_enabled")).toBe(false);
+    expect(isSensitiveFeatureFlagKey("broker_weekly_ai_summary_enabled")).toBe(true);
   });
 
   it("returns undefined without any model call when a gate is closed", async () => {
@@ -312,7 +312,7 @@ describe("weekly AI summary for the scheduled alerts", () => {
     expect(await optedOut.service.weeklySummaryText(TENANT_A, stats)).toBeUndefined();
 
     const partnerOff = await world({ flags: ["ai_summary_enabled", "broker_weekly_ai_summary_enabled"] });
-    await partnerOff.featureFlags.setFlag({ key: "broker_weekly_ai_summary_enabled", scopeType: "partner", scopeId: TENANT_A, value: false, reason: "partner off" }, compliance);
+    await partnerOff.featureFlags.applyCompliancePolicy({ key: "broker_weekly_ai_summary_enabled", scopeType: "partner", scopeId: TENANT_A, value: false, reason: "partner off" }, compliance, { reference: "TEST-069-OFF", approvedBy: "compliance" });
     expect(await partnerOff.service.weeklySummaryText(TENANT_A, stats)).toBeUndefined();
 
     for (const closed of [closedWeekly, closedSummary, starterTenant, suspended, noProfile, optedOut, partnerOff]) expect(closed.calls).toHaveLength(0);
@@ -339,6 +339,14 @@ describe("weekly AI summary for the scheduled alerts", () => {
 });
 
 describe("boundAggregates", () => {
+  it("rejects a phone-like digit run under every slug-typed key", () => {
+    for (const key of ["type", "source", "category", "segment", "slug", "product"]) {
+      expect(boundAggregates({ [key]: "22507070707" })).toEqual({});
+      expect(boundAggregates({ [key]: "auto-22507070707" })).toEqual({});
+    }
+    expect(boundAggregates({ type: "auto_2" })).toEqual({ type: "auto_2" });
+  });
+
   it("keeps numbers, booleans, codes and ISO dates; drops free text, identities, digit runs and depth", () => {
     expect(boundAggregates({
       total: 4,

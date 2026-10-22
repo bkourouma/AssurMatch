@@ -554,7 +554,7 @@ const ISO_CODE_KEY = /^(country|countryCode|country_code|currency|currencyCode|c
 const ISO_CODE = /^[A-Z]{2,3}$/;
 /** Product-like slugs (`assurance-auto`): lower case with hyphens, accepted only under a product / source style key. */
 const SLUG_KEY = /^(product|productKey|product_key|slug|source|sourceKey|category|segment|type)$/;
-const SLUG = /^(?!.*d{6})[a-z0-9]+(?:[_-][a-z0-9]+)*$/;
+const SLUG = /^(?!.*\d{6})[a-z0-9]+(?:[_-][a-z0-9]+)*$/;
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}(T\d{2}:\d{2}(:\d{2}(\.\d{1,3})?)?Z?)?$/;
 const AGGREGATE_MAX_DEPTH = 4;
 const AGGREGATE_MAX_LEAVES = 150;

@@ -199,7 +199,7 @@ export default async function BrokerCrmPage({ searchParams }: { searchParams: Pr
         <Card title="Performance par conseiller">
           <DataTable
             columns={[
-              { key: "advisor", header: "Conseiller", render: (row) => (teamMembers.some((member) => member.id === row.advisorId) ? advisorDisplayName(teamMembers, row.advisorId) : "Conseiller hors équipe") },
+              { key: "advisor", header: "Conseiller", render: (row) => advisorDisplayName(teamMembers, row.advisorId) },
               { key: "received", header: "Recus", numeric: true, align: "right", render: (row) => row.received },
               { key: "accepted", header: "Acceptes", numeric: true, align: "right", render: (row) => row.accepted },
               { key: "won", header: "Gagnes", numeric: true, align: "right", render: (row) => row.won },

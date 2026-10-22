@@ -219,7 +219,7 @@ test("AI insights are labelled as suggestions to validate, with validation actio
   // Enterprise-only assistant, buttons only with the write right, advisors never shown as raw ids.
   expect(panel).toContain("managerAssistantOpen(profile, assistance)");
   expect(panel).toContain("canWrite && interaction.status ===");
-  expect(panel).toContain("Conseiller hors équipe");
+  expect(panel).toContain("advisorDisplayName(members, id)");
   expect(panel).not.toContain("{advisorId}");
   expect(api).toContain("/broker/crm/ai/performance-summaries");
   expect(api).toContain("/broker/crm/ai/manager-analyses");
@@ -305,7 +305,7 @@ test("the CRM list page uses the server query, no client filtering, server pagin
   expect(page).toContain('name="advisor"');
   expect(page).toContain("teamAdvisorOptions(members)");
   expect(page).toContain("sortHref={table.sortHref}");
-  expect(page).toContain("Conseiller hors équipe");
+  expect(page).toContain("advisorDisplayName(members, lead.advisor)");
   expect(api).toContain("/broker/crm/leads?${listQuery}");
   // The shared table renders aria-sort on sortable headers.
   expect(table).toContain("aria-sort={ariaSort}");

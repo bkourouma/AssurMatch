@@ -2,6 +2,7 @@ import type { BackOfficeProfile } from "../backoffice-auth";
 import { readBrokerAIAssistance, readBrokerAiOptOut, readBrokerManagerAnalyses, readBrokerPerformanceSummaries, readBrokerTeam } from "../broker-api";
 import type { BrokerAIAssistanceData, BrokerAiInteraction, BrokerManagerAnalysis, BrokerTeamMemberData } from "../broker-api";
 import { aiInsightsPrefetchAllowed, aiInsightsVisible, canWriteAiInsights, managerAssistantOpen } from "../ai-insights-access";
+import { advisorDisplayName } from "../team-options";
 import { TENANT_SUSPENDED_MESSAGE, isTenantReadOnly } from "../broker-permissions";
 import { requestManagerAssistantAction, requestPerformanceSummaryAction, validateTenantInsightAction } from "../crm-ai-actions";
 import { Badge, Button, Card, Cluster, Field, Notice, Select, Stack, TenantWriteGuard } from "./broker-ui";
@@ -59,7 +60,7 @@ function statusTone(status: BrokerAiInteraction["status"]): "success" | "warning
 
 /** Nom d'un conseiller à partir de l'équipe du cabinet ; jamais l'identifiant brut. */
 function advisorName(members: readonly BrokerTeamMemberData[], id: string): string {
-  return members.find((member) => member.id === id)?.displayName ?? "Conseiller hors équipe";
+  return members.find((member) => member.id === id)?.displayName ?? advisorDisplayName(members, id);
 }
 
 function InsightList({

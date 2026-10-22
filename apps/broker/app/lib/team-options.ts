@@ -32,8 +32,16 @@ export function teamAdvisorOptions(members: readonly TeamMemberLike[]): TeamAdvi
 
 export const ADVISOR_OUT_OF_TEAM_LABEL = "Conseiller hors équipe";
 
-/** Name of the advisor; "Conseiller hors équipe" when the member is unknown or the team unreadable (never a raw id), "Non assigné" without id. */
+/** Neutral label when the team could not be read (GET /broker/team unavailable or forbidden): it says nothing about the advisor. */
+export const ADVISOR_TEAM_UNAVAILABLE_LABEL = "Conseiller";
+
+/**
+ * Name of the advisor (never a raw id): "Non assigné" without id; "Conseiller" when the team list is
+ * empty/unavailable (we cannot tell whether the advisor belongs to the team); "Conseiller hors équipe"
+ * only when a non-empty team was read and does not contain the advisor.
+ */
 export function advisorDisplayName(members: readonly TeamMemberLike[], id?: string | null): string {
   if (!id) return "Non assigné";
+  if (members.length === 0) return ADVISOR_TEAM_UNAVAILABLE_LABEL;
   return members.find((member) => member.id === id)?.displayName ?? ADVISOR_OUT_OF_TEAM_LABEL;
 }

@@ -19,7 +19,7 @@ import {
 } from "../../lib/crm-list-query";
 import { crmExportHref } from "../../lib/lead-export-links";
 import { CRM_PIPELINE_STATUSES, crmStatusLabel } from "../../lib/lead-vocabulary";
-import { teamAdvisorOptions } from "../../lib/team-options";
+import { advisorDisplayName, teamAdvisorOptions } from "../../lib/team-options";
 import {
   Badge,
   Button,
@@ -119,7 +119,7 @@ export default async function BrokerCrmLeadsPage({ searchParams }: { searchParam
   const leads = apiLeads.data.items.map(leadSummary);
   const rows: CrmListRow[] = leads.map((lead) => ({
     ...lead,
-    advisorName: lead.advisor ? knownMembers.get(lead.advisor) ?? "Conseiller hors équipe" : "Non assigné"
+    advisorName: lead.advisor ? knownMembers.get(lead.advisor) ?? advisorDisplayName(members, lead.advisor) : "Non assigné"
   }));
   // Spec 064 FR-002: the export button is shown only to roles holding broker_crm:export (API re-checks and audits).
   const canExport = session.status === "authenticated" && canExportCrmLeads(session.profile);
