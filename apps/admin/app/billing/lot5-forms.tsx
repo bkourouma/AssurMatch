@@ -66,7 +66,7 @@ export function AddOnPriceForm() {
 }
 
 /** Opens or closes an existing price row with an audited reason. */
-export function AddOnPriceToggleForm({ price }: { price: { kind: string; plan: string; countryCode: string; monthlyAmount: number; enabled: boolean } }) {
+export function AddOnPriceToggleForm({ price }: { price: { kind: string; plan: string; countryCode?: string; monthlyAmount?: number; enabled?: boolean } }) {
   const [state, formAction, pending] = useActionState(upsertAddOnPriceAction, initialState);
   const base = useId();
   const reasonId = `${base}-reason`;
@@ -76,8 +76,8 @@ export function AddOnPriceToggleForm({ price }: { price: { kind: string; plan: s
       <ActionNotice state={state} />
       <input type="hidden" name="kind" value={price.kind} />
       <input type="hidden" name="plan" value={price.plan} />
-      <input type="hidden" name="countryCode" value={price.countryCode} />
-      <input type="hidden" name="monthlyAmount" value={price.monthlyAmount} />
+      <input type="hidden" name="countryCode" value={price.countryCode ?? ""} />
+      <input type="hidden" name="monthlyAmount" value={price.monthlyAmount ?? 0} />
       <input type="hidden" name="enabled" value={price.enabled ? "false" : "true"} />
       <Field id={reasonId} label="Motif (audité)" required>
         <Input {...fieldControlProps(reasonId, { required: true })} name="reason" />

@@ -106,7 +106,7 @@ export function settleKanbanMove<T extends { id: string }>(input: {
   statusLabel: string;
   result: KanbanMoveResult;
 }): { columns: KanbanColumns<T>; message: KanbanMessage; moved: boolean } {
-  if (input.result.ok) {
+  if (!("code" in input.result)) {
     return { columns: input.optimistic, message: { tone: "info", text: `Lead déplacé vers « ${input.statusLabel} ». Le changement est historisé.` }, moved: true };
   }
   return { columns: input.snapshot, message: { tone: "danger", text: KANBAN_ERROR_MESSAGES[input.result.code] }, moved: false };
