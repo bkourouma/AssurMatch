@@ -54,6 +54,9 @@ import { MemoryWaitlistRepository, PrismaWaitlistRepository } from "../modules/w
 import { ProspectsModule } from "../modules/prospects/prospects.module";
 import { QuoteFormsModule } from "../modules/quote-forms/quote-forms.module";
 import { QuoteRequestsModule } from "../modules/quote-requests/quote-requests.module";
+// Lot 1 (spec 067)
+import { QuoteOptionsService } from "../modules/quote-requests/quote-options.service";
+import { PublicJourneyFlagPolicy } from "../modules/feature-flags/public-journey-flag-policy";
 import { PrismaRegulatoryRegimesRepository, RegulatoryRegimesModule } from "../modules/regulatory-regimes/regulatory-regimes.module";
 import { CatalogModule } from "../modules/catalog/catalog.module";
 import { RoutingModule } from "../modules/routing/routing.module";
@@ -99,6 +102,8 @@ import { PrismaQuoteFormDefinitionsRepository } from "../modules/quote-forms/quo
 import { PrismaQuoteRequestsRepository } from "../modules/quote-requests/quote-requests.repository";
 import { PrismaVisitorAccessTokensRepository } from "../modules/quote-requests/visitor-access-tokens.repository";
 import { VisitorQuoteNotifier } from "../modules/notifications/visitor-quote-notifier";
+// Lot 1 (spec 067)
+import { VisitorDocumentReminderService } from "../modules/notifications/visitor-document-reminder.service";
 import { PrismaLeadAssignmentsRepository } from "../modules/leads/lead-assignments.repository";
 import { PrismaRoutingDecisionsRepository } from "../modules/leads/routing-decisions.repository";
 import { PrismaCrmActivityRepository } from "../modules/leads/crm-activity.repository";
@@ -330,7 +335,32 @@ export class AssurMatchRuntime {
     gateway: this.aiGateway,
     redis: this.redis.client,
     countries: this.countries.service,
-    products: this.products.service
+    products: this.products.service,
+    // Lot 2 (spec 068): the explainers read published offers only, through the public catalogue
+    // visibility rules (lazy lambdas: `offers` and `publicOfferContext` are resolved at call time).
+    formFields: {
+      fields: async (countryId, productId, language) => {
+        const published = (await this.quoteForms.service.list()).filter((form) => form.status === "published" && form.countryId === countryId && form.productId === productId);
+        const form = published.find((candidate) => candidate.language === language) ?? published[0];
+        return (form?.fields ?? []).map((field) => ({ key: field.key, label: field.label }));
+      }
+    },
+    offers: {
+      detail: async (offerId, countryId, productId) => {
+        const context = await this.visitorAiOfferContext(countryId, productId);
+        const { offer } = await this.offers.publicCatalog.selectableOffer(offerId, countryId, productId, context);
+        if (!offer) throw new Error("Offer is not publicly available");
+        return this.offers.publicCatalog.detail(offerId, undefined, context);
+      },
+      compare: async (offerIds, countryId, productId) => {
+        const context = await this.visitorAiOfferContext(countryId, productId);
+        for (const offerId of offerIds) {
+          const { offer } = await this.offers.publicCatalog.selectableOffer(offerId, countryId, productId, context);
+          if (!offer) throw new Error("Offer is not publicly available");
+        }
+        return this.offers.publicCatalog.compare({ ids: offerIds.join(",") }, undefined, context);
+      }
+    }
   });
   readonly quoteAiSummary = new QuoteAISummaryService(this.notifications.queue, this.audit.writer, {
     id: "00000000-0000-4000-8000-000000000002",
@@ -520,8 +550,34 @@ readonly enterprise = new EnterpriseService({
     // Spec 055 FR-005: proposals of the request in the tracking space (resolved lazily).
     proposals: { forVisitorStatus: (quote, assignments, actor) => this.leadProposals.service.forVisitorStatus(quote, assignments, actor) },
     // Spec 062 messaging: flag + unread broker messages in the tracking status (resolved lazily).
-    messaging: { summaryForVisitorStatus: (quote) => this.leadMessaging.service.summaryForVisitorStatus(quote) }
+    messaging: { summaryForVisitorStatus: (quote) => this.leadMessaging.service.summaryForVisitorStatus(quote) },
+    // Lot 1 (spec 067) COMP-009: several offers need the flag open (re-checked by routing) and the visitor's consent.
+    isMultiBrokerEnabled: () => this.featureFlags.service.isEnabled("multi_broker_routing_enabled"),
+    // Lot 1 (spec 067) H2: a broker chosen directly must be eligible for the country and product.
+    brokerChoice: { isEligible: async (partnerTenantId: string, countryId: string, productId: string) => (await this.leads.eligibility.evaluate(partnerTenantId, countryId, productId).catch(() => undefined))?.eligible === true }
   }, this.audit.writer, this.redis.client, this.quoteRequestsRepository);
+  /** Lot 1 (spec 067): public options of the quote form (multi-broker availability, documents step, eligible brokers). */
+  readonly quoteOptions: QuoteOptionsService = new QuoteOptionsService({
+    findCountryByCode: (isoCode) => this.countries.service.findByIsoCode(isoCode),
+    findProductByKey: (productKey) => this.products.service.findByKey(productKey),
+    isMultiBrokerEnabled: () => this.featureFlags.service.isEnabled("multi_broker_routing_enabled"),
+    documentUploadEnabled: (countryId, productId) => this.documentUploadEnabledFor(countryId, productId),
+    verifyOffer: (offerId, countryId, productId) => this.verifySelectedOffer(offerId, countryId, productId),
+    partnerName: (partnerTenantId) => this.partnerDisplayName(partnerTenantId),
+    eligibleBrokers: async (countryId, productId) => (await this.leads.eligibility.candidates(countryId, productId))
+      .filter((candidate) => candidate.eligible)
+      .map((candidate) => ({ id: candidate.partner.id, displayName: candidate.partner.tradeName ?? candidate.partner.legalName })),
+    quoteJourneyOpen: (country, product) => {
+      const scoped = this.products.service.forCountry(product, country.id);
+      const state = new PublicJourneyFlagPolicy().resolve({
+        globalFlags: this.publicJourneyGlobalFlags(),
+        countryFlags: publicCountryFlags(country),
+        productFlags: scoped.flags,
+        requireProductFlags: true
+      });
+      return state.quoteEnabled && scoped.status !== "suspended" && scoped.status !== "retired";
+    }
+  });
   /** Spec 055: broker proposals, visitor follow-up and internal lead documents. */
   readonly leadProposals: LeadProposalsModule = new LeadProposalsModule({
     audit: this.audit.writer,
@@ -563,7 +619,9 @@ readonly enterprise = new EnterpriseService({
     partners: { findById: (id: string) => this.partners.service.require(id).catch(() => undefined) },
     // Spec 054 R2: a fresh visitor token is minted when the e-mail is rendered.
     visitorAccess: { issue: (quoteRequestId: string, context: { reason: string }) => this.quoteRequests.submissions.visitorAccess.issue(quoteRequestId, context) },
-    complianceEmail: () => complianceAlertEmail()
+    complianceEmail: () => complianceAlertEmail(),
+    // Lot 1 (spec 067): the document reminder carries a signed unsubscribe link and honours the opt-out.
+    reminderUnsubscribe: this.satisfactionSurveys.unsubscribe
   });
   readonly quoteDocuments = new QuoteDocumentsService({
     audit: this.audit.writer,
@@ -609,6 +667,15 @@ readonly enterprise = new EnterpriseService({
     documents: this.quoteDocuments,
     quotes: { findById: (id: string) => this.quoteRequests.submissions.findById(id) },
     visitorAccess: this.quoteRequests.submissions.visitorAccess
+  });
+  /** Lot 1 (spec 067, PRD §23): single J+3 reminder of a document request left open (worker task `document-reminders`). */
+  readonly documentReminders = new VisitorDocumentReminderService({
+    requests: this.leadMessagingRepository,
+    quotes: { findById: (id: string) => this.quoteRequests.submissions.findById(id) },
+    prospects: { findById: (id: string) => this.prospects.service.require(id).catch(() => undefined) },
+    assignments: { findById: (id: string) => this.leads.assignments.require(id).catch(() => undefined) },
+    notifications: this.notifications.quoteService,
+    unsubscribe: this.satisfactionSurveys.unsubscribe
   });
   readonly brokerAi = new BrokerAiService({
     audit: this.audit.writer,
@@ -1038,6 +1105,13 @@ readonly enterprise = new EnterpriseService({
     };
   }
 
+  /** Lot 2 (spec 068): visibility context of the visitor offer explainers, scoped to one country and product. */
+  private async visitorAiOfferContext(countryId: string, productId: string): Promise<PublicOfferVisibilityContext> {
+    const country = await this.countries.service.require(countryId);
+    const product = await this.products.service.require(productId);
+    return this.publicOfferContext({ countryFlags: publicCountryFlags(country), productFlags: this.products.service.effectiveFlags(product, country.id) });
+  }
+
   async publicOfferPartnerEligibility(partnerTenantId: string, countryId: string, productId: string): Promise<{ eligible: boolean; reasons: string[] }> {
     const reasons: string[] = [];
     const partner = await this.partners.service.require(partnerTenantId);
@@ -1103,6 +1177,23 @@ readonly enterprise = new EnterpriseService({
     }));
     if (!offer) return { accepted: false, reason: reasons[0] ?? "offer_not_public" };
     return { accepted: true, ...(offer.partnerTenantId ? { partnerTenantId: offer.partnerTenantId } : {}) };
+  }
+
+  /**
+   * Lot 1 (spec 067): same rule as the quote-documents upload gate (global quote flag, country and
+   * product quote flags, product document upload flag), read before a request exists.
+   */
+  async documentUploadEnabledFor(countryId: string, productId: string): Promise<boolean> {
+    const [country, product] = await Promise.all([
+      this.countries.service.require(countryId).catch(() => undefined),
+      this.products.service.require(productId).catch(() => undefined)
+    ]);
+    if (!country || !product) return false;
+    const flags = this.products.service.effectiveFlags(product, country.id);
+    return this.featureFlags.service.isEnabled("quote_request_enabled")
+      && publicCountryFlags(country).country_quote_enabled === true
+      && flags.product_quote_enabled === true
+      && flags.product_document_upload_enabled === true;
   }
 
   /** Spec 054: the name a visitor sees for a partner (trade name, else legal name). */

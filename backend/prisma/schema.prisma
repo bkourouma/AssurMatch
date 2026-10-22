@@ -215,6 +215,8 @@ enum NotificationType {
   visitor_data_request_closed
   broker_visitor_message
   admin_data_request_received
+  // Spec 067 (lot 1): single J+3 reminder of a document request left open.
+  visitor_documents_reminder
 }
 
 enum DeliveryStatus {
@@ -1285,6 +1287,12 @@ model QuoteRequest {
   /// Spec 052 R7: `accepted` or `ignored` (with the reason) after verification of the selected offer.
   selectedOfferOutcome       String?
   selectedOfferIgnoredReason String?
+  /// Spec 067 COMP-009: further offers (max 2) chosen with the primary `selectedOfferId`, verified at submission.
+  additionalOfferIds    String[]           @default([])
+  /// Spec 067 H2: broker (partner tenant) the visitor chose directly; routed first when still eligible.
+  chosenPartnerTenantId String?
+  /// Spec 067: declarative marketing source (UTM + referrer host), never a cookie or an identifier.
+  marketingSource       Json?
   quoteFormDefinitionId String
   prospectId            String
   consentRecordId       String
@@ -1597,6 +1605,8 @@ model LeadDocumentRequest {
   status                 String    @default("open")
   fulfilledAt            DateTime?
   fulfilledDocumentCount Int       @default(0)
+  /// Spec 067 (lot 1): set when the single J+3 reminder to the visitor was queued.
+  reminderQueuedAt       DateTime?
   cancelledAt            DateTime?
   cancelledById          String?
   /// `broker` | `reassigned` | `closed`.
@@ -1608,6 +1618,7 @@ model LeadDocumentRequest {
   @@index([leadAssignmentId, status])
   @@index([quoteRequestId])
   @@index([partnerTenantId])
+  @@index([status, createdAt])
 }
 
 /// Spec 062 (D-10): a data-subject request (access, rectification, erasure) from the visitor.

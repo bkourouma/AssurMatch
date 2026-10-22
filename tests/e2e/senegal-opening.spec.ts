@@ -6,6 +6,7 @@ import { loadWorld, saveWorld } from "./support/journey-state";
 import { extractLink, waitForMail } from "./support/mailpit";
 import { onboardBrokerSenegal, publishOfferSenegal } from "./support/senegal";
 import { card, fillReason, rowWith, uniqueSuffix } from "./support/ui";
+import { reviewQuote } from "./support/quote-form";
 import { appPage, complianceAccount, superAdminAccount } from "./support/world";
 
 // Spec 065 / PRD v0.3 section 4, SC-01 "à dérouler pour CI puis pour SN": the Super Admin opens the
@@ -319,10 +320,11 @@ test("SN-09 la conformité ouvre le Sénégal au public (checklist verte) : offr
     await visitor.locator("#am-answer-city").fill("Dakar");
     await visitor.locator("#am-answer-contact_preference").selectOption("email");
     await visitor.getByRole("button", { name: language === "fr" ? "Continuer" : "Continue" }).click();
-    await visitor.locator("#am-quote-name").fill("Awa Diallo");
+    await visitor.locator("#am-quote-first-name").fill("Awa");
+    await visitor.locator("#am-quote-last-name").fill("Diallo");
     await visitor.locator("#am-quote-email").fill(`visiteur.sn.${uniqueSuffix()}@visitor.e2e.test`);
     await visitor.locator("#am-quote-phone").fill("+221771234567");
-    await visitor.getByRole("button", { name: language === "fr" ? "Vérifier ma demande" : "Review my request" }).click();
+    await reviewQuote(visitor, language === "fr" ? "Vérifier ma demande" : "Review my request");
     // Nothing is sent: the journey stops on the review step, where the named consent is shown.
     await expect(visitor.locator("label[for='am-quote-consent'], #am-quote-consent >> xpath=..").first()).toContainText(partnerName);
     await expect(visitor.locator("label[for='am-quote-consent'], #am-quote-consent >> xpath=..").first()).toContainText(expected.consent);

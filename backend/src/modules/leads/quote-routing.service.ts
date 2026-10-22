@@ -1,6 +1,7 @@
 import { AuditLogWriter } from "../audit-logs/audit-log-writer.service";
 import { QuoteAuditActions } from "../audit-logs/quote-audit-actions";
 import type { ActorContext } from "../common/types";
+import { MAX_QUOTE_OFFERS } from "../../../../packages/shared/contracts/quote.contracts";
 import { MULTI_SEND_DEFAULT_RECIPIENTS } from "../../../../packages/shared/contracts/routing-rule.contracts";
 import type { RoutingRuleRecord } from "../routing/routing-rules.repository";
 import { EMPTY_ROUTING_STATS, selectRoutingCandidates, type RoutingCandidate, type RoutingPartnerStats } from "../routing/routing-strategy";
@@ -26,10 +27,42 @@ export interface RoutableQuoteRequest {
   selectedOfferOutcome?: "accepted" | "ignored";
   /** Spec 052 R7: broker of the accepted offer, retained first when it is eligible. */
   preferredPartnerTenantId?: string;
+  /**
+   * Spec 067 COMP-009 / H2: every preferred broker, in priority order (the first one is the principal
+   * and equals `preferredPartnerTenantId`). Built by the submission service from verified offers and
+   * the eligible direct choice; at most `MAX_QUOTE_OFFERS` are considered. When present it wins over
+   * the single `preferredPartnerTenantId`.
+   */
+  preferredPartnerTenantIds?: string[];
+  /** Spec 067 H2: the preferred broker that comes from the visitor's direct choice (not from an offer). */
+  chosenBrokerPartnerTenantId?: string;
 }
 
 /** Spec 052 R7: whether the broker of the selected offer was retained. */
 export type SelectedOfferRoutingOutcome = "retained" | "unavailable" | "none";
+
+/** Spec 052 R8: prefix of a consent naming one broker (`partner:<id>`). */
+export const NAMED_PARTNER_CONSENT_PREFIX = "partner:";
+/** Spec 067 COMP-009: prefix of a consent naming several brokers (`partners:<id1>,<id2>,<id3>`). */
+export const NAMED_PARTNERS_CONSENT_PREFIX = "partners:";
+
+/** Spec 067: the brokers a recorded consent names (`partner:` or `partners:`); empty for a category consent. */
+export function consentNamedPartners(intendedRecipient: string | undefined): string[] {
+  if (!intendedRecipient) return [];
+  if (intendedRecipient.startsWith(NAMED_PARTNERS_CONSENT_PREFIX)) {
+    return intendedRecipient.slice(NAMED_PARTNERS_CONSENT_PREFIX.length).split(",").map((id) => id.trim()).filter(Boolean);
+  }
+  if (intendedRecipient.startsWith(NAMED_PARTNER_CONSENT_PREFIX)) {
+    const id = intendedRecipient.slice(NAMED_PARTNER_CONSENT_PREFIX.length).trim();
+    return id ? [id] : [];
+  }
+  return [];
+}
+
+/** Spec 067: assignment and decision reason of a broker retained from the visitor's direct choice. */
+export const CHOSEN_BROKER_REASON = "chosen_broker";
+/** Spec 052 R7: assignment and decision reason of the broker of a selected offer. */
+export const SELECTED_OFFER_PARTNER_REASON = "selected_offer_partner";
 
 export interface QuoteRoutingResult {
   /** First recipient, kept for callers that only need one (notifications, confirmation copy). */
@@ -40,6 +73,8 @@ export interface QuoteRoutingResult {
   reasons: string[];
   /** Spec 052 R7: present when the request carried an accepted offer. */
   selectedOfferOutcome?: SelectedOfferRoutingOutcome;
+  /** Spec 067: preferred brokers (offers, direct choice) that received the request through the preferred path. */
+  retainedPartnerTenantIds?: string[];
 }
 
 /** Consent categories (spec 042). Anything other than the multi value means a single broker. */
@@ -130,35 +165,44 @@ export class QuoteRoutingService {
     }
 
     // Spec 052 R7 / D-4: the broker of the selected offer is retained alone when the deterministic
-    // eligibility accepts it (quota included), whatever the strategy; never more than one recipient.
-    if (offer.preferred) {
-      const preferred = candidates.find((candidate) => candidate.partner.id === offer.preferred);
-      const exclusiveConflict = mode === "exclusive" && rule?.exclusivePartnerTenantId !== offer.preferred;
-      if (preferred?.eligible && !exclusiveConflict) {
-        const reasons = ["selected_offer_partner"];
+    // eligibility accepts it (quota included), whatever the strategy.
+    // Spec 067 COMP-009 / H2: with several preferred brokers (offers, direct choice), only those that
+    // are eligible, compatible with an `exclusive` rule and named by the recorded consent are
+    // retained, and only while `multi_broker_routing_enabled` is open; otherwise the first usable
+    // preferred broker is retained alone. Never more than `MAX_QUOTE_OFFERS` recipients.
+    if (offer.preferredIds.length > 0) {
+      const retention = await this.retainPreferred(quote, offer.preferredIds, candidates, mode, rule, actor);
+      if (retention.retained.length > 0) {
+        const retained = retention.retained;
+        const reasonOf = (partnerTenantId: string): string =>
+          partnerTenantId === offer.chosenBroker ? CHOSEN_BROKER_REASON : SELECTED_OFFER_PARTNER_REASON;
+        const reasons = [...new Set(retained.map(reasonOf)), ...retention.reasons];
+        offer.retainedIds = retained;
         const decision = await this.decisions.record({
           quoteRequestId: quote.id,
           result: "assigned",
-          selectedPartnerTenantId: preferred.partner.id,
-          selectedPartnerTenantIds: [preferred.partner.id],
+          selectedPartnerTenantId: retained[0] as string,
+          selectedPartnerTenantIds: retained,
           candidateCount: candidates.length,
           excludedCandidates,
           reasons,
           ...correlation,
-          selectedOfferId: offer.offerId as string,
-          selectedOfferOutcome: "retained"
+          ...offer.decision
         }, actor);
-        const assignment = await this.assignments.create({
-          quoteRequestId: quote.id,
-          partnerTenantId: preferred.partner.id,
-          assignmentReason: "selected_offer_partner",
-          routingDecisionId: decision.id,
-          recipientCount: 1,
-          ...this.assignmentScope(quote)
-        }, actor);
-        return { assignment, assignments: [assignment], routingStatus: "assigned", reasons, selectedOfferOutcome: "retained" };
+        const assignments: LeadAssignmentRecord[] = [];
+        for (const partnerTenantId of retained) {
+          assignments.push(await this.assignments.create({
+            quoteRequestId: quote.id,
+            partnerTenantId,
+            assignmentReason: reasonOf(partnerTenantId),
+            routingDecisionId: decision.id,
+            recipientCount: retained.length,
+            ...this.assignmentScope(quote)
+          }, actor));
+        }
+        return { assignment: assignments[0] as LeadAssignmentRecord, assignments, routingStatus: "assigned", reasons, ...offer.result, retainedPartnerTenantIds: retained };
       }
-      offer.unavailableCode = exclusiveConflict ? "exclusive_rule" : preferred ? preferred.reasons[0] ?? "not_eligible" : "not_candidate";
+      offer.unavailableCode = retention.unavailableCode;
     }
 
     const now = new Date();
@@ -214,13 +258,26 @@ export class QuoteRoutingService {
    */
   private selectedOffer(quote: RoutableQuoteRequest) {
     const offerId = quote.selectedOfferOutcome === "accepted" ? quote.selectedOfferId : undefined;
+    // Spec 067: the explicit list (built from verified offers and the eligible direct choice) wins;
+    // the legacy single field only counts when it is backed by an accepted offer (spec 052).
+    const explicit = [...new Set((quote.preferredPartnerTenantIds ?? []).filter((id) => typeof id === "string" && id.length > 0))];
+    const preferredIds = explicit.length > 0
+      ? explicit.slice(0, MAX_QUOTE_OFFERS)
+      : offerId && quote.preferredPartnerTenantId ? [quote.preferredPartnerTenantId] : [];
+    const chosenBroker = quote.chosenBrokerPartnerTenantId && preferredIds.includes(quote.chosenBrokerPartnerTenantId) ? quote.chosenBrokerPartnerTenantId : undefined;
+    // Broker of the selected offer: the first preferred broker that does not come from the direct choice.
+    const offerPartner = offerId ? preferredIds.find((id) => id !== chosenBroker) : undefined;
     const state = {
       offerId,
-      preferred: offerId ? quote.preferredPartnerTenantId : undefined,
+      preferredIds,
+      preferred: preferredIds[0],
+      chosenBroker,
+      retainedIds: [] as string[],
       unavailableCode: undefined as string | undefined,
       get outcome(): SelectedOfferRoutingOutcome | undefined {
         if (!offerId) return undefined;
-        return state.preferred ? "unavailable" : "none";
+        if (!offerPartner) return "none";
+        return state.retainedIds.includes(offerPartner) ? "retained" : "unavailable";
       },
       get decision(): { selectedOfferId?: string; selectedOfferOutcome?: SelectedOfferRoutingOutcome } {
         return offerId && state.outcome ? { selectedOfferId: offerId, selectedOfferOutcome: state.outcome } : {};
@@ -234,6 +291,64 @@ export class QuoteRoutingService {
       }
     };
     return state;
+  }
+
+  /**
+   * Spec 052 R7 / Spec 067 COMP-009: which preferred brokers receive the request directly.
+   * - a preferred broker is usable when the deterministic eligibility accepts it (quota included)
+   *   and an `exclusive` rule does not name another partner;
+   * - one usable broker is retained alone (spec 052 behaviour);
+   * - several usable brokers are all retained (capped) only when the multi-broker flag is open AND
+   *   the recorded consent names them (`partners:`); otherwise the request degrades, audited, to the
+   *   first usable preferred broker alone. A consent is never widened by a later flag flip.
+   * An empty `retained` means no preferred broker can be used: the standard routing applies.
+   */
+  private async retainPreferred(
+    quote: RoutableQuoteRequest,
+    preferredIds: readonly string[],
+    candidates: Awaited<ReturnType<BrokerEligibilityPolicy["candidates"]>>,
+    mode: string,
+    rule: RoutingRuleRecord | undefined,
+    actor: ActorContext
+  ): Promise<{ retained: string[]; reasons: string[]; unavailableCode: string }> {
+    const usable: string[] = [];
+    const skipped: string[] = [];
+    let unavailableCode: string | undefined;
+    for (const partnerTenantId of preferredIds) {
+      const candidate = candidates.find((item) => item.partner.id === partnerTenantId);
+      const exclusiveConflict = mode === "exclusive" && rule?.exclusivePartnerTenantId !== partnerTenantId;
+      if (candidate?.eligible && !exclusiveConflict) {
+        usable.push(partnerTenantId);
+        continue;
+      }
+      const code = exclusiveConflict ? "exclusive_rule" : candidate ? candidate.reasons[0] ?? "not_eligible" : "not_candidate";
+      unavailableCode ??= code;
+      skipped.push(`preferred_partner_skipped:${code}`);
+    }
+    // Spec 052: a single preferred broker keeps exactly the historical decision reasons.
+    const skippedReasons = preferredIds.length > 1 ? skipped : [];
+    if (usable.length <= 1) return { retained: usable, reasons: skippedReasons, unavailableCode: unavailableCode ?? "not_candidate" };
+
+    const degrade = (reason: string): { retained: string[]; reasons: string[]; unavailableCode: string } => {
+      this.audit.write({
+        actor,
+        action: QuoteAuditActions.routingEvaluated,
+        targetType: "QuoteRequest",
+        targetId: quote.id,
+        scope: { countryId: quote.countryId, productId: quote.productId },
+        result: "success",
+        reason,
+        context: { mode, degradedToSingleBroker: true, preferredPartnerCount: usable.length }
+      });
+      return { retained: [usable[0] as string], reasons: [...skippedReasons, reason], unavailableCode: unavailableCode ?? "not_candidate" };
+    };
+    if (!this.options.multiBroker?.isEnabled()) return degrade("multi_broker_routing_disabled");
+    const consent = await this.options.consent?.findRecord(quote.consentRecordId);
+    const named = consent?.intendedRecipient?.startsWith(NAMED_PARTNERS_CONSENT_PREFIX) ? new Set(consentNamedPartners(consent.intendedRecipient)) : new Set<string>();
+    const covered = usable.filter((partnerTenantId) => named.has(partnerTenantId));
+    if (covered.length <= 1) return degrade("consent_covers_single_broker");
+    const notCovered = usable.filter((partnerTenantId) => !named.has(partnerTenantId)).map(() => "preferred_partner_skipped:consent_not_covering");
+    return { retained: covered.slice(0, MAX_QUOTE_OFFERS), reasons: [...skippedReasons, ...notCovered], unavailableCode: unavailableCode ?? "not_candidate" };
   }
 
   /**

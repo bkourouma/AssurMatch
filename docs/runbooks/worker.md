@@ -7,7 +7,12 @@ Un seul processus longue durée (`scripts/worker/assurmatch-worker.ts`, image AP
 1. recharge les drapeaux depuis la base ;
 2. livre les notifications de devis dues (spec 044) — `ASSURMATCH_QUOTE_NOTIFICATION_DELIVERY_LIMIT` ;
 3. livre les enquêtes de satisfaction dues (spec 048) — `ASSURMATCH_SATISFACTION_SURVEY_DELIVERY_LIMIT` ;
-4. livre les webhooks partenaires dus — **uniquement** si `ASSURMATCH_PARTNER_WEBHOOK_DELIVERY_ENABLED=true`
+4. envoie la relance unique « documents manquants » au visiteur (spec 067) — active sauf
+   `ASSURMATCH_DOCUMENT_REMINDERS_ENABLED=false` ; délai `ASSURMATCH_DOCUMENT_REMINDER_DAYS` (1-30,
+   défaut 3 jours après l'ouverture de la demande de documents), intervalle minimal entre deux
+   balayages `ASSURMATCH_DOCUMENT_REMINDER_INTERVAL_MINUTES` (1-1440, défaut 60) ; une seule relance
+   par demande, jamais si la demande est remplie, annulée ou l'adresse désinscrite ;
+5. livre les webhooks partenaires dus — **uniquement** si `ASSURMATCH_PARTNER_WEBHOOK_DELIVERY_ENABLED=true`
    (et le drapeau `partner_webhooks_enabled` reste vérifié par le service).
 
 Puis attend `ASSURMATCH_WORKER_INTERVAL_SECONDS` (défaut 30). Deux cycles ne se chevauchent jamais ;

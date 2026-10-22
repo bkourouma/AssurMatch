@@ -1,4 +1,5 @@
 import type { AiAssistTypeCatalog } from "../../../../../packages/shared/contracts/ai.contracts";
+import { renderCompareExplainer, renderFormHelp, renderGuaranteeExplainer } from "./visitor-explainer-templates";
 
 export interface AiGenerateRequest {
   assistType: AiAssistTypeCatalog;
@@ -62,7 +63,11 @@ export class TemplateAiProvider implements AiProviderPort {
         return `Resume de votre besoin (${product}, ${country}): ${provided.length > 0 ? provided.map(([key, value]) => `${key}: ${describe(value)}`).join("; ") : "aucun element detaille"}.${missing.length > 0 ? ` Elements a completer: ${missing.join(", ")}.` : ""} Cette demande sera transmise a un courtier partenaire eligible qui confirmera le devis.`;
       }
       case "visitor_form_help":
-        return `Le champ "${describe(input.fieldLabel)}" sert au courtier partenaire pour preparer un devis ${product} adapte. Indiquez une valeur exacte ou approximative; elle pourra etre precisee avec le courtier.`;
+        return renderFormHelp(input, request.language) ?? `Le champ "${describe(input.fieldLabel)}" sert au courtier partenaire pour preparer un devis ${product} adapte. Indiquez une valeur exacte ou approximative; elle pourra etre precisee avec le courtier.`;
+      case "visitor_guarantee_explainer":
+        return renderGuaranteeExplainer(input, request.language);
+      case "visitor_compare_explainer":
+        return renderCompareExplainer(input, request.language);
       case "visitor_consistency_check": {
         const answers = entries(input, "answers");
         const empty = answers.filter(([, value]) => value === null || value === undefined || value === "").map(([key]) => key);

@@ -27,6 +27,8 @@ export type EmailPurpose =
   | "quote_visitor_documents_requested"
   | "quote_visitor_data_request_acknowledged"
   | "quote_visitor_data_request_closed"
+  // Spec 067: single J+3 reminder of a document request left open.
+  | "quote_visitor_documents_reminder"
   // Spec 047: the three public-site forms confirm their own submission, so each one needs a
   // distinct purpose in the `email.delivery.*` audit trail rather than a shared "public form" value.
   | "public_waitlist_confirmation"

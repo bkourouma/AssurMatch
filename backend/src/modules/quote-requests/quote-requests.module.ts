@@ -50,6 +50,10 @@ export interface QuoteRequestsModuleDeps {
   proposals?: QuoteSubmissionDependencies["proposals"];
   /** Spec 062: messaging flag and unread count of the tracking status. */
   messaging?: QuoteSubmissionDependencies["messaging"];
+  /** Spec 067 COMP-009: `multi_broker_routing_enabled`; absent means closed. */
+  isMultiBrokerEnabled?: QuoteSubmissionDependencies["isMultiBrokerEnabled"];
+  /** Spec 067 H2: eligibility of the broker the visitor chose directly. */
+  brokerChoice?: QuoteSubmissionDependencies["brokerChoice"];
 }
 
 export class QuoteRequestsModule {
@@ -89,6 +93,8 @@ export class QuoteRequestsModule {
       ...(deps.assignmentHistory ? { assignmentHistory: deps.assignmentHistory } : {}),
       ...(deps.proposals ? { proposals: deps.proposals } : {}),
       ...(deps.messaging ? { messaging: deps.messaging } : {}),
+      ...(deps.isMultiBrokerEnabled ? { isMultiBrokerEnabled: deps.isMultiBrokerEnabled } : {}),
+      ...(deps.brokerChoice ? { brokerChoice: deps.brokerChoice } : {}),
       findCountryById: async (countryId: string) => {
         const country = await deps.countries.require(countryId).catch(() => undefined);
         return country ? { isoCode: country.isoCode, name: country.name } : undefined;

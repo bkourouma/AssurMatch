@@ -11,6 +11,7 @@ import {
 import { activateWithMfa, e2ePassword, newAppContext, openAs, type BackOfficeAccount } from "./support/backoffice";
 import { e2eEnv } from "./support/env";
 import { loadJourneyState, requireState, saveJourneyState } from "./support/journey-state";
+import { reviewQuote } from "./support/quote-form";
 import { extractLink, messageIdsTo, waitForMail } from "./support/mailpit";
 import { card, confirmInDialog, escapeRegExp, expectActionSuccess, fillReason, idFromUrl, uniqueSuffix } from "./support/ui";
 import { pdfFile } from "./support/files";
@@ -428,10 +429,11 @@ test("SC-05 le visiteur compare, choisit l'offre du courtier, consent nommément
   await visitor.locator("#am-answer-city").fill("Abidjan");
   await visitor.locator("#am-answer-contact_preference").selectOption("email");
   await visitor.getByRole("button", { name: "Continuer" }).click();
-  await visitor.locator("#am-quote-name").fill("Mariam Traoré");
+  await visitor.locator("#am-quote-first-name").fill("Mariam");
+  await visitor.locator("#am-quote-last-name").fill("Traoré");
   await visitor.locator("#am-quote-email").fill(visitorEmail);
   await visitor.locator("#am-quote-phone").fill("+2250102030405");
-  await visitor.getByRole("button", { name: "Vérifier ma demande" }).click();
+  await reviewQuote(visitor);
 
   // The consent names the recipient broker (constitution II, decision D-4).
   const consent = visitor.locator("label[for='am-quote-consent'], #am-quote-consent >> xpath=..").first();
