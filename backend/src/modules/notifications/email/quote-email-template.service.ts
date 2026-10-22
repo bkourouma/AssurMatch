@@ -91,6 +91,8 @@ export type BrokerAlertEmailType =
   | "broker_quota_threshold"
   | "broker_license_expiring"
   | "broker_offer_expiring"
+  | "broker_lead_expiring"
+  | "broker_weekly_summary"
   | "broker_dispute_decided";
 
 const BROKER_ALERT_COPY: Record<BrokerAlertEmailType, { subject: string; line: string; path: string }> = {
@@ -101,6 +103,9 @@ const BROKER_ALERT_COPY: Record<BrokerAlertEmailType, { subject: string; line: s
   broker_quota_threshold: { subject: "Quota mensuel de leads", line: "Votre quota mensuel de leads atteint un seuil d'alerte.", path: "/account" },
   broker_license_expiring: { subject: "Licence bientôt expirée", line: "Une licence de votre cabinet arrive bientôt à expiration. Pensez à transmettre son renouvellement.", path: "/licenses" },
   broker_offer_expiring: { subject: "Offre bientôt expirée", line: "Une de vos offres publiées arrive bientôt à la fin de sa période de validité.", path: "/offers" },
+  // PRD section 23: pointers only; the lead reference and the figures stay in the back-office.
+  broker_lead_expiring: { subject: "Lead proche de son échéance", line: "Un de vos leads n'a pas encore été traité et approche de son délai de première action.", path: "/leads" },
+  broker_weekly_summary: { subject: "Résumé hebdomadaire de votre activité", line: "Le résumé de votre semaine est disponible dans votre espace courtier.", path: "/reports" },
   // Spec 063 FR-B08: pointer only; the decision itself is shown in Facturation > Contestations.
   broker_dispute_decided: { subject: "Décision sur votre contestation", line: "Une décision est disponible dans Facturation > Contestations.", path: "/billing" }
 };

@@ -165,7 +165,7 @@ export interface BrokerApiState<T> {
   mfaRequired?: boolean;
 }
 
-async function readBroker<T>(path: string, fallback: T): Promise<BrokerApiState<T>> {
+export async function readBroker<T>(path: string, fallback: T): Promise<BrokerApiState<T>> {
   const token = await getBackOfficeToken();
   if (!token) return { status: "unauthenticated", data: fallback, unauthenticated: true, error: "session_required" };
 
@@ -195,7 +195,7 @@ export interface BrokerAgencyQuery {
   agencyId?: string | undefined;
 }
 
-function withAgency(path: string, query: BrokerAgencyQuery | undefined): string {
+export function withAgency(path: string, query: BrokerAgencyQuery | undefined): string {
   if (!query?.agencyId) return path;
   return `${path}${path.includes("?") ? "&" : "?"}agencyId=${encodeURIComponent(query.agencyId)}`;
 }
@@ -798,4 +798,19 @@ export function readLeadConversation(channel: "starter" | "crm", leadAssignmentI
 /** GET /broker/{starter|crm}/leads/:leadId/document-requests */
 export function readLeadDocumentRequests(channel: "starter" | "crm", leadAssignmentId: string) {
   return readBroker<BrokerDocumentRequestListData>(`/broker/${channel}/leads/${encodeURIComponent(leadAssignmentId)}/document-requests`, emptyDocumentRequests);
+}
+
+/** Lot 3 (spec 069) CRM-006: members of the caller's own cabinet (GET /broker/team, tenant-bound server side). */
+export interface BrokerTeamMemberData {
+  id: string;
+  displayName: string;
+  email: string;
+  roles: string[];
+  status: string;
+  isSelf: boolean;
+  isOwner: boolean;
+}
+
+export function readBrokerTeam() {
+  return readBroker<BrokerTeamMemberData[]>("/broker/team", []);
 }

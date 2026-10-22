@@ -39,7 +39,14 @@ export const GLOBAL_FEATURE_FLAG_DEFAULTS = {
    * is obtained. Non-sensitive on purpose: admin-toggleable, and switching it off refuses new writes with
    * MESSAGING_DISABLED while reads stay.
    */
-  broker_visitor_messaging_enabled: false
+  broker_visitor_messaging_enabled: false,
+  /**
+   * PRD section 23: weekly summary of a Pro/Enterprise broker's activity, composed with the AI when
+   * `ai_summary_enabled`, the plan and the partner opt-out allow it (deterministic text otherwise).
+   * Ships OFF. Non-sensitive like `ai_summary_enabled`: the text is aggregates only and purely
+   * descriptive (guardrail `advice_not_allowed`), so an admin may toggle it from the flags screen.
+   */
+  broker_weekly_ai_summary_enabled: false
 } as const;
 
 export const COUNTRY_FEATURE_FLAG_DEFAULTS = {

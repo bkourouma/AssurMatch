@@ -9,7 +9,7 @@ import type { VisitorEmailNotificationType } from "./quote-notification.service"
 export type DeliverableQuoteNotificationType = VisitorEmailNotificationType | "broker_lead_assigned" | "broker_visitor_response" | "broker_lead_reassigned" | BrokerAlertEmailType | "admin_alert_raised";
 
 /** Spec 061: broker alert pointers rendered from the partner alone (no quote lookup). */
-const BROKER_ALERT_TYPES = new Set<string>(["broker_visitor_message", "broker_document_received", "broker_task_due", "broker_quota_threshold", "broker_license_expiring", "broker_offer_expiring", "broker_dispute_decided"]);
+const BROKER_ALERT_TYPES = new Set<string>(["broker_visitor_message", "broker_document_received", "broker_task_due", "broker_quota_threshold", "broker_license_expiring", "broker_offer_expiring", "broker_lead_expiring", "broker_weekly_summary", "broker_dispute_decided"]);
 
 /**
  * Spec 054 R4: the step each visitor type announces. The two spec 044 types stay renderable for the

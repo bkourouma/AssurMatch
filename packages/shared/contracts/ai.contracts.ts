@@ -4,7 +4,7 @@ import { dateTimeStringSchema, isoCountrySchema, nonEmptyStringSchema, uuidSchem
 export const aiSurfaceSchema = z.enum(["visitor", "broker_crm", "admin_platform"]);
 
 export const visitorAssistTypes = ["visitor_product_assistant", "visitor_request_summary", "visitor_form_help", "visitor_consistency_check", "visitor_faq"] as const;
-export const brokerAssistTypes = ["lead_summary", "lead_score", "next_action", "relaunch_message", "lead_classification", "duplicate_hint", "loss_analysis"] as const;
+export const brokerAssistTypes = ["lead_summary", "lead_score", "next_action", "relaunch_message", "lead_classification", "duplicate_hint", "loss_analysis", "performance_summary", "manager_assistant", "weekly_summary"] as const;
 export const adminAssistTypes = ["admin_risk_triage", "activation_gap_summary", "offer_consistency_check", "activity_report", "suspicious_leads", "routing_anomaly_analysis"] as const;
 export const aiAssistTypes = [...visitorAssistTypes, ...brokerAssistTypes, ...adminAssistTypes] as const;
 export const aiAssistTypeCatalogSchema = z.enum(aiAssistTypes);
@@ -131,3 +131,38 @@ export type AiInteractionStatus = z.output<typeof aiInteractionStatusSchema>;
 export type AiHumanValidationStatus = z.output<typeof aiHumanValidationStatusSchema>;
 export type AiInteraction = z.output<typeof aiInteractionSchema>;
 export type AiLeadScore = z.output<typeof aiLeadScoreSchema>;
+
+/**
+ * Tenant-level broker assistances (PRD section 10.2, DASH-B-009, section 23): they only ever receive
+ * aggregates of the caller's own tenant, never prospect data. `manager_assistant` is Enterprise only,
+ * `weekly_summary` is the descriptive text of the scheduled weekly alert (no recommendation).
+ */
+export const brokerTenantAssistTypes = ["loss_analysis", "performance_summary", "manager_assistant", "weekly_summary"] as const;
+export const brokerTenantAssistTypeSchema = z.enum(brokerTenantAssistTypes);
+export const brokerAiInsightRequestSchema = z.object({
+  language: z.enum(["fr", "en"]).default("fr"),
+  /** Observation window of the aggregates, in days. */
+  windowDays: z.coerce.number().int().min(7).max(365).default(30)
+});
+/** Manager analysis: advisors are sent to the model as neutral labels; the label -> advisor id map stays server side and is only returned to the manager. */
+export const brokerManagerAnalysisSchema = aiInteractionSchema.extend({
+  advisorLabels: z.record(z.string().max(16), z.string().max(128))
+});
+/** CRM-015: an approved (human validated) indicative priority score of one lead. */
+export const brokerAiPriorityScoreSchema = z.object({
+  score: z.number().int().min(0).max(100),
+  level: z.enum(["low", "medium", "high"]),
+  interactionId: uuidSchema
+});
+export const brokerAiPriorityScoresSchema = z.object({
+  /** False when lead scoring is closed for the caller (flag, partner opt-out or plan): `scores` is then empty. */
+  enabled: z.boolean(),
+  /** Keyed by lead assignment id; only leads of the caller's CRM perimeter with an approved score. */
+  scores: z.record(z.string(), brokerAiPriorityScoreSchema)
+});
+
+export type BrokerTenantAssistType = z.output<typeof brokerTenantAssistTypeSchema>;
+export type BrokerAiInsightRequest = z.output<typeof brokerAiInsightRequestSchema>;
+export type BrokerManagerAnalysis = z.output<typeof brokerManagerAnalysisSchema>;
+export type BrokerAiPriorityScore = z.output<typeof brokerAiPriorityScoreSchema>;
+export type BrokerAiPriorityScores = z.output<typeof brokerAiPriorityScoresSchema>;

@@ -4,6 +4,8 @@ export const featureFlagMutationRefusedAction = "feature_flag.change_refused";
 export const sensitiveFeatureFlagRefusalReason = "explicit_policy_required_for_sensitive_feature_flag";
 
 // ai_partner_opt_out restricts AI usage (partner opt-out), so it stays freely mutable.
+// broker_weekly_ai_summary_enabled follows ai_summary_enabled (descriptive aggregates, still gated by it
+// in the AI gateway): not listed below, so it stays admin-toggleable.
 const aiFlagsWithExplicitMutationPolicy = new Set(["ai_summary_enabled", "ai_partner_opt_out"]);
 
 const explicitlyProtectedFeatureFlags = new Set([

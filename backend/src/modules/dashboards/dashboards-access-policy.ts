@@ -98,6 +98,26 @@ export class DashboardsAccessPolicy {
     });
   }
 
+  /** PRD §6.3: the multi-agency view is an Enterprise steering view, closed to assigned-only roles. */
+  assertBrokerAgenciesView(actor: ActorContext, plan: BrokerDashboardPlan): void {
+    if (plan !== "enterprise") this.refuseBroker(actor, "enterprise_plan_required");
+    if (actor.roles.includes("broker_agent") || actor.roles.includes("broker_read_only")) {
+      this.refuseBroker(actor, "agencies_view_not_allowed");
+    }
+  }
+
+  auditBrokerAgenciesRead(actor: ActorContext, rowCount: number): void {
+    this.audit.write({
+      actor,
+      action: DashboardAuditActions.brokerAgenciesRead,
+      targetType: "BrokerDashboardAgencies",
+      targetId: "agencies",
+      scope: { partnerTenantId: actor.partnerTenantId },
+      result: "success",
+      context: { rowCount }
+    });
+  }
+
   crmSectionAllowed(actor: ActorContext, brokerCrmEnabled: boolean): boolean {
     if (!brokerCrmEnabled) {
       this.audit.write({
