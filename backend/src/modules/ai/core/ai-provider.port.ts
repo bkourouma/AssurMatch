@@ -105,6 +105,8 @@ export class TemplateAiProvider implements AiProviderPort {
         return `Ecarts d'activation: ${describe(input.blocked)} section(s) bloquee(s), ${describe(input.warning)} avertissement(s). Principaux manques: ${describe(input.reasons)}.`;
       case "offer_consistency_check":
         return `Verification indicative de l'offre "${describe(input.name)}": ${describe(input.issues)}. Ces points sont a confirmer par un admin avant publication.`;
+      case "offer_summary":
+        return `Resume indicatif de l'offre "${describe(input.offerKey)}": garanties ${describe(input.guarantees)}; exclusions ${describe(input.exclusions)}; franchise ${describe(input.deductible)}; plafond ${describe(input.ceiling)}; delai de traitement ${describe(input.processingDelayDays)} jour(s); prix indicatif ${describe(input.indicativePrice)}; validite ${describe(input.validity)}. Offre indicative, conditions a confirmer par le courtier partenaire.`;
       case "activity_report":
         return `Rapport d'activite (${describe(input.window)}): ${describe(input.received)} demandes recues, ${describe(input.transmitted)} transmises, ${describe(input.refused)} refusees, ${describe(input.nonRouted)} non routees. Partenaires actifs: ${describe(input.activePartners)}.`;
       case "suspicious_leads":

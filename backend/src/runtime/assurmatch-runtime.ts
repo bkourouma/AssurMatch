@@ -129,6 +129,20 @@ import { AdminOperationsModule } from "../modules/admin-operations/admin-operati
 // Spec 062 data requests
 import { DataRequestsModule, MemoryDataRequestsRepository, PrismaDataRequestsRepository } from "../modules/data-requests/data-requests.module";
 import type { DataRequestNotificationsPort } from "../modules/lead-messaging/lead-messaging.ports";
+// Lot 4 (spec 070)
+import { InsurersModule, MemoryInsurersRepository, PrismaInsurersRepository } from "../modules/insurers/insurers.module";
+import { AdminProductCategoriesController } from "../modules/products/admin-product-categories.controller";
+import { MemoryProductCategoriesRepository, PrismaProductCategoriesRepository } from "../modules/products/product-categories.repository";
+import { ProductCategoriesService } from "../modules/products/product-categories.service";
+import { MemoryProductVersionsRepository, PrismaProductVersionsRepository } from "../modules/products/product-versions.repository";
+import { OfferAiSummaryController } from "../modules/offers/offer-ai-summary.controller";
+import { OfferAiSummaryService } from "../modules/offers/offer-ai-summary.service";
+import { ActivationAttestationsController } from "../modules/activation-checklist/activation-attestations.controller";
+import { MemoryActivationAttestationsRepository, PrismaActivationAttestationsRepository } from "../modules/activation-checklist/activation-attestations.repository";
+import { ActivationAttestationsService } from "../modules/activation-checklist/activation-attestations.service";
+import { MemoryRoutingRulesRepository, type RoutingRulesRepository } from "../modules/routing/routing-rules.repository";
+import { MemoryScoringRulesRepository, type ScoringRulesRepository } from "../modules/offers/scoring-rules.repository";
+// End Lot 4 (spec 070)
 
 export class AssurMatchRuntime {
   readonly config = new ConfigModule();
@@ -166,6 +180,14 @@ export class AssurMatchRuntime {
   private readonly visitorAccessTokensRepository = this.runtimeRepository(new PrismaVisitorAccessTokensRepository(this.prisma));
   private readonly routingRulesRepository = this.runtimeRepository(new PrismaRoutingRulesRepository(this.prisma));
   private readonly scoringRulesRepository = this.runtimeRepository(new PrismaScoringRulesRepository(this.prisma));
+  // Lot 4 (spec 070): memory instances owned here under test, so the checklist reads the very rules the services hold.
+  private readonly routingRulesStore: RoutingRulesRepository = this.routingRulesRepository ?? new MemoryRoutingRulesRepository();
+  private readonly scoringRulesStore: ScoringRulesRepository = this.scoringRulesRepository ?? new MemoryScoringRulesRepository();
+  private readonly productCategoriesRepository = this.runtimeRepository(new PrismaProductCategoriesRepository(this.prisma)) ?? new MemoryProductCategoriesRepository();
+  private readonly productVersionsRepository = this.runtimeRepository(new PrismaProductVersionsRepository(this.prisma)) ?? new MemoryProductVersionsRepository();
+  private readonly insurersRepository = this.runtimeRepository(new PrismaInsurersRepository(this.prisma)) ?? new MemoryInsurersRepository();
+  private readonly activationAttestationsRepository = this.runtimeRepository(new PrismaActivationAttestationsRepository(this.prisma)) ?? new MemoryActivationAttestationsRepository();
+  // End Lot 4 (spec 070)
   private readonly quoteDocumentsRepository = this.runtimeRepository(new PrismaQuoteDocumentsRepository(this.prisma)) ?? new MemoryQuoteDocumentsRepository();
   private readonly waitlistRepository = this.runtimeRepository(new PrismaWaitlistRepository(this.prisma)) ?? new MemoryWaitlistRepository();
   private readonly partnerApplicationsRepository = this.runtimeRepository(new PrismaPartnerApplicationsRepository(this.prisma)) ?? new MemoryPartnerApplicationsRepository();
@@ -216,7 +238,13 @@ export class AssurMatchRuntime {
   readonly countries: CountriesModule = new CountriesModule(this.audit.writer, this.countriesRepository, {
     find: async (id: string): Promise<{ id: string; status: string } | undefined> => this.regulatoryRegimes.service.find(id)
   });
-  readonly products = new ProductsModule(this.audit.writer, this.productsRepository);
+  // Lot 4 (spec 070): categories and content versions; the author label comes from the user directory (lazy: users are built later).
+  readonly products = new ProductsModule(this.audit.writer, this.productsRepository, {
+    categories: this.productCategoriesRepository,
+    versions: this.productVersionsRepository,
+    resolveAuthorLabel: async (authorId: string) => (await this.users.service.require(authorId).catch(() => undefined))?.displayName
+  });
+  // End Lot 4 (spec 070)
   readonly partners = new PartnersModule(this.audit.writer, this.partnersRepository);
   readonly partnerLicenses = new PartnerLicensesModule(this.audit.writer, this.partnerLicensesRepository);
   /** Spec 051 R12: partner status per request (auth guard, login), invalidated on every partner change. */
@@ -318,6 +346,9 @@ export class AssurMatchRuntime {
     countryFlags: { country_ai_enabled: false },
     productFlags: { product_ai_form_assistant_enabled: false }
   });
+  // Lot 4 (spec 070): insurer referential (offers link to it through `OfferIntegrations.insurer`).
+  readonly insurers = new InsurersModule(this.audit.writer, this.insurersRepository);
+  // End Lot 4 (spec 070)
   /** Spec 052: offer versions; the integrations are lazy (partners, licences, inbox, eligibility). */
   readonly offers: OffersModule = new OffersModule(this.audit.writer, this.redis.client, this.offersRepository, {
     partnerEligibility: (partnerTenantId: string, countryId: string, productId: string) => this.publicOfferPartnerEligibility(partnerTenantId, countryId, productId),
@@ -328,6 +359,9 @@ export class AssurMatchRuntime {
       return partner?.tradeName ?? partner?.legalName;
     },
     partnerStatus: async (partnerTenantId: string) => (await this.partners.service.require(partnerTenantId).catch(() => undefined))?.status,
+    // Lot 4 (spec 070)
+    insurer: (insurerId: string) => this.insurers.service.resolve(insurerId),
+    // End Lot 4 (spec 070)
     notifier: {
       publishInApp: (input) => this.notifications.dispatch.publishInApp(input),
       listInApp: (scopeId: string, limit?: number) => this.notifications.dispatch.listInApp(scopeId, limit)
@@ -337,7 +371,9 @@ export class AssurMatchRuntime {
     audit: this.audit.writer,
     countries: this.countries.service,
     products: this.products.service,
-    ...(this.scoringRulesRepository ? { repository: this.scoringRulesRepository } : {})
+    // Lot 4 (spec 070)
+    repository: this.scoringRulesStore
+    // End Lot 4 (spec 070)
   });
   readonly quoteForms = new QuoteFormsModule(this.audit.writer, {
     // Spec 050 T007 (C4): the real purpose, language, scope and content reach the forms service, so
@@ -382,7 +418,9 @@ export class AssurMatchRuntime {
     countries: this.countries.service,
     products: this.products.service,
     partners: this.partners.service,
-    ...(this.routingRulesRepository ? { repository: this.routingRulesRepository } : {})
+    // Lot 4 (spec 070)
+    repository: this.routingRulesStore
+    // End Lot 4 (spec 070)
   });
   readonly leads = new LeadsModule(
     this.partners.service,
@@ -709,6 +747,11 @@ readonly enterprise = new EnterpriseService({
     offers: this.offers,
     quoteForms: this.quoteForms.service,
     consent: this.consent.service,
+    // Lot 4 (spec 070): manual attestations and the computed routing / scoring rule controls (PRD 35/36).
+    attestations: this.activationAttestationsRepository,
+    routingRules: { listRules: () => this.routingRulesStore.list() },
+    scoringRules: { listRules: () => this.scoringRulesStore.list() },
+    // End Lot 4 (spec 070)
     partnerReadiness: this.partnerAdmin
   });
   /** Spec 050: admin catalogue and controlled flag toggles; closes cached public reads on change. */
@@ -723,6 +766,34 @@ readonly enterprise = new EnterpriseService({
     consent: this.consent.service,
     onCatalogChanged: () => this.publicCountryDirectory.invalidate()
   });
+  // Lot 4 (spec 070): admin product categories, offer AI summary (closed by default) and activation attestations.
+  readonly productCategories = new ProductCategoriesService(this.audit.writer, { list: (countryId?: string) => this.products.service.listAdmin(countryId) }, this.productCategoriesRepository);
+  readonly adminProductCategories = new AdminProductCategoriesController(this.productCategories, this.audit.writer);
+  readonly offerAiSummary = new OfferAiSummaryController(new OfferAiSummaryService({
+    offers: this.offers.repository,
+    gateway: this.aiGateway,
+    audit: this.audit.writer,
+    scopeFlags: async (offer) => {
+      const [country, product] = await Promise.all([
+        this.countries.service.require(offer.countryId).catch(() => undefined),
+        this.products.service.require(offer.productId).catch(() => undefined)
+      ]);
+      return {
+        countryId: offer.countryId,
+        productId: offer.productId,
+        // A missing country or product closes the summary (an absent flag is not true).
+        countryFlags: country ? { ...publicCountryFlags(country) } : { country_ai_enabled: false },
+        productFlags: product ? { ...this.products.service.effectiveFlags(product, offer.countryId) } : {}
+      };
+    }
+  }));
+  readonly activationAttestations = new ActivationAttestationsController(new ActivationAttestationsService({
+    repository: this.activationAttestationsRepository,
+    audit: this.audit.writer,
+    countries: this.countries.service,
+    products: this.products.service
+  }));
+  // End Lot 4 (spec 070)
   readonly routingAnomalies = new RoutingAnomalyDetectorService({
     quoteRequests: {
       list: () => this.quoteRequests.submissions.list()
@@ -1073,6 +1144,14 @@ readonly enterprise = new EnterpriseService({
       WaitlistRepository: this.waitlistRepository?.mode,
       PartnerApplicationsRepository: this.partnerApplicationsRepository?.mode,
       ContactMessagesRepository: this.contactMessagesRepository?.mode,
+      // Lot 4 (spec 070)
+      ProductCategoriesRepository: this.productCategoriesRepository.mode,
+      ProductVersionsRepository: this.productVersionsRepository.mode,
+      InsurersRepository: this.insurersRepository.mode,
+      ActivationAttestationsRepository: this.activationAttestationsRepository.mode,
+      RoutingRulesRepository: this.routingRulesStore.mode,
+      ScoringRulesRepository: this.scoringRulesStore.mode,
+      // End Lot 4 (spec 070)
       DataRetentionRepository: this.dataRetentionRepository?.mode,
       RetentionSubjectsRepository: this.retentionSubjectsRepository?.mode,
       // Spec 062 messaging

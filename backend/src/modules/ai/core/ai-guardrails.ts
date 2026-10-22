@@ -11,7 +11,8 @@ const FORBIDDEN_AI_PATTERNS: Array<[string, RegExp]> = [
   ["acceptance_decision", /(demande|dossier)\s+(acceptee?|refusee?|validee?)\b/i],
   ["contract_validated", /contrat\s+valid(e|é)/i],
   ["chosen_broker", /courtier\s+choisi/i],
-  ["guaranteed", /garantie\s+acceptee|nous\s+vous\s+assurons/i]
+  ["guaranteed", /garantie\s+acceptee|nous\s+vous\s+assurons/i],
+  ["guarantee_promise", /nous\s+(vous\s+)?garantissons|vous\s+(etes|êtes)\s+(couvert|assure|assuré)|couverture\s+garantie|remboursement\s+garanti|sans\s+aucune\s+exclusion/i]
 ];
 
 const MAX_OUTPUT_CHARS = 4000;
@@ -19,7 +20,7 @@ const MAX_OUTPUT_CHARS = 4000;
 /** Assist types whose output influences score, priority, relaunch or risk analysis: human validation is mandatory. */
 const HUMAN_VALIDATION_REQUIRED: ReadonlySet<AiAssistTypeCatalog> = new Set([
   "lead_score", "next_action", "relaunch_message", "lead_classification", "duplicate_hint", "loss_analysis",
-  "admin_risk_triage", "offer_consistency_check", "suspicious_leads", "routing_anomaly_analysis"
+  "admin_risk_triage", "offer_consistency_check", "offer_summary", "suspicious_leads", "routing_anomaly_analysis"
 ]);
 
 export interface GuardrailVerdict {

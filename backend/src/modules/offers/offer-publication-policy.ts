@@ -8,6 +8,8 @@ export interface OfferPublicationDecision {
 export class OfferPublicationPolicy {
   evaluate(offer: OfferRecord, now = new Date()): OfferPublicationDecision {
     const reasons: string[] = [];
+    // Spec 070 (PRD 13): a private offer belongs to its broker only, whatever its validation state.
+    if (offer.offerType === "private") reasons.push("offer_private");
     if (offer.status !== "active" && offer.status !== "validated") reasons.push("offer_not_active");
     if (offer.validationStatus !== "validated") reasons.push("offer_not_validated");
     if (offer.validFrom > now) reasons.push("offer_not_started");
