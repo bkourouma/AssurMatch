@@ -42,9 +42,34 @@ export class OpenContentEntryExistsError extends Error {
   }
 }
 
+/**
+ * What a conditional write expects to find on the row. Any mismatch means another write landed
+ * between the read and this write: nothing is written and the caller answers 409.
+ */
+export interface ContentEntryGuard {
+  status: ContentStatus;
+  /** `updatedAt` as read. The service moves it strictly forward on every write, so it is the row version. */
+  updatedAt: Date;
+  /** Four eyes, checked in the write itself: the stored submitter must be set and differ from this actor. */
+  submittedByNot?: string;
+}
+
+/** Fields a transition may change; the identity of the content (key, version) never changes. */
+export type ContentEntryPatch = Partial<Pick<ContentEntryRecord, "status" | "label" | "payload" | "submittedById" | "submittedAt" | "decidedById" | "decidedAt" | "decisionNote" | "publishedAt">> & { updatedAt: Date };
+
+export interface ContentPublication {
+  publishedAt: Date;
+  decidedById: string;
+  note: string | null;
+}
+
 export interface ContentCmsRepository extends RuntimeRepository {
   create(entry: ContentEntryRecord): Promise<ContentEntryRecord>;
-  update(id: string, patch: Partial<Omit<ContentEntryRecord, "id" | "createdAt">>): Promise<ContentEntryRecord>;
+  /**
+   * Conditional write: applied only when the row still matches `guard` (compare-and-set). Returns
+   * the updated row, or `undefined` when the row is gone or changed since it was read.
+   */
+  transition(id: string, guard: ContentEntryGuard, patch: ContentEntryPatch): Promise<ContentEntryRecord | undefined>;
   find(id: string): Promise<ContentEntryRecord | undefined>;
   list(filter: ContentEntryListQuery): Promise<ContentEntryRecord[]>;
   /** Every version of one key, newest version first. */
@@ -57,10 +82,17 @@ export interface ContentCmsRepository extends RuntimeRepository {
   /** Public read path: published rows of one locale only. */
   listPublished(locale: ContentCmsLocale): Promise<ContentEntryRecord[]>;
   /**
-   * Publishing never leaves a key with zero or two published versions: the previous published
-   * version is archived and the new one published in one write.
+   * Publishing never leaves a key with zero or two published versions: in one transaction, the
+   * previous published version is archived and `id` is published, the latter only when it still
+   * matches `guard`. On a guard mismatch nothing stays written and `undefined` is returned.
    */
-  publishExclusively(id: string, publishedAt: Date, decidedById: string, note: string | null): Promise<ContentEntryRecord>;
+  publishExclusively(id: string, guard: ContentEntryGuard, publication: ContentPublication): Promise<ContentEntryRecord | undefined>;
+}
+
+function matchesGuard(entry: ContentEntryRecord, guard: ContentEntryGuard): boolean {
+  if (entry.status !== guard.status || entry.updatedAt.getTime() !== guard.updatedAt.getTime()) return false;
+  if (guard.submittedByNot === undefined) return true;
+  return entry.submittedById !== null && entry.submittedById !== undefined && entry.submittedById !== guard.submittedByNot;
 }
 
 function sameKey(entry: ContentEntryRecord, key: ContentEntryKey): boolean {
@@ -93,11 +125,22 @@ export class MemoryContentCmsRepository implements ContentCmsRepository {
   }
 
   async create(entry: ContentEntryRecord): Promise<ContentEntryRecord> {
+    // Same constraints as the SQL unique indexes: one open version per key, one row per key and version.
     if (isOpen(entry) && this.entries.some((candidate) => sameKey(candidate, entry) && isOpen(candidate))) throw new OpenContentEntryExistsError();
+    if (this.entries.some((candidate) => sameKey(candidate, entry) && candidate.version === entry.version)) throw new OpenContentEntryExistsError();
     this.entries.push(copy(entry));
     return copy(entry);
   }
 
+  /** Check and write happen with no `await` in between, so they are atomic on the event loop. */
+  async transition(id: string, guard: ContentEntryGuard, patch: ContentEntryPatch): Promise<ContentEntryRecord | undefined> {
+    const entry = this.entries.find((candidate) => candidate.id === id);
+    if (!entry || !matchesGuard(entry, guard)) return undefined;
+    Object.assign(entry, patch);
+    return copy(entry);
+  }
+
+  /** Test helper only (not part of the repository contract): unconditional overwrite, to simulate a tampered row. */
   async update(id: string, patch: Partial<Omit<ContentEntryRecord, "id" | "createdAt">>): Promise<ContentEntryRecord> {
     const entry = this.require(id);
     Object.assign(entry, patch);
@@ -135,8 +178,11 @@ export class MemoryContentCmsRepository implements ContentCmsRepository {
     return this.entries.filter((entry) => entry.status === "published" && entry.locale === locale).map(copy);
   }
 
-  async publishExclusively(id: string, publishedAt: Date, decidedById: string, note: string | null): Promise<ContentEntryRecord> {
-    const entry = this.require(id);
+  async publishExclusively(id: string, guard: ContentEntryGuard, publication: ContentPublication): Promise<ContentEntryRecord | undefined> {
+    const entry = this.entries.find((candidate) => candidate.id === id);
+    // Guard first, then both writes, with no `await` in between: all or nothing.
+    if (!entry || !matchesGuard(entry, guard)) return undefined;
+    const { publishedAt, decidedById, note } = publication;
     for (const candidate of this.entries) {
       if (candidate.id === id || candidate.status !== "published" || !sameKey(candidate, entry)) continue;
       candidate.status = "archived";
@@ -155,15 +201,41 @@ export class MemoryContentCmsRepository implements ContentCmsRepository {
 
 type ContentEntryDelegate = {
   create(input: unknown): Promise<unknown>;
-  update(input: unknown): Promise<unknown>;
-  updateMany(input: unknown): Promise<unknown>;
+  updateMany(input: unknown): Promise<{ count: number }>;
   findMany(input?: unknown): Promise<unknown[]>;
   findFirst(input?: unknown): Promise<unknown | null>;
   findUnique(input: unknown): Promise<unknown | null>;
   aggregate(input: unknown): Promise<{ _max: { version: number | null } }>;
 };
 
+type ContentEntryTransactionClient = { contentEntry: ContentEntryDelegate };
+type ContentEntryClient = ContentEntryTransactionClient & {
+  /** Interactive transaction: every write inside goes through `tx`, so a throw rolls all of them back. */
+  $transaction<T>(callback: (tx: ContentEntryTransactionClient) => Promise<T>): Promise<T>;
+};
+
 const OPEN_STATUSES = ["draft", "pending_review"];
+
+/** Raised inside the publication transaction to roll back the archiving when the guard no longer matches. */
+class StaleContentEntryError extends Error {
+  constructor() {
+    super("Content entry changed since it was read");
+  }
+}
+
+function isUniqueViolation(error: unknown): boolean {
+  return typeof error === "object" && error !== null && (error as { code?: unknown }).code === "P2002";
+}
+
+function guardWhere(id: string, guard: ContentEntryGuard): Record<string, unknown> {
+  return {
+    id,
+    status: guard.status,
+    updatedAt: guard.updatedAt,
+    // SQL `<>` never matches NULL; the explicit `not: null` states it.
+    ...(guard.submittedByNot !== undefined ? { AND: [{ submittedById: { not: null } }, { submittedById: { not: guard.submittedByNot } }] } : {})
+  };
+}
 
 export class PrismaContentCmsRepository implements ContentCmsRepository {
   readonly mode = "prisma-runtime" as const;
@@ -174,17 +246,24 @@ export class PrismaContentCmsRepository implements ContentCmsRepository {
     try {
       return this.toRecord(await this.entries().create({ data: entry }));
     } catch (error) {
-      // The partial unique index "ContentEntry_open_key" turns a concurrent second draft into P2002.
-      if ((error as { code?: string }).code === "P2002") throw new OpenContentEntryExistsError();
+      // The unique indexes "ContentEntry_open_key" and "ContentEntry_key_version" turn a concurrent
+      // second draft (or a second row with the same version) into P2002.
+      if (isUniqueViolation(error)) throw new OpenContentEntryExistsError();
       throw error;
     }
   }
 
-  async update(id: string, patch: Partial<Omit<ContentEntryRecord, "id" | "createdAt">>): Promise<ContentEntryRecord> {
-    const data = { ...patch } as Record<string, unknown>;
-    delete data.id;
-    delete data.createdAt;
-    return this.toRecord(await this.entries().update({ where: { id }, data }));
+  /**
+   * `updateMany` with the guard in its WHERE: PostgreSQL re-checks the WHERE on the latest row
+   * version once a concurrent writer commits, so of two racing writes exactly one matches.
+   */
+  async transition(id: string, guard: ContentEntryGuard, patch: ContentEntryPatch): Promise<ContentEntryRecord | undefined> {
+    return this.client().$transaction(async (tx) => {
+      const result = await tx.contentEntry.updateMany({ where: guardWhere(id, guard), data: { ...patch } });
+      if (result.count !== 1) return undefined;
+      const row = await tx.contentEntry.findUnique({ where: { id } });
+      return row ? this.toRecord(row) : undefined;
+    });
   }
 
   async find(id: string): Promise<ContentEntryRecord | undefined> {
@@ -225,28 +304,49 @@ export class PrismaContentCmsRepository implements ContentCmsRepository {
     return (await this.entries().findMany({ where: { locale, status: "published" } })).map((row) => this.toRecord(row));
   }
 
-  async publishExclusively(id: string, publishedAt: Date, decidedById: string, note: string | null): Promise<ContentEntryRecord> {
-    return this.prisma.transaction(async () => {
-      const entry = await this.entries().findUnique({ where: { id } });
-      if (!entry) throw new Error(`Content entry ${id} not found`);
-      const key = this.toRecord(entry);
-      await this.entries().updateMany({
-        where: { ...this.keyWhere(key), status: "published", id: { not: id } },
-        data: { status: "archived", updatedAt: publishedAt }
+  /**
+   * One interactive transaction on `tx` (not `PrismaService.transaction`, which does not hand the
+   * transaction client over). The previous published version is archived first because the partial
+   * unique index "ContentEntry_published_key" allows one published row per key; the guarded
+   * publication follows, and a guard mismatch throws so that the archiving is rolled back too.
+   */
+  async publishExclusively(id: string, guard: ContentEntryGuard, publication: ContentPublication): Promise<ContentEntryRecord | undefined> {
+    const { publishedAt, decidedById, note } = publication;
+    try {
+      return await this.client().$transaction(async (tx) => {
+        const row = await tx.contentEntry.findUnique({ where: { id } });
+        if (!row) return undefined;
+        const key = this.toRecord(row);
+        await tx.contentEntry.updateMany({
+          where: { ...this.keyWhere(key), status: "published", id: { not: id } },
+          data: { status: "archived", updatedAt: publishedAt }
+        });
+        const published = await tx.contentEntry.updateMany({
+          where: guardWhere(id, guard),
+          data: { status: "published", publishedAt, decidedById, decidedAt: publishedAt, decisionNote: note, updatedAt: publishedAt }
+        });
+        if (published.count !== 1) throw new StaleContentEntryError();
+        const updated = await tx.contentEntry.findUnique({ where: { id } });
+        if (!updated) throw new StaleContentEntryError();
+        return this.toRecord(updated);
       });
-      return this.toRecord(await this.entries().update({
-        where: { id },
-        data: { status: "published", publishedAt, decidedById, decidedAt: publishedAt, decisionNote: note }
-      }));
-    });
+    } catch (error) {
+      // A version published meanwhile by another transaction surfaces as P2002 on the partial index.
+      if (error instanceof StaleContentEntryError || isUniqueViolation(error)) return undefined;
+      throw error;
+    }
   }
 
   private keyWhere(key: ContentEntryKey): Record<string, unknown> {
     return { kind: key.kind, entryKey: key.entryKey, locale: key.locale, countryCode: key.countryCode ?? null };
   }
 
+  private client(): ContentEntryClient {
+    return this.prisma.requireRuntimeClient() as unknown as ContentEntryClient;
+  }
+
   private entries(): ContentEntryDelegate {
-    return (this.prisma.requireRuntimeClient() as unknown as { contentEntry: ContentEntryDelegate }).contentEntry;
+    return this.client().contentEntry;
   }
 
   private toRecord(row: unknown): ContentEntryRecord {

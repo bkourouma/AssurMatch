@@ -11,6 +11,7 @@ import {
   validateContentScope,
   type ContentCapabilitiesView,
   type ContentCmsLocale,
+  type ContentEntryListResponse,
   type ContentEntryView,
   type ContentKind,
   type FaqPayload,
@@ -26,7 +27,14 @@ import type { AuditLogWriter } from "../audit-logs/audit-log-writer.service";
 import { ContentAuditActions } from "../audit-logs/content-audit-actions";
 import { parseHttpInput } from "../common/http/zod-validation";
 import type { ActorContext } from "../common/types";
-import { OpenContentEntryExistsError, type ContentCmsRepository, type ContentEntryKey, type ContentEntryRecord } from "./content-cms.repository";
+import {
+  OpenContentEntryExistsError,
+  type ContentCmsRepository,
+  type ContentEntryGuard,
+  type ContentEntryKey,
+  type ContentEntryPatch,
+  type ContentEntryRecord
+} from "./content-cms.repository";
 
 export interface ContentCmsServiceDeps {
   audit: AuditLogWriter;
@@ -151,7 +159,7 @@ export class ContentCmsService {
   // Reads
   // -------------------------------------------------------------------------------------------
 
-  async list(actor: ActorContext, rawQuery: unknown): Promise<{ items: ContentEntryView[] }> {
+  async list(actor: ActorContext, rawQuery: unknown): Promise<ContentEntryListResponse> {
     this.authorize(actor, "content:read", "list");
     const query = parseHttpInput(contentEntryListQuerySchema, rawQuery ?? {});
     return { items: (await this.deps.repository.list(query)).map(toView) };
@@ -162,7 +170,7 @@ export class ContentCmsService {
     return toView(await this.require(id));
   }
 
-  async history(actor: ActorContext, id: string): Promise<{ items: ContentEntryView[] }> {
+  async history(actor: ActorContext, id: string): Promise<ContentEntryListResponse> {
     this.authorize(actor, "content:read", id);
     const entry = await this.require(id);
     return { items: (await this.deps.repository.history(keyOf(entry))).map(toView) };
@@ -212,10 +220,10 @@ export class ContentCmsService {
     const body = parseHttpInput(contentEntryUpdateSchema, input ?? {});
     if (entry.status !== "draft") this.refuseTransition(actor, entry, "not_a_draft", "Only a draft can be edited");
     const payload = this.parsePayload(entry.kind, body.payload);
-    const updated = await this.deps.repository.update(entry.id, {
+    const updated = await this.transition(actor, entry, { status: "draft", updatedAt: entry.updatedAt }, {
       payload,
       label: labelFor(entry.kind, entry.entryKey, entry.countryCode, payload),
-      updatedAt: this.now()
+      updatedAt: this.stamp(entry)
     });
     this.audit(actor, ContentAuditActions.updated, updated, "success", { from: "draft", to: "draft" });
     return toView(updated);
@@ -228,8 +236,9 @@ export class ContentCmsService {
     if (entry.status !== "draft") this.refuseTransition(actor, entry, "invalid_transition", `A ${entry.status} entry cannot be submitted`);
     this.parsePayload(entry.kind, entry.payload);
     this.assertEditorial(actor, entry);
-    const now = this.now();
-    const updated = await this.deps.repository.update(entry.id, { status: "pending_review", submittedById: actor.actorId ?? null, submittedAt: now, updatedAt: now });
+    const now = this.stamp(entry);
+    // The guard pins the checked text: an edit landing after the read makes the submission fail.
+    const updated = await this.transition(actor, entry, { status: "draft", updatedAt: entry.updatedAt }, { status: "pending_review", submittedById: actor.actorId ?? null, submittedAt: now, updatedAt: now });
     this.audit(actor, ContentAuditActions.submitted, updated, "success", { from: "draft", to: "pending_review" });
     return toView(updated);
   }
@@ -239,22 +248,31 @@ export class ContentCmsService {
     this.authorize(actor, "content:submit", id);
     const entry = await this.require(id);
     if (entry.status !== "pending_review") this.refuseTransition(actor, entry, "invalid_transition", `A ${entry.status} entry cannot be withdrawn`);
-    const updated = await this.deps.repository.update(entry.id, { status: "draft", submittedById: null, submittedAt: null, updatedAt: this.now() });
+    const updated = await this.transition(actor, entry, { status: "pending_review", updatedAt: entry.updatedAt }, { status: "draft", submittedById: null, submittedAt: null, updatedAt: this.stamp(entry) });
     this.audit(actor, ContentAuditActions.withdrawn, updated, "success", { from: "pending_review", to: "draft" });
     return toView(updated);
   }
 
-  /** `pending_review -> published`: another actor than the submitter, clean wording, atomic swap of the published version. */
+  /**
+   * `pending_review -> published`: another actor than the submitter, clean wording, atomic swap of
+   * the published version. The status, the read `updatedAt` and "submitter is not me" are part of
+   * the publishing write itself, so a withdraw/edit/resubmit racing this approval cannot publish a
+   * text this actor did not review, nor one this actor submitted.
+   */
   async approve(actor: ActorContext, id: string, input: unknown): Promise<ContentEntryView> {
     this.authorize(actor, "content:approve", id);
     const entry = await this.require(id);
     const body = parseHttpInput(contentDecisionSchema, input ?? {});
     if (entry.status !== "pending_review") this.refuseTransition(actor, entry, "invalid_transition", `A ${entry.status} entry cannot be approved`);
     if (!actor.actorId || actor.actorId === entry.submittedById) this.refuseApproval(actor, entry, "self_approval", "The submitter cannot approve their own entry");
+    // Four eyes needs a known submitter: an anonymous submission cannot be told apart from the approver.
+    if (!entry.submittedById) this.refuseApproval(actor, entry, "unknown_submitter", "A submission without a known submitter cannot be approved");
     if (entry.kind === "legal_override" && !canApproveLegal(actor)) this.refuseApproval(actor, entry, "legal_override_requires_compliance", "A legal override can only be approved by a compliance administrator");
     this.parsePayload(entry.kind, entry.payload);
     this.assertEditorial(actor, entry);
-    const published = await this.deps.repository.publishExclusively(entry.id, this.now(), actor.actorId, body.note ?? null);
+    const guard: ContentEntryGuard = { status: "pending_review", updatedAt: entry.updatedAt, submittedByNot: actor.actorId };
+    const published = await this.deps.repository.publishExclusively(entry.id, guard, { publishedAt: this.stamp(entry), decidedById: actor.actorId, note: body.note ?? null });
+    if (!published) this.refuseConcurrentChange(actor, entry);
     this.audit(actor, ContentAuditActions.approved, published, "success", { from: "pending_review", to: "published", hasNote: Boolean(body.note) });
     return toView(published);
   }
@@ -265,8 +283,8 @@ export class ContentCmsService {
     const entry = await this.require(id);
     const body = parseHttpInput(contentReasonRequiredSchema, input ?? {});
     if (entry.status !== "pending_review") this.refuseTransition(actor, entry, "invalid_transition", `A ${entry.status} entry cannot be rejected`);
-    const now = this.now();
-    const updated = await this.deps.repository.update(entry.id, { status: "draft", decidedById: actor.actorId ?? null, decidedAt: now, decisionNote: body.note, updatedAt: now });
+    const now = this.stamp(entry);
+    const updated = await this.transition(actor, entry, { status: "pending_review", updatedAt: entry.updatedAt }, { status: "draft", decidedById: actor.actorId ?? null, decidedAt: now, decisionNote: body.note, updatedAt: now });
     this.audit(actor, ContentAuditActions.rejected, updated, "success", { from: "pending_review", to: "draft" });
     return toView(updated);
   }
@@ -277,8 +295,8 @@ export class ContentCmsService {
     const entry = await this.require(id);
     const body = parseHttpInput(contentReasonRequiredSchema, input ?? {});
     if (entry.status !== "published" && entry.status !== "draft") this.refuseTransition(actor, entry, "invalid_transition", `A ${entry.status} entry cannot be archived`);
-    const now = this.now();
-    const updated = await this.deps.repository.update(entry.id, { status: "archived", decidedById: actor.actorId ?? null, decidedAt: now, decisionNote: body.note, updatedAt: now });
+    const now = this.stamp(entry);
+    const updated = await this.transition(actor, entry, { status: entry.status, updatedAt: entry.updatedAt }, { status: "archived", decidedById: actor.actorId ?? null, decidedAt: now, decisionNote: body.note, updatedAt: now });
     this.audit(actor, ContentAuditActions.archived, updated, "success", { from: entry.status, to: "archived" });
     return toView(updated);
   }
@@ -378,6 +396,26 @@ export class ContentCmsService {
 
   private now(): Date {
     return this.deps.now ? this.deps.now() : new Date();
+  }
+
+  /**
+   * Timestamp of a write on `entry`: never equal to (nor before) the `updatedAt` it replaces, so two
+   * writes within the same millisecond, or a clock step back, still change the row version that the
+   * guards compare.
+   */
+  private stamp(entry: ContentEntryRecord): Date {
+    return new Date(Math.max(this.now().getTime(), entry.updatedAt.getTime() + 1));
+  }
+
+  /** Conditional write; a guard mismatch (concurrent change) is an audited 409. */
+  private async transition(actor: ActorContext, entry: ContentEntryRecord, guard: ContentEntryGuard, patch: ContentEntryPatch): Promise<ContentEntryRecord> {
+    const updated = await this.deps.repository.transition(entry.id, guard, patch);
+    if (!updated) this.refuseConcurrentChange(actor, entry);
+    return updated;
+  }
+
+  private refuseConcurrentChange(actor: ActorContext, entry: ContentEntryRecord): never {
+    this.refuseTransition(actor, entry, "concurrent_change", "This content changed since it was read: reload it and try again");
   }
 
   private async require(id: string): Promise<ContentEntryRecord> {

@@ -1,3 +1,4 @@
+import { cache } from "react";
 import { z } from "zod";
 import {
   contentLegalSlugs,
@@ -13,6 +14,10 @@ import {
  * The result is only ever used to complete the static copy of the site, so this module never throws:
  * a network error, a timeout (2 s), a non-2xx status, an invalid body or any text that looks like
  * markup all yield the empty response and the site renders its static content.
+ *
+ * One read per server render and per (locale, country): a fetch carrying an abort `signal` is not
+ * deduplicated by Next, so without `cache()` a page that resolves several pieces of content (or
+ * `generateMetadata` plus the page) would pay the 2 s budget once per call.
  */
 
 const PUBLIC_API_BASE_URL = process.env.NEXT_PUBLIC_ASSURMATCH_API_URL ?? "http://127.0.0.1:3000";
@@ -66,14 +71,11 @@ export function parsePublicContent(body: unknown, locale: ContentCmsLocale): Pub
   return parsed.data as PublicContentResponse;
 }
 
-/**
- * Reads the published content for one locale (and, for the per-country legal pages, one country).
- * Never throws and never rejects.
- */
-export async function fetchPublicContent(locale: ContentCmsLocale, countryCode?: string): Promise<PublicContentResponse> {
+/** Uncached read; `country` is already normalised ("" when none) so it is a stable cache key. */
+async function readPublicContent(locale: ContentCmsLocale, country: string): Promise<PublicContentResponse> {
   try {
     const params = new URLSearchParams({ locale });
-    if (countryCode) params.set("country", countryCode.toUpperCase());
+    if (country) params.set("country", country);
     const response = await fetch(`${PUBLIC_API_BASE_URL}/public-content?${params.toString()}`, {
       signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
       next: { revalidate: REVALIDATE_SECONDS }
@@ -83,4 +85,20 @@ export async function fetchPublicContent(locale: ContentCmsLocale, countryCode?:
   } catch {
     return emptyPublicContent(locale);
   }
+}
+
+/** Memoised per server render by React (a no-op outside a server component render). */
+const readPublicContentOncePerRender = cache(readPublicContent);
+
+/**
+ * Reads the published content for one locale (and, for the per-country legal pages, one country).
+ * Never throws and never rejects. Callers share the cached result: they must not mutate it.
+ */
+export function fetchPublicContent(locale: ContentCmsLocale, countryCode?: string): Promise<PublicContentResponse> {
+  return readPublicContentOncePerRender(locale, publicContentCountryKey(countryCode));
+}
+
+/** Cache key of the country: upper case, "" when absent, so `sn`, `SN` and ` SN ` share one read. */
+export function publicContentCountryKey(countryCode?: string): string {
+  return (countryCode ?? "").trim().toUpperCase();
 }

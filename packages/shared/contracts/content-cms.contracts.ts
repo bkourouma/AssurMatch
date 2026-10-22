@@ -169,6 +169,14 @@ export interface ContentEntryView {
   publishedAt: string | null;
 }
 
+/**
+ * `GET /admin/content/entries` and `GET /admin/content/entries/:id/history`: always an `{ items }`
+ * envelope (list: newest change first, at most 500; history: newest version first).
+ */
+export interface ContentEntryListResponse {
+  items: ContentEntryView[];
+}
+
 /** What the signed-in admin may do, so the screen shows only the buttons the API will accept. */
 export interface ContentCapabilitiesView {
   canRead: boolean;

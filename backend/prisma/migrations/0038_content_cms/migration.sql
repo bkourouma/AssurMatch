@@ -25,7 +25,10 @@ CREATE TABLE IF NOT EXISTS "ContentEntry" (
 );
 
 CREATE INDEX IF NOT EXISTS "ContentEntry_kind_locale_status_idx" ON "ContentEntry"("kind", "locale", "status");
--- At most one published version, and at most one open (draft or pending_review) version, per key.
--- Prisma cannot express partial unique indexes: they live only in this SQL (see the ContentEntry model).
+-- At most one published version, and at most one open (draft or pending_review) version, per key;
+-- and never two rows with the same version of a key (a concurrent create/revise computing the same
+-- next version fails instead of duplicating it). COALESCE makes a NULL country one value.
+-- Prisma cannot express expression or partial unique indexes: they live only in this SQL (see the ContentEntry model).
+CREATE UNIQUE INDEX IF NOT EXISTS "ContentEntry_key_version" ON "ContentEntry"("kind", "entryKey", "locale", COALESCE("countryCode", ''), "version");
 CREATE UNIQUE INDEX IF NOT EXISTS "ContentEntry_published_key" ON "ContentEntry"("kind", "entryKey", "locale", COALESCE("countryCode", '')) WHERE "status" = 'published';
 CREATE UNIQUE INDEX IF NOT EXISTS "ContentEntry_open_key" ON "ContentEntry"("kind", "entryKey", "locale", COALESCE("countryCode", '')) WHERE "status" IN ('draft', 'pending_review');

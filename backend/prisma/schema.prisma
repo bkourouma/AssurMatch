@@ -2426,7 +2426,7 @@ model TrustedDevice {
 
 /// Lot 9 (start)
 /// Lot 9 (spec 072): minimal CMS. One versioned row per (kind, entryKey, locale, countryCode, version).
-/// The partial unique indexes (one published, one open draft/pending_review per key) live only in the
+/// The unique indexes (one row per key and version, one published and one open draft/pending_review per key) live only in the
 /// SQL migration 0038, Prisma cannot express them.
 model ContentEntry {
   id            String    @id @default(uuid())
@@ -2455,5 +2455,9 @@ model ContentEntry {
   publishedAt   DateTime?
 
   @@index([kind, locale, status])
+  // Unique indexes kept in migration 0038 only (Prisma cannot express them; COALESCE("countryCode", '')
+  // makes a NULL country one value): "ContentEntry_key_version" (kind, entryKey, locale, country,
+  // version), "ContentEntry_published_key" (one published version per key) and
+  // "ContentEntry_open_key" (one draft or pending_review version per key).
 }
 /// Lot 9 (end)

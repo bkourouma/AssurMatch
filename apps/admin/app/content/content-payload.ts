@@ -4,12 +4,30 @@
  * data with it and the edit form uses the reverse conversion to prefill its fields.
  *
  * Field names are prefixed by the kind (`faq_question`, `guide_sections`, ...). Sections are typed
- * one per line as `id|titre|paragraphe 1 ‖ paragraphe 2` with an optional fourth segment of bullets
- * separated the same way. The API validates the payload; this module only rejects what it cannot read.
+ * as blocks of lines, so no character inside a text is ever a separator:
+ *
+ *   # identifiant           starts a section
+ *   Titre de la section     first line after it: the heading
+ *   Un paragraphe par ligne (any character allowed, | and ‖ included)
+ *   - une puce par ligne, préfixée par « - »
+ *
+ * A heading or paragraph that itself starts with `#`, `-` or a backslash is typed with a leading
+ * backslash (`\- 10 % de remise`); `formatSections` adds it. The API validates the payload; this
+ * module only rejects what it cannot read.
  */
 import type { ContentKind } from "../../../../packages/shared/contracts/content-cms.contracts";
 
-export const SECTION_SEPARATOR = "‖";
+export const SECTION_MARKER = "#";
+export const BULLET_MARKER = "-";
+export const ESCAPE_MARKER = "\\";
+
+/** Help text shown under the sections fields. */
+export const SECTIONS_HELP = "Une section commence par une ligne « # identifiant », suivie d'une ligne de titre, puis d'un paragraphe par ligne ; une puce par ligne, préfixée par « - ». Une ligne de texte qui commence par #, - ou \\ s'écrit précédée de \\. Une ligne vide sépare les sections.";
+
+/** Example typed in an empty sections field (placeholder). */
+export function sectionsExample(id: string, heading: string): string {
+  return [`${SECTION_MARKER} ${id}`, heading, "Premier paragraphe.", "Second paragraphe.", `${BULLET_MARKER} Une puce`].join("\n");
+}
 
 export type FormValues = Record<string, string>;
 
@@ -26,32 +44,73 @@ function lines(value: string): string[] {
   return value.split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
 }
 
-function parts(value: string): string[] {
-  return value.split(SECTION_SEPARATOR).map((part) => part.trim()).filter(Boolean);
+export interface ParsedSection {
+  id: string;
+  heading: string;
+  body: string[];
+  bullets?: string[];
 }
 
-export function parseSections(value: string): Array<{ id: string; heading: string; body: string[]; bullets?: string[] }> {
-  return lines(value).map((line, index) => {
-    const [id = "", heading = "", body = "", bullets = ""] = line.split("|").map((part) => part.trim());
-    const bodyParts = parts(body);
-    if (!id || !heading || bodyParts.length === 0) {
-      throw new Error(`form_Section ${index + 1} invalide : utilisez « identifiant|titre|paragraphe 1 ${SECTION_SEPARATOR} paragraphe 2 ».`);
+/** Removes the leading escape of a heading or paragraph line. */
+function unescapeLine(line: string): string {
+  return line.startsWith(ESCAPE_MARKER) ? line.slice(ESCAPE_MARKER.length) : line;
+}
+
+/** Escapes a heading or paragraph whose first character would otherwise read as a marker. */
+function escapeLine(text: string): string {
+  const value = text.trim();
+  return value.startsWith(SECTION_MARKER) || value.startsWith(BULLET_MARKER) || value.startsWith(ESCAPE_MARKER) ? `${ESCAPE_MARKER}${value}` : value;
+}
+
+/** A single line: inner line breaks of a heading or a bullet become spaces (one line per item). */
+function oneLine(text: string): string {
+  return text.replace(/\s*\r?\n\s*/g, " ").trim();
+}
+
+const SECTION_FORMAT_HINT = "« # identifiant », puis une ligne de titre, puis un paragraphe par ligne";
+
+export function parseSections(value: string): ParsedSection[] {
+  const sections: Array<{ id: string; heading?: string; body: string[]; bullets: string[] }> = [];
+  value.split(/\r?\n/).forEach((raw, index) => {
+    const line = raw.trim();
+    if (!line) return;
+    if (line.startsWith(SECTION_MARKER)) {
+      sections.push({ id: line.slice(SECTION_MARKER.length).trim(), body: [], bullets: [] });
+      return;
     }
-    const bulletParts = parts(bullets);
-    return { id, heading, body: bodyParts, ...(bulletParts.length > 0 ? { bullets: bulletParts } : {}) };
+    const current = sections.at(-1);
+    if (!current) throw new Error(`form_Ligne ${index + 1} : une section commence par une ligne ${SECTION_FORMAT_HINT}.`);
+    if (current.heading === undefined) {
+      current.heading = unescapeLine(line).trim();
+      return;
+    }
+    if (line.startsWith(BULLET_MARKER)) {
+      const bullet = line.slice(BULLET_MARKER.length).trim();
+      if (bullet) current.bullets.push(bullet);
+      return;
+    }
+    const paragraph = unescapeLine(line).trim();
+    if (paragraph) current.body.push(paragraph);
+  });
+  return sections.map((section, index) => {
+    if (!section.id || !section.heading || section.body.length === 0) {
+      throw new Error(`form_Section ${index + 1} invalide : utilisez ${SECTION_FORMAT_HINT} (au moins un).`);
+    }
+    return { id: section.id, heading: section.heading, body: section.body, ...(section.bullets.length > 0 ? { bullets: section.bullets } : {}) };
   });
 }
 
+/** Reverse of `parseSections`: `parseSections(formatSections(x))` gives `x` back for single-line texts. */
 export function formatSections(sections: unknown): string {
   if (!Array.isArray(sections)) return "";
   return sections
     .map((section) => {
       const s = (section ?? {}) as { id?: unknown; heading?: unknown; body?: unknown; bullets?: unknown };
-      const body = Array.isArray(s.body) ? s.body.map(String).join(` ${SECTION_SEPARATOR} `) : "";
-      const bullets = Array.isArray(s.bullets) && s.bullets.length > 0 ? `|${s.bullets.map(String).join(` ${SECTION_SEPARATOR} `)}` : "";
-      return `${String(s.id ?? "")}|${String(s.heading ?? "")}|${body}${bullets}`;
+      const body = Array.isArray(s.body) ? s.body.flatMap((paragraph) => String(paragraph).split(/\r?\n/)).map((line) => line.trim()).filter(Boolean).map(escapeLine) : [];
+      const bullets = Array.isArray(s.bullets) ? s.bullets.map((bullet) => oneLine(String(bullet))).filter(Boolean).map((bullet) => `${BULLET_MARKER} ${bullet}`) : [];
+      return [`${SECTION_MARKER} ${oneLine(String(s.id ?? ""))}`, escapeLine(oneLine(String(s.heading ?? ""))), ...body, ...bullets].join("\n");
     })
-    .join("\n");
+    .join("\n\n");
 }
 
 function list(value: unknown): string {

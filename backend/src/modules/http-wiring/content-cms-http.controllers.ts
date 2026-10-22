@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Header, HttpCode, Param, Post, Put, Query, Req, UseGuards } from "@nestjs/common";
+import { Body, Controller, Get, Header, HttpCode, Param, Post, Put, Query, Req, Res, UseGuards } from "@nestjs/common";
 import { z } from "zod";
 import { publicContentQuerySchema } from "../../../../packages/shared/contracts/content-cms.contracts";
 import { uuidSchema } from "../../../../packages/shared/validation/common.schemas";
@@ -14,8 +14,17 @@ import type { ContentPermission } from "../content-cms/content-cms.service";
  *
  * - Admin routes (`/admin/content`): authenticated and MFA-gated at the class level; the service
  *   checks the permission and audits every refusal BEFORE any path parameter or body is parsed.
- * - Public route (`/public-content`): no authentication, published content only, cacheable 60 s.
+ * - Public route (`/public-content`): no authentication, published content only, cacheable 60 s
+ *   on success only. `@Header` is applied by Nest before the handler runs, so it would also mark a
+ *   400 as public: the route declares `no-store` and the handler upgrades it once the read succeeded.
  */
+
+/** Shared caches may keep a successful public read 60 s (plus the public site's own 60 s revalidation). */
+export const PUBLIC_CONTENT_CACHE_CONTROL = "public, max-age=60";
+
+interface HeaderWritableResponse {
+  setHeader(name: string, value: string): unknown;
+}
 
 type MethodDecoratorFactory = (target: object, propertyKey: string | symbol, descriptor: PropertyDescriptor) => void;
 type ParamDecoratorFactory = (target: object, propertyKey: string | symbol | undefined, parameterIndex: number) => void;
@@ -49,10 +58,12 @@ function idParam(value: string): string {
 export class PublicContentCmsHttpController {
   constructor(private readonly runtime: AssurMatchRuntime) {}
 
-  /** `GET /public-content?locale=fr|en&country=XX`: published content only; invalid values are a 400. */
-  read(query: Record<string, string>) {
+  /** `GET /public-content?locale=fr|en&country=XX`: published content only; invalid values are a 400 (no-store). */
+  async read(query: Record<string, string>, response: HeaderWritableResponse) {
     const parsed = parseHttpInput(publicContentQuerySchema, query ?? {});
-    return this.runtime.contentCms.service.publicContent(parsed.locale, parsed.country);
+    const content = await this.runtime.contentCms.service.publicContent(parsed.locale, parsed.country);
+    response.setHeader("Cache-Control", PUBLIC_CONTENT_CACHE_CONTROL);
+    return content;
   }
 }
 
@@ -132,7 +143,7 @@ const id = Param("id") as ParamDecoratorFactory;
 const query = Query() as ParamDecoratorFactory;
 
 publicController(PublicContentCmsHttpController);
-decorate(PublicContentCmsHttpController, "read", [Get("public-content") as MethodDecoratorFactory, Header("Cache-Control", "public, max-age=60") as MethodDecoratorFactory], [[0, query]]);
+decorate(PublicContentCmsHttpController, "read", [Get("public-content") as MethodDecoratorFactory, noStore], [[0, query], [1, Res({ passthrough: true }) as ParamDecoratorFactory]]);
 
 protectedController("admin/content", AdminContentCmsHttpController);
 decorate(AdminContentCmsHttpController, "capabilities", [Get("capabilities") as MethodDecoratorFactory, noStore], [[0, req]]);

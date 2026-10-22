@@ -24,7 +24,7 @@ import {
   fieldControlProps
 } from "../lib/ui/admin-ui";
 import { contentWorkflowAction, createContentEntryAction, updateContentEntryAction, type ContentActionState } from "./actions";
-import { SECTION_SEPARATOR, type FormValues } from "./content-payload";
+import { SECTIONS_HELP, sectionsExample, type FormValues } from "./content-payload";
 
 const initialState: ContentActionState = { status: "idle" };
 
@@ -32,7 +32,7 @@ const kindOptions = (Object.keys(CONTENT_KIND_LABELS) as ContentKind[]).map((kin
 const localeOptions = Object.entries(CONTENT_LOCALE_LABELS).map(([value, label]) => ({ value, label }));
 const legalSlugOptions = Object.entries(CONTENT_LEGAL_SLUG_LABELS).map(([value, label]) => ({ value, label }));
 
-const sectionsHelp = `Une section par ligne : identifiant|titre|paragraphe 1 ${SECTION_SEPARATOR} paragraphe 2 (quatrième segment facultatif : puces séparées par ${SECTION_SEPARATOR}).`;
+const sectionsHelp = SECTIONS_HELP;
 
 function TextField({ base, name, label, values, required, maxLength }: {
   base: string;
@@ -85,7 +85,7 @@ function KindFields({ kind, base, values }: { kind: ContentKind; base: string; v
         <TextField base={base} name="guide_title" label="Titre" values={values} required maxLength={200} />
         <AreaField base={base} name="guide_description" label="Description" values={values} required rows={3} />
         <TextField base={base} name="guide_productKey" label="Clé produit (facultatif)" values={values} maxLength={40} />
-        <AreaField base={base} name="guide_sections" label="Sections" values={values} required rows={8} hint={`introduction|Introduction|Premier paragraphe ${SECTION_SEPARATOR} Second paragraphe`} />
+        <AreaField base={base} name="guide_sections" label="Sections" values={values} required rows={8} hint={sectionsExample("introduction", "Introduction")} />
         <p className="bo-description">{sectionsHelp}</p>
         <AreaField base={base} name="guide_keyPoints" label="Points clés (un par ligne, 1 à 8)" values={values} required rows={4} />
         <AreaField base={base} name="guide_mistakes" label="Erreurs à éviter (une par ligne, 1 à 8)" values={values} required rows={4} />
@@ -107,7 +107,7 @@ function KindFields({ kind, base, values }: { kind: ContentKind; base: string; v
       <TextField base={base} name="legal_title" label="Titre (facultatif)" values={values} maxLength={200} />
       <AreaField base={base} name="legal_description" label="Description (facultatif)" values={values} rows={2} />
       <AreaField base={base} name="legal_summary" label="Résumé (une ligne par point, facultatif)" values={values} rows={3} />
-      <AreaField base={base} name="legal_sections" label="Sections" values={values} required rows={8} hint={`droits|Vos droits|Premier paragraphe ${SECTION_SEPARATOR} Second paragraphe`} />
+      <AreaField base={base} name="legal_sections" label="Sections" values={values} required rows={8} hint={sectionsExample("droits", "Vos droits")} />
       <p className="bo-description">{sectionsHelp}</p>
       <AreaField base={base} name="legal_placeholders" label="Éléments « à compléter » (un par ligne, facultatif)" values={values} rows={3} />
     </>

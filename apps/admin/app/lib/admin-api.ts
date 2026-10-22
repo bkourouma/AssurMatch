@@ -1776,6 +1776,7 @@ import type {
   ContentCapabilitiesView,
   ContentCmsLocale,
   ContentEntryCreateDto,
+  ContentEntryListResponse,
   ContentEntryView,
   ContentKind,
   ContentStatus
@@ -1844,11 +1845,11 @@ export function readContentCapabilities() {
   return readAdmin<ContentCapabilitiesView>("/admin/content/capabilities", emptyContentCapabilities);
 }
 
-/** The contract says an array; a `{ items }` envelope is accepted too so the screen survives either. */
+/** List and history answer the `{ items }` envelope of the shared contract (ContentEntryListResponse). */
 async function readContentList(path: string): Promise<AdminApiState<ContentEntryView[]>> {
-  const state = await readAdmin<ContentEntryView[] | { items?: ContentEntryView[] }>(path, []);
-  const data = Array.isArray(state.data) ? state.data : state.data.items ?? [];
-  return { ...state, data };
+  const state = await readAdmin<ContentEntryListResponse>(path, { items: [] });
+  const items = Array.isArray(state.data?.items) ? state.data.items : [];
+  return { ...state, data: items };
 }
 
 export function readContentEntries(filters: ContentEntryListFilters = {}) {
