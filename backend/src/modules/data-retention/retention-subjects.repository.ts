@@ -14,6 +14,9 @@ import type { ProspectRecord } from "../prospects/prospects.service";
 import type { QuoteDocumentRecord } from "../quote-documents/quote-documents.repository";
 import type { QuoteRequestRecord } from "../quote-requests/quote-submission.service";
 import type { WaitlistEntryRecord } from "../waitlist/waitlist.repository";
+// Lot 8 (spec 075): erasure lookup by blind index and anonymization of the encrypted columns.
+import { prospectAnonymizedPiiColumns, prospectErasureKeys, quoteAnonymizedPiiColumns } from "../common/security/pii-columns";
+import { PiiVault } from "../common/security/pii-vault";
 
 /**
  * Spec 046: the only file that knows the tables holding visitor personal data. It selects rows for
@@ -110,8 +113,9 @@ export interface AnonymizationStamp {
 export interface RetentionSubjectsRepository extends RuntimeRepository {
   listCandidates(category: RetentionCategory, query: RetentionCandidateQuery): Promise<RetentionCandidatePage>;
   /** The row a public reference designates (quote request, contact message or partner application) and its e-mail fingerprint. */
-  findByPublicReference(publicReference: string): Promise<{ subjects: ErasureSubjectIds; emailFingerprint: string | undefined }>;
-  findByEmailFingerprint(emailFingerprint: string): Promise<ErasureSubjectIds>;
+  // Lot 8 (spec 075 FR-A2): `emailBlindIndex` finds the prospects written encrypted (no legacy fingerprint).
+  findByPublicReference(publicReference: string): Promise<{ subjects: ErasureSubjectIds; emailFingerprint: string | undefined; emailBlindIndex?: string | undefined }>;
+  findByEmailFingerprint(emailFingerprint: string, emailBlindIndex?: string): Promise<ErasureSubjectIds>;
   loadQuoteCascade(quoteRequestId: string): Promise<QuoteCascade | undefined>;
   anonymizeLeadContent(assignmentIds: readonly string[]): Promise<void>;
   /** Spec 062: the data requests of the quote request lose their free text; reference, type, status and dates stay. */
@@ -677,7 +681,8 @@ interface IdRow { id: string }
 export class PrismaRetentionSubjectsRepository implements RetentionSubjectsRepository {
   readonly mode = "prisma-runtime" as const;
 
-  constructor(private readonly prisma: PrismaService) {}
+  // Lot 8: the vault is injectable (tests); the runtime builds it from the environment.
+  constructor(private readonly prisma: PrismaService, private readonly vault: PiiVault = PiiVault.fromEnv()) {}
 
   async listCandidates(category: RetentionCategory, query: RetentionCandidateQuery): Promise<RetentionCandidatePage> {
     const page = await this.fetchCandidates(category, query);
@@ -819,14 +824,20 @@ export class PrismaRetentionSubjectsRepository implements RetentionSubjectsRepos
     }
   }
 
-  async findByPublicReference(publicReference: string): Promise<{ subjects: ErasureSubjectIds; emailFingerprint: string | undefined }> {
+  async findByPublicReference(publicReference: string): Promise<{ subjects: ErasureSubjectIds; emailFingerprint: string | undefined; emailBlindIndex?: string | undefined }> {
     const subjects = emptySubjects();
     const quote = await this.delegate("quoteRequest").findFirst({ where: { publicReference, anonymizedAt: null }, select: { id: true, prospectId: true } }) as { id: string; prospectId: string } | null;
     if (quote) {
       subjects.quoteRequests.push(quote.id);
       Object.assign(subjects, await this.messagingSubjects([quote.id]));
-      const prospect = await this.delegate("prospect").findFirst({ where: { id: quote.prospectId, anonymizedAt: null }, select: { emailFingerprint: true } }) as { emailFingerprint: string | null } | null;
-      return { subjects, emailFingerprint: prospect?.emailFingerprint ?? undefined };
+      // Lot 8: an encrypted prospect has no legacy fingerprint; both keys are derived in memory from
+      // the decrypted e-mail (legacy fingerprint for the other tables, blind index for the prospects).
+      const prospect = await this.delegate("prospect").findFirst({
+        where: { id: quote.prospectId, anonymizedAt: null },
+        select: { emailFingerprint: true, emailNormalized: true, ...(this.vault.blindIndexEnabled ? { emailBlindIndex: true } : {}) }
+      }) as { emailFingerprint: string | null; emailNormalized: string | null; emailBlindIndex?: string | null } | null;
+      const keys = prospectErasureKeys(this.vault, prospect);
+      return { subjects, emailFingerprint: keys.emailFingerprint, ...(keys.emailBlindIndex ? { emailBlindIndex: keys.emailBlindIndex } : {}) };
     }
     const message = await this.delegate("contactMessage").findFirst({ where: { publicReference, anonymizedAt: null }, select: { id: true, emailFingerprint: true } }) as { id: string; emailFingerprint: string } | null;
     if (message) {
@@ -841,8 +852,10 @@ export class PrismaRetentionSubjectsRepository implements RetentionSubjectsRepos
     return { subjects, emailFingerprint: undefined };
   }
 
-  async findByEmailFingerprint(emailFingerprint: string): Promise<ErasureSubjectIds> {
-    const prospects = await this.rows<IdRow>("prospect", { where: { emailFingerprint, anonymizedAt: null }, select: { id: true } });
+  async findByEmailFingerprint(emailFingerprint: string, emailBlindIndex?: string): Promise<ErasureSubjectIds> {
+    // Lot 8: legacy clear prospects by fingerprint OR encrypted prospects by blind index.
+    const prospectMatch = emailBlindIndex ? { OR: [{ emailFingerprint }, { emailBlindIndex }] } : { emailFingerprint };
+    const prospects = await this.rows<IdRow>("prospect", { where: { ...prospectMatch, anonymizedAt: null }, select: { id: true } });
     const prospectIds = prospects.map((row) => row.id);
     const quotes = prospectIds.length === 0 ? [] : await this.rows<{ id: string; prospectId: string }>("quoteRequest", {
       where: { prospectId: { in: prospectIds }, anonymizedAt: null },
@@ -974,7 +987,8 @@ export class PrismaRetentionSubjectsRepository implements RetentionSubjectsRepos
   }
 
   async anonymizeQuoteRequestRow(id: string, stamp: AnonymizationStamp): Promise<boolean> {
-    return this.stampOnce("quoteRequest", id, { payload: ANONYMIZED_JSON }, stamp);
+    // Lot 8: the D5 marker is clear JSON, so the row no longer carries a PII key id.
+    return this.stampOnce("quoteRequest", id, { payload: ANONYMIZED_JSON, ...quoteAnonymizedPiiColumns(this.vault) }, stamp);
   }
 
   async prospectHasLiveQuotes(prospectId: string): Promise<boolean> {
@@ -987,6 +1001,8 @@ export class PrismaRetentionSubjectsRepository implements RetentionSubjectsRepos
       phoneNormalized: null,
       emailFingerprint: null,
       phoneFingerprint: null,
+      // Lot 8: blind indexes and key id go with the contact.
+      ...prospectAnonymizedPiiColumns(this.vault),
       displayName: null,
       preferredContactChannel: null
     }, stamp);

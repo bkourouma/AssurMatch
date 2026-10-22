@@ -1169,6 +1169,8 @@ readonly enterprise = new EnterpriseService({
   }
 
   async onModuleDestroy(): Promise<void> {
+    // Lot 8 (FR-B1): last chance for audit entries waiting in the outbox, before the pool closes.
+    await this.audit.writer.drain();
     await this.prisma.onModuleDestroy();
     await this.redis.close();
     await this.queues.close();

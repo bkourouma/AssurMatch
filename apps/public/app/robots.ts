@@ -21,7 +21,8 @@ export default function robots() {
         "/desinscription",
         "/en/unsubscribe",
         "/aller",
-        "/*/devis"
+        "/*/devis",
+        "/*/quote"
       ]
     },
     sitemap: `${siteUrl}/sitemap.xml`

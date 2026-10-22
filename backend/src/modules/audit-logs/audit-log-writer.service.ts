@@ -1,3 +1,5 @@
+import { auditReliability } from "../observability/audit-metrics";
+import { logEvent } from "../observability/structured-logger";
 import { maskPii } from "../common/logging/pii-masker";
 import { assertRuntimeRepository } from "../common/repositories/runtime-repository";
 import type { ActorContext, AuditEntry, AuditResult } from "../common/types";
@@ -27,6 +29,28 @@ function durableMemoryLimit(): number {
   return Number.isInteger(raw) && raw > 0 ? raw : DEFAULT_DURABLE_MEMORY_ENTRIES;
 }
 
+/** Spec 075 FR-B1: bounded outbox of entries whose first persistence attempt failed. */
+const DEFAULT_OUTBOX_MAX = 2000;
+const DEFAULT_RETRY_BASE_MS = 1000;
+const DEFAULT_RETRY_MAX_MS = 60_000;
+const MAX_ATTEMPTS = 20;
+
+export interface AuditWriterOptions {
+  outboxMax?: number;
+  retryBaseMs?: number;
+  retryMaxMs?: number;
+}
+
+function outboxLimit(): number {
+  const raw = Number(process.env.ASSURMATCH_AUDIT_OUTBOX_MAX);
+  return Number.isInteger(raw) && raw > 0 ? raw : DEFAULT_OUTBOX_MAX;
+}
+
+interface OutboxItem {
+  entry: AuditEntry;
+  attempts: number;
+}
+
 export class AuditLogWriter {
   private readonly entries: AuditEntry[] = [];
   readonly repository: AuditLogRepository;
@@ -34,23 +58,118 @@ export class AuditLogWriter {
   /** Process copy bound: unlimited in memory mode (it IS the store), a recent window otherwise. */
   private readonly memoryLimit: number;
 
-  constructor(repository?: AuditLogRepository) {
+  private readonly outbox: OutboxItem[] = [];
+  private readonly outboxMax: number;
+  private readonly retryBaseMs: number;
+  private readonly retryMaxMs: number;
+  private retryDelayMs: number;
+  private retryTimer: ReturnType<typeof setTimeout> | undefined;
+  private draining: Promise<number> | undefined;
+
+  constructor(repository?: AuditLogRepository, options: AuditWriterOptions = {}) {
     this.repository = repository ?? new MemoryAuditLogRepository();
     this.runtimeMode = this.repository.mode === "prisma-runtime" ? "durable-boundary" : "memory-test";
     if (process.env.ASSURMATCH_AUDIT_MEMORY !== "true") assertRuntimeRepository(this.repository.mode, "AuditLogRepository");
+    this.outboxMax = options.outboxMax ?? outboxLimit();
+    this.retryBaseMs = options.retryBaseMs ?? DEFAULT_RETRY_BASE_MS;
+    this.retryMaxMs = options.retryMaxMs ?? DEFAULT_RETRY_MAX_MS;
+    this.retryDelayMs = this.retryBaseMs;
     this.memoryLimit = this.runtimeMode === "durable-boundary" ? durableMemoryLimit() : Number.POSITIVE_INFINITY;
   }
 
   write(input: AuditWriteInput): AuditEntry {
     const entry = this.createEntry(input);
     this.remember(entry);
-    Promise.resolve(this.repository.persist(entry)).catch(() => undefined);
+    // Lot 8 (FR-B1): a failure is no longer swallowed. It is logged (masked, no context), counted
+    // and retried from the bounded outbox. Sensitive actions use writeAsync (fail-closed) instead.
+    void this.persist(entry).catch((error: unknown) => this.onWriteFailure(entry, error, 1));
     return entry;
+  }
+
+  /** Entries waiting for a retry. */
+  get outboxDepth(): number {
+    return this.outbox.length;
+  }
+
+  /**
+   * Retries every outbox entry now (shutdown and tests). Resolves with the number still pending;
+   * concurrent calls share one pass.
+   */
+  drain(): Promise<number> {
+    this.draining ??= this.retryPass().finally(() => {
+      this.draining = undefined;
+    });
+    return this.draining;
+  }
+
+  private persist(entry: AuditEntry): Promise<void> {
+    return (async () => {
+      await this.repository.persist(entry);
+    })();
+  }
+
+  private onWriteFailure(entry: AuditEntry, error: unknown, attempts: number): void {
+    auditReliability.recordPersistFailure();
+    // No context, no identifier, no error message: names only, so the log cannot carry PII.
+    logEvent("error", "audit.persist_failed", {
+      action: entry.action,
+      targetType: entry.targetType,
+      errorName: error instanceof Error ? error.name : "UnknownError"
+    });
+    if (attempts >= MAX_ATTEMPTS) {
+      this.drop(entry);
+      return;
+    }
+    if (this.outbox.length >= this.outboxMax) {
+      const oldest = this.outbox.shift();
+      auditReliability.adjustOutboxDepth(-1);
+      if (oldest) this.drop(oldest.entry);
+    }
+    this.outbox.push({ entry, attempts });
+    auditReliability.adjustOutboxDepth(1);
+    this.scheduleRetry();
+  }
+
+  private drop(entry: AuditEntry): void {
+    auditReliability.recordDropped();
+    logEvent("error", "audit.dropped", { action: entry.action, targetType: entry.targetType });
+  }
+
+  private scheduleRetry(): void {
+    if (this.retryTimer || this.outbox.length === 0) return;
+    this.retryTimer = setTimeout(() => {
+      this.retryTimer = undefined;
+      void this.drain();
+    }, this.retryDelayMs);
+    // Never keep the process alive for a retry: shutdown calls drain() explicitly.
+    this.retryTimer.unref?.();
+  }
+
+  private async retryPass(): Promise<number> {
+    if (this.retryTimer) clearTimeout(this.retryTimer);
+    this.retryTimer = undefined;
+    const pending = this.outbox.splice(0);
+    auditReliability.adjustOutboxDepth(-pending.length);
+    let failed = false;
+    for (const item of pending) {
+      try {
+        await this.persist(item.entry);
+      } catch (error) {
+        failed = true;
+        this.onWriteFailure(item.entry, error, item.attempts + 1);
+      }
+    }
+    this.retryDelayMs = failed ? Math.min(this.retryDelayMs * 2, this.retryMaxMs) : this.retryBaseMs;
+    if (this.retryTimer) clearTimeout(this.retryTimer);
+    this.retryTimer = undefined;
+    this.scheduleRetry();
+    return this.outbox.length;
   }
 
   async writeAsync(input: AuditWriteInput): Promise<AuditEntry> {
     const entry = this.createEntry(input);
     this.remember(entry);
+    // Fail-closed: the caller sees the error; nothing goes to the outbox.
     await this.repository.persist(entry);
     return entry;
   }

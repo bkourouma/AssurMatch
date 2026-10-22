@@ -56,6 +56,10 @@ export function backendEnv() {
     BULLMQ_PREFIX: "assurmatch-e2e",
     ASSURMATCH_AUTH_TOKEN_SECRET: "assurmatch-e2e-auth-token-secret-for-ci-only-32b",
     ENCRYPTION_KEY: "assurmatch-e2e-encryption-key-for-ci-only-32bytes",
+    // Lot 8 (spec 075): throwaway PII keys, identical to docker-compose.e2e.yml.
+    PII_ENCRYPTION_KEYS: "e2e1:YXNzdXJtYXRjaC1lMmUtcGlpLWtleS1jaS1vbmx5LTE=", // secret-scan:allow throwaway e2e stack value
+    PII_ENCRYPTION_ACTIVE_KEY_ID: "e2e1",
+    PII_BLIND_INDEX_KEY: "YXNzdXJtYXRjaC1lMmUtYmxpbmQtaW5kZXgtY2ktb25seQ==", // secret-scan:allow throwaway e2e stack value
     EMAIL_SERVICE_TYPE: "mailpit",
     EMAIL_FROM: "e2e@assurmatch.test",
     EMAIL_SMTP_HOST: "127.0.0.1",
