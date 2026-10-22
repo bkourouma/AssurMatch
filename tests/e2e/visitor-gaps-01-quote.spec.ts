@@ -122,8 +122,10 @@ test("VG-00 deux cabinets supplémentaires (Y avec documents requis, Z) rejoigne
   const z = requireWorld(ROOT_WORLD_Z);
   const x = brokerX();
   await expect
-    .poll(async () => (await readQuoteOptions([x.offerId, offerOf(y), offerOf(z)])).brokers.map((broker) => broker.displayName).sort(), { timeout: 60_000 })
-    .toEqual([x.partnerName, y.partnerName, z.partnerName].sort());
+    .poll(async () => (await readQuoteOptions([x.offerId, offerOf(y), offerOf(z)])).brokers.map((broker) => broker.displayName), { timeout: 60_000 })
+    // Other journeys of a full run publish their own brokers on the same country x product: the three
+    // firms of this scenario must be listed, the list itself is not exclusive.
+    .toEqual(expect.arrayContaining([x.partnerName, y.partnerName, z.partnerName]));
   const options = await readQuoteOptions([x.offerId, offerOf(y), offerOf(z)]);
   expect(options.maxOffers).toBe(3);
   expect(options.offers.map((offer) => offer.partnerName)).toEqual([x.partnerName, y.partnerName, z.partnerName]);

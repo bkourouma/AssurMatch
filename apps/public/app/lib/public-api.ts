@@ -449,8 +449,9 @@ export async function submitPublicQuoteRequest(input: QuoteRequestCreateDto, opt
     if (!response.ok) {
       const errorBody = await response.json().catch(() => null) as { message?: unknown } | null;
       const serverMessage = typeof errorBody?.message === "string" ? errorBody.message : "";
-      // Spec 050 R8: the server is the authority on the country phone rule.
-      if (response.status === 400 && /phone/i.test(serverMessage)) {
+      // Spec 050 R8: the server is the authority on the country phone rule. Match the exact backend message
+      // ("Phone is invalid for country"), not any 400 that merely mentions a phone-related column.
+      if (response.status === 400 && /^phone is invalid/i.test(serverMessage.trim())) {
         return { status: "error", error: "phone_invalid", messageKey: "quotePhoneInvalid", publicMessage: "Le numero de telephone ne correspond pas au format attendu pour ce pays." };
       }
       // Spec 050 R5: the consent text changed since the page was loaded.
