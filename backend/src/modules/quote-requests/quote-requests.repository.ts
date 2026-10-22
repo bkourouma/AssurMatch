@@ -117,6 +117,10 @@ export class PrismaQuoteRequestsRepository implements QuoteRequestsRepository {
     return (this.prisma.requireRuntimeClient() as unknown as { quoteRequest: QuoteRequestDelegate }).quoteRequest;
   }
 
+  /**
+   * Columns map one to one, including the spec 067 ones (`additionalOfferIds` String[],
+   * `chosenPartnerTenantId` String?, `marketingSource` Json?); an absent value is left to the column default.
+   */
   private toPrisma(quote: QuoteRequestRecord): Record<string, unknown> {
     const data = { ...quote } as Record<string, unknown>;
     delete data.countryCode;
@@ -131,7 +135,16 @@ export class PrismaQuoteRequestsRepository implements QuoteRequestsRepository {
     return Object.fromEntries(Object.entries(data).filter(([, value]) => value !== undefined));
   }
 
+  /**
+   * Spec 067: the new optional columns read back as the domain expects them - an empty
+   * `additionalOfferIds` and a null `chosenPartnerTenantId` / `marketingSource` are simply absent.
+   * Every other column is passed through unchanged.
+   */
   private toDomain(row: unknown): QuoteRequestRecord {
-    return row as QuoteRequestRecord;
+    const record = { ...(row as Record<string, unknown>) };
+    if (!Array.isArray(record.additionalOfferIds) || record.additionalOfferIds.length === 0) delete record.additionalOfferIds;
+    if (record.chosenPartnerTenantId === null) delete record.chosenPartnerTenantId;
+    if (record.marketingSource === null || (record.marketingSource !== undefined && typeof record.marketingSource !== "object")) delete record.marketingSource;
+    return record as unknown as QuoteRequestRecord;
   }
 }

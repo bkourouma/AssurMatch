@@ -4,6 +4,7 @@ import { activateWithMfa, e2ePassword, newAppContext, openAs, type BackOfficeAcc
 import { e2eEnv } from "./support/env";
 import { eicarFile } from "./support/files";
 import { loadJourneyState, requireState, saveJourneyState } from "./support/journey-state";
+import { reviewQuote } from "./support/quote-form";
 import { extractLink, searchMessages, waitForMail } from "./support/mailpit";
 import { documentRow, onboardBrokerDirect, submitStatusTransition, uploadPartnerDocument } from "./support/partners";
 import { card, uniqueSuffix } from "./support/ui";
@@ -30,7 +31,7 @@ async function fillQuoteSteps(visitor: Page, email: string, phone: string, city:
   await visitor.getByRole("button", { name: "Continuer" }).click();
   await visitor.locator("#am-quote-email").fill(email);
   await visitor.locator("#am-quote-phone").fill(phone);
-  await visitor.getByRole("button", { name: "Vérifier ma demande" }).click();
+  await reviewQuote(visitor);
 }
 
 /** Fills the CI x Auto quote form for the visible offer and captures the JSON the browser posts. */

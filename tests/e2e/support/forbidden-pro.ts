@@ -1,5 +1,6 @@
 import { expect, type Locator, type Page } from "@playwright/test";
 import { openAs, type BackOfficeAccount } from "./backoffice";
+import { reviewQuote } from "./quote-form";
 
 // Spec 065: helpers of the forbidden-cases-pro journeys (licence expiry, consent withdrawal).
 
@@ -37,10 +38,11 @@ export async function openQuoteReview(visitor: Page, offerId: string): Promise<L
   await visitor.locator("#am-answer-city").fill("Abidjan");
   await visitor.locator("#am-answer-contact_preference").selectOption("email");
   await visitor.getByRole("button", { name: "Continuer" }).click();
-  await visitor.locator("#am-quote-name").fill("Mariam Traoré");
+  await visitor.locator("#am-quote-first-name").fill("Mariam");
+  await visitor.locator("#am-quote-last-name").fill("Traoré");
   await visitor.locator("#am-quote-email").fill(`relecture.${Date.now().toString(36)}@visitor.e2e.test`);
   await visitor.locator("#am-quote-phone").fill("+2250102030405");
-  await visitor.getByRole("button", { name: "Vérifier ma demande" }).click();
+  await reviewQuote(visitor);
   const consent = visitor.locator("label[for='am-quote-consent'], #am-quote-consent >> xpath=..").first();
   await expect(consent).toBeVisible();
   return consent;
