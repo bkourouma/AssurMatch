@@ -40,6 +40,11 @@ export function simulationActorHeaders(actor: ActorContext): Record<string, stri
 }
 
 export async function createRuntimeHttpHarness(): Promise<RuntimeHttpHarness> {
+  // Lot 5 (spec 071) control 9: the shared seeds create brokers without a recorded contract, so the suites that do not
+  // test the contract control keep routing them. Suites of the control set the variable to "true" before this call.
+  process.env.ASSURMATCH_ROUTING_REQUIRE_RECORDED_CONTRACT ??= "false";
+  // Control 12 likewise: the hand-built quotes of the older suites carry no contact data, so they would be parked for review.
+  process.env.ASSURMATCH_ROUTING_LEAD_QUALITY_MIN_SCORE ??= "0";
   const app = await NestFactory.create(AppModule, { logger: false });
   // Spec 058: same request logging / metrics middleware as `main.ts` (silent under NODE_ENV=test).
   applyObservability(app);

@@ -35,6 +35,11 @@ export interface AiGatewayRequest {
   scope: AiGatewayScope;
   /** Quota bucket owner: hashed visitor IP, partner tenant id or admin actor id. */
   quotaKey: string;
+  /**
+   * Server-side context kept on the interaction (e.g. the advisor label map of a manager analysis).
+   * It is never minimized into the prompt, never sent to the model and never part of the DTO.
+   */
+  context?: Record<string, unknown> | undefined;
 }
 
 export interface AiGatewayDeps {
@@ -82,13 +87,20 @@ const GLOBAL_FLAG_BY_ASSIST: Record<AiAssistTypeCatalog, string> = {
   admin_risk_triage: "ai_summary_enabled",
   activation_gap_summary: "ai_summary_enabled",
   offer_consistency_check: "ai_summary_enabled",
+  offer_summary: "ai_summary_enabled",
   activity_report: "ai_summary_enabled",
   suspicious_leads: "ai_summary_enabled",
-  routing_anomaly_analysis: "ai_routing_anomaly_detection_enabled"
+  routing_anomaly_analysis: "ai_routing_anomaly_detection_enabled",
+  performance_summary: "ai_summary_enabled",
+  manager_assistant: "ai_broker_assistant_enabled",
+  weekly_summary: "ai_summary_enabled"
 };
 
+// Lot 8
 const BROKER_PRODUCT_GATED: ReadonlySet<AiAssistTypeCatalog> = new Set(["lead_summary", "next_action", "relaunch_message", "loss_analysis", "duplicate_hint"]);
-const ENTERPRISE_ONLY: ReadonlySet<AiAssistTypeCatalog> = new Set(["loss_analysis"]);
+const ENTERPRISE_ONLY: ReadonlySet<AiAssistTypeCatalog> = new Set(["loss_analysis", "manager_assistant"]);
+/** Tenant-level broker insights are plan-gated: an unknown plan is refused (fail closed) instead of being treated as allowed. */
+const PLAN_REQUIRED: ReadonlySet<AiAssistTypeCatalog> = new Set(["performance_summary", "manager_assistant", "weekly_summary"]);
 const JSON_SCHEMAS: Partial<Record<AiAssistTypeCatalog, (value: unknown) => unknown>> = {
   lead_score: (value) => aiLeadScoreSchema.parse(value),
   lead_classification: (value) => aiLeadClassificationSchema.parse(value)
@@ -125,6 +137,7 @@ export class AiGateway {
     if (scope.partnerTenantId && this.deps.featureFlags.isEnabled(AI_PARTNER_OPT_OUT_FLAG, "partner", scope.partnerTenantId)) reasons.push("partner_opted_out");
     if (scope.plan === "starter") reasons.push("plan_starter_excluded");
     if (ENTERPRISE_ONLY.has(assistType) && scope.plan !== "enterprise" && scope.plan !== undefined) reasons.push("plan_enterprise_required");
+    if (PLAN_REQUIRED.has(assistType) && scope.plan === undefined) reasons.push("plan_required");
     return { enabled: reasons.length === 0, reasons };
   }
 
@@ -140,7 +153,7 @@ export class AiGateway {
       id: crypto.randomUUID(),
       moduleConfigId: request.assistType,
       actorId: request.actor.actorId ?? null,
-      scope: { minimizedInput: minimized, language: request.language ?? "fr", plan: request.scope.plan ?? null },
+      scope: { minimizedInput: minimized, language: request.language ?? "fr", plan: request.scope.plan ?? null, ...(request.context ? { context: request.context } : {}) },
       minimizedInputReference: this.hash(JSON.stringify(minimized)),
       outputReference: "pending",
       guardrailResult: "pending",
@@ -308,6 +321,10 @@ export class AiGateway {
 
   async listForTarget(targetType: string, targetId: string): Promise<AiInteractionRecord[]> {
     return this.repository.listForTarget(targetType, targetId);
+  }
+
+  async listForTargets(targetType: string, targetIds: readonly string[], assistType: AiAssistTypeCatalog): Promise<AiInteractionRecord[]> {
+    return this.repository.listForTargets(targetType, targetIds, assistType);
   }
 
   async listForSurface(surface: AiSurface, limit = 50): Promise<AiInteractionRecord[]> {

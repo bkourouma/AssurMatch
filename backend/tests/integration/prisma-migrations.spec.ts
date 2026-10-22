@@ -40,8 +40,12 @@ describe("prisma migration fresh-base readiness", () => {
       "0031_broker_visitor_messaging",
       "0032_custom_role_members",
       "0033_visitor_quote_journey_gaps",
+      "0034_catalog_offers_gaps",
+      // Lot 5 (spec 071)
+      "0035_routing_billing_gaps",
       // Lot 8 (spec 075)
-      "0037_security_hardening"
+      "0037_security_hardening",
+      "0039_broker_lead_alerts"
     ]);
     const schema = readFileSync(join(process.cwd(), "backend", "prisma", "schema.prisma"), "utf8").replace(/\r\n/g, "\n");
     for (const model of ["AuditLog", "FeatureFlag", "ConsentRecord", "QuoteRequest", "LeadAssignment", "BrokerCrmLeadState", "PartnerApiKey", "PartnerWebhookEndpoint", "PartnerWebhookDelivery", "PartnerWebhookAllowlistEntry", "RoutingRule", "RoutingRuleHistory"]) {
@@ -296,5 +300,13 @@ describe("prisma migration fresh-base readiness", () => {
     expect(visitorQuoteJourney).toContain(`ALTER TABLE "LeadDocumentRequest" ADD COLUMN IF NOT EXISTS "reminderQueuedAt" TIMESTAMP(3)`);
     expect(visitorQuoteJourney).not.toMatch(/DROP|DELETE|UPDATE |NOT NULL/);
     expect(schema).toMatch(/model PartnerCustomRole \{[^}]*memberIds\s+Json\s+@default\("\[\]"\)/);
+    // Spec 070: catalog and offers gaps, additive only (the single UPDATE backfills the new Offer insurer columns).
+    const catalogOffersGaps = readFileSync(join(migrationsDir, "0034_catalog_offers_gaps", "migration.sql"), "utf8");
+    expect(catalogOffersGaps).toContain('CREATE TABLE IF NOT EXISTS "Insurer"');
+    expect(catalogOffersGaps).toContain('CREATE TABLE IF NOT EXISTS "ProductVersion"');
+    expect(catalogOffersGaps).toContain('CREATE TABLE IF NOT EXISTS "ActivationAttestation"');
+    expect(catalogOffersGaps).not.toMatch(/DROP|DELETE|TRUNCATE/);
+    expect(schema).toContain("model Insurer");
+    expect(schema).toContain("model ActivationAttestation");
   });
 });

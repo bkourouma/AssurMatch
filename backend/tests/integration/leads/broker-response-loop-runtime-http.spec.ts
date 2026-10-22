@@ -6,6 +6,7 @@ import type { AuthEmailDeliveryResult, AuthEmailPayload } from "../../../src/mod
 import { QuoteEmailTemplateService } from "../../../src/modules/notifications/email/quote-email-template.service";
 import { QuoteNotificationDeliveryService } from "../../../src/modules/notifications/quote-notification-delivery.service";
 import type { AssurMatchRuntime } from "../../../src/runtime/assurmatch-runtime";
+import { brokerUser } from "../broker-self-service/self-service-helpers";
 import { actorHeaders, createRuntimeHttpHarness, readJson, seedPublicRuntime, type RuntimeHttpHarness } from "../runtime-http-test-utils";
 
 type Seed = Awaited<ReturnType<typeof seedPublicRuntime>>;
@@ -409,9 +410,11 @@ describe("broker response loop runtime HTTP (spec 055)", () => {
 
   it("assigns a lead to an advisor: the agent sees it with the full contact, another agent does not", async () => {
     const { active, assignment, actors, seed } = await start();
-    const assign = await post(active, `/broker/crm/leads/${assignment.id}/assign`, actors.manager, { advisorId: actors.agentA.actorId, advisorPartnerTenantId: seed.partner.id });
+    // Lot 3 (spec 069 FR-006): the advisor must be a real user of the cabinet (resolved from the user directory).
+    const agentA = await brokerUser(active, seed.partner.id, "broker_agent");
+    const assign = await post(active, `/broker/crm/leads/${assignment.id}/assign`, actors.manager, { advisorId: agentA.actorId, advisorPartnerTenantId: seed.partner.id });
     expect(assign.status).toBe(201);
-    const agentView = await active.request(`/broker/crm/leads/${assignment.id}`, { headers: actorHeaders(actors.agentA) });
+    const agentView = await active.request(`/broker/crm/leads/${assignment.id}`, { headers: actorHeaders(agentA) });
     expect(agentView.status).toBe(200);
     expect((await agentView.json() as { contact: Record<string, unknown> }).contact).toMatchObject({ email: "reponse@example.com" });
     expect((await active.request(`/broker/crm/leads/${assignment.id}`, { headers: actorHeaders(actors.agentB) })).status).toBe(403);

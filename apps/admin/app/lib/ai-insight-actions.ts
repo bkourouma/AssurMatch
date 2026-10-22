@@ -3,7 +3,7 @@
 import { redirect } from "next/navigation";
 import { backOfficeApiBaseUrl, getBackOfficeToken, loginRedirect } from "./backoffice-auth";
 
-const ASSIST_TYPES = new Set(["admin_risk_triage", "activation_gap_summary", "offer_consistency_check", "activity_report", "suspicious_leads"]);
+const ASSIST_TYPES = new Set(["admin_risk_triage", "activation_gap_summary", "offer_consistency_check", "offer_summary", "activity_report", "suspicious_leads"]);
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 function stringValue(value: FormDataEntryValue | null): string {

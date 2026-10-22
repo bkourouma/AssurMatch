@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it } from "vitest";
 import type { AdminCountryView, CatalogActivationBlocker } from "../../../../packages/shared/contracts/catalog.contracts";
 import { createRuntimeHttpHarness, seedPublicRuntime, type RuntimeHttpHarness } from "../runtime-http-test-utils";
+import { satisfyLot4ActivationRequirements } from "../helpers/lot4-activation-fixtures";
 import { auditEntries, call, complianceAdmin, countryAdmin, senegal, superAdmin, supportAdmin } from "./catalog-http-helpers";
 
 type ErrorBody = { code: string; message: string; blockers?: CatalogActivationBlocker[] };
@@ -150,7 +151,9 @@ describe("admin countries over HTTP (spec 050 US1)", () => {
     const refusedStatus = await call(harness, ciAdmin, "POST", `/admin/countries/${seed.country.id}/status`, { status: "public", reason: "reouverture par admin pays" });
     expect(refusedStatus.status).toBe(403);
 
-    // The seeded country meets every checklist condition: compliance reopens it.
+    // The seeded country meets every structural checklist condition; the lot 4 requirements (routing and scoring rules,
+    // FR + EN legal notice, compliance attestations) are provided by the fixture helper: compliance then reopens it.
+    await satisfyLot4ActivationRequirements(harness, { countryId: seed.country.id, productIds: [seed.product.id] });
     const reopened = await call<AdminCountryView>(harness, complianceAdmin, "POST", `/admin/countries/${seed.country.id}/flags`, { key: "country_public_enabled", value: true, reason: "reouverture conformite" });
     expect(reopened.status, JSON.stringify(reopened.body)).toBe(200);
     expect((await harness.request("/countries/CI")).status).toBe(200);

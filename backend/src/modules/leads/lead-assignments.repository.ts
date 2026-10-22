@@ -2,6 +2,7 @@ import type { RuntimeRepository } from "../common/repositories/runtime-repositor
 import { assertRuntimeRepository } from "../common/repositories/runtime-repository";
 import type { BrokerStarterLeadHistoryEvent } from "../../../../packages/shared/contracts/quote.contracts";
 import type { PrismaService } from "../common/prisma/prisma.service";
+import type { PartnerSlaState } from "../routing/routing-controls.ports";
 import type { RoutingPartnerStats } from "../routing/routing-strategy";
 import type { LeadAssignmentRecord, LeadAssignmentStatus } from "./lead-assignment.service";
 // Lot 8 (spec 075): the enrichment reads encrypted prospect contacts and quote payloads.
@@ -23,6 +24,11 @@ export interface LeadAssignmentsRepository extends RuntimeRepository {
   /** Leads assigned in the month containing `now`, excluding rejected and disputed ones. */
   monthlyCountForPartner(partnerTenantId: string, now: Date): Promise<number>;
   routingStatsForPartners(partnerTenantIds: string[], now: Date): Promise<Map<string, RoutingPartnerStats>>;
+  /**
+   * Lot 5 (spec 071, PRD 17 control 10): untouched leads beyond each broker SLA. `slaTargetMinutes`
+   * maps a partner id to its SLA; partners without SLA are not queried and never appear in the result.
+   */
+  slaOverrunForPartners(slaTargetMinutes: ReadonlyMap<string, number>, now: Date): Promise<Map<string, PartnerSlaState>>;
   list(): Promise<LeadAssignmentRecord[]>;
   /** The assignment rows of one quote request (spec 062: the visitor's conversations), newest first. */
   listForQuote(quoteRequestId: string): Promise<LeadAssignmentRecord[]>;
@@ -49,6 +55,9 @@ export interface LeadCrmStatePatch {
 }
 
 const DAY_MS = 24 * 60 * 60 * 1000;
+/** Control 10 only looks at leads assigned in this window, so a stale legacy lead never degrades a broker forever. */
+export const SLA_LOOKBACK_DAYS = 30;
+const SLA_WAITING_STATUSES: readonly LeadAssignmentStatus[] = ["assigned", "broker_notified"];
 const QUOTA_EXEMPT_STATUSES: ReadonlySet<LeadAssignmentStatus> = new Set(["rejected", "disputed"]);
 const ACCEPTED_STATUSES: ReadonlySet<LeadAssignmentStatus> = new Set(["accepted", "received", "contacted", "closed"]);
 
@@ -82,6 +91,34 @@ export function computeRoutingStats(assignments: readonly LeadAssignmentRecord[]
       ? { averageFirstActionMinutes: firstActionSamples.reduce((sum, minutes) => sum + minutes, 0) / firstActionSamples.length }
       : {})
   }]));
+}
+
+/** A lead still waiting for the broker's first action (no seen, accepted or broker action timestamp). */
+export function isUntouched(assignment: Pick<LeadAssignmentRecord, "status" | "seenAt" | "acceptedAt" | "lastBrokerActionAt">): boolean {
+  return SLA_WAITING_STATUSES.includes(assignment.status) && !assignment.seenAt && !assignment.acceptedAt && !assignment.lastBrokerActionAt;
+}
+
+/** Shared between the memory and Prisma repositories: per partner, untouched leads older than its SLA. */
+export function computeSlaOverrun(
+  assignments: ReadonlyArray<Pick<LeadAssignmentRecord, "partnerTenantId" | "assignedAt" | "status" | "seenAt" | "acceptedAt" | "lastBrokerActionAt">>,
+  slaTargetMinutes: ReadonlyMap<string, number>,
+  now: Date
+): Map<string, PartnerSlaState> {
+  const windowStart = now.getTime() - SLA_LOOKBACK_DAYS * DAY_MS;
+  const result = new Map<string, PartnerSlaState>();
+  for (const assignment of assignments) {
+    const target = slaTargetMinutes.get(assignment.partnerTenantId);
+    if (!target || target <= 0 || !isUntouched(assignment)) continue;
+    const assignedAt = new Date(assignment.assignedAt).getTime();
+    if (assignedAt < windowStart) continue;
+    const waitingMinutes = (now.getTime() - assignedAt) / 60_000;
+    if (waitingMinutes <= target) continue;
+    const entry = result.get(assignment.partnerTenantId) ?? { overrunCount: 0 };
+    entry.overrunCount += 1;
+    entry.oldestOverrunMinutes = Math.max(entry.oldestOverrunMinutes ?? 0, Math.floor(waitingMinutes));
+    result.set(assignment.partnerTenantId, entry);
+  }
+  return result;
 }
 
 interface RoutingStatsRow {
@@ -148,6 +185,10 @@ export class MemoryLeadAssignmentsRepository implements LeadAssignmentsRepositor
 
   async routingStatsForPartners(partnerTenantIds: string[], now: Date): Promise<Map<string, RoutingPartnerStats>> {
     return computeRoutingStats(this.assignments, partnerTenantIds, now);
+  }
+
+  async slaOverrunForPartners(slaTargetMinutes: ReadonlyMap<string, number>, now: Date): Promise<Map<string, PartnerSlaState>> {
+    return computeSlaOverrun(this.assignments, slaTargetMinutes, now);
   }
 
   async list(): Promise<LeadAssignmentRecord[]> {
@@ -300,6 +341,26 @@ export class PrismaLeadAssignmentsRepository implements LeadAssignmentsRepositor
       });
     }
     return stats;
+  }
+
+  async slaOverrunForPartners(slaTargetMinutes: ReadonlyMap<string, number>, now: Date): Promise<Map<string, PartnerSlaState>> {
+    const targets = [...slaTargetMinutes.entries()].filter(([, minutes]) => minutes > 0);
+    if (targets.length === 0) return new Map();
+    // Only untouched leads of the window older than the SHORTEST SLA are read (index
+    // partnerTenantId/status/assignedAt); the per-partner SLA is then applied by the shared helper.
+    const shortest = Math.min(...targets.map(([, minutes]) => minutes));
+    const rows = await this.assignments().findMany({
+      where: {
+        partnerTenantId: { in: targets.map(([partnerTenantId]) => partnerTenantId) },
+        status: { in: [...SLA_WAITING_STATUSES] },
+        assignedAt: { gte: new Date(now.getTime() - SLA_LOOKBACK_DAYS * DAY_MS), lt: new Date(now.getTime() - shortest * 60_000) },
+        seenAt: null,
+        acceptedAt: null,
+        lastBrokerActionAt: null
+      },
+      select: { partnerTenantId: true, assignedAt: true, status: true, seenAt: true, acceptedAt: true, lastBrokerActionAt: true }
+    });
+    return computeSlaOverrun(rows.map((row) => this.toDomain(row)), slaTargetMinutes, now);
   }
 
   async list(): Promise<LeadAssignmentRecord[]> {

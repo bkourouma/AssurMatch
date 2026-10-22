@@ -110,12 +110,28 @@ export class TemplateAiProvider implements AiProviderPort {
         return `Ecarts d'activation: ${describe(input.blocked)} section(s) bloquee(s), ${describe(input.warning)} avertissement(s). Principaux manques: ${describe(input.reasons)}.`;
       case "offer_consistency_check":
         return `Verification indicative de l'offre "${describe(input.name)}": ${describe(input.issues)}. Ces points sont a confirmer par un admin avant publication.`;
+      case "offer_summary":
+        return `Resume indicatif de l'offre "${describe(input.offerKey)}": garanties ${describe(input.guarantees)}; exclusions ${describe(input.exclusions)}; franchise ${describe(input.deductible)}; plafond ${describe(input.ceiling)}; delai de traitement ${describe(input.processingDelayDays)} jour(s); prix indicatif ${describe(input.indicativePrice)}; validite ${describe(input.validity)}. Offre indicative, conditions a confirmer par le courtier partenaire.`;
       case "activity_report":
         return `Rapport d'activite (${describe(input.window)}): ${describe(input.received)} demandes recues, ${describe(input.transmitted)} transmises, ${describe(input.refused)} refusees, ${describe(input.nonRouted)} non routees. Partenaires actifs: ${describe(input.activePartners)}.`;
       case "suspicious_leads":
         return `Leads suspects (indicatif): ${describe(input.flaggedCount)} demande(s) presentant des signaux (doublons, coordonnees incoherentes, rafales). A revoir manuellement.`;
       case "routing_anomaly_analysis":
         return `Analyse indicative du routage: ${describe(input.totalAnomalies)} anomalie(s) detectee(s) dont ${describe(input.criticalCount)} critique(s). Piste: verifier la capacite des courtiers et les quotas configures.`;
+      case "performance_summary":
+        return `Résumé indicatif de performance sur ${describe(input.windowDays)} jours : ${describe(input.received)} lead(s) reçu(s), ${describe(input.won)} gagné(s), ${describe(input.lost)} perdu(s), ${describe(input.open)} encore ouvert(s) dont ${describe(input.overdueOpen)} sans activité récente. Taux de conversion gagnés/reçus : ${input.conversionRate === null || input.conversionRate === undefined ? "non mesurable" : `${describe(input.conversionRate)} %`}. Délai moyen de première réponse visible : ${input.averageFirstReplyMinutes === null || input.averageFirstReplyMinutes === undefined ? "non mesuré" : `${describe(input.averageFirstReplyMinutes)} min`}. Point d'attention : les leads ouverts sans activité récente, à examiner par le responsable du cabinet.`;
+      case "manager_assistant": {
+        const advisors = Array.isArray(input.advisors) ? (input.advisors as Array<Record<string, unknown>>) : [];
+        const byLoad = [...advisors].sort((left, right) => Number(right.openLeads ?? 0) - Number(left.openLeads ?? 0));
+        const busiest = byLoad[0];
+        const lightest = byLoad.at(-1);
+        const balance = busiest && lightest && busiest !== lightest
+          ? ` Charge la plus élevée : ${describe(busiest.label)} (${describe(busiest.openLeads)} lead(s) ouvert(s), ${describe(busiest.overdueOpen)} en retard) ; la plus faible : ${describe(lightest.label)} (${describe(lightest.openLeads)} lead(s) ouvert(s)). Piste à valider par le manager : examiner la répartition des nouveaux leads entre ces conseillers.`
+          : "";
+        return `Analyse indicative de la charge sur ${describe(input.windowDays)} jours : ${advisors.length} conseiller(s) avec des leads, ${describe(input.unassignedOpen)} lead(s) ouvert(s) non attribué(s).${balance} Le manager reste seul juge de toute affectation.`;
+      }
+      case "weekly_summary":
+        return `Cette semaine : ${describe(input.received)} lead(s) reçu(s), ${describe(input.accepted)} accepté(s), ${describe(input.contactedCount)} contacté(s), ${describe(input.won)} gagné(s) et ${describe(input.lost)} perdu(s). ${describe(input.overdueTasks)} tâche(s) CRM en retard.`;
       default:
         return `Assistance indicative generee pour ${request.assistType}.`;
     }

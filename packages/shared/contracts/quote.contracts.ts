@@ -9,7 +9,7 @@ import {
   uuidSchema
 } from "../validation/common.schemas";
 import { agencyFilterSchema } from "./enterprise.contracts";
-import { adminOfferContentObjectSchema, offerContentGuaranteeSchema, offerContentPaymentFlexibilitySchema, refineOfferContent } from "./offer-content";
+import { adminOfferContentObjectSchema, offerContentGuaranteeSchema, offerContentPaymentFlexibilitySchema, offerTypeSchema, refineOfferContent } from "./offer-content";
 
 export const quoteFeatureFlags = [
   "public_comparator_enabled",
@@ -149,7 +149,7 @@ export const adminOfferUpsertSchema = adminOfferContentObjectSchema.extend({
   productId: uuidSchema,
   partnerTenantId: uuidSchema.optional(),
   publicKey: nonEmptyStringSchema.optional(),
-  offerType: z.enum(["indicative", "partner"]).optional(),
+  offerType: offerTypeSchema.optional(),
   expectedUpdatedAt: dateTimeStringSchema.optional(),
   reason: reasonSchema
 }).superRefine(refineOfferContent);
@@ -515,7 +515,14 @@ const brokerCrmLeadListQueryBaseSchema = paginationQuerySchema.extend({
   agencyId: agencyFilterSchema.optional()
 });
 
-export const brokerCrmLeadListQuerySchema = brokerCrmLeadListQueryBaseSchema.refine((value) => !value.dateFrom || !value.dateTo || new Date(value.dateFrom) <= new Date(value.dateTo), {
+/** Lot 3 (spec 069 FR-004): sort keys of the CRM list; `priority` uses the human-approved AI score (leads without one last). */
+export const brokerCrmLeadSortSchema = z.enum(["assignedAt", "status", "priority", "urgency"]);
+export const brokerCrmSortDirectionSchema = z.enum(["asc", "desc"]);
+
+export const brokerCrmLeadListQuerySchema = brokerCrmLeadListQueryBaseSchema.extend({
+  sort: brokerCrmLeadSortSchema.default("assignedAt"),
+  sortDirection: brokerCrmSortDirectionSchema.default("desc")
+}).refine((value) => !value.dateFrom || !value.dateTo || new Date(value.dateFrom) <= new Date(value.dateTo), {
   message: "dateFrom must be before dateTo"
 });
 
@@ -537,7 +544,10 @@ export const brokerCrmLeadSummarySchema = z.object({
    * of recipients is exposed; the identity of the co-recipients never is.
    */
   isShared: z.boolean().default(false),
-  recipientCount: z.number().int().min(1).default(1)
+  recipientCount: z.number().int().min(1).default(1),
+  /** Lot 3 (spec 069 FR-004): human-approved indicative AI score, present only when one exists and scoring is open. Never exported. */
+  priorityScore: z.number().int().min(0).max(100).optional(),
+  priorityLevel: z.enum(["low", "medium", "high"]).optional()
 });
 
 export const brokerCrmHistoryEventSchema = z.object({

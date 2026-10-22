@@ -28,12 +28,12 @@ export interface OffersRepository extends RuntimeRepository {
 /** Optional columns of `Offer` and `OfferVersion` that an explicit `undefined` clears. */
 const NULLABLE_OFFER_KEYS = new Set([
   "partnerTenantId", "shortDescription", "guaranteeSummary", "indicativePriceMin", "indicativePriceMax", "pricingUnit",
-  "sponsorLabel", "insurerName", "guaranteeLevel", "deductibleAmount", "coverageCeiling", "processingDelayDays",
+  "sponsorLabel", "insurerName", "insurerId", "guaranteeLevel", "deductibleAmount", "coverageCeiling", "processingDelayDays",
   "paymentFlexibility", "exclusionsSummary", "sourceOfInformation", "validatedById", "validatedAt",
   "publishedVersionId", "pendingVersionId", "withdrawnAt"
 ]);
 const NULLABLE_VERSION_KEYS = new Set([
-  "shortDescription", "guaranteeSummary", "exclusionsSummary", "insurerName", "guaranteeLevel", "deductibleAmount",
+  "shortDescription", "guaranteeSummary", "exclusionsSummary", "insurerName", "insurerId", "guaranteeLevel", "deductibleAmount",
   "coverageCeiling", "processingDelayDays", "paymentFlexibility", "sourceOfInformation", "indicativePriceMin",
   "indicativePriceMax", "pricingUnit", "sponsorLabel", "authorId", "submittedAt", "decidedById", "decidedAt",
   "lastDecision", "decisionReason"

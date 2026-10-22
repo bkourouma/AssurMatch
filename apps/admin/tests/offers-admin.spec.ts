@@ -50,7 +50,7 @@ test("the offer list exposes the FR-010 filters, the validation queue, completen
   const page = source("apps/admin/app/offers/page.tsx");
   for (const marker of [
     "Offres indicatives",
-    "readAdminOfferList",
+    "readAdminOffersByType",
     "name=\"countryId\"",
     "name=\"productId\"",
     "name=\"partnerTenantId\"",

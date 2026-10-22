@@ -12,12 +12,13 @@ import {
   type AdminCountryView,
   type AdminProductView,
   type AdminRegulatoryRegimeView,
-  type CatalogFlagToggleDto
+  type CatalogFlagToggleDto,
+  type ProductVersionView
 } from "../../../../packages/shared/contracts/catalog.contracts";
 import type { AuditLogWriter } from "../audit-logs/audit-log-writer.service";
 import type { ActorContext } from "../common/types";
 import type { Country, CountriesService } from "../countries/countries.module";
-import { countryLinkFor, effectiveProductFlags, type CountryProductLink, type Product, type ProductsService } from "../products/products.module";
+import { countryLinkFor, effectiveProductFlags, normalizeLegalNotice, type CountryProductLink, type Product, type ProductsService } from "../products/products.module";
 import type { RegulatoryRegime, RegulatoryRegimesService } from "../regulatory-regimes/regulatory-regimes.module";
 import { CatalogAccess } from "./catalog-access";
 import type { CatalogActivationGuard } from "./catalog-activation-guard";
@@ -132,6 +133,13 @@ export class CatalogAdminService {
     return this.productView(await this.requireProduct(productId));
   }
 
+  /** Spec 070 PROD-009: content history of a product, same access as `getProduct`. */
+  async listProductVersions(actor: ActorContext, productId: string): Promise<ProductVersionView[]> {
+    this.access.require(actor, this.access.canRead(actor, "products:read", { productId }), this.readRefusal("Product", productId, { productId }));
+    await this.requireProduct(productId);
+    return this.deps.products.listVersions(productId);
+  }
+
   async createProduct(actor: ActorContext, input: unknown): Promise<AdminProductView> {
     const { reason, ...parsed } = adminProductCreateSchema.parse(input);
     this.access.require(actor, this.access.can(actor, "products:create") && this.access.isUnscoped(actor), {
@@ -157,6 +165,14 @@ export class CatalogAdminService {
       this.access.require(actor, this.access.isCompliance(actor), {
         action: "product.update_refused", targetType: "Product", targetId: productId, scope: { productId }, refusal: "manual_review_removal_requires_compliance", requestReason: parsed.reason
       });
+    }
+    if (parsed.status === "public" && current.status !== "public") {
+      // Spec 070 PRD 36: the product activation checklist gates the public status (deactivation is never gated).
+      const blockers = await this.deps.guard.productPublicBlockers(productId);
+      if (blockers.length) {
+        this.access.refuse(actor, { action: "product.update_refused", targetType: "Product", targetId: productId, scope: { productId }, refusal: "activation_blocked", requestReason: parsed.reason, context: { status: "public", blockers } });
+        throw catalogUnprocessable(CatalogErrorCodes.activationBlocked, "Activation blocked: the activation checklist has failing blocking controls", blockers);
+      }
     }
     try {
       const product = await this.deps.products.update(productId, parsed, actor);
@@ -297,6 +313,9 @@ export class CatalogAdminService {
       sensitivity: product.sensitivity,
       requiresDocuments: product.requiresDocuments,
       requiresManualReview: product.requiresManualReview,
+      legalNotice: normalizeLegalNotice(product.legalNotice),
+      requiredDocumentKinds: [...(product.requiredDocumentKinds ?? [])],
+      version: product.version ?? 1,
       status: product.status,
       flags: { ...PRODUCT_FEATURE_FLAG_DEFAULTS, ...product.flags },
       countryIds: [...product.countryIds],

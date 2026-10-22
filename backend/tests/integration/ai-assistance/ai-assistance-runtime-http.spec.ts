@@ -36,6 +36,7 @@ describe("AI assistance runtime HTTP", () => {
     const status = aiAssistanceStatusSchema.parse(await readJson<AIAssistanceStatus>(response));
     expect(status).toMatchObject({ surface: "broker_crm", enabled: false, modelCall: false });
     expect(status.availableAssistTypes).toContain("lead_summary");
+    expect(status.availableAssistTypes).not.toContain("weekly_summary");
   });
 
   it("refuses non-AI admin role for admin assistance and audits refusal", async () => {

@@ -16,6 +16,11 @@ export interface RoutingCandidate {
   partnerTenantId: string;
   quotaMonthlyLeads: number;
   stats: RoutingPartnerStats;
+  /**
+   * Lot 5 (spec 071, control 10): the broker holds untouched leads beyond its SLA. A degraded
+   * candidate stays eligible but is ranked after every healthy one (except in exclusive/manual).
+   */
+  degraded?: boolean | undefined;
 }
 
 export interface RoutingSelectionInput {
@@ -43,6 +48,9 @@ export function selectRoutingCandidate(input: RoutingSelectionInput): RoutingSel
   const candidates = [...input.candidates];
   if (input.mode === "manual") return { reason: "manual_assignment_required", ranking: [] };
   if (candidates.length === 0) return { reason: "no_eligible_broker", ranking: [] };
+  // Lot 5 (spec 071, PRD 32.8): `ai_assisted` never selects by itself. The ranking is returned for
+  // context only; the request is parked and an admin assigns (the AI suggestion is advisory).
+  if (input.mode === "ai_assisted") return { reason: "ai_suggestion_pending", ranking: candidates.sort(withSlaDegradation(byId)).map((candidate) => candidate.partnerTenantId) };
 
   if (input.mode === "exclusive") {
     const exclusive = candidates.find((candidate) => candidate.partnerTenantId === input.exclusivePartnerTenantId);
@@ -51,7 +59,7 @@ export function selectRoutingCandidate(input: RoutingSelectionInput): RoutingSel
       : { reason: "exclusive_partner_not_eligible", ranking: [] };
   }
 
-  const ranked = candidates.sort(comparatorFor(input));
+  const ranked = candidates.sort(withSlaDegradation(comparatorFor(input)));
   const selected = ranked[0];
   return {
     selected,
@@ -76,7 +84,7 @@ export interface RoutingMultiSelection {
 export function selectRoutingCandidates(input: RoutingSelectionInput, max: number): RoutingMultiSelection {
   const single = selectRoutingCandidate(input);
   if (!single.selected) return { selected: [], reason: single.reason, ranking: single.ranking };
-  if (input.mode === "exclusive" || input.mode === "manual" || max <= 1) {
+  if (input.mode === "exclusive" || input.mode === "manual" || input.mode === "ai_assisted" || max <= 1) {
     return { selected: [single.selected], reason: single.reason, ranking: single.ranking };
   }
   const byPartnerId = new Map(input.candidates.map((candidate) => [candidate.partnerTenantId, candidate]));
@@ -116,6 +124,11 @@ function comparatorFor(input: RoutingSelectionInput): (a: RoutingCandidate, b: R
     default:
       return byId;
   }
+}
+
+/** Control 10: healthy candidates first, then the mode order (degradation never excludes). */
+function withSlaDegradation(compare: (a: RoutingCandidate, b: RoutingCandidate) => number): (a: RoutingCandidate, b: RoutingCandidate) => number {
+  return (a, b) => Number(Boolean(a.degraded)) - Number(Boolean(b.degraded)) || compare(a, b);
 }
 
 function byId(a: RoutingCandidate, b: RoutingCandidate): number {

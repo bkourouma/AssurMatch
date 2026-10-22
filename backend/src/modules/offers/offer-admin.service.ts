@@ -37,6 +37,7 @@ type ParsedContent = {
   guaranteeSummary?: string | undefined;
   exclusionsSummary?: string | undefined;
   insurerName?: string | undefined;
+  insurerId?: string | undefined;
   guarantees: OfferVersionContent["guarantees"];
   guaranteeLevel?: number | undefined;
   deductibleAmount?: number | undefined;
@@ -63,6 +64,7 @@ export function contentFromInput(parsed: ParsedContent, sponsorship: { isSponsor
     guaranteeSummary: text(parsed.guaranteeSummary),
     exclusionsSummary: text(parsed.exclusionsSummary),
     insurerName: text(parsed.insurerName),
+    insurerId: text(parsed.insurerId),
     guarantees: parsed.guarantees,
     guaranteeLevel: parsed.guaranteeLevel,
     deductibleAmount: parsed.deductibleAmount,
@@ -136,6 +138,10 @@ export class OfferAdminService {
     this.requireAccess(actor, this.canWrite(actor), undefined, "update", "forbidden_role");
     const offer = await this.requireInScope(id, actor, "update");
     const parsed = parseOfferInput(adminOfferUpsertSchema, input);
+    if (parsed.offerType !== undefined && parsed.offerType !== (offer.offerType ?? "indicative")) {
+      this.lifecycle.refused(actor, offer, "update", "offer_type_immutable", { from: offer.offerType ?? "indicative", to: parsed.offerType });
+      throw offerUnprocessable(OfferErrorCodes.typeImmutable, "The type of an offer cannot change after creation", [{ code: "offer_type_immutable", field: "offerType" }]);
+    }
     if (parsed.countryId !== offer.countryId || parsed.productId !== offer.productId) {
       this.lifecycle.refused(actor, offer, "update", "scope_change_refused");
       throw offerInvalid("Validation failed: the country and the product of an offer cannot change");
@@ -205,6 +211,7 @@ export class OfferAdminService {
       if (parsed.countryId && offer.countryId !== parsed.countryId) continue;
       if (parsed.productId && offer.productId !== parsed.productId) continue;
       if (parsed.partnerTenantId && offer.partnerTenantId !== parsed.partnerTenantId) continue;
+      if (parsed.offerType && (offer.offerType ?? "indicative") !== parsed.offerType) continue;
       const versions = await this.lifecycle.versions(offer);
       const pending = pendingVersion(offer, versions);
       const published = publishedVersion(offer, versions);

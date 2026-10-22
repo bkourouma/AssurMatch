@@ -4,6 +4,7 @@ import { ActivationChecklistAuditActions } from "../../../src/modules/activation
 import { actorHeaders, createRuntimeHttpHarness, readJson, type RuntimeHttpHarness } from "../runtime-http-test-utils";
 import { seedAcceptedAccreditation, seedOwnerAndContract } from "../helpers/partner-onboarding-seed";
 import { publishOffer } from "../helpers/offer-test-helpers";
+import { satisfyLot4ActivationRequirements } from "../helpers/lot4-activation-fixtures";
 
 describe("activation checklist runtime HTTP", () => {
   let harness: RuntimeHttpHarness | undefined;
@@ -94,6 +95,9 @@ describe("activation checklist runtime HTTP", () => {
       validUntil: "2030-01-01T00:00:00.000Z",
       reason: "activation checklist test"
     }, admin, admin);
+
+    // Spec 070: routing and scoring rules, FR + EN legal notice and compliance attestations are blocking controls.
+    await satisfyLot4ActivationRequirements(harness, { countryId: country.id, productIds: [product.id] });
 
     const response = await harness.request("/admin/activation-checklist?country=CI&product=auto", { headers: actorHeaders(admin) });
     expect(response.status).toBe(200);

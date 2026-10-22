@@ -63,6 +63,16 @@ interface RegulatoryRegimeSeed {
 interface ProductCategorySeed {
   key: string;
   name: string;
+  nameEn?: string;
+  sortOrder?: number;
+}
+
+/** Spec 070: reference insurers (country ISO code + short code). Real insurers are not committed. */
+interface InsurerSeed {
+  countryIsoCode: string;
+  name: string;
+  code: string;
+  approvalNumber?: string;
 }
 
 interface ProductSeed {
@@ -106,6 +116,7 @@ async function main(): Promise<void> {
     const regimes = readJson<RegulatoryRegimeSeed[]>("regulatory-regimes.json");
     const categories = readJson<ProductCategorySeed[]>("product-categories.json");
     const products = readJson<ProductSeed[]>("products.json");
+    const insurers = readJson<InsurerSeed[]>("insurers.json");
     const flagDefaults = readJson<FeatureFlagDefaults>("feature-flags.defaults.json");
     const consentTemplates = readJson<ConsentTemplateSeed[]>("consent-templates.json").filter((template) => template.purpose === "lead_transmission");
 
@@ -121,11 +132,19 @@ async function main(): Promise<void> {
       });
     }
 
+    // Spec 070 PROD-001: the 14 PRD categories are created `active` when absent and NEVER rewritten
+    // on a rerun (name, labels, order and status belong to the admin once created).
     for (const category of categories) {
       await prisma.productCategory.upsert({
         where: { key: category.key },
-        update: { name: category.name },
-        create: { key: category.key, name: category.name }
+        update: {},
+        create: {
+          key: category.key,
+          name: category.name,
+          status: "active",
+          ...(category.nameEn ? { nameEn: category.nameEn } : {}),
+          ...(category.sortOrder !== undefined ? { sortOrder: category.sortOrder } : {})
+        }
       });
     }
 
@@ -175,19 +194,49 @@ async function main(): Promise<void> {
     }
     for (const product of products) {
       const categoryId = categoryByKey.get(product.category) ?? null;
-      await prisma.product.upsert({
-        where: { key: product.key },
-        // Rerun: name and category only; flags and status are never rewritten.
-        update: {
-          name: product.name,
-          ...(categoryId ? { categoryId } : {})
-        },
-        create: {
+      const existingProduct = await prisma.product.findUnique({ where: { key: product.key } });
+      if (existingProduct) {
+        // Rerun: name only, plus the category when the product has none yet (an admin choice is
+        // never overwritten); flags and status are never rewritten.
+        await prisma.product.update({
+          where: { key: product.key },
+          data: {
+            name: product.name,
+            ...(categoryId && !existingProduct.categoryId ? { categoryId } : {})
+          }
+        });
+        continue;
+      }
+      const created = await prisma.product.create({
+        data: {
           key: product.key,
           name: product.name,
           flags: product.defaultFlags as object,
           ...(categoryId ? { categoryId } : {})
         }
+      });
+      // Spec 070 PROD-008: the history of a new product starts at version 1.
+      await prisma.productVersion.upsert({
+        where: { productId_versionNumber: { productId: created.id, versionNumber: 1 } },
+        update: {},
+        create: {
+          productId: created.id,
+          versionNumber: 1,
+          snapshot: { name: created.name, description: null, categoryId: created.categoryId, sensitivity: created.sensitivity, requiresDocuments: created.requiresDocuments, requiresManualReview: created.requiresManualReview, status: created.status, legalNotice: {}, requiredDocumentKinds: [] },
+          changes: [],
+          reason: "Version initiale (seed de référence)"
+        }
+      });
+    }
+
+    // Spec 070 PRD section 8: insurers referential, created when absent, never rewritten.
+    for (const insurer of insurers) {
+      const country = await prisma.country.findUnique({ where: { isoCode: insurer.countryIsoCode } });
+      if (!country) continue;
+      await prisma.insurer.upsert({
+        where: { countryId_code: { countryId: country.id, code: insurer.code } },
+        update: {},
+        create: { countryId: country.id, code: insurer.code, name: insurer.name, ...(insurer.approvalNumber ? { approvalNumber: insurer.approvalNumber } : {}) }
       });
     }
 

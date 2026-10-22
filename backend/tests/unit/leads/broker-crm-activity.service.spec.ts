@@ -21,6 +21,7 @@ describe("BrokerCrmActivityService", () => {
   it("creates internal activities and enforces same-tenant advisor assignment", async () => {
     const audit = new AuditLogWriter();
     const module = new LeadsModule(new PartnersService(audit), new PartnerLicensesService(audit), audit, { brokerCrmEnabled: true });
+    module.brokerCrmActivity.setAdvisorTenantResolver(async (advisorId) => manager.brokerUserTenantIds?.[advisorId] ? { partnerTenantId: manager.brokerUserTenantIds[advisorId], status: "active" } : undefined);
     const lead = await module.assignments.create({ quoteRequestId: "activity-q1", partnerTenantId: "broker-a", assignmentReason: "routing" }, manager);
 
     expect((await module.brokerCrmController.addNote(lead.id, { body: "Relance prevue" }, manager)).body).toBe("Relance prevue");
