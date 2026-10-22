@@ -12,17 +12,17 @@
 - [x] T105 Tests : unitaires (masquage, périmètre), intégration HTTP (refus finance / content, audit), écran.
 
 ### T2 Visites
-- [ ] T201 Modèle `VisitCounter` (bloc `// Lot 6`) et migration `0036_admin_steering` ; test schéma / migration.
-- [ ] T202 Contrat `visit-stats.contracts.ts` (liste fermée des pages) et module `visit-stats` (service, dépôts mémoire + Prisma, plafond par minute et par page, `totalsBetween`).
-- [ ] T203 Route publique `POST /public-stats/visits` + câblage runtime (`// Lot 6`) + variable `ASSURMATCH_VISIT_COUNTER_ENABLED`.
-- [ ] T204 Balise publique sans UI (DNT, sans cookie ni stockage) et montage dans le layout.
-- [ ] T205 Tests : liste fermée, plafond, upsert, aucune donnée personnelle persistée, route HTTP.
+- [x] T201 Modèle `VisitCounter` (bloc `// Lot 6`) et migration `0036_admin_steering` ; test schéma / migration.
+- [x] T202 Contrat `visit-stats.contracts.ts` (liste fermée des pages) et module `visit-stats` (service, dépôts mémoire + Prisma, plafond par minute et par page, `totalsBetween`).
+- [x] T203 Route publique `POST /public-stats/visits` + câblage runtime (`// Lot 6`) + variable `ASSURMATCH_VISIT_COUNTER_ENABLED`.
+- [x] T204 Balise publique sans UI (DNT, sans cookie ni stockage) et montage dans le layout.
+- [x] T205 Tests : liste fermée, plafond, upsert, aucune donnée personnelle persistée, route HTTP.
 
 ### T4 Contrôleurs non branchés
-- [ ] T401 Route `POST /admin/routing/precheck` (enregistrement de `AdminRoutingPrecheckController`, RBAC, schéma de requête) + test HTTP.
-- [ ] T402 Formulaire de pré-contrôle sur `/routing` (action serveur, résultat et mention « simulation »).
-- [ ] T403 Bouton « Envoyer un message de test » sur `/messaging` (action serveur vers `POST /admin/messaging/test`, destinataire masqué).
-- [ ] T404 Tests (routes, action serveur, rendu) ; FR-021 (modules IA non branchés) documenté.
+- [x] T401 Route `POST /admin/routing/precheck` (enregistrement de `AdminRoutingPrecheckController`, RBAC, schéma de requête) + test HTTP.
+- [x] T402 Formulaire de pré-contrôle sur `/routing` (action serveur, résultat et mention « simulation »).
+- [x] T403 Bouton « Envoyer un message de test » sur `/messaging` (action serveur vers `POST /admin/messaging/test`, destinataire masqué).
+- [x] T404 Tests (routes, action serveur, rendu) ; FR-021 (modules IA non branchés) documenté.
 
 ## Phase 2 — KPI et dashboard (après T2)
 - [ ] T301 Contrat `dashboard.contracts.ts` : champs optionnels `visits`, `visitToRequestRate`, `activeCountries`, `activeProducts`, `partnerSla`, `leadQuality`, `revenue`, `revenueRestricted`, `aiSummary`, `aiAlerts`.

@@ -12,6 +12,8 @@ import { LEAD_DOCUMENT_MAX_BYTES, LEAD_PROPOSAL_DOCUMENT_MAX_BYTES, leadDocument
 import type { UploadedLeadFile } from "../lead-proposals/scanned-upload";
 import type { ProposalFile } from "../lead-proposals/lead-proposals.service";
 import { activateRequestSchema, loginRequestSchema, mfaVerifyRequestSchema, passwordChangeRequestSchema, passwordResetRequestSchema, type ActivateRequest, type LoginRequest, type PasswordChangeRequest, type PasswordResetRequest } from "../../../../packages/shared/contracts/auth.contracts";
+import { routingPrecheckRequestSchema } from "../../../../packages/shared/contracts/ops.contracts";
+import { AdminRoutingPrecheckController as RoutingPrecheckDomainController } from "../routing/admin-routing-precheck.controller";
 import { activationChecklistQuerySchema } from "../../../../packages/shared/contracts/activation-checklist.contracts";
 import { adminConsentRecordSearchQuerySchema, adminConsentTextCreateSchema, adminConsentTextListQuerySchema } from "../../../../packages/shared/contracts/compliance.contracts";
 import {
@@ -139,6 +141,7 @@ import { AuthRateLimiter } from "../auth/rate-limit.guard";
 import { assertBrokerTenantWritable } from "../partners/partner-tenant-status.service";
 import { actorFromRequest, clientIp, protectedActorFromRequest, type AssurMatchHttpRequest } from "../common/http/request-actor";
 import { parseHttpInput } from "../common/http/zod-validation";
+import { visitRecordInputSchema } from "../../../../packages/shared/contracts/visit-stats.contracts"; // Lot 6
 import type { ActorContext } from "../common/types";
 import { RetentionAccessRefusedError, RetentionBatchConflictError, RetentionBatchNotFoundError, RetentionPurgeDisabledError } from "../data-retention/data-retention.service";
 import { PublicJourneyFlagPolicy } from "../feature-flags/public-journey-flag-policy";
@@ -181,7 +184,10 @@ const adminRoleAllowList = {
   audit: new Set<AssurMatchRole>(["super_admin", "compliance_admin", "support_admin"]),
   quoteRequests: new Set<AssurMatchRole>(["super_admin", "admin_pays", "support_admin", "compliance_admin"]),
   leadAssignments: new Set<AssurMatchRole>(["super_admin", "admin_pays", "support_admin", "compliance_admin"]),
-  health: new Set<AssurMatchRole>(["super_admin"])
+  health: new Set<AssurMatchRole>(["super_admin"]),
+  // Lot 6 (spec 073 T401)
+  routingPrecheck: new Set<AssurMatchRole>(["super_admin", "admin_pays", "support_admin", "compliance_admin"])
+  // Lot 6 (end)
 };
 
 function decorate(controller: ControllerTarget, methodName: string, methods: MethodDecoratorFactory[], params: Array<[number, ParamDecoratorFactory]> = []): void {
@@ -1115,6 +1121,21 @@ export class PublicStatsController {
     return this.runtime.publicStats.service.read({ globalFlags: this.runtime.publicJourneyGlobalFlags() });
   }
 }
+
+// Lot 6 (spec 073 T203)
+/**
+ * Page-view counter. Deliberately takes no request object: the client IP, the user agent and the
+ * headers are never read, and nothing is logged.
+ */
+export class PublicVisitStatsController {
+  constructor(private readonly runtime: AssurMatchRuntime) {}
+
+  async record(body: unknown): Promise<void> {
+    const input = parseHttpInput(visitRecordInputSchema, body ?? {});
+    await this.runtime.visitStats.service.record(input.page);
+  }
+}
+// Lot 6 (end)
 
 export class AdminPartnerApplicationsController {
   constructor(private readonly runtime: AssurMatchRuntime) {}
@@ -2130,6 +2151,18 @@ export class AdminRoutingOperationsController {
   }
 }
 
+// Lot 6 (spec 073 T401): non-transmissive routing precheck. Simulation only: no broker notified, no lead created.
+export class AdminRoutingPrecheckHttpController {
+  constructor(private readonly runtime: AssurMatchRuntime) {}
+
+  precheck(request: AssurMatchHttpRequest, input: unknown) {
+    const actor = protectedActorFromRequest(request);
+    assertAnyRole(actor, adminRoleAllowList.routingPrecheck);
+    return new RoutingPrecheckDomainController(this.runtime.routing.service).precheck(actor, parseHttpInput(routingPrecheckRequestSchema, input));
+  }
+}
+// Lot 6 (end)
+
 export class AdminPartnerIntegrationsController {
   constructor(private readonly runtime: AssurMatchRuntime) {}
 
@@ -2283,6 +2316,10 @@ decorate(PublicInsurersController, "list", [Get("countries/:countryCode/insurers
 
 controller("public-stats", PublicStatsController);
 decorate(PublicStatsController, "read", [Get() as MethodDecoratorFactory]);
+// Lot 6 (spec 073 T203)
+controller("public-stats/visits", PublicVisitStatsController);
+decorate(PublicVisitStatsController, "record", [Post() as MethodDecoratorFactory, HttpCode(204) as MethodDecoratorFactory], [[0, Body() as ParamDecoratorFactory]]);
+// Lot 6 (end)
 
 controller("admin", AdminPartnerApplicationsController, true);
 decorate(AdminPartnerApplicationsController, "list", [Get("partners/applications") as MethodDecoratorFactory], [[0, Req() as ParamDecoratorFactory], [1, Query() as ParamDecoratorFactory]]);
@@ -2657,6 +2694,11 @@ controller("admin", AdminRoutingAnomaliesHttpController, true);
 decorate(AdminRoutingAnomaliesHttpController, "anomalies", [Get("routing/anomalies") as MethodDecoratorFactory], [[0, Req() as ParamDecoratorFactory], [1, Query() as ParamDecoratorFactory]]);
 decorate(AdminRoutingAnomaliesHttpController, "analyze", [Post("routing/anomalies/analyze") as MethodDecoratorFactory], [[0, Req() as ParamDecoratorFactory], [1, Body() as ParamDecoratorFactory]]);
 
+// Lot 6 (spec 073 T401)
+controller("admin", AdminRoutingPrecheckHttpController, true);
+decorate(AdminRoutingPrecheckHttpController, "precheck", [Post("routing/precheck") as MethodDecoratorFactory], [[0, Req() as ParamDecoratorFactory], [1, Body() as ParamDecoratorFactory]]);
+// Lot 6 (end)
+
 controller("admin", AdminRoutingOperationsController, true);
 decorate(AdminRoutingOperationsController, "pending", [Get("routing/pending") as MethodDecoratorFactory], [[0, Req() as ParamDecoratorFactory]]);
 decorate(AdminRoutingOperationsController, "assign", [Post("routing/pending/:quoteRequestId/assign") as MethodDecoratorFactory], [[0, Param("quoteRequestId") as ParamDecoratorFactory], [1, Req() as ParamDecoratorFactory], [2, Body() as ParamDecoratorFactory]]);
@@ -2727,6 +2769,7 @@ Module({
     PublicPartnerDirectoryController,
     PublicInsurersController,
     PublicStatsController,
+    PublicVisitStatsController, // Lot 6
     AdminPartnerApplicationsController,
     AdminContactMessagesController,
     PublicAiController,
@@ -2774,6 +2817,7 @@ Module({
     AdminRoutingRulesController,
     AdminRoutingAnomaliesHttpController,
     AdminRoutingOperationsController,
+    AdminRoutingPrecheckHttpController, // Lot 6
     AdminPartnerIntegrationsController,
     PartnerApiController,
     PublicHealthController,

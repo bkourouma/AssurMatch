@@ -1764,3 +1764,32 @@ export function updateAdminOffer(offerId: string, input: AdminOfferWriteInput) {
 export function runAdminOfferDecision(offerId: string, action: "submit" | "validate" | "reject" | "suspend", reason: string) {
   return writeAdminResult<AdminOfferDetailView>(offerPath(offerId, `/${action}`), "POST", { reason });
 }
+
+// Lot 6 (spec 073 T402/T403)
+export interface RoutingPrecheckResultData {
+  result: "eligible" | "not_eligible";
+  reasons: string[];
+  notifiedBrokers: false;
+  transmittedLead: false;
+}
+
+/** Simulation only: the server notifies no broker and transmits no lead. */
+export function runRoutingPrecheck(input: { partnerTenantId: string; countryId: string; productId: string; consentRecordId?: string }) {
+  return writeAdmin<RoutingPrecheckResultData>("/admin/routing/precheck", "POST", input);
+}
+
+export interface MessagingTestResultData {
+  id: string;
+  channel: string;
+  status: "sent" | "refused" | "failed";
+  template: string;
+  recipientMasked: string;
+  provider: string;
+  reason: string | null;
+}
+
+/** Super-admin smoke test of a configured channel; the server answers with a masked recipient only. */
+export function sendMessagingTest(input: { channel: "sms" | "whatsapp"; recipient: string; scopeId: string; reason: string }) {
+  return writeAdmin<MessagingTestResultData>("/admin/messaging/test", "POST", input);
+}
+// Lot 6 (end)

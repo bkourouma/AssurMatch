@@ -49,6 +49,10 @@ import { AdminUsersController } from "../modules/users/admin-users.controller";
 import { PartnerTenantStatusService } from "../modules/partners/partner-tenant-status.service";
 import { ProductsModule } from "../modules/products/products.module";
 import { PublicStatsModule } from "../modules/public-stats/public-stats.module";
+// Lot 6
+import { MemoryVisitStatsRepository, PrismaVisitStatsRepository } from "../modules/visit-stats/visit-stats.repository";
+import { VisitStatsModule } from "../modules/visit-stats/visit-stats.module";
+// Lot 6 (end)
 import { WaitlistModule } from "../modules/waitlist/waitlist.module";
 import { MemoryWaitlistRepository, PrismaWaitlistRepository } from "../modules/waitlist/waitlist.repository";
 import { ProspectsModule } from "../modules/prospects/prospects.module";
@@ -947,6 +951,9 @@ readonly enterprise = new EnterpriseService({
     this.offers.repository,
     this.redis.client
   );
+  // Lot 6 (spec 073 T203): aggregated page-view counter, no personal data.
+  readonly visitStats = new VisitStatsModule(this.runtimeRepository(new PrismaVisitStatsRepository(this.prisma)) ?? new MemoryVisitStatsRepository());
+  // Lot 6 (end)
   readonly publicCountryDirectory = new PublicCountryDirectoryService(this.countriesRepository, this.redis.client);
   private readonly dataRetentionRepository = this.runtimeRepository(new PrismaDataRetentionRepository(this.prisma));
   private readonly retentionSubjectsRepository = this.runtimeRepository(new PrismaRetentionSubjectsRepository(this.prisma));

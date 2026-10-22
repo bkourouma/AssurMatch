@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { assignPendingQuote, createRoutingRule, reassignLead, updateRoutingRule, type RoutingRuleMode } from "../lib/admin-api";
+import { assignPendingQuote, createRoutingRule, reassignLead, runRoutingPrecheck, updateRoutingRule, type RoutingRuleMode } from "../lib/admin-api";
 
 export interface RoutingActionState {
   status: "idle" | "success" | "error";
@@ -122,3 +122,27 @@ export async function reassignLeadAction(_previous: RoutingActionState, formData
     return actionError(error);
   }
 }
+
+// Lot 6 (spec 073 T402)
+const precheckReasonLabels: Record<string, string> = {
+  consent_missing_or_out_of_scope: "consentement absent ou hors perimetre"
+};
+
+/** Simulation only: no broker is notified and no lead is transmitted. */
+export async function precheckRoutingAction(_previous: RoutingActionState, formData: FormData): Promise<RoutingActionState> {
+  try {
+    const consentRecordId = optionalString(formData.get("consentRecordId"));
+    const result = await runRoutingPrecheck({
+      partnerTenantId: stringValue(formData.get("partnerTenantId")),
+      countryId: stringValue(formData.get("countryId")),
+      productId: stringValue(formData.get("productId")),
+      ...(consentRecordId ? { consentRecordId } : {})
+    });
+    if (result.result === "eligible") return { status: "success", message: "Eligible." };
+    const reasons = result.reasons.map((reason) => precheckReasonLabels[reason] ?? reason).join(", ");
+    return { status: "error", message: `Non eligible${reasons ? ` : ${reasons}` : ""}.` };
+  } catch (error) {
+    return actionError(error);
+  }
+}
+// Lot 6 (end)

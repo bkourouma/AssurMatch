@@ -10,7 +10,7 @@ import {
   StatusBadge,
   ruleStatusTones
 } from "../lib/ui/admin-ui";
-import { AssignPendingQuoteForm, CreateRoutingRuleForm, ReassignLeadForm, UpdateRoutingRuleForm } from "./routing-forms";
+import { AssignPendingQuoteForm, CreateRoutingRuleForm, ReassignLeadForm, RoutingPrecheckForm, UpdateRoutingRuleForm } from "./routing-forms";
 
 const modeLabels: Record<RoutingRuleData["mode"], string> = {
   first_eligible: "Premier eligible",
@@ -94,6 +94,8 @@ export default async function RoutingPage() {
           </Card>
 
           <ReassignLeadForm />
+
+          <RoutingPrecheckForm />
 
           <StateMessage>Le mode multi-envoi ne s'applique que si le flag est ouvert et si le visiteur l'accepte: sinon la demande part a un seul courtier partenaire, avec un motif audite. Le routage assiste par IA n'est pas propose: l'IA ne decide jamais de l'eligibilite.</StateMessage>
         </>

@@ -1,5 +1,6 @@
 import { readMessagingDeliveries, readMessagingProviders } from "../lib/admin-api";
 import { Badge, Card, DataTable, PageHeader, PageStack, StateMessage } from "../lib/ui/admin-ui";
+import { MessagingTestForm } from "./messaging-test-form";
 
 export default async function AdminMessagingPage() {
   const [providers, deliveries] = await Promise.all([readMessagingProviders(), readMessagingDeliveries()]);
@@ -34,6 +35,8 @@ export default async function AdminMessagingPage() {
               aria-label="Canaux de messagerie"
             />
           </Card>
+
+          <MessagingTestForm channels={providers.data.providers.map((provider) => provider.channel)} />
 
           <Card title="Restrictions">
             <ul className="bo-list">

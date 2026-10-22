@@ -16,7 +16,7 @@ import {
   Textarea,
   fieldControlProps
 } from "../lib/ui/admin-ui";
-import { assignPendingQuoteAction, createRoutingRuleAction, reassignLeadAction, updateRoutingRuleAction, type RoutingActionState } from "./actions";
+import { assignPendingQuoteAction, createRoutingRuleAction, precheckRoutingAction, reassignLeadAction, updateRoutingRuleAction, type RoutingActionState } from "./actions";
 
 const initialState: RoutingActionState = { status: "idle" };
 
@@ -207,3 +207,35 @@ export function ReassignLeadForm() {
     </Card>
   );
 }
+
+// Lot 6 (spec 073 T402)
+export function RoutingPrecheckForm() {
+  const [state, formAction, pending] = useActionState(precheckRoutingAction, initialState);
+  const base = useId();
+  const ids = { partner: `${base}-partner`, country: `${base}-country`, product: `${base}-product`, consent: `${base}-consent` };
+
+  return (
+    <Card title="Pre-controle de routage" description="Verifie l'eligibilite d'un courtier partenaire pour un pays, un produit et un consentement. Chaque verification est auditee.">
+      <Form action={formAction} data-routing-form="precheck">
+        <Notice tone="info">Simulation : aucun courtier notifie, aucun lead transmis.</Notice>
+        <ActionNotice state={state} />
+        <Field id={ids.partner} label="Courtier partenaire (UUID)" required>
+          <Input {...fieldControlProps(ids.partner, { required: true })} name="partnerTenantId" />
+        </Field>
+        <Field id={ids.country} label="Pays (UUID)" required>
+          <Input {...fieldControlProps(ids.country, { required: true })} name="countryId" />
+        </Field>
+        <Field id={ids.product} label="Produit (UUID)" required>
+          <Input {...fieldControlProps(ids.product, { required: true })} name="productId" />
+        </Field>
+        <Field id={ids.consent} label="Identifiant de consentement (UUID)">
+          <Input {...fieldControlProps(ids.consent)} name="consentRecordId" />
+        </Field>
+        <FormActions>
+          <Button type="submit" pending={pending} pendingLabel="Verification...">Verifier l'eligibilite</Button>
+        </FormActions>
+      </Form>
+    </Card>
+  );
+}
+// Lot 6 (end)
