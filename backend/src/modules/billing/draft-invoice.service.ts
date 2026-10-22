@@ -37,8 +37,9 @@ export interface DraftInvoiceDeps {
   /** Spec 060: true when the partner's draft for that period already became an active invoice. */
   isPeriodInvoiced?: ((partnerId: string, periodFrom: Date) => Promise<boolean>) | undefined;
   /**
-   * Lot 5 (spec 071) H4: true when an ACTIVE (not cancelled by a credit note) issued invoice of the partner
-   * already carries the one-time `setup_fee` line. See `setupFeeInvoicedPort` for the runtime implementation.
+   * Lot 5 (spec 071) H4: true when the partner already has an ACTIVE (not cancelled by a credit note) issued
+   * invoice, whatever its lines: the setup fee belongs to the FIRST invoice only, never added retroactively
+   * to a later one. See `setupFeeInvoicedPort` for the runtime implementation.
    */
   hasActiveSetupFeeInvoice?: ((partnerId: string) => Promise<boolean>) | undefined;
   /**
@@ -52,7 +53,7 @@ export interface DraftInvoiceDeps {
 
 /** Runtime implementation of `DraftInvoiceDeps.hasActiveSetupFeeInvoice` from the invoicing repository. */
 export function setupFeeInvoicedPort(invoicing: Pick<InvoicingRepository, "listInvoices">): (partnerId: string) => Promise<boolean> {
-  return async (partnerId) => (await invoicing.listInvoices({ partnerId })).some((invoice) => invoice.status !== "cancelled" && invoice.lines.some((line) => line.kind === "setup_fee" && !line.informational));
+  return async (partnerId) => (await invoicing.listInvoices({ partnerId })).some((invoice) => invoice.status !== "cancelled");
 }
 
 /**
@@ -328,7 +329,7 @@ export class DraftInvoiceService {
 
   /**
    * Lot 5 (spec 071) H4. Setup fee: billed once, on the broker's first invoice. The period's draft carries the
-   * line when setupFee > 0, no ACTIVE issued invoice carries it yet (a credit-noted invoice re-opens it) and no
+   * line when setupFee > 0, the broker has NO active issued invoice yet (first invoice only; a credit-noted invoice no longer counts) and no
    * OTHER period's draft carries it. A draft recomputed for its own period keeps its line (idempotent).
    * Add-ons: one line per kind active during the period (assigned before its end, not ended before its start)
    * with an ENABLED price for the effective plan and country; no enabled price means no line.

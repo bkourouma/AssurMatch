@@ -9,6 +9,7 @@ import type { FeatureFlagsService } from "../feature-flags/feature-flags.module"
 import type { PartnersService } from "../partners/partners.module";
 import { BillingAuditActions } from "./billing-audit-actions";
 import { BillingAccessRefusedError, BillingDisabledError } from "./billing-foundation.service";
+import { AdminCountryScope } from "./admin-country-scope";
 import type { BillingAddOnPriceRecord, BillingRepository, PartnerAddOnRecord } from "./billing.repository";
 
 /** The add-on or the partner does not exist (HTTP 404). */
@@ -44,17 +45,24 @@ export interface BillingAddOnsDeps {
  * one broker (audited); the monthly draft then carries an `add_on` line. Nothing is ever collected online.
  */
 export class BillingAddOnsService {
-  constructor(private readonly deps: BillingAddOnsDeps) {}
+  private readonly scope: AdminCountryScope;
+
+  constructor(private readonly deps: BillingAddOnsDeps) {
+    this.scope = new AdminCountryScope({ countries: deps.countries, partners: deps.partners });
+  }
 
   async listPrices(actor: ActorContext): Promise<BillingAddOnPrice[]> {
     this.assertAccess(actor, "read");
-    return (await this.deps.repository.listAddOnPrices()).map((record) => this.priceDto(record));
+    const adminScope = await this.scope.of(actor);
+    return (await this.deps.repository.listAddOnPrices()).filter((record) => adminScope === null || adminScope.has(record.countryCode)).map((record) => this.priceDto(record));
   }
 
   async upsertPrice(input: BillingAddOnPriceUpsert, actor: ActorContext): Promise<BillingAddOnPrice> {
     this.assertAccess(actor, "write");
     const parsed = billingAddOnPriceUpsertSchema.parse(input);
     if (!this.deps.featureFlags.isEnabled("billing_enabled")) this.refuseDisabled(actor, "BillingAddOnPrice");
+    const priceScope = await this.scope.of(actor);
+    if (priceScope !== null && !priceScope.has(parsed.countryCode)) this.refuseAccess(actor, "out_of_scope_country");
     const country = await this.deps.countries.findByIsoCode(parsed.countryCode);
     if (!country) throw new BillingAddOnNotFoundError("country_not_found");
     const existing = (await this.deps.repository.listAddOnPrices()).find((price) => price.kind === parsed.kind && price.plan === parsed.plan && price.countryCode === parsed.countryCode);
@@ -91,7 +99,13 @@ export class BillingAddOnsService {
 
   async list(actor: ActorContext, partnerId?: string): Promise<PartnerAddOn[]> {
     this.assertAccess(actor, "read");
-    return (await this.deps.repository.listPartnerAddOns(partnerId)).map((record) => this.addOnDto(record));
+    const adminScope = await this.scope.of(actor);
+    if (partnerId && !(await this.scope.partnerInScope(adminScope, partnerId))) this.refuseAccess(actor, "out_of_scope_country");
+    const records: PartnerAddOnRecord[] = [];
+    for (const record of await this.deps.repository.listPartnerAddOns(partnerId)) {
+      if (await this.scope.partnerInScope(adminScope, record.partnerId)) records.push(record);
+    }
+    return records.map((record) => this.addOnDto(record));
   }
 
   async assign(input: PartnerAddOnAssign, actor: ActorContext): Promise<PartnerAddOn> {
@@ -100,6 +114,7 @@ export class BillingAddOnsService {
     if (!this.deps.featureFlags.isEnabled("billing_enabled")) this.refuseDisabled(actor, "PartnerAddOn");
     const partner = await this.deps.partners.find(parsed.partnerId);
     if (!partner) return this.refuseAssignment(actor, parsed, "partner_not_found", new BillingAddOnNotFoundError("partner_not_found"));
+    if (!(await this.scope.partnerInScope(await this.scope.of(actor), partner.id))) return this.refuseAssignment(actor, parsed, "out_of_scope_country", new BillingAccessRefusedError("out_of_scope_country"));
     const now = this.now();
     const currentPlan = partner.plan as BillingPlanKey;
     const plan = (await this.deps.effectivePlan?.(partner.id, currentPlan, now)) ?? currentPlan;
@@ -141,6 +156,7 @@ export class BillingAddOnsService {
     if (!this.deps.featureFlags.isEnabled("billing_enabled")) this.refuseDisabled(actor, "PartnerAddOn");
     const existing = (await this.deps.repository.listPartnerAddOns()).find((addOn) => addOn.id === id);
     if (!existing) this.refuseEnd(actor, id, "add_on_not_found", new BillingAddOnNotFoundError("add_on_not_found"));
+    if (!(await this.scope.partnerInScope(await this.scope.of(actor), existing.partnerId))) this.refuseEnd(actor, id, "out_of_scope_country", new BillingAccessRefusedError("out_of_scope_country"), existing.partnerId);
     if (existing.status !== "active") this.refuseEnd(actor, id, "already_ended", new BillingAddOnConflictError("already_ended"), existing.partnerId);
     const saved = await this.deps.repository.updatePartnerAddOn(id, { status: "ended", endedAt: this.now(), endedById: actor.actorId ?? null });
     this.deps.audit.write({

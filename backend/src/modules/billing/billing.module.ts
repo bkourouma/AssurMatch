@@ -81,10 +81,11 @@ export class BillingModule {
       inApp: deps.inApp
     });
     // Lot 5 (spec 071)
-    this.subscriptions = new PartnerSubscriptionsService({ audit: deps.audit, partners: deps.partners, repository });
+    this.subscriptions = new PartnerSubscriptionsService({ audit: deps.audit, partners: deps.partners, countries: deps.countries, repository });
     this.planChanges = new PlanChangeRequestsService({
       audit: deps.audit,
       partners: deps.partners,
+      countries: deps.countries,
       repository: deps.planChangeRepository ?? new MemoryPlanChangeRequestsRepository(),
       inApp: deps.inApp
     });

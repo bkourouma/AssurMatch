@@ -8,7 +8,9 @@ import {
 import { roleHasPermission } from "../../../../packages/shared/rbac/assurmatch-role-matrix";
 import type { AuditLogWriter } from "../audit-logs/audit-log-writer.service";
 import type { ActorContext } from "../common/types";
+import type { CountriesService } from "../countries/countries.module";
 import type { PartnersService } from "../partners/partners.module";
+import { AdminCountryScope } from "./admin-country-scope";
 import { BillingAuditActions } from "./billing-audit-actions";
 import { BillingAccessRefusedError } from "./billing-foundation.service";
 import type { InvoiceInAppPublisher } from "./invoicing.service";
@@ -18,6 +20,8 @@ import type { PlanChangeRequestRecord, PlanChangeRequestsRepository } from "./pl
 export interface PlanChangeRequestsDeps {
   audit: AuditLogWriter;
   partners: PartnersService;
+  /** Admin country scope (finance admins limited to some countries). */
+  countries?: CountriesService | undefined;
   repository: PlanChangeRequestsRepository;
   inApp?: InvoiceInAppPublisher | undefined;
   now?: (() => Date) | undefined;
@@ -41,7 +45,11 @@ function byLatestAcceptance(left: PlanChangeRequestRecord, right: PlanChangeRequ
  * effect only, read by invoicing through `effectivePlan`, from the first day of the next monthly cycle.
  */
 export class PlanChangeRequestsService {
-  constructor(private readonly deps: PlanChangeRequestsDeps) {}
+  private readonly scope: AdminCountryScope | undefined;
+
+  constructor(private readonly deps: PlanChangeRequestsDeps) {
+    this.scope = deps.countries ? new AdminCountryScope({ countries: deps.countries, partners: deps.partners }) : undefined;
+  }
 
   async create(actor: ActorContext, input: unknown): Promise<PlanChangeRequest> {
     const tenantId = this.assertBroker(actor, "create");
@@ -130,7 +138,13 @@ export class PlanChangeRequestsService {
   async list(actor: ActorContext, query: unknown = {}): Promise<{ items: PlanChangeRequest[]; total: number }> {
     this.assertAdmin(actor, "list");
     const filter = planChangeRequestQuerySchema.parse(query ?? {});
-    const records = await this.deps.repository.listAll(filter);
+    const adminScope = (await this.scope?.of(actor)) ?? null;
+    const all = await this.deps.repository.listAll(filter);
+    // A country-scoped admin only lists the requests of brokers of its countries.
+    const records: typeof all = [];
+    for (const record of all) {
+      if (!this.scope || (await this.scope.partnerInScope(adminScope, record.partnerTenantId))) records.push(record);
+    }
     const names = new Map<string, string | null>();
     for (const record of records) {
       if (!names.has(record.partnerTenantId)) {
@@ -149,6 +163,9 @@ export class PlanChangeRequestsService {
     const { decision, reason } = planChangeDecisionSchema.parse(input);
     const request = await this.deps.repository.find(id);
     if (!request) this.refuse(actor, "decide", id, "request_not_found", new PlanChangeNotFoundError("request_not_found"));
+    if (this.scope && !(await this.scope.partnerInScope(await this.scope.of(actor), request.partnerTenantId))) {
+      this.refuse(actor, "decide", id, "out_of_scope_country", new BillingAccessRefusedError("out_of_scope_country"));
+    }
     if (request.status !== "pending") {
       this.refuse(actor, "decide", id, "request_not_pending", new PlanChangeConflictError("request_not_pending"), { status: request.status, decision });
     }

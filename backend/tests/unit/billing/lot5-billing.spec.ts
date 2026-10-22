@@ -93,6 +93,18 @@ describe("lot 5 setup fee (H4)", () => {
     expect(await port("cancelled")(PARTNER)).toBe(false);
   });
 
+  it("does not add the setup fee for a broker that already has an earlier invoice without a setup_fee line", async () => {
+    const earlier = { status: "issued", lines: [{ kind: "subscription", label: "x", quantity: 1, unitAmount: 1, amount: 1, informational: false }] };
+    const port = setupFeeInvoicedPort({ listInvoices: async () => [earlier] } as never);
+    expect(await port(PARTNER)).toBe(true);
+    const t = setup();
+    await seedPrice(t.repository);
+    t.state.activeSetupFeeInvoice = await port(PARTNER);
+    const [draft] = await t.drafts.recompute({ reason: "monthly" }, admin);
+    expect(draft?.lines.some((line) => line.kind === "setup_fee")).toBe(false);
+    expect(draft?.totalAmount).toBe(40_000);
+  });
+
   it("includes the fee in the broker estimate and no fee when setupFee is 0", async () => {
     const t = setup();
     await seedPrice(t.repository);

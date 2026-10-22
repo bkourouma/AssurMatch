@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { QuoteAuditActions } from "../../../src/modules/audit-logs/quote-audit-actions";
 import type { ActorContext } from "../../../src/modules/common/types";
+import { RapidDisableService } from "../../../src/modules/feature-flags/rapid-disable.service";
 import { RoutingAuditActions } from "../../../src/modules/routing/routing-audit-actions";
 import { seedAcceptedAccreditation, seedOwnerAndContract } from "../helpers/partner-onboarding-seed";
 import { actorHeaders, createRuntimeHttpHarness, readJson, seedPublicRuntime, type RuntimeHttpHarness } from "../runtime-http-test-utils";
@@ -181,6 +182,20 @@ describe("lot 5 (spec 071) routing controls on the runtime", () => {
     }
     // A quota exhausted at routing time is reported by the exclusion audit as well.
     expect(harness.runtime.audit.writer.search({ action: QuoteAuditActions.routingBrokerExcluded }).filter((entry) => entry.targetId === limited.id)).toHaveLength(3);
+  });
+
+  it("refuses to activate ai_assisted_routing_enabled through the admin feature flag route (compliance policy only)", async () => {
+    harness = await createRuntimeHttpHarness();
+    await seedIsolatedRuntime(harness);
+    const flag = await new RapidDisableService(harness.runtime.featureFlags.service).disable("global", undefined, "ai_assisted_routing_enabled", "seed disabled flag", superAdmin);
+    expect(flag.value).toBe(false);
+    const response = await harness.request(`/admin/feature-flags/${flag.id}`, {
+      method: "PATCH",
+      headers: { ...actorHeaders(superAdmin), "content-type": "application/json" },
+      body: JSON.stringify({ value: true, reason: "tentative d'activation de l'assistance IA" })
+    });
+    expect(response.status).toBe(403);
+    expect(harness.runtime.featureFlags.service.isEnabled("ai_assisted_routing_enabled")).toBe(false);
   });
 
   it("mode ai_assisted: closed by default (plain manual parking), then open: a suggestion is attached but nothing is ever assigned", async () => {

@@ -3,7 +3,9 @@ import { partnerSubscriptionUpdateSchema } from "../../../../packages/shared/con
 import { roleHasPermission } from "../../../../packages/shared/rbac/assurmatch-role-matrix";
 import type { AuditLogWriter } from "../audit-logs/audit-log-writer.service";
 import type { ActorContext } from "../common/types";
+import type { CountriesService } from "../countries/countries.module";
 import type { PartnersService } from "../partners/partners.module";
+import { AdminCountryScope } from "./admin-country-scope";
 import type { PartnerCommercialState } from "../routing/routing-controls.ports";
 import { BillingAuditActions } from "./billing-audit-actions";
 import { BillingAccessRefusedError } from "./billing-foundation.service";
@@ -13,6 +15,7 @@ import type { BillingRepository, PartnerSubscriptionRecord } from "./billing.rep
 export interface PartnerSubscriptionsDeps {
   audit: AuditLogWriter;
   partners: PartnersService;
+  countries?: CountriesService | undefined;
   repository: BillingRepository;
   now?: (() => Date) | undefined;
 }
@@ -23,10 +26,15 @@ export interface PartnerSubscriptionsDeps {
  * `billing_enabled` because it protects routing; a broker without a row is active without expiry.
  */
 export class PartnerSubscriptionsService {
-  constructor(private readonly deps: PartnerSubscriptionsDeps) {}
+  private readonly scope: AdminCountryScope | undefined;
+
+  constructor(private readonly deps: PartnerSubscriptionsDeps) {
+    this.scope = deps.countries ? new AdminCountryScope({ countries: deps.countries, partners: deps.partners }) : undefined;
+  }
 
   async get(actor: ActorContext, partnerId: string): Promise<PartnerSubscription> {
     this.assertAccess(actor, "read");
+    await this.assertInScope(actor, partnerId);
     return this.toDto(partnerId, await this.deps.repository.getSubscription(partnerId));
   }
 
@@ -47,6 +55,7 @@ export class PartnerSubscriptionsService {
       });
       throw new BillingAddOnNotFoundError("partner_not_found");
     }
+    await this.assertInScope(actor, partnerId);
     const existing = await this.deps.repository.getSubscription(partnerId);
     const now = this.now();
     // contractExpiresAt: omitted keeps the stored value, null clears it, a date sets it (end of that UTC day).
@@ -99,6 +108,11 @@ export class PartnerSubscriptionsService {
       reason: record?.reason ?? null,
       updatedAt: record ? record.updatedAt.toISOString() : null
     };
+  }
+
+  private async assertInScope(actor: ActorContext, partnerId: string): Promise<void> {
+    if (!this.scope) return;
+    if (!(await this.scope.partnerInScope(await this.scope.of(actor), partnerId))) this.refuse(actor, "out_of_scope_country");
   }
 
   private assertAccess(actor: ActorContext, mode: "read" | "write"): void {
