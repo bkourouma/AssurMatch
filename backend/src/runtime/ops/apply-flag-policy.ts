@@ -2,6 +2,8 @@ import { z } from "zod";
 import type { ActorContext } from "../../modules/common/types";
 import { GLOBAL_FEATURE_FLAG_DEFAULTS } from "../../modules/feature-flags/default-flags";
 import type { FeatureFlag, FeatureFlagsService } from "../../modules/feature-flags/feature-flags.module";
+import type { AiScopeFlagPolicyService } from "../../modules/ai/ai-scope-flags.service";
+import { aiScopeFlagChangeSchema, type AiScopeFlagChangeResult } from "../../../../packages/shared/contracts/ai-scope-flags.contracts";
 
 /**
  * Spec 059 follow-up: the audited compliance-policy path for SENSITIVE global flags, as a command.
@@ -12,6 +14,11 @@ import type { FeatureFlag, FeatureFlagsService } from "../../modules/feature-fla
  * Only the flags whose validated spec defines this path can be switched on. Regulated modules
  * (payments, e-signature, policy issuance, claims, insurer API) are refused whatever the policy:
  * no validated spec activates them. Switching any known flag OFF is always accepted.
+ *
+ * Per-country and per-product AI flags (`country_ai_enabled`, `product_ai_scoring_enabled`,
+ * `product_ai_form_assistant_enabled`, spec 074) are activated through the same command with
+ * `--scope-type country|product --scope-id <uuid>` (`applyScopedFlagPolicy`); the admin screen
+ * `/ai-assistance/flags` can only disable them. A highly sensitive product refuses AI activation.
  */
 export const POLICY_ACTIVATABLE_FLAGS = [
   "satisfaction_survey_enabled", // spec 048
@@ -61,4 +68,20 @@ export async function applyFlagPolicy(flags: Pick<FeatureFlagsService, "applyCom
   const previousValue = flags.isEnabled(flag);
   const updated = await flags.applyCompliancePolicy({ key: flag, scopeType: "global", value, reason }, OPS_ACTOR, { reference, approvedBy });
   return { flag: updated, previousValue };
+}
+
+/** Spec 074: the audited operations activation (or disabling) of a per-country / per-product AI flag. */
+export async function applyScopedFlagPolicy(
+  service: Pick<AiScopeFlagPolicyService, "activateViaOps">,
+  input: { scopeType: string; scopeId: string; flag: string; value: boolean; reference: string; approvedBy: string; reason: string }
+): Promise<AiScopeFlagChangeResult> {
+  const parsed = aiScopeFlagChangeSchema.safeParse({ scopeType: input.scopeType, scopeId: input.scopeId, key: input.flag, value: input.value, reference: input.reference, approvedBy: input.approvedBy, reason: input.reason });
+  if (!parsed.success) throw new FlagPolicyRefusedError(`invalid_input: ${parsed.error.issues.map((issue) => issue.path.join(".") || issue.message).join(", ")}`);
+  try {
+    return await service.activateViaOps(OPS_ACTOR, parsed.data);
+  } catch (error) {
+    const code = (error as { response?: { code?: unknown } }).response?.code;
+    if (typeof code === "string") throw new FlagPolicyRefusedError(code.toLowerCase());
+    throw error;
+  }
 }

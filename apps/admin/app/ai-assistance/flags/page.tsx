@@ -36,7 +36,7 @@ export default async function AiScopeFlagsPage() {
         breadcrumb={[{ label: "Plateforme" }, { label: "Assistance IA", href: "/ai-assistance" }, { label: "Flags IA" }]}
         kicker="IA controlee"
         title="Flags IA par pays et produit"
-        description="L'IA reste une assistance avec validation humaine. Chaque activation par pays ou produit est une decision de conformite, auditee. Aucun flag global n'est modifie depuis cet ecran."
+        description="L'IA reste une assistance avec validation humaine. Depuis cet ecran, un flag par pays ou produit ne peut etre que desactive (motif audite) ; son activation est une decision de conformite appliquee par la commande d'exploitation. Aucun flag global n'est modifie ici."
       />
 
       {flags.status === "forbidden" ? <StateMessage tone="danger">Acces refuse pour ce role admin.</StateMessage> : null}

@@ -107,8 +107,9 @@ export class FeatureFlagsService {
 
   /**
    * Explicit compliance-policy path for sensitive flags (AI, regulated modules, billing, messaging).
-   * Never exposed over HTTP: it is reserved for compliance-approved operations (ops scripts, seeds,
-   * tests) and records the policy reference in the audit trail. Callers without a policy reference
+   * Activation is never exposed over HTTP: it is reserved for compliance-approved operations (ops
+   * scripts, seeds, tests). The only route that calls it is the audited DISABLE of the per-country
+   * and per-product AI flags (spec 074). It records the policy reference in the audit trail. Callers without a policy reference
    * are refused exactly like a regular mutation.
    */
   async applyCompliancePolicy(

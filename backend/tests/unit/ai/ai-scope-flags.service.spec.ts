@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { aiScopeFlagChangeSchema } from "../../../../packages/shared/contracts/ai-scope-flags.contracts";
 import { AiScopeFlagPolicyService } from "../../../src/modules/ai/ai-scope-flags.service";
 import { AuditLogWriter } from "../../../src/modules/audit-logs/audit-log-writer.service";
@@ -13,6 +13,7 @@ const superAdmin: ActorContext = { actorId: "11111111-1111-4111-8111-11111111111
 const compliance: ActorContext = { actorId: "22222222-2222-4222-8222-222222222222", roles: ["compliance_admin"], mfaVerified: true };
 const aiAdmin: ActorContext = { actorId: "33333333-3333-4333-8333-333333333333", roles: ["ai_admin"], mfaVerified: true };
 const policy = { reference: "COMP-2026-014", approvedBy: "Responsable conformite" };
+const OTHER_SCOPE = "99999999-9999-4999-8999-999999999999";
 
 async function build() {
   const audit = new AuditLogWriter();
@@ -30,10 +31,13 @@ async function build() {
 const countryChange = (scopeId: string, value: boolean, extra: Record<string, unknown> = {}) =>
   ({ scopeType: "country" as const, scopeId, key: "country_ai_enabled" as const, value, reason: "decision conformite", ...extra });
 
+const productChange = (scopeId: string, value: boolean, extra: Record<string, unknown> = {}) =>
+  ({ scopeType: "product" as const, scopeId, key: "product_ai_scoring_enabled" as const, value, reason: "decision conformite", ...extra });
+
 describe("AiScopeFlagPolicyService (lot 7)", () => {
-  it("activates a country flag for super_admin with reference, and the public journey source reads it", async () => {
+  it("activates a country flag through the operations path and the public journey source reads it", async () => {
     const { service, country, countries, audit, featureFlags, changes } = await build();
-    const result = await service.apply(superAdmin, countryChange(country.id, true, policy));
+    const result = await service.activateViaOps(superAdmin, countryChange(country.id, true, policy));
     expect(result).toMatchObject({ scopeType: "country", key: "country_ai_enabled", previousValue: false, value: true });
     expect((await countries.require(country.id)).flags.country_ai_enabled).toBe(true);
     expect(featureFlags.isEnabled("country_ai_enabled", "country", country.id)).toBe(true);
@@ -42,45 +46,74 @@ describe("AiScopeFlagPolicyService (lot 7)", () => {
     expect(changes()).toBe(1);
   });
 
+  it("refuses every activation over the HTTP path with ACTIVATION_VIA_OPS_ONLY, audited, whatever the role", async () => {
+    const { service, country, audit, countries } = await build();
+    for (const actor of [superAdmin, compliance, aiAdmin]) {
+      await expect(service.apply(actor, countryChange(country.id, true, policy))).rejects.toMatchObject({ status: 403, response: { code: "ACTIVATION_VIA_OPS_ONLY" } });
+    }
+    expect((await countries.require(country.id)).flags.country_ai_enabled).toBe(false);
+    const refusals = audit.all().filter((entry) => entry.reason === "ACTIVATION_VIA_OPS_ONLY");
+    expect(refusals).toHaveLength(3);
+    expect(JSON.stringify(refusals)).not.toContain(policy.reference);
+    expect(audit.all().filter((entry) => entry.action === "feature_flag.policy_applied")).toHaveLength(0);
+  });
+
   it("refuses without MFA, audits, and leaks nothing", async () => {
     const { service, country, audit, countries } = await build();
-    await expect(service.apply({ ...superAdmin, mfaVerified: false }, countryChange(country.id, true, policy))).rejects.toMatchObject({ status: 403 });
+    await expect(service.apply({ ...superAdmin, mfaVerified: false }, countryChange(country.id, false))).rejects.toMatchObject({ status: 403 });
     expect((await countries.require(country.id)).flags.country_ai_enabled).toBe(false);
     const refusal = audit.all().find((entry) => entry.action === "feature_flag.change_refused");
-    expect(refusal).toMatchObject({ result: "refused", reason: "MFA_REQUIRED", context: { key: "country_ai_enabled", requestedValue: true, scopeType: "country" } });
-    expect(JSON.stringify(refusal)).not.toContain(policy.reference);
+    expect(refusal).toMatchObject({ result: "refused", reason: "MFA_REQUIRED", context: { key: "country_ai_enabled", requestedValue: false, scopeType: "country" } });
   });
 
-  it("refuses activation by ai_admin but lets ai_admin disable with a reason only", async () => {
+  it("lets super_admin, compliance_admin and ai_admin disable with a reason only, and refuses other roles", async () => {
     const { service, country, countries } = await build();
-    await expect(service.apply(aiAdmin, countryChange(country.id, true, policy))).rejects.toMatchObject({ status: 403 });
-    await service.apply(compliance, countryChange(country.id, true, policy));
-    const off = await service.apply(aiAdmin, countryChange(country.id, false));
-    expect(off).toMatchObject({ previousValue: true, value: false });
-    expect((await countries.require(country.id)).flags.country_ai_enabled).toBe(false);
+    for (const actor of [superAdmin, compliance, aiAdmin]) {
+      await service.activateViaOps(superAdmin, countryChange(country.id, true, policy));
+      const off = await service.apply(actor, countryChange(country.id, false));
+      expect(off).toMatchObject({ previousValue: true, value: false });
+      expect((await countries.require(country.id)).flags.country_ai_enabled).toBe(false);
+    }
+    await expect(service.apply({ actorId: "x", roles: ["support_admin"], mfaVerified: true }, countryChange(country.id, false))).rejects.toMatchObject({ status: 403 });
   });
 
-  it("refuses an activation without reference or approver", async () => {
+  it("the operations path refuses an activation without reference or approver, and ai_admin", async () => {
     const { service, country, audit } = await build();
-    await expect(service.apply(superAdmin, countryChange(country.id, true))).rejects.toMatchObject({ status: 403, response: { code: "POLICY_REFERENCE_REQUIRED" } });
-    await expect(service.apply(superAdmin, countryChange(country.id, true, { reference: policy.reference }))).rejects.toMatchObject({ status: 403 });
+    await expect(service.activateViaOps(superAdmin, countryChange(country.id, true))).rejects.toMatchObject({ status: 403, response: { code: "POLICY_REFERENCE_REQUIRED" } });
+    await expect(service.activateViaOps(superAdmin, countryChange(country.id, true, { reference: policy.reference }))).rejects.toMatchObject({ status: 403 });
+    await expect(service.activateViaOps(aiAdmin, countryChange(country.id, true, policy))).rejects.toMatchObject({ status: 403 });
     expect(audit.all().filter((entry) => entry.reason === "POLICY_REFERENCE_REQUIRED")).toHaveLength(2);
   });
 
-  it("refuses AI activation on a highly sensitive product with a 422", async () => {
+  it("refuses AI activation on a highly sensitive product with a 422 (operations path)", async () => {
     const { service, sensitive, product, products } = await build();
-    await expect(service.apply(superAdmin, { scopeType: "product", scopeId: sensitive.id, key: "product_ai_scoring_enabled", value: true, reason: "decision conformite", ...policy }))
+    await expect(service.activateViaOps(superAdmin, productChange(sensitive.id, true, policy)))
       .rejects.toMatchObject({ status: 422, response: { code: "SENSITIVE_PRODUCT_AI_REQUIRES_EXCEPTION" } });
-    await service.apply(superAdmin, { scopeType: "product", scopeId: product.id, key: "product_ai_form_assistant_enabled", value: true, reason: "decision conformite", ...policy });
+    await service.activateViaOps(superAdmin, { ...productChange(product.id, true, policy), key: "product_ai_form_assistant_enabled" });
     expect((await products.require(product.id)).flags.product_ai_form_assistant_enabled).toBe(true);
   });
 
-  it("refuses a scoped actor on a product and outside its country scope", async () => {
+  it("respects the country and product scopes of every role, including super_admin and compliance_admin", async () => {
     const { service, product, country } = await build();
-    const scoped: ActorContext = { ...compliance, countryScopes: ["99999999-9999-4999-8999-999999999999"], productScopes: [product.id] };
-    await expect(service.apply(scoped, { scopeType: "product", scopeId: product.id, key: "product_ai_scoring_enabled", value: true, reason: "decision conformite", ...policy })).rejects.toMatchObject({ status: 403 });
-    const scopedAdmin: ActorContext = { ...aiAdmin, countryScopes: ["99999999-9999-4999-8999-999999999999"] };
-    await expect(service.apply(scopedAdmin, countryChange(country.id, false))).rejects.toMatchObject({ status: 403 });
+    await service.activateViaOps(superAdmin, countryChange(country.id, true, policy));
+    for (const base of [aiAdmin, compliance, superAdmin]) {
+      await expect(service.apply({ ...base, countryScopes: [OTHER_SCOPE] }, countryChange(country.id, false))).rejects.toMatchObject({ status: 403, response: { code: "RBAC_DENIED" } });
+    }
+    await expect(service.apply({ ...compliance, countryScopes: [country.id] }, countryChange(country.id, false))).resolves.toMatchObject({ value: false });
+    await service.activateViaOps(superAdmin, productChange(product.id, true, policy));
+    await expect(service.apply({ ...superAdmin, productScopes: [OTHER_SCOPE] }, productChange(product.id, false))).rejects.toMatchObject({ status: 403 });
+    await expect(service.apply({ ...compliance, productScopes: [product.id] }, productChange(product.id, false))).resolves.toMatchObject({ value: false });
+    const overview = await service.overview({ ...compliance, countryScopes: [OTHER_SCOPE] });
+    expect(overview.countries).toHaveLength(0);
+  });
+
+  it("never leaves a changed flag without its audit trail: restores the value when the policy write fails", async () => {
+    const { service, country, countries, featureFlags } = await build();
+    await service.activateViaOps(superAdmin, countryChange(country.id, true, policy));
+    const spy = vi.spyOn(featureFlags, "applyCompliancePolicy").mockRejectedValueOnce(new Error("audit store down"));
+    await expect(service.apply(aiAdmin, countryChange(country.id, false))).rejects.toThrow("audit store down");
+    spy.mockRestore();
+    expect((await countries.require(country.id)).flags.country_ai_enabled).toBe(true);
   });
 
   it("is a no-op when the value is unchanged (no write, no success audit)", async () => {
@@ -99,12 +132,12 @@ describe("AiScopeFlagPolicyService (lot 7)", () => {
 
   it("answers not found for an unknown country", async () => {
     const { service } = await build();
-    await expect(service.apply(superAdmin, countryChange("55555555-5555-4555-8555-555555555555", true, policy))).rejects.toThrow(/not found/);
+    await expect(service.apply(superAdmin, countryChange("55555555-5555-4555-8555-555555555555", false))).rejects.toThrow(/not found/);
   });
 
   it("overview lists flags and history, gated by MFA and role", async () => {
     const { service, country } = await build();
-    await service.apply(superAdmin, countryChange(country.id, true, policy));
+    await service.activateViaOps(superAdmin, countryChange(country.id, true, policy));
     const overview = await service.overview(aiAdmin);
     expect(overview.countries.find((entry) => entry.id === country.id)?.flags.country_ai_enabled).toBe(true);
     expect(overview.globalFlags.map((flag) => flag.key)).toContain("ai_summary_enabled");

@@ -28,3 +28,34 @@ describe("ops apply-flag-policy (spec 059 follow-up)", () => {
     expect((await applyFlagPolicy(flags, { flag: "payments_enabled", value: false, ...policy })).flag.value).toBe(false);
   });
 });
+
+describe("ops apply-flag-policy, per-scope AI flags (spec 074)", () => {
+  const scopedPolicy = { reference: "POL-2026-051", approvedBy: "DPO AssurMatch", reason: "Ouverture IA pays apres decision" };
+
+  it("activates a country flag through the scoped path and refuses invalid or unauthorised requests", async () => {
+    const { AiScopeFlagPolicyService } = await import("../../../src/modules/ai/ai-scope-flags.service");
+    const { CountriesService } = await import("../../../src/modules/countries/countries.module");
+    const { ProductsService } = await import("../../../src/modules/products/products.module");
+    const { applyScopedFlagPolicy } = await import("../../../src/runtime/ops/apply-flag-policy");
+    const audit = new AuditLogWriter();
+    const countries = new CountriesService(audit);
+    const products = new ProductsService(audit);
+    const featureFlags = new FeatureFlagsService(audit);
+    const service = new AiScopeFlagPolicyService({ audit, countries, products, featureFlags });
+    const admin = { roles: ["super_admin" as const], mfaVerified: true };
+    const country = await countries.create({ isoCode: "SN", name: "Senegal", currency: "XOF", languages: ["fr"], timezone: "Africa/Dakar", regulatoryFamily: "cima" }, admin);
+    const sensitive = await products.create({ key: "sante", name: "Sante", sensitivity: "highly_sensitive" }, admin);
+
+    const result = await applyScopedFlagPolicy(service, { scopeType: "country", scopeId: country.id, flag: "country_ai_enabled", value: true, ...scopedPolicy });
+    expect(result).toMatchObject({ previousValue: false, value: true });
+    expect((await countries.require(country.id)).flags.country_ai_enabled).toBe(true);
+    expect(audit.search({ action: "feature_flag.policy_applied" })[0]?.context).toMatchObject({ policyReference: scopedPolicy.reference });
+
+    await expect(applyScopedFlagPolicy(service, { scopeType: "product", scopeId: sensitive.id, flag: "product_ai_scoring_enabled", value: true, ...scopedPolicy }))
+      .rejects.toMatchObject({ reason: "sensitive_product_ai_requires_exception" });
+    await expect(applyScopedFlagPolicy(service, { scopeType: "country", scopeId: "not-a-uuid", flag: "country_ai_enabled", value: true, ...scopedPolicy }))
+      .rejects.toMatchObject({ reason: expect.stringContaining("invalid_input") });
+    await expect(applyScopedFlagPolicy(service, { scopeType: "country", scopeId: country.id, flag: "product_ai_scoring_enabled", value: true, ...scopedPolicy }))
+      .rejects.toBeInstanceOf(FlagPolicyRefusedError);
+  });
+});

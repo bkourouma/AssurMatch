@@ -17,57 +17,49 @@ interface ScopeFlagFormProps {
 }
 
 /**
- * Spec 074 FR-006: one flag of one country or product. Enabling opens a form (policy reference,
- * approver, reason); disabling only asks for a reason. The API decides role, MFA and scope.
+ * Spec 074 FR-006 (disable-only, supervisor decision pending the owner's arbitration on a derogation
+ * to specs 035 and 050): an active flag can be disabled here with a reason; an inactive flag shows
+ * the read-only operations procedure instead of an Activate button. The API decides role, MFA and scope.
  */
 export function ScopeFlagForm({ scopeType, scopeId, scopeLabel, flagKey, currentValue, activationBlocked = false }: ScopeFlagFormProps) {
   const [state, formAction, pending] = useActionState(applyAiScopeFlagAction, initialState);
   const [open, setOpen] = useState(false);
   const base = useId();
-  const nextValue = !currentValue;
-  const blocked = nextValue && activationBlocked;
+
+  if (!currentValue) {
+    return (
+      <Stack>
+        {state.status === "success" ? <Notice tone="success">{state.message}</Notice> : null}
+        {activationBlocked ? (
+          <small className="bo-description">Produit hautement sensible : activation IA refusee sans exception documentee</small>
+        ) : (
+          <small className="bo-description">
+            Activation par la commande d'exploitation uniquement (decision de conformite, reference de politique et approbateur) :
+            <pre><code>{`npm run ops:apply-flag-policy -- --flag ${flagKey} --scope-type ${scopeType} --scope-id ${scopeId} --value true --reference <reference de politique> --approved-by "<nom, role>" --reason "<motif>"`}</code></pre>
+          </small>
+        )}
+      </Stack>
+    );
+  }
 
   return (
     <Stack>
       {state.status !== "idle" ? <Notice tone={state.status === "success" ? "success" : "danger"}>{state.message}</Notice> : null}
       {!open ? (
-        <>
-          <Button
-            type="button"
-            size="sm"
-            variant={nextValue ? "primary" : "secondary"}
-            disabled={blocked}
-            aria-label={`${nextValue ? "Activer" : "Desactiver"} ${flagKey} pour ${scopeLabel}`}
-            onClick={() => setOpen(true)}
-          >
-            {nextValue ? "Activer" : "Desactiver"}
-          </Button>
-          {blocked ? <small className="bo-description">Produit hautement sensible : activation IA refusee sans exception documentee</small> : null}
-        </>
+        <Button type="button" size="sm" variant="secondary" aria-label={`Desactiver ${flagKey} pour ${scopeLabel}`} onClick={() => setOpen(true)}>
+          Desactiver
+        </Button>
       ) : (
         <Form action={formAction} data-ai-scope-flag-form={`${scopeType}:${scopeId}:${flagKey}`}>
           <input type="hidden" name="scopeType" value={scopeType} />
           <input type="hidden" name="scopeId" value={scopeId} />
           <input type="hidden" name="key" value={flagKey} />
-          <input type="hidden" name="value" value={String(nextValue)} />
-          {nextValue ? (
-            <>
-              <Notice tone="warning">Decision de conformite : l'activation est reservee aux roles super admin et conformite, avec MFA, et est auditee.</Notice>
-              <Field id={`${base}-reference`} label="Reference de politique" required>
-                <Input {...fieldControlProps(`${base}-reference`, { required: true })} name="reference" minLength={3} maxLength={120} />
-              </Field>
-              <Field id={`${base}-approvedBy`} label="Approbateur" required>
-                <Input {...fieldControlProps(`${base}-approvedBy`, { required: true })} name="approvedBy" minLength={3} maxLength={120} />
-              </Field>
-            </>
-          ) : null}
+          <input type="hidden" name="value" value="false" />
           <Field id={`${base}-reason`} label="Motif (audite)" required>
             <Input {...fieldControlProps(`${base}-reason`, { required: true })} name="reason" minLength={8} maxLength={500} />
           </Field>
           <FormActions>
-            <Button type="submit" size="sm" variant={nextValue ? "primary" : "secondary"} pending={pending} pendingLabel="Envoi...">
-              {nextValue ? "Confirmer l'activation" : "Confirmer la desactivation"}
-            </Button>
+            <Button type="submit" size="sm" variant="secondary" pending={pending} pendingLabel="Envoi...">Confirmer la desactivation</Button>
             <Button type="button" size="sm" variant="secondary" onClick={() => setOpen(false)}>Annuler</Button>
           </FormActions>
         </Form>

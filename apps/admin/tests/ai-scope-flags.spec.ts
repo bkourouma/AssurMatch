@@ -24,10 +24,15 @@ test("AI scope flags page exposes the sections, the ops command and the complian
   expect(page).toContain("validation humaine");
   expect(page).toContain("readBackOfficeSession");
   expect(page).toContain("mfa_required");
-  expect(form).toContain("Reference de politique");
-  expect(form).toContain("Approbateur");
   expect(form).toContain("Motif");
-  expect(form).toContain("Decision de conformite : l'activation est reservee aux roles super admin et conformite, avec MFA, et est auditee.");
+  // Disable-only: no activation button, the ops procedure is shown read-only instead.
+  expect(form).toContain("npm run ops:apply-flag-policy -- --flag");
+  expect(form).toContain("--scope-type");
+  expect(form).toContain("--scope-id");
+  expect(form).toContain("Activation par la commande d'exploitation uniquement");
+  expect(form).not.toContain("Confirmer l'activation");
+  expect(form).not.toContain("Activer");
+  expect(form).not.toContain('name="reference"');
   expect(form).toContain("Produit hautement sensible : activation IA refusee sans exception documentee");
 });
 
@@ -40,6 +45,10 @@ test("AI scope flag changes go through the dedicated route, never PATCH /feature
   expect(actions).toContain('const FLAGS_PATH = "/ai-assistance/flags"');
   expect(actions).toContain("loginRedirect");
   expect(actions).not.toContain("PATCH");
+  expect(actions).toContain("ACTIVATION_VIA_OPS_ONLY");
+  expect(actions).toContain("SENSITIVE_PRODUCT_AI_REQUIRES_EXCEPTION");
+  expect(actions).toContain("toUpperCase()");
+  expect(actions).not.toContain("sensitive_product_ai_requires_exception");
   expect(actions).not.toContain("/feature-flags");
   expect(api).toContain("/admin/ai/scope-flags");
   expect(api).not.toContain("PATCH");

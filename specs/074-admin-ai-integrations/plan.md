@@ -18,7 +18,7 @@
 
 ## Contrats HTTP
 - `GET /admin/ai/scope-flags` -> `{ generatedAt, globalFlags:[{key,value}], countries:[{id,code,name,flags:{country_ai_enabled}}], products:[{id,key,name,sensitivity,flags:{product_ai_scoring_enabled,product_ai_form_assistant_enabled}}], history:[{key,scopeType,scopeId,value,reason,changedAt}] }`
-- `POST /admin/ai/scope-flags` `{scopeType,scopeId,key,value,reference?,approvedBy?,reason}` -> `{scopeType,scopeId,key,previousValue,value,appliedAt}` ; 200. Refus : 403 (rôle, MFA, portée), 422 (produit sensible, référence/approbateur manquants à l'activation).
+- `POST /admin/ai/scope-flags` `{scopeType,scopeId,key,value,reason}` -> `{scopeType,scopeId,key,previousValue,value,appliedAt}` ; 200 (désactivation uniquement). Refus : 403 (`ACTIVATION_VIA_OPS_ONLY` pour toute activation, rôle, MFA, portée), 422 (`SENSITIVE_PRODUCT_AI_REQUIRES_EXCEPTION`, commande d'exploitation). Dérogation d'activation HTTP NON retenue en attendant la décision du propriétaire (specs 035 l.15 et 050 scénario 6 applicables).
 - `POST /admin/partner-integrations/webhook-endpoints/:id/test` `{reason}` -> `{endpointId,eventId,eventType:"webhook.test",outcome:"delivered"|"failed"|"refused",responseClass,durationMs,sentAt}`.
 
 ## Parallélisation (un propriétaire par fichier)

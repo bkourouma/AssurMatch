@@ -41,79 +41,73 @@ describe("admin AI scope flags runtime HTTP", () => {
     expect(overview.history).toEqual([]);
   });
 
-  it("activates a country flag for a super admin with a policy reference, audits it and keeps the generic routes closed", async () => {
+  it("refuses an HTTP activation (ACTIVATION_VIA_OPS_ONLY), then disables an ops-activated flag, audited, with the generic routes closed", async () => {
     harness = await createRuntimeHttpHarness();
     const seed = await seedPublicRuntime(harness.runtime);
     const body = { scopeType: "country", scopeId: seed.country.id, key: "country_ai_enabled", value: true, ...ACTIVATION };
 
-    const response = await post(superAdmin, body);
-    expect(response.status).toBe(200);
-    const result = await readJson<AiScopeFlagChangeResult>(response);
-    expect(result).toMatchObject({ scopeType: "country", scopeId: seed.country.id, key: "country_ai_enabled", previousValue: false, value: true });
+    for (const actor of [superAdmin, aiAdmin]) {
+      const refused = await post(actor, body);
+      expect(refused.status).toBe(403);
+      expect(JSON.stringify(await readJson(refused))).toContain("ACTIVATION_VIA_OPS_ONLY");
+    }
+    expect((await harness.runtime.countries.service.require(seed.country.id)).flags.country_ai_enabled).toBe(false);
+    expect(harness.runtime.audit.writer.search({ action: "feature_flag.change_refused" }).some((entry) => entry.reason === "ACTIVATION_VIA_OPS_ONLY")).toBe(true);
 
-    // The source read by the public journey is updated, and the overview reflects it.
-    expect((await harness.runtime.countries.service.require(seed.country.id)).flags.country_ai_enabled).toBe(true);
+    // The operations path (npm run ops:apply-flag-policy) is the only way to activate.
+    await harness.runtime.aiScopeFlags.activateViaOps({ roles: ["super_admin"], mfaVerified: true }, body as never);
     const overview = await readJson<AiScopeFlagsOverview>(await harness.request("/admin/ai/scope-flags", { headers: actorHeaders(aiAdmin) }));
     expect(overview.countries[0]?.flags.country_ai_enabled).toBe(true);
     expect(overview.history[0]).toMatchObject({ key: "country_ai_enabled", scopeType: "country", scopeId: seed.country.id, value: true });
 
+    const off = await post(aiAdmin, { scopeType: "country", scopeId: seed.country.id, key: "country_ai_enabled", value: false, reason: "Desactivation rapide par la supervision IA" });
+    expect(off.status).toBe(200);
+    expect(await readJson<AiScopeFlagChangeResult>(off)).toMatchObject({ previousValue: true, value: false });
+    expect((await harness.runtime.countries.service.require(seed.country.id)).flags.country_ai_enabled).toBe(false);
     const audit = harness.runtime.audit.writer.search({ action: "feature_flag.policy_applied" });
-    expect(audit.length).toBeGreaterThan(0);
-    expect(audit.at(-1)).toMatchObject({ result: "success" });
-    const serialized = JSON.stringify(audit.at(-1));
-    expect(serialized).toContain("country_ai_enabled");
-    expect(serialized).not.toMatch(/token|password|authorization|secret/i);
-
-    // Applying the same value again is a no-op that reports the unchanged state.
-    const again = await readJson<AiScopeFlagChangeResult>(await post(superAdmin, body));
-    expect(again).toMatchObject({ previousValue: true, value: true });
+    expect(audit.length).toBeGreaterThan(1);
+    expect(JSON.stringify(audit.at(-1))).not.toMatch(/token|password|authorization|secret/i);
 
     // The generic flag route refuses the scoped row created above.
     const row = (await harness.runtime.featureFlags.service.list()).find((flag) => flag.key === "country_ai_enabled" && flag.scopeId === seed.country.id);
     expect(row).toBeDefined();
-    const patch = await harness.request(`/admin/feature-flags/${row?.id}`, { method: "PATCH", headers: { ...actorHeaders(superAdmin), ...json }, body: JSON.stringify({ value: false, reason: "Tentative via la route generique" }) });
+    const patch = await harness.request(`/admin/feature-flags/${row?.id}`, { method: "PATCH", headers: { ...actorHeaders(superAdmin), ...json }, body: JSON.stringify({ value: true, reason: "Tentative via la route generique" }) });
     expect(patch.status).toBe(403);
     expect(harness.runtime.audit.writer.search({ action: "feature_flag.update_refused" }).at(-1)?.reason).toBe("scoped_flag_catalog_only");
 
     // The catalogue toggles refuse the AI scope keys by design.
-    const catalog = await harness.request(`/admin/countries/${seed.country.id}/flags`, { method: "POST", headers: { ...actorHeaders(superAdmin), ...json }, body: JSON.stringify({ key: "country_ai_enabled", value: false, reason: "Tentative via le catalogue" }) });
+    const catalog = await harness.request(`/admin/countries/${seed.country.id}/flags`, { method: "POST", headers: { ...actorHeaders(superAdmin), ...json }, body: JSON.stringify({ key: "country_ai_enabled", value: true, reason: "Tentative via le catalogue" }) });
     expect(catalog.status).toBe(403);
     const catalogProduct = await harness.request(`/admin/products/${seed.product.id}/flags`, { method: "POST", headers: { ...actorHeaders(superAdmin), ...json }, body: JSON.stringify({ key: "product_ai_scoring_enabled", value: true, reason: "Tentative via le catalogue" }) });
     expect(catalogProduct.status).toBe(403);
-    expect((await harness.runtime.countries.service.require(seed.country.id)).flags.country_ai_enabled).toBe(true);
+    expect((await harness.runtime.countries.service.require(seed.country.id)).flags.country_ai_enabled).toBe(false);
   });
 
-  it("refuses activation without the right role, reference or on a highly sensitive product, but allows a rapid disable", async () => {
+  it("refuses a role outside the allowed ones and a highly sensitive product activation (ops path), but allows a rapid disable", async () => {
     harness = await createRuntimeHttpHarness();
     const seed = await seedPublicRuntime(harness.runtime);
     const country = { scopeType: "country", scopeId: seed.country.id, key: "country_ai_enabled" };
+    const support: ActorContext = { actorId: "support", roles: ["support_admin"], mfaVerified: true };
 
-    const byAiAdmin = await post(aiAdmin, { ...country, value: true, ...ACTIVATION });
-    expect(byAiAdmin.status).toBe(403);
-
-    const noReference = await post(superAdmin, { ...country, value: true, reason: "Activation sans reference de politique" });
-    expect(noReference.status).toBe(403);
-    expect((await readJson<{ message: string }>(noReference)).message).toContain("policy reference");
-    expect(harness.runtime.audit.writer.search({ action: "feature_flag.change_refused" }).some((entry) => entry.reason === "POLICY_REFERENCE_REQUIRED")).toBe(true);
+    expect((await post(support, { ...country, value: false, reason: "Desactivation par un role non autorise" })).status).toBe(403);
 
     const sensitive = await harness.runtime.products.service.create({ key: "health", name: "Sante", sensitivity: "highly_sensitive" } as never, seed.admin);
-    const refusedSensitive = await post(superAdmin, { scopeType: "product", scopeId: sensitive.id, key: "product_ai_scoring_enabled", value: true, ...ACTIVATION });
-    expect(refusedSensitive.status).toBe(422);
+    await expect(harness.runtime.aiScopeFlags.activateViaOps({ roles: ["super_admin"], mfaVerified: true }, { scopeType: "product", scopeId: sensitive.id, key: "product_ai_scoring_enabled", value: true, ...ACTIVATION } as never))
+      .rejects.toMatchObject({ status: 422 });
     expect(harness.runtime.audit.writer.search({ action: "feature_flag.change_refused" }).some((entry) => entry.reason === "SENSITIVE_PRODUCT_AI_REQUIRES_EXCEPTION")).toBe(true);
 
-    expect((await post(superAdmin, { ...country, value: true, ...ACTIVATION })).status).toBe(200);
+    await harness.runtime.aiScopeFlags.activateViaOps({ roles: ["super_admin"], mfaVerified: true }, { ...country, value: true, ...ACTIVATION } as never);
     const disabled = await post(aiAdmin, { ...country, value: false, reason: "Desactivation rapide par la supervision IA" });
     expect(disabled.status).toBe(200);
     expect(await readJson<AiScopeFlagChangeResult>(disabled)).toMatchObject({ previousValue: true, value: false });
-    expect((await harness.runtime.countries.service.require(seed.country.id)).flags.country_ai_enabled).toBe(false);
   });
 
   it("rejects a key outside the scope type and an unknown scope", async () => {
     harness = await createRuntimeHttpHarness();
     const seed = await seedPublicRuntime(harness.runtime);
 
-    const wrongKey = await post(superAdmin, { scopeType: "country", scopeId: seed.country.id, key: "product_ai_scoring_enabled", value: true, ...ACTIVATION });
-    const unknownKey = await post(superAdmin, { scopeType: "country", scopeId: seed.country.id, key: "country_public_enabled", value: true, ...ACTIVATION });
+    const wrongKey = await post(superAdmin, { scopeType: "country", scopeId: seed.country.id, key: "product_ai_scoring_enabled", value: false, reason: "Cle hors portee" });
+    const unknownKey = await post(superAdmin, { scopeType: "country", scopeId: seed.country.id, key: "country_public_enabled", value: false, reason: "Cle inconnue du lot" });
     const unknownScope = await post(superAdmin, { scopeType: "country", scopeId: "00000000-0000-4000-8000-0000000000aa", key: "country_ai_enabled", value: false, reason: "Pays inconnu pour le test" });
     // Statuses are asserted as observed (see the report for the error filter mapping).
     // The controller validates the body (parseHttpInput): schema failures give 400.

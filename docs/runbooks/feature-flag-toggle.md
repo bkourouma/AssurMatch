@@ -36,7 +36,8 @@ issuance, claims and insurer API are refused whatever the policy.
 
 `country_ai_enabled`, `product_ai_scoring_enabled` and `product_ai_form_assistant_enabled` are NOT changed by the route above nor by the catalogue (both refuse them). They follow the audited, protected path of the admin screen `/ai-assistance/flags` (`POST /admin/ai/scope-flags`):
 
-- MFA is mandatory. Activation: `super_admin` or `compliance_admin` only, with a policy reference, an approver and a reason (audit `feature_flag.policy_applied`). Deactivation: also `ai_admin`, reason only.
+- MFA is mandatory. The screen and the route only DISABLE (`super_admin`, `compliance_admin`, `ai_admin`; reason only; the actor's country/product scopes apply). Any HTTP activation is refused with 403 `ACTIVATION_VIA_OPS_ONLY` and audited (pending the owner's arbitration on a derogation to specs 035 and 050).
+- Activation is an operations command with a policy reference, an approver and a reason (audit `feature_flag.policy_applied`): `npm run ops:apply-flag-policy -- --flag <country_ai_enabled|product_ai_scoring_enabled|product_ai_form_assistant_enabled> --scope-type <country|product> --scope-id <uuid> --value true --reference <ref> --approved-by "<name, role>" --reason "<text>"`.
 - A `highly_sensitive` product refuses AI activation (documented exception required).
 - Every refusal is audited (`feature_flag.change_refused`). The global AI flags stay on `npm run ops:apply-flag-policy` (read-only on the screen).
 
