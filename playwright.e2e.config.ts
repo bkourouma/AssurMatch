@@ -81,6 +81,15 @@ export default defineConfig({
       dependencies: ["scenario"]
     },
     {
+      // Lot 11c: admin journeys of lots 7, 9 and 10 (CMS four eyes, AI flags without activation, partner API keys and
+      // webhooks, CRM connectors, messaging outbox, channel flags). Each file builds on the CI opened by the scenario
+      // and reads its own extra admin accounts (content_admin, support_admin) created through /users.
+      name: "admin-lot11",
+      testMatch: ["admin-cms.spec.ts", "admin-ai-integrations.spec.ts", "admin-channels.spec.ts"],
+      use: { baseURL: adminUrl },
+      dependencies: ["scenario"]
+    },
+    {
       // Spec 065, SC-01 for Senegal. Opens SN, so it runs after the SC-09a check that SN is closed.
       name: "senegal",
       testMatch: ["senegal-opening.spec.ts"],
