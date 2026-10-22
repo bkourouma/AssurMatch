@@ -27,7 +27,7 @@ export default async function BrokerCrmKanbanPage({ searchParams }: { searchPara
   if (session.status !== "authenticated" || isStarterCrmDenied(session.profile)) {
     return (
       <PageStack>
-        <PageHeader breadcrumb={[{ label: "CRM", href: "/crm" }, { label: "Vue Kanban" }]} kicker="CRM Pro/Enterprise" title="Acces CRM refuse" description="La vue Kanban exige un plan Pro/Enterprise, la MFA verifiee et les permissions CRM." />
+        <PageHeader breadcrumb={[{ label: "CRM", href: "/crm" }, { label: "Vue Kanban" }]} kicker="CRM Pro/Enterprise" title="Accès CRM refusé" description="La vue Kanban exige un plan Pro/Enterprise, la MFA vérifiée et les permissions CRM." />
         <Notice tone="info">Le CRM complet est disponible avec le plan Pro.</Notice>
       </PageStack>
     );
@@ -38,7 +38,7 @@ export default async function BrokerCrmKanbanPage({ searchParams }: { searchPara
   if (kanban.unauthenticated) redirect(loginRedirect("/crm/kanban", kanban.error ?? "session_required"));
 
   const canMove = kanbanMovesEnabled(canMutateCrmLead(session.profile), isTenantReadOnly(session.profile));
-  // The team read is best effort (a role without team right gets 403): the raw advisor id is the fallback.
+  // The team read is best effort (a role without team right gets 403): "Conseiller hors équipe" is the fallback.
   const members = team.status === "success" ? team.data : [];
   const columns: Record<string, KanbanCardData[]> = {};
   if (kanban.status === "success") {
@@ -56,11 +56,11 @@ export default async function BrokerCrmKanbanPage({ searchParams }: { searchPara
         breadcrumb={[{ label: "CRM", href: "/crm" }, { label: "Vue Kanban" }]}
         kicker="CRM Pro/Enterprise"
         title="Vue Kanban"
-        description="Leads autorises regroupes par statut pipeline, selon votre role, votre tenant et votre conseiller."
+        description="Leads autorisés regroupés par statut du pipeline, selon votre rôle, votre cabinet et votre conseiller."
         actions={<Badge tone="info">{canMove ? "Glissez une carte pour changer son statut" : "Lecture seule"}</Badge>}
       />
       <AgencyFilterForm action="/crm/kanban" filter={agency} fieldId="kanban-agency" />
-      {kanban.forbidden ? <Notice tone="danger" title="Acces CRM refuse">Verifiez le plan, la MFA et le flag broker_crm_enabled. Aucune donnee CRM n'est affichee.</Notice> : null}
+      {kanban.forbidden ? <Notice tone="danger" title="Accès CRM refusé">Vérifiez le plan, la MFA et les permissions CRM. Aucune donnée CRM n'est affichée.</Notice> : null}
       {kanban.status === "error" ? <Notice tone="warning">Vue Kanban temporairement indisponible.</Notice> : null}
       {kanban.status === "success" ? <KanbanBoard columns={columns} canMove={canMove} /> : null}
     </PageStack>

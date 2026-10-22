@@ -30,8 +30,10 @@ export function teamAdvisorOptions(members: readonly TeamMemberLike[]): TeamAdvi
     });
 }
 
-/** Name of the advisor, falling back to the raw id when the member is unknown, "Non assigné" without id. */
+export const ADVISOR_OUT_OF_TEAM_LABEL = "Conseiller hors équipe";
+
+/** Name of the advisor; "Conseiller hors équipe" when the member is unknown or the team unreadable (never a raw id), "Non assigné" without id. */
 export function advisorDisplayName(members: readonly TeamMemberLike[], id?: string | null): string {
   if (!id) return "Non assigné";
-  return members.find((member) => member.id === id)?.displayName ?? id;
+  return members.find((member) => member.id === id)?.displayName ?? ADVISOR_OUT_OF_TEAM_LABEL;
 }

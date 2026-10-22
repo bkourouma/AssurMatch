@@ -93,7 +93,8 @@ test("CRM-006: team helpers list active members only and never expose a raw id a
     { value: "u2", label: "Moussa Ba (Agent)" }
   ]);
   expect(advisorDisplayName(members, "u2")).toBe("Moussa Ba");
-  expect(advisorDisplayName(members, "unknown-id")).toBe("unknown-id");
+  expect(advisorDisplayName(members, "unknown-id")).toBe("Conseiller hors équipe");
+  expect(advisorDisplayName([], "u1")).toBe("Conseiller hors équipe");
   expect(advisorDisplayName(members, undefined)).toBe("Non assigné");
   expect(advisorDisplayName([], null)).toBe("Non assigné");
 });

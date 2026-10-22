@@ -1,10 +1,10 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { DragEvent } from "react";
 import { moveCrmLeadStatusAction } from "../../lib/kanban-actions";
-import { KANBAN_ERROR_MESSAGES, KANBAN_READ_ONLY_MESSAGE, decideKanbanDrop, moveCardBetweenColumns } from "../../lib/kanban-moves";
-import type { KanbanColumns } from "../../lib/kanban-moves";
+import { KANBAN_READ_ONLY_MESSAGE, KANBAN_SAME_COLUMN_MESSAGE, canConfirmKanbanReason, decideKanbanDrop, effectiveKanbanTarget, failKanbanMove, moveCardBetweenColumns, settleKanbanMove, withoutKanbanTarget } from "../../lib/kanban-moves";
+import type { KanbanColumns, KanbanMessage } from "../../lib/kanban-moves";
 import { CRM_OUTCOME_REASONS, CRM_PIPELINE_STATUSES, CRM_REASON_LABELS, CRM_STATUS_LABELS } from "../../lib/lead-vocabulary";
 import type { CrmPipelineStatus } from "../../lib/lead-vocabulary";
 import { Button, Card, Field, Notice, Select } from "../../lib/ui/broker-ui";
@@ -28,6 +28,12 @@ interface PendingReason {
   status: CrmPipelineStatus;
 }
 
+/** Where keyboard focus goes after a state change: the moved card's link, or the card's "Déplacer vers" select (the button is disabled once the target is cleared). */
+interface FocusRequest {
+  leadId: string;
+  target: "card" | "control";
+}
+
 /**
  * Kanban CRM: HTML5 drag and drop plus a keyboard alternative ("Déplacer vers" select + button on
  * each card), announced through an aria-live region. The move is optimistic and rolled back when the
@@ -41,8 +47,24 @@ export function KanbanBoard({ columns: initial, canMove }: KanbanBoardProps) {
   const [pendingReason, setPendingReason] = useState<PendingReason | undefined>();
   const [reason, setReason] = useState("");
   const [busy, setBusy] = useState(false);
-  const [message, setMessage] = useState<{ tone: "info" | "danger"; text: string } | undefined>();
+  const [message, setMessage] = useState<KanbanMessage | undefined>();
+  const [focusRequest, setFocusRequest] = useState<FocusRequest | undefined>();
   const [targets, setTargets] = useState<Record<string, string>>({});
+
+  // A keyboard move removes the focused button from the DOM (the card changes column): focus is set
+  // explicitly once the new tree is rendered. A form opening moves focus to the reason field.
+  useEffect(() => {
+    if (!pendingReason) return;
+    document.getElementById("kanban-reason")?.focus();
+  }, [pendingReason]);
+
+  useEffect(() => {
+    if (!focusRequest) return;
+    const card = document.querySelector(`[data-kanban-card="${focusRequest.leadId}"]`);
+    const element = focusRequest.target === "card" ? card?.querySelector<HTMLElement>("a") : card?.querySelector<HTMLElement>("select");
+    element?.focus();
+    setFocusRequest(undefined);
+  }, [focusRequest]);
 
   function commit(next: KanbanColumns<KanbanCardData>) {
     columnsRef.current = next;
@@ -51,20 +73,23 @@ export function KanbanBoard({ columns: initial, canMove }: KanbanBoardProps) {
 
   async function submitMove(leadId: string, status: CrmPipelineStatus, moveReason?: string) {
     const snapshot = columnsRef.current;
-    commit(moveCardBetweenColumns(snapshot, leadId, status));
+    const optimistic = moveCardBetweenColumns(snapshot, leadId, status);
+    commit(optimistic);
+    // The keyboard target never outlives the move (success, rollback or cancel): no stale "Déplacer".
+    setTargets((current) => withoutKanbanTarget(current, leadId));
     setBusy(true);
     setMessage(undefined);
     try {
       const result = await moveCrmLeadStatusAction(leadId, status, moveReason);
-      if (result.ok) {
-        setMessage({ tone: "info", text: `Lead déplacé vers « ${CRM_STATUS_LABELS[status]} ». Le changement est historisé.` });
-      } else {
-        commit(snapshot);
-        setMessage({ tone: "danger", text: KANBAN_ERROR_MESSAGES[result.code] });
-      }
+      const settled = settleKanbanMove({ snapshot, optimistic, status, statusLabel: CRM_STATUS_LABELS[status], result });
+      commit(settled.columns);
+      setMessage(settled.message);
+      setFocusRequest({ leadId, target: settled.moved ? "card" : "control" });
     } catch {
-      commit(snapshot);
-      setMessage({ tone: "danger", text: KANBAN_ERROR_MESSAGES.error });
+      const failed = failKanbanMove(snapshot);
+      commit(failed.columns);
+      setMessage(failed.message);
+      setFocusRequest({ leadId, target: "control" });
     } finally {
       setBusy(false);
     }
@@ -73,7 +98,10 @@ export function KanbanBoard({ columns: initial, canMove }: KanbanBoardProps) {
   function requestMove(leadId: string, from: string, to: string) {
     if (!canMove || busy) return;
     const decision = decideKanbanDrop(from, to);
-    if (decision.kind === "noop") return;
+    if (decision.kind === "noop") {
+      if (from === to) setMessage({ tone: "info", text: KANBAN_SAME_COLUMN_MESSAGE });
+      return;
+    }
     if (decision.kind === "needs_reason") {
       setReason("");
       setPendingReason({ leadId, status: decision.status });
@@ -118,8 +146,18 @@ export function KanbanBoard({ columns: initial, canMove }: KanbanBoardProps) {
               options={CRM_OUTCOME_REASONS.map((value) => ({ value, label: CRM_REASON_LABELS[value] }))}
             />
           </Field>
-          <Button type="submit" disabled={!reason || busy}>Confirmer le déplacement</Button>{" "}
-          <Button type="button" variant="secondary" onClick={() => setPendingReason(undefined)}>Annuler</Button>
+          <Button type="submit" disabled={!canConfirmKanbanReason(reason, busy)}>Confirmer le déplacement</Button>{" "}
+          <Button
+            type="button"
+            variant="secondary"
+            onClick={() => {
+              setTargets((current) => withoutKanbanTarget(current, pendingReason.leadId));
+              setFocusRequest({ leadId: pendingReason.leadId, target: "control" });
+              setPendingReason(undefined);
+            }}
+          >
+            Annuler
+          </Button>
         </form>
       ) : null}
       <div style={{ display: "grid", gridAutoFlow: "column", gridAutoColumns: "minmax(240px, 1fr)", gap: "var(--bo-space-4, 16px)", overflowX: "auto" }} aria-label="Colonnes du pipeline CRM">
@@ -140,6 +178,7 @@ export function KanbanBoard({ columns: initial, canMove }: KanbanBoardProps) {
                   <ul style={{ listStyle: "none", padding: 0, margin: 0, display: "grid", gap: 12 }}>
                     {cards.map((card) => {
                       const targetId = `kanban-move-${card.id}`;
+                      const target = effectiveKanbanTarget(status, targets[card.id]);
                       return (
                         <li
                           key={card.id}
@@ -156,7 +195,7 @@ export function KanbanBoard({ columns: initial, canMove }: KanbanBoardProps) {
                               <label htmlFor={targetId}>Déplacer {card.reference} vers</label>
                               <Select
                                 id={targetId}
-                                value={targets[card.id] ?? ""}
+                                value={target}
                                 onChange={(event) => setTargets((current) => ({ ...current, [card.id]: event.target.value }))}
                                 placeholder="Choisir une colonne"
                                 options={CRM_PIPELINE_STATUSES.filter((target) => target !== status).map((target) => ({ value: target, label: CRM_STATUS_LABELS[target] }))}
@@ -165,9 +204,8 @@ export function KanbanBoard({ columns: initial, canMove }: KanbanBoardProps) {
                                 type="button"
                                 variant="secondary"
                                 size="sm"
-                                disabled={busy || !targets[card.id]}
+                                disabled={busy || !target}
                                 onClick={() => {
-                                  const target = targets[card.id];
                                   if (target) requestMove(card.id, status, target);
                                 }}
                               >

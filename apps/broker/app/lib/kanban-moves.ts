@@ -76,3 +76,53 @@ export function moveCardBetweenColumns<T extends { id: string }>(columns: Kanban
   next[to] = [card, ...(next[to] ?? [])];
   return next;
 }
+
+export interface KanbanMessage {
+  tone: "info" | "danger";
+  text: string;
+}
+
+export const KANBAN_SAME_COLUMN_MESSAGE = "La carte est déjà dans cette colonne.";
+
+/** The keyboard target only counts when it differs from the card's current column. */
+export function effectiveKanbanTarget(currentColumn: string, target: string | undefined): string {
+  return target && target !== currentColumn && isCrmPipelineStatus(target) ? target : "";
+}
+
+/** The "Confirmer le déplacement" button of the reason form: a reason is mandatory, never while busy. */
+export function canConfirmKanbanReason(reason: string, busy: boolean): boolean {
+  return !busy && isCrmOutcomeReason(reason);
+}
+
+/**
+ * Final board state once the API answered: the optimistic columns stay on success, the snapshot taken
+ * before the move comes back (with a danger message) on any refusal. `moved` drives the focus: the
+ * moved card on success, the card in its original column otherwise.
+ */
+export function settleKanbanMove<T extends { id: string }>(input: {
+  snapshot: KanbanColumns<T>;
+  optimistic: KanbanColumns<T>;
+  status: CrmPipelineStatus;
+  statusLabel: string;
+  result: KanbanMoveResult;
+}): { columns: KanbanColumns<T>; message: KanbanMessage; moved: boolean } {
+  if (input.result.ok) {
+    return { columns: input.optimistic, message: { tone: "info", text: `Lead déplacé vers « ${input.statusLabel} ». Le changement est historisé.` }, moved: true };
+  }
+  return { columns: input.snapshot, message: { tone: "danger", text: KANBAN_ERROR_MESSAGES[input.result.code] }, moved: false };
+}
+
+/** Board state when the server action itself throws (network, crash): rollback with the generic message. */
+export function failKanbanMove<T extends { id: string }>(snapshot: KanbanColumns<T>): { columns: KanbanColumns<T>; message: KanbanMessage; moved: boolean } {
+  return { columns: snapshot, message: { tone: "danger", text: KANBAN_ERROR_MESSAGES.error }, moved: false };
+}
+
+/** Column key holding a card, or undefined. */
+export function kanbanColumnOf<T extends { id: string }>(columns: KanbanColumns<T>, leadId: string): string | undefined {
+  return CRM_PIPELINE_STATUSES.find((status) => (columns[status] ?? []).some((card) => card.id === leadId));
+}
+
+/** Keyboard targets without the given card (new object). */
+export function withoutKanbanTarget(targets: Record<string, string>, leadId: string): Record<string, string> {
+  return Object.fromEntries(Object.entries(targets).filter(([id]) => id !== leadId));
+}
