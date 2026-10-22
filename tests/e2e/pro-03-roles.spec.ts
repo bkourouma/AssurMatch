@@ -85,7 +85,11 @@ test("PRO-ROLES-00 les comptes de l'équipe existent et le lead 2 est assigné �
 
   const owner = await visit(browser, world.owner, `/crm/leads/${ids.lead2}`);
   const assign = owner.locator("form").filter({ has: owner.locator("#crm-advisor-id") });
-  await assign.locator("#crm-advisor-id").fill(agentActorId);
+  // Options read "<name> (<role>)": pick the one that starts with the agent name.
+  const picker = assign.locator("#crm-advisor-id");
+  const optionLabel = (await picker.locator("option").allInnerTexts()).map((text) => text.trim()).find((text) => text.startsWith("Aya Agent"));
+  expect(optionLabel, "the agent is listed by name in the picker").toBeDefined();
+  await picker.selectOption({ label: optionLabel as string });
   await assign.getByRole("button", { name: WRITE_CONTROLS.assign }).click();
   await expect(owner.getByText("Lead assigne au conseiller.")).toBeVisible();
   expect((await leadFootprint(ownerToken, ids.lead2 as string)).advisorId).toBe(agentActorId);
