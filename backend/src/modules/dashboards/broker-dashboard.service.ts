@@ -38,6 +38,12 @@ export interface BrokerDashboardServiceDeps {
   leadPricing?: ((plan: "starter" | "pro" | "enterprise", countryCode: string) => Promise<LeadPricing | undefined>) | undefined;
   /** Optional agencies of the tenant (PRD 6.3 multi-agency view); a member id is an advisor id. */
   agencies?: BrokerDashboardAgenciesPort | undefined;
+  /**
+   * Lot 3 (spec 069 FR-001): number of sent, non-withdrawn broker proposals of one lead held by the spec 055
+   * store. The CRM activity store only knows the legacy CRM proposals, so this count is ADDED to it for the
+   * "devis/propositions envoyes" KPI. Without it the KPI is unchanged.
+   */
+  quotesSent?: ((assignmentId: string) => Promise<number>) | undefined;
   config: () => BrokerDashboardServiceConfig;
 }
 
@@ -246,7 +252,10 @@ export class BrokerDashboardService {
     const rows: Array<{ assignment: LeadAssignmentRecord; facts: LeadCrmFacts; firstHistoryAt: number | null }> = [];
     for (const assignment of records) {
       const history = this.deps.crmActivity ? await this.deps.crmActivity.pipelineHistoryForLead(assignment.id) : [];
-      const proposals = this.deps.crmActivity?.proposalsForLead ? (await this.deps.crmActivity.proposalsForLead(assignment.id)).length : 0;
+      const crmProposals = this.deps.crmActivity?.proposalsForLead ? (await this.deps.crmActivity.proposalsForLead(assignment.id)).length : 0;
+      // Lot 3: proposals sent through the spec 055 store count too (distinct stores, no double counting).
+      const extraProposals = this.deps.quotesSent ? Math.max(0, Math.trunc(await this.deps.quotesSent(assignment.id).catch(() => 0))) : 0;
+      const proposals = crmProposals + extraProposals;
       const firstHistory = [...history].sort((left, right) => left.occurredAt.localeCompare(right.occurredAt))[0];
       const occurred = firstHistory ? new Date(firstHistory.occurredAt).getTime() : Number.NaN;
       rows.push({ assignment, facts: computeLeadFacts(assignment, history, proposals), firstHistoryAt: Number.isFinite(occurred) ? occurred : null });

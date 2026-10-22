@@ -62,6 +62,7 @@ import { MemoryAiInteractionsRepository, PrismaAiInteractionsRepository } from "
 import { resolveAiProvider } from "../modules/ai/core/ai-provider.config";
 import { VisitorAiService } from "../modules/ai/visitor-ai.service";
 import { BrokerAiService } from "../modules/ai/broker-ai.service";
+import type { PartnerPlan } from "../modules/ai/core/ai-gateway.service";
 import { AdminAiService } from "../modules/ai/admin-ai.service";
 import { LeadReassignmentService } from "../modules/routing/lead-reassignment.service";
 import { ManualRoutingService } from "../modules/routing/manual-routing.service";
@@ -580,7 +581,21 @@ readonly enterprise = new EnterpriseService({
     assignments: this.leads.assignments,
     access: this.leads.brokerCrmAccess,
     countries: this.countries.service,
-    products: this.products.service
+    products: this.products.service,
+    // Lot 3 (spec 069 FR-004) begin: bounded dashboard aggregates (no PII) and the plan/status of a tenant for system callers.
+    performanceInput: async (actor, query) => {
+      const windowDays = Math.min(365, Math.max(1, Number(query.windowDays) || 30));
+      const now = new Date();
+      const dashboard = await this.dashboards.broker.dashboard(actor, { from: new Date(now.getTime() - windowDays * 24 * 60 * 60 * 1000).toISOString(), to: now.toISOString() });
+      // Per-advisor ids are left out: the model only needs the tenant-level counters.
+      const crm = dashboard.crm ? Object.fromEntries(Object.entries(dashboard.crm).filter(([key]) => key !== "byAssignedAdvisor")) : undefined;
+      return { starter: dashboard.starter, ...(crm ? { crm } : {}) };
+    },
+    partnerProfile: async (partnerTenantId: string) => {
+      const partner = await this.partners.service.require(partnerTenantId).catch(() => undefined);
+      return partner ? { plan: partner.plan as PartnerPlan, status: partner.status } : undefined;
+    }
+    // Lot 3 end
   });
   readonly manualRouting = new ManualRoutingService({
     audit: this.audit.writer,
@@ -646,7 +661,18 @@ readonly enterprise = new EnterpriseService({
     crmActivity: this.leadRepositorySet.crmActivity,
     brokerCrmConfig: this.brokerCrmConfig,
     // Spec 064: Enterprise agency display filter (lazy: the enterprise service is built after this module).
-    agencyScope: { resolve: (actor: ActorContext, agencyId: string | undefined): Promise<AdvisorAgencyPredicate | undefined> => this.enterprise.agencyScopeFor(actor, agencyId) }
+    agencyScope: { resolve: (actor: ActorContext, agencyId: string | undefined): Promise<AdvisorAgencyPredicate | undefined> => this.enterprise.agencyScopeFor(actor, agencyId) },
+    // Lot 3 (spec 069 FR-001/FR-003) begin: billing tariff for the estimated lead cost, agencies of the tenant, spec 055 proposals.
+    leadPricing: async (plan, countryCode) => {
+      const prices = await this.billing.plans.list({ actorId: "system:broker-dashboard", roles: ["super_admin"], mfaVerified: true });
+      const match = prices.find((price) => price.plan === plan && price.countryCode === countryCode) ?? prices.find((price) => price.plan === plan);
+      return match && match.perLeadPrice > 0 ? { perLeadPrice: match.perLeadPrice, sharedLeadPriceMultiplier: match.sharedLeadPriceMultiplier, currency: match.currency } : undefined;
+    },
+    agencies: {
+      listForTenant: async (actor: ActorContext) => (await this.enterprise.listAgencies(actor)).map((agency) => ({ id: agency.id, name: agency.name, memberIds: agency.memberIds }))
+    },
+    quotesSent: async (assignmentId: string) => (await this.leadProposalsRepository.listForAssignment(assignmentId)).filter((proposal) => proposal.status !== "withdrawn").length
+    // Lot 3 end
   });
   /** Spec 051: partner onboarding and lifecycle behind the `/admin/partners` routes. */
   readonly partnerAdmin = new PartnerAdminService({
@@ -834,7 +860,10 @@ readonly enterprise = new EnterpriseService({
       },
       countries: this.countries.service,
       quotes: { list: () => this.quoteRequests.submissions.list() }
-    })
+    }),
+    // Lot 3 (spec 069 FR-008, D4): weekly AI summary, flag closed by default; the text comes from the central AI gateway.
+    isWeeklySummaryEnabled: () => this.featureFlags.service.isEnabled("broker_weekly_ai_summary_enabled"),
+    composeWeeklySummary: (partnerTenantId, stats) => this.brokerAi.weeklySummaryText(partnerTenantId, { ...stats })
   });
   /** Spec 045: public-site intake (waitlist, partner applications, contact) and public read models. */
   readonly waitlist = new WaitlistModule({

@@ -38,6 +38,8 @@ export interface DashboardsModuleDeps {
   leadPricing?: BrokerDashboardServiceDeps["leadPricing"];
   /** Lot 3 (spec 069): agencies of the tenant for the Enterprise multi-agency view (optional). */
   agencies?: BrokerDashboardAgenciesPort | undefined;
+  /** Lot 3 (spec 069): sent proposals (spec 055 store) of one lead, added to the "quotes sent" KPI (optional). */
+  quotesSent?: BrokerDashboardServiceDeps["quotesSent"];
 }
 
 export class DashboardsModule {
@@ -57,6 +59,7 @@ export class DashboardsModule {
       agencyScope: deps.agencyScope,
       leadPricing: deps.leadPricing,
       agencies: deps.agencies,
+      quotesSent: deps.quotesSent,
       config: () => ({
         brokerDashboardEnabled: deps.featureFlags.isEnabled("broker_dashboard_enabled"),
         brokerCrmEnabled: deps.brokerCrmConfig.brokerCrmEnabled || deps.featureFlags.isEnabled("broker_crm_enabled")

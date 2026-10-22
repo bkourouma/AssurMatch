@@ -43,6 +43,7 @@ function makeService(
   options: {
     histories?: Map<string, History>;
     proposals?: Map<string, number>;
+    quotesSent?: (assignmentId: string) => Promise<number>;
     agencyScope?: (advisorId: string | undefined) => boolean;
     leadPricing?: (plan: string, country: string) => Promise<Pricing | undefined>;
     agencies?: Array<{ id: string; name: string; memberIds: string[] }>;
@@ -62,6 +63,7 @@ function makeService(
     } as never,
     agencyScope: options.agencyScope ? { resolve: async () => options.agencyScope } : undefined,
     leadPricing: options.leadPricing as never,
+    quotesSent: options.quotesSent,
     agencies: options.agencies ? { listForTenant: async () => options.agencies as never } : undefined,
     config: () => ({ brokerDashboardEnabled: true, brokerCrmEnabled: true })
   });
@@ -125,6 +127,24 @@ describe("BrokerDashboardService CRM KPIs (PRD 20)", () => {
     });
     // First history event of any kind: (5 + 90 + 10) / 3 = 35 minutes.
     expect(crm?.averageReceptionToFirstActivityMinutes).toBe(35);
+  });
+
+  it("adds the spec 055 proposals to the quotes sent KPI when the port is provided (Lot 3)", async () => {
+    const withCrmProposal = lead({});
+    const withVisitorProposal = lead({});
+    const withNone = lead({});
+    const quotesSent = async (id: string) => (id === withVisitorProposal.id ? 2 : id === withCrmProposal.id ? 1 : 0);
+    const records = [withCrmProposal, withVisitorProposal, withNone];
+    const proposals = new Map([[withCrmProposal.id, 1]]);
+
+    const without = (await makeService(records, { proposals }).service.dashboard(actor("pro"), {})).crm;
+    expect(without?.kpis?.quotesSent).toEqual({ leads: 1, proposals: 1 });
+
+    const withPort = (await makeService(records, { proposals, quotesSent }).service.dashboard(actor("pro"), {})).crm;
+    expect(withPort?.kpis?.quotesSent).toEqual({ leads: 2, proposals: 4 });
+    // A failing port never breaks the dashboard.
+    const failing = (await makeService(records, { proposals, quotesSent: async () => { throw new Error("store down"); } }).service.dashboard(actor("pro"), {})).crm;
+    expect(failing?.kpis?.quotesSent).toEqual({ leads: 1, proposals: 1 });
   });
 
   it("ranks top sources by won then received, defaulting to quote_request", async () => {

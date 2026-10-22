@@ -1433,6 +1433,30 @@ export class BrokerCrmController {
     return this.runtime.brokerAi.listLossAnalyses(protectedActorFromRequest(request));
   }
   // Spec 064 end
+
+  // Lot 3 (spec 069 FR-004) begin: approved priority scores, performance summaries and manager assistant.
+  aiPriorityScores(request: AssurMatchHttpRequest) {
+    return this.runtime.brokerAi.priorityScores(protectedActorFromRequest(request));
+  }
+
+  aiPerformanceSummary(input: unknown, request: AssurMatchHttpRequest) {
+    const actor = brokerWriteActor(request);
+    return this.runtime.brokerAi.performanceSummary(actor, input);
+  }
+
+  aiPerformanceSummaries(request: AssurMatchHttpRequest) {
+    return this.runtime.brokerAi.listPerformanceSummaries(protectedActorFromRequest(request));
+  }
+
+  aiManagerAssistant(input: unknown, request: AssurMatchHttpRequest) {
+    const actor = brokerWriteActor(request);
+    return this.runtime.brokerAi.managerAssistant(actor, input);
+  }
+
+  aiManagerAnalyses(request: AssurMatchHttpRequest) {
+    return this.runtime.brokerAi.listManagerAnalyses(protectedActorFromRequest(request));
+  }
+  // Lot 3 end
 }
 
 export class BrokerDashboardController {
@@ -1445,6 +1469,11 @@ export class BrokerDashboardController {
 
   advisors(request: AssurMatchHttpRequest, query: Record<string, string>) {
     return this.runtime.dashboards.broker.advisors(protectedActorFromRequest(request), parseHttpInput(dashboardScopeQuerySchema, query));
+  }
+
+  // Lot 3 (spec 069 FR-003): per-agency rollup, Enterprise only (refused and audited by the service otherwise).
+  agencies(request: AssurMatchHttpRequest, query: Record<string, string>) {
+    return this.runtime.dashboards.broker.agenciesOverview(protectedActorFromRequest(request), parseHttpInput(dashboardScopeQuerySchema, query));
   }
 
   export(request: AssurMatchHttpRequest, query: Record<string, string>) {
@@ -2376,10 +2405,18 @@ registerBrokerMessagingRoutes([BrokerStarterController, BrokerCrmController]);
 // Spec 064 begin: no parameterised GET route starts with "ai/loss-analysis", so nothing captures it.
 decorate(BrokerCrmController, "aiLossAnalyses", [Get("ai/loss-analysis") as MethodDecoratorFactory, Header("Cache-Control", "no-store") as MethodDecoratorFactory], [[0, Req() as ParamDecoratorFactory]]);
 // Spec 064 end
+// Lot 3 (spec 069) begin: fixed paths under "ai/", none captured by a parameterised GET route.
+decorate(BrokerCrmController, "aiPriorityScores", [Get("ai/priority-scores") as MethodDecoratorFactory, Header("Cache-Control", "no-store") as MethodDecoratorFactory], [[0, Req() as ParamDecoratorFactory]]);
+decorate(BrokerCrmController, "aiPerformanceSummary", [Post("ai/performance-summary") as MethodDecoratorFactory], [[0, Body() as ParamDecoratorFactory], [1, Req() as ParamDecoratorFactory]]);
+decorate(BrokerCrmController, "aiPerformanceSummaries", [Get("ai/performance-summaries") as MethodDecoratorFactory, Header("Cache-Control", "no-store") as MethodDecoratorFactory], [[0, Req() as ParamDecoratorFactory]]);
+decorate(BrokerCrmController, "aiManagerAssistant", [Post("ai/manager-assistant") as MethodDecoratorFactory], [[0, Body() as ParamDecoratorFactory], [1, Req() as ParamDecoratorFactory]]);
+decorate(BrokerCrmController, "aiManagerAnalyses", [Get("ai/manager-analyses") as MethodDecoratorFactory, Header("Cache-Control", "no-store") as MethodDecoratorFactory], [[0, Req() as ParamDecoratorFactory]]);
+// Lot 3 end
 
 controller("broker/dashboard", BrokerDashboardController, true);
 decorate(BrokerDashboardController, "dashboard", [Get() as MethodDecoratorFactory], [[0, Req() as ParamDecoratorFactory], [1, Query() as ParamDecoratorFactory]]);
 decorate(BrokerDashboardController, "advisors", [Get("advisors") as MethodDecoratorFactory], [[0, Req() as ParamDecoratorFactory], [1, Query() as ParamDecoratorFactory]]);
+decorate(BrokerDashboardController, "agencies", [Get("agencies") as MethodDecoratorFactory, Header("Cache-Control", "no-store") as MethodDecoratorFactory], [[0, Req() as ParamDecoratorFactory], [1, Query() as ParamDecoratorFactory]]);
 decorate(BrokerDashboardController, "export", [Get("export.csv") as MethodDecoratorFactory], [[0, Req() as ParamDecoratorFactory], [1, Query() as ParamDecoratorFactory]]);
 controller("admin/dashboard", AdminDashboardExportController, true);
 decorate(AdminDashboardExportController, "export", [Get("export.csv") as MethodDecoratorFactory], [[0, Req() as ParamDecoratorFactory], [1, Query() as ParamDecoratorFactory]]);
@@ -2679,7 +2716,7 @@ Reflect.defineMetadata("design:paramtypes", [AssurMatchRuntime], AuthRequiredHtt
  */
 export const BROKER_TENANT_WRITE_GUARDED: Readonly<Record<string, readonly string[]>> = {
   BrokerStarterController: ["accept", "reject", "dispute", "close", "sendProposal", "withdrawProposal", "sendMessage", "markRead", "createDocumentRequest", "cancelDocumentRequest"],
-  BrokerCrmController: ["status", "note", "task", "reminder", "assign", "document", "proposal", "withdrawProposal", "dispute", "aiRequest", "aiValidate", "aiLossAnalysis", "aiSetOptOut", "sendMessage", "markRead", "createDocumentRequest", "cancelDocumentRequest"],
+  BrokerCrmController: ["status", "note", "task", "reminder", "assign", "document", "proposal", "withdrawProposal", "dispute", "aiRequest", "aiValidate", "aiLossAnalysis", "aiPerformanceSummary", "aiManagerAssistant", "aiSetOptOut", "sendMessage", "markRead", "createDocumentRequest", "cancelDocumentRequest"],
   // Spec 064: setMemberCustomRole (assignment of a custom role) is a tenant write like the other enterprise routes.
   BrokerEnterpriseController: ["createAgency", "updateAgency", "assignMember", "createRole", "updateRole", "updateSla", "updateBranding", "setMemberCustomRole"],
   BrokerNotificationsController: ["updatePreferences"],

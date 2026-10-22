@@ -214,6 +214,13 @@ describe("RuntimeScheduledAlertSources: unprocessed leads and weekly stats", () 
     expect(leads.find((entry) => entry.id === "fresh")?.slaTargetMinutes).toBe(120);
   });
 
+  it("never lets a looser broker target exceed the contractual one (minimum of both, D1)", async () => {
+    const deps = runtimeDeps();
+    deps.branding = { listBranding: async () => [{ partnerTenantId: PRO, firstActionTargetMinutes: 300 }] };
+    const leads = await new RuntimeScheduledAlertSources(deps).unprocessedLeads(NOW);
+    expect(leads.find((entry) => entry.id === "fresh")?.slaTargetMinutes).toBe(120);
+  });
+
   it("aggregates the week per tenant, aggregates only", async () => {
     const stats = await new RuntimeScheduledAlertSources(runtimeDeps()).weeklyBrokerStats(new Date(NOW.getTime() - 7 * DAY));
     expect(stats.find((entry) => entry.partnerTenantId === PRO)).toEqual({

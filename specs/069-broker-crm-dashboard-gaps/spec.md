@@ -29,7 +29,7 @@ Le PRD §20 liste des indicateurs que le tableau de bord courtier n'expose pas (
 - **FR-009 (non-régression).** Starter sans CRM ni IA commerciale ; rôles personnalisés (spec 064) et filtre agence appliqués sur chaque nouvelle route.
 
 ## Décisions techniques
-- **D1** Expiration d'un lead : échéance = `assignedAt` + cible SLA de première action (contractuelle `slaTargetMinutes`, sinon cible du courtier, sinon 240 min). « Proche » = 80 % du délai consommé (`ASSURMATCH_ALERT_LEAD_EXPIRY_WARNING_PERCENT`), annonce possible jusqu'à 3 jours après l'échéance.
+- **D1** Expiration d'un lead : échéance = `assignedAt` + cible SLA de première action = MINIMUM entre la cible contractuelle `slaTargetMinutes` et la cible du courtier (même règle que l'écran SLA, `effectiveSlaTarget`), 240 min si aucune des deux. « Proche » = 80 % du délai consommé (`ASSURMATCH_ALERT_LEAD_EXPIRY_WARNING_PERCENT`), annonce possible jusqu'à 3 jours après l'échéance.
 - **D2** Source marketing : aucune donnée UTM n'est capturée ; la source CRM du lead (`comparator`, `quote_request`, `manual_import`, `partner_referral`, `support`) sert de « source de la demande ».
 - **D3** Coût par lead : estimation `perLeadPrice` du plan et du pays (leads partagés au multiplicateur) ; ce n'est pas une facture.
 - **D4** Résumé hebdomadaire : texte IA si la passerelle l'autorise, sinon texte déterministe ; flag fermé par défaut.
