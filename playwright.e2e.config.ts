@@ -81,7 +81,6 @@ export default defineConfig({
       dependencies: ["scenario"]
     },
     {
-<<<<<<< HEAD
       // Lot 11a (specs 067, 068, 070): visitor journeys of the PRD gaps (names, documents step, direct broker
       // choice, multi-offer requests, closed AI, catalogue conditions). 01 provisions two more broker firms
       // on the CI x Auto opened by the scenario; 02 and 03 read what 01 published. The visitor itself runs in
@@ -89,14 +88,15 @@ export default defineConfig({
       name: "visitor-gaps",
       testMatch: ["visitor-gaps-*.spec.ts"],
       use: { baseURL: publicUrl },
-=======
+      dependencies: ["scenario"]
+    },
+    {
       // Lot 11c: admin journeys of lots 7, 9 and 10 (CMS four eyes, AI flags without activation, partner API keys and
       // webhooks, CRM connectors, messaging outbox, channel flags). Each file builds on the CI opened by the scenario
       // and reads its own extra admin accounts (content_admin, support_admin) created through /users.
       name: "admin-lot11",
       testMatch: ["admin-cms.spec.ts", "admin-ai-integrations.spec.ts", "admin-channels.spec.ts"],
       use: { baseURL: adminUrl },
->>>>>>> orch/2026-10-21-ecarts-prd
       dependencies: ["scenario"]
     },
     {
