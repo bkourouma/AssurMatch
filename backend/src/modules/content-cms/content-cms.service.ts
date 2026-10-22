@@ -1,4 +1,5 @@
 import { BadRequestException, ConflictException, ForbiddenException, NotFoundException, UnprocessableEntityException } from "@nestjs/common";
+import type { ZodType } from "zod";
 import {
   contentDecisionSchema,
   contentEntryCreateSchema,
@@ -12,7 +13,6 @@ import {
   type ContentCmsLocale,
   type ContentEntryView,
   type ContentKind,
-  type ContentStatus,
   type FaqPayload,
   type GlossaryPayload,
   type GuidePayload,
@@ -396,7 +396,7 @@ export class ContentCmsService {
   }
 
   private parsePayload(kind: ContentKind, payload: unknown): Record<string, unknown> {
-    return parseHttpInput(contentPayloadSchemas[kind], payload) as unknown as Record<string, unknown>;
+    return parseHttpInput(contentPayloadSchemas[kind] as ZodType<unknown>, payload) as Record<string, unknown>;
   }
 
   /** Constitution VIII + editorial charter, on every string of the payload. A refusal is audited without the text. */

@@ -286,7 +286,7 @@ describe("ContentCmsService", () => {
     const denied = AssurMatchRoles.filter((role) => !["content_admin", "super_admin", "compliance_admin"].includes(role));
     for (const role of denied) {
       const actor: ActorContext = { actorId: `actor-${role}`, roles: [role], mfaVerified: true };
-      for (const run of [
+      const runs: Array<() => unknown> = [
         () => service.capabilities(actor),
         () => service.list(actor, {}),
         () => service.get(actor, draft.id),
@@ -299,7 +299,8 @@ describe("ContentCmsService", () => {
         () => service.reject(actor, draft.id, { note: "non" }),
         () => service.archive(actor, draft.id, { note: "non" }),
         () => service.revise(actor, draft.id)
-      ]) expect(await status(Promise.resolve().then(run)), role).toBe(403);
+      ];
+      for (const run of runs) expect(await status(Promise.resolve().then(run) as Promise<unknown>), role).toBe(403);
     }
     expect(await status(service.list({ roles: [] }, {}))).toBe(403);
     expect(audit.search({ action: ContentAuditActions.refused, result: "refused" }).length).toBe(denied.length * 12 + 1);
