@@ -326,7 +326,11 @@ test("PRO-CRM-03 lead2 : le propriétaire l'assigne à l'agent de l'équipe, l'a
   const assignCard = card(page, labelRx("Conseiller assigne"));
   await expect(assignCard.getByRole("button", { name: "Assigner au conseiller" })).toBeVisible();
   if ((await assignCard.getByText(`Conseiller actuel : ${AGENT_NAME}`).count()) === 0) {
-    await assignCard.locator("#crm-advisor-id").selectOption({ label: AGENT_NAME });
+    // Options read "<name> (<role>)": pick the one that starts with the agent name.
+    const picker = assignCard.locator("#crm-advisor-id");
+    const optionLabel = (await picker.locator("option").allInnerTexts()).map((text) => text.trim()).find((text) => text.startsWith(AGENT_NAME));
+    expect(optionLabel, "the agent is listed by name in the picker").toBeDefined();
+    await picker.selectOption({ label: optionLabel as string });
     await submitCrmForm(page, assignCard.getByRole("button", { name: "Assigner au conseiller" }), "assigned");
     await expect(page.locator(".bo-notice").filter({ hasText: /Lead assign/u }), "result notice").not.toHaveCount(0);
   }
