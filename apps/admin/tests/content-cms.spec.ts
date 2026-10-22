@@ -122,7 +122,11 @@ test("the forms are plain text fields per kind, without a rich editor", () => {
   expect(forms).toContain("legalSlug");
   expect(forms).toContain("CONTENT_LEGAL_SLUG_LABELS");
   expect(forms).toContain("CONTENT_LOCALE_LABELS");
-  expect(payload).toContain("identifiant|titre|paragraphe 1");
+  // Block format (one marker per line start), never a character separator inside a paragraph:
+  // the round trip is unit tested in apps/admin/tests/unit/content-payload.test.ts.
+  expect(payload).toContain("« # identifiant »");
+  expect(payload).not.toContain('split("|")');
+  expect(forms).toContain("SECTIONS_HELP");
 });
 
 test("the menu links to the content section", () => {
