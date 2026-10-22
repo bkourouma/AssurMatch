@@ -5,7 +5,6 @@ import {
   changeAdminCountryStatus,
   createAdminCountry,
   createAdminCountryLink,
-  createAdminProduct,
   createRegulatoryRegime,
   retireAdminCountryLink,
   retireRegulatoryRegime,
@@ -23,6 +22,9 @@ import {
   type RegulatoryRegimeWriteInput
 } from "./admin-api";
 import { adminWriteErrorMessage, flagLabel, isSensitiveFlagKey, SENSITIVE_FLAG_EXPLANATION } from "./catalog-messages";
+import { createAdminProductWithContent, updateAdminProductWithContent, type Lot4ProductWriteInput } from "./lot4-catalog-api";
+import { quoteDocumentKinds } from "../../../../packages/shared/contracts/quote-document.contracts";
+import type { ProductLegalNotice, ProductRequiredDocumentKind } from "../../../../packages/shared/contracts/catalog.contracts";
 
 /**
  * Spec 050 US1, US2, US6 and the global flag screen. Every mutation carries a reason ("Motif
@@ -182,12 +184,34 @@ export async function retireCountryLinkAction(_previous: CatalogActionState, for
   return toState(result, "Liaison retirée : le produit n'est plus proposé dans ce pays.", [`/catalog/countries/${countryId}`, "/catalog/products"]);
 }
 
-function productFields(formData: FormData, { includeChecks }: { includeChecks: boolean }): AdminProductWriteInput {
+/** Spec 070 PROD-007: FR and EN legal text and disclaimer; an empty zone is left out of the notice. */
+function legalNoticeFields(formData: FormData): ProductLegalNotice {
+  const notice: ProductLegalNotice = {};
+  for (const language of ["fr", "en"] as const) {
+    const legalText = optionalText(formData, `legalText_${language}`);
+    const disclaimer = optionalText(formData, `disclaimer_${language}`);
+    if (legalText || disclaimer) notice[language] = { ...(legalText ? { legalText } : {}), ...(disclaimer ? { disclaimer } : {}) };
+  }
+  return notice;
+}
+
+/** Spec 070 PROD-005: only kinds of the shared vocabulary are sent. */
+function requiredDocumentKindFields(formData: FormData): ProductRequiredDocumentKind[] {
+  const allowed = new Set<string>(quoteDocumentKinds);
+  return listValue(formData, "requiredDocumentKinds").filter((kind, index, all) => allowed.has(kind) && all.indexOf(kind) === index) as ProductRequiredDocumentKind[];
+}
+
+function productFields(formData: FormData, { includeChecks }: { includeChecks: boolean }): Lot4ProductWriteInput {
   const name = optionalText(formData, "name");
   const description = optionalText(formData, "description");
   const sensitivity = optionalText(formData, "sensitivity") as AdminProductWriteInput["sensitivity"] | undefined;
+  // The API cannot clear a category, so "none" simply leaves the stored category alone.
+  const categoryId = optionalText(formData, "categoryId");
   return {
     ...(name ? { name } : {}),
+    ...(categoryId ? { categoryId } : {}),
+    legalNotice: legalNoticeFields(formData),
+    requiredDocumentKinds: requiredDocumentKindFields(formData),
     ...(description ? { description } : {}),
     ...(sensitivity ? { sensitivity } : {}),
     ...(includeChecks ? { requiresDocuments: checked(formData, "requiresDocuments"), requiresManualReview: checked(formData, "requiresManualReview") } : {})
@@ -200,7 +224,7 @@ export async function createProductAction(_previous: CatalogActionState, formDat
   if (invalid) return invalid;
   const key = text(formData, "key");
   const name = text(formData, "name");
-  const result = await createAdminProduct({ ...productFields(formData, { includeChecks: true }), key, name, reason });
+  const result = await createAdminProductWithContent({ ...productFields(formData, { includeChecks: true }), key, name, reason });
   return toState(result, `Produit ${key} créé en brouillon, tous ses flags fermés.`, ["/catalog/products", "/catalog"]);
 }
 
@@ -210,7 +234,7 @@ export async function updateProductAction(_previous: CatalogActionState, formDat
   if (invalid) return invalid;
   const productId = text(formData, "productId");
   const expectedUpdatedAt = optionalText(formData, "expectedUpdatedAt");
-  const result = await updateAdminProduct(productId, {
+  const result = await updateAdminProductWithContent(productId, {
     ...productFields(formData, { includeChecks: true }),
     ...(expectedUpdatedAt ? { expectedUpdatedAt } : {}),
     reason

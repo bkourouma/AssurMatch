@@ -12,6 +12,7 @@ import {
   type OfferCompleteness,
   type OfferCompletenessField,
   type OfferEffectiveStatus,
+  type OfferType,
   type OfferVersionStatus
 } from "../../../../packages/shared/contracts/offer-content";
 import type { OfferContent } from "../../../../packages/shared/contracts/offer-content";
@@ -58,10 +59,38 @@ export const OFFER_VERSION_STATUS_TONES: Record<string, "neutral" | "success" | 
   withdrawn: "disabled"
 };
 
+/** Spec 070 (PRD section 13): the four offer types a broker can meet. */
 export const OFFER_TYPE_LABELS: Record<string, string> = {
   indicative: "Offre indicative",
-  partner: "Offre partenaire"
+  partner: "Offre partenaire",
+  insurer: "Offre assureur (validée par un assureur, saisie par l'administration)",
+  private: "Offre privée (visible uniquement du courtier, jamais publique ni comparée)"
 };
+
+/** Short wording for list cells, badges and kickers. */
+export const OFFER_TYPE_SHORT_LABELS: Record<string, string> = {
+  indicative: "Offre indicative",
+  partner: "Offre partenaire",
+  insurer: "Offre assureur",
+  private: "Offre privée"
+};
+
+/** A broker creates only indicative and private offers (`brokerOfferTypeSchema`); partner and insurer offers come from the administration. */
+export const BROKER_OFFER_TYPE_OPTIONS = ["indicative", "private"] as const satisfies readonly OfferType[];
+
+/** Filter options of the list: every type the broker can own. */
+export const OFFER_TYPE_FILTER_OPTIONS = ["indicative", "partner", "insurer", "private"] as const satisfies readonly OfferType[];
+
+export const BROKER_OFFER_TYPE_DESCRIPTIONS: Record<string, string> = {
+  indicative: "Offre indicative publiée au comparateur après validation par AssurMatch.",
+  private: "Une offre privée n'est jamais affichée au public : elle reste visible de votre cabinet uniquement et n'entre jamais dans la comparaison."
+};
+
+export const PRIVATE_OFFER_BADGE = "Privée — jamais publique";
+
+export function offerTypeLabel(offerType: string | undefined): string {
+  return OFFER_TYPE_SHORT_LABELS[offerType ?? "indicative"] ?? "Offre indicative";
+}
 
 export const PAYMENT_FLEXIBILITY_LABELS: Record<string, string> = {
   annual: "Annuel",
@@ -73,6 +102,8 @@ export const PAYMENT_FLEXIBILITY_LABELS: Record<string, string> = {
 export const OFFER_FIELD_LABELS: Record<string, string> = {
   name: "Nom commercial",
   insurerName: "Assureur porteur",
+  insurerId: "Assureur du référentiel",
+  offerType: "Type d'offre",
   shortDescription: "Description",
   guaranteeSummary: "Résumé des garanties",
   guarantees: "Garanties (au moins une)",
@@ -120,7 +151,12 @@ export const OFFER_BLOCKER_LABELS: Record<string, string> = {
   partner_capacity_blocked: "Capacité du courtier bloquée ou pleine",
   partner_country_not_authorized: "Courtier non autorisé pour ce pays",
   partner_product_not_authorized: "Courtier non autorisé pour ce produit",
-  license_not_valid_for_scope: "Aucune licence valide du courtier pour ce pays et ce produit"
+  license_not_valid_for_scope: "Aucune licence valide du courtier pour ce pays et ce produit",
+  private_offer_not_sponsorable: "Une offre privée ne peut pas être sponsorisée",
+  insurer_missing: "Choisissez l'assureur (référentiel) ou saisissez son nom",
+  insurer_not_found: "Assureur introuvable dans le référentiel",
+  insurer_not_active: "Assureur suspendu ou retiré : il ne peut plus porter de nouvelle offre",
+  insurer_country_mismatch: "L'assureur choisi appartient à un autre pays que l'offre"
 };
 
 export function offerBlockerLabel(blocker: OfferBlocker): string {
@@ -136,7 +172,10 @@ export const OFFER_ERROR_MESSAGES: Record<string, string> = {
   OFFER_TRANSITION_INVALID: "Action impossible dans l'état actuel de l'offre (version déjà soumise, aucune version en cours ou offre retirée). Rechargez la page.",
   RBAC_DENIED: "Action réservée au propriétaire et aux managers du cabinet. Les agents et les comptes en lecture seule consultent uniquement.",
   NOT_FOUND: "Offre introuvable.",
-  PARTNER_SUSPENDED: TENANT_SUSPENDED_MESSAGE
+  PARTNER_SUSPENDED: TENANT_SUSPENDED_MESSAGE,
+  OFFER_TYPE_INVALID: "Type d'offre : les règles de ce type ne sont pas respectées. Voir la liste ci-dessous.",
+  OFFER_TYPE_IMMUTABLE: "Le type d'une offre ne peut pas changer après sa création. Créez une nouvelle offre du type voulu.",
+  OFFER_INSURER_INVALID: "Assureur refusé : il est introuvable, suspendu ou rattaché à un autre pays que l'offre. Choisissez un assureur actif du pays de l'offre ou saisissez son nom."
 };
 
 export function offerWriteErrorMessage(result: { status: number; code?: string | undefined; message?: string | undefined; suspended?: boolean | undefined }): string {
@@ -214,6 +253,10 @@ function optionalText(formData: FormData, name: string): string | undefined {
   return value ? value : undefined;
 }
 
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+type BrokerOfferType = (typeof BROKER_OFFER_TYPE_OPTIONS)[number];
+
 function optionalNumber(formData: FormData, name: string): number | undefined {
   const raw = text(formData, name).replace(/\s/g, "").replace(",", ".");
   if (!raw) return undefined;
@@ -286,8 +329,8 @@ export function slugify(value: string): string {
  * Content of an offer version read from the form. Never any sponsorship key: the broker schema is
  * strict and sponsorship is an admin decision (FR-013, 403 otherwise).
  */
-export function offerContentFromForm(formData: FormData): Partial<OfferContent> {
-  const content: Partial<OfferContent> = {
+export function offerContentFromForm(formData: FormData): Partial<OfferContent> & { offerType?: BrokerOfferType } {
+  const content: Partial<OfferContent> & { offerType?: BrokerOfferType } = {
     name: text(formData, "name"),
     currency: text(formData, "currency").toUpperCase() || "XOF",
     guarantees: guarantees(formData),
@@ -299,6 +342,13 @@ export function offerContentFromForm(formData: FormData): Partial<OfferContent> 
     const value = optionalText(formData, key);
     if (value !== undefined) content[key] = value;
   }
+  // Spec 070: a chosen insurer of the referential (the API then sets the displayed name itself).
+  const insurerId = optionalText(formData, "insurerId");
+  if (insurerId !== undefined && UUID_PATTERN.test(insurerId)) content.insurerId = insurerId;
+  // Spec 070: only the two types a broker may write travel (the stored type is re-sent on edit; a
+  // partner or insurer offer sends none, the API keeps its type).
+  const offerType = optionalText(formData, "offerType");
+  if (offerType === "indicative" || offerType === "private") content.offerType = offerType;
   const numberKeys = ["indicativePriceMin", "indicativePriceMax", "deductibleAmount", "coverageCeiling"] as const;
   for (const key of numberKeys) {
     const value = optionalNumber(formData, key);

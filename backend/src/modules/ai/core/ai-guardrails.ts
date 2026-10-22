@@ -11,7 +11,8 @@ const FORBIDDEN_AI_PATTERNS: Array<[string, RegExp]> = [
   ["acceptance_decision", /(demande|dossier)\s+(acceptee?|refusee?|validee?)\b/i],
   ["contract_validated", /contrat\s+valid(e|é)/i],
   ["chosen_broker", /courtier\s+choisi/i],
-  ["guaranteed", /garantie\s+acceptee|nous\s+vous\s+assurons/i]
+  ["guaranteed", /garantie\s+acceptee|nous\s+vous\s+assurons/i],
+  ["guarantee_promise", /nous\s+(vous\s+)?garantissons|vous\s+(etes|êtes)\s+(couvert|assure|assuré)|couverture\s+garantie|remboursement\s+garanti|sans\s+aucune\s+exclusion/i]
 ];
 
 /**
@@ -32,10 +33,30 @@ const FORBIDDEN_VISITOR_PATTERNS: Array<[string, RegExp]> = [
 
 const MAX_OUTPUT_CHARS = 4000;
 
+/**
+ * Tenant-level broker insights (performance summary, manager assistant, weekly summary) describe a
+ * cabinet's own aggregates: they never decide a routing or reassignment, never judge or sanction a
+ * person, and never give insurance advice. Matched on accent-free lower-case text.
+ */
+const TENANT_INSIGHT_PATTERNS: Array<[string, RegExp]> = [
+  ["automatic_routing", /(routage|reaffectation|reattribution|redistribution|reassignation)\s+automatique|(reaffect|reattribu|redistribu|reassign)\w*\s+automatiquement/],
+  ["routing_decision", /\b(decide|decidons|decidez|decision)\s+(de|du)\s+routage\b(?!\s+(reste|appartient|revient))/],
+  ["personnel_decision", /\b(licenci\w*|sanction\w*|blamer?|avertissement\s+disciplinaire|mesure\s+disciplinaire)\b/],
+  ["personal_judgement", /\b(incompetent\w*|paresseu\w*|mauvais(e)?\s+(conseiller|conseillere|agent|commercial)\w*)\b/],
+  ["insurance_advice", /\b(proposez|vendez|placez)\s+(le|ce|cette|un|une)\s+(contrat|garantie|assurance)\b/]
+];
+/** The weekly summary is sent without per-message validation: it must stay purely descriptive. */
+const DESCRIPTIVE_ONLY_PATTERNS: Array<[string, RegExp]> = [
+  ["advice_not_allowed", /\b(recommand\w*|conseillons|conseillez|preconis\w*|sugger\w*|suggestion\w*|piste\w*)\b|vous\s+devriez|il\s+faut\b|il\s+faudrait|vous\s+devez/]
+];
+const TENANT_INSIGHT_TYPES: ReadonlySet<AiAssistTypeCatalog> = new Set(["performance_summary", "manager_assistant", "weekly_summary"]);
+
 /** Assist types whose output influences score, priority, relaunch or risk analysis: human validation is mandatory. */
 const HUMAN_VALIDATION_REQUIRED: ReadonlySet<AiAssistTypeCatalog> = new Set([
   "lead_score", "next_action", "relaunch_message", "lead_classification", "duplicate_hint", "loss_analysis",
-  "admin_risk_triage", "offer_consistency_check", "suspicious_leads", "routing_anomaly_analysis"
+  "admin_risk_triage", "offer_consistency_check", "offer_summary", "suspicious_leads", "routing_anomaly_analysis",
+  // Steering insights (DASH-B-009, PRD 10.2 manager assistant): they influence how the cabinet is run.
+  "performance_summary", "manager_assistant"
 ]);
 
 export interface GuardrailVerdict {
@@ -55,6 +76,12 @@ export class AiGuardrails {
     if (text.trim().length === 0) reasons.push("empty_output");
     if (text.length > MAX_OUTPUT_CHARS) reasons.push("output_too_long");
     if (assistType === "relaunch_message" && /https?:\/\//i.test(text)) reasons.push("links_not_allowed");
+    if (TENANT_INSIGHT_TYPES.has(assistType)) {
+      const plain = text.normalize("NFD").replace(/\p{M}/gu, "").toLowerCase();
+      reasons.push(...TENANT_INSIGHT_PATTERNS.filter(([, pattern]) => pattern.test(plain)).map(([name]) => `forbidden_pattern:${name}`));
+      if (/https?:\/\//.test(plain)) reasons.push("links_not_allowed");
+      if (assistType === "weekly_summary") reasons.push(...DESCRIPTIVE_ONLY_PATTERNS.filter(([, pattern]) => pattern.test(plain)).map(([name]) => `forbidden_pattern:${name}`));
+    }
     return { approved: reasons.length === 0, reasons };
   }
 

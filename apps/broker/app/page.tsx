@@ -3,6 +3,8 @@ import { isBrokerProfile, loginRedirect, readBackOfficeSession } from "./lib/bac
 import { logoutAction } from "./lib/backoffice-session-actions";
 import { readBrokerDashboard } from "./lib/broker-api";
 import { Badge, Button, Card, Grid, KpiCard, Notice, PageHeader, PageStack, Split } from "./lib/ui/broker-ui";
+import { AiInsightsDashboardSection } from "./lib/ui/ai-insights-panel";
+import { CrmKpiSection } from "./lib/ui/crm-kpi-section";
 import { dashboardKpis } from "./lib/ui/broker-view-models";
 
 interface BrokerShellPageProps {
@@ -12,6 +14,7 @@ interface BrokerShellPageProps {
 export default async function BrokerShellPage({ searchParams }: BrokerShellPageProps = {}) {
   const params = searchParams ? await searchParams : {};
   const notice = Array.isArray(params.notice) ? params.notice[0] : params.notice;
+  const insight = Array.isArray(params.insight) ? params.insight[0] : params.insight;
   const session = await readBackOfficeSession();
   if (session.status === "unauthenticated" || session.status === "expired") redirect(loginRedirect("/", session.status));
   if (session.status === "mfa_required") {
@@ -59,6 +62,9 @@ export default async function BrokerShellPage({ searchParams }: BrokerShellPageP
 
       <BrokerDashboardSection />
 
+      {/* Lot 3 (spec 069 FR-004, DASH-B-009): AI insights next to the KPI; same guard as the pipeline page. */}
+      <AiInsightsDashboardSection profile={session.profile} notice={insight} />
+
       <Split>
         <Card title="Notifications">
           <ul>
@@ -97,6 +103,9 @@ async function BrokerDashboardSection() {
           ))}
         </Grid>
       </section>
+
+      {/* Lot 3 (spec 069): PRD §20 CRM KPIs, rendered only when the API sends the `crm` section (never for Starter). */}
+      <CrmKpiSection data={dashboard.data} />
 
       {dashboard.data.licenseAlerts.length > 0 ? (
         <Card title="Alertes licence">

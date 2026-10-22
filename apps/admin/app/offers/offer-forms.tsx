@@ -1,13 +1,16 @@
 "use client";
 
-import { useActionState, useCallback, useEffect, useId, useRef, useState } from "react";
+import { useActionState, useCallback, useEffect, useId, useRef, useState, type ReactNode } from "react";
 import type { AdminOfferContent, OfferBlocker } from "../lib/admin-api";
 import { createOfferAction, offerDecisionAction, updateOfferAction, type OfferActionState } from "../lib/offer-actions";
 import {
   COMPLETENESS_CHECKLIST,
   OFFER_INDICATIVE_DISCLAIMERS,
+  OFFER_TYPE_DESCRIPTIONS,
   OFFER_TYPE_LABELS,
+  OFFER_TYPE_OPTIONS,
   PAYMENT_FLEXIBILITY_LABELS,
+  PRIVATE_OFFER_BADGE,
   isoToDateInput,
   offerBlockerLabel,
   offerCompleteness,
@@ -45,6 +48,13 @@ const initialState: OfferActionState = { status: "idle" };
 export interface SelectChoice {
   value: string;
   label: string;
+}
+
+/** Spec 070: an active insurer of the referential, as offered in the offer form. */
+export interface InsurerChoiceItem {
+  id: string;
+  name: string;
+  countryId: string;
 }
 
 type OfferFormContent = Partial<AdminOfferContent>;
@@ -175,7 +185,70 @@ function GuaranteesEditor({ base, initial, onChange }: { base: string; initial: 
 
 /* ------------------------------------------------------------------------- content fields */
 
-function OfferContentFields({ base, content, onChange }: { base: string; content: OfferFormContent | undefined; onChange: () => void }) {
+/**
+ * Spec 070: « Assureur porteur du risque ». The select lists the ACTIVE insurers of the offer
+ * country (the API refuses a suspended, retired or foreign one with OFFER_INSURER_INVALID); the
+ * free text stays as a fallback (« Autre assureur »). A chosen insurer sends `insurerId` plus its
+ * name, so the live completeness still counts the insurer.
+ */
+function InsurerFields({ base, content, insurers, countryId, offerType, onChange }: {
+  base: string;
+  content: OfferFormContent | undefined;
+  insurers: InsurerChoiceItem[];
+  countryId: string;
+  offerType: string;
+  onChange: () => void;
+}) {
+  const [selectedId, setSelectedId] = useState(content?.insurerId ?? "");
+  const options = insurers.filter((insurer) => insurer.countryId === countryId);
+  const orphan = content?.insurerId && !options.some((insurer) => insurer.id === content.insurerId)
+    ? { id: content.insurerId, name: `${content.insurerName ?? "Assureur lié"} (non actif ou hors pays)` }
+    : undefined;
+  const choices = orphan ? [...options, { ...orphan, countryId }] : options;
+  const chosen = choices.find((insurer) => insurer.id === selectedId);
+  const effectiveId = chosen ? chosen.id : "";
+  useEffect(() => {
+    onChange();
+  }, [effectiveId, onChange]);
+  return (
+    <>
+      <Field
+        id={`${base}-insurer-id`}
+        label="Assureur porteur du risque"
+        hint={countryId ? "Assureurs actifs du pays de l'offre. Choisissez « Autre assureur » pour saisir un nom libre." : "Choisissez d'abord le pays pour lister les assureurs."}
+      >
+        <Select
+          {...fieldControlProps(`${base}-insurer-id`, { hint: "x" })}
+          name="insurerId"
+          value={effectiveId}
+          onChange={(event) => setSelectedId(event.target.value)}
+        >
+          <option value="">Autre assureur (saisie libre)</option>
+          {choices.map((insurer) => <option key={insurer.id} value={insurer.id}>{insurer.name}</option>)}
+        </Select>
+      </Field>
+      {chosen ? (
+        <input type="hidden" name="insurerName" value={chosen.name} />
+      ) : (
+        <Field
+          id={`${base}-insurer`}
+          label="Nom de l'assureur (saisie libre)"
+          required={offerType === "insurer"}
+          hint={offerType === "insurer" ? "Offre assureur : l'assureur est obligatoire (référentiel ou saisie libre)." : undefined}
+        >
+          <Input
+            {...fieldControlProps(`${base}-insurer`, { required: offerType === "insurer", ...(offerType === "insurer" ? { hint: "x" } : {}) })}
+            name="insurerName"
+            maxLength={120}
+            defaultValue={content?.insurerId ? "" : content?.insurerName ?? ""}
+          />
+        </Field>
+      )}
+    </>
+  );
+}
+
+function OfferContentFields({ base, content, onChange, insurerFields }: { base: string; content: OfferFormContent | undefined; onChange: () => void; insurerFields: ReactNode }) {
   const disclaimers = content?.publicDisclaimers?.length ? content.publicDisclaimers : [...OFFER_INDICATIVE_DISCLAIMERS];
   return (
     <>
@@ -183,9 +256,7 @@ function OfferContentFields({ base, content, onChange }: { base: string; content
         <Field id={`${base}-name`} label="Nom commercial" required>
           <Input {...fieldControlProps(`${base}-name`, { required: true })} name="name" maxLength={160} defaultValue={content?.name ?? ""} />
         </Field>
-        <Field id={`${base}-insurer`} label="Assureur porteur">
-          <Input {...fieldControlProps(`${base}-insurer`)} name="insurerName" maxLength={120} defaultValue={content?.insurerName ?? ""} />
-        </Field>
+        {insurerFields}
         <Field id={`${base}-description`} label="Description">
           <Textarea {...fieldControlProps(`${base}-description`)} name="shortDescription" rows={3} maxLength={1000} defaultValue={content?.shortDescription ?? ""} />
         </Field>
@@ -286,9 +357,15 @@ function useLiveCompleteness(content: OfferFormContent | undefined) {
 
 /* ---------------------------------------------------------------------------------- create */
 
-export function CreateOfferForm({ partners, scopes }: { partners: SelectChoice[]; scopes: { countries: SelectChoice[]; products: SelectChoice[] } }) {
+export function CreateOfferForm({ partners, scopes, insurers }: {
+  partners: SelectChoice[];
+  scopes: { countries: SelectChoice[]; products: SelectChoice[] };
+  insurers: InsurerChoiceItem[];
+}) {
   const [state, formAction, pending] = useActionState(createOfferAction, initialState);
   const base = useId();
+  const [offerType, setOfferType] = useState<string>("indicative");
+  const [countryId, setCountryId] = useState("");
   const { formRef, completeness, recompute } = useLiveCompleteness(undefined);
   return (
     <Card title="Nouvelle offre pour un courtier" description="L'offre est créée en brouillon (version 1). Elle n'est publique qu'après validation par la conformité.">
@@ -299,20 +376,27 @@ export function CreateOfferForm({ partners, scopes }: { partners: SelectChoice[]
             <Select {...fieldControlProps(`${base}-partner`, { required: true })} name="partnerTenantId" options={partners} placeholder="Choisir un courtier" defaultValue="" />
           </Field>
           <Field id={`${base}-country`} label="Pays" required>
-            <Select {...fieldControlProps(`${base}-country`, { required: true })} name="countryId" options={scopes.countries} placeholder="Choisir un pays" defaultValue="" />
+            <Select {...fieldControlProps(`${base}-country`, { required: true })} name="countryId" options={scopes.countries} placeholder="Choisir un pays" defaultValue="" onChange={(event) => setCountryId(event.target.value)} />
           </Field>
           <Field id={`${base}-product`} label="Produit" required>
             <Select {...fieldControlProps(`${base}-product`, { required: true })} name="productId" options={scopes.products} placeholder="Choisir un produit" defaultValue="" />
           </Field>
-          <Field id={`${base}-type`} label="Type d'offre">
-            <Select {...fieldControlProps(`${base}-type`)} name="offerType" defaultValue="indicative">
-              {Object.entries(OFFER_TYPE_LABELS).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+          <Field id={`${base}-type`} label="Type d'offre" required hint="Le type est définitif : il ne pourra plus être modifié après la création.">
+            <Select {...fieldControlProps(`${base}-type`, { required: true, hint: "x" })} name="offerType" value={offerType} onChange={(event) => setOfferType(event.target.value)}>
+              {OFFER_TYPE_OPTIONS.map((value) => <option key={value} value={value}>{OFFER_TYPE_LABELS[value]}</option>)}
             </Select>
           </Field>
+          <p data-offer-type-description={offerType}>{OFFER_TYPE_DESCRIPTIONS[offerType]}</p>
+          {offerType === "private" ? <Badge tone="warning">{PRIVATE_OFFER_BADGE}</Badge> : null}
         </FormSection>
         <CompletenessChecklist completeness={completeness} />
-        <OfferContentFields base={base} content={undefined} onChange={recompute} />
-        <SponsorshipFields base={base} content={undefined} />
+        <OfferContentFields
+          base={base}
+          content={undefined}
+          onChange={recompute}
+          insurerFields={<InsurerFields base={base} content={undefined} insurers={insurers} countryId={countryId} offerType={offerType} onChange={recompute} />}
+        />
+        {offerType === "private" ? null : <SponsorshipFields base={base} content={undefined} />}
         <ReasonField id={`${base}-reason`} />
         <FormActions>
           <Button type="submit" pending={pending} pendingLabel="Création...">Créer le brouillon</Button>
@@ -326,17 +410,19 @@ export function CreateOfferForm({ partners, scopes }: { partners: SelectChoice[]
 
 export interface EditableOffer {
   id: string;
+  offerType: string;
   countryId: string;
   productId: string;
   partnerTenantId?: string | undefined;
   concurrencyToken: string;
 }
 
-export function EditOfferForm({ offer, content, hasPending, partners }: {
+export function EditOfferForm({ offer, content, hasPending, partners, insurers }: {
   offer: EditableOffer;
   content: OfferFormContent | undefined;
   hasPending: boolean;
   partners: SelectChoice[];
+  insurers: InsurerChoiceItem[];
 }) {
   const [state, formAction, pending] = useActionState(updateOfferAction, initialState);
   const base = useId();
@@ -354,6 +440,11 @@ export function EditOfferForm({ offer, content, hasPending, partners }: {
         <input type="hidden" name="countryId" value={offer.countryId} />
         <input type="hidden" name="productId" value={offer.productId} />
         <input type="hidden" name="expectedUpdatedAt" value={offer.concurrencyToken} />
+        <input type="hidden" name="offerType" value={offer.offerType} />
+        <Field id={`${base}-type-readonly`} label="Type d'offre" hint="Le type est définitif : il ne peut pas être modifié après la création.">
+          <Input {...fieldControlProps(`${base}-type-readonly`, { hint: "x" })} value={OFFER_TYPE_LABELS[offer.offerType] ?? OFFER_TYPE_LABELS.indicative ?? ""} readOnly />
+        </Field>
+        {offer.offerType === "private" ? <Badge tone="warning">{PRIVATE_OFFER_BADGE}</Badge> : null}
         {offer.partnerTenantId ? (
           <input type="hidden" name="partnerTenantId" value={offer.partnerTenantId} />
         ) : (
@@ -362,8 +453,13 @@ export function EditOfferForm({ offer, content, hasPending, partners }: {
           </Field>
         )}
         <CompletenessChecklist completeness={completeness} />
-        <OfferContentFields base={base} content={content} onChange={recompute} />
-        <SponsorshipFields base={base} content={content} />
+        <OfferContentFields
+          base={base}
+          content={content}
+          onChange={recompute}
+          insurerFields={<InsurerFields base={base} content={content} insurers={insurers} countryId={offer.countryId} offerType={offer.offerType} onChange={recompute} />}
+        />
+        {offer.offerType === "private" ? null : <SponsorshipFields base={base} content={content} />}
         <ReasonField id={`${base}-reason`} />
         <FormActions>
           <Button type="submit" pending={pending} pendingLabel="Enregistrement...">Enregistrer la version</Button>

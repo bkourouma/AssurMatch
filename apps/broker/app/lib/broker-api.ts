@@ -165,7 +165,7 @@ export interface BrokerApiState<T> {
   mfaRequired?: boolean;
 }
 
-async function readBroker<T>(path: string, fallback: T): Promise<BrokerApiState<T>> {
+export async function readBroker<T>(path: string, fallback: T): Promise<BrokerApiState<T>> {
   const token = await getBackOfficeToken();
   if (!token) return { status: "unauthenticated", data: fallback, unauthenticated: true, error: "session_required" };
 
@@ -195,13 +195,26 @@ export interface BrokerAgencyQuery {
   agencyId?: string | undefined;
 }
 
-function withAgency(path: string, query: BrokerAgencyQuery | undefined): string {
+export function withAgency(path: string, query: BrokerAgencyQuery | undefined): string {
   if (!query?.agencyId) return path;
   return `${path}${path.includes("?") ? "&" : "?"}agencyId=${encodeURIComponent(query.agencyId)}`;
 }
 
-export function listCrmLeads(query?: BrokerAgencyQuery) {
-  return readBroker<{ items: Array<Record<string, unknown>> }>(withAgency("/broker/crm/leads", query), { items: [] });
+/** Lot 3 (spec 069 FR-007): page of the CRM list as the API paginates it. */
+export interface BrokerCrmLeadListData {
+  items: Array<Record<string, unknown>>;
+  page?: number;
+  pageSize?: number;
+  total?: number;
+}
+
+/**
+ * `listQuery` is the server-side query (filters, sort, pagination) built by `buildCrmLeadsApiQuery`,
+ * without the leading `?`. The agency display filter (spec 064) is appended to it.
+ */
+export function listCrmLeads(query?: BrokerAgencyQuery, listQuery?: string) {
+  const path = listQuery ? `/broker/crm/leads?${listQuery}` : "/broker/crm/leads";
+  return readBroker<BrokerCrmLeadListData>(withAgency(path, query), { items: [] });
 }
 
 export function readCrmDashboard() {
@@ -222,10 +235,40 @@ export interface BrokerDashboardStarter {
   byCountry: Array<{ countryCode: string; total: number }>;
 }
 
+/** Lot 3 (spec 069 FR-001, PRD §20): one source of requests; `conversionRate` = won / received. */
+export interface BrokerCrmSourceRow {
+  source: string;
+  received: number;
+  won: number;
+  conversionRate: number;
+}
+
+/** DASH-B-009: estimated cost per lead from the plan tariff. An estimate, never an invoice. */
+export interface BrokerLeadCost {
+  currency: string;
+  estimatedTotal: number;
+  perLead: number;
+  perWonLead: number | null;
+  basis: "billing_tariff_estimate";
+}
+
+export interface BrokerCrmKpis {
+  contactRate?: number | null;
+  averageFirstContactMinutes?: number | null;
+  qualificationRate?: number | null;
+  quotesSent?: { leads: number; proposals: number } | null;
+  topSources?: BrokerCrmSourceRow[] | null;
+  leadCost?: BrokerLeadCost | null;
+}
+
 export interface BrokerDashboardCrm {
   pipeline: Array<{ status: string; total: number }>;
   byAssignedAdvisor: Array<{ advisorId: string; total: number }>;
-  conversionByProduct: Array<{ productKey: string; received: number; accepted: number; rate: number }>;
+  conversionByProduct: Array<{ productKey: string; received: number; accepted: number; won?: number; rate: number }>;
+  /** Lot 3: global conversion = leads won / leads received. Additive. */
+  conversionRate?: number | null;
+  /** Lot 3: PRD §20 KPIs. Additive, absent for Starter. */
+  kpis?: BrokerCrmKpis;
   averageReceptionToFirstActivityMinutes: number | null;
   upcomingTasks: number;
   upcomingReminders: number;
@@ -516,6 +559,39 @@ export function readBrokerAIAssistance() {
   return readBroker<BrokerAIAssistanceData>("/broker/crm/ai-assistance", emptyAIAssistance);
 }
 
+/** Lot 3 (spec 069 FR-004): DASH-B-009 performance summaries of the tenant (newest first, at most 10). */
+export function readBrokerPerformanceSummaries() {
+  return readBroker<BrokerAiInteraction[]>("/broker/crm/ai/performance-summaries", []);
+}
+
+/** Lot 3: manager analysis; `advisorLabels` (label -> advisor id) is returned by the server to the manager only. */
+export interface BrokerManagerAnalysis extends BrokerAiInteraction {
+  advisorLabels?: Record<string, string>;
+}
+
+/** Lot 3 (spec 069 FR-004): assistant manager analyses (Enterprise only). */
+export function readBrokerManagerAnalyses() {
+  return readBroker<BrokerManagerAnalysis[]>("/broker/crm/ai/manager-analyses", []);
+}
+
+/** Lot 3 (spec 069 FR-003, PRD §6.3): one row of the Enterprise multi-agency view; `agencyId` is `none` for « Sans agence ». */
+export interface BrokerAgencyOverviewRow {
+  agencyId: string;
+  agencyName: string;
+  advisors: number;
+  received: number;
+  accepted: number;
+  won: number;
+  lost: number;
+  contactRate: number;
+  conversionRate: number;
+  averageFirstContactMinutes: number | null;
+}
+
+export function readBrokerAgenciesOverview() {
+  return readBroker<BrokerAgencyOverviewRow[]>("/broker/dashboard/agencies", []);
+}
+
 /** Spec 064 FR-003: the tenant's 10 most recent loss analyses, newest first. */
 export function readLossAnalyses() {
   return readBroker<BrokerAiInteraction[]>("/broker/crm/ai/loss-analysis", []);
@@ -798,4 +874,19 @@ export function readLeadConversation(channel: "starter" | "crm", leadAssignmentI
 /** GET /broker/{starter|crm}/leads/:leadId/document-requests */
 export function readLeadDocumentRequests(channel: "starter" | "crm", leadAssignmentId: string) {
   return readBroker<BrokerDocumentRequestListData>(`/broker/${channel}/leads/${encodeURIComponent(leadAssignmentId)}/document-requests`, emptyDocumentRequests);
+}
+
+/** Lot 3 (spec 069) CRM-006: members of the caller's own cabinet (GET /broker/team, tenant-bound server side). */
+export interface BrokerTeamMemberData {
+  id: string;
+  displayName: string;
+  email: string;
+  roles: string[];
+  status: string;
+  isSelf: boolean;
+  isOwner: boolean;
+}
+
+export function readBrokerTeam() {
+  return readBroker<BrokerTeamMemberData[]>("/broker/team", []);
 }

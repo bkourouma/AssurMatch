@@ -6,6 +6,7 @@ import type { ActorContext } from "../common/types";
 import type { AdminDashboardService } from "../dashboards/admin-dashboard.service";
 import type { ComplianceAlertsService } from "../dashboards/compliance-alerts.service";
 import type { ActivationChecklistService } from "../activation-checklist/activation-checklist.service";
+import type { OfferRecord } from "../offers/offers.module";
 import type { OffersRepository } from "../offers/offers.repository";
 import type { QuoteSubmissionService } from "../quote-requests/quote-submission.service";
 import type { RoutingAnomalyDetectorService } from "../routing/routing-anomaly-detector.service";
@@ -29,6 +30,31 @@ export class AdminAiAccessRefusedError extends Error {
     super(`AI insight access denied: ${reason}`);
     this.name = "AdminAiAccessRefusedError";
   }
+}
+
+/**
+ * Input of the `offer_summary` assist type: catalogue fields of the offer only. No prospect, lead or
+ * partner identity, no `name` key (the minimiser drops it); the offer key is a catalogue reference.
+ */
+export function buildOfferSummaryInput(offer: OfferRecord): Record<string, unknown> {
+  const currency = offer.currency;
+  const price = offer.indicativePriceMin !== undefined || offer.indicativePriceMax !== undefined
+    ? `${offer.indicativePriceMin ?? "?"} - ${offer.indicativePriceMax ?? "?"} ${currency}${offer.pricingUnit ? ` / ${offer.pricingUnit}` : ""}`
+    : undefined;
+  return {
+    offerKey: offer.publicKey,
+    insurer: offer.insurerName,
+    shortDescription: offer.shortDescription,
+    guaranteeSummary: offer.guaranteeSummary,
+    guarantees: (offer.guarantees ?? []).map((guarantee) => `${guarantee.label}${guarantee.included ? "" : " (non incluse)"}${guarantee.detail ? `: ${guarantee.detail}` : ""}`),
+    exclusions: offer.exclusionsSummary,
+    deductible: offer.deductibleAmount !== undefined ? `${offer.deductibleAmount} ${currency}` : undefined,
+    ceiling: offer.coverageCeiling !== undefined ? `${offer.coverageCeiling} ${currency}` : undefined,
+    processingDelayDays: offer.processingDelayDays,
+    indicativePrice: price,
+    validity: `${offer.validFrom.toISOString().slice(0, 10)} -> ${offer.validUntil.toISOString().slice(0, 10)}`,
+    indicative: true
+  };
 }
 
 const SUSPICIOUS_BURST_WINDOW_MS = 60 * 60 * 1000;
@@ -110,6 +136,14 @@ export class AdminAiService {
       if (actor.countryScopes?.length && !actor.countryScopes.includes(offer.countryId)) this.refuse(actor, "offer_consistency_check", "out_of_scope_country");
       if (actor.productScopes?.length && !actor.productScopes.includes(offer.productId)) this.refuse(actor, "offer_consistency_check", "out_of_scope_product");
       return { input: { name: offer.publicKey, issues: this.offerIssues(offer), status: offer.status, validationStatus: offer.validationStatus }, target: { type: "Offer", id: offer.id } };
+    }
+    if (assistType === "offer_summary") {
+      if (!query.offerId) throw new Error("Invalid AI insight request: offerId is required for offer_summary");
+      const offer = (await this.deps.offers.list()).find((candidate) => candidate.id === query.offerId);
+      if (!offer) throw new Error("Offer not found");
+      if (actor.countryScopes?.length && !actor.countryScopes.includes(offer.countryId)) this.refuse(actor, "offer_summary", "out_of_scope_country");
+      if (actor.productScopes?.length && !actor.productScopes.includes(offer.productId)) this.refuse(actor, "offer_summary", "out_of_scope_product");
+      return { input: buildOfferSummaryInput(offer), target: { type: "Offer", id: offer.id } };
     }
     if (assistType === "routing_anomaly_analysis") {
       const report = this.deps.routingAnomalyDetector
