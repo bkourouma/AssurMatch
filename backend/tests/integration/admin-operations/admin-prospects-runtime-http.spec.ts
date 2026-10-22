@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it } from "vitest";
+import { fingerprintTypedProspectContact } from "../../../../packages/shared/security/prospect-contact-fingerprint";
 import type { ActorContext } from "../../../src/modules/common/types";
 import { actorHeaders, createRuntimeHttpHarness, readJson, seedPublicRuntime, type RuntimeHttpHarness } from "../runtime-http-test-utils";
 
@@ -79,8 +80,10 @@ describe("spec 073 admin prospects console (runtime HTTP)", () => {
     expect(page.items[0]).toMatchObject({ id: prospect.id, countryCode: "CI", productKey: "auto", quoteRequestCount: 1, anonymized: false });
 
     // Search by exact e-mail or phone: matched through the fingerprint, never echoed.
-    expect((await readJson<{ total: number }>(await get(harness, `/admin/operations/prospects?search=${encodeURIComponent(EMAIL)}`, SUPPORT_ADMIN))).total).toBe(1);
-    expect((await readJson<{ total: number }>(await get(harness, `/admin/operations/prospects?search=${encodeURIComponent(PHONE)}`, SUPPORT_ADMIN))).total).toBe(1);
+    expect((await readJson<{ total: number }>(await get(harness, `/admin/operations/prospects?contactHash=${fingerprintTypedProspectContact(EMAIL)}`, SUPPORT_ADMIN))).total).toBe(1);
+    expect((await readJson<{ total: number }>(await get(harness, `/admin/operations/prospects?contactHash=${fingerprintTypedProspectContact(PHONE)}`, SUPPORT_ADMIN))).total).toBe(1);
+    // A clear e-mail / phone in the query string is refused (400): it would land in URLs and logs.
+    expect((await get(harness, `/admin/operations/prospects?search=${encodeURIComponent(EMAIL)}`, SUPPORT_ADMIN)).status).toBe(400);
     expect((await readJson<{ total: number }>(await get(harness, "/admin/operations/prospects?search=inconnu", SUPPORT_ADMIN))).total).toBe(0);
 
     for (const actor of [SUPER_ADMIN, SUPPORT_ADMIN]) {
