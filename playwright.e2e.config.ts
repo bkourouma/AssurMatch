@@ -81,6 +81,16 @@ export default defineConfig({
       dependencies: ["scenario"]
     },
     {
+      // Lot 11a (specs 067, 068, 070): visitor journeys of the PRD gaps (names, documents step, direct broker
+      // choice, multi-offer requests, closed AI, catalogue conditions). 01 provisions two more broker firms
+      // on the CI x Auto opened by the scenario; 02 and 03 read what 01 published. The visitor itself runs in
+      // its own browser context; the back-office pages only provision and verify.
+      name: "visitor-gaps",
+      testMatch: ["visitor-gaps-*.spec.ts"],
+      use: { baseURL: publicUrl },
+      dependencies: ["scenario"]
+    },
+    {
       // Spec 065, SC-01 for Senegal. Opens SN, so it runs after the SC-09a check that SN is closed.
       name: "senegal",
       testMatch: ["senegal-opening.spec.ts"],
