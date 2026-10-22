@@ -121,7 +121,12 @@ describe("BrokerCrmActivityService assignment tenant check", () => {
     const audit = new AuditLogWriter();
     const module = new LeadsModule(new PartnersService(audit), new PartnerLicensesService(audit), audit, { brokerCrmEnabled: true });
     const lead = await module.assignments.create({ quoteRequestId: "q-a", partnerTenantId: "broker-a", assignmentReason: "routing", publicReference: "A1" }, owner);
-    const directory: Record<string, string> = { "adv-a": "broker-a", "adv-b": "broker-b" };
+    const directory: Record<string, { partnerTenantId: string; status: string }> = {
+      "adv-a": { partnerTenantId: "broker-a", status: "active" },
+      "adv-b": { partnerTenantId: "broker-b", status: "active" },
+      "adv-off": { partnerTenantId: "broker-a", status: "suspended" },
+      "adv-gone": { partnerTenantId: "broker-a", status: "deleted" }
+    };
     module.brokerCrmActivity.setAdvisorTenantResolver(async (advisorId) => directory[advisorId]);
     return { module, lead };
   };
@@ -136,6 +141,20 @@ describe("BrokerCrmActivityService assignment tenant check", () => {
     const { module, lead } = await setupAssign();
     await expect(module.brokerCrmController.assignAdvisor(lead.id, { advisorId: "adv-b", advisorPartnerTenantId: "broker-a" }, owner)).rejects.toThrow("Broker CRM access denied");
     await expect(module.brokerCrmController.assignAdvisor(lead.id, { advisorId: "adv-b", advisorPartnerTenantId: "broker-b" }, owner)).rejects.toThrow("Broker CRM access denied");
+  });
+
+  it("refuses a suspended, locked or deleted advisor of the same cabinet", async () => {
+    const { module, lead } = await setupAssign();
+    for (const advisorId of ["adv-off", "adv-gone"]) {
+      await expect(module.brokerCrmController.assignAdvisor(lead.id, { advisorId, advisorPartnerTenantId: "broker-a" }, owner)).rejects.toThrow("Broker CRM access denied");
+    }
+  });
+
+  it("fails closed when no advisor directory is wired", async () => {
+    const audit = new AuditLogWriter();
+    const module = new LeadsModule(new PartnersService(audit), new PartnerLicensesService(audit), audit, { brokerCrmEnabled: true });
+    const lead = await module.assignments.create({ quoteRequestId: "q-z", partnerTenantId: "broker-a", assignmentReason: "routing", publicReference: "Z1" }, owner);
+    await expect(module.brokerCrmController.assignAdvisor(lead.id, { advisorId: "adv-a", advisorPartnerTenantId: "broker-a" }, owner)).rejects.toThrow("Broker CRM access denied");
   });
 
   it("refuses an unknown advisor id without crashing", async () => {

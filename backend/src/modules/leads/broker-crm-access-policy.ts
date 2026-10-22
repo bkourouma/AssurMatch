@@ -57,6 +57,11 @@ export class BrokerCrmAccessPolicy {
     }
   }
 
+  /** Lot 3 (spec 069 FR-006): the advisor account is suspended, locked or deleted. */
+  refuseAdvisorUnavailable(actor: ActorContext, assignment: LeadAssignmentRecord): never {
+    return this.refuse(actor, "LeadAssignment", assignment.id, "advisor_account_unavailable");
+  }
+
   assertSameTenantAssignee(actor: ActorContext, assignment: LeadAssignmentRecord, assigneeId: string): void {
     const assigneeTenantId = actor.brokerUserTenantIds?.[assigneeId];
     if (assigneeTenantId !== assignment.partnerTenantId || assigneeTenantId !== actor.partnerTenantId) {
