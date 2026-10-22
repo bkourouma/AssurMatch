@@ -178,9 +178,13 @@ describe("content CMS runtime HTTP (lot 9, spec 072)", () => {
     // Guard rail: no markup in any published string.
     expect(dump.replace(/"[^"]*":/g, "")).not.toMatch(/[<>]/);
 
-    // Invalid query values are a 400.
-    expect((await publicRead("?locale=de")).status).toBe(400);
-    expect((await publicRead("?locale=fr&country=SEN")).status).toBe(400);
+    // Invalid query values are a 400, never cacheable by a shared cache (the public header is set on success only).
+    for (const invalid of ["?locale=de", "?locale=fr&country=SEN"]) {
+      const refused = await publicRead(invalid);
+      expect(refused.status, invalid).toBe(400);
+      expect(refused.headers.get("cache-control") ?? "", invalid).not.toContain("public");
+      expect(refused.headers.get("cache-control"), invalid).toBe("no-store");
+    }
 
     // Revision: the published version stays online until the new one is approved, then swaps atomically.
     const v2 = await call(active, author, "POST", `/admin/content/entries/${v1.id}/revise`);
@@ -198,6 +202,21 @@ describe("content CMS runtime HTTP (lot 9, spec 072)", () => {
     expect(history.items.map((item) => [item.version, item.status])).toEqual([[2, "published"], [1, "archived"]]);
     const listed = await readJson<{ items: ContentEntryView[] }>(await call(active, author, "GET", "/admin/content/entries?status=published&locale=fr"));
     expect(listed.items.map((item) => item.status)).toEqual(["published", "published"]);
+  });
+
+  it("answers an audited 409 to the loser of two concurrent decisions on the same entry", async () => {
+    const active = await start();
+    const entry = await create(active, author, { kind: "faq", entryKey: "concurrent", locale: "fr", payload: FAQ });
+    expect((await call(active, author, "POST", `/admin/content/entries/${entry.id}/submit`)).status).toBe(200);
+    const [approved, rejected] = await Promise.all([
+      call(active, compliance, "POST", `/admin/content/entries/${entry.id}/approve`, {}),
+      call(active, superAdmin, "POST", `/admin/content/entries/${entry.id}/reject`, { note: "À reprendre" })
+    ]);
+    expect([approved.status, rejected.status].sort()).toEqual([200, 409]);
+    const stored = await readJson<ContentEntryView>(await call(active, compliance, "GET", `/admin/content/entries/${entry.id}`));
+    expect(stored.status).toBe(approved.status === 200 ? "published" : "draft");
+    const refusals = active.runtime.audit.writer.search({ action: ContentAuditActions.refused, result: "refused", targetId: entry.id });
+    expect(refusals.length).toBe(1);
   });
 
   it("audits each step without ever copying the editorial text", async () => {

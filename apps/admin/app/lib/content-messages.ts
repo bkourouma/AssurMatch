@@ -99,7 +99,7 @@ export function contentErrorMessage(error: unknown): string {
   }
   if (e.status === 404) return "Contenu introuvable (il a peut-être été remplacé). Revenez à la liste.";
   if (e.status === 409) {
-    return "Conflit : cette transition n'est plus possible dans l'état actuel (une version est peut-être déjà ouverte ou publiée pour cette clé). Rechargez la page.";
+    return "Conflit : ce contenu a été modifié entre-temps ou cette transition n'est plus possible dans l'état actuel (une version est peut-être déjà ouverte ou publiée pour cette clé). Rechargez la page.";
   }
   if (e.status === 400 || e.status === 422) {
     return `Contenu refusé par les règles de validation${raw && raw !== code ? ` : ${raw}` : ""}. Vérifiez les champs et rappelez-vous : texte brut, longueurs bornées.`;
