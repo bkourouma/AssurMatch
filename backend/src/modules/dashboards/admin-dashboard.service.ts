@@ -234,7 +234,10 @@ export class AdminDashboardService {
       }
     }
     extra.visits = visits;
-    extra.visitToRequestRate = visits ? visitToRequestRate(context.received, visits.total) : null;
+    // The visit counter is global: under a country / product / partner filter the ratio would mix filtered
+    // requests with unfiltered visits, so it is reported as not measured.
+    const filtered = scope.countries.length > 0 || scope.products.length > 0 || Boolean(scope.partnerId);
+    extra.visitToRequestRate = visits && !filtered ? visitToRequestRate(context.received, visits.total) : null;
 
     // Active countries and products: same publication rules as the public counters.
     const [countries, products] = await Promise.all([this.deps.countries.listAdmin(), this.deps.products.listAdmin()]);

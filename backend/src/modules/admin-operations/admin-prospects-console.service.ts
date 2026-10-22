@@ -40,6 +40,8 @@ export class AdminProspectsConsoleService {
     const catalog = await loadOperationsCatalog(this.deps);
     const revealNames = this.canRevealPii(actor);
     const searchTerm = query.search?.trim().toLowerCase();
+    // A name search on masked rows would be an existence oracle: only roles that may reveal the PII can use it.
+    if (searchTerm) this.deps.access.assert(actor, { roles: PROSPECT_PII_ROLES }, { type: "Prospect", id: "list" });
     const contactHash = query.contactHash?.toLowerCase();
     const [prospects, quotesByProspect] = await Promise.all([this.deps.prospects.list(), this.quotesByProspect()]);
     const rows = prospects
@@ -99,13 +101,11 @@ export class AdminProspectsConsoleService {
       targetId: prospect.id,
       scope: { countryId: prospect.countryId, productId: prospect.productId },
       result: "success",
-      // Ids and truncated fingerprints only: never an e-mail, a phone or a name.
+      // Ids and flags only: never an e-mail, a phone, a name or any fingerprint of them.
       context: {
         piiRevealed: reveal,
         anonymized,
-        scopeReason: scopeReason(actor),
-        emailFingerprint: prospect.emailFingerprint?.slice(0, 12) ?? null,
-        phoneFingerprint: prospect.phoneFingerprint?.slice(0, 12) ?? null
+        scopeReason: scopeReason(actor)
       }
     });
     return detail;

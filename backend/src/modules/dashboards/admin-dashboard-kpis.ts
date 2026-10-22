@@ -174,7 +174,8 @@ export function summariseRevenue(invoices: IssuedInvoice[], window: ResolvedDash
 
 export function summariseAiSummary(insights: AdminAiInsightView[]) {
   const latest = insights
-    .filter((insight) => insight.assistType === "activity_report")
+    // Only a human-approved report is shown: a pending or rejected analysis never reaches the dashboard excerpt.
+    .filter((insight) => insight.assistType === "activity_report" && (insight.humanValidationStatus === "approved" || insight.humanValidationStatus === "validated"))
     .sort((left, right) => right.createdAt.getTime() - left.createdAt.getTime())[0];
   if (!latest) return null;
   return {

@@ -127,6 +127,15 @@ describe("spec 073 admin prospects console", () => {
     expect(anonymous).toMatchObject({ anonymized: true, email: null, phone: null, displayName: null });
   });
 
+  it("refuses the name search (403) to roles that only see masked names, to avoid an existence oracle", async () => {
+    const { service } = build();
+    for (const role of ["admin_pays", "compliance_admin"] as const) {
+      await expect(service.list(actor(role), query({ search: "kone" })), role).rejects.toThrow(/denied/);
+      expect((await service.list(actor(role), query({}))).total).toBeGreaterThan(0);
+    }
+    expect((await service.list(actor("support_admin"), query({ search: "kone" }))).total).toBe(1);
+  });
+
   it("paginates", async () => {
     const { service } = build();
     const page = await service.list(actor("super_admin"), query({ pageSize: "2", page: "2" }));
@@ -168,7 +177,8 @@ describe("spec 073 admin prospects console", () => {
     expect(entries.map((entry) => entry.context.piiRevealed)).toEqual([true, true, false, false]);
     const raw = JSON.stringify(entries);
     for (const forbidden of ["awa.kone", "example.com", "+22501020304", "Awa", "Kone"]) expect(raw).not.toContain(forbidden);
-    expect(String(entries[0]?.context.emailFingerprint)).toHaveLength(12);
+    expect(entries[0]?.context).not.toHaveProperty("emailFingerprint");
+    expect(entries[0]?.context).not.toHaveProperty("phoneFingerprint");
   });
 
   it("returns no contact data at all for an anonymised prospect, even to a super admin", async () => {

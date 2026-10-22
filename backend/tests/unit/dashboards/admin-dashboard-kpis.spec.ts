@@ -117,6 +117,20 @@ describe("AdminDashboardService extra KPIs (spec 073)", () => {
     expect(dashboard.visitToRequestRate).toBe(0.02);
   });
 
+  it.each([{ country: "CI" }, { product: "auto" }])("reports the visit-to-request rate as not measured under a filter %j (global visits vs filtered requests)", async (filter) => {
+    const { service } = build({ visits: { total: 150, byPage: [{ page: "home", total: 150 }] } });
+    const dashboard = await service.dashboard(superAdmin, filter);
+    expect(dashboard.visits?.total).toBe(150);
+    expect(dashboard.visitToRequestRate).toBeNull();
+  });
+
+  it("never shows the excerpt of a rejected or pending activity report", async () => {
+    const { service } = build({ flags: { ai_summary_enabled: true }, insights: [insight("only-rejected", "activity_report", "rejected", 1, "Secret rejete"), insight("only-pending", "activity_report", "pending", 1, "Non valide")] });
+    const dashboard = await service.dashboard(superAdmin, {});
+    expect(dashboard.aiSummary).toBeNull();
+    expect(JSON.stringify(dashboard)).not.toContain("Secret rejete");
+  });
+
   it.each(["absent", "disabled", "throws"] as const)("flags visits as not measured when the counter is %s", async (mode) => {
     const { service } = build({ visits: mode });
     const dashboard = await service.dashboard(superAdmin, {});
@@ -237,7 +251,9 @@ describe("AdminDashboardService extra KPIs (spec 073)", () => {
   describe("AI cards", () => {
     const insights = [
       insight("i-report-old", "activity_report", "approved", 100, "Ancien rapport"),
-      insight("i-report", "activity_report", "pending", 2, "R".repeat(900)),
+      insight("i-report", "activity_report", "approved", 2, "R".repeat(900)),
+      insight("i-report-rejected", "activity_report", "rejected", 1, "Analyse rejetee"),
+      insight("i-report-pending", "activity_report", "pending", 0.5, "Analyse en attente"),
       insight("i-risk", "admin_risk_triage", "pending", 1),
       insight("i-routing", "routing_anomaly_analysis", "pending", 3),
       insight("i-offer", "offer_consistency_check", "approved", 4),
@@ -250,7 +266,7 @@ describe("AdminDashboardService extra KPIs (spec 073)", () => {
       expect(dashboard.aiEnabled).toBe(true);
       expect(dashboard.aiRestricted).toBe(false);
       expect(dashboard.aiSummary?.insightId).toBe("i-report");
-      expect(dashboard.aiSummary?.status).toBe("pending");
+      expect(dashboard.aiSummary?.status).toBe("approved");
       expect(dashboard.aiSummary?.excerpt?.length).toBeLessThanOrEqual(600);
       expect(dashboard.aiAlerts?.pendingValidation).toBe(2);
       expect(dashboard.aiAlerts?.items.map((item) => item.insightId)).toEqual(["i-risk", "i-routing"]);
@@ -299,7 +315,7 @@ describe("AdminDashboardService extra KPIs (spec 073)", () => {
   });
 
   it("validates the extended response against the contract, with and without the new fields", async () => {
-    const { service } = build({ flags: { ai_summary_enabled: true, public_comparator_enabled: true }, visits: { total: 10, byPage: [{ page: "home", total: 10 }] }, invoices: [], insights: [insight("x", "activity_report", "pending", 1)] });
+    const { service } = build({ flags: { ai_summary_enabled: true, public_comparator_enabled: true }, visits: { total: 10, byPage: [{ page: "home", total: 10 }] }, invoices: [], insights: [insight("x", "activity_report", "approved", 1)] });
     const dashboard = await service.dashboard(superAdmin, {});
     expect(adminDashboardResponseSchema.safeParse(dashboard).success).toBe(true);
     const legacy = { ...dashboard } as Record<string, unknown>;

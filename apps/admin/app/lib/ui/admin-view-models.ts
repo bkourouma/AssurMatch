@@ -35,6 +35,7 @@ export function dashboardKpis(data: AdminDashboardData): DashboardKpiView[] {
 // Lot 6 (spec 073 T304): the 15 KPI of the PRD section 21, with explicit states instead of misleading zeros.
 export const NOT_MEASURED = "Non mesure";
 export const SUPER_ADMIN_ONLY = "Reserve au super admin";
+export const AI_RESTRICTED = "Reserve aux roles IA et conformite";
 export const AI_DISABLED = "IA desactivee";
 
 function percent(rate: number | null | undefined): string {
@@ -67,7 +68,7 @@ export function dashboardPrdKpis(data: AdminDashboardData): DashboardKpiView[] {
   let aiValue: string = NOT_MEASURED;
   let aiTone: Tone = "disabled";
   if (data.aiEnabled === false) aiValue = AI_DISABLED;
-  else if (data.aiRestricted) aiValue = SUPER_ADMIN_ONLY;
+  else if (data.aiRestricted) aiValue = AI_RESTRICTED;
   else if (data.aiSummary) {
     aiValue = aiValidationLabel(data.aiSummary.status);
     aiTone = data.aiSummary.status === "pending" ? "warning" : "info";
@@ -75,7 +76,7 @@ export function dashboardPrdKpis(data: AdminDashboardData): DashboardKpiView[] {
   return [
     { label: "Visites (pages vues)", value: data.visits ? data.visits.total : NOT_MEASURED, helper: data.visits ? "Compteur agrege sans donnee personnelle" : "Compteur absent, desactive ou vide", tone: data.visits ? "info" : "disabled" },
     { label: "Demandes creees", value: data.leadVolumes.received, helper: "Demandes recues sur la fenetre", tone: "info" },
-    { label: "Taux visite vers demande", value: percent(data.visitToRequestRate), helper: "Demandes creees / pages vues", tone: data.visitToRequestRate === null || data.visitToRequestRate === undefined ? "disabled" : "info" },
+    { label: "Taux visite vers demande", value: percent(data.visitToRequestRate), helper: data.visits && (data.visitToRequestRate === null || data.visitToRequestRate === undefined) ? "Non mesure sous filtre pays / produit / partenaire (visites non filtrees)" : "Demandes creees / pages vues", tone: data.visitToRequestRate === null || data.visitToRequestRate === undefined ? "disabled" : "info" },
     { label: "Leads routes", value: data.leadVolumes.transmitted, helper: "Transmissions deja effectuees", tone: "success" },
     { label: "Leads non routes", value: data.leadVolumes.nonRouted, helper: "A traiter sans forcer le routage", tone: data.leadVolumes.nonRouted > 0 ? "warning" : "neutral" },
     { label: "Partenaires actifs", value: data.partners.active, helper: `${data.partners.inactive} inactifs`, tone: "info" },
