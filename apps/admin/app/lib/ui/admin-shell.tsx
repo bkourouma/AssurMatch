@@ -109,7 +109,7 @@ export const adminNavigation: NavGroup[] = [
       { label: "Messagerie", href: "/messaging", icon: "message", match: ["/messaging"] },
       // Lot 12 (spec 077): retry queue of the optional channels and the generic CRM connector.
       { label: "Canaux", href: "/channels", icon: "message", match: ["/channels"] },
-      { label: "Connecteurs CRM", href: "/crm-connectors", icon: "plug", match: ["/crm-connectors"] }
+      { label: "Connecteurs CRM", href: "/connecteurs-crm", icon: "plug", match: ["/connecteurs-crm"] }
     ]
   },
   {

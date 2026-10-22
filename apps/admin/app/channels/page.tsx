@@ -147,7 +147,7 @@ export default async function ChannelsPage() {
       <Card title="Liens utiles">
         <ul className="bo-list">
           <li><a href="/messaging">Messagerie : envoi de test</a></li>
-          <li><a href="/crm-connectors">Connecteurs CRM</a></li>
+          <li><a href="/connecteurs-crm">Connecteurs CRM</a></li>
         </ul>
       </Card>
     </PageStack>

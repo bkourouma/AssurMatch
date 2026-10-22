@@ -17,7 +17,7 @@ import {
 } from "../lib/ui/admin-ui";
 import { CreateCrmConnectorForm, CrmStatusForm, RotateSecretForm } from "./crm-forms";
 
-const PAGE_PATH = "/crm-connectors";
+const PAGE_PATH = "/connecteurs-crm";
 
 function formatDate(value: string | null): string {
   if (!value) return "-";

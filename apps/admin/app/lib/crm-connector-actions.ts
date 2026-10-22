@@ -5,7 +5,7 @@ import { redirect } from "next/navigation";
 import { backOfficeApiBaseUrl, getBackOfficeToken, loginRedirect } from "./backoffice-auth";
 
 /**
- * Spec 077 (admin screen): server actions for /crm-connectors.
+ * Spec 077 (admin screen): server actions for /connecteurs-crm.
  *
  * The signing secret (`crmsec_...`) is returned ONLY inside the action state so the client form can
  * show it once. Neither it nor the auth header value is ever put in a URL, a redirect, a cookie, a
@@ -24,7 +24,7 @@ export interface CrmActionState {
   secret?: CrmSigningSecret;
 }
 
-const PAGE_PATH = "/crm-connectors";
+const PAGE_PATH = "/connecteurs-crm";
 const REASON_MIN_LENGTH = 8;
 const EVENT_TYPES = new Set(["lead.assigned", "lead.status_changed"]);
 const STATUSES = new Set(["active", "suspended", "disabled"]);

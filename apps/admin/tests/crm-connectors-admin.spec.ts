@@ -6,8 +6,8 @@ function source(path: string): string {
 }
 
 const FILES = [
-  "apps/admin/app/crm-connectors/page.tsx",
-  "apps/admin/app/crm-connectors/crm-forms.tsx",
+  "apps/admin/app/connecteurs-crm/page.tsx",
+  "apps/admin/app/connecteurs-crm/crm-forms.tsx",
   "apps/admin/app/lib/crm-connector-actions.ts",
   "apps/admin/app/lib/crm-connector-api.ts"
 ];
@@ -80,5 +80,5 @@ test("signing secret is shown once and never leaks; auth header value is write-o
 
 test("admin shell exposes the CRM connectors entry", () => {
   const shell = source("apps/admin/app/lib/ui/admin-shell.tsx");
-  expect(shell).toContain('label: "Connecteurs CRM", href: "/crm-connectors"');
+  expect(shell).toContain('label: "Connecteurs CRM", href: "/connecteurs-crm"');
 });

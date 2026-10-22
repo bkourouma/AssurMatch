@@ -34,7 +34,7 @@ test("channels page exposes the sections, labels and the read-only ops command",
   expect(page).toContain("Etat des canaux");
   expect(page).toContain("Dernieres diffusions (destinataire masque)");
   expect(page).toContain('href="/messaging"');
-  expect(page).toContain('href="/crm-connectors"');
+  expect(page).toContain('href="/connecteurs-crm"');
   expect(page).toContain("npm run ops:apply-flag-policy -- --flag sms_enabled --value true --reference ... --approved-by ... --reason ...");
   expect(page).not.toContain("<button");
   expect(page).not.toContain("<form");

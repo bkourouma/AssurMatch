@@ -87,4 +87,23 @@ describe("channel dead letter admin alert", () => {
     expect((await ctx.repository.listOutbox(5))[0]).toMatchObject({ status: "dead_letter" });
     expect(await ctx.alertsRepository.list({ status: "open", limit: 10 })).toHaveLength(0);
   });
+
+  it("dedupes day over day: ongoing while open, duplicate after ack the same day, created again on a later day", async () => {
+    const audit = new AuditLogWriter();
+    const repository = new MemoryAdminAlertsRepository();
+    const alerts = new AdminAlertsService({ repository, heartbeats: new MemoryWorkerHeartbeatRepository(), audit, now: () => T0 });
+    const input = { type: "channel_dead_letter" as const, severity: "critical" as const, conditionKey: `channel_dead_letter:sms:${TENANT}`, targetType: "ChannelOutbox", targetId: "sms", partnerTenantId: TENANT };
+    const day = (n: number) => new Date(T0.getTime() + n * 24 * 60 * MINUTE);
+
+    expect(await alerts.raise(input, day(0))).toBe("created");
+    expect(await alerts.raise(input, day(0))).toBe("ongoing");
+    expect(await alerts.raise(input, day(1))).toBe("ongoing");
+    const [open] = await repository.list({ status: "open", type: "channel_dead_letter", limit: 10 });
+    expect(open?.occurrences).toBe(2);
+
+    await alerts.acknowledge(open!.id, { reason: "Passerelle SMS verifiee" }, actor);
+    expect(await alerts.raise(input, day(0))).toBe("duplicate");
+    expect(await alerts.raise(input, day(2))).toBe("created");
+    expect(await repository.list({ status: "open", type: "channel_dead_letter", limit: 10 })).toHaveLength(1);
+  });
 });

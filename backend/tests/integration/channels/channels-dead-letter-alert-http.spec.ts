@@ -65,4 +65,26 @@ describe("channel dead letter admin alert runtime HTTP (lot 12)", () => {
     expect(raw).not.toContain("0102030405");
     expect(raw).not.toContain("sms-test-key-never-in-repo");
   });
+
+  it("real runtime hook: a non-UUID partner identifier still raises the alert, without a partner scope", async () => {
+    process.env.ASSURMATCH_SMS_PROVIDER = "http";
+    process.env.ASSURMATCH_SMS_API_KEY = "sms-test-key-never-in-repo";
+    process.env.ASSURMATCH_SMS_API_URL = "https://sms-gateway.example.test/v1/messages";
+    process.env.ASSURMATCH_SMS_SENDER = "AssurMatch";
+    harness = await createRuntimeHttpHarness();
+    await harness.runtime.featureFlags.service.applyCompliancePolicy({ key: "sms_enabled", scopeType: "global", value: true, reason: "pilot" }, superAdmin, { reference: "TEST-LOT12-POLICY", approvedBy: "compliance" });
+    const legacyScope = "legacy-tenant-not-a-uuid";
+    const dispatch = harness.runtime.notifications.dispatch;
+    await dispatch.updatePreferences(legacyScope, { sms: true, reason: "Le cabinet choisit le SMS" }, superAdmin);
+    await dispatch.dispatch({ channel: "sms", scopeId: legacyScope, recipient: PHONE, template: "quote_alert", body: "Demande transmise", partnerTenantId: legacyScope }, superAdmin);
+    const later = Date.now() + 24 * 60 * 60 * 1000;
+    await dispatch.processDueOutbox({ now: new Date(later) });
+    await dispatch.processDueOutbox({ now: new Date(later + 2 * 60 * 60 * 1000) });
+    expect(await dispatch.processDueOutbox({ now: new Date(later + 4 * 60 * 60 * 1000) })).toMatchObject({ deadLetter: 1 });
+    await new Promise((resolve) => setTimeout(resolve, 20));
+
+    const listed = await readJson<AdminAlertsListResponse>(await harness.request("/admin/alerts?type=channel_dead_letter", { headers: actorHeaders(support) }));
+    expect(listed.items).toHaveLength(1);
+    expect(listed.items[0]).toMatchObject({ type: "channel_dead_letter", severity: "critical", partnerTenantId: null });
+  });
 });
