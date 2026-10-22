@@ -8,6 +8,7 @@ import { visitorAiAnswers } from "../lib/visitor-ai-answers";
 import { InitialsTile } from "./journey/tiles";
 import { IndicativeOfferNotice } from "./public-journey";
 import { VisitorAiAssistant } from "./visitor-ai-assistant";
+import { VisitorFieldHelpProvider } from "./visitor-field-help";
 import { BackendText } from "./ui/backend-text";
 import { Button } from "./ui/button";
 import { EmptyState } from "./ui/empty-state";
@@ -548,6 +549,7 @@ export function QuoteFormShell({
           {quoteForm.fields.length > 0 ? (
             <div className="am-stack">
               <p className="am-j-panel__lead">{t("fieldsIntro")}</p>
+              <VisitorFieldHelpProvider countryCode={countryCode} productKey={productKey} fields={quoteForm.fields}>
               <div className="am-j-form__grid">
                 {quoteForm.fields.map((field) => (
                   <QuoteFormFieldInput
@@ -562,6 +564,7 @@ export function QuoteFormShell({
                   />
                 ))}
               </div>
+              </VisitorFieldHelpProvider>
             </div>
           ) : null}
           {jsEnabled ? (

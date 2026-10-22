@@ -1056,7 +1056,24 @@
       "consistency": {
         "title": "Vérification de cohérence par l'assistant de lecture",
         "button": "Vérifier mes réponses"
+      },
+      "guarantees": {
+        "title": "Les garanties en langage simple",
+        "button": "Expliquer les garanties",
+        "aiNotice": "Contenu généré par IA, à confirmer par le courtier partenaire."
+      },
+      "compare": {
+        "title": "Les différences entre ces offres",
+        "button": "Expliquer les différences",
+        "aiNotice": "Contenu généré par IA, à confirmer par le courtier partenaire."
       }
+    },
+    "fieldHelp": {
+      "trigger": "Aide pour le champ « {field} »",
+      "title": "Aide pour ce champ",
+      "close": "Masquer l'aide",
+      "note": "Explication générale du champ. Votre réponse n'est pas envoyée à l'assistant ; ne saisissez pas de données personnelles.",
+      "aiNotice": "Contenu généré par IA, à confirmer par le courtier partenaire."
     }
   },
   "DocumentUpload": {

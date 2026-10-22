@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import type { AiInteraction, VisitorAssistType } from "../../../../packages/shared/contracts/ai.contracts";
 import { visitorAiRequestSchemas, visitorAssistTypeSchema } from "../../../../packages/shared/contracts/ai.contracts";
+import type { OfferCompareResponse, OfferDetail } from "../../../../packages/shared/contracts/quote.contracts";
 import type { AuditLogWriter } from "../audit-logs/audit-log-writer.service";
 import type { RedisClientPort } from "../common/redis/redis.module";
 import type { ActorContext } from "../common/types";
@@ -9,12 +10,43 @@ import type { ProductsService } from "../products/products.module";
 import { AiAuditActions } from "./core/ai-audit-actions";
 import type { AiGateway } from "./core/ai-gateway.service";
 
+/**
+ * Public offer data the explainers may read. Implementations MUST only return offers the public
+ * catalogue shows for this country and product, and throw `Offer is not publicly available` otherwise.
+ */
+export interface VisitorAiOfferSource {
+  detail(offerId: string, countryId: string, productId: string): Promise<OfferDetail>;
+  /** Items and row values follow the order of `offerIds`. */
+  compare(offerIds: string[], countryId: string, productId: string): Promise<OfferCompareResponse>;
+}
+
+/** Comparison rows that rank, score or identify a broker are never sent to the model. */
+const EXCLUDED_COMPARE_ROWS: ReadonlySet<string> = new Set(["partner", "score", "sponsored", "validUntil", "guaranteeLevel"]);
+
+export function offerExplainerData(offer: OfferDetail): Record<string, unknown> {
+  return {
+    // `offerName`, not `name`: the PII minimiser drops `name` keys.
+    offerName: offer.name,
+    ...(offer.insurerName ? { insurerName: offer.insurerName } : {}),
+    ...(offer.shortDescription ? { shortDescription: offer.shortDescription } : {}),
+    ...(offer.guaranteeSummary ? { guaranteeSummary: offer.guaranteeSummary } : {}),
+    guarantees: offer.guarantees.map((guarantee) => ({ label: guarantee.label, included: guarantee.included })),
+    ...(offer.exclusionsSummary ? { exclusionsSummary: offer.exclusionsSummary } : {}),
+    ...(offer.deductibleAmount !== undefined ? { deductibleAmount: offer.deductibleAmount } : {}),
+    ...(offer.coverageCeiling !== undefined ? { coverageCeiling: offer.coverageCeiling } : {}),
+    ...(offer.processingDelayDays !== undefined ? { processingDelayDays: offer.processingDelayDays } : {}),
+    ...(offer.indicativePriceMin !== undefined ? { indicativePriceMin: offer.indicativePriceMin } : {}),
+    ...(offer.indicativePriceMax !== undefined ? { indicativePriceMax: offer.indicativePriceMax } : {})
+  };
+}
+
 export interface VisitorAiDeps {
   audit: AuditLogWriter;
   gateway: AiGateway;
   redis: RedisClientPort;
   countries: CountriesService;
   products: ProductsService;
+  offers?: VisitorAiOfferSource | undefined;
   hourlyLimit?: number | undefined;
 }
 
@@ -27,7 +59,10 @@ export class VisitorAiService {
 
   async request(assistTypeInput: string, body: unknown, ipAddress: string, actor: ActorContext): Promise<AiInteraction> {
     const assistType = visitorAssistTypeSchema.parse(assistTypeInput);
-    const parsed = visitorAiRequestSchemas[assistType].parse(body ?? {});
+    const validation = visitorAiRequestSchemas[assistType].safeParse(body ?? {});
+    // A rejected body is a client error (HTTP 400), whatever the wording of the schema message.
+    if (!validation.success) throw new Error(`Invalid request: ${validation.error.issues.map((issue) => `${issue.path.join(".") || "body"}: ${issue.message}`).join("; ")}`);
+    const parsed = validation.data;
     const ipHash = createHash("sha256").update(ipAddress).digest("hex").slice(0, 32);
     const count = await this.deps.redis.incr(`rl:ai:visitor:${ipHash}`, 3600);
     if (count > (this.deps.hourlyLimit ?? 20)) throw new Error("Rate limit exceeded for visitor AI assistance");
@@ -36,12 +71,15 @@ export class VisitorAiService {
     const productKey = "productKey" in parsed ? parsed.productKey : undefined;
     const product = productKey ? await this.deps.products.findByKey(productKey) : undefined;
     if (productKey && !product) throw new Error("Product is not publicly available");
-    const { language, ...input } = parsed as Record<string, unknown> & { language: "fr" | "en" };
+    const { language, offerId, offerIds, ...input } = parsed as Record<string, unknown> & { language: "fr" | "en"; offerId?: string; offerIds?: string[] };
+    const offerInput = product
+      ? await this.offerInput(assistType, { offerId, offerIds }, country.id, product.id, country.currency)
+      : {};
     const record = await this.deps.gateway.run({
       assistType,
       surface: "visitor",
       actor,
-      input: { ...input, countryCode: country.isoCode, ...(product ? { productKey: product.key } : {}) },
+      input: { ...input, ...offerInput, countryCode: country.isoCode, ...(product ? { productKey: product.key } : {}) },
       language,
       target: { type: "visitor_session", id: ipHash },
       scope: {
@@ -52,6 +90,30 @@ export class VisitorAiService {
       quotaKey: ipHash
     }, { wait: false });
     return this.deps.gateway.toDto(record);
+  }
+
+  /**
+   * Lot 2 (spec 068): the server resolves the offers from their ids and sends public offer data only;
+   * no offer text coming from the client is ever trusted.
+   */
+  private async offerInput(assistType: VisitorAssistType, ids: { offerId?: string | undefined; offerIds?: string[] | undefined }, countryId: string, productId: string, currency: string): Promise<Record<string, unknown>> {
+    if (assistType === "visitor_guarantee_explainer") {
+      if (!ids.offerId || !this.deps.offers) throw new Error("Offer is not publicly available");
+      return { currency, offer: offerExplainerData(await this.deps.offers.detail(ids.offerId, countryId, productId)) };
+    }
+    if (assistType === "visitor_compare_explainer") {
+      if (!ids.offerIds || !this.deps.offers) throw new Error("Offer is not publicly available");
+      const comparison = await this.deps.offers.compare(ids.offerIds, countryId, productId);
+      const order = comparison.items.map((item) => item.id);
+      return {
+        currency,
+        offers: comparison.items.map((item, index) => ({ label: `offre ${index + 1}`, ...offerExplainerData(item) })),
+        rows: comparison.rows
+          .filter((row) => !EXCLUDED_COMPARE_ROWS.has(row.key))
+          .map((row) => ({ key: row.key, label: row.label, values: order.map((id) => row.values[id] ?? null) }))
+      };
+    }
+    return {};
   }
 
   async read(id: string, actor: ActorContext): Promise<AiInteraction> {
