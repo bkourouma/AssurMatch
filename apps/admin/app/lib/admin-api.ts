@@ -1798,20 +1798,6 @@ export function runRoutingPrecheck(input: { partnerTenantId: string; countryId: 
   return writeAdmin<RoutingPrecheckResultData>("/admin/routing/precheck", "POST", input);
 }
 
-export interface MessagingTestResultData {
-  id: string;
-  channel: string;
-  status: "sent" | "refused" | "failed";
-  template: string;
-  recipientMasked: string;
-  provider: string;
-  reason: string | null;
-}
-
-/** Super-admin smoke test of a configured channel; the server answers with a masked recipient only. */
-export function sendMessagingTest(input: { channel: "sms" | "whatsapp"; recipient: string; scopeId: string; reason: string }) {
-  return writeAdmin<MessagingTestResultData>("/admin/messaging/test", "POST", input);
-}
 // Lot 6 (end)
 
 // Lot 9 (imports)

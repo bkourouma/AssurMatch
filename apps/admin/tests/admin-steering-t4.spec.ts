@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 
 function source(path: string): string {
   return readFileSync(path, "utf8");
@@ -25,9 +25,13 @@ test("messaging page sends a test message through the server action without echo
   const api = source("apps/admin/app/lib/admin-api.ts");
   const page = source("apps/admin/app/messaging/page.tsx");
   const form = source("apps/admin/app/messaging/messaging-test-form.tsx");
-  const actions = source("apps/admin/app/messaging/actions.ts");
+  // Lot 7 (spec 074 FR-010) owns the action; the lot 6 duplicate and its API helper were removed.
+  const actions = source("apps/admin/app/lib/messaging-test-actions.ts");
 
-  expect(api).toContain("/admin/messaging/test");
+  expect(existsSync("apps/admin/app/messaging/actions.ts")).toBe(false);
+  expect(api).not.toContain("sendMessagingTest");
+  expect(form).toContain("../lib/messaging-test-actions");
+  expect(actions).toContain("/admin/messaging/test");
   expect(page).toContain("MessagingTestForm");
   expect(form).toContain("Envoyer un message de test");
   expect(actions).toContain("recipientMasked");
