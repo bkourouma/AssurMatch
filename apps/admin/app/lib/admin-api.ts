@@ -1764,3 +1764,134 @@ export function updateAdminOffer(offerId: string, input: AdminOfferWriteInput) {
 export function runAdminOfferDecision(offerId: string, action: "submit" | "validate" | "reject" | "suspend", reason: string) {
   return writeAdminResult<AdminOfferDetailView>(offerPath(offerId, `/${action}`), "POST", { reason });
 }
+
+// Lot 9 (imports)
+import type {
+  ContentCapabilitiesView,
+  ContentCmsLocale,
+  ContentEntryCreateDto,
+  ContentEntryView,
+  ContentKind,
+  ContentStatus
+} from "../../../../packages/shared/contracts/content-cms.contracts";
+
+// Lot 9 (start)
+// Spec 072: minimal CMS for the Content Admin role. Routes `/admin/content/*`; the API stays the
+// authority on every permission and transition, the screen only mirrors it.
+
+/** Error of a content write, carrying the API status and its `{ code, message }` body. */
+export class ContentApiError extends Error {
+  readonly status: number;
+  readonly code: string;
+
+  constructor(status: number, code: string, message: string) {
+    super(message);
+    this.name = "ContentApiError";
+    this.status = status;
+    this.code = code;
+  }
+}
+
+export interface ContentEntryListFilters {
+  kind?: ContentKind | undefined;
+  locale?: ContentCmsLocale | undefined;
+  status?: ContentStatus | undefined;
+  countryCode?: string | undefined;
+  entryKey?: string | undefined;
+}
+
+const emptyContentCapabilities: ContentCapabilitiesView = { canRead: false, canEdit: false, canApprove: false, canApproveLegal: false };
+
+function contentPath(id: string, suffix = ""): string {
+  return `/admin/content/entries/${encodeURIComponent(id)}${suffix}`;
+}
+
+async function writeContent<T>(path: string, method: "POST" | "PUT", body?: unknown): Promise<T> {
+  const token = await getBackOfficeToken();
+  if (!token) throw new ContentApiError(401, "session_required", "session_required");
+  const response = await fetch(`${backOfficeApiBaseUrl()}${path}`, {
+    method,
+    headers: {
+      Authorization: `Bearer ${token}`,
+      ...(body !== undefined ? { "content-type": "application/json" } : {})
+    },
+    ...(body !== undefined ? { body: JSON.stringify(body) } : {}),
+    cache: "no-store"
+  });
+  if (!response.ok) {
+    let code = `api_${response.status}`;
+    let message = code;
+    try {
+      const parsed = await response.json() as { code?: unknown; message?: unknown };
+      if (typeof parsed.code === "string") code = parsed.code;
+      if (typeof parsed.message === "string") message = parsed.message;
+      else if (Array.isArray(parsed.message)) message = parsed.message.map(String).join("; ");
+    } catch {
+      // Body is not JSON: keep the status-based code.
+    }
+    throw new ContentApiError(response.status, code, message);
+  }
+  return response.json() as Promise<T>;
+}
+
+export function readContentCapabilities() {
+  return readAdmin<ContentCapabilitiesView>("/admin/content/capabilities", emptyContentCapabilities);
+}
+
+/** The contract says an array; a `{ items }` envelope is accepted too so the screen survives either. */
+async function readContentList(path: string): Promise<AdminApiState<ContentEntryView[]>> {
+  const state = await readAdmin<ContentEntryView[] | { items?: ContentEntryView[] }>(path, []);
+  const data = Array.isArray(state.data) ? state.data : state.data.items ?? [];
+  return { ...state, data };
+}
+
+export function readContentEntries(filters: ContentEntryListFilters = {}) {
+  const params = new URLSearchParams();
+  for (const [key, value] of Object.entries(filters)) {
+    if (typeof value === "string" && value) params.set(key, value);
+  }
+  const query = params.toString();
+  return readContentList(`/admin/content/entries${query ? `?${query}` : ""}`);
+}
+
+export function readContentEntry(id: string) {
+  return readAdmin<ContentEntryView | null>(contentPath(id), null);
+}
+
+export function readContentHistory(id: string) {
+  return readContentList(contentPath(id, "/history"));
+}
+
+export function createContentEntry(input: ContentEntryCreateDto) {
+  return writeContent<ContentEntryView>("/admin/content/entries", "POST", input);
+}
+
+export function updateContentEntry(id: string, payload: Record<string, unknown>) {
+  return writeContent<ContentEntryView>(contentPath(id), "PUT", { payload });
+}
+
+export function submitContentEntry(id: string) {
+  return writeContent<ContentEntryView>(contentPath(id, "/submit"), "POST");
+}
+
+export function withdrawContentEntry(id: string) {
+  return writeContent<ContentEntryView>(contentPath(id, "/withdraw"), "POST");
+}
+
+export function approveContentEntry(id: string, note?: string) {
+  return writeContent<ContentEntryView>(contentPath(id, "/approve"), "POST", note ? { note } : {});
+}
+
+export function rejectContentEntry(id: string, note: string) {
+  return writeContent<ContentEntryView>(contentPath(id, "/reject"), "POST", { note });
+}
+
+export function archiveContentEntry(id: string, note: string) {
+  return writeContent<ContentEntryView>(contentPath(id, "/archive"), "POST", { note });
+}
+
+/** Creates the next draft version from a published entry; returns that new draft. */
+export function reviseContentEntry(id: string) {
+  return writeContent<ContentEntryView>(contentPath(id, "/revise"), "POST");
+}
+// Lot 9 (end)

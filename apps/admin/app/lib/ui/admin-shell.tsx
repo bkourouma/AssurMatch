@@ -114,7 +114,9 @@ export const adminNavigation: NavGroup[] = [
       { label: "Utilisateurs", href: "/users", icon: "users", match: ["/users"] },
       { label: "Feature flags", href: "/feature-flags", icon: "flag", match: ["/feature-flags"] },
       { label: "Activation", href: "/activation-checklist", icon: "checklist", match: ["/activation-checklist"] },
-      { label: "Assistance IA", href: "/ai-assistance", icon: "sparkles", match: ["/ai-assistance"] }
+      { label: "Assistance IA", href: "/ai-assistance", icon: "sparkles", match: ["/ai-assistance"] },
+      // Lot 9 (spec 072): minimal CMS (FAQ, guides, glossary, legal overrides); the API refuses the other roles.
+      { label: "Contenu", href: "/content", icon: "catalog", match: ["/content"] }
     ]
   },
   {
