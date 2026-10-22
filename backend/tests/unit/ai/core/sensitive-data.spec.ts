@@ -22,8 +22,8 @@ const POSITIVES: Array<[string, string, string]> = [
   ["iban", "GB82WEST12345698765432", "iban"],
   ["secret", "token eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxMjM0NTYifQ.abcDEF123_-xyz", "secret"],
   ["secret", "Authorization: Bearer abcdefghijklmnop1234567890", "secret"],
-  ["secret", "cle sk-ant-api03-ABCDEFGHIJKLMNOPQRSTUV", "secret"],
-  ["secret", "AKIAIOSFODNN7EXAMPLE", "secret"],
+  ["secret", "cle sk-ant-api03-ABCDEFGHIJKLMNOPQRSTUV", "secret"], // secret-scan:allow reviewed fixture
+  ["secret", "AKIAIOSFODNN7EXAMPLE", "secret"], // secret-scan:allow reviewed fixture
   ["secret", "mot de passe : Tr0ub4dor&3", "secret"],
   ["secret", "password=hunter2", "secret"],
   ["secret", "mdp: azerty123", "secret"],
