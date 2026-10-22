@@ -26,7 +26,7 @@ export class AIAssistanceService {
   status(actor: ActorContext, surface: AIAssistanceSurface): AIAssistanceStatus {
     this.assertAccess(actor, surface);
     const flagKeys = surface === "broker_crm"
-      ? ["ai_broker_assistant_enabled", "ai_summary_enabled", "ai_lead_scoring_enabled", "ai_duplicate_detection_enabled"]
+      ? ["ai_broker_assistant_enabled", "ai_summary_enabled", "ai_lead_scoring_enabled", "ai_duplicate_detection_enabled", "broker_weekly_ai_summary_enabled"]
       : ["ai_broker_assistant_enabled", "ai_summary_enabled", "ai_recommendation_enabled"];
     const flags = flagKeys.map((key) => ({ key, value: this.deps.featureFlags.isEnabled(key), required: true }));
     const assistTypes = this.assistTypes(surface);
