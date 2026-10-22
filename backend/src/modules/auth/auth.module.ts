@@ -92,30 +92,30 @@ export class AuthService {
     const user = await this.users.findByEmail(parsed.email);
     if (!user) {
       await this.passwordHashing.verifyBogus(parsed.password);
-      this.audit.write({ action: AuthAuditActions.userLoginFailed, targetType: "User", targetId: "unknown", result: "refused", context: { email: parsed.email } });
+      await this.audit.writeAsync({ action: AuthAuditActions.userLoginFailed, targetType: "User", targetId: "unknown", result: "refused", context: { email: parsed.email } });
       throw new Error("Invalid credentials");
     }
     if (user.status === "suspended") {
-      this.audit.write({ action: AuthAuditActions.userLoginRefusedSuspended, targetType: "User", targetId: user.id, result: "refused", context: { email: user.email } });
+      await this.audit.writeAsync({ action: AuthAuditActions.userLoginRefusedSuspended, targetType: "User", targetId: user.id, result: "refused", context: { email: user.email } });
       throw new Error("Account suspended");
     }
     if (user.status === "locked" || user.status === "deleted") {
-      this.audit.write({ action: AuthAuditActions.userLoginFailed, targetType: "User", targetId: user.id, result: "refused", context: { email: user.email, status: user.status } });
+      await this.audit.writeAsync({ action: AuthAuditActions.userLoginFailed, targetType: "User", targetId: user.id, result: "refused", context: { email: user.email, status: user.status } });
       throw new Error("Invalid credentials");
     }
     if (!await this.passwordHashing.verify(user.passwordHash, parsed.password)) {
       const failed = await this.users.incrementFailedLogin(user.id);
-      this.audit.write({ action: AuthAuditActions.userLoginFailed, targetType: "User", targetId: user.id, result: "refused", context: { email: user.email, failedLoginCount: failed.failedLoginCount } });
+      await this.audit.writeAsync({ action: AuthAuditActions.userLoginFailed, targetType: "User", targetId: user.id, result: "refused", context: { email: user.email, failedLoginCount: failed.failedLoginCount } });
       if (failed.failedLoginCount >= this.lockoutThreshold()) {
         await this.users.lock(user.id, "failed-login-threshold");
-        this.audit.write({ action: AuthAuditActions.userLockedAfterFailedLogins, targetType: "User", targetId: user.id, result: "success", context: { email: user.email } });
+        await this.audit.writeAsync({ action: AuthAuditActions.userLockedAfterFailedLogins, targetType: "User", targetId: user.id, result: "success", context: { email: user.email } });
       }
       throw new Error("Invalid credentials");
     }
     // Spec 051 FR-022: checked only once the password is proven, with a neutral message, so the
     // response tells nothing about the partner to someone who does not hold the credentials.
     if (user.partnerTenantId && this.tenantStatus && await this.tenantStatus.status(user.partnerTenantId) === "retired") {
-      this.audit.write({ action: AuthAuditActions.userLoginFailed, targetType: "User", targetId: user.id, result: "refused", reason: "partner_retired", context: { email: user.email, partnerTenantId: user.partnerTenantId } });
+      await this.audit.writeAsync({ action: AuthAuditActions.userLoginFailed, targetType: "User", targetId: user.id, result: "refused", reason: "partner_retired", context: { email: user.email, partnerTenantId: user.partnerTenantId } });
       throw new UnauthorizedException({ code: ErrorCodes.AUTH_REQUIRED, message: "Account unavailable" });
     }
     // Spec 063 FR-A01 / FR-A05: the password alone never proves the second factor. Only a valid
@@ -126,14 +126,14 @@ export class AuthService {
       if (user.status === "active" && user.mfaSecretEncrypted) {
         trustedDeviceUsed = (await this.trustedDevices.consume(user.id, parsed.trustedDeviceToken)).status === "valid";
       } else {
-        this.audit.write({ action: AuthAuditActions.userTrustedDeviceRejected, targetType: "User", targetId: user.id, result: "refused", reason: "ineligible_account", context: { cause: "ineligible_account" } });
+        await this.audit.writeAsync({ action: AuthAuditActions.userTrustedDeviceRejected, targetType: "User", targetId: user.id, result: "refused", reason: "ineligible_account", context: { cause: "ineligible_account" } });
       }
       trustedDeviceRejected = !trustedDeviceUsed;
     }
     // The failed-attempt counter is cleared only when the login is complete (device trusted); with a
     // second factor pending, the password alone must not reset the lockout.
     const activeUser = await this.users.recordSuccessfulLogin(user.id, undefined, { resetFailedLogins: trustedDeviceUsed });
-    this.audit.write({ action: AuthAuditActions.userLoginSucceeded, targetType: "User", targetId: user.id, result: "success", context: { email: user.email, mfaRequired: !trustedDeviceUsed, trustedDevice: trustedDeviceUsed } });
+    await this.audit.writeAsync({ action: AuthAuditActions.userLoginSucceeded, targetType: "User", targetId: user.id, result: "success", context: { email: user.email, mfaRequired: !trustedDeviceUsed, trustedDevice: trustedDeviceUsed } });
     return {
       accessToken: this.sign(activeUser, trustedDeviceUsed),
       mfaRequired: !trustedDeviceUsed,
@@ -156,13 +156,13 @@ export class AuthService {
     const tokenHash = this.passwordReset.hashToken(parsed.token);
     const user = await this.users.findByPasswordResetTokenHash(tokenHash);
     if (!user) {
-      this.audit.write({ action: AuthAuditActions.userPasswordResetInvalid, targetType: "User", targetId: "unknown", result: "refused", context: {} });
+      await this.audit.writeAsync({ action: AuthAuditActions.userPasswordResetInvalid, targetType: "User", targetId: "unknown", result: "refused", context: {} });
       throw new Error("Invalid activation token");
     }
     const passwordHash = await this.passwordReset.hashNewPassword(parsed.password, user);
     const activated = await this.users.activateWithPassword(user.id, passwordHash);
-    this.audit.write({ action: AuthAuditActions.userActivated, targetType: "User", targetId: user.id, result: "success", context: { email: user.email } });
-    this.audit.write({ action: AuthAuditActions.userPasswordChanged, targetType: "User", targetId: user.id, result: "success", context: { email: user.email } });
+    await this.audit.writeAsync({ action: AuthAuditActions.userActivated, targetType: "User", targetId: user.id, result: "success", context: { email: user.email } });
+    await this.audit.writeAsync({ action: AuthAuditActions.userPasswordChanged, targetType: "User", targetId: user.id, result: "success", context: { email: user.email } });
     return {
       accessToken: this.sign(activated, false),
       mfaRequired: true,
@@ -174,18 +174,18 @@ export class AuthService {
     const parsed = passwordChangeRequestSchema.parse(input);
     const user = await this.users.require(actor.actorId ?? "");
     if (!await this.passwordHashing.verify(user.passwordHash, parsed.oldPassword)) {
-      this.audit.write({ actor, action: AuthAuditActions.userPasswordChangeFailed, targetType: "User", targetId: user.id, result: "refused", context: { email: user.email } });
+      await this.audit.writeAsync({ actor, action: AuthAuditActions.userPasswordChangeFailed, targetType: "User", targetId: user.id, result: "refused", context: { email: user.email } });
       throw new Error("Invalid password");
     }
     let passwordHash: string;
     try {
       passwordHash = await this.passwordReset.hashNewPassword(parsed.newPassword, user);
     } catch (error) {
-      this.audit.write({ actor, action: AuthAuditActions.userPasswordChangeFailed, targetType: "User", targetId: user.id, result: "refused", context: { email: user.email, reason: "policy" } });
+      await this.audit.writeAsync({ actor, action: AuthAuditActions.userPasswordChangeFailed, targetType: "User", targetId: user.id, result: "refused", context: { email: user.email, reason: "policy" } });
       throw error;
     }
     await this.users.setPassword(user.id, passwordHash);
-    this.audit.write({ actor, action: AuthAuditActions.userPasswordChanged, targetType: "User", targetId: user.id, result: "success", context: { email: user.email } });
+    await this.audit.writeAsync({ actor, action: AuthAuditActions.userPasswordChanged, targetType: "User", targetId: user.id, result: "success", context: { email: user.email } });
   }
 
   async resetPassword(input: PasswordResetRequest): Promise<void> {
@@ -193,12 +193,12 @@ export class AuthService {
     const tokenHash = this.passwordReset.hashToken(parsed.token);
     const user = await this.users.findByPasswordResetTokenHash(tokenHash);
     if (!user || this.passwordReset.isExpired(user.passwordResetTokenExpiresAt)) {
-      this.audit.write({ action: AuthAuditActions.userPasswordResetInvalid, targetType: "User", targetId: user?.id ?? "unknown", result: "refused", context: {} });
+      await this.audit.writeAsync({ action: AuthAuditActions.userPasswordResetInvalid, targetType: "User", targetId: user?.id ?? "unknown", result: "refused", context: {} });
       throw new Error("Invalid password reset token");
     }
     const passwordHash = await this.passwordReset.hashNewPassword(parsed.newPassword, user);
     await this.users.consumePasswordReset(user.id, passwordHash);
-    this.audit.write({ action: AuthAuditActions.userPasswordResetConsumed, targetType: "User", targetId: user.id, result: "success", context: { email: user.email } });
+    await this.audit.writeAsync({ action: AuthAuditActions.userPasswordResetConsumed, targetType: "User", targetId: user.id, result: "success", context: { email: user.email } });
   }
 
   /**
@@ -209,12 +209,12 @@ export class AuthService {
     // A secret that was never confirmed by a valid code protects nothing yet: it can be regenerated (a user who
     // left the screen before the first code must not be locked out). A confirmed one cannot be replaced.
     if (user.mfaSecretEncrypted && user.mfaStatus === "verified" && actor?.mfaVerified !== true) {
-      this.audit.write({ action: AuthAuditActions.userMfaEnrolled, targetType: "User", targetId: user.id, result: "refused", reason: "mfa_required", context: { email: user.email } });
+      await this.audit.writeAsync({ action: AuthAuditActions.userMfaEnrolled, targetType: "User", targetId: user.id, result: "refused", reason: "mfa_required", context: { email: user.email } });
       throw new ForbiddenException({ code: ErrorCodes.MFA_REQUIRED, message: "MFA required" });
     }
     const challenge = await this.mfa.enroll(user);
     await this.users.setMfaEnrollment(user.id, challenge.encryptedSecret, challenge.backupCodeHashes);
-    this.audit.write({ action: AuthAuditActions.userMfaEnrolled, targetType: "User", targetId: user.id, result: "success", context: { email: user.email } });
+    await this.audit.writeAsync({ action: AuthAuditActions.userMfaEnrolled, targetType: "User", targetId: user.id, result: "success", context: { email: user.email } });
     return {
       secret: challenge.secret,
       otpauthUri: challenge.otpauthUri,
@@ -226,15 +226,15 @@ export class AuthService {
     const result = await this.mfa.verify(user, code, kind);
     if (!result.verified) {
       const failed = await this.users.incrementFailedLogin(user.id);
-      this.audit.write({ action: AuthAuditActions.userMfaFailed, targetType: "User", targetId: user.id, result: "refused", context: { email: user.email, failedLoginCount: failed.failedLoginCount, kind } });
+      await this.audit.writeAsync({ action: AuthAuditActions.userMfaFailed, targetType: "User", targetId: user.id, result: "refused", context: { email: user.email, failedLoginCount: failed.failedLoginCount, kind } });
       if (failed.failedLoginCount >= this.lockoutThreshold()) {
         await this.users.lock(user.id, "failed-mfa-threshold");
-        this.audit.write({ action: AuthAuditActions.userLockedAfterFailedLogins, targetType: "User", targetId: user.id, result: "success", context: { email: user.email, source: "mfa" } });
+        await this.audit.writeAsync({ action: AuthAuditActions.userLockedAfterFailedLogins, targetType: "User", targetId: user.id, result: "success", context: { email: user.email, source: "mfa" } });
       }
       throw new Error("Invalid MFA code");
     }
     const verifiedUser = await this.users.markMfaVerified(user.id, result.backupCodeHashes);
-    this.audit.write({ action: AuthAuditActions.userMfaVerified, targetType: "User", targetId: user.id, result: "success", context: { email: user.email, kind } });
+    await this.audit.writeAsync({ action: AuthAuditActions.userMfaVerified, targetType: "User", targetId: user.id, result: "success", context: { email: user.email, kind } });
     // Spec 063 FR-A02: the clear token leaves the server once, in this response.
     const device = options.trustDevice === true ? await this.trustedDevices.issue(user.id, options.deviceLabel) : undefined;
     return {

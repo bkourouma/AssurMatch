@@ -53,6 +53,10 @@ import { AdminUsersController } from "../modules/users/admin-users.controller";
 import { PartnerTenantStatusService } from "../modules/partners/partner-tenant-status.service";
 import { ProductsModule } from "../modules/products/products.module";
 import { PublicStatsModule } from "../modules/public-stats/public-stats.module";
+// Lot 6
+import { MemoryVisitStatsRepository, PrismaVisitStatsRepository } from "../modules/visit-stats/visit-stats.repository";
+import { VisitStatsModule } from "../modules/visit-stats/visit-stats.module";
+// Lot 6 (end)
 import { WaitlistModule } from "../modules/waitlist/waitlist.module";
 import { MemoryWaitlistRepository, PrismaWaitlistRepository } from "../modules/waitlist/waitlist.repository";
 import { ProspectsModule } from "../modules/prospects/prospects.module";
@@ -329,6 +333,19 @@ export class AssurMatchRuntime {
     notifications: this.notifications.service,
     complianceEmail: () => complianceAlertEmail(),
     workerStaleMinutes: () => readIntegerEnv(process.env, "ASSURMATCH_WORKER_STALE_MINUTES", 10, 1, 1440)
+  });
+  // Lot 12 (spec 077): an SMS/WhatsApp message that reaches dead_letter raises a critical admin alert (identifiers and counters only).
+  private readonly channelDeadLetterAlert = this.notifications.dispatch.setDeadLetterHook((info) => {
+    const isUuid = info.partnerTenantId !== null && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(info.partnerTenantId);
+    void this.adminAlerts.raise({
+      type: "channel_dead_letter",
+      severity: "critical",
+      conditionKey: `channel_dead_letter:${info.channel}:${info.partnerTenantId ?? "global"}`,
+      targetType: "ChannelOutbox",
+      targetId: info.channel,
+      ...(isUuid ? { partnerTenantId: info.partnerTenantId as string } : {}),
+      details: { channel: info.channel, template: info.template, attempts: info.attempts, errorClass: info.errorClass }
+    }).catch(() => undefined);
   });
   // Lot 3: shared with the scheduled alerts (broker first-action target), so the in-memory mode needs an explicit instance.
   private readonly enterpriseRepository = this.runtimeRepository(new PrismaEnterpriseRepository(this.prisma)) ?? new MemoryEnterpriseRepository();
@@ -765,6 +782,14 @@ readonly enterprise = new EnterpriseService({
     decisions: this.leads.decisions,
     consent: { findRecord: (id: string) => this.consent.service.findRecord(id) },
     prospects: { find: (id: string) => this.prospects.service.require(id).catch(() => undefined) },
+    // Lot 6
+    prospectsList: {
+      list: () => this.prospects.service.list(),
+      require: (id: string) => this.prospects.service.require(id),
+      // Lot 8: blind index + legacy fingerprint lookup of the admin contact search.
+      findIdsByContact: (kind, value) => this.prospects.service.findIdsByContact(kind, value)
+    },
+    // Lot 6 (end)
     offers: { find: (id: string) => this.offers.repository.require(id).catch(() => undefined) },
     documents: { list: async (actor, quoteRequestId) => (await this.quoteDocuments.adminList(actor, quoteRequestId)).items },
     eligibility: this.leads.eligibility,
@@ -790,6 +815,24 @@ readonly enterprise = new EnterpriseService({
     brokerCrmConfig: this.brokerCrmConfig,
     // Spec 064: Enterprise agency display filter (lazy: the enterprise service is built after this module).
     agencyScope: { resolve: (actor: ActorContext, agencyId: string | undefined): Promise<AdvisorAgencyPredicate | undefined> => this.enterprise.agencyScopeFor(actor, agencyId) },
+    // Lot 6 (spec 073 T302): lazy read-only ports (visit counter, billing, disputes and AI are built after this module).
+    adminVisitStats: {
+      isEnabled: () => (process.env.ASSURMATCH_VISIT_COUNTER_ENABLED ?? "true").trim().toLowerCase() !== "false",
+      totalsBetween: (from: Date, to: Date) => this.visitStats.service.totalsBetween(from, to)
+    },
+    adminInvoices: { list: (actor: ActorContext, query: Record<string, never>) => this.billing.invoicing.list(actor, query) },
+    adminLeadDisputes: { listDisputes: (filter: { from?: Date | undefined; to?: Date | undefined }) => this.leads.crmActivityRepository.listDisputes(filter) },
+    adminAiInsights: {
+      list: async () => (await this.aiGateway.listForSurface("admin_platform", 200)).map((record) => ({
+        id: record.id,
+        assistType: record.assistType,
+        humanValidationStatus: record.humanValidationStatus,
+        outputText: record.outputText,
+        createdAt: record.createdAt,
+        actorId: record.actorId
+      }))
+    },
+    // Lot 6 (end)
     // Lot 3 (spec 069 FR-001/FR-003) begin: billing tariff for the estimated lead cost, agencies of the tenant, spec 055 proposals.
     leadPricing: async (plan, countryCode) => {
       const prices = await this.billing.plans.list({ actorId: "system:broker-dashboard", roles: ["super_admin"], mfaVerified: true });
@@ -1118,6 +1161,9 @@ readonly enterprise = new EnterpriseService({
     this.offers.repository,
     this.redis.client
   );
+  // Lot 6 (spec 073 T203): aggregated page-view counter, no personal data.
+  readonly visitStats = new VisitStatsModule(this.runtimeRepository(new PrismaVisitStatsRepository(this.prisma)) ?? new MemoryVisitStatsRepository());
+  // Lot 6 (end)
   readonly publicCountryDirectory = new PublicCountryDirectoryService(this.countriesRepository, this.redis.client);
   private readonly dataRetentionRepository = this.runtimeRepository(new PrismaDataRetentionRepository(this.prisma));
   private readonly retentionSubjectsRepository = this.runtimeRepository(new PrismaRetentionSubjectsRepository(this.prisma));
@@ -1169,6 +1215,8 @@ readonly enterprise = new EnterpriseService({
   }
 
   async onModuleDestroy(): Promise<void> {
+    // Lot 8 (FR-B1): last chance for audit entries waiting in the outbox, before the pool closes.
+    await this.audit.writer.drain();
     await this.prisma.onModuleDestroy();
     await this.redis.close();
     await this.queues.close();

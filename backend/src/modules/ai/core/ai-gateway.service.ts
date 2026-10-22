@@ -12,6 +12,7 @@ import { MemoryAiInteractionsRepository, type AiInteractionRecord, type AiIntera
 import { AiPromptLibrary } from "./ai-prompts";
 import type { AiProviderPort } from "./ai-provider.port";
 import { PiiMinimizer } from "./pii-minimizer";
+import { SensitiveDataDetector } from "./sensitive-data-detector";
 
 export type PartnerPlan = "starter" | "pro" | "enterprise";
 
@@ -95,6 +96,8 @@ const GLOBAL_FLAG_BY_ASSIST: Record<AiAssistTypeCatalog, string> = {
   weekly_summary: "ai_summary_enabled"
 };
 
+// Lot 8
+const BROKER_PRODUCT_GATED: ReadonlySet<AiAssistTypeCatalog> = new Set(["lead_summary", "next_action", "relaunch_message", "loss_analysis", "duplicate_hint"]);
 const ENTERPRISE_ONLY: ReadonlySet<AiAssistTypeCatalog> = new Set(["loss_analysis", "manager_assistant"]);
 /** Tenant-level broker insights are plan-gated: an unknown plan is refused (fail closed) instead of being treated as allowed. */
 const PLAN_REQUIRED: ReadonlySet<AiAssistTypeCatalog> = new Set(["performance_summary", "manager_assistant", "weekly_summary"]);
@@ -114,6 +117,7 @@ export const AI_PARTNER_OPT_OUT_FLAG = "ai_partner_opt_out";
 export class AiGateway {
   private readonly repository: AiInteractionsRepository;
   private readonly minimizer = new PiiMinimizer();
+  private readonly detector = new SensitiveDataDetector();
   private readonly guardrails = new AiGuardrails();
   private readonly prompts = new AiPromptLibrary();
 
@@ -128,6 +132,8 @@ export class AiGateway {
     if (scope.countryFlags && scope.countryFlags.country_ai_enabled !== true) reasons.push("country_ai_disabled");
     if (scope.productFlags && assistType.startsWith("visitor_") && scope.productFlags.product_ai_form_assistant_enabled !== true) reasons.push("product_ai_form_assistant_disabled");
     if (scope.productFlags && (assistType === "lead_score" || assistType === "lead_classification") && scope.productFlags.product_ai_scoring_enabled !== true) reasons.push("product_ai_scoring_disabled");
+    // Spec 075 (FR-D1): broker assistants follow the product AI flag too; unknown product scope = unchanged behaviour.
+    if (scope.productFlags && BROKER_PRODUCT_GATED.has(assistType) && scope.productFlags.product_ai_scoring_enabled !== true) reasons.push("product_ai_broker_assistant_disabled");
     if (scope.partnerTenantId && this.deps.featureFlags.isEnabled(AI_PARTNER_OPT_OUT_FLAG, "partner", scope.partnerTenantId)) reasons.push("partner_opted_out");
     if (scope.plan === "starter") reasons.push("plan_starter_excluded");
     if (ENTERPRISE_ONLY.has(assistType) && scope.plan !== "enterprise" && scope.plan !== undefined) reasons.push("plan_enterprise_required");
@@ -212,6 +218,25 @@ export class AiGateway {
     let fallback = false;
     let provider = this.deps.provider.name;
     const generateRequest = { assistType: record.assistType, system: prompt.system, user: prompt.user, json: prompt.json, maxOutputTokens: prompt.maxOutputTokens, input: minimizedInput, language };
+    // Spec 075 (FR-E2): defence in depth, the final prompt is rescanned right before any external call.
+    if (this.deps.provider.name !== "template") {
+      const leak = this.detector.detect(`${prompt.system}\n${prompt.user}`);
+      if (leak.categories.length > 0) {
+        const refusedAt = new Date();
+        const blocked = await this.repository.update(record.id, {
+          status: "refused",
+          refusalReason: "sensitive_data_in_prompt",
+          guardrailResult: "not_evaluated",
+          outputReference: "refused",
+          promptHash: this.hash(prompt.system + prompt.user),
+          completedAt: refusedAt,
+          updatedAt: refusedAt
+        });
+        if (jobId) this.deps.queue.transition(jobId, "completed");
+        this.audit(blocked, actor, AiAuditActions.refused, "refused", { modelCall: false, reasons: ["sensitive_data_in_prompt"], sensitiveCategories: Object.entries(leak.occurrences).map(([category, count]) => ({ category, count })) });
+        return blocked;
+      }
+    }
     try {
       generated = await this.deps.provider.generate(generateRequest);
     } catch (error) {

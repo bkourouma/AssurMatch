@@ -12,7 +12,7 @@ import {
 } from "../lib/ui/admin-ui";
 import type { PendingManualQuoteData } from "../lib/admin-api";
 import { AI_ASSISTED_MODE_LABEL, AI_ASSISTED_MODE_NOTE, candidateReasonLabel, parkedReasonLabel, qualityScoreLabel } from "./routing-labels";
-import { AssignPendingQuoteForm, CreateRoutingRuleForm, ReassignLeadForm, UpdateRoutingRuleForm } from "./routing-forms";
+import { AssignPendingQuoteForm, CreateRoutingRuleForm, ReassignLeadForm, RoutingPrecheckForm, UpdateRoutingRuleForm } from "./routing-forms";
 
 const modeLabels: Record<RoutingRuleData["mode"], string> = {
   first_eligible: "Premier eligible",
@@ -124,6 +124,8 @@ export default async function RoutingPage() {
           </Card>
 
           <ReassignLeadForm />
+
+          <RoutingPrecheckForm />
 
           <StateMessage>Le mode multi-envoi ne s'applique que si le flag est ouvert et si le visiteur l'accepte: sinon la demande part a un seul courtier partenaire, avec un motif audite. {AI_ASSISTED_MODE_NOTE}</StateMessage>
         </>

@@ -57,7 +57,7 @@ export async function cleanupRuntimeSmokeData(prisma: RuntimeSmokePrismaClient, 
   await prisma.routingDecision.deleteMany({ where: { OR: [{ quoteRequestId: { in: quoteIds } }, { correlationId: run.correlationId }] } });
   await prisma.quoteRequest.deleteMany({ where: { id: { in: quoteIds } } });
   await prisma.consentRecord.deleteMany({ where: { OR: [{ id: { in: consentRecordIds } }, { subjectReference: { contains: run.id } }] } });
-  await prisma.prospect.deleteMany({ where: { OR: [{ id: { in: prospectIds } }, { emailNormalized: run.email }] } });
+  await prisma.prospect.deleteMany({ where: { id: { in: prospectIds } } });
   await prisma.offerHistory.deleteMany({ where: { reason: { contains: "runtime smoke" } } });
   await prisma.offer.deleteMany({ where: { OR: [{ publicKey: { contains: run.id } }, { name: { contains: run.prefix } }] } });
   await prisma.partnerLicense.deleteMany({ where: { partnerTenantId: { in: partnerIds } } });

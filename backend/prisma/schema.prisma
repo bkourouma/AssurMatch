@@ -1007,6 +1007,9 @@ model AuditLog {
   occurredAt     DateTime    @default(now())
   retentionUntil DateTime
   createdAt      DateTime    @default(now())
+  // Lot 8 (spec 075): HMAC-SHA256 of the canonical entry (tamper evidence) and the id of the key that signed it.
+  integrityHash  String?
+  integrityKeyId String?
 
   // Spec 056: admin audit-log search (actor, action prefix, target, period).
   @@index([occurredAt])
@@ -1273,10 +1276,20 @@ model Prospect {
   retentionUntil          DateTime
   anonymizedAt            DateTime?
   anonymizationBatchId    String?
+  /// Lot 8 (spec 075): HMAC blind indexes of the normalised e-mail and phone (the PII columns above hold an
+  /// encrypted envelope once written under a PII key; legacy rows keep the clear value until backfilled).
+  emailBlindIndex         String?
+  phoneBlindIndex         String?
+  /// Lot 8 (spec 075): id of the PII key that encrypted this row (null = clear text, not yet backfilled).
+  piiKeyId                String?
   createdAt               DateTime @default(now())
   updatedAt               DateTime @updatedAt
 
   @@index([countryId, productId, emailFingerprint, phoneFingerprint, createdAt])
+  // Lot 8 (spec 075): the prospect match runs on the blind indexes once the PII columns are encrypted.
+  @@index([countryId, productId, emailBlindIndex, phoneBlindIndex])
+  @@index([countryId, productId, phoneBlindIndex])
+  @@index([piiKeyId])
   // Spec 059 follow-up (M-03): the prospect match is an OR on the e-mail or the phone fingerprint.
   @@index([countryId, productId, phoneFingerprint])
 }
@@ -1318,10 +1331,13 @@ model QuoteRequest {
   reviewedAt                DateTime?
   reviewedById              String?
   duplicateOfQuoteRequestId String?
+  /// Lot 8 (spec 075): id of the PII key that encrypted `payload` (null = clear JSON, not yet backfilled).
+  piiKeyId              String?
   createdAt             DateTime           @default(now())
   updatedAt             DateTime           @updatedAt
 
   @@index([countryId, productId, status, routingStatus, createdAt])
+  @@index([piiKeyId])
   @@index([duplicateOfQuoteRequestId])
   // Spec 059 follow-up (M-03): offer popularity counted in the database.
   @@index([selectedOfferId])
@@ -2425,6 +2441,18 @@ model TrustedDevice {
 
   @@index([userId, revokedAt])
 }
+
+// Lot 6 (spec 073 FR-006, hypothesis H5)
+/// Page-view counter per UTC day and page key. Aggregated only: no IP, user agent, referrer,
+/// visitor identifier or cookie is ever stored.
+model VisitCounter {
+  day   DateTime @db.Date
+  page  String
+  count Int      @default(0)
+
+  @@id([day, page])
+}
+// Lot 6 (end)
 
 // Lot 10 (spec 076): SMS / WhatsApp retry outbox and generic outbound CRM connector.
 /// Spec 076: one SMS / WhatsApp message waiting for a (re)try. Recipient and body are encrypted at

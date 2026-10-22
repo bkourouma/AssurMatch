@@ -43,7 +43,9 @@
     "seed:reference": "node --import tsx scripts/preprod/seed-reference.ts",
     "import:partners": "node --import tsx scripts/preprod/import-partners.ts",
     "validate": "npm run typecheck && npm run lint && npm run test",
-    "satisfaction-surveys:deliver-due": "node --import tsx scripts/satisfaction-survey-delivery-worker.ts"
+    "satisfaction-surveys:deliver-due": "node --import tsx scripts/satisfaction-survey-delivery-worker.ts",
+    "ops:verify-audit": "node --import tsx scripts/ops/verify-audit-integrity.ts",
+    "ops:backfill-pii": "node --import tsx scripts/ops/backfill-pii-encryption.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.131.0",

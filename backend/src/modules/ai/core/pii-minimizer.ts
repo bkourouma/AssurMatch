@@ -4,10 +4,14 @@
  * scrubbed of e-mail addresses, phone numbers, long digit runs (ids, plates, cards) and IBAN-like
  * strings. It returns a report so the interaction can prove what was removed without keeping it.
  */
+import { SensitiveDataDetector } from "./sensitive-data-detector";
+
 export interface MinimizationReport {
   droppedKeys: string[];
   redactedPatterns: Record<string, number>;
   truncatedValues: number;
+  /** Spec 075: sensitive categories masked (health, card, secret...), counters only, never values. */
+  sensitiveCategories?: Record<string, number> | undefined;
 }
 
 export interface MinimizationResult<T> {
@@ -31,6 +35,8 @@ const PATTERNS: Array<[string, RegExp]> = [
 const MAX_TEXT_LENGTH = 800;
 
 export class PiiMinimizer {
+  private readonly detector = new SensitiveDataDetector();
+
   minimize<T>(input: T): MinimizationResult<T> {
     const report: MinimizationReport = { droppedKeys: [], redactedPatterns: {}, truncatedValues: 0 };
     return { minimized: this.walk(input, report, "") as T, report };
@@ -43,7 +49,14 @@ export class PiiMinimizer {
 
   private walk(value: unknown, report: MinimizationReport, path: string): unknown {
     if (typeof value === "string") return this.scrub(value, report);
-    if (typeof value === "number" || typeof value === "boolean" || value === null || value === undefined) return value;
+    if (typeof value === "number") {
+      // A bare number can carry a card number: mask it like text so the final prompt rescans clean.
+      const masked = this.detector.redactWithReport(String(value));
+      if (masked.categories.length === 0) return value;
+      this.recordSensitive(report, masked.occurrences);
+      return masked.text;
+    }
+    if (typeof value === "boolean" || value === null || value === undefined) return value;
     if (Array.isArray(value)) return value.slice(0, 50).map((item, index) => this.walk(item, report, `${path}[${index}]`));
     if (typeof value === "object") {
       const result: Record<string, unknown> = {};
@@ -60,7 +73,9 @@ export class PiiMinimizer {
   }
 
   private scrub(text: string, report: MinimizationReport): string {
-    let output = text;
+    const sensitive = this.detector.redactWithReport(text);
+    this.recordSensitive(report, sensitive.occurrences);
+    let output = sensitive.text;
     for (const [name, pattern] of PATTERNS) {
       output = output.replace(pattern, () => {
         report.redactedPatterns[name] = (report.redactedPatterns[name] ?? 0) + 1;
@@ -72,5 +87,11 @@ export class PiiMinimizer {
       output = `${output.slice(0, MAX_TEXT_LENGTH)}...`;
     }
     return output;
+  }
+
+  private recordSensitive(report: MinimizationReport, occurrences: Record<string, number>): void {
+    for (const [category, count] of Object.entries(occurrences)) {
+      report.sensitiveCategories = { ...(report.sensitiveCategories ?? {}), [category]: (report.sensitiveCategories?.[category] ?? 0) + count };
+    }
   }
 }

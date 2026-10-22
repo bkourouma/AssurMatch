@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 
 function source(path: string): string {
   return readFileSync(path, "utf8");
@@ -32,6 +32,9 @@ test("messaging test action posts to the existing route and never echoes the rec
   expect(action).toContain("recipientMasked");
   expect(action).not.toMatch(/searchParams|URLSearchParams/);
   expect(action).not.toMatch(/redirect\([^)]*recipient/);
+  // Single implementation: the lot 6 duplicate action and its `sendMessagingTest` helper are gone.
+  expect(existsSync("apps/admin/app/messaging/actions.ts")).toBe(false);
+  expect(source("apps/admin/app/lib/admin-api.ts")).not.toContain("sendMessagingTest");
 });
 
 test("messaging test files stay free of console output and forbidden wording", () => {

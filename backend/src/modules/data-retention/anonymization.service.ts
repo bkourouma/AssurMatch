@@ -94,7 +94,7 @@ export class AnonymizationService {
           });
         }
       }
-      this.deps.audit.write({
+      await this.deps.audit.writeAsync({
         actor,
         action: DataRetentionAuditActions.categoryAnonymized,
         targetType: "AnonymizationBatch",
