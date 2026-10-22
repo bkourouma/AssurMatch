@@ -8,7 +8,7 @@
 ALTER TABLE "Prospect" ADD COLUMN IF NOT EXISTS "emailBlindIndex" TEXT;
 ALTER TABLE "Prospect" ADD COLUMN IF NOT EXISTS "phoneBlindIndex" TEXT;
 ALTER TABLE "Prospect" ADD COLUMN IF NOT EXISTS "piiKeyId" TEXT;
-CREATE INDEX IF NOT EXISTS "Prospect_countryId_productId_emailBlindIndex_phoneBlindIndex_idx" ON "Prospect"("countryId", "productId", "emailBlindIndex", "phoneBlindIndex");
+CREATE INDEX IF NOT EXISTS "Prospect_countryId_productId_emailBlindIndex_phoneBlindInde_idx" ON "Prospect"("countryId", "productId", "emailBlindIndex", "phoneBlindIndex");
 CREATE INDEX IF NOT EXISTS "Prospect_countryId_productId_phoneBlindIndex_idx" ON "Prospect"("countryId", "productId", "phoneBlindIndex");
 CREATE INDEX IF NOT EXISTS "Prospect_piiKeyId_idx" ON "Prospect"("piiKeyId");
 
