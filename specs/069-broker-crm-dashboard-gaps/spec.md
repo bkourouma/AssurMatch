@@ -2,7 +2,7 @@
 
 **Status**: Validated (lot 3 « écarts PRD », mandaté par le superviseur du projet le 2026-10-21 ; spec standard, aucun `[NEEDS CLARIFICATION]`)
 **Input**: PRD §6.3, §10.2, §19 (CRM-002, CRM-006, CRM-015), §20 (KPI, DASH-B-001..009), §23 (notifications courtier) ; specs 012, 035, 040, 041, 061, 064. Dépend des specs 040 (Enterprise), 053 (équipe), 060 (facturation), 061 (alertes), 064 (rôles personnalisés et filtre agence).
-**Impacted surfaces**: Backend API (tableau de bord courtier, IA courtier, alertes planifiées, liste CRM), Broker Back-office (tableau de bord, liste CRM, Kanban, fiche lead), shared packages (contrats dashboard, IA, ops), feature flags (un flag IA fermé par défaut). **Web Publique Client : aucun changement. Back-office Plateforme : aucun changement. Base de données : aucune migration.**
+**Impacted surfaces**: Backend API (tableau de bord courtier, IA courtier, alertes planifiées, liste CRM), Broker Back-office (tableau de bord, liste CRM, Kanban, fiche lead), shared packages (contrats dashboard, IA, ops), feature flags (un flag IA fermé par défaut). **Web Publique Client : aucun changement. Back-office Plateforme : aucun changement. Base de données : une migration additive minimale, `0039_broker_lead_alerts` (deux valeurs d'enum `NotificationType`), aucune table ni colonne.**
 
 ## Why
 Le PRD §20 liste des indicateurs que le tableau de bord courtier n'expose pas (taux de contact, délai de premier contact, taux de qualification, devis envoyés, sources performantes, coût par lead) et définit la conversion comme leads gagnés / leads reçus alors que le produit calcule acceptés / reçus. Le CRM n'a ni glisser-déposer, ni sélecteur de conseillers (l'identifiant brut est saisi), ni filtres serveur paginés (filtrage sur la première page seulement), ni score de priorité IA, ni vue consolidée Enterprise, et deux notifications courtier du PRD §23 manquent.
@@ -35,7 +35,7 @@ Le PRD §20 liste des indicateurs que le tableau de bord courtier n'expose pas (
 - **D4** Résumé hebdomadaire : texte IA si la passerelle l'autorise, sinon texte déterministe ; flag fermé par défaut.
 
 ## Hors périmètre
-- Capture UTM / source marketing publique ; restriction d'accès par agence ; migration de base de données.
+- Capture UTM / source marketing publique ; restriction d'accès par agence ; toute migration autre que l'ajout des deux types de notification.
 
 ## Success criteria
 - Chaque KPI testé, dont la conversion gagnés / reçus ; glisser-déposer audité et refusé aux rôles sans droit ; sélecteur limité à l'équipe ; filtres serveur paginés ; tri par score IA ; deux alertes idempotentes ; vue multi-agences Enterprise ; rien de visible pour le Starter.
