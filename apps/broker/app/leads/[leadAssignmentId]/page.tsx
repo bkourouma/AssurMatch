@@ -3,6 +3,7 @@ import { loginRedirect, readBackOfficeSession } from "../../lib/backoffice-auth"
 import { isNotFoundState, readLeadProposals, readStarterLeadDetail, readStarterLeadHistory } from "../../lib/broker-api";
 import { PROPOSAL_NOTICES, VISITOR_RESPONSE_LABELS } from "../../lib/proposal-vocabulary";
 import { ProposalPanel } from "../../lib/ui/proposal-panel";
+import { LeadConversationSection } from "../../lib/ui/conversation-panel";
 import { acceptStarterLeadAction, closeStarterLeadAction, disputeStarterLeadAction, rejectStarterLeadAction } from "../../lib/lead-actions";
 import { TENANT_SUSPENDED_MESSAGE, canMutateStarterLead, isTenantReadOnly } from "../../lib/broker-permissions";
 import {
@@ -13,6 +14,7 @@ import {
   STARTER_CLOSE_OUTCOME_LABELS,
   STARTER_FINAL_STATUSES,
   STARTER_REASON_LABELS,
+  DISPUTE_FINAL_DECISION_NOTICE,
   renderAnswerValue,
   starterCloseOutcomeLabel,
   starterEventLabel,
@@ -36,7 +38,8 @@ import {
   StatusBadge,
   starterStatusLabels
 } from "../../lib/ui/broker-ui";
-import { formatDate, statusTone } from "../../lib/ui/broker-view-models";
+import { DisputeStatusCard } from "../../lib/ui/dispute-status-card";
+import { disputeAvailability, formatDate, statusTone } from "../../lib/ui/broker-view-models";
 
 const NOTICES: Record<string, { tone: "info" | "warning" | "danger"; message: string }> = {
   accepted: { tone: "info", message: "Lead accepte. L'action est historisee avec acteur et date." },
@@ -46,6 +49,9 @@ const NOTICES: Record<string, { tone: "info" | "warning" | "danger"; message: st
   outcome_required: { tone: "warning", message: "Choisissez l'issue de la cloture: gagne, perdu ou sans suite." },
   conflict: { tone: "warning", message: "Cloture refusee: le lead doit etre accepte et ne pas etre deja cloture." },
   reason_required: { tone: "warning", message: "Un motif allowliste est obligatoire pour rejeter ou contester un lead." },
+  // Spec 063 (CRM-012): fenêtre de 30 jours et contestation unique.
+  dispute_window_expired: { tone: "warning", message: "Contestation refusée : la fenêtre de 30 jours suivant la réception du lead est close." },
+  dispute_exists: { tone: "warning", message: "Contestation refusée : ce lead a déjà fait l'objet d'une contestation." },
   forbidden: { tone: "warning", message: "Action refusee: vos permissions, votre tenant ou votre MFA ne l'autorisent pas." },
   // Spec 051 FR-021: 403 PARTNER_SUSPENDED.
   suspended: { tone: "warning", message: TENANT_SUSPENDED_MESSAGE },
@@ -77,10 +83,10 @@ export default async function BrokerLeadDetailPage({
   searchParams
 }: {
   params: Promise<{ leadAssignmentId: string }>;
-  searchParams: Promise<{ lead?: string; proposal?: string }>;
+  searchParams: Promise<{ lead?: string; proposal?: string; conv?: string }>;
 }) {
   const { leadAssignmentId } = await params;
-  const { lead: notice, proposal: proposalNotice } = await searchParams;
+  const { lead: notice, proposal: proposalNotice, conv } = await searchParams;
   const session = await readBackOfficeSession();
   if (session.status === "unauthenticated" || session.status === "expired") redirect(loginRedirect(`/leads/${leadAssignmentId}`, session.status));
   if (session.status !== "authenticated") {
@@ -116,6 +122,8 @@ export default async function BrokerLeadDetailPage({
   // « Accepter » n'a de sens que tant que le lead n'est pas accepte.
   const canAccept = showActions && Boolean(lead && (STARTER_ACCEPTABLE_STATUSES as readonly string[]).includes(lead.status));
   const canClose = showActions && Boolean(lead && (STARTER_CLOSABLE_STATUSES as readonly string[]).includes(lead.status));
+  // Spec 063 FR-B01/FR-B09: la contestation n'est offerte que dans la fenêtre de 30 jours et une seule fois.
+  const availability = disputeAvailability({ window: lead?.disputeWindow, hasDispute: Boolean(lead?.dispute), canMutate, tenantReadOnly });
   const noticeEntry = notice ? NOTICES[notice] : undefined;
   const proposalNoticeEntry = proposalNotice ? PROPOSAL_NOTICES[proposalNotice] : undefined;
   const contactMasked = lead?.contactVisibility === "masked";
@@ -234,30 +242,35 @@ export default async function BrokerLeadDetailPage({
                   </Field>
                 </ConfirmDialog>
 
-                <ConfirmDialog
-                  triggerLabel="Contester avec motif"
-                  title="Contester avec motif"
-                  description="La contestation exige un motif allowliste et suit le workflow existant."
-                  confirmLabel="Contester le lead"
-                  cancelLabel="Annuler"
-                  formAction={disputeStarterLeadAction}
-                >
-                  <input type="hidden" name="leadAssignmentId" value={lead.leadAssignmentId} />
-                  <Field id="dispute-reason" label="Motif de contestation" required requiredLabel="obligatoire">
-                    <Select
-                      id="dispute-reason"
-                      name="reason" required
-                      defaultValue=""
-                      aria-label="Motif de contestation"
-                      placeholder="Choisir un motif"
-                      options={REASON_OPTIONS}
-                    />
-                  </Field>
-                  <Field id="dispute-comment" label="Commentaire interne">
-                    <Input id="dispute-comment" name="comment" maxLength={500} placeholder="Optionnel" aria-label="Commentaire de contestation" />
-                  </Field>
-                </ConfirmDialog>
+                {availability.canDispute ? (
+                  <ConfirmDialog
+                    triggerLabel="Contester avec motif"
+                    title="Contester avec motif"
+                    description={`La contestation exige un motif allowliste. Elle est transmise à la finance AssurMatch, qui statue et vous notifie. ${DISPUTE_FINAL_DECISION_NOTICE}`}
+                    confirmLabel="Contester le lead"
+                    cancelLabel="Annuler"
+                    formAction={disputeStarterLeadAction}
+                  >
+                    <input type="hidden" name="leadAssignmentId" value={lead.leadAssignmentId} />
+                    <Field id="dispute-reason" label="Motif de contestation" required requiredLabel="obligatoire">
+                      <Select
+                        id="dispute-reason"
+                        name="reason" required
+                        defaultValue=""
+                        aria-label="Motif de contestation"
+                        placeholder="Choisir un motif"
+                        options={REASON_OPTIONS}
+                      />
+                    </Field>
+                    <Field id="dispute-comment" label="Commentaire interne">
+                      <Input id="dispute-comment" name="comment" maxLength={500} placeholder="Optionnel" aria-label="Commentaire de contestation" />
+                    </Field>
+                  </ConfirmDialog>
+                ) : (
+                  <Badge tone="disabled">Contestation indisponible</Badge>
+                )}
               </Cluster>
+              <Notice tone={availability.canDispute ? "info" : "warning"}>{availability.message}</Notice>
 
               {canClose ? (
                 <Cluster>
@@ -311,6 +324,8 @@ export default async function BrokerLeadDetailPage({
         </Card>
       ) : null}
 
+      {lead?.dispute ? <DisputeStatusCard disputes={[lead.dispute]} /> : null}
+
       {lead ? (
         <div id="repondre-au-visiteur">
           <Card title="Répondre au visiteur" description="Proposition simple et non contractuelle (constitution 1.3.0) : message, prime indicative ou fourchette, garanties, validite et PDF facultatif. Aucune fonction CRM.">
@@ -323,6 +338,9 @@ export default async function BrokerLeadDetailPage({
           </Card>
         </div>
       ) : null}
+
+      {/* Spec 062: messagerie et demandes de documents du visiteur (id="conversation"), sans fonction CRM. */}
+      {lead ? <LeadConversationSection channel="starter" leadAssignmentId={lead.leadAssignmentId} canMutate={canMutate} tenantReadOnly={tenantReadOnly} notice={conv} /> : null}
 
       {lead && answerEntries.length > 0 ? (
         <Card title="Reponses consenties">

@@ -429,7 +429,7 @@ Les statuts internes « injoignable », « hors cible », « doublon » et « co
 | D-6 | Que reçoit un courtier « Actif test » ? | **Uniquement des leads de test** | Marqueur « test » sur la demande ; jamais facturé ; jamais routé vers un courtier « Actif public ». |
 | D-7 | BullMQ ou sondage en base ? | **Sondage en base**, dans un conteneur worker dédié | Retirer les files BullMQ jamais consommées (spec 057). |
 | D-8 | Paiement des courtiers | **Facturation manuelle** au lancement | Spec 060. Paiement en ligne dans une spec ultérieure. |
-| D-9 | Messagerie libre au lancement ? | **Après le lancement** | Au lancement : proposition et réponse du visiteur (E-02, E-04). Spec 062 hors chemin critique. |
+| D-9 | Messagerie libre au lancement ? | **Après le lancement** — **levée le 2026-10-15** : la messagerie courtier ↔ visiteur est livrée maintenant (spec 062, derrière le drapeau `broker_visitor_messaging_enabled`) | ~~Au lancement : proposition et réponse du visiteur (E-02, E-04). Spec 062 hors chemin critique.~~ **Note du 2026-10-15** : le propriétaire du produit a levé cette décision. La spec 062 (messages, pièces jointes, demandes de documents E-05, SLA E-08, demandes de données D-10) est livrée avant le lancement. |
 | D-10 | Domaine de production | **À définir** | Spec 057 rédigée avec des domaines paramétrables ; le choix est un prérequis de J4. |
 
 ---

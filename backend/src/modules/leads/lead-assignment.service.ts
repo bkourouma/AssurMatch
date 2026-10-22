@@ -45,6 +45,8 @@ export interface LeadAssignmentRecord {
   actionComment?: string;
   lastBrokerActionById?: string;
   lastBrokerActionAt?: Date;
+  /** Spec 062 E-08: first reply the visitor can see (first proposal or first broker message) of the CURRENT partner. */
+  firstVisibleReplyAt?: Date | null;
   crmStatus?: BrokerCrmPipelineStatus;
   urgency?: "low" | "normal" | "high" | "urgent";
   source?: "comparator" | "quote_request" | "manual_import" | "partner_referral" | "support";
@@ -204,7 +206,9 @@ export class LeadAssignmentService {
       actionReason: input.reason,
       updatedAt: now,
       ...(actor.actorId ? { lastBrokerActionById: actor.actorId } : {}),
-      lastBrokerActionAt: now
+      lastBrokerActionAt: now,
+      // Spec 062 E-08: the new partner's visible-reply SLA starts from the reassignment (explicit null: the column is cleared).
+      firstVisibleReplyAt: null
     };
     for (const key of ["brokerNotificationId", "seenAt", "seenById", "acceptedAt", "rejectedAt", "disputedAt", "actionComment", "crmStatus", "assignedAdvisorId", "crmUpdatedAt"] as const) {
       delete assignment[key];
@@ -226,12 +230,32 @@ export class LeadAssignmentService {
     return assignment;
   }
 
+  /**
+   * Spec 062 E-08 (`FirstVisibleReplyPort`): the first proposal or first broker message of the current
+   * partner is the "first visible reply". Idempotent: only the first call after the assignment (or its
+   * reassignment) writes; it counts as a broker action but never moves the assignment status.
+   */
+  async recordFirstVisibleReply(id: string, at: Date, actor: ActorContext): Promise<void> {
+    const assignment = await this.require(id);
+    if (assignment.firstVisibleReplyAt) return;
+    assignment.firstVisibleReplyAt = at;
+    assignment.lastBrokerActionAt = at;
+    if (actor.actorId) assignment.lastBrokerActionById = actor.actorId;
+    assignment.updatedAt = at;
+    await this.repository.update(id, { firstVisibleReplyAt: at, lastBrokerActionAt: at, ...(actor.actorId ? { lastBrokerActionById: actor.actorId } : {}), updatedAt: at });
+  }
+
   activeCountForPartner(partnerTenantId: string): Promise<number> {
     return this.repository.activeCountForPartner(partnerTenantId);
   }
 
   list(): Promise<LeadAssignmentRecord[]> {
     return this.repository.list();
+  }
+
+  /** Assignments of one quote request without reading every lead (spec 062 conversations). */
+  listForQuote(quoteRequestId: string): Promise<LeadAssignmentRecord[]> {
+    return this.repository.listForQuote(quoteRequestId);
   }
 
   require(id: string): Promise<LeadAssignmentRecord> {

@@ -41,6 +41,9 @@ import {
 import { BillingAccessRefusedError, BillingDisabledError } from "../billing/billing-foundation.service";
 import { InvoiceConflictError, InvoiceIntegrityError, InvoiceNotFoundError, InvoicingConfigurationError } from "../billing/invoicing-errors";
 import type { InvoiceDocumentFile } from "../billing/invoicing.service";
+// Spec 063 (start)
+import { adminLeadDisputeQuerySchema } from "../../../../packages/shared/contracts/lead-disputes.contracts";
+// Spec 063 (end)
 import {
   partnerApplicationConvertSchema,
   partnerApplicationRejectSchema,
@@ -145,6 +148,10 @@ import { PublicHealthController } from "../health/public-health.controller";
 import { MetricsController } from "../observability/metrics.controller";
 import { adminAuditLogQuerySchema } from "../../../../packages/shared/contracts/admin-operations.contracts";
 import { ADMIN_OPERATIONS_HTTP_CONTROLLERS } from "./admin-operations-http.controllers";
+// Spec 062 data requests
+import { DATA_REQUESTS_HTTP_CONTROLLERS } from "./data-requests-http.controllers";
+// Spec 062 messaging
+import { BrokerMessagingRoutes, LEAD_MESSAGING_HTTP_CONTROLLERS, registerBrokerMessagingRoutes } from "./lead-messaging-http.controllers";
 
 type MethodDecoratorFactory = (target: object, propertyKey: string | symbol, descriptor: PropertyDescriptor) => void;
 type ParamDecoratorFactory = (target: object, propertyKey: string | symbol | undefined, parameterIndex: number) => void;
@@ -286,7 +293,8 @@ export class AuthController {
     const actor = this.runtime.auth.service.me(protectedActorFromRequest(request));
     // The back-office headers show the user's name; a missing account keeps the actor as before.
     const account = actor.actorId ? await this.runtime.users.service.require(actor.actorId).catch(() => undefined) : undefined;
-    return account?.displayName ? { ...actor, displayName: account.displayName } : actor;
+    // Spec 063 FR-A11: the MFA screen offers enrolment only when no secret exists yet (false for an unknown account).
+    return { ...actor, ...(account?.displayName ? { displayName: account.displayName } : {}), mfaEnrolled: Boolean(account?.mfaSecretEncrypted) && account?.mfaStatus === "verified" };
   }
 
   passwordChange(request: AssurMatchHttpRequest, input: PasswordChangeRequest) {
@@ -302,15 +310,26 @@ export class AuthController {
 
   async enrollMfa(request: AssurMatchHttpRequest) {
     const actor = protectedActorFromRequest(request);
-    return this.runtime.auth.service.enrollMfa(await this.runtime.users.service.require(actor.actorId ?? ""));
+    // Spec 063 FR-A08: the actor tells whether the session already passed the second factor.
+    return this.runtime.auth.service.enrollMfa(await this.runtime.users.service.require(actor.actorId ?? ""), actor);
   }
 
-  async verifyMfa(request: AssurMatchHttpRequest, input: { challengeId: string; code: string }) {
+  async verifyMfa(request: AssurMatchHttpRequest, input: unknown) {
     const actor = protectedActorFromRequest(request);
     return this.rateLimiter.run({ route: "/auth/mfa/verify", ip: clientIp(request), identifier: actor.actorId ?? undefined }, async () => {
       const parsed = parseHttpInput(mfaVerifyRequestSchema, input);
-      return this.runtime.auth.service.verifyMfa(await this.runtime.users.service.require(actor.actorId ?? ""), parsed.challengeId ?? "", parsed.code, parsed.kind);
+      return this.runtime.auth.service.verifyMfa(await this.runtime.users.service.require(actor.actorId ?? ""), parsed.challengeId ?? "", parsed.code, parsed.kind, { trustDevice: parsed.trustDevice, deviceLabel: parsed.deviceLabel });
     });
+  }
+
+  /** Spec 063: active trusted devices of the signed-in (MFA-verified) user. */
+  trustedDevices(request: AssurMatchHttpRequest) {
+    return this.runtime.auth.service.listTrustedDevices(protectedActorFromRequest(request));
+  }
+
+  /** Spec 063: "revoke all my devices". */
+  revokeTrustedDevices(request: AssurMatchHttpRequest) {
+    return this.runtime.auth.service.revokeTrustedDevices(protectedActorFromRequest(request));
   }
 }
 
@@ -1200,6 +1219,43 @@ export class BrokerStarterController {
   async proposalDocument(leadId: string, proposalId: string, request: AssurMatchHttpRequest) {
     return attachment(await this.runtime.leadProposals.service.brokerDocument("starter", parseParam("leadId", leadId, uuidSchema), parseParam("proposalId", proposalId, uuidSchema), protectedActorFromRequest(request)));
   }
+
+  // Spec 062 messaging: conversation with the visitor and document requests (Starter has it too; no CRM feature).
+  conversation(leadId: string, query: Record<string, string>, request: AssurMatchHttpRequest) {
+    return new BrokerMessagingRoutes(this.runtime).conversation("starter", leadId, query, request);
+  }
+
+  sendMessage(leadId: string, files: unknown, input: unknown, request: AssurMatchHttpRequest) {
+    const actor = brokerWriteActor(request);
+    return new BrokerMessagingRoutes(this.runtime).send("starter", leadId, files, input, actor);
+  }
+
+  markRead(leadId: string, request: AssurMatchHttpRequest) {
+    const actor = brokerWriteActor(request);
+    return new BrokerMessagingRoutes(this.runtime).markRead("starter", leadId, actor);
+  }
+
+  messageAttachment(leadId: string, messageId: string, attachmentId: string, request: AssurMatchHttpRequest) {
+    return new BrokerMessagingRoutes(this.runtime).attachment("starter", leadId, messageId, attachmentId, request);
+  }
+
+  documentRequests(leadId: string, request: AssurMatchHttpRequest) {
+    return new BrokerMessagingRoutes(this.runtime).documentRequests("starter", leadId, request);
+  }
+
+  createDocumentRequest(leadId: string, input: unknown, request: AssurMatchHttpRequest) {
+    const actor = brokerWriteActor(request);
+    return new BrokerMessagingRoutes(this.runtime).createDocumentRequest("starter", leadId, input, actor);
+  }
+
+  cancelDocumentRequest(leadId: string, requestId: string, input: unknown, request: AssurMatchHttpRequest) {
+    const actor = brokerWriteActor(request);
+    return new BrokerMessagingRoutes(this.runtime).cancelDocumentRequest("starter", leadId, requestId, input, actor);
+  }
+
+  documentRequestFile(leadId: string, requestId: string, documentId: string, request: AssurMatchHttpRequest) {
+    return new BrokerMessagingRoutes(this.runtime).documentFile("starter", leadId, requestId, documentId, request);
+  }
 }
 
 export class BrokerCrmController {
@@ -1284,6 +1340,43 @@ export class BrokerCrmController {
     return attachment(await this.runtime.leadProposals.service.brokerDocument("crm", parseParam("leadId", leadId, uuidSchema), parseParam("proposalId", proposalId, uuidSchema), protectedActorFromRequest(request)));
   }
 
+  // Spec 062 messaging: conversation with the visitor and document requests (CRM channel).
+  conversation(leadId: string, query: Record<string, string>, request: AssurMatchHttpRequest) {
+    return new BrokerMessagingRoutes(this.runtime).conversation("crm", leadId, query, request);
+  }
+
+  sendMessage(leadId: string, files: unknown, input: unknown, request: AssurMatchHttpRequest) {
+    const actor = brokerWriteActor(request);
+    return new BrokerMessagingRoutes(this.runtime).send("crm", leadId, files, input, actor);
+  }
+
+  markRead(leadId: string, request: AssurMatchHttpRequest) {
+    const actor = brokerWriteActor(request);
+    return new BrokerMessagingRoutes(this.runtime).markRead("crm", leadId, actor);
+  }
+
+  messageAttachment(leadId: string, messageId: string, attachmentId: string, request: AssurMatchHttpRequest) {
+    return new BrokerMessagingRoutes(this.runtime).attachment("crm", leadId, messageId, attachmentId, request);
+  }
+
+  documentRequests(leadId: string, request: AssurMatchHttpRequest) {
+    return new BrokerMessagingRoutes(this.runtime).documentRequests("crm", leadId, request);
+  }
+
+  createDocumentRequest(leadId: string, input: unknown, request: AssurMatchHttpRequest) {
+    const actor = brokerWriteActor(request);
+    return new BrokerMessagingRoutes(this.runtime).createDocumentRequest("crm", leadId, input, actor);
+  }
+
+  cancelDocumentRequest(leadId: string, requestId: string, input: unknown, request: AssurMatchHttpRequest) {
+    const actor = brokerWriteActor(request);
+    return new BrokerMessagingRoutes(this.runtime).cancelDocumentRequest("crm", leadId, requestId, input, actor);
+  }
+
+  documentRequestFile(leadId: string, requestId: string, documentId: string, request: AssurMatchHttpRequest) {
+    return new BrokerMessagingRoutes(this.runtime).documentFile("crm", leadId, requestId, documentId, request);
+  }
+
   dispute(leadId: string, input: unknown, request: AssurMatchHttpRequest) {
     const actor = brokerWriteActor(request);
     return this.runtime.leads.brokerCrmController.addDispute(parseParam("leadId", leadId, uuidSchema), parseHttpInput(brokerCrmDisputeCreateSchema, input), actor);
@@ -1334,6 +1427,12 @@ export class BrokerCrmController {
     const actor = brokerWriteActor(request);
     return this.runtime.brokerAi.setOptOut(actor, input);
   }
+
+  // Spec 064 (FR-003) begin: recent loss analyses of the caller's own tenant.
+  aiLossAnalyses(request: AssurMatchHttpRequest) {
+    return this.runtime.brokerAi.listLossAnalyses(protectedActorFromRequest(request));
+  }
+  // Spec 064 end
 }
 
 export class BrokerDashboardController {
@@ -1530,6 +1629,35 @@ async function invoicingCall<T>(call: () => Promise<T>): Promise<T> {
   }
 }
 
+// Spec 063 (start): lead disputes. Admin routes need `billing:dispute_read` / `billing:dispute_decide`
+// (finance_admin, super_admin) with a verified MFA; the country scope and the billing flag live in the service.
+export class AdminLeadDisputesController {
+  constructor(private readonly runtime: AssurMatchRuntime) {}
+
+  list(request: AssurMatchHttpRequest, query: Record<string, string>) {
+    return invoicingCall(() => this.runtime.leads.disputes.listForAdmin(protectedActorFromRequest(request), parseHttpInput(adminLeadDisputeQuerySchema, query ?? {})));
+  }
+
+  detail(id: string, request: AssurMatchHttpRequest) {
+    return invoicingCall(() => this.runtime.leads.disputes.detailForAdmin(protectedActorFromRequest(request), parseParam("disputeId", id, uuidSchema)));
+  }
+
+  /** The body is validated by the service after the RBAC check (an unauthorised caller gets 403, a missing reason 422). */
+  decision(id: string, input: unknown, request: AssurMatchHttpRequest) {
+    return invoicingCall(() => this.runtime.leads.disputes.decide(protectedActorFromRequest(request), parseParam("disputeId", id, uuidSchema), input));
+  }
+}
+
+/** Broker side: the disputes of the caller's own tenant (roles with `billing:read_own`; agents are refused). */
+export class BrokerLeadDisputesController {
+  constructor(private readonly runtime: AssurMatchRuntime) {}
+
+  list(request: AssurMatchHttpRequest) {
+    return invoicingCall(() => this.runtime.leads.disputes.listForBroker(protectedActorFromRequest(request)));
+  }
+}
+// Spec 063 (end)
+
 function pdfFile(file: InvoiceDocumentFile): StreamableFile {
   return new StreamableFile(file.bytes, {
     type: "application/pdf",
@@ -1692,6 +1820,13 @@ export class BrokerEnterpriseController {
     const actor = brokerWriteActor(request);
     return this.runtime.enterprise.updateBranding(input, actor);
   }
+
+  // Spec 064 (FR-006) begin: assigns (or clears) the custom role of a member of the same tenant.
+  setMemberCustomRole(userId: string, input: unknown, request: AssurMatchHttpRequest) {
+    const actor = brokerWriteActor(request);
+    return this.runtime.enterprise.assignCustomRole(parseParam("userId", userId, uuidSchema), input, actor);
+  }
+  // Spec 064 end
 }
 
 export class BrokerNotificationsController {
@@ -2071,6 +2206,8 @@ decorate(AuthController, "passwordChange", [authRoute, Post("password-change") a
 decorate(AuthController, "passwordReset", [Post("password-reset") as MethodDecoratorFactory], [[0, Body() as ParamDecoratorFactory], [1, Req() as ParamDecoratorFactory]]);
 decorate(AuthController, "enrollMfa", [authRoute, Post("mfa/enroll") as MethodDecoratorFactory], [[0, Req() as ParamDecoratorFactory]]);
 decorate(AuthController, "verifyMfa", [authRoute, Post("mfa/verify") as MethodDecoratorFactory], [[0, Req() as ParamDecoratorFactory], [1, Body() as ParamDecoratorFactory]]);
+decorate(AuthController, "trustedDevices", [protectedRoute, Get("trusted-devices") as MethodDecoratorFactory], [[0, Req() as ParamDecoratorFactory]]);
+decorate(AuthController, "revokeTrustedDevices", [protectedRoute, Delete("trusted-devices") as MethodDecoratorFactory], [[0, Req() as ParamDecoratorFactory]]);
 
 controller("countries", PublicCountriesController);
 decorate(PublicCountriesController, "list", [Get() as MethodDecoratorFactory]);
@@ -2234,6 +2371,11 @@ decorate(BrokerCrmController, "aiValidate", [Post("ai/interactions/:id/validatio
 decorate(BrokerCrmController, "aiLossAnalysis", [Post("ai/loss-analysis") as MethodDecoratorFactory], [[0, Body() as ParamDecoratorFactory], [1, Req() as ParamDecoratorFactory]]);
 decorate(BrokerCrmController, "aiOptOutStatus", [Get("ai/opt-out") as MethodDecoratorFactory], [[0, Req() as ParamDecoratorFactory]]);
 decorate(BrokerCrmController, "aiSetOptOut", [Put("ai/opt-out") as MethodDecoratorFactory], [[0, Body() as ParamDecoratorFactory], [1, Req() as ParamDecoratorFactory]]);
+// Spec 062 messaging: conversation and document-request routes of the Starter and CRM controllers (see lead-messaging-http.controllers.ts).
+registerBrokerMessagingRoutes([BrokerStarterController, BrokerCrmController]);
+// Spec 064 begin: no parameterised GET route starts with "ai/loss-analysis", so nothing captures it.
+decorate(BrokerCrmController, "aiLossAnalyses", [Get("ai/loss-analysis") as MethodDecoratorFactory, Header("Cache-Control", "no-store") as MethodDecoratorFactory], [[0, Req() as ParamDecoratorFactory]]);
+// Spec 064 end
 
 controller("broker/dashboard", BrokerDashboardController, true);
 decorate(BrokerDashboardController, "dashboard", [Get() as MethodDecoratorFactory], [[0, Req() as ParamDecoratorFactory], [1, Query() as ParamDecoratorFactory]]);
@@ -2359,11 +2501,23 @@ decorate(BrokerEnterpriseController, "sla", [Get("sla") as MethodDecoratorFactor
 decorate(BrokerEnterpriseController, "updateSla", [Put("sla") as MethodDecoratorFactory], [[0, Body() as ParamDecoratorFactory], [1, Req() as ParamDecoratorFactory]]);
 decorate(BrokerEnterpriseController, "branding", [Get("branding") as MethodDecoratorFactory], [[0, Req() as ParamDecoratorFactory]]);
 decorate(BrokerEnterpriseController, "updateBranding", [Put("branding") as MethodDecoratorFactory], [[0, Body() as ParamDecoratorFactory], [1, Req() as ParamDecoratorFactory]]);
+// Spec 064 begin
+decorate(BrokerEnterpriseController, "setMemberCustomRole", [Put("members/:userId/custom-role") as MethodDecoratorFactory], [[0, Param("userId") as ParamDecoratorFactory], [1, Body() as ParamDecoratorFactory], [2, Req() as ParamDecoratorFactory]]);
+// Spec 064 end
 controller("broker/notifications", BrokerNotificationsController, true);
 decorate(BrokerNotificationsController, "inbox", [Get("inbox") as MethodDecoratorFactory], [[0, Req() as ParamDecoratorFactory]]);
 decorate(BrokerNotificationsController, "markRead", [Post("inbox/:id/read") as MethodDecoratorFactory], [[0, Param("id") as ParamDecoratorFactory], [1, Req() as ParamDecoratorFactory]]);
 decorate(BrokerNotificationsController, "preferences", [Get("preferences") as MethodDecoratorFactory], [[0, Req() as ParamDecoratorFactory]]);
 decorate(BrokerNotificationsController, "updatePreferences", [Put("preferences") as MethodDecoratorFactory], [[0, Body() as ParamDecoratorFactory], [1, Req() as ParamDecoratorFactory]]);
+// Spec 063 (start)
+controller("admin", AdminLeadDisputesController, true);
+decorate(AdminLeadDisputesController, "list", [Get("billing/disputes") as MethodDecoratorFactory], [[0, Req() as ParamDecoratorFactory], [1, Query() as ParamDecoratorFactory]]);
+decorate(AdminLeadDisputesController, "detail", [Get("billing/disputes/:disputeId") as MethodDecoratorFactory], [[0, Param("disputeId") as ParamDecoratorFactory], [1, Req() as ParamDecoratorFactory]]);
+decorate(AdminLeadDisputesController, "decision", [Post("billing/disputes/:disputeId/decision") as MethodDecoratorFactory, HttpCode(200) as MethodDecoratorFactory], [[0, Param("disputeId") as ParamDecoratorFactory], [1, Body() as ParamDecoratorFactory], [2, Req() as ParamDecoratorFactory]]);
+controller("broker/billing", BrokerLeadDisputesController, true);
+decorate(BrokerLeadDisputesController, "list", [Get("disputes") as MethodDecoratorFactory], [[0, Req() as ParamDecoratorFactory]]);
+// Spec 063 (end)
+
 controller("broker/billing", BrokerBillingController, true);
 decorate(BrokerBillingController, "statement", [Get("statement") as MethodDecoratorFactory], [[0, Req() as ParamDecoratorFactory]]);
 decorate(BrokerBillingController, "account", [Get("account") as MethodDecoratorFactory], [[0, Req() as ParamDecoratorFactory]]);
@@ -2524,9 +2678,10 @@ Reflect.defineMetadata("design:paramtypes", [AssurMatchRuntime], AuthRequiredHtt
  * every non-GET broker route is in one of the two lists.
  */
 export const BROKER_TENANT_WRITE_GUARDED: Readonly<Record<string, readonly string[]>> = {
-  BrokerStarterController: ["accept", "reject", "dispute", "close", "sendProposal", "withdrawProposal"],
-  BrokerCrmController: ["status", "note", "task", "reminder", "assign", "document", "proposal", "withdrawProposal", "dispute", "aiRequest", "aiValidate", "aiLossAnalysis", "aiSetOptOut"],
-  BrokerEnterpriseController: ["createAgency", "updateAgency", "assignMember", "createRole", "updateRole", "updateSla", "updateBranding"],
+  BrokerStarterController: ["accept", "reject", "dispute", "close", "sendProposal", "withdrawProposal", "sendMessage", "markRead", "createDocumentRequest", "cancelDocumentRequest"],
+  BrokerCrmController: ["status", "note", "task", "reminder", "assign", "document", "proposal", "withdrawProposal", "dispute", "aiRequest", "aiValidate", "aiLossAnalysis", "aiSetOptOut", "sendMessage", "markRead", "createDocumentRequest", "cancelDocumentRequest"],
+  // Spec 064: setMemberCustomRole (assignment of a custom role) is a tenant write like the other enterprise routes.
+  BrokerEnterpriseController: ["createAgency", "updateAgency", "assignMember", "createRole", "updateRole", "updateSla", "updateBranding", "setMemberCustomRole"],
   BrokerNotificationsController: ["updatePreferences"],
   BrokerOffersController: ["create", "update", "submit", "withdraw", "renew"],
   // Spec 053 FR-016: every self-service write of a suspended partner is refused.
@@ -2576,6 +2731,10 @@ Module({
     AdminDataRetentionController,
     AdminConsentRecordsHttpController,
     BrokerBillingController,
+    // Spec 063 (start)
+    AdminLeadDisputesController,
+    BrokerLeadDisputesController,
+    // Spec 063 (end)
     BrokerNotificationsController,
     BrokerEnterpriseController,
     BrokerOffersController,
@@ -2605,6 +2764,10 @@ Module({
     MetricsController,
     // Spec 056: admin operations consoles (see admin-operations-http.controllers.ts).
     ...ADMIN_OPERATIONS_HTTP_CONTROLLERS,
+    // Spec 062 data requests: visitor and admin routes (see data-requests-http.controllers.ts).
+    ...DATA_REQUESTS_HTTP_CONTROLLERS,
+    // Spec 062 messaging: visitor routes and the admin read-only route (see lead-messaging-http.controllers.ts).
+    ...LEAD_MESSAGING_HTTP_CONTROLLERS,
     // Spec 051: last, after the static `partners/sla` and `partners/applications` routes.
     AdminPartnersHttpController
   ],

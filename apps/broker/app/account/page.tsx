@@ -35,7 +35,12 @@ export default async function BrokerAccountPage() {
         </Card>
       </Grid>
 
-      <MfaPanel returnTo="/account" />
+      {/* Spec 063 (FR-A11): a verified user may re-enrol (this revokes the trusted devices). */}
+      <MfaPanel returnTo="/account" mfaEnrolled={session.profile.mfaEnrolled === true} showEnrollment />
+
+      <Card title="Appareils de confiance" description="Consultez ou révoquez les appareils sur lesquels le code MFA n'est plus demandé pendant 30 jours.">
+        <Button href="/account/security" variant="secondary">Gérer les appareils de confiance</Button>
+      </Card>
     </PageStack>
   );
 }

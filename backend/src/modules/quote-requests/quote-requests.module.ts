@@ -48,6 +48,8 @@ export interface QuoteRequestsModuleDeps {
   assignmentHistory?: (leadAssignmentId: string) => Promise<QuoteAssignmentHistoryEvent[]>;
   /** Spec 055 FR-005: proposals shown in the tracking space. */
   proposals?: QuoteSubmissionDependencies["proposals"];
+  /** Spec 062: messaging flag and unread count of the tracking status. */
+  messaging?: QuoteSubmissionDependencies["messaging"];
 }
 
 export class QuoteRequestsModule {
@@ -86,6 +88,7 @@ export class QuoteRequestsModule {
       ...(deps.partnerName ? { partnerName: deps.partnerName } : {}),
       ...(deps.assignmentHistory ? { assignmentHistory: deps.assignmentHistory } : {}),
       ...(deps.proposals ? { proposals: deps.proposals } : {}),
+      ...(deps.messaging ? { messaging: deps.messaging } : {}),
       findCountryById: async (countryId: string) => {
         const country = await deps.countries.require(countryId).catch(() => undefined);
         return country ? { isoCode: country.isoCode, name: country.name } : undefined;

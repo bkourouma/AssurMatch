@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { dateTimeStringSchema, isoCountrySchema, nonEmptyStringSchema, uuidSchema } from "../validation/common.schemas";
+import { agencyFilterSchema } from "./enterprise.contracts";
 
 const MAX_WINDOW_DAYS = 365;
 const MIN_WINDOW_DAYS = 1;
@@ -46,7 +47,9 @@ const baseScopeQueryObject = baseTimeWindowObject.extend({
   country: isoCountrySchema.optional(),
   product: nonEmptyStringSchema.optional(),
   partnerId: uuidSchema.optional(),
-  agentId: uuidSchema.optional()
+  agentId: uuidSchema.optional(),
+  /** Spec 064: Enterprise display filter by agency (uuid or `none`); ignored by other plans. */
+  agencyId: agencyFilterSchema.optional()
 });
 
 export const dashboardScopeQuerySchema = baseScopeQueryObject.superRefine(refineWindow);
@@ -98,6 +101,9 @@ export const brokerStarterDashboardSectionSchema = z.object({
   disputed: z.number().int().min(0),
   pendingAction: z.number().int().min(0),
   averageFirstActionMinutes: z.number().nullable(),
+  /** Spec 062 E-08: additive, optional. */
+  averageFirstVisibleReplyMinutes: z.number().nullable().optional(),
+  firstVisibleReplyMeasured: z.number().int().min(0).optional(),
   byProduct: z.array(z.object({ productKey: nonEmptyStringSchema, total: z.number().int().min(0) })),
   byCountry: z.array(z.object({ countryCode: isoCountrySchema, total: z.number().int().min(0) })),
   satisfaction: brokerSatisfactionSummarySchema.optional()

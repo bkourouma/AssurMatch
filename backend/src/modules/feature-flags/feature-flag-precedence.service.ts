@@ -1,3 +1,5 @@
+import { GLOBAL_FEATURE_FLAG_DEFAULTS } from "./default-flags";
+
 export interface FlagRecord {
   key: string;
   scopeType: "global" | "country" | "product" | "partner" | "plan" | "module" | "ai";
@@ -17,6 +19,6 @@ export class FeatureFlagPrecedenceService {
       const scoped = flags.find((flag) => flag.key === key && flag.scopeType === scope.scopeType && flag.scopeId === scope.scopeId);
       if (scoped?.value === true) return true;
     }
-    return global?.value ?? false;
+    return global?.value ?? (GLOBAL_FEATURE_FLAG_DEFAULTS as Record<string, boolean>)[key] ?? false;
   }
 }

@@ -2,6 +2,7 @@ import { AuditLogWriter } from "../audit-logs/audit-log-writer.service";
 import { assertRuntimeRepository } from "../common/repositories/runtime-repository";
 import type { ActorContext } from "../common/types";
 import { FeatureFlagCacheService } from "./feature-flag-cache.service";
+import { GLOBAL_FEATURE_FLAG_DEFAULTS } from "./default-flags";
 import { MemoryFeatureFlagRepository, type FeatureFlagRepository } from "./feature-flag-repository";
 import type { FlagRecord } from "./feature-flag-precedence.service";
 import { evaluateFeatureFlagMutation, featureFlagMutationRefusedAction } from "./sensitive-feature-flag-policy";
@@ -53,8 +54,25 @@ export class FeatureFlagsService {
     this.flags.splice(0, this.flags.length, ...persisted);
   }
 
+  /**
+   * A stored row always wins. Without a row, a global flag falls back to its documented default
+   * (Spec 063: the three broker back-office flags are on, everything else is off), every other
+   * scope to `false`.
+   */
   isEnabled(key: string, scopeType: FeatureFlag["scopeType"] = "global", scopeId?: string): boolean {
-    return this.flags.find((flag) => flag.key === key && flag.scopeType === scopeType && flag.scopeId === scopeId)?.value ?? false;
+    const stored = this.flags.find((flag) => flag.key === key && flag.scopeType === scopeType && flag.scopeId === scopeId);
+    if (stored) return stored.value;
+    if (scopeType !== "global") return false;
+    return (GLOBAL_FEATURE_FLAG_DEFAULTS as Record<string, boolean>)[key] ?? false;
+  }
+
+  /**
+   * Spec 062: a flag that is ON until someone switches it off. The stored value wins when a row
+   * exists for the scope; with no row (nothing seeded yet, memory test runtime) the fallback is returned,
+   * where `isEnabled` would answer its documented default.
+   */
+  isEnabledOrDefault(key: string, fallback: boolean, scopeType: FeatureFlag["scopeType"] = "global", scopeId?: string): boolean {
+    return this.flags.find((flag) => flag.key === key && flag.scopeType === scopeType && flag.scopeId === scopeId)?.value ?? fallback;
   }
 
   async setFlag(input: Omit<FeatureFlag, "id" | "changedAt" | "cacheVersion">, actor: ActorContext, options: FeatureFlagMutationOptions = {}): Promise<FeatureFlag> {

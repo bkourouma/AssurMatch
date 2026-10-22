@@ -207,7 +207,14 @@ enum NotificationType {
   broker_quota_threshold
   broker_license_expiring
   broker_offer_expiring
+  broker_dispute_decided
   admin_alert_raised
+  visitor_broker_message
+  visitor_documents_requested
+  visitor_data_request_acknowledged
+  visitor_data_request_closed
+  broker_visitor_message
+  admin_data_request_received
 }
 
 enum DeliveryStatus {
@@ -337,6 +344,10 @@ model QuoteRequestDocument {
   status                 QuoteDocumentStatus     @default(uploaded)
   sharedLeadAssignmentId String?
   sharedAt               DateTime?
+  /// Spec 062: the broker document request this file answers (null for a regular upload).
+  documentRequestId      String?
+  /// Spec 062: who uploaded the file (`visitor` when null, the historical case).
+  uploadedBy             String?
   retentionUntil         DateTime
   anonymizedAt           DateTime?
   anonymizationBatchId   String?
@@ -345,6 +356,7 @@ model QuoteRequestDocument {
 
   @@index([quoteRequestId, createdAt])
   @@index([scanStatus, createdAt])
+  @@index([documentRequestId])
 }
 
 model ScoringRule {
@@ -1267,6 +1279,8 @@ model LeadAssignment {
   actionComment         String?
   lastBrokerActionById  String?
   lastBrokerActionAt     DateTime?
+  /// Spec 062 R7: first reply the visitor can see (first proposal or first broker message); written once.
+  firstVisibleReplyAt    DateTime?
   recipientCount         Int                  @default(1)
   createdAt              DateTime             @default(now())
   updatedAt              DateTime             @updatedAt
@@ -1452,6 +1466,114 @@ model VisitorProposalResponse {
   @@index([partnerTenantId, createdAt])
 }
 
+/// Spec 062: one message of the conversation between a visitor and the broker of an assignment.
+/// Append-only: the body is never updated (only `readAt` and the spec 046 anonymization marker).
+/// `partnerTenantId` is the broker of the assignment at the time of sending: after a reassignment
+/// the new broker only sees its own messages.
+model LeadMessage {
+  id               String    @id @default(uuid())
+  quoteRequestId   String
+  leadAssignmentId String
+  partnerTenantId  String
+  /// `broker` | `visitor`.
+  senderType       String
+  authorId         String?
+  body             String
+  readAt           DateTime?
+  /// Client-supplied idempotency key (retries); NULLs never collide.
+  clientRequestId  String?
+  anonymizedAt     DateTime?
+  createdAt        DateTime  @default(now())
+
+  @@unique([leadAssignmentId, senderType, clientRequestId])
+  @@index([quoteRequestId, createdAt])
+  @@index([leadAssignmentId, createdAt])
+  @@index([partnerTenantId])
+}
+
+/// Spec 062: a scanned file attached to a message (only `clean` files are ever served).
+model LeadMessageAttachment {
+  id               String    @id @default(uuid())
+  messageId        String
+  leadAssignmentId String
+  quoteRequestId   String
+  fileName         String
+  mimeType         String
+  sizeBytes        Int
+  checksum         String
+  storageKey       String
+  scanStatus       String
+  scanEngine       String?
+  scannedAt        DateTime?
+  anonymizedAt     DateTime?
+  createdAt        DateTime  @default(now())
+
+  @@index([messageId])
+  @@index([leadAssignmentId, createdAt])
+  @@index([quoteRequestId])
+}
+
+/// Spec 062: a document the broker asks the visitor for. Only open -> fulfilled|cancelled.
+model LeadDocumentRequest {
+  id                     String    @id @default(uuid())
+  quoteRequestId         String
+  leadAssignmentId       String
+  partnerTenantId        String
+  authorId               String?
+  label                  String
+  note                   String?
+  dueAt                  DateTime?
+  /// `open` | `fulfilled` | `cancelled`.
+  status                 String    @default("open")
+  fulfilledAt            DateTime?
+  fulfilledDocumentCount Int       @default(0)
+  cancelledAt            DateTime?
+  cancelledById          String?
+  /// `broker` | `reassigned` | `closed`.
+  cancelReason           String?
+  anonymizedAt           DateTime?
+  createdAt              DateTime  @default(now())
+  updatedAt              DateTime  @updatedAt
+
+  @@index([leadAssignmentId, status])
+  @@index([quoteRequestId])
+  @@index([partnerTenantId])
+}
+
+/// Spec 062 (D-10): a data-subject request (access, rectification, erasure) from the visitor.
+/// `detail` is personal data: never logged nor e-mailed. Nothing is erased from here: `erasureBatchId`
+/// only links the spec 046 erasure preview/batch started by a compliance admin.
+model DataRequest {
+  id              String    @id @default(uuid())
+  /// `DR-` + 8 unguessable characters.
+  reference       String    @unique
+  quoteRequestId  String
+  /// `access` | `rectification` | `erasure`.
+  type            String
+  /// `received` | `in_review` | `completed` | `rejected`.
+  status          String    @default("received")
+  detail          String?
+  /// `fr` | `en`: language of the e-mails.
+  locale          String    @default("fr")
+  dueAt           DateTime
+  acknowledgedAt  DateTime?
+  reviewedById    String?
+  reviewedAt      DateTime?
+  decidedById     String?
+  decidedAt       DateTime?
+  decisionNote    String?
+  erasureBatchId  String?
+  anonymizedAt    DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  @@index([quoteRequestId, type, status])
+  @@index([status, dueAt])
+  // Not expressible in Prisma, created by migration 0031 only: the partial unique index
+  // "DataRequest_open_quote_type_key" ON ("quoteRequestId", "type") WHERE "status" IN ('received', 'in_review')
+  // (one open data request per quote request and type). The repository maps its P2002 to DATA_REQUEST_ALREADY_OPEN.
+}
+
 model BrokerCrmProposal {
   id               String   @id @default(uuid())
   leadAssignmentId String
@@ -1478,9 +1600,23 @@ model BrokerCrmDispute {
   createdById      String?
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
+  /// Spec 063: where the dispute was opened ("starter" | "crm") and the lead country, for admin filters.
+  source           String   @default("crm")
+  countryCode      String?
+  /// Spec 063: finance decision (accept | reject) with its mandatory reason, and the resulting credit.
+  decidedAt        DateTime?
+  decidedById      String?
+  decisionReason   String?
+  /// "draft_invoice" | "credit_note" | "none" - set when the dispute is accepted.
+  creditMode       String?
+  creditNoteId     String?
+  creditAmount     Int?
+  /// "pack_credit" mode: the LeadPack row that gave one credit back.
+  creditPackId     String?
 
   @@index([leadAssignmentId, createdAt])
   @@index([partnerTenantId, status])
+  @@index([status, createdAt])
 }
 
 model BrokerCrmAiAssistRequest {
@@ -1667,10 +1803,15 @@ model LeadPack {
   grantedById     String?
   /// Spec 060 J-03: invoice whose recorded payment justified the grant.
   invoiceId       String?
+  /// Spec 063: dispute that gave one credit back (unique: idempotent restore) and the invoice whose
+  /// pack-covered lead was re-credited. sourceInvoiceId is NOT the payment justification above.
+  disputeId       String?  @unique
+  sourceInvoiceId String?
   grantedAt       DateTime @default(now())
   updatedAt       DateTime @default(now())
 
   @@index([partnerId, grantedAt])
+  @@index([sourceInvoiceId])
 }
 
 model DraftInvoice {
@@ -1774,7 +1915,9 @@ model CreditNote {
   countryCode        String
   year               Int
   sequence           Int
-  invoiceId          String   @unique
+  /// Spec 063: no longer unique - a partial dispute credit note can precede the cancellation one
+  /// (unique per invoice for kind = 'cancellation' through a partial index, see migration 0030).
+  invoiceId          String
   invoiceNumber      String
   partnerId          String
   currency           String   @default("XOF")
@@ -1786,7 +1929,12 @@ model CreditNote {
   documentSha256     String
   issuedById         String?
   issuedAt           DateTime
+  /// Spec 063: "cancellation" (total, spec 060) | "dispute" (partial, one per accepted dispute).
+  kind               String   @default("cancellation")
+  disputeId          String?  @unique
+  leadAssignmentId   String?
 
+  @@index([invoiceId])
   @@unique([countryCode, year, sequence])
   @@index([partnerId, issuedAt])
 }
@@ -1854,6 +2002,8 @@ model PartnerCustomRole {
   partnerTenantId String
   name            String
   permissions     Json     @default("[]")
+  /// Spec 064: ids of the members holding this role (at most one custom role per member).
+  memberIds       Json     @default("[]")
   reason          String
   createdById     String?
   createdAt       DateTime @default(now())
@@ -2100,4 +2250,20 @@ model NotificationUnsubscribe {
   createdAt   DateTime @default(now())
 
   @@unique([subjectHash, purpose])
+}
+
+/// Spec 063: device the user chose to trust after a valid MFA code, for 30 days. The token is a
+/// 256-bit random value kept by the browser; only its SHA-256 is stored here.
+model TrustedDevice {
+  id            String    @id @default(uuid())
+  userId        String
+  tokenHash     String    @unique
+  label         String?
+  createdAt     DateTime  @default(now())
+  expiresAt     DateTime
+  lastUsedAt    DateTime?
+  revokedAt     DateTime?
+  revokedReason String?
+
+  @@index([userId, revokedAt])
 }

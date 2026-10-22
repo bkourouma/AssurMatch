@@ -190,6 +190,10 @@ export interface QuoteSubmissionDependencies {
   proposals?: {
     forVisitorStatus(quote: QuoteRequestRecord, assignments: LeadAssignmentRecord[], actor?: ActorContext): Promise<{ proposals: PublicLeadProposal[]; activeProposalAt: Map<string, Date> }>;
   };
+  /** Spec 062: `messaging: { enabled, unreadCount }` of the tracking status (resolved lazily by the runtime). */
+  messaging?: {
+    summaryForVisitorStatus(quote: QuoteRequestRecord): Promise<{ enabled: boolean; unreadCount: number }>;
+  };
 }
 
 export class QuoteSubmissionService {
@@ -280,7 +284,7 @@ export class QuoteSubmissionService {
         : {})
     });
     const contactFingerprint = contact.emailFingerprint;
-    const duplicateDecision = await this.deps.duplicate?.evaluate(country.id, product.id, contactFingerprint) ?? "unique";
+    const duplicateDecision = await this.deps.duplicate?.evaluate(country.id, product.id, contactFingerprint, contact.phoneFingerprint) ?? "unique";
     if (duplicateDecision === "blocked_duplicate") {
       this.audit.write({
         actor,
@@ -693,7 +697,9 @@ export class QuoteSubmissionService {
       timeline: projected.timeline,
       consent: projected.consent,
       tokenExpiresAt: grant.expiresAt.toISOString(),
-      proposals: visible.proposals
+      proposals: visible.proposals,
+      // Spec 062: messaging flag and unread broker messages (off when the messaging module is not wired).
+      messaging: this.deps.messaging ? await this.deps.messaging.summaryForVisitorStatus(quote) : { enabled: false, unreadCount: 0 }
     };
   }
 

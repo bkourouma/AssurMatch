@@ -182,6 +182,12 @@ export interface CreditNotePdfModel {
   issuer: InvoiceIssuer;
   customer: InvoiceCustomer;
   legalMentionsComplete: boolean;
+  /** Spec 063: "dispute" renders a partial credit note (accepted lead dispute); default is the total cancellation. */
+  variant?: "cancellation" | "dispute" | undefined;
+  /** Spec 063: public reference of the disputed lead (never contact or answers). */
+  leadReference?: string | undefined;
+  /** Spec 063: amount (incl. VAT) already credited by partial credit notes, for a cancellation of the net remainder. */
+  alreadyCreditedAmount?: number | undefined;
 }
 
 const PLATFORM_MENTION =
@@ -279,16 +285,24 @@ export function renderInvoicePdf(model: InvoicePdfModel): Buffer {
 export function renderCreditNotePdf(model: CreditNotePdfModel): Buffer {
   const pdf = new SimplePdfDocument();
   const flow = new FlowWriter(pdf);
-  headerBlock(flow, "AVOIR", model.creditNote.number, model.issuer, model.legalMentionsComplete);
+  const partial = model.variant === "dispute";
+  headerBlock(flow, partial ? "AVOIR PARTIEL" : "AVOIR", model.creditNote.number, model.issuer, model.legalMentionsComplete);
   customerBlock(flow, model.customer);
   flow.line(`Date d'emission : ${isoDay(model.issuedAt)}`, { size: 9 });
-  flow.line(`Annule la facture : ${model.creditNote.invoiceNumber}`, { size: 9, bold: true });
+  flow.line(partial ? `Avoir partiel - contestation de lead - facture : ${model.creditNote.invoiceNumber}` : `Annule la facture : ${model.creditNote.invoiceNumber}`, { size: 9, bold: true });
+  if (partial && model.leadReference) flow.line(`Lead concerne (reference publique) : ${model.leadReference}`, { size: 9 });
   flow.space(4);
   flow.line("Motif", { size: 10, bold: true });
   flow.paragraph(model.creditNote.reason);
   flow.space(8);
   totalsBlock(flow, model.creditNote.subtotalAmount, model.vatRateBps, model.creditNote.vatAmount, model.creditNote.totalAmount);
-  flow.paragraph("Cet avoir annule integralement la facture citee. Les montants viennent en deduction du solde du compte client.");
+  if (partial) {
+    flow.paragraph("Cet avoir partiel credite un lead conteste par le client et accepte par la finance. La facture citee n'est pas modifiee. Le montant vient en deduction du solde du compte client.");
+  } else if (model.alreadyCreditedAmount && model.alreadyCreditedAmount > 0) {
+    flow.paragraph(`Cet avoir annule la facture citee pour son reste net : ${formatXof(model.alreadyCreditedAmount)} TTC ont deja ete credites par des avoirs partiels de contestation. Les montants viennent en deduction du solde du compte client.`);
+  } else {
+    flow.paragraph("Cet avoir annule integralement la facture citee. Les montants viennent en deduction du solde du compte client.");
+  }
   flow.paragraph(PLATFORM_MENTION);
   return pdf.toBuffer({ title: `Avoir ${model.creditNote.number}`, createdAt: model.issuedAt });
 }

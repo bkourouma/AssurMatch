@@ -124,7 +124,8 @@ export class BrokerTeamService {
         throw partnerUnprocessable(ErrorCodes.TEAM_LAST_OWNER, "The last active owner of the partner cannot be deactivated");
       }
     }
-    const updated = await this.deps.users.suspend(target.id);
+    // Spec 063 FR-A06: the member's trusted devices end with the deactivation.
+    const updated = await this.deps.users.suspend(target.id, "deactivated");
     this.deps.invalidateUserAccess(target.id);
     this.audited(actor, BrokerTeamAuditActions.deactivated, target, reason, { before: { status: target.status }, after: { status: updated.status } });
     return this.view(updated, actor);

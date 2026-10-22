@@ -72,6 +72,59 @@ export class LeadPacksService {
     return this.toDto(saved);
   }
 
+  /** Spec 063: the pack row that gave one credit back for this dispute, if any. */
+  async restoredForDispute(partnerId: string, disputeId: string): Promise<LeadPackRecord | undefined> {
+    return (await this.deps.repository.listPacks(partnerId)).find((pack) => pack.disputeId === disputeId);
+  }
+
+  /** Spec 063: credits already given back for pack-covered leads of this invoice. */
+  async restoredCountForInvoice(partnerId: string, invoiceId: string): Promise<number> {
+    return (await this.deps.repository.listPacks(partnerId)).filter((pack) => pack.sourceInvoiceId === invoiceId).reduce((sum, pack) => sum + pack.creditsGranted, 0);
+  }
+
+  /**
+   * Spec 063 (decision D-B3): gives ONE credit back to the partner after an accepted dispute on a lead
+   * covered by a prepaid pack. Idempotent per dispute (unique disputeId); audited when created.
+   */
+  async restoreForDispute(input: { partnerId: string; disputeId: string; sourceInvoiceId: string; sourceInvoiceNumber: string }, actor: ActorContext): Promise<{ pack: LeadPackRecord; created: boolean }> {
+    const existing = await this.restoredForDispute(input.partnerId, input.disputeId);
+    if (existing) return { pack: existing, created: false };
+    const now = new Date();
+    const record: LeadPackRecord = {
+      id: crypto.randomUUID(),
+      partnerId: input.partnerId,
+      creditsGranted: 1,
+      creditsConsumed: 0,
+      reason: "Restitution - contestation de lead acceptee",
+      grantedById: actor.actorId ?? null,
+      invoiceId: null,
+      disputeId: input.disputeId,
+      sourceInvoiceId: input.sourceInvoiceId,
+      grantedAt: now,
+      updatedAt: now
+    };
+    let pack: LeadPackRecord;
+    try {
+      pack = await this.deps.repository.createPack(record);
+    } catch (error) {
+      // A concurrent decision stored the same dispute first: converge on its row.
+      const winner = await this.restoredForDispute(input.partnerId, input.disputeId);
+      if (!winner) throw error;
+      return { pack: winner, created: false };
+    }
+    this.deps.audit.write({
+      actor,
+      action: BillingAuditActions.packRestored,
+      targetType: "LeadPack",
+      targetId: pack.id,
+      scope: { partnerId: input.partnerId },
+      result: "success",
+      reason: "dispute_accepted",
+      context: { credits: 1, disputeId: input.disputeId, sourceInvoiceId: input.sourceInvoiceId, sourceInvoiceNumber: input.sourceInvoiceNumber, paymentCaptured: false }
+    });
+    return { pack, created: true };
+  }
+
   /** Internal read for statements already authorized by the caller (admin account or own tenant). */
   async listForPartner(partnerId: string): Promise<LeadPack[]> {
     return (await this.deps.repository.listPacks(partnerId)).map((record) => this.toDto(record));
@@ -107,6 +160,34 @@ export class LeadPacksService {
     return applied;
   }
 
+  /**
+   * Spec 063: gives back `units` credits (newest pack first) when a refreshed draft needs fewer than it
+   * already consumed (an accepted dispute removed a lead the packs had covered). Returns how many were released.
+   */
+  async release(partnerId: string, units: number, actor: ActorContext): Promise<number> {
+    if (units <= 0) return 0;
+    let remaining = units;
+    let released = 0;
+    for (const pack of [...(await this.deps.repository.listPacks(partnerId))].reverse()) {
+      if (remaining === 0) break;
+      const back = Math.min(pack.creditsConsumed, remaining);
+      if (back === 0) continue;
+      await this.deps.repository.updatePackConsumption(pack.id, pack.creditsConsumed - back);
+      remaining -= back;
+      released += back;
+      this.deps.audit.write({
+        actor,
+        action: BillingAuditActions.packReleased,
+        targetType: "LeadPack",
+        targetId: pack.id,
+        scope: { partnerId },
+        result: "success",
+        context: { released: back }
+      });
+    }
+    return released;
+  }
+
   private toDto(record: LeadPackRecord): LeadPack {
     return {
       id: record.id,
@@ -116,6 +197,7 @@ export class LeadPacksService {
       creditsRemaining: Math.max(0, record.creditsGranted - record.creditsConsumed),
       reason: record.reason,
       invoiceId: record.invoiceId ?? null,
+      ...(record.disputeId ? { disputeId: record.disputeId } : {}),
       grantedAt: record.grantedAt.toISOString()
     };
   }

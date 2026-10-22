@@ -10,6 +10,7 @@ import {
 } from "../../../../packages/shared/contracts/quote.contracts";
 import { QuoteAuditActions } from "../audit-logs/quote-audit-actions";
 import { AuditLogWriter } from "../audit-logs/audit-log-writer.service";
+import type { AgencyScopePort } from "../common/agency-scope";
 import type { ActorContext, Page } from "../common/types";
 import { BrokerCrmAccessPolicy } from "./broker-crm-access-policy";
 import { BrokerCrmExportPolicy } from "./broker-crm-export-policy";
@@ -17,6 +18,7 @@ import { BrokerCrmHistoryService } from "./broker-crm-history.service";
 import type { BrokerCrmActivityService } from "./broker-crm-activity.service";
 import { maskEmail, maskPhone, type LeadContactPolicy } from "./lead-contact-policy";
 import { LeadAssignmentService, type LeadAssignmentRecord } from "./lead-assignment.service";
+import type { LeadDisputesService } from "./lead-disputes.service";
 
 const CRM_STATUSES: BrokerCrmPipelineStatus[] = [
   "nouveau",
@@ -45,7 +47,11 @@ export class BrokerCrmLeadsService {
     private readonly exportPolicy: BrokerCrmExportPolicy,
     private readonly activity?: BrokerCrmActivityService,
     /** Spec 055 FR-001: full contact for the assigned broker (audited), masked after a withdrawal. */
-    private readonly contactPolicy?: LeadContactPolicy
+    private readonly contactPolicy?: LeadContactPolicy,
+    /** Spec 063: dispute window shown on the lead detail. */
+    private readonly disputes?: LeadDisputesService,
+    /** Spec 064: Enterprise display filter by agency, applied after the access policy. */
+    private readonly agencyScope?: AgencyScopePort
   ) {}
 
   async list(actor: ActorContext, query: BrokerCrmLeadListQuery = {}): Promise<Page<BrokerCrmLeadSummary>> {
@@ -110,7 +116,8 @@ export class BrokerCrmLeadsService {
       reminders: await this.activity?.remindersForLead(id) ?? [],
       documents: await this.activity?.documentsForLead(id) ?? [],
       proposals: await this.activity?.proposalsForLead(id) ?? [],
-      disputes: await this.activity?.disputesForLead(id) ?? []
+      disputes: await this.activity?.disputesForLead(id) ?? [],
+      ...(this.disputes ? { disputeWindow: this.disputes.windowFor(assignment) } : {})
     };
   }
 
@@ -143,6 +150,9 @@ export class BrokerCrmLeadsService {
 
   async applyFilters(actor: ActorContext, query: Partial<BrokerCrmLeadListQuery>): Promise<LeadAssignmentRecord[]> {
     this.access.assertCrmAccess(actor);
+    // Spec 064: resolved after the access check (an unauthorised actor learns nothing about agencies); callers that must
+    // not filter (the loss analysis) simply leave agencyId out of their query.
+    const inAgency = await this.agencyScope?.resolve(actor, query.agencyId);
     return (await this.assignments.list())
       .filter((assignment) => assignment.partnerTenantId === actor.partnerTenantId)
       .filter((assignment) => {
@@ -153,6 +163,7 @@ export class BrokerCrmLeadsService {
           return false;
         }
       })
+      .filter((assignment) => !inAgency || inAgency(assignment.assignedAdvisorId))
       .filter((assignment) => !query.status || this.statusOf(assignment) === query.status)
       .filter((assignment) => !query.productKey || assignment.productKey === query.productKey)
       .filter((assignment) => !query.countryCode || assignment.countryCode === query.countryCode)
@@ -219,6 +230,7 @@ export class BrokerCrmLeadsService {
       productKey: query.productKey,
       countryCode: query.countryCode,
       advisorId: query.advisorId,
+      agencyId: query.agencyId,
       urgency: query.urgency,
       source: query.source,
       dateFrom: query.dateFrom,

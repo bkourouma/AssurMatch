@@ -35,7 +35,10 @@ describe("prisma migration fresh-base readiness", () => {
       "0026_b2b_invoicing",
       "0027_broker_response_loop",
       "0028_notifications_completion",
-      "0029_query_performance_indexes"
+      "0029_query_performance_indexes",
+      "0030_critical_fixes",
+      "0031_broker_visitor_messaging",
+      "0032_custom_role_members"
     ]);
     const schema = readFileSync(join(process.cwd(), "backend", "prisma", "schema.prisma"), "utf8").replace(/\r\n/g, "\n");
     for (const model of ["AuditLog", "FeatureFlag", "ConsentRecord", "QuoteRequest", "LeadAssignment", "BrokerCrmLeadState", "PartnerApiKey", "PartnerWebhookEndpoint", "PartnerWebhookDelivery", "PartnerWebhookAllowlistEntry", "RoutingRule", "RoutingRuleHistory"]) {
@@ -258,5 +261,31 @@ describe("prisma migration fresh-base readiness", () => {
     expect(completion).toContain('CREATE UNIQUE INDEX IF NOT EXISTS "AdminAlert_dedupeKey_key"');
     expect(completion).toContain('CREATE UNIQUE INDEX IF NOT EXISTS "NotificationUnsubscribe_subjectHash_purpose_key"');
     expect(completion).not.toMatch(/DROP|DELETE|UPDATE /);
+    // Spec 062: broker <-> visitor messaging, document requests and data requests, additive only.
+    const messaging = readFileSync(join(migrationsDir, "0031_broker_visitor_messaging", "migration.sql"), "utf8");
+    for (const value of ["visitor_broker_message", "visitor_documents_requested", "visitor_data_request_acknowledged", "visitor_data_request_closed", "broker_visitor_message", "admin_data_request_received"]) {
+      expect(messaging).toContain(`ALTER TYPE "NotificationType" ADD VALUE IF NOT EXISTS '${value}'`);
+      expect(schema).toContain(`  ${value}\n`);
+    }
+    for (const table of ["LeadMessage", "LeadMessageAttachment", "LeadDocumentRequest", "DataRequest"]) {
+      expect(messaging).toContain(`CREATE TABLE IF NOT EXISTS "${table}"`);
+      expect(schema).toContain(`model ${table} {`);
+    }
+    expect(messaging).toContain('CREATE UNIQUE INDEX IF NOT EXISTS "LeadMessage_leadAssignmentId_senderType_clientRequestId_key" ON "LeadMessage"("leadAssignmentId", "senderType", "clientRequestId")');
+    expect(messaging).toContain('CREATE UNIQUE INDEX IF NOT EXISTS "DataRequest_reference_key" ON "DataRequest"("reference")');
+    // One open data request per quote request and type: a partial unique index (SQL only, Prisma cannot express it).
+    expect(messaging).toContain('CREATE UNIQUE INDEX IF NOT EXISTS "DataRequest_open_quote_type_key" ON "DataRequest"("quoteRequestId", "type") WHERE "status" IN (\'received\', \'in_review\')');
+    expect(schema).toContain('"DataRequest_open_quote_type_key"');
+    expect(messaging).toContain('ALTER TABLE "LeadAssignment" ADD COLUMN IF NOT EXISTS "firstVisibleReplyAt" TIMESTAMP(3)');
+    expect(messaging).toContain('ALTER TABLE "QuoteRequestDocument" ADD COLUMN IF NOT EXISTS "documentRequestId" TEXT');
+    expect(messaging).toContain('ALTER TABLE "QuoteRequestDocument" ADD COLUMN IF NOT EXISTS "uploadedBy" TEXT');
+    expect(messaging).not.toMatch(/DROP|DELETE|UPDATE |TRUNCATE/);
+    // Messages are append-only for the application: the schema has no edit/delete marker on the body.
+    expect(schema).not.toMatch(/model LeadMessage {[^}]*\b(editedAt|deletedAt|updatedAt)\b/);
+    // Spec 064: custom roles can be assigned to members (additive JSON column).
+    const customRoleMembers = readFileSync(join(migrationsDir, "0032_custom_role_members", "migration.sql"), "utf8");
+    expect(customRoleMembers).toContain(`ALTER TABLE "PartnerCustomRole" ADD COLUMN IF NOT EXISTS "memberIds" JSONB NOT NULL DEFAULT '[]'`);
+    expect(customRoleMembers).not.toMatch(/DROP|DELETE|UPDATE /);
+    expect(schema).toMatch(/model PartnerCustomRole \{[^}]*memberIds\s+Json\s+@default\("\[\]"\)/);
   });
 });

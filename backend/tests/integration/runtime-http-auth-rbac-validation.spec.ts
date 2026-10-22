@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it } from "vitest";
 import { signActorToken } from "../../src/modules/auth/http-auth-token.service";
+import { firstLoginWithEnrolment, httpLogin } from "./helpers/mfa-login";
 import { actorHeaders, createRuntimeHttpHarness, simulationActorHeaders, type RuntimeHttpHarness } from "./runtime-http-test-utils";
 
 describe("runtime HTTP auth RBAC and validation boundaries", () => {
@@ -53,17 +54,14 @@ describe("runtime HTTP auth RBAC and validation boundaries", () => {
       partnerTenantId: "00000000-0000-4000-8000-0000000000b1",
       scopes: { countryIds: [], productIds: [] }
     }, adminActor);
-    brokerUser.mfaStatus = "verified";
-    await harness.runtime.users.service.update(brokerUser);
     await harness.runtime.users.service.setPassword(brokerUser.id, await harness.runtime.auth.passwordHashing.hash("very-secure-pass"));
 
-    const login = await harness.request("/auth/login", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ email: "broker-login@example.com", password: "very-secure-pass" })
-    });
-    expect(login.ok).toBe(true);
-    const session = await login.json() as { accessToken: string };
+    // Spec 063: the password alone no longer opens protected routes; the second factor does.
+    const passwordOnly = await httpLogin(harness, "broker-login@example.com", "very-secure-pass");
+    expect(passwordOnly.status).toBeLessThan(400);
+    expect(passwordOnly.body.mfaRequired).toBe(true);
+    expect((await harness.request("/broker/starter/leads", { headers: { authorization: `Bearer ${passwordOnly.body.accessToken}` } })).status).toBe(403);
+    const session = await firstLoginWithEnrolment(harness, "broker-login@example.com", "very-secure-pass");
     expect(session.accessToken).toBeTruthy();
 
     const bearerHeaders = { authorization: `Bearer ${session.accessToken}` };
@@ -89,16 +87,10 @@ describe("runtime HTTP auth RBAC and validation boundaries", () => {
       partnerTenantId: brokerTenantId,
       scopes: { countryIds: [countryId], productIds: [productId] }
     }, adminActor);
-    await harness.runtime.users.service.update({ ...brokerUser, partnerPlan: "pro", mfaStatus: "verified" });
+    await harness.runtime.users.service.update({ ...brokerUser, partnerPlan: "pro" });
     await harness.runtime.users.service.setPassword(brokerUser.id, await harness.runtime.auth.passwordHashing.hash("very-secure-pass"));
 
-    const login = await harness.request("/auth/login", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ email: "broker-crm-login@example.com", password: "very-secure-pass" })
-    });
-    expect(login.ok).toBe(true);
-    const session = await login.json() as { accessToken: string };
+    const session = await firstLoginWithEnrolment(harness, "broker-crm-login@example.com", "very-secure-pass");
     const bearerHeaders = { authorization: `Bearer ${session.accessToken}` };
     const me = await harness.request("/auth/me", { headers: bearerHeaders });
 
@@ -126,7 +118,6 @@ describe("runtime HTTP auth RBAC and validation boundaries", () => {
       roles: ["admin_pays"],
       scopes: { countryIds: [countryId], productIds: [productId] }
     }, adminActor);
-    await harness.runtime.users.service.update({ ...scopedAdmin, mfaStatus: "verified" });
     await harness.runtime.users.service.setPassword(scopedAdmin.id, await harness.runtime.auth.passwordHashing.hash("very-secure-pass"));
     const visibleUser = await harness.runtime.users.service.create({
       id: crypto.randomUUID(),
@@ -143,13 +134,7 @@ describe("runtime HTTP auth RBAC and validation boundaries", () => {
       scopes: { countryIds: [otherCountryId], productIds: [] }
     }, adminActor);
 
-    const login = await harness.request("/auth/login", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ email: "admin-pays-login@example.com", password: "very-secure-pass" })
-    });
-    expect(login.ok).toBe(true);
-    const session = await login.json() as { accessToken: string };
+    const session = await firstLoginWithEnrolment(harness, "admin-pays-login@example.com", "very-secure-pass");
     const bearerHeaders = { authorization: `Bearer ${session.accessToken}` };
     const me = await harness.request("/auth/me", { headers: bearerHeaders });
     expect(await me.json()).toMatchObject({ actorId: scopedAdmin.id, countryScopes: [countryId], productScopes: [productId] });
@@ -175,6 +160,9 @@ describe("runtime HTTP auth RBAC and validation boundaries", () => {
   it("enforces CRM feature flag and plan from verified token claims", async () => {
     process.env.ASSURMATCH_BROKER_CRM_ENABLED = "false";
     harness = await createRuntimeHttpHarness();
+    // Spec 063: broker_crm_enabled is on by default; an admin switches it off explicitly.
+    await harness.runtime.featureFlags.service.setFlag({ key: "broker_crm_enabled", scopeType: "global", value: false, reason: "test switches the broker CRM off" }, { actorId: "test-admin", roles: ["super_admin"], mfaVerified: true });
+    await harness.runtime.reloadRuntimeFeatureFlags();
     expect((await harness.request("/broker/crm/leads", { headers: actorHeaders(starter) })).status).toBe(403);
     expect((await harness.request("/broker/crm/leads", { headers: actorHeaders(pro) })).status).toBe(403);
 

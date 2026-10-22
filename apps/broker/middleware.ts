@@ -29,6 +29,15 @@ function accessDeniedUrl(request: NextRequest, reason: string): URL {
   return url;
 }
 
+// Spec 066 F4: a Starter session keeps its session and lands on the dashboard with a notice.
+function starterCrmDeniedUrl(request: NextRequest): URL {
+  const url = request.nextUrl.clone();
+  url.pathname = "/";
+  url.search = "";
+  url.searchParams.set("notice", "crm_requires_pro");
+  return url;
+}
+
 function isPublicPath(pathname: string): boolean {
   return pathname.startsWith("/login") ||
     pathname.startsWith("/activate") ||
@@ -75,7 +84,7 @@ export async function middleware(request: NextRequest) {
     const profile = (await response.json()) as Profile;
     if (profile.mfaVerified !== true) return NextResponse.redirect(loginUrl(request, "mfa_required"));
     if (!isBrokerProfile(profile)) return NextResponse.redirect(accessDeniedUrl(request, "access_denied"));
-    if (isStarterCrmDenied(profile, request.nextUrl.pathname)) return NextResponse.redirect(accessDeniedUrl(request, "starter_crm_denied"));
+    if (isStarterCrmDenied(profile, request.nextUrl.pathname)) return NextResponse.redirect(starterCrmDeniedUrl(request));
     return NextResponse.next();
   } catch {
     return NextResponse.redirect(loginUrl(request, "auth_unavailable"));

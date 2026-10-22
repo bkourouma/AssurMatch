@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
-import { loginRedirect, readBackOfficeSession } from "../lib/backoffice-auth";
+import { isStarterCrmDenied, loginRedirect, readBackOfficeSession } from "../lib/backoffice-auth";
 import { readBrokerInbox, readBrokerNotificationPreferences } from "../lib/broker-api";
+import { MESSAGING_NOTIFICATION_TYPE_LABELS, leadNotificationHref } from "../lib/conversation-vocabulary";
 import { markNotificationReadAction, updateNotificationPreferencesAction } from "../lib/notification-actions";
 import {
   Badge,
@@ -82,8 +83,11 @@ export default async function BrokerNotificationsPage({ searchParams }: { search
                 </Cluster>
                 <p>{notification.body}</p>
                 <Cluster>
+                  {MESSAGING_NOTIFICATION_TYPE_LABELS[notification.type] ? <Badge tone="info">{MESSAGING_NOTIFICATION_TYPE_LABELS[notification.type]}</Badge> : null}
                   {notification.targetType === "LeadAssignment" && notification.targetId ? (
-                    <Button href={`/crm/leads/${notification.targetId}`} variant="tertiary" size="sm">Ouvrir le lead</Button>
+                    <Button href={leadNotificationHref(notification.type, notification.targetId, isStarterCrmDenied(session.profile))} variant="tertiary" size="sm">
+                      {MESSAGING_NOTIFICATION_TYPE_LABELS[notification.type] ? "Ouvrir la conversation" : "Ouvrir le lead"}
+                    </Button>
                   ) : null}
                   {notification.read ? null : (
                     <form action={markNotificationReadAction}>

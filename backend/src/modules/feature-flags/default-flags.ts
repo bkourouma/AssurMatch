@@ -1,9 +1,15 @@
 export const GLOBAL_FEATURE_FLAG_DEFAULTS = {
   public_comparator_enabled: false,
   quote_request_enabled: false,
-  starter_portal_enabled: false,
-  broker_crm_enabled: false,
-  broker_dashboard_enabled: false,
+  /**
+   * Spec 063 (PRD section 9.1): the three broker back-office modules are ON by default. They are not
+   * regulated modules: Starter keeps no CRM through its plan gating, and an admin can still switch
+   * them off from the feature flags screen (audited). Existing rows in an initialised database are
+   * never rewritten by the seeds.
+   */
+  starter_portal_enabled: true,
+  broker_crm_enabled: true,
+  broker_dashboard_enabled: true,
   billing_enabled: false,
   ai_lead_scoring_enabled: false,
   ai_summary_enabled: false,
@@ -26,7 +32,14 @@ export const GLOBAL_FEATURE_FLAG_DEFAULTS = {
   /** Spec 048: sending broker satisfaction survey requests post-lead completion. */
   satisfaction_survey_enabled: false,
   /** Spec 049: AI routing anomaly detection. */
-  ai_routing_anomaly_detection_enabled: false
+  ai_routing_anomaly_detection_enabled: false,
+  /**
+   * Spec 062: broker <-> visitor messaging and document requests. Ships OFF (product owner, 2026-10-16):
+   * open it from the admin flags screen only once the legal opinion L-08 (CIMA intermediary positioning)
+   * is obtained. Non-sensitive on purpose: admin-toggleable, and switching it off refuses new writes with
+   * MESSAGING_DISABLED while reads stay.
+   */
+  broker_visitor_messaging_enabled: false
 } as const;
 
 export const COUNTRY_FEATURE_FLAG_DEFAULTS = {

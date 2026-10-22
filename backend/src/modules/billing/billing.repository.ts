@@ -27,6 +27,9 @@ export interface LeadPackRecord {
   grantedById: string | null;
   /** Spec 060 J-03: invoice whose recorded payment justified the grant. */
   invoiceId?: string | null | undefined;
+  /** Spec 063: dispute that gave one credit back (unique) and the invoice whose pack-covered lead was re-credited. */
+  disputeId?: string | null | undefined;
+  sourceInvoiceId?: string | null | undefined;
   grantedAt: Date;
   updatedAt: Date;
 }
@@ -92,6 +95,8 @@ export class MemoryBillingRepository implements BillingRepository {
   }
 
   async createPack(record: LeadPackRecord): Promise<LeadPackRecord> {
+    // Same guarantee as the unique index on disputeId: one restored credit per dispute.
+    if (record.disputeId && this.packs.some((pack) => pack.disputeId === record.disputeId)) throw Object.assign(new Error("Unique constraint failed on disputeId"), { code: "P2002" });
     this.packs.push(record);
     return record;
   }

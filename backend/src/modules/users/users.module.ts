@@ -4,11 +4,26 @@ import { AuditLogWriter } from "../audit-logs/audit-log-writer.service";
 import { AuthAuditActions } from "../audit-logs/auth-audit-actions";
 import type { ActorContext } from "../common/types";
 import { MemoryUsersRepository, type UserAccount, type UsersRepository } from "./users.repository";
+import type { TrustedDeviceRevoker } from "../auth/trusted-device.service";
 
 export type { UserAccount } from "./users.repository";
 
+/** Statuses after which a still-trusted browser must not skip the second factor (spec 063 FR-A06). */
+const ACCESS_ENDING_STATUSES = new Set<UserAccount["status"]>(["suspended", "locked", "deleted"]);
+
 export class UsersService {
+  /** Spec 063: ends the trusted devices of a user whose credentials or access change. */
+  private trustedDevices?: TrustedDeviceRevoker | undefined;
+
   constructor(private readonly audit: AuditLogWriter, private readonly repository: UsersRepository = new MemoryUsersRepository()) {}
+
+  setTrustedDeviceRevoker(revoker: TrustedDeviceRevoker | undefined): void {
+    this.trustedDevices = revoker;
+  }
+
+  private async revokeTrustedDevices(userId: string, reason: Parameters<TrustedDeviceRevoker["revokeAll"]>[1]): Promise<void> {
+    await this.trustedDevices?.revokeAll(userId, reason);
+  }
 
   async create(input: UserCreateDto, actor: ActorContext): Promise<UserAccount> {
     const parsed = userCreateSchema.parse(input);
@@ -71,8 +86,20 @@ export class UsersService {
     return user?.status === "deleted" ? undefined : user;
   }
 
-  update(user: UserAccount): Promise<UserAccount> {
-    return this.repository.update(user);
+  /**
+   * Generic write. Spec 063: a change of password, MFA secret or of an access-ending status made
+   * through this door (not through the dedicated methods below) also ends the trusted devices.
+   */
+  async update(user: UserAccount): Promise<UserAccount> {
+    const before = await this.repository.findById(user.id);
+    const updated = await this.repository.update(user);
+    if (before) {
+      const statusEnded = ACCESS_ENDING_STATUSES.has(updated.status) && updated.status !== before.status;
+      if (statusEnded) await this.revokeTrustedDevices(updated.id, updated.status === "suspended" ? "suspended" : updated.status === "locked" ? "locked" : "deleted");
+      else if (before.passwordHash !== updated.passwordHash) await this.revokeTrustedDevices(updated.id, "password_change");
+      else if (before.mfaSecretEncrypted !== updated.mfaSecretEncrypted) await this.revokeTrustedDevices(updated.id, updated.mfaSecretEncrypted ? "mfa_reenrolled" : "mfa_reset");
+    }
+    return updated;
   }
 
   async setPassword(userId: string, passwordHash: string): Promise<UserAccount> {
@@ -80,7 +107,9 @@ export class UsersService {
     user.passwordHash = passwordHash;
     user.passwordChangedAt = new Date();
     user.passwordChangeRequired = false;
-    return this.repository.update(user);
+    const updated = await this.repository.update(user);
+    await this.revokeTrustedDevices(userId, "password_change");
+    return updated;
   }
 
   async setPasswordResetToken(userId: string, tokenHash: string, expiresAt: Date): Promise<UserAccount> {
@@ -104,7 +133,9 @@ export class UsersService {
       delete user.lockedAt;
       delete user.lockedReason;
     }
-    return this.repository.update(user);
+    const updated = await this.repository.update(user);
+    await this.revokeTrustedDevices(userId, "password_reset");
+    return updated;
   }
 
   async findByPasswordResetTokenHash(tokenHash: string, now = new Date()): Promise<UserAccount | undefined> {
@@ -124,13 +155,22 @@ export class UsersService {
     user.status = "active";
     delete user.passwordResetTokenHash;
     delete user.passwordResetTokenExpiresAt;
-    return this.repository.update(user);
+    const updated = await this.repository.update(user);
+    await this.revokeTrustedDevices(userId, "password_reset");
+    return updated;
   }
 
-  async recordSuccessfulLogin(userId: string, lastLoginIpHash?: string): Promise<UserAccount> {
+  /**
+   * `resetFailedLogins: false` is used when the password is proven but a second factor is still
+   * pending (spec 063): the counter is then cleared only once the login is complete, so the password
+   * cannot be used to reset the lockout between wrong MFA codes.
+   */
+  async recordSuccessfulLogin(userId: string, lastLoginIpHash?: string, options: { resetFailedLogins?: boolean } = {}): Promise<UserAccount> {
     const user = await this.require(userId);
-    user.failedLoginCount = 0;
-    delete user.lastFailedLoginAt;
+    if (options.resetFailedLogins !== false) {
+      user.failedLoginCount = 0;
+      delete user.lastFailedLoginAt;
+    }
     user.lastLoginAt = new Date();
     if (lastLoginIpHash) user.lastLoginIpHash = lastLoginIpHash;
     return this.repository.update(user);
@@ -138,16 +178,22 @@ export class UsersService {
 
   async setMfaEnrollment(userId: string, encryptedSecret: string, backupCodeHashes: string[]): Promise<UserAccount> {
     const user = await this.require(userId);
+    const reenrolled = Boolean(user.mfaSecretEncrypted);
     user.mfaSecretEncrypted = encryptedSecret;
     user.mfaSecretIssuedAt = new Date();
     user.mfaBackupCodesHashes = backupCodeHashes;
     user.mfaStatus = "enrolled";
-    return this.repository.update(user);
+    const updated = await this.repository.update(user);
+    if (reenrolled) await this.revokeTrustedDevices(userId, "mfa_reenrolled");
+    return updated;
   }
 
   async markMfaVerified(userId: string, backupCodeHashes?: string[]): Promise<UserAccount> {
     const user = await this.require(userId);
     user.mfaStatus = "verified";
+    // A valid second factor completes the login: the failed-attempt counter ends here.
+    user.failedLoginCount = 0;
+    delete user.lastFailedLoginAt;
     if (backupCodeHashes) user.mfaBackupCodesHashes = backupCodeHashes;
     return this.repository.update(user);
   }
@@ -164,13 +210,18 @@ export class UsersService {
     user.status = "locked";
     user.lockedAt = new Date();
     user.lockedReason = reason;
-    return this.repository.update(user);
+    const updated = await this.repository.update(user);
+    await this.revokeTrustedDevices(userId, "locked");
+    return updated;
   }
 
-  async suspend(userId: string): Promise<UserAccount> {
+  /** `revocationReason` is "deactivated" when the owner of a broker firm deactivates a team member. */
+  async suspend(userId: string, revocationReason: "suspended" | "deactivated" = "suspended"): Promise<UserAccount> {
     const user = await this.require(userId);
     user.status = "suspended";
-    return this.repository.update(user);
+    const updated = await this.repository.update(user);
+    await this.revokeTrustedDevices(userId, revocationReason);
+    return updated;
   }
 
   async unsuspend(userId: string): Promise<UserAccount> {
@@ -193,7 +244,9 @@ export class UsersService {
     user.status = "deleted";
     user.deletedAt = new Date();
     user.email = `${user.id}@deleted.assurmatch.local`;
-    return this.repository.update(user);
+    const updated = await this.repository.update(user);
+    await this.revokeTrustedDevices(userId, "deleted");
+    return updated;
   }
 
   async resetMfa(userId: string): Promise<UserAccount> {
@@ -202,7 +255,9 @@ export class UsersService {
     delete user.mfaSecretIssuedAt;
     user.mfaBackupCodesHashes = [];
     user.mfaStatus = "required";
-    return this.repository.update(user);
+    const updated = await this.repository.update(user);
+    await this.revokeTrustedDevices(userId, "mfa_reset");
+    return updated;
   }
 
   async require(id: string): Promise<UserAccount> {

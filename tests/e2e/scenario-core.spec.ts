@@ -61,7 +61,8 @@ test("SC-01b ouvrir la Côte d'Ivoire, Auto et Voyage : consentements, formulair
   const admin = superAdmin();
   await openAs(page, admin, "/");
 
-  // Global journeys (the reference seed leaves them closed).
+  // Global journeys (the reference seed leaves the public ones closed; since spec 063 the broker
+  // starter portal, CRM and dashboard flags are on by default, so setting them below is idempotent).
   await setGlobalFlag(page, "public_comparator_enabled", true, REASON);
   await setGlobalFlag(page, "quote_request_enabled", true, REASON);
   await setGlobalFlag(page, "starter_portal_enabled", true, REASON);

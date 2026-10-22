@@ -26,6 +26,7 @@ Légende : 🔴 bloquant pour le pilote fermé (J4) · 🟠 bloquant pour l'ouve
 | 2.6 🔴 | Textes de consentement FR et EN par pays, validés puis publiés par la conformité | Conformité | Écran admin Consentements (spec 050) |
 | 2.7 🟠 | Durées de rétention par pays validées, qui remplacent les valeurs provisoires | Juridique | `/compliance/retention` (spec 046) |
 | 2.8 🟠 | Avis écrit sur le positionnement d'intermédiaire au regard de la CIMA, notamment pour la proposition non contractuelle relayée (spec 055) | Juridique | — |
+| 2.8 bis 🟠 | Ouvrir la messagerie courtier ↔ visiteur (flag `broker_visitor_messaging_enabled`, **fermé par défaut**) depuis l'écran des drapeaux de l'admin, **seulement une fois l'avis juridique L-08 (positionnement d'intermédiaire, CIMA) obtenu** (ligne 2.8). Le drapeau est non sensible : activable et coupable par l'admin, sans déploiement (spec 062) | Conformité, après avis juridique | `docs/scenarios/e2e-admin-courtier-devis.md` (étapes 28a à 28n) |
 | 2.9 🔴 | Mentions légales de facturation : `ASSURMATCH_INVOICE_*`, TVA CI et SN, délai de paiement | Comptabilité | Spec 060 (émission refusée en production tant que ces champs sont incomplets) |
 
 ## 3. Infrastructure (spec 057, runbooks)
@@ -63,6 +64,7 @@ Légende : 🔴 bloquant pour le pilote fermé (J4) · 🟠 bloquant pour l'ouve
    - passage en « Actif test », puis en « Actif public ».
 4. 🔴 **Offres** (spec 052) : saisies par les courtiers dans « Mes offres », puis validées par la conformité.
 5. 🟠 **Flags globaux** : `public_comparator_enabled` et `quote_request_enabled`.
+   Les trois flags du back-office courtier, `starter_portal_enabled`, `broker_crm_enabled` et `broker_dashboard_enabled`, sont **activés par défaut** depuis la spec 063 (PRD §9.1). Ils ne figurent pas parmi les modules réglementés. Pour en couper un : écran « Feature flags » du back-office admin (motif obligatoire, action auditée). Sur un environnement **déjà initialisé** (préproduction, base existante), les lignes existantes à `false` ne sont jamais réécrites par les seeds : les passer à `true` depuis le même écran avant le pilote. Le plan Starter n'accède jamais au CRM, quelle que soit la valeur du flag.
 6. 🟠 **Ouverture publique** : `country_public_enabled`, une fois la checklist d'activation entièrement verte. C'est le jalon J5, réservé à la conformité.
 7. 🟢 **Facturation** : activer `billing_enabled` par le chemin de conformité audité, puis émettre les factures mensuelles (spec 060) :
    `npm run ops:apply-flag-policy -- --flag billing_enabled --value true --reference <réf. décision> --approved-by "<nom, fonction>" --reason "<motif>"`.
@@ -72,6 +74,7 @@ Légende : 🔴 bloquant pour le pilote fermé (J4) · 🟠 bloquant pour l'ouve
 
 | # | Vérification | Référence |
 |---|---|---|
+| 5.0 🔴 | Demandes antérieures au correctif F1 (spec 066) : exécuter la requête en lecture seule `scripts/ops/sql/f1-shared-prospect-detection.sql` sur la préproduction puis la production ; si elle compte des demandes, décider de leur correction ou de la remise à zéro de la base avant toute ouverture | Spec 066 |
 | 5.1 🔴 | Scénario de bout en bout réussi sur la préproduction : SC-01 à SC-08 (clôture, enquête, facture et paiement compris), avec les e-mails réels | Spec 059 (`npm run test:e2e:stack`) |
 | 5.2 🔴 | Cas interdits (SC-09) : pays fermé, absence de consentement, courtier suspendu, isolation | idem |
 | 5.2b 🔴 | Exploitation (SC-10) : sondes `/healthz` et `/readyz` et battement du worker sont automatisés (`ops-health.spec.ts`) ; restauration de sauvegarde chronométrée, alertes et exercice d'incident restent manuels | Spec 059, `docs/runbooks/backup-restore.md`, `docs/runbooks/worker.md` |

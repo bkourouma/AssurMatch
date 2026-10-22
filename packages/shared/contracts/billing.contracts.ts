@@ -129,6 +129,8 @@ export const leadPackSchema = z.object({
   reason: nonEmptyStringSchema,
   /** Spec 060 J-03: invoice whose recorded payment justified the grant, when there is one. */
   invoiceId: uuidSchema.nullable().optional(),
+  /** Spec 063: set when the pack row gave one credit back after an accepted lead dispute. */
+  disputeId: z.string().nullable().optional(),
   grantedAt: dateTimeStringSchema
 });
 
@@ -240,7 +242,11 @@ export const creditNoteSchema = z.object({
   vatAmount: xofAmountSchema,
   totalAmount: xofAmountSchema,
   reason: nonEmptyStringSchema,
-  issuedAt: dateTimeStringSchema
+  issuedAt: dateTimeStringSchema,
+  /** Spec 063: "cancellation" = total credit note of spec 060, "dispute" = partial credit of one accepted dispute. */
+  kind: z.enum(["cancellation", "dispute"]).default("cancellation"),
+  disputeId: z.string().optional(),
+  leadAssignmentId: z.string().optional()
 });
 
 export const issuedInvoiceSchema = z.object({
@@ -264,13 +270,18 @@ export const issuedInvoiceSchema = z.object({
   vatAmount: xofAmountSchema,
   totalAmount: xofAmountSchema,
   amountPaid: xofAmountSchema,
+  /** Net remaining due: total minus the partial (dispute) credit notes minus what was paid. */
   amountDue: xofAmountSchema,
+  /** Spec 063: sum (incl. VAT) of the partial credit notes of accepted lead disputes; absent when none. */
+  partialCreditsTotal: xofAmountSchema.optional(),
   creditNote: creditNoteSchema.nullable(),
   paymentsEnabled: z.literal(false)
 });
 
 export const issuedInvoiceDetailSchema = issuedInvoiceSchema.extend({
-  payments: z.array(invoicePaymentSchema)
+  payments: z.array(invoicePaymentSchema),
+  /** Spec 063: partial credit notes of accepted lead disputes issued on this invoice. */
+  partialCreditNotes: z.array(creditNoteSchema).optional()
 });
 
 export const issuedInvoiceQuerySchema = z.object({

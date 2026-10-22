@@ -7,6 +7,7 @@ import type {
   AdminRegulatoryRegimeView
 } from "../../../../packages/shared/contracts/catalog.contracts";
 import type { AdminConsentTextView, ConsentTextTemplate } from "../../../../packages/shared/contracts/compliance.contracts";
+import type { AdminLeadDispute, AdminLeadDisputeList } from "../../../../packages/shared/contracts/lead-disputes.contracts";
 import type {
   AdminOfferContent,
   AdminOfferDetailView,
@@ -45,14 +46,17 @@ export interface BackOfficeLoginResult {
   status: "success" | "mfa_required" | "activation_required" | "locked" | "suspended" | "validation_error" | "invalid_credentials" | "error";
   accessToken?: string;
   mfaRequired?: boolean;
+  /** Spec 063 (FR-A04): the API refused the presented trusted-device token; the app clears its cookie. */
+  trustedDeviceRejected?: boolean;
+  trustedDeviceUsed?: boolean;
   error?: string;
 }
 
-export async function loginBackOffice(email: string, password: string): Promise<BackOfficeLoginResult> {
+export async function loginBackOffice(email: string, password: string, trustedDeviceToken?: string): Promise<BackOfficeLoginResult> {
   const response = await fetch(`${backOfficeApiBaseUrl()}/auth/login`, {
     method: "POST",
     headers: { "content-type": "application/json" },
-    body: JSON.stringify({ email, password }),
+    body: JSON.stringify(trustedDeviceToken ? { email, password, trustedDeviceToken } : { email, password }),
     cache: "no-store"
   });
   if (response.status === 400 || response.status === 422) return { status: "validation_error", error: `api_${response.status}` };
@@ -61,7 +65,7 @@ export async function loginBackOffice(email: string, password: string): Promise<
   if (response.status === 428) return { status: "activation_required", error: "activation_required" };
   if (response.status === 401) return { status: "invalid_credentials", error: "invalid_credentials" };
   if (!response.ok) return { status: "error", error: `api_${response.status}` };
-  const session = await response.json() as { accessToken?: string; mfaRequired?: boolean };
+  const session = await response.json() as { accessToken?: string; mfaRequired?: boolean; trustedDeviceRejected?: boolean; trustedDeviceUsed?: boolean };
   if (!session.accessToken) return { status: "error", error: "invalid_session" };
   return session.mfaRequired ? { status: "mfa_required", ...session } : { status: "success", ...session };
 }
@@ -89,17 +93,70 @@ export async function enrollMfa() {
   return response.json() as Promise<{ secret: string; otpauthUri: string; backupCodes: string[] }>;
 }
 
-export async function verifyMfa(code: string, kind: "totp" | "backup" = "totp") {
+/** Spec 063: `trustedDevice` is returned once, only when `trustDevice` was requested. */
+export interface VerifyMfaResult {
+  accessToken?: string;
+  mfaRequired?: boolean;
+  trustedDevice?: { token: string; expiresAt: string };
+}
+
+export async function verifyMfa(
+  code: string,
+  kind: "totp" | "backup" = "totp",
+  options: { trustDevice?: boolean; deviceLabel?: string } = {}
+): Promise<VerifyMfaResult> {
   const token = await getBackOfficeToken();
   if (!token) throw new Error("session_required");
   const response = await fetch(`${backOfficeApiBaseUrl()}/auth/mfa/verify`, {
     method: "POST",
     headers: { Authorization: `Bearer ${token}`, "content-type": "application/json" },
-    body: JSON.stringify({ code, kind }),
+    body: JSON.stringify(options.trustDevice ? { code, kind, trustDevice: true, deviceLabel: options.deviceLabel } : { code, kind }),
     cache: "no-store"
   });
   if (!response.ok) throw new Error(`api_${response.status}`);
-  return response.json();
+  return response.json() as Promise<VerifyMfaResult>;
+}
+
+/** Spec 063 (FR-A06): active trusted devices of the signed-in user (MFA-verified token required). */
+export interface TrustedDeviceView {
+  id: string;
+  label: string | null;
+  createdAt: string;
+  lastUsedAt: string | null;
+  expiresAt: string;
+}
+
+export async function listTrustedDevices(): Promise<{ ok: true; devices: TrustedDeviceView[] } | { ok: false; error: string }> {
+  const token = await getBackOfficeToken();
+  if (!token) return { ok: false, error: "session_required" };
+  try {
+    const response = await fetch(`${backOfficeApiBaseUrl()}/auth/trusted-devices`, {
+      headers: { Authorization: `Bearer ${token}` },
+      cache: "no-store"
+    });
+    if (!response.ok) return { ok: false, error: `api_${response.status}` };
+    const body = (await response.json()) as TrustedDeviceView[] | { devices?: TrustedDeviceView[] };
+    return { ok: true, devices: Array.isArray(body) ? body : body.devices ?? [] };
+  } catch {
+    return { ok: false, error: "api_unavailable" };
+  }
+}
+
+export async function revokeTrustedDevices(): Promise<{ ok: true; revoked: number } | { ok: false; error: string }> {
+  const token = await getBackOfficeToken();
+  if (!token) return { ok: false, error: "session_required" };
+  try {
+    const response = await fetch(`${backOfficeApiBaseUrl()}/auth/trusted-devices`, {
+      method: "DELETE",
+      headers: { Authorization: `Bearer ${token}` },
+      cache: "no-store"
+    });
+    if (!response.ok) return { ok: false, error: `api_${response.status}` };
+    const body = (await response.json()) as { revoked?: number };
+    return { ok: true, revoked: typeof body.revoked === "number" ? body.revoked : 0 };
+  } catch {
+    return { ok: false, error: "api_unavailable" };
+  }
 }
 
 export async function changePassword(oldPassword: string, newPassword: string): Promise<void> {
@@ -481,6 +538,11 @@ export interface AdminPartnerSlaRowData {
   leadsWithinTarget: number;
   complianceRate: number;
   averageFirstActionMinutes: number | null;
+  /** Spec 062 (additive, null/absent when nothing is measured): first reply visible to the visitor. */
+  averageFirstVisibleReplyMinutes?: number | null;
+  firstVisibleReplyMeasured?: number;
+  firstVisibleReplyWithinTarget?: number;
+  firstVisibleReplyComplianceRate?: number | null;
 }
 
 export function readPartnerSla() {
@@ -617,6 +679,36 @@ export function readLeadPacks() {
   return readAdmin<LeadPackData[]>("/admin/billing/packs", []);
 }
 
+/** Spec 063 (CRM-012): lead disputes decided by the finance admin. Mirrors `lead-disputes.contracts.ts`. */
+export type { AdminLeadDispute, AdminLeadDisputeList } from "../../../../packages/shared/contracts/lead-disputes.contracts";
+
+export interface LeadDisputeFilters {
+  status?: string;
+  partnerId?: string;
+  countryCode?: string;
+  from?: string;
+  to?: string;
+  page?: number;
+  pageSize?: number;
+}
+
+const emptyLeadDisputeList: AdminLeadDisputeList = { items: [], page: 1, pageSize: 20, total: 0 };
+
+/** GET /admin/billing/disputes: filtered, paginated list (never carries lead contact or answers). */
+export function readLeadDisputes(filters: LeadDisputeFilters = {}) {
+  const query = new URLSearchParams();
+  for (const [key, value] of Object.entries(filters)) {
+    if (value !== undefined && value !== "") query.set(key, String(value));
+  }
+  const suffix = query.toString();
+  return readAdmin<AdminLeadDisputeList>(`/admin/billing/disputes${suffix ? `?${suffix}` : ""}`, emptyLeadDisputeList);
+}
+
+/** GET /admin/billing/disputes/:id */
+export function readLeadDispute(disputeId: string) {
+  return readAdmin<AdminLeadDispute | null>(`/admin/billing/disputes/${encodeURIComponent(disputeId)}`, null);
+}
+
 /** Spec 046: mirrors `packages/shared/contracts/data-retention.contracts.ts` (metadata and counts only, no personal data). */
 export const RETENTION_CATEGORY_KEYS = [
   "quote_requests",
@@ -626,7 +718,12 @@ export const RETENTION_CATEGORY_KEYS = [
   "waitlist",
   "ai_traces",
   "webhook_payloads",
-  "messaging_references"
+  "messaging_references",
+  "satisfaction_feedback",
+  // Spec 062: provisional durations, pending legal validation.
+  "lead_message_threads",
+  "lead_document_requests",
+  "data_requests"
 ] as const;
 export type RetentionCategoryKey = (typeof RETENTION_CATEGORY_KEYS)[number];
 export type RetentionSubjectKey = RetentionCategoryKey | "prospects";
@@ -635,7 +732,7 @@ export interface RetentionPolicyItemData {
   category: RetentionCategoryKey;
   retentionDays: number;
   source: "default" | "global" | "country";
-  anchor: "last_activity" | "created_at" | "reviewed_at" | "country_public_since" | "occurred_at";
+  anchor: "last_activity" | "created_at" | "reviewed_at" | "country_public_since" | "occurred_at" | "submitted_at";
   defaultRetentionDays: number;
   globalRetentionDays: number | null;
   countryRetentionDays: number | null;
@@ -699,6 +796,97 @@ export function readRetentionPolicies(countryId?: string) {
 
 export function readRetentionBatches() {
   return readAdmin<RetentionBatchesData>("/admin/retention/batches", { purgeEnabled: false, items: [] });
+}
+
+/**
+ * Spec 062: data-subject requests (access, rectification, erasure) of the compliance queue. Mirrors
+ * `packages/shared/contracts/data-requests.ts`. The support role only receives the list fields.
+ */
+export const DATA_REQUEST_TYPE_KEYS = ["access", "rectification", "erasure"] as const;
+export const DATA_REQUEST_STATUS_KEYS = ["received", "in_review", "completed", "rejected"] as const;
+export type DataRequestTypeKey = (typeof DATA_REQUEST_TYPE_KEYS)[number];
+export type DataRequestStatusKey = (typeof DATA_REQUEST_STATUS_KEYS)[number];
+
+export interface DataRequestListItemData {
+  id: string;
+  reference: string;
+  type: DataRequestTypeKey | (string & {});
+  status: DataRequestStatusKey | (string & {});
+  createdAt: string;
+  dueAt: string;
+  overdue?: boolean;
+  quoteReference?: string;
+  locale?: string;
+}
+
+export interface DataRequestListData {
+  items: DataRequestListItemData[];
+  nextCursor: string | null;
+}
+
+export interface DataRequestHistoryEntryData {
+  action: string;
+  at: string;
+}
+
+export interface DataRequestDetailData extends DataRequestListItemData {
+  /** Personal data written by the visitor: absent for the support role. */
+  detail?: string;
+  acknowledgedAt?: string | null;
+  reviewedAt?: string;
+  decidedAt?: string;
+  decisionNote?: string;
+  erasureBatchId?: string;
+  erasureAllowed?: boolean;
+  history?: DataRequestHistoryEntryData[];
+}
+
+export function readDataRequests(filters: { status?: string; type?: string; cursor?: string; limit?: number } = {}) {
+  const params = new URLSearchParams();
+  if (filters.status) params.set("status", filters.status);
+  if (filters.type) params.set("type", filters.type);
+  if (filters.cursor) params.set("cursor", filters.cursor);
+  if (filters.limit) params.set("limit", String(filters.limit));
+  const query = params.toString();
+  return readAdmin<DataRequestListData>(`/admin/data-requests${query ? `?${query}` : ""}`, { items: [], nextCursor: null });
+}
+
+export function readDataRequest(id: string) {
+  return readAdmin<DataRequestDetailData | null>(`/admin/data-requests/${encodeURIComponent(id)}`, null);
+}
+
+/**
+ * Spec 062: read-only view of the broker/visitor conversations of one quote request. Every read is
+ * audited by the API; with `masked` set, the message bodies are replaced by a placeholder.
+ */
+export interface AdminConversationMessageData {
+  id: string;
+  senderType: "broker" | "visitor" | (string & {});
+  /** Null when masked (support role). */
+  body: string | null;
+  bodyMasked?: boolean;
+  createdAt: string;
+  readAt?: string | null;
+  /** Count only: file names are personal data and are never sent to the admin view. */
+  attachmentCount?: number;
+}
+
+export interface AdminConversationData {
+  conversationId: string;
+  partnerName: string;
+  state?: "open" | "read_only" | (string & {});
+  readOnlyReason?: string | null;
+  messages: AdminConversationMessageData[];
+}
+
+export interface AdminLeadConversationsData {
+  quoteRequestId?: string;
+  masked: boolean;
+  conversations: AdminConversationData[];
+}
+
+export function readAdminLeadConversations(quoteRequestId: string) {
+  return readAdmin<AdminLeadConversationsData>(`/admin/leads/${encodeURIComponent(quoteRequestId)}/conversations`, { masked: false, conversations: [] });
 }
 
 export interface AdminAiInsight {

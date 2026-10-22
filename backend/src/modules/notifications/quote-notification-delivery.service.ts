@@ -9,7 +9,7 @@ import type { VisitorEmailNotificationType } from "./quote-notification.service"
 export type DeliverableQuoteNotificationType = VisitorEmailNotificationType | "broker_lead_assigned" | "broker_visitor_response" | "broker_lead_reassigned" | BrokerAlertEmailType | "admin_alert_raised";
 
 /** Spec 061: broker alert pointers rendered from the partner alone (no quote lookup). */
-const BROKER_ALERT_TYPES = new Set<string>(["broker_document_received", "broker_task_due", "broker_quota_threshold", "broker_license_expiring", "broker_offer_expiring"]);
+const BROKER_ALERT_TYPES = new Set<string>(["broker_visitor_message", "broker_document_received", "broker_task_due", "broker_quota_threshold", "broker_license_expiring", "broker_offer_expiring", "broker_dispute_decided"]);
 
 /**
  * Spec 054 R4: the step each visitor type announces. The two spec 044 types stay renderable for the
@@ -27,7 +27,12 @@ const VISITOR_STEP: Record<VisitorEmailNotificationType, VisitorEmailStep> = {
   visitor_quote_closed: "closed",
   visitor_consent_withdrawn: "consent_withdrawn",
   visitor_tracking_link: "tracking_link",
-  visitor_proposal_available: "proposal_available"
+  visitor_proposal_available: "proposal_available",
+  // Spec 062: pointers only.
+  visitor_broker_message: "broker_message",
+  visitor_documents_requested: "documents_requested",
+  visitor_data_request_acknowledged: "data_request_acknowledged",
+  visitor_data_request_closed: "data_request_closed"
 };
 
 const DELIVERABLE_TYPES = new Set<string>([...Object.keys(VISITOR_STEP), "broker_lead_assigned", "broker_visitor_response", "broker_lead_reassigned", ...BROKER_ALERT_TYPES, "admin_alert_raised"]);
@@ -203,7 +208,15 @@ export class QuoteNotificationDeliveryService {
       locale: quote.language === "en" ? "en" : "fr",
       partnerName: partner ? partner.tradeName ?? partner.legalName : undefined,
       token: access?.token,
-      tokenExpiresAt: access?.expiresAt
+      tokenExpiresAt: access?.expiresAt,
+      // Spec 062 D-10: reference, kind and indicative due date only (the row never holds free text).
+      ...(notification.eventPayload?.dataRequestReference ? {
+        dataRequest: {
+          reference: String(notification.eventPayload.dataRequestReference),
+          requestType: notification.eventPayload.dataRequestType ? String(notification.eventPayload.dataRequestType) : undefined,
+          dueAt: notification.eventPayload.dataRequestDueAt ? String(notification.eventPayload.dataRequestDueAt) : undefined
+        }
+      } : {})
     });
   }
 

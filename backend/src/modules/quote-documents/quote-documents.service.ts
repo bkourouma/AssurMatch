@@ -81,7 +81,8 @@ export class QuoteDocumentsService {
     if (!(quoteDocumentMimeTypes as readonly string[]).includes(mimeType)) this.refuse(actor, quote, "mime_not_allowed", "Invalid document: mime_not_allowed");
     if (!matchesFileSignature(mimeType, file.buffer)) this.refuse(actor, quote, "content_mismatch", "Invalid document: content_mismatch");
     const existing = await this.repository.listForQuote(quote.id);
-    if (existing.filter((document) => document.status !== "removed").length >= QUOTE_DOCUMENT_MAX_PER_REQUEST) this.refuse(actor, quote, "too_many_documents", "Invalid document: too_many_documents");
+    // Spec 062: files provided against a broker document request do not use the submission quota.
+    if (existing.filter((document) => document.status !== "removed" && !document.documentRequestId).length >= QUOTE_DOCUMENT_MAX_PER_REQUEST) this.refuse(actor, quote, "too_many_documents", "Invalid document: too_many_documents");
 
     const now = new Date();
     const record: QuoteDocumentRecord = {
@@ -197,6 +198,8 @@ export class QuoteDocumentsService {
     let shared = 0;
     for (const document of await this.repository.listForQuote(quoteRequestId)) {
       if (document.status !== "available" || document.sharedLeadAssignmentId === assignment.id) continue;
+      // Spec 062: a file given to answer the previous broker's request is not handed to the next broker.
+      if (document.documentRequestId) continue;
       await this.share(document, assignment);
       shared += 1;
     }
@@ -208,7 +211,63 @@ export class QuoteDocumentsService {
     if (assignment) await this.share(document, assignment);
   }
 
-  private async share(document: QuoteDocumentRecord, assignment: LeadAssignmentRecord): Promise<void> {
+  /**
+   * Spec 062 (document requests): a file the visitor provided against a broker request. It went
+   * through the synchronous scan of the messaging upload (clean only), so it is stored as an
+   * `available` document tied to the request and shared with the current assignment at once, without
+   * the generic broker alert (the request flow sends its own pointer notification).
+   */
+  async acceptRequestedDocument(input: {
+    quote: { id: string; prospectId?: string | null | undefined };
+    assignment: LeadAssignmentRecord;
+    documentRequestId: string;
+    label: string;
+    file: { storageKey: string; fileName: string; mimeType: string; sizeBytes: number; checksum: string; scanEngine: string; scannedAt: Date };
+  }): Promise<QuoteDocumentRecord> {
+    const now = new Date();
+    const record: QuoteDocumentRecord = {
+      id: crypto.randomUUID(),
+      quoteRequestId: input.quote.id,
+      prospectId: input.quote.prospectId ?? null,
+      label: input.label,
+      documentKind: "other",
+      fileName: input.file.fileName,
+      mimeType: input.file.mimeType,
+      sizeBytes: input.file.sizeBytes,
+      checksum: input.file.checksum.replace(/^sha256:/, ""),
+      storageKey: input.file.storageKey,
+      scanStatus: "clean",
+      scanEngine: input.file.scanEngine,
+      scanSignature: null,
+      scannedAt: input.file.scannedAt,
+      status: "available",
+      sharedLeadAssignmentId: null,
+      sharedAt: null,
+      documentRequestId: input.documentRequestId,
+      uploadedBy: "visitor",
+      retentionUntil: new Date(Date.UTC(now.getUTCFullYear() + RETENTION_YEARS, now.getUTCMonth(), now.getUTCDate())),
+      createdAt: now,
+      updatedAt: now
+    };
+    await this.repository.create(record);
+    await this.share(record, input.assignment, false);
+    return this.repository.require(record.id);
+  }
+
+  /** Spec 062: the files provided against one document request (any scan status; callers serve clean ones only). */
+  async listForDocumentRequest(quoteRequestId: string, documentRequestId: string): Promise<QuoteDocumentRecord[]> {
+    return (await this.repository.listForQuote(quoteRequestId)).filter((document) => document.documentRequestId === documentRequestId && document.status !== "removed");
+  }
+
+  /** Spec 062: bytes of a clean, available file provided against a request; undefined otherwise. */
+  async readRequestedDocument(quoteRequestId: string, documentRequestId: string, documentId: string): Promise<{ document: QuoteDocumentRecord; bytes: Buffer } | undefined> {
+    const document = (await this.listForDocumentRequest(quoteRequestId, documentRequestId)).find((candidate) => candidate.id === documentId);
+    if (!document || document.scanStatus !== "clean" || document.status !== "available") return undefined;
+    const bytes = await this.deps.storage.get(document.storageKey);
+    return bytes ? { document, bytes } : undefined;
+  }
+
+  private async share(document: QuoteDocumentRecord, assignment: LeadAssignmentRecord, notify = true): Promise<void> {
     const crmDocument: BrokerCrmDocument & { partnerTenantId: string } = {
       id: crypto.randomUUID(),
       leadAssignmentId: assignment.id,
@@ -220,7 +279,9 @@ export class QuoteDocumentsService {
     };
     await this.deps.crmDocuments.addDocument(crmDocument);
     await this.repository.update(document.id, { sharedLeadAssignmentId: assignment.id, sharedAt: new Date(), updatedAt: new Date() });
-    if (this.deps.brokerAlerts) {
+    if (!notify) {
+      // Notified by the caller (spec 062 document request flow).
+    } else if (this.deps.brokerAlerts) {
       await this.deps.brokerAlerts.notify({
         partnerTenantId: assignment.partnerTenantId,
         type: "broker_document_received",

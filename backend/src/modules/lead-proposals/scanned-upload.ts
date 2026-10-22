@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 import { matchesFileSignature, safeUploadFileName } from "../common/files/file-signature";
 import type { DocumentStoragePort } from "../quote-documents/document-storage.port";
-import type { VirusScannerPort } from "../quote-documents/virus-scanner.port";
+import type { VirusScannerPort, VirusScanResult } from "../quote-documents/virus-scanner.port";
 
 /** Shape multer hands over for a multipart `file` field (same as quote and accreditation documents). */
 export interface UploadedLeadFile {
@@ -61,7 +61,8 @@ export async function storeScannedFile(
 
   const storageKey = `${rules.keyPrefix}-${crypto.randomUUID()}`;
   await deps.storage.put(storageKey, file.buffer, mimeType);
-  const result = await deps.scanner.scan(file.buffer);
+  // A scanner that throws is a failed scan (never a clean one), and the stored object is deleted just below.
+  const result = await deps.scanner.scan(file.buffer).catch((): VirusScanResult => ({ verdict: "failed", engine: deps.scanner.engine, detail: "scanner_error" }));
   if (result.verdict !== "clean") {
     await deps.storage.delete(storageKey).catch(() => undefined);
     return { ok: false, refusal: result.verdict === "infected" ? "infected" : "scan_failed", signature: result.signature ?? result.detail, engine: result.engine };

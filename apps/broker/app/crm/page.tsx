@@ -1,4 +1,6 @@
 import { redirect } from "next/navigation";
+import { AGENCY_PARAM, agencyQuery } from "../lib/agency-filter";
+import { loadAgencyFilter } from "../lib/agency-filter-loader";
 import { isStarterCrmDenied, loginRedirect, readBackOfficeSession } from "../lib/backoffice-auth";
 import { readBrokerAIAssistance, readBrokerAdvisors, readBrokerAiOptOut, readBrokerBillingStatement, readBrokerDashboardWithComparison } from "../lib/broker-api";
 import { setAiOptOutAction } from "../lib/crm-ai-actions";
@@ -17,13 +19,14 @@ import {
   Split,
   TenantWriteGuard
 } from "../lib/ui/broker-ui";
+import { AgencyFilterForm } from "../lib/ui/agency-filter-form";
 import { TENANT_SUSPENDED_MESSAGE, isTenantReadOnly } from "../lib/broker-permissions";
 import { crmKpis, dashboardKpis } from "../lib/ui/broker-view-models";
 
 const BREADCRUMB = [{ label: "CRM" }, { label: "Pipeline" }];
 
-export default async function BrokerCrmPage({ searchParams }: { searchParams: Promise<{ ai?: string }> }) {
-  const { ai: aiNotice } = await searchParams;
+export default async function BrokerCrmPage({ searchParams }: { searchParams: Promise<{ ai?: string; agence?: string }> }) {
+  const { ai: aiNotice, [AGENCY_PARAM]: agenceParam } = await searchParams;
   const session = await readBackOfficeSession();
   if (session.status !== "authenticated") {
     if (session.status === "unauthenticated" || session.status === "expired") redirect(loginRedirect("/crm", session.error ?? "session_required"));
@@ -60,8 +63,11 @@ export default async function BrokerCrmPage({ searchParams }: { searchParams: Pr
     );
   }
 
-  const dashboard = await readBrokerDashboardWithComparison();
-  const advisors = await readBrokerAdvisors();
+  // Spec 064: Enterprise agency DISPLAY filter (no access restriction); other plans make no extra API call.
+  const agency = await loadAgencyFilter(session.profile, agenceParam);
+  const filterQuery = agencyQuery(agency);
+  const dashboard = await readBrokerDashboardWithComparison(filterQuery);
+  const advisors = await readBrokerAdvisors(filterQuery);
   const [aiAssistance, aiOptOut, statement] = await Promise.all([readBrokerAIAssistance(), readBrokerAiOptOut(), readBrokerBillingStatement()]);
   if (dashboard.unauthenticated) redirect(loginRedirect("/crm", dashboard.error ?? "session_required"));
   if (dashboard.forbidden) {
@@ -93,12 +99,17 @@ export default async function BrokerCrmPage({ searchParams }: { searchParams: Pr
         description="Indicateurs operationnels internes. Aucune action CRM ne change les regles de routage, consentement, licence ou tenant."
         actions={
           crm ? (
-            <Button href="/crm/leads" variant="secondary">Vue tableau</Button>
+            <Cluster>
+              <Button href="/crm/leads" variant="secondary">Vue tableau</Button>
+              {session.profile.partnerPlan === "enterprise" ? <Button href="/crm/loss-analysis" variant="secondary">Analyse des pertes</Button> : null}
+            </Cluster>
           ) : (
             <Badge tone="disabled">Module indisponible</Badge>
           )
         }
       />
+
+      <AgencyFilterForm action="/crm" filter={agency} fieldId="crm-agency-filter" />
 
       <section aria-label="Indicateurs Starter">
         <Grid columns="kpi">

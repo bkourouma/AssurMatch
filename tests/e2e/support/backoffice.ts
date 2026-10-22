@@ -50,20 +50,63 @@ export async function activateWithMfa(page: Page, activationLink: string, passwo
   return secret;
 }
 
-export async function verifyTotp(page: Page, secret: string): Promise<void> {
+/** Label of the opt-in checkbox of the MFA verification form (spec 063, FR-A11). */
+export const TRUST_DEVICE_LABEL = /Faire confiance à cet appareil pendant 30 jours/u;
+
+/**
+ * Submits the current TOTP on the MFA verification form. With `trustDevice` the "trust this device for 30 days"
+ * checkbox is ticked (unchecked by default), so the browser context then skips the code at its next login.
+ */
+export async function verifyTotp(page: Page, secret: string, options: { trustDevice?: boolean } = {}): Promise<void> {
   await page.locator("#mfa-code").fill(await freshTotp(secret));
+  const trustBox = page.getByLabel(TRUST_DEVICE_LABEL);
+  if (options.trustDevice) await trustBox.check();
+  else await expect(trustBox).not.toBeChecked();
   await page.getByRole("button", { name: /Verifier MFA|Vérifier/u }).click();
   await page.waitForURL((url) => !url.pathname.startsWith("/mfa"));
 }
 
-/** Password + TOTP login (sessions last 15 minutes: long journeys log in again when needed). */
-export async function login(page: Page, account: BackOfficeAccount, returnTo = "/"): Promise<void> {
+/** Fills and submits the password step of the login screen, leaving the page wherever the app sends it. */
+async function submitPasswordStep(page: Page, account: BackOfficeAccount, returnTo: string): Promise<void> {
   await page.goto(`${appUrl(account.app)}/login?returnTo=${encodeURIComponent(returnTo)}`);
   await page.locator("#login-email").fill(account.email);
   await page.locator("#login-password").fill(account.password);
   await page.getByRole("button", { name: "Se connecter" }).click();
   await page.waitForURL((url) => !url.pathname.startsWith("/login"));
-  if (new URL(page.url()).pathname.startsWith("/mfa")) await verifyTotp(page, account.totpSecret);
+}
+
+/**
+ * Password + TOTP login (sessions last 15 minutes: long journeys log in again when needed). The TOTP step only
+ * happens when the app asks for it: a context holding a valid trusted-device cookie goes straight in.
+ * `trustDevice` ticks "trust this device" when the code is asked.
+ */
+export async function login(page: Page, account: BackOfficeAccount, returnTo = "/", options: { trustDevice?: boolean } = {}): Promise<void> {
+  await submitPasswordStep(page, account, returnTo);
+  if (new URL(page.url()).pathname.startsWith("/mfa")) await verifyTotp(page, account.totpSecret, options);
+}
+
+/**
+ * Asserts that an enrolled account is forced to the MFA screen after its password (no trusted device in this
+ * context): verification only, the enrolment form is not offered (spec 063, FR-A01 / FR-A11). Leaves the page
+ * on /mfa so the caller can complete or abandon the step.
+ */
+export async function expectMfaPromptOnLogin(page: Page, account: BackOfficeAccount, returnTo = "/"): Promise<void> {
+  await submitPasswordStep(page, account, returnTo);
+  await expect(page).toHaveURL(/\/mfa/u);
+  await expect(page.locator("#mfa-code")).toBeVisible();
+  await expect(page.getByRole("button", { name: /Generer secret/u })).toHaveCount(0);
+  await expect(page.getByLabel(TRUST_DEVICE_LABEL)).not.toBeChecked();
+}
+
+/**
+ * Asserts that the password alone opens the session because this context holds a valid trusted-device cookie:
+ * the login ends outside /login and /mfa (spec 063, scenario A2). Returns once the app has loaded `returnTo`.
+ */
+export async function loginExpectingNoMfa(page: Page, account: BackOfficeAccount, returnTo = "/"): Promise<void> {
+  await submitPasswordStep(page, account, returnTo);
+  const pathname = new URL(page.url()).pathname;
+  expect(pathname.startsWith("/mfa"), "the trusted device must skip the MFA prompt").toBe(false);
+  await expect(page.locator("#mfa-code")).toHaveCount(0);
 }
 
 /** Opens `path`, logging in again first if the session expired or was never opened. */

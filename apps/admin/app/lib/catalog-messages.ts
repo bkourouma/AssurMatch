@@ -45,8 +45,20 @@ export const FLAG_LABELS: Record<string, string> = {
   product_sensitive_data_enabled: "Données sensibles",
   product_manual_review_required: "Revue manuelle obligatoire",
   product_ai_scoring_enabled: "Scoring IA",
-  product_ai_form_assistant_enabled: "Assistant de formulaire IA"
+  product_ai_form_assistant_enabled: "Assistant de formulaire IA",
+  // Spec 062: global, non-sensitive flag (history stays readable when it is switched off).
+  broker_visitor_messaging_enabled: "Messagerie courtier ↔ visiteur"
 };
+
+/** Spec 062: one-sentence explanation shown under a global flag on the feature-flags screen. */
+export const FLAG_DESCRIPTIONS: Record<string, string> = {
+  broker_visitor_messaging_enabled:
+    "Autorise l'envoi de messages et de demandes de documents ; l'historique reste lisible lorsqu'elle est coupée. Fermée par défaut : à ouvrir seulement après l'avis juridique L-08 (positionnement d'intermédiaire, CIMA)."
+};
+
+export function flagDescription(key: string): string | undefined {
+  return FLAG_DESCRIPTIONS[key];
+}
 
 export function flagLabel(key: string): string {
   return FLAG_LABELS[key] ?? key;

@@ -73,6 +73,8 @@ export function backendEnv() {
     // flags every 5 s (30 s by default), like the worker before each cycle.
     ASSURMATCH_SATISFACTION_SURVEY_DELAY_MINUTES: "0",
     ASSURMATCH_FEATURE_FLAG_REFRESH_SECONDS: "5",
+    // Spec 065: licence expiry alerts run every minute instead of every hour (SC-10-LIC-3).
+    ASSURMATCH_SCHEDULED_ALERTS_INTERVAL_MINUTES: "1",
     // Spec 058 auth rate limiting counts per IP: every browser of the suite logs in from 127.0.0.1.
     ASSURMATCH_AUTH_RATE_LIMIT_IP_MAX: "2000",
     TRUSTED_PROXY_HOPS: process.env.ASSURMATCH_E2E_TRUSTED_PROXY_HOPS ?? "0",
