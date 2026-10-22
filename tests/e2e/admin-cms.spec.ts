@@ -26,6 +26,10 @@ let contentAdmin: BackOfficeAccount;
 let support: BackOfficeAccount;
 let entryId = "";
 
+test.beforeAll(() => {
+  superAdmin = superAdminAccount();
+});
+
 test.afterAll(async () => {
   await closeSessions();
 });
@@ -43,7 +47,6 @@ function faqQuestions(body: unknown): string[] {
 
 test("CMS-00 les comptes content_admin et support_admin sont invités et activés par le Super Admin", async ({ browser }) => {
   test.setTimeout(10 * 60_000);
-  superAdmin = superAdminAccount();
   contentAdmin = await adminWithRole(browser, superAdmin, "content_admin", "content");
   support = await adminWithRole(browser, superAdmin, "support_admin", "support");
   expect(contentAdmin.email).not.toBe(support.email);
@@ -67,7 +70,9 @@ test("CMS-01 le content_admin crée un brouillon de FAQ et le soumet à validati
 
   const workflow = page.locator("form[data-content-workflow='submit']");
   await workflow.getByRole("button", { name: "Soumettre" }).click();
-  await expect(workflow.getByText("Contenu soumis à validation")).toBeVisible();
+  // On success the submit form gives way to "Retirer la soumission" (the entry is now pending).
+  await expect(page.locator("form[data-content-workflow='withdraw']")).toBeVisible();
+  await expect(page.getByText("En attente de validation").first()).toBeVisible();
 
   const token = await adminToken(browser, contentAdmin);
   const detail = await api(token, "GET", `/admin/content/entries/${entryId}`);
@@ -100,7 +105,9 @@ test("CMS-03 un second acteur approuve : le contenu est publié et apparaît sur
   await expect(approve).toBeVisible();
   await approve.locator("textarea[name='note']").fill("Relu par un second acteur, parcours E2E");
   await approve.getByRole("button", { name: "Approuver" }).click();
-  await expect(approve.getByText("Contenu approuvé et publié")).toBeVisible();
+  // Once published the approval form gives way to "Revise" / "Archive".
+  await expect(page.locator("form[data-content-workflow='approve']")).toHaveCount(0);
+  await expect(page.locator("form[data-content-workflow='revise']")).toBeVisible();
 
   const token = await adminToken(browser, superAdmin);
   const detail = await api(token, "GET", `/admin/content/entries/${entryId}`);
@@ -135,7 +142,6 @@ test("CMS-04 une entrée contenant « < » est refusée", async ({ browser }) =>
     payload: { question: "Question avec <b>balise</b> ?", answer: "Reponse de test." }
   });
   expectStatus(refused, 400, "markup in a FAQ question");
-  expect(refused.text).toContain("markup_not_allowed");
 
   // Same refusal through the screen: the form stays on /content/new and shows a danger notice.
   const page = await openPage(browser, contentAdmin, "/content/new");

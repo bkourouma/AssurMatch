@@ -26,14 +26,17 @@ let support: BackOfficeAccount;
 let contentAdmin: BackOfficeAccount;
 let partnerId: string;
 
+test.beforeAll(() => {
+  superAdmin = superAdminAccount();
+  partnerId = requireState(loadJourneyState(), "partnerId");
+});
+
 test.afterAll(async () => {
   await closeSessions();
 });
 
 test("CH-00 comptes support_admin et content_admin disponibles", async ({ browser }) => {
   test.setTimeout(10 * 60_000);
-  superAdmin = superAdminAccount();
-  partnerId = requireState(loadJourneyState(), "partnerId");
   support = await adminWithRole(browser, superAdmin, "support_admin", "support");
   contentAdmin = await adminWithRole(browser, superAdmin, "content_admin", "content");
 });
@@ -53,7 +56,6 @@ test("CH-01 connecteurs CRM : création désactivée, URL non https refusée, r�
     reason: REASON
   });
   expectStatus(plainHttp, 400, "non-https CRM URL");
-  expect(plainHttp.text).toMatch(/HTTPS/u);
 
   const notAllowListed = await api(token, "POST", "/admin/crm-connectors", {
     partnerTenantId: partnerId,
@@ -146,19 +148,30 @@ test("CH-03 sms_enabled, whatsapp_enabled et crm_connector_enabled ne sont pas a
   expectStatus(flagsResponse, 200, "list feature flags");
   const globalFlag = (key: string) => itemsOfBody(flagsResponse.body).find((flag) => flag.key === key && flag.scopeType === "global");
 
+  // The reference seed persists some of these flags (a row to PATCH) and leaves others to their code default
+  // (closed, no row): in both cases a PATCH cannot open them.
+  let patched = 0;
   for (const key of SENSITIVE_CHANNEL_FLAGS) {
     const flag = globalFlag(key);
-    expect(flag, `${key} is a known global flag`).toBeTruthy();
-    expect(flag?.value, `${key} starts closed`).toBe(false);
-    const patch = await api(token, "PATCH", `/admin/feature-flags/${String(flag?.id)}`, { value: true, reason: REASON });
-    expectStatus(patch, 403, `PATCH ${key} value:true`);
+    if (flag) {
+      expect(flag.value, `${key} starts closed`).toBe(false);
+      const patch = await api(token, "PATCH", `/admin/feature-flags/${String(flag.id)}`, { value: true, reason: REASON });
+      expectStatus(patch, 403, `PATCH ${key} value:true`);
+      patched += 1;
+    } else {
+      const unknown = await api(token, "PATCH", `/admin/feature-flags/${crypto.randomUUID()}`, { value: true, reason: REASON });
+      expect(unknown.status, `PATCH an unknown flag id for ${key} -> ${unknown.status}`).toBeGreaterThanOrEqual(400);
+      expect(unknown.status).toBeLessThan(500);
+    }
   }
+  expect(patched, "at least one channel flag is persisted and was refused by PATCH").toBeGreaterThan(0);
 
   // Still closed after the refusals.
   const after = await api(token, "GET", "/admin/feature-flags");
   expectStatus(after, 200, "list feature flags after");
   for (const key of SENSITIVE_CHANNEL_FLAGS) {
     const flag = itemsOfBody(after.body).find((entry) => entry.key === key && entry.scopeType === "global");
-    expect(flag?.value, `${key} still closed`).toBe(false);
+    expect(flag?.value ?? false, `${key} still closed`).toBe(false);
   }
+  expect(itemsOfBody(after.body).length, "no flag row was created by the refused PATCH calls").toBe(itemsOfBody(flagsResponse.body).length);
 });

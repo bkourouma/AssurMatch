@@ -84,15 +84,13 @@ test("AI-02 une clé API partenaire est créée : le secret n'est affiché qu'un
   await fillReason(form, REASON);
   await form.getByRole("button", { name: "Creer la cle API" }).click();
 
-  const reveal = form.locator("[data-secret-reveal='api_key']");
-  await expect(reveal).toBeVisible();
-  await expect(reveal).toContainText("une seule fois");
-  const rawKey = ((await reveal.locator("[data-secret-value='true']").textContent()) ?? "").trim();
+  await expect(form.getByText("n'est affiche qu'une seule fois")).toBeVisible();
+  const rawKey = ((await form.locator("code[data-secret-value='true']").textContent()) ?? "").trim();
   expect(rawKey).toMatch(/^am_pk_/u);
 
   // After a reload the secret is gone from the page; only the non-secret prefix is listed.
   await page.reload();
-  await expect(page.locator("[data-secret-reveal]")).toHaveCount(0);
+  await expect(page.getByText("n'est affiche qu'une seule fois")).toHaveCount(0);
   await expect(page.locator("[data-secret-value]")).toHaveCount(0);
   expect(await page.content()).not.toContain(rawKey);
   const row = page.getByRole("table", { name: "Cles API partenaires" }).getByRole("row").filter({ hasText: `Cle E2E ${suffix}` });
@@ -126,9 +124,8 @@ test("AI-03 un endpoint webhook est créé (désactivé, secret une seule fois) 
   await fillReason(form, REASON);
   await form.getByRole("button", { name: "Creer l'endpoint" }).click();
 
-  const reveal = form.locator("[data-secret-reveal='webhook_secret'], [data-secret-reveal]").first();
-  await expect(reveal).toBeVisible();
-  const signingSecret = ((await reveal.locator("[data-secret-value='true']").textContent()) ?? "").trim();
+  await expect(form.getByText("n'est affiche qu'une seule fois")).toBeVisible();
+  const signingSecret = ((await form.locator("code[data-secret-value='true']").textContent()) ?? "").trim();
   expect(signingSecret).toMatch(/^whsec_/u);
 
   await page.reload();
