@@ -64,7 +64,7 @@ test("contact search posts the typed e-mail / phone in a body, renders the resul
 
   const page = source("apps/admin/app/prospects/page.tsx");
   expect(page).toContain("action={searchProspectsAction}");
-  expect(page).toContain("<ProspectContactSearch />");
+  expect(page).toContain("{canSearchByName ? <ProspectContactSearch /> : null}");
   for (const forbidden of ["contactHash", "params.contact", "fingerprint"]) expect(page, forbidden).not.toContain(forbidden);
 
   const contracts = source("packages/shared/contracts/admin-operations.contracts.ts");

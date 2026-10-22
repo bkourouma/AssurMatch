@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { adminProspectContactSearchSchema, adminProspectsQuerySchema } from "../../../../packages/shared/contracts/admin-operations.contracts";
 import { AdminOperationsAccess } from "../../../src/modules/admin-operations/admin-operations-access";
-import { AdminProspectsConsoleService, maskDisplayName } from "../../../src/modules/admin-operations/admin-prospects-console.service";
+import { AdminProspectsConsoleService, CONTACT_SEARCH_MAX_PER_MINUTE, maskDisplayName } from "../../../src/modules/admin-operations/admin-prospects-console.service";
 import { AuditLogWriter } from "../../../src/modules/audit-logs/audit-log-writer.service";
 import type { ActorContext } from "../../../src/modules/common/types";
 import { isPiiEnvelope, legacyPiiFingerprint, PiiVault } from "../../../src/modules/common/security/pii-vault";
@@ -46,7 +46,7 @@ const PROSPECTS: ProspectRecord[] = [
   prospect("p-anon", CI, AUTO, "Efface", "efface@example.com", "+22509090909", { anonymizedAt: new Date("2026-10-05T00:00:00Z"), createdAt: new Date("2026-09-01T10:00:00Z") })
 ];
 
-function build() {
+function build(now?: () => number) {
   const audit = new AuditLogWriter();
   const access = new AdminOperationsAccess(audit);
   const quotes = [
@@ -67,7 +67,8 @@ function build() {
       findIdsByContact: async (kind: "email" | "phone", value: string) =>
         PROSPECTS.filter((item) => (kind === "email" ? item.emailFingerprint : item.phoneFingerprint) === legacyPiiFingerprint(value)).map((item) => item.id)
     },
-    quotes: { list: async () => quotes }
+    quotes: { list: async () => quotes },
+    ...(now ? { now } : {})
   });
   return { service, audit };
 }
@@ -161,10 +162,15 @@ describe("spec 073 admin prospects console", () => {
     // A partial e-mail does not match: only the exact address does.
     expect((await service.searchByContact(admin, contactSearch("moussa@example"))).total).toBe(0);
     // Scope and filters still apply to a contact search; anonymised prospects never match.
-    expect((await service.searchByContact(actor("admin_pays", { countryScopes: ["CI"] }), contactSearch("+221771234567"))).total).toBe(0);
-    expect((await service.searchByContact(actor("admin_pays", { countryScopes: ["SN"] }), contactSearch("+221771234567"))).total).toBe(1);
+    expect((await service.searchByContact(actor("support_admin", { countryScopes: ["CI"] }), contactSearch("+221771234567"))).total).toBe(0);
+    expect((await service.searchByContact(actor("support_admin", { countryScopes: ["SN"] }), contactSearch("+221771234567"))).total).toBe(1);
     expect((await service.searchByContact(admin, contactSearch("efface@example.com", { includeAnonymized: true }))).total).toBe(0);
     await expect(service.searchByContact(actor("finance_admin"), contactSearch("moussa@example.com"))).rejects.toThrow(/denied/);
+    // Masked-only roles may not run an exact lookup (it would unmask a partially masked phone): audited refusal.
+    for (const role of ["admin_pays", "compliance_admin"] as const) {
+      await expect(service.searchByContact(actor(role), contactSearch("moussa@example.com")), role).rejects.toThrow(/denied/);
+    }
+    expect(audit.search({ action: "admin_operations.access_refused", targetType: "Prospect" }).filter((entry) => entry.reason === "forbidden_role").length).toBeGreaterThanOrEqual(3);
     const logged = JSON.stringify(audit.search({ action: "admin_operations.prospects_listed" }));
     expect(logged).not.toContain("Moussa");
     expect(logged).not.toContain("example.com");
@@ -215,6 +221,18 @@ describe("spec 073 admin prospects console", () => {
     expect(() => contactSearch("")).toThrow();
     expect(contactSearch(" moussa@example.com ").contact).toBe("moussa@example.com");
     expect(contactSearch("+221 77 12 34 567").includeAnonymized).toBe(false);
+  });
+
+  it("limits the contact search to 30 calls per minute and per actor (429), then resets", async () => {
+    let clock = 1_000_000;
+    const { service } = build(() => clock);
+    const admin = actor("super_admin");
+    for (let i = 0; i < CONTACT_SEARCH_MAX_PER_MINUTE; i += 1) await service.searchByContact(admin, contactSearch("moussa@example.com"));
+    await expect(service.searchByContact(admin, contactSearch("moussa@example.com"))).rejects.toMatchObject({ status: 429 });
+    // Another actor has its own budget.
+    await expect(service.searchByContact(actor("support_admin"), contactSearch("moussa@example.com"))).resolves.toBeDefined();
+    clock += 60_001;
+    await expect(service.searchByContact(admin, contactSearch("moussa@example.com"))).resolves.toBeDefined();
   });
 
   it("audits a contact search as contactSearch: true only (no value, no fingerprint, no blind index)", async () => {

@@ -19,6 +19,7 @@ import type { PartnersService } from "../partners/partners.module";
 import type { ProductsService } from "../products/products.module";
 import type { QuoteSubmissionService } from "../quote-requests/quote-submission.service";
 import type { AuditLogWriter } from "../audit-logs/audit-log-writer.service";
+import { logEvent } from "../observability/structured-logger";
 import { countryCatalog, productCatalog, resolveScopeCodes } from "../common/scope/actor-scope-codes";
 import { DashboardsAccessPolicy, type ResolvedAdminScope } from "./dashboards-access-policy";
 import { DashboardAuditActions } from "./dashboard-audit-actions";
@@ -272,8 +273,10 @@ export class AdminDashboardService {
             result: "success",
             context: { currencies: extra.revenue.byCurrency.length }
           });
-        } catch {
+        } catch (error) {
+          // Fail-closed: revenue is withheld when its reading cannot be audited. The failure is logged (name only, no data).
           extra.revenue = null;
+          logEvent("error", "admin_dashboard.revenue_read_failed", { reason: error instanceof Error ? error.name : "unknown" });
         }
       }
     }

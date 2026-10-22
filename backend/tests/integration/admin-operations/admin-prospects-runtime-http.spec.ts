@@ -8,6 +8,8 @@ import { actorHeaders, createRuntimeHttpHarness, readJson, seedPublicRuntime, ty
 const SUPER_ADMIN: ActorContext = { actorId: "00000000-0000-4000-8000-00000000a001", roles: ["super_admin"], mfaVerified: true };
 const COMPLIANCE_ADMIN: ActorContext = { actorId: "00000000-0000-4000-8000-00000000a002", roles: ["compliance_admin"], mfaVerified: true };
 const SUPPORT_ADMIN: ActorContext = { actorId: "00000000-0000-4000-8000-00000000a003", roles: ["support_admin"], mfaVerified: true };
+const SUPPORT_ADMIN_CI: ActorContext = { actorId: "00000000-0000-4000-8000-00000000a006", roles: ["support_admin"], countryScopes: ["CI"], mfaVerified: true };
+const SUPPORT_ADMIN_SN: ActorContext = { actorId: "00000000-0000-4000-8000-00000000a007", roles: ["support_admin"], countryScopes: ["SN"], mfaVerified: true };
 const ADMIN_PAYS_CI: ActorContext = { actorId: "00000000-0000-4000-8000-00000000a004", roles: ["admin_pays"], countryScopes: ["CI"], mfaVerified: true };
 const ADMIN_PAYS_SN: ActorContext = { actorId: "00000000-0000-4000-8000-00000000a005", roles: ["admin_pays"], countryScopes: ["SN"], mfaVerified: true };
 const CONTENT_ADMIN: ActorContext = { actorId: "00000000-0000-4000-8000-00000000a006", roles: ["content_admin"], mfaVerified: true };
@@ -95,9 +97,10 @@ describe("spec 073 admin prospects console (runtime HTTP)", () => {
       expect(raw, contact).not.toContain(PHONE);
       expect(JSON.parse(raw), contact).toMatchObject({ total: 1, items: [{ id: prospect.id }] });
     }
-    // Every operations role may search a contact, inside its scope only.
-    expect((await readJson<{ total: number }>(await postContact(harness, { contact: PHONE }, ADMIN_PAYS_CI))).total).toBe(1);
-    expect((await readJson<{ total: number }>(await postContact(harness, { contact: PHONE }, ADMIN_PAYS_SN))).total).toBe(0);
+    // Only the roles that may read the contact in clear search by contact (no unmasking oracle), inside their scope.
+    expect((await readJson<{ total: number }>(await postContact(harness, { contact: PHONE }, SUPPORT_ADMIN_CI))).total).toBe(1);
+    expect((await readJson<{ total: number }>(await postContact(harness, { contact: PHONE }, SUPPORT_ADMIN_SN))).total).toBe(0);
+    for (const refused of [ADMIN_PAYS_CI, COMPLIANCE_ADMIN]) expect((await postContact(harness, { contact: PHONE }, refused)).status).toBe(403);
     expect((await readJson<{ total: number }>(await postContact(harness, { contact: "autre@example.com" }, SUPER_ADMIN))).total).toBe(0);
 
     // Invalid bodies: a name, an empty value, the former hash parameter, an unknown key.

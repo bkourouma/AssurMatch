@@ -128,6 +128,11 @@ async function gatewayWith(provider: AiProviderPort) {
   return { audit, gateway };
 }
 
+/** Random UUIDs (ids, request ids) may contain a digit run like 4111: strip them so the assertion only sees real content. */
+function withoutUuids(value: string): string {
+  return value.replace(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/gi, "<uuid>");
+}
+
 describe("AiGateway sensitive data guard", () => {
   it("masks sensitive input before the provider and never stores or audits the value", async () => {
     const provider = countingProvider();
@@ -135,9 +140,9 @@ describe("AiGateway sensitive data guard", () => {
     const record = await gateway.run({ assistType: "visitor_request_summary", surface: "visitor", actor: superAdminActor, input: { need: "diabétique, carte 4111 1111 1111 1111" }, scope: {}, quotaKey: "ip-s1" });
     expect(record.status).toBe("completed");
     expect(provider.calls).toBe(1);
-    expect(JSON.stringify(record)).not.toMatch(/4111|diab/i);
+    expect(withoutUuids(JSON.stringify(record))).not.toMatch(/4111|diab/i);
     expect(record.minimizationReport).toMatchObject({ sensitiveCategories: { health: 1, card: 1 } });
-    expect(JSON.stringify(audit.search({}))).not.toMatch(/4111|diab/i);
+    expect(withoutUuids(JSON.stringify(audit.search({})))).not.toMatch(/4111|diab/i);
   });
 
   it("refuses without provider call when the final prompt still holds sensitive data", async () => {

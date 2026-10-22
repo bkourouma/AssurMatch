@@ -12,7 +12,7 @@ import type { AuditLogWriter } from "../audit-logs/audit-log-writer.service";
 import type { ActorContext } from "../common/types";
 import type { QuoteRequestRecord } from "../quote-requests/quote-submission.service";
 import type { ProspectRecord } from "../prospects/prospects.service";
-import { BadRequestException } from "@nestjs/common";
+import { BadRequestException, HttpException, HttpStatus } from "@nestjs/common";
 import { ErrorCodes } from "../../../../packages/shared/contracts/error-codes";
 import { OPERATIONS_ROLES, isoOrNull, maskEmail, maskPhone, paginate, type AdminOperationsAccess } from "./admin-operations-access";
 import { loadOperationsCatalog, type OperationsCatalog, type OperationsCatalogPorts } from "./admin-operations-catalog";
@@ -37,7 +37,14 @@ export interface AdminProspectsConsoleDeps extends OperationsCatalogPorts {
     findIdsByContact(kind: ProspectContactKind, normalizedValue: string): Promise<string[]>;
   };
   quotes: { list(): Promise<QuoteRequestRecord[]> };
+  /** Test seam for the contact-search limiter clock. */
+  now?: () => number;
 }
+
+/** Exact contact lookups allowed per actor and per minute (anti-enumeration of the blind index). */
+export const CONTACT_SEARCH_MAX_PER_MINUTE = 30;
+const CONTACT_SEARCH_WINDOW_MS = 60_000;
+const CONTACT_SEARCH_MAX_TRACKED_ACTORS = 1_000;
 
 interface ListFilters {
   country?: string | undefined;
@@ -48,7 +55,32 @@ interface ListFilters {
 }
 
 export class AdminProspectsConsoleService {
+  private readonly contactSearchWindows = new Map<string, { windowStart: number; count: number }>();
+
   constructor(private readonly deps: AdminProspectsConsoleDeps) {}
+
+  /** Fixed-window limiter, bounded in memory; 429 beyond the limit. */
+  private enforceContactSearchLimit(actor: ActorContext): void {
+    const nowMs = (this.deps.now ?? Date.now)();
+    const key = actor.actorId ?? actor.roles.join(",");
+    const entry = this.contactSearchWindows.get(key);
+    if (entry && nowMs - entry.windowStart < CONTACT_SEARCH_WINDOW_MS) {
+      entry.count += 1;
+      if (entry.count > CONTACT_SEARCH_MAX_PER_MINUTE) {
+        throw new HttpException({ code: ErrorCodes.RATE_LIMITED, message: "Too many requests. Please try again later." }, HttpStatus.TOO_MANY_REQUESTS);
+      }
+      return;
+    }
+    if (this.contactSearchWindows.size >= CONTACT_SEARCH_MAX_TRACKED_ACTORS) {
+      for (const [k, v] of this.contactSearchWindows) if (nowMs - v.windowStart >= CONTACT_SEARCH_WINDOW_MS) this.contactSearchWindows.delete(k);
+      while (this.contactSearchWindows.size >= CONTACT_SEARCH_MAX_TRACKED_ACTORS) {
+        const oldest = this.contactSearchWindows.keys().next().value;
+        if (oldest === undefined) break;
+        this.contactSearchWindows.delete(oldest);
+      }
+    }
+    this.contactSearchWindows.set(key, { windowStart: nowMs, count: 1 });
+  }
 
   async list(actor: ActorContext, query: AdminProspectsQuery): Promise<AdminPage<AdminProspectListItem>> {
     this.deps.access.assert(actor, { roles: OPERATIONS_ROLES }, { type: "Prospect", id: "list" });
@@ -69,7 +101,9 @@ export class AdminProspectsConsoleService {
    * migrated yet). The value is never echoed, logged nor audited: the audit says `contactSearch: true`.
    */
   async searchByContact(actor: ActorContext, input: AdminProspectContactSearch): Promise<AdminPage<AdminProspectListItem>> {
-    this.deps.access.assert(actor, { roles: OPERATIONS_ROLES }, { type: "Prospect", id: "list" });
+    // An exact lookup on masked rows is an oracle that unmasks a partially masked phone: same roles as the name search.
+    this.deps.access.assert(actor, { roles: PROSPECT_PII_ROLES }, { type: "Prospect", id: "list" });
+    this.enforceContactSearchLimit(actor);
     const contact = normalizeTypedProspectContact(input.contact);
     // Generic message: never the typed value.
     if (!contact) throw new BadRequestException({ code: ErrorCodes.VALIDATION_FAILED, message: "Invalid input: expected an e-mail address or a phone number" });

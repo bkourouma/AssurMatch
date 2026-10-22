@@ -93,7 +93,7 @@ export default async function AdminProspectsPage({ searchParams }: { searchParam
         <StateMessage tone="warning">Un e-mail ou un telephone saisi dans le champ nom n'est pas recherche (il apparaitrait dans l'adresse de la page) : utilisez la recherche par e-mail ou telephone.</StateMessage>
       ) : null}
 
-      <ProspectContactSearch />
+      {canSearchByName ? <ProspectContactSearch /> : null}
 
       <Card as="section" aria-label="Liste des prospects">
         <DataTable
