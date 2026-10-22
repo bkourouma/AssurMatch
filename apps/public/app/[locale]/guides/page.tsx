@@ -1,6 +1,7 @@
 import { getTranslations, setRequestLocale } from "next-intl/server";
 import { toLocale, type AppLocale } from "../../../i18n/routing";
-import { guideReadingTimeMinutes, listGuides } from "../../content/guides";
+import { resolveGuides } from "../../content/cms-content";
+import { guideReadingTimeMinutes } from "../../content/guides";
 import { Breadcrumb } from "../../components/ui/breadcrumb";
 import { Directory, type DirectoryItem } from "../../components/ui/directory";
 import { Hero } from "../../components/ui/hero";
@@ -27,7 +28,7 @@ export default async function GuidesIndexPage({ params }: { params: Promise<{ lo
   setRequestLocale(locale);
   const t = await getTranslations("Guides");
   const common = await getTranslations("Common");
-  const guides = listGuides(locale);
+  const guides = await resolveGuides(locale);
   const productLabel = (key?: string) => (key === "auto" ? t("productAuto") : key === "voyage" ? t("productVoyage") : undefined);
 
   const rows: DirectoryItem[] = guides.map((guide) => {

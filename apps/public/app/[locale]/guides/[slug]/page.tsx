@@ -12,7 +12,8 @@ import { Icon } from "../../../components/ui/icons";
 import { productPictogram } from "../../../components/ui/pictogram";
 import { Section } from "../../../components/ui/section";
 import { getEntrySelectorData } from "../../../content/entry-selector-data";
-import { getGuide, guideReadingTimeMinutes, guideSlugs, listGuides } from "../../../content/guides";
+import { resolveGuide, resolveGuides } from "../../../content/cms-content";
+import { guideReadingTimeMinutes, guideSlugs } from "../../../content/guides";
 import { formatDate } from "../../../lib/country-format";
 import { buildMetadata, localeUrl } from "../../../lib/seo";
 import type { PageMetadata } from "../../../lib/seo";
@@ -27,7 +28,7 @@ type PageParams = { locale: string; slug: string };
 export async function generateMetadata({ params }: { params: Promise<PageParams> }): Promise<PageMetadata> {
   const { locale: rawLocale, slug } = await params;
   const locale = toLocale(rawLocale);
-  const guide = getGuide(locale, slug);
+  const guide = await resolveGuide(locale, slug);
   const t = await getTranslations({ locale, namespace: "Guides" });
   return buildMetadata({
     title: guide?.title ?? t("title"),
@@ -47,13 +48,13 @@ export default async function GuidePage({ params }: { params: Promise<PageParams
   const { locale: rawLocale, slug } = await params;
   const locale: AppLocale = toLocale(rawLocale);
   setRequestLocale(locale);
-  const guide = getGuide(locale, slug);
+  const guide = await resolveGuide(locale, slug);
   if (!guide) notFound();
 
   const t = await getTranslations("Guides");
   const common = await getTranslations("Common");
   const selector = await getEntrySelectorData();
-  const others = listGuides(locale)
+  const others = (await resolveGuides(locale))
     .filter((entry) => entry.slug !== guide.slug)
     .slice(0, 3);
   const readingTimeLabel = (entry: typeof guide) => t("readingTime", { minutes: guideReadingTimeMinutes(entry) });
