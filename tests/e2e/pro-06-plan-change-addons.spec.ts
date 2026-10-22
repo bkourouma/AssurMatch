@@ -103,7 +103,7 @@ test("PLAN-01 le propriétaire demande un changement de plan puis l'annule", asy
   });
 
   await planChangeCard(page).getByRole("button", { name: "Annuler la demande" }).click();
-  await expect(page.getByText("Demande annulée.")).toBeVisible();
+  // The cancel form disappears with the pending row, so the closed row is the visible proof.
   await expect(historyRow(page, "Pro vers Enterprise", "Annulée")).toBeVisible();
   await expect(planChangeCard(page).locator("select[name='requestedPlan']")).toBeEnabled();
   expect((await ownRequests(ownerToken)).map((request) => request.status)).toEqual(["cancelled"]);

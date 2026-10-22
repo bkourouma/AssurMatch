@@ -75,6 +75,21 @@ function kanbanCard(page: Page, leadId: string) {
   return page.locator(`[data-kanban-card='${leadId}']`);
 }
 
+/**
+ * HTML5 drag and drop of a Kanban card onto a column: the same dragstart / dragover / drop / dragend sequence the
+ * browser fires, sent to the exact card and column. A pointer drag from pixel coordinates picked another card of a
+ * tall column once (the card under the cursor changes with the scroll position), so the events are dispatched.
+ */
+async function dragCardTo(page: Page, leadId: string, status: string): Promise<void> {
+  const dataTransfer = await page.evaluateHandle(() => new DataTransfer());
+  const source = kanbanCard(page, leadId);
+  const target = column(page, status);
+  await source.dispatchEvent("dragstart", { dataTransfer });
+  await target.dispatchEvent("dragover", { dataTransfer });
+  await target.dispatchEvent("drop", { dataTransfer });
+  await source.dispatchEvent("dragend", { dataTransfer });
+}
+
 async function accountActorId(browser: Parameters<typeof tokenFor>[0], account: BackOfficeAccount): Promise<string> {
   const me = await apiCall(await tokenFor(browser, account), "GET", "/auth/me");
   expect(me.status).toBe(200);
@@ -160,9 +175,9 @@ test("LOT3-02 Kanban : glisser-déposer persistant, menu clavier, motif exigé p
   await expect(column(page, "nouveau").locator(`[data-kanban-card='${leadId}']`)).toBeVisible();
 
   await test.step("glisser la carte de Nouveau vers Accepte", async () => {
-    await kanbanCard(page, leadId).dragTo(column(page, "accepte"), { sourcePosition: { x: 4, y: 4 } });
+    await dragCardTo(page, leadId, "accepte");
     await expect(column(page, "accepte").locator(`[data-kanban-card='${leadId}']`)).toBeVisible();
-    await expect(page.getByRole("status")).toContainText("Lead déplacé vers");
+    await expect(page.getByText(/Lead déplacé vers/u)).toBeVisible();
     await expect.poll(async () => (await leadFootprint(ownerToken, leadId)).status).toBe("accepte");
     // Persistent: a fresh page load still shows the card in the new column.
     await page.goto("/crm/kanban");
@@ -178,7 +193,7 @@ test("LOT3-02 Kanban : glisser-déposer persistant, menu clavier, motif exigé p
   });
 
   await test.step("une sortie (Perdu) exige un motif : rien n'est écrit avant la confirmation", async () => {
-    await kanbanCard(page, leadId).dragTo(column(page, "perdu"), { sourcePosition: { x: 4, y: 4 } });
+    await dragCardTo(page, leadId, "perdu");
     const form = page.getByRole("group", { name: "Motif du changement de statut" });
     await expect(form).toBeVisible();
     await expect(form.getByRole("button", { name: "Confirmer le déplacement" })).toBeDisabled();
@@ -295,8 +310,11 @@ test("LOT3-05 liste CRM : filtres, tri et pagination sont appliqués par l'API (
     const descending = await dates("desc");
     expect(ascending).toEqual([...ascending].sort((left, right) => left - right));
     expect(descending).toEqual([...descending].sort((left, right) => right - left));
-    const statusSorted = itemsOf(await list("sort=status&sortDirection=asc&page=1&pageSize=25")).map((item) => String(item.status));
-    expect(statusSorted).toEqual([...statusSorted].sort());
+    // Status order is the server's (pipeline order): descending is the exact reverse of ascending.
+    const statusAsc = itemsOf(await list("sort=status&sortDirection=asc&page=1&pageSize=25")).map((item) => String(item.status));
+    const statusDesc = itemsOf(await list("sort=status&sortDirection=desc&page=1&pageSize=25")).map((item) => String(item.status));
+    expect(statusAsc.length).toBeGreaterThanOrEqual(4);
+    expect(statusDesc).toEqual([...statusAsc].reverse());
   });
 
   await test.step("pagination : deux pages disjointes, le total reste celui du jeu filtré", async () => {
@@ -377,12 +395,17 @@ test("LOT3-07 export CSV du tableau de bord : KPI pour le Pro, rien pour le Star
   expect(pro.text, "no agency block for a Pro cabinet").not.toContain("section,agence,");
   assertNoIdentity(pro.text);
 
-  // The broker app proxies the same file through the session cookie (httpOnly token never reaches the browser).
+  // The broker app proxies the same file through the session cookie (the httpOnly token never reaches the page code).
   const page = await visit(browser, world.owner, "/");
-  const proxied = await page.request.get(`${e2eEnv.brokerUrl}/reports/export`);
-  expect(proxied.status()).toBe(200);
-  expect(proxied.headers()["content-type"]).toContain("text/csv");
-  assertNoIdentity(await proxied.text());
+  const [download] = await Promise.all([page.waitForEvent("download"), page.evaluate(() => { window.location.href = "/reports/export"; })]);
+  expect(download.suggestedFilename()).toMatch(/^rapport-activite-\d{4}-\d{2}-\d{2}\.csv$/u);
+  const stream = await download.createReadStream();
+  const chunks: Buffer[] = [];
+  for await (const chunk of stream) chunks.push(Buffer.from(chunk as Uint8Array));
+  const proxied = Buffer.concat(chunks).toString("utf8");
+  expect(proxied.startsWith("section,dimension,valeur")).toBe(true);
+  expect(proxied).toContain("kpi,contactRate,");
+  assertNoIdentity(proxied);
 
   const ent = await apiCall(await tokenFor(browser, enterprise.owner), "GET", "/broker/dashboard/export.csv");
   expect(ent.status).toBe(200);
