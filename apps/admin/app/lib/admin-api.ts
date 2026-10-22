@@ -219,6 +219,20 @@ export interface AdminDashboardData {
     other: number;
   };
   sensitiveFeatureFlags: Array<{ key: string; scopeType: string; scopeId: string | null; value: boolean }>;
+  // Lot 6 (spec 073 T304): additive KPI blocks; an older API omits them, the screen then shows "Non mesure".
+  visits?: { total: number; byPage: Array<{ page: string; total: number }> } | null;
+  visitToRequestRate?: number | null;
+  activeCountries?: number;
+  activeProducts?: number;
+  partnerSla?: { averageFirstActionMinutes: number | null; measured: number };
+  leadQuality?: { transmitted: number; disputed: number; accepted: number; rejected: number; disputeRate: number | null };
+  revenue?: { byCurrency: Array<{ currency: string; subscription: number; leads: number }> } | null;
+  revenueRestricted?: boolean;
+  aiEnabled?: boolean;
+  aiRestricted?: boolean;
+  aiSummary?: { insightId: string; generatedAt: string; status: string; excerpt: string | null } | null;
+  aiAlerts?: { pendingValidation: number; items: Array<{ insightId: string; type: string; createdAt: string; status: string }> } | null;
+  // Lot 6 (end)
 }
 
 export interface AdminUser {

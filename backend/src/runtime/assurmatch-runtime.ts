@@ -733,7 +733,25 @@ readonly enterprise = new EnterpriseService({
     crmActivity: this.leadRepositorySet.crmActivity,
     brokerCrmConfig: this.brokerCrmConfig,
     // Spec 064: Enterprise agency display filter (lazy: the enterprise service is built after this module).
-    agencyScope: { resolve: (actor: ActorContext, agencyId: string | undefined): Promise<AdvisorAgencyPredicate | undefined> => this.enterprise.agencyScopeFor(actor, agencyId) }
+    agencyScope: { resolve: (actor: ActorContext, agencyId: string | undefined): Promise<AdvisorAgencyPredicate | undefined> => this.enterprise.agencyScopeFor(actor, agencyId) },
+    // Lot 6 (spec 073 T302): lazy read-only ports (visit counter, billing, disputes and AI are built after this module).
+    adminVisitStats: {
+      isEnabled: () => (process.env.ASSURMATCH_VISIT_COUNTER_ENABLED ?? "true").trim().toLowerCase() !== "false",
+      totalsBetween: (from: Date, to: Date) => this.visitStats.service.totalsBetween(from, to)
+    },
+    adminInvoices: { list: (actor: ActorContext, query: Record<string, never>) => this.billing.invoicing.list(actor, query) },
+    adminLeadDisputes: { listDisputes: (filter: { from?: Date | undefined; to?: Date | undefined }) => this.leads.crmActivityRepository.listDisputes(filter) },
+    adminAiInsights: {
+      list: async () => (await this.aiGateway.listForSurface("admin_platform", 200)).map((record) => ({
+        id: record.id,
+        assistType: record.assistType,
+        humanValidationStatus: record.humanValidationStatus,
+        outputText: record.outputText,
+        createdAt: record.createdAt,
+        actorId: record.actorId
+      }))
+    }
+    // Lot 6 (end)
   });
   /** Spec 051: partner onboarding and lifecycle behind the `/admin/partners` routes. */
   readonly partnerAdmin = new PartnerAdminService({

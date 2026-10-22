@@ -24,6 +24,24 @@ import { DashboardsAccessPolicy, type ResolvedAdminScope } from "./dashboards-ac
 import { DashboardAuditActions } from "./dashboard-audit-actions";
 import { isWithinWindow, resolveDashboardWindow, type ResolvedDashboardWindow } from "./dashboard-time-window";
 import { categorizeAuditEntry } from "./compliance-alerts.service";
+// Lot 6
+import {
+  AI_ADMIN_FLAG_KEYS,
+  actorCanReadAiInsights,
+  countActiveCountries,
+  countActiveProducts,
+  summariseAiAlerts,
+  summariseAiSummary,
+  summariseLeadQuality,
+  summarisePartnerSla,
+  summariseRevenue,
+  visitToRequestRate,
+  type AdminAiInsightsPort,
+  type AdminInvoicesPort,
+  type AdminLeadDisputesPort,
+  type AdminVisitStatsPort
+} from "./admin-dashboard-kpis";
+// Lot 6 (end)
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -39,6 +57,12 @@ export interface AdminDashboardServiceDeps {
   offers: OffersModule;
   countries: CountriesService;
   products: ProductsService;
+  // Lot 6 (spec 073 T302): optional read-only ports; a missing port degrades its KPI to "not measured".
+  visitStats?: AdminVisitStatsPort | undefined;
+  invoices?: AdminInvoicesPort | undefined;
+  leadDisputes?: AdminLeadDisputesPort | undefined;
+  aiInsights?: AdminAiInsightsPort | undefined;
+  // Lot 6 (end)
 }
 
 export class AdminDashboardService {
@@ -106,6 +130,10 @@ export class AdminDashboardService {
 
     this.deps.access.recordAdminSuccess(actor, scope, window);
 
+    // Lot 6 (spec 073 T302)
+    const extra = await this.buildExtraKpis(actor, scope, window, { received, assignmentsInWindow, allAssignments, countryMap });
+    // Lot 6 (end)
+
     const response: AdminDashboardResponse = {
       window: window.dto,
       scope,
@@ -118,6 +146,7 @@ export class AdminDashboardService {
       licenseAlerts: licenseAlertCounts,
       complianceAlertCounts: complianceCounts,
       sensitiveFeatureFlags,
+      ...extra,
       ...(query.compare === "previous"
         ? { comparison: this.buildComparison(allAssignments, window, (assignment) => this.assignmentInScope(assignment, scope, countryMap), { received, transmitted, refused }) }
         : {})
@@ -163,6 +192,9 @@ export class AdminDashboardService {
     for (const entry of dashboard.nonRoutedReasons) lines.push(`non_route,${entry.reason},${entry.total}`);
     lines.push(`partenaires,actifs,${dashboard.partners.active}`);
     lines.push(`partenaires,inactifs,${dashboard.partners.inactive}`);
+    // Lot 6 (spec 073 T303)
+    lines.push(...this.extraCsvLines(dashboard));
+    // Lot 6 (end)
     this.deps.audit.write({
       actor,
       action: DashboardAuditActions.adminExported,
@@ -174,6 +206,125 @@ export class AdminDashboardService {
     });
     return lines.join("\n");
   }
+
+  // Lot 6 (spec 073 T302): extra KPIs of the PRD section 21, same window and scope as the rest.
+  private flagOn(key: string): boolean {
+    const flags = this.deps.featureFlags as { isEnabled?: (flagKey: string) => boolean };
+    return typeof flags.isEnabled === "function" ? flags.isEnabled(key) : false;
+  }
+
+  private async buildExtraKpis(
+    actor: ActorContext,
+    scope: ResolvedAdminScope,
+    window: ResolvedDashboardWindow,
+    context: { received: number; assignmentsInWindow: LeadAssignmentRecord[]; allAssignments: LeadAssignmentRecord[]; countryMap: Map<string, string> }
+  ): Promise<Partial<AdminDashboardResponse>> {
+    const extra: Partial<AdminDashboardResponse> = {};
+
+    // Visits and conversion: the counter is global (no country or product), so the rate is only
+    // indicative under a country/product filter. Absent, disabled or empty counter = "Non mesure".
+    let visits: AdminDashboardResponse["visits"] = null;
+    const visitStats = this.deps.visitStats;
+    if (visitStats && (visitStats.isEnabled?.() ?? true)) {
+      try {
+        const totals = await visitStats.totalsBetween(window.from, window.to);
+        if (totals.total > 0) visits = { total: totals.total, byPage: totals.byPage.map((entry) => ({ page: entry.page, total: entry.total })) };
+      } catch {
+        visits = null;
+      }
+    }
+    extra.visits = visits;
+    extra.visitToRequestRate = visits ? visitToRequestRate(context.received, visits.total) : null;
+
+    // Active countries and products: same publication rules as the public counters.
+    const [countries, products] = await Promise.all([this.deps.countries.listAdmin(), this.deps.products.listAdmin()]);
+    extra.activeCountries = countActiveCountries(countries, { public_comparator_enabled: this.flagOn("public_comparator_enabled") }, scope);
+    extra.activeProducts = countActiveProducts(products as never, scope);
+
+    extra.partnerSla = summarisePartnerSla(context.assignmentsInWindow);
+
+    if (this.deps.leadDisputes) {
+      const disputes = await this.deps.leadDisputes.listDisputes({ from: window.from, to: window.to });
+      extra.leadQuality = summariseLeadQuality(context.assignmentsInWindow, disputes, context.allAssignments, window, (assignment) =>
+        this.assignmentInScope(assignment as LeadAssignmentRecord, scope, context.countryMap)
+      );
+    }
+
+    // Revenue: issued invoices of the window, super_admin only (hypothesis H7).
+    if (scope.role !== "super_admin") {
+      extra.revenueRestricted = true;
+    } else {
+      extra.revenueRestricted = false;
+      extra.revenue = null;
+      if (this.deps.invoices) {
+        try {
+          const invoices = await this.deps.invoices.list(actor, {});
+          extra.revenue = summariseRevenue(invoices, window, scope);
+          this.deps.audit.write({
+            actor,
+            action: DashboardAuditActions.adminRevenueRead,
+            targetType: "AdminDashboard",
+            targetId: "revenue",
+            scope: { role: scope.role, countries: scope.countries, partnerId: scope.partnerId },
+            result: "success",
+            context: { currencies: extra.revenue.byCurrency.length }
+          });
+        } catch {
+          extra.revenue = null;
+        }
+      }
+    }
+
+    // AI cards read stored insights only: no generation, no provider call, nothing when the flags are closed.
+    const aiEnabled = AI_ADMIN_FLAG_KEYS.some((key) => this.flagOn(key));
+    extra.aiEnabled = aiEnabled;
+    extra.aiRestricted = !actorCanReadAiInsights(actor);
+    extra.aiSummary = null;
+    extra.aiAlerts = null;
+    if (aiEnabled && !extra.aiRestricted && this.deps.aiInsights) {
+      try {
+        // Same readers as GET /admin/ai/insights (ai:* / ai:read / compliance_admin); no admin_pays or support_admin.
+        const insights = await this.deps.aiInsights.list();
+        extra.aiSummary = summariseAiSummary(insights);
+        extra.aiAlerts = summariseAiAlerts(insights);
+      } catch {
+        extra.aiSummary = null;
+        extra.aiAlerts = null;
+      }
+    }
+    return extra;
+  }
+
+  private extraCsvLines(dashboard: AdminDashboardResponse): string[] {
+    const lines: string[] = [];
+    if (dashboard.visits) {
+      lines.push(`visites,total,${dashboard.visits.total}`);
+      for (const entry of dashboard.visits.byPage) lines.push(`visites,${entry.page},${entry.total}`);
+    } else {
+      lines.push("visites,total,non_mesure");
+    }
+    lines.push(`conversion,visite_vers_demande,${dashboard.visitToRequestRate ?? "non_mesure"}`);
+    if (dashboard.activeCountries !== undefined) lines.push(`actifs,pays,${dashboard.activeCountries}`);
+    if (dashboard.activeProducts !== undefined) lines.push(`actifs,produits,${dashboard.activeProducts}`);
+    if (dashboard.partnerSla) {
+      lines.push(`sla_courtier,minutes_moyennes_premiere_action,${dashboard.partnerSla.averageFirstActionMinutes ?? "non_mesure"}`);
+      lines.push(`sla_courtier,leads_mesures,${dashboard.partnerSla.measured}`);
+    }
+    if (dashboard.leadQuality) {
+      for (const [key, value] of Object.entries(dashboard.leadQuality)) lines.push(`qualite_leads,${key},${value ?? "non_mesure"}`);
+    }
+    // Revenue only for the roles allowed to see it (super_admin).
+    if (dashboard.revenue) {
+      for (const entry of dashboard.revenue.byCurrency) {
+        lines.push(`ca,abonnement_${entry.currency},${entry.subscription}`);
+        lines.push(`ca,leads_${entry.currency},${entry.leads}`);
+      }
+    }
+    if (dashboard.aiAlerts) lines.push(`ia,alertes_en_attente_validation,${dashboard.aiAlerts.pendingValidation}`);
+    if (dashboard.aiSummary) lines.push(`ia,synthese_statut_validation,${dashboard.aiSummary.status}`);
+    return lines;
+  }
+  // Lot 6 (end)
 
   private async actorWithScopeCodes(actor: ActorContext): Promise<ActorContext> {
     if (!actor.countryScopes?.length && !actor.productScopes?.length) return actor;

@@ -25,11 +25,11 @@
 - [x] T404 Tests (routes, action serveur, rendu) ; FR-021 (modules IA non branchés) documenté.
 
 ## Phase 2 — KPI et dashboard (après T2)
-- [ ] T301 Contrat `dashboard.contracts.ts` : champs optionnels `visits`, `visitToRequestRate`, `activeCountries`, `activeProducts`, `partnerSla`, `leadQuality`, `revenue`, `revenueRestricted`, `aiSummary`, `aiAlerts`.
-- [ ] T302 `AdminDashboardService` : agrégats (visites, SLA, contestations, CA réservé `super_admin`, pays / produits actifs, synthèse et alertes IA en lecture seule) + dépendances dans `dashboards.module.ts` et runtime (`// Lot 6`).
-- [ ] T303 Export CSV : nouvelles lignes.
-- [ ] T304 Écran `/dashboard` : 15 KPI du PRD §21, états « Non mesuré » / « Réservé », cartes IA avec lien `/ai-assistance`.
-- [ ] T305 Tests : agrégats, RBAC revenus, périmètre, absence d'appel IA, rendu.
+- [x] T301 Contrat `dashboard.contracts.ts` : champs optionnels `visits`, `visitToRequestRate`, `activeCountries`, `activeProducts`, `partnerSla`, `leadQuality`, `revenue`, `revenueRestricted`, `aiSummary`, `aiAlerts`.
+- [x] T302 `AdminDashboardService` : agrégats (visites, SLA, contestations, CA réservé `super_admin`, pays / produits actifs, synthèse et alertes IA en lecture seule) + dépendances dans `dashboards.module.ts` et runtime (`// Lot 6`).
+- [x] T303 Export CSV : nouvelles lignes.
+- [x] T304 Écran `/dashboard` : 15 KPI du PRD §21, états « Non mesuré » / « Réservé », cartes IA avec lien `/ai-assistance`.
+- [x] T305 Tests : agrégats, RBAC revenus, périmètre, absence d'appel IA, rendu.
 
 ## Phase 3 — Validation (chef de lot)
 - [ ] T501 `npm run typecheck`, `npm run lint`, `NODE_ENV=test npm run test`, `npm run test:web`, `node scripts/ci/secret-scan.mjs`.
