@@ -33,6 +33,13 @@ export class BrokerCrmActivityService {
     private readonly disputes: LeadDisputesService = new LeadDisputesService({ audit, assignments, repository })
   ) {}
 
+  private advisorTenantResolver: ((advisorId: string) => Promise<string | undefined>) | undefined;
+
+  /** Lot 3 (spec 069 FR-006): late port (set by the runtime) giving the partner tenant of a user id, `undefined` when unknown. */
+  setAdvisorTenantResolver(resolver: ((advisorId: string) => Promise<string | undefined>) | undefined): void {
+    this.advisorTenantResolver = resolver;
+  }
+
   async addNote(id: string, input: unknown, actor: ActorContext): Promise<BrokerCrmNote> {
     const assignment = await this.requireMutable(id, actor);
     const parsed = brokerCrmNoteCreateSchema.parse(input);
@@ -66,6 +73,11 @@ export class BrokerCrmActivityService {
     const parsed = brokerCrmAssignRequestSchema.parse(input);
     const assignment = await this.assignments.require(id);
     this.access.assertAssignment(actor, assignment, parsed.advisorPartnerTenantId);
+    // Lot 3 (spec 069 FR-006): `advisorPartnerTenantId` is client-asserted; the advisor's real tenant comes from the user directory.
+    if (this.advisorTenantResolver) {
+      const advisorTenantId = await this.advisorTenantResolver(parsed.advisorId).catch(() => undefined);
+      this.access.assertAdvisorTenantResolved(actor, assignment, advisorTenantId);
+    }
     const updated = await this.assignments.updateCrmMetadata(id, { assignedAdvisorId: parsed.advisorId }, actor);
     await this.track(assignment, actor, "assigned", QuoteAuditActions.brokerCrmLeadAssigned);
     return updated;

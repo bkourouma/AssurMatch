@@ -38,6 +38,15 @@ const CRM_STATUSES: BrokerCrmPipelineStatus[] = [
   "rejete_conteste"
 ];
 
+type BrokerCrmLeadSort = "assignedAt" | "status" | "priority" | "urgency";
+interface PriorityEntry {
+  score: number;
+  level: "low" | "medium" | "high";
+}
+/** `(actor) => Map<leadId, approved score>` of the actor's own CRM perimeter, never throwing, empty when scoring is closed. */
+export type PriorityScoreSource = (actor: ActorContext) => Promise<ReadonlyMap<string, number | { score: number; level?: "low" | "medium" | "high" }>>;
+const URGENCY_RANK: Record<"low" | "normal" | "high" | "urgent", number> = { low: 0, normal: 1, high: 2, urgent: 3 };
+
 export class BrokerCrmLeadsService {
   constructor(
     private readonly assignments: LeadAssignmentService,
@@ -54,9 +63,22 @@ export class BrokerCrmLeadsService {
     private readonly agencyScope?: AgencyScopePort
   ) {}
 
+  /**
+   * Lot 3 (spec 069 FR-004): late link to the human-approved AI priority scores. The AI service depends on this
+   * service, so the port is set after construction by the runtime (no circular import). Unset = no score anywhere.
+   */
+  setPriorityScoreSource(source: PriorityScoreSource | undefined): void {
+    this.priorityScores = source;
+  }
+
+  private priorityScores: PriorityScoreSource | undefined;
+
   async list(actor: ActorContext, query: BrokerCrmLeadListQuery = {}): Promise<Page<BrokerCrmLeadSummary>> {
     const parsed = brokerCrmLeadListQuerySchema.parse(query);
-    const filtered = (await this.applyFilters(actor, parsed)).map((assignment) => this.toSummary(assignment));
+    const rows = await this.applyFilters(actor, parsed);
+    // One read of the approved scores per request, joined only to the leads of the filtered perimeter.
+    const scores = await this.scoresFor(actor);
+    const filtered = this.sortRows(rows, scores, parsed.sort, parsed.sortDirection).map((assignment) => this.toSummary(assignment, scores.get(assignment.id)));
     this.audit.write({
       actor,
       action: QuoteAuditActions.brokerCrmLeadListViewed,
@@ -175,7 +197,50 @@ export class BrokerCrmLeadsService {
       .filter((assignment) => this.matchesSearch(actor, assignment, query.search));
   }
 
-  private toSummary(assignment: LeadAssignmentRecord): BrokerCrmLeadSummary {
+  private async scoresFor(actor: ActorContext): Promise<Map<string, PriorityEntry>> {
+    const normalised = new Map<string, PriorityEntry>();
+    if (!this.priorityScores) return normalised;
+    try {
+      for (const [leadId, value] of await this.priorityScores(actor)) {
+        const score = typeof value === "number" ? value : value.score;
+        if (!Number.isFinite(score)) continue;
+        const bounded = Math.min(100, Math.max(0, Math.round(score)));
+        const level = typeof value === "number" || !value.level ? (bounded >= 70 ? "high" : bounded >= 40 ? "medium" : "low") : value.level;
+        normalised.set(leadId, { score: bounded, level });
+      }
+    } catch {
+      // A scoring failure never breaks the list: it simply carries no score.
+    }
+    return normalised;
+  }
+
+  /** Stable sort over the whole filtered set; ties fall back to assignedAt desc then id. */
+  private sortRows(rows: LeadAssignmentRecord[], scores: Map<string, PriorityEntry>, sort: BrokerCrmLeadSort = "assignedAt", direction: "asc" | "desc" = "desc"): LeadAssignmentRecord[] {
+    const sign = direction === "asc" ? 1 : -1;
+    const tieBreak = (left: LeadAssignmentRecord, right: LeadAssignmentRecord) => right.assignedAt.getTime() - left.assignedAt.getTime() || (left.id < right.id ? -1 : left.id > right.id ? 1 : 0);
+    // Without any approved score (flag closed, opt-out, Starter) the priority sort falls back to assignedAt.
+    const effective = sort === "priority" && scores.size === 0 ? "assignedAt" : sort;
+    const primary = (left: LeadAssignmentRecord, right: LeadAssignmentRecord): number => {
+      switch (effective) {
+        case "assignedAt":
+          return sign * (left.assignedAt.getTime() - right.assignedAt.getTime());
+        case "status":
+          return sign * (CRM_STATUSES.indexOf(this.statusOf(left)) - CRM_STATUSES.indexOf(this.statusOf(right)));
+        case "urgency":
+          return sign * (URGENCY_RANK[left.urgency ?? "normal"] - URGENCY_RANK[right.urgency ?? "normal"]);
+        case "priority": {
+          const leftScore = scores.get(left.id)?.score;
+          const rightScore = scores.get(right.id)?.score;
+          // Leads without an approved score always come last, whatever the direction.
+          if (leftScore === undefined || rightScore === undefined) return leftScore === rightScore ? 0 : leftScore === undefined ? 1 : -1;
+          return sign * (leftScore - rightScore);
+        }
+      }
+    };
+    return [...rows].sort((left, right) => primary(left, right) || tieBreak(left, right));
+  }
+
+  private toSummary(assignment: LeadAssignmentRecord, priority?: PriorityEntry): BrokerCrmLeadSummary {
     const contact = assignment.contact ?? {};
     const email = typeof contact.email === "string" ? contact.email : undefined;
     const phone = typeof contact.phone === "string" ? contact.phone : undefined;
@@ -194,7 +259,8 @@ export class BrokerCrmLeadsService {
       ...(assignment.assignedAdvisorId ? { advisorId: assignment.assignedAdvisorId } : {}),
       ...(typeof contact.displayName === "string" ? { prospectName: contact.displayName } : {}),
       ...(email ? { emailMasked: this.maskEmail(email) } : {}),
-      ...(phone ? { phoneMasked: this.maskPhone(phone) } : {})
+      ...(phone ? { phoneMasked: this.maskPhone(phone) } : {}),
+      ...(priority ? { priorityScore: priority.score, priorityLevel: priority.level } : {})
     };
   }
 

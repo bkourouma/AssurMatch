@@ -718,6 +718,15 @@ readonly enterprise = new EnterpriseService({
     provisionUser: (actor, input) => this.adminUsersController().createPartnerUser(actor, input),
     invalidateUserAccess: (userId: string) => this.userAccessStatus.invalidate(userId)
   });
+  // Lot 3 (spec 069 FR-004/FR-006) begin: late links (the AI service and the user directory depend on, or come after, the CRM services).
+  private readonly crmLateLinks = (() => {
+    // Approved AI priority scores of the actor's own CRM perimeter (empty when the flag, opt-out or plan closes scoring).
+    this.leads.brokerCrmLeads.setPriorityScoreSource((actor) => this.brokerAi.priorityScoreMapFor(actor));
+    // The advisor of an assignment is resolved from the user directory, never from the client-asserted tenant.
+    this.leads.brokerCrmActivity.setAdvisorTenantResolver(async (advisorId) => (await this.users.service.require(advisorId).catch(() => undefined))?.partnerTenantId);
+    return true;
+  })();
+  // Lot 3 end
   /** Spec 053 FR-004/FR-013: admin decisions on the broker requests (applied through `partnerAdmin`). */
   readonly partnerRequestAdmin = new PartnerRequestAdminService({
     audit: this.audit.writer,
