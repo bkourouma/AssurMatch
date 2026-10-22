@@ -29,7 +29,11 @@ const explicitlyProtectedFeatureFlags = new Set([
   "satisfaction_survey_enabled",
   "ai_routing_anomaly_detection_enabled",
   "ai_assisted_routing_enabled",
-  "broker_weekly_ai_summary_enabled"
+  "broker_weekly_ai_summary_enabled",
+  // Lot 7: per-country and per-product AI flags follow the audited compliance path only
+  "country_ai_enabled",
+  "product_ai_scoring_enabled",
+  "product_ai_form_assistant_enabled"
 ]);
 
 const regulatedFlagKeyFragments = [

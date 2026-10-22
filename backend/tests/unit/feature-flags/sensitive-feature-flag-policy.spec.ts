@@ -47,4 +47,8 @@ describe("sensitive feature flag mutation policy", () => {
     expect(evaluateFeatureFlagMutation({ key: "payments_enabled", scopeType: "global", value: false, allowSensitiveDisable: true })).toEqual({ allowed: true });
     expect(evaluateFeatureFlagMutation({ key: "payments_enabled", scopeType: "global", value: true, allowSensitiveDisable: true }).allowed).toBe(false);
   });
+
+  it("protects the per-country and per-product AI flags (lot 7)", () => {
+    for (const key of ["country_ai_enabled", "product_ai_scoring_enabled", "product_ai_form_assistant_enabled"]) expect(isSensitiveFeatureFlagKey(key)).toBe(true);
+  });
 });

@@ -1,7 +1,10 @@
-// Applies a compliance decision to a SENSITIVE global feature flag (spec 059 follow-up).
+// Applies a compliance decision to a SENSITIVE global feature flag (spec 059 follow-up), or to a
+// per-country / per-product AI flag (spec 074) when --scope-type and --scope-id are given.
 //
 //   npm run ops:apply-flag-policy -- --flag satisfaction_survey_enabled --value true \
 //     --reference "POL-2026-048" --approved-by "Nom Prenom, DPO" --reason "Ouverture enquete CI apres validation"
+//
+//   npm run ops:apply-flag-policy -- --flag country_ai_enabled --scope-type country --scope-id <country uuid> \n//     --value true --reference "POL-2026-051" --approved-by "Nom Prenom, DPO" --reason "Ouverture IA pays"
 //
 // In a container:
 //   docker compose -f docker-compose.production.yml run --rm api \
@@ -15,15 +18,17 @@
 
 import { parseArgs } from "node:util";
 import { AssurMatchRuntime } from "../../backend/src/runtime/assurmatch-runtime";
-import { applyFlagPolicy, FlagPolicyRefusedError } from "../../backend/src/runtime/ops/apply-flag-policy";
+import { applyFlagPolicy, applyScopedFlagPolicy, FlagPolicyRefusedError } from "../../backend/src/runtime/ops/apply-flag-policy";
 
-const usage = "Usage: npm run ops:apply-flag-policy -- --flag <key> --value true|false --reference <policy ref> --approved-by <name, role> --reason <text>";
+const usage = "Usage: npm run ops:apply-flag-policy -- --flag <key> [--scope-type country|product --scope-id <uuid>] --value true|false --reference <policy ref> --approved-by <name, role> --reason <text>";
 
-let values: { flag?: string; value?: string; reference?: string; "approved-by"?: string; reason?: string; help?: boolean };
+let values: { "scope-type"?: string; "scope-id"?: string; flag?: string; value?: string; reference?: string; "approved-by"?: string; reason?: string; help?: boolean };
 try {
   ({ values } = parseArgs({
     options: {
       flag: { type: "string" },
+      "scope-type": { type: "string" },
+      "scope-id": { type: "string" },
       value: { type: "string" },
       reference: { type: "string" },
       "approved-by": { type: "string" },
@@ -52,14 +57,27 @@ if (runtime.prisma.runtimeMode !== "prisma-client" && process.env.NODE_ENV !== "
 let exitCode = 0;
 try {
   await runtime.onModuleInit();
-  const { flag, previousValue } = await applyFlagPolicy(runtime.featureFlags.service, {
-    flag: values.flag,
-    value: values.value === "true",
-    reference: values.reference,
-    approvedBy: values["approved-by"],
-    reason: values.reason
-  });
-  process.stdout.write(`Policy applied: ${flag.key} ${previousValue} -> ${flag.value} (reference ${values.reference}). Audited as feature_flag.policy_applied.\n`);
+  if (values["scope-type"] || values["scope-id"]) {
+    const result = await applyScopedFlagPolicy(runtime.aiScopeFlags, {
+      scopeType: values["scope-type"] ?? "",
+      scopeId: values["scope-id"] ?? "",
+      flag: values.flag,
+      value: values.value === "true",
+      reference: values.reference,
+      approvedBy: values["approved-by"],
+      reason: values.reason
+    });
+    process.stdout.write(`Policy applied: ${result.key} (${result.scopeType} ${result.scopeId}) ${result.previousValue} -> ${result.value} (reference ${values.reference}). Audited as feature_flag.policy_applied.\n`);
+  } else {
+    const { flag, previousValue } = await applyFlagPolicy(runtime.featureFlags.service, {
+      flag: values.flag,
+      value: values.value === "true",
+      reference: values.reference,
+      approvedBy: values["approved-by"],
+      reason: values.reason
+    });
+    process.stdout.write(`Policy applied: ${flag.key} ${previousValue} -> ${flag.value} (reference ${values.reference}). Audited as feature_flag.policy_applied.\n`);
+  }
 } catch (error) {
   if (error instanceof FlagPolicyRefusedError) {
     console.error(`Refused: ${error.reason}. Nothing was changed.`);
