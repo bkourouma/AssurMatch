@@ -1,7 +1,7 @@
 import type { BackOfficeProfile } from "../backoffice-auth";
-import { readBrokerManagerAnalyses, readBrokerPerformanceSummaries, readBrokerTeam } from "../broker-api";
+import { readBrokerAIAssistance, readBrokerAiOptOut, readBrokerManagerAnalyses, readBrokerPerformanceSummaries, readBrokerTeam } from "../broker-api";
 import type { BrokerAIAssistanceData, BrokerAiInteraction, BrokerManagerAnalysis, BrokerTeamMemberData } from "../broker-api";
-import { aiInsightsVisible, canWriteAiInsights } from "../ai-insights-access";
+import { aiInsightsPrefetchAllowed, aiInsightsVisible, canWriteAiInsights, managerAssistantOpen } from "../ai-insights-access";
 import { TENANT_SUSPENDED_MESSAGE, isTenantReadOnly } from "../broker-permissions";
 import { requestManagerAssistantAction, requestPerformanceSummaryAction, validateTenantInsightAction } from "../crm-ai-actions";
 import { Badge, Button, Card, Cluster, Field, Notice, Select, Stack, TenantWriteGuard } from "./broker-ui";
@@ -15,6 +15,9 @@ import { formatDate } from "./broker-view-models";
  * humain ; rien ne modifie un lead. L'API reste l'autorité (plan, drapeaux, opt-out, quota, rôle).
  */
 export const AI_INSIGHT_LABEL = "Assistance IA - suggestion à valider";
+
+/** Pages that render the panel; the actions return to the page the form came from. */
+export type InsightReturnPage = "/" | "/crm";
 
 const WINDOW_OPTIONS = [
   { value: "7", label: "7 derniers jours" },
@@ -61,11 +64,13 @@ function advisorName(members: readonly BrokerTeamMemberData[], id: string): stri
 
 function InsightList({
   items,
+  returnTo,
   canWrite,
   members,
   emptyLabel
 }: {
   items: Array<BrokerAiInteraction | BrokerManagerAnalysis>;
+  returnTo: InsightReturnPage;
   canWrite: boolean;
   members: readonly BrokerTeamMemberData[];
   emptyLabel: string;
@@ -111,6 +116,7 @@ function InsightList({
                 {(["approved", "rejected"] as const).map((decision) => (
                   <form key={decision} action={validateTenantInsightAction}>
                     <input type="hidden" name="interactionId" value={interaction.id} />
+                    <input type="hidden" name="returnTo" value={returnTo} />
                     <input type="hidden" name="decision" value={decision} />
                     <Button type="submit" variant="secondary" size="sm">
                       {decision === "approved" ? "Valider la suggestion" : "Rejeter la suggestion"}
@@ -126,9 +132,10 @@ function InsightList({
   );
 }
 
-function RequestForm({ action, id, buttonLabel }: { action: (formData: FormData) => Promise<void>; id: string; buttonLabel: string }) {
+function RequestForm({ action, id, buttonLabel, returnTo }: { action: (formData: FormData) => Promise<void>; id: string; buttonLabel: string; returnTo: InsightReturnPage }) {
   return (
     <form action={action}>
+      <input type="hidden" name="returnTo" value={returnTo} />
       <Cluster>
         <Field id={id} label="Période analysée">
           <Select id={id} name="windowDays" defaultValue="30" options={WINDOW_OPTIONS} />
@@ -140,23 +147,25 @@ function RequestForm({ action, id, buttonLabel }: { action: (formData: FormData)
 }
 
 /**
- * Server component. Rendered by the CRM dashboard only for Pro/Enterprise; returns nothing when the
+ * Server component. Rendered by the dashboard and the CRM pipeline only for Pro/Enterprise; returns nothing when the
  * assistance is closed, so a closed flag, an opt-out or a role without right leaks no AI surface.
  */
 export async function AiInsightsPanel({
   profile,
   assistance,
   optedOut,
-  notice
+  notice,
+  returnTo = "/crm"
 }: {
   profile: BackOfficeProfile;
   assistance: BrokerAIAssistanceData | undefined;
   optedOut: boolean;
   notice?: string | undefined;
+  returnTo?: InsightReturnPage | undefined;
 }) {
   if (!aiInsightsVisible(profile, assistance, optedOut)) return null;
 
-  const enterprise = profile.partnerPlan === "enterprise";
+  const enterprise = managerAssistantOpen(profile, assistance);
   const canWrite = canWriteAiInsights(profile);
   const suspended = isTenantReadOnly(profile);
   const [summaries, analyses, team] = await Promise.all([
@@ -179,7 +188,7 @@ export async function AiInsightsPanel({
       >
         {canWrite ? (
           <TenantWriteGuard readOnly={suspended}>
-            <RequestForm action={requestPerformanceSummaryAction} id="ai-summary-window" buttonLabel="Générer le résumé IA" />
+            <RequestForm action={requestPerformanceSummaryAction} id="ai-summary-window" buttonLabel="Générer le résumé IA" returnTo={returnTo} />
           </TenantWriteGuard>
         ) : (
           <Badge tone="disabled">Lecture seule pour votre rôle</Badge>
@@ -189,7 +198,7 @@ export async function AiInsightsPanel({
         ) : summaries.status === "error" ? (
           <Notice tone="warning">Les résumés IA n&apos;ont pas pu être chargés. Réessayez dans quelques instants.</Notice>
         ) : (
-          <InsightList items={summaries.data} canWrite={canWrite} members={members} emptyLabel="Aucun résumé IA pour le moment." />
+          <InsightList returnTo={returnTo} items={summaries.data} canWrite={canWrite} members={members} emptyLabel="Aucun résumé IA pour le moment." />
         )}
       </Card>
 
@@ -201,7 +210,7 @@ export async function AiInsightsPanel({
         >
           {canWrite ? (
             <TenantWriteGuard readOnly={suspended}>
-              <RequestForm action={requestManagerAssistantAction} id="ai-manager-window" buttonLabel="Lancer l'assistant manager" />
+              <RequestForm action={requestManagerAssistantAction} id="ai-manager-window" buttonLabel="Lancer l'assistant manager" returnTo={returnTo} />
             </TenantWriteGuard>
           ) : (
             <Badge tone="disabled">Lecture seule pour votre rôle</Badge>
@@ -211,10 +220,29 @@ export async function AiInsightsPanel({
           ) : analyses?.status === "error" ? (
             <Notice tone="warning">Les analyses n&apos;ont pas pu être chargées. Réessayez dans quelques instants.</Notice>
           ) : (
-            <InsightList items={analyses?.data ?? []} canWrite={canWrite} members={members} emptyLabel="Aucune analyse manager pour le moment." />
+            <InsightList returnTo={returnTo} items={analyses?.data ?? []} canWrite={canWrite} members={members} emptyLabel="Aucune analyse manager pour le moment." />
           )}
         </Card>
       ) : null}
     </section>
+  );
+}
+
+/**
+ * Dashboard entry (DASH-B-009): reads the assistance status and the cabinet opt-out, then renders the panel.
+ * Starter and roles without CRM read right make no API call at all; the panel itself stays the single
+ * visibility decision (closed flag, opt-out, inactive assistance render nothing and read no insight).
+ */
+export async function AiInsightsDashboardSection({ profile, notice }: { profile: BackOfficeProfile; notice?: string | undefined }) {
+  if (!aiInsightsPrefetchAllowed(profile)) return null;
+  const [assistance, optOut] = await Promise.all([readBrokerAIAssistance(), readBrokerAiOptOut()]);
+  return (
+    <AiInsightsPanel
+      profile={profile}
+      assistance={assistance.status === "success" ? assistance.data : undefined}
+      optedOut={optOut.status === "success" && optOut.data.optedOut}
+      notice={notice}
+      returnTo="/"
+    />
   );
 }

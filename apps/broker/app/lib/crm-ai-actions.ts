@@ -60,6 +60,12 @@ export async function setAiOptOutAction(formData: FormData): Promise<void> {
 /* ---------- Lot 3 (spec 069 FR-004): résumé IA de performance (DASH-B-009) et assistant manager ---------- */
 
 const INSIGHT_PAGE = "/crm";
+/** The panel is shown on the dashboard and on the pipeline: the action returns to the page it came from (whitelist). */
+const INSIGHT_PAGES = new Set(["/", "/crm"]);
+function insightPage(formData: FormData): string {
+  const value = stringValue(formData.get("returnTo"));
+  return INSIGHT_PAGES.has(value) ? value : INSIGHT_PAGE;
+}
 const INSIGHT_WINDOW_DAYS = [7, 30, 90];
 
 function insightOutcome(result: BrokerWriteResult, success: string): string {
@@ -75,24 +81,27 @@ function windowDaysOf(formData: FormData): number {
 
 /** Requests a performance summary over aggregates of the cabinet (no prospect data). The API re-checks plan, flags, opt-out and role. */
 export async function requestPerformanceSummaryAction(formData: FormData): Promise<void> {
+  const page = insightPage(formData);
   const result = await callBrokerApi("/broker/crm/ai/performance-summary", "POST", { language: "fr", windowDays: windowDaysOf(formData) });
-  if (result.status === 401) redirect(loginRedirect(INSIGHT_PAGE, "session_expired"));
-  redirect(`${INSIGHT_PAGE}?insight=${insightOutcome(result, "queued")}`);
+  if (result.status === 401) redirect(loginRedirect(page, "session_expired"));
+  redirect(`${page}?insight=${insightOutcome(result, "queued")}`);
 }
 
 /** Requests a manager analysis (Enterprise). Advisors reach the model as neutral labels only. */
 export async function requestManagerAssistantAction(formData: FormData): Promise<void> {
+  const page = insightPage(formData);
   const result = await callBrokerApi("/broker/crm/ai/manager-assistant", "POST", { language: "fr", windowDays: windowDaysOf(formData) });
-  if (result.status === 401) redirect(loginRedirect(INSIGHT_PAGE, "session_expired"));
-  redirect(`${INSIGHT_PAGE}?insight=${insightOutcome(result, "queued")}`);
+  if (result.status === 401) redirect(loginRedirect(page, "session_expired"));
+  redirect(`${page}?insight=${insightOutcome(result, "queued")}`);
 }
 
 /** Human validation (valider / rejeter) of a performance summary or manager analysis. Never triggers an automatic decision. */
 export async function validateTenantInsightAction(formData: FormData): Promise<void> {
   const interactionId = stringValue(formData.get("interactionId"));
   const decision = stringValue(formData.get("decision")) === "rejected" ? "rejected" : "approved";
-  if (!UUID.test(interactionId)) redirect(INSIGHT_PAGE);
+  const page = insightPage(formData);
+  if (!UUID.test(interactionId)) redirect(page);
   const result = await callBrokerApi(`/broker/crm/ai/interactions/${interactionId}/validation`, "POST", { decision });
-  if (result.status === 401) redirect(loginRedirect(INSIGHT_PAGE, "session_expired"));
-  redirect(`${INSIGHT_PAGE}?insight=${insightOutcome(result, "validated")}`);
+  if (result.status === 401) redirect(loginRedirect(page, "session_expired"));
+  redirect(`${page}?insight=${insightOutcome(result, "validated")}`);
 }

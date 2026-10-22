@@ -8,6 +8,8 @@ import { hasPermission, isReadOnlyBroker } from "./broker-permissions";
  * partner opt-out, quota and role; the page only avoids showing a surface that would be refused.
  */
 export const AI_SUMMARY_FLAG = "ai_summary_enabled";
+/** The gateway serves the manager assistant only when this flag is open (exposed by GET /broker/crm/ai-assistance). */
+export const AI_MANAGER_FLAG = "ai_broker_assistant_enabled";
 
 /** The panel is visible only if the assistance is active, the summary flag is open and the cabinet is not opted out. */
 export function aiInsightsOpen(assistance: Pick<BrokerAIAssistanceData, "enabled" | "flags"> | undefined, optedOut: boolean): boolean {
@@ -25,7 +27,17 @@ export function canWriteAiInsights(profile: BackOfficeProfile): boolean {
   return canReadAiInsights(profile) && !isReadOnlyBroker(profile);
 }
 
+/** Cheap pre-check before any API read: Starter and a role without CRM read right never reach the assistance status. */
+export function aiInsightsPrefetchAllowed(profile: BackOfficeProfile): boolean {
+  return profile.partnerPlan !== "starter" && canReadAiInsights(profile);
+}
+
 /** Single decision used by the panel: Starter, closed flag, opt-out or a role without read right render nothing. */
 export function aiInsightsVisible(profile: BackOfficeProfile, assistance: Pick<BrokerAIAssistanceData, "enabled" | "flags"> | undefined, optedOut: boolean): boolean {
-  return profile.partnerPlan !== "starter" && aiInsightsOpen(assistance, optedOut) && canReadAiInsights(profile);
+  return aiInsightsPrefetchAllowed(profile) && aiInsightsOpen(assistance, optedOut);
+}
+
+/** The « Assistant manager » card (Enterprise) also needs its own gateway flag, independent of the summary flag. */
+export function managerAssistantOpen(profile: Pick<BackOfficeProfile, "partnerPlan">, assistance: Pick<BrokerAIAssistanceData, "flags"> | undefined): boolean {
+  return profile.partnerPlan === "enterprise" && Boolean(assistance?.flags.some((flag) => flag.key === AI_MANAGER_FLAG && flag.value === true));
 }

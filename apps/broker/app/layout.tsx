@@ -6,6 +6,7 @@ import { readBackOfficeSession } from "./lib/backoffice-auth";
 import { readBrokerBranding } from "./lib/broker-api";
 import { toBrokerBranding } from "./lib/branding";
 import type { BrokerBranding } from "./lib/branding";
+import { agenciesOverviewAccess } from "./lib/agencies-overview";
 import { TENANT_SUSPENDED_MESSAGE, isTenantReadOnly } from "./lib/broker-permissions";
 import { BrokerShell } from "./lib/ui/broker-shell";
 
@@ -47,10 +48,13 @@ export default async function BrokerLayout({ children }: { children: React.React
   // Spec 051 R12: a suspended partner keeps read access only; the banner stays on every page.
   const suspendedBanner = isTenantReadOnly(profile) ? TENANT_SUSPENDED_MESSAGE : undefined;
 
+  // Lot 3 (spec 069 FR-003): the multi-agency link follows the page and API rule (Enterprise and a role seeing the whole cabinet).
+  const showAgenciesOverview = session.status === "authenticated" && agenciesOverviewAccess(session.profile) === "allowed";
+
   return (
     <html lang="fr" className={`${headingFont.variable} ${bodyFont.variable}`}>
       <body>
-        <BrokerShell user={user} plan={plan} branding={branding} envBadge={envBadge} suspendedBanner={suspendedBanner}>
+        <BrokerShell user={user} plan={plan} showAgenciesOverview={showAgenciesOverview} branding={branding} envBadge={envBadge} suspendedBanner={suspendedBanner}>
           {children}
         </BrokerShell>
       </body>

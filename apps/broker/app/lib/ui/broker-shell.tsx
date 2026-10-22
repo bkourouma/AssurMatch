@@ -14,6 +14,8 @@ export interface BrokerShellProps {
   children: ReactNode;
   user?: AppShellUser | undefined;
   plan?: BrokerPlan | undefined;
+  /** Lot 3 (spec 069 FR-003): computed by the layout with `agenciesOverviewAccess` (Enterprise and a role seeing the whole cabinet). */
+  showAgenciesOverview?: boolean | undefined;
   /** Spec 064 FR-009: Enterprise charte (label, validated colour) read by the layout; absent for other plans. */
   branding?: BrokerBranding | undefined;
   envBadge?: string | undefined;
@@ -49,7 +51,7 @@ function isAuthRoute(pathname: string): boolean {
  * Les entrees CRM restent visibles en plan Starter mais desactivees: le portail Starter ne presente
  * jamais Kanban, pipeline avance, taches, rappels ou assignation equipe comme disponibles.
  */
-function brokerNavigation(plan?: BrokerPlan | undefined): NavGroup[] {
+function brokerNavigation(plan?: BrokerPlan | undefined, showAgenciesOverview = false): NavGroup[] {
   const starter = plan === "starter";
   const crmRestriction = starter
     ? { disabled: true, badge: PRO_BADGE, disabledHint: PRO_HINT }
@@ -91,8 +93,8 @@ function brokerNavigation(plan?: BrokerPlan | undefined): NavGroup[] {
         { label: "Licences", href: "/licenses", icon: "shield", match: ["/licenses"] },
         { label: "Equipe", href: "/team", icon: "team", match: ["/team"] },
         { label: "Entreprise", href: "/enterprise", icon: "building", match: ["/enterprise"], badge: organisationBadge },
-        // Lot 3 (spec 069 FR-003): consolidated multi-agency view, linked only for the Enterprise plan.
-        ...(plan === "enterprise" ? [{ label: AGENCIES_OVERVIEW_LABEL, href: AGENCIES_OVERVIEW_HREF, icon: "gauge" as const, match: [AGENCIES_OVERVIEW_HREF] }] : [])
+        // Lot 3 (spec 069 FR-003): consolidated multi-agency view, linked only when the layout allows it (Enterprise plan and a role seeing the whole cabinet).
+        ...(showAgenciesOverview ? [{ label: AGENCIES_OVERVIEW_LABEL, href: AGENCIES_OVERVIEW_HREF, icon: "gauge" as const, match: [AGENCIES_OVERVIEW_HREF] }] : [])
       ]
     },
     {
@@ -108,7 +110,7 @@ function brokerNavigation(plan?: BrokerPlan | undefined): NavGroup[] {
 }
 
 /** Enveloppe mince autour du design system back-office partage: aucune logique de session ici. */
-export function BrokerShell({ children, user, plan, branding, envBadge, suspendedBanner }: BrokerShellProps) {
+export function BrokerShell({ children, user, plan, showAgenciesOverview, branding, envBadge, suspendedBanner }: BrokerShellProps) {
   const pathname = usePathname() || "/";
   // Spec 064 FR-009: the cabinet label sits next to the plan and the platform mention is always kept.
   // The colour only overrides the sidebar primary token, and only when it keeps a readable contrast.
@@ -126,7 +128,7 @@ export function BrokerShell({ children, user, plan, branding, envBadge, suspende
   return (
     <AppShell
       brand={{ scope: SCOPE, homeHref: "/", plan: planLabel(plan), tenant: tenantLine }}
-      navigation={brokerNavigation(plan)}
+      navigation={brokerNavigation(plan, showAgenciesOverview === true)}
       user={user}
       logoutAction={logoutAction}
       logoutLabel="Deconnexion"

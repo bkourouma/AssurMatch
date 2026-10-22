@@ -1,14 +1,18 @@
 import { expect, test } from "@playwright/test";
 import { readFileSync } from "node:fs";
+import { readTableParams } from "../../../../packages/ui/backoffice/data-table";
 import type { BrokerDashboardData } from "../../app/lib/broker-api";
-import { aiInsightsOpen, aiInsightsVisible, canReadAiInsights, canWriteAiInsights } from "../../app/lib/ai-insights-access";
+import { aiInsightsOpen, aiInsightsPrefetchAllowed, aiInsightsVisible, canReadAiInsights, canWriteAiInsights, managerAssistantOpen } from "../../app/lib/ai-insights-access";
 import { AGENCIES_OVERVIEW_MESSAGES, agenciesOverviewAccess } from "../../app/lib/agencies-overview";
 import {
   CRM_LIST_PAGE_SIZE,
   buildCrmLeadsApiQuery,
   countCrmFilters,
+  CRM_URGENCY_LABELS,
+  PRIORITY_LEVEL_LABELS,
   hasPriorityScores,
   parseCrmListParams,
+  showPriorityColumn,
   withCrmDateRange
 } from "../../app/lib/crm-list-query";
 import {
@@ -105,12 +109,18 @@ test("the Starter plan, or a missing crm section, shows no KPI at all", () => {
 });
 
 test("the multi-agency view is Enterprise only and refused to roles that do not see the whole cabinet", () => {
-  expect(agenciesOverviewAccess({ partnerPlan: "enterprise", roles: ["broker_owner_pro"] })).toBe("allowed");
-  expect(agenciesOverviewAccess({ partnerPlan: "enterprise", roles: ["broker_manager"] })).toBe("allowed");
-  expect(agenciesOverviewAccess({ partnerPlan: "enterprise", roles: ["broker_agent"] })).toBe("role_not_allowed");
-  expect(agenciesOverviewAccess({ partnerPlan: "enterprise", roles: ["broker_read_only"] })).toBe("role_not_allowed");
-  expect(agenciesOverviewAccess({ partnerPlan: "pro", roles: ["broker_owner_pro"] })).toBe("plan_required");
-  expect(agenciesOverviewAccess({ partnerPlan: "starter", roles: ["broker_owner_starter"] })).toBe("plan_required");
+  const access = (roles: string[], partnerPlan: "pro" | "enterprise" | "starter", customRolePermissions?: string[]) =>
+    agenciesOverviewAccess({ roles, partnerPlan, partnerTenantId: "t", mfaVerified: true, ...(customRolePermissions ? { customRolePermissions } : {}) });
+  expect(access(["broker_owner_pro"], "enterprise")).toBe("allowed");
+  expect(access(["broker_manager"], "enterprise")).toBe("allowed");
+  // Same rule as the API: broker_crm:read is enough, so the read-only role with CRM read is allowed; the advisor is not.
+  expect(access(["broker_read_only"], "enterprise")).toBe("allowed");
+  expect(access(["broker_agent"], "enterprise")).toBe("role_not_allowed");
+  // A custom role narrowing the CRM resource away from broker_crm:read removes the access.
+  expect(access(["broker_manager"], "enterprise", ["broker_leads:read"])).toBe("role_not_allowed");
+  expect(access(["broker_owner_pro"], "pro")).toBe("plan_required");
+  expect(access(["broker_read_only"], "pro")).toBe("plan_required");
+  expect(access(["broker_owner_starter"], "starter")).toBe("plan_required");
   expect(AGENCIES_OVERVIEW_MESSAGES.plan_required).toContain("Enterprise");
   expect(agencyRowLabel({ agencyId: "none", agencyName: "none" })).toBe("Sans agence");
   expect(agencyRowLabel({ agencyId: "0d6f0c2c-6d6e-4c33-9a43-0e0f4c2a8b11", agencyName: "Agence Abidjan" })).toBe("Agence Abidjan");
@@ -121,12 +131,17 @@ test("the multi-agency view is Enterprise only and refused to roles that do not 
   expect(api).toContain("/broker/dashboard/agencies");
   expect(page).toContain("agenciesOverviewAccess(session.profile)");
   // The API is only called once the access check passed, and a 403 shows a generic message with no data.
-  expect(page.indexOf("readBrokerAgenciesOverview()")).toBeGreaterThan(page.indexOf('access !== "allowed"'));
+  expect(page.indexOf('access !== "allowed"')).toBeGreaterThan(-1);
+  expect(page.indexOf("await readBrokerAgenciesOverview()")).toBeGreaterThan(page.indexOf('access !== "allowed"'));
   expect(page).toContain('overview.status === "forbidden"');
   expect(page).toContain("Aucune donnée n&apos;est affichée");
   expect(page).toContain("Gagnés / reçus");
-  // The navigation link exists only for the Enterprise plan.
-  expect(shell).toContain('plan === "enterprise" ? [{ label: AGENCIES_OVERVIEW_LABEL');
+  // The navigation link follows the page rule (plan AND role), computed by the layout, never from the plan alone.
+  const layout = read("apps/broker/app/layout.tsx");
+  expect(layout).toContain('agenciesOverviewAccess(session.profile) === "allowed"');
+  expect(layout).toContain("showAgenciesOverview={showAgenciesOverview}");
+  expect(shell).toContain("...(showAgenciesOverview ? [{ label: AGENCIES_OVERVIEW_LABEL");
+  expect(shell).not.toContain('plan === "enterprise" ? [{ label: AGENCIES_OVERVIEW_LABEL');
   expect(shell).toContain('"/enterprise/agencies"');
 });
 
@@ -154,11 +169,40 @@ test("AI insights panel is hidden unless the assistance, the ai_summary_enabled 
   expect(aiInsightsVisible(profile(["broker_owner_starter"], "starter"), open, false)).toBe(false);
   expect(aiInsightsVisible(profile(["broker_agent"]), open, false)).toBe(false);
   expect(aiInsightsVisible(profile(["broker_owner_pro"]), undefined, false)).toBe(false);
+  // The dashboard makes no API call at all for Starter or a role without CRM read right.
+  expect(aiInsightsPrefetchAllowed(profile(["broker_owner_starter"], "starter"))).toBe(false);
+  expect(aiInsightsPrefetchAllowed(profile(["broker_agent"]))).toBe(false);
+  expect(aiInsightsPrefetchAllowed(profile(["broker_manager"]))).toBe(true);
+
+  // The panel is rendered by the dashboard (KPI page) and by the pipeline page, from the same component.
+  expect(read("apps/broker/app/page.tsx")).toContain("<AiInsightsDashboardSection profile={session.profile}");
+  const section = read("apps/broker/app/lib/ui/ai-insights-panel.tsx");
+  expect(section.slice(section.indexOf("export async function AiInsightsDashboardSection"))).toContain("if (!aiInsightsPrefetchAllowed(profile)) return null;");
 
   const panel = read("apps/broker/app/lib/ui/ai-insights-panel.tsx");
   expect(panel).toContain("if (!aiInsightsVisible(profile, assistance, optedOut)) return null;");
   // The closed check precedes every API read.
   expect(panel.indexOf("aiInsightsVisible(profile")).toBeLessThan(panel.indexOf("readBrokerPerformanceSummaries()"));
+});
+
+test("the manager assistant card also needs the ai_broker_assistant_enabled flag", () => {
+  const flags = (summary: boolean, manager: boolean) => [
+    { key: "ai_summary_enabled", value: summary, required: true },
+    { key: "ai_broker_assistant_enabled", value: manager, required: true }
+  ];
+  const enterprise = { partnerPlan: "enterprise" as const };
+  // Manager flag closed, summary flag open: the summary card is visible, the manager card is not.
+  const summaryOnly = { enabled: true, flags: flags(true, false) };
+  expect(aiInsightsOpen(summaryOnly, false)).toBe(true);
+  expect(managerAssistantOpen(enterprise, summaryOnly)).toBe(false);
+  // Both open on Enterprise: both cards. Pro never gets the manager card.
+  const both = { enabled: true, flags: flags(true, true) };
+  expect(managerAssistantOpen(enterprise, both)).toBe(true);
+  expect(managerAssistantOpen({ partnerPlan: "pro" }, both)).toBe(false);
+  expect(managerAssistantOpen(enterprise, { flags: [] })).toBe(false);
+  expect(managerAssistantOpen(enterprise, undefined)).toBe(false);
+  // Manager flag open but summary flag closed: the panel is hidden altogether.
+  expect(aiInsightsOpen({ enabled: true, flags: flags(false, true) }, false)).toBe(false);
 });
 
 test("AI insights are labelled as suggestions to validate, with validation actions behind the write right", () => {
@@ -173,7 +217,7 @@ test("AI insights are labelled as suggestions to validate, with validation actio
   expect(panel).toContain("Rejeter la suggestion");
   expect(panel).toContain("Validation humaine");
   // Enterprise-only assistant, buttons only with the write right, advisors never shown as raw ids.
-  expect(panel).toContain('profile.partnerPlan === "enterprise"');
+  expect(panel).toContain("managerAssistantOpen(profile, assistance)");
   expect(panel).toContain("canWrite && interaction.status ===");
   expect(panel).toContain("Conseiller hors équipe");
   expect(panel).not.toContain("{advisorId}");
@@ -184,6 +228,7 @@ test("AI insights are labelled as suggestions to validate, with validation actio
   expect(actions).toContain('language: "fr"');
   expect(actions).toContain("windowDays");
   expect(actions).toContain("/broker/crm/ai/interactions/${interactionId}/validation");
+  expect(actions).toContain('INSIGHT_PAGES = new Set(["/", "/crm"])');
   expect(read("apps/broker/app/crm/page.tsx")).toContain("<AiInsightsPanel");
 });
 
@@ -267,7 +312,7 @@ test("the CRM list page uses the server query, no client filtering, server pagin
   for (const key of ['key: "status"', 'key: "date"', 'key: "urgency"', 'key: "priority"']) expect(page).toContain(key);
 });
 
-test("the AI priority column appears only when a lead of the page carries a score", () => {
+test("the AI priority column appears when the priority sort is active or a lead of the page carries a score", () => {
   const scored = leadSummary({ id: "a", status: "nouveau", assignedAt: "2026-10-02T10:00:00.000Z", priorityScore: 82, priorityLevel: "high" });
   const plain = leadSummary({ id: "b", status: "nouveau", assignedAt: "2026-10-02T10:00:00.000Z" });
   const odd = leadSummary({ id: "c", status: "nouveau", priorityScore: "high", priorityLevel: "urgent" });
@@ -282,9 +327,70 @@ test("the AI priority column appears only when a lead of the page carries a scor
   // A score of 0 is a real score.
   expect(hasPriorityScores([leadSummary({ id: "z", status: "nouveau", priorityScore: 0, priorityLevel: "low" })])).toBe(true);
 
+  // Priority sort without any scored lead on the page (or page 2): the column and its sort link stay.
+  expect(showPriorityColumn({ sort: "priority" }, [plain])).toBe(true);
+  expect(showPriorityColumn({ sort: "priority" }, [])).toBe(true);
+  expect(showPriorityColumn({ sort: "date" }, [plain])).toBe(false);
+  expect(showPriorityColumn({ sort: "date" }, [scored])).toBe(true);
+
   const page = read("apps/broker/app/crm/leads/page.tsx");
-  expect(page).toContain("crmColumns(hasPriorityScores(leads))");
+  expect(page).toContain("crmColumns(showPriorityColumn(state, leads))");
   expect(page).toContain("if (withPriority)");
   expect(page).toContain("Priorité IA");
   expect(page).toContain("assistance IA, indicatif");
+});
+
+test("each CRM filter is forwarded alone to the API with its own parameter", () => {
+  const cases: Array<[Record<string, string>, Record<string, string>]> = [
+    [{ status: "contacte" }, { status: "contacte" }],
+    [{ product: "auto" }, { productKey: "auto" }],
+    [{ country: "sn" }, { countryCode: "SN" }],
+    [{ advisor: "member-9" }, { advisorId: "member-9" }],
+    [{ urgency: "urgent" }, { urgency: "urgent" }],
+    [{ source: "support" }, { source: "support" }],
+    [{ q: "dupont" }, { search: "dupont" }],
+    [{ dateFrom: "2026-10-05" }, { dateFrom: "2026-10-05T00:00:00.000Z" }],
+    [{ dateTo: "2026-10-06" }, { dateTo: "2026-10-06T23:59:59.999Z" }]
+  ];
+  const base = { sort: "assignedAt", sortDirection: "desc", page: "1", pageSize: String(CRM_LIST_PAGE_SIZE) };
+  for (const [input, expected] of cases) {
+    const state = parseCrmListParams(input);
+    expect(countCrmFilters(state)).toBe(1);
+    expect(Object.fromEntries(new URLSearchParams(buildCrmLeadsApiQuery(state)))).toEqual({ ...expected, ...base });
+  }
+});
+
+test("previous / next pagination links keep every filter and the sort", () => {
+  const params = { status: "contacte", product: "auto", country: "CI", urgency: "high", q: "REF-12", sort: "priority", dir: "desc", page: "2" };
+  const state = parseCrmListParams(params);
+  expect(state.page).toBe(2);
+  const table = readTableParams(params, { pathname: "/crm/leads", defaultSort: { key: "date", direction: "desc" }, pageSize: CRM_LIST_PAGE_SIZE });
+
+  const next = new URL(table.pageHref(3), "http://broker.local");
+  const previous = new URL(table.pageHref(1), "http://broker.local");
+  expect(next.pathname).toBe("/crm/leads");
+  expect(Object.fromEntries(next.searchParams)).toEqual({ ...params, page: "3" });
+  // Back to the first page drops only the page parameter.
+  const withoutPage: Record<string, string> = { ...params };
+  delete withoutPage.page;
+  expect(Object.fromEntries(previous.searchParams)).toEqual(withoutPage);
+  // The API query of the next page carries the same filters with the new page number.
+  const apiNext = new URLSearchParams(buildCrmLeadsApiQuery({ ...state, page: 3 }));
+  expect(apiNext.get("status")).toBe("contacte");
+  expect(apiNext.get("productKey")).toBe("auto");
+  expect(apiNext.get("sort")).toBe("priority");
+  expect(apiNext.get("page")).toBe("3");
+  // A sort link restarts at page 1 and keeps the filters.
+  const sortLink = new URL(table.sortHref("status", "asc"), "http://broker.local");
+  expect(sortLink.searchParams.get("page")).toBeNull();
+  expect(sortLink.searchParams.get("q")).toBe("REF-12");
+});
+
+test("visible CRM list labels are accented French", () => {
+  expect(CRM_URGENCY_LABELS.high).toBe("Élevée");
+  expect(PRIORITY_LEVEL_LABELS.high).toBe("Élevée");
+  const page = read("apps/broker/app/crm/leads/page.tsx");
+  expect(page).toContain("Aucun résultat pour ce filtre");
+  expect(page).toContain("Code pays à 2 lettres");
+  expect(page).toContain("Saisissez la clé exacte du produit");
 });

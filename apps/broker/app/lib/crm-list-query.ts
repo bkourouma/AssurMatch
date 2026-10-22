@@ -15,7 +15,7 @@ export const CRM_SOURCES = ["comparator", "quote_request", "manual_import", "par
 export const CRM_URGENCY_LABELS: Record<string, string> = {
   low: "Faible",
   normal: "Normale",
-  high: "Elevee",
+  high: "Élevée",
   urgent: "Urgente"
 };
 
@@ -148,8 +148,16 @@ export function hasPriorityScores(leads: ReadonlyArray<{ priorityScore?: number 
   return leads.some((lead) => typeof lead.priorityScore === "number");
 }
 
+/**
+ * The « Priorité IA » column (and its sort link) is shown when the priority sort is active or when a lead
+ * of the page carries a score: page 2 or an unscored page must not hide the column the user is sorting on.
+ */
+export function showPriorityColumn(state: Pick<CrmListState, "sort">, leads: ReadonlyArray<{ priorityScore?: number | undefined }>): boolean {
+  return state.sort === "priority" || hasPriorityScores(leads);
+}
+
 export const PRIORITY_LEVEL_LABELS: Record<string, string> = {
   low: "Faible",
   medium: "Moyenne",
-  high: "Elevee"
+  high: "Élevée"
 };

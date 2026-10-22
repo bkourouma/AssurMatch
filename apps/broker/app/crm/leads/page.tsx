@@ -13,8 +13,8 @@ import {
   PRIORITY_LEVEL_LABELS,
   buildCrmLeadsApiQuery,
   countCrmFilters,
-  hasPriorityScores,
   parseCrmListParams,
+  showPriorityColumn,
   withCrmDateRange
 } from "../../lib/crm-list-query";
 import { crmExportHref } from "../../lib/lead-export-links";
@@ -53,10 +53,10 @@ function priorityTone(level: LeadSummaryViewModel["priorityLevel"]): "success" |
   return "neutral";
 }
 
-/** Columns of the list. The « Priorité IA » column is added only when a lead of the page carries a score. */
+/** Columns of the list. The « Priorité IA » column is added when the priority sort is active or when a lead of the page carries a score. */
 function crmColumns(withPriority: boolean): Array<DataTableColumn<CrmListRow>> {
   const columns: Array<DataTableColumn<CrmListRow>> = [
-    { key: "reference", header: "Reference", render: (lead) => lead.reference },
+    { key: "reference", header: "Référence", render: (lead) => lead.reference },
     { key: "country", header: "Pays", render: (lead) => lead.country },
     { key: "product", header: "Produit", render: (lead) => lead.product },
     {
@@ -134,7 +134,7 @@ export default async function BrokerCrmLeadsPage({ searchParams }: { searchParam
   const page = typeof apiLeads.data.page === "number" ? apiLeads.data.page : state.page;
   const pageSize = typeof apiLeads.data.pageSize === "number" ? apiLeads.data.pageSize : CRM_LIST_PAGE_SIZE;
   const table = readTableParams(params, { pathname: "/crm/leads", defaultSort: { key: "date", direction: "desc" }, pageSize });
-  const columns = crmColumns(hasPriorityScores(leads));
+  const columns = crmColumns(showPriorityColumn(state, leads));
 
   return (
     <PageStack>
@@ -159,7 +159,7 @@ export default async function BrokerCrmLeadsPage({ searchParams }: { searchParam
         action="/crm/leads"
         label="Filtres CRM"
         submitLabel="Filtrer"
-        resetLabel="Reinitialiser"
+        resetLabel="Réinitialiser"
         resetHref="/crm/leads"
         activeCount={activeCount}
         autoSubmit
@@ -172,10 +172,10 @@ export default async function BrokerCrmLeadsPage({ searchParams }: { searchParam
             options={[{ value: "", label: "Tous" }, ...CRM_PIPELINE_STATUSES.map((value) => ({ value, label: crmStatusLabel(value) }))]}
           />
         </Field>
-        <Field id="crm-product" label="Produit">
+        <Field id="crm-product" label="Produit" hint="Saisissez la clé exacte du produit (ex. auto). Aucun résultat si elle n'existe pas dans vos leads.">
           <Input id="crm-product" name="product" type="search" defaultValue={product} placeholder="Clé produit, ex. auto" maxLength={64} />
         </Field>
-        <Field id="crm-country" label="Pays">
+        <Field id="crm-country" label="Pays" hint="Code pays à 2 lettres (ex. CI pour la Côte d'Ivoire).">
           <Input id="crm-country" name="country" type="search" defaultValue={country} placeholder="Code pays, ex. CI" maxLength={2} />
         </Field>
         <Field id="crm-date-from" label="Date de début">
@@ -232,7 +232,7 @@ export default async function BrokerCrmLeadsPage({ searchParams }: { searchParam
         items={rows}
         getKey={(lead) => lead.id}
         aria-label="Leads CRM"
-        emptyLabel="Aucun lead CRM autorise a afficher."
+        emptyLabel={activeCount > 0 ? "Aucun résultat pour ce filtre : modifiez ou réinitialisez les filtres (produit et pays attendent une clé produit et un code pays exacts)." : "Aucun lead CRM autorisé à afficher."}
         getRowHref={(lead) => `/crm/leads/${lead.id}`}
         sort={{ key: state.sort, direction: state.direction }}
         sortHref={table.sortHref}
