@@ -26,7 +26,7 @@ Les décisions du propriétaire sont écrites dans chaque `specs/06x-*/spec.md`.
   - `test:web` : 389 OK, 14 ignorés ;
   - E2E `--apps=host` sur Docker Desktop : 107/107.
 - CI de la PR #42 sous Linux : `verify`, `e2e` (applications conteneurisées) et `secret-scan` au vert.
-- La CI de `main` après fusion tournait encore à l'écriture de ce document : vérifier son résultat.
+- La CI de `main` après la PR #42 était en échec sur l'étape `npm audit` (avis de sécurité sur `next` et `vite`, dépendances déjà présentes) : à traiter par une mise à jour de ces dépendances.
 
 ## Reste à faire (code)
 
@@ -41,27 +41,14 @@ Les décisions du propriétaire sont écrites dans chaque `specs/06x-*/spec.md`.
 - Les durées de conservation des messages, des demandes de documents et des demandes sur les données sont provisoires (730, 180 et 1825 jours) : à faire valider par le juridique.
 - Sur une base déjà seedée, les flags existants à `false` ne changent pas : passer les trois modules courtier à « actif » depuis l'écran des flags.
 
-## Chantier suivant en cours (autre session)
+## Chantier suivant : écarts PRD (fait)
 
-Les écarts restants de l'audit font l'objet de l'orchestration `ecarts-prd` :
-- supervisée par la session Claude « Où en est-on ? » ;
-- suivi dans `.orchestration/2026-10-21-ecarts-prd/suivi.md` (dossier non versionné) ;
-- branches `orch/2026-10-21-ecarts-prd-lot-N`, copies dans `D:/APP/AssurMatch-worktrees/`.
+Les écarts restants de l'audit ont été traités par l'orchestration `ecarts-prd` (lots 1 à 12, specs 067 à 077, migrations 0033 à 0040) et fusionnés dans `main` par la PR #44 (commit `50c0c84`, 2026-10-23).
 
-Ses lots 1 à 5 partent de `integration/recos-1-4` (a5a0d10), qui est maintenant dans `main`. Sa PR finale peut donc viser `main`.
+Pour l'état détaillé, les variables d'environnement nouvelles, les flags sensibles, les étapes de mise en ligne et les points d'attention, voir `docs/handoff/ecarts-prd-integration.md`.
 
-| Lot | Sujet |
-|---|---|
-| 1 | Parcours devis : multi-offres, choix du courtier, étape documents, prénom/nom, rappel documents |
-| 2 | IA visiteur |
-| 3 | CRM et tableau de bord courtier |
-| 4 | Catalogue et offres |
-| 5 | Routage et facturation |
-| 6 à 11 | Pilotage admin, IA admin et intégrations, sécurité, CMS, canaux, E2E et documentation |
-
-- **Hypothèses validées par le propriétaire** : H1 à H4 (multi-offres jusqu'à 3 si le multi est ouvert, choix direct d'un courtier éligible, revue manuelle sous le seuil de qualité, setup fee et forfaits mensuels).
-- **Hypothèses non encore posées** : H5 à H8 (comptage des visiteurs sans cookie, chiffrement des données personnelles, CMS minimal, fournisseurs SMS/WhatsApp).
-- **Impact connu** : le lot 4 durcit l'ouverture d'un pays (règles, disclaimers, attestations). `tests/e2e/scenario-core.spec.ts` et `senegal-opening.spec.ts` devront être adaptés.
+- **Hypothèses validées par le propriétaire** : H1 à H4, plus flags IA par pays/produit en désactivation seule, CMS à quatre yeux strict, changement de plan limité à la facturation.
+- **Hypothèses restant à valider** : H5 (compteur de visites), H6 (clés PII par variables d'environnement), H8 (variables SMS/WhatsApp).
 
 ## Copies de travail locales à nettoyer
 
