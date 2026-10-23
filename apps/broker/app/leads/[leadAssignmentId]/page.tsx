@@ -165,15 +165,6 @@ export default async function BrokerLeadDetailPage({
           Le detail du lead est temporairement indisponible. Aucune donnee protegee n'est affichee en mode erreur.
         </Notice>
       ) : null}
-      {lead && !showActions ? (
-        <Notice tone="info" title="Lecture seule">
-          {isFinal
-            ? "Ce lead est cloture: aucune action courtier n'est plus possible."
-            : tenantReadOnly
-              ? TENANT_SUSPENDED_MESSAGE
-              : "Votre role ne permet pas d'agir sur ce lead. Les actions restent visibles en lecture seule."}
-        </Notice>
-      ) : null}
 
       {lead ? (
         <>
@@ -355,11 +346,20 @@ export default async function BrokerLeadDetailPage({
                   </p>
                 </>
               ) : (
-                <Cluster>
-                  <Badge tone="disabled">Accepter</Badge>
-                  <Badge tone="disabled">Rejeter avec motif</Badge>
-                  <Badge tone="disabled">Contester avec motif</Badge>
-                </Cluster>
+                <>
+                  <Cluster>
+                    <Badge tone="disabled">Accepter</Badge>
+                    <Badge tone="disabled">Rejeter avec motif</Badge>
+                    <Badge tone="disabled">Contester avec motif</Badge>
+                  </Cluster>
+                  <Notice tone="info" title="Lecture seule">
+                    {isFinal
+                      ? "Ce lead est cloture: aucune action courtier n'est plus possible."
+                      : tenantReadOnly
+                        ? TENANT_SUSPENDED_MESSAGE
+                        : "Votre role ne permet pas d'agir sur ce lead. Les actions restent visibles en lecture seule."}
+                  </Notice>
+                </>
               )}
               <DescriptionList
                 items={[

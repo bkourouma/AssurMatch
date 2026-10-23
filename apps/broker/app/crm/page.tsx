@@ -269,6 +269,7 @@ export default async function BrokerCrmPage({ searchParams }: { searchParams: Pr
               { term: "Decision", value: <Badge tone="warning">validation humaine obligatoire</Badge> }
             ]}
           />
+          <p className="bo-ref">enabled: {String(aiAssistance.data.enabled)} · modelCall: {String(aiAssistance.data.modelCall)}</p>
           <p className={styles.muted}>{aiAssistance.data.message}</p>
           {aiOptOut.status === "success" ? (
             <TenantWriteGuard readOnly={isTenantReadOnly(session.profile)}>

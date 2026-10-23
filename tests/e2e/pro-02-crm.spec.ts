@@ -185,9 +185,9 @@ interface DashboardSnapshot {
 }
 
 async function kpiValue(page: Page, label: string): Promise<number> {
-  const kpi = page.locator("section[aria-label='Indicateurs CRM'] article.bo-kpi").filter({ has: page.locator(".bo-kpi__label", { hasText: labelRx(label) }) });
+  const kpi = page.locator("section[aria-label='Indicateurs CRM'] li.bo-stats__cell").filter({ has: page.locator(".bo-stats__label", { hasText: labelRx(label) }) });
   await expect(kpi, `KPI ${label}`).toHaveCount(1);
-  return Number.parseInt((await kpi.locator(".bo-kpi__value").innerText()).replace(/\D/gu, ""), 10);
+  return Number.parseInt((await kpi.locator(".bo-stats__value").innerText()).replace(/\D/gu, ""), 10);
 }
 
 async function readDashboard(page: Page, account: BackOfficeAccount): Promise<DashboardSnapshot> {

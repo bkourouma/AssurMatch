@@ -245,8 +245,7 @@ export default async function BrokerEnterprisePage({ searchParams }: { searchPar
         </TenantWriteGuard>
       </Card>
 
-      <section aria-label="Engagement de reactivite (SLA)" className="bo-stack">
-        <h2 className="bo-section-title">Engagement de reactivite (SLA)</h2>
+      <Card title="Engagement de reactivite (SLA)">
         {sla.status === "success" ? (
           <>
             <StatStrip
@@ -291,7 +290,7 @@ export default async function BrokerEnterprisePage({ searchParams }: { searchPar
         ) : (
           <Notice tone="warning">SLA indisponible: {sla.error ?? "erreur inconnue"}.</Notice>
         )}
-      </section>
+      </Card>
 
       <Card
         title="Charte du portail courtier"

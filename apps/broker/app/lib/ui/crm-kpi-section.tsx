@@ -17,7 +17,7 @@ export function CrmKpiSection({ data }: { data: BrokerDashboardData }) {
   return (
     <>
       <section aria-label="Indicateurs de performance commerciale">
-        <StatStrip items={cards.map((card) => ({ label: card.label, value: card.value, helper: card.helper, tone: card.tone }))} label="Indicateurs de performance commerciale" />
+        <StatStrip items={cards.map((card) => ({ label: card.label, value: card.value, helper: card.helper, tone: card.tone }))} />
         {hasCost ? <Notice tone="info">{LEAD_COST_NOTICE}</Notice> : null}
       </section>
 

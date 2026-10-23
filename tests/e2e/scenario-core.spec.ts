@@ -220,7 +220,7 @@ test("SC-02b licence, preuve d'agrément, couverture, contrat, invitation du pro
 
   // Accreditation proof attached to the draft licence declared in the application.
   const license = card(page, /^Licence CI-AGR-/u);
-  const licenseNumber = (await license.locator("h2").first().innerText()).replace(/^Licence\s+/u, "").trim();
+  const licenseNumber = ((await license.locator("h2").first().textContent()) ?? "").replace(/^Licence\s+/u, "").trim();
   await uploadPartnerDocument(page, "license", pdfFile("agrement.pdf", `Agrement ${licenseNumber}`), licenseNumber);
   await reviewDocument(page, "agrement.pdf", "Accepter");
 

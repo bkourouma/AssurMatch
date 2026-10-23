@@ -362,10 +362,9 @@ export default async function PartnerDetailPage({ params, searchParams }: Partne
       <div id="licences">
         <Card title="Licences" description="Statut effectif : une licence valide dont la date est passée est affichée expirée. Validation, suspension et révocation : conformité uniquement.">
           {partner.licenses.length === 0 ? <StateMessage>Aucune licence enregistrée.{editable ? " Enregistrez-la avec le formulaire ci-dessous." : ""}</StateMessage> : null}
-          <ul className="bo-list" aria-label="Licences du courtier">
+          <div className="bo-stack" aria-label="Licences du courtier">
           {partner.licenses.map((license: AdminPartnerLicenseData) => (
-            <li key={license.id} className="bo-stack">
-              <h3 className="bo-section-title">{`Licence ${license.licenseNumber}`}</h3>
+            <Card key={license.id} muted title={`Licence ${license.licenseNumber}`}>
               <DescriptionList
                 columns={2}
                 items={[
@@ -396,9 +395,9 @@ export default async function PartnerDetailPage({ params, searchParams }: Partne
                   ))}
                 </ol>
               ) : null}
-            </li>
+            </Card>
           ))}
-          </ul>
+          </div>
         </Card>
         {editable ? <CreateLicenseForm partnerId={partner.id} countries={countryChoices} products={productChoices} /> : null}
       </div>
