@@ -3,6 +3,8 @@ import { resolveEmailRuntimeConfig, validateEmailRuntimeEnvironment } from "../m
 import { validateDocumentEnvironment } from "../modules/quote-documents/quote-documents.config";
 import { validateAiEnvironment } from "../modules/ai/core/ai-provider.config";
 import { trustedProxyHops } from "../modules/common/http/trusted-proxy";
+// Lot 8 (spec 075 FR-A3): PII encryption keys, mandatory with NODE_ENV=production or APP_ENV=production.
+import { validatePiiEnvironment } from "../modules/common/security/pii-key-ring";
 
 export interface AppConfig {
   appEnv: "local" | "test" | "runtime-smoke" | "staging" | "preproduction" | "production";
@@ -102,6 +104,8 @@ export function validateRuntimeEnvironment(env: Record<string, string | undefine
   validateDocumentEnvironment(env);
   validateAiEnvironment(env);
   trustedProxyHops(env);
+  // Lot 8: refuses to start without valid PII keys in production-like runtimes (never echoes a value).
+  validatePiiEnvironment(env);
 }
 
 export class ConfigModule {

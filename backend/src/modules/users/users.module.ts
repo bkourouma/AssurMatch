@@ -45,7 +45,7 @@ export class UsersService {
       createdAt: now,
       updatedAt: now
     });
-    this.audit.write({
+    await this.audit.writeAsync({
       actor,
       action: AuthAuditActions.userCreated,
       targetType: "User",
@@ -60,7 +60,7 @@ export class UsersService {
     const user = await this.require(userId);
     user.roles = roles;
     const updated = await this.repository.update(user);
-    this.audit.write({
+    await this.audit.writeAsync({
       actor,
       action: AuthAuditActions.userRoleChanged,
       targetType: "User",

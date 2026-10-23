@@ -63,10 +63,15 @@ export interface LeadDocumentRequestRecord {
   cancelledAt?: Date | undefined;
   cancelledById?: string | undefined;
   cancelReason?: DocumentRequestCancelReason | undefined;
+  /** Spec 067: set when the single J+3 reminder to the visitor was queued; never reset. */
+  reminderQueuedAt?: Date | undefined;
   anonymizedAt?: Date | undefined;
   createdAt: Date;
   updatedAt: Date;
 }
+
+/** Spec 067: what the reminder needs to know about an open request (no label, no note). */
+export type DocumentReminderCandidate = Pick<LeadDocumentRequestRecord, "id" | "quoteRequestId" | "leadAssignmentId" | "partnerTenantId" | "createdAt">;
 
 /** The only fields a document request may change: `open -> fulfilled` or `open -> cancelled`. */
 export type DocumentRequestTransition =
@@ -97,6 +102,10 @@ export interface LeadMessagingRepository extends RuntimeRepository {
   listDocumentRequestsForAssignment(leadAssignmentId: string): Promise<LeadDocumentRequestRecord[]>;
   listDocumentRequestsForQuote(quoteRequestId: string): Promise<LeadDocumentRequestRecord[]>;
   anonymizeDocumentRequestsForAssignments(leadAssignmentIds: readonly string[], marker: string, now: Date): Promise<void>;
+  /** Spec 067: `open` requests created at or before `cutoff`, not anonymized and never reminded. Oldest first. */
+  listOpenForReminder(cutoff: Date): Promise<DocumentReminderCandidate[]>;
+  /** Spec 067: marks the single reminder as queued (only rows that were never marked); returns how many changed. */
+  markReminderQueued(ids: string[], at: Date): Promise<number>;
 }
 
 function byCreation<T extends { createdAt: Date; id: string }>(left: T, right: T): number {
@@ -217,6 +226,23 @@ export class MemoryLeadMessagingRepository implements LeadMessagingRepository {
       delete request.note;
       request.anonymizedAt = now;
     }
+  }
+
+  async listOpenForReminder(cutoff: Date): Promise<DocumentReminderCandidate[]> {
+    return this.requests
+      .filter((request) => request.status === "open" && !request.reminderQueuedAt && !request.anonymizedAt && request.createdAt.getTime() <= cutoff.getTime())
+      .sort(byCreation)
+      .map(({ id, quoteRequestId, leadAssignmentId, partnerTenantId, createdAt }) => ({ id, quoteRequestId, leadAssignmentId, partnerTenantId, createdAt }));
+  }
+
+  async markReminderQueued(ids: string[], at: Date): Promise<number> {
+    let marked = 0;
+    for (const request of this.requests) {
+      if (!ids.includes(request.id) || request.reminderQueuedAt) continue;
+      request.reminderQueuedAt = at;
+      marked += 1;
+    }
+    return marked;
   }
 }
 
@@ -341,6 +367,21 @@ export class PrismaLeadMessagingRepository implements LeadMessagingRepository {
   async anonymizeDocumentRequestsForAssignments(leadAssignmentIds: readonly string[], marker: string, now: Date): Promise<void> {
     if (leadAssignmentIds.length === 0) return;
     await this.requestsTable().updateMany({ where: { leadAssignmentId: { in: [...leadAssignmentIds] } }, data: { label: marker, note: null, anonymizedAt: now } });
+  }
+
+  async listOpenForReminder(cutoff: Date): Promise<DocumentReminderCandidate[]> {
+    const rows = await this.requestsTable().findMany({
+      where: { status: "open", reminderQueuedAt: null, anonymizedAt: null, createdAt: { lte: cutoff } },
+      select: { id: true, quoteRequestId: true, leadAssignmentId: true, partnerTenantId: true, createdAt: true },
+      orderBy: ORDER
+    });
+    return rows as DocumentReminderCandidate[];
+  }
+
+  async markReminderQueued(ids: string[], at: Date): Promise<number> {
+    if (ids.length === 0) return 0;
+    const result = await this.requestsTable().updateMany({ where: { id: { in: [...ids] }, reminderQueuedAt: null }, data: { reminderQueuedAt: at } });
+    return result.count;
   }
 
   private async attachmentRows(messageIds: readonly string[]): Promise<LeadMessageAttachmentRecord[]> {

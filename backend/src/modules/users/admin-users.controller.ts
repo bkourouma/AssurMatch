@@ -70,7 +70,7 @@ export class AdminUsersController {
   async create(actor: ActorContext, input: AdminUserCreateRequest): Promise<AdminUserCreateResponse> {
     const parsed = adminUserCreateRequestSchema.parse(input);
     if (!this.canCreate(actor, parsed.roles, parsed.scopes.countryIds, parsed.partnerTenantId ?? undefined)) {
-      this.audit.write({ actor, action: AuthAuditActions.userCreated, targetType: "User", targetId: "refused", result: "refused", reason: parsed.reason, context: { email: parsed.email, roles: parsed.roles } });
+      await this.audit.writeAsync({ actor, action: AuthAuditActions.userCreated, targetType: "User", targetId: "refused", result: "refused", reason: parsed.reason, context: { email: parsed.email, roles: parsed.roles } });
       throw new Error("RBAC denied");
     }
     await this.assertPartnerConsistency(actor, parsed.roles, parsed.partnerTenantId ?? undefined, parsed.email, parsed.reason);
@@ -108,7 +108,7 @@ export class AdminUsersController {
       const delivery = await this.notifications.deliverActivation(user, issued.token, issued.expiresAt);
       return { user, ...delivery, expiresAt: issued.expiresAt };
     } catch (error) {
-      this.audit.write({ actor, action: AuthAuditActions.userCreated, targetType: "User", targetId: "refused", result: "refused", reason, context: { email: input.email } });
+      await this.audit.writeAsync({ actor, action: AuthAuditActions.userCreated, targetType: "User", targetId: "refused", result: "refused", reason, context: { email: input.email } });
       throw error;
     }
   }
@@ -119,7 +119,7 @@ export class AdminUsersController {
    */
   private async assertPartnerConsistency(actor: ActorContext, roles: AssurMatchRole[], partnerTenantId: string | undefined, email: string, reason: string): Promise<void> {
     const refuse = (refusal: string, code: string, message: string): never => {
-      this.audit.write({ actor, action: AuthAuditActions.userCreated, targetType: "User", targetId: "refused", result: "refused", reason, context: { email, roles, refusal, ...(partnerTenantId ? { partnerTenantId } : {}) } });
+      this.audit.write(/* Lot 8: sync closure, stays on the outbox */ { actor, action: AuthAuditActions.userCreated, targetType: "User", targetId: "refused", result: "refused", reason, context: { email, roles, refusal, ...(partnerTenantId ? { partnerTenantId } : {}) } });
       throw partnerUnprocessable(code, message);
     };
     const brokerRoles = roles.filter(isBrokerRole);
@@ -136,7 +136,7 @@ export class AdminUsersController {
     const parsed = adminUserUpdateRequestSchema.parse(input);
     const existing = await this.users.require(userId);
     if (!this.canUpdate(actor, existing, parsed.scopes?.countryIds)) {
-      this.audit.write({ actor, action: AuthAuditActions.userUpdated, targetType: "User", targetId: userId, result: "refused", reason: parsed.reason, context: { email: existing.email } });
+      await this.audit.writeAsync({ actor, action: AuthAuditActions.userUpdated, targetType: "User", targetId: userId, result: "refused", reason: parsed.reason, context: { email: existing.email } });
       throw new Error("RBAC denied");
     }
     const updated = await this.users.update({
@@ -145,7 +145,7 @@ export class AdminUsersController {
       ...(parsed.phone ? { phone: parsed.phone } : {}),
       ...(parsed.scopes ? { countryScopes: parsed.scopes.countryIds, productScopes: parsed.scopes.productIds } : {})
     });
-    this.audit.write({ actor, action: AuthAuditActions.userUpdated, targetType: "User", targetId: updated.id, result: "success", reason: parsed.reason, context: { email: updated.email } });
+    await this.audit.writeAsync({ actor, action: AuthAuditActions.userUpdated, targetType: "User", targetId: updated.id, result: "success", reason: parsed.reason, context: { email: updated.email } });
     return updated;
   }
 
@@ -156,7 +156,7 @@ export class AdminUsersController {
     const issued = this.passwordReset.issueToken();
     await this.users.setPasswordResetToken(user.id, issued.tokenHash, issued.expiresAt);
     const delivery = await this.notifications.deliverPasswordReset(user, issued.token, issued.expiresAt);
-    this.audit.write({
+    await this.audit.writeAsync({
       actor,
       action: AuthAuditActions.userPasswordResetIssued,
       targetType: "User",
@@ -172,7 +172,7 @@ export class AdminUsersController {
     const reason = this.parseReason(input);
     this.assertLifecycleActor(actor);
     const user = await this.users.suspend(userId);
-    this.audit.write({ actor, action: AuthAuditActions.userSuspended, targetType: "User", targetId: user.id, result: "success", reason, context: { email: user.email } });
+    await this.audit.writeAsync({ actor, action: AuthAuditActions.userSuspended, targetType: "User", targetId: user.id, result: "success", reason, context: { email: user.email } });
     return user;
   }
 
@@ -180,7 +180,7 @@ export class AdminUsersController {
     const reason = this.parseReason(input);
     this.assertLifecycleActor(actor);
     const user = await this.users.unsuspend(userId);
-    this.audit.write({ actor, action: AuthAuditActions.userUnsuspended, targetType: "User", targetId: user.id, result: "success", reason, context: { email: user.email } });
+    await this.audit.writeAsync({ actor, action: AuthAuditActions.userUnsuspended, targetType: "User", targetId: user.id, result: "success", reason, context: { email: user.email } });
     return user;
   }
 
@@ -188,7 +188,7 @@ export class AdminUsersController {
     const reason = this.parseReason(input);
     this.assertLifecycleActor(actor);
     const user = await this.users.lock(userId, reason);
-    this.audit.write({ actor, action: AuthAuditActions.userLocked, targetType: "User", targetId: user.id, result: "success", reason, context: { email: user.email } });
+    await this.audit.writeAsync({ actor, action: AuthAuditActions.userLocked, targetType: "User", targetId: user.id, result: "success", reason, context: { email: user.email } });
     return user;
   }
 
@@ -196,7 +196,7 @@ export class AdminUsersController {
     const reason = this.parseReason(input);
     this.assertLifecycleActor(actor);
     const user = await this.users.unlock(userId);
-    this.audit.write({ actor, action: AuthAuditActions.userUnlocked, targetType: "User", targetId: user.id, result: "success", reason, context: { email: user.email } });
+    await this.audit.writeAsync({ actor, action: AuthAuditActions.userUnlocked, targetType: "User", targetId: user.id, result: "success", reason, context: { email: user.email } });
     return user;
   }
 
@@ -204,7 +204,7 @@ export class AdminUsersController {
     const reason = this.parseReason(input);
     this.assertLifecycleActor(actor);
     const user = await this.users.resetMfa(userId);
-    this.audit.write({ actor, action: AuthAuditActions.userMfaReset, targetType: "User", targetId: user.id, result: "success", reason, context: { email: user.email } });
+    await this.audit.writeAsync({ actor, action: AuthAuditActions.userMfaReset, targetType: "User", targetId: user.id, result: "success", reason, context: { email: user.email } });
     return user;
   }
 
@@ -212,7 +212,7 @@ export class AdminUsersController {
     const reason = this.parseReason(input);
     if (!actor.roles.includes("super_admin")) throw new Error("RBAC denied");
     const user = await this.users.softDelete(userId);
-    this.audit.write({ actor, action: AuthAuditActions.userDeleted, targetType: "User", targetId: user.id, result: "success", reason, context: { tombstoneEmail: user.email } });
+    await this.audit.writeAsync({ actor, action: AuthAuditActions.userDeleted, targetType: "User", targetId: user.id, result: "success", reason, context: { tombstoneEmail: user.email } });
     return user;
   }
 

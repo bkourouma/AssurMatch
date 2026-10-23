@@ -13,6 +13,8 @@ import {
 } from "./demo-offer-catalog";
 import { withoutUndefined } from "../lib/without-undefined";
 import { consentContentHash } from "../../packages/shared/contracts/consent-content";
+import { ACTIVATION_ATTESTABLE_CONTROLS } from "../../packages/shared/contracts/activation-checklist.contracts";
+import { DEFAULT_SCORING_WEIGHTS } from "../../packages/shared/contracts/scoring-rule.contracts";
 import type { QuoteFormFieldDto } from "../../packages/shared/contracts/quote.contracts";
 import { withGenericFields } from "../../backend/src/modules/quote-forms/quote-form-definition.service";
 import { resolveDocumentStorage } from "../../backend/src/modules/quote-documents/quote-documents.config";
@@ -117,6 +119,10 @@ const SAFE_DISABLED_FLAGS = [
   "claims_enabled",
   "insurer_api_enabled",
   "whatsapp_enabled",
+  "sms_enabled",
+  "crm_connector_enabled",
+  "partner_api_enabled",
+  "partner_webhooks_enabled",
   "sponsored_offers_enabled",
   "multi_broker_routing_enabled",
   "ai_lead_scoring_enabled",
@@ -186,6 +192,7 @@ async function main(): Promise<void> {
     await seedPartnerOnboardingEvidence(prisma, partners, licenses);
     const users = await seedBrokerUsers(prisma, partners, passwordHash);
     const adminUsers = await seedAdminUsers(prisma, passwordHash);
+    await seedActivationRequirements(prisma, countries.ci, [products.auto, products.voyage], adminUsers);
     await seedBillingPlanPrices(prisma, countries.ci);
     await seedOffers(prisma, partners, countries.ci, products);
     await seedStarterLeads(prisma, partners.starter, countries.ci, products);
@@ -207,6 +214,75 @@ async function main(): Promise<void> {
     }, null, 2));
   } finally {
     await prisma.$disconnect();
+  }
+}
+
+const DEMO_LEGAL_DISCLAIMERS = {
+  fr: "Les informations présentées sont indicatives et ne constituent pas un contrat d'assurance.",
+  en: "The information shown is indicative and does not constitute an insurance contract."
+} as const;
+
+const DEMO_ATTESTATION_NOTES: Record<string, string> = {
+  country_deactivation_plan: "Plan de désactivation local documenté : couper country_public_enabled puis suspendre le pays (démonstration locale)."
+};
+
+/**
+ * Spec 070 (PRD 35/36): the blocking activation controls added by the catalog lot. The demo opens CI and
+ * its products directly in the database, so it also seeds what the checklist now asks for: an active
+ * routing rule for the country, an active scoring rule and a FR + EN legal notice per product, and the
+ * manual attestations (placed by the demo compliance admin). Idempotent: existing rules, notices and
+ * attestations are left alone.
+ */
+async function seedActivationRequirements(prisma: PrismaClient, country: CountryRecord, products: ProductRecord[], adminUsers: AdminDemoUserRecord[]): Promise<void> {
+  const attester = adminUsers.find((user) => user.role === "compliance_admin") ?? adminUsers.find((user) => user.role === "super_admin");
+  if (!attester) throw new Error("A demo compliance or super admin is required to seed the activation attestations");
+
+  const activeRouting = await prisma.routingRule.count({ where: { countryId: country.id, status: "active" } });
+  if (activeRouting === 0) {
+    await prisma.routingRule.create({
+      data: { countryId: country.id, productId: null, mode: "first_eligible", status: "active", description: "Règle de routage locale de démonstration", createdById: DEMO_ACTOR_ID }
+    });
+  }
+
+  for (const product of products) {
+    const activeScoring = await prisma.scoringRule.count({
+      where: { productId: product.id, status: "active", OR: [{ countryId: null }, { countryId: country.id }] }
+    });
+    if (activeScoring === 0) {
+      await prisma.scoringRule.create({
+        data: { countryId: country.id, productId: product.id, weights: { ...DEFAULT_SCORING_WEIGHTS }, status: "active", description: "Pondération locale de démonstration", createdById: DEMO_ACTOR_ID }
+      });
+    }
+    const stored = await prisma.product.findUniqueOrThrow({ where: { id: product.id } });
+    const notice = (stored.legalNotice ?? {}) as Record<string, { disclaimer?: string } | undefined>;
+    const legalNotice = {
+      ...notice,
+      fr: notice.fr?.disclaimer?.trim() ? notice.fr : { ...notice.fr, disclaimer: DEMO_LEGAL_DISCLAIMERS.fr },
+      en: notice.en?.disclaimer?.trim() ? notice.en : { ...notice.en, disclaimer: DEMO_LEGAL_DISCLAIMERS.en }
+    };
+    const needsDocumentKinds = stored.requiresDocuments && stored.requiredDocumentKinds.length === 0;
+    await prisma.product.update({
+      where: { id: product.id },
+      data: { legalNotice, ...(needsDocumentKinds ? { requiredDocumentKinds: ["identity"] } : {}) }
+    });
+    await seedAttestations(prisma, "product", product.id, attester.id);
+  }
+  await seedAttestations(prisma, "country", country.id, attester.id);
+}
+
+async function seedAttestations(prisma: PrismaClient, scopeType: "country" | "product", scopeId: string, attestedById: string): Promise<void> {
+  for (const controlKey of Object.keys(ACTIVATION_ATTESTABLE_CONTROLS[scopeType])) {
+    await prisma.activationAttestation.upsert({
+      where: { scopeType_scopeId_controlKey: { scopeType, scopeId, controlKey } },
+      create: {
+        scopeType,
+        scopeId,
+        controlKey,
+        note: DEMO_ATTESTATION_NOTES[controlKey] ?? "Vérifié sur l'environnement local de démonstration (données synthétiques).",
+        attestedById
+      },
+      update: {}
+    });
   }
 }
 

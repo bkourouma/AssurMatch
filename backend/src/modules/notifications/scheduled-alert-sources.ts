@@ -1,9 +1,29 @@
+import { CONTACTED_STATUSES } from "../dashboards/broker-dashboard-kpis";
 import type { ScheduledAlertSources } from "./scheduled-alerts.service";
 
 /** Quote routing outcomes in which no broker received the request. */
 const UNROUTED_STATUSES = new Set(["blocked", "no_broker_available", "manual_review_required", "pending_manual_assignment"]);
 
-interface PartnerLike { id: string; status: string; quotaMonthlyLeads?: number | undefined }
+interface PartnerLike { id: string; status: string; quotaMonthlyLeads?: number | undefined; plan?: string | undefined; slaTargetMinutes?: number | null | undefined }
+interface AssignmentLike {
+  id: string;
+  partnerTenantId: string;
+  assignedAt: Date | string;
+  disputedAt?: Date | string | undefined;
+  status?: string | undefined;
+  publicReference?: string | undefined;
+  productKey?: string | undefined;
+  countryCode?: string | undefined;
+  acceptedAt?: Date | string | undefined;
+  rejectedAt?: Date | string | undefined;
+  firstVisibleReplyAt?: Date | string | null | undefined;
+  crmStatus?: string | undefined;
+}
+
+/** Same default as the enterprise module (`DEFAULT_SLA_MINUTES`). */
+const DEFAULT_FIRST_ACTION_MINUTES = 240;
+/** Initial assignment states: the broker did nothing yet (the lead may have been displayed, `seen`). */
+const INITIAL_STATUSES = new Set(["assigned", "broker_notified", "seen", "received"]);
 interface LicenseLike { id: string; partnerTenantId: string; countryId: string; status: string; licenseNumber?: string | undefined; expirationDate: Date | string }
 interface OfferLike { id: string; partnerTenantId?: string | null | undefined; countryId: string; status: string; publishedVersionId?: string | null | undefined }
 interface VersionLike { id: string; status: string; name: string; validUntil: Date | string }
@@ -27,10 +47,15 @@ export interface RuntimeScheduledAlertSourcesDeps {
     remindersDueBetween(from: Date, to: Date): Promise<Array<{ id: string; leadAssignmentId: string; remindAt: string; partnerTenantId?: string | undefined }>>;
   };
   assignments: {
-    list(): Promise<Array<{ id: string; partnerTenantId: string; assignedAt: Date | string; disputedAt?: Date | string | undefined; status?: string }>>;
+    list(): Promise<AssignmentLike[]>;
     monthlyCountForPartner(partnerTenantId: string, now: Date): Promise<number>;
   };
   countries: { listAdmin(): Promise<Array<{ id: string; isoCode: string; status: string }>> };
+  /**
+   * Optional: the broker's own first-action targets (`PartnerBranding.firstActionTargetMinutes`, e.g.
+   * `enterprise.repository.listBranding()`). Without it only the contractual target and the default apply.
+   */
+  branding?: { listBranding(): Promise<Array<{ partnerTenantId: string; firstActionTargetMinutes: number }>> } | undefined;
   quotes: { list(): Promise<Array<{ createdAt: Date | string; routingStatus?: string | undefined; status?: string | undefined }>> };
 }
 
@@ -135,6 +160,67 @@ export class RuntimeScheduledAlertSources implements ScheduledAlertSources {
       stat.assignments += 1;
       if (assignment.disputedAt || assignment.status === "disputed") stat.disputed += 1;
       stats.set(assignment.partnerTenantId, stat);
+    }
+    return [...stats.values()];
+  }
+
+  /**
+   * Untreated leads with their resolved first-action target. Same rule as `effectiveSlaTarget`
+   * (enterprise module): the contractual target caps the broker's own target, default 240 minutes.
+   */
+  async unprocessedLeads(_now: Date) {
+    // Only `active` partners receive real leads (`active_test` is never routed), as in `weeklyBrokerStats` and the quotas.
+    const partners = new Map((await this.deps.partners.list()).filter((partner) => partner.status === "active").map((partner) => [partner.id, partner]));
+    const brokerTargets = new Map((await this.deps.branding?.listBranding() ?? []).map((entry) => [entry.partnerTenantId, entry.firstActionTargetMinutes]));
+    const leads = [];
+    for (const assignment of await this.deps.assignments.list()) {
+      const partner = partners.get(assignment.partnerTenantId);
+      if (!partner || !assignment.publicReference) continue;
+      if (!INITIAL_STATUSES.has(assignment.status ?? "assigned")) continue;
+      if (assignment.firstVisibleReplyAt || assignment.acceptedAt || assignment.rejectedAt || assignment.disputedAt) continue;
+      if (assignment.crmStatus && assignment.crmStatus !== "nouveau") continue;
+      const contractual = partner.slaTargetMinutes ?? undefined;
+      const broker = brokerTargets.get(partner.id);
+      const slaTargetMinutes = contractual === undefined ? (broker ?? DEFAULT_FIRST_ACTION_MINUTES) : broker === undefined ? contractual : Math.min(broker, contractual);
+      leads.push({
+        id: assignment.id,
+        partnerTenantId: partner.id,
+        publicReference: assignment.publicReference,
+        ...(assignment.productKey ? { productKey: assignment.productKey } : {}),
+        ...(assignment.countryCode ? { countryCode: assignment.countryCode } : {}),
+        assignedAt: new Date(assignment.assignedAt),
+        slaTargetMinutes,
+        plan: partner.plan ?? "starter"
+      });
+    }
+    return leads;
+  }
+
+  /** Counters per active partner for the leads assigned since `since`, plus its overdue open CRM tasks. */
+  async weeklyBrokerStats(since: Date) {
+    const stats = new Map<string, { partnerTenantId: string; plan: string; received: number; accepted: number; won: number; lost: number; contactedCount: number; overdueTasks: number }>();
+    for (const partner of await this.deps.partners.list()) {
+      if (partner.status !== "active") continue;
+      stats.set(partner.id, { partnerTenantId: partner.id, plan: partner.plan ?? "starter", received: 0, accepted: 0, won: 0, lost: 0, contactedCount: 0, overdueTasks: 0 });
+    }
+    const assignments = await this.deps.assignments.list();
+    for (const assignment of assignments) {
+      const stat = stats.get(assignment.partnerTenantId);
+      if (!stat || new Date(assignment.assignedAt).getTime() < since.getTime()) continue;
+      stat.received += 1;
+      if (assignment.acceptedAt || assignment.status === "accepted" || assignment.crmStatus === "accepte") stat.accepted += 1;
+      if (assignment.crmStatus === "gagne") stat.won += 1;
+      if (assignment.crmStatus === "perdu") stat.lost += 1;
+      // Same definition as the dashboard KPI (PRD section 20): `contact_tente` does not count as contacted.
+      if (assignment.status === "contacted" || CONTACTED_STATUSES.has(assignment.crmStatus ?? "")) stat.contactedCount += 1;
+    }
+    const now = new Date();
+    const overdue = await this.deps.crm.openTasksDueBetween(new Date(0), now);
+    const owners = await this.ownerByAssignment(overdue);
+    for (const task of overdue) {
+      const tenant = task.partnerTenantId ?? owners.get(task.leadAssignmentId);
+      const stat = tenant ? stats.get(tenant) : undefined;
+      if (stat && task.dueAt && new Date(task.dueAt).getTime() < now.getTime()) stat.overdueTasks += 1;
     }
     return [...stats.values()];
   }

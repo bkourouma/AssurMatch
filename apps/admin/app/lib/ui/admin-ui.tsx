@@ -64,6 +64,8 @@ export const documentScanTones: Record<string, Tone> = {
 export const integrationStatusTones: Record<string, Tone> = {
   active: "success",
   delivered: "success",
+  suspended: "warning",
+  disabled: "neutral",
   pending: "warning",
   retryable: "warning",
   dead_letter: "danger",

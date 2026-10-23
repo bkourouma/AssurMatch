@@ -6,5 +6,6 @@ export const AiAuditActions = {
   read: "ai.interaction.read",
   validated: "ai.interaction.validated",
   quotaExceeded: "ai.quota.exceeded",
-  partnerOptOutChanged: "ai.partner_opt_out.changed"
+  partnerOptOutChanged: "ai.partner_opt_out.changed",
+  offerSummaryRead: "ai.offer_summary.read"
 } as const;

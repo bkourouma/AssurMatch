@@ -27,8 +27,8 @@ export function isTenantReadOnly(profile: Pick<BackOfficeProfile, "tenantReadOnl
  * echoue des que la matrice partagee change.
  */
 export const BROKER_ROLE_PERMISSIONS: Record<string, string[]> = {
-  broker_owner_starter: ["broker_leads:read", "broker_leads:update", "broker_leads:export", "notifications:read", "broker_offers:read", "broker_offers:write", "broker_account:read", "broker_account:write", "broker_team:read", "broker_team:write", "billing:read_own"],
-  broker_owner_pro: ["broker_leads:*", "broker_crm:*", "notifications:read", "broker_offers:read", "broker_offers:write", "broker_account:read", "broker_account:write", "broker_team:read", "broker_team:write", "billing:read_own"],
+  broker_owner_starter: ["broker_leads:read", "broker_leads:update", "broker_leads:export", "notifications:read", "broker_offers:read", "broker_offers:write", "broker_account:read", "broker_account:write", "broker_team:read", "broker_team:write", "billing:read_own", "billing:plan_change_request"],
+  broker_owner_pro: ["broker_leads:*", "broker_crm:*", "notifications:read", "broker_offers:read", "broker_offers:write", "broker_account:read", "broker_account:write", "broker_team:read", "broker_team:write", "billing:read_own", "billing:plan_change_request"],
   broker_manager: ["broker_leads:read", "broker_leads:update", "broker_crm:read", "broker_crm:update", "broker_crm:assign", "broker_crm:export", "notifications:read", "broker_offers:read", "broker_offers:write", "broker_account:read", "broker_account:write", "broker_team:read", "broker_team:write", "billing:read_own"],
   broker_agent: ["broker_leads:read", "broker_leads:update", "broker_crm:read_assigned", "broker_crm:update_assigned", "notifications:read", "broker_offers:read", "broker_account:read", "broker_team:read"],
   broker_read_only: ["broker_leads:read", "broker_crm:read", "broker_offers:read", "broker_account:read", "broker_team:read", "billing:read_own"]

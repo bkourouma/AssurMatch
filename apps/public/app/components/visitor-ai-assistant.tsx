@@ -1,6 +1,6 @@
 "use client";
 
-import { useTranslations } from "next-intl";
+import { useLocale, useTranslations } from "next-intl";
 import { useEffect, useState } from "react";
 import { readVisitorAi, readVisitorAiAvailability, requestVisitorAi, type VisitorAiInteraction } from "../lib/public-api";
 import { AiBox } from "./ui/ai-box";
@@ -10,14 +10,19 @@ import { Icon } from "./ui/icons";
 import { Notice } from "./ui/notice";
 import { Skeleton } from "./ui/skeleton";
 
-type Mode = "product" | "faq" | "summary" | "consistency";
+type Mode = "product" | "faq" | "summary" | "consistency" | "guarantees" | "compare";
 
 const MODE_CONFIG: Record<Mode, { assistType: string; hasInput: boolean }> = {
   product: { assistType: "visitor_product_assistant", hasInput: true },
   faq: { assistType: "visitor_faq", hasInput: true },
   summary: { assistType: "visitor_request_summary", hasInput: false },
-  consistency: { assistType: "visitor_consistency_check", hasInput: false }
+  consistency: { assistType: "visitor_consistency_check", hasInput: false },
+  guarantees: { assistType: "visitor_guarantee_explainer", hasInput: false },
+  compare: { assistType: "visitor_compare_explainer", hasInput: false }
 };
+
+/** Modes that explain published offers: they need a product, and carry a permanent "to be confirmed" line. */
+const OFFER_MODES: readonly Mode[] = ["guarantees", "compare"];
 
 /**
  * Public AI assistance: hidden entirely when the assist type is disabled for the country/product
@@ -27,8 +32,26 @@ const MODE_CONFIG: Record<Mode, { assistType: string; hasInput: boolean }> = {
  * component the function is called "l'assistant de lecture", never "IA", per decision D2 of spec 050.
  * It is never required to move forward: nothing here blocks a quote request.
  */
-export function VisitorAiAssistant({ countryCode, productKey, mode, answers = {} }: { countryCode: string; productKey?: string; mode: Mode; answers?: Record<string, unknown> }) {
+export function VisitorAiAssistant({
+  countryCode,
+  productKey,
+  mode,
+  answers = {},
+  offerId,
+  offerIds
+}: {
+  countryCode: string;
+  productKey?: string;
+  mode: Mode;
+  answers?: Record<string, unknown>;
+  offerId?: string;
+  offerIds?: string[];
+}) {
   const t = useTranslations("VisitorAi");
+  const locale = useLocale();
+  const offerMode = OFFER_MODES.includes(mode);
+  // An offer explainer without its context (country, product, offer(s)) is not shown at all.
+  const contextMissing = offerMode && (!countryCode || !productKey || (mode === "guarantees" && !offerId) || (mode === "compare" && !(offerIds && offerIds.length >= 2 && offerIds.length <= 4)));
   const config = MODE_CONFIG[mode];
   const title = t(`modes.${mode}.title`);
   const buttonLabel = t(`modes.${mode}.button`);
@@ -38,6 +61,7 @@ export function VisitorAiAssistant({ countryCode, productKey, mode, answers = {}
   const [state, setState] = useState<{ status: "idle" | "submitting" | "polling" | "done" | "error"; message?: string; interaction?: VisitorAiInteraction }>({ status: "idle" });
 
   useEffect(() => {
+    if (contextMissing) return;
     let active = true;
     readVisitorAiAvailability(countryCode, productKey).then((availability) => {
       if (active) setAvailable(availability.some((entry) => entry.assistType === config.assistType && entry.enabled));
@@ -45,7 +69,7 @@ export function VisitorAiAssistant({ countryCode, productKey, mode, answers = {}
     return () => {
       active = false;
     };
-  }, [countryCode, productKey, config.assistType]);
+  }, [countryCode, productKey, config.assistType, contextMissing]);
 
   useEffect(() => {
     if (state.status !== "polling" || !state.interaction) return;
@@ -65,11 +89,14 @@ export function VisitorAiAssistant({ countryCode, productKey, mode, answers = {}
     return () => clearInterval(timer);
   }, [state.status, state.interaction, t]);
 
+  if (contextMissing) return null;
   if (available !== true) return null;
 
   async function submit() {
     setState({ status: "submitting" });
-    const body: Record<string, unknown> = { countryCode, ...(productKey ? { productKey } : {}) };
+    const body: Record<string, unknown> = { countryCode, ...(productKey ? { productKey } : {}), language: locale };
+    if (mode === "guarantees") body.offerId = offerId;
+    if (mode === "compare") body.offerIds = offerIds;
     if (mode === "product") body.need = text;
     if (mode === "faq") body.question = text;
     if (mode === "summary" || mode === "consistency") body.answers = answers;
@@ -88,6 +115,11 @@ export function VisitorAiAssistant({ countryCode, productKey, mode, answers = {}
   return (
     <div data-visitor-ai={mode}>
       <AiBox generatedLabel={t("disclosureLabel")} disclaimer={t("disclaimer")} title={title} ariaLabel={title}>
+        {offerMode ? (
+          <p className="am-field__hint" data-visitor-ai-notice="permanent">
+            {mode === "guarantees" ? t("modes.guarantees.aiNotice") : t("modes.compare.aiNotice")}
+          </p>
+        ) : null}
         <p className="am-field__hint">{t("note", { label: interaction?.assistanceLabel ?? t("defaultLabel") })}</p>
         <p className="am-field__hint">{t("optional")}</p>
         {config.hasInput ? (

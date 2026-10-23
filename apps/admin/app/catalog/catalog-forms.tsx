@@ -1,7 +1,8 @@
 "use client";
 
-import { useActionState, useId } from "react";
+import { useActionState, useId, useState } from "react";
 import type { AdminCountryData, AdminProductData, AdminRegulatoryRegimeData } from "../lib/admin-api";
+import type { AdminProductCategoryData } from "../lib/lot4-catalog-api";
 import {
   changeCountryStatusAction,
   changeProductStatusAction,
@@ -18,7 +19,18 @@ import {
   type CatalogActionState
 } from "../lib/catalog-actions";
 import { allowedCountryStatusTransitions } from "../../../../packages/shared/contracts/country-status-transitions";
-import { COUNTRY_STATUS_OPTIONS, LANGUAGE_OPTIONS, PRODUCT_STATUS_OPTIONS, REGULATORY_FAMILY_OPTIONS } from "../lib/catalog-messages";
+import {
+  CATEGORY_STATUS_OPTIONS,
+  COUNTRY_STATUS_OPTIONS,
+  DISCLAIMER_MAX_LENGTH,
+  DOCUMENT_KIND_LABELS,
+  LANGUAGE_OPTIONS,
+  LEGAL_TEXT_MAX_LENGTH,
+  PRODUCT_STATUS_OPTIONS,
+  REGULATORY_FAMILY_OPTIONS
+} from "../lib/catalog-messages";
+import { createProductCategoryAction, updateProductCategoryAction } from "../lib/lot4-catalog-actions";
+import { quoteDocumentKinds } from "../../../../packages/shared/contracts/quote-document.contracts";
 import { CatalogActionResult } from "../lib/ui/catalog-action-result";
 import {
   Button,
@@ -306,7 +318,26 @@ const sensitivityChoices = [
   { value: "highly_sensitive", label: "highly_sensitive" }
 ];
 
-function ProductFields({ product, base }: { product?: AdminProductData; base: string }) {
+const documentKindChoices = quoteDocumentKinds.map((kind) => ({ value: kind, label: DOCUMENT_KIND_LABELS[kind] ?? kind }));
+
+/** Textarea with a live character counter against the contract limit (the API stays the authority). */
+function CountedTextarea({ id, name, label, maxLength, defaultValue }: { id: string; name: string; label: string; maxLength: number; defaultValue: string }) {
+  const [length, setLength] = useState(defaultValue.length);
+  return (
+    <Field id={id} label={label} hint={`${length} / ${maxLength} caractères`}>
+      <Textarea
+        {...fieldControlProps(id, { hint: "x" })}
+        name={name}
+        rows={4}
+        maxLength={maxLength}
+        defaultValue={defaultValue}
+        onChange={(event) => setLength(event.currentTarget.value.length)}
+      />
+    </Field>
+  );
+}
+
+function ProductFields({ product, base, categories }: { product?: AdminProductData; base: string; categories: SelectChoice[] }) {
   return (
     <>
       <Field id={`${base}-name`} label="Nom" required>
@@ -318,7 +349,26 @@ function ProductFields({ product, base }: { product?: AdminProductData; base: st
       <Field id={`${base}-sensitivity`} label="Sensibilité" required>
         <Select {...fieldControlProps(`${base}-sensitivity`, { required: true })} name="sensitivity" options={sensitivityChoices} defaultValue={product?.sensitivity ?? "standard"} />
       </Field>
+      <Field id={`${base}-category`} label="Catégorie" hint="Seules les catégories actives sont proposées. Une catégorie déjà rattachée se remplace, elle ne se retire pas.">
+        <Select {...fieldControlProps(`${base}-category`, { hint: "x" })} name="categoryId" defaultValue={product?.categoryId ?? ""}>
+          <option value="">Aucune</option>
+          {categories.map((category) => <option key={category.value} value={category.value}>{category.label}</option>)}
+        </Select>
+      </Field>
       <Checkbox id={`${base}-documents`} name="requiresDocuments" label="Documents requis" defaultChecked={product?.requiresDocuments ?? false} />
+      <CheckboxGroup
+        legend="Types de documents demandés au visiteur"
+        name="requiredDocumentKinds"
+        options={documentKindChoices}
+        defaultValues={product?.requiredDocumentKinds ?? []}
+      />
+      <fieldset className="bo-fieldset" data-product-legal-notice="true">
+        <legend>Textes légaux affichés au visiteur</legend>
+        <CountedTextarea id={`${base}-legal-fr`} name="legalText_fr" label="Texte légal (français)" maxLength={LEGAL_TEXT_MAX_LENGTH} defaultValue={product?.legalNotice?.fr?.legalText ?? ""} />
+        <CountedTextarea id={`${base}-disclaimer-fr`} name="disclaimer_fr" label="Avertissement (français)" maxLength={DISCLAIMER_MAX_LENGTH} defaultValue={product?.legalNotice?.fr?.disclaimer ?? ""} />
+        <CountedTextarea id={`${base}-legal-en`} name="legalText_en" label="Texte légal (anglais)" maxLength={LEGAL_TEXT_MAX_LENGTH} defaultValue={product?.legalNotice?.en?.legalText ?? ""} />
+        <CountedTextarea id={`${base}-disclaimer-en`} name="disclaimer_en" label="Avertissement (anglais)" maxLength={DISCLAIMER_MAX_LENGTH} defaultValue={product?.legalNotice?.en?.disclaimer ?? ""} />
+      </fieldset>
       <Checkbox
         id={`${base}-review`}
         name="requiresManualReview"
@@ -330,7 +380,7 @@ function ProductFields({ product, base }: { product?: AdminProductData; base: st
   );
 }
 
-export function CreateProductForm() {
+export function CreateProductForm({ categories = [] }: { categories?: SelectChoice[] }) {
   const [state, formAction, pending] = useActionState(createProductAction, initialState);
   const base = useId();
   return (
@@ -340,7 +390,7 @@ export function CreateProductForm() {
         <Field id={`${base}-key`} label="Clé technique" required hint="Minuscules, par exemple auto ou voyage. Non modifiable ensuite.">
           <Input {...fieldControlProps(`${base}-key`, { required: true, hint: "x" })} name="key" pattern="[a-z0-9_\-]+" />
         </Field>
-        <ProductFields base={base} />
+        <ProductFields base={base} categories={categories} />
         <ReasonField id={`${base}-reason`} />
         <FormActions>
           <Button type="submit" pending={pending} pendingLabel="Création...">Créer le produit</Button>
@@ -350,7 +400,7 @@ export function CreateProductForm() {
   );
 }
 
-export function EditProductForm({ product }: { product: AdminProductData }) {
+export function EditProductForm({ product, categories = [] }: { product: AdminProductData; categories?: SelectChoice[] }) {
   const [state, formAction, pending] = useActionState(updateProductAction, initialState);
   const base = useId();
   return (
@@ -359,7 +409,7 @@ export function EditProductForm({ product }: { product: AdminProductData }) {
         <CatalogActionResult state={state} scope={{ productId: product.id }} />
         <input type="hidden" name="productId" value={product.id} />
         <input type="hidden" name="expectedUpdatedAt" value={product.updatedAt} />
-        <ProductFields product={product} base={base} />
+        <ProductFields product={product} base={base} categories={categories} />
         <ReasonField id={`${base}-reason`} />
         <FormActions>
           <Button type="submit" pending={pending} pendingLabel="Enregistrement...">Enregistrer</Button>
@@ -460,5 +510,66 @@ export function RetireRegimeForm({ regime }: { regime: AdminRegulatoryRegimeData
         </Field>
       </ConfirmDialog>
     </div>
+  );
+}
+
+/* --- Spec 070 PROD-001: product categories --- */
+
+function CategoryFields({ category, base }: { category?: AdminProductCategoryData; base: string }) {
+  return (
+    <>
+      <Field id={`${base}-name`} label="Nom (français)" required>
+        <Input {...fieldControlProps(`${base}-name`, { required: true })} name="name" maxLength={120} defaultValue={category?.name ?? ""} />
+      </Field>
+      <Field id={`${base}-name-en`} label="Nom (anglais)">
+        <Input {...fieldControlProps(`${base}-name-en`)} name="nameEn" maxLength={120} defaultValue={category?.nameEn ?? ""} />
+      </Field>
+      <Field id={`${base}-description`} label="Description">
+        <Textarea {...fieldControlProps(`${base}-description`)} name="description" rows={2} maxLength={1000} defaultValue={category?.description ?? ""} />
+      </Field>
+      <Field id={`${base}-sort`} label="Ordre d'affichage" hint="Entier de 0 à 10000, les plus petits d'abord.">
+        <Input {...fieldControlProps(`${base}-sort`, { hint: "x" })} name="sortOrder" type="number" min={0} max={10000} defaultValue={category?.sortOrder ?? 0} />
+      </Field>
+    </>
+  );
+}
+
+export function CreateCategoryForm() {
+  const [state, formAction, pending] = useActionState(createProductCategoryAction, initialState);
+  const base = useId();
+  return (
+    <Card title="Créer une catégorie" description="Une catégorie est créée en brouillon : activez-la ensuite pour pouvoir la choisir sur un produit.">
+      <Form action={formAction} data-catalog-form="category-create">
+        <CatalogActionResult state={state} />
+        <Field id={`${base}-key`} label="Clé technique" required hint="Minuscules et tirets, par exemple auto-moto. Non modifiable ensuite.">
+          <Input {...fieldControlProps(`${base}-key`, { required: true, hint: "x" })} name="key" pattern="[a-z0-9]+(-[a-z0-9]+)*" minLength={2} maxLength={64} />
+        </Field>
+        <CategoryFields base={base} />
+        <ReasonField id={`${base}-reason`} />
+        <FormActions>
+          <Button type="submit" pending={pending} pendingLabel="Création...">Créer la catégorie</Button>
+        </FormActions>
+      </Form>
+    </Card>
+  );
+}
+
+export function EditCategoryForm({ category }: { category: AdminProductCategoryData }) {
+  const [state, formAction, pending] = useActionState(updateProductCategoryAction, initialState);
+  const base = useId();
+  return (
+    <Form action={formAction} data-catalog-form="category-update">
+      <CatalogActionResult state={state} />
+      <input type="hidden" name="categoryId" value={category.id} />
+      <input type="hidden" name="expectedUpdatedAt" value={category.updatedAt} />
+      <CategoryFields category={category} base={base} />
+      <Field id={`${base}-status`} label="Statut" required hint={category.productCount > 0 ? `Retrait refusé tant que ${category.productCount} produit(s) y sont rattachés.` : "Brouillon, active ou retirée."}>
+        <Select {...fieldControlProps(`${base}-status`, { required: true, hint: "x" })} name="status" options={[...CATEGORY_STATUS_OPTIONS]} defaultValue={category.status} />
+      </Field>
+      <ReasonField id={`${base}-reason`} />
+      <FormActions>
+        <Button type="submit" pending={pending} pendingLabel="Enregistrement...">Enregistrer</Button>
+      </FormActions>
+    </Form>
   );
 }

@@ -70,10 +70,11 @@ test("the four legal pages and their country variants call getLegalPage", () => 
     expect(globalPages).toContain(`const SLUG = "${slug}" as const`);
   }
   // Every one of the eight pages resolves its content through the single legal content seam.
-  expect((globalPages.match(/getLegalPage\(/g) ?? []).length).toBeGreaterThanOrEqual(8);
-  expect((countryPages.match(/getLegalPage\(/g) ?? []).length).toBeGreaterThanOrEqual(8);
+  // Lot 9 (spec 072): the seam is `content/cms-content.ts`, which wraps getLegalPage and merges the published CMS override.
+  expect((globalPages.match(/resolveLegalPage\(/g) ?? []).length).toBeGreaterThanOrEqual(8);
+  expect((countryPages.match(/resolveLegalPageWithOverride\(/g) ?? []).length).toBeGreaterThanOrEqual(8);
   // Country variants also merge in any country-specific override rather than always showing the global page.
-  expect(countryPages).toContain("hasCountryLegalOverride");
+  expect(countryPages).toContain("hasOverride");
 });
 
 test("the contact form is rendered with a no-JavaScript server action", () => {

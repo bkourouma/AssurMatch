@@ -1,3 +1,4 @@
+import type { BillingAddOnKind } from "../../../../packages/shared/contracts/billing-addons.contracts";
 import type { BillingPlanKey, DraftInvoiceLine } from "../../../../packages/shared/contracts/billing.contracts";
 import type { PrismaService } from "../common/prisma/prisma.service";
 import { assertRuntimeRepository, type RuntimeRepository } from "../common/repositories/runtime-repository";
@@ -54,6 +55,54 @@ export interface DraftInvoiceRecord {
   computedAt: Date;
 }
 
+/** Lot 5 (spec 071) H4: optional monthly package price per kind, plan and country; applies only when `enabled`. */
+export interface BillingAddOnPriceRecord {
+  id: string;
+  kind: BillingAddOnKind;
+  plan: BillingPlanKey;
+  countryCode: string;
+  monthlyAmount: number;
+  enabled: boolean;
+  currency: "XOF";
+  reason: string;
+  updatedById: string | null;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+/** Lot 5 (spec 071): add-on assigned to one broker; `createdAt` is the assignment date. */
+export interface PartnerAddOnRecord {
+  id: string;
+  partnerId: string;
+  kind: BillingAddOnKind;
+  status: "active" | "ended";
+  reason: string;
+  assignedById: string | null;
+  endedById: string | null;
+  endedAt: Date | null;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+/** Lot 5 (spec 071): commercial subscription state of a broker (routing controls 9 and 11). */
+export interface PartnerSubscriptionRecord {
+  partnerId: string;
+  status: "active" | "suspended" | "cancelled";
+  contractExpiresAt: Date | null;
+  reason: string;
+  updatedById: string | null;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+/**
+ * An add-on counts for a period when it was assigned before the period ends and was not ended before
+ * the period starts.
+ */
+export function addOnActiveDuring(addOn: Pick<PartnerAddOnRecord, "createdAt" | "endedAt">, period: { from: Date; to: Date }): boolean {
+  return addOn.createdAt.getTime() <= period.to.getTime() && (addOn.endedAt === null || addOn.endedAt.getTime() >= period.from.getTime());
+}
+
 export interface BillingRepository extends RuntimeRepository {
   listPlanPrices(): Promise<BillingPlanPriceRecord[]>;
   upsertPlanPrice(record: BillingPlanPriceRecord): Promise<BillingPlanPriceRecord>;
@@ -62,6 +111,13 @@ export interface BillingRepository extends RuntimeRepository {
   updatePackConsumption(id: string, creditsConsumed: number): Promise<LeadPackRecord>;
   listDrafts(partnerId?: string): Promise<DraftInvoiceRecord[]>;
   upsertDraft(record: DraftInvoiceRecord): Promise<DraftInvoiceRecord>;
+  listAddOnPrices(): Promise<BillingAddOnPriceRecord[]>;
+  upsertAddOnPrice(record: BillingAddOnPriceRecord): Promise<BillingAddOnPriceRecord>;
+  listPartnerAddOns(partnerId?: string): Promise<PartnerAddOnRecord[]>;
+  createPartnerAddOn(record: PartnerAddOnRecord): Promise<PartnerAddOnRecord>;
+  updatePartnerAddOn(id: string, patch: Pick<PartnerAddOnRecord, "status" | "endedAt" | "endedById">): Promise<PartnerAddOnRecord>;
+  getSubscription(partnerId: string): Promise<PartnerSubscriptionRecord | undefined>;
+  upsertSubscription(record: PartnerSubscriptionRecord): Promise<PartnerSubscriptionRecord>;
 }
 
 export class MemoryBillingRepository implements BillingRepository {
@@ -69,6 +125,9 @@ export class MemoryBillingRepository implements BillingRepository {
   private readonly planPrices: BillingPlanPriceRecord[] = [];
   private readonly packs: LeadPackRecord[] = [];
   private readonly drafts: DraftInvoiceRecord[] = [];
+  private readonly addOnPrices: BillingAddOnPriceRecord[] = [];
+  private readonly partnerAddOns: PartnerAddOnRecord[] = [];
+  private readonly subscriptions = new Map<string, PartnerSubscriptionRecord>();
 
   constructor() {
     assertRuntimeRepository(this.mode, "BillingRepository");
@@ -124,6 +183,50 @@ export class MemoryBillingRepository implements BillingRepository {
     this.drafts.push(record);
     return record;
   }
+
+  async listAddOnPrices(): Promise<BillingAddOnPriceRecord[]> {
+    return this.addOnPrices.map((price) => ({ ...price }));
+  }
+
+  async upsertAddOnPrice(record: BillingAddOnPriceRecord): Promise<BillingAddOnPriceRecord> {
+    const index = this.addOnPrices.findIndex((candidate) => candidate.kind === record.kind && candidate.plan === record.plan && candidate.countryCode === record.countryCode);
+    if (index >= 0) {
+      const existing = this.addOnPrices[index] as BillingAddOnPriceRecord;
+      const merged = { ...record, id: existing.id, createdAt: existing.createdAt };
+      this.addOnPrices[index] = merged;
+      return { ...merged };
+    }
+    this.addOnPrices.push({ ...record });
+    return { ...record };
+  }
+
+  async listPartnerAddOns(partnerId?: string): Promise<PartnerAddOnRecord[]> {
+    return this.partnerAddOns.filter((addOn) => !partnerId || addOn.partnerId === partnerId).map((addOn) => ({ ...addOn })).sort((left, right) => left.createdAt.getTime() - right.createdAt.getTime());
+  }
+
+  async createPartnerAddOn(record: PartnerAddOnRecord): Promise<PartnerAddOnRecord> {
+    this.partnerAddOns.push({ ...record });
+    return { ...record };
+  }
+
+  async updatePartnerAddOn(id: string, patch: Pick<PartnerAddOnRecord, "status" | "endedAt" | "endedById">): Promise<PartnerAddOnRecord> {
+    const addOn = this.partnerAddOns.find((candidate) => candidate.id === id);
+    if (!addOn) throw new Error(`Partner add-on ${id} not found`);
+    Object.assign(addOn, patch, { updatedAt: new Date() });
+    return { ...addOn };
+  }
+
+  async getSubscription(partnerId: string): Promise<PartnerSubscriptionRecord | undefined> {
+    const found = this.subscriptions.get(partnerId);
+    return found ? { ...found } : undefined;
+  }
+
+  async upsertSubscription(record: PartnerSubscriptionRecord): Promise<PartnerSubscriptionRecord> {
+    const existing = this.subscriptions.get(record.partnerId);
+    const merged = { ...record, createdAt: existing?.createdAt ?? record.createdAt };
+    this.subscriptions.set(record.partnerId, merged);
+    return { ...merged };
+  }
 }
 
 type Delegate = {
@@ -131,6 +234,7 @@ type Delegate = {
   create(input: unknown): Promise<unknown>;
   update(input: unknown): Promise<unknown>;
   upsert(input: unknown): Promise<unknown>;
+  findUnique(input: unknown): Promise<unknown | null>;
 };
 
 export class PrismaBillingRepository implements BillingRepository {
@@ -202,12 +306,73 @@ export class PrismaBillingRepository implements BillingRepository {
     }));
   }
 
-  private delegate(name: "billingPlanPrice" | "leadPack" | "draftInvoice"): Delegate {
+  async listAddOnPrices(): Promise<BillingAddOnPriceRecord[]> {
+    return (await this.delegate("billingAddOnPrice").findMany({ orderBy: [{ countryCode: "asc" }, { plan: "asc" }, { kind: "asc" }] })) as BillingAddOnPriceRecord[];
+  }
+
+  async upsertAddOnPrice(record: BillingAddOnPriceRecord): Promise<BillingAddOnPriceRecord> {
+    const data = {
+      kind: record.kind,
+      plan: record.plan,
+      countryCode: record.countryCode,
+      monthlyAmount: record.monthlyAmount,
+      enabled: record.enabled,
+      currency: record.currency,
+      reason: record.reason,
+      updatedById: record.updatedById,
+      updatedAt: record.updatedAt
+    };
+    return (await this.delegate("billingAddOnPrice").upsert({
+      where: { kind_plan_countryCode: { kind: record.kind, plan: record.plan, countryCode: record.countryCode } },
+      create: { id: record.id, ...data, createdAt: record.createdAt },
+      update: data
+    })) as BillingAddOnPriceRecord;
+  }
+
+  async listPartnerAddOns(partnerId?: string): Promise<PartnerAddOnRecord[]> {
+    const rows = await this.delegate("partnerAddOn").findMany({ ...(partnerId ? { where: { partnerTenantId: partnerId } } : {}), orderBy: { createdAt: "asc" } });
+    return rows.map((row) => this.toPartnerAddOn(row));
+  }
+
+  async createPartnerAddOn(record: PartnerAddOnRecord): Promise<PartnerAddOnRecord> {
+    const { partnerId, ...rest } = record;
+    return this.toPartnerAddOn(await this.delegate("partnerAddOn").create({ data: { ...rest, partnerTenantId: partnerId } }));
+  }
+
+  async updatePartnerAddOn(id: string, patch: Pick<PartnerAddOnRecord, "status" | "endedAt" | "endedById">): Promise<PartnerAddOnRecord> {
+    return this.toPartnerAddOn(await this.delegate("partnerAddOn").update({ where: { id }, data: { ...patch, updatedAt: new Date() } }));
+  }
+
+  async getSubscription(partnerId: string): Promise<PartnerSubscriptionRecord | undefined> {
+    const row = await this.delegate("partnerSubscription").findUnique({ where: { partnerTenantId: partnerId } });
+    return row ? this.toSubscription(row) : undefined;
+  }
+
+  async upsertSubscription(record: PartnerSubscriptionRecord): Promise<PartnerSubscriptionRecord> {
+    const data = { status: record.status, contractExpiresAt: record.contractExpiresAt, reason: record.reason, updatedById: record.updatedById, updatedAt: record.updatedAt };
+    return this.toSubscription(await this.delegate("partnerSubscription").upsert({
+      where: { partnerTenantId: record.partnerId },
+      create: { partnerTenantId: record.partnerId, ...data, createdAt: record.createdAt },
+      update: data
+    }));
+  }
+
+  private delegate(name: "billingPlanPrice" | "leadPack" | "draftInvoice" | "billingAddOnPrice" | "partnerAddOn" | "partnerSubscription"): Delegate {
     return (this.prisma.requireRuntimeClient() as unknown as Record<string, Delegate>)[name] as Delegate;
   }
 
   private toPlanPrice(row: unknown): BillingPlanPriceRecord {
     return row as BillingPlanPriceRecord;
+  }
+
+  private toPartnerAddOn(row: unknown): PartnerAddOnRecord {
+    const { partnerTenantId, ...rest } = row as PartnerAddOnRecord & { partnerTenantId: string };
+    return { ...rest, partnerId: partnerTenantId };
+  }
+
+  private toSubscription(row: unknown): PartnerSubscriptionRecord {
+    const { partnerTenantId, ...rest } = row as PartnerSubscriptionRecord & { partnerTenantId: string };
+    return { ...rest, partnerId: partnerTenantId };
   }
 
   private toPack(row: unknown): LeadPackRecord {

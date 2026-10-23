@@ -98,6 +98,44 @@ export class DashboardsAccessPolicy {
     });
   }
 
+  /**
+   * PRD §6.3 / spec 069 FR-003: the multi-agency view is an Enterprise steering view. It needs the tenant-wide
+   * CRM read permission (`broker_crm:read` or `broker_crm:*`, custom roles included) and the CRM flag, exactly
+   * like the `crm` section; "assigned only" (`broker_crm:read_assigned`) never opens it.
+   */
+  assertBrokerAgenciesView(actor: ActorContext, plan: BrokerDashboardPlan, brokerCrmEnabled: boolean): void {
+    if (plan !== "enterprise") this.refuseBroker(actor, "enterprise_plan_required");
+    if (!brokerCrmEnabled) this.refuseBroker(actor, "broker_crm_disabled");
+    if (!this.hasTenantWideCrmRead(actor)) this.refuseBroker(actor, "agencies_view_not_allowed");
+  }
+
+  /** Non-throwing twin of `assertBrokerAgenciesView`, used to leave the agency block out of the CSV. */
+  agenciesViewAllowed(actor: ActorContext, plan: BrokerDashboardPlan, brokerCrmEnabled: boolean): boolean {
+    return plan === "enterprise" && brokerCrmEnabled && this.hasTenantWideCrmRead(actor);
+  }
+
+  /** True when the actor reads the CRM of the whole tenant (not only its assigned leads). */
+  hasTenantWideCrmRead(actor: ActorContext): boolean {
+    return actorHasAnyPermission(actor, ["broker_crm:read", "broker_crm:*"]);
+  }
+
+  /** The estimated lead cost derives from billing tariffs: it needs `billing:read_own`. */
+  canReadLeadCost(actor: ActorContext): boolean {
+    return actorHasPermission(actor, "billing:read_own");
+  }
+
+  auditBrokerAgenciesRead(actor: ActorContext, rowCount: number): void {
+    this.audit.write({
+      actor,
+      action: DashboardAuditActions.brokerAgenciesRead,
+      targetType: "BrokerDashboardAgencies",
+      targetId: "agencies",
+      scope: { partnerTenantId: actor.partnerTenantId },
+      result: "success",
+      context: { rowCount }
+    });
+  }
+
   crmSectionAllowed(actor: ActorContext, brokerCrmEnabled: boolean): boolean {
     if (!brokerCrmEnabled) {
       this.audit.write({

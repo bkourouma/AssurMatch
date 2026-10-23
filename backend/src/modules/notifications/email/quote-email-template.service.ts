@@ -20,7 +20,9 @@ export type VisitorEmailStep =
   | "broker_message"
   | "documents_requested"
   | "data_request_acknowledged"
-  | "data_request_closed";
+  | "data_request_closed"
+  /** Spec 067: single J+3 reminder of a document request left open; pointer only, no document label. */
+  | "documents_reminder";
 
 /** Spec 044 legacy context, kept for the rows queued before spec 054. */
 export interface VisitorQuoteEmailContext {
@@ -54,6 +56,8 @@ export interface VisitorStepEmailContext {
   tokenExpiresAt?: Date | undefined;
   /** Spec 062 D-10: reference (`DR-…`), kind and indicative due date of a data request. No free text. */
   dataRequest?: { reference: string; requestType?: string | undefined; dueAt?: string | undefined } | undefined;
+  /** Spec 067: signed opt-out token of a non-transactional reminder; adds the unsubscribe link when present. */
+  unsubscribeToken?: string | undefined;
 }
 
 /** Spec 055 FR-008: a pointer only; the visitor's answer itself stays in the back-office. */
@@ -91,6 +95,8 @@ export type BrokerAlertEmailType =
   | "broker_quota_threshold"
   | "broker_license_expiring"
   | "broker_offer_expiring"
+  | "broker_lead_expiring"
+  | "broker_weekly_summary"
   | "broker_dispute_decided";
 
 const BROKER_ALERT_COPY: Record<BrokerAlertEmailType, { subject: string; line: string; path: string }> = {
@@ -101,6 +107,9 @@ const BROKER_ALERT_COPY: Record<BrokerAlertEmailType, { subject: string; line: s
   broker_quota_threshold: { subject: "Quota mensuel de leads", line: "Votre quota mensuel de leads atteint un seuil d'alerte.", path: "/account" },
   broker_license_expiring: { subject: "Licence bientôt expirée", line: "Une licence de votre cabinet arrive bientôt à expiration. Pensez à transmettre son renouvellement.", path: "/licenses" },
   broker_offer_expiring: { subject: "Offre bientôt expirée", line: "Une de vos offres publiées arrive bientôt à la fin de sa période de validité.", path: "/offers" },
+  // PRD section 23: pointers only; the lead reference and the figures stay in the back-office.
+  broker_lead_expiring: { subject: "Lead proche de son échéance", line: "Un de vos leads n'a pas encore été traité et approche de son délai de première action.", path: "/leads" },
+  broker_weekly_summary: { subject: "Résumé hebdomadaire de votre activité", line: "Le résumé de votre semaine est disponible dans votre espace courtier.", path: "/reports" },
   // Spec 063 FR-B08: pointer only; the decision itself is shown in Facturation > Contestations.
   broker_dispute_decided: { subject: "Décision sur votre contestation", line: "Une décision est disponible dans Facturation > Contestations.", path: "/billing" }
 };
@@ -149,7 +158,8 @@ const STEP_PURPOSE: Record<VisitorEmailStep, EmailPurpose> = {
   broker_message: "quote_visitor_broker_message",
   documents_requested: "quote_visitor_documents_requested",
   data_request_acknowledged: "quote_visitor_data_request_acknowledged",
-  data_request_closed: "quote_visitor_data_request_closed"
+  data_request_closed: "quote_visitor_data_request_closed",
+  documents_reminder: "quote_visitor_documents_reminder"
 };
 
 
@@ -197,6 +207,11 @@ export class QuoteEmailTemplateService {
       : (context.displayName ? `Bonjour ${context.displayName},` : "Bonjour,");
     const reference = locale === "en" ? `Your request reference: ${context.publicReference}` : `Référence de votre demande: ${context.publicReference}`;
     const follow = locale === "en" ? `Follow your request: ${link}` : `Suivre votre demande: ${link}`;
+    // Spec 067: the reminder is not transactional, so it always carries its signed opt-out link.
+    const unsubscribeUrl = context.unsubscribeToken ? this.unsubscribeLink(locale, context.unsubscribeToken) : undefined;
+    const unsubscribe = unsubscribeUrl
+      ? (locale === "en" ? `To stop receiving these reminders: ${unsubscribeUrl}` : `Ne plus recevoir ces rappels : ${unsubscribeUrl}`)
+      : undefined;
     const validity = context.tokenExpiresAt
       ? locale === "en"
         ? `This personal link is valid until ${formatDate(context.tokenExpiresAt)}. Do not share it. You can ask for a new one at any time from the tracking page.`
@@ -210,6 +225,7 @@ export class QuoteEmailTemplateService {
       "",
       follow,
       ...(validity ? [validity] : []),
+      ...(unsubscribe ? ["", unsubscribe] : []),
       "",
       NO_COMMITMENT[locale],
       DISCLAIMER[locale]
@@ -220,7 +236,9 @@ export class QuoteEmailTemplateService {
       body: lines.join("\n"),
       html: this.html(lines.filter((line) => line !== "").map((line) => line === follow
         ? `<p><a href="${escapeHtml(link)}">${escapeHtml(locale === "en" ? "Follow your request" : "Suivre votre demande")}</a></p>`
-        : `<p>${escapeHtml(line)}</p>`)),
+        : unsubscribeUrl && line === unsubscribe
+          ? `<p><a href="${escapeHtml(unsubscribeUrl)}">${escapeHtml(locale === "en" ? "Stop receiving these reminders" : "Ne plus recevoir ces rappels")}</a></p>`
+          : `<p>${escapeHtml(line)}</p>`)),
       purpose: STEP_PURPOSE[context.step]
     });
   }
@@ -351,6 +369,12 @@ export class QuoteEmailTemplateService {
     return `${base}${TRACKING_PATH[locale]}${encodeURIComponent(publicReference)}${query}`;
   }
 
+  /** Spec 061 FR-005 / spec 067: FR `/desinscription`, EN `/en/unsubscribe`, signed token in the query. */
+  unsubscribeLink(locale: VisitorEmailLocale, token: string): string {
+    const base = (this.options.publicAppUrl ?? process.env.PUBLIC_APP_URL ?? "http://127.0.0.1:3601").replace(/\/$/, "");
+    return `${base}${locale === "en" ? "/en/unsubscribe" : "/desinscription"}?token=${encodeURIComponent(token)}`;
+  }
+
   private frenchCopy(context: VisitorStepEmailContext): StepCopy {
     const scope = `${context.productKey} (${context.countryCode})`;
     const broker = context.partnerName;
@@ -460,6 +484,16 @@ export class QuoteEmailTemplateService {
           lines: [
             `${broker ?? "Le courtier partenaire"} vous demande des documents pour votre demande de devis ${scope}.`,
             "Consultez la liste dans votre espace de suivi et ajoutez les fichiers demandés.",
+            ""
+          ]
+        };
+      case "documents_reminder":
+        // Spec 067: pointer only, no document label and no content.
+        return {
+          subject: `Des documents sont toujours attendus pour votre demande ${context.publicReference}`,
+          lines: [
+            `${broker ?? "Le courtier partenaire"} attend toujours des documents pour votre demande ${context.publicReference}.`,
+            "Ajoutez-les depuis votre espace de suivi.",
             ""
           ]
         };
@@ -615,6 +649,16 @@ export class QuoteEmailTemplateService {
           lines: [
             `${broker ?? "The partner broker"} asks you for documents for your ${scope} quote request.`,
             "See the list in your tracking space and add the requested files.",
+            ""
+          ]
+        };
+      case "documents_reminder":
+        // Spec 067: pointer only, no document label and no content.
+        return {
+          subject: `Documents are still awaited for your request ${context.publicReference}`,
+          lines: [
+            `${broker ?? "The partner broker"} is still waiting for documents for your request ${context.publicReference}.`,
+            "Add them from your tracking space.",
             ""
           ]
         };

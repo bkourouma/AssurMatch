@@ -215,6 +215,10 @@ enum NotificationType {
   visitor_data_request_closed
   broker_visitor_message
   admin_data_request_received
+  broker_lead_expiring
+  broker_weekly_summary
+  // Spec 067 (lot 1): single J+3 reminder of a document request left open.
+  visitor_documents_reminder
 }
 
 enum DeliveryStatus {
@@ -300,6 +304,8 @@ enum RoutingRuleMode {
   exclusive
   manual
   multi_send
+  /// Lot 5 (spec 071): the AI suggests one eligible broker, a human validates (never applied alone).
+  ai_assisted
 }
 
 enum RoutingRuleStatus {
@@ -766,6 +772,10 @@ model ProductCategory {
   id        String                @id @default(uuid())
   key       String                @unique
   name      String
+  /// Spec 070 PROD-001: English label, free description and display order (all optional/additive).
+  nameEn      String?
+  description String?
+  sortOrder   Int                   @default(0)
   status    ProductCategoryStatus @default(draft)
   createdAt DateTime              @default(now())
   updatedAt DateTime              @updatedAt
@@ -783,9 +793,72 @@ model Product {
   requiresManualReview Boolean            @default(true)
   status               ProductStatus      @default(draft)
   flags                Json
+  /// Spec 070 PROD-007: legal text and disclaimer per language, `{ fr?: { legalText?, disclaimer? }, en?: { ... } }`.
+  legalNotice          Json               @default("{}")
+  /// Spec 070 PROD-005: kinds of documents a visitor is asked for (`quoteDocumentKinds` vocabulary).
+  requiredDocumentKinds String[]          @default([])
+  /// Spec 070 PROD-008: number of the current content version (history in `ProductVersion`).
+  version              Int                @default(1)
   createdAt            DateTime           @default(now())
   updatedAt            DateTime           @updatedAt
   createdById          String?
+}
+
+/// Spec 070 PROD-008/009: one row per change of a product's conditions, with the author, the reason
+/// and the field-level diff. `snapshot` is the full conditions after the change.
+model ProductVersion {
+  id            String   @id @default(uuid())
+  productId     String
+  versionNumber Int
+  snapshot      Json
+  changes       Json     @default("[]")
+  reason        String
+  authorId      String?
+  createdAt     DateTime @default(now())
+
+  @@unique([productId, versionNumber])
+  @@index([productId, createdAt])
+}
+
+enum InsurerStatus {
+  active
+  suspended
+  retired
+}
+
+/// Spec 070 (PRD section 8): the insurer carrying the risk, per country. Offers link to it
+/// optionally (`Offer.insurerId`); `Offer.insurerName` stays the displayed, denormalised name.
+model Insurer {
+  id             String        @id @default(uuid())
+  countryId      String
+  name           String
+  /// Short code unique within the country (for example the regulator's company code).
+  code           String
+  approvalNumber String?
+  status         InsurerStatus @default(active)
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+  createdById    String?
+
+  @@unique([countryId, code])
+  @@index([countryId, status])
+}
+
+/// Spec 070 PRD 35/36: manual attestation of one activation checklist control by compliance.
+/// `scopeType` is `country` or `product`; one live row per (scopeType, scopeId, controlKey).
+model ActivationAttestation {
+  id           String    @id @default(uuid())
+  scopeType    String
+  scopeId      String
+  controlKey   String
+  note         String
+  attestedById String
+  attestedAt   DateTime  @default(now())
+  revokedById  String?
+  revokedAt    DateTime?
+
+  @@unique([scopeType, scopeId, controlKey])
+  @@index([scopeType, scopeId])
 }
 
 model CountryProduct {
@@ -934,6 +1007,9 @@ model AuditLog {
   occurredAt     DateTime    @default(now())
   retentionUntil DateTime
   createdAt      DateTime    @default(now())
+  // Lot 8 (spec 075): HMAC-SHA256 of the canonical entry (tamper evidence) and the id of the key that signed it.
+  integrityHash  String?
+  integrityKeyId String?
 
   // Spec 056: admin audit-log search (actor, action prefix, target, period).
   @@index([occurredAt])
@@ -1084,8 +1160,10 @@ model Offer {
   /// Spec 052 R1: the columns above hold the published version only (or v1 of a never published offer).
   publishedVersionId  String?
   pendingVersionId    String?
-  /// Spec 052: `indicative` or `partner`.
+  /// Spec 052/070: `indicative`, `partner`, `insurer` or `private` (never public, never compared).
   offerType           String                @default("indicative")
+  /// Spec 070: optional link to the insurer referential; `insurerName` stays the displayed name.
+  insurerId           String?
   withdrawnAt         DateTime?
   createdAt           DateTime              @default(now())
   updatedAt           DateTime              @updatedAt
@@ -1116,6 +1194,7 @@ model OfferVersion {
   guaranteeSummary    String?
   exclusionsSummary   String?
   insurerName         String?
+  insurerId           String?
   guarantees          Json               @default("[]")
   guaranteeLevel      Int?
   deductibleAmount    Decimal?
@@ -1197,10 +1276,20 @@ model Prospect {
   retentionUntil          DateTime
   anonymizedAt            DateTime?
   anonymizationBatchId    String?
+  /// Lot 8 (spec 075): HMAC blind indexes of the normalised e-mail and phone (the PII columns above hold an
+  /// encrypted envelope once written under a PII key; legacy rows keep the clear value until backfilled).
+  emailBlindIndex         String?
+  phoneBlindIndex         String?
+  /// Lot 8 (spec 075): id of the PII key that encrypted this row (null = clear text, not yet backfilled).
+  piiKeyId                String?
   createdAt               DateTime @default(now())
   updatedAt               DateTime @updatedAt
 
   @@index([countryId, productId, emailFingerprint, phoneFingerprint, createdAt])
+  // Lot 8 (spec 075): the prospect match runs on the blind indexes once the PII columns are encrypted.
+  @@index([countryId, productId, emailBlindIndex, phoneBlindIndex])
+  @@index([countryId, productId, phoneBlindIndex])
+  @@index([piiKeyId])
   // Spec 059 follow-up (M-03): the prospect match is an OR on the e-mail or the phone fingerprint.
   @@index([countryId, productId, phoneFingerprint])
 }
@@ -1215,6 +1304,12 @@ model QuoteRequest {
   /// Spec 052 R7: `accepted` or `ignored` (with the reason) after verification of the selected offer.
   selectedOfferOutcome       String?
   selectedOfferIgnoredReason String?
+  /// Spec 067 COMP-009: further offers (max 2) chosen with the primary `selectedOfferId`, verified at submission.
+  additionalOfferIds    String[]           @default([])
+  /// Spec 067 H2: broker (partner tenant) the visitor chose directly; routed first when still eligible.
+  chosenPartnerTenantId String?
+  /// Spec 067: declarative marketing source (UTM + referrer host), never a cookie or an identifier.
+  marketingSource       Json?
   quoteFormDefinitionId String
   prospectId            String
   consentRecordId       String
@@ -1236,10 +1331,13 @@ model QuoteRequest {
   reviewedAt                DateTime?
   reviewedById              String?
   duplicateOfQuoteRequestId String?
+  /// Lot 8 (spec 075): id of the PII key that encrypted `payload` (null = clear JSON, not yet backfilled).
+  piiKeyId              String?
   createdAt             DateTime           @default(now())
   updatedAt             DateTime           @updatedAt
 
   @@index([countryId, productId, status, routingStatus, createdAt])
+  @@index([piiKeyId])
   @@index([duplicateOfQuoteRequestId])
   // Spec 059 follow-up (M-03): offer popularity counted in the database.
   @@index([selectedOfferId])
@@ -1527,6 +1625,8 @@ model LeadDocumentRequest {
   status                 String    @default("open")
   fulfilledAt            DateTime?
   fulfilledDocumentCount Int       @default(0)
+  /// Spec 067 (lot 1): set when the single J+3 reminder to the visitor was queued.
+  reminderQueuedAt       DateTime?
   cancelledAt            DateTime?
   cancelledById          String?
   /// `broker` | `reassigned` | `closed`.
@@ -1538,6 +1638,7 @@ model LeadDocumentRequest {
   @@index([leadAssignmentId, status])
   @@index([quoteRequestId])
   @@index([partnerTenantId])
+  @@index([status, createdAt])
 }
 
 /// Spec 062 (D-10): a data-subject request (access, rectification, erasure) from the visitor.
@@ -1744,9 +1845,82 @@ model RoutingDecision {
   /// Spec 052 R7: offer chosen by the visitor and whether its broker was retained (`retained|unavailable|none`).
   selectedOfferId         String?
   selectedOfferOutcome    String?
+  /// Lot 5 (spec 071): outcome of checks 9-12 (lead quality score, degraded candidates, AI suggestion).
+  controlDetails          Json?
   createdAt               DateTime @default(now())
 
   @@index([quoteRequestId, createdAt])
+}
+
+/// Lot 5 (spec 071): commercial subscription state of a broker, read by routing check 11 (plan status) and
+/// check 9 (contract validity window). No row = active with no expiry (legacy partners keep routing).
+model PartnerSubscription {
+  partnerTenantId   String    @id
+  /// active | suspended | cancelled
+  status            String    @default("active")
+  /// Contract validity end set by finance; null = no expiry. A recorded PartnerContract is still required.
+  contractExpiresAt DateTime?
+  reason            String
+  updatedById       String?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @default(now())
+}
+
+/// Lot 5 (spec 071) G-06: plan change requested by the broker owner, decided by an admin, effective next cycle.
+model PlanChangeRequest {
+  id              String    @id @default(uuid())
+  partnerTenantId String
+  currentPlan     String
+  requestedPlan   String
+  /// pending | accepted | refused | cancelled
+  status          String    @default("pending")
+  justification   String
+  requestedById   String?
+  decidedById     String?
+  decidedAt       DateTime?
+  decisionReason  String?
+  /// First day (UTC) of the cycle following the acceptance.
+  effectiveAt     DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @default(now())
+
+  @@index([partnerTenantId, status])
+  @@index([status, createdAt])
+}
+
+/// Lot 5 (spec 071) H4: optional monthly add-on package (api | white_label | ai) priced per plan and country.
+/// Disabled by default: a price row only applies when `enabled` is true.
+model BillingAddOnPrice {
+  id            String   @id @default(uuid())
+  kind          String
+  plan          String
+  countryCode   String
+  monthlyAmount Float    @default(0)
+  enabled       Boolean  @default(false)
+  currency      String   @default("XOF")
+  reason        String
+  updatedById   String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @default(now())
+
+  @@unique([kind, plan, countryCode])
+}
+
+/// Lot 5 (spec 071) H4: add-on assigned to one broker by finance (audited); billed on the monthly draft while active.
+model PartnerAddOn {
+  id              String    @id @default(uuid())
+  partnerTenantId String
+  kind            String
+  /// active | ended
+  status          String    @default("active")
+  reason          String
+  assignedById    String?
+  endedById       String?
+  endedAt         DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @default(now())
+
+  @@index([partnerTenantId, status])
 }
 
 model QuoteAISummary {
@@ -2267,3 +2441,114 @@ model TrustedDevice {
 
   @@index([userId, revokedAt])
 }
+
+// Lot 6 (spec 073 FR-006, hypothesis H5)
+/// Page-view counter per UTC day and page key. Aggregated only: no IP, user agent, referrer,
+/// visitor identifier or cookie is ever stored.
+model VisitCounter {
+  day   DateTime @db.Date
+  page  String
+  count Int      @default(0)
+
+  @@id([day, page])
+}
+// Lot 6 (end)
+
+// Lot 10 (spec 076): SMS / WhatsApp retry outbox and generic outbound CRM connector.
+/// Spec 076: one SMS / WhatsApp message waiting for a (re)try. Recipient and body are encrypted at
+/// rest and wiped (empty string) as soon as the row reaches a terminal status.
+model ChannelOutbox {
+  id                 String    @id @default(uuid())
+  channel            String
+  scopeId            String
+  partnerTenantId    String?
+  template           String
+  recipientEncrypted String
+  bodyEncrypted      String
+  status             String    @default("retryable")
+  attemptCount       Int       @default(0)
+  nextAttemptAt      DateTime?
+  lastErrorClass     String?
+  providerMessageId  String?
+  correlationId      String?
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+
+  @@index([status, nextAttemptAt])
+  @@index([partnerTenantId, createdAt])
+}
+
+/// Spec 076: generic outbound REST connector of a partner CRM (one per partner, disabled by default).
+model CrmConnector {
+  id                       String   @id @default(uuid())
+  partnerTenantId          String   @unique
+  name                     String
+  url                      String
+  eventTypes               String[] @default([])
+  status                   String   @default("disabled")
+  secretEncrypted          String
+  secretHash               String
+  authHeaderName           String?
+  authHeaderValueEncrypted String?
+  createdById              String?
+  createdAt                DateTime @default(now())
+  updatedAt                DateTime @updatedAt
+}
+
+/// Spec 076: one outbound CRM call. The body is minimised (no contact data) and encrypted at rest.
+model CrmConnectorDelivery {
+  id                String    @id @default(uuid())
+  connectorId       String
+  partnerTenantId   String
+  eventId           String
+  eventType         String
+  idempotencyKey    String    @unique
+  payloadEncrypted  String
+  payloadMetadata   Json
+  status            String    @default("pending")
+  attemptCount      Int       @default(0)
+  nextAttemptAt     DateTime?
+  lastResponseClass String?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  @@index([connectorId, status, nextAttemptAt])
+  @@index([partnerTenantId, createdAt])
+}
+/// Lot 9 (start)
+/// Lot 9 (spec 072): minimal CMS. One versioned row per (kind, entryKey, locale, countryCode, version).
+/// The unique indexes (one row per key and version, one published and one open draft/pending_review per key) live only in the
+/// SQL migration 0038, Prisma cannot express them.
+model ContentEntry {
+  id            String    @id @default(uuid())
+  /// `faq` | `guide` | `glossary` | `legal_override`.
+  kind          String
+  entryKey      String
+  /// `fr` | `en`.
+  locale        String
+  /// ISO country, only for `legal_override`.
+  countryCode   String?
+  version       Int
+  /// `draft` | `pending_review` | `published` | `archived`.
+  status        String    @default("draft")
+  label         String
+  /// Plain-text payload validated per kind (no markup).
+  payload       Json
+  basedOnId     String?
+  createdById   String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  submittedById String?
+  submittedAt   DateTime?
+  decidedById   String?
+  decidedAt     DateTime?
+  decisionNote  String?
+  publishedAt   DateTime?
+
+  @@index([kind, locale, status])
+  // Unique indexes kept in migration 0038 only (Prisma cannot express them; COALESCE("countryCode", '')
+  // makes a NULL country one value): "ContentEntry_key_version" (kind, entryKey, locale, country,
+  // version), "ContentEntry_published_key" (one published version per key) and
+  // "ContentEntry_open_key" (one draft or pending_review version per key).
+}
+/// Lot 9 (end)

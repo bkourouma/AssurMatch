@@ -28,7 +28,9 @@ function emptySources(): ScheduledAlertSources {
     partnerQuotas: async () => [],
     publicCountryCoverage: async () => [],
     unroutedLeadsSince: async () => 0,
-    disputeStats: async () => []
+    disputeStats: async () => [],
+    unprocessedLeads: async () => [],
+    weeklyBrokerStats: async () => []
   };
 }
 

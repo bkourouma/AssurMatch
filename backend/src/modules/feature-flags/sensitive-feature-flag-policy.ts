@@ -4,6 +4,8 @@ export const featureFlagMutationRefusedAction = "feature_flag.change_refused";
 export const sensitiveFeatureFlagRefusalReason = "explicit_policy_required_for_sensitive_feature_flag";
 
 // ai_partner_opt_out restricts AI usage (partner opt-out), so it stays freely mutable.
+// broker_weekly_ai_summary_enabled is an AI flag (constitution v1.4.0): explicitly protected below, so it
+// opens only through the compliance policy path.
 const aiFlagsWithExplicitMutationPolicy = new Set(["ai_summary_enabled", "ai_partner_opt_out"]);
 
 const explicitlyProtectedFeatureFlags = new Set([
@@ -20,11 +22,18 @@ const explicitlyProtectedFeatureFlags = new Set([
   "billing_enabled",
   "sms_enabled",
   "whatsapp_enabled",
+  "crm_connector_enabled", // Lot 10 (spec 076)
   "partner_api_enabled",
   "partner_webhooks_enabled",
   "retention_purge_enabled",
   "satisfaction_survey_enabled",
-  "ai_routing_anomaly_detection_enabled"
+  "ai_routing_anomaly_detection_enabled",
+  "ai_assisted_routing_enabled",
+  "broker_weekly_ai_summary_enabled",
+  // Lot 7: per-country and per-product AI flags follow the audited compliance path only
+  "country_ai_enabled",
+  "product_ai_scoring_enabled",
+  "product_ai_form_assistant_enabled"
 ]);
 
 const regulatedFlagKeyFragments = [

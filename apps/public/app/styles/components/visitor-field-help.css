@@ -1,0 +1,47 @@
+/* Per-field reading help: a plain "?" trigger beside the label and a dashed, unobtrusive answer panel. */
+.am-field-help__trigger {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  inline-size: 1.5rem;
+  block-size: 1.5rem;
+  margin-block-start: var(--am-space-4);
+  padding: 0;
+  border: 1px solid currentColor;
+  border-radius: 50%;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-size: 0.875rem;
+  font-weight: 700;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.am-field-help__trigger[aria-expanded="true"] {
+  background: var(--am-primary-800);
+  color: var(--am-neutral-0);
+}
+
+.am-field-help__trigger:focus-visible {
+  outline: 2px solid currentColor;
+  outline-offset: 2px;
+}
+
+.am-field-help__panel:empty {
+  display: none;
+}
+
+.am-field-help__text {
+  margin: 0;
+}
+
+.am-field-help__close {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-decoration: underline;
+  cursor: pointer;
+}

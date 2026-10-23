@@ -44,6 +44,8 @@ export interface AiInteractionsRepository extends RuntimeRepository {
   find(id: string): Promise<AiInteractionRecord | undefined>;
   listQueued(limit: number): Promise<AiInteractionRecord[]>;
   listForTarget(targetType: string, targetId: string): Promise<AiInteractionRecord[]>;
+  /** Interactions of one assist type for many targets at once (newest first), e.g. the CRM-015 lead scores of a CRM list. */
+  listForTargets(targetType: string, targetIds: readonly string[], assistType: AiAssistTypeCatalog): Promise<AiInteractionRecord[]>;
   listForSurface(surface: AiSurface, limit: number): Promise<AiInteractionRecord[]>;
   countSince(filter: { surface?: AiSurface; partnerTenantId?: string; actorId?: string; since: Date }): Promise<number>;
 }
@@ -78,6 +80,13 @@ export class MemoryAiInteractionsRepository implements AiInteractionsRepository 
 
   async listForTarget(targetType: string, targetId: string): Promise<AiInteractionRecord[]> {
     return this.records.filter((record) => record.targetType === targetType && record.targetId === targetId).sort((left, right) => right.createdAt.getTime() - left.createdAt.getTime());
+  }
+
+  async listForTargets(targetType: string, targetIds: readonly string[], assistType: AiAssistTypeCatalog): Promise<AiInteractionRecord[]> {
+    const ids = new Set(targetIds);
+    return this.records
+      .filter((record) => record.targetType === targetType && record.targetId !== null && ids.has(record.targetId) && record.assistType === assistType)
+      .sort((left, right) => right.createdAt.getTime() - left.createdAt.getTime());
   }
 
   async listForSurface(surface: AiSurface, limit: number): Promise<AiInteractionRecord[]> {
@@ -126,6 +135,11 @@ export class PrismaAiInteractionsRepository implements AiInteractionsRepository 
 
   async listForTarget(targetType: string, targetId: string): Promise<AiInteractionRecord[]> {
     return (await this.delegate().findMany({ where: { targetType, targetId }, orderBy: { createdAt: "desc" } })).map((row) => this.toRecord(row));
+  }
+
+  async listForTargets(targetType: string, targetIds: readonly string[], assistType: AiAssistTypeCatalog): Promise<AiInteractionRecord[]> {
+    if (targetIds.length === 0) return [];
+    return (await this.delegate().findMany({ where: { targetType, targetId: { in: [...targetIds] }, assistType }, orderBy: { createdAt: "desc" } })).map((row) => this.toRecord(row));
   }
 
   async listForSurface(surface: AiSurface, limit: number): Promise<AiInteractionRecord[]> {

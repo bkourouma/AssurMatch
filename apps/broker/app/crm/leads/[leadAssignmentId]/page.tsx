@@ -1,9 +1,10 @@
 import { redirect } from "next/navigation";
 import { isStarterCrmDenied, loginRedirect, readBackOfficeSession } from "../../../lib/backoffice-auth";
-import { isNotFoundState, listLeadAiInteractions, readBrokerAIAssistance, readCrmLeadDetail, readLeadProposals } from "../../../lib/broker-api";
+import { isNotFoundState, listLeadAiInteractions, readBrokerTeam, readBrokerAIAssistance, readCrmLeadDetail, readLeadProposals } from "../../../lib/broker-api";
 import { TENANT_SUSPENDED_MESSAGE, canAssignCrmLead, canMutateCrmLead, isTenantReadOnly } from "../../../lib/broker-permissions";
 import { addCrmLeadNoteAction, addCrmLeadReminderAction, addCrmLeadTaskAction, changeCrmLeadStatusAction, disputeCrmLeadAction } from "../../../lib/lead-actions";
 import { assignCrmAdvisorAction } from "../../../lib/proposal-actions";
+import { advisorDisplayName, teamAdvisorOptions } from "../../../lib/team-options";
 import { PROPOSAL_NOTICES } from "../../../lib/proposal-vocabulary";
 import { ProposalPanel } from "../../../lib/ui/proposal-panel";
 import { LeadConversationSection } from "../../../lib/ui/conversation-panel";
@@ -114,9 +115,14 @@ export default async function BrokerCrmLeadDetailPage({ params, searchParams }: 
     );
   }
 
-  const [detail, assistance, interactions, proposals] = await Promise.all([readCrmLeadDetail(leadAssignmentId), readBrokerAIAssistance(), listLeadAiInteractions(leadAssignmentId), readLeadProposals("crm", leadAssignmentId)]);
+  const [detail, assistance, interactions, proposals, team] = await Promise.all([readCrmLeadDetail(leadAssignmentId), readBrokerAIAssistance(), listLeadAiInteractions(leadAssignmentId), readLeadProposals("crm", leadAssignmentId), readBrokerTeam()]);
+  // CRM-006: advisor picker and names come from the tenant team (GET /broker/team, tenant-scoped by the API).
+  const teamMembers = team.status === "success" ? team.data : [];
+  const teamAvailable = team.status === "success";
+  const advisorOptions = teamAdvisorOptions(teamMembers);
   if (detail.unauthenticated) redirect(loginRedirect(`/crm/leads/${leadAssignmentId}`, detail.error ?? "session_required"));
   const lead = detail.status === "success" ? detail.data : undefined;
+  const advisorName = advisorDisplayName(teamMembers, lead?.advisorId);
   const notFound = isNotFoundState(detail);
   const canMutate = canMutateCrmLead(session.profile);
   const tenantReadOnly = isTenantReadOnly(session.profile);
@@ -196,7 +202,7 @@ export default async function BrokerCrmLeadDetailPage({ params, searchParams }: 
                       { term: "Urgence", value: lead.urgency },
                       { term: "Source", value: lead.source },
                       { term: "Recu le", value: formatDate(lead.assignedAt) },
-                      { term: "Conseiller", value: lead.advisorId ?? "Non assigne" },
+                      { term: "Conseiller", value: advisorName },
                     ]}
                   />
                 ) : null}
@@ -224,12 +230,24 @@ export default async function BrokerCrmLeadDetailPage({ params, searchParams }: 
 
               {lead ? (
                 <Card title="Conseiller assigne" description="Un agent ne voit que les leads qui lui sont assignes.">
-                  <p>Conseiller actuel : {lead.advisorId ?? "Non assigne"}</p>
-                  {canAssign ? (
+                  <p>Conseiller actuel : {advisorName}</p>
+                  {canAssign && !teamAvailable ? (
+                    <Notice tone="warning">Liste de l'équipe indisponible : l'assignation est momentanément impossible.</Notice>
+                  ) : canAssign && advisorOptions.length === 0 ? (
+                    <Notice tone="warning">Aucun membre actif dans l'équipe : invitez un conseiller avant d'assigner ce lead.</Notice>
+                  ) : canAssign ? (
                     <Form action={assignCrmAdvisorAction} columns={2}>
                       <input type="hidden" name="leadAssignmentId" value={lead.leadAssignmentId} />
-                      <Field id="crm-advisor-id" label="Identifiant du conseiller" required requiredLabel="obligatoire" hint="Utilisateur de votre cabinet ; un conseiller d'un autre cabinet est refuse.">
-                        <Input id="crm-advisor-id" name="advisorId" required maxLength={120} defaultValue={lead.advisorId ?? ""} aria-label="Identifiant du conseiller" />
+                      <Field id="crm-advisor-id" label="Conseiller" required requiredLabel="obligatoire" hint="Membre actif de votre cabinet ; un conseiller d'un autre cabinet est refusé.">
+                        <Select
+                          id="crm-advisor-id"
+                          name="advisorId"
+                          required
+                          defaultValue={advisorOptions.some((option) => option.value === lead.advisorId) ? lead.advisorId : ""}
+                          placeholder="Choisir un conseiller"
+                          aria-label="Conseiller"
+                          options={advisorOptions}
+                        />
                       </Field>
                       <FormActions>
                         <Button type="submit" variant="secondary">Assigner au conseiller</Button>

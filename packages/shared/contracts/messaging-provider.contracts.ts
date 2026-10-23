@@ -41,6 +41,21 @@ export const messagingDeliverySchema = z.object({
   createdAt: dateTimeStringSchema
 });
 
+export const channelOutboxStatusSchema = z.enum(["retryable", "sent", "failed", "dead_letter", "cancelled"]);
+
+/** Lot 10 (spec 076): operator view of a durable retry row; never carries the recipient or the body. */
+export const channelOutboxItemSchema = z.object({
+  id: uuidSchema,
+  channel: optionalChannelSchema,
+  status: channelOutboxStatusSchema,
+  template: nonEmptyStringSchema,
+  partnerTenantId: z.string().nullable(),
+  attemptCount: z.number().int().nonnegative(),
+  nextAttemptAt: dateTimeStringSchema.nullable(),
+  lastErrorClass: z.string().nullable(),
+  createdAt: dateTimeStringSchema
+});
+
 export const notificationPreferencesSchema = z.object({
   scopeId: nonEmptyStringSchema,
   email: z.literal(true),
@@ -79,6 +94,8 @@ export const messagingTestDispatchSchema = z.object({
 
 export type NotificationChannel = z.infer<typeof notificationChannelSchema>;
 export type OptionalChannel = z.infer<typeof optionalChannelSchema>;
+export type ChannelOutboxStatus = z.infer<typeof channelOutboxStatusSchema>;
+export type ChannelOutboxItem = z.infer<typeof channelOutboxItemSchema>;
 export type MessagingDelivery = z.infer<typeof messagingDeliverySchema>;
 export type MessagingDeliveryStatus = z.infer<typeof messagingDeliveryStatusSchema>;
 export type NotificationPreferences = z.infer<typeof notificationPreferencesSchema>;

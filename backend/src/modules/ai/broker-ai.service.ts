@@ -1,6 +1,7 @@
-import type { AiInteraction, BrokerAiOptOutStatus, BrokerLeadAssistType } from "../../../../packages/shared/contracts/ai.contracts";
-import { aiHumanValidationDecisionSchema, brokerAiOptOutSchema, brokerAiRequestSchema, brokerLeadAssistTypeSchema } from "../../../../packages/shared/contracts/ai.contracts";
-import type { BrokerCrmLeadDetail } from "../../../../packages/shared/contracts/quote.contracts";
+import type { AiInteraction, BrokerAiOptOutStatus, BrokerAiPriorityScore, BrokerAiPriorityScores, BrokerLeadAssistType, BrokerManagerAnalysis, BrokerTenantAssistType } from "../../../../packages/shared/contracts/ai.contracts";
+import { aiHumanValidationDecisionSchema, aiLeadScoreSchema, brokerAiInsightRequestSchema, brokerAiOptOutSchema, brokerAiRequestSchema, brokerLeadAssistTypeSchema } from "../../../../packages/shared/contracts/ai.contracts";
+import type { PartnerStatus } from "../../../../packages/shared/contracts/partner.contracts";
+import type { BrokerCrmLeadDetail, BrokerCrmPipelineStatus } from "../../../../packages/shared/contracts/quote.contracts";
 import type { AuditLogWriter } from "../audit-logs/audit-log-writer.service";
 import { actorHasPermission } from "../common/rbac/actor-permissions";
 import type { ActorContext } from "../common/types";
@@ -8,6 +9,7 @@ import type { CountriesService } from "../countries/countries.module";
 import type { FeatureFlagsService } from "../feature-flags/feature-flags.module";
 import type { BrokerCrmAccessPolicy } from "../leads/broker-crm-access-policy";
 import type { BrokerCrmLeadsService } from "../leads/broker-crm-leads.service";
+import { firstVisibleReplyMinutes } from "../leads/first-visible-reply";
 import type { LeadAssignmentRecord, LeadAssignmentService } from "../leads/lead-assignment.service";
 import type { ProductsService } from "../products/products.module";
 import { AiAuditActions } from "./core/ai-audit-actions";
@@ -23,12 +25,36 @@ export interface BrokerAiDeps {
   access: BrokerCrmAccessPolicy;
   countries: CountriesService;
   products: ProductsService;
+  /**
+   * DASH-B-009: optional dashboard aggregates of the caller's perimeter. Whatever it returns is reduced
+   * to bounded numeric aggregates before reaching the gateway (no free text, no identifier, no prospect).
+   */
+  performanceInput?: ((actor: ActorContext, query: Record<string, unknown>) => Promise<Record<string, unknown>>) | undefined;
+  /** Plan and status of a partner tenant, for system callers (scheduled alerts) that carry no actor plan. Absent: no AI for them. */
+  partnerProfile?: ((partnerTenantId: string) => Promise<BrokerAiPartnerProfile | undefined>) | undefined;
 }
+
+export interface BrokerAiPartnerProfile {
+  plan: PartnerPlan;
+  status: PartnerStatus;
+}
+
+/** Counters of one tenant's week, as computed by the scheduled alerts worker (no prospect data). */
+export type BrokerWeeklyStats = Record<string, unknown>;
 
 const DRAFTING_ASSISTS: ReadonlySet<BrokerLeadAssistType> = new Set(["next_action", "relaunch_message"]);
 const DUPLICATE_WINDOW_MS = 30 * 24 * 3600 * 1000;
 const LOSS_WINDOW_MS = 90 * 24 * 3600 * 1000;
 const LOSS_ANALYSES_LIST_LIMIT = 10;
+const DAY_MS = 24 * 3600 * 1000;
+/** An open lead without any activity for this long counts as "en retard" in the steering aggregates. */
+const OVERDUE_AFTER_HOURS = 72;
+const MANAGER_MAX_ADVISORS = 50;
+const CLOSED_PIPELINE_STATUSES: ReadonlySet<BrokerCrmPipelineStatus> = new Set(["gagne", "perdu", "doublon", "hors_cible", "rejete_conteste"]);
+export const BROKER_WEEKLY_AI_SUMMARY_FLAG = "broker_weekly_ai_summary_enabled";
+const WEEKLY_SUMMARY_ACTOR_ID = "system:scheduled-alerts";
+const AI_ELIGIBLE_PARTNER_STATUSES: ReadonlySet<PartnerStatus> = new Set(["active", "active_test"]);
+const CRM_PLANS: ReadonlySet<PartnerPlan> = new Set(["pro", "enterprise"]);
 
 /**
  * Broker CRM AI assistance (PRD §10.2). Every request first passes the CRM access policy (tenant,
@@ -96,9 +122,124 @@ export class BrokerAiService {
     return records.map((record) => this.deps.gateway.toDto(record));
   }
 
+  /**
+   * DASH-B-009 "Générer résumé IA de performance": tenant-level, Pro and Enterprise (the gateway refuses
+   * Starter and an unknown plan). The model only sees aggregates of the caller's perimeter; the output
+   * stays pending until a human validates it (steering insight).
+   */
+  async performanceSummary(actor: ActorContext, body: unknown): Promise<AiInteraction> {
+    const parsed = brokerAiInsightRequestSchema.parse(body ?? {});
+    this.assertTenantInsightAccess(actor);
+    const rows = await this.deps.crmLeads.applyFilters(actor, {});
+    const dashboard = await this.dashboardAggregates(actor, parsed.windowDays);
+    const input = { ...this.performanceAggregates(rows, parsed.windowDays), ...(dashboard ? { dashboard } : {}) };
+    const record = await this.runTenantInsight("performance_summary", actor, input, parsed.language);
+    return this.deps.gateway.toDto(record);
+  }
+
+  /**
+   * PRD 10.2 "assistant manager" (Enterprise only, like the loss analysis): workload and lateness per
+   * advisor. Advisors reach the model as neutral labels (C1, C2...); the label map is kept on the
+   * interaction server side and returned to the manager only.
+   */
+  async managerAssistant(actor: ActorContext, body: unknown): Promise<BrokerManagerAnalysis> {
+    const parsed = brokerAiInsightRequestSchema.parse(body ?? {});
+    this.assertTenantInsightAccess(actor);
+    const rows = await this.deps.crmLeads.applyFilters(actor, {});
+    const { input, advisorLabels } = this.managerAggregates(rows, parsed.windowDays);
+    const record = await this.runTenantInsight("manager_assistant", actor, input, parsed.language, { advisorLabels });
+    return this.toManagerAnalysis(record);
+  }
+
+  /** The recent performance summaries of the caller's own tenant (newest first, at most 10). */
+  async listPerformanceSummaries(actor: ActorContext): Promise<AiInteraction[]> {
+    return (await this.listTenantInsights(actor, "performance_summary")).map((record) => this.deps.gateway.toDto(record));
+  }
+
+  /** The recent manager analyses of the caller's own tenant (Enterprise only, newest first, at most 10). */
+  async listManagerAnalyses(actor: ActorContext): Promise<BrokerManagerAnalysis[]> {
+    this.assertTenantInsightAccess(actor);
+    if (actor.partnerPlan !== "enterprise") throw new Error("Manager analysis access denied");
+    return (await this.listTenantInsights(actor, "manager_assistant")).map((record) => this.toManagerAnalysis(record));
+  }
+
+  /**
+   * CRM-015: the human-approved indicative priority scores of the leads in the caller's CRM perimeter
+   * (role, agency and tenant through `applyFilters`). Lead scoring closed (flag, partner opt-out, plan)
+   * answers `enabled: false` with no score; this method never calls a model.
+   */
+  async priorityScores(actor: ActorContext): Promise<BrokerAiPriorityScores> {
+    const tenant = this.tenantOf(actor);
+    // Starter has no CRM: it learns only that scoring is closed for it.
+    if (actor.partnerPlan !== "starter") this.deps.access.assertCrmAccess(actor);
+    const plan = this.planOf(actor);
+    if (!this.leadScoringEnabled(tenant, plan)) return { enabled: false, scores: {} };
+    const rows = await this.deps.crmLeads.applyFilters(actor, {});
+    const scores = await this.approvedScores(tenant, plan, rows);
+    this.deps.audit.write({ actor, action: AiAuditActions.read, targetType: "AIInteraction", targetId: "priority_scores", scope: { surface: "broker_crm", partnerTenantId: tenant }, result: "success", context: { assistType: "lead_score", count: scores.size, modelCall: false } });
+    return { enabled: true, scores: Object.fromEntries(scores) };
+  }
+
+  /**
+   * Internal port for the CRM lists (they do not depend on the AI module): approved scores of the given
+   * leads of one tenant. Leads of another tenant are ignored; the caller owns the perimeter check.
+   */
+  async priorityScoreMap(partnerTenantId: string, leadIds: readonly string[], plan: PartnerPlan | undefined): Promise<Map<string, BrokerAiPriorityScore>> {
+    if (leadIds.length === 0 || !this.leadScoringEnabled(partnerTenantId, plan)) return new Map();
+    const wanted = new Set(leadIds);
+    const rows = (await this.deps.assignments.list()).filter((assignment) => wanted.has(assignment.id) && assignment.partnerTenantId === partnerTenantId);
+    return this.approvedScores(partnerTenantId, plan, rows);
+  }
+
+  /** `(actor) => Map<leadId, score>` port for the CRM list service: the actor's perimeter only, never throws. */
+  async priorityScoreMapFor(actor: ActorContext): Promise<Map<string, number>> {
+    try {
+      const plan = this.planOf(actor);
+      if (!actor.partnerTenantId || !this.leadScoringEnabled(actor.partnerTenantId, plan)) return new Map();
+      const scores = await this.approvedScores(actor.partnerTenantId, plan, await this.deps.crmLeads.applyFilters(actor, {}));
+      return new Map([...scores].map(([leadId, entry]) => [leadId, entry.score]));
+    } catch {
+      return new Map();
+    }
+  }
+
+  /**
+   * PRD section 23 weekly summary, composed for the scheduled alerts worker with a system actor of the
+   * tenant. Returns `undefined` (the worker keeps its deterministic text) unless the weekly AI flag, the
+   * AI summary flag, the partner opt-out, the plan (Pro/Enterprise) and the partner status all allow it.
+   * The text is descriptive only (guardrail `advice_not_allowed`), hence no per-message validation.
+   */
+  async weeklySummaryText(partnerTenantId: string, stats: BrokerWeeklyStats, language: "fr" | "en" = "fr"): Promise<string | undefined> {
+    if (!partnerTenantId || !this.deps.featureFlags.isEnabled(BROKER_WEEKLY_AI_SUMMARY_FLAG)) return undefined;
+    if (!this.deps.featureFlags.isEnabledOrDefault(BROKER_WEEKLY_AI_SUMMARY_FLAG, true, "partner", partnerTenantId)) return undefined;
+    const profile = await this.deps.partnerProfile?.(partnerTenantId).catch(() => undefined);
+    if (!profile || !CRM_PLANS.has(profile.plan) || !AI_ELIGIBLE_PARTNER_STATUSES.has(profile.status)) return undefined;
+    const scope: AiGatewayScope = { partnerTenantId, plan: profile.plan };
+    if (!this.deps.gateway.isEnabled("weekly_summary", scope).enabled) return undefined;
+    const actor: ActorContext = { actorId: WEEKLY_SUMMARY_ACTOR_ID, roles: [], partnerTenantId, partnerPlan: profile.plan, mfaVerified: true };
+    try {
+      const record = await this.deps.gateway.run({
+        assistType: "weekly_summary",
+        surface: "broker_crm",
+        actor,
+        input: boundAggregates(stats),
+        language,
+        target: { type: "PartnerTenant", id: partnerTenantId },
+        scope,
+        quotaKey: partnerTenantId
+      }, { wait: true });
+      return record.status === "completed" && record.outputText ? record.outputText : undefined;
+    } catch {
+      // Quota exceeded or provider chain failure: the worker keeps its deterministic text.
+      return undefined;
+    }
+  }
+
   async read(id: string, actor: ActorContext): Promise<AiInteraction> {
     this.deps.access.assertCrmAccess(actor);
     const record = await this.requireTenantRecord(id, actor);
+    // Tenant-level insights (aggregates of the whole cabinet) stay with the roles that see them.
+    if (record.targetType === "PartnerTenant" && !this.deps.access.canSeeSensitiveSearch(actor)) throw new Error("AI interaction not found");
     this.deps.audit.write({ actor, action: AiAuditActions.read, targetType: "AIInteraction", targetId: id, scope: { surface: "broker_crm", partnerTenantId: record.partnerTenantId }, result: "success", context: { status: record.status, assistType: record.assistType } });
     return this.deps.gateway.toDto(record);
   }
@@ -117,8 +258,13 @@ export class BrokerAiService {
     const record = await this.requireTenantRecord(id, actor);
     if (record.targetType === "LeadAssignment" && record.targetId) {
       this.deps.access.assertMutation(actor, await this.deps.assignments.require(record.targetId));
-    } else if (actor.roles.includes("broker_read_only") || !actorHasPermission(actor, "broker_crm:update")) {
-      throw new Error("AI decision denied: CRM update permission required");
+    } else {
+      // A tenant-level insight is validated only by someone who may read it (same rule as `read()`): an "assigned only"
+      // agent holding `broker_crm:update` must not act on an insight it cannot see.
+      if (record.targetType === "PartnerTenant" && !this.deps.access.canSeeSensitiveSearch(actor)) throw new Error("AI interaction not found");
+      if (actor.roles.includes("broker_read_only") || !actorHasPermission(actor, "broker_crm:update")) {
+        throw new Error("AI decision denied: CRM update permission required");
+      }
     }
     if (record.status !== "completed") throw new Error("Invalid validation: the AI interaction is not completed");
     const updated = await this.deps.gateway.validate(id, parsed.decision, actor);
@@ -139,7 +285,7 @@ export class BrokerAiService {
     if (!actorHasPermission(actor, "broker_crm:*")) throw new Error("AI opt-out change denied: owner permission required");
     const tenant = this.tenantOf(actor);
     await this.deps.featureFlags.setFlag({ key: AI_PARTNER_OPT_OUT_FLAG, scopeType: "partner", scopeId: tenant, value: parsed.optOut, reason: parsed.reason }, actor);
-    this.deps.audit.write({ actor, action: AiAuditActions.partnerOptOutChanged, targetType: "PartnerTenant", targetId: tenant, scope: { partnerTenantId: tenant }, result: "success", reason: parsed.reason, context: { optOut: parsed.optOut } });
+    await this.deps.audit.writeAsync({ actor, action: AiAuditActions.partnerOptOutChanged, targetType: "PartnerTenant", targetId: tenant, scope: { partnerTenantId: tenant }, result: "success", reason: parsed.reason, context: { optOut: parsed.optOut } });
     return this.optOutStatus(actor);
   }
 
@@ -192,13 +338,170 @@ export class BrokerAiService {
   }
 
   private async scopeFor(actor: ActorContext, assignment: LeadAssignmentRecord): Promise<AiGatewayScope> {
+    return this.leadScope(this.tenantOf(actor), actor.partnerPlan as PartnerPlan | undefined, assignment);
+  }
+
+  private async leadScope(partnerTenantId: string, plan: PartnerPlan | undefined, assignment: LeadAssignmentRecord): Promise<AiGatewayScope> {
     const country = assignment.countryCode ? await this.deps.countries.findByIsoCode(assignment.countryCode) : undefined;
     const product = assignment.productKey ? await this.deps.products.findByKey(assignment.productKey) : undefined;
     return {
-      partnerTenantId: this.tenantOf(actor),
-      plan: actor.partnerPlan as PartnerPlan | undefined,
+      partnerTenantId,
+      plan,
       ...(country ? { countryId: country.id, countryFlags: country.flags } : {}),
       ...(product ? { productId: product.id, productFlags: product.flags } : {})
+    };
+  }
+
+  /** Tenant-wide aggregates: never for an assigned-only agent (same rule as the sensitive search and the loss analyses). */
+  private assertTenantInsightAccess(actor: ActorContext): void {
+    this.deps.access.assertCrmAccess(actor);
+    if (!this.deps.access.canSeeSensitiveSearch(actor)) throw new Error("AI insight access denied");
+  }
+
+  private async runTenantInsight(assistType: BrokerTenantAssistType, actor: ActorContext, input: Record<string, unknown>, language: "fr" | "en", context?: Record<string, unknown>): Promise<AiInteractionRecord> {
+    const tenant = this.tenantOf(actor);
+    return this.deps.gateway.run({
+      assistType,
+      surface: "broker_crm",
+      actor,
+      input,
+      language,
+      target: { type: "PartnerTenant", id: tenant },
+      scope: { partnerTenantId: tenant, plan: this.planOf(actor) },
+      quotaKey: tenant,
+      ...(context ? { context } : {})
+    }, { wait: false });
+  }
+
+  /** Tenant read from the actor, never from the request; the list read is audited. */
+  private async listTenantInsights(actor: ActorContext, assistType: BrokerTenantAssistType): Promise<AiInteractionRecord[]> {
+    this.assertTenantInsightAccess(actor);
+    const tenant = this.tenantOf(actor);
+    const records = (await this.deps.gateway.listForTarget("PartnerTenant", tenant))
+      .filter((record) => record.assistType === assistType && record.surface === "broker_crm" && record.partnerTenantId === tenant)
+      .sort((left, right) => right.createdAt.getTime() - left.createdAt.getTime())
+      .slice(0, LOSS_ANALYSES_LIST_LIMIT);
+    this.deps.audit.write({ actor, action: AiAuditActions.read, targetType: "AIInteraction", targetId: `${assistType}_list`, scope: { surface: "broker_crm", partnerTenantId: tenant }, result: "success", context: { assistType, count: records.length } });
+    return records;
+  }
+
+  private toManagerAnalysis(record: AiInteractionRecord): BrokerManagerAnalysis {
+    const context = record.scope.context as { advisorLabels?: unknown } | undefined;
+    const labels = context?.advisorLabels && typeof context.advisorLabels === "object" ? context.advisorLabels as Record<string, unknown> : {};
+    const advisorLabels = Object.fromEntries(Object.entries(labels).filter((entry): entry is [string, string] => typeof entry[1] === "string"));
+    return { ...this.deps.gateway.toDto(record), advisorLabels };
+  }
+
+  private planOf(actor: ActorContext): PartnerPlan | undefined {
+    return actor.partnerPlan;
+  }
+
+  /** Lead scoring at tenant level: Pro/Enterprise only (an unknown plan is closed), flag and partner opt-out through the gateway. */
+  private leadScoringEnabled(partnerTenantId: string, plan: PartnerPlan | undefined): boolean {
+    if (!plan || !CRM_PLANS.has(plan)) return false;
+    return this.deps.gateway.isEnabled("lead_score", { partnerTenantId, plan }).enabled;
+  }
+
+  /**
+   * The latest `lead_score` interaction of each lead, kept only when it belongs to the tenant, is
+   * completed AND human-approved, and when scoring is still open for the lead's country and product.
+   */
+  private async approvedScores(partnerTenantId: string, plan: PartnerPlan | undefined, rows: readonly LeadAssignmentRecord[]): Promise<Map<string, BrokerAiPriorityScore>> {
+    const scores = new Map<string, BrokerAiPriorityScore>();
+    const inTenant = rows.filter((assignment) => assignment.partnerTenantId === partnerTenantId);
+    if (inTenant.length === 0) return scores;
+    const latest = new Map<string, AiInteractionRecord>();
+    for (const record of await this.deps.gateway.listForTargets("LeadAssignment", inTenant.map((assignment) => assignment.id), "lead_score")) {
+      if (!record.targetId || record.surface !== "broker_crm" || record.partnerTenantId !== partnerTenantId) continue;
+      const current = latest.get(record.targetId);
+      if (!current || record.createdAt.getTime() > current.createdAt.getTime()) latest.set(record.targetId, record);
+    }
+    for (const assignment of inTenant) {
+      const record = latest.get(assignment.id);
+      if (!record || record.status !== "completed" || record.humanValidationStatus !== "approved") continue;
+      const parsed = aiLeadScoreSchema.safeParse(record.outputData);
+      if (!parsed.success) continue;
+      if (!this.deps.gateway.isEnabled("lead_score", await this.leadScope(partnerTenantId, plan, assignment)).enabled) continue;
+      scores.set(assignment.id, { score: parsed.data.score, level: parsed.data.level, interactionId: record.id });
+    }
+    return scores;
+  }
+
+  /** Optional dashboard port: its output is reduced to bounded aggregates; a failing port is simply left out. */
+  private async dashboardAggregates(actor: ActorContext, windowDays: number): Promise<Record<string, unknown> | undefined> {
+    if (!this.deps.performanceInput) return undefined;
+    try {
+      const bounded = boundAggregates(await this.deps.performanceInput(actor, { windowDays }));
+      return Object.keys(bounded).length > 0 ? bounded : undefined;
+    } catch {
+      return undefined;
+    }
+  }
+
+  private performanceAggregates(rows: readonly LeadAssignmentRecord[], windowDays: number): Record<string, unknown> {
+    const now = Date.now();
+    const inWindow = rows.filter((assignment) => assignment.assignedAt.getTime() >= now - windowDays * DAY_MS);
+    const open = rows.filter((assignment) => !CLOSED_PIPELINE_STATUSES.has(pipelineStatusOf(assignment)));
+    const won = inWindow.filter((assignment) => pipelineStatusOf(assignment) === "gagne").length;
+    const lost = inWindow.filter((assignment) => pipelineStatusOf(assignment) === "perdu").length;
+    const replies = averageFirstReply(inWindow);
+    return {
+      windowDays,
+      received: inWindow.length,
+      won,
+      lost,
+      conversionRate: inWindow.length === 0 ? null : Math.round((won / inWindow.length) * 1000) / 10,
+      open: open.length,
+      overdueOpen: open.filter((assignment) => isOverdue(assignment, now)).length,
+      overdueAfterHours: OVERDUE_AFTER_HOURS,
+      averageFirstReplyMinutes: replies.average,
+      firstReplyMeasured: replies.measured,
+      byStatus: this.countBy([...inWindow], pipelineStatusOf),
+      bySource: this.countBy([...inWindow], (assignment) => assignment.source ?? "quote_request"),
+      byProduct: this.countBy([...inWindow], (assignment) => assignment.productKey ?? "unknown"),
+      byUrgency: this.countBy([...inWindow], (assignment) => assignment.urgency ?? "normal")
+    };
+  }
+
+  private managerAggregates(rows: readonly LeadAssignmentRecord[], windowDays: number): { input: Record<string, unknown>; advisorLabels: Record<string, string> } {
+    const now = Date.now();
+    const since = now - windowDays * DAY_MS;
+    const byAdvisor = new Map<string, LeadAssignmentRecord[]>();
+    let unassignedOpen = 0;
+    for (const assignment of rows) {
+      const open = !CLOSED_PIPELINE_STATUSES.has(pipelineStatusOf(assignment));
+      if (!assignment.assignedAdvisorId) {
+        if (open) unassignedOpen += 1;
+        continue;
+      }
+      byAdvisor.set(assignment.assignedAdvisorId, [...(byAdvisor.get(assignment.assignedAdvisorId) ?? []), assignment]);
+    }
+    const stats = [...byAdvisor.entries()].map(([advisorId, leads]) => {
+      const open = leads.filter((assignment) => !CLOSED_PIPELINE_STATUSES.has(pipelineStatusOf(assignment)));
+      const inWindow = leads.filter((assignment) => assignment.assignedAt.getTime() >= since);
+      const won = inWindow.filter((assignment) => pipelineStatusOf(assignment) === "gagne").length;
+      return {
+        advisorId,
+        openLeads: open.length,
+        overdueOpen: open.filter((assignment) => isOverdue(assignment, now)).length,
+        received: inWindow.length,
+        won,
+        lost: inWindow.filter((assignment) => pipelineStatusOf(assignment) === "perdu").length,
+        conversionRate: inWindow.length === 0 ? null : Math.round((won / inWindow.length) * 1000) / 10,
+        averageFirstReplyMinutes: averageFirstReply(inWindow).average
+      };
+    })
+      .sort((left, right) => right.openLeads - left.openLeads || left.advisorId.localeCompare(right.advisorId))
+      .slice(0, MANAGER_MAX_ADVISORS);
+    const advisorLabels: Record<string, string> = {};
+    const advisors = stats.map(({ advisorId, ...counters }, index) => {
+      const label = `C${index + 1}`;
+      advisorLabels[label] = advisorId;
+      return { label, ...counters };
+    });
+    return {
+      input: { windowDays, overdueAfterHours: OVERDUE_AFTER_HOURS, advisorsCount: byAdvisor.size, unassignedOpen, advisors },
+      advisorLabels
     };
   }
 
@@ -220,4 +523,80 @@ export class BrokerAiService {
       return acc;
     }, {});
   }
+}
+
+/** Same reading as the CRM lists (`BrokerCrmLeadsService.statusOf`, private there). */
+function pipelineStatusOf(assignment: LeadAssignmentRecord): BrokerCrmPipelineStatus {
+  if (assignment.crmStatus) return assignment.crmStatus;
+  if (assignment.status === "accepted") return "accepte";
+  if (assignment.status === "contacted") return "contacte";
+  if (assignment.status === "rejected" || assignment.status === "disputed") return "rejete_conteste";
+  return "nouveau";
+}
+
+function isOverdue(assignment: LeadAssignmentRecord, now: number): boolean {
+  const lastActivity = assignment.crmUpdatedAt ?? assignment.lastBrokerActionAt ?? assignment.assignedAt;
+  return now - lastActivity.getTime() > OVERDUE_AFTER_HOURS * 3600 * 1000;
+}
+
+function averageFirstReply(rows: readonly LeadAssignmentRecord[]): { average: number | null; measured: number } {
+  const delays = rows.map(firstVisibleReplyMinutes).filter((minutes): minutes is number => minutes !== null);
+  return { average: delays.length === 0 ? null : Math.round(delays.reduce((sum, minutes) => sum + minutes, 0) / delays.length), measured: delays.length };
+}
+
+const AGGREGATE_KEY = /^[A-Za-z0-9_-]{1,48}$/;
+/** Keys that could carry an identity even in an aggregate payload: dropped whatever their value. */
+const IDENTITY_LIKE_KEY = /(name|nom|prenom|tel|contact|address|adresse|reference|token|ip)$|mail|phone|mobile|msisdn|whatsapp|iban|passport|card/i;
+/** Only lower-case codes (statuses, product keys, sources) and ISO dates survive as strings; digit runs (phones, ids) never do. */
+const AGGREGATE_CODE = /^(?!.*\d{6})[a-z0-9_]{1,40}$/;
+/** ISO 3166 country / ISO 4217 currency codes: upper case, accepted only under a country or currency key. */
+const ISO_CODE_KEY = /^(country|countryCode|country_code|currency|currencyCode|currency_code|isoCode|iso_code)$/;
+const ISO_CODE = /^[A-Z]{2,3}$/;
+/** Product-like slugs (`assurance-auto`): lower case with hyphens, accepted only under a product / source style key. */
+const SLUG_KEY = /^(product|productKey|product_key|slug|source|sourceKey|category|segment|type)$/;
+const SLUG = /^(?!.*\d{6})[a-z0-9]+(?:[_-][a-z0-9]+)*$/;
+const ISO_DATE = /^\d{4}-\d{2}-\d{2}(T\d{2}:\d{2}(:\d{2}(\.\d{1,3})?)?Z?)?$/;
+const AGGREGATE_MAX_DEPTH = 4;
+const AGGREGATE_MAX_LEAVES = 150;
+const AGGREGATE_MAX_ARRAY = 20;
+
+/**
+ * Reduces a caller-provided aggregate object (dashboard port, weekly stats) to a bounded tree of
+ * numbers, booleans, nulls, lower-case codes and ISO dates: no free text, no identifier, no prospect.
+ */
+export function boundAggregates(value: unknown): Record<string, unknown> {
+  const budget = { leaves: AGGREGATE_MAX_LEAVES };
+  const bounded = boundNode(value, 0, budget);
+  return bounded && typeof bounded === "object" && !Array.isArray(bounded) ? bounded as Record<string, unknown> : {};
+}
+
+function boundString(value: string, key: string | undefined): boolean {
+  if (AGGREGATE_CODE.test(value) || ISO_DATE.test(value)) return true;
+  if (key !== undefined && ISO_CODE_KEY.test(key) && ISO_CODE.test(value)) return true;
+  return key !== undefined && SLUG_KEY.test(key) && value.length <= 40 && SLUG.test(value);
+}
+
+function boundNode(value: unknown, depth: number, budget: { leaves: number }, key?: string): unknown {
+  if (value === null || typeof value === "boolean") return takeLeaf(budget, value);
+  if (typeof value === "number") return Number.isFinite(value) ? takeLeaf(budget, Math.round(value * 100) / 100) : undefined;
+  if (typeof value === "string") return boundString(value, key) ? takeLeaf(budget, value) : undefined;
+  if (value instanceof Date) return Number.isNaN(value.getTime()) ? undefined : takeLeaf(budget, value.toISOString());
+  if (depth >= AGGREGATE_MAX_DEPTH || typeof value !== "object") return undefined;
+  if (Array.isArray(value)) {
+    const items = value.slice(0, AGGREGATE_MAX_ARRAY).map((item) => boundNode(item, depth + 1, budget, key)).filter((item) => item !== undefined);
+    return items.length > 0 ? items : undefined;
+  }
+  const result: Record<string, unknown> = {};
+  for (const [key, child] of Object.entries(value as Record<string, unknown>)) {
+    if (!AGGREGATE_KEY.test(key) || IDENTITY_LIKE_KEY.test(key)) continue;
+    const bounded = boundNode(child, depth + 1, budget, key);
+    if (bounded !== undefined) result[key] = bounded;
+  }
+  return Object.keys(result).length > 0 ? result : undefined;
+}
+
+function takeLeaf(budget: { leaves: number }, value: unknown): unknown {
+  if (budget.leaves <= 0) return undefined;
+  budget.leaves -= 1;
+  return value;
 }
