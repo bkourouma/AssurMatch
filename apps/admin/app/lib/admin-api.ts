@@ -7,6 +7,7 @@ import type {
   AdminRegulatoryRegimeView
 } from "../../../../packages/shared/contracts/catalog.contracts";
 import type { AdminConsentTextView, ConsentTextTemplate } from "../../../../packages/shared/contracts/compliance.contracts";
+import type { AdminLeadDispute, AdminLeadDisputeList } from "../../../../packages/shared/contracts/lead-disputes.contracts";
 import type {
   AdminOfferContent,
   AdminOfferDetailView,
@@ -45,14 +46,17 @@ export interface BackOfficeLoginResult {
   status: "success" | "mfa_required" | "activation_required" | "locked" | "suspended" | "validation_error" | "invalid_credentials" | "error";
   accessToken?: string;
   mfaRequired?: boolean;
+  /** Spec 063 (FR-A04): the API refused the presented trusted-device token; the app clears its cookie. */
+  trustedDeviceRejected?: boolean;
+  trustedDeviceUsed?: boolean;
   error?: string;
 }
 
-export async function loginBackOffice(email: string, password: string): Promise<BackOfficeLoginResult> {
+export async function loginBackOffice(email: string, password: string, trustedDeviceToken?: string): Promise<BackOfficeLoginResult> {
   const response = await fetch(`${backOfficeApiBaseUrl()}/auth/login`, {
     method: "POST",
     headers: { "content-type": "application/json" },
-    body: JSON.stringify({ email, password }),
+    body: JSON.stringify(trustedDeviceToken ? { email, password, trustedDeviceToken } : { email, password }),
     cache: "no-store"
   });
   if (response.status === 400 || response.status === 422) return { status: "validation_error", error: `api_${response.status}` };
@@ -61,7 +65,7 @@ export async function loginBackOffice(email: string, password: string): Promise<
   if (response.status === 428) return { status: "activation_required", error: "activation_required" };
   if (response.status === 401) return { status: "invalid_credentials", error: "invalid_credentials" };
   if (!response.ok) return { status: "error", error: `api_${response.status}` };
-  const session = await response.json() as { accessToken?: string; mfaRequired?: boolean };
+  const session = await response.json() as { accessToken?: string; mfaRequired?: boolean; trustedDeviceRejected?: boolean; trustedDeviceUsed?: boolean };
   if (!session.accessToken) return { status: "error", error: "invalid_session" };
   return session.mfaRequired ? { status: "mfa_required", ...session } : { status: "success", ...session };
 }
@@ -89,17 +93,70 @@ export async function enrollMfa() {
   return response.json() as Promise<{ secret: string; otpauthUri: string; backupCodes: string[] }>;
 }
 
-export async function verifyMfa(code: string, kind: "totp" | "backup" = "totp") {
+/** Spec 063: `trustedDevice` is returned once, only when `trustDevice` was requested. */
+export interface VerifyMfaResult {
+  accessToken?: string;
+  mfaRequired?: boolean;
+  trustedDevice?: { token: string; expiresAt: string };
+}
+
+export async function verifyMfa(
+  code: string,
+  kind: "totp" | "backup" = "totp",
+  options: { trustDevice?: boolean; deviceLabel?: string } = {}
+): Promise<VerifyMfaResult> {
   const token = await getBackOfficeToken();
   if (!token) throw new Error("session_required");
   const response = await fetch(`${backOfficeApiBaseUrl()}/auth/mfa/verify`, {
     method: "POST",
     headers: { Authorization: `Bearer ${token}`, "content-type": "application/json" },
-    body: JSON.stringify({ code, kind }),
+    body: JSON.stringify(options.trustDevice ? { code, kind, trustDevice: true, deviceLabel: options.deviceLabel } : { code, kind }),
     cache: "no-store"
   });
   if (!response.ok) throw new Error(`api_${response.status}`);
-  return response.json();
+  return response.json() as Promise<VerifyMfaResult>;
+}
+
+/** Spec 063 (FR-A06): active trusted devices of the signed-in user (MFA-verified token required). */
+export interface TrustedDeviceView {
+  id: string;
+  label: string | null;
+  createdAt: string;
+  lastUsedAt: string | null;
+  expiresAt: string;
+}
+
+export async function listTrustedDevices(): Promise<{ ok: true; devices: TrustedDeviceView[] } | { ok: false; error: string }> {
+  const token = await getBackOfficeToken();
+  if (!token) return { ok: false, error: "session_required" };
+  try {
+    const response = await fetch(`${backOfficeApiBaseUrl()}/auth/trusted-devices`, {
+      headers: { Authorization: `Bearer ${token}` },
+      cache: "no-store"
+    });
+    if (!response.ok) return { ok: false, error: `api_${response.status}` };
+    const body = (await response.json()) as TrustedDeviceView[] | { devices?: TrustedDeviceView[] };
+    return { ok: true, devices: Array.isArray(body) ? body : body.devices ?? [] };
+  } catch {
+    return { ok: false, error: "api_unavailable" };
+  }
+}
+
+export async function revokeTrustedDevices(): Promise<{ ok: true; revoked: number } | { ok: false; error: string }> {
+  const token = await getBackOfficeToken();
+  if (!token) return { ok: false, error: "session_required" };
+  try {
+    const response = await fetch(`${backOfficeApiBaseUrl()}/auth/trusted-devices`, {
+      method: "DELETE",
+      headers: { Authorization: `Bearer ${token}` },
+      cache: "no-store"
+    });
+    if (!response.ok) return { ok: false, error: `api_${response.status}` };
+    const body = (await response.json()) as { revoked?: number };
+    return { ok: true, revoked: typeof body.revoked === "number" ? body.revoked : 0 };
+  } catch {
+    return { ok: false, error: "api_unavailable" };
+  }
 }
 
 export async function changePassword(oldPassword: string, newPassword: string): Promise<void> {
@@ -162,6 +219,20 @@ export interface AdminDashboardData {
     other: number;
   };
   sensitiveFeatureFlags: Array<{ key: string; scopeType: string; scopeId: string | null; value: boolean }>;
+  // Lot 6 (spec 073 T304): additive KPI blocks; an older API omits them, the screen then shows "Non mesure".
+  visits?: { total: number; byPage: Array<{ page: string; total: number }> } | null;
+  visitToRequestRate?: number | null;
+  activeCountries?: number;
+  activeProducts?: number;
+  partnerSla?: { averageFirstActionMinutes: number | null; measured: number };
+  leadQuality?: { transmitted: number; disputed: number; accepted: number; rejected: number; disputeRate: number | null };
+  revenue?: { byCurrency: Array<{ currency: string; subscription: number; leads: number }> } | null;
+  revenueRestricted?: boolean;
+  aiEnabled?: boolean;
+  aiRestricted?: boolean;
+  aiSummary?: { insightId: string; generatedAt: string; status: string; excerpt: string | null } | null;
+  aiAlerts?: { pendingValidation: number; items: Array<{ insightId: string; type: string; createdAt: string; status: string }> } | null;
+  // Lot 6 (end)
 }
 
 export interface AdminUser {
@@ -481,6 +552,11 @@ export interface AdminPartnerSlaRowData {
   leadsWithinTarget: number;
   complianceRate: number;
   averageFirstActionMinutes: number | null;
+  /** Spec 062 (additive, null/absent when nothing is measured): first reply visible to the visitor. */
+  averageFirstVisibleReplyMinutes?: number | null;
+  firstVisibleReplyMeasured?: number;
+  firstVisibleReplyWithinTarget?: number;
+  firstVisibleReplyComplianceRate?: number | null;
 }
 
 export function readPartnerSla() {
@@ -617,6 +693,36 @@ export function readLeadPacks() {
   return readAdmin<LeadPackData[]>("/admin/billing/packs", []);
 }
 
+/** Spec 063 (CRM-012): lead disputes decided by the finance admin. Mirrors `lead-disputes.contracts.ts`. */
+export type { AdminLeadDispute, AdminLeadDisputeList } from "../../../../packages/shared/contracts/lead-disputes.contracts";
+
+export interface LeadDisputeFilters {
+  status?: string;
+  partnerId?: string;
+  countryCode?: string;
+  from?: string;
+  to?: string;
+  page?: number;
+  pageSize?: number;
+}
+
+const emptyLeadDisputeList: AdminLeadDisputeList = { items: [], page: 1, pageSize: 20, total: 0 };
+
+/** GET /admin/billing/disputes: filtered, paginated list (never carries lead contact or answers). */
+export function readLeadDisputes(filters: LeadDisputeFilters = {}) {
+  const query = new URLSearchParams();
+  for (const [key, value] of Object.entries(filters)) {
+    if (value !== undefined && value !== "") query.set(key, String(value));
+  }
+  const suffix = query.toString();
+  return readAdmin<AdminLeadDisputeList>(`/admin/billing/disputes${suffix ? `?${suffix}` : ""}`, emptyLeadDisputeList);
+}
+
+/** GET /admin/billing/disputes/:id */
+export function readLeadDispute(disputeId: string) {
+  return readAdmin<AdminLeadDispute | null>(`/admin/billing/disputes/${encodeURIComponent(disputeId)}`, null);
+}
+
 /** Spec 046: mirrors `packages/shared/contracts/data-retention.contracts.ts` (metadata and counts only, no personal data). */
 export const RETENTION_CATEGORY_KEYS = [
   "quote_requests",
@@ -626,7 +732,12 @@ export const RETENTION_CATEGORY_KEYS = [
   "waitlist",
   "ai_traces",
   "webhook_payloads",
-  "messaging_references"
+  "messaging_references",
+  "satisfaction_feedback",
+  // Spec 062: provisional durations, pending legal validation.
+  "lead_message_threads",
+  "lead_document_requests",
+  "data_requests"
 ] as const;
 export type RetentionCategoryKey = (typeof RETENTION_CATEGORY_KEYS)[number];
 export type RetentionSubjectKey = RetentionCategoryKey | "prospects";
@@ -635,7 +746,7 @@ export interface RetentionPolicyItemData {
   category: RetentionCategoryKey;
   retentionDays: number;
   source: "default" | "global" | "country";
-  anchor: "last_activity" | "created_at" | "reviewed_at" | "country_public_since" | "occurred_at";
+  anchor: "last_activity" | "created_at" | "reviewed_at" | "country_public_since" | "occurred_at" | "submitted_at";
   defaultRetentionDays: number;
   globalRetentionDays: number | null;
   countryRetentionDays: number | null;
@@ -701,6 +812,97 @@ export function readRetentionBatches() {
   return readAdmin<RetentionBatchesData>("/admin/retention/batches", { purgeEnabled: false, items: [] });
 }
 
+/**
+ * Spec 062: data-subject requests (access, rectification, erasure) of the compliance queue. Mirrors
+ * `packages/shared/contracts/data-requests.ts`. The support role only receives the list fields.
+ */
+export const DATA_REQUEST_TYPE_KEYS = ["access", "rectification", "erasure"] as const;
+export const DATA_REQUEST_STATUS_KEYS = ["received", "in_review", "completed", "rejected"] as const;
+export type DataRequestTypeKey = (typeof DATA_REQUEST_TYPE_KEYS)[number];
+export type DataRequestStatusKey = (typeof DATA_REQUEST_STATUS_KEYS)[number];
+
+export interface DataRequestListItemData {
+  id: string;
+  reference: string;
+  type: DataRequestTypeKey | (string & {});
+  status: DataRequestStatusKey | (string & {});
+  createdAt: string;
+  dueAt: string;
+  overdue?: boolean;
+  quoteReference?: string;
+  locale?: string;
+}
+
+export interface DataRequestListData {
+  items: DataRequestListItemData[];
+  nextCursor: string | null;
+}
+
+export interface DataRequestHistoryEntryData {
+  action: string;
+  at: string;
+}
+
+export interface DataRequestDetailData extends DataRequestListItemData {
+  /** Personal data written by the visitor: absent for the support role. */
+  detail?: string;
+  acknowledgedAt?: string | null;
+  reviewedAt?: string;
+  decidedAt?: string;
+  decisionNote?: string;
+  erasureBatchId?: string;
+  erasureAllowed?: boolean;
+  history?: DataRequestHistoryEntryData[];
+}
+
+export function readDataRequests(filters: { status?: string; type?: string; cursor?: string; limit?: number } = {}) {
+  const params = new URLSearchParams();
+  if (filters.status) params.set("status", filters.status);
+  if (filters.type) params.set("type", filters.type);
+  if (filters.cursor) params.set("cursor", filters.cursor);
+  if (filters.limit) params.set("limit", String(filters.limit));
+  const query = params.toString();
+  return readAdmin<DataRequestListData>(`/admin/data-requests${query ? `?${query}` : ""}`, { items: [], nextCursor: null });
+}
+
+export function readDataRequest(id: string) {
+  return readAdmin<DataRequestDetailData | null>(`/admin/data-requests/${encodeURIComponent(id)}`, null);
+}
+
+/**
+ * Spec 062: read-only view of the broker/visitor conversations of one quote request. Every read is
+ * audited by the API; with `masked` set, the message bodies are replaced by a placeholder.
+ */
+export interface AdminConversationMessageData {
+  id: string;
+  senderType: "broker" | "visitor" | (string & {});
+  /** Null when masked (support role). */
+  body: string | null;
+  bodyMasked?: boolean;
+  createdAt: string;
+  readAt?: string | null;
+  /** Count only: file names are personal data and are never sent to the admin view. */
+  attachmentCount?: number;
+}
+
+export interface AdminConversationData {
+  conversationId: string;
+  partnerName: string;
+  state?: "open" | "read_only" | (string & {});
+  readOnlyReason?: string | null;
+  messages: AdminConversationMessageData[];
+}
+
+export interface AdminLeadConversationsData {
+  quoteRequestId?: string;
+  masked: boolean;
+  conversations: AdminConversationData[];
+}
+
+export function readAdminLeadConversations(quoteRequestId: string) {
+  return readAdmin<AdminLeadConversationsData>(`/admin/leads/${encodeURIComponent(quoteRequestId)}/conversations`, { masked: false, conversations: [] });
+}
+
 export interface AdminAiInsight {
   id: string;
   assistType: string;
@@ -738,7 +940,7 @@ export async function readPartnerIntegrations(): Promise<AdminApiState<PartnerIn
   };
 }
 
-export type RoutingRuleMode = "first_eligible" | "round_robin" | "priority" | "capacity" | "performance" | "exclusive" | "manual" | "multi_send";
+export type RoutingRuleMode = "first_eligible" | "round_robin" | "priority" | "capacity" | "performance" | "exclusive" | "manual" | "multi_send" | "ai_assisted";
 
 export interface RoutingRuleData {
   id: string;
@@ -772,6 +974,12 @@ export interface PendingManualQuoteData {
   productKey: string;
   createdAt: string;
   candidates: Array<{ partnerTenantId: string; legalName: string; plan: "starter" | "pro" | "enterprise"; eligible: boolean; reasons: string[] }>;
+  /** Lot 5 (spec 071): why the request is parked (manual_rule, lead_quality_below_threshold, ai_suggestion_pending, ...). */
+  parkedReasons?: string[];
+  /** Lot 5 (spec 071): lead quality score (0-100) computed at routing time, when known. */
+  qualityScore?: number | null;
+  /** Lot 5 (spec 071): advisory AI suggestion among the eligible brokers; the admin validates by assigning. */
+  aiSuggestion?: { partnerTenantId: string; rationale: string; provider: string; generatedAt: string } | null;
 }
 
 export interface PendingManualQueueData {
@@ -1576,3 +1784,150 @@ export function updateAdminOffer(offerId: string, input: AdminOfferWriteInput) {
 export function runAdminOfferDecision(offerId: string, action: "submit" | "validate" | "reject" | "suspend", reason: string) {
   return writeAdminResult<AdminOfferDetailView>(offerPath(offerId, `/${action}`), "POST", { reason });
 }
+
+// Lot 6 (spec 073 T402/T403)
+export interface RoutingPrecheckResultData {
+  result: "eligible" | "not_eligible";
+  reasons: string[];
+  notifiedBrokers: false;
+  transmittedLead: false;
+}
+
+/** Simulation only: the server notifies no broker and transmits no lead. */
+export function runRoutingPrecheck(input: { partnerTenantId: string; countryId: string; productId: string; consentRecordId?: string }) {
+  return writeAdmin<RoutingPrecheckResultData>("/admin/routing/precheck", "POST", input);
+}
+
+// Lot 6 (end)
+
+// Lot 9 (imports)
+import type {
+  ContentCapabilitiesView,
+  ContentCmsLocale,
+  ContentEntryCreateDto,
+  ContentEntryListResponse,
+  ContentEntryView,
+  ContentKind,
+  ContentStatus
+} from "../../../../packages/shared/contracts/content-cms.contracts";
+
+// Lot 9 (start)
+// Spec 072: minimal CMS for the Content Admin role. Routes `/admin/content/*`; the API stays the
+// authority on every permission and transition, the screen only mirrors it.
+
+/** Error of a content write, carrying the API status and its `{ code, message }` body. */
+export class ContentApiError extends Error {
+  readonly status: number;
+  readonly code: string;
+
+  constructor(status: number, code: string, message: string) {
+    super(message);
+    this.name = "ContentApiError";
+    this.status = status;
+    this.code = code;
+  }
+}
+
+export interface ContentEntryListFilters {
+  kind?: ContentKind | undefined;
+  locale?: ContentCmsLocale | undefined;
+  status?: ContentStatus | undefined;
+  countryCode?: string | undefined;
+  entryKey?: string | undefined;
+}
+
+const emptyContentCapabilities: ContentCapabilitiesView = { canRead: false, canEdit: false, canApprove: false, canApproveLegal: false };
+
+function contentPath(id: string, suffix = ""): string {
+  return `/admin/content/entries/${encodeURIComponent(id)}${suffix}`;
+}
+
+async function writeContent<T>(path: string, method: "POST" | "PUT", body?: unknown): Promise<T> {
+  const token = await getBackOfficeToken();
+  if (!token) throw new ContentApiError(401, "session_required", "session_required");
+  const response = await fetch(`${backOfficeApiBaseUrl()}${path}`, {
+    method,
+    headers: {
+      Authorization: `Bearer ${token}`,
+      ...(body !== undefined ? { "content-type": "application/json" } : {})
+    },
+    ...(body !== undefined ? { body: JSON.stringify(body) } : {}),
+    cache: "no-store"
+  });
+  if (!response.ok) {
+    let code = `api_${response.status}`;
+    let message = code;
+    try {
+      const parsed = await response.json() as { code?: unknown; message?: unknown };
+      if (typeof parsed.code === "string") code = parsed.code;
+      if (typeof parsed.message === "string") message = parsed.message;
+      else if (Array.isArray(parsed.message)) message = parsed.message.map(String).join("; ");
+    } catch {
+      // Body is not JSON: keep the status-based code.
+    }
+    throw new ContentApiError(response.status, code, message);
+  }
+  return response.json() as Promise<T>;
+}
+
+export function readContentCapabilities() {
+  return readAdmin<ContentCapabilitiesView>("/admin/content/capabilities", emptyContentCapabilities);
+}
+
+/** List and history answer the `{ items }` envelope of the shared contract (ContentEntryListResponse). */
+async function readContentList(path: string): Promise<AdminApiState<ContentEntryView[]>> {
+  const state = await readAdmin<ContentEntryListResponse>(path, { items: [] });
+  const items = Array.isArray(state.data?.items) ? state.data.items : [];
+  return { ...state, data: items };
+}
+
+export function readContentEntries(filters: ContentEntryListFilters = {}) {
+  const params = new URLSearchParams();
+  for (const [key, value] of Object.entries(filters)) {
+    if (typeof value === "string" && value) params.set(key, value);
+  }
+  const query = params.toString();
+  return readContentList(`/admin/content/entries${query ? `?${query}` : ""}`);
+}
+
+export function readContentEntry(id: string) {
+  return readAdmin<ContentEntryView | null>(contentPath(id), null);
+}
+
+export function readContentHistory(id: string) {
+  return readContentList(contentPath(id, "/history"));
+}
+
+export function createContentEntry(input: ContentEntryCreateDto) {
+  return writeContent<ContentEntryView>("/admin/content/entries", "POST", input);
+}
+
+export function updateContentEntry(id: string, payload: Record<string, unknown>) {
+  return writeContent<ContentEntryView>(contentPath(id), "PUT", { payload });
+}
+
+export function submitContentEntry(id: string) {
+  return writeContent<ContentEntryView>(contentPath(id, "/submit"), "POST");
+}
+
+export function withdrawContentEntry(id: string) {
+  return writeContent<ContentEntryView>(contentPath(id, "/withdraw"), "POST");
+}
+
+export function approveContentEntry(id: string, note?: string) {
+  return writeContent<ContentEntryView>(contentPath(id, "/approve"), "POST", note ? { note } : {});
+}
+
+export function rejectContentEntry(id: string, note: string) {
+  return writeContent<ContentEntryView>(contentPath(id, "/reject"), "POST", { note });
+}
+
+export function archiveContentEntry(id: string, note: string) {
+  return writeContent<ContentEntryView>(contentPath(id, "/archive"), "POST", { note });
+}
+
+/** Creates the next draft version from a published entry; returns that new draft. */
+export function reviseContentEntry(id: string) {
+  return writeContent<ContentEntryView>(contentPath(id, "/revise"), "POST");
+}
+// Lot 9 (end)

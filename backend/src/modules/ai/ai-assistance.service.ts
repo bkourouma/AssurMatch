@@ -1,6 +1,7 @@
 import type { AIAssistanceStatus, AIAssistanceSurface, AIAssistType } from "../../../../packages/shared/contracts/ai-assistance.contracts";
 import { roleHasPermission } from "../../../../packages/shared/rbac/assurmatch-role-matrix";
 import type { AuditLogWriter } from "../audit-logs/audit-log-writer.service";
+import { actorHasAnyPermission } from "../common/rbac/actor-permissions";
 import type { ActorContext } from "../common/types";
 import type { FeatureFlagsService } from "../feature-flags/feature-flags.module";
 import { AIAssistanceAuditActions } from "./ai-assistance-audit-actions";
@@ -25,7 +26,7 @@ export class AIAssistanceService {
   status(actor: ActorContext, surface: AIAssistanceSurface): AIAssistanceStatus {
     this.assertAccess(actor, surface);
     const flagKeys = surface === "broker_crm"
-      ? ["ai_broker_assistant_enabled", "ai_summary_enabled", "ai_lead_scoring_enabled", "ai_duplicate_detection_enabled"]
+      ? ["ai_broker_assistant_enabled", "ai_summary_enabled", "ai_lead_scoring_enabled", "ai_duplicate_detection_enabled", "broker_weekly_ai_summary_enabled"]
       : ["ai_broker_assistant_enabled", "ai_summary_enabled", "ai_recommendation_enabled"];
     const flags = flagKeys.map((key) => ({ key, value: this.deps.featureFlags.isEnabled(key), required: true }));
     const assistTypes = this.assistTypes(surface);
@@ -69,14 +70,14 @@ export class AIAssistanceService {
   private assistTypes(surface: AIAssistanceSurface): AIAssistType[] {
     return surface === "broker_crm"
       ? ["lead_summary", "lead_score", "next_action", "relaunch_message", "lead_classification", "duplicate_hint", "loss_analysis"]
-      : ["admin_risk_triage", "activation_gap_summary", "offer_consistency_check", "activity_report", "suspicious_leads", "routing_anomaly_analysis"];
+      : ["admin_risk_triage", "activation_gap_summary", "offer_consistency_check", "offer_summary", "activity_report", "suspicious_leads", "routing_anomaly_analysis"];
   }
 
   private assertAccess(actor: ActorContext, surface: AIAssistanceSurface): void {
     if (actor.mfaVerified !== true) this.refuse(actor, surface, "mfa_required");
     if (surface === "broker_crm") {
       if (!actor.partnerTenantId) this.refuse(actor, surface, "missing_broker_tenant");
-      if (!actor.roles.some((role) => roleHasPermission(role, "broker_crm:read") || roleHasPermission(role, "broker_crm:read_assigned") || roleHasPermission(role, "broker_crm:*"))) {
+      if (!actorHasAnyPermission(actor, ["broker_crm:read", "broker_crm:read_assigned", "broker_crm:*"])) {
         this.refuse(actor, surface, "missing_crm_read_permission");
       }
       return;

@@ -1,5 +1,8 @@
 import { readActivationChecklist, readAdminCountries, readAdminProducts } from "../lib/admin-api";
-import { correctionTarget } from "../lib/catalog-messages";
+import { readBackOfficeSession } from "../lib/backoffice-auth";
+import { activationControlLabel, canApprovePublicActivation, correctionTarget, formatDate } from "../lib/catalog-messages";
+import { ACTIVATION_ATTESTABLE_CONTROLS, type ActivationChecklistControl as ChecklistControl, type ActivationChecklistSection } from "../../../../packages/shared/contracts/activation-checklist.contracts";
+import { AttestControlForm, RevokeAttestationForm } from "./attestation-forms";
 import {
   DataTable,
   Field,
@@ -22,12 +25,40 @@ function firstParam(value: string | string[] | undefined): string {
  * Read-only screen. The filters are a GET form and every "Corriger" entry is a plain link to the
  * screen that owns the fix (catalogue, consent texts, quote forms, offers, partners).
  */
+
+/** Spec 070 PRD 35/36: a manual control is passed by a compliance attestation, never computed. */
+function ManualControlAttestation({ control, canAttest }: { control: ChecklistControl; canAttest: boolean }) {
+  const target = control.attestationTarget;
+  const attestable = target ? (ACTIVATION_ATTESTABLE_CONTROLS[target.scopeType] as Record<string, { minNoteLength: number }>)[target.controlKey] : undefined;
+  if (control.attestation) {
+    return (
+      <div data-attestation="present">
+        <strong>Attestation de conformité</strong>
+        {` : par ${control.attestation.attestedById.slice(0, 8)} le ${formatDate(control.attestation.attestedAt)} — ${control.attestation.note}`}
+        {canAttest && target ? <RevokeAttestationForm target={target} /> : null}
+      </div>
+    );
+  }
+  if (!target || !attestable) return null;
+  return (
+    <div data-attestation="missing">
+      {canAttest ? (
+        <AttestControlForm target={target} minNoteLength={attestable.minNoteLength} />
+      ) : (
+        <span className="bo-description">Attestation manuelle requise, réservée à la conformité (compliance_admin, super_admin).</span>
+      )}
+    </div>
+  );
+}
+
 export default async function ActivationChecklistPage({
   searchParams
 }: {
   searchParams?: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const params = searchParams ? await searchParams : {};
+  const session = await readBackOfficeSession();
+  const canAttest = session.status === "authenticated" && canApprovePublicActivation(session.profile.roles);
   const countryFilter = firstParam(params.country).toUpperCase();
   const productFilter = firstParam(params.product);
   const [checklist, countries, products] = await Promise.all([
@@ -114,9 +145,10 @@ export default async function ActivationChecklistPage({
                         });
                       return (
                         <li key={control.key}>
-                          <StatusBadge status={control.status} tones={checklistStatusTones} /> {control.label}: {control.evidence}
+                          <StatusBadge status={control.status} tones={checklistStatusTones} /> {activationControlLabel(control.key, control.label)}: {control.evidence}
                           {target ? <> — <a href={target.href}>Corriger</a></> : null}
                           {target?.note ? <> ({target.note})</> : null}
+                          {control.manual ? <ManualControlAttestation control={control} canAttest={canAttest} /> : null}
                         </li>
                       );
                     })}
@@ -124,7 +156,7 @@ export default async function ActivationChecklistPage({
                 )
               }
             ]}
-            items={checklist.data.sections}
+            items={checklist.data.sections as ActivationChecklistSection[]}
             getKey={(section) => section.key}
             emptyLabel="Aucune precondition d'activation disponible."
             aria-label="Preconditions techniques d'activation"

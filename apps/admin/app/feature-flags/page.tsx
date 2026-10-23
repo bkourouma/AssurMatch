@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import { readAdminFeatureFlags, type AdminFeatureFlagData } from "../lib/admin-api";
 import { isAdminProfile, loginRedirect, readBackOfficeSession } from "../lib/backoffice-auth";
-import { adminReadErrorMessage, formatDate, isSensitiveFlagKey } from "../lib/catalog-messages";
+import { adminReadErrorMessage, flagDescription, flagLabel, formatDate, isSensitiveFlagKey } from "../lib/catalog-messages";
 import { Badge, Button, Card, DataTable, PageHeader, PageStack, StateMessage } from "../lib/ui/admin-ui";
 import { sensitiveFeatureFlagKeys } from "../lib/ui/admin-view-models";
 import { GlobalFlagToggleForm } from "./feature-flag-forms";
@@ -53,7 +53,20 @@ export default async function FeatureFlagsPage() {
       >
         <DataTable
           columns={[
-            { key: "flag", header: "Flag", render: (flag) => <span className="bo-ref">{flag.key}</span> },
+            {
+              key: "flag",
+              header: "Flag",
+              render: (flag) => (
+                <>
+                  <span className="bo-ref">{flag.key}</span>
+                  {flagDescription(flag.key) ? (
+                    <div className="bo-description">
+                      <strong>{flagLabel(flag.key)}</strong> - {flagDescription(flag.key)}
+                    </div>
+                  ) : null}
+                </>
+              )
+            },
             { key: "value", header: "Etat", render: (flag) => <ValueBadge value={flag.value} /> },
             { key: "changed", header: "Modifie le", render: (flag) => formatDate(flag.changedAt) },
             { key: "reason", header: "Dernier motif", render: (flag) => flag.reason ?? "-" },

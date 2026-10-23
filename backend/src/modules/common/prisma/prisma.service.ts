@@ -1,5 +1,7 @@
 import type { OnModuleDestroy, OnModuleInit } from "@nestjs/common";
-import { isTestEnvironment, validateRuntimeEnvironment } from "../../../config/config.module";
+import { isProductionLike, isTestEnvironment, validateRuntimeEnvironment } from "../../../config/config.module";
+import { logEvent } from "../../observability/structured-logger";
+import { auditIntegrityConfigured, signAuditEntry } from "../security/audit-integrity";
 import type { AuditEntry } from "../types";
 
 type TransactionCallback<T> = (client: PrismaService) => Promise<T>;
@@ -28,10 +30,10 @@ const AUDIT_FLUSH_MAX_ROWS = 200;
  * Prisma's `createMany` compiled a new query plan for every distinct row count (its query compiler
  * cost more CPU than the insert itself) and wrapped each batch in a transaction.
  */
-const AUDIT_BATCH_INSERT_SQL = `INSERT INTO "AuditLog" ("id", "actorId", "action", "targetType", "targetId", "scope", "result", "reason", "context", "correlationId", "occurredAt", "retentionUntil", "createdAt")
+const AUDIT_BATCH_INSERT_SQL = `INSERT INTO "AuditLog" ("id", "actorId", "action", "targetType", "targetId", "scope", "result", "reason", "context", "correlationId", "occurredAt", "retentionUntil", "integrityHash", "integrityKeyId", "createdAt")
 SELECT r."id", r."actorId", r."action", r."targetType", r."targetId", r."scope", r."result"::"AuditResult", r."reason", r."context", r."correlationId",
-  r."occurredAt" AT TIME ZONE 'UTC', r."retentionUntil" AT TIME ZONE 'UTC', r."createdAt" AT TIME ZONE 'UTC'
-FROM jsonb_to_recordset($1::jsonb) AS r("id" text, "actorId" text, "action" text, "targetType" text, "targetId" text, "scope" jsonb, "result" text, "reason" text, "context" jsonb, "correlationId" text, "occurredAt" timestamptz, "retentionUntil" timestamptz, "createdAt" timestamptz)`;
+  r."occurredAt" AT TIME ZONE 'UTC', r."retentionUntil" AT TIME ZONE 'UTC', r."integrityHash", r."integrityKeyId", r."createdAt" AT TIME ZONE 'UTC'
+FROM jsonb_to_recordset($1::jsonb) AS r("id" text, "actorId" text, "action" text, "targetType" text, "targetId" text, "scope" jsonb, "result" text, "reason" text, "context" jsonb, "correlationId" text, "occurredAt" timestamptz, "retentionUntil" timestamptz, "integrityHash" text, "integrityKeyId" text, "createdAt" timestamptz)`;
 
 interface PendingAuditRow {
   data: Record<string, unknown>;
@@ -53,6 +55,8 @@ export class PrismaService implements OnModuleInit, OnModuleDestroy {
   async onModuleInit(): Promise<void> {
     validateRuntimeEnvironment();
     if (this.runtimeMode !== "prisma-client") return;
+    // Lot 8 (FR-B3): no hard failure yet, but production rows would be stored unsigned.
+    if (isProductionLike() && !auditIntegrityConfigured()) logEvent("warn", "audit.integrity_key_missing", { variable: "AUDIT_INTEGRITY_KEYS" });
     if (!process.env.DATABASE_URL) throw new Error("DATABASE_URL is required for Prisma runtime");
     const adapterModule = await import("@prisma/adapter-pg") as unknown as { PrismaPg: new (input: string) => unknown };
     const prismaModule = await import("@prisma/client") as unknown as PrismaClientModule;
@@ -99,7 +103,9 @@ export class PrismaService implements OnModuleInit, OnModuleDestroy {
       context: entry.context,
       correlationId: entry.correlationId,
       occurredAt: entry.occurredAt,
-      retentionUntil: entry.retentionUntil
+      retentionUntil: entry.retentionUntil,
+      // Spec 075 FR-B3 (lot 8): HMAC of the canonical entry; NULL when no integrity key is configured.
+      ...signAuditEntry(entry)
     };
     if (!this.client.$executeRawUnsafe) {
       await this.client.auditLog.create({ data });

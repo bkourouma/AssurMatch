@@ -77,6 +77,15 @@ export interface CreditNoteRecord {
   documentSha256: string;
   issuedById: string | null;
   issuedAt: Date;
+  /** Spec 063: "cancellation" (total, default) or "dispute" (partial, one per accepted dispute). */
+  kind?: "cancellation" | "dispute" | undefined;
+  disputeId?: string | null | undefined;
+  leadAssignmentId?: string | null | undefined;
+}
+
+/** Spec 063: a partial credit note never cancels the invoice. */
+export function isDisputeCreditNote(note: Pick<CreditNoteRecord, "kind">): boolean {
+  return note.kind === "dispute";
 }
 
 export interface AllocatedNumber {
@@ -102,9 +111,17 @@ export interface InvoicingRepository extends RuntimeRepository {
   findActiveInvoiceForPeriod(partnerId: string, periodFrom: Date): Promise<IssuedInvoiceRecord | undefined>;
   recordPayment(payment: InvoicePaymentRecord, transition: InvoiceStateTransition): Promise<IssuedInvoiceRecord>;
   listPayments(filter?: { invoiceId?: string | undefined; partnerId?: string | undefined }): Promise<InvoicePaymentRecord[]>;
-  issueCreditNote(invoiceId: string, scope: { countryCode: string; year: number }, build: (allocated: AllocatedNumber, invoice: IssuedInvoiceRecord) => Promise<CreditNoteRecord>): Promise<{ creditNote: CreditNoteRecord; invoice: IssuedInvoiceRecord }>;
+  /** Total cancellation credit note; "build" also receives the partial (dispute) notes already issued on the invoice. */
+  issueCreditNote(invoiceId: string, scope: { countryCode: string; year: number }, build: (allocated: AllocatedNumber, invoice: IssuedInvoiceRecord, existingCreditNotes: CreditNoteRecord[]) => Promise<CreditNoteRecord>): Promise<{ creditNote: CreditNoteRecord; invoice: IssuedInvoiceRecord }>;
+  /**
+   * Spec 063: partial credit note of one accepted dispute. Idempotent through "disputeId": a second
+   * call returns the note already issued (created: false) and allocates no number. The invoice is
+   * never modified.
+   */
+  issueDisputeCreditNote(invoiceId: string, disputeId: string, scope: { countryCode: string; year: number }, build: (allocated: AllocatedNumber, invoice: IssuedInvoiceRecord) => Promise<CreditNoteRecord>): Promise<{ creditNote: CreditNoteRecord; invoice: IssuedInvoiceRecord; created: boolean }>;
   findCreditNote(id: string): Promise<CreditNoteRecord | undefined>;
-  listCreditNotes(filter?: { partnerId?: string | undefined }): Promise<CreditNoteRecord[]>;
+  findCreditNoteByDispute(disputeId: string): Promise<CreditNoteRecord | undefined>;
+  listCreditNotes(filter?: { partnerId?: string | undefined; invoiceId?: string | undefined }): Promise<CreditNoteRecord[]>;
 }
 
 function byIssuedAtDesc<T extends { issuedAt: Date }>(left: T, right: T): number {
@@ -172,13 +189,14 @@ export class MemoryInvoicingRepository implements InvoicingRepository {
       .map((payment) => structuredClone(payment));
   }
 
-  async issueCreditNote(invoiceId: string, scope: { countryCode: string; year: number }, build: (allocated: AllocatedNumber, invoice: IssuedInvoiceRecord) => Promise<CreditNoteRecord>): Promise<{ creditNote: CreditNoteRecord; invoice: IssuedInvoiceRecord }> {
+  async issueCreditNote(invoiceId: string, scope: { countryCode: string; year: number }, build: (allocated: AllocatedNumber, invoice: IssuedInvoiceRecord, existingCreditNotes: CreditNoteRecord[]) => Promise<CreditNoteRecord>): Promise<{ creditNote: CreditNoteRecord; invoice: IssuedInvoiceRecord }> {
     return this.serialized(async () => {
       const invoice = this.invoices.find((candidate) => candidate.id === invoiceId);
       if (!invoice) throw new InvoiceConflictError("invoice_missing");
       assertCancellable(invoice);
       const allocated = this.peek("credit_note", scope.countryCode, scope.year);
-      const creditNote = await build(allocated, structuredClone(invoice));
+      const existing = this.creditNotes.filter((note) => note.invoiceId === invoiceId).map((note) => structuredClone(note));
+      const creditNote = await build(allocated, structuredClone(invoice), existing);
       this.commit("credit_note", scope.countryCode, scope.year, allocated.sequence);
       this.creditNotes.push(structuredClone(creditNote));
       invoice.status = "cancelled";
@@ -189,13 +207,36 @@ export class MemoryInvoicingRepository implements InvoicingRepository {
     });
   }
 
+  async issueDisputeCreditNote(invoiceId: string, disputeId: string, scope: { countryCode: string; year: number }, build: (allocated: AllocatedNumber, invoice: IssuedInvoiceRecord) => Promise<CreditNoteRecord>): Promise<{ creditNote: CreditNoteRecord; invoice: IssuedInvoiceRecord; created: boolean }> {
+    return this.serialized(async () => {
+      const invoice = this.invoices.find((candidate) => candidate.id === invoiceId);
+      if (!invoice) throw new InvoiceConflictError("invoice_missing");
+      const existing = this.creditNotes.find((note) => note.disputeId === disputeId);
+      if (existing) return { creditNote: structuredClone(existing), invoice: structuredClone(invoice), created: false };
+      if (invoice.status === "cancelled") throw new InvoiceConflictError("invoice_already_cancelled");
+      const allocated = this.peek("credit_note", scope.countryCode, scope.year);
+      const creditNote = await build(allocated, structuredClone(invoice));
+      this.commit("credit_note", scope.countryCode, scope.year, allocated.sequence);
+      this.creditNotes.push(structuredClone(creditNote));
+      return { creditNote: structuredClone(creditNote), invoice: structuredClone(invoice), created: true };
+    });
+  }
+
   async findCreditNote(id: string): Promise<CreditNoteRecord | undefined> {
     const found = this.creditNotes.find((note) => note.id === id);
     return found ? structuredClone(found) : undefined;
   }
 
-  async listCreditNotes(filter: { partnerId?: string | undefined } = {}): Promise<CreditNoteRecord[]> {
-    return this.creditNotes.filter((note) => !filter.partnerId || note.partnerId === filter.partnerId).sort(byIssuedAtDesc).map((note) => structuredClone(note));
+  async findCreditNoteByDispute(disputeId: string): Promise<CreditNoteRecord | undefined> {
+    const found = this.creditNotes.find((note) => note.disputeId === disputeId);
+    return found ? structuredClone(found) : undefined;
+  }
+
+  async listCreditNotes(filter: { partnerId?: string | undefined; invoiceId?: string | undefined } = {}): Promise<CreditNoteRecord[]> {
+    return this.creditNotes
+      .filter((note) => (!filter.partnerId || note.partnerId === filter.partnerId) && (!filter.invoiceId || note.invoiceId === filter.invoiceId))
+      .sort(byIssuedAtDesc)
+      .map((note) => structuredClone(note));
   }
 
   private peek(kind: InvoiceDocumentKind, countryCode: string, year: number): AllocatedNumber {
@@ -290,14 +331,15 @@ export class PrismaInvoicingRepository implements InvoicingRepository {
     return (await this.delegate("invoicePayment").findMany({ where, orderBy: { recordedAt: "asc" } })) as InvoicePaymentRecord[];
   }
 
-  async issueCreditNote(invoiceId: string, scope: { countryCode: string; year: number }, build: (allocated: AllocatedNumber, invoice: IssuedInvoiceRecord) => Promise<CreditNoteRecord>): Promise<{ creditNote: CreditNoteRecord; invoice: IssuedInvoiceRecord }> {
+  async issueCreditNote(invoiceId: string, scope: { countryCode: string; year: number }, build: (allocated: AllocatedNumber, invoice: IssuedInvoiceRecord, existingCreditNotes: CreditNoteRecord[]) => Promise<CreditNoteRecord>): Promise<{ creditNote: CreditNoteRecord; invoice: IssuedInvoiceRecord }> {
     return this.client().$transaction(async (tx) => {
       const row = await tx.issuedInvoice.findUnique({ where: { id: invoiceId } });
       if (!row) throw new InvoiceConflictError("invoice_missing");
       const invoice = this.toInvoice(row);
       assertCancellable(invoice);
       const allocated = await this.allocate(tx, "credit_note", scope.countryCode, scope.year);
-      const creditNote = (await tx.creditNote.create({ data: await build(allocated, invoice) })) as CreditNoteRecord;
+      const existing = (await tx.creditNote.findMany({ where: { invoiceId } })) as CreditNoteRecord[];
+      const creditNote = (await tx.creditNote.create({ data: await build(allocated, invoice, existing) })) as CreditNoteRecord;
       const updated = await tx.issuedInvoice.updateMany({
         where: { id: invoiceId, status: "issued", amountPaid: 0 },
         data: { status: "cancelled", creditNoteId: creditNote.id, cancelledAt: creditNote.issuedAt, updatedAt: new Date() }
@@ -307,12 +349,41 @@ export class PrismaInvoicingRepository implements InvoicingRepository {
     });
   }
 
+  async issueDisputeCreditNote(invoiceId: string, disputeId: string, scope: { countryCode: string; year: number }, build: (allocated: AllocatedNumber, invoice: IssuedInvoiceRecord) => Promise<CreditNoteRecord>): Promise<{ creditNote: CreditNoteRecord; invoice: IssuedInvoiceRecord; created: boolean }> {
+    try {
+      return await this.client().$transaction(async (tx) => {
+        const row = await tx.issuedInvoice.findUnique({ where: { id: invoiceId } });
+        if (!row) throw new InvoiceConflictError("invoice_missing");
+        const invoice = this.toInvoice(row);
+        const existing = (await tx.creditNote.findFirst({ where: { disputeId } })) as CreditNoteRecord | null;
+        if (existing) return { creditNote: existing, invoice, created: false };
+        if (invoice.status === "cancelled") throw new InvoiceConflictError("invoice_already_cancelled");
+        const allocated = await this.allocate(tx, "credit_note", scope.countryCode, scope.year);
+        const creditNote = (await tx.creditNote.create({ data: await build(allocated, invoice) })) as CreditNoteRecord;
+        return { creditNote, invoice, created: true };
+      });
+    } catch (error) {
+      // A concurrent decision stored the same dispute first (unique disputeId): converge on its note.
+      if (isUniqueViolation(error)) {
+        const existing = await this.findCreditNoteByDispute(disputeId);
+        const invoice = await this.findInvoice(invoiceId);
+        if (existing && invoice) return { creditNote: existing, invoice, created: false };
+      }
+      throw error;
+    }
+  }
+
   async findCreditNote(id: string): Promise<CreditNoteRecord | undefined> {
     return ((await this.delegate("creditNote").findUnique({ where: { id } })) as CreditNoteRecord | null) ?? undefined;
   }
 
-  async listCreditNotes(filter: { partnerId?: string | undefined } = {}): Promise<CreditNoteRecord[]> {
-    return (await this.delegate("creditNote").findMany({ ...(filter.partnerId ? { where: { partnerId: filter.partnerId } } : {}), orderBy: { issuedAt: "desc" } })) as CreditNoteRecord[];
+  async findCreditNoteByDispute(disputeId: string): Promise<CreditNoteRecord | undefined> {
+    return ((await this.delegate("creditNote").findFirst({ where: { disputeId } })) as CreditNoteRecord | null) ?? undefined;
+  }
+
+  async listCreditNotes(filter: { partnerId?: string | undefined; invoiceId?: string | undefined } = {}): Promise<CreditNoteRecord[]> {
+    const where = { ...(filter.partnerId ? { partnerId: filter.partnerId } : {}), ...(filter.invoiceId ? { invoiceId: filter.invoiceId } : {}) };
+    return (await this.delegate("creditNote").findMany({ where, orderBy: { issuedAt: "desc" } })) as CreditNoteRecord[];
   }
 
   /** The upsert locks the sequence row until the surrounding transaction ends: no gap, no duplicate. */

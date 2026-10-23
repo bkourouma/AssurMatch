@@ -122,3 +122,26 @@ export async function issueCreditNoteAction(formData: FormData): Promise<void> {
   if (status === 401) redirect(loginRedirect("/billing?tab=factures", "session_expired"));
   redirect(`/billing?tab=factures&billing=${outcome(status, "credit_note_issued")}`);
 }
+
+const DISPUTE_ID = /^[A-Za-z0-9_-]{8,64}$/;
+const DISPUTE_DECISIONS = new Set(["accept", "reject"]);
+
+/**
+ * Spec 063 FR-B03/FR-B04: the finance admin decides an opened lead dispute. The reason is mandatory
+ * (10 to 1000 characters, checked here and by the API). Accepting credits the lead on the next draft
+ * invoice or through an automatic partial credit note; nothing is refunded to anybody and no payment
+ * is captured. The API enforces the role, the country scope, `billing_enabled` and the single decision.
+ */
+export async function decideLeadDisputeAction(formData: FormData): Promise<void> {
+  const disputeId = stringValue(formData.get("disputeId")).trim();
+  const decision = stringValue(formData.get("decision"));
+  const reason = stringValue(formData.get("reason")).trim();
+  if (!DISPUTE_ID.test(disputeId)) redirect("/billing?tab=contestations&billing=invalid");
+  const detail = `/billing?tab=contestations&dispute=${encodeURIComponent(disputeId)}`;
+  if (!DISPUTE_DECISIONS.has(decision) || reason.length < 10 || reason.length > 1000) redirect(`${detail}&billing=dispute_invalid`);
+  const status = await callBillingApi(`/admin/billing/disputes/${encodeURIComponent(disputeId)}/decision`, "POST", { decision, reason });
+  if (status === 401) redirect(loginRedirect(detail, "session_expired"));
+  if (status === 409) redirect(`${detail}&billing=dispute_already_decided`);
+  if (status === 422) redirect(`${detail}&billing=dispute_billing_disabled`);
+  redirect(`${detail}&billing=${outcome(status, decision === "accept" ? "dispute_accepted" : "dispute_rejected")}`);
+}

@@ -15,7 +15,14 @@ export type VisitorEmailStep =
   | "consent_withdrawn"
   | "tracking_link"
   /** Spec 055: the named broker sent an indicative proposal. */
-  | "proposal_available";
+  | "proposal_available"
+  /** Spec 062: pointers only, the message / request / decision itself stays in the tracking space. */
+  | "broker_message"
+  | "documents_requested"
+  | "data_request_acknowledged"
+  | "data_request_closed"
+  /** Spec 067: single J+3 reminder of a document request left open; pointer only, no document label. */
+  | "documents_reminder";
 
 /** Spec 044 legacy context, kept for the rows queued before spec 054. */
 export interface VisitorQuoteEmailContext {
@@ -47,6 +54,10 @@ export interface VisitorStepEmailContext {
   /** Fresh visitor access token minted at render time (R2); never stored in clear. */
   token?: string | undefined;
   tokenExpiresAt?: Date | undefined;
+  /** Spec 062 D-10: reference (`DR-…`), kind and indicative due date of a data request. No free text. */
+  dataRequest?: { reference: string; requestType?: string | undefined; dueAt?: string | undefined } | undefined;
+  /** Spec 067: signed opt-out token of a non-transactional reminder; adds the unsubscribe link when present. */
+  unsubscribeToken?: string | undefined;
 }
 
 /** Spec 055 FR-008: a pointer only; the visitor's answer itself stays in the back-office. */
@@ -78,18 +89,29 @@ export interface BrokerAlertEmailContext {
 }
 
 export type BrokerAlertEmailType =
+  | "broker_visitor_message"
   | "broker_document_received"
   | "broker_task_due"
   | "broker_quota_threshold"
   | "broker_license_expiring"
-  | "broker_offer_expiring";
+  | "broker_offer_expiring"
+  | "broker_lead_expiring"
+  | "broker_weekly_summary"
+  | "broker_dispute_decided";
 
 const BROKER_ALERT_COPY: Record<BrokerAlertEmailType, { subject: string; line: string; path: string }> = {
+  // Spec 062: a pointer only, the message itself is read in the back-office.
+  broker_visitor_message: { subject: "Nouveau message d'un visiteur", line: "Un visiteur vous a écrit au sujet de l'un de vos leads.", path: "/leads" },
   broker_document_received: { subject: "Nouveau document d'un visiteur", line: "Un visiteur a ajouté un document à l'un de vos leads.", path: "/leads" },
   broker_task_due: { subject: "Rappel de tâche CRM", line: "Une tâche ou un rappel de votre CRM arrive à échéance.", path: "/crm" },
   broker_quota_threshold: { subject: "Quota mensuel de leads", line: "Votre quota mensuel de leads atteint un seuil d'alerte.", path: "/account" },
   broker_license_expiring: { subject: "Licence bientôt expirée", line: "Une licence de votre cabinet arrive bientôt à expiration. Pensez à transmettre son renouvellement.", path: "/licenses" },
-  broker_offer_expiring: { subject: "Offre bientôt expirée", line: "Une de vos offres publiées arrive bientôt à la fin de sa période de validité.", path: "/offers" }
+  broker_offer_expiring: { subject: "Offre bientôt expirée", line: "Une de vos offres publiées arrive bientôt à la fin de sa période de validité.", path: "/offers" },
+  // PRD section 23: pointers only; the lead reference and the figures stay in the back-office.
+  broker_lead_expiring: { subject: "Lead proche de son échéance", line: "Un de vos leads n'a pas encore été traité et approche de son délai de première action.", path: "/leads" },
+  broker_weekly_summary: { subject: "Résumé hebdomadaire de votre activité", line: "Le résumé de votre semaine est disponible dans votre espace courtier.", path: "/reports" },
+  // Spec 063 FR-B08: pointer only; the decision itself is shown in Facturation > Contestations.
+  broker_dispute_decided: { subject: "Décision sur votre contestation", line: "Une décision est disponible dans Facturation > Contestations.", path: "/billing" }
 };
 
 /** Spec 061 FR-004: pointer e-mail to the compliance team; the alert itself stays in the center. */
@@ -132,7 +154,12 @@ const STEP_PURPOSE: Record<VisitorEmailStep, EmailPurpose> = {
   not_transmitted: "quote_visitor_non_routable",
   consent_withdrawn: "quote_visitor_consent_withdrawn",
   tracking_link: "quote_visitor_tracking_link",
-  proposal_available: "quote_visitor_proposal_available"
+  proposal_available: "quote_visitor_proposal_available",
+  broker_message: "quote_visitor_broker_message",
+  documents_requested: "quote_visitor_documents_requested",
+  data_request_acknowledged: "quote_visitor_data_request_acknowledged",
+  data_request_closed: "quote_visitor_data_request_closed",
+  documents_reminder: "quote_visitor_documents_reminder"
 };
 
 
@@ -180,6 +207,11 @@ export class QuoteEmailTemplateService {
       : (context.displayName ? `Bonjour ${context.displayName},` : "Bonjour,");
     const reference = locale === "en" ? `Your request reference: ${context.publicReference}` : `Référence de votre demande: ${context.publicReference}`;
     const follow = locale === "en" ? `Follow your request: ${link}` : `Suivre votre demande: ${link}`;
+    // Spec 067: the reminder is not transactional, so it always carries its signed opt-out link.
+    const unsubscribeUrl = context.unsubscribeToken ? this.unsubscribeLink(locale, context.unsubscribeToken) : undefined;
+    const unsubscribe = unsubscribeUrl
+      ? (locale === "en" ? `To stop receiving these reminders: ${unsubscribeUrl}` : `Ne plus recevoir ces rappels : ${unsubscribeUrl}`)
+      : undefined;
     const validity = context.tokenExpiresAt
       ? locale === "en"
         ? `This personal link is valid until ${formatDate(context.tokenExpiresAt)}. Do not share it. You can ask for a new one at any time from the tracking page.`
@@ -193,6 +225,7 @@ export class QuoteEmailTemplateService {
       "",
       follow,
       ...(validity ? [validity] : []),
+      ...(unsubscribe ? ["", unsubscribe] : []),
       "",
       NO_COMMITMENT[locale],
       DISCLAIMER[locale]
@@ -203,7 +236,9 @@ export class QuoteEmailTemplateService {
       body: lines.join("\n"),
       html: this.html(lines.filter((line) => line !== "").map((line) => line === follow
         ? `<p><a href="${escapeHtml(link)}">${escapeHtml(locale === "en" ? "Follow your request" : "Suivre votre demande")}</a></p>`
-        : `<p>${escapeHtml(line)}</p>`)),
+        : unsubscribeUrl && line === unsubscribe
+          ? `<p><a href="${escapeHtml(unsubscribeUrl)}">${escapeHtml(locale === "en" ? "Stop receiving these reminders" : "Ne plus recevoir ces rappels")}</a></p>`
+          : `<p>${escapeHtml(line)}</p>`)),
       purpose: STEP_PURPOSE[context.step]
     });
   }
@@ -334,6 +369,12 @@ export class QuoteEmailTemplateService {
     return `${base}${TRACKING_PATH[locale]}${encodeURIComponent(publicReference)}${query}`;
   }
 
+  /** Spec 061 FR-005 / spec 067: FR `/desinscription`, EN `/en/unsubscribe`, signed token in the query. */
+  unsubscribeLink(locale: VisitorEmailLocale, token: string): string {
+    const base = (this.options.publicAppUrl ?? process.env.PUBLIC_APP_URL ?? "http://127.0.0.1:3601").replace(/\/$/, "");
+    return `${base}${locale === "en" ? "/en/unsubscribe" : "/desinscription"}?token=${encodeURIComponent(token)}`;
+  }
+
   private frenchCopy(context: VisitorStepEmailContext): StepCopy {
     const scope = `${context.productKey} (${context.countryCode})`;
     const broker = context.partnerName;
@@ -428,6 +469,65 @@ export class QuoteEmailTemplateService {
             ""
           ]
         };
+      case "broker_message":
+        return {
+          subject: `Nouveau message de votre courtier pour votre demande ${context.publicReference}`,
+          lines: [
+            `${broker ?? "Le courtier partenaire"} vous a écrit au sujet de votre demande de devis ${scope}.`,
+            "Lisez le message et répondez-lui depuis votre espace de suivi. Le contenu du message n'est pas repris dans cet e-mail.",
+            ""
+          ]
+        };
+      case "documents_requested":
+        return {
+          subject: `Des documents vous sont demandés pour votre demande ${context.publicReference}`,
+          lines: [
+            `${broker ?? "Le courtier partenaire"} vous demande des documents pour votre demande de devis ${scope}.`,
+            "Consultez la liste dans votre espace de suivi et ajoutez les fichiers demandés.",
+            ""
+          ]
+        };
+      case "documents_reminder":
+        // Spec 067: pointer only, no document label and no content.
+        return {
+          subject: `Des documents sont toujours attendus pour votre demande ${context.publicReference}`,
+          lines: [
+            `${broker ?? "Le courtier partenaire"} attend toujours des documents pour votre demande ${context.publicReference}.`,
+            "Ajoutez-les depuis votre espace de suivi.",
+            ""
+          ]
+        };
+      case "data_request_acknowledged": {
+        const reference = context.dataRequest?.reference ?? "";
+        const kind = context.dataRequest?.requestType === "access"
+          ? "d'accès à vos données personnelles"
+          : context.dataRequest?.requestType === "rectification"
+            ? "de rectification de vos données personnelles"
+            : "d'effacement de vos données personnelles";
+        const due = context.dataRequest?.dueAt ? `Une réponse vous sera apportée au plus tard le ${context.dataRequest.dueAt.slice(0, 10)} (échéance indicative).` : undefined;
+        return {
+          subject: `Votre demande ${reference} est bien reçue`,
+          lines: [
+            `Nous avons bien reçu votre demande ${kind}.`,
+            `Référence de la demande: ${reference}`,
+            "Un membre de l'équipe conformité l'examine. Aucune donnée n'est modifiée ni effacée automatiquement.",
+            ...(due ? [due] : []),
+            "Vous pouvez suivre son statut dans votre espace de suivi.",
+            ""
+          ]
+        };
+      }
+      case "data_request_closed": {
+        const reference = context.dataRequest?.reference ?? "";
+        return {
+          subject: `Votre demande ${reference} a été traitée`,
+          lines: [
+            `Le traitement de votre demande ${reference} est terminé.`,
+            "Consultez son statut dans votre espace de suivi.",
+            ""
+          ]
+        };
+      }
       case "tracking_link":
         return {
           subject: `Votre lien de suivi (${context.publicReference})`,
@@ -534,6 +634,65 @@ export class QuoteEmailTemplateService {
             ""
           ]
         };
+      case "broker_message":
+        return {
+          subject: `New message from your broker about your request ${context.publicReference}`,
+          lines: [
+            `${broker ?? "The partner broker"} has written to you about your ${scope} quote request.`,
+            "Read the message and reply from your tracking space. The content of the message is not included in this e-mail.",
+            ""
+          ]
+        };
+      case "documents_requested":
+        return {
+          subject: `Documents are requested for your request ${context.publicReference}`,
+          lines: [
+            `${broker ?? "The partner broker"} asks you for documents for your ${scope} quote request.`,
+            "See the list in your tracking space and add the requested files.",
+            ""
+          ]
+        };
+      case "documents_reminder":
+        // Spec 067: pointer only, no document label and no content.
+        return {
+          subject: `Documents are still awaited for your request ${context.publicReference}`,
+          lines: [
+            `${broker ?? "The partner broker"} is still waiting for documents for your request ${context.publicReference}.`,
+            "Add them from your tracking space.",
+            ""
+          ]
+        };
+      case "data_request_acknowledged": {
+        const reference = context.dataRequest?.reference ?? "";
+        const kind = context.dataRequest?.requestType === "access"
+          ? "to access your personal data"
+          : context.dataRequest?.requestType === "rectification"
+            ? "to correct your personal data"
+            : "to erase your personal data";
+        const due = context.dataRequest?.dueAt ? `You will receive an answer by ${context.dataRequest.dueAt.slice(0, 10)} at the latest (indicative deadline).` : undefined;
+        return {
+          subject: `Your request ${reference} has been received`,
+          lines: [
+            `We have received your request ${kind}.`,
+            `Request reference: ${reference}`,
+            "A member of the compliance team is reviewing it. No data is changed or erased automatically.",
+            ...(due ? [due] : []),
+            "You can follow its status in your tracking space.",
+            ""
+          ]
+        };
+      }
+      case "data_request_closed": {
+        const reference = context.dataRequest?.reference ?? "";
+        return {
+          subject: `Your request ${reference} has been processed`,
+          lines: [
+            `The handling of your request ${reference} is complete.`,
+            "See its status in your tracking space.",
+            ""
+          ]
+        };
+      }
       case "tracking_link":
         return {
           subject: `Your tracking link (${context.publicReference})`,

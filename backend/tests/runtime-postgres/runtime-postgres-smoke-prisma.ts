@@ -41,6 +41,7 @@ export interface RuntimeSmokePrismaClient {
   partnerProductAuthorization: Delegate<IdRow>;
   partnerTenant: Delegate<IdRow>;
   product: Delegate<IdRow>;
+  productVersion: Delegate<IdRow>;
   prospect: Delegate<{ id: string; emailNormalized: string | null; emailFingerprint: string | null }>;
   queueJobRecord: Delegate<IdRow>;
   quoteFormDefinition: Delegate<IdRow>;

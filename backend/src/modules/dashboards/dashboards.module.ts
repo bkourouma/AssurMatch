@@ -10,7 +10,11 @@ import type { PartnersService } from "../partners/partners.module";
 import type { ProductsService } from "../products/products.module";
 import type { QuoteSubmissionService } from "../quote-requests/quote-submission.service";
 import { AdminDashboardService } from "./admin-dashboard.service";
-import { BrokerDashboardService } from "./broker-dashboard.service";
+// Lot 6
+import type { AdminAiInsightsPort, AdminInvoicesPort, AdminLeadDisputesPort, AdminVisitStatsPort } from "./admin-dashboard-kpis";
+// Lot 6 (end)
+import type { AgencyScopePort } from "../common/agency-scope";
+import { BrokerDashboardService, type BrokerDashboardAgenciesPort, type BrokerDashboardServiceDeps } from "./broker-dashboard.service";
 import { ComplianceAlertsService } from "./compliance-alerts.service";
 import { DashboardsAccessPolicy } from "./dashboards-access-policy";
 
@@ -31,6 +35,20 @@ export interface DashboardsModuleDeps {
   quoteRequests: QuoteSubmissionService;
   crmActivity?: CrmActivityRepository | undefined;
   brokerCrmConfig: { brokerCrmEnabled: boolean };
+  /** Spec 064: Enterprise display filter by agency (resolved lazily by the runtime). */
+  agencyScope?: AgencyScopePort | undefined;
+  // Lot 6 (spec 073 T302): read-only ports for the extra admin KPIs, bound lazily by the runtime.
+  adminVisitStats?: AdminVisitStatsPort | undefined;
+  adminInvoices?: AdminInvoicesPort | undefined;
+  adminLeadDisputes?: AdminLeadDisputesPort | undefined;
+  adminAiInsights?: AdminAiInsightsPort | undefined;
+  // Lot 6 (end)
+  /** Lot 3 (spec 069): billing tariff lookup for the estimated lead cost (optional). */
+  leadPricing?: BrokerDashboardServiceDeps["leadPricing"];
+  /** Lot 3 (spec 069): agencies of the tenant for the Enterprise multi-agency view (optional). */
+  agencies?: BrokerDashboardAgenciesPort | undefined;
+  /** Lot 3 (spec 069): sent proposals (spec 055 store) of one lead, added to the "quotes sent" KPI (optional). */
+  quotesSent?: BrokerDashboardServiceDeps["quotesSent"];
 }
 
 export class DashboardsModule {
@@ -47,6 +65,10 @@ export class DashboardsModule {
       partnerLicenses: deps.partnerLicenses,
       countries: deps.countries,
       crmActivity: deps.crmActivity,
+      agencyScope: deps.agencyScope,
+      leadPricing: deps.leadPricing,
+      agencies: deps.agencies,
+      quotesSent: deps.quotesSent,
       config: () => ({
         brokerDashboardEnabled: deps.featureFlags.isEnabled("broker_dashboard_enabled"),
         brokerCrmEnabled: deps.brokerCrmConfig.brokerCrmEnabled || deps.featureFlags.isEnabled("broker_crm_enabled")
@@ -63,7 +85,13 @@ export class DashboardsModule {
       partners: deps.partners,
       offers: deps.offers,
       countries: deps.countries,
-      products: deps.products
+      products: deps.products,
+      // Lot 6
+      visitStats: deps.adminVisitStats,
+      invoices: deps.adminInvoices,
+      leadDisputes: deps.adminLeadDisputes,
+      aiInsights: deps.adminAiInsights
+      // Lot 6 (end)
     });
     this.complianceAlerts = new ComplianceAlertsService({ access: this.access, audit: deps.audit });
   }

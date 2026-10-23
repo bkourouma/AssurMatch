@@ -21,6 +21,9 @@ const modulesDir = path.join(root, "backend", "src", "modules");
 const WIRING_FILES = [
   path.join(root, "backend", "src", "modules", "http-wiring", "runtime-http-wiring.module.ts"),
   path.join(root, "backend", "src", "modules", "http-wiring", "admin-operations-http.controllers.ts"),
+  // Lot 4 (spec 070)
+  path.join(root, "backend", "src", "modules", "http-wiring", "lot4-catalog-http.controllers.ts"),
+  // End Lot 4 (spec 070)
   path.join(root, "backend", "src", "runtime", "runtime-http.controller.ts")
 ];
 
@@ -74,8 +77,6 @@ export const INTERNAL_ONLY: Record<string, string> = {
     "Superseded: /admin/routing/anomalies and /analyze are served by AdminRoutingAnomaliesHttpController.",
   "AdminRoutingAnomaliesController.list":
     "Superseded: /admin/routing/anomalies and /analyze are served by AdminRoutingAnomaliesHttpController.",
-  "AdminRoutingPrecheckController.precheck":
-    "Internal: the routing precheck is evaluated by the routing engine itself and shown read-only in the activation checklist; no standalone admin route is planned (spec 049/056).",
   "AdminUsersController.createPartnerUser":
     "Superseded: broker users are invited from the partner record (POST /admin/partners/:id/users, spec 051) or by the owner (broker team, spec 053).",
   "AuthController.activate":

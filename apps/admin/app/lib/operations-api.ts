@@ -4,6 +4,8 @@ import type {
   AdminContactMessageStatusResult,
   AdminLeadAssignmentListItem,
   AdminPage,
+  AdminProspectDetail,
+  AdminProspectListItem,
   AdminQuoteRequestDetail,
   AdminQuoteRequestListItem,
   AdminQuoteReviewQueueItem,
@@ -173,6 +175,19 @@ export function readRoutingAnomalies() {
     anomalies: []
   });
 }
+
+// Lot 6 (spec 073 FR-005): prospects console.
+export type ProspectRow = AdminProspectListItem;
+export type ProspectDetail = AdminProspectDetail;
+
+export function readProspects(filters: Record<string, string | number | undefined>) {
+  return readOperations<AdminPage<ProspectRow>>(`/admin/operations/prospects${toQueryString(filters)}`, emptyPage());
+}
+
+export function readProspectDetail(prospectId: string) {
+  return readOperations<ProspectDetail | null>(`/admin/operations/prospects/${encodeURIComponent(prospectId)}`, null);
+}
+// Lot 6 (end)
 
 /** First value of a Next `searchParams` entry, trimmed; empty means "no filter". */
 export function firstValue(value: string | string[] | undefined): string | undefined {

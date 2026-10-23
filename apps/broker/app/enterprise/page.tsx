@@ -2,7 +2,8 @@ import { redirect } from "next/navigation";
 import { loginRedirect, readBackOfficeSession } from "../lib/backoffice-auth";
 import { readBrokerAgencies, readBrokerBranding, readBrokerCustomRoles, readBrokerSla } from "../lib/broker-api";
 import type { BrokerAgency, BrokerCustomRole } from "../lib/broker-api";
-import { assignAgencyMemberAction, createAgencyAction, createCustomRoleAction, updateBrandingAction, updateSlaAction } from "../lib/enterprise-actions";
+import { formatFirstVisibleReplyLine } from "../lib/conversation-vocabulary";
+import { assignAgencyMemberAction, createAgencyAction, createCustomRoleAction, updateAgencyAction, updateBrandingAction, updateSlaAction } from "../lib/enterprise-actions";
 import {
   Badge,
   Button,
@@ -17,6 +18,7 @@ import {
   Notice,
   PageHeader,
   PageStack,
+  Select,
   StatStrip,
   StatusBadge,
   TenantWriteGuard
@@ -26,6 +28,7 @@ import type { DataTableColumn } from "../lib/ui/broker-ui";
 
 const NOTICES: Record<string, string> = {
   agency_created: "Agence creee et auditee.",
+  agency_updated: "Agence modifiée et auditée.",
   member_assigned: "Membre rattache a l'agence.",
   role_created: "Role personnalise cree. Seules les permissions courtier autorisees sont conservees.",
   sla_saved: "Engagement de reactivite enregistre.",
@@ -74,7 +77,17 @@ const agencyColumns: Array<DataTableColumn<BrokerAgency>> = [
 
 const roleColumns: Array<DataTableColumn<BrokerCustomRole>> = [
   { key: "name", header: "Role", render: (role) => role.name, sortable: true, sortValue: (role) => role.name },
-  { key: "permissions", header: "Permissions accordees", render: (role) => <span className="bo-ref">{role.permissions.join(", ")}</span> }
+  { key: "permissions", header: "Permissions accordees", render: (role) => <span className="bo-ref">{role.permissions.join(", ")}</span> },
+  // Spec 064 FR-007: members holding the role (assigned from the Equipe page).
+  {
+    key: "members",
+    header: "Membres",
+    numeric: true,
+    align: "right",
+    render: (role) => (role.memberIds ?? []).length,
+    sortable: true,
+    sortValue: (role) => (role.memberIds ?? []).length
+  }
 ];
 
 export default async function BrokerEnterprisePage({ searchParams }: { searchParams: Promise<{ ent?: string }> }) {
@@ -109,6 +122,8 @@ export default async function BrokerEnterprisePage({ searchParams }: { searchPar
   // Spec 051 FR-021: a suspended partner reads its organisation but cannot change it.
   const readOnly = isTenantReadOnly(session.profile);
   const [agencies, roles, sla, branding] = await Promise.all([readBrokerAgencies(), readBrokerCustomRoles(), readBrokerSla(), readBrokerBranding()]);
+  // Spec 062 (E-08): additive fields, nothing is rendered until the API sends them.
+  const firstVisibleReplyLine = sla.status === "success" ? formatFirstVisibleReplyLine(sla.data) : undefined;
 
   return (
     <PageStack>
@@ -118,7 +133,7 @@ export default async function BrokerEnterprisePage({ searchParams }: { searchPar
         description="Agences, roles internes, engagement de reactivite et charte du portail. Rien ici ne modifie l'eligibilite, le routage ou ce que voit un visiteur."
       />
       {ent && NOTICES[ent] ? (
-        <Notice tone={ent.endsWith("created") || ent.endsWith("saved") || ent === "member_assigned" ? "success" : "warning"}>{NOTICES[ent]}</Notice>
+        <Notice tone={ent.endsWith("created") || ent.endsWith("updated") || ent.endsWith("saved") || ent === "member_assigned" ? "success" : "warning"}>{NOTICES[ent]}</Notice>
       ) : null}
 
       <Card title="Agences">
@@ -130,6 +145,35 @@ export default async function BrokerEnterprisePage({ searchParams }: { searchPar
           emptyLabel="Aucune agence enregistree."
           rowActions={(agency) => (
             <TenantWriteGuard readOnly={readOnly}>
+            <ConfirmDialog
+              triggerLabel="Modifier"
+              title={`Modifier l'agence ${agency.name}`}
+              description="La modification est auditée. Le pays de l'agence n'est pas modifiable ; elle ne change ni le routage ni l'éligibilité."
+              confirmLabel="Enregistrer"
+              cancelLabel="Annuler"
+              formAction={updateAgencyAction}
+              dataAttributes={{ "data-enterprise-form": "agency-update" }}
+            >
+              <input type="hidden" name="agencyId" value={agency.id} />
+              <Field id={`agency-name-${agency.id}`} label="Nom de l'agence">
+                <Input id={`agency-name-${agency.id}`} name="name" defaultValue={agency.name} maxLength={120} required aria-label="Nom de l'agence" />
+              </Field>
+              <Field id={`agency-city-${agency.id}`} label="Ville de l'agence">
+                <Input id={`agency-city-${agency.id}`} name="city" defaultValue={agency.city ?? ""} maxLength={80} aria-label="Ville de l'agence" />
+              </Field>
+              <Field id={`agency-status-${agency.id}`} label="Statut de l'agence">
+                <Select
+                  id={`agency-status-${agency.id}`}
+                  name="status"
+                  defaultValue={agency.status}
+                  aria-label="Statut de l'agence"
+                  options={[{ value: "active", label: "Active" }, { value: "suspended", label: "Suspendue" }]}
+                />
+              </Field>
+              <Field id={`agency-update-reason-${agency.id}`} label="Motif">
+                <Input id={`agency-update-reason-${agency.id}`} name="reason" required minLength={3} placeholder="Motif" aria-label="Motif de la modification" />
+              </Field>
+            </ConfirmDialog>
             <ConfirmDialog
               triggerLabel="Rattacher un membre"
               title={`Rattacher un membre a ${agency.name}`}
@@ -219,6 +263,7 @@ export default async function BrokerEnterprisePage({ searchParams }: { searchPar
                 { label: "Delai moyen", value: sla.data.averageFirstActionMinutes === null ? "-" : `${sla.data.averageFirstActionMinutes} min` }
               ]}
             />
+            {firstVisibleReplyLine ? <p data-sla-first-visible-reply="true">{firstVisibleReplyLine}</p> : null}
             <Card title="Objectif interne" description="Il ne peut pas etre plus lache que la cible contractuelle fixee par AssurMatch.">
               <TenantWriteGuard readOnly={readOnly}>
               <Form action={updateSlaAction} columns={2}>

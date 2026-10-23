@@ -293,9 +293,9 @@
         "lead": "Compare indicative insurance offers in Senegal, then have the quote and the guarantees confirmed by a broker authorised by the competent authority."
       }
     },
-    "pilotNotice": "This country is in its pilot phase: the number of partner brokers and comparable offers is still limited.",
+    "pilotNotice": "This country is in its pilot phase: comparable offers are only shown once the country opens publicly. In the meantime, the partner brokers and the products enabled are listed below.",
     "productsTitle": "Comparable products",
-    "productsLead": "Each product gives access to the indicative offers and, when the activation allows it, to a quote request.",
+    "productsLead": "When public activation allows it, each product gives access to the indicative offers and to a quote request.",
     "comparisonEnabled": "Comparison enabled",
     "comparisonDisabled": "Comparison not enabled",
     "quoteEnabled": "Quote enabled",
@@ -533,7 +533,12 @@
       "deductible": "lowest deductible among the offers compared",
       "ceiling": "highest coverage ceiling among the offers compared",
       "processingDelay": "shortest processing time among the offers compared"
-    }
+    },
+    "quotePickTitle": "Request a quote for several offers",
+    "quotePickHint": "Tick up to 3 offers. Each broker concerned will be named before your agreement, which you only give at the consent step.",
+    "quotePickOption": "Include {name} in my request",
+    "quotePickSubmit": "Continue to the quote request",
+    "quotePickLimit": "3 offers maximum per request."
   },
   "OfferDetail": {
     "kicker": "Indicative offer",
@@ -569,6 +574,7 @@
     "steps": {
       "need": "Your need",
       "contact": "Your details",
+      "documents": "Documents (optional)",
       "consent": "Review and consent",
       "confirmation": "Confirmation"
     },
@@ -587,22 +593,30 @@
     "preselectedRouting": "Your request will be transmitted to a partner broker authorised for {product} in {country} (or up to 3 partner brokers if you tick the box on the next step). The name of the broker chosen will appear on your tracking page.",
     "contactLegend": "Your details",
     "contactIntro": "This information lets the partner broker answer you. It is only transmitted after your consent, on the next step.",
-    "name": "Name",
+    "firstName": "First name",
+    "lastName": "Last name",
+    "fullName": "Full name",
     "nameHint": "Optional: lets the partner broker address you by name instead of writing \"Dear Sir or Madam\".",
     "email": "E-mail address",
     "emailHint": "The partner broker writes to you at this address to detail your quote; you will also receive the confirmation of your request there.",
     "phone": "Phone",
     "phoneHint": "The partner broker calls you on this number to finalise your quote. Country code included (example: +225 07 00 00 00 00).",
+    "preferredBroker": "Preferred broker",
+    "preferredBrokerNone": "No preference: we direct you to an eligible broker",
+    "preferredBrokerHint": "Your choice is taken into account if this broker remains eligible for your request; otherwise your request is directed to another eligible broker and you are told.",
     "verifyLegend": "Review and consent",
     "verifyIntro": "Check the information below before sending your request. You can still change it.",
     "reviewNeedTitle": "Your need",
     "reviewContactTitle": "Your details",
     "reviewEdit": "Edit",
+    "reviewDocuments": "Documents",
+    "reviewDocumentsValue": "{count, plural, one {# document attached} other {# documents attached}}",
     "reviewEmpty": "not provided",
     "brokerTitle": "Responsible partner broker",
     "brokerConfirm": {
       "routing": "Your request will be transmitted to a partner broker authorised for {product} in {country} (or up to 3 partner brokers if the box below is ticked). The name of the broker chosen will appear on your tracking page after sending."
     },
+    "brokerChosen": "You asked to be directed to {partner}. Your request will be transmitted to them if they remain eligible; otherwise it will be directed to another eligible partner broker and you will be told.",
     "brokerLicence": "Licence {licence} ({authority}).",
     "transmissionNotice": "Nothing is transmitted until you have ticked the consent box and sent your request.",
     "options": {
@@ -628,6 +642,27 @@
         "other": "Other"
       }
     },
+    "documents": {
+      "intro": "Optional. You can attach up to {max} documents (PDF, JPEG or PNG, {size} MB maximum each). Files are scanned before transmission, and nothing is transmitted to the broker before your agreement, given at the consent step.",
+      "memory": "Files stay in your browser and are only sent once your request has been saved.",
+      "pick": "Choose files",
+      "remove": "Remove",
+      "listLabel": "Documents attached to your request",
+      "kind": "Document type",
+      "label": "Label",
+      "full": "Maximum number of documents reached.",
+      "errorType": "\"{name}\" is not accepted: PDF, JPEG or PNG only.",
+      "errorSize": "\"{name}\" is too large: 5 MB maximum per file.",
+      "errorCount": "\"{name}\" was not added: 5 documents maximum per request.",
+      "errorEmpty": "\"{name}\" is empty and was not added."
+    },
+    "multiOffers": {
+      "label": "I authorise the transmission of my request to: {partners}; each will receive my contact details.",
+      "explain": "Without this authorisation, only the first offer ({partner}) is kept.",
+      "explainNoName": "Without this authorisation, only the first offer is kept.",
+      "single": "Only one offer can be kept per request: {partner}.",
+      "singleNoName": "Only one offer can be kept per request: the first one."
+    },
     "consentLegend": "Consent",
     "consentIntro": "Read the text below before ticking the box.",
     "consentLabel": "I agree that my request is transmitted to a partner broker eligible for this country and this product.",
@@ -641,6 +676,12 @@
     "successPrefix": "Public reference:",
     "offerPartnerRetained": "Your request has been sent to {partner}.",
     "offerPartnerNotRetained": "The broker of the selected offer was not available: your request has been directed to another approved partner broker.",
+    "chosenPartnerNotRetained": "The broker you chose could not be kept for this request: it has been directed to another eligible broker.",
+    "partnersRetained": "Your request was transmitted to {retained, plural, one {# broker} other {# brokers}} out of {requested} requested.",
+    "additionalOffersIgnored": "Only the first offer was kept.",
+    "sendingDocuments": "Sending documents.",
+    "documentsAllSent": "{sent, plural, one {# document sent} other {# documents sent}}.",
+    "documentsSomeFailed": "{sent, plural, one {# document sent} other {# documents sent}}, {failed} not sent: you can add them from your tracking space.",
     "trackLink": "Follow my request and add documents (optional)",
     "trackLinkOnly": "Follow my request",
     "backToOffers": "Back to the offers",
@@ -848,6 +889,181 @@
       "cta": "Receive a new link",
       "rateLimited": "Too many views in a short time. Try again in a few minutes.",
       "unavailable": "Tracking is temporarily unavailable. Try again in a few minutes."
+    },
+    "messaging": {
+      "title": "Conversation with your broker",
+      "lead": "Write to the broker who took charge of your request and read their replies. An e-mail tells you about a new message, without repeating its content.",
+      "empty": "No conversation yet. It will open here once a broker takes charge of your request.",
+      "loadError": "Your conversations cannot be displayed right now. Please try again in a few moments.",
+      "disabledNotice": "Messaging is paused for the moment. You can reread your exchanges, but you cannot send a new message.",
+      "unreadOne": "1 unread message",
+      "unreadMany": "{count} unread messages",
+      "threadLabel": "Conversation with {partnerName}",
+      "messagesLabel": "Messages of the conversation with {partnerName}",
+      "senderBroker": "Broker",
+      "senderYou": "You",
+      "readReceipt": "Read",
+      "readReceiptAt": "Read on {date}",
+      "noMessages": "No message yet. You can write the first one below.",
+      "noMessagesReadOnly": "No message was exchanged in this conversation.",
+      "olderMessages": "Show earlier messages",
+      "loadingOlder": "Loading earlier messages.",
+      "refresh": "Refresh the conversation",
+      "refreshing": "Refreshing.",
+      "refreshed": "Conversation up to date.",
+      "refreshFailed": "The conversation could not be refreshed. Please try again in a few moments.",
+      "attachmentsLabel": "Attachments",
+      "attachmentDownload": "Download {fileName}",
+      "sizeKb": "{value} KB",
+      "sizeMb": "{value} MB",
+      "composeTitle": "Write to the broker",
+      "composeLabel": "Your message",
+      "composeHint": "Plain text. Do not enter a bank card number or a password.",
+      "counter": "{count} / {max} characters",
+      "attachLabel": "Attachments (optional)",
+      "attachHint": "Up to 3 files, PDF, JPEG or PNG, 5 MB each. Each file is scanned before it is passed on.",
+      "selectedFiles": "Selected files",
+      "removeFile": "Remove {fileName}",
+      "send": "Send the message",
+      "sending": "Sending.",
+      "sent": "Message sent.",
+      "bodyRequired": "Enter a message before sending it.",
+      "bodyTooLong": "Your message is longer than {max} characters.",
+      "honeypotLabel": "Leave this field empty",
+      "fileErrors": {
+        "tooMany": "You can attach {max} files at most.",
+        "tooLarge": "The file \"{fileName}\" is larger than 5 MB.",
+        "type": "The file \"{fileName}\" is not a PDF, a JPEG or a PNG.",
+        "empty": "The file \"{fileName}\" is empty."
+      },
+      "readOnly": {
+        "title": "Read-only conversation",
+        "consent_withdrawn": "You withdrew your consent: the conversation can still be read, but no further message can be sent.",
+        "lead_closed": "This request is closed: you can reread the exchanges, but not send new ones.",
+        "reassigned": "Your request was handed to another broker: this conversation is kept read-only.",
+        "messaging_disabled": "Messaging is paused for the moment: the exchanges can still be read.",
+        "partner_suspended": "This broker cannot receive messages for the moment: the conversation can still be read.",
+        "not_accepted": "The broker has not taken charge of your request yet: you will be able to write to them once they do.",
+        "generic": "You cannot send a message in this conversation for the moment."
+      },
+      "errors": {
+        "rate_limited": "You sent too many messages in a short time. Please try again later.",
+        "read_only": "This conversation became read-only: your message was not sent.",
+        "disabled": "Messaging is paused for the moment: your message was not sent.",
+        "duplicate": "This message was just sent. Please wait a few minutes before sending it again.",
+        "thread_limit": "This conversation reached the maximum number of messages. Your message was not sent.",
+        "quarantined": "An attachment did not pass the security scan. Remove or replace it: your message was not sent.",
+        "invalid_document": "An attachment is not accepted (PDF, JPEG or PNG, 5 MB maximum, 3 files at most). Your message was not sent.",
+        "too_large": "An attachment is larger than 5 MB. Your message was not sent.",
+        "invalid": "Your message could not be sent: please check its content.",
+        "denied": "This link no longer gives access to the conversation. Please request a new tracking link.",
+        "error": "Your message could not be sent. Please try again in a few moments."
+      }
+    },
+    "documentRequests": {
+      "title": "Requested documents",
+      "lead": "Your broker may ask you for documents to review your request. You choose what you send: each file is scanned, then passed on to the broker concerned.",
+      "loadError": "The document requests cannot be displayed right now. Please try again in a few moments.",
+      "listLabel": "Documents requested by your brokers",
+      "requestedBy": "Requested by {partnerName}",
+      "noteLabel": "Note from the broker",
+      "due": "To provide before {date} (indicative)",
+      "createdAt": "Requested on {date}",
+      "fulfilledAt": "Provided on {date}",
+      "uploadedOne": "1 file sent",
+      "uploadedMany": "{count} files sent",
+      "status": {
+        "open": "To provide",
+        "fulfilled": "Provided",
+        "cancelled": "Cancelled"
+      },
+      "fulfilledBody": "The files for this request were received.",
+      "cancelledBody": "The broker cancelled this request: there is nothing left for you to send.",
+      "uploadDisabled": "Sending documents is paused for the moment.",
+      "uploadTitle": "Send files",
+      "fileLabel": "Files to send",
+      "fileHint": "Up to 3 files, PDF, JPEG or PNG, 5 MB each. Each file is scanned before it is passed on.",
+      "selectedFiles": "Selected files",
+      "removeFile": "Remove {fileName}",
+      "submit": "Send the files",
+      "submitting": "Sending.",
+      "noFile": "Choose at least one file.",
+      "uploadedStatusOne": "File received. It is scanned, then passed on to the broker.",
+      "uploadedStatusMany": "{count} files received. They are scanned, then passed on to the broker.",
+      "refresh": "Refresh the list",
+      "fileErrors": {
+        "tooMany": "You can send {max} files at most at a time.",
+        "tooLarge": "The file \"{fileName}\" is larger than 5 MB.",
+        "type": "The file \"{fileName}\" is not a PDF, a JPEG or a PNG.",
+        "empty": "The file \"{fileName}\" is empty."
+      },
+      "errors": {
+        "rate_limited": "You sent too many files in a short time. Please try again later.",
+        "not_open": "This request is no longer open: your files were not sent.",
+        "read_only": "This request is no longer open: your files were not sent.",
+        "disabled": "Sending documents is paused for the moment: your files were not sent.",
+        "quarantined": "A file did not pass the security scan. Remove or replace it: nothing was sent.",
+        "invalid_document": "A file is not accepted (PDF, JPEG or PNG, 5 MB maximum, 3 files at most). Nothing was sent.",
+        "too_large": "A file is larger than 5 MB. Nothing was sent.",
+        "invalid": "Your files could not be sent: please check your selection.",
+        "denied": "This link no longer allows sending documents. Please request a new tracking link.",
+        "error": "Your files could not be sent. Please try again in a few moments."
+      },
+      "sizeKb": "{value} KB",
+      "sizeMb": "{value} MB"
+    },
+    "dataRequests": {
+      "title": "My data",
+      "lead": "You can ask to access your personal data, to have it corrected or to have it erased. This does not depend on messaging and remains possible at any time.",
+      "howTitle": "What happens next",
+      "howReceived": "You receive an acknowledgement by e-mail, with the reference of your request.",
+      "howReview": "Our compliance team reviews your request, then tells you what was decided.",
+      "howDeadline": "The response time shown is indicative and may vary depending on your country.",
+      "howErasure": "An erasure request is never carried out automatically: it is reviewed by our compliance team, who may have to keep some data to comply with the law.",
+      "formTitle": "File a request",
+      "typeLegend": "What would you like to ask for?",
+      "types": {
+        "access": "Access my data",
+        "rectification": "Correct my data",
+        "erasure": "Erase my data"
+      },
+      "typeHints": {
+        "access": "Receive a copy of the personal data we hold about you.",
+        "rectification": "Have inaccurate or incomplete information corrected.",
+        "erasure": "Ask for your personal data to be erased, subject to review by our compliance team."
+      },
+      "detailLabel": "Details (optional)",
+      "detailHint": "Up to 1,000 characters. Do not enter a bank card number or a password.",
+      "counter": "{count} / {max} characters",
+      "detailTooLong": "Your details are longer than {max} characters.",
+      "honeypotLabel": "Leave this field empty",
+      "submit": "File my request",
+      "submitting": "Sending.",
+      "confirmTitle": "Request recorded",
+      "confirmBody": "The reference of your request is {reference}. An acknowledgement is sent to you by e-mail. Keep this reference for any exchange about it.",
+      "listTitle": "Your requests",
+      "listLabel": "Data requests filed",
+      "listEmpty": "You have not filed any request yet.",
+      "loadError": "Your requests cannot be displayed right now. Please try again in a few moments.",
+      "reference": "Reference {reference}",
+      "createdAt": "Filed on {date}",
+      "dueAt": "Answer expected before {date} (indicative)",
+      "closedAt": "Closed on {date}",
+      "status": {
+        "received": "Received",
+        "in_review": "Under review",
+        "completed": "Completed",
+        "rejected": "Declined"
+      },
+      "errors": {
+        "already_open": "A request of this type is already in progress: {reference}.",
+        "already_open_unknown": "A request of this type is already in progress. Find its reference in the list of your requests.",
+        "rate_limited": "You filed too many requests in a short time. Please try again later.",
+        "invalid": "Your request could not be recorded: please check your information.",
+        "denied": "This link no longer allows filing a request. Please request a new tracking link.",
+        "error": "Your request could not be recorded. Please try again in a few moments."
+      },
+      "typeRequired": "Choose the type of request."
     }
   },
   "VisitorAi": {
@@ -881,7 +1097,24 @@
       "consistency": {
         "title": "Consistency check by the reading assistant",
         "button": "Check my answers"
+      },
+      "guarantees": {
+        "title": "The guarantees in plain language",
+        "button": "Explain the guarantees",
+        "aiNotice": "AI-generated content, to be confirmed by the partner broker."
+      },
+      "compare": {
+        "title": "The differences between these offers",
+        "button": "Explain the differences",
+        "aiNotice": "AI-generated content, to be confirmed by the partner broker."
       }
+    },
+    "fieldHelp": {
+      "trigger": "Help for the \"{field}\" field",
+      "title": "Help for this field",
+      "close": "Hide help",
+      "note": "General explanation of the field. Your answer is not sent to the assistant; do not enter personal data.",
+      "aiNotice": "AI-generated content, to be confirmed by the partner broker."
     }
   },
   "DocumentUpload": {
@@ -1505,16 +1738,16 @@
   },
   "Unsubscribe": {
     "kicker": "Unsubscribe",
-    "title": "Stop receiving satisfaction surveys",
-    "description": "Unsubscribe from AssurMatch satisfaction surveys.",
+    "title": "Stop receiving these reminder and survey e-mails",
+    "description": "Unsubscribe from AssurMatch reminder and survey e-mails.",
     "breadcrumb": "Unsubscribe",
-    "lead": "Confirm to stop receiving a satisfaction survey after your broker introductions. Messages about the follow-up of your quote requests are still sent to you.",
+    "lead": "Confirm to stop receiving this type of e-mail (missing-document reminders or the satisfaction survey after your broker introductions). Messages about the follow-up of your quote requests are still sent to you.",
     "confirm": "Confirm unsubscribe",
     "sending": "Sending.",
     "successTitle": "You are unsubscribed",
-    "successBody": "You will no longer receive AssurMatch satisfaction surveys at this address.",
+    "successBody": "You will no longer receive this type of AssurMatch e-mail at this address.",
     "unavailableTitle": "This link is not valid",
-    "unavailableBody": "The link may be incomplete. Use the link from the survey e-mail.",
+    "unavailableBody": "The link may be incomplete. Use the link from the e-mail.",
     "error": "The service is temporarily unavailable. Try again in a few minutes."
   }
 }

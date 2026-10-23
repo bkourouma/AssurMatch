@@ -1,21 +1,26 @@
 import { redirect } from "next/navigation";
 import {
   readAdminCountries,
-  readAdminOfferList,
   readAdminPartners,
   readAdminProducts,
   type AdminOfferListItem,
-  type OfferEffectiveStatus
+  type OfferEffectiveStatus,
+  type OfferType
 } from "../lib/admin-api";
 import { isAdminProfile, loginRedirect, readBackOfficeSession } from "../lib/backoffice-auth";
 import { adminReadErrorMessage } from "../lib/catalog-messages";
+import { readAdminOffersByType } from "../lib/lot4-offers-api";
 import {
   OFFER_STATUS_LABELS,
   OFFER_STATUS_OPTIONS,
   OFFER_STATUS_TONES,
+  OFFER_TYPE_OPTIONS,
+  OFFER_TYPE_SHORT_LABELS,
+  PRIVATE_OFFER_BADGE,
   canDecideOffer,
   canPrepareOffer,
-  offerFormatDate
+  offerFormatDate,
+  offerTypeLabel
 } from "../lib/offer-messages";
 import {
   Badge,
@@ -81,6 +86,8 @@ export default async function AdminOffersPage({
   const queue = firstParam(params.queue) === "submitted" ? "submitted" as const : undefined;
   const statusParam = firstParam(params.status);
   const status = (OFFER_STATUS_OPTIONS as readonly string[]).includes(statusParam) ? statusParam as OfferEffectiveStatus : undefined;
+  const typeParam = firstParam(params.offerType);
+  const offerType = (OFFER_TYPE_OPTIONS as readonly string[]).includes(typeParam) ? typeParam as OfferType : undefined;
   const countryId = UUID.test(firstParam(params.countryId)) ? firstParam(params.countryId) : undefined;
   const productId = UUID.test(firstParam(params.productId)) ? firstParam(params.productId) : undefined;
   const partnerTenantId = UUID.test(firstParam(params.partnerTenantId)) ? firstParam(params.partnerTenantId) : undefined;
@@ -90,12 +97,12 @@ export default async function AdminOffersPage({
   const expiring = Number.isInteger(expiringParam) && expiringParam >= 0 && expiringParam <= 365 ? expiringParam : undefined;
 
   const [offers, countries, products, partners] = await Promise.all([
-    readAdminOfferList({ countryId, productId, partnerTenantId, status, sponsored, expiringWithinDays: expiring, queue }),
+    readAdminOffersByType({ countryId, productId, partnerTenantId, status, offerType, sponsored, expiringWithinDays: expiring, queue }),
     readAdminCountries(),
     readAdminProducts(),
     readAdminPartners()
   ]);
-  if (offers.unauthenticated) redirect(loginRedirect("/offers", offers.error ?? "session_required"));
+  if (offers.status === "unauthenticated") redirect(loginRedirect("/offers", offers.error ?? "session_required"));
 
   const countryById = new Map(countries.data.map((country) => [country.id, country]));
   const productById = new Map(products.data.map((product) => [product.id, product]));
@@ -107,7 +114,10 @@ export default async function AdminOffersPage({
       render: (offer) => (
         <>
           <a href={`/offers/${encodeURIComponent(offer.id)}`}><strong>{offerName(offer)}</strong></a>
-          <div className="bo-description">{offer.offerType === "partner" ? "Offre partenaire" : "Offre indicative"}</div>
+          <div className="bo-description">
+            {offerTypeLabel(offer.offerType)}
+            {offer.offerType === "private" ? <> <Badge tone="warning">{PRIVATE_OFFER_BADGE}</Badge></> : null}
+          </div>
         </>
       ),
       sortable: true,
@@ -163,7 +173,7 @@ export default async function AdminOffersPage({
     pageSize: 25
   });
   const rows = paginateItems(sortItems(offers.data, columns, table.sort), table.page, table.pageSize);
-  const activeFilters = [countryId, productId, partnerTenantId, status, sponsoredParam || undefined, expiring].filter((value) => value !== undefined).length;
+  const activeFilters = [countryId, productId, partnerTenantId, status, offerType, sponsoredParam || undefined, expiring].filter((value) => value !== undefined).length;
 
   return (
     <PageStack>
@@ -220,6 +230,12 @@ export default async function AdminOffersPage({
             {OFFER_STATUS_OPTIONS.map((option) => <option key={option} value={option}>{OFFER_STATUS_LABELS[option]}</option>)}
           </Select>
         </Field>
+        <Field id="offers-type" label="Type d'offre">
+          <Select {...fieldControlProps("offers-type")} name="offerType" defaultValue={offerType ?? ""}>
+            <option value="">Tous</option>
+            {OFFER_TYPE_OPTIONS.map((option) => <option key={option} value={option}>{OFFER_TYPE_SHORT_LABELS[option]}</option>)}
+          </Select>
+        </Field>
         <Field id="offers-sponsored" label="Sponsorisation">
           <Select {...fieldControlProps("offers-sponsored")} name="sponsored" defaultValue={sponsoredParam}>
             <option value="">Toutes</option>
@@ -231,7 +247,7 @@ export default async function AdminOffersPage({
           <Input {...fieldControlProps("offers-expiring")} name="expiring" type="number" min={0} max={365} defaultValue={expiring ?? ""} placeholder="15" />
         </Field>
       </FilterBar>
-      {offers.forbidden ? <StateMessage tone="danger">{adminReadErrorMessage("access_denied")}</StateMessage> : null}
+      {offers.status === "forbidden" ? <StateMessage tone="danger">{adminReadErrorMessage("access_denied")}</StateMessage> : null}
       {offers.status === "error" ? <StateMessage tone="danger">{adminReadErrorMessage(offers.error)}</StateMessage> : null}
       <DataTable
         columns={columns}

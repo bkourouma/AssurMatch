@@ -93,7 +93,7 @@ export class BrokerTeamService {
       }
       throw error;
     }
-    this.deps.audit.write({
+    await this.deps.audit.writeAsync({
       actor,
       action: BrokerTeamAuditActions.invited,
       targetType: "User",
@@ -124,9 +124,10 @@ export class BrokerTeamService {
         throw partnerUnprocessable(ErrorCodes.TEAM_LAST_OWNER, "The last active owner of the partner cannot be deactivated");
       }
     }
-    const updated = await this.deps.users.suspend(target.id);
+    // Spec 063 FR-A06: the member's trusted devices end with the deactivation.
+    const updated = await this.deps.users.suspend(target.id, "deactivated");
     this.deps.invalidateUserAccess(target.id);
-    this.audited(actor, BrokerTeamAuditActions.deactivated, target, reason, { before: { status: target.status }, after: { status: updated.status } });
+    await this.audited(actor, BrokerTeamAuditActions.deactivated, target, reason, { before: { status: target.status }, after: { status: updated.status } });
     return this.view(updated, actor);
   }
 
@@ -143,7 +144,7 @@ export class BrokerTeamService {
     }
     const updated = await this.deps.users.update({ ...target, status: target.passwordHash ? "active" : "invited" });
     this.deps.invalidateUserAccess(target.id);
-    this.audited(actor, BrokerTeamAuditActions.reactivated, target, reason, { before: { status: target.status }, after: { status: updated.status } });
+    await this.audited(actor, BrokerTeamAuditActions.reactivated, target, reason, { before: { status: target.status }, after: { status: updated.status } });
     return this.view(updated, actor);
   }
 
@@ -160,7 +161,7 @@ export class BrokerTeamService {
     if (target.roles.length === 1 && target.roles[0] === role) return this.view(target, actor);
     const updated = await this.deps.users.updateRoles(target.id, [role as AssurMatchRole], reason, actor);
     this.deps.invalidateUserAccess(target.id);
-    this.audited(actor, BrokerTeamAuditActions.roleChanged, target, reason, { before: { roles: target.roles }, after: { roles: updated.roles } });
+    await this.audited(actor, BrokerTeamAuditActions.roleChanged, target, reason, { before: { roles: target.roles }, after: { roles: updated.roles } });
     return this.view(updated, actor);
   }
 
@@ -190,8 +191,9 @@ export class BrokerTeamService {
     throw partnerForbidden("Only an owner can change the access of another owner");
   }
 
-  private audited(actor: ActorContext, action: string, target: UserAccount, reason: string, context: Record<string, unknown>): void {
-    this.deps.audit.write({
+  // Lot 8 (FR-B2): role and access changes are fail-closed.
+  private async audited(actor: ActorContext, action: string, target: UserAccount, reason: string, context: Record<string, unknown>): Promise<void> {
+    await this.deps.audit.writeAsync({
       actor,
       action,
       targetType: "User",

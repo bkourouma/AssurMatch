@@ -9,7 +9,7 @@ import type { VisitorEmailNotificationType } from "./quote-notification.service"
 export type DeliverableQuoteNotificationType = VisitorEmailNotificationType | "broker_lead_assigned" | "broker_visitor_response" | "broker_lead_reassigned" | BrokerAlertEmailType | "admin_alert_raised";
 
 /** Spec 061: broker alert pointers rendered from the partner alone (no quote lookup). */
-const BROKER_ALERT_TYPES = new Set<string>(["broker_document_received", "broker_task_due", "broker_quota_threshold", "broker_license_expiring", "broker_offer_expiring"]);
+const BROKER_ALERT_TYPES = new Set<string>(["broker_visitor_message", "broker_document_received", "broker_task_due", "broker_quota_threshold", "broker_license_expiring", "broker_offer_expiring", "broker_lead_expiring", "broker_weekly_summary", "broker_dispute_decided"]);
 
 /**
  * Spec 054 R4: the step each visitor type announces. The two spec 044 types stay renderable for the
@@ -27,7 +27,14 @@ const VISITOR_STEP: Record<VisitorEmailNotificationType, VisitorEmailStep> = {
   visitor_quote_closed: "closed",
   visitor_consent_withdrawn: "consent_withdrawn",
   visitor_tracking_link: "tracking_link",
-  visitor_proposal_available: "proposal_available"
+  visitor_proposal_available: "proposal_available",
+  // Spec 062: pointers only.
+  visitor_broker_message: "broker_message",
+  visitor_documents_requested: "documents_requested",
+  visitor_data_request_acknowledged: "data_request_acknowledged",
+  visitor_data_request_closed: "data_request_closed",
+  // Spec 067: single J+3 reminder, pointer only.
+  visitor_documents_reminder: "documents_reminder"
 };
 
 const DELIVERABLE_TYPES = new Set<string>([...Object.keys(VISITOR_STEP), "broker_lead_assigned", "broker_visitor_response", "broker_lead_reassigned", ...BROKER_ALERT_TYPES, "admin_alert_raised"]);
@@ -72,6 +79,11 @@ export interface QuoteNotificationDeliveryDeps {
   partners: { findById(id: string): Promise<QuoteNotificationPartnerLookup | undefined> };
   /** Spec 054 R2: mints the visitor access token at render time; the clear token is never stored. */
   visitorAccess?: { issue(quoteRequestId: string, context: { reason: string }): Promise<{ token: string; expiresAt: Date }> };
+  /**
+   * Spec 067: opt-out registry and signed link of the non-transactional document reminder (same
+   * mechanism as the satisfaction survey, purpose `document_reminder`). Without it the reminder is not rendered.
+   */
+  reminderUnsubscribe?: { isUnsubscribedFromReminders(email: string): Promise<boolean>; reminderLinkToken(email: string, locale: "fr" | "en"): string } | undefined;
   retryCap?: number;
   /** Spec 061: compliance team address of the `admin_alert_raised` pointer (env, read at render time). */
   complianceEmail?: () => string | undefined;
@@ -190,6 +202,15 @@ export class QuoteNotificationDeliveryService {
     const prospect = await this.deps.prospects.findById(quote.prospectId);
     if (!prospect?.emailNormalized) throw new Error("recipient_unresolved");
     const step = VISITOR_STEP[notification.type as VisitorEmailNotificationType];
+    const locale = quote.language === "en" ? "en" : "fr";
+    // Spec 067: a reminder is never sent to an unsubscribed address, and always carries the opt-out link.
+    // The recipient is resolved above from the request's own prospect, exactly as for every visitor e-mail.
+    let unsubscribeToken: string | undefined;
+    if (notification.type === "visitor_documents_reminder") {
+      if (!this.deps.reminderUnsubscribe) throw new Error("reminder_unsubscribe_unavailable");
+      if (await this.deps.reminderUnsubscribe.isUnsubscribedFromReminders(prospect.emailNormalized)) throw new Error("visitor_unsubscribed");
+      unsubscribeToken = this.deps.reminderUnsubscribe.reminderLinkToken(prospect.emailNormalized, locale);
+    }
     const partnerTenantId = notification.eventPayload?.partnerTenantId;
     const partner = partnerTenantId ? await this.deps.partners.findById(partnerTenantId).catch(() => undefined) : undefined;
     const access = this.deps.visitorAccess ? await this.deps.visitorAccess.issue(quote.id, { reason: `notification:${notification.type}` }) : undefined;
@@ -200,10 +221,19 @@ export class QuoteNotificationDeliveryService {
       publicReference: quote.publicReference,
       countryCode: quote.countryCode,
       productKey: quote.productKey,
-      locale: quote.language === "en" ? "en" : "fr",
+      locale,
+      ...(unsubscribeToken ? { unsubscribeToken } : {}),
       partnerName: partner ? partner.tradeName ?? partner.legalName : undefined,
       token: access?.token,
-      tokenExpiresAt: access?.expiresAt
+      tokenExpiresAt: access?.expiresAt,
+      // Spec 062 D-10: reference, kind and indicative due date only (the row never holds free text).
+      ...(notification.eventPayload?.dataRequestReference ? {
+        dataRequest: {
+          reference: String(notification.eventPayload.dataRequestReference),
+          requestType: notification.eventPayload.dataRequestType ? String(notification.eventPayload.dataRequestType) : undefined,
+          dueAt: notification.eventPayload.dataRequestDueAt ? String(notification.eventPayload.dataRequestDueAt) : undefined
+        }
+      } : {})
     });
   }
 

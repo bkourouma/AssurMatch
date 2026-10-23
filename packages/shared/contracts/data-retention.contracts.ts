@@ -15,7 +15,12 @@ export const RETENTION_CATEGORIES = [
   "ai_traces",
   "webhook_payloads",
   "messaging_references",
-  "satisfaction_feedback"
+  "satisfaction_feedback",
+  // Spec 062: conversation messages, broker document requests and visitor data requests
+  // (provisional durations, pending legal validation).
+  "lead_message_threads",
+  "lead_document_requests",
+  "data_requests"
 ] as const;
 
 export const RETENTION_DAYS_MIN = 30;

@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { readAdminCountries, readAdminProducts, type AdminProductData } from "../../lib/admin-api";
+import { readAdminProductCategories } from "../../lib/lot4-catalog-api";
 import { isAdminProfile, loginRedirect, readBackOfficeSession } from "../../lib/backoffice-auth";
 import { adminReadErrorMessage, flagLabel } from "../../lib/catalog-messages";
 import {
@@ -32,8 +33,10 @@ export default async function CatalogProductsPage({
   if (session.status !== "authenticated" || !isAdminProfile(session.profile)) redirect("/login?error=access_denied&returnTo=%2Fcatalog%2Fproducts");
 
   const params = searchParams ? await searchParams : {};
-  const [products, countries] = await Promise.all([readAdminProducts(), readAdminCountries()]);
+  const [products, countries, categories] = await Promise.all([readAdminProducts(), readAdminCountries(), readAdminProductCategories()]);
   if (products.unauthenticated) redirect(loginRedirect("/catalog/products", products.error ?? "session_required"));
+  const activeCategories = categories.data.filter((category) => category.status === "active").map((category) => ({ value: category.id, label: category.name }));
+  const categoryNames = new Map(categories.data.map((category) => [category.id, category.name]));
   const countryCodes = new Map(countries.data.map((country) => [country.id, country.isoCode]));
 
   const columns: Array<DataTableColumn<AdminProductData>> = [
@@ -56,6 +59,11 @@ export default async function CatalogProductsPage({
       key: "sensitivity",
       header: "Sensibilité",
       render: (product) => <Badge tone={product.sensitivity === "standard" ? "neutral" : "warning"}>{product.sensitivity}</Badge>
+    },
+    {
+      key: "category",
+      header: "Catégorie",
+      render: (product) => (product.categoryId ? categoryNames.get(product.categoryId) ?? "-" : "-")
     },
     {
       key: "countries",
@@ -110,7 +118,7 @@ export default async function CatalogProductsPage({
         />
       ) : null}
 
-      {products.status === "success" ? <div id="creer-produit"><CreateProductForm /></div> : null}
+      {products.status === "success" ? <div id="creer-produit"><CreateProductForm categories={activeCategories} /></div> : null}
     </PageStack>
   );
 }

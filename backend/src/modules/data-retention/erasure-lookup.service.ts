@@ -3,6 +3,8 @@ import type { ErasureSubjectIds, RetentionSubjectsRepository } from "./retention
 
 export interface EmailFingerprintPort {
   fingerprint(value: string): string;
+  /** Lot 8 (spec 075 FR-A2): blind index of an e-mail (prospects written encrypted); undefined without key. */
+  emailBlindIndex?(value: string): string | undefined;
 }
 
 export type ErasureSubject = { publicReference: string } | { email: string };
@@ -18,11 +20,19 @@ export class ErasureLookupService {
 
   async resolve(subject: ErasureSubject): Promise<RetentionTargets> {
     if ("email" in subject) {
-      return this.toTargets(await this.subjects.findByEmailFingerprint(this.identity.fingerprint(subject.email.trim().toLowerCase())));
+      const email = subject.email.trim().toLowerCase();
+      // Lot 8: legacy fingerprint OR blind index, both computed in memory only.
+      const blindIndex = this.identity.emailBlindIndex?.(email);
+      return this.toTargets(blindIndex
+        ? await this.subjects.findByEmailFingerprint(this.identity.fingerprint(email), blindIndex)
+        : await this.subjects.findByEmailFingerprint(this.identity.fingerprint(email)));
     }
     const direct = await this.subjects.findByPublicReference(subject.publicReference.trim());
     if (!direct.emailFingerprint) return this.toTargets(direct.subjects);
-    return this.toTargets(this.merge(direct.subjects, await this.subjects.findByEmailFingerprint(direct.emailFingerprint)));
+    const related = direct.emailBlindIndex
+      ? await this.subjects.findByEmailFingerprint(direct.emailFingerprint, direct.emailBlindIndex)
+      : await this.subjects.findByEmailFingerprint(direct.emailFingerprint);
+    return this.toTargets(this.merge(direct.subjects, related));
   }
 
   private merge(left: ErasureSubjectIds, right: ErasureSubjectIds): ErasureSubjectIds {
@@ -33,7 +43,10 @@ export class ErasureLookupService {
       quoteDocuments: union(left.quoteDocuments, right.quoteDocuments),
       contactMessages: union(left.contactMessages, right.contactMessages),
       waitlist: union(left.waitlist, right.waitlist),
-      partnerApplications: union(left.partnerApplications, right.partnerApplications)
+      partnerApplications: union(left.partnerApplications, right.partnerApplications),
+      leadMessageThreads: union(left.leadMessageThreads, right.leadMessageThreads),
+      leadDocumentRequests: union(left.leadDocumentRequests, right.leadDocumentRequests),
+      dataRequests: union(left.dataRequests, right.dataRequests)
     };
   }
 
@@ -44,6 +57,10 @@ export class ErasureLookupService {
       contact_messages: subjects.contactMessages,
       waitlist: subjects.waitlist,
       partner_applications: subjects.partnerApplications,
+      // Spec 062: conversation, document requests (by lead assignment) and data requests of the person.
+      lead_message_threads: subjects.leadMessageThreads,
+      lead_document_requests: subjects.leadDocumentRequests,
+      data_requests: subjects.dataRequests,
       ...(subjects.prospects.length > 0 ? { prospects: subjects.prospects } : {})
     };
   }

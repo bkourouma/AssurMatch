@@ -13,7 +13,13 @@ export const CatalogErrorCodes = {
   updateConflict: "CATALOG_UPDATE_CONFLICT",
   rbacDenied: "RBAC_DENIED",
   notFound: "NOT_FOUND",
-  invalidTransition: "VALIDATION_FAILED"
+  invalidTransition: "VALIDATION_FAILED",
+  /** Spec 070: a category cannot be retired while non-retired products use it. */
+  categoryInUse: "CATALOG_CATEGORY_IN_USE",
+  /** Spec 070: the product category is missing or not active. */
+  categoryInvalid: "PRODUCT_CATEGORY_INVALID",
+  /** Spec 070: regulated or forbidden wording in a legal notice. */
+  forbiddenWording: "FORBIDDEN_WORDING"
 } as const;
 
 export function catalogForbidden(message: string, code: string = CatalogErrorCodes.rbacDenied): ForbiddenException {

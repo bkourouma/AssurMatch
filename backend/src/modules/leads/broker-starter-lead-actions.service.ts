@@ -15,6 +15,7 @@ import type { ActorContext } from "../common/types";
 import { BrokerStarterAccessPolicy } from "./broker-starter-access-policy";
 import { BrokerStarterHistoryService } from "./broker-starter-history.service";
 import { LeadAssignmentService, type LeadAssignmentRecord, type LeadAssignmentStatus } from "./lead-assignment.service";
+import { LeadDisputesService } from "./lead-disputes.service";
 
 const FINAL_STATUSES = new Set<LeadAssignmentStatus>(["closed"]);
 /** Only a lead the broker took on can be closed with an outcome. */
@@ -26,7 +27,9 @@ export class BrokerStarterLeadActionsService {
     private readonly access: BrokerStarterAccessPolicy,
     private readonly history: BrokerStarterHistoryService,
     private readonly audit: AuditLogWriter,
-    private readonly events?: { publish(eventType: "lead.status_changed" | "lead.accepted" | "lead.rejected", partnerTenantId: string, data: Record<string, unknown>): Promise<void> } | undefined
+    private readonly events?: { publish(eventType: "lead.status_changed" | "lead.accepted" | "lead.rejected", partnerTenantId: string, data: Record<string, unknown>): Promise<void> } | undefined,
+    /** Spec 063: the shared dispute service (window, uniqueness, record); a private one when not injected. */
+    private readonly disputes: LeadDisputesService = new LeadDisputesService({ audit, assignments })
   ) {}
 
   /**
@@ -69,9 +72,42 @@ export class BrokerStarterLeadActionsService {
     return this.transition(id, actor, "rejected", QuoteAuditActions.brokerStarterLeadRejected, parsed);
   }
 
-  dispute(id: string, input: BrokerStarterLeadActionRequest, actor: ActorContext): Promise<LeadAssignmentRecord> {
+  /**
+   * Spec 063 FR-B01/FR-B02: the Starter dispute creates the shared dispute record (30-day window,
+   * one dispute per lead) and moves the assignment to `disputed`; the finance admin decides later.
+   */
+  async dispute(id: string, input: BrokerStarterLeadActionRequest, actor: ActorContext): Promise<LeadAssignmentRecord> {
     const parsed = this.requireReason(input);
-    return this.transition(id, actor, "disputed", QuoteAuditActions.brokerStarterLeadDisputed, parsed);
+    const assignment = await this.assignments.require(id);
+    this.access.assertMutationAccess(actor, assignment);
+    if (FINAL_STATUSES.has(assignment.status)) {
+      throw new Error("Final lead cannot be mutated");
+    }
+    const previousStatus = assignment.status;
+    await this.disputes.open({ assignment, source: "starter", reason: parsed.reason, ...(parsed.comment ? { comment: parsed.comment } : {}), actor });
+    const updated = await this.assignments.require(id);
+    if (parsed.comment) updated.actionComment = parsed.comment.slice(0, 500);
+    await this.history.append({
+      leadAssignmentId: updated.id,
+      partnerTenantId: updated.partnerTenantId,
+      actor,
+      eventType: "disputed",
+      previousStatus: this.toStarterStatus(previousStatus),
+      nextStatus: this.toStarterStatus("disputed"),
+      reason: parsed.reason,
+      ...(parsed.comment ? { comment: parsed.comment } : {})
+    });
+    this.audit.write({
+      actor,
+      action: QuoteAuditActions.brokerStarterLeadDisputed,
+      targetType: "LeadAssignment",
+      targetId: updated.id,
+      scope: { partnerTenantId: updated.partnerTenantId },
+      result: "success",
+      reason: parsed.reason,
+      context: { previousStatus, nextStatus: "disputed" }
+    });
+    return updated;
   }
 
   private async transition(

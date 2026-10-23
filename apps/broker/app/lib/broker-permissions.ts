@@ -27,8 +27,8 @@ export function isTenantReadOnly(profile: Pick<BackOfficeProfile, "tenantReadOnl
  * echoue des que la matrice partagee change.
  */
 export const BROKER_ROLE_PERMISSIONS: Record<string, string[]> = {
-  broker_owner_starter: ["broker_leads:read", "broker_leads:update", "broker_leads:export", "notifications:read", "broker_offers:read", "broker_offers:write", "broker_account:read", "broker_account:write", "broker_team:read", "broker_team:write", "billing:read_own"],
-  broker_owner_pro: ["broker_leads:*", "broker_crm:*", "notifications:read", "broker_offers:read", "broker_offers:write", "broker_account:read", "broker_account:write", "broker_team:read", "broker_team:write", "billing:read_own"],
+  broker_owner_starter: ["broker_leads:read", "broker_leads:update", "broker_leads:export", "notifications:read", "broker_offers:read", "broker_offers:write", "broker_account:read", "broker_account:write", "broker_team:read", "broker_team:write", "billing:read_own", "billing:plan_change_request"],
+  broker_owner_pro: ["broker_leads:*", "broker_crm:*", "notifications:read", "broker_offers:read", "broker_offers:write", "broker_account:read", "broker_account:write", "broker_team:read", "broker_team:write", "billing:read_own", "billing:plan_change_request"],
   broker_manager: ["broker_leads:read", "broker_leads:update", "broker_crm:read", "broker_crm:update", "broker_crm:assign", "broker_crm:export", "notifications:read", "broker_offers:read", "broker_offers:write", "broker_account:read", "broker_account:write", "broker_team:read", "broker_team:write", "billing:read_own"],
   broker_agent: ["broker_leads:read", "broker_leads:update", "broker_crm:read_assigned", "broker_crm:update_assigned", "notifications:read", "broker_offers:read", "broker_account:read", "broker_team:read"],
   broker_read_only: ["broker_leads:read", "broker_crm:read", "broker_offers:read", "broker_account:read", "broker_team:read", "billing:read_own"]
@@ -41,8 +41,29 @@ function roleGrants(role: string, permission: string): boolean {
   return permissions.includes("*:*") || permissions.includes(permission) || permissions.includes(`${resource}:*`);
 }
 
-function hasPermission(profile: BackOfficeProfile, permission: string): boolean {
-  return profile.roles.some((role) => roleGrants(role, permission));
+/**
+ * Spec 064 FR-005..008: resources a tenant custom role can restrict. It mirrors the backend catalogue
+ * (`GRANTABLE_PERMISSIONS` of the Enterprise page): offers, account, team and billing are never
+ * narrowed by a custom role.
+ */
+export const CUSTOM_ROLE_RESOURCES: readonly string[] = ["broker_leads", "broker_crm", "notifications"];
+
+/**
+ * A custom role only ever narrows the base role (no elevation). `customRolePermissions` is absent
+ * when no custom role applies; when present, a permission of a catalogue resource must be listed
+ * exactly, so a wildcard query (`broker_crm:*`) is denied under restriction.
+ */
+function customRoleAllows(profile: Pick<BackOfficeProfile, "customRolePermissions">, permission: string): boolean {
+  const restricted = profile.customRolePermissions;
+  if (!restricted) return true;
+  const resource = permission.split(":")[0] ?? "";
+  if (!CUSTOM_ROLE_RESOURCES.includes(resource)) return true;
+  return restricted.includes(permission);
+}
+
+/** Same semantics as the backend `actorHasPermission`: base role grants AND custom role restriction allows. */
+export function hasPermission(profile: BackOfficeProfile, permission: string): boolean {
+  return profile.roles.some((role) => roleGrants(role, permission)) && customRoleAllows(profile, permission);
 }
 
 export function isReadOnlyBroker(profile: BackOfficeProfile): boolean {
@@ -98,6 +119,27 @@ export function canMutateAccount(profile: BackOfficeProfile): boolean {
 export function canManageTeam(profile: BackOfficeProfile): boolean {
   if (isReadOnlyBroker(profile) || isTenantReadOnly(profile)) return false;
   return hasPermission(profile, "broker_team:write");
+}
+
+/** Spec 064 FR-001: the Starter lead export exige broker_leads:export (after any custom role restriction). */
+export function canExportStarterLeads(profile: BackOfficeProfile): boolean {
+  return hasPermission(profile, "broker_leads:export");
+}
+
+/** Spec 064 FR-002: the CRM lead export exige broker_crm:export (or the broker_crm:* wildcard of the base role). */
+export function canExportCrmLeads(profile: BackOfficeProfile): boolean {
+  return hasPermission(profile, "broker_crm:export") || hasPermission(profile, "broker_crm:*");
+}
+
+/** Spec 064 FR-003: reading or validating loss analyses needs CRM read access and a non read-only role. */
+export function canReviewLossAnalysis(profile: BackOfficeProfile): boolean {
+  if (isReadOnlyBroker(profile) || isTenantReadOnly(profile)) return false;
+  return hasPermission(profile, "broker_crm:read") || hasPermission(profile, "broker_crm:*");
+}
+
+/** Spec 064 FR-003: requesting a loss analysis is an Enterprise feature, never on a suspended partner. */
+export function canRequestLossAnalysis(profile: BackOfficeProfile): boolean {
+  return profile.partnerPlan === "enterprise" && canReviewLossAnalysis(profile);
 }
 
 /** Spec 053 R5: only an owner acts on another owner (deactivation); a manager never does. */

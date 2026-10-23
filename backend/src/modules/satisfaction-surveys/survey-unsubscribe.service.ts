@@ -7,6 +7,12 @@ import { assertRuntimeRepository, type RuntimeRepository } from "../common/repos
 /** Spec 061 FR-005: the only non-transactional message of the platform so far. */
 export const SATISFACTION_SURVEY_PURPOSE = "satisfaction_survey";
 
+/** Spec 067: the non-transactional reminder of a document request left open (same opt-out mechanism). */
+export const DOCUMENT_REMINDER_PURPOSE = "document_reminder";
+
+/** Allow-list of the purposes a signed token may opt out of; any other purpose is refused as a forged token. */
+const UNSUBSCRIBE_PURPOSES: ReadonlySet<string> = new Set([SATISFACTION_SURVEY_PURPOSE, DOCUMENT_REMINDER_PURPOSE]);
+
 const DEFAULT_TEST_SECRET = "assurmatch-unsubscribe-test-secret-not-used-in-production";
 
 export class UnsubscribeTokenInvalidError extends Error {
@@ -157,10 +163,19 @@ export class SurveyUnsubscribeService {
     return this.repository.exists(unsubscribeSubjectHash(email), SATISFACTION_SURVEY_PURPOSE);
   }
 
+  /** Spec 067: signed opt-out link of the document reminder e-mail. */
+  reminderLinkToken(email: string, locale: "fr" | "en"): string {
+    return this.signer.sign(email, DOCUMENT_REMINDER_PURPOSE, locale);
+  }
+
+  isUnsubscribedFromReminders(email: string): Promise<boolean> {
+    return this.repository.exists(unsubscribeSubjectHash(email), DOCUMENT_REMINDER_PURPOSE);
+  }
+
   async unsubscribe(input: unknown): Promise<{ status: "unsubscribed"; locale: "fr" | "en" }> {
     const parsed = notificationUnsubscribeSchema.safeParse(input ?? {});
     const payload = parsed.success ? this.signer.verify(parsed.data.token) : undefined;
-    if (!payload || payload.p !== SATISFACTION_SURVEY_PURPOSE) {
+    if (!payload || !UNSUBSCRIBE_PURPOSES.has(payload.p)) {
       this.audit.write({ action: UnsubscribeAuditActions.refused, targetType: "NotificationUnsubscribe", targetId: "token", result: "refused", reason: "unsubscribe_token_invalid", context: {} });
       throw new UnsubscribeTokenInvalidError();
     }

@@ -35,7 +35,22 @@ describe("prisma migration fresh-base readiness", () => {
       "0026_b2b_invoicing",
       "0027_broker_response_loop",
       "0028_notifications_completion",
-      "0029_query_performance_indexes"
+      "0029_query_performance_indexes",
+      "0030_critical_fixes",
+      "0031_broker_visitor_messaging",
+      "0032_custom_role_members",
+      "0033_visitor_quote_journey_gaps",
+      "0034_catalog_offers_gaps",
+      // Lot 5 (spec 071)
+      "0035_routing_billing_gaps",
+      "0036_admin_steering", // Lot 6
+      // Lot 8 (spec 075)
+      "0037_security_hardening",
+      // Lot 9 (spec 072)
+      "0038_content_cms",
+      "0039_broker_lead_alerts",
+      // Lot 10 (spec 076)
+      "0040_channels_integrations"
     ]);
     const schema = readFileSync(join(process.cwd(), "backend", "prisma", "schema.prisma"), "utf8").replace(/\r\n/g, "\n");
     for (const model of ["AuditLog", "FeatureFlag", "ConsentRecord", "QuoteRequest", "LeadAssignment", "BrokerCrmLeadState", "PartnerApiKey", "PartnerWebhookEndpoint", "PartnerWebhookDelivery", "PartnerWebhookAllowlistEntry", "RoutingRule", "RoutingRuleHistory"]) {
@@ -258,5 +273,52 @@ describe("prisma migration fresh-base readiness", () => {
     expect(completion).toContain('CREATE UNIQUE INDEX IF NOT EXISTS "AdminAlert_dedupeKey_key"');
     expect(completion).toContain('CREATE UNIQUE INDEX IF NOT EXISTS "NotificationUnsubscribe_subjectHash_purpose_key"');
     expect(completion).not.toMatch(/DROP|DELETE|UPDATE /);
+    // Spec 062: broker <-> visitor messaging, document requests and data requests, additive only.
+    const messaging = readFileSync(join(migrationsDir, "0031_broker_visitor_messaging", "migration.sql"), "utf8");
+    for (const value of ["visitor_broker_message", "visitor_documents_requested", "visitor_data_request_acknowledged", "visitor_data_request_closed", "broker_visitor_message", "admin_data_request_received"]) {
+      expect(messaging).toContain(`ALTER TYPE "NotificationType" ADD VALUE IF NOT EXISTS '${value}'`);
+      expect(schema).toContain(`  ${value}\n`);
+    }
+    for (const table of ["LeadMessage", "LeadMessageAttachment", "LeadDocumentRequest", "DataRequest"]) {
+      expect(messaging).toContain(`CREATE TABLE IF NOT EXISTS "${table}"`);
+      expect(schema).toContain(`model ${table} {`);
+    }
+    expect(messaging).toContain('CREATE UNIQUE INDEX IF NOT EXISTS "LeadMessage_leadAssignmentId_senderType_clientRequestId_key" ON "LeadMessage"("leadAssignmentId", "senderType", "clientRequestId")');
+    expect(messaging).toContain('CREATE UNIQUE INDEX IF NOT EXISTS "DataRequest_reference_key" ON "DataRequest"("reference")');
+    // One open data request per quote request and type: a partial unique index (SQL only, Prisma cannot express it).
+    expect(messaging).toContain('CREATE UNIQUE INDEX IF NOT EXISTS "DataRequest_open_quote_type_key" ON "DataRequest"("quoteRequestId", "type") WHERE "status" IN (\'received\', \'in_review\')');
+    expect(schema).toContain('"DataRequest_open_quote_type_key"');
+    expect(messaging).toContain('ALTER TABLE "LeadAssignment" ADD COLUMN IF NOT EXISTS "firstVisibleReplyAt" TIMESTAMP(3)');
+    expect(messaging).toContain('ALTER TABLE "QuoteRequestDocument" ADD COLUMN IF NOT EXISTS "documentRequestId" TEXT');
+    expect(messaging).toContain('ALTER TABLE "QuoteRequestDocument" ADD COLUMN IF NOT EXISTS "uploadedBy" TEXT');
+    expect(messaging).not.toMatch(/DROP|DELETE|UPDATE |TRUNCATE/);
+    // Messages are append-only for the application: the schema has no edit/delete marker on the body.
+    expect(schema).not.toMatch(/model LeadMessage {[^}]*\b(editedAt|deletedAt|updatedAt)\b/);
+    // Spec 064: custom roles can be assigned to members (additive JSON column).
+    const customRoleMembers = readFileSync(join(migrationsDir, "0032_custom_role_members", "migration.sql"), "utf8");
+    expect(customRoleMembers).toContain(`ALTER TABLE "PartnerCustomRole" ADD COLUMN IF NOT EXISTS "memberIds" JSONB NOT NULL DEFAULT '[]'`);
+    expect(customRoleMembers).not.toMatch(/DROP|DELETE|UPDATE /);
+    // Spec 067 (lot 1): visitor quote journey gaps, additive only (new enum value, nullable or defaulted columns).
+    const visitorQuoteJourney = readFileSync(join(migrationsDir, "0033_visitor_quote_journey_gaps", "migration.sql"), "utf8");
+    expect(visitorQuoteJourney).toContain(`ALTER TYPE "NotificationType" ADD VALUE IF NOT EXISTS 'visitor_documents_reminder'`);
+    expect(visitorQuoteJourney).toContain(`ALTER TABLE "QuoteRequest" ADD COLUMN IF NOT EXISTS "additionalOfferIds" TEXT[]`);
+    expect(visitorQuoteJourney).toContain(`ALTER TABLE "LeadDocumentRequest" ADD COLUMN IF NOT EXISTS "reminderQueuedAt" TIMESTAMP(3)`);
+    expect(visitorQuoteJourney).not.toMatch(/DROP|DELETE|UPDATE |NOT NULL/);
+    expect(schema).toMatch(/model PartnerCustomRole \{[^}]*memberIds\s+Json\s+@default\("\[\]"\)/);
+    // Lot 10 (spec 076): channels and integrations, three new tables, additive only.
+    const channelsIntegrations = readFileSync(join(migrationsDir, "0040_channels_integrations", "migration.sql"), "utf8");
+    for (const table of ["ChannelOutbox", "CrmConnector", "CrmConnectorDelivery"]) {
+      expect(channelsIntegrations).toContain(`CREATE TABLE IF NOT EXISTS "${table}"`);
+      expect(schema).toContain(`model ${table} {`);
+    }
+    expect(channelsIntegrations).not.toMatch(/DROP|DELETE|UPDATE |ALTER /);
+    // Spec 070: catalog and offers gaps, additive only (the single UPDATE backfills the new Offer insurer columns).
+    const catalogOffersGaps = readFileSync(join(migrationsDir, "0034_catalog_offers_gaps", "migration.sql"), "utf8");
+    expect(catalogOffersGaps).toContain('CREATE TABLE IF NOT EXISTS "Insurer"');
+    expect(catalogOffersGaps).toContain('CREATE TABLE IF NOT EXISTS "ProductVersion"');
+    expect(catalogOffersGaps).toContain('CREATE TABLE IF NOT EXISTS "ActivationAttestation"');
+    expect(catalogOffersGaps).not.toMatch(/DROP|DELETE|TRUNCATE/);
+    expect(schema).toContain("model Insurer");
+    expect(schema).toContain("model ActivationAttestation");
   });
 });

@@ -91,6 +91,11 @@ services:
       BROKER_APP_URL: http://localhost:3603
       ASSURMATCH_AUTH_TOKEN_SECRET: local-preprod-auth-token-secret-please-change-32bytes
       ENCRYPTION_KEY: local-preprod-encryption-key-please-change-32bytes
+      # Lot 8 (spec 075): local preproduction simulation only - base64 of the readable strings
+      # "assurmatch-preprod-local-pii-k01" / "assurmatch-preprod-local-blind-ix". Never on a VPS.
+      PII_ENCRYPTION_KEYS: local1:YXNzdXJtYXRjaC1wcmVwcm9kLWxvY2FsLXBpaS1rMDE= # secret-scan:allow local preprod simulation value
+      PII_ENCRYPTION_ACTIVE_KEY_ID: local1
+      PII_BLIND_INDEX_KEY: YXNzdXJtYXRjaC1wcmVwcm9kLWxvY2FsLWJsaW5kLWl4 # secret-scan:allow local preprod simulation value
       TRUSTED_PROXY_HOPS: "0"
       CORS_ORIGINS: http://localhost:3601
       EMAIL_SERVICE_TYPE: mailpit
@@ -128,6 +133,10 @@ services:
       REDIS_URL: redis://redis:6379
       ASSURMATCH_AUTH_TOKEN_SECRET: local-preprod-auth-token-secret-please-change-32bytes
       ENCRYPTION_KEY: local-preprod-encryption-key-please-change-32bytes
+      # Lot 8 (spec 075): same local simulation PII keys as the app container.
+      PII_ENCRYPTION_KEYS: local1:YXNzdXJtYXRjaC1wcmVwcm9kLWxvY2FsLXBpaS1rMDE= # secret-scan:allow local preprod simulation value
+      PII_ENCRYPTION_ACTIVE_KEY_ID: local1
+      PII_BLIND_INDEX_KEY: YXNzdXJtYXRjaC1wcmVwcm9kLWxvY2FsLWJsaW5kLWl4 # secret-scan:allow local preprod simulation value
       PUBLIC_APP_URL: http://localhost:3601
       APP_BASE_URL: http://localhost:3602
       BROKER_APP_URL: http://localhost:3603

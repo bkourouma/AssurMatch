@@ -17,6 +17,11 @@ export interface RetentionInAppPort {
  */
 const EXECUTION_ORDER: readonly RetentionSubjectKind[] = [
   "quote_documents",
+  // Spec 062: before the quote requests, so an erasure batch counts what it anonymizes itself; the
+  // quote request cascade then finds these rows already done.
+  "lead_message_threads",
+  "lead_document_requests",
+  "data_requests",
   "quote_requests",
   "prospects",
   "contact_messages",
@@ -89,7 +94,7 @@ export class AnonymizationService {
           });
         }
       }
-      this.deps.audit.write({
+      await this.deps.audit.writeAsync({
         actor,
         action: DataRetentionAuditActions.categoryAnonymized,
         targetType: "AnonymizationBatch",
@@ -134,6 +139,16 @@ export class AnonymizationService {
         return subjects.anonymizeMessagingReference(id);
       case "satisfaction_feedback":
         return true;
+      // Spec 062: a thread / document request set is designated by its lead assignment id.
+      case "lead_message_threads": {
+        // The stored files go first: if a deletion fails the rows stay un-anonymized and eligible again.
+        for (const attachment of await subjects.findLiveThreadAttachments(id)) await this.deps.storage.delete(attachment.storageKey);
+        return subjects.anonymizeMessageThread(id, stamp);
+      }
+      case "lead_document_requests":
+        return subjects.anonymizeDocumentRequestThread(id, stamp);
+      case "data_requests":
+        return subjects.anonymizeDataRequest(id, stamp);
     }
   }
 
@@ -150,8 +165,11 @@ export class AnonymizationService {
       await this.deps.storage.delete(document.storageKey);
       await subjects.anonymizeDocumentRow(document.id, stamp);
     }
+    // Spec 062: files attached to messages go like documents (object first, row after).
+    for (const attachment of cascade.messageAttachments) await this.deps.storage.delete(attachment.storageKey);
     const assignmentIds = cascade.assignments.map((assignment) => assignment.id);
     await subjects.anonymizeLeadContent(assignmentIds);
+    await subjects.anonymizeDataRequestsForQuote(id);
     await subjects.anonymizeQuoteAi(id, assignmentIds);
     await subjects.anonymizeSatisfactionSurvey?.(id);
     const changed = await subjects.anonymizeQuoteRequestRow(id, stamp);

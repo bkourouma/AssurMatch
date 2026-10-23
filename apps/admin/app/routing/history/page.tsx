@@ -1,5 +1,6 @@
 import { firstValue, formatDateTime, pageHref, pageNumber, readRoutingHistory, type RoutingHistoryRow } from "../../lib/operations-api";
 import { Badge, Button, DataTable, Field, FilterBar, Input, PageHeader, PageStack, Select, StateMessage, fieldControlProps, type DataTableColumn } from "../../lib/ui/admin-ui";
+import { candidateReasonLabel } from "../routing-labels";
 import { routingResultTones } from "../../lib/ui/operations-tones";
 
 /**
@@ -20,7 +21,7 @@ const columns: Array<DataTableColumn<RoutingHistoryRow>> = [
     header: "Exclus et raisons",
     render: (row) => row.excludedCandidates.length === 0
       ? "-"
-      : row.excludedCandidates.map((candidate) => `${candidate.legalName ?? candidate.partnerTenantId.slice(0, 8)} : ${candidate.reasons.join(", ")}`).join(" ; ")
+      : row.excludedCandidates.map((candidate) => `${candidate.legalName ?? candidate.partnerTenantId.slice(0, 8)} : ${candidate.reasons.map(candidateReasonLabel).join(", ")}`).join(" ; ")
   },
   { key: "reasons", header: "Raisons", render: (row) => row.reasons.join(", ") || "-" }
 ];

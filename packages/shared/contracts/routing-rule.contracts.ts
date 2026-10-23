@@ -4,10 +4,12 @@ import { dateTimeStringSchema, nonEmptyStringSchema, uuidSchema } from "../valid
 /**
  * Routing modes selectable by an admin (PRD §17). Every mode only ranks partners that the
  * eligibility policy already accepted. `multi_send` fans a request out to several of them and is
- * itself gated by `multi_broker_routing_enabled` plus the visitor's own consent (spec 042);
- * `ai_assisted` remains deliberately absent - AI never decides a routing outcome.
+ * itself gated by `multi_broker_routing_enabled` plus the visitor's own consent (spec 042).
+ * Lot 5 (spec 071): `ai_assisted` only attaches an AI SUGGESTION (one broker among the deterministic
+ * eligible ones) to a request parked for manual assignment; AI never decides a routing outcome (§32.8),
+ * a human admin validates by assigning manually, and the mode is closed by `ai_assisted_routing_enabled`.
  */
-export const routingRuleModes = ["first_eligible", "round_robin", "priority", "capacity", "performance", "exclusive", "manual", "multi_send"] as const;
+export const routingRuleModes = ["first_eligible", "round_robin", "priority", "capacity", "performance", "exclusive", "manual", "multi_send", "ai_assisted"] as const;
 
 /** Spec 042 D3: default 3 recipients, hard cap 5. */
 export const MULTI_SEND_DEFAULT_RECIPIENTS = 3;
@@ -97,7 +99,18 @@ export const pendingManualQuoteSchema = z.object({
   productId: uuidSchema,
   productKey: nonEmptyStringSchema,
   createdAt: dateTimeStringSchema,
-  candidates: z.array(pendingManualQuoteCandidateSchema)
+  candidates: z.array(pendingManualQuoteCandidateSchema),
+  /** Lot 5 (spec 071): why the request is parked (e.g. manual_rule, lead_quality_below_threshold, ai_suggestion_pending). */
+  parkedReasons: z.array(z.string()).default([]),
+  /** Lot 5 (spec 071): lead quality score (0-100) computed at routing time, when known. */
+  qualityScore: z.number().int().min(0).max(100).nullable().default(null),
+  /** Lot 5 (spec 071): AI suggestion among the eligible brokers; advisory only, validated by the admin. */
+  aiSuggestion: z.object({
+    partnerTenantId: uuidSchema,
+    rationale: z.string(),
+    provider: z.string(),
+    generatedAt: dateTimeStringSchema
+  }).nullable().default(null)
 });
 
 export const pendingManualQueueResponseSchema = z.object({

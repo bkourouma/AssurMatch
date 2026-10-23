@@ -46,6 +46,17 @@ export default function ComplianceEvidencePage() {
                   </Cluster>
                 </Stack>
               )
+            },
+            {
+              term: "Demandes de données des visiteurs",
+              value: (
+                <Stack>
+                  <p>Demandes d&apos;accès, de rectification ou d&apos;effacement déposées par les visiteurs, avec échéance indicative et historique.</p>
+                  <Cluster>
+                    <Button href="/compliance/data-requests" variant="secondary" size="sm">Ouvrir la file des demandes</Button>
+                  </Cluster>
+                </Stack>
+              )
             }
           ]}
         />

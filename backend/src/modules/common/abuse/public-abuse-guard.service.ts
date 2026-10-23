@@ -1,7 +1,7 @@
 import { QuoteRedisKeys } from "../redis/quote-redis-keys";
 import type { RedisClientPort } from "../redis/redis.module";
 
-export const PUBLIC_ABUSE_SCOPES = ["waitlist", "contact", "partner_application", "consent_withdrawal", "tracking_status", "tracking_link_resend", "proposal_response", "proposal_document"] as const;
+export const PUBLIC_ABUSE_SCOPES = ["waitlist", "contact", "partner_application", "consent_withdrawal", "tracking_status", "tracking_link_resend", "proposal_response", "proposal_document", "lead_message", "lead_message_attachment", "document_request_upload", "data_request"] as const;
 
 export type PublicAbuseScope = (typeof PUBLIC_ABUSE_SCOPES)[number];
 
@@ -25,6 +25,16 @@ const SESSION_BURST_WINDOW_SECONDS = 300;
  */
 export class PublicAbuseGuardService {
   constructor(private readonly redis: RedisClientPort) {}
+
+  /**
+   * Read-only look at the per-IP counter of a scope (nothing is incremented): true once the address has
+   * used its whole quota of the window, i.e. when `assertAllowed` would refuse its next call. Lets a
+   * route refuse a flooding address before it parses a large body.
+   */
+  async isIpOverLimit(scope: PublicAbuseScope, ipAddress: string, limitPerWindow: number): Promise<boolean> {
+    const count = Number.parseInt((await this.redis.get(QuoteRedisKeys.publicScopeRateLimit(scope, ipAddress))) ?? "0", 10);
+    return count >= limitPerWindow;
+  }
 
   async assertAllowed(input: PublicAbuseGuardInput): Promise<void> {
     if (typeof input.honeypot === "string" && input.honeypot.trim().length > 0) {

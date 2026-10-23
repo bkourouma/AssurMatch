@@ -1,5 +1,6 @@
 import { readMessagingDeliveries, readMessagingProviders } from "../lib/admin-api";
 import { Badge, Card, DataTable, Notice, PageHeader, PageStack, StateMessage } from "../lib/ui/admin-ui";
+import { MessagingTestForm } from "./messaging-test-form";
 
 export default async function AdminMessagingPage() {
   const [providers, deliveries] = await Promise.all([readMessagingProviders(), readMessagingDeliveries()]);
@@ -40,6 +41,13 @@ export default async function AdminMessagingPage() {
               emptyLabel="Aucun canal reference."
               aria-label="Canaux de messagerie"
             />
+          </Card>
+
+          <Card
+            title="Envoi de test"
+            description="Verifie qu'un canal configure envoie bien un message. Un canal ferme ou sans fournisseur refuse l'envoi."
+          >
+            <MessagingTestForm channels={providers.data.providers.map((provider) => provider.channel)} />
           </Card>
 
           <Card

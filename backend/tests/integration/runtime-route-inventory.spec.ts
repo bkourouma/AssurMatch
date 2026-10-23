@@ -133,6 +133,45 @@ describe("runtime HTTP route inventory", () => {
     }
   });
 
+  // Spec 062 messaging: the visitor routes answer the neutral 404 without a token, broker and admin routes need a session.
+  it("exposes the spec 062 messaging routes and keeps them behind the visitor token or a session", async () => {
+    harness = await createRuntimeHttpHarness();
+    const id = "00000000-0000-4000-8000-000000000062";
+    const visitor = [
+      ["GET", "/quote-requests/QR-X/conversations"],
+      ["GET", "/quote-requests/QR-X/conversations/abc"],
+      ["POST", "/quote-requests/QR-X/conversations/abc/messages"],
+      ["POST", "/quote-requests/QR-X/conversations/abc/read"],
+      ["GET", `/quote-requests/QR-X/conversations/abc/messages/${id}/attachments/${id}`],
+      ["GET", "/quote-requests/QR-X/document-requests"],
+      ["POST", `/quote-requests/QR-X/document-requests/${id}/documents`]
+    ] as const;
+    for (const [method, path] of visitor) {
+      const response = await harness.request(path, { method, headers: { "content-type": "application/json" }, ...(method === "POST" ? { body: JSON.stringify({ body: "Bonjour" }) } : {}) });
+      expect(response.status, `${method} ${path}`).toBe(404);
+      expect(await response.json(), `${method} ${path}`).toMatchObject({ code: "VISITOR_ACCESS_DENIED" });
+    }
+    const sessions = [
+      ["GET", `/broker/starter/leads/${id}/conversation`],
+      ["POST", `/broker/starter/leads/${id}/conversation/messages`],
+      ["POST", `/broker/starter/leads/${id}/conversation/read`],
+      ["GET", `/broker/starter/leads/${id}/conversation/messages/${id}/attachments/${id}`],
+      ["GET", `/broker/crm/leads/${id}/document-requests`],
+      ["POST", `/broker/crm/leads/${id}/document-requests`],
+      ["POST", `/broker/crm/leads/${id}/document-requests/${id}/cancel`],
+      ["GET", `/broker/crm/leads/${id}/document-requests/${id}/documents/${id}/file`],
+      ["GET", `/admin/leads/${id}/conversations`]
+    ] as const;
+    for (const [method, path] of sessions) {
+      const response = await harness.request(path, { method });
+      expect(response.status, `${method} ${path}`).toBe(401);
+    }
+    // Messages are append-only: no route edits or deletes one.
+    for (const method of ["PATCH", "PUT", "DELETE"]) {
+      expect((await harness.request(`/broker/starter/leads/${id}/conversation/messages/${id}`, { method })).status, method).toBe(404);
+    }
+  });
+
   it("uses the runtime HTTP wiring module instead of registering RuntimeHttpController in AppModule", async () => {
     const appImports = Reflect.getMetadata("imports", AppModule) as unknown[];
     const appControllers = (Reflect.getMetadata("controllers", AppModule) as unknown[] | undefined) ?? [];

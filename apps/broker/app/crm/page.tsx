@@ -1,6 +1,8 @@
 import { redirect } from "next/navigation";
+import { AGENCY_PARAM, agencyQuery } from "../lib/agency-filter";
+import { loadAgencyFilter } from "../lib/agency-filter-loader";
 import { isStarterCrmDenied, loginRedirect, readBackOfficeSession } from "../lib/backoffice-auth";
-import { readBrokerAIAssistance, readBrokerAdvisors, readBrokerAiOptOut, readBrokerBillingStatement, readBrokerDashboardWithComparison } from "../lib/broker-api";
+import { readBrokerAIAssistance, readBrokerAdvisors, readBrokerAiOptOut, readBrokerBillingStatement, readBrokerDashboardWithComparison, readBrokerTeam } from "../lib/broker-api";
 import { setAiOptOutAction } from "../lib/crm-ai-actions";
 import { crmStatusLabel } from "../lib/lead-vocabulary";
 import {
@@ -18,8 +20,12 @@ import {
   TenantWriteGuard
 } from "../lib/ui/broker-ui";
 import type { StatItem } from "../lib/ui/broker-ui";
+import { AgencyFilterForm } from "../lib/ui/agency-filter-form";
 import { TENANT_SUSPENDED_MESSAGE, isTenantReadOnly } from "../lib/broker-permissions";
-import { crmKpis, dashboardStats } from "../lib/ui/broker-view-models";
+import { AiInsightsPanel } from "../lib/ui/ai-insights-panel";
+import { CrmKpiSection } from "../lib/ui/crm-kpi-section";
+import { CONVERSION_LABEL, crmKpis, dashboardStats, formatRate, wonOverReceived } from "../lib/ui/broker-view-models";
+import { advisorDisplayName } from "../lib/team-options";
 import styles from "../lib/ui/broker-screens.module.css";
 
 const BREADCRUMB = [{ label: "CRM" }, { label: "Pipeline" }];
@@ -28,8 +34,8 @@ function signed(value: number): string {
   return `${value >= 0 ? "+" : ""}${value}`;
 }
 
-export default async function BrokerCrmPage({ searchParams }: { searchParams: Promise<{ ai?: string }> }) {
-  const { ai: aiNotice } = await searchParams;
+export default async function BrokerCrmPage({ searchParams }: { searchParams: Promise<{ ai?: string; agence?: string; insight?: string }> }) {
+  const { ai: aiNotice, insight: insightNotice, [AGENCY_PARAM]: agenceParam } = await searchParams;
   const session = await readBackOfficeSession();
   if (session.status !== "authenticated") {
     if (session.status === "unauthenticated" || session.status === "expired") redirect(loginRedirect("/crm", session.error ?? "session_required"));
@@ -64,9 +70,14 @@ export default async function BrokerCrmPage({ searchParams }: { searchParams: Pr
     );
   }
 
-  const dashboard = await readBrokerDashboardWithComparison();
-  const advisors = await readBrokerAdvisors();
-  const [aiAssistance, aiOptOut, statement] = await Promise.all([readBrokerAIAssistance(), readBrokerAiOptOut(), readBrokerBillingStatement()]);
+  // Spec 064: Enterprise agency DISPLAY filter (no access restriction); other plans make no extra API call.
+  const agency = await loadAgencyFilter(session.profile, agenceParam);
+  const filterQuery = agencyQuery(agency);
+  const dashboard = await readBrokerDashboardWithComparison(filterQuery);
+  const advisors = await readBrokerAdvisors(filterQuery);
+  const [aiAssistance, aiOptOut, statement, team] = await Promise.all([readBrokerAIAssistance(), readBrokerAiOptOut(), readBrokerBillingStatement(), readBrokerTeam()]);
+  // Best effort: a role without team right gets 403, advisors are then shown without a name.
+  const teamMembers = team.status === "success" ? team.data : [];
   if (dashboard.unauthenticated) redirect(loginRedirect("/crm", dashboard.error ?? "session_required"));
   if (dashboard.forbidden) {
     return (
@@ -104,13 +115,16 @@ export default async function BrokerCrmPage({ searchParams }: { searchParams: Pr
           crm ? (
             <Cluster>
               <Button href="/crm/kanban" variant="secondary">Vue Kanban</Button>
-              <Button href="/crm/leads">Vue tableau</Button>
+              <Button href="/crm/leads" variant="secondary">Vue tableau</Button>
+              {session.profile.partnerPlan === "enterprise" ? <Button href="/crm/loss-analysis" variant="secondary">Analyse des pertes</Button> : null}
             </Cluster>
           ) : (
             <Badge tone="disabled">Module indisponible</Badge>
           )
         }
       />
+
+      <AgencyFilterForm action="/crm" filter={agency} fieldId="crm-agency-filter" />
 
       {dashboard.data.licenseAlerts.length > 0 ? (
         <Notice tone="warning" title="Alertes licence">
@@ -137,6 +151,8 @@ export default async function BrokerCrmPage({ searchParams }: { searchParams: Pr
         </section>
       ) : null}
 
+      <CrmKpiSection data={dashboard.data} />
+
       {crm ? (
         <Split>
           <Card title="Pipeline par statut">
@@ -156,8 +172,8 @@ export default async function BrokerCrmPage({ searchParams }: { searchParams: Pr
             <DataTable
               columns={[
                 { key: "product", header: "Produit", render: (row) => row.productKey },
-                { key: "accepted", header: "Acceptes / recus", numeric: true, align: "right", render: (row) => `${row.accepted}/${row.received}` },
-                { key: "rate", header: "Taux", numeric: true, align: "right", render: (row) => `${Math.round(row.rate * 100)}%` }
+                { key: "won", header: CONVERSION_LABEL, numeric: true, align: "right", render: (row) => wonOverReceived(row) },
+                { key: "rate", header: "Taux", numeric: true, align: "right", render: (row) => formatRate(row.rate) }
               ]}
               items={crm.conversionByProduct}
               getKey={(row) => row.productKey}
@@ -187,7 +203,7 @@ export default async function BrokerCrmPage({ searchParams }: { searchParams: Pr
         <Card title="Performance par conseiller">
           <DataTable
             columns={[
-              { key: "advisor", header: "Conseiller", render: (row) => <span className="bo-ref">{row.advisorId}</span> },
+              { key: "advisor", header: "Conseiller", render: (row) => advisorDisplayName(teamMembers, row.advisorId) },
               { key: "received", header: "Recus", numeric: true, align: "right", render: (row) => row.received },
               { key: "accepted", header: "Acceptes", numeric: true, align: "right", render: (row) => row.accepted },
               { key: "won", header: "Gagnes", numeric: true, align: "right", render: (row) => row.won },
@@ -235,6 +251,13 @@ export default async function BrokerCrmPage({ searchParams }: { searchParams: Pr
           </Cluster>
         </section>
       ) : null}
+
+      <AiInsightsPanel
+        profile={session.profile}
+        assistance={aiAssistance.status === "success" ? aiAssistance.data : undefined}
+        optedOut={aiOptOut.status === "success" && aiOptOut.data.optedOut}
+        notice={insightNotice}
+      />
 
       {aiAssistance.status === "success" ? (
         <Card title="Assistance IA">

@@ -15,6 +15,9 @@ describe("broker dashboard runtime HTTP", () => {
       value: true,
       reason: "test enables broker dashboard for spec 012"
     }, { actorId: "test-admin", roles: ["super_admin"], mfaVerified: true });
+    // Spec 063: broker_crm_enabled is on by default; these tests start from an explicit "off".
+    await harness.runtime.featureFlags.service.setFlag({ key: "broker_crm_enabled", scopeType: "global", value: false, reason: "test switches the broker CRM off" }, { actorId: "test-admin", roles: ["super_admin"], mfaVerified: true });
+    await harness.runtime.reloadRuntimeFeatureFlags();
     harness.runtime.featureFlags.service.isEnabled("broker_dashboard_enabled");
   });
 

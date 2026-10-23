@@ -10,7 +10,9 @@ import {
   StatusBadge,
   ruleStatusTones
 } from "../lib/ui/admin-ui";
-import { AssignPendingQuoteForm, CreateRoutingRuleForm, ReassignLeadForm, UpdateRoutingRuleForm } from "./routing-forms";
+import type { PendingManualQuoteData } from "../lib/admin-api";
+import { AI_ASSISTED_MODE_LABEL, AI_ASSISTED_MODE_NOTE, candidateReasonLabel, parkedReasonLabel, qualityScoreLabel } from "./routing-labels";
+import { AssignPendingQuoteForm, CreateRoutingRuleForm, ReassignLeadForm, RoutingPrecheckForm, UpdateRoutingRuleForm } from "./routing-forms";
 
 const modeLabels: Record<RoutingRuleData["mode"], string> = {
   first_eligible: "Premier eligible",
@@ -20,8 +22,35 @@ const modeLabels: Record<RoutingRuleData["mode"], string> = {
   performance: "Performance",
   exclusive: "Exclusif",
   manual: "Manuel",
-  multi_send: "Multi-courtiers"
+  multi_send: "Multi-courtiers",
+  ai_assisted: AI_ASSISTED_MODE_LABEL
 };
+
+/** Parked reasons (French), quality score and excluded candidates of one pending request. */
+function PendingContext({ quote }: { quote: PendingManualQuoteData }) {
+  const reasons = quote.parkedReasons ?? [];
+  const excluded = quote.candidates.filter((candidate) => !candidate.eligible);
+  return (
+    <div>
+      {reasons.length > 0 ? (
+        <ul className="bo-list">
+          {reasons.map((reason) => <li key={reason}>{parkedReasonLabel(reason)}</li>)}
+        </ul>
+      ) : <span>-</span>}
+      {typeof quote.qualityScore === "number" ? <p>{qualityScoreLabel(quote.qualityScore)}</p> : null}
+      {excluded.length > 0 ? (
+        <details>
+          <summary>{excluded.length} candidat(s) exclu(s)</summary>
+          <ul className="bo-list">
+            {excluded.map((candidate) => (
+              <li key={candidate.partnerTenantId}>{candidate.legalName} : {candidate.reasons.map(candidateReasonLabel).join(", ") || "-"}</li>
+            ))}
+          </ul>
+        </details>
+      ) : null}
+    </div>
+  );
+}
 
 export default async function RoutingPage() {
   const [rules, pending] = await Promise.all([readRoutingRules(), readRoutingPendingQueue()]);
@@ -36,7 +65,7 @@ export default async function RoutingPage() {
         title="Regles de routage"
         description="Regles auditees par pays et produit. Chaque mode classe uniquement des courtiers partenaires deja juges eligibles: licence valide, autorisations pays/produit, capacite et quota mensuel."
       />
-      <StateMessage>Le mode multi-envoi ne s'applique que si le flag est ouvert et si le visiteur l'accepte: sinon la demande part a un seul courtier partenaire, avec un motif audite. Le routage assiste par IA n'est pas propose: l'IA ne decide jamais de l'eligibilite.</StateMessage>
+      <StateMessage>Le mode multi-envoi ne s'applique que si le flag est ouvert et si le visiteur l'accepte: sinon la demande part a un seul courtier partenaire, avec un motif audite. {AI_ASSISTED_MODE_NOTE}</StateMessage>
 
       {unauthenticated ? <StateMessage tone="danger">Session admin requise.</StateMessage> : null}
       {forbidden ? <StateMessage tone="danger">Acces routage refuse pour ce role admin.</StateMessage> : null}
@@ -61,7 +90,7 @@ export default async function RoutingPage() {
                 { key: "mode", header: "Mode", render: (rule) => modeLabels[rule.mode] },
                 { key: "status", header: "Statut", render: (rule) => <StatusBadge status={rule.status} tones={ruleStatusTones} /> },
                 { key: "version", header: "Version", render: (rule) => rule.version, numeric: true, align: "right" },
-                { key: "parameters", header: "Parametres", render: (rule) => rule.mode === "priority" ? `${rule.priorities.length} priorite(s)` : rule.mode === "exclusive" ? `exclusif ${rule.exclusivePartnerTenantId?.slice(0, 8) ?? "-"}` : rule.mode === "multi_send" ? `jusqu'a ${rule.maxRecipients} courtiers, si le visiteur l'accepte` : rule.description ?? "-" },
+                { key: "parameters", header: "Parametres", render: (rule) => rule.mode === "priority" ? `${rule.priorities.length} priorite(s)` : rule.mode === "exclusive" ? `exclusif ${rule.exclusivePartnerTenantId?.slice(0, 8) ?? "-"}` : rule.mode === "multi_send" ? `jusqu'a ${rule.maxRecipients} courtiers, si le visiteur l'accepte` : rule.mode === "ai_assisted" ? "suggestion IA a valider par un admin" : rule.description ?? "-" },
                 { key: "id", header: "Identifiant", render: (rule) => <span className="bo-ref">{rule.id}</span> }
               ]}
               items={rules.data.items}
@@ -88,6 +117,7 @@ export default async function RoutingPage() {
                 { key: "scope", header: "Scope", render: (quote) => `${quote.countryCode} / ${quote.productKey}` },
                 { key: "createdAt", header: "Recue le", render: (quote) => new Date(quote.createdAt).toISOString().slice(0, 16).replace("T", " ") },
                 { key: "candidates", header: "Candidats eligibles", render: (quote) => `${quote.candidates.filter((candidate) => candidate.eligible).length} / ${quote.candidates.length}` },
+                { key: "context", header: "Motif de mise en attente", render: (quote) => <PendingContext quote={quote} /> },
                 { key: "assign", header: "Assigner", render: (quote) => <AssignPendingQuoteForm quote={quote} /> }
               ]}
               items={pending.data.items}
@@ -99,6 +129,8 @@ export default async function RoutingPage() {
           </div>
 
           <ReassignLeadForm />
+
+          <RoutingPrecheckForm />
         </>
       ) : null}
     </PageStack>

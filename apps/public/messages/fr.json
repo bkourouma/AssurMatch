@@ -293,9 +293,9 @@
         "lead": "Comparez des offres indicatives d'assurance au Sénégal, puis faites confirmer le devis et les garanties par un courtier autorisé par l'autorité compétente."
       }
     },
-    "pilotNotice": "Ce pays est en phase pilote : le nombre de courtiers partenaires et d'offres comparables y est encore limité.",
+    "pilotNotice": "Ce pays est en phase pilote : les offres comparables ne sont affichées qu'à l'ouverture publique du pays. En attendant, les courtiers partenaires et les produits activés sont présentés ci-dessous.",
     "productsTitle": "Produits comparables",
-    "productsLead": "Chaque produit donne accès aux offres indicatives et, lorsque l'activation le permet, à une demande de devis.",
+    "productsLead": "Lorsque l'activation publique le permet, chaque produit donne accès aux offres indicatives et à une demande de devis.",
     "comparisonEnabled": "Comparaison activée",
     "comparisonDisabled": "Comparaison non activée",
     "quoteEnabled": "Devis activé",
@@ -533,7 +533,12 @@
       "deductible": "franchise la plus basse parmi les offres comparées",
       "ceiling": "plafond le plus élevé parmi les offres comparées",
       "processingDelay": "délai le plus court parmi les offres comparées"
-    }
+    },
+    "quotePickTitle": "Demander un devis pour plusieurs offres",
+    "quotePickHint": "Cochez jusqu'à 3 offres. Chaque courtier concerné sera nommé avant votre accord, que vous ne donnez qu'à l'étape de consentement.",
+    "quotePickOption": "Inclure {name} dans ma demande",
+    "quotePickSubmit": "Continuer vers la demande de devis",
+    "quotePickLimit": "3 offres au maximum par demande."
   },
   "OfferDetail": {
     "kicker": "Offre indicative",
@@ -569,6 +574,7 @@
     "steps": {
       "need": "Votre besoin",
       "contact": "Vos coordonnées",
+      "documents": "Documents (facultatif)",
       "consent": "Vérification et consentement",
       "confirmation": "Confirmation"
     },
@@ -587,22 +593,30 @@
     "preselectedRouting": "Votre demande sera transmise à un courtier partenaire autorisé pour {product} en {country} (ou jusqu'à 3 courtiers partenaires si vous cochez la case correspondante à l'étape suivante). Le nom du courtier retenu apparaîtra sur votre page de suivi.",
     "contactLegend": "Vos coordonnées",
     "contactIntro": "Ces informations permettent au courtier partenaire de vous répondre. Elles ne sont transmises qu'après votre consentement, à l'étape suivante.",
-    "name": "Nom",
+    "firstName": "Prénom",
+    "lastName": "Nom",
+    "fullName": "Nom complet",
     "nameHint": "Facultatif : permet au courtier partenaire de vous nommer dans sa réponse plutôt que d'écrire « Madame, Monsieur ».",
     "email": "Adresse e-mail",
     "emailHint": "Le courtier partenaire vous écrit à cette adresse pour préciser votre devis ; vous y recevrez aussi la confirmation de votre demande.",
     "phone": "Téléphone",
     "phoneHint": "Le courtier partenaire vous appelle à ce numéro pour finaliser votre devis. Indicatif pays compris (exemple : +225 07 00 00 00 00).",
+    "preferredBroker": "Courtier souhaité",
+    "preferredBrokerNone": "Aucune préférence : nous vous orientons vers un courtier éligible",
+    "preferredBrokerHint": "Votre choix est pris en compte si ce courtier reste éligible pour votre demande ; sinon, votre demande est orientée vers un autre courtier éligible et vous en êtes informé.",
     "verifyLegend": "Vérification et consentement",
     "verifyIntro": "Vérifiez les informations ci-dessous avant d'envoyer votre demande. Vous pouvez encore les modifier.",
     "reviewNeedTitle": "Votre besoin",
     "reviewContactTitle": "Vos coordonnées",
     "reviewEdit": "Modifier",
+    "reviewDocuments": "Documents",
+    "reviewDocumentsValue": "{count, plural, one {# document joint} other {# documents joints}}",
     "reviewEmpty": "non renseigné",
     "brokerTitle": "Courtier partenaire responsable",
     "brokerConfirm": {
       "routing": "Votre demande sera transmise à un courtier partenaire autorisé pour {product} en {country} (ou jusqu'à 3 courtiers partenaires si la case ci-dessous est cochée). Le nom du courtier retenu apparaîtra sur votre page de suivi après l'envoi."
     },
+    "brokerChosen": "Vous avez souhaité être orienté vers {partner}. Votre demande lui sera transmise s'il reste éligible ; sinon elle sera orientée vers un autre courtier partenaire éligible et vous en serez informé.",
     "brokerLicence": "Agrément {licence} ({authority}).",
     "transmissionNotice": "Rien n'est transmis tant que vous n'avez pas coché la case de consentement et envoyé votre demande.",
     "options": {
@@ -628,6 +642,27 @@
         "other": "Autre"
       }
     },
+    "documents": {
+      "intro": "Facultatif. Vous pouvez joindre jusqu'à {max} documents (PDF, JPEG ou PNG, {size} Mo maximum chacun). Les fichiers sont analysés avant transmission, et rien n'est transmis au courtier avant votre accord, donné à l'étape de consentement.",
+      "memory": "Les fichiers restent dans votre navigateur et ne sont envoyés qu'une fois votre demande enregistrée.",
+      "pick": "Choisir des fichiers",
+      "remove": "Retirer",
+      "listLabel": "Documents joints à votre demande",
+      "kind": "Type de document",
+      "label": "Libellé",
+      "full": "Nombre maximum de documents atteint.",
+      "errorType": "« {name} » n'est pas accepté : formats PDF, JPEG ou PNG uniquement.",
+      "errorSize": "« {name} » est trop volumineux : 5 Mo maximum par fichier.",
+      "errorCount": "« {name} » n'a pas été ajouté : 5 documents au maximum par demande.",
+      "errorEmpty": "« {name} » est vide et n'a pas été ajouté."
+    },
+    "multiOffers": {
+      "label": "J'autorise la transmission de ma demande à : {partners} ; chacun recevra mes coordonnées.",
+      "explain": "Sans cette autorisation, seule la première offre ({partner}) est retenue.",
+      "explainNoName": "Sans cette autorisation, seule la première offre est retenue.",
+      "single": "Une seule offre peut être retenue par demande : {partner}.",
+      "singleNoName": "Une seule offre peut être retenue par demande : la première."
+    },
     "consentLegend": "Consentement",
     "consentIntro": "Lisez le texte ci-dessous avant de cocher la case.",
     "consentLabel": "J'accepte que ma demande soit transmise à un courtier partenaire éligible pour ce pays et ce produit.",
@@ -641,6 +676,12 @@
     "successPrefix": "Référence publique :",
     "offerPartnerRetained": "Votre demande a été transmise à {partner}.",
     "offerPartnerNotRetained": "Le courtier de l'offre choisie n'était pas disponible : votre demande a été orientée vers un autre courtier partenaire agréé.",
+    "chosenPartnerNotRetained": "Le courtier que vous avez choisi n'a pas pu être retenu pour cette demande : elle a été orientée vers un autre courtier éligible.",
+    "partnersRetained": "Votre demande a été transmise à {retained, plural, one {# courtier} other {# courtiers}} sur {requested} demandé{requested, plural, one {} other {s}}.",
+    "additionalOffersIgnored": "Seule la première offre a été retenue.",
+    "sendingDocuments": "Envoi des documents en cours.",
+    "documentsAllSent": "{sent, plural, one {# document envoyé} other {# documents envoyés}}.",
+    "documentsSomeFailed": "{sent, plural, one {# document envoyé} other {# documents envoyés}}, {failed, plural, one {# non envoyé} other {# non envoyés}} : vous pouvez les ajouter depuis votre espace de suivi.",
     "trackLink": "Suivre ma demande et ajouter des documents (optionnel)",
     "trackLinkOnly": "Suivre ma demande",
     "backToOffers": "Retour aux offres",
@@ -848,6 +889,181 @@
       "cta": "Recevoir un nouveau lien",
       "rateLimited": "Trop de consultations en peu de temps. Réessayez dans quelques minutes.",
       "unavailable": "Le suivi est temporairement indisponible. Réessayez dans quelques minutes."
+    },
+    "messaging": {
+      "title": "Conversation avec votre courtier",
+      "lead": "Écrivez au courtier qui a pris en charge votre demande et lisez ses réponses. Un e-mail vous prévient d'un nouveau message, sans en reprendre le contenu.",
+      "empty": "Aucune conversation pour le moment. Elle s'ouvrira ici dès qu'un courtier aura pris en charge votre demande.",
+      "loadError": "Vos conversations ne peuvent pas être affichées pour le moment. Réessayez dans quelques instants.",
+      "disabledNotice": "La messagerie est suspendue pour le moment. Vous pouvez relire vos échanges, mais pas envoyer de nouveau message.",
+      "unreadOne": "1 message non lu",
+      "unreadMany": "{count} messages non lus",
+      "threadLabel": "Échange avec {partnerName}",
+      "messagesLabel": "Messages de la conversation avec {partnerName}",
+      "senderBroker": "Courtier",
+      "senderYou": "Vous",
+      "readReceipt": "Lu",
+      "readReceiptAt": "Lu le {date}",
+      "noMessages": "Aucun message pour le moment. Vous pouvez écrire le premier ci-dessous.",
+      "noMessagesReadOnly": "Aucun message n'a été échangé dans cette conversation.",
+      "olderMessages": "Afficher les messages précédents",
+      "loadingOlder": "Chargement des messages précédents.",
+      "refresh": "Actualiser la conversation",
+      "refreshing": "Actualisation en cours.",
+      "refreshed": "Conversation à jour.",
+      "refreshFailed": "La conversation n'a pas pu être actualisée. Réessayez dans quelques instants.",
+      "attachmentsLabel": "Pièces jointes",
+      "attachmentDownload": "Télécharger {fileName}",
+      "sizeKb": "{value} Ko",
+      "sizeMb": "{value} Mo",
+      "composeTitle": "Écrire au courtier",
+      "composeLabel": "Votre message",
+      "composeHint": "Texte brut. N'indiquez ni numéro de carte bancaire ni mot de passe.",
+      "counter": "{count} / {max} caractères",
+      "attachLabel": "Pièces jointes (facultatif)",
+      "attachHint": "3 fichiers au maximum, au format PDF, JPEG ou PNG, 5 Mo chacun. Chaque fichier est analysé avant d'être transmis.",
+      "selectedFiles": "Fichiers sélectionnés",
+      "removeFile": "Retirer {fileName}",
+      "send": "Envoyer le message",
+      "sending": "Envoi en cours.",
+      "sent": "Message envoyé.",
+      "bodyRequired": "Saisissez un message avant de l'envoyer.",
+      "bodyTooLong": "Votre message dépasse {max} caractères.",
+      "honeypotLabel": "Laissez ce champ vide",
+      "fileErrors": {
+        "tooMany": "Vous pouvez joindre {max} fichiers au maximum.",
+        "tooLarge": "Le fichier « {fileName} » dépasse 5 Mo.",
+        "type": "Le fichier « {fileName} » n'est ni un PDF, ni un JPEG, ni un PNG.",
+        "empty": "Le fichier « {fileName} » est vide."
+      },
+      "readOnly": {
+        "title": "Conversation en lecture seule",
+        "consent_withdrawn": "Vous avez retiré votre consentement : la conversation reste consultable, mais plus aucun message ne peut être envoyé.",
+        "lead_closed": "Cette demande est clôturée : vous pouvez relire les échanges, mais plus en envoyer.",
+        "reassigned": "Votre demande a été confiée à un autre courtier : cette conversation est conservée en lecture seule.",
+        "messaging_disabled": "La messagerie est suspendue pour le moment : les échanges restent consultables.",
+        "partner_suspended": "Ce courtier ne peut plus recevoir de messages pour le moment : la conversation reste consultable.",
+        "not_accepted": "Le courtier n'a pas encore pris en charge votre demande : vous pourrez lui écrire dès que ce sera le cas.",
+        "generic": "Vous ne pouvez pas envoyer de message dans cette conversation pour le moment."
+      },
+      "errors": {
+        "rate_limited": "Vous avez envoyé trop de messages en peu de temps. Réessayez plus tard.",
+        "read_only": "Cette conversation est passée en lecture seule : votre message n'a pas été envoyé.",
+        "disabled": "La messagerie est suspendue pour le moment : votre message n'a pas été envoyé.",
+        "duplicate": "Ce message vient déjà d'être envoyé. Patientez quelques minutes avant de le renvoyer.",
+        "thread_limit": "Cette conversation a atteint le nombre maximal de messages. Votre message n'a pas été envoyé.",
+        "quarantined": "Une pièce jointe n'a pas passé l'analyse de sécurité. Retirez-la ou remplacez-la : votre message n'a pas été envoyé.",
+        "invalid_document": "Une pièce jointe n'est pas acceptée (PDF, JPEG ou PNG, 5 Mo maximum, 3 fichiers au plus). Votre message n'a pas été envoyé.",
+        "too_large": "Une pièce jointe dépasse 5 Mo. Votre message n'a pas été envoyé.",
+        "invalid": "Votre message n'a pas pu être envoyé : vérifiez son contenu.",
+        "denied": "Ce lien ne permet plus d'accéder à la conversation. Demandez un nouveau lien de suivi.",
+        "error": "Votre message n'a pas pu être envoyé. Réessayez dans quelques instants."
+      }
+    },
+    "documentRequests": {
+      "title": "Documents demandés",
+      "lead": "Votre courtier peut vous demander des pièces pour étudier votre demande. Vous choisissez ce que vous envoyez : chaque fichier est analysé, puis transmis au courtier concerné.",
+      "loadError": "Les demandes de documents ne peuvent pas être affichées pour le moment. Réessayez dans quelques instants.",
+      "listLabel": "Documents demandés par vos courtiers",
+      "requestedBy": "Demandé par {partnerName}",
+      "noteLabel": "Précision du courtier",
+      "due": "À fournir avant le {date} (indicatif)",
+      "createdAt": "Demande du {date}",
+      "fulfilledAt": "Fournie le {date}",
+      "uploadedOne": "1 fichier transmis",
+      "uploadedMany": "{count} fichiers transmis",
+      "status": {
+        "open": "À fournir",
+        "fulfilled": "Fournie",
+        "cancelled": "Annulée"
+      },
+      "fulfilledBody": "Les fichiers de cette demande ont été reçus.",
+      "cancelledBody": "Le courtier a annulé cette demande : vous n'avez plus rien à envoyer.",
+      "uploadDisabled": "L'envoi de documents est suspendu pour le moment.",
+      "uploadTitle": "Envoyer des fichiers",
+      "fileLabel": "Fichiers à envoyer",
+      "fileHint": "3 fichiers au maximum, au format PDF, JPEG ou PNG, 5 Mo chacun. Chaque fichier est analysé avant d'être transmis.",
+      "selectedFiles": "Fichiers sélectionnés",
+      "removeFile": "Retirer {fileName}",
+      "submit": "Envoyer les fichiers",
+      "submitting": "Envoi en cours.",
+      "noFile": "Choisissez au moins un fichier.",
+      "uploadedStatusOne": "Fichier reçu. Il est analysé puis transmis au courtier.",
+      "uploadedStatusMany": "{count} fichiers reçus. Ils sont analysés puis transmis au courtier.",
+      "refresh": "Actualiser la liste",
+      "fileErrors": {
+        "tooMany": "Vous pouvez envoyer {max} fichiers au maximum à la fois.",
+        "tooLarge": "Le fichier « {fileName} » dépasse 5 Mo.",
+        "type": "Le fichier « {fileName} » n'est ni un PDF, ni un JPEG, ni un PNG.",
+        "empty": "Le fichier « {fileName} » est vide."
+      },
+      "errors": {
+        "rate_limited": "Vous avez envoyé trop de fichiers en peu de temps. Réessayez plus tard.",
+        "not_open": "Cette demande n'est plus ouverte : vos fichiers n'ont pas été envoyés.",
+        "read_only": "Cette demande n'est plus ouverte : vos fichiers n'ont pas été envoyés.",
+        "disabled": "L'envoi de documents est suspendu pour le moment : vos fichiers n'ont pas été envoyés.",
+        "quarantined": "Un fichier n'a pas passé l'analyse de sécurité. Retirez-le ou remplacez-le : rien n'a été envoyé.",
+        "invalid_document": "Un fichier n'est pas accepté (PDF, JPEG ou PNG, 5 Mo maximum, 3 fichiers au plus). Rien n'a été envoyé.",
+        "too_large": "Un fichier dépasse 5 Mo. Rien n'a été envoyé.",
+        "invalid": "Vos fichiers n'ont pas pu être envoyés : vérifiez votre sélection.",
+        "denied": "Ce lien ne permet plus d'envoyer de documents. Demandez un nouveau lien de suivi.",
+        "error": "Vos fichiers n'ont pas pu être envoyés. Réessayez dans quelques instants."
+      },
+      "sizeKb": "{value} Ko",
+      "sizeMb": "{value} Mo"
+    },
+    "dataRequests": {
+      "title": "Mes données",
+      "lead": "Vous pouvez demander à accéder à vos données personnelles, à les faire rectifier ou à les faire effacer. Cette démarche ne dépend pas de la messagerie et reste possible à tout moment.",
+      "howTitle": "Ce qui se passe ensuite",
+      "howReceived": "Vous recevez un accusé de réception par e-mail, avec la référence de votre demande.",
+      "howReview": "Notre équipe conformité examine votre demande, puis vous informe de la suite donnée.",
+      "howDeadline": "Le délai de réponse affiché est indicatif et peut varier selon votre pays.",
+      "howErasure": "Une demande d'effacement n'est jamais exécutée automatiquement : elle est examinée par notre équipe conformité, qui peut devoir conserver certaines données pour respecter la loi.",
+      "formTitle": "Déposer une demande",
+      "typeLegend": "Que souhaitez-vous demander ?",
+      "types": {
+        "access": "Accéder à mes données",
+        "rectification": "Rectifier mes données",
+        "erasure": "Effacer mes données"
+      },
+      "typeHints": {
+        "access": "Recevoir une copie des données personnelles que nous détenons à votre sujet.",
+        "rectification": "Faire corriger une information inexacte ou incomplète.",
+        "erasure": "Demander l'effacement de vos données personnelles, sous réserve de l'examen de notre équipe conformité."
+      },
+      "detailLabel": "Précisions (facultatif)",
+      "detailHint": "1 000 caractères au maximum. N'indiquez ni numéro de carte bancaire ni mot de passe.",
+      "counter": "{count} / {max} caractères",
+      "detailTooLong": "Vos précisions dépassent {max} caractères.",
+      "honeypotLabel": "Laissez ce champ vide",
+      "submit": "Déposer ma demande",
+      "submitting": "Envoi en cours.",
+      "confirmTitle": "Demande enregistrée",
+      "confirmBody": "La référence de votre demande est {reference}. Un accusé de réception vous est envoyé par e-mail. Conservez cette référence pour tout échange à ce sujet.",
+      "listTitle": "Vos demandes",
+      "listLabel": "Demandes de données déposées",
+      "listEmpty": "Vous n'avez pas encore déposé de demande.",
+      "loadError": "Vos demandes ne peuvent pas être affichées pour le moment. Réessayez dans quelques instants.",
+      "reference": "Référence {reference}",
+      "createdAt": "Déposée le {date}",
+      "dueAt": "Réponse attendue avant le {date} (indicatif)",
+      "closedAt": "Clôturée le {date}",
+      "status": {
+        "received": "Reçue",
+        "in_review": "En cours d'examen",
+        "completed": "Traitée",
+        "rejected": "Refusée"
+      },
+      "errors": {
+        "already_open": "Une demande de ce type est déjà en cours : {reference}.",
+        "already_open_unknown": "Une demande de ce type est déjà en cours. Retrouvez sa référence dans la liste de vos demandes.",
+        "rate_limited": "Vous avez déposé trop de demandes en peu de temps. Réessayez plus tard.",
+        "invalid": "Votre demande n'a pas pu être enregistrée : vérifiez vos informations.",
+        "denied": "Ce lien ne permet plus de déposer une demande. Demandez un nouveau lien de suivi.",
+        "error": "Votre demande n'a pas pu être enregistrée. Réessayez dans quelques instants."
+      },
+      "typeRequired": "Choisissez le type de demande."
     }
   },
   "VisitorAi": {
@@ -881,7 +1097,24 @@
       "consistency": {
         "title": "Vérification de cohérence par l'assistant de lecture",
         "button": "Vérifier mes réponses"
+      },
+      "guarantees": {
+        "title": "Les garanties en langage simple",
+        "button": "Expliquer les garanties",
+        "aiNotice": "Contenu généré par IA, à confirmer par le courtier partenaire."
+      },
+      "compare": {
+        "title": "Les différences entre ces offres",
+        "button": "Expliquer les différences",
+        "aiNotice": "Contenu généré par IA, à confirmer par le courtier partenaire."
       }
+    },
+    "fieldHelp": {
+      "trigger": "Aide pour le champ « {field} »",
+      "title": "Aide pour ce champ",
+      "close": "Masquer l'aide",
+      "note": "Explication générale du champ. Votre réponse n'est pas envoyée à l'assistant ; ne saisissez pas de données personnelles.",
+      "aiNotice": "Contenu généré par IA, à confirmer par le courtier partenaire."
     }
   },
   "DocumentUpload": {
@@ -1505,16 +1738,16 @@
   },
   "Unsubscribe": {
     "kicker": "Désinscription",
-    "title": "Ne plus recevoir d'enquêtes de satisfaction",
-    "description": "Désinscription des enquêtes de satisfaction AssurMatch.",
+    "title": "Ne plus recevoir ces e-mails de rappel et d'enquête",
+    "description": "Désinscription des e-mails de rappel et d'enquête AssurMatch.",
     "breadcrumb": "Désinscription",
-    "lead": "Confirmez pour ne plus recevoir d'enquête de satisfaction après vos mises en relation. Les messages liés au suivi de vos demandes de devis continuent de vous être envoyés.",
+    "lead": "Confirmez pour ne plus recevoir ce type d'e-mail (rappel de documents manquants ou enquête de satisfaction après vos mises en relation). Les messages liés au suivi de vos demandes de devis continuent de vous être envoyés.",
     "confirm": "Confirmer la désinscription",
     "sending": "Envoi en cours.",
     "successTitle": "Désinscription enregistrée",
-    "successBody": "Vous ne recevrez plus d'enquête de satisfaction AssurMatch à cette adresse.",
+    "successBody": "Vous ne recevrez plus ce type d'e-mail AssurMatch à cette adresse.",
     "unavailableTitle": "Ce lien n'est pas valide",
-    "unavailableBody": "Le lien est peut-être incomplet. Utilisez le lien reçu dans l'e-mail d'enquête.",
+    "unavailableBody": "Le lien est peut-être incomplet. Utilisez le lien reçu dans l'e-mail.",
     "error": "Le service est momentanément indisponible. Réessayez dans quelques minutes."
   }
 }

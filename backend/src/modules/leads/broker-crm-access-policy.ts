@@ -1,6 +1,6 @@
-import { roleHasPermission } from "../../../../packages/shared/rbac/assurmatch-role-matrix";
 import { QuoteAuditActions } from "../audit-logs/quote-audit-actions";
 import { AuditLogWriter } from "../audit-logs/audit-log-writer.service";
+import { actorHasAnyPermission } from "../common/rbac/actor-permissions";
 import type { ActorContext } from "../common/types";
 import type { LeadAssignmentRecord } from "./lead-assignment.service";
 
@@ -50,6 +50,18 @@ export class BrokerCrmAccessPolicy {
     }
   }
 
+  /** Lot 3 (spec 069 FR-006): the advisor resolved from the user directory must belong to the actor's cabinet; unknown ids are refused like foreign ones. */
+  assertAdvisorTenantResolved(actor: ActorContext, assignment: LeadAssignmentRecord, advisorTenantId: string | undefined): void {
+    if (!advisorTenantId || advisorTenantId !== actor.partnerTenantId || advisorTenantId !== assignment.partnerTenantId) {
+      this.refuse(actor, "LeadAssignment", assignment.id, "advisor_cross_tenant_or_unresolved");
+    }
+  }
+
+  /** Lot 3 (spec 069 FR-006): the advisor account is suspended, locked or deleted. */
+  refuseAdvisorUnavailable(actor: ActorContext, assignment: LeadAssignmentRecord): never {
+    return this.refuse(actor, "LeadAssignment", assignment.id, "advisor_account_unavailable");
+  }
+
   assertSameTenantAssignee(actor: ActorContext, assignment: LeadAssignmentRecord, assigneeId: string): void {
     const assigneeTenantId = actor.brokerUserTenantIds?.[assigneeId];
     if (assigneeTenantId !== assignment.partnerTenantId || assigneeTenantId !== actor.partnerTenantId) {
@@ -89,7 +101,7 @@ export class BrokerCrmAccessPolicy {
   }
 
   private hasAny(actor: ActorContext, permissions: string[]): boolean {
-    return actor.roles.some((role) => permissions.some((permission) => roleHasPermission(role, permission)));
+    return actorHasAnyPermission(actor, permissions);
   }
 
   private refuse(actor: ActorContext, targetType: string, targetId: string, reason: string): never {

@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { listAdminAiInsights, readAdminAIAssistance } from "../lib/admin-api";
 import { requestAdminInsightAction, validateAdminInsightAction } from "../lib/ai-insight-actions";
 import { Badge, Button, Card, Cluster, DataTable, DescriptionList, EmptyState, Form, Input, PageHeader, PageStack, Split, Stack, StateMessage } from "../lib/ui/admin-ui";
@@ -6,8 +7,14 @@ const INSIGHT_LABELS: Record<string, string> = {
   admin_risk_triage: "Triage des risques de conformite",
   activation_gap_summary: "Ecarts d'activation",
   offer_consistency_check: "Coherence d'une offre",
+  offer_summary: "Résumé d'une offre",
   activity_report: "Rapport d'activite",
   suspicious_leads: "Demandes suspectes"
+};
+
+/** Display-only labels: analyses requested elsewhere (spec 064: /routing/anomalies), never requestable from this page. */
+const DISPLAY_ONLY_LABELS: Record<string, string> = {
+  routing_anomaly_analysis: "Analyse des anomalies de routage (demandée depuis Routage > Anomalies)"
 };
 
 const NOTICES: Record<string, string> = {
@@ -38,6 +45,13 @@ export default async function AdminAIAssistancePage({ searchParams }: { searchPa
         <>
           <Split>
             <Stack>
+            <Card
+              title="Flags IA par pays et produit"
+              description="Etat et changement des flags IA par pays et par produit, par une voie de conformite auditee (MFA, reference de politique, approbateur, motif)."
+            >
+              <Link href="/ai-assistance/flags">Ouvrir les flags IA par pays et produit</Link>
+            </Card>
+
             {enabled ? (
               <Card
                 title="Demander un insight IA a valider"
@@ -47,7 +61,7 @@ export default async function AdminAIAssistancePage({ searchParams }: { searchPa
                   {Object.entries(INSIGHT_LABELS).filter(([assistType]) => assistance.data.availableAssistTypes.includes(assistType)).map(([assistType, label]) => (
                     <Form key={assistType} action={requestAdminInsightAction}>
                       <input type="hidden" name="assistType" value={assistType} />
-                      {assistType === "offer_consistency_check" ? (
+                      {assistType === "offer_consistency_check" || assistType === "offer_summary" ? (
                         <Input name="offerId" placeholder="Identifiant de l'offre" aria-label="Identifiant de l'offre" />
                       ) : null}
                       <Button type="submit" variant="secondary">{label}</Button>
@@ -72,7 +86,7 @@ export default async function AdminAIAssistancePage({ searchParams }: { searchPa
                     <li key={insight.id}>
                       <Stack>
                         <Cluster>
-                          <strong>{INSIGHT_LABELS[insight.assistType] ?? insight.assistType}</strong>
+                          <strong>{INSIGHT_LABELS[insight.assistType] ?? DISPLAY_ONLY_LABELS[insight.assistType] ?? insight.assistType}</strong>
                           <Badge tone={insight.status === "completed" ? "success" : insight.status === "queued" ? "info" : "warning"}>{insight.status}</Badge>
                           {insight.humanValidationStatus !== "not_required" ? <Badge tone={insight.humanValidationStatus === "pending" ? "warning" : "info"}>validation: {insight.humanValidationStatus}</Badge> : null}
                         </Cluster>

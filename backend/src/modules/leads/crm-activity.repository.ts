@@ -24,6 +24,31 @@ export interface BrokerCrmPipelineHistoryRecord extends BrokerCrmHistoryEvent {
   nextStatus?: BrokerCrmPipelineStatus;
 }
 
+/** Spec 063: a dispute as stored, with the tenant it belongs to (the public DTO omits it). */
+export type LeadDisputeRecord = BrokerCrmDispute & { partnerTenantId: string };
+
+/** Spec 063: filters of the admin dispute list; the country filter is applied by the service. */
+export interface LeadDisputeFilter {
+  status?: BrokerCrmDispute["status"] | undefined;
+  partnerTenantId?: string | undefined;
+  from?: Date | undefined;
+  to?: Date | undefined;
+}
+
+/** Spec 063: the dispute was decided by someone else between the read and the conditional write. */
+export class DisputeStatusConflictError extends Error {
+  constructor() {
+    super("Dispute status changed concurrently");
+  }
+}
+
+/** Spec 063 D-B1: a dispute already exists for this lead assignment (one per lead, also guaranteed by a partial unique index). */
+export class DisputeAlreadyExistsError extends Error {
+  constructor() {
+    super("A dispute already exists for this lead");
+  }
+}
+
 export interface CrmActivityRepository extends RuntimeRepository {
   appendPipelineHistory(history: BrokerCrmPipelineHistoryRecord): Promise<BrokerCrmPipelineHistoryRecord>;
   pipelineHistoryForLead(leadAssignmentId: string): Promise<BrokerCrmPipelineHistoryRecord[]>;
@@ -32,13 +57,23 @@ export interface CrmActivityRepository extends RuntimeRepository {
   addReminder(reminder: BrokerCrmReminder): Promise<BrokerCrmReminder>;
   addDocument(document: BrokerCrmDocument): Promise<BrokerCrmDocument>;
   addProposal(proposal: BrokerCrmProposal): Promise<BrokerCrmProposal>;
-  addDispute(dispute: BrokerCrmDispute): Promise<BrokerCrmDispute>;
+  addDispute(dispute: LeadDisputeRecord): Promise<LeadDisputeRecord>;
   notesForLead(leadAssignmentId: string): Promise<BrokerCrmNote[]>;
   tasksForLead(leadAssignmentId: string): Promise<BrokerCrmTask[]>;
   remindersForLead(leadAssignmentId: string): Promise<BrokerCrmReminder[]>;
   documentsForLead(leadAssignmentId: string): Promise<BrokerCrmDocument[]>;
   proposalsForLead(leadAssignmentId: string): Promise<BrokerCrmProposal[]>;
-  disputesForLead(leadAssignmentId: string): Promise<BrokerCrmDispute[]>;
+  disputesForLead(leadAssignmentId: string): Promise<LeadDisputeRecord[]>;
+  /** Spec 063: one dispute by id, with its tenant. */
+  findDispute(id: string): Promise<LeadDisputeRecord | undefined>;
+  /** Spec 063: persists the finance decision (status, reason, credit) of an existing dispute. */
+  /**
+   * Persists a dispute. With `expectedStatus` the write is conditional (compare-and-set): when the stored
+   * status differs (another instance decided first) it throws `DisputeStatusConflictError`.
+   */
+  updateDispute(dispute: LeadDisputeRecord, expectedStatus?: LeadDisputeRecord["status"]): Promise<LeadDisputeRecord>;
+  /** Spec 063: disputes across tenants, newest first (admin list and broker billing view). */
+  listDisputes(filter?: LeadDisputeFilter): Promise<LeadDisputeRecord[]>;
   /** Spec 061: open tasks due in [from, to], across tenants (scheduled-alerts job only). */
   openTasksDueBetween(from: Date, to: Date): Promise<Array<BrokerCrmTask & { partnerTenantId?: string }>>;
   /** Spec 061: reminders scheduled in [from, to], across tenants (scheduled-alerts job only). */
@@ -59,7 +94,7 @@ export class MemoryCrmActivityRepository implements CrmActivityRepository {
   private readonly reminders: BrokerCrmReminder[] = [];
   private readonly documents: BrokerCrmDocument[] = [];
   private readonly proposals: BrokerCrmProposal[] = [];
-  private readonly disputes: BrokerCrmDispute[] = [];
+  private readonly disputes: LeadDisputeRecord[] = [];
 
   constructor() {
     assertRuntimeRepository(this.mode, "CRMActivityRepository");
@@ -99,7 +134,8 @@ export class MemoryCrmActivityRepository implements CrmActivityRepository {
     return proposal;
   }
 
-  async addDispute(dispute: BrokerCrmDispute): Promise<BrokerCrmDispute> {
+  async addDispute(dispute: LeadDisputeRecord): Promise<LeadDisputeRecord> {
+    if (this.disputes.some((item) => item.leadAssignmentId === dispute.leadAssignmentId)) throw new DisputeAlreadyExistsError();
     this.disputes.push(dispute);
     return dispute;
   }
@@ -124,8 +160,32 @@ export class MemoryCrmActivityRepository implements CrmActivityRepository {
     return this.proposals.filter((item) => item.leadAssignmentId === leadAssignmentId);
   }
 
-  async disputesForLead(leadAssignmentId: string): Promise<BrokerCrmDispute[]> {
+  async disputesForLead(leadAssignmentId: string): Promise<LeadDisputeRecord[]> {
+    // Live references on purpose: the retention anonymizer scrubs the comment in place.
     return this.disputes.filter((item) => item.leadAssignmentId === leadAssignmentId);
+  }
+
+  async findDispute(id: string): Promise<LeadDisputeRecord | undefined> {
+    const found = this.disputes.find((item) => item.id === id);
+    return found ? structuredClone(found) : undefined;
+  }
+
+  async updateDispute(dispute: LeadDisputeRecord, expectedStatus?: LeadDisputeRecord["status"]): Promise<LeadDisputeRecord> {
+    const index = this.disputes.findIndex((item) => item.id === dispute.id);
+    if (index < 0) throw new Error("Dispute not found");
+    if (expectedStatus && this.disputes[index]?.status !== expectedStatus) throw new DisputeStatusConflictError();
+    this.disputes[index] = structuredClone(dispute);
+    return structuredClone(dispute);
+  }
+
+  async listDisputes(filter: LeadDisputeFilter = {}): Promise<LeadDisputeRecord[]> {
+    return this.disputes
+      .filter((item) => !filter.status || item.status === filter.status)
+      .filter((item) => !filter.partnerTenantId || item.partnerTenantId === filter.partnerTenantId)
+      .filter((item) => !filter.from || new Date(item.createdAt) >= filter.from)
+      .filter((item) => !filter.to || new Date(item.createdAt) <= filter.to)
+      .sort((left, right) => right.createdAt.localeCompare(left.createdAt))
+      .map((item) => structuredClone(item));
   }
 
   async openTasksDueBetween(from: Date, to: Date): Promise<Array<BrokerCrmTask & { partnerTenantId?: string }>> {
@@ -140,6 +200,9 @@ export class MemoryCrmActivityRepository implements CrmActivityRepository {
 type Delegate = {
   create(input: unknown): Promise<unknown>;
   findMany(input?: unknown): Promise<unknown[]>;
+  findUnique(input: unknown): Promise<unknown>;
+  update(input: unknown): Promise<unknown>;
+  updateMany(input: unknown): Promise<{ count: number }>;
 };
 
 export class PrismaCrmActivityRepository implements CrmActivityRepository {
@@ -186,8 +249,14 @@ export class PrismaCrmActivityRepository implements CrmActivityRepository {
     return this.toProposal(await this.delegate("brokerCrmProposal").create({ data: { ...proposal, createdAt: new Date(proposal.createdAt) } }));
   }
 
-  async addDispute(dispute: BrokerCrmDispute): Promise<BrokerCrmDispute> {
-    return this.toDispute(await this.delegate("brokerCrmDispute").create({ data: { ...dispute, createdAt: new Date(dispute.createdAt) } }));
+  async addDispute(dispute: LeadDisputeRecord): Promise<LeadDisputeRecord> {
+    try {
+      return this.toDispute(await this.delegate("brokerCrmDispute").create({ data: this.disputeData(dispute) }));
+    } catch (error) {
+      // Partial unique index on leadAssignmentId (migration 0030): a concurrent opening won.
+      if (typeof error === "object" && error !== null && (error as { code?: unknown }).code === "P2002") throw new DisputeAlreadyExistsError();
+      throw error;
+    }
   }
 
   async notesForLead(leadAssignmentId: string): Promise<BrokerCrmNote[]> {
@@ -210,8 +279,30 @@ export class PrismaCrmActivityRepository implements CrmActivityRepository {
     return (await this.delegate("brokerCrmProposal").findMany({ where: { leadAssignmentId }, orderBy: { createdAt: "asc" } })).map((row) => this.toProposal(row));
   }
 
-  async disputesForLead(leadAssignmentId: string): Promise<BrokerCrmDispute[]> {
+  async disputesForLead(leadAssignmentId: string): Promise<LeadDisputeRecord[]> {
     return (await this.delegate("brokerCrmDispute").findMany({ where: { leadAssignmentId }, orderBy: { createdAt: "asc" } })).map((row) => this.toDispute(row));
+  }
+
+  async findDispute(id: string): Promise<LeadDisputeRecord | undefined> {
+    const row = await this.delegate("brokerCrmDispute").findUnique({ where: { id } });
+    return row ? this.toDispute(row) : undefined;
+  }
+
+  async updateDispute(dispute: LeadDisputeRecord, expectedStatus?: LeadDisputeRecord["status"]): Promise<LeadDisputeRecord> {
+    const data: Record<string, unknown> = { ...this.disputeData(dispute) };
+    delete data.id;
+    if (expectedStatus) {
+      const result = await this.delegate("brokerCrmDispute").updateMany({ where: { id: dispute.id, status: expectedStatus }, data });
+      if (result.count !== 1) throw new DisputeStatusConflictError();
+      return this.toDispute(await this.delegate("brokerCrmDispute").findUnique({ where: { id: dispute.id } }));
+    }
+    return this.toDispute(await this.delegate("brokerCrmDispute").update({ where: { id: dispute.id }, data }));
+  }
+
+  async listDisputes(filter: LeadDisputeFilter = {}): Promise<LeadDisputeRecord[]> {
+    const createdAt = filter.from || filter.to ? { ...(filter.from ? { gte: filter.from } : {}), ...(filter.to ? { lte: filter.to } : {}) } : undefined;
+    const where = { ...(filter.status ? { status: filter.status } : {}), ...(filter.partnerTenantId ? { partnerTenantId: filter.partnerTenantId } : {}), ...(createdAt ? { createdAt } : {}) };
+    return (await this.delegate("brokerCrmDispute").findMany({ where, orderBy: { createdAt: "desc" } })).map((row) => this.toDispute(row));
   }
 
   async openTasksDueBetween(from: Date, to: Date): Promise<Array<BrokerCrmTask & { partnerTenantId?: string }>> {
@@ -274,8 +365,49 @@ export class PrismaCrmActivityRepository implements CrmActivityRepository {
     return { ...item, createdAt: this.dateString(item.createdAt) };
   }
 
-  private toDispute(row: unknown): BrokerCrmDispute {
-    const item = row as BrokerCrmDispute;
-    return { ...item, createdAt: this.dateString(item.createdAt) };
+  private disputeData(dispute: LeadDisputeRecord) {
+    return {
+      id: dispute.id,
+      leadAssignmentId: dispute.leadAssignmentId,
+      partnerTenantId: dispute.partnerTenantId,
+      reason: dispute.reason,
+      comment: dispute.comment ?? null,
+      status: dispute.status,
+      source: dispute.source ?? "crm",
+      countryCode: dispute.countryCode ?? null,
+      createdAt: new Date(dispute.createdAt),
+      decidedAt: dispute.decidedAt ? new Date(dispute.decidedAt) : null,
+      decidedById: dispute.decidedById ?? null,
+      decisionReason: dispute.decisionReason ?? null,
+      creditMode: dispute.creditMode ?? null,
+      creditNoteId: dispute.creditNoteId ?? null,
+      creditPackId: dispute.creditPackId ?? null,
+      creditAmount: dispute.creditAmount ?? null
+    };
+  }
+
+  /** Null columns are left out so the DTO keeps its optional fields absent; internal columns never leak. */
+  private toDispute(row: unknown): LeadDisputeRecord {
+    const item = row as Record<string, unknown>;
+    const text = (key: string): string | undefined => (typeof item[key] === "string" ? (item[key] as string) : undefined);
+    const decidedAt = item.decidedAt ? this.dateString(item.decidedAt) : undefined;
+    return {
+      id: String(item.id),
+      leadAssignmentId: String(item.leadAssignmentId),
+      partnerTenantId: String(item.partnerTenantId),
+      reason: String(item.reason) as LeadDisputeRecord["reason"],
+      ...(text("comment") ? { comment: text("comment") as string } : {}),
+      status: String(item.status) as LeadDisputeRecord["status"],
+      createdAt: this.dateString(item.createdAt),
+      source: item.source === "starter" ? "starter" : "crm",
+      ...(text("countryCode") ? { countryCode: text("countryCode") as string } : {}),
+      ...(decidedAt ? { decidedAt } : {}),
+      ...(text("decidedById") ? { decidedById: text("decidedById") as string } : {}),
+      ...(text("decisionReason") ? { decisionReason: text("decisionReason") as string } : {}),
+      ...(text("creditMode") ? { creditMode: text("creditMode") as NonNullable<LeadDisputeRecord["creditMode"]> } : {}),
+      ...(text("creditNoteId") ? { creditNoteId: text("creditNoteId") as string } : {}),
+      ...(text("creditPackId") ? { creditPackId: text("creditPackId") as string } : {}),
+      ...(typeof item.creditAmount === "number" ? { creditAmount: item.creditAmount } : {})
+    };
   }
 }

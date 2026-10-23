@@ -1,4 +1,9 @@
-import { readAccountStatement, readBillingFoundation, readBillingPlans, readDraftInvoices, readIssuedInvoices, readLeadPacks } from "../lib/admin-api";
+import { readAccountStatement, readBillingFoundation, readBillingPlans, readDraftInvoices, readIssuedInvoices, readLeadDispute, readLeadDisputes, readLeadPacks } from "../lib/admin-api";
+import { readBackOfficeSession } from "../lib/backoffice-auth";
+import { DISPUTE_DECIDER_ROLES, DISPUTE_PAGE_SIZE } from "../lib/dispute-vocabulary";
+import { DisputesPanel } from "./disputes-panel";
+import { DraftLinesPanel, Lot5BillingPanels } from "./lot5-panels";
+import type { DisputeTabFilters } from "./disputes-panel";
 import {
   grantLeadPackAction,
   issueCreditNoteAction,
@@ -45,7 +50,13 @@ const BILLING_NOTICES: Record<string, string> = {
   disabled: "Module billing desactive ou configuration de facturation incomplete (billing_enabled, mentions legales, TVA du pays).",
   forbidden: "Action refusee: role Finance Admin ou Super Admin requis.",
   invalid: "Saisie incomplete: verifiez le plan, le pays et le motif.",
-  error: "Billing temporairement indisponible."
+  error: "Billing temporairement indisponible.",
+  // Spec 063 (CRM-012): decision on a lead dispute.
+  dispute_accepted: "Contestation acceptée et auditée. Le cabinet est notifié ; le crédit appliqué est indiqué ci-dessous.",
+  dispute_rejected: "Contestation rejetée et auditée. Le lead reste facturable et le cabinet est notifié.",
+  dispute_invalid: "Décision incomplète : choisissez accepter ou rejeter et saisissez un motif de 10 à 1000 caractères.",
+  dispute_already_decided: "Cette contestation a déjà été tranchée : la décision ne peut plus être modifiée.",
+  dispute_billing_disabled: "La facturation n'est pas activée : activez billing_enabled avant de statuer sur une contestation."
 };
 
 const TABS = [
@@ -54,10 +65,15 @@ const TABS = [
   { key: "brouillons", label: "Brouillons" },
   { key: "factures", label: "Factures" },
   { key: "comptes", label: "Comptes" },
+  { key: "contestations", label: "Contestations" },
   { key: "packs", label: "Packs" }
 ];
 
-const SUCCESS_NOTICES = new Set(["plan_saved", "drafts_computed", "pack_granted", "invoice_issued", "payment_recorded", "credit_note_issued"]);
+/** Lot 5 (spec 071): add-on prices, assignments, subscription state and plan-change inbox (`billing:plan_manage`). */
+const PLAN_MANAGER_ROLES = new Set(["finance_admin", "super_admin"]);
+const MODULES_TAB = { key: "modules", label: "Modules et abonnements" };
+
+const SUCCESS_NOTICES = new Set(["plan_saved", "drafts_computed", "pack_granted", "invoice_issued", "payment_recorded", "credit_note_issued", "dispute_accepted", "dispute_rejected"]);
 
 /** Spec 060 invoice statuses, worded for finance (the raw status stays visible in the badge title). */
 const INVOICE_STATUS_LABELS: Record<IssuedInvoiceData["status"], string> = {
@@ -134,10 +150,39 @@ export default async function BillingFoundationPage({
   const params = await searchParams;
   const notice = firstParam(params.billing);
   const requestedTab = firstParam(params.tab);
-  const tab = TABS.some((entry) => entry.key === requestedTab) ? requestedTab : "suivi";
+  const tab = [...TABS, MODULES_TAB].some((entry) => entry.key === requestedTab) ? requestedTab : "suivi";
+  const lot5Session = await readBackOfficeSession();
+  const canManagePlans = lot5Session.status === "authenticated" && lot5Session.profile.roles.some((role) => PLAN_MANAGER_ROLES.has(role));
   const accountPartnerId = firstParam(params.partner);
   const [billing, plans, drafts, packs, invoices] = await Promise.all([readBillingFoundation(), readBillingPlans(), readDraftInvoices(), readLeadPacks(), readIssuedInvoices()]);
   const account = tab === "comptes" && /^[0-9a-f-]{36}$/i.test(accountPartnerId) ? await readAccountStatement(accountPartnerId) : undefined;
+  // Spec 063 FR-B10: disputes tab (filters live in the query string; dates are YYYY-MM-DD).
+  const disputeFilters: DisputeTabFilters = {
+    status: firstParam(params.status),
+    partnerId: /^[0-9a-f-]{36}$/i.test(firstParam(params.partnerId)) ? firstParam(params.partnerId) : "",
+    countryCode: /^[A-Za-z]{2}$/.test(firstParam(params.countryCode)) ? firstParam(params.countryCode).toUpperCase() : "",
+    from: /^\d{4}-\d{2}-\d{2}$/.test(firstParam(params.from)) ? firstParam(params.from) : "",
+    to: /^\d{4}-\d{2}-\d{2}$/.test(firstParam(params.to)) ? firstParam(params.to) : ""
+  };
+  const disputePage = Math.max(1, Number.parseInt(firstParam(params.page), 10) || 1);
+  const disputeId = /^[A-Za-z0-9_-]{8,64}$/.test(firstParam(params.dispute)) ? firstParam(params.dispute) : "";
+  const disputeTab = tab === "contestations"
+    ? await Promise.all([
+        readLeadDisputes({
+          ...(["opened", "accepted", "rejected"].includes(disputeFilters.status) ? { status: disputeFilters.status } : {}),
+          partnerId: disputeFilters.partnerId,
+          countryCode: disputeFilters.countryCode,
+          ...(disputeFilters.from ? { from: `${disputeFilters.from}T00:00:00.000Z` } : {}),
+          ...(disputeFilters.to ? { to: `${disputeFilters.to}T23:59:59.999Z` } : {}),
+          page: disputePage,
+          pageSize: DISPUTE_PAGE_SIZE
+        }),
+        disputeId ? readLeadDispute(disputeId) : Promise.resolve(undefined),
+        readBackOfficeSession()
+      ])
+    : undefined;
+  const disputeSession = disputeTab?.[2];
+  const canDecideDispute = disputeSession?.status === "authenticated" && disputeSession.profile.roles.some((role) => DISPUTE_DECIDER_ROLES.has(role));
   const issuedItems: IssuedInvoiceData[] = invoices.status === "success" ? invoices.data : [];
   const invoicedDraftIds = new Set(issuedItems.filter((invoice) => invoice.status !== "cancelled").map((invoice) => invoice.draftId));
   const issuableDrafts = (drafts.status === "success" ? drafts.data.items : []).filter((draft) => !invoicedDraftIds.has(draft.id) && draft.totalAmount > 0);
@@ -180,7 +225,7 @@ export default async function BillingFoundationPage({
 
           <Tabs
             label="Sections facturation"
-            items={TABS.map((entry) => ({ label: entry.label, href: hrefForTab(entry.key), current: entry.key === tab }))}
+            items={(canManagePlans ? [...TABS, MODULES_TAB] : TABS).map((entry) => ({ label: entry.label, href: hrefForTab(entry.key), current: entry.key === tab }))}
           />
 
           {tab === "suivi" ? (
@@ -266,7 +311,17 @@ export default async function BillingFoundationPage({
             </Card>
           ) : null}
 
+          {tab === "modules" && canManagePlans ? (
+            <Lot5BillingPanels
+              partners={billing.data.partners.map((partner) => ({ partnerId: partner.partnerId, partnerName: partner.partnerName }))}
+              subscriptionPartnerId={firstParam(params.abonnement)}
+              planStatus={firstParam(params.planStatus)}
+            />
+          ) : null}
+          {tab === "modules" && !canManagePlans ? <StateMessage tone="warning">Modules et abonnements : rôle Finance Admin ou Super Admin requis.</StateMessage> : null}
+
           {tab === "brouillons" ? (
+            <>
             <Card title="Brouillons mensuels non facturables">
               <DataTable
                 columns={draftColumns}
@@ -296,6 +351,8 @@ export default async function BillingFoundationPage({
                 </FormActions>
               </Form>
             </Card>
+            <DraftLinesPanel drafts={draftItems} />
+            </>
           ) : null}
 
           {tab === "factures" ? (
@@ -419,6 +476,17 @@ export default async function BillingFoundationPage({
               {account?.status === "success" && account.data ? <AccountPanel account={account.data} /> : null}
               {account && account.status !== "success" ? <StateMessage tone="danger">Etat des comptes indisponible ({account.error}).</StateMessage> : null}
             </>
+          ) : null}
+
+          {tab === "contestations" && disputeTab ? (
+            <DisputesPanel
+              filters={disputeFilters}
+              list={disputeTab[0]}
+              detail={disputeTab[1]}
+              partners={billing.data.partners}
+              canDecide={canDecideDispute === true}
+              page={disputePage}
+            />
           ) : null}
 
           {tab === "packs" ? (

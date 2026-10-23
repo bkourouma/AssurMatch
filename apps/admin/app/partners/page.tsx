@@ -71,6 +71,29 @@ const slaColumns: Array<DataTableColumn<AdminPartnerSlaRowData>> = [
     align: "right",
     sortable: true,
     sortValue: (row) => row.averageFirstActionMinutes
+  },
+  // Spec 062 (additive): first reply visible to the visitor; "—" while nothing is measured.
+  {
+    key: "visibleReply",
+    header: "Première réponse visible",
+    render: (row) =>
+      row.firstVisibleReplyComplianceRate === null || row.firstVisibleReplyComplianceRate === undefined
+        ? "—"
+        : `${Math.round(row.firstVisibleReplyComplianceRate * 100)}% (${row.firstVisibleReplyWithinTarget ?? 0}/${row.firstVisibleReplyMeasured ?? 0})`,
+    numeric: true,
+    align: "right",
+    sortable: true,
+    sortValue: (row) => row.firstVisibleReplyComplianceRate ?? null
+  },
+  {
+    key: "visibleReplyAverage",
+    header: "Délai moyen réponse visible",
+    render: (row) =>
+      row.averageFirstVisibleReplyMinutes === null || row.averageFirstVisibleReplyMinutes === undefined ? "—" : `${row.averageFirstVisibleReplyMinutes} min`,
+    numeric: true,
+    align: "right",
+    sortable: true,
+    sortValue: (row) => row.averageFirstVisibleReplyMinutes ?? null
   }
 ];
 

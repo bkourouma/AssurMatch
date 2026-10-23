@@ -8,7 +8,11 @@ export const ADMIN_ALERT_TYPES = [
   "country_without_public_broker",
   "unrouted_leads_spike",
   "dispute_rate_high",
-  "worker_stale"
+  "worker_stale",
+  /** Spec 062 D-10: a visitor filed an access, rectification or erasure request. */
+  "data_request_received",
+  /** Lot 12 (spec 077): an SMS/WhatsApp outbox row reached dead_letter. */
+  "channel_dead_letter"
 ] as const;
 
 export type AdminAlertType = (typeof ADMIN_ALERT_TYPES)[number];
@@ -22,7 +26,9 @@ export const ADMIN_ALERT_LABELS: Record<AdminAlertType, string> = {
   country_without_public_broker: "Pays public sans courtier actif",
   unrouted_leads_spike: "Pic de leads non routes (24 h)",
   dispute_rate_high: "Taux de litige eleve",
-  worker_stale: "Worker de notifications inactif"
+  worker_stale: "Worker de notifications inactif",
+  data_request_received: "Nouvelle demande de donnees personnelles",
+  channel_dead_letter: "Message SMS/WhatsApp en echec definitif"
 };
 
 export interface AdminAlertView {

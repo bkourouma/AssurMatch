@@ -66,8 +66,8 @@ test("Starter CRM entry points show required Pro availability message", () => {
   for (const fileSource of [crm, leads, detail, viewModels]) {
     expect(fileSource).toContain("Le CRM complet est disponible avec le plan Pro.");
   }
-  expect(crm.indexOf("const session = await readBackOfficeSession();")).toBeLessThan(crm.indexOf("const dashboard = await readBrokerDashboardWithComparison();"));
-  expect(crm.indexOf("if (isStarterCrmDenied(session.profile))")).toBeLessThan(crm.indexOf("const dashboard = await readBrokerDashboardWithComparison();"));
+  expect(crm.indexOf("const session = await readBackOfficeSession();")).toBeLessThan(crm.indexOf("const dashboard = await readBrokerDashboardWithComparison(filterQuery);"));
+  expect(crm.indexOf("if (isStarterCrmDenied(session.profile))")).toBeLessThan(crm.indexOf("const dashboard = await readBrokerDashboardWithComparison(filterQuery);"));
   expect(detail).toContain("ne presente pas Kanban");
 });
 

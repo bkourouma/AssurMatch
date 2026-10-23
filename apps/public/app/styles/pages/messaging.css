@@ -1,0 +1,231 @@
+/* ==========================================================================
+   Spec 062: conversations, requested documents and data requests of the tracking space.
+   Plain wayfinding: ruled lines and a navy rule, no bubbles, no shadows. Mobile first (375px).
+   ========================================================================== */
+
+.am-msg {
+  min-width: 0;
+}
+
+.am-msg .am-j-panel__head {
+  flex-wrap: wrap;
+}
+
+.am-msg .am-j-panel__title {
+  flex: 1 1 12ch;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+/* The thread: ruled, one group per sender and moment. */
+.am-msg__list {
+  margin: 0;
+  padding: 0;
+  border-top: 1px solid var(--am-rule);
+  list-style: none;
+}
+
+.am-msg__group {
+  display: grid;
+  gap: var(--am-space-8);
+  margin: 0;
+  padding: var(--am-space-12) 0 var(--am-space-12) var(--am-space-12);
+  border-bottom: 1px solid var(--am-rule);
+  border-left: 4px solid var(--am-neutral-500);
+}
+
+/* The broker speaks on the navy rule, the visitor on a neutral one. */
+.am-msg__group[data-from="broker"] {
+  border-left-color: var(--am-primary-800);
+}
+
+.am-msg__who {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--am-space-4) var(--am-space-12);
+  align-items: baseline;
+  margin: 0;
+  color: var(--am-heading);
+  font-size: var(--am-small-size);
+  line-height: var(--am-small-line);
+}
+
+.am-msg__time {
+  color: var(--am-text-muted);
+  font-size: var(--am-caption-size);
+  line-height: var(--am-caption-line);
+}
+
+.am-msg__item {
+  display: grid;
+  gap: var(--am-space-4);
+  min-width: 0;
+}
+
+/* Plain text: line breaks kept by CSS, long words and addresses wrap, nothing is ever turned into a link. */
+.am-msg__body {
+  max-width: 76ch;
+  margin: 0;
+  color: var(--am-text);
+  font-size: var(--am-body-size);
+  line-height: var(--am-body-line);
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+
+.am-msg__receipt {
+  display: inline-flex;
+  gap: var(--am-space-4);
+  align-items: center;
+  margin: 0;
+  color: var(--am-text-muted);
+  font-size: var(--am-caption-size);
+  line-height: var(--am-caption-line);
+}
+
+.am-msg__muted {
+  color: var(--am-text-muted);
+  font-size: var(--am-caption-size);
+}
+
+.am-msg__status {
+  margin: 0;
+  color: var(--am-text-muted);
+  font-size: var(--am-small-size);
+  line-height: var(--am-small-line);
+}
+
+.am-msg__status[role="alert"] {
+  color: var(--am-danger-700);
+}
+
+/* Files: chosen in a form, or attached to a message. */
+.am-msg__files {
+  display: grid;
+  gap: var(--am-space-4);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.am-msg__file {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--am-space-8);
+  align-items: center;
+  min-width: 0;
+  font-size: var(--am-small-size);
+  line-height: var(--am-small-line);
+}
+
+.am-msg__file-name {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.am-msg__remove {
+  display: inline-flex;
+  width: 44px;
+  height: 44px;
+  align-items: center;
+  justify-content: center;
+  margin-left: auto;
+  padding: 0;
+  border: 1px solid var(--am-neutral-500);
+  border-radius: var(--am-radius-field);
+  background: var(--am-surface);
+  color: var(--am-text);
+  cursor: pointer;
+}
+
+.am-msg__remove:hover:not(:disabled) {
+  border-color: var(--am-neutral-800);
+}
+
+.am-msg__remove:focus-visible {
+  outline: 3px solid var(--am-primary-600);
+  outline-offset: 2px;
+}
+
+.am-msg__remove:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+/* The forms sit under a ruled line, like the document upload form of the page. */
+.am-msg__compose {
+  padding-top: var(--am-space-24);
+  border-top: 1px solid var(--am-rule);
+}
+
+.am-msg__compose-title {
+  margin: 0;
+  font-size: var(--am-h3-size);
+  line-height: var(--am-h3-line);
+}
+
+.am-msg__counter {
+  margin: calc(var(--am-space-8) * -1) 0 0;
+  color: var(--am-text-muted);
+  font-size: var(--am-caption-size);
+  line-height: var(--am-caption-line);
+  text-align: right;
+}
+
+.am-msg__option-hint {
+  display: block;
+  color: var(--am-text-muted);
+  font-size: var(--am-small-size);
+  font-weight: 400;
+  line-height: var(--am-small-line);
+}
+
+/* Honeypot: out of the layout and out of reach for people, left for bots. */
+.am-msg__trap {
+  position: absolute;
+  left: -10000px;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+}
+
+/* Requested documents and data requests: ruled rows. */
+.am-msg__requests {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.am-msg__request {
+  display: grid;
+  gap: var(--am-space-4);
+  margin: 0;
+  padding: var(--am-space-12) 0;
+  border-bottom: 1px solid var(--am-rule);
+}
+
+.am-msg__request:first-child {
+  border-top: 1px solid var(--am-rule);
+}
+
+.am-msg__request p {
+  margin: 0;
+}
+
+.am-msg__request-head {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--am-space-8) var(--am-space-12);
+  align-items: center;
+}
+
+.am-msg__meta {
+  display: grid;
+  gap: var(--am-space-2);
+  margin: 0;
+  padding: 0;
+  color: var(--am-text-muted);
+  font-size: var(--am-caption-size);
+  line-height: var(--am-caption-line);
+  list-style: none;
+}

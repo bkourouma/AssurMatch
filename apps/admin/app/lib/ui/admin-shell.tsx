@@ -9,8 +9,8 @@ import { ADMIN_THEME_COOKIE } from "../theme-cookie";
 
 export interface AdminShellUser {
   label: string;
-  role?: string;
-  initials?: string;
+  role?: string | undefined;
+  initials?: string | undefined;
 }
 
 const authRoutePrefixes = ["/login", "/mfa", "/activate", "/password-change", "/password-reset"];
@@ -47,6 +47,8 @@ export const adminNavigation: NavGroup[] = [
           { label: "Alertes", href: "/dashboard/compliance-alerts" },
           // Spec 046: retention policies, anonymization batches and erasure requests.
           { label: "Conservation des données", href: "/compliance/retention" },
+          // Spec 062: data-subject requests (access, rectification, erasure) filed by visitors.
+          { label: "Demandes de données", href: "/compliance/data-requests" },
           // Spec 056 (H-05): audit-log search and restricted export.
           { label: "Journaux d'audit", href: "/compliance/audit-logs" },
           // Spec 059 follow-up: consent-proof search (compliance_admin, super_admin).
@@ -63,11 +65,12 @@ export const adminNavigation: NavGroup[] = [
         label: "Catalogue",
         href: "/catalog",
         icon: "catalog",
-        match: ["/catalog", "/offers", "/consent-texts"],
+        match: ["/catalog", "/offers", "/insurers", "/consent-texts"],
         children: [
           { label: "Pays", href: "/catalog/countries" },
           { label: "Produits", href: "/catalog/products" },
           { label: "Régimes", href: "/catalog/regimes" },
+          { label: "Assureurs", href: "/insurers" },
           { label: "Consentements", href: "/consent-texts" }
         ]
       },
@@ -104,7 +107,10 @@ export const adminNavigation: NavGroup[] = [
       },
       { label: "Intégrations", href: "/partner-integrations", icon: "plug", match: ["/partner-integrations"] },
       { label: "Facturation", href: "/billing", icon: "receipt", match: ["/billing"] },
-      { label: "Messagerie", href: "/messaging", icon: "message", match: ["/messaging"] }
+      { label: "Messagerie", href: "/messaging", icon: "message", match: ["/messaging"] },
+      // Lot 12 (spec 077): retry queue of the optional channels and the generic CRM connector.
+      { label: "Canaux", href: "/channels", icon: "message", match: ["/channels"] },
+      { label: "Connecteurs CRM", href: "/connecteurs-crm", icon: "plug", match: ["/connecteurs-crm"] }
     ]
   },
   {
@@ -113,7 +119,17 @@ export const adminNavigation: NavGroup[] = [
       { label: "Utilisateurs", href: "/users", icon: "users", match: ["/users"] },
       { label: "Feature flags", href: "/feature-flags", icon: "flag", match: ["/feature-flags"] },
       { label: "Activation", href: "/activation-checklist", icon: "checklist", match: ["/activation-checklist"] },
-      { label: "Assistance IA", href: "/ai-assistance", icon: "sparkles", match: ["/ai-assistance"] }
+      { label: "Assistance IA", href: "/ai-assistance", icon: "sparkles", match: ["/ai-assistance"] },
+      // Lot 9 (spec 072): minimal CMS (FAQ, guides, glossary, legal overrides); the API refuses the other roles.
+      { label: "Contenu", href: "/content", icon: "catalog", match: ["/content"] },
+      { label: "Flags IA", href: "/ai-assistance/flags", icon: "flag", match: ["/ai-assistance/flags"] }
+    ]
+  },
+  {
+    title: "Compte",
+    items: [
+      // Spec 063 (FR-A06): trusted devices and password change of the signed-in user.
+      { label: "Sécurité du compte", href: "/account/security", icon: "shield", match: ["/account"] }
     ]
   }
 ];

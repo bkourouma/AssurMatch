@@ -5,7 +5,7 @@ import { Breadcrumb } from "../../components/ui/breadcrumb";
 import { Hero } from "../../components/ui/hero";
 import { Section } from "../../components/ui/section";
 import { getEntrySelectorData } from "../../content/entry-selector-data";
-import { listGlossary } from "../../content/glossary";
+import { resolveGlossary } from "../../content/cms-content";
 import type { GlossaryEntry } from "../../content/types";
 import { buildMetadata, localeUrl } from "../../lib/seo";
 import type { PageMetadata } from "../../lib/seo";
@@ -48,7 +48,7 @@ export default async function GlossaryPage({ params }: { params: Promise<{ local
   setRequestLocale(locale);
   const t = await getTranslations("Glossary");
   const common = await getTranslations("Common");
-  const entries = listGlossary(locale);
+  const entries = await resolveGlossary(locale);
   const groups = groupByLetter(entries);
   const selector = await getEntrySelectorData();
 

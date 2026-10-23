@@ -1,6 +1,6 @@
 import { timingSafeEqual } from "node:crypto";
 import { NotFoundException } from "@nestjs/common";
-import { quoteRequestCreateSchema, type QuoteConfirmation, type QuoteRequestCreateDto } from "../../../../packages/shared/contracts/quote.contracts";
+import { MAX_QUOTE_OFFERS, quoteRequestCreateSchema, type QuoteConfirmation, type QuoteMarketingSource, type QuoteRequestCreateDto } from "../../../../packages/shared/contracts/quote.contracts";
 import type { ConsentWithdrawalResponse } from "../../../../packages/shared/contracts/public-site.contracts";
 import {
   projectPublicQuoteStatus,
@@ -20,7 +20,15 @@ import { QuoteRedisKeys } from "../common/redis/quote-redis-keys";
 import type { RedisClientPort } from "../common/redis/redis.module";
 import type { ActorContext } from "../common/types";
 import { ConsentService } from "../consent/consent.module";
-import { MULTI_BROKER_CONSENT, SINGLE_BROKER_CONSENT } from "../leads/quote-routing.service";
+import {
+  consentNamedPartners,
+  MULTI_BROKER_CONSENT,
+  NAMED_PARTNER_CONSENT_PREFIX,
+  NAMED_PARTNERS_CONSENT_PREFIX,
+  SINGLE_BROKER_CONSENT,
+  type QuoteRoutingResult,
+  type RoutableQuoteRequest
+} from "../leads/quote-routing.service";
 import { publicCountryFlags, type Country } from "../countries/countries.module";
 import { countryLinkFor, effectiveProductFlags, type Product } from "../products/products.module";
 import type { ProspectIdentityService } from "../prospects/prospect-identity.service";
@@ -53,6 +61,12 @@ export interface QuoteRequestRecord {
   /** Spec 052 R7: outcome of the verification of `selectedOfferId` (absent without offer). */
   selectedOfferOutcome?: "accepted" | "ignored";
   selectedOfferIgnoredReason?: string;
+  /** Spec 067 COMP-009: further offers accepted and honoured at submission (multi-broker flag and consent). */
+  additionalOfferIds?: string[];
+  /** Spec 067 H2: broker chosen directly by the visitor, kept when the deterministic eligibility accepted it. */
+  chosenPartnerTenantId?: string;
+  /** Spec 067 (PRD §16): declarative marketing source; never part of `payload`, never sent to a broker. */
+  marketingSource?: QuoteMarketingSource;
   quoteFormDefinitionId: string;
   /** Spec 050 R6: language of the submitted form (`fr` for every request created before the spec). */
   language?: string;
@@ -149,7 +163,68 @@ export interface SelectedOfferVerifier {
 
 /** Spec 052 R8: consent recipient category recorded when the broker of the selected offer is named. */
 export function selectedOfferRecipient(partnerTenantId: string): string {
-  return `partner:${partnerTenantId}`;
+  return `${NAMED_PARTNER_CONSENT_PREFIX}${partnerTenantId}`;
+}
+
+/**
+ * Spec 067 COMP-009: consent recipient recorded when several preferred brokers are named; routing only
+ * fans a request out to the brokers this list names (`partners:<id1>,<id2>,<id3>`, priority order).
+ */
+export function selectedOffersRecipient(partnerTenantIds: readonly string[]): string {
+  return `${NAMED_PARTNERS_CONSENT_PREFIX}${partnerTenantIds.join(",")}`;
+}
+
+/** Spec 067 H2: deterministic eligibility of a broker the visitor chose directly (same policy as routing). */
+export interface BrokerChoicePort {
+  isEligible(partnerTenantId: string, countryId: string, productId: string): Promise<boolean>;
+}
+
+/** Spec 067: audited reasons an additional offer or a direct broker choice is not honoured. */
+export const MULTI_BROKER_ROUTING_DISABLED = "multi_broker_routing_disabled";
+export const MULTI_BROKER_CONSENT_MISSING = "multi_broker_consent_missing";
+
+/** Spec 067: where a preferred broker comes from. */
+export type PreferredPartnerSource = "selected_offer" | "chosen_broker";
+
+interface PreferredPartner {
+  partnerTenantId: string;
+  source: PreferredPartnerSource;
+}
+
+/** Spec 052 R7 verdict of the primary selected offer (kept on the request). */
+interface PrimaryOfferVerdict {
+  outcome: "accepted" | "ignored";
+  partnerTenantId?: string | undefined;
+  ignoredReason?: string;
+}
+
+/** Spec 067: what the submission resolved from the offers and the direct choice of the visitor. */
+interface SubmissionPreferences {
+  primary: PrimaryOfferVerdict | undefined;
+  preferred: PreferredPartner[];
+  /** Additional offers accepted and honoured (persisted on the request for the manual review). */
+  honouredAdditionalOfferIds: string[];
+  /** `undefined` when no additional offer was sent. */
+  additionalOffersIgnored: boolean | undefined;
+  /** The visitor's direct choice when the deterministic eligibility accepted it (persisted). */
+  eligibleChosenPartnerTenantId: string | undefined;
+  /** Distinct brokers the visitor asked for (an offer whose broker is unknown counts as one). */
+  requestedPartnerCount: number;
+}
+
+/** Spec 067 (PRD §16): the declarative marketing source without its empty values; `undefined` when nothing is left. */
+export function pruneMarketingSource(source: QuoteMarketingSource | undefined): QuoteMarketingSource | undefined {
+  if (!source) return undefined;
+  const entries = Object.entries(source).filter(([, value]) => typeof value === "string" && value.trim().length > 0).map(([key, value]) => [key, (value as string).trim()]);
+  return entries.length > 0 ? Object.fromEntries(entries) as QuoteMarketingSource : undefined;
+}
+
+/** Spec 067 (PRD §16): `firstName lastName` when sent separately, else the legacy `displayName`. */
+export function composeContactDisplayName(contact: { displayName?: string | undefined; firstName?: string | undefined; lastName?: string | undefined }): string | undefined {
+  const composed = [contact.firstName, contact.lastName].map((part) => part?.trim() ?? "").filter(Boolean).join(" ").trim();
+  if (composed) return composed;
+  const legacy = contact.displayName?.trim();
+  return legacy ? legacy : undefined;
 }
 
 export interface QuoteSubmissionDependencies {
@@ -175,6 +250,13 @@ export interface QuoteSubmissionDependencies {
   isGlobalFlagEnabled?: (key: string) => boolean;
   /** Spec 052 R7: absent means the selected offer is recorded without verification (legacy unit tests). */
   selectedOffers?: SelectedOfferVerifier;
+  /**
+   * Spec 067 COMP-009: `multi_broker_routing_enabled`. Absent means closed: only `selectedOfferId`
+   * counts, further offers are ignored (audited) and a direct choice never adds a second broker.
+   */
+  isMultiBrokerEnabled?: () => boolean;
+  /** Spec 067 H2: eligibility of the broker chosen directly. Absent means the direct choice is ignored (audited). */
+  brokerChoice?: BrokerChoicePort;
   /** Spec 054 R1: persisted visitor access tokens (memory store when absent, tests only). */
   visitorAccessTokens?: VisitorAccessTokensRepository;
   visitorAccessOptions?: VisitorAccessOptions;
@@ -189,6 +271,10 @@ export interface QuoteSubmissionDependencies {
   /** Spec 055 FR-005: visible proposals of the request and the active proposal per assignment. */
   proposals?: {
     forVisitorStatus(quote: QuoteRequestRecord, assignments: LeadAssignmentRecord[], actor?: ActorContext): Promise<{ proposals: PublicLeadProposal[]; activeProposalAt: Map<string, Date> }>;
+  };
+  /** Spec 062: `messaging: { enabled, unreadCount }` of the tracking status (resolved lazily by the runtime). */
+  messaging?: {
+    summaryForVisitorStatus(quote: QuoteRequestRecord): Promise<{ enabled: boolean; unreadCount: number }>;
   };
 }
 
@@ -268,9 +354,11 @@ export class QuoteSubmissionService {
       });
       throw new Error("Consent text mismatch");
     }
-    const selectedOffer = await this.verifySelectedOffer(parsed.selectedOfferId, country.id, product.id, actor);
+    const preferences = await this.resolveSubmissionPreferences(parsed, country.id, product.id, actor);
+    const selectedOffer = preferences.primary;
+    const displayName = composeContactDisplayName(parsed.contact);
     const contact = this.deps.identity.normalize({
-      ...(parsed.contact.displayName ? { displayName: parsed.contact.displayName } : {}),
+      ...(displayName ? { displayName } : {}),
       email: parsed.contact.email,
       phone: parsed.contact.phone,
       countryCode: country.isoCode,
@@ -280,7 +368,7 @@ export class QuoteSubmissionService {
         : {})
     });
     const contactFingerprint = contact.emailFingerprint;
-    const duplicateDecision = await this.deps.duplicate?.evaluate(country.id, product.id, contactFingerprint) ?? "unique";
+    const duplicateDecision = await this.deps.duplicate?.evaluate(country.id, product.id, contactFingerprint, contact.phoneFingerprint) ?? "unique";
     if (duplicateDecision === "blocked_duplicate") {
       this.audit.write({
         actor,
@@ -304,9 +392,12 @@ export class QuoteSubmissionService {
       // Spec 042 D2: the visitor decides. The category recorded here is what routing will honour,
       // so a request submitted without the opt-in can never be fanned out later.
       // Spec 052 R8: the broker of an accepted offer is the named recipient (never a fan-out).
-      intendedRecipient: selectedOffer?.partnerTenantId
-        ? selectedOfferRecipient(selectedOffer.partnerTenantId)
-        : parsed.consent.multiBrokerAccepted ? MULTI_BROKER_CONSENT : SINGLE_BROKER_CONSENT,
+      // Spec 067: several preferred brokers are all named (`partners:`); routing honours that list only.
+      intendedRecipient: preferences.preferred.length > 1
+        ? selectedOffersRecipient(preferences.preferred.map((item) => item.partnerTenantId))
+        : preferences.preferred[0]
+          ? selectedOfferRecipient(preferences.preferred[0].partnerTenantId)
+          : parsed.consent.multiBrokerAccepted ? MULTI_BROKER_CONSENT : SINGLE_BROKER_CONSENT,
       status: "granted",
       grantedAt: new Date().toISOString()
     }, actor);
@@ -341,6 +432,7 @@ export class QuoteSubmissionService {
       context: { intendedRecipient: "AssurMatch" }
     });
     const prospect = await this.deps.prospects.createOrLink(country.id, product.id, contact, consentRecord.id, actor);
+    const marketingSource = pruneMarketingSource(parsed.marketingSource);
     const now = new Date();
     const quote: QuoteRequestRecord = {
       id: crypto.randomUUID(),
@@ -354,6 +446,9 @@ export class QuoteSubmissionService {
       ...(parsed.selectedOfferId ? { selectedOfferId: parsed.selectedOfferId } : {}),
       ...(selectedOffer ? { selectedOfferOutcome: selectedOffer.outcome } : {}),
       ...(selectedOffer?.ignoredReason ? { selectedOfferIgnoredReason: selectedOffer.ignoredReason } : {}),
+      ...(preferences.honouredAdditionalOfferIds.length > 0 ? { additionalOfferIds: preferences.honouredAdditionalOfferIds } : {}),
+      ...(preferences.eligibleChosenPartnerTenantId ? { chosenPartnerTenantId: preferences.eligibleChosenPartnerTenantId } : {}),
+      ...(marketingSource ? { marketingSource } : {}),
       quoteFormDefinitionId: parsed.formDefinitionId,
       language: parsed.language,
       prospectId: prospect.id,
@@ -382,7 +477,7 @@ export class QuoteSubmissionService {
     });
     const routingResult = quote.routingStatus === "manual_review_required"
       ? undefined
-      : await this.deps.routing?.route({ ...quote, ...(selectedOffer?.partnerTenantId ? { preferredPartnerTenantId: selectedOffer.partnerTenantId } : {}) }, actor);
+      : await this.deps.routing?.route(routableWithPreferences(quote, preferences.preferred), actor);
     if (routingResult?.assignment) {
       quote.status = "routed";
       quote.routingStatus = "assigned";
@@ -409,19 +504,150 @@ export class QuoteSubmissionService {
     }
     await this.deps.aiSummary?.enqueueIfAllowed(quote, actor);
     const brokerName = routingResult?.assignment ? await this.brokerName(routingResult.assignment.partnerTenantId) : undefined;
+    const outcome = this.preferenceOutcome(parsed.preferredPartnerId, preferences, routingResult);
+    const chosenNotRetained = quote.status === "routed" && outcome.chosenPartnerRetained === false;
     return {
       publicReference: quote.publicReference,
       status: quote.status === "routed" ? "routed" : quote.status === "manual_review" ? "manual_review" : quote.status === "duplicate" ? "duplicate" : "non_routable",
       routed: quote.status === "routed",
       ...(brokerName ? { brokerName } : {}),
       message: quote.status === "routed"
-        ? (routingResult?.assignments.length ?? 0) > 1
-          ? `Votre demande indicative a ete transmise a ${routingResult?.assignments.length} courtiers partenaires eligibles, comme vous l'avez accepte.`
-          : "Votre demande indicative a ete transmise au courtier partenaire identifie."
-        : "Votre demande a ete recue et reste a confirmer par un courtier partenaire.",
+        ? ((routingResult?.assignments.length ?? 0) > 1
+          ? `Votre demande indicative a été transmise à ${routingResult?.assignments.length} courtiers partenaires éligibles, comme vous l'avez accepté.`
+          : "Votre demande indicative a été transmise au courtier partenaire identifié.")
+          // Spec 067 H2: said only when the broker selected by the visitor could not receive the request.
+          + (chosenNotRetained ? " Le courtier que vous aviez sélectionné ne pouvait pas recevoir votre demande : elle a été confiée à un autre courtier partenaire éligible." : "")
+        : "Votre demande a été reçue et reste à confirmer par un courtier partenaire.",
       verificationToken: access.token,
-      selectedOfferPartnerRetained: this.selectedOfferPartnerRetained(selectedOffer, routingResult?.selectedOfferOutcome)
+      selectedOfferPartnerRetained: this.selectedOfferPartnerRetained(selectedOffer, routingResult?.selectedOfferOutcome),
+      ...outcome
     };
+  }
+
+  /**
+   * Spec 067: what the visitor asked for against what routing did. `chosenPartnerRetained` is `null`
+   * without a direct choice; `retainedPartnerCount` counts the assignments whose broker is preferred.
+   */
+  private preferenceOutcome(
+    chosenPartnerId: string | undefined,
+    preferences: SubmissionPreferences,
+    routingResult: QuoteRoutingResult | undefined
+  ): Pick<QuoteConfirmation, "chosenPartnerRetained" | "requestedPartnerCount" | "retainedPartnerCount" | "additionalOffersIgnored"> {
+    const assigned = (routingResult?.assignments ?? []).map((assignment) => assignment.partnerTenantId);
+    const preferredIds = new Set(preferences.preferred.map((item) => item.partnerTenantId));
+    return {
+      chosenPartnerRetained: chosenPartnerId ? assigned.includes(chosenPartnerId) : null,
+      ...(preferences.requestedPartnerCount > 0
+        ? { requestedPartnerCount: preferences.requestedPartnerCount, retainedPartnerCount: assigned.filter((id) => preferredIds.has(id)).length }
+        : {}),
+      ...(preferences.additionalOffersIgnored !== undefined ? { additionalOffersIgnored: preferences.additionalOffersIgnored } : {})
+    };
+  }
+
+  /** Spec 067 COMP-009: several brokers only with the flag open AND the visitor's multi-broker consent. */
+  private multiBrokerGate(multiBrokerAccepted: boolean): { allowed: true } | { allowed: false; reason: string } {
+    if (this.deps.isMultiBrokerEnabled?.() !== true) return { allowed: false, reason: MULTI_BROKER_ROUTING_DISABLED };
+    if (!multiBrokerAccepted) return { allowed: false, reason: MULTI_BROKER_CONSENT_MISSING };
+    return { allowed: true };
+  }
+
+  /**
+   * Spec 052 R7 + Spec 067 COMP-009 / H2: the preferred brokers of a submission, in priority order.
+   * 1. the broker of the primary offer (verified as before);
+   * 2. with the multi-broker gate open, the brokers of the further offers, each verified the same
+   *    way (a refused offer is dropped and audited, two offers of one broker make one recipient);
+   *    with the gate closed, every further offer is ignored and audited with the gate reason;
+   * 3. the broker chosen directly, when the deterministic eligibility accepts it: first when no
+   *    offer was accepted, after the offers when the gate is open, ignored (audited) otherwise.
+   * Never more than `MAX_QUOTE_OFFERS` preferred brokers.
+   */
+  private async resolveSubmissionPreferences(
+    parsed: { selectedOfferId?: string | undefined; additionalOfferIds: string[]; preferredPartnerId?: string | undefined; consent: { multiBrokerAccepted: boolean } },
+    countryId: string,
+    productId: string,
+    actor: ActorContext
+  ): Promise<SubmissionPreferences> {
+    const primary = await this.verifySelectedOffer(parsed.selectedOfferId, countryId, productId, actor);
+    const preferred: PreferredPartner[] = [];
+    const requested = new Set<string>();
+    const addPreferred = (partnerTenantId: string, source: PreferredPartnerSource): boolean => {
+      if (preferred.some((item) => item.partnerTenantId === partnerTenantId)) return true;
+      if (preferred.length >= MAX_QUOTE_OFFERS) return false;
+      preferred.push({ partnerTenantId, source });
+      return true;
+    };
+    if (parsed.selectedOfferId) requested.add(primary?.partnerTenantId ?? `offer:${parsed.selectedOfferId}`);
+    if (primary?.outcome === "accepted" && primary.partnerTenantId) addPreferred(primary.partnerTenantId, "selected_offer");
+
+    const gate = this.multiBrokerGate(parsed.consent.multiBrokerAccepted);
+    const additional = [...new Set(parsed.additionalOfferIds)].filter((offerId) => offerId !== parsed.selectedOfferId).slice(0, MAX_QUOTE_OFFERS - 1);
+    const honouredAdditionalOfferIds: string[] = [];
+    for (const offerId of additional) {
+      const verdict = this.deps.selectedOffers
+        ? await this.deps.selectedOffers.verify(offerId, countryId, productId).catch(() => ({ accepted: false as const, reason: "offer_verification_failed" }))
+        : { accepted: false as const, reason: "offer_verification_unavailable" };
+      requested.add(verdict.accepted && verdict.partnerTenantId ? verdict.partnerTenantId : `offer:${offerId}`);
+      if (!gate.allowed) {
+        this.auditIgnoredChoice(actor, "Offer", offerId, countryId, productId, gate.reason, "additional_offer");
+        continue;
+      }
+      if (!verdict.accepted) {
+        this.auditIgnoredChoice(actor, "Offer", offerId, countryId, productId, verdict.reason, "additional_offer");
+        continue;
+      }
+      if (verdict.partnerTenantId && !addPreferred(verdict.partnerTenantId, "selected_offer")) {
+        this.auditIgnoredChoice(actor, "Offer", offerId, countryId, productId, "max_partners_reached", "additional_offer");
+        continue;
+      }
+      honouredAdditionalOfferIds.push(offerId);
+    }
+
+    let eligibleChosenPartnerTenantId: string | undefined;
+    const chosen = parsed.preferredPartnerId;
+    if (chosen) {
+      requested.add(chosen);
+      if (preferred.some((item) => item.partnerTenantId === chosen)) {
+        // Already preferred through an offer of the same broker: it keeps the offer's priority.
+        eligibleChosenPartnerTenantId = chosen;
+      } else if (!this.deps.brokerChoice) {
+        this.auditIgnoredChoice(actor, "PartnerTenant", chosen, countryId, productId, "broker_choice_unavailable", "chosen_broker");
+      } else if (!await this.deps.brokerChoice.isEligible(chosen, countryId, productId).catch(() => false)) {
+        this.auditIgnoredChoice(actor, "PartnerTenant", chosen, countryId, productId, "chosen_partner_not_eligible", "chosen_broker");
+      } else {
+        eligibleChosenPartnerTenantId = chosen;
+        if (preferred.length === 0) {
+          addPreferred(chosen, "chosen_broker");
+        } else if (!gate.allowed) {
+          // The accepted offer keeps the priority; a second broker needs the multi-broker gate.
+          this.auditIgnoredChoice(actor, "PartnerTenant", chosen, countryId, productId, gate.reason, "chosen_broker");
+        } else if (!addPreferred(chosen, "chosen_broker")) {
+          this.auditIgnoredChoice(actor, "PartnerTenant", chosen, countryId, productId, "max_partners_reached", "chosen_broker");
+        }
+      }
+    }
+
+    return {
+      primary,
+      preferred,
+      honouredAdditionalOfferIds,
+      additionalOffersIgnored: additional.length > 0 ? !gate.allowed : undefined,
+      eligibleChosenPartnerTenantId,
+      requestedPartnerCount: requested.size
+    };
+  }
+
+  /** Spec 052 FR-016 / Spec 067: an offer or a direct broker choice that is not honoured is audited, never blocking. */
+  private auditIgnoredChoice(actor: ActorContext, targetType: "Offer" | "PartnerTenant", targetId: string, countryId: string, productId: string, reason: string, role: "additional_offer" | "chosen_broker"): void {
+    this.audit.write({
+      actor,
+      action: QuoteAuditActions.quoteRequestSelectedOfferIgnored,
+      targetType,
+      targetId,
+      scope: { countryId, productId },
+      result: "refused",
+      reason,
+      context: { role }
+    });
   }
 
   /** FR-019: `true` broker of the offer retained, `false` routed elsewhere or offer ignored, `null` without offer. */
@@ -488,8 +714,9 @@ export class QuoteSubmissionService {
     if (!this.deps.routing) throw new Error("Manual review conflict: routing_not_configured");
     // Spec 052 R7: the broker of the offer the visitor selected stays preferred after the review,
     // provided the offer is still public (it is re-verified; an expired one simply drops out).
-    const preferredPartnerTenantId = await this.preferredPartnerAfterReview(quote);
-    const routingResult = await this.deps.routing.route({ ...quote, ...(preferredPartnerTenantId ? { preferredPartnerTenantId } : {}) }, actor);
+    // Spec 067: so do the further offers and the broker chosen directly, within the recorded consent.
+    const preferred = await this.preferredPartnersAfterReview(quote);
+    const routingResult = await this.deps.routing.route(routableWithPreferences(quote, preferred), actor);
     if (routingResult.assignment) {
       quote.status = "routed";
       quote.routingStatus = "assigned";
@@ -563,10 +790,41 @@ export class QuoteSubmissionService {
     }
   }
 
-  private async preferredPartnerAfterReview(quote: QuoteRequestRecord): Promise<string | undefined> {
-    if (quote.selectedOfferOutcome !== "accepted" || !quote.selectedOfferId || !this.deps.selectedOffers) return undefined;
-    const verdict = await this.deps.selectedOffers.verify(quote.selectedOfferId, quote.countryId, quote.productId).catch(() => undefined);
-    return verdict?.accepted ? verdict.partnerTenantId : undefined;
+  /**
+   * Spec 056 + Spec 067: the preferred brokers recomputed from what the request persisted - primary
+   * offer and honoured further offers (re-verified), then the broker chosen directly (re-checked by
+   * the deterministic eligibility) - in the submission's priority order, capped, and limited to the
+   * brokers the recorded consent names. A request whose consent names no broker keeps the spec 052
+   * behaviour (primary offer only). Routing still applies the flag and consent gates.
+   */
+  private async preferredPartnersAfterReview(quote: QuoteRequestRecord): Promise<PreferredPartner[]> {
+    const preferred: PreferredPartner[] = [];
+    const add = (partnerTenantId: string, source: PreferredPartnerSource): void => {
+      if (preferred.length < MAX_QUOTE_OFFERS && !preferred.some((item) => item.partnerTenantId === partnerTenantId)) preferred.push({ partnerTenantId, source });
+    };
+    const offerIds = [
+      ...(quote.selectedOfferOutcome === "accepted" && quote.selectedOfferId ? [quote.selectedOfferId] : []),
+      ...(quote.additionalOfferIds ?? [])
+    ];
+    if (this.deps.selectedOffers) {
+      for (const offerId of offerIds) {
+        const verdict = await this.deps.selectedOffers.verify(offerId, quote.countryId, quote.productId).catch(() => undefined);
+        if (verdict?.accepted && verdict.partnerTenantId) add(verdict.partnerTenantId, "selected_offer");
+      }
+    }
+    const chosen = quote.chosenPartnerTenantId;
+    if (chosen && !preferred.some((item) => item.partnerTenantId === chosen) && this.deps.brokerChoice
+      && await this.deps.brokerChoice.isEligible(chosen, quote.countryId, quote.productId).catch(() => false)) {
+      add(chosen, "chosen_broker");
+    }
+    if (preferred.length === 0) return preferred;
+    const consent = await Promise.resolve().then(() => this.deps.consent.findRecord(quote.consentRecordId)).catch(() => undefined);
+    const named = consentNamedPartners(consent?.intendedRecipient);
+    if (named.length === 0) {
+      // Pre-067 request (or a category consent): only the primary offer's broker, as in spec 052.
+      return preferred[0]?.source === "selected_offer" && quote.selectedOfferOutcome === "accepted" ? [preferred[0]] : [];
+    }
+    return preferred.filter((item) => named.includes(item.partnerTenantId));
   }
 
   private stampReview(quote: QuoteRequestRecord, actor: ActorContext, stamp: ManualReviewStamp): void {
@@ -693,7 +951,9 @@ export class QuoteSubmissionService {
       timeline: projected.timeline,
       consent: projected.consent,
       tokenExpiresAt: grant.expiresAt.toISOString(),
-      proposals: visible.proposals
+      proposals: visible.proposals,
+      // Spec 062: messaging flag and unread broker messages (off when the messaging module is not wired).
+      messaging: this.deps.messaging ? await this.deps.messaging.summaryForVisitorStatus(quote) : { enabled: false, unreadCount: 0 }
     };
   }
 
@@ -907,6 +1167,22 @@ export class QuoteSubmissionService {
     };
   }
 
+}
+
+/**
+ * Spec 052 R7 / Spec 067: the request as routing reads it, with its preferred brokers in priority
+ * order (the first one is also `preferredPartnerTenantId`, for the single-preferred behaviour).
+ */
+function routableWithPreferences(quote: QuoteRequestRecord, preferred: readonly PreferredPartner[]): RoutableQuoteRequest {
+  const first = preferred[0];
+  if (!first) return { ...quote };
+  const chosen = preferred.find((item) => item.source === "chosen_broker");
+  return {
+    ...quote,
+    preferredPartnerTenantId: first.partnerTenantId,
+    preferredPartnerTenantIds: preferred.map((item) => item.partnerTenantId),
+    ...(chosen ? { chosenBrokerPartnerTenantId: chosen.partnerTenantId } : {})
+  };
 }
 
 /** Constant-time equality of two hex digests of the same length. */

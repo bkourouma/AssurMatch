@@ -48,12 +48,7 @@ export default async function ConsentTextDetailPage({ params, searchParams }: Co
         <PageHeader
           breadcrumb={[{ label: "Catalogue", href: "/catalog" }, { label: "Consentements", href: "/consent-texts" }, { label: "Detail" }]}
           title="Texte indisponible"
-          actions={
-          <Cluster>
-            <StatusBadge status={text.status} tones={consentTextStatusTones} />
-            <Button href="/consent-texts" variant="secondary">Retour aux textes</Button>
-          </Cluster>
-        }
+          actions={<Button href="/consent-texts" variant="secondary">Retour aux textes</Button>}
         />
         <StateMessage tone="danger">
           {result.forbidden ? "Accès aux textes de consentement réservé à la conformité (compliance_admin, super_admin)." : adminReadErrorMessage(result.error)}

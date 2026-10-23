@@ -16,10 +16,12 @@ export default async function MfaPage({ searchParams }: PageProps) {
   const session = await readBackOfficeSession();
   if (session.status === "unauthenticated" || session.status === "expired") redirect(loginRedirect(returnTo, session.status));
   if (session.status === "authenticated") redirect(returnTo);
+  // Spec 063 (FR-A11): an enrolled account only gets the verification form.
+  const mfaEnrolled = session.status === "mfa_required" && session.profile.mfaEnrolled === true;
   return (
     <>
       <h1 className="bo-auth__title">MFA requise</h1>
-      <MfaPanel returnTo={returnTo} />
+      <MfaPanel returnTo={returnTo} mfaEnrolled={mfaEnrolled} />
     </>
   );
 }

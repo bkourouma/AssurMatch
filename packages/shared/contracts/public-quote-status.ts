@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { publicLeadProposalSchema } from "./lead-proposals";
+import { publicMessagingSummarySchema } from "./lead-messaging";
 
 /**
  * Spec 054 R5: the status a visitor sees for their own request. It is a pure projection of the
@@ -48,7 +49,12 @@ export const publicQuoteStatusViewSchema = z.object({
    * Spec 055 FR-005: proposals of the request, sent and not withdrawn, newest first; empty after a
    * consent withdrawal. Optional on input so a pre-055 payload still parses.
    */
-  proposals: z.array(publicLeadProposalSchema).default([])
+  proposals: z.array(publicLeadProposalSchema).default([]),
+  /**
+   * Spec 062: whether the broker <-> visitor messaging is on and how many broker messages are unread.
+   * Optional on input so a pre-062 payload still parses (messaging then reads as off).
+   */
+  messaging: publicMessagingSummarySchema.default({ enabled: false, unreadCount: 0 })
 });
 
 export type PublicQuoteBroker = z.output<typeof publicQuoteBrokerSchema>;

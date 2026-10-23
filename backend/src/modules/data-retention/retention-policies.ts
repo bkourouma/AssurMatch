@@ -24,7 +24,12 @@ export const DEFAULT_RETENTION_POLICIES: Readonly<Record<RetentionCategory, { re
   ai_traces: { retentionDays: 365, anchor: "occurred_at" },
   webhook_payloads: { retentionDays: 90, anchor: "created_at" },
   messaging_references: { retentionDays: 90, anchor: "created_at" },
-  satisfaction_feedback: { retentionDays: 730, anchor: "submitted_at" }
+  satisfaction_feedback: { retentionDays: 730, anchor: "submitted_at" },
+  // Spec 062: PROVISIONAL durations, awaiting legal validation. Messages 2 years, document requests
+  // 180 days, data requests 5 years (kept longer as compliance proof; only free text is anonymized).
+  lead_message_threads: { retentionDays: 730, anchor: "created_at" },
+  lead_document_requests: { retentionDays: 180, anchor: "created_at" },
+  data_requests: { retentionDays: 1825, anchor: "created_at" }
 };
 
 /**
@@ -34,7 +39,7 @@ export const DEFAULT_RETENTION_POLICIES: Readonly<Record<RetentionCategory, { re
 export const COUNTRY_LESS_CATEGORIES: ReadonlySet<RetentionCategory> = new Set(["webhook_payloads", "messaging_references"]);
 
 /** Spec 046 D3: what an erasure request reaches. Retention durations do not apply to it. */
-export const ERASURE_CATEGORIES: readonly RetentionCategory[] = ["quote_requests", "quote_documents", "contact_messages", "waitlist", "partner_applications"];
+export const ERASURE_CATEGORIES: readonly RetentionCategory[] = ["quote_requests", "quote_documents", "contact_messages", "waitlist", "partner_applications", "lead_message_threads", "lead_document_requests", "data_requests"];
 
 export interface RetentionPolicyRecord {
   id: string;

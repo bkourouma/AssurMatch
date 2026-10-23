@@ -1,4 +1,4 @@
-import type { OfferCompareResponse, OfferDetail, OfferSummary, QuoteRequestCreateDto } from "../../../../packages/shared/contracts/quote.contracts";
+import type { OfferCompareResponse, OfferDetail, OfferSummary, QuoteOptionsResponse, QuoteRequestCreateDto } from "../../../../packages/shared/contracts/quote.contracts";
 import type { QuoteDocumentsResponse } from "../../../../packages/shared/contracts/quote-document.contracts";
 import type { PartnerApplicationCreateDto } from "../../../../packages/shared/contracts/partner-application.contracts";
 import type {
@@ -18,6 +18,27 @@ import type {
   VisitorProposalResponseResult,
   VisitorResponseType
 } from "../../../../packages/shared/contracts/lead-proposals";
+import {
+  leadConversationViewSchema,
+  leadConversationReadResultSchema,
+  leadMessageSendResultSchema,
+  visitorConversationListSchema,
+  visitorDocumentRequestListSchema,
+  visitorDocumentUploadResultSchema,
+  type LeadConversationView,
+  type LeadMessageView,
+  type VisitorConversationList,
+  type VisitorDocumentRequestList
+} from "../../../../packages/shared/contracts/lead-messaging";
+import {
+  dataRequestCreateResultSchema,
+  isDataRequestReference,
+  visitorDataRequestListSchema,
+  type DataRequestCreateResult,
+  type DataRequestType,
+  type VisitorDataRequestList
+} from "../../../../packages/shared/contracts/data-requests";
+import { mapMessagingFailure, type MessagingFailure } from "./messaging-helpers";
 import type frMessages from "../../messages/fr.json";
 
 const PUBLIC_API_BASE_URL = process.env.NEXT_PUBLIC_ASSURMATCH_API_URL ?? "http://127.0.0.1:3000";
@@ -99,6 +120,13 @@ export interface PublicQuoteSubmitState {
    * routed to another partner broker (or the offer was ignored), `null` no offer was selected.
    */
   selectedOfferPartnerRetained?: boolean | null;
+  /** Spec 067 H2: `false` the broker chosen directly was not retained, `null` no direct choice. */
+  chosenPartnerRetained?: boolean | null;
+  /** Spec 067 COMP-009: brokers asked for and brokers that received the request. */
+  requestedPartnerCount?: number;
+  retainedPartnerCount?: number;
+  /** Spec 067: further offers were sent but not honoured. */
+  additionalOffersIgnored?: boolean;
   error?: string;
   publicMessage: string;
   messageKey: ApiMessageKey;
@@ -179,6 +207,34 @@ export async function quoteDocumentUploadEnabled(publicReference: string, token:
     return ((await response.json()) as { uploadEnabled?: unknown }).uploadEnabled === true;
   } catch {
     return false;
+  }
+}
+
+/**
+ * Spec 067: what the quote form needs besides the published definition (multi-broker availability,
+ * document upload, eligible brokers, partner names of the requested offers). Tolerant on purpose:
+ * any failure answers `null` and the form behaves as it did before (single offer, no broker choice,
+ * no documents step). The server stays the authority on every one of those rules.
+ */
+export async function getQuoteOptions(countryCode: string, productKey: string, offerIds: readonly string[]): Promise<QuoteOptionsResponse | null> {
+  try {
+    const params = offerIds.length > 0 ? `?${new URLSearchParams({ offerIds: offerIds.join(",") }).toString()}` : "";
+    const response = await fetch(
+      `${PUBLIC_API_BASE_URL}/countries/${encodeURIComponent(countryCode)}/products/${encodeURIComponent(productKey)}/quote-options${params}`,
+      { cache: "no-store" }
+    );
+    if (!response.ok) return null;
+    const body = await response.json() as Partial<QuoteOptionsResponse> | null;
+    if (!body || typeof body !== "object") return null;
+    return {
+      multiBrokerAvailable: body.multiBrokerAvailable === true,
+      maxOffers: typeof body.maxOffers === "number" && body.maxOffers > 0 ? body.maxOffers : 3,
+      documentUploadEnabled: body.documentUploadEnabled === true,
+      offers: Array.isArray(body.offers) ? body.offers : [],
+      brokers: Array.isArray(body.brokers) ? body.brokers : []
+    };
+  } catch {
+    return null;
   }
 }
 
@@ -393,8 +449,9 @@ export async function submitPublicQuoteRequest(input: QuoteRequestCreateDto, opt
     if (!response.ok) {
       const errorBody = await response.json().catch(() => null) as { message?: unknown } | null;
       const serverMessage = typeof errorBody?.message === "string" ? errorBody.message : "";
-      // Spec 050 R8: the server is the authority on the country phone rule.
-      if (response.status === 400 && /phone/i.test(serverMessage)) {
+      // Spec 050 R8: the server is the authority on the country phone rule. Match the exact backend message
+      // ("Phone is invalid for country"), not any 400 that merely mentions a phone-related column.
+      if (response.status === 400 && /^phone is invalid/i.test(serverMessage.trim())) {
         return { status: "error", error: "phone_invalid", messageKey: "quotePhoneInvalid", publicMessage: "Le numero de telephone ne correspond pas au format attendu pour ce pays." };
       }
       // Spec 050 R5: the consent text changed since the page was loaded.
@@ -403,7 +460,15 @@ export async function submitPublicQuoteRequest(input: QuoteRequestCreateDto, opt
       }
       return { status: "error", error: `api_${response.status}`, messageKey: "quoteRejected", publicMessage: "La demande de devis ne peut pas etre envoyee avec ces informations." };
     }
-    const body = await response.json() as { publicReference?: string; message?: string; selectedOfferPartnerRetained?: unknown };
+    const body = await response.json() as {
+      publicReference?: string;
+      message?: string;
+      selectedOfferPartnerRetained?: unknown;
+      chosenPartnerRetained?: unknown;
+      requestedPartnerCount?: unknown;
+      retainedPartnerCount?: unknown;
+      additionalOffersIgnored?: unknown;
+    };
     if (!body.publicReference) {
       return { status: "error", error: "missing_public_reference", messageKey: "confirmationFailed", publicMessage: "La confirmation n'a pas pu etre generee." };
     }
@@ -412,6 +477,10 @@ export async function submitPublicQuoteRequest(input: QuoteRequestCreateDto, opt
       publicReference: body.publicReference,
       ...(typeof (body as { verificationToken?: unknown }).verificationToken === "string" ? { verificationToken: (body as { verificationToken: string }).verificationToken } : {}),
       selectedOfferPartnerRetained: typeof body.selectedOfferPartnerRetained === "boolean" ? body.selectedOfferPartnerRetained : null,
+      chosenPartnerRetained: typeof body.chosenPartnerRetained === "boolean" ? body.chosenPartnerRetained : null,
+      ...(typeof body.requestedPartnerCount === "number" ? { requestedPartnerCount: body.requestedPartnerCount } : {}),
+      ...(typeof body.retainedPartnerCount === "number" ? { retainedPartnerCount: body.retainedPartnerCount } : {}),
+      additionalOffersIgnored: body.additionalOffersIgnored === true,
       messageKey: "quoteTransmitted",
       // The server message states how many brokers received the request (spec 042).
       publicMessage: body.message ?? "Demande transmise selon votre consentement."
@@ -879,16 +948,259 @@ export async function respondToProposal(
  * only by the `/api/quote-requests/.../document` route handler, which streams the PDF back with
  * `no-store`. Every refusal of the API is the same neutral 404.
  */
-export async function fetchProposalDocument(publicReference: string, proposalId: string, token: string): Promise<Response> {
+export async function fetchProposalDocument(publicReference: string, proposalId: string, token: string, forwardedFor?: string): Promise<Response> {
   const params = new URLSearchParams({ token });
   return fetch(
     `${PUBLIC_API_BASE_URL}/quote-requests/${encodeURIComponent(publicReference)}/proposals/${encodeURIComponent(proposalId)}/document?${params.toString()}`,
-    { cache: "no-store" }
+    { cache: "no-store", ...(forwardedFor ? { headers: { "x-forwarded-for": forwardedFor } } : {}) }
   );
+}
+
+/**
+ * Visitor address of an incoming request (spec 050 D6 convention): first `x-forwarded-for` hop, else
+ * `x-real-ip`. Forwarded by the server-side proxies so the API's per-IP limits apply per visitor
+ * and not to the server's own address.
+ */
+export function visitorForwardedFor(incoming: Headers): string | undefined {
+  return incoming.get("x-forwarded-for")?.split(",")[0]?.trim() || incoming.get("x-real-ip")?.trim() || undefined;
 }
 
 /** Same-origin path of the proposal PDF proxy; the token stays in the URL, as on the tracking page. */
 export function proposalDocumentHref(publicReference: string, proposalId: string, token: string): string {
   const params = new URLSearchParams({ token });
   return `/api/quote-requests/${encodeURIComponent(publicReference)}/proposals/${encodeURIComponent(proposalId)}/document?${params.toString()}`;
+}
+
+/* ---------- Spec 062: broker <-> visitor messaging, requested documents and data requests ---------- */
+
+/**
+ * Every call below authenticates with the visitor token of the tracking URL (`?token=`), never with
+ * a session. Refusals are mapped to a `MessagingFailure` by `mapMessagingFailure`; the neutral 404
+ * of the API reads as `denied`, whatever the reason. Nothing here is cached.
+ */
+export type VisitorReadResult<T> =
+  | { status: "success"; data: T }
+  | { status: "failure"; failure: MessagingFailure };
+
+function visitorUrl(publicReference: string, token: string, suffix: string, extra: Record<string, string> = {}): string {
+  const params = new URLSearchParams({ token, ...extra });
+  return `${PUBLIC_API_BASE_URL}/quote-requests/${encodeURIComponent(publicReference)}${suffix}?${params.toString()}`;
+}
+
+/** The `code` (and `reference`, for a duplicate data request) of an API error body, when readable. */
+async function readErrorBody(response: Response): Promise<{ code: string | null; reference: string | null }> {
+  try {
+    const body: unknown = await response.json();
+    if (!body || typeof body !== "object") return { code: null, reference: null };
+    const record = body as Record<string, unknown>;
+    return {
+      code: typeof record.code === "string" ? record.code : null,
+      reference: typeof record.reference === "string" && isDataRequestReference(record.reference) ? record.reference : null
+    };
+  } catch {
+    return { code: null, reference: null };
+  }
+}
+
+async function failureOf(response: Response): Promise<{ failure: MessagingFailure; reference: string | null }> {
+  const { code, reference } = await readErrorBody(response);
+  return { failure: mapMessagingFailure(response.status, code), reference };
+}
+
+async function readVisitor<T>(url: string, schema: { safeParse: (value: unknown) => { success: true; data: T } | { success: false } }): Promise<VisitorReadResult<T>> {
+  try {
+    const response = await fetch(url, { cache: "no-store" });
+    if (!response.ok) return { status: "failure", failure: (await failureOf(response)).failure };
+    const parsed = schema.safeParse(await response.json());
+    return parsed.success ? { status: "success", data: parsed.data } : { status: "failure", failure: "error" };
+  } catch {
+    return { status: "failure", failure: "error" };
+  }
+}
+
+/** `GET /quote-requests/:publicReference/conversations?token=`: one summary per broker. */
+export function listVisitorConversations(publicReference: string, token: string): Promise<VisitorReadResult<VisitorConversationList>> {
+  return readVisitor(visitorUrl(publicReference, token, "/conversations"), visitorConversationListSchema);
+}
+
+/** `GET .../conversations/:conversationId?token=&before=`: the thread, newest page first, `before` pages back. */
+export function getVisitorConversation(
+  publicReference: string,
+  conversationId: string,
+  token: string,
+  before?: string
+): Promise<VisitorReadResult<LeadConversationView>> {
+  return readVisitor(
+    visitorUrl(publicReference, token, `/conversations/${encodeURIComponent(conversationId)}`, before ? { before } : {}),
+    leadConversationViewSchema
+  );
+}
+
+export interface VisitorMessageInput {
+  body: string;
+  files: readonly File[];
+  clientRequestId: string;
+  /** Honeypot: a real visitor leaves it empty; a filled one gets a fake success with no write. */
+  website: string;
+}
+
+export type VisitorMessageResult =
+  | { status: "sent"; message: LeadMessageView | null }
+  | { status: "failed"; failure: MessagingFailure };
+
+/**
+ * `POST .../conversations/:conversationId/messages?token=`: JSON without files, multipart (`payload`
+ * JSON field and up to three `files`) with files. `clientRequestId` makes a retry idempotent.
+ */
+export async function sendVisitorMessage(
+  publicReference: string,
+  conversationId: string,
+  token: string,
+  input: VisitorMessageInput
+): Promise<VisitorMessageResult> {
+  const payload = {
+    body: input.body,
+    clientRequestId: input.clientRequestId,
+    ...(input.website ? { website: input.website } : {})
+  };
+  try {
+    let init: RequestInit;
+    if (input.files.length > 0) {
+      const form = new FormData();
+      form.append("payload", JSON.stringify(payload));
+      for (const file of input.files) form.append("files", file, file.name);
+      init = { method: "POST", body: form, cache: "no-store" };
+    } else {
+      init = { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(payload), cache: "no-store" };
+    }
+    const response = await fetch(visitorUrl(publicReference, token, `/conversations/${encodeURIComponent(conversationId)}/messages`), init);
+    if (!response.ok) return { status: "failed", failure: (await failureOf(response)).failure };
+    const parsed = leadMessageSendResultSchema.safeParse(await response.json().catch(() => null));
+    return { status: "sent", message: parsed.success ? parsed.data.message : null };
+  } catch {
+    return { status: "failed", failure: "error" };
+  }
+}
+
+/** `POST .../conversations/:conversationId/read?token=`: acknowledges the broker messages; best effort. */
+export async function markVisitorConversationRead(publicReference: string, conversationId: string, token: string): Promise<number | null> {
+  try {
+    const response = await fetch(visitorUrl(publicReference, token, `/conversations/${encodeURIComponent(conversationId)}/read`), {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: "{}",
+      cache: "no-store"
+    });
+    if (!response.ok) return null;
+    const parsed = leadConversationReadResultSchema.safeParse(await response.json().catch(() => null));
+    return parsed.success ? parsed.data.unreadCount : 0;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Same-origin path of the message attachment proxy; the token stays in the URL, as on the tracking
+ * page. The handler forwards it server-side and streams the file back with `no-store`.
+ */
+export function visitorAttachmentHref(publicReference: string, conversationId: string, messageId: string, attachmentId: string, token: string): string {
+  const params = new URLSearchParams({ token });
+  return `/api/quote-requests/${encodeURIComponent(publicReference)}/conversations/${encodeURIComponent(conversationId)}/messages/${encodeURIComponent(messageId)}/attachments/${encodeURIComponent(attachmentId)}?${params.toString()}`;
+}
+
+/**
+ * `GET .../conversations/:conversationId/messages/:messageId/attachments/:attachmentId?token=`,
+ * called server-side only by the `/api/quote-requests/.../attachments/...` route handler.
+ */
+export async function fetchVisitorMessageAttachment(
+  publicReference: string,
+  conversationId: string,
+  messageId: string,
+  attachmentId: string,
+  token: string,
+  forwardedFor?: string
+): Promise<Response> {
+  return fetch(
+    visitorUrl(publicReference, token, `/conversations/${encodeURIComponent(conversationId)}/messages/${encodeURIComponent(messageId)}/attachments/${encodeURIComponent(attachmentId)}`),
+    { cache: "no-store", ...(forwardedFor ? { headers: { "x-forwarded-for": forwardedFor } } : {}) }
+  );
+}
+
+/** `GET /quote-requests/:publicReference/document-requests?token=`. */
+export function listVisitorDocumentRequests(publicReference: string, token: string): Promise<VisitorReadResult<VisitorDocumentRequestList>> {
+  return readVisitor(visitorUrl(publicReference, token, "/document-requests"), visitorDocumentRequestListSchema);
+}
+
+export type VisitorDocumentUploadOutcome =
+  | { status: "uploaded"; uploaded: number; requestStatus: string }
+  | { status: "failed"; failure: MessagingFailure };
+
+/** `POST .../document-requests/:requestId/documents?token=`: multipart `files` (3 at most, 5 MB each). */
+export async function uploadRequestedDocuments(
+  publicReference: string,
+  requestId: string,
+  token: string,
+  files: readonly File[]
+): Promise<VisitorDocumentUploadOutcome> {
+  try {
+    const form = new FormData();
+    for (const file of files) form.append("files", file, file.name);
+    const response = await fetch(visitorUrl(publicReference, token, `/document-requests/${encodeURIComponent(requestId)}/documents`), {
+      method: "POST",
+      body: form,
+      cache: "no-store"
+    });
+    if (!response.ok) return { status: "failed", failure: (await failureOf(response)).failure };
+    const parsed = visitorDocumentUploadResultSchema.safeParse(await response.json().catch(() => null));
+    return parsed.success
+      ? { status: "uploaded", uploaded: parsed.data.uploaded, requestStatus: parsed.data.status }
+      : { status: "uploaded", uploaded: files.length, requestStatus: "fulfilled" };
+  } catch {
+    return { status: "failed", failure: "error" };
+  }
+}
+
+/** `GET /quote-requests/:publicReference/data-requests?token=`. */
+export function listVisitorDataRequests(publicReference: string, token: string): Promise<VisitorReadResult<VisitorDataRequestList>> {
+  return readVisitor(visitorUrl(publicReference, token, "/data-requests"), visitorDataRequestListSchema);
+}
+
+export interface VisitorDataRequestInput {
+  type: DataRequestType;
+  detail: string;
+  /** Honeypot, see `VisitorMessageInput.website`. */
+  website: string;
+}
+
+export type VisitorDataRequestOutcome =
+  | { status: "created"; result: DataRequestCreateResult }
+  | { status: "failed"; failure: MessagingFailure; existingReference: string | null };
+
+/** `POST /quote-requests/:publicReference/data-requests?token=`: access, rectification or erasure. */
+export async function createVisitorDataRequest(
+  publicReference: string,
+  token: string,
+  input: VisitorDataRequestInput
+): Promise<VisitorDataRequestOutcome> {
+  const payload = {
+    type: input.type,
+    ...(input.detail.trim() ? { detail: input.detail.trim() } : {}),
+    ...(input.website ? { website: input.website } : {})
+  };
+  try {
+    const response = await fetch(visitorUrl(publicReference, token, "/data-requests"), {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(payload),
+      cache: "no-store"
+    });
+    if (!response.ok) {
+      const { failure, reference } = await failureOf(response);
+      return { status: "failed", failure, existingReference: reference };
+    }
+    const parsed = dataRequestCreateResultSchema.safeParse(await response.json().catch(() => null));
+    return parsed.success ? { status: "created", result: parsed.data } : { status: "failed", failure: "error", existingReference: null };
+  } catch {
+    return { status: "failed", failure: "error", existingReference: null };
+  }
 }

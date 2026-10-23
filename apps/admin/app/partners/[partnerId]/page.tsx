@@ -252,6 +252,15 @@ export default async function PartnerDetailPage({ params, searchParams }: Partne
                 { term: "Capacité", value: PARTNER_CAPACITY_LABELS[partner.capacityStatus] ?? partner.capacityStatus },
                 { term: "SLA contractuel", value: partner.slaTargetMinutes ? `${partner.slaTargetMinutes} min` : "Non fixé" },
                 { term: "SLA mesuré (30 j)", value: sla ? `${Math.round(sla.complianceRate * 100)}% dans l'objectif, ${sla.leadsMeasured} leads` : "-" },
+                {
+                  term: "Première réponse visible (30 j)",
+                  value:
+                    sla && sla.firstVisibleReplyComplianceRate !== null && sla.firstVisibleReplyComplianceRate !== undefined
+                      ? `${Math.round(sla.firstVisibleReplyComplianceRate * 100)}% dans l'objectif (${sla.firstVisibleReplyWithinTarget ?? 0}/${sla.firstVisibleReplyMeasured ?? 0})${
+                          sla.averageFirstVisibleReplyMinutes != null ? `, délai moyen ${sla.averageFirstVisibleReplyMinutes} min` : ""
+                        }`
+                      : "—"
+                },
                 { term: "Prochaine expiration", value: partnerFormatDate(partner.nextLicenseExpiration) },
                 { term: "Assureurs partenaires", value: partner.partnerInsurers.length ? partner.partnerInsurers.join(", ") : "-" },
                 { term: "Mis à jour", value: partnerFormatDate(partner.updatedAt) }

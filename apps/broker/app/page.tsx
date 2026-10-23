@@ -6,8 +6,17 @@ import { AttentionList, Button, Card, DataTable, Notice, PageHeader, PageStack, 
 import type { DataTableColumn } from "./lib/ui/broker-ui";
 import { dashboardAttention, dashboardStats, leadSummary } from "./lib/ui/broker-view-models";
 import type { LeadSummaryViewModel } from "./lib/ui/broker-view-models";
+import { AiInsightsDashboardSection } from "./lib/ui/ai-insights-panel";
+import { CrmKpiSection } from "./lib/ui/crm-kpi-section";
 
-export default async function BrokerShellPage() {
+interface BrokerShellPageProps {
+  searchParams?: Promise<Record<string, string | string[] | undefined>>;
+}
+
+export default async function BrokerShellPage({ searchParams }: BrokerShellPageProps = {}) {
+  const params = searchParams ? await searchParams : {};
+  const notice = Array.isArray(params.notice) ? params.notice[0] : params.notice;
+  const insight = Array.isArray(params.insight) ? params.insight[0] : params.insight;
   const session = await readBackOfficeSession();
   if (session.status === "unauthenticated" || session.status === "expired") redirect(loginRedirect("/", session.status));
   if (session.status === "mfa_required") {
@@ -48,7 +57,12 @@ export default async function BrokerShellPage() {
         actions={<Button href="/leads">Voir les leads</Button>}
       />
 
+      {notice === "crm_requires_pro" ? <Notice tone="warning">Le CRM est réservé aux formules Pro et Enterprise.</Notice> : null}
+
       <BrokerDashboardSection />
+
+      {/* Lot 3 (spec 069 FR-004, DASH-B-009): AI insights next to the KPI; same guard as the pipeline page. */}
+      <AiInsightsDashboardSection profile={session.profile} notice={insight} />
 
       {session.profile.partnerPlan === "starter" ? (
         <Notice tone="info" title="CRM">
@@ -81,6 +95,9 @@ async function BrokerDashboardSection() {
       </section>
 
       <WaitingLeads />
+
+      {/* Lot 3 (spec 069): PRD §20 CRM KPIs, rendered only when the API sends the `crm` section (never for Starter). */}
+      <CrmKpiSection data={dashboard.data} />
 
       {dashboard.data.licenseAlerts.length > 0 ? (
         <Card title="Alertes licence">

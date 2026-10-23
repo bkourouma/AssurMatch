@@ -8,7 +8,8 @@ import {
   reasonSchema,
   uuidSchema
 } from "../validation/common.schemas";
-import { adminOfferContentObjectSchema, offerContentGuaranteeSchema, offerContentPaymentFlexibilitySchema, refineOfferContent } from "./offer-content";
+import { agencyFilterSchema } from "./enterprise.contracts";
+import { adminOfferContentObjectSchema, offerContentGuaranteeSchema, offerContentPaymentFlexibilitySchema, offerTypeSchema, refineOfferContent } from "./offer-content";
 
 export const quoteFeatureFlags = [
   "public_comparator_enabled",
@@ -148,7 +149,7 @@ export const adminOfferUpsertSchema = adminOfferContentObjectSchema.extend({
   productId: uuidSchema,
   partnerTenantId: uuidSchema.optional(),
   publicKey: nonEmptyStringSchema.optional(),
-  offerType: z.enum(["indicative", "partner"]).optional(),
+  offerType: offerTypeSchema.optional(),
   expectedUpdatedAt: dateTimeStringSchema.optional(),
   reason: reasonSchema
 }).superRefine(refineOfferContent);
@@ -242,15 +243,44 @@ export const publicQuoteFormResponseSchema = z.object({
 });
 
 export const quoteContactSchema = z.object({
+  /** Kept for compatibility (spec 067): the server composes it from `firstName` + `lastName` when those are sent. */
   displayName: z.string().trim().optional(),
+  /** Spec 067 (PRD §16): first and last name captured separately; stored as the prospect's display name. */
+  firstName: z.string().trim().min(1).max(80).optional(),
+  lastName: z.string().trim().min(1).max(80).optional(),
   email: emailSchema,
   phone: z.string().trim().min(6).max(32)
+});
+
+/** Spec 067 COMP-009: at most 3 offers (the primary `selectedOfferId` plus 2 additional ones) per request. */
+export const MAX_QUOTE_OFFERS = 3;
+
+/**
+ * Spec 067 (PRD §16): declarative marketing source of the request, read by the form from its own page
+ * URL (`utm_*`) and the host of the referrer. Never a cookie, a device identifier or a full URL.
+ */
+export const quoteMarketingSourceSchema = z.object({
+  utmSource: z.string().trim().max(100).optional(),
+  utmMedium: z.string().trim().max(100).optional(),
+  utmCampaign: z.string().trim().max(100).optional(),
+  utmTerm: z.string().trim().max(100).optional(),
+  utmContent: z.string().trim().max(100).optional(),
+  referrerHost: z.string().trim().max(255).optional()
 });
 
 export const quoteRequestCreateSchema = z.object({
   countryCode: isoCountrySchema,
   productKey: nonEmptyStringSchema,
   selectedOfferId: uuidSchema.optional(),
+  /**
+   * Spec 067 COMP-009: up to 2 more offers. Honoured only when `multi_broker_routing_enabled` is open AND
+   * `consent.multiBrokerAccepted` is true; otherwise only `selectedOfferId` counts and the request says so.
+   */
+  additionalOfferIds: z.array(uuidSchema).max(MAX_QUOTE_OFFERS - 1).default([]),
+  /** Spec 067 H2 (PRD §16 step 4): broker (partner tenant id of the public directory) chosen directly; routed first when still eligible. */
+  preferredPartnerId: uuidSchema.optional(),
+  /** Spec 067 (PRD §16): declarative marketing source. */
+  marketingSource: quoteMarketingSourceSchema.optional(),
   formDefinitionId: uuidSchema,
   /** Spec 050 R6: language of the submitted form; consent is checked against the form of this language. */
   language: quoteLanguageSchema.default("fr"),
@@ -282,7 +312,30 @@ export const quoteConfirmationSchema = z.object({
    * Spec 052 R7 / FR-019: `true` when the broker of the selected offer received the request, `false`
    * when it was routed to another eligible partner (or the offer was ignored), `null` without offer.
    */
-  selectedOfferPartnerRetained: z.boolean().nullable().optional()
+  selectedOfferPartnerRetained: z.boolean().nullable().optional(),
+  /** Spec 067 H2: `true` the broker chosen directly received the request, `false` routed to another eligible broker, `null` without choice. */
+  chosenPartnerRetained: z.boolean().nullable().optional(),
+  /** Spec 067 COMP-009: brokers the visitor asked for (offers and direct choice) and the number that received the request. */
+  requestedPartnerCount: z.number().int().nonnegative().optional(),
+  retainedPartnerCount: z.number().int().nonnegative().optional(),
+  /** Spec 067: further offers were sent but not honoured (flag closed or multi-broker consent not given). */
+  additionalOffersIgnored: z.boolean().optional()
+});
+
+/**
+ * Spec 067: what the public quote form needs to know besides the published definition. Served by
+ * `GET /countries/:countryCode/products/:productKey/quote-options?offerIds=a,b,c` (public, no personal data).
+ */
+export const quoteOptionsResponseSchema = z.object({
+  /** `multi_broker_routing_enabled` is open: the form may offer the multi-broker consent for several offers. */
+  multiBrokerAvailable: z.boolean(),
+  maxOffers: z.number().int().positive(),
+  /** Documents can be added to a request of this country and product (`product_document_upload_enabled`). */
+  documentUploadEnabled: z.boolean(),
+  /** Requested offers, in order, that are still public; `partnerName` is served only for an eligible broker. */
+  offers: z.array(z.object({ offerId: uuidSchema, partnerId: uuidSchema.optional(), partnerName: z.string().optional() })),
+  /** Brokers currently eligible for this country and product (H2 direct choice). */
+  brokers: z.array(z.object({ id: uuidSchema, displayName: nonEmptyStringSchema }))
 });
 
 export const quoteStatusResponseSchema = z.object({
@@ -364,7 +417,23 @@ export const brokerStarterLeadDetailSchema = brokerStarterLeadSummarySchema.exte
   contact: z.record(z.string(), z.unknown()).default({}),
   contactVisibility: leadContactVisibilitySchema.optional(),
   answers: z.record(z.string(), z.unknown()).default({}),
-  history: z.array(brokerStarterLeadHistoryEventSchema).default([])
+  history: z.array(brokerStarterLeadHistoryEventSchema).default([]),
+  /** Spec 063: dispute window (30 days after reception) and the dispute of this lead, if any. */
+  disputeWindow: z.object({ deadline: dateTimeStringSchema, open: z.boolean() }).optional(),
+  dispute: z.object({
+    id: z.string(),
+    status: z.enum(["opened", "accepted", "rejected"]),
+    reason: z.string(),
+    comment: z.string().optional(),
+    createdAt: dateTimeStringSchema,
+    decidedAt: dateTimeStringSchema.optional(),
+    decisionReason: z.string().optional(),
+    creditMode: z.enum(["draft_invoice", "credit_note", "pack_credit", "none"]).optional(),
+    creditPackId: z.string().optional(),
+    creditNoteId: z.string().optional(),
+    creditNoteNumber: z.string().optional(),
+    creditAmount: z.number().int().nonnegative().optional()
+  }).optional()
 });
 
 export const brokerStarterLeadActionRequestSchema = z.object({
@@ -441,10 +510,19 @@ const brokerCrmLeadListQueryBaseSchema = paginationQuerySchema.extend({
   source: brokerCrmSourceSchema.optional(),
   dateFrom: dateTimeStringSchema.optional(),
   dateTo: dateTimeStringSchema.optional(),
-  search: z.string().trim().max(120).optional()
+  search: z.string().trim().max(120).optional(),
+  /** Spec 064: Enterprise display filter by agency (uuid or `none`); ignored by other plans. */
+  agencyId: agencyFilterSchema.optional()
 });
 
-export const brokerCrmLeadListQuerySchema = brokerCrmLeadListQueryBaseSchema.refine((value) => !value.dateFrom || !value.dateTo || new Date(value.dateFrom) <= new Date(value.dateTo), {
+/** Lot 3 (spec 069 FR-004): sort keys of the CRM list; `priority` uses the human-approved AI score (leads without one last). */
+export const brokerCrmLeadSortSchema = z.enum(["assignedAt", "status", "priority", "urgency"]);
+export const brokerCrmSortDirectionSchema = z.enum(["asc", "desc"]);
+
+export const brokerCrmLeadListQuerySchema = brokerCrmLeadListQueryBaseSchema.extend({
+  sort: brokerCrmLeadSortSchema.default("assignedAt"),
+  sortDirection: brokerCrmSortDirectionSchema.default("desc")
+}).refine((value) => !value.dateFrom || !value.dateTo || new Date(value.dateFrom) <= new Date(value.dateTo), {
   message: "dateFrom must be before dateTo"
 });
 
@@ -466,7 +544,10 @@ export const brokerCrmLeadSummarySchema = z.object({
    * of recipients is exposed; the identity of the co-recipients never is.
    */
   isShared: z.boolean().default(false),
-  recipientCount: z.number().int().min(1).default(1)
+  recipientCount: z.number().int().min(1).default(1),
+  /** Lot 3 (spec 069 FR-004): human-approved indicative AI score, present only when one exists and scoring is open. Never exported. */
+  priorityScore: z.number().int().min(0).max(100).optional(),
+  priorityLevel: z.enum(["low", "medium", "high"]).optional()
 });
 
 export const brokerCrmHistoryEventSchema = z.object({
@@ -534,10 +615,22 @@ export const brokerCrmProposalSchema = z.object({
 export const brokerCrmDisputeSchema = z.object({
   id: z.string(),
   leadAssignmentId: z.string(),
-  reason: brokerCrmOutcomeReasonSchema,
+  /** Spec 063: a Starter dispute carries a Starter reason, a CRM one a CRM outcome reason. */
+  reason: z.union([brokerCrmOutcomeReasonSchema, brokerStarterReasonSchema]),
   comment: z.string().optional(),
   status: z.enum(["opened", "under_review", "accepted", "rejected"]).default("opened"),
-  createdAt: dateTimeStringSchema
+  createdAt: dateTimeStringSchema,
+  /** Spec 063: source, finance decision and credit outcome (all optional: absent while `opened`). */
+  source: z.enum(["starter", "crm"]).optional(),
+  countryCode: z.string().optional(),
+  decidedAt: dateTimeStringSchema.optional(),
+  decidedById: z.string().optional(),
+  decisionReason: z.string().optional(),
+  creditMode: z.enum(["draft_invoice", "credit_note", "pack_credit", "none"]).optional(),
+  creditPackId: z.string().optional(),
+  creditNoteId: z.string().optional(),
+  creditNoteNumber: z.string().optional(),
+  creditAmount: z.number().int().nonnegative().optional()
 });
 
 export const brokerCrmLeadDetailSchema = brokerCrmLeadSummarySchema.extend({
@@ -550,7 +643,9 @@ export const brokerCrmLeadDetailSchema = brokerCrmLeadSummarySchema.extend({
   reminders: z.array(brokerCrmReminderSchema).default([]),
   documents: z.array(brokerCrmDocumentSchema).default([]),
   proposals: z.array(brokerCrmProposalSchema).default([]),
-  disputes: z.array(brokerCrmDisputeSchema).default([])
+  disputes: z.array(brokerCrmDisputeSchema).default([]),
+  /** Spec 063: dispute window (30 days after reception). */
+  disputeWindow: z.object({ deadline: dateTimeStringSchema, open: z.boolean() }).optional()
 });
 
 export const brokerCrmStatusUpdateSchema = z.object({
@@ -635,6 +730,8 @@ export type AdminQuoteFormDefinitionView = z.output<typeof adminQuoteFormDefinit
 export type PublicQuoteFormResponse = z.output<typeof publicQuoteFormResponseSchema>;
 export type QuoteRequestCreateDto = z.input<typeof quoteRequestCreateSchema>;
 export type QuoteConfirmation = z.output<typeof quoteConfirmationSchema>;
+export type QuoteOptionsResponse = z.output<typeof quoteOptionsResponseSchema>;
+export type QuoteMarketingSource = z.output<typeof quoteMarketingSourceSchema>;
 export type QuoteStatusResponse = z.output<typeof quoteStatusResponseSchema>;
 export type BrokerLeadSummary = z.output<typeof brokerLeadSummarySchema>;
 export type BrokerLeadDetail = z.output<typeof brokerLeadDetailSchema>;

@@ -27,6 +27,8 @@ export default defineConfig({
     ? [["list"], ["html", { outputFolder: "playwright-report/e2e", open: "never" }], ["github"]]
     : [["list"], ["html", { outputFolder: "playwright-report/e2e", open: "never" }]],
   use: {
+    // Optional: drive an installed browser (E2E_BROWSER_CHANNEL=chrome) when the bundled Chromium is not downloaded.
+    ...(process.env.E2E_BROWSER_CHANNEL ? { channel: process.env.E2E_BROWSER_CHANNEL } : {}),
     locale: "fr-FR",
     timezoneId: "Africa/Abidjan",
     actionTimeout: 30_000,
@@ -60,6 +62,49 @@ export default defineConfig({
       testMatch: ["visitor-tracking.spec.ts"],
       use: { baseURL: publicUrl },
       dependencies: ["scenario"]
+    },
+    {
+      // Spec 065, Pro / Enterprise journeys (PRD 32.1, 32.2, 32.6, 32.7): each file provisions its own
+      // broker firms (plan set by the admin) on top of the Côte d'Ivoire opened by the scenario.
+      name: "pro-enterprise",
+      testMatch: ["pro-*.spec.ts", "enterprise-agencies-sla.spec.ts", "forbidden-cases-pro.spec.ts"],
+      use: { baseURL: adminUrl },
+      dependencies: ["scenario"]
+    },
+    {
+      // Specs 062/063/064 (recos 1-4), spec 065 phase B: MFA trusted devices, disputes, wired capabilities
+      // and broker-visitor messaging. Each file provisions its own broker firms on the CI x Auto opened by
+      // the scenario, so none depends on another journey.
+      name: "recos",
+      testMatch: ["recos-*.spec.ts"],
+      use: { baseURL: adminUrl },
+      dependencies: ["scenario"]
+    },
+    {
+      // Lot 11a (specs 067, 068, 070): visitor journeys of the PRD gaps (names, documents step, direct broker
+      // choice, multi-offer requests, closed AI, catalogue conditions). 01 provisions two more broker firms
+      // on the CI x Auto opened by the scenario; 02 and 03 read what 01 published. The visitor itself runs in
+      // its own browser context; the back-office pages only provision and verify.
+      name: "visitor-gaps",
+      testMatch: ["visitor-gaps-*.spec.ts"],
+      use: { baseURL: publicUrl },
+      dependencies: ["scenario"]
+    },
+    {
+      // Lot 11c: admin journeys of lots 7, 9 and 10 (CMS four eyes, AI flags without activation, partner API keys and
+      // webhooks, CRM connectors, messaging outbox, channel flags). Each file builds on the CI opened by the scenario
+      // and reads its own extra admin accounts (content_admin, support_admin) created through /users.
+      name: "admin-lot11",
+      testMatch: ["admin-cms.spec.ts", "admin-ai-integrations.spec.ts", "admin-channels.spec.ts"],
+      use: { baseURL: adminUrl },
+      dependencies: ["scenario"]
+    },
+    {
+      // Spec 065, SC-01 for Senegal. Opens SN, so it runs after the SC-09a check that SN is closed.
+      name: "senegal",
+      testMatch: ["senegal-opening.spec.ts"],
+      use: { baseURL: adminUrl },
+      dependencies: ["backoffice"]
     }
   ]
 });
