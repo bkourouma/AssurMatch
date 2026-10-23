@@ -9,6 +9,7 @@ import { SiteFooter } from "../components/site/site-footer";
 import { SiteHeader } from "../components/site/site-header";
 import { LocalContactBlock } from "../components/site/local-contact-block";
 import { SkipLink } from "../components/site/skip-link";
+import { VisitBeacon } from "../components/site/visit-beacon";
 import { JsonLd } from "../components/ui/json-ld";
 import { organizationJsonLd } from "../lib/seo";
 import type { PageMetadata } from "../lib/seo";
@@ -47,6 +48,7 @@ export default async function LocaleLayout({ children, params }: { children: Rea
         <NextIntlClientProvider locale={locale} messages={pickMessages(messages, CLIENT_NAMESPACES)}>
           <div className="am-shell">
             <SkipLink label={t("skipToContent")} />
+            <VisitBeacon />
             <SiteHeader locale={locale} />
             <main className="am-main" id="contenu">
               {children}

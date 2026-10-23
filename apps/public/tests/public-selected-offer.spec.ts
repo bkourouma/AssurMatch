@@ -23,7 +23,7 @@ test("spec 052: the selected offer travels to the quote form read", async () => 
   expect(api).toContain("offerPartnerName?: string");
   expect(page).toContain("getPublicQuoteForm(countryCode, productKey, locale, selectedOfferId)");
   // Only a well-formed identifier is forwarded; the server stays the authority on the offer.
-  expect(page).toContain("/^[0-9a-f-]{36}$/i.test(offerIdParam)");
+  expect(page).toContain("readQuoteOfferIds(query.offerId)");
 });
 
 test("spec 052: the offer's broker is named in the form header, the offer stays indicative", async () => {

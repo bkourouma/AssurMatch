@@ -219,6 +219,20 @@ export interface AdminDashboardData {
     other: number;
   };
   sensitiveFeatureFlags: Array<{ key: string; scopeType: string; scopeId: string | null; value: boolean }>;
+  // Lot 6 (spec 073 T304): additive KPI blocks; an older API omits them, the screen then shows "Non mesure".
+  visits?: { total: number; byPage: Array<{ page: string; total: number }> } | null;
+  visitToRequestRate?: number | null;
+  activeCountries?: number;
+  activeProducts?: number;
+  partnerSla?: { averageFirstActionMinutes: number | null; measured: number };
+  leadQuality?: { transmitted: number; disputed: number; accepted: number; rejected: number; disputeRate: number | null };
+  revenue?: { byCurrency: Array<{ currency: string; subscription: number; leads: number }> } | null;
+  revenueRestricted?: boolean;
+  aiEnabled?: boolean;
+  aiRestricted?: boolean;
+  aiSummary?: { insightId: string; generatedAt: string; status: string; excerpt: string | null } | null;
+  aiAlerts?: { pendingValidation: number; items: Array<{ insightId: string; type: string; createdAt: string; status: string }> } | null;
+  // Lot 6 (end)
 }
 
 export interface AdminUser {
@@ -926,7 +940,7 @@ export async function readPartnerIntegrations(): Promise<AdminApiState<PartnerIn
   };
 }
 
-export type RoutingRuleMode = "first_eligible" | "round_robin" | "priority" | "capacity" | "performance" | "exclusive" | "manual" | "multi_send";
+export type RoutingRuleMode = "first_eligible" | "round_robin" | "priority" | "capacity" | "performance" | "exclusive" | "manual" | "multi_send" | "ai_assisted";
 
 export interface RoutingRuleData {
   id: string;
@@ -960,6 +974,12 @@ export interface PendingManualQuoteData {
   productKey: string;
   createdAt: string;
   candidates: Array<{ partnerTenantId: string; legalName: string; plan: "starter" | "pro" | "enterprise"; eligible: boolean; reasons: string[] }>;
+  /** Lot 5 (spec 071): why the request is parked (manual_rule, lead_quality_below_threshold, ai_suggestion_pending, ...). */
+  parkedReasons?: string[];
+  /** Lot 5 (spec 071): lead quality score (0-100) computed at routing time, when known. */
+  qualityScore?: number | null;
+  /** Lot 5 (spec 071): advisory AI suggestion among the eligible brokers; the admin validates by assigning. */
+  aiSuggestion?: { partnerTenantId: string; rationale: string; provider: string; generatedAt: string } | null;
 }
 
 export interface PendingManualQueueData {
@@ -1764,3 +1784,150 @@ export function updateAdminOffer(offerId: string, input: AdminOfferWriteInput) {
 export function runAdminOfferDecision(offerId: string, action: "submit" | "validate" | "reject" | "suspend", reason: string) {
   return writeAdminResult<AdminOfferDetailView>(offerPath(offerId, `/${action}`), "POST", { reason });
 }
+
+// Lot 6 (spec 073 T402/T403)
+export interface RoutingPrecheckResultData {
+  result: "eligible" | "not_eligible";
+  reasons: string[];
+  notifiedBrokers: false;
+  transmittedLead: false;
+}
+
+/** Simulation only: the server notifies no broker and transmits no lead. */
+export function runRoutingPrecheck(input: { partnerTenantId: string; countryId: string; productId: string; consentRecordId?: string }) {
+  return writeAdmin<RoutingPrecheckResultData>("/admin/routing/precheck", "POST", input);
+}
+
+// Lot 6 (end)
+
+// Lot 9 (imports)
+import type {
+  ContentCapabilitiesView,
+  ContentCmsLocale,
+  ContentEntryCreateDto,
+  ContentEntryListResponse,
+  ContentEntryView,
+  ContentKind,
+  ContentStatus
+} from "../../../../packages/shared/contracts/content-cms.contracts";
+
+// Lot 9 (start)
+// Spec 072: minimal CMS for the Content Admin role. Routes `/admin/content/*`; the API stays the
+// authority on every permission and transition, the screen only mirrors it.
+
+/** Error of a content write, carrying the API status and its `{ code, message }` body. */
+export class ContentApiError extends Error {
+  readonly status: number;
+  readonly code: string;
+
+  constructor(status: number, code: string, message: string) {
+    super(message);
+    this.name = "ContentApiError";
+    this.status = status;
+    this.code = code;
+  }
+}
+
+export interface ContentEntryListFilters {
+  kind?: ContentKind | undefined;
+  locale?: ContentCmsLocale | undefined;
+  status?: ContentStatus | undefined;
+  countryCode?: string | undefined;
+  entryKey?: string | undefined;
+}
+
+const emptyContentCapabilities: ContentCapabilitiesView = { canRead: false, canEdit: false, canApprove: false, canApproveLegal: false };
+
+function contentPath(id: string, suffix = ""): string {
+  return `/admin/content/entries/${encodeURIComponent(id)}${suffix}`;
+}
+
+async function writeContent<T>(path: string, method: "POST" | "PUT", body?: unknown): Promise<T> {
+  const token = await getBackOfficeToken();
+  if (!token) throw new ContentApiError(401, "session_required", "session_required");
+  const response = await fetch(`${backOfficeApiBaseUrl()}${path}`, {
+    method,
+    headers: {
+      Authorization: `Bearer ${token}`,
+      ...(body !== undefined ? { "content-type": "application/json" } : {})
+    },
+    ...(body !== undefined ? { body: JSON.stringify(body) } : {}),
+    cache: "no-store"
+  });
+  if (!response.ok) {
+    let code = `api_${response.status}`;
+    let message = code;
+    try {
+      const parsed = await response.json() as { code?: unknown; message?: unknown };
+      if (typeof parsed.code === "string") code = parsed.code;
+      if (typeof parsed.message === "string") message = parsed.message;
+      else if (Array.isArray(parsed.message)) message = parsed.message.map(String).join("; ");
+    } catch {
+      // Body is not JSON: keep the status-based code.
+    }
+    throw new ContentApiError(response.status, code, message);
+  }
+  return response.json() as Promise<T>;
+}
+
+export function readContentCapabilities() {
+  return readAdmin<ContentCapabilitiesView>("/admin/content/capabilities", emptyContentCapabilities);
+}
+
+/** List and history answer the `{ items }` envelope of the shared contract (ContentEntryListResponse). */
+async function readContentList(path: string): Promise<AdminApiState<ContentEntryView[]>> {
+  const state = await readAdmin<ContentEntryListResponse>(path, { items: [] });
+  const items = Array.isArray(state.data?.items) ? state.data.items : [];
+  return { ...state, data: items };
+}
+
+export function readContentEntries(filters: ContentEntryListFilters = {}) {
+  const params = new URLSearchParams();
+  for (const [key, value] of Object.entries(filters)) {
+    if (typeof value === "string" && value) params.set(key, value);
+  }
+  const query = params.toString();
+  return readContentList(`/admin/content/entries${query ? `?${query}` : ""}`);
+}
+
+export function readContentEntry(id: string) {
+  return readAdmin<ContentEntryView | null>(contentPath(id), null);
+}
+
+export function readContentHistory(id: string) {
+  return readContentList(contentPath(id, "/history"));
+}
+
+export function createContentEntry(input: ContentEntryCreateDto) {
+  return writeContent<ContentEntryView>("/admin/content/entries", "POST", input);
+}
+
+export function updateContentEntry(id: string, payload: Record<string, unknown>) {
+  return writeContent<ContentEntryView>(contentPath(id), "PUT", { payload });
+}
+
+export function submitContentEntry(id: string) {
+  return writeContent<ContentEntryView>(contentPath(id, "/submit"), "POST");
+}
+
+export function withdrawContentEntry(id: string) {
+  return writeContent<ContentEntryView>(contentPath(id, "/withdraw"), "POST");
+}
+
+export function approveContentEntry(id: string, note?: string) {
+  return writeContent<ContentEntryView>(contentPath(id, "/approve"), "POST", note ? { note } : {});
+}
+
+export function rejectContentEntry(id: string, note: string) {
+  return writeContent<ContentEntryView>(contentPath(id, "/reject"), "POST", { note });
+}
+
+export function archiveContentEntry(id: string, note: string) {
+  return writeContent<ContentEntryView>(contentPath(id, "/archive"), "POST", { note });
+}
+
+/** Creates the next draft version from a published entry; returns that new draft. */
+export function reviseContentEntry(id: string) {
+  return writeContent<ContentEntryView>(contentPath(id, "/revise"), "POST");
+}
+// Lot 9 (end)

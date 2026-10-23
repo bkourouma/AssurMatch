@@ -4,6 +4,7 @@ import { e2eEnv } from "./env";
 import { loadJourneyState, requireState, saveWorld, type BrokerWorld } from "./journey-state";
 import { extractLink, waitForMail } from "./mailpit";
 import { onboardBrokerDirect } from "./partners";
+import { reviewQuote } from "./quote-form";
 import { card, confirmInDialog, expectActionSuccess, fillReason, idFromUrl, uniqueSuffix } from "./ui";
 
 // Spec 065: building blocks shared by the Pro / Enterprise / forbidden-case journeys. They reuse the
@@ -178,10 +179,12 @@ export async function requestQuote(browser: Browser, offerTitle: string, partner
   await visitor.locator("#am-answer-city").fill("Abidjan");
   await visitor.locator("#am-answer-contact_preference").selectOption("email");
   await visitor.getByRole("button", { name: "Continuer" }).click();
-  await visitor.locator("#am-quote-name").fill(name);
+  const [firstName, ...lastParts] = name.split(" ");
+  await visitor.locator("#am-quote-first-name").fill(firstName ?? "");
+  await visitor.locator("#am-quote-last-name").fill(lastParts.join(" "));
   await visitor.locator("#am-quote-email").fill(email);
   await visitor.locator("#am-quote-phone").fill(phone);
-  await visitor.getByRole("button", { name: "Vérifier ma demande" }).click();
+  await reviewQuote(visitor);
   await expect(visitor.locator("label[for='am-quote-consent'], #am-quote-consent >> xpath=..").first()).toContainText(partnerName);
   await visitor.locator("#am-quote-consent").check();
   await visitor.getByRole("button", { name: "Envoyer ma demande" }).click();

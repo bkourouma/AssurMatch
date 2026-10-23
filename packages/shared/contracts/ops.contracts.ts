@@ -17,7 +17,9 @@ export const VISITOR_NOTIFICATION_TYPES = [
   "visitor_broker_message",
   "visitor_documents_requested",
   "visitor_data_request_acknowledged",
-  "visitor_data_request_closed"
+  "visitor_data_request_closed",
+  // Spec 067: the single J+3 reminder of a document request left open (pointer only).
+  "visitor_documents_reminder"
 ] as const;
 
 export type VisitorNotificationType = (typeof VISITOR_NOTIFICATION_TYPES)[number];
@@ -30,6 +32,9 @@ export const BROKER_ALERT_NOTIFICATION_TYPES = [
   "broker_quota_threshold",
   "broker_license_expiring",
   "broker_offer_expiring",
+  // PRD section 23: a lead nearing its first-action deadline, and the weekly activity summary (aggregates only).
+  "broker_lead_expiring",
+  "broker_weekly_summary",
   // Spec 063 FR-B08: the finance decision on a lead dispute (pointer only, never lead content).
   "broker_dispute_decided",
   // Spec 062: the visitor wrote to the assigned broker.

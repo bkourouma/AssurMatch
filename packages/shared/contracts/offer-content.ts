@@ -21,7 +21,12 @@ export const OFFER_INDICATIVE_DISCLAIMERS = ["offre indicative", "prix à confir
 export const OFFER_INDICATIVE_MARKER = "offre indicative";
 export const OFFER_MAX_GUARANTEES = 50;
 
-export const offerTypeSchema = z.enum(["indicative", "partner"]);
+/**
+ * Spec 070 (PRD section 13): `insurer` is an insurer offer (admin only), `private` an offer reserved
+ * to its owner broker (never public, never compared).
+ */
+export const offerTypeSchema = z.enum(["indicative", "partner", "insurer", "private"]);
+export const brokerOfferTypeSchema = z.enum(["indicative", "private"]);
 export const offerVersionStatusSchema = z.enum(["draft", "submitted", "published", "archived", "withdrawn"]);
 export const offerVersionDecisionSchema = z.enum(["validated", "rejected"]);
 /** Effective status of an offer as shown in the back-offices (`expired` is computed from `validUntil`). */
@@ -32,6 +37,8 @@ const contentFields = {
   shortDescription: z.string().max(1000).optional(),
   guaranteeSummary: z.string().max(1000).optional(),
   insurerName: z.string().trim().max(120).optional(),
+  /** Spec 070: optional link to the insurer referential; `insurerName` stays the displayed name. */
+  insurerId: uuidSchema.optional(),
   indicativePriceMin: z.number().nonnegative().optional(),
   indicativePriceMax: z.number().nonnegative().optional(),
   currency: z.string().min(3).max(3).default("XOF"),
@@ -115,10 +122,14 @@ export const adminOfferContentSchema = adminOfferContentObjectSchema.superRefine
 export const brokerOfferCreateSchema = offerContentObjectSchema.extend({
   countryId: uuidSchema,
   productId: uuidSchema,
+  /** Spec 070: `indicative` (default) or `private`; `partner` and `insurer` are admin only. */
+  offerType: brokerOfferTypeSchema.optional(),
   reason: z.string().trim().max(500).optional()
 }).strict().superRefine(refineOfferContent);
 /** PATCH /broker/offers/:id (full content of the version in progress). */
 export const brokerOfferUpdateSchema = offerContentObjectSchema.extend({
+  /** Spec 070: the type is immutable; sending the stored one is accepted, any other is refused. */
+  offerType: brokerOfferTypeSchema.optional(),
   expectedUpdatedAt: dateTimeStringSchema.optional(),
   reason: z.string().trim().max(500).optional()
 }).strict().superRefine(refineOfferContent);
@@ -141,13 +152,15 @@ export const offerDecisionReasonSchema = z.object({ reason: reasonSchema });
 export const brokerOfferListQuerySchema = z.object({
   status: offerEffectiveStatusSchema.optional(),
   countryId: uuidSchema.optional(),
-  productId: uuidSchema.optional()
+  productId: uuidSchema.optional(),
+  offerType: offerTypeSchema.optional()
 });
 
 export const adminOfferListQuerySchema = z.object({
   countryId: uuidSchema.optional(),
   productId: uuidSchema.optional(),
   partnerTenantId: uuidSchema.optional(),
+  offerType: offerTypeSchema.optional(),
   status: offerEffectiveStatusSchema.optional(),
   sponsored: z.enum(["true", "false"]).transform((value) => value === "true").optional(),
   expiringWithinDays: z.coerce.number().int().min(0).max(365).optional(),

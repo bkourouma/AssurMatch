@@ -10,10 +10,11 @@ import {
 } from "../../lib/admin-api";
 import { isAdminProfile, loginRedirect, readBackOfficeSession } from "../../lib/backoffice-auth";
 import { adminReadErrorMessage } from "../../lib/catalog-messages";
+import { readAdminInsurers, readAdminOfferAiSummary } from "../../lib/lot4-offers-api";
 import {
   OFFER_STATUS_LABELS,
   OFFER_STATUS_TONES,
-  OFFER_TYPE_LABELS,
+  PRIVATE_OFFER_BADGE,
   OFFER_VERSION_STATUS_LABELS,
   OFFER_VERSION_STATUS_TONES,
   canDecideOffer,
@@ -22,7 +23,8 @@ import {
   formatDiffValue,
   formatPriceRange,
   offerFieldLabel,
-  offerFormatDate
+  offerFormatDate,
+  offerTypeLabel
 } from "../../lib/offer-messages";
 import {
   Badge,
@@ -39,6 +41,7 @@ import {
 } from "../../lib/ui/admin-ui";
 import type { DataTableColumn } from "../../lib/ui/admin-ui";
 import { CompletenessChecklist, EditOfferForm, OfferDecisionForm } from "../offer-forms";
+import { OfferAiSummaryCard } from "../offer-ai-summary";
 
 /**
  * Spec 052 US2/US3/US5: offer page. Published and pending versions side by side with the field
@@ -57,7 +60,7 @@ function VersionSummary({ version }: { version: OfferVersionView }) {
       items={[
         { term: "Version", value: <Cluster><span>{`v${version.versionNumber}`}</span><StatusBadge status={version.status} labels={OFFER_VERSION_STATUS_LABELS} tones={OFFER_VERSION_STATUS_TONES} /></Cluster> },
         { term: "Nom commercial", value: content.name },
-        { term: "Assureur porteur", value: content.insurerName ?? "-" },
+        { term: "Assureur porteur", value: content.insurerName ? `${content.insurerName}${content.insurerId ? " (référentiel)" : ""}` : "-" },
         { term: "Prix indicatif", value: formatPriceRange(content.indicativePriceMin, content.indicativePriceMax, content.currency, content.pricingUnit) },
         { term: "Garanties", value: content.guarantees.length ? formatDiffValue(content.guarantees) : "-" },
         { term: "Validité", value: `${offerFormatDate(content.validFrom)} → ${offerFormatDate(content.validUntil)}` },
@@ -108,11 +111,12 @@ export default async function AdminOfferPage({ params, searchParams }: OfferPage
   const canPrepare = canPrepareOffer(roles);
   const canDecide = canDecideOffer(roles);
 
-  const [offerResult, countries, products, partners] = await Promise.all([
+  const [offerResult, countries, products, partners, aiSummary] = await Promise.all([
     readAdminOffer(offerId),
     readAdminCountries(),
     readAdminProducts(),
-    canPrepare ? readAdminPartners() : Promise.resolve({ status: "success" as const, data: [] })
+    canPrepare ? readAdminPartners() : Promise.resolve({ status: "success" as const, data: [] }),
+    readAdminOfferAiSummary(offerId)
   ]);
   if (offerResult.unauthenticated) redirect(loginRedirect(path, offerResult.error ?? "session_required"));
   const offer = offerResult.data;
@@ -132,6 +136,9 @@ export default async function AdminOfferPage({ params, searchParams }: OfferPage
   const published = offer.published;
   const editable = offer.status !== "withdrawn";
   const editContent = (pending ?? published)?.content;
+  const insurers = canPrepare && editable ? await readAdminInsurers({ countryId: offer.countryId, status: "active" }) : undefined;
+  const canGenerateSummary = roles.some((role) => role === "super_admin" || role === "ai_admin");
+  const aiParam = Array.isArray(query.ai) ? query.ai[0] : query.ai;
   const partnerChoices = partners.data.map((partner) => ({ value: partner.id, label: partner.tradeName || partner.legalName }));
   const notice = query.notice === "created" ? "Offre créée en brouillon (version 1). Soumettez-la à la conformité quand elle est complète." : undefined;
 
@@ -139,12 +146,13 @@ export default async function AdminOfferPage({ params, searchParams }: OfferPage
     <PageStack>
       <PageHeader
         breadcrumb={breadcrumb}
-        kicker={OFFER_TYPE_LABELS[offer.offerType] ?? "Offre indicative"}
+        kicker={offerTypeLabel(offer.offerType)}
         title={offerTitle(offer)}
         description={`${offer.partnerName ?? "Aucun courtier rattaché"} · ${country ? `${country.name} (${country.isoCode})` : "Pays inconnu"} · ${product?.name ?? "Produit inconnu"}. Offre indicative : prix à confirmer par le courtier partenaire.`}
         actions={
           <Cluster>
             <StatusBadge status={offer.status} labels={OFFER_STATUS_LABELS} tones={OFFER_STATUS_TONES} />
+            {offer.offerType === "private" ? <Badge tone="warning">{PRIVATE_OFFER_BADGE}</Badge> : null}
             {offer.isSponsored ? <Badge tone="warning">Sponsorisé</Badge> : null}
             {offer.expiringSoon ? <Badge tone="warning">{`Expire dans ${offer.expiresInDays ?? 0} j`}</Badge> : null}
           </Cluster>
@@ -163,6 +171,14 @@ export default async function AdminOfferPage({ params, searchParams }: OfferPage
           {!canDecide ? <Badge tone="disabled">Décisions réservées à la conformité</Badge> : null}
         </Cluster>
       </Card>
+
+      {offer.offerType === "private" ? (
+        <Notice tone="warning" title={PRIVATE_OFFER_BADGE}>
+          Offre privée : visible uniquement du courtier propriétaire, jamais affichée au public ni comparée.
+        </Notice>
+      ) : null}
+
+      <OfferAiSummaryCard offerId={offer.id} result={aiSummary} canGenerate={canGenerateSummary} aiNotice={aiParam} />
 
       <Grid columns="two">
         <Card title="Version publiée" description="Seule cette version est visible du public.">
@@ -202,10 +218,11 @@ export default async function AdminOfferPage({ params, searchParams }: OfferPage
 
       {canPrepare && editable ? (
         <EditOfferForm
-          offer={{ id: offer.id, countryId: offer.countryId, productId: offer.productId, partnerTenantId: offer.partnerTenantId, concurrencyToken: offer.concurrencyToken }}
+          offer={{ id: offer.id, offerType: offer.offerType, countryId: offer.countryId, productId: offer.productId, partnerTenantId: offer.partnerTenantId, concurrencyToken: offer.concurrencyToken }}
           content={editContent}
           hasPending={Boolean(pending)}
           partners={partnerChoices}
+          insurers={(insurers?.data ?? []).map((insurer) => ({ id: insurer.id, name: insurer.name, countryId: insurer.countryId }))}
         />
       ) : null}
     </PageStack>

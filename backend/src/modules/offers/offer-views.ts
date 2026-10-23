@@ -14,7 +14,7 @@ export const OFFER_EXPIRY_WARNING_DAYS = 15;
 const DAY_MS = 24 * 60 * 60 * 1000;
 
 export const OFFER_CONTENT_KEYS = [
-  "name", "shortDescription", "guaranteeSummary", "exclusionsSummary", "insurerName", "guarantees", "guaranteeLevel",
+  "name", "shortDescription", "guaranteeSummary", "exclusionsSummary", "insurerName", "insurerId", "guarantees", "guaranteeLevel",
   "deductibleAmount", "coverageCeiling", "processingDelayDays", "paymentFlexibility", "requiredDocuments",
   "sourceOfInformation", "indicativePriceMin", "indicativePriceMax", "currency", "pricingUnit", "validFrom",
   "validUntil", "publicDisclaimers", "isSponsored", "sponsorLabel", "displayPriority"

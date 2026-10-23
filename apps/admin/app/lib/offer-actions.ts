@@ -11,7 +11,7 @@ import {
   type OfferBlocker,
   type OfferType
 } from "./admin-api";
-import { offerContentFromForm, offerWriteErrorMessage } from "./offer-messages";
+import { OFFER_TYPE_OPTIONS, offerContentFromForm, offerWriteErrorMessage } from "./offer-messages";
 
 /**
  * Spec 052 US2/US5: admin offer actions. Every mutation carries the audited reason ("Motif
@@ -62,6 +62,18 @@ function writeInput(formData: FormData): AdminOfferWriteInput | OfferActionState
   if (!content.name) return { status: "error", message: "Le nom commercial est obligatoire." };
   if (!content.validFrom || !content.validUntil) return { status: "error", message: "Renseignez les dates de début et de fin de validité." };
   const offerType = text(formData, "offerType");
+  const knownType = (OFFER_TYPE_OPTIONS as readonly string[]).includes(offerType) ? offerType as OfferType : undefined;
+  if (offerType && !knownType) return { status: "error", message: "Type d'offre inconnu : rechargez la page." };
+  // Spec 070: the same rules as the API (OFFER_TYPE_INVALID), spared as a round trip.
+  if (knownType === "private" && !partnerTenantId) {
+    return { status: "error", message: "Une offre privée appartient à un courtier : choisissez le courtier propriétaire." };
+  }
+  if (knownType === "insurer" && !content.insurerId && !content.insurerName) {
+    return { status: "error", message: "Une offre assureur nomme son assureur : choisissez-le dans le référentiel ou saisissez son nom." };
+  }
+  if (knownType === "private" && formData.get("isSponsored") === "on") {
+    return { status: "error", message: "Une offre privée ne peut pas être sponsorisée." };
+  }
   const expectedUpdatedAt = text(formData, "expectedUpdatedAt");
   return {
     ...content,
@@ -69,7 +81,7 @@ function writeInput(formData: FormData): AdminOfferWriteInput | OfferActionState
     productId,
     reason: text(formData, "reason"),
     ...(partnerTenantId ? { partnerTenantId } : {}),
-    ...(offerType === "indicative" || offerType === "partner" ? { offerType: offerType as OfferType } : {}),
+    ...(knownType ? { offerType: knownType } : {}),
     ...(expectedUpdatedAt ? { expectedUpdatedAt } : {})
   };
 }

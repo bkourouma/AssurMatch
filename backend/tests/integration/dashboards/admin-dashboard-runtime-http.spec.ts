@@ -1,5 +1,6 @@
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import type { AdminDashboardResponse, ComplianceAlertsResponse } from "../../../../packages/shared/contracts/dashboard.contracts";
+import { adminDashboardResponseSchema } from "../../../../packages/shared/contracts/dashboard.contracts";
 import { actorHeaders, createRuntimeHttpHarness, readJson, type RuntimeHttpHarness } from "../runtime-http-test-utils";
 import { DashboardAuditActions } from "../../../src/modules/dashboards/dashboard-audit-actions";
 
@@ -24,6 +25,37 @@ describe("admin dashboard runtime HTTP", () => {
     expect(audits.length).toBe(1);
     expect(audits[0]?.result).toBe("success");
   });
+
+  // Lot 6 (spec 073 T305)
+  it("returns the extra PRD KPIs additively, with revenue for the super admin only and no AI call", async () => {
+    harness = await createRuntimeHttpHarness();
+    await harness.runtime.visitStats.service.record("home");
+    await harness.runtime.visitStats.service.record("home");
+    const providerCalls = vi.spyOn(harness.runtime.aiGateway, "run");
+    const admin = { actorId: "super-admin", roles: ["super_admin" as const], mfaVerified: true };
+    const response = await harness.request("/admin/dashboard", { headers: actorHeaders(admin) });
+    expect(response.status).toBe(200);
+    const dashboard = await readJson<AdminDashboardResponse>(response);
+    expect(adminDashboardResponseSchema.safeParse(dashboard).success).toBe(true);
+    expect(dashboard.visits?.total).toBe(2);
+    expect(typeof dashboard.activeCountries).toBe("number");
+    expect(typeof dashboard.activeProducts).toBe("number");
+    expect(dashboard.partnerSla).toEqual({ averageFirstActionMinutes: null, measured: 0 });
+    expect(dashboard.leadQuality).toMatchObject({ transmitted: 0, disputed: 0, disputeRate: null });
+    expect(dashboard.revenueRestricted).toBe(false);
+    expect(dashboard.revenue).toEqual({ byCurrency: [] });
+    expect(dashboard.aiEnabled).toBe(false);
+    expect(dashboard.aiSummary).toBeNull();
+    expect(providerCalls).not.toHaveBeenCalled();
+    expect(harness.runtime.audit.writer.search({ action: DashboardAuditActions.adminRevenueRead })).toHaveLength(1);
+
+    const compliance = { actorId: "compliance", roles: ["compliance_admin" as const], mfaVerified: true };
+    const restricted = await readJson<AdminDashboardResponse>(await harness.request("/admin/dashboard", { headers: actorHeaders(compliance) }));
+    expect(restricted.revenueRestricted).toBe(true);
+    expect(restricted.revenue).toBeUndefined();
+    expect(restricted.visits?.total).toBe(2);
+  });
+  // Lot 6 (end)
 
   it("denies broker actor reaching admin dashboard with structured refusal audit", async () => {
     harness = await createRuntimeHttpHarness();

@@ -118,7 +118,7 @@ export class DataRetentionService {
     }
     const after = await this.deps.repository.listPolicies();
     const next = resolveRetentionPolicy(parsed.category, countryId, after);
-    this.deps.audit.write({
+    await this.deps.audit.writeAsync({
       actor,
       action: DataRetentionAuditActions.policyChanged,
       targetType: "RetentionPolicy",
@@ -193,7 +193,7 @@ export class DataRetentionService {
     if (!await this.deps.repository.claimForApproval(batch.id, actor.actorId ?? null, parsed.reason, now)) {
       this.refuseBatch(batch, actor, "batch_already_approved", new RetentionBatchConflictError("batch_already_approved"));
     }
-    this.deps.audit.write({
+    await this.deps.audit.writeAsync({
       actor,
       action: DataRetentionAuditActions.batchApproved,
       targetType: "AnonymizationBatch",
@@ -209,7 +209,7 @@ export class DataRetentionService {
     try {
       await this.deps.anonymization.execute(batch, eligible, actor, now, progress);
       const executed = await this.deps.repository.updateBatch(batch.id, { status: "executed", counts: progress, executedAt: this.now() });
-      this.deps.audit.write({
+      await this.deps.audit.writeAsync({
         actor,
         action: DataRetentionAuditActions.batchExecuted,
         targetType: "AnonymizationBatch",
@@ -294,7 +294,7 @@ export class DataRetentionService {
       updatedAt: input.now
     });
     // Counts and the lookup kind only: never the e-mail, the reference looked up or a fingerprint.
-    this.deps.audit.write({
+    await this.deps.audit.writeAsync({
       actor,
       action: DataRetentionAuditActions.batchPreviewed,
       targetType: "AnonymizationBatch",

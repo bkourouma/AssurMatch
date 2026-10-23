@@ -92,3 +92,19 @@ test("spec 050: the public quote surface never imports back-office code or authe
   expect(sources).not.toMatch(/from "[^"]*(admin|broker-backoffice|auth)[^"]*"/);
   expect(sources).not.toMatch(/authorization|bearer/i);
 });
+
+test("phone-invalid mapping follows the backend validation message, not any 400 mentioning a phone column", async () => {
+  const { submitPublicQuoteRequest } = await import("../app/lib/public-api");
+  const realFetch = globalThis.fetch;
+  const respond = (status: number, message: string) => {
+    globalThis.fetch = (async () => new Response(JSON.stringify({ code: "VALIDATION_FAILED", message }), { status, headers: { "content-type": "application/json" } })) as typeof fetch;
+  };
+  try {
+    respond(400, "Phone is invalid for country");
+    expect(await submitPublicQuoteRequest({} as never)).toMatchObject({ status: "error", error: "phone_invalid" });
+    respond(400, "Unknown argument `phoneBlindIndex`. Available options are listed in green.");
+    expect(await submitPublicQuoteRequest({} as never)).toMatchObject({ status: "error", error: "api_400", messageKey: "quoteRejected" });
+  } finally {
+    globalThis.fetch = realFetch;
+  }
+});

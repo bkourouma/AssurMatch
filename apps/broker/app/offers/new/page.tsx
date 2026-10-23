@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { loginRedirect, readBackOfficeSession } from "../../lib/backoffice-auth";
 import { TENANT_SUSPENDED_MESSAGE, canMutateOffers, isTenantReadOnly } from "../../lib/broker-permissions";
 import { readOfferScopeChoices } from "../../lib/offer-api";
+import { readBrokerInsurersForCountries } from "../../lib/lot4-offers-api";
 import { Button, Notice, PageHeader, PageStack } from "../../lib/ui/broker-ui";
 import { CreateBrokerOfferForm } from "../offer-forms";
 
@@ -20,7 +21,7 @@ export default async function NewBrokerOfferPage() {
       breadcrumb={BREADCRUMB}
       kicker="Offres"
       title="Nouvelle offre"
-      description="Offre indicative : prix à confirmer par le courtier partenaire. Elle n'est publiée qu'après validation par AssurMatch."
+      description="Offre indicative ou privée. Une offre indicative est publiée après validation par AssurMatch ; une offre privée n'est jamais affichée au public."
     />
   );
   if (session.status !== "authenticated" || !canMutateOffers(session.profile)) {
@@ -36,10 +37,14 @@ export default async function NewBrokerOfferPage() {
     );
   }
   const scopes = await readOfferScopeChoices();
+  const insurers = await readBrokerInsurersForCountries(scopes.map((scope) => scope.countryId));
   return (
     <PageStack>
       {header}
-      <CreateBrokerOfferForm scopes={scopes.map((scope) => ({ value: `${scope.countryId}:${scope.productId}`, label: `${scope.countryLabel} — ${scope.productLabel}` }))} />
+      <CreateBrokerOfferForm
+        scopes={scopes.map((scope) => ({ value: `${scope.countryId}:${scope.productId}`, label: `${scope.countryLabel} — ${scope.productLabel}` }))}
+        insurers={insurers}
+      />
     </PageStack>
   );
 }

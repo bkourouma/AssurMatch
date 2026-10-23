@@ -109,6 +109,45 @@ export const brokerStarterDashboardSectionSchema = z.object({
   satisfaction: brokerSatisfactionSummarySchema.optional()
 });
 
+/** One source of requests (DASH-B-008). The CRM `source` of the lead is used: no UTM/marketing attribution is captured. */
+export const brokerCrmSourceRowSchema = z.object({
+  source: nonEmptyStringSchema,
+  received: z.number().int().min(0),
+  won: z.number().int().min(0),
+  /** won / received, 0 when nothing was received. */
+  conversionRate: z.number().min(0).max(1)
+});
+
+/** Estimated lead cost from the billing tariff of the plan (DASH-B-009); never an invoice amount. */
+export const brokerLeadCostSchema = z.object({
+  currency: nonEmptyStringSchema,
+  estimatedTotal: z.number().min(0),
+  perLead: z.number().min(0),
+  /** null when no lead was won in the scope. */
+  perWonLead: z.number().min(0).nullable(),
+  basis: z.literal("billing_tariff_estimate")
+});
+
+/**
+ * Pro/Enterprise CRM KPIs (PRD §20, DASH-B-001..009), computed on the same scope as the dashboard
+ * (window, filters, agency). Rates are ratios in [0, 1] over the leads received.
+ * - contactRate: leads that reached a "contacted" status (contacte, qualifie, documents_demandes,
+ *   devis_en_preparation, devis_envoye, negociation, gagne; `contact_tente` does not count).
+ * - averageFirstContactMinutes: assignment -> first transition to such a status. Distinct from
+ *   `starter.averageFirstActionMinutes` (first view) and from `averageReceptionToFirstActivityMinutes`
+ *   (first history event of any kind).
+ * - qualificationRate: leads that reached `qualifie` or a later status.
+ * - quotesSent: distinct leads with a CRM proposal or having reached `devis_envoye`, and the total of CRM proposals.
+ */
+export const brokerCrmKpisSchema = z.object({
+  contactRate: z.number().min(0).max(1),
+  averageFirstContactMinutes: z.number().nullable(),
+  qualificationRate: z.number().min(0).max(1),
+  quotesSent: z.object({ leads: z.number().int().min(0), proposals: z.number().int().min(0) }),
+  topSources: z.array(brokerCrmSourceRowSchema),
+  leadCost: brokerLeadCostSchema.optional()
+});
+
 export const brokerCrmDashboardSectionSchema = z.object({
   pipeline: z.array(z.object({ status: nonEmptyStringSchema, total: z.number().int().min(0) })),
   byAssignedAdvisor: z.array(z.object({ advisorId: nonEmptyStringSchema, total: z.number().int().min(0) })),
@@ -116,8 +155,13 @@ export const brokerCrmDashboardSectionSchema = z.object({
     productKey: nonEmptyStringSchema,
     received: z.number().int().min(0),
     accepted: z.number().int().min(0),
+    /** Leads won (crmStatus `gagne`); `rate` is won / received. */
+    won: z.number().int().min(0).optional(),
     rate: z.number().min(0).max(1)
   })),
+  /** Global conversion = leads won / leads received (0 when nothing was received). */
+  conversionRate: z.number().min(0).max(1).optional(),
+  kpis: brokerCrmKpisSchema.optional(),
   averageReceptionToFirstActivityMinutes: z.number().nullable(),
   upcomingTasks: z.number().int().min(0),
   upcomingReminders: z.number().int().min(0),
@@ -149,6 +193,55 @@ export const featureFlagSummarySchema = z.object({
   value: z.boolean()
 });
 
+// Lot 6 (spec 073 T301): additive KPI blocks of the PRD section 21 (every field optional: older APIs omit them).
+export const adminDashboardVisitsSchema = z.object({
+  total: z.number().int().min(0),
+  byPage: z.array(z.object({ page: nonEmptyStringSchema, total: z.number().int().min(0) }))
+});
+
+export const adminDashboardPartnerSlaSchema = z.object({
+  /** Mean minutes between assignment and the first broker action; null when no lead was measured. */
+  averageFirstActionMinutes: z.number().min(0).nullable(),
+  /** Number of assignments of the window that have a first action. */
+  measured: z.number().int().min(0)
+});
+
+export const adminDashboardLeadQualitySchema = z.object({
+  transmitted: z.number().int().min(0),
+  disputed: z.number().int().min(0),
+  accepted: z.number().int().min(0),
+  rejected: z.number().int().min(0),
+  /** Disputes opened in the window / leads transmitted in the window; null when no lead was transmitted. */
+  disputeRate: z.number().min(0).nullable()
+});
+
+export const adminDashboardRevenueSchema = z.object({
+  byCurrency: z.array(z.object({
+    currency: nonEmptyStringSchema,
+    subscription: z.number().int(),
+    leads: z.number().int()
+  }))
+});
+
+export const adminDashboardAiSummarySchema = z.object({
+  insightId: nonEmptyStringSchema,
+  generatedAt: dateTimeStringSchema,
+  /** Human validation status of the insight (not_required, pending, approved, rejected). */
+  status: nonEmptyStringSchema,
+  excerpt: z.string().max(600).nullable()
+});
+
+export const adminDashboardAiAlertsSchema = z.object({
+  pendingValidation: z.number().int().min(0),
+  items: z.array(z.object({
+    insightId: nonEmptyStringSchema,
+    type: nonEmptyStringSchema,
+    createdAt: dateTimeStringSchema,
+    status: nonEmptyStringSchema
+  })).max(5)
+});
+// Lot 6 (end)
+
 export const adminDashboardResponseSchema = z.object({
   window: dashboardWindowDtoSchema,
   scope: adminDashboardScopeSchema,
@@ -174,7 +267,26 @@ export const adminDashboardResponseSchema = z.object({
     other: z.number().int().min(0)
   }),
   sensitiveFeatureFlags: z.array(featureFlagSummarySchema),
-  comparison: z.lazy(() => dashboardComparisonSchema).optional()
+  comparison: z.lazy(() => dashboardComparisonSchema).optional(),
+  // Lot 6 (spec 073 T301)
+  /** Page views of the window; null = counter absent, disabled or empty ("Non mesure"). */
+  visits: adminDashboardVisitsSchema.nullable().optional(),
+  /** Requests created in the window / page views; null when there is no visit. */
+  visitToRequestRate: z.number().min(0).nullable().optional(),
+  activeCountries: z.number().int().min(0).optional(),
+  activeProducts: z.number().int().min(0).optional(),
+  partnerSla: adminDashboardPartnerSlaSchema.optional(),
+  leadQuality: adminDashboardLeadQualitySchema.optional(),
+  /** Issued invoices of the window, super_admin only; absent for other roles (see revenueRestricted). */
+  revenue: adminDashboardRevenueSchema.nullable().optional(),
+  revenueRestricted: z.boolean().optional(),
+  /** False when the AI flags are closed: the AI cards then show "IA desactivee". */
+  aiEnabled: z.boolean().optional(),
+  /** True when the role cannot read AI insights. */
+  aiRestricted: z.boolean().optional(),
+  aiSummary: adminDashboardAiSummarySchema.nullable().optional(),
+  aiAlerts: adminDashboardAiAlertsSchema.nullable().optional()
+  // Lot 6 (end)
 });
 
 export const complianceAlertItemSchema = z.object({
@@ -209,6 +321,11 @@ export type AdminDashboardScope = z.infer<typeof adminDashboardScopeSchema>;
 export type RoutingRefusalReasonCount = z.infer<typeof routingRefusalReasonCountSchema>;
 export type FeatureFlagSummary = z.infer<typeof featureFlagSummarySchema>;
 export type AdminDashboardResponse = z.infer<typeof adminDashboardResponseSchema>;
+// Lot 6
+export type AdminDashboardVisits = z.infer<typeof adminDashboardVisitsSchema>;
+export type AdminDashboardLeadQuality = z.infer<typeof adminDashboardLeadQualitySchema>;
+export type AdminDashboardRevenue = z.infer<typeof adminDashboardRevenueSchema>;
+// Lot 6 (end)
 export type ComplianceAlertItem = z.infer<typeof complianceAlertItemSchema>;
 export type ComplianceAlertsResponse = z.infer<typeof complianceAlertsResponseSchema>;
 
@@ -295,3 +412,23 @@ export const routingAnomalyReportSchema = z.object({
   recommendations: z.array(z.string()).optional()
 });
 export type RoutingAnomalyReport = z.infer<typeof routingAnomalyReportSchema>;
+
+/** PRD §6.3: one row of the Enterprise multi-agency view; `agencyId` is `none` for advisors in no agency. */
+export const brokerAgencyOverviewRowSchema = z.object({
+  agencyId: agencyFilterSchema,
+  agencyName: nonEmptyStringSchema,
+  advisors: z.number().int().min(0),
+  received: z.number().int().min(0),
+  accepted: z.number().int().min(0),
+  won: z.number().int().min(0),
+  lost: z.number().int().min(0),
+  contactRate: z.number().min(0).max(1),
+  /** won / received. */
+  conversionRate: z.number().min(0).max(1),
+  averageFirstContactMinutes: z.number().nullable()
+});
+
+export type BrokerCrmSourceRow = z.infer<typeof brokerCrmSourceRowSchema>;
+export type BrokerLeadCost = z.infer<typeof brokerLeadCostSchema>;
+export type BrokerCrmKpis = z.infer<typeof brokerCrmKpisSchema>;
+export type BrokerAgencyOverviewRow = z.infer<typeof brokerAgencyOverviewRowSchema>;

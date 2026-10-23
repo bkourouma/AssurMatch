@@ -34,7 +34,9 @@ function corpus(...directories: string[]): string {
 // Spec 060: the invoicing settings are read through a computed name
 // (`ASSURMATCH_INVOICE_${country}_ISSUER_${field}`, `ASSURMATCH_INVOICE_ISSUER_${field}`...).
 const computedKeyPrefixes = ["ASSURMATCH_INVOICE_"];
-const secretKeys = ["DATABASE_URL", "REDIS_URL", "ASSURMATCH_AUTH_TOKEN_SECRET", "ENCRYPTION_KEY", "EMAIL_SMTP_PASS", "ASSURMATCH_S3_SECRET_ACCESS_KEY", "ANTHROPIC_API_KEY"];
+const secretKeys = ["DATABASE_URL", "REDIS_URL", "ASSURMATCH_AUTH_TOKEN_SECRET", "ENCRYPTION_KEY", "EMAIL_SMTP_PASS", "ASSURMATCH_S3_SECRET_ACCESS_KEY", "ANTHROPIC_API_KEY", "PII_ENCRYPTION_KEYS", "PII_BLIND_INDEX_KEY"];
+// Lot 8 (spec 075): the PII keys are declared, empty, in the API and worker examples (never a value).
+const piiKeys = ["PII_ENCRYPTION_KEYS", "PII_ENCRYPTION_ACTIVE_KEY_ID", "PII_BLIND_INDEX_KEY"];
 const deadKeys = ["JWT_SECRET", "SESSION_SECRET", "LOCAL_STORAGE_ROOT", "S3_ENDPOINT", "S3_BUCKET", "S3_ACCESS_KEY_ID", "S3_SECRET_ACCESS_KEY", "COOKIE_DOMAIN", "RATE_LIMIT_GLOBAL_PER_MIN", "MFA_REQUIRED"];
 
 describe("production env examples (spec 057)", () => {
@@ -63,6 +65,16 @@ describe("production env examples (spec 057)", () => {
     const api = keys(".env.production.api.example");
     for (const key of ["ASSURMATCH_DOCUMENT_STORAGE", "ASSURMATCH_S3_ENDPOINT", "ASSURMATCH_S3_BUCKET", "ASSURMATCH_S3_REGION", "ASSURMATCH_S3_ACCESS_KEY_ID", "ASSURMATCH_S3_SECRET_ACCESS_KEY", "ASSURMATCH_ANTIVIRUS", "ASSURMATCH_CLAMAV_HOST", "ASSURMATCH_CLAMAV_PORT", "ASSURMATCH_AUTH_TOKEN_SECRET", "ENCRYPTION_KEY", "TRUSTED_PROXY_HOPS", "ASSURMATCH_AI_PROVIDER", "ASSURMATCH_VISITOR_TOKEN_TTL_DAYS"]) {
       expect(api, key).toContain(key);
+    }
+  });
+
+  it("declares the PII encryption keys in the API and worker examples without any value (lot 8)", () => {
+    for (const file of [".env.production.api.example", ".env.production.worker.example"]) {
+      expect(keys(file), file).toEqual(expect.arrayContaining(piiKeys));
+      for (const line of readFileSync(join(root, file), "utf8").split(/\r?\n/)) {
+        const match = line.match(/^(PII_[A-Z_]+)=(.*)$/);
+        if (match) expect(["", "REDACTED"], `${file} ${match[1]}`).toContain(match[2]);
+      }
     }
   });
 

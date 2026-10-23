@@ -2,6 +2,7 @@ import { getTranslations, setRequestLocale } from "next-intl/server";
 import { Link } from "../../../../i18n/navigation";
 import { toLocale } from "../../../../i18n/routing";
 import { JourneyRoute } from "../../../components/journey/journey-route";
+import { VisitorAiAssistant } from "../../../components/visitor-ai-assistant";
 import { OfferCriteria, OfferPrice, OfferScore, ScoreBreakdown, SponsoredBadge } from "../../../components/offer-cards";
 import { JourneyHeroNotice } from "../../../components/public-journey";
 import { BackendText } from "../../../components/ui/backend-text";
@@ -254,6 +255,8 @@ export default async function PublicOfferDetailPage({
                     {detail.sourceOfInformation ? ` ${t("source", { source: detail.sourceOfInformation })}` : ""}
                   </p>
                 </section>
+
+                {countryCode && productKey ? <VisitorAiAssistant countryCode={countryCode} productKey={productKey} offerId={offerId} mode="guarantees" /> : null}
 
                 {detail.exclusionsSummary ? (
                   <section className="am-j-part" aria-labelledby="am-offer-exclusions">

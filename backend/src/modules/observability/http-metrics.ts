@@ -1,3 +1,5 @@
+import { renderAuditMetrics } from "./audit-metrics";
+
 /**
  * Spec 058 FR-003: in-process metrics rendered in the Prometheus text format (0.0.4), without a
  * client library. Labels are route templates (`/leads/:id`), never raw URLs, so neither an
@@ -100,6 +102,8 @@ export class HttpMetricsRegistry {
     };
     taskCounter("assurmatch_worker_task_failures_total", "Deliveries reported as failed by worker tasks (cumulative).", worker?.taskFailuresTotal);
     taskCounter("assurmatch_worker_task_errors_total", "Worker task runs that threw (cumulative).", worker?.taskErrorsTotal);
+
+    lines.push(...renderAuditMetrics());
 
     gauge("assurmatch_process_uptime_seconds", "API process uptime.", Math.round(process.uptime()));
     gauge("assurmatch_process_resident_memory_bytes", "API process resident memory.", process.memoryUsage().rss);

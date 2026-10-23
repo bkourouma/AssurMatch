@@ -17,10 +17,15 @@
     "claims_enabled": false,
     "insurer_api_enabled": false,
     "whatsapp_enabled": false,
+    "sms_enabled": false,
+    "crm_connector_enabled": false,
+    "partner_api_enabled": false,
+    "partner_webhooks_enabled": false,
     "sponsored_offers_enabled": false,
     "multi_broker_routing_enabled": false,
     "retention_purge_enabled": false,
-    "broker_visitor_messaging_enabled": false
+    "broker_visitor_messaging_enabled": false,
+    "broker_weekly_ai_summary_enabled": false
   },
   "country": {
     "country_public_enabled": false,

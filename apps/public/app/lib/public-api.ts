@@ -1,4 +1,4 @@
-import type { OfferCompareResponse, OfferDetail, OfferSummary, QuoteRequestCreateDto } from "../../../../packages/shared/contracts/quote.contracts";
+import type { OfferCompareResponse, OfferDetail, OfferSummary, QuoteOptionsResponse, QuoteRequestCreateDto } from "../../../../packages/shared/contracts/quote.contracts";
 import type { QuoteDocumentsResponse } from "../../../../packages/shared/contracts/quote-document.contracts";
 import type { PartnerApplicationCreateDto } from "../../../../packages/shared/contracts/partner-application.contracts";
 import type {
@@ -120,6 +120,13 @@ export interface PublicQuoteSubmitState {
    * routed to another partner broker (or the offer was ignored), `null` no offer was selected.
    */
   selectedOfferPartnerRetained?: boolean | null;
+  /** Spec 067 H2: `false` the broker chosen directly was not retained, `null` no direct choice. */
+  chosenPartnerRetained?: boolean | null;
+  /** Spec 067 COMP-009: brokers asked for and brokers that received the request. */
+  requestedPartnerCount?: number;
+  retainedPartnerCount?: number;
+  /** Spec 067: further offers were sent but not honoured. */
+  additionalOffersIgnored?: boolean;
   error?: string;
   publicMessage: string;
   messageKey: ApiMessageKey;
@@ -200,6 +207,34 @@ export async function quoteDocumentUploadEnabled(publicReference: string, token:
     return ((await response.json()) as { uploadEnabled?: unknown }).uploadEnabled === true;
   } catch {
     return false;
+  }
+}
+
+/**
+ * Spec 067: what the quote form needs besides the published definition (multi-broker availability,
+ * document upload, eligible brokers, partner names of the requested offers). Tolerant on purpose:
+ * any failure answers `null` and the form behaves as it did before (single offer, no broker choice,
+ * no documents step). The server stays the authority on every one of those rules.
+ */
+export async function getQuoteOptions(countryCode: string, productKey: string, offerIds: readonly string[]): Promise<QuoteOptionsResponse | null> {
+  try {
+    const params = offerIds.length > 0 ? `?${new URLSearchParams({ offerIds: offerIds.join(",") }).toString()}` : "";
+    const response = await fetch(
+      `${PUBLIC_API_BASE_URL}/countries/${encodeURIComponent(countryCode)}/products/${encodeURIComponent(productKey)}/quote-options${params}`,
+      { cache: "no-store" }
+    );
+    if (!response.ok) return null;
+    const body = await response.json() as Partial<QuoteOptionsResponse> | null;
+    if (!body || typeof body !== "object") return null;
+    return {
+      multiBrokerAvailable: body.multiBrokerAvailable === true,
+      maxOffers: typeof body.maxOffers === "number" && body.maxOffers > 0 ? body.maxOffers : 3,
+      documentUploadEnabled: body.documentUploadEnabled === true,
+      offers: Array.isArray(body.offers) ? body.offers : [],
+      brokers: Array.isArray(body.brokers) ? body.brokers : []
+    };
+  } catch {
+    return null;
   }
 }
 
@@ -414,8 +449,9 @@ export async function submitPublicQuoteRequest(input: QuoteRequestCreateDto, opt
     if (!response.ok) {
       const errorBody = await response.json().catch(() => null) as { message?: unknown } | null;
       const serverMessage = typeof errorBody?.message === "string" ? errorBody.message : "";
-      // Spec 050 R8: the server is the authority on the country phone rule.
-      if (response.status === 400 && /phone/i.test(serverMessage)) {
+      // Spec 050 R8: the server is the authority on the country phone rule. Match the exact backend message
+      // ("Phone is invalid for country"), not any 400 that merely mentions a phone-related column.
+      if (response.status === 400 && /^phone is invalid/i.test(serverMessage.trim())) {
         return { status: "error", error: "phone_invalid", messageKey: "quotePhoneInvalid", publicMessage: "Le numero de telephone ne correspond pas au format attendu pour ce pays." };
       }
       // Spec 050 R5: the consent text changed since the page was loaded.
@@ -424,7 +460,15 @@ export async function submitPublicQuoteRequest(input: QuoteRequestCreateDto, opt
       }
       return { status: "error", error: `api_${response.status}`, messageKey: "quoteRejected", publicMessage: "La demande de devis ne peut pas etre envoyee avec ces informations." };
     }
-    const body = await response.json() as { publicReference?: string; message?: string; selectedOfferPartnerRetained?: unknown };
+    const body = await response.json() as {
+      publicReference?: string;
+      message?: string;
+      selectedOfferPartnerRetained?: unknown;
+      chosenPartnerRetained?: unknown;
+      requestedPartnerCount?: unknown;
+      retainedPartnerCount?: unknown;
+      additionalOffersIgnored?: unknown;
+    };
     if (!body.publicReference) {
       return { status: "error", error: "missing_public_reference", messageKey: "confirmationFailed", publicMessage: "La confirmation n'a pas pu etre generee." };
     }
@@ -433,6 +477,10 @@ export async function submitPublicQuoteRequest(input: QuoteRequestCreateDto, opt
       publicReference: body.publicReference,
       ...(typeof (body as { verificationToken?: unknown }).verificationToken === "string" ? { verificationToken: (body as { verificationToken: string }).verificationToken } : {}),
       selectedOfferPartnerRetained: typeof body.selectedOfferPartnerRetained === "boolean" ? body.selectedOfferPartnerRetained : null,
+      chosenPartnerRetained: typeof body.chosenPartnerRetained === "boolean" ? body.chosenPartnerRetained : null,
+      ...(typeof body.requestedPartnerCount === "number" ? { requestedPartnerCount: body.requestedPartnerCount } : {}),
+      ...(typeof body.retainedPartnerCount === "number" ? { retainedPartnerCount: body.retainedPartnerCount } : {}),
+      additionalOffersIgnored: body.additionalOffersIgnored === true,
       messageKey: "quoteTransmitted",
       // The server message states how many brokers received the request (spec 042).
       publicMessage: body.message ?? "Demande transmise selon votre consentement."

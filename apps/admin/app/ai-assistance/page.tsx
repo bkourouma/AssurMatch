@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { listAdminAiInsights, readAdminAIAssistance } from "../lib/admin-api";
 import { requestAdminInsightAction, validateAdminInsightAction } from "../lib/ai-insight-actions";
 import { Badge, Button, Card, Cluster, DataTable, Form, Grid, Input, PageHeader, PageStack, Stack, StateMessage } from "../lib/ui/admin-ui";
@@ -6,6 +7,7 @@ const INSIGHT_LABELS: Record<string, string> = {
   admin_risk_triage: "Triage des risques de conformite",
   activation_gap_summary: "Ecarts d'activation",
   offer_consistency_check: "Coherence d'une offre",
+  offer_summary: "Résumé d'une offre",
   activity_report: "Rapport d'activite",
   suspicious_leads: "Demandes suspectes"
 };
@@ -58,6 +60,13 @@ export default async function AdminAIAssistancePage({ searchParams }: { searchPa
             </Card>
           </Grid>
 
+          <Card
+            title="Flags IA par pays et produit"
+            description="Etat et changement des flags IA par pays et par produit, par une voie de conformite auditee (MFA, reference de politique, approbateur, motif)."
+          >
+            <Link href="/ai-assistance/flags">Ouvrir les flags IA par pays et produit</Link>
+          </Card>
+
           {enabled ? (
             <Card
               title="Demander un insight IA a valider"
@@ -67,7 +76,7 @@ export default async function AdminAIAssistancePage({ searchParams }: { searchPa
                 {Object.entries(INSIGHT_LABELS).filter(([assistType]) => assistance.data.availableAssistTypes.includes(assistType)).map(([assistType, label]) => (
                   <Form key={assistType} action={requestAdminInsightAction}>
                     <input type="hidden" name="assistType" value={assistType} />
-                    {assistType === "offer_consistency_check" ? (
+                    {assistType === "offer_consistency_check" || assistType === "offer_summary" ? (
                       <Input name="offerId" placeholder="Identifiant de l'offre" aria-label="Identifiant de l'offre" />
                     ) : null}
                     <Button type="submit" variant="secondary">{label}</Button>

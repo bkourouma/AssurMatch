@@ -9,6 +9,9 @@ export interface ProspectRecord extends NormalizedProspectContact {
   productId: string;
   consentRecordIds: string[];
   retentionUntil: Date;
+  // Lot 6
+  anonymizedAt?: Date | null;
+  // Lot 6 (end)
   createdAt: Date;
   updatedAt: Date;
 }
@@ -37,6 +40,11 @@ export class ProspectsService {
 
   require(id: string): Promise<ProspectRecord> {
     return this.repository.require(id);
+  }
+
+  /** Lot 6 x lot 8: ids of the prospects carrying this exact normalised e-mail or phone. */
+  findIdsByContact(kind: "email" | "phone", normalizedValue: string): Promise<string[]> {
+    return this.repository.findIdsByContact(kind, normalizedValue);
   }
 }
 

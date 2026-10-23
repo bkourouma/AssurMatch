@@ -32,7 +32,8 @@ type QueuedNotification = { notification: NotificationRecord; job: QueueJobRecor
 export function visitorNotificationDedupeKey(quoteRequestId: string, event: VisitorNotificationEvent): string {
   // Spec 062: the coalesced conversation e-mails (bucketed by `seq`) are also keyed by the broker, so two
   // brokers of a reassigned assignment inside the same 15-minute bucket both notify the visitor.
-  if ((event.type === "visitor_broker_message" || event.type === "visitor_documents_requested") && event.partnerTenantId) {
+  // Spec 067: the single document reminder is keyed by (request, assignment, broker) with the fixed `reminder` seq.
+  if ((event.type === "visitor_broker_message" || event.type === "visitor_documents_requested" || event.type === "visitor_documents_reminder") && event.partnerTenantId) {
     return `${event.type}:${quoteRequestId}:${event.assignmentId ?? "-"}:${event.partnerTenantId}:${event.seq ?? "0"}`;
   }
   return `${event.type}:${quoteRequestId}:${event.assignmentId ?? "-"}:${event.seq ?? event.partnerTenantId ?? "0"}`;
@@ -220,6 +221,18 @@ export class QuoteNotificationService implements LeadMessagingNotificationsPort,
     actor: ActorContext
   ): Promise<QueuedNotification | undefined> {
     return this.queueVisitorEvent(quote, { type: "visitor_documents_requested", assignmentId: event.assignmentId, partnerTenantId: event.partnerTenantId, seq: event.bucket }, actor);
+  }
+
+  /**
+   * Spec 067: the single J+3 reminder of a document request left open; pointer only. The key is
+   * `visitor_documents_reminder:{quoteId}:{assignmentId}:{partnerTenantId}:reminder`, so a second call never queues a second e-mail.
+   */
+  queueVisitorDocumentsReminder(
+    quote: Pick<QuoteRequestRecord, "id" | "publicReference">,
+    event: { assignmentId: string; partnerTenantId: string },
+    actor: ActorContext
+  ): Promise<QueuedNotification | undefined> {
+    return this.queueVisitorEvent(quote, { type: "visitor_documents_reminder", assignmentId: event.assignmentId, partnerTenantId: event.partnerTenantId, seq: "reminder" }, actor);
   }
 
   /** Spec 062 D-10: acknowledgement of a data request, with its reference and indicative due date. */

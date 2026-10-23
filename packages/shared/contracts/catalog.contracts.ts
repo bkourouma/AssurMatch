@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { dateTimeStringSchema, isoCountrySchema, languageCodeSchema, nonEmptyStringSchema, reasonSchema, uuidSchema } from "../validation/common.schemas";
 import { toPatchSchema } from "../validation/patch.schemas";
+import { quoteDocumentKindSchema } from "./quote-document.contracts";
 
 export const COUNTRY_FEATURE_FLAG_DEFAULTS = {
   country_public_enabled: false,
@@ -86,6 +87,18 @@ export const countryUpdateSchema = toPatchSchema(countryCreateSchema).omit({ id:
   reason: reasonSchema
 });
 
+/** Spec 070 PROD-007: legal text and disclaimer of a product, per language (FR and EN). */
+export const productLegalNoticeLanguageSchema = z.object({
+  legalText: z.string().trim().max(5000).optional(),
+  disclaimer: z.string().trim().max(1000).optional()
+});
+export const productLegalNoticeSchema = z.object({
+  fr: productLegalNoticeLanguageSchema.optional(),
+  en: productLegalNoticeLanguageSchema.optional()
+});
+/** Spec 070 PROD-005: kinds of documents asked for a product (same vocabulary as the visitor uploads). */
+export const productRequiredDocumentKindsSchema = z.array(quoteDocumentKindSchema).max(10).refine((kinds) => new Set(kinds).size === kinds.length, "Duplicate document kinds");
+
 export const productCreateSchema = z.object({
   id: uuidSchema.optional(),
   categoryId: uuidSchema.optional(),
@@ -95,6 +108,10 @@ export const productCreateSchema = z.object({
   sensitivity: z.enum(["standard", "sensitive", "highly_sensitive"]).default("standard"),
   requiresDocuments: z.boolean().default(false),
   requiresManualReview: z.boolean().default(true),
+  /** Spec 070 PROD-007. */
+  legalNotice: productLegalNoticeSchema.default({}),
+  /** Spec 070 PROD-005. */
+  requiredDocumentKinds: productRequiredDocumentKindsSchema.default([]),
   status: productStatusSchema.default("draft"),
   flags: productFlagsSchema.default(PRODUCT_FEATURE_FLAG_DEFAULTS)
 });
@@ -179,6 +196,30 @@ export const adminProductUpdateSchema = toPatchSchema(productCreateSchema).omit(
   reason: reasonSchema
 });
 
+/* Spec 070 PROD-001: product categories (admin CRUD, immutable kebab-case key). */
+export const productCategoryStatusSchema = z.enum(["draft", "active", "retired"]);
+export const productCategoryKeySchema = z.string().trim().min(2).max(64).regex(/^[a-z0-9]+(-[a-z0-9]+)*$/, "Key must be kebab-case (lowercase letters, digits and dashes)");
+
+export const adminProductCategoryCreateSchema = z.object({
+  key: productCategoryKeySchema,
+  name: nonEmptyStringSchema.max(120),
+  nameEn: z.string().trim().min(1).max(120).optional(),
+  description: z.string().trim().min(1).max(1000).optional(),
+  sortOrder: z.number().int().min(0).max(10000).default(0),
+  reason: reasonSchema
+});
+
+/** `nameEn` and `description` accept `null` to clear the value. The key is immutable and absent here. */
+export const adminProductCategoryUpdateSchema = z.object({
+  name: nonEmptyStringSchema.max(120).optional(),
+  nameEn: z.string().trim().min(1).max(120).nullable().optional(),
+  description: z.string().trim().min(1).max(1000).nullable().optional(),
+  sortOrder: z.number().int().min(0).max(10000).optional(),
+  status: productCategoryStatusSchema.optional(),
+  expectedUpdatedAt: dateTimeStringSchema.optional(),
+  reason: reasonSchema
+});
+
 export const adminProductListQuerySchema = z.object({ countryId: uuidSchema.optional() });
 
 export const adminRegulatoryRegimeCreateSchema = regulatoryRegimeSchema.omit({ id: true }).extend({
@@ -249,11 +290,61 @@ export interface AdminProductView {
   sensitivity: ProductRecord["sensitivity"];
   requiresDocuments: boolean;
   requiresManualReview: boolean;
+  /** Spec 070 PROD-007. */
+  legalNotice: ProductLegalNotice;
+  /** Spec 070 PROD-005. */
+  requiredDocumentKinds: ProductRequiredDocumentKind[];
+  /** Spec 070 PROD-008: number of the current content version. */
+  version: number;
   status: ProductRecord["status"];
   flags: ProductFlags;
   countryIds: string[];
   createdAt: string;
   updatedAt: string;
+}
+
+export interface AdminProductCategoryView {
+  id: string;
+  key: string;
+  name: string;
+  nameEn: string | null;
+  description: string | null;
+  sortOrder: number;
+  status: z.output<typeof productCategoryStatusSchema>;
+  /** Non-retired products attached to the category. */
+  productCount: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/** Spec 070 PROD-008/009: one field-level change; `before`/`after` are JSON values (`null` when absent). */
+export interface ProductVersionChange {
+  /** Dotted path, for example `name` or `legalNotice.en.disclaimer`. */
+  field: string;
+  before: unknown;
+  after: unknown;
+}
+
+export interface ProductVersionView {
+  versionNumber: number;
+  createdAt: string;
+  authorId: string | null;
+  authorLabel?: string;
+  reason: string;
+  changes: ProductVersionChange[];
+  /** Full content of the product after the change. */
+  snapshot: Record<string, unknown>;
+}
+
+/**
+ * Spec 070 PROD-005/007: what a visitor must know before a quote on a public product. Read by the
+ * quote journey (document kinds asked) and by the product page (legal notice, per language).
+ */
+export interface PublicProductRequirements {
+  productKey: string;
+  requiredDocumentKinds: ProductRequiredDocumentKind[];
+  legalNotice: ProductLegalNotice;
+  category: { key: string; name: string; nameEn: string | null } | null;
 }
 
 export interface AdminRegulatoryRegimeView {
@@ -277,6 +368,11 @@ export type ProductFlagsPatch = z.output<typeof productFlagsPatchSchema>;
 export type CountryDto = z.input<typeof countryCreateSchema>;
 export type CountryRecord = z.output<typeof countryCreateSchema>;
 export type CountryUpdateDto = z.input<typeof countryUpdateSchema>;
+export type ProductLegalNotice = z.output<typeof productLegalNoticeSchema>;
+export type ProductRequiredDocumentKind = z.output<typeof quoteDocumentKindSchema>;
+export type ProductCategoryStatus = z.output<typeof productCategoryStatusSchema>;
+export type AdminProductCategoryCreateDto = z.input<typeof adminProductCategoryCreateSchema>;
+export type AdminProductCategoryUpdateDto = z.input<typeof adminProductCategoryUpdateSchema>;
 export type ProductDto = z.input<typeof productCreateSchema>;
 export type ProductRecord = z.output<typeof productCreateSchema>;
 export type ProductUpdateDto = z.input<typeof productUpdateSchema>;

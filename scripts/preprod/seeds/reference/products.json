@@ -2,7 +2,7 @@
   {
     "key": "auto",
     "name": "Assurance auto",
-    "category": "personal-lines",
+    "category": "auto-moto",
     "defaultFlags": {
       "product_public_enabled": false,
       "product_quote_enabled": false,
@@ -17,7 +17,7 @@
   {
     "key": "moto",
     "name": "Assurance moto",
-    "category": "personal-lines",
+    "category": "auto-moto",
     "defaultFlags": {
       "product_public_enabled": false,
       "product_quote_enabled": false,
@@ -32,7 +32,7 @@
   {
     "key": "sante",
     "name": "Assurance sante",
-    "category": "personal-lines",
+    "category": "sante",
     "defaultFlags": {
       "product_public_enabled": false,
       "product_quote_enabled": false,
@@ -47,7 +47,7 @@
   {
     "key": "voyage",
     "name": "Assurance voyage",
-    "category": "personal-lines",
+    "category": "voyage",
     "defaultFlags": {
       "product_public_enabled": false,
       "product_quote_enabled": false,
@@ -62,7 +62,7 @@
   {
     "key": "habitation",
     "name": "Assurance habitation",
-    "category": "personal-lines",
+    "category": "habitation",
     "defaultFlags": {
       "product_public_enabled": false,
       "product_quote_enabled": false,
@@ -77,7 +77,7 @@
   {
     "key": "vie-epargne",
     "name": "Vie / epargne",
-    "category": "life-savings",
+    "category": "vie-epargne",
     "defaultFlags": {
       "product_public_enabled": false,
       "product_quote_enabled": false,
@@ -92,7 +92,7 @@
   {
     "key": "entreprise",
     "name": "Assurance entreprise",
-    "category": "commercial-lines",
+    "category": "entreprise",
     "defaultFlags": {
       "product_public_enabled": false,
       "product_quote_enabled": false,
@@ -107,7 +107,7 @@
   {
     "key": "transport",
     "name": "Assurance transport",
-    "category": "commercial-lines",
+    "category": "transport",
     "defaultFlags": {
       "product_public_enabled": false,
       "product_quote_enabled": false,
@@ -122,7 +122,7 @@
   {
     "key": "agricole",
     "name": "Assurance agricole",
-    "category": "commercial-lines",
+    "category": "agricole",
     "defaultFlags": {
       "product_public_enabled": false,
       "product_quote_enabled": false,
@@ -137,7 +137,7 @@
   {
     "key": "scolaire",
     "name": "Assurance scolaire",
-    "category": "personal-lines",
+    "category": "scolaire",
     "defaultFlags": {
       "product_public_enabled": false,
       "product_quote_enabled": false,
@@ -167,7 +167,7 @@
   {
     "key": "credit-caution",
     "name": "Credit et caution",
-    "category": "specialty",
+    "category": "credit-caution",
     "defaultFlags": {
       "product_public_enabled": false,
       "product_quote_enabled": false,
@@ -182,7 +182,7 @@
   {
     "key": "cyber",
     "name": "Cyber",
-    "category": "specialty",
+    "category": "cyber",
     "defaultFlags": {
       "product_public_enabled": false,
       "product_quote_enabled": false,
@@ -197,7 +197,7 @@
   {
     "key": "evenementiel",
     "name": "Evenementiel",
-    "category": "specialty",
+    "category": "evenementiel",
     "defaultFlags": {
       "product_public_enabled": false,
       "product_quote_enabled": false,
@@ -212,7 +212,7 @@
   {
     "key": "construction",
     "name": "Construction",
-    "category": "commercial-lines",
+    "category": "construction",
     "defaultFlags": {
       "product_public_enabled": false,
       "product_quote_enabled": false,

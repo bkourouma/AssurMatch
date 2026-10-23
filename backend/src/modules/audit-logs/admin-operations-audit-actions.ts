@@ -12,5 +12,9 @@ export const ADMIN_OPERATIONS_AUDIT_ACTIONS = {
   auditLogsExported: "audit_log.exported",
   auditLogsExportRefused: "audit_log.export_refused",
   contactMessageStatusUpdated: "contact_message.status_updated",
-  contactMessageStatusRefused: "contact_message.status_update_refused"
+  contactMessageStatusRefused: "contact_message.status_update_refused",
+  // Lot 6
+  prospectsListed: "admin_operations.prospects_listed",
+  prospectViewed: "admin.prospect.viewed"
+  // Lot 6 (end)
 } as const;

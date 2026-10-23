@@ -2,6 +2,9 @@ import type { RuntimeRepository } from "../common/repositories/runtime-repositor
 import { assertRuntimeRepository } from "../common/repositories/runtime-repository";
 import type { PrismaService } from "../common/prisma/prisma.service";
 import type { QuoteRequestRecord } from "./quote-submission.service";
+// Lot 8 (spec 075 FR-A1): the payload is encrypted in its JSON column by common/security.
+import { quotePayloadColumns, quoteRowToDomain } from "../common/security/pii-columns";
+import { PiiVault } from "../common/security/pii-vault";
 
 export const QUOTE_REQUESTS_REPOSITORY = Symbol("QUOTE_REQUESTS_REPOSITORY");
 
@@ -76,14 +79,17 @@ type QuoteRequestDelegate = {
 export class PrismaQuoteRequestsRepository implements QuoteRequestsRepository {
   readonly mode = "prisma-runtime" as const;
 
-  constructor(private readonly prisma: PrismaService) {}
+  // Lot 8: the vault is injectable (tests); the runtime builds it from the environment.
+  constructor(private readonly prisma: PrismaService, private readonly vault: PiiVault = PiiVault.fromEnv()) {}
 
   async create(quote: QuoteRequestRecord): Promise<QuoteRequestRecord> {
-    return this.toDomain(await this.client().create({ data: this.toPrisma(quote) }));
+    // Lot 8: encrypted payload + piiKeyId when a PII key is active.
+    return this.toDomain(await this.client().create({ data: quotePayloadColumns(this.vault, this.toPrisma(quote)) }));
   }
 
   async update(id: string, update: Partial<QuoteRequestRecord>): Promise<QuoteRequestRecord> {
-    const data = this.toPrismaUpdate(update);
+    // Lot 8: a payload written by an update is encrypted the same way.
+    const data = quotePayloadColumns(this.vault, this.toPrismaUpdate(update));
     return this.toDomain(await this.client().update({ where: { id }, data }));
   }
 
@@ -117,6 +123,10 @@ export class PrismaQuoteRequestsRepository implements QuoteRequestsRepository {
     return (this.prisma.requireRuntimeClient() as unknown as { quoteRequest: QuoteRequestDelegate }).quoteRequest;
   }
 
+  /**
+   * Columns map one to one, including the spec 067 ones (`additionalOfferIds` String[],
+   * `chosenPartnerTenantId` String?, `marketingSource` Json?); an absent value is left to the column default.
+   */
   private toPrisma(quote: QuoteRequestRecord): Record<string, unknown> {
     const data = { ...quote } as Record<string, unknown>;
     delete data.countryCode;
@@ -131,7 +141,17 @@ export class PrismaQuoteRequestsRepository implements QuoteRequestsRepository {
     return Object.fromEntries(Object.entries(data).filter(([, value]) => value !== undefined));
   }
 
+  /**
+   * Spec 067: the new optional columns read back as the domain expects them - an empty
+   * `additionalOfferIds` and a null `chosenPartnerTenantId` / `marketingSource` are simply absent.
+   * Every other column is passed through unchanged.
+   */
   private toDomain(row: unknown): QuoteRequestRecord {
-    return row as QuoteRequestRecord;
+    // Lot 8: clear payload, no piiKeyId in the domain record.
+    const record = quoteRowToDomain(this.vault, row);
+    if (!Array.isArray(record.additionalOfferIds) || record.additionalOfferIds.length === 0) delete record.additionalOfferIds;
+    if (record.chosenPartnerTenantId === null) delete record.chosenPartnerTenantId;
+    if (record.marketingSource === null || (record.marketingSource !== undefined && typeof record.marketingSource !== "object")) delete record.marketingSource;
+    return record as unknown as QuoteRequestRecord;
   }
 }

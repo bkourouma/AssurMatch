@@ -20,6 +20,10 @@ export interface ActivationChecklistModuleDeps {
   quoteForms: QuoteFormDefinitionService;
   consent: ConsentService;
   partnerReadiness?: ActivationChecklistDeps["partnerReadiness"];
+  /** Spec 070: routing rules, scoring rules and manual attestations (controls left out when absent). */
+  routingRules?: ActivationChecklistDeps["routingRules"];
+  scoringRules?: ActivationChecklistDeps["scoringRules"];
+  attestations?: ActivationChecklistDeps["attestations"];
 }
 
 export class ActivationChecklistModule {
@@ -31,4 +35,8 @@ export class ActivationChecklistModule {
 }
 
 export { ActivationChecklistAuditActions } from "./activation-checklist-audit-actions";
+export { ACTIVATION_ATTESTATIONS_REPOSITORY, MemoryActivationAttestationsRepository, PrismaActivationAttestationsRepository } from "./activation-attestations.repository";
+export type { ActivationAttestation, ActivationAttestationsRepository } from "./activation-attestations.repository";
+export { ActivationAttestationRefusedError, ActivationAttestationsService, type ActivationAttestationsDeps } from "./activation-attestations.service";
+export { ActivationAttestationsController } from "./activation-attestations.controller";
 export { ActivationChecklistAccessRefusedError, ActivationChecklistService };

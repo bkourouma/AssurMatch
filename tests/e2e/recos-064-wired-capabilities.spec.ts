@@ -165,7 +165,7 @@ test("W064-00 le cabinet Enterprise est créé avec son manager, son agent, son 
     if ((await leadFootprint(ownerToken, leadId)).advisorId === advisorId) continue;
     const owner = await visit(browser, world.owner, `/crm/leads/${leadId}`);
     const assign = owner.locator("form").filter({ has: owner.locator("#crm-advisor-id") });
-    await assign.locator("#crm-advisor-id").fill(advisorId);
+    await assign.locator("#crm-advisor-id").selectOption(advisorId);
     await assign.getByRole("button", { name: "Assigner au conseiller" }).click();
     await expect(owner.getByText("Lead assigne au conseiller.")).toBeVisible();
     expect((await leadFootprint(ownerToken, leadId)).advisorId).toBe(advisorId);
