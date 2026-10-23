@@ -20,7 +20,6 @@ export default async function MfaPage({ searchParams }: PageProps) {
   const mfaEnrolled = session.status === "mfa_required" && session.profile.mfaEnrolled === true;
   return (
     <>
-      <p className="bo-kicker">Verification forte</p>
       <h1 className="bo-auth__title">MFA requise</h1>
       <MfaPanel returnTo={returnTo} mfaEnrolled={mfaEnrolled} />
     </>

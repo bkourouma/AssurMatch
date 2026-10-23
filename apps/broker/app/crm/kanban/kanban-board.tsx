@@ -7,7 +7,8 @@ import { KANBAN_READ_ONLY_MESSAGE, KANBAN_SAME_COLUMN_MESSAGE, canConfirmKanbanR
 import type { KanbanColumns, KanbanMessage } from "../../lib/kanban-moves";
 import { CRM_OUTCOME_REASONS, CRM_PIPELINE_STATUSES, CRM_REASON_LABELS, CRM_STATUS_LABELS } from "../../lib/lead-vocabulary";
 import type { CrmPipelineStatus } from "../../lib/lead-vocabulary";
-import { Button, Card, Field, Notice, Select } from "../../lib/ui/broker-ui";
+import { Badge, Button, Field, Notice, Select } from "../../lib/ui/broker-ui";
+import styles from "../../lib/ui/broker-screens.module.css";
 
 export interface KanbanCardData {
   id: string;
@@ -160,12 +161,13 @@ export function KanbanBoard({ columns: initial, canMove }: KanbanBoardProps) {
           </Button>
         </form>
       ) : null}
-      <div style={{ display: "grid", gridAutoFlow: "column", gridAutoColumns: "minmax(240px, 1fr)", gap: "var(--bo-space-4, 16px)", overflowX: "auto" }} aria-label="Colonnes du pipeline CRM">
+      <div className={styles.board} aria-label="Colonnes du pipeline CRM">
         {CRM_PIPELINE_STATUSES.map((status) => {
           const cards = columns[status] ?? [];
           return (
             <section
               key={status}
+              className={styles.column}
               data-kanban-column={status}
               aria-label={`${CRM_STATUS_LABELS[status]}, ${cards.length} lead(s)`}
               onDragOver={canMove ? (event) => { event.preventDefault(); setOverColumn(status); } : undefined}
@@ -173,15 +175,19 @@ export function KanbanBoard({ columns: initial, canMove }: KanbanBoardProps) {
               onDrop={canMove ? (event) => onDrop(event, status) : undefined}
               style={overColumn === status ? { outline: "2px dashed currentColor", outlineOffset: 2 } : undefined}
             >
-              <Card title={`${CRM_STATUS_LABELS[status]} (${cards.length})`} as="div">
-                {cards.length > 0 ? (
-                  <ul style={{ listStyle: "none", padding: 0, margin: 0, display: "grid", gap: 12 }}>
+              <h2 className={styles.columnHead}>
+                <span>{CRM_STATUS_LABELS[status]}</span>
+                <Badge tone={cards.length > 0 ? "info" : "neutral"}>{String(cards.length)}</Badge>
+              </h2>
+              {cards.length > 0 ? (
+                <ul className={styles.columnList}>
                     {cards.map((card) => {
                       const targetId = `kanban-move-${card.id}`;
                       const target = effectiveKanbanTarget(status, targets[card.id]);
                       return (
                         <li
                           key={card.id}
+                          className={styles.ticket}
                           data-kanban-card={card.id}
                           draggable={canMove}
                           onDragStart={canMove ? (event) => { event.dataTransfer.effectAllowed = "move"; event.dataTransfer.setData("text/plain", card.id); setDragging({ id: card.id, from: status }); } : undefined}
@@ -218,9 +224,8 @@ export function KanbanBoard({ columns: initial, canMove }: KanbanBoardProps) {
                     })}
                   </ul>
                 ) : (
-                  <p>Aucun lead.</p>
+                  <p className={styles.columnEmpty}>Aucun lead.</p>
                 )}
-              </Card>
             </section>
           );
         })}

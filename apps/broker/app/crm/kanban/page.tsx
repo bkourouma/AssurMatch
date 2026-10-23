@@ -54,7 +54,6 @@ export default async function BrokerCrmKanbanPage({ searchParams }: { searchPara
     <PageStack>
       <PageHeader
         breadcrumb={[{ label: "CRM", href: "/crm" }, { label: "Vue Kanban" }]}
-        kicker="CRM Pro/Enterprise"
         title="Vue Kanban"
         description="Leads autorisés regroupés par statut du pipeline, selon votre rôle, votre cabinet et votre conseiller."
         actions={<Badge tone="info">{canMove ? "Glissez une carte pour changer son statut" : "Lecture seule"}</Badge>}

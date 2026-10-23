@@ -19,7 +19,6 @@ export default async function NewAdminOfferPage() {
   const header = (
     <PageHeader
       breadcrumb={[{ label: "Catalogue" }, { label: "Offres indicatives", href: "/offers" }, { label: "Nouvelle offre" }]}
-      kicker="Catalogue"
       title="Nouvelle offre"
       description="Préparation d'une offre pour le compte d'un courtier (indicative, partenaire, assureur ou privée). Offre indicative : prix à confirmer par le courtier partenaire."
     />

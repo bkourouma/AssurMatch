@@ -30,8 +30,8 @@ import {
   DataTable,
   Field,
   FilterBar,
-  Grid,
   Input,
+  Notice,
   PageHeader,
   PageStack,
   Select,
@@ -161,7 +161,7 @@ export default async function PartnerDirectoryPage({
       render: (partner) => (
         <>
           <a href={`/partners/${encodeURIComponent(partner.id)}`}><strong>{partner.tradeName || partner.legalName}</strong></a>
-          {partner.tradeName ? <div>{partner.legalName}</div> : null}
+          {partner.tradeName ? <div className="bo-description">{partner.legalName}</div> : null}
         </>
       ),
       sortable: true,
@@ -209,79 +209,77 @@ export default async function PartnerDirectoryPage({
     <PageStack>
       <PageHeader
         breadcrumb={[{ label: "Partenaires" }, { label: "Courtiers" }]}
-        kicker="Conformite partenaires"
         title="Courtiers partenaires"
-        description="Annuaire, statuts, licences et agrements. Seul un courtier « Actif public » avec une licence valide est routable et visible des visiteurs."
-        actions={<Button href="/partners/applications" variant="secondary">Candidatures</Button>}
+        description="Annuaire, statuts et licences. Seul un courtier « Actif public » avec une licence valide est routable et visible des visiteurs."
+        actions={
+          <Cluster>
+            <Badge tone={canPrepare ? "info" : "disabled"}>{canPrepare ? "Préparation autorisée" : "Lecture seule"}</Badge>
+            <Button href="/partners/applications" variant="secondary">Candidatures</Button>
+            {canPrepare ? <Button href="#creer-courtier">Créer un courtier</Button> : null}
+          </Cluster>
+        }
       />
-      <Grid columns="two">
-        <Card
-          title="Licences et agrements"
-          description="Activation bloquee sans licence valide, preuve d'agrement acceptee, couverture, proprietaire et contrat enregistre. Les conditions sont listees sur chaque fiche."
-        >
-          <Badge tone="warning">Licence expiree = statut Expiré et inéligibilité immédiate</Badge>
-        </Card>
-        <Card
-          title="Actions disponibles"
-          description="Création et préparation : super_admin, admin_pays (son pays), compliance_admin. Activation, suspension, résiliation, validation de licence et revue des documents : conformité uniquement."
-        >
-          <Badge tone={canPrepare ? "info" : "disabled"}>{canPrepare ? "Préparation autorisée" : "Lecture seule"}</Badge>
-        </Card>
-      </Grid>
+      <Notice tone="neutral" title="Licences et agréments">
+        Un courtier n&apos;est routable qu&apos;avec une licence valide : une licence expirée le rend inéligible immédiatement.
+        <details>
+          <summary>Voir les conditions et les rôles</summary>
+          Activation bloquée sans licence valide, preuve d&apos;agrément acceptée, couverture, propriétaire et contrat enregistré ; les conditions manquantes sont listées sur chaque fiche.
+          Création et préparation : super_admin, admin_pays (son pays), compliance_admin ; activation, suspension, résiliation, validation de licence et revue des documents : conformité uniquement.
+        </details>
+      </Notice>
 
-      <Card title="Annuaire des courtiers">
-        <FilterBar
-          action="/partners"
-          label="Filtres courtiers"
-          submitLabel="Filtrer"
-          resetLabel="Reinitialiser"
-          resetHref="/partners"
-          activeCount={activeFilters}
-          autoSubmit
-        >
-          <Field id="partners-status" label="Statut">
-            <Select {...fieldControlProps("partners-status")} name="status" defaultValue={status ?? ""}>
-              <option value="">Tous</option>
-              {PARTNER_STATUS_FILTER_OPTIONS.map((option) => <option key={option} value={option}>{partnerStatusLabel(option)}</option>)}
-            </Select>
-          </Field>
-          <Field id="partners-country" label="Pays">
-            <Select {...fieldControlProps("partners-country")} name="countryId" defaultValue={countryId ?? ""}>
-              <option value="">Tous</option>
-              {countryChoices.map((country) => <option key={country.value} value={country.value}>{country.label}</option>)}
-            </Select>
-          </Field>
-          <Field id="partners-plan" label="Plan">
-            <Select {...fieldControlProps("partners-plan")} name="plan" defaultValue={plan ?? ""}>
-              <option value="">Tous</option>
-              {PARTNER_PLAN_OPTIONS.map((option) => <option key={option} value={option}>{PARTNER_PLAN_LABELS[option]}</option>)}
-            </Select>
-          </Field>
-          <Field id="partners-expiring" label="Licence expirant sous N jours">
-            <Input {...fieldControlProps("partners-expiring")} name="expiring" type="number" min={1} max={730} defaultValue={expiring ?? ""} placeholder="30" />
-          </Field>
-        </FilterBar>
-        {partners.forbidden ? <StateMessage tone="danger">{adminReadErrorMessage("access_denied")}</StateMessage> : null}
-        {partners.status === "error" ? <StateMessage tone="danger">{adminReadErrorMessage(partners.error)}</StateMessage> : null}
-        <DataTable
-          columns={directoryColumns}
-          items={directoryRows}
-          getKey={(partner) => partner.id}
-          emptyLabel="Aucun courtier pour ces filtres."
-          aria-label="Annuaire des courtiers"
-          sort={directoryTable.sort}
-          sortHref={directoryTable.sortHref}
-          pagination={{
-            page: directoryTable.page,
-            pageSize: directoryTable.pageSize,
-            total: partners.data.length,
-            hrefFor: directoryTable.pageHref,
-            label: (from, to, total) => `${from}-${to} sur ${total} courtiers`
-          }}
-        />
-      </Card>
+      <FilterBar
+        action="/partners"
+        label="Filtres courtiers"
+        submitLabel="Filtrer"
+        resetLabel="Reinitialiser"
+        resetHref="/partners"
+        activeCount={activeFilters}
+        autoSubmit
+      >
+        <Field id="partners-status" label="Statut">
+          <Select {...fieldControlProps("partners-status")} name="status" defaultValue={status ?? ""}>
+            <option value="">Tous</option>
+            {PARTNER_STATUS_FILTER_OPTIONS.map((option) => <option key={option} value={option}>{partnerStatusLabel(option)}</option>)}
+          </Select>
+        </Field>
+        <Field id="partners-country" label="Pays">
+          <Select {...fieldControlProps("partners-country")} name="countryId" defaultValue={countryId ?? ""}>
+            <option value="">Tous</option>
+            {countryChoices.map((country) => <option key={country.value} value={country.value}>{country.label}</option>)}
+          </Select>
+        </Field>
+        <Field id="partners-plan" label="Plan">
+          <Select {...fieldControlProps("partners-plan")} name="plan" defaultValue={plan ?? ""}>
+            <option value="">Tous</option>
+            {PARTNER_PLAN_OPTIONS.map((option) => <option key={option} value={option}>{PARTNER_PLAN_LABELS[option]}</option>)}
+          </Select>
+        </Field>
+        <Field id="partners-expiring" label="Licence expirant sous N jours">
+          <Input {...fieldControlProps("partners-expiring")} name="expiring" type="number" min={1} max={730} defaultValue={expiring ?? ""} placeholder="30" />
+        </Field>
+      </FilterBar>
+      {partners.forbidden ? <StateMessage tone="danger">{adminReadErrorMessage("access_denied")}</StateMessage> : null}
+      {partners.status === "error" ? <StateMessage tone="danger">{adminReadErrorMessage(partners.error)}</StateMessage> : null}
+      <DataTable
+        columns={directoryColumns}
+        items={directoryRows}
+        getKey={(partner) => partner.id}
+        emptyLabel="Aucun courtier pour ces filtres."
+        emptyDescription={activeFilters > 0 ? "Reinitialisez les filtres pour revoir tout l'annuaire." : canPrepare ? "Creez le premier courtier avec le formulaire ci-dessous, ou convertissez une candidature." : "Aucun courtier n'est encore enregistre dans votre perimetre."}
+        aria-label="Annuaire des courtiers"
+        sort={directoryTable.sort}
+        sortHref={directoryTable.sortHref}
+        pagination={{
+          page: directoryTable.page,
+          pageSize: directoryTable.pageSize,
+          total: partners.data.length,
+          hrefFor: directoryTable.pageHref,
+          label: (from, to, total) => `${from}-${to} sur ${total} courtiers`
+        }}
+      />
 
-      {canPrepare ? <CreatePartnerForm countries={countryChoices} /> : null}
+      {canPrepare ? <div id="creer-courtier"><CreatePartnerForm countries={countryChoices} /></div> : null}
 
       <Card
         title="Engagement de reactivite (SLA) par partenaire"

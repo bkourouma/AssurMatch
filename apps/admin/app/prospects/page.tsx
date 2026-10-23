@@ -51,7 +51,6 @@ export default async function AdminProspectsPage({ searchParams }: { searchParam
     <PageStack>
       <PageHeader
         breadcrumb={[{ label: "Pilotage" }, { label: "Operations", href: "/operations" }, { label: "Prospects" }]}
-        kicker="Operations"
         title="Prospects"
         description="Recherche paginee des prospects dans votre perimetre pays et produit. Les coordonnees sont masquees dans la liste; la fiche les affiche en clair uniquement pour les roles autorises, avec journal d'audit."
       />

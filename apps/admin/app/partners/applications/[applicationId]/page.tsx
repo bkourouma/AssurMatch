@@ -20,7 +20,8 @@ import {
   Card,
   Cluster,
   DescriptionList,
-  Grid,
+  Split,
+  Stack,
   Notice,
   PageHeader,
   PageStack,
@@ -76,7 +77,6 @@ export default async function PartnerApplicationDetailPage({ params }: Applicati
     <PageStack>
       <PageHeader
         breadcrumb={[{ label: "Partenaires" }, { label: "Candidatures", href: "/partners/applications" }, { label: application.publicReference }]}
-        kicker="Candidature courtier"
         title={application.tradeName || application.legalName}
         description="Une candidature n'active jamais un courtier. La conversion crée un courtier Prospect et une licence brouillon à faire vérifier."
         actions={
@@ -87,73 +87,75 @@ export default async function PartnerApplicationDetailPage({ params }: Applicati
         }
       />
 
-      <Grid columns="two">
-        <Card title="Cabinet">
-          <DescriptionList
-            items={[
-              { term: "Référence", value: application.publicReference },
-              { term: "Raison sociale", value: application.legalName },
-              { term: "Nom commercial", value: application.tradeName ?? "-" },
-              { term: "Pays", value: country ? `${country.name} (${country.isoCode})` : application.countryId },
-              { term: "Plan souhaité", value: PARTNER_PLAN_LABELS[application.desiredPlan as keyof typeof PARTNER_PLAN_LABELS] ?? application.desiredPlan },
-              { term: "Capacité mensuelle", value: `${application.monthlyCapacity} leads` },
-              { term: "Produits", value: application.productIds.map((id) => productById.get(id)?.name ?? id).join(", ") || "-" },
-              { term: "Langue", value: application.locale ?? "fr" },
-              { term: "Reçue le", value: partnerFormatDate(application.createdAt) }
-            ]}
-          />
-        </Card>
-        <Card title="Licence déclarée et contact">
-          <DescriptionList
-            items={[
-              { term: "Numéro de licence", value: application.licenseNumber },
-              { term: "Autorité", value: application.licenseIssuingAuthority ?? "-" },
-              { term: "Expiration", value: partnerFormatDate(application.licenseExpiresAt) },
-              { term: "Contact", value: application.contactName },
-              {
-                term: "E-mail",
-                value: application.contactEmail
-                  ? `${application.contactEmail}${application.contactEmailMasked ? " (masqué)" : ""}`
-                  : "Masqué : visible de la conformité uniquement"
-              },
-              { term: "Téléphone", value: application.contactPhone },
-              { term: "WhatsApp", value: application.whatsapp ?? "-" }
-            ]}
-          />
-          {application.message ? <p className="bo-description">Message : {application.message}</p> : null}
-        </Card>
-      </Grid>
-
-      <Card title="Décision">
-        {decided ? (
-          <>
-            <Notice tone={application.status === "accepted" ? "success" : "info"}>
-              {application.status === "accepted"
-                ? "Candidature convertie : la décision est définitive."
-                : `Candidature refusée (${REJECTION_REASON_LABELS[application.rejectionReasonCode ?? ""] ?? "motif non précisé"}) : la décision est définitive.`}
-            </Notice>
+      <Split>
+        <Stack>
+          <Card title="Cabinet">
             <DescriptionList
               items={[
-                { term: "Décidée le", value: partnerFormatDate(application.decidedAt ?? application.reviewedAt ?? null) },
-                ...(application.reviewNote ? [{ term: "Note interne", value: application.reviewNote }] : [])
+                { term: "Référence", value: <span className="bo-ref">{application.publicReference}</span> },
+                { term: "Raison sociale", value: application.legalName },
+                { term: "Nom commercial", value: application.tradeName ?? "-" },
+                { term: "Pays", value: country ? `${country.name} (${country.isoCode})` : application.countryId },
+                { term: "Plan souhaité", value: PARTNER_PLAN_LABELS[application.desiredPlan as keyof typeof PARTNER_PLAN_LABELS] ?? application.desiredPlan },
+                { term: "Capacité mensuelle", value: `${application.monthlyCapacity} leads` },
+                { term: "Produits", value: application.productIds.map((id) => productById.get(id)?.name ?? id).join(", ") || "-" },
+                { term: "Langue", value: application.locale ?? "fr" },
+                { term: "Reçue le", value: partnerFormatDate(application.createdAt) }
               ]}
             />
-            {application.partnerTenantId ? <Button href={`/partners/${encodeURIComponent(application.partnerTenantId)}`}>Ouvrir la fiche courtier</Button> : null}
-          </>
-        ) : (
-          <>
-            {application.status === "received" && canReview ? <ReviewApplicationForm applicationId={application.id} /> : null}
-            {canDecide ? (
-              <Cluster>
-                <ConvertApplicationForm applicationId={application.id} />
-                <RejectApplicationForm applicationId={application.id} />
-              </Cluster>
-            ) : (
-              <p className="bo-description">La conversion et le refus sont réservés à la conformité (compliance_admin, super_admin).</p>
-            )}
-          </>
-        )}
-      </Card>
+          </Card>
+          <Card title="Licence déclarée et contact">
+            <DescriptionList
+              items={[
+                { term: "Numéro de licence", value: application.licenseNumber },
+                { term: "Autorité", value: application.licenseIssuingAuthority ?? "-" },
+                { term: "Expiration", value: partnerFormatDate(application.licenseExpiresAt) },
+                { term: "Contact", value: application.contactName },
+                {
+                  term: "E-mail",
+                  value: application.contactEmail
+                    ? `${application.contactEmail}${application.contactEmailMasked ? " (masqué)" : ""}`
+                    : "Masqué : visible de la conformité uniquement"
+                },
+                { term: "Téléphone", value: application.contactPhone },
+                { term: "WhatsApp", value: application.whatsapp ?? "-" }
+              ]}
+            />
+            {application.message ? <p className="bo-description">Message : {application.message}</p> : null}
+          </Card>
+        </Stack>
+
+        <Card title="Décision">
+          {decided ? (
+            <>
+              <Notice tone={application.status === "accepted" ? "success" : "info"}>
+                {application.status === "accepted"
+                  ? "Candidature convertie : la décision est définitive."
+                  : `Candidature refusée (${REJECTION_REASON_LABELS[application.rejectionReasonCode ?? ""] ?? "motif non précisé"}) : la décision est définitive.`}
+              </Notice>
+              <DescriptionList
+                items={[
+                  { term: "Décidée le", value: partnerFormatDate(application.decidedAt ?? application.reviewedAt ?? null) },
+                  ...(application.reviewNote ? [{ term: "Note interne", value: application.reviewNote }] : [])
+                ]}
+              />
+              {application.partnerTenantId ? <Button href={`/partners/${encodeURIComponent(application.partnerTenantId)}`}>Ouvrir la fiche courtier</Button> : null}
+            </>
+          ) : (
+            <>
+              {application.status === "received" && canReview ? <ReviewApplicationForm applicationId={application.id} /> : null}
+              {canDecide ? (
+                <Cluster>
+                  <ConvertApplicationForm applicationId={application.id} />
+                  <RejectApplicationForm applicationId={application.id} />
+                </Cluster>
+              ) : (
+                <p className="bo-description">La conversion et le refus sont réservés à la conformité (compliance_admin, super_admin).</p>
+              )}
+            </>
+          )}
+        </Card>
+      </Split>
     </PageStack>
   );
 }

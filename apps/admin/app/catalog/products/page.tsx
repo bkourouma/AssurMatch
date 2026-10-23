@@ -5,7 +5,8 @@ import { isAdminProfile, loginRedirect, readBackOfficeSession } from "../../lib/
 import { adminReadErrorMessage, flagLabel } from "../../lib/catalog-messages";
 import {
   Badge,
-  Card,
+  Button,
+  Cluster,
   DataTable,
   PageHeader,
   PageStack,
@@ -42,7 +43,7 @@ export default async function CatalogProductsPage({
     {
       key: "key",
       header: "Clé",
-      render: (product) => <a href={`/catalog/products/${encodeURIComponent(product.id)}`}><strong>{product.key}</strong></a>,
+      render: (product) => <a className="bo-ref" href={`/catalog/products/${encodeURIComponent(product.id)}`}>{product.key}</a>,
       sortable: true,
       sortValue: (product) => product.key
     },
@@ -73,11 +74,11 @@ export default async function CatalogProductsPage({
       key: "flags",
       header: "Flags globaux clés",
       render: (product) => (
-        <>
+        <Cluster>
           {KEY_FLAGS.map((key) => (
             <Badge key={key} tone={product.flags[key] ? "warning" : "disabled"}>{`${flagLabel(key)} : ${product.flags[key] ? "oui" : "non"}`}</Badge>
           ))}
-        </>
+        </Cluster>
       )
     }
   ];
@@ -89,36 +90,35 @@ export default async function CatalogProductsPage({
     <PageStack>
       <PageHeader
         breadcrumb={[{ label: "Catalogue", href: "/catalog" }, { label: "Produits" }]}
-        kicker="Catalogue"
         title="Produits"
         description="Produits du catalogue. Le flag lu par le parcours public combine le flag global du produit et celui de la liaison pays (fiche pays)."
+        actions={products.status === "success" ? <Button href="#creer-produit">Créer un produit</Button> : null}
       />
 
       {products.forbidden ? <StateMessage tone="danger">{adminReadErrorMessage("access_denied")}</StateMessage> : null}
       {products.status === "error" ? <StateMessage tone="danger">{adminReadErrorMessage(products.error)}</StateMessage> : null}
 
       {products.status === "success" ? (
-        <Card title="Produits">
-          <DataTable
-            columns={columns}
-            items={rows}
-            getKey={(product) => product.id}
-            emptyLabel="Aucun produit."
-            aria-label="Produits du catalogue"
-            sort={table.sort}
-            sortHref={table.sortHref}
-            pagination={{
-              page: table.page,
-              pageSize: table.pageSize,
-              total: products.data.length,
-              hrefFor: table.pageHref,
-              label: (from, to, total) => `${from}-${to} sur ${total} produits`
-            }}
-          />
-        </Card>
+        <DataTable
+          columns={columns}
+          items={rows}
+          getKey={(product) => product.id}
+          emptyLabel="Aucun produit."
+          emptyDescription="Créez un produit avec le formulaire ci-dessous, puis liez-le à un pays depuis la fiche pays."
+          aria-label="Produits du catalogue"
+          sort={table.sort}
+          sortHref={table.sortHref}
+          pagination={{
+            page: table.page,
+            pageSize: table.pageSize,
+            total: products.data.length,
+            hrefFor: table.pageHref,
+            label: (from, to, total) => `${from}-${to} sur ${total} produits`
+          }}
+        />
       ) : null}
 
-      {products.status === "success" ? <CreateProductForm categories={activeCategories} /> : null}
+      {products.status === "success" ? <div id="creer-produit"><CreateProductForm categories={activeCategories} /></div> : null}
     </PageStack>
   );
 }

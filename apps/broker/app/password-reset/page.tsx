@@ -12,7 +12,6 @@ export default async function PasswordResetPage({ searchParams }: PageProps) {
   const params = searchParams ? await searchParams : {};
   return (
     <>
-      <p>Reinitialisation courtier</p>
       <h1 className="bo-auth__title">Consommer un jeton</h1>
       <PasswordResetConsumeForm token={firstParam(params.token)} />
     </>

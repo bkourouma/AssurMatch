@@ -29,7 +29,7 @@ test("navigation exposes Société, Licences and a functional Equipe in the brok
   const shell = source("apps/broker/app/lib/ui/broker-shell.tsx");
   expect(shell).toContain("{ label: \"Société\", href: \"/company\"");
   expect(shell).toContain("{ label: \"Licences\", href: \"/licenses\"");
-  expect(shell).toContain("{ label: \"Equipe\", href: \"/team\", icon: \"team\", match: [\"/team\"] }");
+  expect(shell).toContain("{ label: \"Équipe\", href: \"/team\", icon: \"team\", match: [\"/team\"] }");
   const adminShell = source("apps/admin/app/lib/ui/admin-shell.tsx");
   expect(adminShell).not.toContain("/company");
   expect(adminShell).not.toContain("\"/team\"");

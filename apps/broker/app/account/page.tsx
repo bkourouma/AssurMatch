@@ -13,9 +13,8 @@ export default async function BrokerAccountPage() {
     <PageStack>
       <PageHeader
         breadcrumb={[{ label: "Compte" }, { label: "Compte" }]}
-        kicker="Compte courtier"
         title="Securite du compte"
-        description="Gestion du mot de passe, de la MFA et des informations du profil connecte."
+        description="Mot de passe, MFA et informations du profil connecte."
         actions={<Button href="/company" variant="secondary">Profil société</Button>}
       />
 
@@ -23,8 +22,8 @@ export default async function BrokerAccountPage() {
         <Card title="Profil">
           <DescriptionList
             items={[
-              { term: "Acteur", value: session.profile.actorId ?? "-" },
-              { term: "Tenant", value: session.profile.partnerTenantId ?? "-" },
+              { term: "Acteur", value: session.profile.actorId ? <span className="bo-ref">{session.profile.actorId}</span> : "-" },
+              { term: "Tenant", value: session.profile.partnerTenantId ? <span className="bo-ref">{session.profile.partnerTenantId}</span> : "-" },
               { term: "Plan", value: <Badge tone="info">{session.profile.partnerPlan ?? "-"}</Badge> },
               { term: "Roles", value: session.profile.roles.join(", ") }
             ]}

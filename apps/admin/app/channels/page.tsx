@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import { readChannelOutbox, readMessagingDeliveries, readMessagingProviders } from "../lib/channels-api";
 import { isAdminProfile, loginRedirect, readBackOfficeSession } from "../lib/backoffice-auth";
-import { Badge, Card, DataTable, Grid, KpiCard, PageHeader, PageStack, StateMessage, StatusBadge, type Tone } from "../lib/ui/admin-ui";
+import { Badge, Card, DataTable, PageHeader, PageStack, StateMessage, StatStrip, StatusBadge, type Tone } from "../lib/ui/admin-ui";
 
 const PAGE_PATH = "/channels";
 const SAMPLE_NOTE = "50 dernieres lignes";
@@ -65,11 +65,10 @@ export default async function ChannelsPage() {
 
       {outbox.status === "success" ? (
         <>
-          <Grid columns="kpi" as="section" aria-label="Synthese de la file de reprise">
-            {counts.map(({ status, count }) => (
-              <KpiCard key={status} label={`${OUTBOX_LABELS[status]} (${SAMPLE_NOTE})`} value={count} tone={OUTBOX_TONES[status] ?? "neutral"} />
-            ))}
-          </Grid>
+          <StatStrip
+            label="Synthèse de la file de reprise"
+            items={counts.map(({ status, count }) => ({ label: `${OUTBOX_LABELS[status]} (${SAMPLE_NOTE})`, value: count, tone: OUTBOX_TONES[status] ?? "neutral" }))}
+          />
 
           <Card title="File de reprise" description={`Calcul sur les ${SAMPLE_NOTE} recues. Le partenaire est une reference opaque.`}>
             <DataTable

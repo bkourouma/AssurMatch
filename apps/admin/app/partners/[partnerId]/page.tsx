@@ -45,6 +45,8 @@ import {
   Notice,
   PageHeader,
   PageStack,
+  Split,
+  Stack,
   StateMessage,
   StatusBadge,
   userStatusTones
@@ -81,6 +83,19 @@ const NOTICES: Record<string, string> = {
   created: "Courtier créé en Prospect. Complétez licences, documents, couverture, propriétaire et contrat avant toute activation.",
   converted: "Candidature convertie : courtier Prospect et licence brouillon créés. Vérifiez la fiche avant de l'envoyer en vérification."
 };
+
+/** In-page navigation; the anchors are also the targets of the activation blockers' "Corriger" links. */
+const SECTIONS = [
+  { label: "Synthèse", href: "#identite" },
+  { label: "Conditions", href: "#conditions" },
+  { label: "Demandes", href: "#demandes" },
+  { label: "Licences", href: "#licences" },
+  { label: "Documents", href: "#documents" },
+  { label: "Contrat", href: "#contrat" },
+  { label: "Couverture", href: "#couverture" },
+  { label: "Utilisateurs", href: "#utilisateurs" },
+  { label: "Journal", href: "#historique" }
+];
 
 interface JournalEntry {
   key: string;
@@ -195,7 +210,6 @@ export default async function PartnerDetailPage({ params, searchParams }: Partne
     <PageStack>
       <PageHeader
         breadcrumb={[{ label: "Partenaires" }, { label: "Courtiers", href: "/partners" }, { label: partner.tradeName || partner.legalName }]}
-        kicker="Fiche courtier"
         title={partner.tradeName || partner.legalName}
         description="Chaque modification est auditée avec son motif. Seul un courtier « Actif public » avec une licence valide est routable et visible des visiteurs."
         actions={
@@ -211,75 +225,89 @@ export default async function PartnerDetailPage({ params, searchParams }: Partne
       {retired ? <Notice tone="warning">Courtier résilié : la fiche est en lecture seule et ses utilisateurs n&apos;ont plus accès au portail.</Notice> : null}
       {!canPrepare ? <Notice tone="info">Lecture seule : votre rôle ne permet aucune action sur les courtiers.</Notice> : null}
 
-      <div id="identite">
-        <Card title="Synthèse">
-          <DescriptionList
-            columns={2}
-            items={[
-              { term: "Raison sociale", value: partner.legalName },
-              { term: "Pays principal", value: countryLabel(partner.countryId) },
-              { term: "Ville", value: partner.city ?? "-" },
-              { term: "RCCM", value: partner.registrationNumber ?? "-" },
-              { term: "Plan", value: PARTNER_PLAN_LABELS[partner.plan] ?? partner.plan },
-              { term: "Quota mensuel", value: `${partner.quotaMonthlyLeads} leads` },
-              { term: "Capacité", value: PARTNER_CAPACITY_LABELS[partner.capacityStatus] ?? partner.capacityStatus },
-              { term: "SLA contractuel", value: partner.slaTargetMinutes ? `${partner.slaTargetMinutes} min` : "Non fixé" },
-              { term: "SLA mesuré (30 j)", value: sla ? `${Math.round(sla.complianceRate * 100)}% dans l'objectif, ${sla.leadsMeasured} leads` : "-" },
-              {
-                term: "Première réponse visible (30 j)",
-                value:
-                  sla && sla.firstVisibleReplyComplianceRate !== null && sla.firstVisibleReplyComplianceRate !== undefined
-                    ? `${Math.round(sla.firstVisibleReplyComplianceRate * 100)}% dans l'objectif (${sla.firstVisibleReplyWithinTarget ?? 0}/${sla.firstVisibleReplyMeasured ?? 0})${
-                        sla.averageFirstVisibleReplyMinutes != null ? `, délai moyen ${sla.averageFirstVisibleReplyMinutes} min` : ""
-                      }`
-                    : "—"
-              },
-              { term: "Prochaine expiration", value: partnerFormatDate(partner.nextLicenseExpiration) },
-              { term: "Assureurs partenaires", value: partner.partnerInsurers.length ? partner.partnerInsurers.join(", ") : "-" },
-              { term: "Mis à jour", value: partnerFormatDate(partner.updatedAt) }
-            ]}
-          />
-        </Card>
-      </div>
+      <nav aria-label="Sections de la fiche courtier">
+        <Cluster>
+          {SECTIONS.map((section) => (
+            <Button key={section.href} href={section.href} variant="tertiary" size="sm">
+              {section.label}
+              {section.href === "#demandes" && pendingRequestCount > 0 ? ` (${pendingRequestCount})` : ""}
+              {section.href === "#conditions" && partner.activationBlockers.length > 0 ? ` (${partner.activationBlockers.length})` : ""}
+            </Button>
+          ))}
+        </Cluster>
+      </nav>
+
+      <Split>
+        <div id="identite">
+          <Card title="Synthèse">
+            <DescriptionList
+              columns={2}
+              items={[
+                { term: "Raison sociale", value: partner.legalName },
+                { term: "Pays principal", value: countryLabel(partner.countryId) },
+                { term: "Ville", value: partner.city ?? "-" },
+                { term: "RCCM", value: partner.registrationNumber ?? "-" },
+                { term: "Plan", value: PARTNER_PLAN_LABELS[partner.plan] ?? partner.plan },
+                { term: "Quota mensuel", value: `${partner.quotaMonthlyLeads} leads` },
+                { term: "Capacité", value: PARTNER_CAPACITY_LABELS[partner.capacityStatus] ?? partner.capacityStatus },
+                { term: "SLA contractuel", value: partner.slaTargetMinutes ? `${partner.slaTargetMinutes} min` : "Non fixé" },
+                { term: "SLA mesuré (30 j)", value: sla ? `${Math.round(sla.complianceRate * 100)}% dans l'objectif, ${sla.leadsMeasured} leads` : "-" },
+                {
+                  term: "Première réponse visible (30 j)",
+                  value:
+                    sla && sla.firstVisibleReplyComplianceRate !== null && sla.firstVisibleReplyComplianceRate !== undefined
+                      ? `${Math.round(sla.firstVisibleReplyComplianceRate * 100)}% dans l'objectif (${sla.firstVisibleReplyWithinTarget ?? 0}/${sla.firstVisibleReplyMeasured ?? 0})${
+                          sla.averageFirstVisibleReplyMinutes != null ? `, délai moyen ${sla.averageFirstVisibleReplyMinutes} min` : ""
+                        }`
+                      : "—"
+                },
+                { term: "Prochaine expiration", value: partnerFormatDate(partner.nextLicenseExpiration) },
+                { term: "Assureurs partenaires", value: partner.partnerInsurers.length ? partner.partnerInsurers.join(", ") : "-" },
+                { term: "Mis à jour", value: partnerFormatDate(partner.updatedAt) }
+              ]}
+            />
+          </Card>
+        </div>
+
+        <Stack>
+          <div id="statut">
+            <Card title="Statut" description="Envoi en vérification : préparation. Activation, suspension, réactivation et résiliation : conformité uniquement.">
+              <p>
+                Statut actuel : <StatusBadge status={partner.status} labels={PARTNER_STATUS_LABELS} tones={PARTNER_STATUS_TONES} />
+                {partner.statusReason ? <span className="bo-description"> ({partner.statusReason})</span> : null}
+              </p>
+              {transitions.length > 0 ? (
+                <div data-partner-transitions="true">
+                  {transitions.map((target) => <PartnerStatusTransitionForm key={target} partner={partnerRef} target={target} />)}
+                </div>
+              ) : (
+                <p className="bo-description">
+                  {partner.allowedTransitions.length === 0 ? "Aucune transition possible depuis ce statut." : "Les transitions possibles sont réservées à la conformité (compliance_admin, super_admin)."}
+                </p>
+              )}
+            </Card>
+          </div>
+          <div id="conditions">
+            <Card title="Conditions d'activation" description="Recalculées à chaque chargement ; une activation ou une réactivation est refusée tant qu'une condition manque.">
+              {partner.activationBlockers.length === 0 ? (
+                <Notice tone="success">Toutes les conditions d&apos;activation sont remplies.</Notice>
+              ) : (
+                <>
+                  <Notice tone="warning">{`${partner.activationBlockers.length} condition(s) non remplie(s).`}</Notice>
+                  <PartnerBlockers blockers={partner.activationBlockers} partner={partnerRef} />
+                </>
+              )}
+            </Card>
+          </div>
+        </Stack>
+      </Split>
 
       {editable ? <EditPartnerForm partner={partner} countries={countryChoices} /> : null}
-
-      <Grid columns="two">
-        <div id="statut">
-          <Card title="Statut" description="Envoi en vérification : préparation. Activation, suspension, réactivation et résiliation : conformité uniquement.">
-            <p>
-              Statut actuel : <StatusBadge status={partner.status} labels={PARTNER_STATUS_LABELS} tones={PARTNER_STATUS_TONES} />
-              {partner.statusReason ? <span className="bo-description"> ({partner.statusReason})</span> : null}
-            </p>
-            {transitions.length > 0 ? (
-              <div data-partner-transitions="true">
-                {transitions.map((target) => <PartnerStatusTransitionForm key={target} partner={partnerRef} target={target} />)}
-              </div>
-            ) : (
-              <p className="bo-description">
-                {partner.allowedTransitions.length === 0 ? "Aucune transition possible depuis ce statut." : "Les transitions possibles sont réservées à la conformité (compliance_admin, super_admin)."}
-              </p>
-            )}
-          </Card>
-        </div>
-        <div id="conditions">
-          <Card title="Conditions d'activation" description="Recalculées à chaque chargement ; une activation ou une réactivation est refusée tant qu'une condition manque.">
-            {partner.activationBlockers.length === 0 ? (
-              <Notice tone="success">Toutes les conditions d&apos;activation sont remplies.</Notice>
-            ) : (
-              <>
-                <Notice tone="warning">{`${partner.activationBlockers.length} condition(s) non remplie(s).`}</Notice>
-                <PartnerBlockers blockers={partner.activationBlockers} partner={partnerRef} />
-              </>
-            )}
-          </Card>
-        </div>
-      </Grid>
 
       <div id="demandes">
         <Card
           title="Demandes du courtier"
-          description="Demandes déposées depuis le portail courtier : modification d'identité (raison sociale, nom commercial, RCCM, pays) et extension de couverture. Une acceptation applique la modification avec les contrôles habituels de la fiche."
+          description="Modifications d'identité et extensions de couverture déposées depuis le portail courtier. Une acceptation applique la modification avec les contrôles habituels de la fiche."
         >
           {pendingRequestCount > 0 ? <Notice tone="warning">{`${pendingRequestCount} demande(s) en attente de décision.`}</Notice> : null}
           {pendingRenewals.length > 0 ? (
@@ -333,7 +361,8 @@ export default async function PartnerDetailPage({ params, searchParams }: Partne
 
       <div id="licences">
         <Card title="Licences" description="Statut effectif : une licence valide dont la date est passée est affichée expirée. Validation, suspension et révocation : conformité uniquement.">
-          {partner.licenses.length === 0 ? <StateMessage>Aucune licence enregistrée.</StateMessage> : null}
+          {partner.licenses.length === 0 ? <StateMessage>Aucune licence enregistrée.{editable ? " Enregistrez-la avec le formulaire ci-dessous." : ""}</StateMessage> : null}
+          <div className="bo-stack" aria-label="Licences du courtier">
           {partner.licenses.map((license: AdminPartnerLicenseData) => (
             <Card key={license.id} muted title={`Licence ${license.licenseNumber}`}>
               <DescriptionList
@@ -368,6 +397,7 @@ export default async function PartnerDetailPage({ params, searchParams }: Partne
               ) : null}
             </Card>
           ))}
+          </div>
         </Card>
         {editable ? <CreateLicenseForm partnerId={partner.id} countries={countryChoices} products={productChoices} /> : null}
       </div>
@@ -385,8 +415,8 @@ export default async function PartnerDetailPage({ params, searchParams }: Partne
                 render: (document: AdminPartnerDocumentData) => (
                   <>
                     <strong>{DOCUMENT_TYPE_LABELS[document.documentType] ?? document.documentType}</strong>
-                    <div>{document.fileName ?? "-"}{document.sizeBytes ? ` · ${Math.ceil(document.sizeBytes / 1024)} Ko` : ""}</div>
-                    {document.licenseId ? <div>Licence {partner.licenses.find((license) => license.id === document.licenseId)?.licenseNumber ?? document.licenseId}</div> : null}
+                    <div className="bo-description">{document.fileName ?? "-"}{document.sizeBytes ? ` · ${Math.ceil(document.sizeBytes / 1024)} Ko` : ""}</div>
+                    {document.licenseId ? <div className="bo-description">Licence {partner.licenses.find((license) => license.id === document.licenseId)?.licenseNumber ?? document.licenseId}</div> : null}
                   </>
                 )
               },
@@ -521,7 +551,7 @@ export default async function PartnerDetailPage({ params, searchParams }: Partne
                 render: (user: AdminPartnerDetailData["users"][number]) => (
                   <>
                     <a href={`/users/${encodeURIComponent(user.id)}`}><strong>{user.displayName}</strong></a>
-                    <div>{user.email}</div>
+                    <div className="bo-description">{user.email}</div>
                   </>
                 )
               },

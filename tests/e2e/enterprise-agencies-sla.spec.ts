@@ -66,7 +66,7 @@ function slaCard(page: Page) {
 }
 
 function slaTarget(page: Page) {
-  return slaCard(page).locator("article.bo-kpi[aria-label='Objectif premiere action']");
+  return slaCard(page).locator("li.bo-stats__cell").filter({ hasText: "Objectif premiere action" });
 }
 
 async function submitSla(page: Page, minutes: number, reason: string): Promise<void> {

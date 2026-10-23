@@ -28,10 +28,10 @@ const columns: Array<DataTableColumn<AdminConsentRecordView>> = [
   { key: "status", header: "Statut", render: (row) => <Badge tone={STATUS_TONES[row.status] ?? "neutral"}>{row.status}</Badge> },
   { key: "withdrawnAt", header: "Retire le", render: (row) => day(row.withdrawnAt) },
   { key: "text", header: "Texte (version, langue)", render: (row) => `${row.consentTextVersion ?? "?"} (${row.consentTextLanguage ?? "?"})` },
-  { key: "hash", header: "Empreinte du texte", render: (row) => (row.consentTextHash ? <code>{row.consentTextHash.slice(0, 16)}</code> : "-") },
+  { key: "hash", header: "Empreinte du texte", render: (row) => (row.consentTextHash ? <span className="bo-ref">{row.consentTextHash.slice(0, 16)}</span> : "-") },
   { key: "recipient", header: "Destinataire prevu", render: (row) => <code>{row.intendedRecipient}</code> },
   { key: "channel", header: "Canal", render: (row) => row.channel },
-  { key: "subject", header: "Sujet (empreinte tronquee)", render: (row) => <code>{row.subjectFingerprint}</code> },
+  { key: "subject", header: "Sujet (empreinte tronquee)", render: (row) => <span className="bo-ref">{row.subjectFingerprint}</span> },
   { key: "retention", header: "Conserve jusqu'au", render: (row) => day(row.retentionUntil).slice(0, 10) }
 ];
 

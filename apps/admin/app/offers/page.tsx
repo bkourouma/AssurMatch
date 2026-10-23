@@ -25,7 +25,6 @@ import {
 import {
   Badge,
   Button,
-  Card,
   Cluster,
   DataTable,
   Field,
@@ -115,7 +114,7 @@ export default async function AdminOffersPage({
       render: (offer) => (
         <>
           <a href={`/offers/${encodeURIComponent(offer.id)}`}><strong>{offerName(offer)}</strong></a>
-          <div>
+          <div className="bo-description">
             {offerTypeLabel(offer.offerType)}
             {offer.offerType === "private" ? <> <Badge tone="warning">{PRIVATE_OFFER_BADGE}</Badge></> : null}
           </div>
@@ -180,9 +179,8 @@ export default async function AdminOffersPage({
     <PageStack>
       <PageHeader
         breadcrumb={[{ label: "Catalogue" }, { label: "Catalogue", href: "/catalog" }, { label: "Offres indicatives" }]}
-        kicker="Catalogue"
         title="Offres indicatives"
-        description="Offres des courtiers partenaires, versions, file de validation et sponsorisation. Seule la version publiée est visible du public : offre indicative, prix à confirmer par le courtier partenaire."
+        description="Offres des courtiers partenaires, versions et file de validation. Seule la version publiée est visible du public : offre indicative, prix à confirmer par le courtier partenaire."
         actions={canPrepare ? <Button href="/offers/new">Nouvelle offre</Button> : null}
       />
       <Notice tone="info">
@@ -198,76 +196,76 @@ export default async function AdminOffersPage({
         ]}
       />
 
-      <Card title={queue ? "File « À valider »" : "Catalogue des offres"} description={queue ? "Versions soumises, de la plus ancienne à la plus récente." : undefined}>
-        <FilterBar
-          action="/offers"
-          label="Filtres offres"
-          submitLabel="Filtrer"
-          resetLabel="Reinitialiser"
-          resetHref={queue ? "/offers?queue=submitted" : "/offers"}
-          activeCount={activeFilters}
-        >
-          {queue ? <input type="hidden" name="queue" value="submitted" /> : null}
-          <Field id="offers-country" label="Pays">
-            <Select {...fieldControlProps("offers-country")} name="countryId" defaultValue={countryId ?? ""}>
-              <option value="">Tous</option>
-              {countries.data.map((country) => <option key={country.id} value={country.id}>{`${country.name} (${country.isoCode})`}</option>)}
-            </Select>
-          </Field>
-          <Field id="offers-product" label="Produit">
-            <Select {...fieldControlProps("offers-product")} name="productId" defaultValue={productId ?? ""}>
-              <option value="">Tous</option>
-              {products.data.map((product) => <option key={product.id} value={product.id}>{product.name}</option>)}
-            </Select>
-          </Field>
-          <Field id="offers-partner" label="Courtier">
-            <Select {...fieldControlProps("offers-partner")} name="partnerTenantId" defaultValue={partnerTenantId ?? ""}>
-              <option value="">Tous</option>
-              {partners.data.map((partner) => <option key={partner.id} value={partner.id}>{partner.tradeName || partner.legalName}</option>)}
-            </Select>
-          </Field>
-          <Field id="offers-status" label="Statut">
-            <Select {...fieldControlProps("offers-status")} name="status" defaultValue={status ?? ""}>
-              <option value="">Tous</option>
-              {OFFER_STATUS_OPTIONS.map((option) => <option key={option} value={option}>{OFFER_STATUS_LABELS[option]}</option>)}
-            </Select>
-          </Field>
-          <Field id="offers-type" label="Type d'offre">
-            <Select {...fieldControlProps("offers-type")} name="offerType" defaultValue={offerType ?? ""}>
-              <option value="">Tous</option>
-              {OFFER_TYPE_OPTIONS.map((option) => <option key={option} value={option}>{OFFER_TYPE_SHORT_LABELS[option]}</option>)}
-            </Select>
-          </Field>
-          <Field id="offers-sponsored" label="Sponsorisation">
-            <Select {...fieldControlProps("offers-sponsored")} name="sponsored" defaultValue={sponsoredParam}>
-              <option value="">Toutes</option>
-              <option value="true">Sponsorisées</option>
-              <option value="false">Non sponsorisées</option>
-            </Select>
-          </Field>
-          <Field id="offers-expiring" label="Expire sous N jours">
-            <Input {...fieldControlProps("offers-expiring")} name="expiring" type="number" min={0} max={365} defaultValue={expiring ?? ""} placeholder="15" />
-          </Field>
-        </FilterBar>
-        {offers.status === "forbidden" ? <StateMessage tone="danger">{adminReadErrorMessage("access_denied")}</StateMessage> : null}
-        {offers.status === "error" ? <StateMessage tone="danger">{adminReadErrorMessage(offers.error)}</StateMessage> : null}
-        <DataTable
-          columns={columns}
-          items={rows}
-          getKey={(offer) => offer.id}
-          emptyLabel={queue ? "Aucune version en attente de validation." : "Aucune offre pour ces filtres."}
-          aria-label="Offres indicatives"
-          sort={table.sort}
-          sortHref={table.sortHref}
-          pagination={{
-            page: table.page,
-            pageSize: table.pageSize,
-            total: offers.data.length,
-            hrefFor: table.pageHref,
-            label: (from, to, total) => `${from}-${to} sur ${total} offres`
-          }}
-        />
-      </Card>
+      {queue ? <p className="bo-description">Versions soumises, de la plus ancienne à la plus récente.</p> : null}
+      <FilterBar
+        action="/offers"
+        label="Filtres offres"
+        submitLabel="Filtrer"
+        resetLabel="Reinitialiser"
+        resetHref={queue ? "/offers?queue=submitted" : "/offers"}
+        activeCount={activeFilters}
+      >
+        {queue ? <input type="hidden" name="queue" value="submitted" /> : null}
+        <Field id="offers-country" label="Pays">
+          <Select {...fieldControlProps("offers-country")} name="countryId" defaultValue={countryId ?? ""}>
+            <option value="">Tous</option>
+            {countries.data.map((country) => <option key={country.id} value={country.id}>{`${country.name} (${country.isoCode})`}</option>)}
+          </Select>
+        </Field>
+        <Field id="offers-product" label="Produit">
+          <Select {...fieldControlProps("offers-product")} name="productId" defaultValue={productId ?? ""}>
+            <option value="">Tous</option>
+            {products.data.map((product) => <option key={product.id} value={product.id}>{product.name}</option>)}
+          </Select>
+        </Field>
+        <Field id="offers-partner" label="Courtier">
+          <Select {...fieldControlProps("offers-partner")} name="partnerTenantId" defaultValue={partnerTenantId ?? ""}>
+            <option value="">Tous</option>
+            {partners.data.map((partner) => <option key={partner.id} value={partner.id}>{partner.tradeName || partner.legalName}</option>)}
+          </Select>
+        </Field>
+        <Field id="offers-status" label="Statut">
+          <Select {...fieldControlProps("offers-status")} name="status" defaultValue={status ?? ""}>
+            <option value="">Tous</option>
+            {OFFER_STATUS_OPTIONS.map((option) => <option key={option} value={option}>{OFFER_STATUS_LABELS[option]}</option>)}
+          </Select>
+        </Field>
+        <Field id="offers-type" label="Type d'offre">
+          <Select {...fieldControlProps("offers-type")} name="offerType" defaultValue={offerType ?? ""}>
+            <option value="">Tous</option>
+            {OFFER_TYPE_OPTIONS.map((option) => <option key={option} value={option}>{OFFER_TYPE_SHORT_LABELS[option]}</option>)}
+          </Select>
+        </Field>
+        <Field id="offers-sponsored" label="Sponsorisation">
+          <Select {...fieldControlProps("offers-sponsored")} name="sponsored" defaultValue={sponsoredParam}>
+            <option value="">Toutes</option>
+            <option value="true">Sponsorisées</option>
+            <option value="false">Non sponsorisées</option>
+          </Select>
+        </Field>
+        <Field id="offers-expiring" label="Expire sous N jours">
+          <Input {...fieldControlProps("offers-expiring")} name="expiring" type="number" min={0} max={365} defaultValue={expiring ?? ""} placeholder="15" />
+        </Field>
+      </FilterBar>
+      {offers.status === "forbidden" ? <StateMessage tone="danger">{adminReadErrorMessage("access_denied")}</StateMessage> : null}
+      {offers.status === "error" ? <StateMessage tone="danger">{adminReadErrorMessage(offers.error)}</StateMessage> : null}
+      <DataTable
+        columns={columns}
+        items={rows}
+        getKey={(offer) => offer.id}
+        emptyLabel={queue ? "Aucune version en attente de validation." : "Aucune offre pour ces filtres."}
+        emptyDescription={queue ? "Les versions soumises par les courtiers ou preparees ici apparaissent dans cette file." : activeFilters > 0 ? "Reinitialisez les filtres pour revoir tout le catalogue." : undefined}
+        aria-label="Offres indicatives"
+        sort={table.sort}
+        sortHref={table.sortHref}
+        pagination={{
+          page: table.page,
+          pageSize: table.pageSize,
+          total: offers.data.length,
+          hrefFor: table.pageHref,
+          label: (from, to, total) => `${from}-${to} sur ${total} offres`
+        }}
+      />
     </PageStack>
   );
 }

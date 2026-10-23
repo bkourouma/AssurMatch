@@ -1,11 +1,13 @@
 import { redirect } from "next/navigation";
 import { isBrokerProfile, loginRedirect, readBackOfficeSession } from "./lib/backoffice-auth";
 import { logoutAction } from "./lib/backoffice-session-actions";
-import { readBrokerDashboard } from "./lib/broker-api";
-import { Badge, Button, Card, Grid, KpiCard, Notice, PageHeader, PageStack, Split } from "./lib/ui/broker-ui";
+import { listStarterLeads, readBrokerDashboard } from "./lib/broker-api";
+import { AttentionList, Button, Card, DataTable, Notice, PageHeader, PageStack, StatStrip, StatusBadge, starterStatusLabels } from "./lib/ui/broker-ui";
+import type { DataTableColumn } from "./lib/ui/broker-ui";
+import { dashboardAttention, dashboardStats, leadSummary } from "./lib/ui/broker-view-models";
+import type { LeadSummaryViewModel } from "./lib/ui/broker-view-models";
 import { AiInsightsDashboardSection } from "./lib/ui/ai-insights-panel";
 import { CrmKpiSection } from "./lib/ui/crm-kpi-section";
-import { dashboardKpis } from "./lib/ui/broker-view-models";
 
 interface BrokerShellPageProps {
   searchParams?: Promise<Record<string, string | string[] | undefined>>;
@@ -22,7 +24,6 @@ export default async function BrokerShellPage({ searchParams }: BrokerShellPageP
       <PageStack>
         <PageHeader
           breadcrumb={[{ label: "Activite" }, { label: "Dashboard" }]}
-          kicker="Securite"
           title="MFA requise"
           description="Votre profil est reconnu, mais l'acces au portail courtier reste bloque tant que la MFA n'est pas verifiee."
         />
@@ -37,7 +38,6 @@ export default async function BrokerShellPage({ searchParams }: BrokerShellPageP
       <PageStack>
         <PageHeader
           breadcrumb={[{ label: "Activite" }, { label: "Dashboard" }]}
-          kicker="Acces"
           title="Acces refuse"
           description="Ce compte ne dispose pas d'un acces courtier autorise."
         />
@@ -52,10 +52,9 @@ export default async function BrokerShellPage({ searchParams }: BrokerShellPageP
     <PageStack>
       <PageHeader
         breadcrumb={[{ label: "Activite" }, { label: "Dashboard" }]}
-        kicker={`Plan ${session.profile.partnerPlan ?? "courtier"}`}
         title="Portail courtier"
         description="Suivi des leads transmis par AssurMatch. Le courtier partenaire reste responsable de la prise de contact et de la suite commerciale."
-        actions={<Badge tone="info">Connecte: {session.profile.actorId ?? "profil courtier"}</Badge>}
+        actions={<Button href="/leads">Voir les leads</Button>}
       />
 
       {notice === "crm_requires_pro" ? <Notice tone="warning">Le CRM est réservé aux formules Pro et Enterprise.</Notice> : null}
@@ -65,19 +64,11 @@ export default async function BrokerShellPage({ searchParams }: BrokerShellPageP
       {/* Lot 3 (spec 069 FR-004, DASH-B-009): AI insights next to the KPI; same guard as the pipeline page. */}
       <AiInsightsDashboardSection profile={session.profile} notice={insight} />
 
-      <Split>
-        <Card title="Notifications">
-          <ul>
-            <li>Nouveau lead assigne disponible dans la liste.</li>
-            <li>Les notifications restent limitees au tenant courtier connecte.</li>
-          </ul>
-        </Card>
-        <Card title="Disponibilite CRM">
-          <p>
-            Le CRM complet est disponible avec le plan Pro. Les modules indisponibles restent clairement separes du portail Starter.
-          </p>
-        </Card>
-      </Split>
+      {session.profile.partnerPlan === "starter" ? (
+        <Notice tone="info" title="CRM">
+          Le CRM complet est disponible avec le plan Pro. Les modules indisponibles restent clairement séparés du portail Starter.
+        </Notice>
+      ) : null}
     </PageStack>
   );
 }
@@ -96,13 +87,14 @@ async function BrokerDashboardSection() {
 
   return (
     <>
-      <section aria-label="Dashboard Starter">
-        <Grid columns="kpi">
-          {dashboardKpis(dashboard.data).map((card) => (
-            <KpiCard key={card.label} label={card.label} value={card.value} helper={card.helper} tone={card.tone} />
-          ))}
-        </Grid>
+      <section aria-label="Dashboard Starter" className="bo-stack">
+        <Card title="À traiter" description="Ce qui attend une action de votre part.">
+          <AttentionList items={dashboardAttention(dashboard.data)} />
+        </Card>
+        <StatStrip items={dashboardStats(dashboard.data)} label="Volumes de leads" />
       </section>
+
+      <WaitingLeads />
 
       {/* Lot 3 (spec 069): PRD §20 CRM KPIs, rendered only when the API sends the `crm` section (never for Starter). */}
       <CrmKpiSection data={dashboard.data} />
@@ -122,5 +114,41 @@ async function BrokerDashboardSection() {
         <Notice tone="info" title="Licences">Aucune alerte licence exposee pour ce tenant.</Notice>
       )}
     </>
+  );
+}
+
+const WAITING_STATUSES = new Set(["assigned", "seen", "received", "broker_notified"]);
+
+const waitingColumns: Array<DataTableColumn<LeadSummaryViewModel>> = [
+  { key: "reference", header: "Reference", render: (lead) => <a className="bo-ref" href={`/leads/${encodeURIComponent(lead.id)}`}>{lead.reference}</a> },
+  { key: "product", header: "Produit", render: (lead) => `${lead.product} / ${lead.country}` },
+  { key: "status", header: "Statut", render: (lead) => <StatusBadge status={lead.status} labels={starterStatusLabels} tones={{ [lead.status]: lead.statusTone }} /> },
+  { key: "date", header: "Assigné le", render: (lead) => lead.assignedAt }
+];
+
+/** The leads a broker can act on now, newest first: the work itself, not only a count. */
+async function WaitingLeads() {
+  const result = await listStarterLeads();
+  if (result.unauthenticated || result.status === "error") return null;
+  const waiting = result.data.items
+    .map(leadSummary)
+    .filter((lead) => WAITING_STATUSES.has(lead.status))
+    .sort((a, b) => b.assignedAt.localeCompare(a.assignedAt))
+    .slice(0, 6);
+  return (
+    <Card
+      title="Leads à traiter"
+      description="Les plus récents en premier."
+      actions={<Button href="/leads" variant="secondary" size="sm">Tous les leads</Button>}
+    >
+      <DataTable
+        columns={waitingColumns}
+        items={waiting}
+        getKey={(lead) => lead.id}
+        emptyLabel="Aucun lead en attente"
+        emptyDescription="Les nouveaux leads assignés apparaîtront ici."
+        aria-label="Leads en attente d'action"
+      />
+    </Card>
   );
 }

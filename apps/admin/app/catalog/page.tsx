@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import { readAdminCountries, readAdminProducts, readRegulatoryRegimes } from "../lib/admin-api";
 import { isAdminProfile, loginRedirect, readBackOfficeSession } from "../lib/backoffice-auth";
-import { Badge, Button, Card, DataTable, Grid, KpiCard, Notice, PageHeader, PageStack, StateMessage } from "../lib/ui/admin-ui";
+import { Button, DataTable, Notice, PageHeader, PageStack, StateMessage, StatStrip } from "../lib/ui/admin-ui";
 
 interface CatalogSection {
   key: string;
@@ -32,45 +32,46 @@ export default async function CatalogFoundationPage() {
     <PageStack>
       <PageHeader
         breadcrumb={[{ label: "Configuration" }, { label: "Catalogue" }]}
-        kicker="Configuration"
         title="Catalogue socle"
-        description="Pilotage interne des pays, regimes et produits avec exposition publique desactivee par defaut et controlee par les flags existants."
+        description="Pays, regimes et produits, avec exposition publique desactivee par defaut et controlee par les flags existants."
       />
 
       <Notice tone="warning" title="Ouverture au public">
-        Un pays ou un produit est créé fermé. Son ouverture au public est refusée tant que la checklist d&apos;activation a un contrôle
-        bloquant, et seule la conformité (compliance_admin, super_admin) peut la demander. Une désactivation est toujours immédiate.
+        <p>
+          Un pays ou un produit est créé fermé. Son ouverture au public est refusée tant que la checklist d&apos;activation a un contrôle
+          bloquant, et seule la conformité (compliance_admin, super_admin) peut la demander. Une désactivation est toujours immédiate.
+        </p>
+        <p>
+          Chaque modification est auditée avec son motif. Les flags sensibles et IA ne sont pas modifiables depuis le catalogue : ils relèvent
+          d&apos;une procédure de conformité.
+        </p>
       </Notice>
 
       {countries.forbidden && products.forbidden ? (
         <StateMessage tone="danger">Accès au catalogue refusé pour ce rôle admin.</StateMessage>
       ) : (
-        <Grid columns="kpi" as="section" aria-label="Synthese catalogue">
-          <KpiCard label="Pays" value={countries.data.length} tone="neutral" />
-          <KpiCard label="Pays publics" value={publicCountries} tone={publicCountries > 0 ? "warning" : "neutral"} />
-          <KpiCard label="Produits" value={products.data.length} tone="neutral" />
-          <KpiCard label="Regimes" value={regimes.data.length} tone="neutral" />
-        </Grid>
+        <StatStrip
+          label="Synthese catalogue"
+          items={[
+            { label: "Pays", value: countries.data.length, href: "/catalog/countries" },
+            { label: "Pays publics", value: publicCountries, tone: publicCountries > 0 ? "warning" : "neutral", helper: "Exposes aux visiteurs" },
+            { label: "Produits", value: products.data.length, href: "/catalog/products" },
+            { label: "Regimes", value: regimes.data.length, href: "/catalog/regimes" }
+          ]}
+        />
       )}
 
-      <Card>
-        <DataTable
-          columns={[
-            { key: "section", header: "Section", render: (section) => <a href={section.href}><strong>{section.title}</strong></a> },
-            { key: "description", header: "Contenu", render: (section) => section.description },
-            { key: "status", header: "Statut", render: () => <Badge tone="disabled">Exposition publique controlee</Badge> },
-            { key: "open", header: "", render: (section) => <Button href={section.href} size="sm" variant="secondary">Ouvrir</Button> }
-          ]}
-          items={catalogSections}
-          getKey={(section) => section.key}
-          emptyLabel="Aucune section catalogue disponible."
-          aria-label="Sections du catalogue socle"
-        />
-      </Card>
-      <StateMessage>
-        Chaque modification est auditée avec son motif. Les flags sensibles et IA ne sont pas modifiables depuis le catalogue : ils relèvent
-        d&apos;une procédure de conformité. La checklist technique d&apos;activation reste la référence avant toute ouverture.
-      </StateMessage>
+      <DataTable
+        columns={[
+          { key: "section", header: "Section", render: (section) => <a href={section.href}><strong>{section.title}</strong></a> },
+          { key: "description", header: "Contenu", render: (section) => section.description },
+          { key: "open", header: "", align: "right", render: (section) => <Button href={section.href} size="sm" variant="secondary">Ouvrir</Button> }
+        ]}
+        items={catalogSections}
+        getKey={(section) => section.key}
+        emptyLabel="Aucune section catalogue disponible."
+        aria-label="Sections du catalogue socle"
+      />
     </PageStack>
   );
 }

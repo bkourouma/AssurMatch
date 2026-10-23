@@ -12,6 +12,7 @@ import {
   Button,
   Card,
   CheckboxGroup,
+  ConfirmDialog,
   DataTable,
   Field,
   FilterBar,
@@ -19,13 +20,13 @@ import {
   FormActions,
   Grid,
   Input,
-  KpiCard,
   PageHeader,
   PageStack,
   RadioGroup,
   Select,
   Stack,
   StateMessage,
+  StatStrip,
   fieldControlProps,
   type DataTableColumn,
   type NoticeTone,
@@ -261,15 +262,21 @@ export default async function DataRetentionPage({ searchParams }: { searchParams
         if (isApprovable(batch, now)) {
           const reasonId = `retention-approve-${batch.id}`;
           return (
-            <Form action={approveBatch}>
+            <ConfirmDialog
+              triggerLabel="Approuver et anonymiser"
+              triggerVariant="danger"
+              title="Approuver et anonymiser ce lot"
+              description={`${batch.totalSelected} element(s) selectionne(s) seront anonymises definitivement. Cette action ne peut pas etre annulee.`}
+              confirmLabel="Approuver et anonymiser"
+              cancelLabel="Annuler"
+              tone="danger"
+              formAction={approveBatch}
+            >
               <input type="hidden" name="batchId" value={batch.id} />
               <Field id={reasonId} label="Motif" required>
                 <Input {...fieldControlProps(reasonId, { required: true })} name="reason" minLength={8} maxLength={500} placeholder="Motif de l'approbation" />
               </Field>
-              <FormActions align="start">
-                <Button type="submit" variant="danger" size="sm">Approuver et anonymiser</Button>
-              </FormActions>
-            </Form>
+            </ConfirmDialog>
           );
         }
         return batch.status === "previewed" ? "Expire: nouvelle previsualisation necessaire" : "-";
@@ -281,9 +288,8 @@ export default async function DataRetentionPage({ searchParams }: { searchParams
     <PageStack>
       <PageHeader
         breadcrumb={[{ label: "Pilotage" }, { label: "Conformite", href: "/compliance" }, { label: "Conservation des donnees" }]}
-        kicker="Conformite"
         title="Conservation et anonymisation"
-        description="Durees de conservation par categorie, previsualisation des lots d'anonymisation et effacement sur demande. Chaque lot est d'abord previsualise, puis approuve manuellement avec un motif: aucune purge automatique."
+        description="Durees de conservation, lots d'anonymisation et effacement sur demande. Chaque lot est previsualise puis approuve manuellement avec un motif : aucune purge automatique."
         actions={
           <>
             <Button href="/compliance/data-requests" variant="secondary">Demandes de données des visiteurs</Button>
@@ -312,11 +318,14 @@ export default async function DataRetentionPage({ searchParams }: { searchParams
 
       {loaded ? (
         <>
-          <Grid columns="kpi" as="section" aria-label="Synthese retention">
-            <KpiCard label="Purge" value={purgeEnabled ? "Active" : "Desactivee"} tone={purgeEnabled ? "warning" : "disabled"} helper="retention_purge_enabled" />
-            <KpiCard label="Lots a approuver" value={openBatches} tone={openBatches > 0 ? "info" : "neutral"} helper="Previsualises, non expires" />
-            <KpiCard label="Lots recents" value={batchItems.length} helper="50 derniers lots" />
-          </Grid>
+          <StatStrip
+            label="Synthese retention"
+            items={[
+              { label: "Purge", value: purgeEnabled ? "Active" : "Desactivee", tone: purgeEnabled ? "warning" : "disabled", helper: "retention_purge_enabled" },
+              { label: "Lots a approuver", value: openBatches, tone: openBatches > 0 ? "info" : "neutral", helper: "Previsualises, non expires" },
+              { label: "Lots recents", value: batchItems.length, helper: "50 derniers lots" }
+            ]}
+          />
 
           <Card title="Durees de conservation" description="Priorite: surcharge pays, puis surcharge globale, puis defaut. Bornes: 30 a 3650 jours.">
             <Stack>
@@ -427,6 +436,7 @@ export default async function DataRetentionPage({ searchParams }: { searchParams
               items={batchItems}
               getKey={(batch) => batch.id}
               emptyLabel="Aucun lot previsualise."
+              emptyDescription="Previsualisez un lot de retention ou un effacement ci-dessus : il apparaitra ici pour approbation."
               aria-label="Lots d'anonymisation"
             />
           </Card>

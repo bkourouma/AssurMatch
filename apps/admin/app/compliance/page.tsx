@@ -1,42 +1,66 @@
-import { Badge, Button, Card, Grid, PageHeader, PageStack, StateMessage } from "../lib/ui/admin-ui";
+import { Badge, Button, Card, Cluster, DescriptionList, PageHeader, PageStack, Stack, StateMessage } from "../lib/ui/admin-ui";
 
 export default function ComplianceEvidencePage() {
   return (
     <PageStack>
       <PageHeader
         breadcrumb={[{ label: "Pilotage" }, { label: "Conformite" }]}
-        kicker="Conformite"
         title="Preuves de conformite"
-        description="Vue structuree des exigences de preuve: consentements, audits, licences et documents."
+        description="Les registres de preuve : consentements, audits, alertes et conservation des donnees."
       />
-      <Grid columns="two">
-        <Card
-          title="Consentements et audits"
-          description="Les preuves critiques sont conservees selon la retention applicable et masquees dans les logs."
-        >
-          <Badge tone="success">Historique opposable</Badge>
-          <Button href="/compliance/consent-records" variant="secondary">Rechercher une preuve de consentement</Button>
-        </Card>
-        <Card
-          title="Alertes"
-          description="Les alertes conformite visibles restent issues des traces existantes."
-        >
-          <Button href="/dashboard/compliance-alerts" variant="secondary">Voir les alertes</Button>
-        </Card>
-        <Card
-          title="Conservation et anonymisation"
-          description="Durees de conservation par categorie, lots d'anonymisation previsualises puis approuves, effacement sur demande."
-        >
-          <Button href="/compliance/retention" variant="secondary">Gerer la retention</Button>
-        </Card>
-        <Card
-          title="Demandes de données des visiteurs"
-          description="Demandes d'accès, de rectification ou d'effacement déposées par les visiteurs, avec échéance indicative et historique."
-        >
-          <Button href="/compliance/data-requests" variant="secondary">Ouvrir la file des demandes</Button>
-        </Card>
-      </Grid>
-      <StateMessage>Aucune preuve n'est creee ou modifiee par cette page de polish UX.</StateMessage>
+      <StateMessage>Cette page ne cree ni ne modifie aucune preuve : elle mene aux registres existants.</StateMessage>
+      <Card title="Registres">
+        <DescriptionList
+          items={[
+            {
+              term: "Consentements et audits",
+              value: (
+                <Stack>
+                  <p>Les preuves critiques sont conservees selon la retention applicable et masquees dans les logs.</p>
+                  <Cluster>
+                    <Badge tone="success">Historique opposable</Badge>
+                    <Button href="/compliance/consent-records" variant="secondary" size="sm">Rechercher une preuve de consentement</Button>
+                    <Button href="/compliance/audit-logs" variant="secondary" size="sm">Ouvrir les journaux d&apos;audit</Button>
+                  </Cluster>
+                </Stack>
+              )
+            },
+            {
+              term: "Alertes",
+              value: (
+                <Stack>
+                  <p>Les alertes conformite visibles restent issues des traces existantes.</p>
+                  <Cluster>
+                    <Button href="/dashboard/compliance-alerts" variant="secondary" size="sm">Voir les alertes</Button>
+                  </Cluster>
+                </Stack>
+              )
+            },
+            {
+              term: "Conservation et anonymisation",
+              value: (
+                <Stack>
+                  <p>Durees de conservation par categorie, lots d&apos;anonymisation previsualises puis approuves, effacement sur demande.</p>
+                  <Cluster>
+                    <Button href="/compliance/retention" variant="secondary" size="sm">Gerer la retention</Button>
+                  </Cluster>
+                </Stack>
+              )
+            },
+            {
+              term: "Demandes de données des visiteurs",
+              value: (
+                <Stack>
+                  <p>Demandes d&apos;accès, de rectification ou d&apos;effacement déposées par les visiteurs, avec échéance indicative et historique.</p>
+                  <Cluster>
+                    <Button href="/compliance/data-requests" variant="secondary" size="sm">Ouvrir la file des demandes</Button>
+                  </Cluster>
+                </Stack>
+              )
+            }
+          ]}
+        />
+      </Card>
     </PageStack>
   );
 }
