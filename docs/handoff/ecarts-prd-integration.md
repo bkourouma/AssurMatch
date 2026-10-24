@@ -1,6 +1,34 @@
 # Handoff : intégration des lots « écarts PRD » (specs 067 à 076)
 
-Mise à jour : 2026-10-22. Base décrite : lots 1 à 5, 7, 9 et 10 intégrés (specs 067, 068, 069, 070, 071, 072, 074, 076). Les lots 6 (spec 073, pilotage admin) et 8 (spec 075, sécurité) arrivent plus tard : ils ne sont pas décrits ici et ce document sera complété à leur intégration.
+## DÉCISIONS EN ATTENTE (utilisateur)
+
+Rien de ce qui suit n'a été fait ni ne doit l'être sans l'utilisateur.
+
+- (a) **Restriction du rôle API sur `AuditLog`** : application en production du script `scripts/ops/sql/revoke-auditlog-modify-from-app-role.sql`. Préparé et testé sur base jetable, jamais appliqué hors base jetable.
+- (b) **Avis juridique L-08** (messagerie courtier-visiteur) et **pages légales** à compléter.
+- (c) **PR #36 (mentions légales, brouillon)** : l'adresse de l'hébergeur doit être confirmée sur la facture Hostinger. Ne pas fusionner avant.
+- (d) **PR #38 (refonte des back-offices)** : prête et fusionnable (35 conflits résolus, CI verte). Fusion à faire par l'utilisateur.
+- (e) **PR #40 (bullmq 5 vers 6, Dependabot)** : à fermer ou fusionner après CI ; la dépendance n'est utilisée que par un test.
+- (f) **Déploiement et données** : migration et déploiement en préproduction puis production, backfill PII sur données réelles, pose des clés PII sur les serveurs. Jamais faits, à l'utilisateur.
+
+## Décisions prises par le chef (déléguées)
+
+- **Clés PII OBLIGATOIRES en production** (défaut sûr). Aucune clé n'a été posée sur un serveur.
+- **Contrôle de routage 9 désactivé par défaut** : `ASSURMATCH_ROUTING_REQUIRE_RECORDED_CONTRACT=true` seulement quand la requête SQL de détection (section 4) renvoie 0.
+- **Limites de débit en mémoire acceptées pour UNE instance d'API** : recherche prospect par contact 30/min/acteur, test d'envoi webhook 1 par 30 s. Redis si plusieurs instances.
+- **Hypothèses de travail retenues, MARQUÉES « à valider »** (par le propriétaire) :
+  - H5 (à valider) : compteur de visites agrégé par jour et par page, sans cookie ni donnée personnelle (spec 073).
+  - H6 (à valider) : clés PII gérées par variables d'environnement, pas de KMS (spec 075).
+  - H8 (à valider) : noms des variables SMS/WhatsApp et liste des fournisseurs (spec 076).
+
+## État après la PR #44
+
+- PR #44 fusionnée le 2026-10-23 (commit `50c0c84`).
+- CI de `main` verte sur `995559a` et `74b47dc`.
+- Worktrees des lots supprimés.
+- Client Prisma régénéré sur le poste de dev.
+
+Mise à jour : 2026-10-24. Base décrite : lots 1 à 5, 7, 9 et 10 intégrés (specs 067, 068, 069, 070, 071, 072, 074, 076). Les lots 6 (spec 073, pilotage admin) et 8 (spec 075, sécurité) arrivent plus tard : ils ne sont pas décrits ici et ce document sera complété à leur intégration.
 
 Principe commun : tout ce qui touche à l'IA, aux canaux sortants (SMS, WhatsApp, CRM) et au routage multi-courtiers est fermé par défaut. Rien de ce qui suit n'est actif sans action explicite d'exploitation.
 
