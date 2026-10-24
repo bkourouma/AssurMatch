@@ -2,7 +2,7 @@
 
 **Statut des hypothèses** : hypothèse de travail, à valider par le propriétaire. H6 : clés PII par variables d'environnement, pas de KMS.
 
-**Statut** : en cours (branche `orch/2026-10-21-ecarts-prd-lot-8`). **Constitution** : III (donnees et securite), V (IA), VII (audit).
+**Statut** : intégré dans main (PR #44, commit 50c0c84). **Constitution** : III (donnees et securite), V (IA), VII (audit).
 
 **Surfaces impactees** : Backend API, database / Prisma / migration 0037, shared packages (aucun contrat public modifie), apps Web Publique / Back-office Plateforme / Broker Back-office (`global-error`, sitemap public uniquement). Les parcours visiteur et les back-offices restent separes applicativement.
 
