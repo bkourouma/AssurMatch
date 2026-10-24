@@ -32,3 +32,4 @@ If Redis is unavailable the limiter does not fail the request (never a 500): it 
 in-memory counter (bounded to 10 000 entries, expired entries purged) and logs
 `partner_api.rate_limit_degraded` at `warn` (at most once every 30 s, no key or IP in the log).
 In this mode limits apply per API instance, not cluster-wide. Fix Redis (see `health.md`) and the warning stops.
+Redis si plusieurs instances: per-process limits are accepted for ONE API instance only; with several instances Redis is required for cluster-wide limits.

@@ -1,8 +1,8 @@
 # Spécification fonctionnelle : Lot 5 — routage et facturation (écarts PRD §17, §24, §6.4)
 
-**Branche** : `orch/2026-10-21-ecarts-prd-lot-5` (base `integration/recos-1-4`)
+**Branche** : `orch/2026-10-21-ecarts-prd-lot-5`, intégrée dans main (PR #44, commit 50c0c84)
 **Créée le** : 2026-10-21
-**Statut** : Validée — lot confié par le superviseur (audit PRD des écarts routage / facturation). Aucun marqueur `[NEEDS CLARIFICATION]` : les points métier non tranchés sont fixés par les hypothèses H3 et H4 du superviseur ou marqués **DÉCISION À CONFIRMER**.
+**Statut** : intégré dans main (PR #44, commit 50c0c84) — lot confié par le superviseur (audit PRD des écarts routage / facturation). Aucun marqueur `[NEEDS CLARIFICATION]` : les points métier non tranchés sont fixés par les hypothèses H3 et H4 du superviseur ou marqués **DÉCISION À CONFIRMER**.
 **Workflow continu** : oui.
 
 ## Pourquoi cette spec

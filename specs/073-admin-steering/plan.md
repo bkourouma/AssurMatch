@@ -38,6 +38,7 @@ Fichiers partagés (`runtime-http-wiring.module.ts`, `assurmatch-runtime.ts`, `s
 ## Décisions techniques
 - Console Prospects dans le module `admin-operations` (même garde, même audit que la spec 056), pas dans `prospects` (domaine inchangé).
 - Recherche par e-mail / téléphone (réconciliation avec le lot 8, spec 075) : `POST /admin/operations/prospects/contact-search`, valeur dans le corps uniquement ; l'API calcule l'index aveugle HMAC (`PiiVault.blindIndex`) et retombe sur l'empreinte héritée (`legacyPiiFingerprint`) pour les lignes non migrées ; aucun hash dans une URL ; audit `contactSearch: true` seulement ; jamais de LIKE sur les valeurs normalisées.
+- Limite de débit de cette recherche : 30 par minute et par acteur, comptée en mémoire (acceptée pour UNE instance d'API). Redis si plusieurs instances.
 - `VisitCounter` : upsert atomique `(day, page)` avec incrément ; dépôt mémoire pour les tests.
 - Dashboard : champs additifs optionnels ; le front tolère leur absence (ancien API).
 - IA : lecture seule des insights ; aucun appel fournisseur ; aucun changement de flag.

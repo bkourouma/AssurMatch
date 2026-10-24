@@ -1,6 +1,6 @@
 # Feature Specification: Écarts PRD du parcours de demande de devis visiteur (spec 067, lot 1)
 
-**Statut** : code commité sur la branche `orch/2026-10-21-ecarts-prd-lot-1`, base `main` (recos-1-4 fusionnée via la PR #42).
+**Statut** : intégré dans main (PR #44, commit 50c0c84) ; recos-1-4 fusionnée via la PR #42.
 **Surfaces impactées** :
 - Web Publique Client (formulaire de devis, page de devis, comparateur, messages FR/EN) ;
 - Backend API (demandes de devis, routage « offres/courtier choisis », notifications visiteur, worker) ;
