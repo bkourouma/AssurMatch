@@ -80,7 +80,7 @@
   "overrides": {
     "@hono/node-server": "1.19.17",
     "deepmerge-ts": "8.0.2",
-    "multer": "2.4.0",
+    "multer": "2.5.0",
     "mysql2": "3.24.4",
     "postcss": "8.5.28"
   },
