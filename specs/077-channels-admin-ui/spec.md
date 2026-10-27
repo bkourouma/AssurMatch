@@ -1,6 +1,6 @@
 # Feature Specification: Channels and CRM connector admin screens + dead-letter alert
 
-**Feature Branch**: `orch/2026-10-21-ecarts-prd-lot-12` (lot 12 of the PRD gap closure)
+**Feature Branch**: `orch/2026-10-21-ecarts-prd-lot-12`, intégrée dans main (PR #44, commit 50c0c84) (lot 12 of the PRD gap closure)
 **Status**: Implemented, flags unchanged (closed by default)
 **Impacted surfaces**: Backend API (admin alert type + dead-letter hook wiring), Back-office Plateforme/Admin (two screens, one menu entry each), shared packages (admin alert contract only). No public web change, no Broker Back-office change, no database migration (`AdminAlert.type` is a free string column), no runtime/Docker change.
 

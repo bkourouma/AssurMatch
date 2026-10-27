@@ -2,6 +2,7 @@
 
 **Feature Branch**: `076-channels-integrations` (lot 10 of the PRD gap closure)
 **Status**: Implemented, flags closed by default
+**Hypothèse H8** : hypothèse de travail, à valider par le propriétaire.
 **Impacted surfaces**: Backend API, notification worker, shared packages (contracts), database / Prisma (migration `0040_channels_integrations`), runtime / env examples. No public web change, no broker back-office change. Platform back-office: REST routes only (no UI in this lot). Public visitor journeys and authenticated journeys stay separated.
 
 ## Context
@@ -10,7 +11,7 @@ Specs 029/038/061 built the SMS and WhatsApp abstraction (flags, status, consent
 
 ## Requirements
 
-- **FR-001 Real SMS adapter**: generic HTTP provider (`http`: JSON + Bearer, `twilio`: form + Basic), built only when the environment is complete (hypothesis H8).
+- **FR-001 Real SMS adapter**: generic HTTP provider (`http`: JSON + Bearer, `twilio`: form + Basic), built only when the environment is complete (hypothesis H8, à valider).
 - **FR-002 Real WhatsApp adapter**: WhatsApp Cloud API (`whatsapp_cloud`), approved template with the operational pointer as the single body parameter.
 - **FR-003 Closed by default**: a channel sends only if (a) `sms_enabled` / `whatsapp_enabled` is open, (b) the provider is fully configured, (c) the recipient scope opted in. The flags are sensitive: no HTTP route can open them, only `npm run ops:apply-flag-policy` (audited). An unrecognised provider name keeps the local logging provider (no network).
 - **FR-004 Consent per channel**: checked when the message is first dispatched AND again at every retry; consent withdrawn or flag closed in between cancels the pending message.
@@ -21,7 +22,7 @@ Specs 029/038/061 built the SMS and WhatsApp abstraction (flags, status, consent
 - **FR-009 Administration**: `GET /admin/messaging/outbox` (audit readers), `GET|POST /admin/crm-connectors`, `PATCH /admin/crm-connectors/:id`, `GET /admin/crm-connectors/deliveries` (MFA + `partners:update`). Secrets are shown once at creation or rotation.
 - **FR-010 No real send in tests**: providers and CRM calls are simulated through an injected `fetch`.
 
-## Environment (H8, to validate)
+## Environment (H8, à valider)
 
 SMS: `ASSURMATCH_SMS_PROVIDER` (`http`|`twilio`), `ASSURMATCH_SMS_API_KEY`, `ASSURMATCH_SMS_API_URL`, `ASSURMATCH_SMS_SENDER`, `ASSURMATCH_SMS_ACCOUNT_ID` (twilio). WhatsApp: `ASSURMATCH_WHATSAPP_PROVIDER=whatsapp_cloud`, `ASSURMATCH_WHATSAPP_API_KEY`, `ASSURMATCH_WHATSAPP_PHONE_NUMBER_ID`, `ASSURMATCH_WHATSAPP_API_BASE_URL`, `ASSURMATCH_WHATSAPP_TEMPLATE_NAME`, `ASSURMATCH_WHATSAPP_TEMPLATE_LANGUAGE`. Common: `ASSURMATCH_CHANNEL_HTTP_TIMEOUT_MS`. Worker: `ASSURMATCH_CRM_CONNECTOR_DELIVERY_ENABLED`, `ASSURMATCH_CRM_CONNECTOR_DELIVERY_LIMIT`, `ASSURMATCH_CHANNEL_OUTBOX_LIMIT`. Examples only in `.env.production.*.example`; no secret in the repository.
 

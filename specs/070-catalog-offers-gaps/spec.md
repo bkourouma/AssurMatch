@@ -1,6 +1,6 @@
 # Feature Specification: Écarts PRD catalogue et offres (spec 070, lot 4)
 
-**Statut** : implémentée sur la branche `orch/2026-10-21-ecarts-prd-lot-4` (base `integration/recos-1-4`).
+**Statut** : implémentée, intégrée dans main (PR #44, commit 50c0c84).
 **Surfaces impactées** : Backend API (produits, catégories, assureurs, offres, checklist d'activation, IA), Back-office Plateforme/Admin (catalogue, offres, checklist), Back-office Courtier (types d'offres, résumé IA en lecture seule), packages partagés (contrats), base de données (Prisma, migration `0034_catalog_offers_gaps`), scripts de seed de référence. Aucun changement du site public : les offres privées n'y apparaissent jamais. Les parcours visiteur public et administrateur/courtier restent séparés.
 **Références** : constitution v1.4.0 (offres indicatives, aucune publication sans validation conformité, IA fermée par défaut avec validation humaine), PRD §8, §12 (PROD-001 à 010), §13 (types d'offres, OFFER-002, OFFER-010), §35, §36 ; specs 032 (critères de comparaison), 050 (catalogue, activation), 052 (offres versionnées, validation conformité).
 

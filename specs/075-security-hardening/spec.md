@@ -1,6 +1,8 @@
 # Spec 075 - Durcissement securite (lot 8)
 
-**Statut** : en cours (branche `orch/2026-10-21-ecarts-prd-lot-8`). **Constitution** : III (donnees et securite), V (IA), VII (audit).
+**Statut des hypothèses** : hypothèse de travail, à valider par le propriétaire. H6 : clés PII par variables d'environnement, pas de KMS.
+
+**Statut** : intégré dans main (PR #44, commit 50c0c84). **Constitution** : III (donnees et securite), V (IA), VII (audit).
 
 **Surfaces impactees** : Backend API, database / Prisma / migration 0037, shared packages (aucun contrat public modifie), apps Web Publique / Back-office Plateforme / Broker Back-office (`global-error`, sitemap public uniquement). Les parcours visiteur et les back-offices restent separes applicativement.
 
@@ -41,7 +43,7 @@
 - FR-G1. Le sitemap public liste toutes les pages indexables des deux locales avec `alternates`, exclut le parcours devis/suivi/avis (coherent avec `robots.ts`) ; test automatise de coherence sitemap/robots. Admin et broker restent `noindex` (pas de sitemap).
 
 ## Hypotheses et decisions metier (a valider)
-- H6 (brief) : cles gerees par variables d'environnement / secret manager, pas de KMS dans ce lot.
+- H6 (brief, à valider) : cles gerees par variables d'environnement / secret manager, pas de KMS dans ce lot.
 - H-D : le flag produit des assistants courtier est `product_ai_scoring_enabled` (seul flag produit IA cote courtier existant).
 - H-A : seuls Prospect + `QuoteRequest.payload` sont chiffres ; `ContactMessage`, `WaitlistEntry`, `PartnerApplication` (e-mails) sont hors lot (a traiter dans une suite).
 - H-B : l'outbox d'audit est en memoire (borne) ; un echec durable declenche une alerte + metrique, il n'existe pas de WAL disque.

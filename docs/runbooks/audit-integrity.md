@@ -76,3 +76,47 @@ Que faire :
 - `assurmatch.audit_maintenance` est un reglage de session (`SET LOCAL`) que n'importe quelle connexion SQL peut positionner, y compris celle du role applicatif. Le trigger protege donc des erreurs et des UPDATE/DELETE accidentels (bug applicatif, requete manuelle), PAS d'une compromission SQL du role applicatif.
 - Recommandation : utiliser pour l'API et le worker un role d'execution distinct du role de migration, avec `REVOKE UPDATE, DELETE, TRUNCATE ON "AuditLog"` (il ne garde que SELECT et INSERT). La purge de retention est alors executee avec un role d'exploitation separe.
 - Le HMAC (`integrityHash`) detecte la modification d'une ligne, mais pas sa suppression : il n'y a pas de chainage entre les lignes. Une ligne supprimee ne se detecte que par comparaison avec une sauvegarde ou les logs applicatifs.
+
+## 7. Restriction du role SQL applicatif sur "AuditLog" (UPDATE, DELETE, TRUNCATE)
+
+Statut : scripts prets et testes sur base jetable ; **application en production sur validation de l'utilisateur** (aucune execution automatique, aucune migration Prisma : le nom du role SQL de l'API varie selon l'environnement).
+
+Scripts : `scripts/ops/sql/revoke-auditlog-modify-from-app-role.sql` (restriction) et `scripts/ops/sql/restore-auditlog-modify-to-app-role.sql` (annulation).
+
+Prerequis : le role applicatif (API et worker, ex. `assurmatch_api`) est distinct du role proprietaire/migrateur qui execute `prisma migrate deploy`. Sinon le script refuse (voir ci-dessous) : creer d'abord le role applicatif et faire pointer `DATABASE_URL` de l'API/worker dessus.
+
+Ordre :
+
+1. `prisma migrate deploy` (migrations 0001 a 0040) avec le role migrateur.
+2. Executer le script de restriction avec un role d'administration (proprietaire ou superutilisateur), JAMAIS avec le role applicatif, **avant l'ouverture au trafic** :
+   ```
+   psql "$ADMIN_DATABASE_URL" -v ON_ERROR_STOP=1 -v app_role=assurmatch_api         -f scripts/ops/sql/revoke-auditlog-modify-from-app-role.sql
+   ```
+3. Demarrer ou redemarrer API et worker.
+4. Rejouer le script apres chaque nouvel environnement ; il est idempotent. Les `GRANT` par defaut de `prisma migrate deploy` ne reaccordent pas de droits au role applicatif, mais tout `GRANT ... ON ALL TABLES` ulterieur ou `ALTER DEFAULT PRIVILEGES` doit etre suivi d'un nouveau passage.
+
+Refus (le script s'arrete avec `RAISE EXCEPTION` et la transaction est annulee) : variable `app_role` absente, table `"AuditLog"` absente, role inexistant, role proprietaire de la table, role superutilisateur, role heritant du proprietaire, role courant identique au role vise, droit de modification encore present apres le `REVOKE` (herite d'un autre role ou de PUBLIC), ou perte d'INSERT/SELECT.
+
+Verification :
+
+```sql
+SELECT has_table_privilege('assurmatch_api', '"AuditLog"', 'UPDATE')   AS update_ok,   -- attendu f
+       has_table_privilege('assurmatch_api', '"AuditLog"', 'DELETE')   AS delete_ok,   -- attendu f
+       has_table_privilege('assurmatch_api', '"AuditLog"', 'TRUNCATE') AS truncate_ok, -- attendu f
+       has_table_privilege('assurmatch_api', '"AuditLog"', 'INSERT')   AS insert_ok,   -- attendu t
+       has_table_privilege('assurmatch_api', '"AuditLog"', 'SELECT')   AS select_ok;   -- attendu t
+```
+
+Puis `npm run ops:verify-audit` : les nouvelles lignes doivent etre signees (`integrityHash` et `integrityKeyId` ecrits a l'INSERT, aucun UPDATE n'est necessaire).
+
+Consequence pour la retention : le role applicatif ne peut plus purger. La purge manuelle de la section 1 s'execute avec un role d'exploitation distinct (celui qui a execute le script).
+
+Annulation (retour arriere decide et trace) :
+
+```
+psql "$ADMIN_DATABASE_URL" -v ON_ERROR_STOP=1 -v app_role=assurmatch_api      -f scripts/ops/sql/restore-auditlog-modify-to-app-role.sql
+```
+
+Les triggers append-only de la migration 0037 restent actifs apres l'annulation.
+
+Procedure de test (base jetable, jamais une base partagee) : creer un conteneur PostgreSQL jetable avec une base dont le nom contient `smoke`, appliquer `prisma migrate deploy`, creer un role `app_user LOGIN` avec `GRANT SELECT, INSERT, UPDATE, DELETE, TRUNCATE` sur les tables du schema `public`, puis verifier : avant (INSERT ok ; UPDATE refuse par le trigger `append-only`), apres restriction (UPDATE, DELETE et TRUNCATE refuses avec `permission denied for table AuditLog`, INSERT et SELECT ok avec `integrityHash` conserve), annulation (droits rendus), et un second passage de chaque script (idempotent). Resultats du 2026-10-24 : tous conformes.
