@@ -6,6 +6,7 @@
     "./tokens.css": "./styles/tokens.css",
     "./backoffice.css": "./styles/backoffice.css",
     "./backoffice": "./backoffice/index.ts",
-    "./fonts": "./fonts.ts"
+    "./fonts": "./fonts.ts",
+    "./backoffice-fonts": "./backoffice-fonts.ts"
   }
 }

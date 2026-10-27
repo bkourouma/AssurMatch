@@ -17,17 +17,18 @@ import {
   Button,
   Card,
   Cluster,
+  ConfirmDialog,
   DataTable,
   Field,
   Form,
   FormActions,
   Grid,
   Input,
-  KpiCard,
   PageHeader,
   PageStack,
   Select,
   StateMessage,
+  StatStrip,
   Tabs,
   fieldControlProps,
   paginateItems,
@@ -96,7 +97,7 @@ function xof(amount: number): string {
 
 function invoiceColumns(): Array<DataTableColumn<IssuedInvoiceData>> {
   return [
-    { key: "number", header: "Numero", render: (invoice) => <code>{invoice.number}</code> },
+    { key: "number", header: "Numero", render: (invoice) => <span className="bo-ref">{invoice.number}</span> },
     { key: "partner", header: "Partenaire", render: (invoice) => <strong>{invoice.customer.legalName}</strong> },
     { key: "period", header: "Periode", render: (invoice) => invoice.periodFrom.slice(0, 7) },
     { key: "total", header: "Total TTC", render: (invoice) => xof(invoice.totalAmount), numeric: true, align: "right" },
@@ -128,7 +129,7 @@ function invoiceColumns(): Array<DataTableColumn<IssuedInvoiceData>> {
 
 const draftColumns: Array<DataTableColumn<DraftInvoiceData>> = [
   { key: "partner", header: "Partenaire", render: (draft) => <strong>{draft.partnerName}</strong>, sortable: true, sortValue: (draft) => draft.partnerName },
-  { key: "reference", header: "Reference", render: (draft) => <code>{draft.reference}</code>, sortable: true, sortValue: (draft) => draft.reference },
+  { key: "reference", header: "Reference", render: (draft) => <span className="bo-ref">{draft.reference}</span>, sortable: true, sortValue: (draft) => draft.reference },
   { key: "billable", header: "Leads factures", render: (draft) => draft.billableLeadCount, numeric: true, align: "right", sortable: true, sortValue: (draft) => draft.billableLeadCount },
   { key: "nonBillable", header: "Non facturables", render: (draft) => draft.nonBillableLeadCount, numeric: true, align: "right", sortable: true, sortValue: (draft) => draft.nonBillableLeadCount },
   { key: "packCredits", header: "Credits pack", render: (draft) => draft.packCreditsUsed, numeric: true, align: "right" },
@@ -202,7 +203,6 @@ export default async function BillingFoundationPage({
     <PageStack>
       <PageHeader
         breadcrumb={[{ label: "Partenaires" }, { label: "Facturation" }]}
-        kicker="Facturation B2B manuelle"
         title="Facturation des courtiers"
         description="Brouillons mensuels, factures numerotees, paiements recus hors plateforme (virement, mobile money) et avoirs. Aucun paiement en ligne et aucune prime d'assurance ne sont encaisses par AssurMatch."
       />
@@ -214,11 +214,14 @@ export default async function BillingFoundationPage({
 
       {billing.status === "success" ? (
         <>
-          <Grid columns="kpi" as="section" aria-label="Synthese billing foundation">
-            <KpiCard label="Partenaires suivis" value={billing.data.totals.partners} />
-            <KpiCard label="Leads acceptes (brouillon)" value={billing.data.totals.acceptedLeadCount} tone="info" />
-            <KpiCard label="Leads contestes" value={billing.data.totals.disputedLeadCount} tone="warning" />
-          </Grid>
+          <StatStrip
+            label="Synthese billing foundation"
+            items={[
+              { label: "Partenaires suivis", value: billing.data.totals.partners },
+              { label: "Leads acceptes (brouillon)", value: billing.data.totals.acceptedLeadCount, tone: "info" },
+              { label: "Leads contestes", value: billing.data.totals.disputedLeadCount, tone: billing.data.totals.disputedLeadCount > 0 ? "warning" : "neutral" }
+            ]}
+          />
 
           <Tabs
             label="Sections facturation"
@@ -227,37 +230,31 @@ export default async function BillingFoundationPage({
 
           {tab === "suivi" ? (
             <>
-              <Grid columns="two">
-                <Card title="Etat module">
-                  <Cluster>
-                    <Badge tone={billing.data.billingEnabled ? "warning" : "disabled"}>billing_enabled: {billing.data.billingEnabled ? "actif" : "desactive"}</Badge>
-                    <Badge tone="disabled">payments_enabled: desactive</Badge>
-                    <Badge tone="disabled">collection: desactivee</Badge>
-                  </Cluster>
-                </Card>
-                <Card title="Restrictions">
-                  <ul className="bo-list">
-                    {billing.data.restrictions.map((restriction) => <li key={restriction}>{restriction}</li>)}
-                  </ul>
-                </Card>
-              </Grid>
-
-              <Card>
-                <DataTable
-                  columns={[
-                    { key: "partner", header: "Partenaire", render: (partner) => <strong>{partner.partnerName}</strong> },
-                    { key: "plan", header: "Plan", render: (partner) => partner.plan },
-                    { key: "accepted", header: "Leads acceptes", render: (partner) => partner.acceptedLeadCount, numeric: true, align: "right" },
-                    { key: "disputed", header: "Contestes", render: (partner) => partner.disputedLeadCount, numeric: true, align: "right" },
-                    { key: "reference", header: "Reference non facturable", render: (partner) => <code>{partner.draftNonBillableReference}</code> },
-                    { key: "invoiceStatus", header: "Statut", render: (partner) => <Badge tone="disabled">{partner.invoiceStatus}</Badge> }
-                  ]}
-                  items={billing.data.partners}
-                  getKey={(partner) => partner.partnerId}
-                  emptyLabel="Aucun partenaire dans la periode courante."
-                  aria-label="Compteurs de leads par partenaire"
-                />
+              <Card title="Etat module">
+                <Cluster>
+                  <Badge tone={billing.data.billingEnabled ? "warning" : "disabled"}>billing_enabled: {billing.data.billingEnabled ? "actif" : "desactive"}</Badge>
+                  <Badge tone="disabled">payments_enabled: desactive</Badge>
+                  <Badge tone="disabled">collection: desactivee</Badge>
+                </Cluster>
+                <Cluster aria-label="Restrictions">
+                  {billing.data.restrictions.map((restriction) => <span key={restriction} className="bo-ref">{restriction}</span>)}
+                </Cluster>
               </Card>
+              <DataTable
+                columns={[
+                  { key: "partner", header: "Partenaire", render: (partner) => <strong>{partner.partnerName}</strong> },
+                  { key: "plan", header: "Plan", render: (partner) => partner.plan },
+                  { key: "accepted", header: "Leads acceptes", render: (partner) => partner.acceptedLeadCount, numeric: true, align: "right" },
+                  { key: "disputed", header: "Contestes", render: (partner) => partner.disputedLeadCount, numeric: true, align: "right" },
+                  { key: "reference", header: "Reference non facturable", render: (partner) => <span className="bo-ref">{partner.draftNonBillableReference}</span> },
+                  { key: "invoiceStatus", header: "Statut", render: (partner) => <Badge tone="disabled">{partner.invoiceStatus}</Badge> }
+                ]}
+                items={billing.data.partners}
+                getKey={(partner) => partner.partnerId}
+                emptyLabel="Aucun partenaire dans la periode courante."
+                emptyDescription="Les compteurs apparaissent des qu'un courtier partenaire accepte un lead sur la periode."
+                aria-label="Compteurs de leads par partenaire"
+              />
             </>
           ) : null}
 
@@ -428,23 +425,31 @@ export default async function BillingFoundationPage({
               </Grid>
 
               <Card title="Emettre un avoir" description="Annule integralement une facture non reglee avec un avoir numerote (serie AV). La facture reste consultable.">
-                <Form action={issueCreditNoteAction} columns={2}>
-                  <Field id="credit-note-invoice" label="Facture a annuler">
-                    <Select
-                      {...fieldControlProps("credit-note-invoice")}
-                      name="invoiceId"
-                      defaultValue=""
-                      placeholder={cancellableInvoices.length ? "Choisir une facture" : "Aucune facture annulable"}
-                      options={cancellableInvoices.map((invoice) => ({ value: invoice.id, label: `${invoice.number} - ${invoice.customer.legalName} - ${xof(invoice.totalAmount)}` }))}
-                    />
-                  </Field>
-                  <Field id="credit-note-reason" label="Motif de l'avoir">
-                    <Input {...fieldControlProps("credit-note-reason")} name="reason" placeholder="Erreur sur la periode facturee" />
-                  </Field>
-                  <FormActions>
-                    <Button type="submit" variant="danger">Emettre l'avoir</Button>
-                  </FormActions>
-                </Form>
+                <Cluster>
+                  <ConfirmDialog
+                    triggerLabel="Emettre l'avoir"
+                    triggerVariant="danger"
+                    title="Emettre un avoir"
+                    description="La facture choisie sera annulee integralement par un avoir numerote. Cette operation est definitive."
+                    confirmLabel="Emettre l'avoir"
+                    cancelLabel="Annuler"
+                    tone="danger"
+                    formAction={issueCreditNoteAction}
+                  >
+                    <Field id="credit-note-invoice" label="Facture a annuler">
+                      <Select
+                        {...fieldControlProps("credit-note-invoice")}
+                        name="invoiceId"
+                        defaultValue=""
+                        placeholder={cancellableInvoices.length ? "Choisir une facture" : "Aucune facture annulable"}
+                        options={cancellableInvoices.map((invoice) => ({ value: invoice.id, label: `${invoice.number} - ${invoice.customer.legalName} - ${xof(invoice.totalAmount)}` }))}
+                      />
+                    </Field>
+                    <Field id="credit-note-reason" label="Motif de l'avoir">
+                      <Input {...fieldControlProps("credit-note-reason")} name="reason" placeholder="Erreur sur la periode facturee" />
+                    </Field>
+                  </ConfirmDialog>
+                </Cluster>
               </Card>
             </>
           ) : null}
@@ -488,12 +493,12 @@ export default async function BillingFoundationPage({
             <Card title="Packs de leads prepayes">
               <DataTable
                 columns={[
-                  { key: "partner", header: "Partenaire", render: (pack) => <code>{pack.partnerId}</code> },
+                  { key: "partner", header: "Partenaire", render: (pack) => <span className="bo-ref">{pack.partnerId}</span> },
                   { key: "granted", header: "Credits", render: (pack) => pack.creditsGranted, numeric: true, align: "right" },
                   { key: "consumed", header: "Consommes", render: (pack) => pack.creditsConsumed, numeric: true, align: "right" },
                   { key: "remaining", header: "Restants", render: (pack) => pack.creditsRemaining, numeric: true, align: "right" },
                   { key: "reason", header: "Motif", render: (pack) => pack.reason },
-                  { key: "invoice", header: "Facture liee", render: (pack) => pack.invoiceId ? <code>{issuedItems.find((invoice) => invoice.id === pack.invoiceId)?.number ?? pack.invoiceId}</code> : "-" }
+                  { key: "invoice", header: "Facture liee", render: (pack) => pack.invoiceId ? <span className="bo-ref">{issuedItems.find((invoice) => invoice.id === pack.invoiceId)?.number ?? pack.invoiceId}</span> : "-" }
                 ]}
                 items={packs.status === "success" ? packs.data : []}
                 getKey={(pack) => pack.id}
@@ -540,19 +545,22 @@ function AccountPanel({ account }: { account: AccountStatementData }) {
   const settled = account.invoices.filter((invoice) => invoice.status === "paid" || invoice.status === "partially_paid");
   return (
     <>
-      <Grid columns="kpi" as="section" aria-label="Synthese du compte courtier">
-        <KpiCard label="Facture TTC" value={xof(account.totals.invoiced)} />
-        <KpiCard label="Avoirs" value={xof(account.totals.credited)} />
-        <KpiCard label="Paiements constates" value={xof(account.totals.paid)} tone="success" />
-        <KpiCard label="Solde du" value={xof(account.totals.balanceDue)} tone={account.totals.balanceDue > 0 ? "warning" : "neutral"} />
-        <KpiCard label="Credits pack restants" value={account.packCreditsRemaining} />
-      </Grid>
+      <StatStrip
+        label="Synthese du compte courtier"
+        items={[
+          { label: "Facture TTC", value: xof(account.totals.invoiced) },
+          { label: "Avoirs", value: xof(account.totals.credited) },
+          { label: "Paiements constates", value: xof(account.totals.paid), tone: "success" },
+          { label: "Solde du", value: xof(account.totals.balanceDue), tone: account.totals.balanceDue > 0 ? "warning" : "neutral" },
+          { label: "Credits pack restants", value: account.packCreditsRemaining }
+        ]}
+      />
       <Card title="Ecritures du compte">
         <DataTable
           columns={[
             { key: "date", header: "Date", render: (entry) => entry.date.slice(0, 10) },
             { key: "label", header: "Ecriture", render: (entry) => entry.label },
-            { key: "reference", header: "Reference", render: (entry) => <code>{entry.reference}</code> },
+            { key: "reference", header: "Reference", render: (entry) => <span className="bo-ref">{entry.reference}</span> },
             { key: "debit", header: "Debit", render: (entry) => (entry.debit ? xof(entry.debit) : "-"), numeric: true, align: "right" },
             { key: "credit", header: "Credit", render: (entry) => (entry.credit ? xof(entry.credit) : "-"), numeric: true, align: "right" },
             { key: "balance", header: "Solde", render: (entry) => xof(entry.balance), numeric: true, align: "right" }
@@ -562,7 +570,7 @@ function AccountPanel({ account }: { account: AccountStatementData }) {
           emptyLabel="Aucune ecriture pour ce partenaire."
           aria-label="Ecritures du compte courtier"
         />
-        <p>{account.notice}</p>
+        <p className="bo-description">{account.notice}</p>
       </Card>
       <Card title="Attribuer un pack apres paiement constate" description="Le pack est lie a la facture reglee; aucun paiement n'est capture par cette action.">
         <Form action={grantLeadPackAction} columns={2}>

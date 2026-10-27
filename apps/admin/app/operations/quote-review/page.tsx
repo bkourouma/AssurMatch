@@ -1,5 +1,5 @@
 import { formatDateTime, pageHref, pageNumber, readQuoteReviewQueue } from "../../lib/operations-api";
-import { Badge, Button, Card, KpiCard, Grid, PageHeader, PageStack, StateMessage, Stack } from "../../lib/ui/admin-ui";
+import { Badge, Button, Card, Cluster, DescriptionList, EmptyState, Grid, PageHeader, PageStack, StateMessage, Stack } from "../../lib/ui/admin-ui";
 import { QuoteReviewForm } from "../../lib/ui/operations-forms";
 import { OperationsTabs } from "../../lib/ui/operations-tabs";
 import { quoteStatusTones } from "../../lib/ui/operations-tones";
@@ -20,9 +20,9 @@ export default async function AdminQuoteReviewPage({ searchParams }: { searchPar
     <PageStack>
       <PageHeader
         breadcrumb={[{ label: "Pilotage" }, { label: "Operations", href: "/operations" }, { label: "Revue devis" }]}
-        kicker="Operations"
         title="Revue operationnelle devis"
-        description="Les demandes non routables ou doublons peuvent etre marquees sans contourner consentement, licence ou autorisation. Chaque decision est persistee, motivee et auditee."
+        description="Decidez des demandes retenues en revue, sans contourner consentement, licence ou autorisation. Chaque decision est motivee et auditee."
+        actions={queue.status === "success" ? <Badge tone={queue.data.total > 0 ? "warning" : "neutral"}>{`${queue.data.total} demande(s) en revue`}</Badge> : null}
       />
       <OperationsTabs current="/operations/quote-review" />
 
@@ -30,44 +30,60 @@ export default async function AdminQuoteReviewPage({ searchParams }: { searchPar
       {queue.status === "forbidden" ? <StateMessage tone="danger">File de revue non accessible pour ce role admin.</StateMessage> : null}
       {queue.status === "error" ? <StateMessage tone="danger">File de revue indisponible : {queue.error}</StateMessage> : null}
 
-      <Grid columns="kpi" as="section" aria-label="Synthese revue">
-        <KpiCard label="Demandes en revue" value={queue.data.total} tone={queue.data.total > 0 ? "warning" : "neutral"} />
-      </Grid>
-
       <StateMessage>
         Router ou assigner exige le droit d'affectation (Super Admin, Admin Pays) et un consentement accorde; marquer non routable ou doublon est ouvert a la conformite. Le support consulte sans decider.
       </StateMessage>
 
-      {items.length === 0 && queue.status === "success" ? <StateMessage>Aucune demande en attente de revue dans votre perimetre.</StateMessage> : null}
+      {items.length === 0 && queue.status === "success" ? (
+        <EmptyState
+          icon="check"
+          title="Aucune demande en attente de revue dans votre perimetre."
+          description="Les demandes arrivent ici quand le produit impose une revue ou qu'une regle de routage manuelle les met de cote."
+        />
+      ) : null}
 
-      <Stack>
-        {items.map((item) => (
-          <Card
-            key={item.id}
-            title={item.publicReference}
-            description={`${item.countryCode ?? "-"} / ${item.productKey ?? "-"} - recue le ${formatDateTime(item.createdAt)}`}
-            actions={<Button href={`/quote-requests/${item.id}`} variant="tertiary" size="sm">Ouvrir la fiche</Button>}
-          >
-            <p>
-              <Badge tone={quoteStatusTones[item.status] ?? "neutral"}>{item.status}</Badge> <Badge tone="warning">{item.routingStatus}</Badge>
-            </p>
-            <p>
-              Courtiers partenaires evalues : {item.candidates.filter((candidate) => candidate.eligible).length} eligible(s) sur {item.candidates.length}.
-              {item.candidates.filter((candidate) => !candidate.eligible).length > 0
-                ? ` Exclus : ${item.candidates.filter((candidate) => !candidate.eligible).map((candidate) => `${candidate.legalName} (${candidate.reasons.join(", ")})`).join(" ; ")}.`
-                : ""}
-            </p>
-            <QuoteReviewForm quoteRequestId={item.id} candidates={item.candidates} />
-          </Card>
-        ))}
+      <Stack as="section" aria-label="File de revue">
+        {items.map((item) => {
+          const eligible = item.candidates.filter((candidate) => candidate.eligible);
+          const excluded = item.candidates.filter((candidate) => !candidate.eligible);
+          return (
+            <Card
+              key={item.id}
+              title={item.publicReference}
+              description={`${item.countryCode ?? "-"} / ${item.productKey ?? "-"} - recue le ${formatDateTime(item.createdAt)}`}
+              actions={<Button href={`/quote-requests/${item.id}`} variant="tertiary" size="sm">Ouvrir la fiche</Button>}
+            >
+              <Grid columns="two">
+                <Stack>
+                  <Cluster>
+                    <Badge tone={quoteStatusTones[item.status] ?? "neutral"}>{item.status}</Badge>
+                    <Badge tone="warning">{item.routingStatus}</Badge>
+                  </Cluster>
+                  <DescriptionList
+                    items={[
+                      { term: "Courtiers partenaires evalues", value: `${eligible.length} eligible(s) sur ${item.candidates.length}` },
+                      {
+                        term: "Exclus",
+                        value: excluded.length > 0 ? excluded.map((candidate) => `${candidate.legalName} (${candidate.reasons.join(", ")})`).join(" ; ") : "-"
+                      }
+                    ]}
+                  />
+                </Stack>
+                <QuoteReviewForm quoteRequestId={item.id} candidates={item.candidates} />
+              </Grid>
+            </Card>
+          );
+        })}
       </Stack>
 
       {lastPage > 1 ? (
-        <p>
-          {page > 1 ? <a href={pageHref("/operations/quote-review", {}, page - 1)}>Page precedente</a> : null}
-          {` Page ${page} sur ${lastPage} `}
-          {page < lastPage ? <a href={pageHref("/operations/quote-review", {}, page + 1)}>Page suivante</a> : null}
-        </p>
+        <nav aria-label="Pagination de la file de revue">
+          <Cluster>
+            {page > 1 ? <Button href={pageHref("/operations/quote-review", {}, page - 1)} variant="secondary" size="sm">Page precedente</Button> : null}
+            <span className="bo-description">{`Page ${page} sur ${lastPage}`}</span>
+            {page < lastPage ? <Button href={pageHref("/operations/quote-review", {}, page + 1)} variant="secondary" size="sm">Page suivante</Button> : null}
+          </Cluster>
+        </nav>
       ) : null}
     </PageStack>
   );

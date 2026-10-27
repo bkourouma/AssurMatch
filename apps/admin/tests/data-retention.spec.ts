@@ -32,7 +32,11 @@ test("retention page shows the flag-off notice and the two-step workflow", () =>
   expect(page).toContain("Previsualiser un lot de retention");
   expect(page).toContain("Previsualiser un effacement sur demande");
   expect(page).toContain(`title="Lots d'anonymisation"`);
-  expect(page).toContain("action={approveBatch}");
+  // The irreversible approval now goes through a confirmation dialog whose form posts to approveBatch,
+  // with the audited reason field inside the dialog.
+  expect(page).toContain("formAction={approveBatch}");
+  expect(page).toContain("<ConfirmDialog");
+  expect(page).toContain('name="reason" minLength={8}');
   expect(page).toContain("n'est ni enregistree sur le lot ni affichee");
 });
 

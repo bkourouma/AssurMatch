@@ -8,7 +8,6 @@ export default async function PasswordChangePage() {
   if (session.status === "mfa_required") redirect(`/mfa?returnTo=${encodeURIComponent("/password-change")}`);
   return (
     <>
-      <p className="bo-kicker">Securite du compte</p>
       <h1 className="bo-auth__title">Changer le mot de passe</h1>
       <PasswordChangeForm />
     </>

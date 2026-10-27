@@ -1,0 +1,134 @@
+/*
+ * Broker screen helpers that `@assurmatch/ui` does not ship yet (muted note, verbatim message,
+ * Kanban board). Tokens only: no colour, size or radius of its own. Candidates for promotion to the
+ * shared stylesheet as `bo-muted`, `bo-pre` and `bo-board`.
+ */
+
+/* Secondary sentence under a block: the muted ink of descriptions, never below 14px. */
+.muted {
+  margin: 0;
+  color: var(--bo-ink-3);
+  font-size: var(--bo-fs);
+  line-height: 1.5;
+}
+
+/* Text typed by a person (proposal message, AI draft): line breaks kept, long tokens wrap. */
+.message {
+  margin: 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+/* Heading of a page section that is not a card (a stat strip, a board): title left, action right. */
+.sectionHead {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--bo-s2) var(--bo-s4);
+}
+
+/* One feed entry: a heading row (title, status, date) above its content. */
+.entry {
+  display: grid;
+  gap: var(--bo-s2);
+  min-width: 0;
+}
+
+.entryHead {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--bo-s2);
+}
+
+.entryTitle {
+  margin: 0;
+  font-size: var(--bo-fs-body);
+  font-weight: 600;
+  line-height: 1.4;
+}
+
+.entryMeta {
+  color: var(--bo-ink-3);
+  font-size: var(--bo-fs);
+}
+
+/* A block that follows other content inside the same card (a form under the facts): one hairline. */
+.subsection {
+  padding-top: var(--bo-s4);
+  border-top: 1px solid var(--bo-line);
+}
+
+/* Kanban: one column per pipeline status, the board scrolls sideways inside its own frame. */
+.board {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(248px, 1fr);
+  gap: var(--bo-s3);
+  overflow-x: auto;
+  padding-bottom: var(--bo-s2);
+  scroll-snap-type: x proximity;
+}
+
+.column {
+  display: grid;
+  align-content: start;
+  gap: var(--bo-s2);
+  min-width: 0;
+  padding: var(--bo-s3);
+  border: 1px solid var(--bo-line);
+  border-radius: var(--bo-r-panel);
+  background: var(--bo-surface-2);
+  scroll-snap-align: start;
+}
+
+.columnHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--bo-s2);
+  margin: 0;
+  font-size: var(--bo-fs);
+  font-weight: 600;
+}
+
+.columnList {
+  display: grid;
+  gap: var(--bo-s2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.ticket {
+  display: grid;
+  gap: 2px;
+  padding: var(--bo-s2) var(--bo-s3);
+  border: 1px solid var(--bo-line);
+  border-radius: var(--bo-r-control);
+  background: var(--bo-surface);
+  font-size: var(--bo-fs);
+}
+
+.ticket a {
+  font-weight: 600;
+}
+
+.columnEmpty {
+  margin: 0;
+  color: var(--bo-ink-3);
+  font-size: var(--bo-fs);
+}
+
+@media (max-width: 760px) {
+  .board {
+    grid-auto-columns: minmax(78vw, 1fr);
+  }
+
+  .ticket a {
+    display: inline-flex;
+    align-items: center;
+    min-height: 44px;
+  }
+}

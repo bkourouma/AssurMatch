@@ -7,11 +7,10 @@ import {
   Badge,
   Card,
   DataTable,
-  Grid,
-  KpiCard,
   PageHeader,
   PageStack,
   StateMessage,
+  StatStrip,
   StatusBadge,
   integrationStatusTones
 } from "../lib/ui/admin-ui";
@@ -82,11 +81,14 @@ export default async function CrmConnectorsPage() {
 
       {connectors.status === "success" ? (
         <>
-          <Grid columns="kpi" as="section" aria-label="Synthese connecteurs CRM">
-            <KpiCard label="Connecteurs" value={connectors.data.total} />
-            <KpiCard label="Actifs" value={items.filter((connector) => connector.status === "active").length} tone="success" />
-            <KpiCard label="Livraisons en echec ou dead_letter" value={failedDeliveries} tone="warning" />
-          </Grid>
+          <StatStrip
+            label="Synthèse connecteurs CRM"
+            items={[
+              { label: "Connecteurs", value: connectors.data.total },
+              { label: "Actifs", value: items.filter((connector) => connector.status === "active").length, tone: "success" },
+              { label: "Livraisons en echec ou dead_letter", value: failedDeliveries, tone: "warning" }
+            ]}
+          />
 
           {partners.length === 0 ? <StateMessage tone="warning">Liste des partenaires indisponible : creation impossible pour le moment.</StateMessage> : null}
 

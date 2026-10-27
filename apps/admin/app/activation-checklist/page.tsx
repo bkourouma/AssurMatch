@@ -4,16 +4,14 @@ import { activationControlLabel, canApprovePublicActivation, correctionTarget, f
 import { ACTIVATION_ATTESTABLE_CONTROLS, type ActivationChecklistControl as ChecklistControl, type ActivationChecklistSection } from "../../../../packages/shared/contracts/activation-checklist.contracts";
 import { AttestControlForm, RevokeAttestationForm } from "./attestation-forms";
 import {
-  Card,
   DataTable,
   Field,
   FilterBar,
-  Grid,
-  KpiCard,
   PageHeader,
   PageStack,
   Select,
   StateMessage,
+  StatStrip,
   StatusBadge,
   checklistStatusTones,
   fieldControlProps
@@ -75,10 +73,12 @@ export default async function ActivationChecklistPage({
     <PageStack>
       <PageHeader
         breadcrumb={[{ label: "Plateforme" }, { label: "Activation" }]}
-        kicker="Activation controlee"
         title="Checklist technique d'activation"
         description="Verification lecture seule des preconditions techniques pays, produit, consentement, formulaire, partenaire, licence, offre et flags avant exposition publique."
       />
+      <StateMessage tone="warning">
+        Cette surface ne modifie aucun flag, pays, produit, partenaire, licence, offre ou formulaire. Elle ne remplace pas le go/no-go conformite, juridique, support ou operations.
+      </StateMessage>
 
       <FilterBar
         action="/activation-checklist"
@@ -109,61 +109,58 @@ export default async function ActivationChecklistPage({
 
       {checklist.status === "success" ? (
         <>
-          <Grid columns="kpi" as="section" aria-label="Synthese checklist activation">
-            <KpiCard label="Prets techniquement" value={checklist.data.summary.passed} tone="success" />
-            <KpiCard label="A surveiller" value={checklist.data.summary.warning} tone="warning" />
-            <KpiCard label="Bloquants" value={checklist.data.summary.blocked} tone="danger" />
-          </Grid>
+          <StatStrip
+            label="Synthese checklist activation"
+            items={[
+              { label: "Prets techniquement", value: checklist.data.summary.passed, tone: "success" },
+              { label: "A surveiller", value: checklist.data.summary.warning, tone: checklist.data.summary.warning > 0 ? "warning" : "neutral" },
+              { label: "Bloquants", value: checklist.data.summary.blocked, tone: checklist.data.summary.blocked > 0 ? "danger" : "neutral" }
+            ]}
+          />
 
-          <Card>
-            <DataTable
-              columns={[
-                { key: "section", header: "Section", render: (section) => <strong>{section.title}</strong> },
-                { key: "status", header: "Statut", render: (section) => <StatusBadge status={section.status} tones={checklistStatusTones} /> },
-                {
-                  key: "scope",
-                  header: "Scope",
-                  render: (section) => [
-                    section.scope.countryCode,
-                    section.scope.productKey,
-                    section.scope.partnerId
-                  ].filter(Boolean).join(" / ") || "global"
-                },
-                {
-                  key: "controls",
-                  header: "Controles",
-                  render: (section) => (
-                    <ul className="bo-list">
-                      {section.controls.map((control) => {
-                        const target = control.status === "passed"
-                          ? undefined
-                          : correctionTarget(control.key, {
-                            countryId: section.scope.countryId ?? filteredCountryId,
-                            productId: section.scope.productId
-                          });
-                        return (
-                          <li key={control.key}>
-                            <StatusBadge status={control.status} tones={checklistStatusTones} /> {activationControlLabel(control.key, control.label)}: {control.evidence}
-                            {target ? <> — <a href={target.href}>Corriger</a></> : null}
-                            {target?.note ? <> ({target.note})</> : null}
-                            {control.manual ? <ManualControlAttestation control={control} canAttest={canAttest} /> : null}
-                          </li>
-                        );
-                      })}
-                    </ul>
-                  )
-                }
-              ]}
-              items={checklist.data.sections as ActivationChecklistSection[]}
-              getKey={(section) => section.key}
-              emptyLabel="Aucune precondition d'activation disponible."
-              aria-label="Preconditions techniques d'activation"
-            />
-          </Card>
-
-          <StateMessage tone="warning">
-            Cette surface ne modifie aucun flag, pays, produit, partenaire, licence, offre ou formulaire. Elle ne remplace pas le go/no-go conformite, juridique, support ou operations.
-          </StateMessage>
+          <DataTable
+            columns={[
+              { key: "section", header: "Section", render: (section) => <strong>{section.title}</strong> },
+              { key: "status", header: "Statut", render: (section) => <StatusBadge status={section.status} tones={checklistStatusTones} /> },
+              {
+                key: "scope",
+                header: "Scope",
+                render: (section) => [
+                  section.scope.countryCode,
+                  section.scope.productKey,
+                  section.scope.partnerId
+                ].filter(Boolean).join(" / ") || "global"
+              },
+              {
+                key: "controls",
+                header: "Controles",
+                render: (section) => (
+                  <ul className="bo-list">
+                    {section.controls.map((control) => {
+                      const target = control.status === "passed"
+                        ? undefined
+                        : correctionTarget(control.key, {
+                          countryId: section.scope.countryId ?? filteredCountryId,
+                          productId: section.scope.productId
+                        });
+                      return (
+                        <li key={control.key}>
+                          <StatusBadge status={control.status} tones={checklistStatusTones} /> {activationControlLabel(control.key, control.label)}: {control.evidence}
+                          {target ? <> — <a href={target.href}>Corriger</a></> : null}
+                          {target?.note ? <> ({target.note})</> : null}
+                          {control.manual ? <ManualControlAttestation control={control} canAttest={canAttest} /> : null}
+                        </li>
+                      );
+                    })}
+                  </ul>
+                )
+              }
+            ]}
+            items={checklist.data.sections as ActivationChecklistSection[]}
+            getKey={(section) => section.key}
+            emptyLabel="Aucune precondition d'activation disponible."
+            aria-label="Preconditions techniques d'activation"
+          />
         </>
       ) : null}
     </PageStack>

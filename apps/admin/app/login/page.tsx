@@ -20,7 +20,6 @@ export default async function AdminLoginPage({ searchParams }: LoginPageProps) {
 
   return (
     <>
-      <p className="bo-kicker">Back-office plateforme</p>
       <h1 className="bo-auth__title">Connexion admin</h1>
 
       {reason === "session_expired" ? <Notice tone="info">Votre session a expire. Connectez-vous a nouveau.</Notice> : null}

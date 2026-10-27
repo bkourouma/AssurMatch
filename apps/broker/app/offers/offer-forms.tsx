@@ -338,7 +338,7 @@ export function CreateBrokerOfferForm({ scopes, insurers }: { scopes: ScopeChoic
   const [scope, setScope] = useState("");
   const { formRef, completeness, recompute } = useLiveCompleteness(undefined);
   return (
-    <Card title="Nouvelle offre" description="L'offre est créée en brouillon (version 1). Elle n'est visible du public qu'après validation par AssurMatch.">
+    <Card title="Contenu de l'offre" description="Créée en brouillon (version 1) ; vous la soumettez à validation quand la complétude minimale est atteinte.">
       <Form action={formAction} ref={formRef} onInput={recompute} onChange={recompute} data-offer-form="create">
         <OfferActionResult state={state} />
         <FormSection

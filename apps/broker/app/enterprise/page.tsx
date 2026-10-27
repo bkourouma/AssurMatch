@@ -14,13 +14,12 @@ import {
   Field,
   Form,
   FormActions,
-  Grid,
   Input,
-  KpiCard,
   Notice,
   PageHeader,
   PageStack,
   Select,
+  StatStrip,
   StatusBadge,
   TenantWriteGuard
 } from "../lib/ui/broker-ui";
@@ -78,7 +77,7 @@ const agencyColumns: Array<DataTableColumn<BrokerAgency>> = [
 
 const roleColumns: Array<DataTableColumn<BrokerCustomRole>> = [
   { key: "name", header: "Role", render: (role) => role.name, sortable: true, sortValue: (role) => role.name },
-  { key: "permissions", header: "Permissions accordees", render: (role) => role.permissions.join(", ") },
+  { key: "permissions", header: "Permissions accordees", render: (role) => <span className="bo-ref">{role.permissions.join(", ")}</span> },
   // Spec 064 FR-007: members holding the role (assigned from the Equipe page).
   {
     key: "members",
@@ -100,7 +99,6 @@ export default async function BrokerEnterprisePage({ searchParams }: { searchPar
       <PageStack>
         <PageHeader
           breadcrumb={BREADCRUMB}
-          kicker="Enterprise"
           title="Acces refuse"
           description="L'espace Enterprise exige une session courtier authentifiee et la MFA verifiee."
         />
@@ -112,7 +110,6 @@ export default async function BrokerEnterprisePage({ searchParams }: { searchPar
       <PageStack>
         <PageHeader
           breadcrumb={BREADCRUMB}
-          kicker="Enterprise"
           title="Espace Enterprise indisponible"
           description="Multi-agences, roles personnalises, engagement de reactivite et charte interne sont reserves au plan Enterprise."
           actions={<Badge tone="disabled">Plan Enterprise requis</Badge>}
@@ -132,7 +129,6 @@ export default async function BrokerEnterprisePage({ searchParams }: { searchPar
     <PageStack>
       <PageHeader
         breadcrumb={BREADCRUMB}
-        kicker="Enterprise"
         title="Organisation du cabinet"
         description="Agences, roles internes, engagement de reactivite et charte du portail. Rien ici ne modifie l'eligibilite, le routage ou ce que voit un visiteur."
       />
@@ -218,10 +214,10 @@ export default async function BrokerEnterprisePage({ searchParams }: { searchPar
         </TenantWriteGuard>
       </Card>
 
-      <Card title="Roles personnalises">
-        <p>
-          Un role personnalise ne peut accorder que des permissions courtier deja prevues par la plateforme, et jamais plus que le role de base du membre.
-        </p>
+      <Card
+        title="Roles personnalises"
+        description="Un role personnalise ne peut accorder que des permissions courtier deja prevues par la plateforme, et jamais plus que le role de base du membre."
+      >
         <DataTable
           columns={roleColumns}
           items={roles.status === "success" ? roles.data : []}
@@ -252,49 +248,54 @@ export default async function BrokerEnterprisePage({ searchParams }: { searchPar
       <Card title="Engagement de reactivite (SLA)">
         {sla.status === "success" ? (
           <>
-            <Grid columns="kpi">
-              <KpiCard label="Objectif premiere action" value={`${sla.data.firstActionTargetMinutes} min`} />
-              <KpiCard label="Leads mesures" value={sla.data.leadsMeasured} helper={`${sla.data.windowDays} derniers jours`} />
-              <KpiCard label="Dans l'objectif" value={sla.data.leadsWithinTarget} tone="info" />
-              <KpiCard
-                label="Taux de respect"
-                value={`${Math.round(sla.data.complianceRate * 100)}%`}
-                tone={sla.data.complianceRate >= 0.8 ? "success" : "warning"}
-              />
-              <KpiCard label="Delai moyen" value={sla.data.averageFirstActionMinutes === null ? "-" : `${sla.data.averageFirstActionMinutes} min`} />
-            </Grid>
+            <StatStrip
+              label="Engagement de reactivite"
+              items={[
+                { label: "Objectif premiere action", value: `${sla.data.firstActionTargetMinutes} min` },
+                { label: "Leads mesures", value: sla.data.leadsMeasured, helper: `${sla.data.windowDays} derniers jours` },
+                { label: "Dans l'objectif", value: sla.data.leadsWithinTarget, tone: "info" },
+                {
+                  label: "Taux de respect",
+                  value: `${Math.round(sla.data.complianceRate * 100)}%`,
+                  tone: sla.data.complianceRate >= 0.8 ? "success" : "warning"
+                },
+                { label: "Delai moyen", value: sla.data.averageFirstActionMinutes === null ? "-" : `${sla.data.averageFirstActionMinutes} min` }
+              ]}
+            />
             {firstVisibleReplyLine ? <p data-sla-first-visible-reply="true">{firstVisibleReplyLine}</p> : null}
-            <TenantWriteGuard readOnly={readOnly}>
-            <Form action={updateSlaAction} columns={2}>
-              <Field id="sla-target" label="Objectif en minutes">
-                <Input
-                  id="sla-target"
-                  name="firstActionTargetMinutes"
-                  type="number"
-                  min={5}
-                  max={10080}
-                  defaultValue={sla.data.firstActionTargetMinutes}
-                  aria-label="Objectif en minutes"
-                />
-              </Field>
-              <Field id="sla-reason" label="Motif">
-                <Input id="sla-reason" name="reason" placeholder="Motif" aria-label="Motif de la mise a jour SLA" />
-              </Field>
-              <FormActions>
-                <Button type="submit" variant="secondary">Enregistrer l'objectif</Button>
-              </FormActions>
-            </Form>
-            </TenantWriteGuard>
+            <Card title="Objectif interne" description="Il ne peut pas etre plus lache que la cible contractuelle fixee par AssurMatch.">
+              <TenantWriteGuard readOnly={readOnly}>
+              <Form action={updateSlaAction} columns={2}>
+                <Field id="sla-target" label="Objectif en minutes">
+                  <Input
+                    id="sla-target"
+                    name="firstActionTargetMinutes"
+                    type="number"
+                    min={5}
+                    max={10080}
+                    defaultValue={sla.data.firstActionTargetMinutes}
+                    aria-label="Objectif en minutes"
+                  />
+                </Field>
+                <Field id="sla-reason" label="Motif">
+                  <Input id="sla-reason" name="reason" placeholder="Motif" aria-label="Motif de la mise a jour SLA" />
+                </Field>
+                <FormActions>
+                  <Button type="submit">Enregistrer l'objectif</Button>
+                </FormActions>
+              </Form>
+              </TenantWriteGuard>
+            </Card>
           </>
         ) : (
           <Notice tone="warning">SLA indisponible: {sla.error ?? "erreur inconnue"}.</Notice>
         )}
       </Card>
 
-      <Card title="Charte du portail courtier">
-        <p>
-          La charte s'applique uniquement a votre back-office. Le comparateur public reste presente par AssurMatch, plateforme technique.
-        </p>
+      <Card
+        title="Charte du portail courtier"
+        description="La charte s'applique uniquement a votre back-office. Le comparateur public reste presente par AssurMatch, plateforme technique."
+      >
         {branding.status === "success" ? (
           <TenantWriteGuard readOnly={readOnly}>
           <Form action={updateBrandingAction} columns={2}>

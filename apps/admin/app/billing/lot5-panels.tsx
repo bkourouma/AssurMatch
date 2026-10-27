@@ -7,10 +7,9 @@ import {
   FilterBar,
   Form,
   FormActions,
-  Grid,
-  KpiCard,
   Notice,
   Select,
+  StatStrip,
   StateMessage,
   fieldControlProps
 } from "../lib/ui/admin-ui";
@@ -177,11 +176,14 @@ export async function Lot5BillingPanels({ partners, subscriptionPartnerId, planS
 
   return (
     <>
-      <Grid columns="kpi" as="section" aria-label="Synthèse modules et abonnements">
-        <KpiCard label="Prix de modules activés" value={prices.data.filter((price) => price.enabled).length} tone="success" />
-        <KpiCard label="Modules affectés (actifs)" value={addOns.data.filter((addOn) => addOn.status === "active").length} tone="info" />
-        <KpiCard label="Demandes de changement de plan en attente" value={pendingCount} tone={pendingCount > 0 ? "warning" : "neutral"} />
-      </Grid>
+      <StatStrip
+        label="Synthèse modules et abonnements"
+        items={[
+          { label: "Prix de modules activés", value: prices.data.filter((price) => price.enabled).length, tone: "success" },
+          { label: "Modules affectés (actifs)", value: addOns.data.filter((addOn) => addOn.status === "active").length, tone: "info" },
+          { label: "Demandes de changement de plan en attente", value: pendingCount, tone: pendingCount > 0 ? "warning" : "neutral" }
+        ]}
+      />
 
       <Card
         title="Demandes de changement de plan"

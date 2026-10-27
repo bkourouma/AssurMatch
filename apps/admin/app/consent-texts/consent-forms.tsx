@@ -165,21 +165,30 @@ export function PublishConsentTextForm({ consentTextId, version }: { consentText
 }
 
 export function RetireConsentTextForm({ consentTextId }: { consentTextId: string }) {
-  const [state, formAction, pending] = useActionState(retireConsentTextAction, initialState);
+  const [state, formAction] = useActionState(retireConsentTextAction, initialState);
   const base = useId();
   return (
-    <Card title="Retirer ce texte">
-      <Form action={formAction} data-consent-form="retire">
-        <CatalogActionResult state={state} />
-        <input type="hidden" name="consentTextId" value={consentTextId} />
-        <Field id={`${base}-reason`} label="Motif (audite)" required>
-          <Input {...fieldControlProps(`${base}-reason`, { required: true })} name="reason" minLength={8} />
-        </Field>
-        <p className="bo-description">Un texte retiré ne peut plus être publié ni lié à un nouveau formulaire ; les preuves déjà recueillies restent valables.</p>
-        <FormActions>
-          <Button type="submit" variant="danger" pending={pending} pendingLabel="Retrait...">Retirer</Button>
-        </FormActions>
-      </Form>
+    <Card title="Retirer ce texte" description="Un texte retiré ne peut plus être publié ni lié à un nouveau formulaire ; les preuves déjà recueillies restent valables.">
+      <CatalogActionResult state={state} />
+      <FormActions>
+        <ConfirmDialog
+          triggerLabel="Retirer"
+          triggerVariant="danger"
+          title="Retirer ce texte de consentement"
+          description="Le texte ne pourra plus être publié ni lié à un nouveau formulaire. Les preuves déjà recueillies restent valables."
+          confirmLabel="Retirer"
+          cancelLabel="Annuler"
+          tone="danger"
+          formAction={formAction}
+          dataAttributes={{ "data-consent-form": "retire" }}
+        >
+          <CatalogActionResult state={state} />
+          <input type="hidden" name="consentTextId" value={consentTextId} />
+          <Field id={`${base}-reason`} label="Motif (audite)" required>
+            <Input {...fieldControlProps(`${base}-reason`, { required: true })} name="reason" minLength={8} />
+          </Field>
+        </ConfirmDialog>
+      </FormActions>
     </Card>
   );
 }

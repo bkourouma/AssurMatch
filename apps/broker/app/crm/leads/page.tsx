@@ -56,7 +56,7 @@ function priorityTone(level: LeadSummaryViewModel["priorityLevel"]): "success" |
 /** Columns of the list. The « Priorité IA » column is added when the priority sort is active or when a lead of the page carries a score. */
 function crmColumns(withPriority: boolean): Array<DataTableColumn<CrmListRow>> {
   const columns: Array<DataTableColumn<CrmListRow>> = [
-    { key: "reference", header: "Référence", render: (lead) => lead.reference },
+    { key: "reference", header: "Référence", render: (lead) => <span className="bo-ref">{lead.reference}</span> },
     { key: "country", header: "Pays", render: (lead) => lead.country },
     { key: "product", header: "Produit", render: (lead) => lead.product },
     {
@@ -105,6 +105,7 @@ export default async function BrokerCrmLeadsPage({ searchParams }: { searchParam
   if (apiLeads.forbidden) {
     return (
       <PageStack>
+        <PageHeader breadcrumb={[{ label: "CRM", href: "/crm" }, { label: "Vue tableau" }]} title="Leads CRM" />
         <Notice tone="danger" title="Acces CRM refuse">
           Acces CRM refuse, verifiez le plan, la MFA et le flag broker_crm_enabled. Aucune donnee CRM n'est affichee.
         </Notice>
@@ -140,7 +141,6 @@ export default async function BrokerCrmLeadsPage({ searchParams }: { searchParam
     <PageStack>
       <PageHeader
         breadcrumb={[{ label: "CRM", href: "/crm" }, { label: "Vue tableau" }]}
-        kicker="CRM Pro/Enterprise"
         title="Leads CRM"
         description="Vue tableau des leads autorises selon role, tenant, conseiller et permissions PII."
         actions={
@@ -233,6 +233,7 @@ export default async function BrokerCrmLeadsPage({ searchParams }: { searchParam
         getKey={(lead) => lead.id}
         aria-label="Leads CRM"
         emptyLabel={activeCount > 0 ? "Aucun résultat pour ce filtre : modifiez ou réinitialisez les filtres (produit et pays attendent une clé produit et un code pays exacts)." : "Aucun lead CRM autorisé à afficher."}
+        emptyAction={activeCount > 0 ? <Button href="/crm/leads" variant="secondary" size="sm">Réinitialiser les filtres</Button> : undefined}
         getRowHref={(lead) => `/crm/leads/${lead.id}`}
         sort={{ key: state.sort, direction: state.direction }}
         sortHref={table.sortHref}

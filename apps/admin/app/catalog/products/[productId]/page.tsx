@@ -22,6 +22,7 @@ import {
   Notice,
   PageHeader,
   PageStack,
+  Split,
   StateMessage,
   StatusBadge,
   catalogStatusTones
@@ -76,45 +77,46 @@ export default async function CatalogProductDetailPage({ params }: ProductDetail
     <PageStack>
       <PageHeader
         breadcrumb={[{ label: "Catalogue", href: "/catalog" }, { label: "Produits", href: "/catalog/products" }, { label: product.key }]}
-        kicker="Fiche produit"
         title={`${product.name} (${product.key})`}
         description="Les flags globaux s'appliquent à tous les pays ; une suspension globale coupe le produit partout. Les flags par pays se règlent sur la fiche pays."
+        actions={<StatusBadge status={product.status} tones={catalogStatusTones} />}
       />
 
-      <Card title="Synthese">
-        <DescriptionList
-          columns={2}
-          items={[
-            { term: "Statut", value: <StatusBadge status={product.status} tones={catalogStatusTones} /> },
-            { term: "Sensibilité", value: <Badge tone={sensitive ? "warning" : "neutral"}>{product.sensitivity}</Badge> },
-            { term: "Documents requis", value: product.requiresDocuments ? "Oui" : "Non" },
-            { term: "Revue manuelle", value: product.requiresManualReview ? "Oui" : "Non" },
-            { term: "Catégorie", value: currentCategory ? currentCategory.name : "Aucune" },
-            { term: "Version courante", value: `v${product.version ?? 1}` },
-            { term: "Types de documents demandés", value: requiredKinds.length > 0 ? requiredKinds.map(documentKindLabel).join(", ") : "Aucun" },
-            { term: "Texte légal (FR)", value: legalNotice.fr?.legalText || "Non renseigné" },
-            { term: "Avertissement (FR)", value: legalNotice.fr?.disclaimer || "Non renseigné" },
-            { term: "Texte légal (EN)", value: legalNotice.en?.legalText || "Non renseigné" },
-            { term: "Avertissement (EN)", value: legalNotice.en?.disclaimer || "Non renseigné" },
-            {
-              term: "Pays liés",
-              value: linkedCountries.length > 0
-                ? linkedCountries.map((country) => <a key={country.id} href={`/catalog/countries/${encodeURIComponent(country.id)}#liaisons`}>{country.isoCode} </a>)
-                : "Aucun"
-            },
-            { term: "Mis à jour", value: formatDate(product.updatedAt) }
-          ]}
-        />
-      </Card>
+      <Split>
+        <Card title="Synthese">
+          <DescriptionList
+            columns={2}
+            items={[
+              { term: "Statut", value: <StatusBadge status={product.status} tones={catalogStatusTones} /> },
+              { term: "Sensibilité", value: <Badge tone={sensitive ? "warning" : "neutral"}>{product.sensitivity}</Badge> },
+              { term: "Documents requis", value: product.requiresDocuments ? "Oui" : "Non" },
+              { term: "Revue manuelle", value: product.requiresManualReview ? "Oui" : "Non" },
+              { term: "Catégorie", value: currentCategory ? currentCategory.name : "Aucune" },
+              { term: "Version courante", value: `v${product.version ?? 1}` },
+              { term: "Types de documents demandés", value: requiredKinds.length > 0 ? requiredKinds.map(documentKindLabel).join(", ") : "Aucun" },
+              { term: "Texte légal (FR)", value: legalNotice.fr?.legalText || "Non renseigné" },
+              { term: "Avertissement (FR)", value: legalNotice.fr?.disclaimer || "Non renseigné" },
+              { term: "Texte légal (EN)", value: legalNotice.en?.legalText || "Non renseigné" },
+              { term: "Avertissement (EN)", value: legalNotice.en?.disclaimer || "Non renseigné" },
+              {
+                term: "Pays liés",
+                value: linkedCountries.length > 0
+                  ? linkedCountries.map((country) => <a key={country.id} className="bo-ref" href={`/catalog/countries/${encodeURIComponent(country.id)}#liaisons`}>{country.isoCode} </a>)
+                  : "Aucun"
+              },
+              { term: "Mis à jour", value: formatDate(product.updatedAt) }
+            ]}
+          />
+        </Card>
+        <ProductStatusForm productId={product.id} currentStatus={product.status} canApprovePublic={canApproveCompliance} />
+      </Split>
 
       <EditProductForm product={product} categories={activeCategories} />
-
-      <ProductStatusForm productId={product.id} currentStatus={product.status} canApprovePublic={canApproveCompliance} />
 
       <Card title="Flags globaux du produit" description="Un formulaire par flag. Désactiver n'a aucune condition ; activer vérifie les conditions (formulaire et consentement publiés).">
         <DataTable
           columns={[
-            { key: "flag", header: "Flag", render: (key: string) => <><strong>{flagLabel(key)}</strong><div><code>{key}</code></div></> },
+            { key: "flag", header: "Flag", render: (key: string) => <><strong>{flagLabel(key)}</strong><div className="bo-ref">{key}</div></> },
             { key: "value", header: "État", render: (key: string) => <Badge tone={flagValue(key) ? "warning" : "disabled"}>{flagValue(key) ? "Ouvert" : "Fermé"}</Badge> },
             {
               key: "action",
@@ -137,7 +139,7 @@ export default async function CatalogProductDetailPage({ params }: ProductDetail
             <ul className="bo-list">
               {readOnlyFlags.map((key) => (
                 <li key={key}>
-                  <code>{key}</code> : {flagValue(key) ? "ouvert" : "fermé"}. {SENSITIVE_FLAG_EXPLANATION}
+                  <span className="bo-ref">{key}</span> : {flagValue(key) ? "ouvert" : "fermé"}. {SENSITIVE_FLAG_EXPLANATION}
                 </li>
               ))}
             </ul>

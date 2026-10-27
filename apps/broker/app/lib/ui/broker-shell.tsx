@@ -3,8 +3,9 @@
 import { usePathname } from "next/navigation";
 import type { ReactNode } from "react";
 import { AppShell, AuthShell, Notice } from "@assurmatch/ui/backoffice";
-import type { AppShellUser, NavGroup } from "@assurmatch/ui/backoffice";
+import type { AppShellUser, NavGroup, ThemeValue } from "@assurmatch/ui/backoffice";
 import { logoutAction } from "../backoffice-session-actions";
+import { BROKER_THEME_COOKIE } from "../theme-cookie";
 import { PLATFORM_MENTION, brandAccentCss } from "../branding";
 import type { BrokerBranding } from "../branding";
 
@@ -21,6 +22,8 @@ export interface BrokerShellProps {
   envBadge?: string | undefined;
   /** Spec 051 R12: persistent banner of a suspended partner (computed by the layout from the session). */
   suspendedBanner?: string | undefined;
+  /** Current theme, read from the cookie by the layout. */
+  theme?: ThemeValue | undefined;
 }
 
 /** Ecrans d'authentification: rendus hors du shell applicatif, sans navigation ni session. */
@@ -66,7 +69,7 @@ function brokerNavigation(plan?: BrokerPlan | undefined, showAgenciesOverview = 
 
   return [
     {
-      title: "Activite",
+      title: "Activité",
       items: [
         { label: "Dashboard", href: "/", icon: "dashboard", match: ["/"] },
         { label: "Leads", href: "/leads", icon: "leads", match: ["/leads"] },
@@ -91,7 +94,7 @@ function brokerNavigation(plan?: BrokerPlan | undefined, showAgenciesOverview = 
         // Spec 053 (G-01..G-04): company profile, licences and team are open to every plan.
         { label: "Société", href: "/company", icon: "partners", match: ["/company"] },
         { label: "Licences", href: "/licenses", icon: "shield", match: ["/licenses"] },
-        { label: "Equipe", href: "/team", icon: "team", match: ["/team"] },
+        { label: "Équipe", href: "/team", icon: "team", match: ["/team"] },
         { label: "Entreprise", href: "/enterprise", icon: "building", match: ["/enterprise"], badge: organisationBadge },
         // Lot 3 (spec 069 FR-003): consolidated multi-agency view, linked only when the layout allows it (Enterprise plan and a role seeing the whole cabinet).
         ...(showAgenciesOverview ? [{ label: AGENCIES_OVERVIEW_LABEL, href: AGENCIES_OVERVIEW_HREF, icon: "gauge" as const, match: [AGENCIES_OVERVIEW_HREF] }] : [])
@@ -110,7 +113,7 @@ function brokerNavigation(plan?: BrokerPlan | undefined, showAgenciesOverview = 
 }
 
 /** Enveloppe mince autour du design system back-office partage: aucune logique de session ici. */
-export function BrokerShell({ children, user, plan, showAgenciesOverview, branding, envBadge, suspendedBanner }: BrokerShellProps) {
+export function BrokerShell({ children, user, plan, showAgenciesOverview, branding, envBadge, suspendedBanner, theme }: BrokerShellProps) {
   const pathname = usePathname() || "/";
   // Spec 064 FR-009: the cabinet label sits next to the plan and the platform mention is always kept.
   // The colour only overrides the sidebar primary token, and only when it keeps a readable contrast.
@@ -138,6 +141,7 @@ export function BrokerShell({ children, user, plan, showAgenciesOverview, brandi
       menuOpenLabel="Ouvrir le menu courtier"
       menuCloseLabel="Fermer le menu courtier"
       userMenuLabel="Menu du compte courtier"
+      themePicker={{ cookieName: BROKER_THEME_COOKIE, current: theme ?? "clair", label: "Theme" }}
       breadcrumbLabel="Fil d'Ariane"
       dataAttributes={{ "data-broker-shell": "true", ...(accentCss ? { "data-broker-brand": "custom" } : {}) }}
     >

@@ -18,7 +18,6 @@ import type { OfferType } from "../../../../packages/shared/contracts/offer-cont
 import {
   Badge,
   Button,
-  Card,
   Cluster,
   DataTable,
   Field,
@@ -31,6 +30,7 @@ import {
   fieldControlProps
 } from "../lib/ui/broker-ui";
 import type { DataTableColumn } from "../lib/ui/broker-ui";
+import styles from "../lib/ui/broker-screens.module.css";
 
 /**
  * Spec 052 US1/US3 (FR-006): « Mes offres ». Every broker role reads its own partner's offers;
@@ -64,7 +64,7 @@ export default async function BrokerOffersPage({
   if (session.status !== "authenticated" || !canReadOffers(session.profile)) {
     return (
       <PageStack>
-        <PageHeader breadcrumb={BREADCRUMB} kicker="Offres" title="Acces refuse" description="La consultation des offres exige une session courtier authentifiee et la MFA verifiee." />
+        <PageHeader breadcrumb={BREADCRUMB} title="Acces refuse" description="La consultation des offres exige une session courtier authentifiee et la MFA verifiee." />
       </PageStack>
     );
   }
@@ -87,8 +87,8 @@ export default async function BrokerOffersPage({
       render: (offer) => (
         <>
           <a href={`/offers/${encodeURIComponent(offer.id)}`}><strong>{offerDisplayName(offer)}</strong></a>
-          <div>{scopeLabel.get(`${offer.countryId}:${offer.productId}`) ?? OFFER_SCOPE_OUTSIDE_COVERAGE}</div>
-          <div>
+          <div className={styles.entryMeta}>{scopeLabel.get(`${offer.countryId}:${offer.productId}`) ?? OFFER_SCOPE_OUTSIDE_COVERAGE}</div>
+          <div className={styles.entryMeta}>
             {offerTypeLabel(offer.offerType)}
             {offer.offerType === "private" ? <> <Badge tone="warning">{PRIVATE_OFFER_BADGE}</Badge></> : null}
           </div>
@@ -134,42 +134,47 @@ export default async function BrokerOffersPage({
     <PageStack>
       <PageHeader
         breadcrumb={BREADCRUMB}
-        kicker="Offres"
         title="Mes offres"
-        description="Vos offres indicatives et leurs versions. Une offre n'est visible du public qu'après validation par AssurMatch ; une modification crée une nouvelle version à valider, la version publiée restant en ligne d'ici là."
+        description="Vos offres indicatives et leurs versions. Une offre n'est visible du public qu'après validation par AssurMatch ; une modification crée une nouvelle version à valider."
         actions={canWrite ? <Button href="/offers/new">Nouvelle offre</Button> : null}
       />
       {readOnlyTenant ? <Notice tone="warning">{TENANT_SUSPENDED_MESSAGE}</Notice> : null}
       {!canWrite && !readOnlyTenant ? (
         <Notice tone="info">Consultation seule : seuls le propriétaire et les managers du cabinet créent et modifient les offres.</Notice>
       ) : null}
-      <Notice tone="info">Offre indicative : prix à confirmer par le courtier partenaire. Aucune offre ne vaut devis ferme ni contrat.</Notice>
+      <Notice tone="neutral">Offre indicative : prix à confirmer par le courtier partenaire. Aucune offre ne vaut devis ferme ni contrat.</Notice>
 
-      <Card title="Offres du cabinet">
-        <FilterBar action="/offers" label="Filtres offres" submitLabel="Filtrer" resetLabel="Reinitialiser" resetHref="/offers" activeCount={(status ? 1 : 0) + (offerType ? 1 : 0)}>
-          <Field id="broker-offers-status" label="Statut">
-            <Select {...fieldControlProps("broker-offers-status")} name="status" defaultValue={status ?? ""}>
-              <option value="">Tous</option>
-              {OFFER_STATUS_OPTIONS.map((option) => <option key={option} value={option}>{OFFER_STATUS_LABELS[option]}</option>)}
-            </Select>
-          </Field>
-          <Field id="broker-offers-type" label="Type d'offre">
-            <Select {...fieldControlProps("broker-offers-type")} name="offerType" defaultValue={offerType ?? ""}>
-              <option value="">Tous</option>
-              {OFFER_TYPE_FILTER_OPTIONS.map((option) => <option key={option} value={option}>{OFFER_TYPE_SHORT_LABELS[option]}</option>)}
-            </Select>
-          </Field>
-        </FilterBar>
-        {offers.status === "forbidden" ? <Notice tone="danger">Accès aux offres refusé pour ce compte.</Notice> : null}
-        {offers.status === "error" ? <Notice tone="danger">Offres temporairement indisponibles ({offers.error ?? "erreur inconnue"}).</Notice> : null}
-        <DataTable
-          columns={columns}
-          items={offers.data}
-          getKey={(offer) => offer.id}
-          aria-label="Mes offres"
-          emptyLabel="Aucune offre pour le moment."
-        />
-      </Card>
+      <FilterBar action="/offers" label="Filtres offres" submitLabel="Filtrer" resetLabel="Reinitialiser" resetHref="/offers" activeCount={(status ? 1 : 0) + (offerType ? 1 : 0)} autoSubmit>
+        <Field id="broker-offers-status" label="Statut">
+          <Select {...fieldControlProps("broker-offers-status")} name="status" defaultValue={status ?? ""}>
+            <option value="">Tous</option>
+            {OFFER_STATUS_OPTIONS.map((option) => <option key={option} value={option}>{OFFER_STATUS_LABELS[option]}</option>)}
+          </Select>
+        </Field>
+        <Field id="broker-offers-type" label="Type d'offre">
+          <Select {...fieldControlProps("broker-offers-type")} name="offerType" defaultValue={offerType ?? ""}>
+            <option value="">Tous</option>
+            {OFFER_TYPE_FILTER_OPTIONS.map((option) => <option key={option} value={option}>{OFFER_TYPE_SHORT_LABELS[option]}</option>)}
+          </Select>
+        </Field>
+      </FilterBar>
+      {offers.status === "forbidden" ? <Notice tone="danger">Accès aux offres refusé pour ce compte.</Notice> : null}
+      {offers.status === "error" ? <Notice tone="danger">Offres temporairement indisponibles ({offers.error ?? "erreur inconnue"}).</Notice> : null}
+      <DataTable
+        columns={columns}
+        items={offers.data}
+        getKey={(offer) => offer.id}
+        aria-label="Mes offres"
+        emptyLabel={status || offerType ? "Aucune offre avec ce filtre." : "Aucune offre pour le moment."}
+        emptyDescription={
+          status || offerType
+            ? "Choisissez un autre filtre ou reinitialisez le filtre."
+            : canWrite
+              ? "Créez une offre indicative : elle est enregistrée en brouillon puis publiée après validation par AssurMatch."
+              : "Le propriétaire ou un manager du cabinet crée les offres ; elles apparaîtront ici."
+        }
+        emptyAction={!status && !offerType && canWrite ? <Button href="/offers/new" variant="secondary" size="sm">Créer une offre</Button> : undefined}
+      />
     </PageStack>
   );
 }

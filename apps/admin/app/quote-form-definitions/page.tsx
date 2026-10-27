@@ -1,16 +1,18 @@
 import { readQuoteFormDefinitions, type QuoteFormDefinitionData } from "../lib/admin-api";
 import {
   Badge,
-  Card,
+  Button,
   DataTable,
   Field,
   FilterBar,
   Grid,
-  KpiCard,
+  Notice,
   PageHeader,
   PageStack,
   Select,
+  Stack,
   StateMessage,
+  StatStrip,
   StatusBadge,
   fieldControlProps,
   paginateItems,
@@ -33,8 +35,8 @@ function firstParam(value: string | string[] | undefined): string {
 }
 
 const columns: Array<DataTableColumn<QuoteFormDefinitionData>> = [
-  { key: "country", header: "Pays", render: (form) => <code>{form.countryId.slice(0, 8)}</code>, sortable: true, sortValue: (form) => form.countryId },
-  { key: "product", header: "Produit", render: (form) => <code>{form.productId.slice(0, 8)}</code>, sortable: true, sortValue: (form) => form.productId },
+  { key: "country", header: "Pays", render: (form) => <span className="bo-ref">{form.countryId.slice(0, 8)}</span>, sortable: true, sortValue: (form) => form.countryId },
+  { key: "product", header: "Produit", render: (form) => <span className="bo-ref">{form.productId.slice(0, 8)}</span>, sortable: true, sortValue: (form) => form.productId },
   { key: "language", header: "Langue", render: (form) => form.language, sortable: true, sortValue: (form) => form.language },
   { key: "version", header: "Version", render: (form) => form.version, sortable: true, sortValue: (form) => form.version },
   {
@@ -50,7 +52,7 @@ const columns: Array<DataTableColumn<QuoteFormDefinitionData>> = [
     header: "Consentement",
     render: (form) => (
       <>
-        <a href={`/consent-texts/${encodeURIComponent(form.consentTextId)}`}><code>{form.consentTextId.slice(0, 8)}</code></a>
+        <a href={`/consent-texts/${encodeURIComponent(form.consentTextId)}`}><span className="bo-ref">{form.consentTextId.slice(0, 8)}</span></a>
         {/* Spec 050 FR-019: a more recent published version of the linked consent text exists. */}
         {form.consentSuperseded ? <Badge tone="warning">Consentement remplacé</Badge> : null}
       </>
@@ -63,7 +65,7 @@ const columns: Array<DataTableColumn<QuoteFormDefinitionData>> = [
     sortable: true,
     sortValue: (form) => form.publishedAt ?? null
   },
-  { key: "id", header: "Identifiant", render: (form) => <code>{form.id}</code> }
+  { key: "id", header: "Identifiant", render: (form) => <span className="bo-ref">{form.id}</span> }
 ];
 
 export default async function AdminQuoteFormDefinitionsPage({
@@ -93,9 +95,9 @@ export default async function AdminQuoteFormDefinitionsPage({
     <PageStack>
       <PageHeader
         breadcrumb={[{ label: "Catalogue" }, { label: "Formulaires devis" }]}
-        kicker="Parcours devis"
         title="Formulaires de demande de devis"
         description="Definitions versionnees par pays, produit et langue. Un formulaire n'est expose aux visiteurs qu'une fois publie et lie a un texte de consentement publie."
+        actions={forms.status === "success" ? <Button href="#creer-formulaire">Creer un brouillon</Button> : null}
       />
 
       {forms.unauthenticated ? <StateMessage tone="danger">Session admin requise.</StateMessage> : null}
@@ -104,12 +106,21 @@ export default async function AdminQuoteFormDefinitionsPage({
 
       {forms.status === "success" ? (
         <>
-          <Grid columns="kpi" as="section" aria-label="Synthese formulaires">
-            <KpiCard label="Versions publiees" value={published.length} tone={published.length > 0 ? "success" : "warning"} />
-            <KpiCard label="Brouillons" value={drafts.length} tone="neutral" />
-            <KpiCard label="Parcours exposes" value={exposedScopes.size} tone={exposedScopes.size > 0 ? "success" : "warning"} />
-            <KpiCard label="Consentement remplacé" value={superseded.length} tone={superseded.length > 0 ? "warning" : "neutral"} />
-          </Grid>
+          {published.length === 0 ? (
+            <StateMessage tone="warning">
+              Aucune version publiee: la demande de devis est indisponible pour tous les pays et produits. La checklist d'activation le signale comme bloquant.
+            </StateMessage>
+          ) : null}
+
+          <StatStrip
+            label="Synthese formulaires"
+            items={[
+              { label: "Versions publiees", value: published.length, tone: published.length > 0 ? "success" : "warning" },
+              { label: "Brouillons", value: drafts.length },
+              { label: "Parcours exposes", value: exposedScopes.size, tone: exposedScopes.size > 0 ? "success" : "warning" },
+              { label: "Consentement remplacé", value: superseded.length, tone: superseded.length > 0 ? "warning" : "neutral" }
+            ]}
+          />
 
           {superseded.length > 0 ? (
             <StateMessage tone="warning">
@@ -117,68 +128,61 @@ export default async function AdminQuoteFormDefinitionsPage({
             </StateMessage>
           ) : null}
 
-          <Card title="Versions">
-            <FilterBar
-              action="/quote-form-definitions"
-              label="Filtres formulaires de devis"
-              submitLabel="Filtrer"
-              resetLabel="Reinitialiser"
-              resetHref="/quote-form-definitions"
-              activeCount={(statusFilter ? 1 : 0) + (languageFilter ? 1 : 0)}
-              autoSubmit
-            >
-              <Field id="quote-form-status" label="Statut">
-                <Select {...fieldControlProps("quote-form-status")} name="status" defaultValue={statusFilter}>
-                  <option value="">Tous</option>
-                  {statusOptions.map((option) => <option key={option} value={option}>{option}</option>)}
-                </Select>
-              </Field>
-              <Field id="quote-form-language" label="Langue">
-                <Select {...fieldControlProps("quote-form-language")} name="language" defaultValue={languageFilter}>
-                  <option value="">Toutes</option>
-                  {languageOptions.map((option) => <option key={option} value={option}>{option}</option>)}
-                </Select>
-              </Field>
-            </FilterBar>
-            <DataTable
-              columns={columns}
-              items={rows}
-              getKey={(form) => form.id}
-              emptyLabel="Aucune definition: le parcours de demande de devis reste indisponible cote public."
-              aria-label="Versions de formulaire de devis"
-              sort={table.sort}
-              sortHref={table.sortHref}
-              pagination={{
-                page: table.page,
-                pageSize: table.pageSize,
-                total: visible.length,
-                hrefFor: table.pageHref,
-                label: (from, to, total) => `${from}-${to} sur ${total} versions`
-              }}
-            />
-          </Card>
+          <FilterBar
+            action="/quote-form-definitions"
+            label="Filtres formulaires de devis"
+            submitLabel="Filtrer"
+            resetLabel="Reinitialiser"
+            resetHref="/quote-form-definitions"
+            activeCount={(statusFilter ? 1 : 0) + (languageFilter ? 1 : 0)}
+            autoSubmit
+          >
+            <Field id="quote-form-status" label="Statut">
+              <Select {...fieldControlProps("quote-form-status")} name="status" defaultValue={statusFilter}>
+                <option value="">Tous</option>
+                {statusOptions.map((option) => <option key={option} value={option}>{option}</option>)}
+              </Select>
+            </Field>
+            <Field id="quote-form-language" label="Langue">
+              <Select {...fieldControlProps("quote-form-language")} name="language" defaultValue={languageFilter}>
+                <option value="">Toutes</option>
+                {languageOptions.map((option) => <option key={option} value={option}>{option}</option>)}
+              </Select>
+            </Field>
+          </FilterBar>
+          <DataTable
+            columns={columns}
+            items={rows}
+            getKey={(form) => form.id}
+            emptyLabel="Aucune definition: le parcours de demande de devis reste indisponible cote public."
+            emptyDescription="Creez un brouillon ci-dessous, liez-le a un consentement publie, puis publiez-le."
+            aria-label="Versions de formulaire de devis"
+            sort={table.sort}
+            sortHref={table.sortHref}
+            pagination={{
+              page: table.page,
+              pageSize: table.pageSize,
+              total: visible.length,
+              hrefFor: table.pageHref,
+              label: (from, to, total) => `${from}-${to} sur ${total} versions`
+            }}
+          />
 
-          {published.length === 0 ? (
-            <StateMessage tone="warning">
-              Aucune version publiee: la demande de devis est indisponible pour tous les pays et produits. La checklist d'activation le signale comme bloquant.
-            </StateMessage>
-          ) : null}
-
-          <Grid columns="two">
-            <CreateQuoteFormDefinitionForm />
-            <PublishQuoteFormDefinitionForm formIds={items.filter((form) => form.status !== "published").map((form) => form.id)} />
-          </Grid>
+          <Notice tone="neutral" title="Regles de publication">
+            <ul className="bo-list">
+              <li>Le texte de consentement doit etre publie, de finalite transmission de lead, et de meme langue, pays et produit (ou sans produit).</li>
+              <li>Les libelles de champ sont exposes aux visiteurs: le vocabulaire reglemente y est refuse.</li>
+              <li>Un champ sensible n'est publiable que si le flag produit correspondant est ouvert.</li>
+              <li>Une seule version publiee par pays, produit et langue: publier retire la precedente.</li>
+            </ul>
+          </Notice>
 
           <Grid columns="two">
-            <RetireQuoteFormDefinitionForm formIds={published.map((form) => form.id)} />
-            <Card title="Regles de publication">
-              <ul className="bo-list">
-                <li>Le texte de consentement doit etre publie, de finalite transmission de lead, et de meme langue, pays et produit (ou sans produit).</li>
-                <li>Les libelles de champ sont exposes aux visiteurs: le vocabulaire reglemente y est refuse.</li>
-                <li>Un champ sensible n'est publiable que si le flag produit correspondant est ouvert.</li>
-                <li>Une seule version publiee par pays, produit et langue: publier retire la precedente.</li>
-              </ul>
-            </Card>
+            <div id="creer-formulaire"><CreateQuoteFormDefinitionForm /></div>
+            <Stack>
+              <PublishQuoteFormDefinitionForm formIds={items.filter((form) => form.status !== "published").map((form) => form.id)} />
+              <RetireQuoteFormDefinitionForm formIds={published.map((form) => form.id)} />
+            </Stack>
           </Grid>
         </>
       ) : null}

@@ -1,6 +1,6 @@
 import type { BrokerDashboardData } from "../broker-api";
 import { CRM_SOURCE_LABELS } from "../crm-list-query";
-import { Card, DataTable, Grid, KpiCard, Notice } from "./broker-ui";
+import { Card, DataTable, Notice, StatStrip } from "./broker-ui";
 import { LEAD_COST_NOTICE, crmPerformanceKpis, crmTopSources, formatCount, formatRate } from "./broker-view-models";
 
 /**
@@ -17,11 +17,7 @@ export function CrmKpiSection({ data }: { data: BrokerDashboardData }) {
   return (
     <>
       <section aria-label="Indicateurs de performance commerciale">
-        <Grid columns="kpi">
-          {cards.map((card) => (
-            <KpiCard key={card.label} label={card.label} value={card.value} helper={card.helper} tone={card.tone} />
-          ))}
-        </Grid>
+        <StatStrip items={cards.map((card) => ({ label: card.label, value: card.value, helper: card.helper, tone: card.tone }))} />
         {hasCost ? <Notice tone="info">{LEAD_COST_NOTICE}</Notice> : null}
       </section>
 

@@ -4,7 +4,8 @@ import { TENANT_SUSPENDED_MESSAGE, canManageTeam, isBrokerOwner, isTenantReadOnl
 import { readBrokerCustomRoles } from "../lib/broker-api";
 import { readBrokerTeam, type BrokerTeamMemberView } from "../lib/self-service-api";
 import { TEAM_ROLE_LABELS, TEAM_STATUS_LABELS, selfServiceFormatDate } from "../lib/self-service-messages";
-import { Badge, Card, Cluster, DataTable, Notice, PageHeader, PageStack, StateMessage, TenantWriteGuard } from "../lib/ui/broker-ui";
+import { Badge, Button, Card, Cluster, DataTable, Notice, PageHeader, PageStack, StateMessage, TenantWriteGuard } from "../lib/ui/broker-ui";
+import styles from "../lib/ui/broker-screens.module.css";
 import { CustomRoleForm, InviteMemberForm, MemberActionForm } from "./team-forms";
 
 /**
@@ -82,9 +83,9 @@ export default async function BrokerTeamPage({ searchParams }: { searchParams: P
     <PageStack>
       <PageHeader
         breadcrumb={BREADCRUMB}
-        kicker="Equipe courtier"
         title="Equipe"
         description="Lecture tenant-safe des utilisateurs de votre cabinet. Toute invitation, désactivation ou changement de rôle est audité ; la MFA reste obligatoire pour chacun."
+        actions={canManage && !readOnlyTenant ? <Button href="#inviter">Inviter un collaborateur</Button> : null}
       />
 
       {readOnlyTenant ? <Notice tone="warning">{TENANT_SUSPENDED_MESSAGE}</Notice> : null}
@@ -106,7 +107,7 @@ export default async function BrokerTeamPage({ searchParams }: { searchParams: P
                 <>
                   <strong>{member.displayName}</strong>
                   {member.isSelf ? <> <Badge tone="info">Vous</Badge></> : null}
-                  <div>{member.email}</div>
+                  <div className={styles.entryMeta}>{member.email}</div>
                 </>
               )
             },
@@ -120,20 +121,23 @@ export default async function BrokerTeamPage({ searchParams }: { searchParams: P
               : []),
             { key: "status", header: "Statut", render: (member: BrokerTeamMemberView) => <Badge tone={STATUS_TONES[member.status] ?? "info"}>{TEAM_STATUS_LABELS[member.status] ?? member.status}</Badge> },
             { key: "mfa", header: "MFA", render: (member: BrokerTeamMemberView) => <Badge tone={member.mfaEnrolled ? "success" : "warning"}>{member.mfaEnrolled ? "Enrôlée" : "À enrôler"}</Badge> },
-            { key: "login", header: "Dernière connexion", render: (member: BrokerTeamMemberView) => selfServiceFormatDate(member.lastLoginAt) },
+            { key: "login", header: "Dernière connexion", render: (member: BrokerTeamMemberView) => <span className="bo-ref">{selfServiceFormatDate(member.lastLoginAt)}</span> },
             { key: "actions", header: "Actions", render: (member: BrokerTeamMemberView) => (readOnlyTenant ? null : actionsFor(member)) }
           ]}
           items={members}
           getKey={(member) => member.id}
           emptyLabel="Aucun utilisateur."
+          emptyDescription="Invitez un premier collaborateur : il reçoit l'e-mail d'activation puis enrôle sa MFA."
           aria-label="Membres de l'équipe"
         />
       </Card>
 
       {canManage || readOnlyTenant ? (
-        <TenantWriteGuard readOnly={readOnlyTenant}>
-          <InviteMemberForm />
-        </TenantWriteGuard>
+        <div id="inviter">
+          <TenantWriteGuard readOnly={readOnlyTenant}>
+            <InviteMemberForm />
+          </TenantWriteGuard>
+        </div>
       ) : null}
     </PageStack>
   );

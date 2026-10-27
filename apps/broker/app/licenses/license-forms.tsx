@@ -4,7 +4,8 @@ import { useActionState, useId, useState } from "react";
 import { useRouter } from "next/navigation";
 import { renewLicenseAction, type SelfServiceActionState } from "../lib/self-service-actions";
 import { PROOF_ACCEPT, PROOF_MAX_BYTES, UPLOAD_CSRF_HEADER } from "../lib/self-service-messages";
-import { Button, Card, Field, Form, FormActions, Input, Notice, Select, fieldControlProps } from "../lib/ui/broker-ui";
+import { Button, Field, Form, FormActions, Input, Notice, Select, fieldControlProps } from "../lib/ui/broker-ui";
+import styles from "../lib/ui/broker-screens.module.css";
 import { SelfServiceResult } from "../company/company-forms";
 
 /**
@@ -19,7 +20,9 @@ export function RenewLicenseForm({ licenseId, licenseNumber, products }: { licen
   const [state, formAction, pending] = useActionState(renewLicenseAction, initialState);
   const base = useId();
   return (
-    <Card muted title={`Déposer le renouvellement de ${licenseNumber}`} description="La nouvelle licence reste en brouillon jusqu'au dépôt de la preuve, puis en revue jusqu'à la décision de la conformité. L'actuelle reste valide d'ici là.">
+    <section className={`${styles.entry} ${styles.subsection}`} aria-label={`Déposer le renouvellement de ${licenseNumber}`}>
+      <h3 className={styles.entryTitle}>{`Déposer le renouvellement de ${licenseNumber}`}</h3>
+      <p className={styles.muted}>La nouvelle licence reste en brouillon jusqu&apos;au dépôt de la preuve, puis en revue jusqu&apos;à la décision de la conformité. L&apos;actuelle reste valide d&apos;ici là.</p>
       <SelfServiceResult state={state} />
       <Form action={formAction} columns={2} data-license-form="renew">
         <input type="hidden" name="licenseId" value={licenseId} />
@@ -45,7 +48,7 @@ export function RenewLicenseForm({ licenseId, licenseNumber, products }: { licen
           <Button type="submit" variant="secondary" pending={pending} pendingLabel="Enregistrement...">Enregistrer le renouvellement</Button>
         </FormActions>
       </Form>
-    </Card>
+    </section>
   );
 }
 
@@ -84,7 +87,9 @@ export function UploadProofForm({ licenseId, licenseNumber }: { licenseId: strin
   }
 
   return (
-    <Card muted title={`Preuve de la licence ${licenseNumber}`} description="PDF, JPEG ou PNG, 5 Mo au plus. Le fichier est analysé par l'antivirus ; un fichier infecté est mis en quarantaine.">
+    <section className={`${styles.entry} ${styles.subsection}`} aria-label={`Preuve de la licence ${licenseNumber}`}>
+      <h3 className={styles.entryTitle}>{`Preuve de la licence ${licenseNumber}`}</h3>
+      <p className={styles.muted}>PDF, JPEG ou PNG, 5 Mo au plus. Le fichier est analysé par l&apos;antivirus ; un fichier infecté est mis en quarantaine.</p>
       <SelfServiceResult state={state} />
       {state.status === "success" ? <Notice tone="info">La conformité AssurMatch examine la preuve puis valide ou non la licence.</Notice> : null}
       <Form action={submit} data-license-form="proof">
@@ -98,6 +103,6 @@ export function UploadProofForm({ licenseId, licenseNumber }: { licenseId: strin
           <Button type="submit" pending={pending} pendingLabel="Dépôt...">Déposer la preuve</Button>
         </FormActions>
       </Form>
-    </Card>
+    </section>
   );
 }

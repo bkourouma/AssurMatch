@@ -14,7 +14,6 @@ export default async function ActivationPage({ searchParams }: PageProps) {
   const returnTo = firstParam(params.returnTo) || "/";
   return (
     <>
-      <p>Activation courtier</p>
       <h1 className="bo-auth__title">Activer le compte</h1>
       <ActivationForm token={token} returnTo={returnTo} />
     </>

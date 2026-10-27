@@ -1,0 +1,159 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-10-08T00:00:00Z",
+  "title": "Design System: AssurMatch Back-offices (admin and courtier)",
+  "extensions": {
+    "colorMeta": {
+      "ground": { "role": "neutral", "displayName": "Charcoal Ground", "canonical": "oklch(0.175 0.004 250)", "tonalRamp": ["oklch(0.15 0.004 250)", "oklch(0.175 0.004 250)", "oklch(0.2 0.005 250)", "oklch(0.225 0.005 250)", "oklch(0.275 0.006 250)", "oklch(0.31 0.006 250)", "oklch(0.43 0.008 250)", "oklch(0.6 0.01 250)"] },
+      "surface": { "role": "neutral", "displayName": "Ash Plate", "canonical": "oklch(0.225 0.005 250)", "tonalRamp": ["oklch(0.145 0.004 250)", "oklch(0.175 0.004 250)", "oklch(0.2 0.005 250)", "oklch(0.225 0.005 250)", "oklch(0.25 0.005 250)", "oklch(0.275 0.006 250)", "oklch(0.31 0.006 250)", "oklch(0.35 0.007 250)"] },
+      "surface-2": { "role": "neutral", "displayName": "Deep Ash Plate", "canonical": "oklch(0.2 0.005 250)", "tonalRamp": ["oklch(0.145 0.004 250)", "oklch(0.16 0.004 250)", "oklch(0.175 0.004 250)", "oklch(0.2 0.005 250)", "oklch(0.225 0.005 250)", "oklch(0.25 0.005 250)", "oklch(0.275 0.006 250)", "oklch(0.31 0.006 250)"] },
+      "rail": { "role": "neutral", "displayName": "Rail Charcoal", "canonical": "oklch(0.15 0.004 250)", "tonalRamp": ["oklch(0.1 0.004 250)", "oklch(0.12 0.004 250)", "oklch(0.135 0.004 250)", "oklch(0.15 0.004 250)", "oklch(0.175 0.004 250)", "oklch(0.2 0.005 250)", "oklch(0.225 0.005 250)", "oklch(0.275 0.006 250)"] },
+      "inset": { "role": "neutral", "displayName": "Inset Field", "canonical": "oklch(0.145 0.004 250)", "tonalRamp": ["oklch(0.1 0.004 250)", "oklch(0.12 0.004 250)", "oklch(0.13 0.004 250)", "oklch(0.145 0.004 250)", "oklch(0.16 0.004 250)", "oklch(0.175 0.004 250)", "oklch(0.2 0.005 250)", "oklch(0.225 0.005 250)"] },
+      "hover": { "role": "neutral", "displayName": "Hover Ash", "canonical": "oklch(0.275 0.006 250)", "tonalRamp": ["oklch(0.2 0.005 250)", "oklch(0.225 0.005 250)", "oklch(0.25 0.005 250)", "oklch(0.275 0.006 250)", "oklch(0.3 0.006 250)", "oklch(0.325 0.006 250)", "oklch(0.35 0.007 250)", "oklch(0.4 0.008 250)"] },
+      "line": { "role": "neutral", "displayName": "Hairline", "canonical": "oklch(0.31 0.006 250)", "tonalRamp": ["oklch(0.225 0.005 250)", "oklch(0.25 0.005 250)", "oklch(0.275 0.006 250)", "oklch(0.31 0.006 250)", "oklch(0.35 0.007 250)", "oklch(0.39 0.007 250)", "oklch(0.43 0.008 250)", "oklch(0.5 0.009 250)"] },
+      "line-strong": { "role": "neutral", "displayName": "Strong Hairline", "canonical": "oklch(0.43 0.008 250)", "tonalRamp": ["oklch(0.31 0.006 250)", "oklch(0.35 0.007 250)", "oklch(0.39 0.007 250)", "oklch(0.43 0.008 250)", "oklch(0.48 0.009 250)", "oklch(0.54 0.009 250)", "oklch(0.6 0.01 250)", "oklch(0.67 0.012 250)"] },
+      "control-line": { "role": "neutral", "displayName": "Control Line", "canonical": "oklch(0.6 0.01 250)", "tonalRamp": ["oklch(0.4 0.008 250)", "oklch(0.45 0.009 250)", "oklch(0.5 0.009 250)", "oklch(0.55 0.01 250)", "oklch(0.6 0.01 250)", "oklch(0.65 0.01 250)", "oklch(0.7 0.01 250)", "oklch(0.75 0.01 250)"] },
+      "ink": { "role": "neutral", "displayName": "Bone Ink", "canonical": "oklch(0.93 0.012 95)", "tonalRamp": ["oklch(0.5 0.012 95)", "oklch(0.58 0.012 95)", "oklch(0.67 0.012 95)", "oklch(0.74 0.012 95)", "oklch(0.8 0.012 95)", "oklch(0.86 0.012 95)", "oklch(0.93 0.012 95)", "oklch(0.97 0.01 95)"] },
+      "ink-2": { "role": "neutral", "displayName": "Muted Bone", "canonical": "oklch(0.8 0.012 95)", "tonalRamp": ["oklch(0.5 0.012 95)", "oklch(0.58 0.012 95)", "oklch(0.67 0.012 95)", "oklch(0.74 0.012 95)", "oklch(0.8 0.012 95)", "oklch(0.86 0.012 95)", "oklch(0.93 0.012 95)", "oklch(0.97 0.01 95)"] },
+      "ink-3": { "role": "neutral", "displayName": "Faint Bone", "canonical": "oklch(0.67 0.012 95)", "tonalRamp": ["oklch(0.4 0.012 95)", "oklch(0.47 0.012 95)", "oklch(0.55 0.012 95)", "oklch(0.61 0.012 95)", "oklch(0.67 0.012 95)", "oklch(0.74 0.012 95)", "oklch(0.8 0.012 95)", "oklch(0.93 0.012 95)"] },
+      "accent-admin-cyan": { "role": "primary", "displayName": "Admin Cyan, 486nm", "canonical": "oklch(0.82 0.12 210)", "tonalRamp": ["oklch(0.27 0.045 210)", "oklch(0.4 0.07 210)", "oklch(0.5 0.09 210)", "oklch(0.62 0.11 210)", "oklch(0.72 0.12 210)", "oklch(0.82 0.12 210)", "oklch(0.88 0.1 210)", "oklch(0.95 0.04 210)"] },
+      "accent-broker-violet": { "role": "primary", "displayName": "Courtier Violet, 405nm", "canonical": "oklch(0.78 0.13 295)", "tonalRamp": ["oklch(0.27 0.05 295)", "oklch(0.4 0.09 295)", "oklch(0.52 0.11 295)", "oklch(0.64 0.13 295)", "oklch(0.72 0.13 295)", "oklch(0.78 0.13 295)", "oklch(0.85 0.11 295)", "oklch(0.95 0.04 295)"] },
+      "success": { "role": "secondary", "displayName": "Line Green, 546nm", "canonical": "oklch(0.82 0.16 150)", "tonalRamp": ["oklch(0.26 0.045 150)", "oklch(0.35 0.07 150)", "oklch(0.45 0.09 150)", "oklch(0.6 0.13 150)", "oklch(0.7 0.16 150)", "oklch(0.8 0.18 150)", "oklch(0.82 0.16 150)", "oklch(0.93 0.07 150)"] },
+      "warning": { "role": "secondary", "displayName": "Sodium Yellow, 589nm", "canonical": "oklch(0.88 0.15 95)", "tonalRamp": ["oklch(0.27 0.045 95)", "oklch(0.38 0.07 95)", "oklch(0.5 0.09 95)", "oklch(0.65 0.12 95)", "oklch(0.78 0.15 95)", "oklch(0.87 0.17 95)", "oklch(0.88 0.15 95)", "oklch(0.95 0.07 95)"] },
+      "danger": { "role": "secondary", "displayName": "Line Red, 656nm", "canonical": "oklch(0.75 0.17 25)", "tonalRamp": ["oklch(0.26 0.05 25)", "oklch(0.38 0.08 25)", "oklch(0.5 0.11 25)", "oklch(0.6 0.16 25)", "oklch(0.7 0.2 25)", "oklch(0.75 0.17 25)", "oklch(0.83 0.1 25)", "oklch(0.93 0.04 25)"] },
+      "info": { "role": "secondary", "displayName": "Line Blue, 436nm", "canonical": "oklch(0.78 0.11 250)", "tonalRamp": ["oklch(0.26 0.04 250)", "oklch(0.36 0.06 250)", "oklch(0.47 0.08 250)", "oklch(0.6 0.11 250)", "oklch(0.7 0.12 250)", "oklch(0.75 0.13 250)", "oklch(0.78 0.11 250)", "oklch(0.9 0.05 250)"] }
+    },
+    "typographyMeta": {
+      "title": { "displayName": "Title", "purpose": "Open page title only: light, semi-wide (width 114%)." },
+      "section": { "displayName": "Section", "purpose": "Dialog and auth titles, attention counts (mono)." },
+      "card-title": { "displayName": "Card title", "purpose": "Card, empty-state and topbar headings." },
+      "body": { "displayName": "Body", "purpose": "Default text and field values." },
+      "label": { "displayName": "Label", "purpose": "Uppercase, semi-condensed: section titles, nav groups, table headers, app tag." },
+      "stat": { "displayName": "Stat", "purpose": "Headline figures in mono, tabular." },
+      "data": { "displayName": "Data", "purpose": "References, identifiers, amounts, numeric cells in mono." }
+    },
+    "shadows": [
+      { "name": "popover", "value": "0 10px 28px oklch(0.05 0.004 250 / 0.6), 0 0 0 1px oklch(0.43 0.008 250)", "purpose": "User menu and dialogs only. The sole elevation shadow." },
+      { "name": "field-focus-halo", "value": "0 0 0 3px var(--bo-accent-soft)", "purpose": "Focus halo on inputs in the lead wavelength (danger-soft when invalid)." }
+    ],
+    "motion": [
+      { "name": "ease", "value": "cubic-bezier(0.22, 1, 0.36, 1)", "purpose": "All hover and state transitions, 0.1 to 0.2s." },
+      { "name": "scale-travel", "value": "linear, scroll(root block)", "purpose": "The ruler's lit tick tracks the scroll position; at rest under reduced motion." }
+    ],
+    "breakpoints": [
+      { "name": "wide-collapse", "value": "1100px" },
+      { "name": "drawer", "value": "900px" },
+      { "name": "narrow-grids", "value": "780px" },
+      { "name": "phone", "value": "760px" }
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary Button (bone plate)",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "The one solid action per view: bone fill, charcoal text.",
+      "html": "<button class=\"ds-btn\">Enregistrer</button>",
+      "css": ".ds-btn { display:inline-flex; align-items:center; justify-content:center; min-height:36px; padding:0 16px; border:1px solid oklch(0.93 0.012 95); border-radius:2px; background:oklch(0.93 0.012 95); color:oklch(0.175 0.004 250); font:600 14px/1.2 Archivo, system-ui, sans-serif; font-stretch:94%; letter-spacing:0.02em; cursor:pointer; transition:background-color .12s, border-color .12s; } .ds-btn:hover { background:#fff; border-color:#fff; } .ds-btn:focus-visible { outline:2px solid oklch(0.82 0.12 210); outline-offset:2px; } .ds-btn:active { transform:translateY(0.5px); }"
+    },
+    {
+      "name": "Secondary Button",
+      "kind": "button",
+      "refersTo": "button-secondary",
+      "description": "Transparent with a strong hairline for supporting actions.",
+      "html": "<button class=\"ds-btn-2\">Annuler</button>",
+      "css": ".ds-btn-2 { display:inline-flex; align-items:center; min-height:36px; padding:0 16px; border:1px solid oklch(0.43 0.008 250); border-radius:2px; background:transparent; color:oklch(0.93 0.012 95); font:600 14px/1.2 Archivo, system-ui, sans-serif; font-stretch:94%; cursor:pointer; } .ds-btn-2:hover { background:oklch(0.275 0.006 250); border-color:oklch(0.67 0.012 95); } .ds-btn-2:focus-visible { outline:2px solid oklch(0.82 0.12 210); outline-offset:2px; }"
+    },
+    {
+      "name": "Text Field",
+      "kind": "input",
+      "refersTo": "field",
+      "description": "Inset charcoal field with a control-line border; the lead wavelength lights on focus.",
+      "html": "<label class=\"ds-field\"><span class=\"ds-field-label\">Reference</span><input class=\"ds-input\" value=\"DOS-2041\" /></label>",
+      "css": ".ds-field { display:grid; gap:6px; } .ds-field-label { font:600 14px/1.25 Archivo, system-ui, sans-serif; font-stretch:94%; color:oklch(0.93 0.012 95); } .ds-input { min-height:38px; padding:0 12px; border:1px solid oklch(0.6 0.01 250); border-radius:2px; background:oklch(0.145 0.004 250); color:oklch(0.93 0.012 95); font:15px Archivo, system-ui, sans-serif; color-scheme:dark; } .ds-input:hover { border-color:oklch(0.8 0.012 95); } .ds-input:focus { outline:none; border-color:oklch(0.82 0.12 210); box-shadow:0 0 0 3px oklch(0.27 0.045 210); }"
+    },
+    {
+      "name": "Navigation Tick Rail",
+      "kind": "nav",
+      "refersTo": "nav-link",
+      "description": "Each entry owns a short tick; the open entry extends it to a long lit line.",
+      "html": "<nav class=\"ds-nav\"><a class=\"ds-nav-link\" href=\"#\">Tableau de bord</a><a class=\"ds-nav-link\" href=\"#\" aria-current=\"page\">Dossiers</a><a class=\"ds-nav-link\" href=\"#\">Courtiers</a></nav>",
+      "css": ".ds-nav { display:grid; gap:1px; width:256px; padding:16px 0; background:oklch(0.15 0.004 250); } .ds-nav-link { position:relative; display:flex; align-items:center; min-height:34px; padding:6px 16px 6px 44px; color:oklch(0.8 0.012 95); font:500 14px Archivo, system-ui, sans-serif; text-decoration:none; } .ds-nav-link::before { content:''; position:absolute; top:50%; left:0; width:34px; height:1px; background:oklch(0.43 0.008 250); transform:scaleX(0.3); transform-origin:left center; transition:transform .2s cubic-bezier(.22,1,.36,1); } .ds-nav-link:hover { background:oklch(0.275 0.006 250); color:oklch(0.93 0.012 95); } .ds-nav-link:hover::before { transform:scaleX(0.55); background:oklch(0.67 0.012 95); } .ds-nav-link[aria-current='page'] { background:oklch(0.225 0.005 250); color:oklch(0.93 0.012 95); font-weight:600; } .ds-nav-link[aria-current='page']::before { transform:scaleX(1); height:2px; background:oklch(0.82 0.12 210); } .ds-nav-link:focus-visible { outline:2px solid oklch(0.82 0.12 210); outline-offset:-2px; }"
+    },
+    {
+      "name": "Emission Badge",
+      "kind": "chip",
+      "refersTo": "state-grammar",
+      "description": "A mark plus a label, no fill: solid, dashed, double, half-height, struck.",
+      "html": "<span class=\"ds-badge ds-ok\">Valide</span> <span class=\"ds-badge ds-warn\">En attente</span> <span class=\"ds-badge ds-bad\">Bloque</span> <span class=\"ds-badge ds-info\">Information</span> <span class=\"ds-badge ds-off\">Desactive</span>",
+      "css": ".ds-badge { display:inline-flex; align-items:center; gap:8px; min-height:24px; color:oklch(0.93 0.012 95); font:500 14px/1.25 Archivo, system-ui, sans-serif; font-stretch:94%; } .ds-badge::before { content:''; flex:none; width:3px; height:14px; background:var(--mark); } .ds-ok { --mark:oklch(0.8 0.18 150); } .ds-warn { --mark:oklch(0.87 0.17 95); } .ds-warn::before { background:repeating-linear-gradient(180deg, var(--mark) 0 4px, transparent 4px 6px); } .ds-bad { --mark:oklch(0.7 0.2 25); } .ds-bad::before { width:7px; background:linear-gradient(90deg, var(--mark) 0 3px, transparent 3px 4px, var(--mark) 4px 7px); } .ds-info { --mark:oklch(0.75 0.13 250); } .ds-info::before { height:8px; } .ds-off { --mark:oklch(0.67 0.012 95); color:oklch(0.67 0.012 95); text-decoration:line-through; } .ds-off::before { width:10px; height:1px; }"
+    },
+    {
+      "name": "Attention List",
+      "kind": "custom",
+      "refersTo": "card",
+      "description": "Queues on a shared scale: each row positions its emission line at its share of the largest queue.",
+      "html": "<div class=\"ds-card\"><div class=\"ds-row\" style=\"--share:1\"><div><div class=\"ds-row-label\">Dossiers a valider</div><div class=\"ds-row-help\">Depuis 48 h</div></div><div class=\"ds-scale\"><span class=\"ds-line ds-line-bad\"></span></div><div class=\"ds-count\">24</div></div><div class=\"ds-row\" style=\"--share:0.4\"><div><div class=\"ds-row-label\">Courtiers en attente</div><div class=\"ds-row-help\">A examiner</div></div><div class=\"ds-scale\"><span class=\"ds-line ds-line-warn\"></span></div><div class=\"ds-count\">10</div></div><div class=\"ds-row\" style=\"--share:0.15\"><div><div class=\"ds-row-label\">Messages</div><div class=\"ds-row-help\">Non lus</div></div><div class=\"ds-scale\"><span class=\"ds-line ds-line-info\"></span></div><div class=\"ds-count\">4</div></div></div>",
+      "css": ".ds-card { width:640px; border:1px solid oklch(0.31 0.006 250); border-radius:3px; background:oklch(0.225 0.005 250); color:oklch(0.93 0.012 95); font-family:Archivo, system-ui, sans-serif; } .ds-row { display:grid; grid-template-columns:minmax(0,1.1fr) minmax(120px,1fr) 5ch; align-items:center; gap:16px; min-height:64px; padding:12px 16px; border-top:1px solid oklch(0.31 0.006 250); } .ds-row:first-child { border-top:0; } .ds-row:hover { background:oklch(0.2 0.005 250); } .ds-row-label { font-size:15px; font-weight:600; } .ds-row-help { font-size:14px; color:oklch(0.67 0.012 95); } .ds-scale { position:relative; height:28px; border-bottom:1px solid oklch(0.43 0.008 250); background:repeating-linear-gradient(90deg, oklch(0.43 0.008 250) 0 1px, transparent 1px 25%) left bottom / 100% 6px no-repeat; } .ds-line { position:absolute; bottom:0; left:calc(var(--share) * 100%); height:24px; width:3px; margin-left:-1px; } .ds-line-bad { width:7px; background:linear-gradient(90deg, oklch(0.7 0.2 25) 0 3px, transparent 3px 4px, oklch(0.7 0.2 25) 4px 7px); } .ds-line-warn { background:repeating-linear-gradient(180deg, oklch(0.87 0.17 95) 0 4px, transparent 4px 6px); } .ds-line-info { height:14px; background:oklch(0.75 0.13 250); } .ds-count { font:400 20px 'Spline Sans Mono', ui-monospace, monospace; font-variant-numeric:tabular-nums; text-align:right; }"
+    },
+    {
+      "name": "Stat Strip",
+      "kind": "custom",
+      "refersTo": "card",
+      "description": "Several mono figures in one plate, separated by hairlines, each with a state mark.",
+      "html": "<ul class=\"ds-stats\"><li class=\"ds-cell\"><p class=\"ds-cell-label\">Dossiers actifs</p><p class=\"ds-cell-value\">128</p></li><li class=\"ds-cell\"><p class=\"ds-cell-label\">En retard</p><p class=\"ds-cell-value\">7</p></li><li class=\"ds-cell\"><p class=\"ds-cell-label\">Cotations</p><p class=\"ds-cell-value\">342</p></li></ul>",
+      "css": ".ds-stats { display:grid; grid-template-columns:repeat(3, 1fr); width:600px; margin:0; padding:0; list-style:none; border:1px solid oklch(0.31 0.006 250); border-radius:3px; background:oklch(0.225 0.005 250); overflow:hidden; color:oklch(0.93 0.012 95); font-family:Archivo, system-ui, sans-serif; } .ds-cell { display:grid; gap:4px; padding:16px 16px 24px; box-shadow:1px 0 0 0 oklch(0.31 0.006 250); } .ds-cell-label { display:flex; align-items:center; gap:8px; margin:0; font-size:14px; font-weight:500; color:oklch(0.67 0.012 95); } .ds-cell-label::before { content:''; width:3px; height:14px; background:oklch(0.8 0.18 150); } .ds-cell-value { margin:0; font:300 40px/1.1 'Spline Sans Mono', ui-monospace, monospace; letter-spacing:-0.03em; font-variant-numeric:tabular-nums; }"
+    },
+    {
+      "name": "Page Ruler",
+      "kind": "custom",
+      "refersTo": "colors.accent-admin-cyan",
+      "description": "The sticky 22px graduated scale across the top of every page, with a lit tick in the app's lead wavelength.",
+      "html": "<div class=\"ds-ruler\"><span class=\"ds-ruler-mark\"></span></div>",
+      "css": ".ds-ruler { position:relative; width:640px; height:22px; border-bottom:1px solid oklch(0.31 0.006 250); background-color:oklch(0.175 0.004 250); background-image:repeating-linear-gradient(90deg, oklch(0.43 0.008 250) 0 1px, transparent 1px 8px), repeating-linear-gradient(90deg, oklch(0.67 0.012 95) 0 1px, transparent 1px 64px); background-position:left bottom, left bottom; background-size:100% 6px, 100% 12px; background-repeat:no-repeat; } .ds-ruler-mark { position:absolute; bottom:0; left:35%; width:2px; height:22px; margin-left:-1px; background:oklch(0.82 0.12 210); }"
+    }
+  ],
+  "narrative": {
+    "northStar": "Raie d'emission",
+    "overview": "A spectrogram lying on a viewing box. The ground is a charcoal continuum, the plates are slightly lighter ash, the legends are bone. Colour is not a surface here: it exists only as thin emission lines, the way a spectral line sits on a dark band. State is carried by the form of the line (solid, dashed, double, half-height, struck), so every status reads with the hue removed; the hue only repeats the form.\n\nThe system is one build for two apps. Admin and courtier share every token and component and are told apart by their lead wavelength (admin cyan, courtier violet, selected by data-app on the root) and by the app tag in the rail. It is dark only, dense and desk-oriented, with a 14px floor for every text. It refuses the default back-office: light grey panels, pastel status pills, a card grid of KPIs.\n\nThis replaces the earlier light \"standard SaaS\" back-office entirely. It is a replacement world, not an extension of it.",
+    "keyCharacteristics": [
+      "Charcoal ground, ash plates, bone ink; no colour fills anywhere except the primary action's bone plate.",
+      "State grammar by line form; hue is redundancy.",
+      "A ruler across every page and a tick rail in the navigation both express position.",
+      "One grotesque (Archivo) at different widths; mono (Spline Sans Mono) for data.",
+      "Square 2 to 4px corners; shadows on popovers only; native controls rendered dark."
+    ],
+    "rules": [
+      { "name": "The Emission Only Rule", "body": "Hue appears as a line, a mark or an icon glyph, never as a filled surface. If you reach for a coloured background, draw a line instead.", "section": "colors" },
+      { "name": "The Form Before Hue Rule", "body": "Every state must be distinguishable in greyscale: solid is success, dashed is warning, double is danger (do first), half-height is info or neutral, struck is disabled. The hue repeats the form and never replaces it.", "section": "colors" },
+      { "name": "The One Wavelength Rule", "body": "An app has one lead wavelength (cyan or violet). Do not use it for state, and do not mix both in a screen.", "section": "colors" },
+      { "name": "The 14px Floor Rule", "body": "Nothing is set below 14px; compact means narrower width, not smaller size. Form fields go to 16px on phones.", "section": "typography" },
+      { "name": "The Mono Is Data Rule", "body": "Mono is for figures, references and amounts only. Prose, labels and buttons stay in Archivo.", "section": "typography" },
+      { "name": "The Width Is Hierarchy Rule", "body": "Hierarchy comes from width and weight (wide and light up top, condensed and semibold in tables), not from adding families.", "section": "typography" },
+      { "name": "The Shared Scale Rule", "body": "Quantities that compare must sit on one scale. The attention list positions each queue's line at its share of the largest queue; do not size each row independently.", "section": "layout" },
+      { "name": "The Ruled Not Boxed Rule", "body": "Group with hairlines and spacing; a table or filter bar inside a card inherits the card frame instead of adding a second border.", "section": "layout" },
+      { "name": "The Popover Only Rule", "body": "A shadow means \"floats above the page\". Nothing that sits in the flow gets one.", "section": "elevation" }
+    ],
+    "dos": [
+      "Do express every state with the line grammar (solid, dashed, double, half-height, struck) and let the hue repeat it.",
+      "Do keep the primary action a bone plate with charcoal text, one per view.",
+      "Do set figures, references and amounts in Spline Sans Mono with tabular numerals; set titles light and wide, tables semi-condensed.",
+      "Do keep text at 14px or above, with ink-3 as the lowest text tone on plates.",
+      "Do use hairlines (1px line) and the 4px spacing scale to group; keep corners at 2, 3 or 4px.",
+      "Do keep native controls dark (color-scheme: dark) and give every interactive element the 2px lead-wavelength focus ring.",
+      "Do put the ruler on every page and let the open nav entry carry the long lit tick.",
+      "Do honour reduced motion: the ruler mark rests at its section position and transitions are removed."
+    ],
+    "donts": [
+      "Don't fill a surface, pill or row with a state colour; state is never a coloured background.",
+      "Don't use a border-left or border-right stripe wider than 1px as an accent; the only thick lines are the 2px underlines of the app tag, active tab and active nav tick.",
+      "Don't add a kicker or eyebrow above titles (the legacy kicker class is retired and hidden).",
+      "Don't add shadows to anything in the flow; shadows belong to popovers and dialogs.",
+      "Don't introduce a light theme or a theme switch; the build is dark only until a light variant is specified.",
+      "Don't round things (beyond 4px) other than avatars, counters and the switch.",
+      "Don't add a second type family, or set prose in mono.",
+      "Don't mix both lead wavelengths on one screen, or use the lead wavelength to signal state.",
+      "Don't read the public site's tokens or styles; the back-office stylesheet is bo- scoped and self-contained."
+    ]
+  }
+}

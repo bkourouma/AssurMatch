@@ -2,7 +2,8 @@ import { redirect } from "next/navigation";
 import { isAdminProfile, loginRedirect, readBackOfficeSession } from "../../lib/backoffice-auth";
 import { readAdminAlerts, readComplianceAlerts } from "../../lib/admin-api";
 import { acknowledgeAlertAction } from "../../lib/alert-actions";
-import { Button, Card, DataTable, Form, FormActions, Input, Notice, PageHeader, PageStack, StateMessage, StatusBadge } from "../../lib/ui/admin-ui";
+import { formatDateTime } from "../../lib/operations-api";
+import { Badge, Button, Card, DataTable, Form, FormActions, Input, Notice, PageHeader, PageStack, StateMessage, StatusBadge, Tabs } from "../../lib/ui/admin-ui";
 
 interface Props {
   searchParams: Promise<{ page?: string; pageSize?: string; alert?: string; alertStatus?: string }>;
@@ -77,34 +78,34 @@ export default async function ComplianceAlertsPage({ searchParams }: Props) {
     <PageStack>
       <PageHeader
         breadcrumb={breadcrumb}
-        kicker="Conformite"
         title="Alertes conformite"
-        description={`Page ${data.page} sur ${lastPage}. Total: ${data.total}.`}
+        description="Les alertes du worker a acquitter, puis le journal des evenements de conformite."
+        actions={center.status === "error" ? null : <Badge tone={center.data.open > 0 ? "warning" : "neutral"}>{`${center.data.open} ouverte${center.data.open > 1 ? "s" : ""}`}</Badge>}
       />
       {alertNotice ? <Notice tone={alertNotice.tone}>{alertNotice.text}</Notice> : null}
-      <Card>
-        <section aria-label="Centre d'alertes" data-alerts-center>
-          <h2>Centre d&apos;alertes ({center.data.open} ouverte{center.data.open > 1 ? "s" : ""})</h2>
-          <p>
-            Alertes calculees par la tache planifiee du worker (licences J-60/J-30/J-7, offres expirees, pays publics sans
-            courtier actif, leads non routes sur 24 h, taux de litige, worker inactif). Une alerte n&apos;est levee qu&apos;une fois
-            par jour et par cible; l&apos;acquittement exige un motif et est audite.
-          </p>
-          <p>
-            Filtre: <a href="/dashboard/compliance-alerts?alertStatus=open">ouvertes</a> ·{" "}
-            <a href="/dashboard/compliance-alerts?alertStatus=acknowledged">acquittees</a> ·{" "}
-            <a href="/dashboard/compliance-alerts?alertStatus=all">toutes</a>
-          </p>
+      <Card
+        title="Centre d'alertes"
+        description="Licences J-60/J-30/J-7, offres expirees, pays publics sans courtier actif, leads non routes sur 24 h, taux de litige, worker inactif. Une alerte est levee une fois par jour et par cible ; l'acquittement exige un motif et est audite."
+      >
+        <section aria-label="Centre d'alertes" data-alerts-center className="bo-stack">
+          <Tabs
+            label="Filtre des alertes"
+            items={[
+              { label: "Ouvertes", href: "/dashboard/compliance-alerts?alertStatus=open", current: alertStatus === "open" },
+              { label: "Acquittees", href: "/dashboard/compliance-alerts?alertStatus=acknowledged", current: alertStatus === "acknowledged" },
+              { label: "Toutes", href: "/dashboard/compliance-alerts?alertStatus=all", current: alertStatus === "all" }
+            ]}
+          />
           {center.status === "error" ? (
             <StateMessage tone="warning">Centre d&apos;alertes indisponible: {center.error}</StateMessage>
           ) : (
             <DataTable
               columns={[
-                { key: "lastSeenAt", header: "Derniere detection", render: (item) => item.lastSeenAt },
+                { key: "lastSeenAt", header: "Derniere detection", render: (item) => formatDateTime(item.lastSeenAt) },
                 { key: "label", header: "Alerte", render: (item) => item.label },
                 { key: "severity", header: "Gravite", render: (item) => <StatusBadge status={item.severity} tones={SEVERITY_TONES} /> },
                 { key: "status", header: "Statut", render: (item) => <StatusBadge status={item.status} tones={ALERT_STATUS_TONES} /> },
-                { key: "target", header: "Cible", render: (item) => `${item.targetType}/${item.targetId ?? "-"}` },
+                { key: "target", header: "Cible", render: (item) => <span className="bo-ref">{`${item.targetType}/${item.targetId ?? "-"}`}</span> },
                 { key: "details", header: "Details", render: (item) => detailsLabel(item.details) },
                 {
                   key: "action",
@@ -117,25 +118,26 @@ export default async function ComplianceAlertsPage({ searchParams }: Props) {
                         <Button type="submit" size="sm" variant="secondary">Acquitter</Button>
                       </FormActions>
                     </Form>
-                  ) : `${item.acknowledgedAt ?? "-"} - ${item.acknowledgeReason ?? ""}`
+                  ) : `${formatDateTime(item.acknowledgedAt)} - ${item.acknowledgeReason ?? ""}`
                 }
               ]}
               items={center.data.items}
               getKey={(item) => item.id}
               emptyLabel="Aucune alerte pour ce filtre."
+              emptyDescription={alertStatus === "open" ? "Rien a acquitter : le worker n'a leve aucune alerte ouverte." : undefined}
               aria-label="Centre d'alertes"
             />
           )}
         </section>
       </Card>
-      <Card>
+      <Card title="Journal conformite" description={`Evenements traces (consentement, RBAC, CRM ferme, inter-tenant). Page ${data.page} sur ${lastPage}.`}>
         <DataTable
           columns={[
-            { key: "occurredAt", header: "Date", render: (item) => item.occurredAt },
+            { key: "occurredAt", header: "Date", render: (item) => formatDateTime(item.occurredAt) },
             { key: "category", header: "Categorie", render: (item) => item.category },
             { key: "reason", header: "Raison", render: (item) => item.reason },
             { key: "target", header: "Cible", render: (item) => `${item.targetType}/${item.targetId ?? "-"}` },
-            { key: "tenant", header: "Tenant", render: (item) => item.partnerTenantId ?? "-" }
+            { key: "tenant", header: "Tenant", render: (item) => (item.partnerTenantId ? <span className="bo-ref">{item.partnerTenantId}</span> : "-") }
           ]}
           items={data.items}
           getKey={(item) => item.id}

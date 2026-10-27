@@ -9,7 +9,8 @@ import {
   SCAN_STATUS_LABELS,
   selfServiceFormatDate
 } from "../lib/self-service-messages";
-import { Badge, Card, Cluster, DescriptionList, Notice, PageHeader, PageStack, StateMessage, StatusBadge, TenantWriteGuard } from "../lib/ui/broker-ui";
+import { Badge, Card, Cluster, DescriptionList, EmptyState, Notice, PageHeader, PageStack, StateMessage, StatusBadge, TenantWriteGuard } from "../lib/ui/broker-ui";
+import styles from "../lib/ui/broker-screens.module.css";
 import { RenewLicenseForm, UploadProofForm } from "./license-forms";
 
 /**
@@ -39,26 +40,32 @@ function LicenseCard({ license, licenses, canWrite, readOnlyTenant, products }: 
       />
       {license.status === "pending_review" ? <Notice tone="info">En revue par la conformité AssurMatch : la licence n&apos;est pas utilisée pour le routage avant sa validation.</Notice> : null}
       {license.documents.length > 0 ? (
-        <ul className="bo-list" aria-label={`Preuves de la licence ${license.licenseNumber}`}>
-          {license.documents.map((document) => (
-            <li key={document.id}>
-              <Cluster>
-                <span>{document.fileName ?? "Document"} — déposé le {selfServiceFormatDate(document.createdAt)}</span>
-                <Badge tone={document.quarantined ? "danger" : document.scanStatus === "clean" ? "success" : "warning"}>{SCAN_STATUS_LABELS[document.scanStatus] ?? document.scanStatus}</Badge>
-                <Badge tone={document.status === "accepted" ? "success" : document.status === "rejected" ? "danger" : "info"}>{DOCUMENT_STATUS_LABELS[document.status] ?? document.status}</Badge>
-              </Cluster>
-            </li>
-          ))}
-        </ul>
+        <div className={styles.entry}>
+          <h3 className={styles.entryTitle}>Preuves déposées</h3>
+          <ul className="bo-list" aria-label={`Preuves de la licence ${license.licenseNumber}`}>
+            {license.documents.map((document) => (
+              <li key={document.id}>
+                <Cluster>
+                  <span>{document.fileName ?? "Document"} — déposé le {selfServiceFormatDate(document.createdAt)}</span>
+                  <Badge tone={document.quarantined ? "danger" : document.scanStatus === "clean" ? "success" : "warning"}>{SCAN_STATUS_LABELS[document.scanStatus] ?? document.scanStatus}</Badge>
+                  <Badge tone={document.status === "accepted" ? "success" : document.status === "rejected" ? "danger" : "info"}>{DOCUMENT_STATUS_LABELS[document.status] ?? document.status}</Badge>
+                </Cluster>
+              </li>
+            ))}
+          </ul>
+        </div>
       ) : null}
       {license.history.length > 0 ? (
-        <ol className="bo-list" aria-label={`Historique de la licence ${license.licenseNumber}`}>
-          {license.history.map((entry, index) => (
-            <li key={`${entry.createdAt}:${index}`}>
-              {selfServiceFormatDate(entry.createdAt)} : {LICENSE_STATUS_LABELS[entry.fromStatus ?? ""] ?? "création"} → {LICENSE_STATUS_LABELS[entry.toStatus] ?? entry.toStatus}
-            </li>
-          ))}
-        </ol>
+        <div className={styles.entry}>
+          <h3 className={styles.entryTitle}>Historique des statuts</h3>
+          <ol className="bo-list" aria-label={`Historique de la licence ${license.licenseNumber}`}>
+            {license.history.map((entry, index) => (
+              <li key={`${entry.createdAt}:${index}`}>
+                <span className={styles.entryMeta}>{selfServiceFormatDate(entry.createdAt)}</span> : {LICENSE_STATUS_LABELS[entry.fromStatus ?? ""] ?? "création"} → {LICENSE_STATUS_LABELS[entry.toStatus] ?? entry.toStatus}
+              </li>
+            ))}
+          </ol>
+        </div>
       ) : null}
       {canWrite || readOnlyTenant ? (
         <TenantWriteGuard readOnly={readOnlyTenant}>
@@ -78,7 +85,7 @@ export default async function BrokerLicensesPage() {
   if (!canReadAccount(session.profile)) {
     return (
       <PageStack>
-        <PageHeader breadcrumb={BREADCRUMB} kicker="Licences" title="Acces refuse" description="La consultation des licences exige un rôle courtier." />
+        <PageHeader breadcrumb={BREADCRUMB} title="Acces refuse" description="La consultation des licences exige un rôle courtier." />
       </PageStack>
     );
   }
@@ -93,14 +100,21 @@ export default async function BrokerLicensesPage() {
     <PageStack>
       <PageHeader
         breadcrumb={BREADCRUMB}
-        kicker="Licences"
         title="Mes licences"
-        description="Une licence expirée, suspendue ou révoquée bloque la réception de demandes pour son périmètre. Déposez le renouvellement avant l'échéance : il est validé par la conformité AssurMatch."
+        description="Une licence expirée, suspendue ou révoquée bloque la réception de demandes pour son périmètre : déposez le renouvellement avant l'échéance."
       />
       {readOnlyTenant ? <Notice tone="warning">{TENANT_SUSPENDED_MESSAGE}</Notice> : null}
       {!canWrite && !readOnlyTenant ? <Notice tone="info">Lecture seule : seuls le propriétaire et les managers déposent un renouvellement.</Notice> : null}
       {licensesResult.status === "error" ? <StateMessage tone="danger">Les licences n&apos;ont pas pu être chargées. Réessayez dans quelques instants.</StateMessage> : null}
-      {licensesResult.status === "success" && licenses.length === 0 ? <StateMessage>Aucune licence enregistrée. AssurMatch saisit la première licence lors de l&apos;onboarding.</StateMessage> : null}
+      {licensesResult.status === "success" && licenses.length === 0 ? (
+        <Card>
+          <EmptyState
+            icon="shield"
+            title="Aucune licence enregistrée."
+            description="AssurMatch saisit la première licence lors de l'onboarding. Contactez AssurMatch si votre dossier est complet."
+          />
+        </Card>
+      ) : null}
       {licenses.map((license) => (
         <LicenseCard key={license.id} license={license} licenses={licenses} canWrite={canWrite} readOnlyTenant={readOnlyTenant} products={products} />
       ))}
