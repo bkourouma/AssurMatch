@@ -51,7 +51,7 @@ export function ActivationForm({ returnTo, token }: { returnTo: string; token: s
       <Field id="activate-token" label="Jeton activation" required requiredLabel="obligatoire">
         <Input id="activate-token" name="token" defaultValue={token} required />
       </Field>
-      <Field id="activate-password" label="Nouveau mot de passe" required requiredLabel="obligatoire" hint="12 caracteres minimum.">
+      <Field id="activate-password" label="Nouveau mot de passe" required requiredLabel="obligatoire" hint="12 caractères minimum.">
         <Input id="activate-password" name="password" type="password" autoComplete="new-password" required minLength={12} />
       </Field>
       <FormActions>
@@ -76,18 +76,18 @@ export function MfaPanel({ returnTo, mfaEnrolled = false, showEnrollment }: { re
   return (
     <Stack>
       {enrollmentVisible ? (
-        <Card title="Enrolement MFA">
+        <Card title="Enrôlement MFA">
           <Form action={enrollAction}>
             <FlowNotice state={enrollState} />
             <FormActions>
               <Button type="submit" variant="secondary" pending={enrollPending} pendingLabel="Generation...">
-                Generer secret et codes de secours
+                Générer secret et codes de secours
               </Button>
             </FormActions>
           </Form>
         </Card>
       ) : null}
-      <Card title="Verification MFA">
+      <Card title="Vérification MFA">
         <Form action={verifyAction}>
           <input type="hidden" name="returnTo" value={returnTo} />
           <FlowNotice state={verifyState} />
@@ -113,7 +113,7 @@ export function MfaPanel({ returnTo, mfaEnrolled = false, showEnrollment }: { re
           />
           <FormActions>
             <Button type="submit" pending={verifyPending} pendingLabel="Verification...">
-              Verifier MFA
+              Vérifier MFA
             </Button>
           </FormActions>
         </Form>
@@ -145,7 +145,7 @@ export function PasswordChangeForm() {
       <Field id="password-old" label="Mot de passe actuel" required requiredLabel="obligatoire">
         <Input id="password-old" name="oldPassword" type="password" autoComplete="current-password" required minLength={12} />
       </Field>
-      <Field id="password-new" label="Nouveau mot de passe" required requiredLabel="obligatoire" hint="12 caracteres minimum.">
+      <Field id="password-new" label="Nouveau mot de passe" required requiredLabel="obligatoire" hint="12 caractères minimum.">
         <Input id="password-new" name="newPassword" type="password" autoComplete="new-password" required minLength={12} />
       </Field>
       <FormActions>
@@ -162,10 +162,10 @@ export function PasswordResetConsumeForm({ token }: { token: string }) {
   return (
     <Form action={formAction}>
       <FlowNotice state={state} />
-      <Field id="reset-token" label="Jeton reinitialisation" required requiredLabel="obligatoire">
+      <Field id="reset-token" label="Jeton réinitialisation" required requiredLabel="obligatoire">
         <Input id="reset-token" name="token" defaultValue={token} required />
       </Field>
-      <Field id="reset-password" label="Nouveau mot de passe" required requiredLabel="obligatoire" hint="12 caracteres minimum.">
+      <Field id="reset-password" label="Nouveau mot de passe" required requiredLabel="obligatoire" hint="12 caractères minimum.">
         <Input id="reset-password" name="newPassword" type="password" autoComplete="new-password" required minLength={12} />
       </Field>
       <FormActions>

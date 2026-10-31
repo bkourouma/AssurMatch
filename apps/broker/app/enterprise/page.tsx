@@ -27,18 +27,18 @@ import { TENANT_SUSPENDED_MESSAGE, isTenantReadOnly } from "../lib/broker-permis
 import type { DataTableColumn } from "../lib/ui/broker-ui";
 
 const NOTICES: Record<string, string> = {
-  agency_created: "Agence creee et auditee.",
+  agency_created: "Agence créée et auditée.",
   agency_updated: "Agence modifiée et auditée.",
-  member_assigned: "Membre rattache a l'agence.",
-  role_created: "Role personnalise cree. Seules les permissions courtier autorisees sont conservees.",
-  sla_saved: "Engagement de reactivite enregistre.",
-  sla_contract: "Objectif refuse : il ne peut pas etre plus lache que la cible contractuelle fixee par AssurMatch.",
-  branding_saved: "Charte du portail courtier enregistree.",
-  forbidden: "Action reservee au proprietaire d'un cabinet Enterprise.",
+  member_assigned: "Membre rattaché à l'agence.",
+  role_created: "Rôle personnalisé créé. Seules les permissions courtier autorisées sont conservées.",
+  sla_saved: "Engagement de réactivité enregistré.",
+  sla_contract: "Objectif refusé : il ne peut pas être plus lâche que la cible contractuelle fixée par AssurMatch.",
+  branding_saved: "Charte du portail courtier enregistrée.",
+  forbidden: "Action réservée au propriétaire d'un cabinet Enterprise.",
   // Spec 051 FR-021: 403 PARTNER_SUSPENDED.
   suspended: TENANT_SUSPENDED_MESSAGE,
-  not_found: "Element introuvable pour votre cabinet.",
-  invalid: "Saisie incomplete.",
+  not_found: "Élément introuvable pour votre cabinet.",
+  invalid: "Saisie incomplète.",
   error: "Espace Enterprise temporairement indisponible."
 };
 
@@ -76,8 +76,8 @@ const agencyColumns: Array<DataTableColumn<BrokerAgency>> = [
 ];
 
 const roleColumns: Array<DataTableColumn<BrokerCustomRole>> = [
-  { key: "name", header: "Role", render: (role) => role.name, sortable: true, sortValue: (role) => role.name },
-  { key: "permissions", header: "Permissions accordees", render: (role) => <span className="bo-ref">{role.permissions.join(", ")}</span> },
+  { key: "name", header: "Rôle", render: (role) => role.name, sortable: true, sortValue: (role) => role.name },
+  { key: "permissions", header: "Permissions accordées", render: (role) => <span className="bo-ref">{role.permissions.join(", ")}</span> },
   // Spec 064 FR-007: members holding the role (assigned from the Equipe page).
   {
     key: "members",
@@ -99,8 +99,8 @@ export default async function BrokerEnterprisePage({ searchParams }: { searchPar
       <PageStack>
         <PageHeader
           breadcrumb={BREADCRUMB}
-          title="Acces refuse"
-          description="L'espace Enterprise exige une session courtier authentifiee et la MFA verifiee."
+          title="Accès refusé"
+          description="L'espace Enterprise exige une session courtier authentifiée et la MFA vérifiée."
         />
       </PageStack>
     );
@@ -111,10 +111,10 @@ export default async function BrokerEnterprisePage({ searchParams }: { searchPar
         <PageHeader
           breadcrumb={BREADCRUMB}
           title="Espace Enterprise indisponible"
-          description="Multi-agences, roles personnalises, engagement de reactivite et charte interne sont reserves au plan Enterprise."
+          description="Multi-agences, rôles personnalisés, engagement de réactivité et charte interne sont réservés au plan Enterprise."
           actions={<Badge tone="disabled">Plan Enterprise requis</Badge>}
         />
-        <Notice tone="info">Votre plan actuel donne acces aux leads et au CRM selon vos permissions.</Notice>
+        <Notice tone="info">Votre plan actuel donne accès aux leads et au CRM selon vos permissions.</Notice>
       </PageStack>
     );
   }
@@ -130,7 +130,7 @@ export default async function BrokerEnterprisePage({ searchParams }: { searchPar
       <PageHeader
         breadcrumb={BREADCRUMB}
         title="Organisation du cabinet"
-        description="Agences, roles internes, engagement de reactivite et charte du portail. Rien ici ne modifie l'eligibilite, le routage ou ce que voit un visiteur."
+        description="Agences, rôles internes, engagement de réactivité et charte du portail. Rien ici ne modifie l'éligibilité, le routage ou ce que voit un visiteur."
       />
       {ent && NOTICES[ent] ? (
         <Notice tone={ent.endsWith("created") || ent.endsWith("updated") || ent.endsWith("saved") || ent === "member_assigned" ? "success" : "warning"}>{NOTICES[ent]}</Notice>
@@ -142,7 +142,7 @@ export default async function BrokerEnterprisePage({ searchParams }: { searchPar
           items={agencies.status === "success" ? agencies.data : []}
           getKey={(agency) => agency.id}
           aria-label="Agences du cabinet"
-          emptyLabel="Aucune agence enregistree."
+          emptyLabel="Aucune agence enregistrée."
           rowActions={(agency) => (
             <TenantWriteGuard readOnly={readOnly}>
             <ConfirmDialog
@@ -176,8 +176,8 @@ export default async function BrokerEnterprisePage({ searchParams }: { searchPar
             </ConfirmDialog>
             <ConfirmDialog
               triggerLabel="Rattacher un membre"
-              title={`Rattacher un membre a ${agency.name}`}
-              description="Le rattachement est audite. Il ne modifie ni les permissions du membre ni le routage."
+              title={`Rattacher un membre à ${agency.name}`}
+              description="Le rattachement est audité. Il ne modifie ni les permissions du membre ni le routage."
               confirmLabel="Rattacher"
               cancelLabel="Annuler"
               formAction={assignAgencyMemberAction}
@@ -205,65 +205,65 @@ export default async function BrokerEnterprisePage({ searchParams }: { searchPar
             <Input id="agency-city" name="city" placeholder="Ville" aria-label="Ville de l'agence" />
           </Field>
           <Field id="agency-reason" label="Motif">
-            <Input id="agency-reason" name="reason" placeholder="Motif" aria-label="Motif de creation" />
+            <Input id="agency-reason" name="reason" placeholder="Motif" aria-label="Motif de création" />
           </Field>
           <FormActions>
-            <Button type="submit" variant="secondary">Creer une agence</Button>
+            <Button type="submit" variant="secondary">Créer une agence</Button>
           </FormActions>
         </Form>
         </TenantWriteGuard>
       </Card>
 
       <Card
-        title="Roles personnalises"
-        description="Un role personnalise ne peut accorder que des permissions courtier deja prevues par la plateforme, et jamais plus que le role de base du membre."
+        title="Rôles personnalisés"
+        description="Un rôle personnalisé ne peut accorder que des permissions courtier déjà prévues par la plateforme, et jamais plus que le rôle de base du membre."
       >
         <DataTable
           columns={roleColumns}
           items={roles.status === "success" ? roles.data : []}
           getKey={(role) => role.id}
-          aria-label="Roles personnalises du cabinet"
-          emptyLabel="Aucun role personnalise."
+          aria-label="Rôles personnalisés du cabinet"
+          emptyLabel="Aucun rôle personnalisé."
         />
         <TenantWriteGuard readOnly={readOnly}>
         <Form action={createCustomRoleAction}>
-          <Field id="role-name" label="Nom du role">
-            <Input id="role-name" name="name" placeholder="Nom du role" aria-label="Nom du role" />
+          <Field id="role-name" label="Nom du rôle">
+            <Input id="role-name" name="name" placeholder="Nom du rôle" aria-label="Nom du rôle" />
           </Field>
           <CheckboxGroup
-            legend="Permissions accordees"
+            legend="Permissions accordées"
             name="permissions"
             options={GRANTABLE_PERMISSIONS.map((permission) => ({ value: permission, label: permission }))}
           />
           <Field id="role-reason" label="Motif">
-            <Input id="role-reason" name="reason" placeholder="Motif" aria-label="Motif de creation du role" />
+            <Input id="role-reason" name="reason" placeholder="Motif" aria-label="Motif de création du rôle" />
           </Field>
           <FormActions>
-            <Button type="submit" variant="secondary">Creer le role</Button>
+            <Button type="submit" variant="secondary">Créer le rôle</Button>
           </FormActions>
         </Form>
         </TenantWriteGuard>
       </Card>
 
-      <Card title="Engagement de reactivite (SLA)">
+      <Card title="Engagement de réactivité (SLA)">
         {sla.status === "success" ? (
           <>
             <StatStrip
-              label="Engagement de reactivite"
+              label="Engagement de réactivité"
               items={[
-                { label: "Objectif premiere action", value: `${sla.data.firstActionTargetMinutes} min` },
-                { label: "Leads mesures", value: sla.data.leadsMeasured, helper: `${sla.data.windowDays} derniers jours` },
+                { label: "Objectif première action", value: `${sla.data.firstActionTargetMinutes} min` },
+                { label: "Leads mesurés", value: sla.data.leadsMeasured, helper: `${sla.data.windowDays} derniers jours` },
                 { label: "Dans l'objectif", value: sla.data.leadsWithinTarget, tone: "info" },
                 {
                   label: "Taux de respect",
                   value: `${Math.round(sla.data.complianceRate * 100)}%`,
                   tone: sla.data.complianceRate >= 0.8 ? "success" : "warning"
                 },
-                { label: "Delai moyen", value: sla.data.averageFirstActionMinutes === null ? "-" : `${sla.data.averageFirstActionMinutes} min` }
+                { label: "Délai moyen", value: sla.data.averageFirstActionMinutes === null ? "-" : `${sla.data.averageFirstActionMinutes} min` }
               ]}
             />
             {firstVisibleReplyLine ? <p data-sla-first-visible-reply="true">{firstVisibleReplyLine}</p> : null}
-            <Card title="Objectif interne" description="Il ne peut pas etre plus lache que la cible contractuelle fixee par AssurMatch.">
+            <Card title="Objectif interne" description="Il ne peut pas être plus lâche que la cible contractuelle fixée par AssurMatch.">
               <TenantWriteGuard readOnly={readOnly}>
               <Form action={updateSlaAction} columns={2}>
                 <Field id="sla-target" label="Objectif en minutes">
@@ -278,7 +278,7 @@ export default async function BrokerEnterprisePage({ searchParams }: { searchPar
                   />
                 </Field>
                 <Field id="sla-reason" label="Motif">
-                  <Input id="sla-reason" name="reason" placeholder="Motif" aria-label="Motif de la mise a jour SLA" />
+                  <Input id="sla-reason" name="reason" placeholder="Motif" aria-label="Motif de la mise à jour SLA" />
                 </Field>
                 <FormActions>
                   <Button type="submit">Enregistrer l'objectif</Button>
@@ -294,19 +294,19 @@ export default async function BrokerEnterprisePage({ searchParams }: { searchPar
 
       <Card
         title="Charte du portail courtier"
-        description="La charte s'applique uniquement a votre back-office. Le comparateur public reste presente par AssurMatch, plateforme technique."
+        description="La charte s'applique uniquement à votre back-office. Le comparateur public reste présenté par AssurMatch, plateforme technique."
       >
         {branding.status === "success" ? (
           <TenantWriteGuard readOnly={readOnly}>
           <Form action={updateBrandingAction} columns={2}>
-            <Field id="branding-label" label="Libelle affiche">
-              <Input id="branding-label" name="displayLabel" defaultValue={branding.data.displayLabel} aria-label="Libelle affiche" />
+            <Field id="branding-label" label="Libellé affiché">
+              <Input id="branding-label" name="displayLabel" defaultValue={branding.data.displayLabel} aria-label="Libellé affiché" />
             </Field>
             <Field id="branding-color" label="Couleur principale">
               <Input id="branding-color" name="primaryColor" defaultValue={branding.data.primaryColor} aria-label="Couleur principale" />
             </Field>
             <Field id="branding-reason" label="Motif">
-              <Input id="branding-reason" name="reason" placeholder="Motif" aria-label="Motif de la mise a jour de charte" />
+              <Input id="branding-reason" name="reason" placeholder="Motif" aria-label="Motif de la mise à jour de charte" />
             </Field>
             <FormActions>
               <Badge tone="info">{branding.data.platformMention}</Badge>

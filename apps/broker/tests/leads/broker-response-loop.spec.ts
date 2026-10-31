@@ -17,7 +17,7 @@ test("Starter lead page offers \"Répondre au visiteur\" and nothing of the CRM 
   expect(page).toContain("Répondre au visiteur");
   expect(page).toContain('channel="starter"');
   expect(page).toContain('readLeadProposals("starter", leadAssignmentId)');
-  expect(page).toContain("Coordonnees completes visibles par votre cabinet");
+  expect(page).toContain("Coordonnées complètes visibles par votre cabinet");
   for (const crmOnly of ["changeCrmLeadStatusAction", "addCrmLeadTaskAction", "addCrmLeadReminderAction", "assignCrmAdvisorAction", "/crm/kanban"]) {
     expect(page).not.toContain(crmOnly);
   }
@@ -64,16 +64,16 @@ test("the CRM lead page completes the CRM tools of spec 055", async () => {
   const page = read("apps/broker/app/crm/leads/[leadAssignmentId]/page.tsx");
   expect(page).toContain('{ key: "propositions", label: "Propositions" }');
   expect(page).toContain('channel="crm"');
-  expect(page).toContain("Coordonnees du visiteur");
+  expect(page).toContain("Coordonnées du visiteur");
   expect(page).toContain("mailto:");
   expect(page).toContain("action={assignCrmAdvisorAction}");
-  expect(page).toContain("Televerser le document interne");
+  expect(page).toContain("Téléverser le document interne");
   expect(page).toContain("ne sont jamais visibles du visiteur");
   expect(page).toContain('href="/crm/kanban"');
   const kanban = read("apps/broker/app/crm/kanban/page.tsx");
   expect(kanban).toContain("readCrmKanban");
   expect(kanban).toContain("isStarterCrmDenied");
-  expect(read("apps/broker/app/lib/ui/proposal-panel.tsx")).toContain("Le statut CRM n'est jamais modifie automatiquement");
+  expect(read("apps/broker/app/lib/ui/proposal-panel.tsx")).toContain("Le statut CRM n'est jamais modifié automatiquement");
   expect(read("apps/broker/app/lib/ui/broker-shell.tsx")).toContain('href: "/crm/kanban"');
 });
 

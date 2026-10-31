@@ -5,6 +5,8 @@ import { TENANT_SUSPENDED_MESSAGE, canAssignCrmLead, canMutateCrmLead, isTenantR
 import { addCrmLeadNoteAction, addCrmLeadReminderAction, addCrmLeadTaskAction, changeCrmLeadStatusAction, disputeCrmLeadAction } from "../../../lib/lead-actions";
 import { assignCrmAdvisorAction } from "../../../lib/proposal-actions";
 import { advisorDisplayName, teamAdvisorOptions } from "../../../lib/team-options";
+import { CRM_SOURCE_LABELS, CRM_URGENCY_LABELS } from "../../../lib/crm-list-query";
+import { productLabel } from "../../../lib/product-vocabulary";
 import { PROPOSAL_NOTICES } from "../../../lib/proposal-vocabulary";
 import { ProposalPanel } from "../../../lib/ui/proposal-panel";
 import { LeadConversationSection } from "../../../lib/ui/conversation-panel";
@@ -18,6 +20,7 @@ import {
   crmReasonLabel,
   crmStatusLabel,
   DISPUTE_FINAL_DECISION_NOTICE,
+  answerLabel,
   renderAnswerValue
 } from "../../../lib/lead-vocabulary";
 import {
@@ -48,48 +51,48 @@ import styles from "../../../lib/ui/broker-screens.module.css";
 import { LeadAiPanel } from "./lead-ai-panel";
 
 const NOTICES: Record<string, { tone: "info" | "warning" | "danger"; message: string }> = {
-  status_changed: { tone: "info", message: "Statut du lead mis a jour et historise." },
-  note_created: { tone: "info", message: "Note interne ajoutee. Elle reste invisible cote Web Publique Client." },
-  task_created: { tone: "info", message: "Tache commerciale creee pour votre cabinet." },
-  reminder_created: { tone: "info", message: "Rappel programme pour votre cabinet." },
+  status_changed: { tone: "info", message: "Statut du lead mis à jour et historisé." },
+  note_created: { tone: "info", message: "Note interne ajoutée. Elle reste invisible côté Web Publique Client." },
+  task_created: { tone: "info", message: "Tâche commerciale créée pour votre cabinet." },
+  reminder_created: { tone: "info", message: "Rappel programmé pour votre cabinet." },
   reason_required: { tone: "warning", message: "Un motif allowliste est obligatoire pour un statut de perte ou de contestation." },
   // Spec 063 (CRM-012): contestation d'un lead.
   disputed: { tone: "info", message: "Contestation enregistrée et historisée. La finance AssurMatch statuera ; vous serez notifié de la décision." },
   dispute_window_expired: { tone: "warning", message: "Contestation refusée : la fenêtre de 30 jours suivant la réception du lead est close." },
   dispute_exists: { tone: "warning", message: "Contestation refusée : ce lead a déjà fait l'objet d'une contestation." },
-  forbidden: { tone: "warning", message: "Action refusee par vos permissions CRM, votre tenant ou votre MFA." },
+  forbidden: { tone: "warning", message: "Action refusée par vos permissions CRM, votre tenant ou votre MFA." },
   // Spec 051 FR-021: 403 PARTNER_SUSPENDED.
   suspended: { tone: "warning", message: TENANT_SUSPENDED_MESSAGE },
   not_found: { tone: "warning", message: "Ce lead n'existe pas ou n'est pas accessible pour votre cabinet." },
   // Spec 055 FR-010: assignation conseiller et documents internes analyses par l'antivirus.
-  assigned: { tone: "info", message: "Lead assigne au conseiller. Seul ce conseiller (et les managers) le voit parmi les agents." },
-  document_added: { tone: "info", message: "Document interne ajoute apres analyse antivirus. Il n'est jamais visible du visiteur." },
-  quarantined: { tone: "danger", message: "Document refuse : il n'a pas passe l'antivirus et n'a pas ete conserve." },
-  document_invalid: { tone: "warning", message: "Document refuse : PDF, JPEG ou PNG de 5 Mo au maximum." },
-  invalid: { tone: "warning", message: "Saisie refusee par l'API. Verifiez les champs obligatoires." },
-  error: { tone: "danger", message: "Action CRM indisponible pour le moment. Aucun changement n'a ete enregistre." }
+  assigned: { tone: "info", message: "Lead assigné au conseiller. Seul ce conseiller (et les managers) le voit parmi les agents." },
+  document_added: { tone: "info", message: "Document interne ajouté après analyse antivirus. Il n'est jamais visible du visiteur." },
+  quarantined: { tone: "danger", message: "Document refusé : il n'a pas passé l'antivirus et n'a pas été conservé." },
+  document_invalid: { tone: "warning", message: "Document refusé : PDF, JPEG ou PNG de 5 Mo au maximum." },
+  invalid: { tone: "warning", message: "Saisie refusée par l'API. Vérifiez les champs obligatoires." },
+  error: { tone: "danger", message: "Action CRM indisponible pour le moment. Aucun changement n'a été enregistré." }
 };
 
 /** Onglets de la fiche CRM: chaque onglet est une vraie navigation, donc une URL partageable. */
 const TABS = [
-  { key: "synthese", label: "Synthese" },
+  { key: "synthese", label: "Synthèse" },
   { key: "propositions", label: "Propositions" },
   { key: "conversation", label: "Conversation" },
-  { key: "activite", label: "Activite" },
+  { key: "activite", label: "Activité" },
   { key: "historique", label: "Historique" }
 ] as const;
 
 const CONTACT_LABELS: Record<string, string> = {
   displayName: "Nom",
   fullName: "Nom",
-  firstName: "Prenom",
+  firstName: "Prénom",
   lastName: "Nom",
   email: "Email",
-  emailMasked: "Email (masque)",
-  phone: "Telephone",
-  phoneMasked: "Telephone (masque)",
-  preferredContactChannel: "Canal prefere",
-  preferredContactTime: "Creneau prefere"
+  emailMasked: "Email (masqué)",
+  phone: "Téléphone",
+  phoneMasked: "Téléphone (masqué)",
+  preferredContactChannel: "Canal préféré",
+  preferredContactTime: "Créneau préféré"
 };
 
 type TabKey = (typeof TABS)[number]["key"];
@@ -108,9 +111,9 @@ export default async function BrokerCrmLeadDetailPage({ params, searchParams }: 
     return (
       <PageStack>
         <PageHeader
-          breadcrumb={[{ label: "CRM", href: "/crm" }, { label: "Vue tableau", href: "/crm/leads" }, { label: "Detail" }]}
-          title="Acces CRM refuse"
-          description="Le detail CRM exige un plan Pro/Enterprise, la MFA verifiee, le flag broker_crm_enabled et les permissions CRM."
+          breadcrumb={[{ label: "CRM", href: "/crm" }, { label: "Vue tableau", href: "/crm/leads" }, { label: "Détail" }]}
+          title="Accès CRM refusé"
+          description="Le détail CRM exige un plan Pro/Enterprise, la MFA vérifiée, le flag broker_crm_enabled et les permissions CRM."
         />
         <Notice tone="info">Le CRM complet est disponible avec le plan Pro.</Notice>
       </PageStack>
@@ -156,7 +159,7 @@ export default async function BrokerCrmLeadDetailPage({ params, searchParams }: 
       <PageHeader
         breadcrumb={[{ label: "CRM", href: "/crm" }, { label: "Vue tableau", href: "/crm/leads" }, { label: lead?.publicReference || "Lead CRM" }]}
         title={lead?.publicReference || "Lead CRM"}
-        description="Notes, documents internes et taches ne sont jamais visibles cote Web Publique Client."
+        description="Notes, documents internes et tâches ne sont jamais visibles côté Web Publique Client."
         actions={
           <Cluster>
             {lead ? <StatusBadge status={lead.status} labels={crmStatusLabels} tones={{ [lead.status]: statusTone(lead.status) }} /> : null}
@@ -167,14 +170,14 @@ export default async function BrokerCrmLeadDetailPage({ params, searchParams }: 
 
       {noticeEntry ? <Notice tone={noticeEntry.tone}>{noticeEntry.message}</Notice> : null}
       {proposalNoticeEntry ? <Notice tone={proposalNoticeEntry.tone}>{proposalNoticeEntry.message}</Notice> : null}
-      {detail.status === "forbidden" ? <Notice tone="warning" title="Acces refuse">Ce lead n'est pas accessible avec vos permissions CRM ou votre tenant.</Notice> : null}
-      {notFound ? <Notice tone="warning" title="Lead introuvable">Aucun lead CRM ne correspond a cette reference pour votre cabinet.</Notice> : null}
+      {detail.status === "forbidden" ? <Notice tone="warning" title="Accès refusé">Ce lead n'est pas accessible avec vos permissions CRM ou votre tenant.</Notice> : null}
+      {notFound ? <Notice tone="warning" title="Lead introuvable">Aucun lead CRM ne correspond à cette référence pour votre cabinet.</Notice> : null}
       {detail.status === "error" && !notFound ? <Notice tone="warning" title="Lead indisponible">{detail.error ?? "erreur inconnue"}</Notice> : null}
       {lead && !canMutate ? (
         <Notice tone="info" title="Lecture seule">
           {tenantReadOnly
             ? TENANT_SUSPENDED_MESSAGE
-            : "Votre role CRM ne permet pas de modifier ce lead. Statut, notes, taches et rappels restent consultables uniquement."}
+            : "Votre rôle CRM ne permet pas de modifier ce lead. Statut, notes, tâches et rappels restent consultables uniquement."}
         </Notice>
       ) : null}
 
@@ -189,34 +192,34 @@ export default async function BrokerCrmLeadDetailPage({ params, searchParams }: 
             <Stack>
               {currentTab === "synthese" ? (
                 <>
-                  <Card title="Synthese">
+                  <Card title="Synthèse">
                     {lead ? (
                       <DescriptionList
                         columns={2}
                         items={[
                           { term: "Statut", value: <StatusBadge status={lead.status} labels={crmStatusLabels} tones={{ [lead.status]: statusTone(lead.status) }} /> },
-                          { term: "Recu le", value: formatDate(lead.assignedAt) },
-                          { term: "Pays / produit", value: `${lead.countryCode} / ${lead.productKey}` },
-                          { term: "Urgence", value: lead.urgency },
-                          { term: "Source", value: lead.source },
+                          { term: "Reçu le", value: formatDate(lead.assignedAt) },
+                          { term: "Pays / produit", value: `${lead.countryCode} / ${productLabel(lead.productKey)}` },
+                          { term: "Urgence", value: lead.urgency ? CRM_URGENCY_LABELS[lead.urgency] ?? lead.urgency : "-" },
+                          { term: "Source", value: lead.source ? CRM_SOURCE_LABELS[lead.source] ?? lead.source : "-" },
                           { term: "Conseiller", value: advisorName },
                           {
-                            term: "Exclusivite",
+                            term: "Exclusivité",
                             value: lead.isShared
-                              ? `Lead partage avec ${(lead.recipientCount ?? 2) - 1} autre(s) courtier(s) partenaire(s), au tarif reduit. L'identite des autres courtiers n'est pas communiquee.`
-                              : "Lead exclusif: vous etes le seul courtier partenaire destinataire."
+                              ? `Lead partagé avec ${(lead.recipientCount ?? 2) - 1} autre(s) courtier(s) partenaire(s), au tarif réduit. L'identité des autres courtiers n'est pas communiquée.`
+                              : "Lead exclusif: vous êtes le seul courtier partenaire destinataire."
                           }
                         ]}
                       />
                     ) : (
-                      <p className={styles.muted}>Aucune donnee CRM affichee pour ce lead.</p>
+                      <p className={styles.muted}>Aucune donnée CRM affichée pour ce lead.</p>
                     )}
                   </Card>
 
                   {lead ? (
-                    <Card title="Coordonnees du visiteur" description="Coordonnees completes pour le courtier affecte, des l'affectation. Chaque consultation est auditee.">
+                    <Card title="Coordonnées du visiteur" description="Coordonnées complètes pour le courtier affecté, dès l'affectation. Chaque consultation est auditée.">
                       {contactMasked ? (
-                        <Notice tone="warning">Le visiteur a retire son consentement : coordonnees masquees, le lead ne doit plus etre recontacte.</Notice>
+                        <Notice tone="warning">Le visiteur a retiré son consentement : coordonnées masquées, le lead ne doit plus être recontacté.</Notice>
                       ) : null}
                       {contactEntries.length > 0 ? (
                         <DescriptionList columns={2}>
@@ -228,7 +231,7 @@ export default async function BrokerCrmLeadDetailPage({ params, searchParams }: 
                           ))}
                         </DescriptionList>
                       ) : (
-                        <p className={styles.muted}>Aucune coordonnee exposee pour ce lead.</p>
+                        <p className={styles.muted}>Aucune coordonnée exposée pour ce lead.</p>
                       )}
                     </Card>
                   ) : null}
@@ -272,11 +275,11 @@ export default async function BrokerCrmLeadDetailPage({ params, searchParams }: 
                   ) : null}
 
                   {lead && Object.keys(lead.answers).length > 0 ? (
-                    <Card title="Reponses consenties">
+                    <Card title="Réponses consenties">
                       <DescriptionList columns={2}>
                         {Object.entries(lead.answers).map(([key, value]) => (
                           <div key={key}>
-                            <dt>{key}</dt>
+                            <dt>{answerLabel(key)}</dt>
                             <dd>{renderAnswerValue(value)}</dd>
                           </div>
                         ))}
@@ -287,7 +290,7 @@ export default async function BrokerCrmLeadDetailPage({ params, searchParams }: 
               ) : null}
 
               {currentTab === "propositions" ? (
-                <Card title="Propositions au visiteur" description="Proposition indicative envoyee au visiteur dans son espace de suivi. L'envoi fait passer le lead a « devis envoye » s'il etait moins avance.">
+                <Card title="Propositions au visiteur" description="Proposition indicative envoyée au visiteur dans son espace de suivi. L'envoi fait passer le lead à « devis envoyé » s'il était moins avancé.">
                   {proposals.status === "success" && lead ? (
                     <ProposalPanel
                       channel="crm"
@@ -340,31 +343,31 @@ export default async function BrokerCrmLeadDetailPage({ params, searchParams }: 
                     ) : null}
                   </Card>
 
-                  <Card title="Taches commerciales">
+                  <Card title="Tâches commerciales">
                     {tasks.length > 0 ? (
                       <ul className="bo-list">
                         {tasks.map((task, index) => (
                           <li key={textOf(task, "id") || `task-${index}`}>
                             {textOf(task, "title")}
-                            {task.dueAt ? <span className={styles.entryMeta}>{` - echeance ${formatDate(textOf(task, "dueAt"))}`}</span> : ""}
-                            {task.completedAt ? <> <Badge tone="success">terminee</Badge></> : ""}
+                            {task.dueAt ? <span className={styles.entryMeta}>{` - échéance ${formatDate(textOf(task, "dueAt"))}`}</span> : ""}
+                            {task.completedAt ? <> <Badge tone="success">terminée</Badge></> : ""}
                           </li>
                         ))}
                       </ul>
                     ) : (
-                      <p className={styles.muted}>Aucune tache commerciale pour ce lead.</p>
+                      <p className={styles.muted}>Aucune tâche commerciale pour ce lead.</p>
                     )}
                     {showForms && lead ? (
                       <Form action={addCrmLeadTaskAction} columns={2} className={styles.subsection}>
                         <input type="hidden" name="leadAssignmentId" value={lead.leadAssignmentId} />
-                        <Field id="crm-task-title" label="Intitule" required requiredLabel="obligatoire">
-                          <Input id="crm-task-title" name="title" maxLength={200} required placeholder="Rappeler le prospect" aria-label="Intitule de la tache" />
+                        <Field id="crm-task-title" label="Intitulé" required requiredLabel="obligatoire">
+                          <Input id="crm-task-title" name="title" maxLength={200} required placeholder="Rappeler le prospect" aria-label="Intitulé de la tâche" />
                         </Field>
-                        <Field id="crm-task-due" label="Echeance">
-                          <Input id="crm-task-due" type="datetime-local" name="dueAt" aria-label="Echeance de la tache" />
+                        <Field id="crm-task-due" label="Échéance">
+                          <Input id="crm-task-due" type="datetime-local" name="dueAt" aria-label="Échéance de la tâche" />
                         </Field>
                         <FormActions>
-                          <Button type="submit" variant="secondary">Ajouter une tache</Button>
+                          <Button type="submit" variant="secondary">Ajouter une tâche</Button>
                         </FormActions>
                       </Form>
                     ) : null}
@@ -381,7 +384,7 @@ export default async function BrokerCrmLeadDetailPage({ params, searchParams }: 
                         ))}
                       </ul>
                     ) : (
-                      <p className={styles.muted}>Aucun rappel programme pour ce lead.</p>
+                      <p className={styles.muted}>Aucun rappel programmé pour ce lead.</p>
                     )}
                     {showForms && lead ? (
                       <Form action={addCrmLeadReminderAction} columns={2} className={styles.subsection}>
@@ -426,19 +429,19 @@ export default async function BrokerCrmLeadDetailPage({ params, searchParams }: 
                         ))}
                       </ol>
                     ) : (
-                      <p className={styles.muted}>Aucun evenement CRM historise pour ce lead.</p>
+                      <p className={styles.muted}>Aucun événement CRM historisé pour ce lead.</p>
                     )}
                   </Card>
 
-                  <Card title="Documents et references">
+                  <Card title="Documents et références">
                     <p className={styles.muted}>
-                      Les propositions ou references de devis sont un suivi interne partenaire, pas une emission contractuelle par AssurMatch.
+                      Les propositions ou références de devis sont un suivi interne partenaire, pas une émission contractuelle par AssurMatch.
                       Les documents internes sont analyses par l'antivirus et ne sont jamais visibles du visiteur.
                     </p>
                     <Cluster>
                       <Badge>Document interne ({documents.filter((document) => document.visibility === "internal").length})</Badge>
                       <Badge>Document prospect ({documents.filter((document) => document.visibility === "prospect_provided").length})</Badge>
-                      <Badge>Reference devis ({lead?.proposals.length ?? 0})</Badge>
+                      <Badge>Référence devis ({lead?.proposals.length ?? 0})</Badge>
                     </Cluster>
                     {documents.length > 0 ? (
                       <ul className="bo-list">
@@ -458,14 +461,14 @@ export default async function BrokerCrmLeadDetailPage({ params, searchParams }: 
                     {lead && (showForms || tenantReadOnly) ? (
                       <TenantWriteGuard readOnly={tenantReadOnly}>
                         <form action={`/crm/leads/${lead.leadAssignmentId}/documents`} method="post" encType="multipart/form-data" className={`bo-form ${styles.subsection}`} aria-label="Ajouter un document interne">
-                          <Field id="crm-document-label" label="Libelle du document" required requiredLabel="obligatoire">
-                            <Input id="crm-document-label" name="label" required maxLength={120} aria-label="Libelle du document interne" />
+                          <Field id="crm-document-label" label="Libellé du document" required requiredLabel="obligatoire">
+                            <Input id="crm-document-label" name="label" required maxLength={120} aria-label="Libellé du document interne" />
                           </Field>
                           <Field id="crm-document-file" label="Fichier" required requiredLabel="obligatoire" hint="PDF, JPEG ou PNG, 5 Mo au maximum, analyse par l'antivirus.">
                             <Input id="crm-document-file" name="file" type="file" required accept="application/pdf,image/jpeg,image/png" aria-label="Fichier du document interne" />
                           </Field>
                           <FormActions>
-                            <Button type="submit" variant="secondary">Televerser le document interne</Button>
+                            <Button type="submit" variant="secondary">Téléverser le document interne</Button>
                           </FormActions>
                         </form>
                       </TenantWriteGuard>
@@ -510,12 +513,12 @@ export default async function BrokerCrmLeadDetailPage({ params, searchParams }: 
                       <Button type="submit">Enregistrer le statut</Button>
                     </FormActions>
                   </Form>
-                  <p className={styles.muted}>Le changement de statut est historise avec acteur, date et motif.</p>
+                  <p className={styles.muted}>Le changement de statut est historisé avec acteur, date et motif.</p>
                 </Card>
               ) : null}
 
               {lead ? (
-                <Card title="Conseiller assigne" description="Un agent ne voit que les leads qui lui sont assignes.">
+                <Card title="Conseiller assigné" description="Un agent ne voit que les leads qui lui sont assignés.">
                   <p>Conseiller actuel : {advisorName}</p>
                   {canAssign && !teamAvailable ? (
                     <Notice tone="warning">Liste de l'équipe indisponible : l'assignation est momentanément impossible.</Notice>
@@ -540,23 +543,23 @@ export default async function BrokerCrmLeadDetailPage({ params, searchParams }: 
                       </FormActions>
                     </Form>
                   ) : (
-                    <p className={styles.muted}>Votre role ne permet pas d'assigner ce lead.</p>
+                    <p className={styles.muted}>Votre rôle ne permet pas d'assigner ce lead.</p>
                   )}
                 </Card>
               ) : null}
 
-              <Card title="Controle d'acces">
+              <Card title="Contrôle d'accès">
                 <DescriptionList
                   items={[
-                    { term: "Acces", value: <Badge tone="success">CRM autorise</Badge> },
-                    { term: "Owner", value: "Organisation." },
-                    { term: "Manager", value: "Equipe ou organisation selon permission." },
-                    { term: "Agent", value: "Leads assignes." },
-                    { term: "Read-only", value: "Lecture seule." }
+                    { term: "Accès", value: <Badge tone="success">CRM autorisé</Badge> },
+                    { term: "Propriétaire", value: "Organisation." },
+                    { term: "Manager", value: "Équipe ou organisation selon permission." },
+                    { term: "Agent", value: "Leads assignés." },
+                    { term: "Lecture seule", value: "Consultation uniquement." }
                   ]}
                 />
                 <p className={styles.muted}>
-                  Les formulaires ne sont proposes que si votre role autorise la mise a jour CRM. Le backend re-verifie chaque action et audite les refus.
+                  Les formulaires ne sont proposés que si votre rôle autorise la mise à jour CRM. Le backend re-vérifie chaque action et audite les refus.
                 </p>
               </Card>
             </Stack>

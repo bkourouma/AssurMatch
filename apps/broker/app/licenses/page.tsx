@@ -85,7 +85,7 @@ export default async function BrokerLicensesPage() {
   if (!canReadAccount(session.profile)) {
     return (
       <PageStack>
-        <PageHeader breadcrumb={BREADCRUMB} title="Acces refuse" description="La consultation des licences exige un rôle courtier." />
+        <PageHeader breadcrumb={BREADCRUMB} title="Accès refusé" description="La consultation des licences exige un rôle courtier." />
       </PageStack>
     );
   }

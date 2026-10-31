@@ -25,10 +25,10 @@ import styles from "../lib/ui/broker-screens.module.css";
 import { TENANT_SUSPENDED_MESSAGE, isTenantReadOnly } from "../lib/broker-permissions";
 
 const NOTICES: Record<string, string> = {
-  read: "Notification marquee comme lue.",
-  preferences_saved: "Preferences de canaux enregistrees et auditees.",
-  baseline: "Email et notifications in-app restent actifs: ce sont les canaux operationnels de base.",
-  forbidden: "Action refusee par vos permissions.",
+  read: "Notification marquée comme lue.",
+  preferences_saved: "Préférences de canaux enregistrées et auditées.",
+  baseline: "Email et notifications in-app restent actifs: ce sont les canaux opérationnels de base.",
+  forbidden: "Action refusée par vos permissions.",
   // Spec 051 FR-021: 403 PARTNER_SUSPENDED (marking a notification read stays allowed).
   suspended: TENANT_SUSPENDED_MESSAGE,
   error: "Notifications temporairement indisponibles."
@@ -49,8 +49,8 @@ export default async function BrokerNotificationsPage({ searchParams }: { search
       <PageStack>
         <PageHeader
           breadcrumb={BREADCRUMB}
-          title="Acces refuse"
-          description="Les notifications exigent une session courtier authentifiee et la MFA verifiee."
+          title="Accès refusé"
+          description="Les notifications exigent une session courtier authentifiée et la MFA vérifiée."
         />
       </PageStack>
     );
@@ -63,8 +63,8 @@ export default async function BrokerNotificationsPage({ searchParams }: { search
     <PageStack>
       <PageHeader
         breadcrumb={BREADCRUMB}
-        title="Notifications operationnelles"
-        description="Messages operationnels sur vos leads et votre compte. Aucun engagement contractuel, aucun contenu promotionnel."
+        title="Notifications opérationnelles"
+        description="Messages opérationnels sur vos leads et votre compte. Aucun engagement contractuel, aucun contenu promotionnel."
       />
       {notif && NOTICES[notif] ? (
         <Notice tone={notif === "read" || notif === "preferences_saved" ? "success" : "warning"}>{NOTICES[notif]}</Notice>
@@ -72,7 +72,7 @@ export default async function BrokerNotificationsPage({ searchParams }: { search
 
       <Split>
         <Card
-          title="Boite de reception"
+          title="Boîte de réception"
           actions={unreadCount > 0 ? <Badge tone="info">{`${unreadCount} non lue(s)`}</Badge> : undefined}
         >
           {inbox.status !== "success" ? (
@@ -81,7 +81,7 @@ export default async function BrokerNotificationsPage({ searchParams }: { search
             <EmptyState
               icon="bell"
               title="Aucune notification pour votre cabinet."
-              description="Les nouveaux leads assignes et les evenements de votre compte apparaissent ici."
+              description="Les nouveaux leads assignés et les événements de votre compte apparaissent ici."
             />
           ) : (
             <ul className="bo-list">
@@ -115,7 +115,7 @@ export default async function BrokerNotificationsPage({ searchParams }: { search
 
         <Card
           title="Canaux de notification"
-          description="Email et notifications in-app restent actifs en permanence. SMS et WhatsApp ne sont utilises que si la plateforme les a actives et si vous les acceptez ici."
+          description="Email et notifications in-app restent actifs en permanence. SMS et WhatsApp ne sont utilisés que si la plateforme les a activés et si vous les acceptez ici."
         >
           {preferences.status === "success" ? (
             <TenantWriteGuard readOnly={isTenantReadOnly(session.profile)}>
@@ -127,7 +127,7 @@ export default async function BrokerNotificationsPage({ searchParams }: { search
               <Checkbox id="notif-sms" name="sms" label="Accepter les notifications SMS" defaultChecked={preferences.data.sms} />
               <Checkbox id="notif-whatsapp" name="whatsapp" label="Accepter les notifications WhatsApp" defaultChecked={preferences.data.whatsapp} />
               <Field id="notif-reason" label="Motif">
-                <Input id="notif-reason" name="reason" placeholder="Motif de la mise a jour" />
+                <Input id="notif-reason" name="reason" placeholder="Motif de la mise à jour" />
               </Field>
               <FormActions>
                 <Button type="submit">Enregistrer mes canaux</Button>
@@ -135,7 +135,7 @@ export default async function BrokerNotificationsPage({ searchParams }: { search
             </Form>
             </TenantWriteGuard>
           ) : (
-            <Notice tone="warning">Preferences indisponibles: {preferences.error ?? "erreur inconnue"}.</Notice>
+            <Notice tone="warning">Préférences indisponibles: {preferences.error ?? "erreur inconnue"}.</Notice>
           )}
         </Card>
       </Split>

@@ -5,6 +5,7 @@ import { isStarterCrmDenied, loginRedirect, readBackOfficeSession } from "../lib
 import { readBrokerAIAssistance, readBrokerAdvisors, readBrokerAiOptOut, readBrokerBillingStatement, readBrokerDashboardWithComparison, readBrokerTeam } from "../lib/broker-api";
 import { setAiOptOutAction } from "../lib/crm-ai-actions";
 import { crmStatusLabel } from "../lib/lead-vocabulary";
+import { productLabel } from "../lib/product-vocabulary";
 import {
   Badge,
   Button,
@@ -30,6 +31,13 @@ import styles from "../lib/ui/broker-screens.module.css";
 
 const BREADCRUMB = [{ label: "CRM" }, { label: "Pipeline" }];
 
+/** Statut du brouillon de facture mensuel: la clé de l'API n'est jamais montrée telle quelle. */
+const DRAFT_STATUS_LABELS: Record<string, string> = { draft_not_billable: "Brouillon non facturable" };
+
+function draftStatusLabel(status: string): string {
+  return DRAFT_STATUS_LABELS[status] ?? "Brouillon";
+}
+
 function signed(value: number): string {
   return `${value >= 0 ? "+" : ""}${value}`;
 }
@@ -45,8 +53,8 @@ export default async function BrokerCrmPage({ searchParams }: { searchParams: Pr
         <PageStack>
           <PageHeader
             breadcrumb={BREADCRUMB}
-            title="Acces CRM refuse"
-            description="Le CRM courtier exige un courtier authentifie, la MFA verifiee et les permissions CRM."
+            title="Accès CRM refusé"
+            description="Le CRM courtier exige un courtier authentifié, la MFA vérifiée et les permissions CRM."
           />
         </PageStack>
       );
@@ -60,7 +68,7 @@ export default async function BrokerCrmPage({ searchParams }: { searchParams: Pr
         <PageHeader
           breadcrumb={BREADCRUMB}
           title="CRM complet indisponible"
-          description="Le portail Starter reste centre sur les leads recus et leurs actions autorisees."
+          description="Le portail Starter reste centré sur les leads reçus et leurs actions autorisées."
           actions={<Badge tone="disabled">Module indisponible</Badge>}
         />
         <Notice tone="info" title="Plan Starter">
@@ -84,8 +92,8 @@ export default async function BrokerCrmPage({ searchParams }: { searchParams: Pr
       <PageStack>
         <PageHeader
           breadcrumb={BREADCRUMB}
-          title="Acces dashboard refuse"
-          description="Le dashboard courtier exige un courtier authentifie, la MFA verifiee et le flag broker_dashboard_enabled actif."
+          title="Accès dashboard refusé"
+          description="Le dashboard courtier exige un courtier authentifié, la MFA vérifiée et le flag broker_dashboard_enabled actif."
         />
       </PageStack>
     );
@@ -99,9 +107,9 @@ export default async function BrokerCrmPage({ searchParams }: { searchParams: Pr
   const comparison = dashboard.data.comparison;
   const comparisonStats: StatItem[] = comparison
     ? [
-        { label: "Leads recus (precedent)", value: comparison.previous.received, helper: `Ecart: ${signed(comparison.delta.received)}` },
-        { label: "Leads acceptes (precedent)", value: comparison.previous.accepted, helper: `Ecart: ${signed(comparison.delta.accepted)}` },
-        { label: "Refus/contestations (precedent)", value: comparison.previous.refused, helper: `Ecart: ${signed(comparison.delta.refused)}` }
+        { label: "Leads reçus (précédent)", value: comparison.previous.received, helper: `Écart: ${signed(comparison.delta.received)}` },
+        { label: "Leads acceptés (précédent)", value: comparison.previous.accepted, helper: `Écart: ${signed(comparison.delta.accepted)}` },
+        { label: "Refus/contestations (précédent)", value: comparison.previous.refused, helper: `Écart: ${signed(comparison.delta.refused)}` }
       ]
     : [];
 
@@ -110,7 +118,7 @@ export default async function BrokerCrmPage({ searchParams }: { searchParams: Pr
       <PageHeader
         breadcrumb={BREADCRUMB}
         title="Pipeline commercial"
-        description="Indicateurs operationnels internes du CRM Pro/Enterprise. Aucune action CRM ne change les regles de routage, consentement, licence ou tenant."
+        description="Indicateurs opérationnels internes du CRM Pro/Enterprise. Aucune action CRM ne change les règles de routage, consentement, licence ou tenant."
         actions={
           crm ? (
             <Cluster>
@@ -131,7 +139,7 @@ export default async function BrokerCrmPage({ searchParams }: { searchParams: Pr
           <ul className="bo-list">
             {dashboard.data.licenseAlerts.map((alert) => (
               <li key={alert.licenseId}>
-                {alert.countryCode} - {alert.status === "expired" ? "expiree" : "expirante"} (
+                {alert.countryCode} - {alert.status === "expired" ? "expirée" : "expirante"} (
                 {new Date(alert.expiresAt).toISOString().slice(0, 10)}) - <a href="/licenses">Ouvrir les licences</a>
               </li>
             ))}
@@ -146,8 +154,8 @@ export default async function BrokerCrmPage({ searchParams }: { searchParams: Pr
 
       {crm ? (
         <section aria-label="Indicateurs CRM" className="bo-stack">
-          <h2 className="bo-section-title">Activite CRM</h2>
-          <StatStrip items={crmKpis(dashboard.data)} label="Activite CRM" />
+          <h2 className="bo-section-title">Activité CRM</h2>
+          <StatStrip items={crmKpis(dashboard.data)} label="Activité CRM" />
         </section>
       ) : null}
 
@@ -164,14 +172,14 @@ export default async function BrokerCrmPage({ searchParams }: { searchParams: Pr
               items={crm.pipeline}
               getKey={(row) => row.status}
               aria-label="Pipeline par statut"
-              emptyLabel="Aucune activite CRM dans la fenetre."
+              emptyLabel="Aucune activité CRM dans la fenêtre."
               dense
             />
           </Card>
           <Card title="Conversion par produit">
             <DataTable
               columns={[
-                { key: "product", header: "Produit", render: (row) => row.productKey },
+                { key: "product", header: "Produit", render: (row) => productLabel(row.productKey) },
                 { key: "won", header: CONVERSION_LABEL, numeric: true, align: "right", render: (row) => wonOverReceived(row) },
                 { key: "rate", header: "Taux", numeric: true, align: "right", render: (row) => formatRate(row.rate) }
               ]}
@@ -185,17 +193,17 @@ export default async function BrokerCrmPage({ searchParams }: { searchParams: Pr
         </Split>
       ) : (
         <Notice tone={starterBlocked ? "info" : "warning"} title="Section CRM indisponible">
-          {starterBlocked ? "Le CRM complet est disponible avec le plan Pro." : "Le flag broker_crm_enabled est ferme ou le scope ne permet pas le CRM avance."}
+          {starterBlocked ? "Le CRM complet est disponible avec le plan Pro." : "Le flag broker_crm_enabled est fermé ou le scope ne permet pas le CRM avancé."}
         </Notice>
       )}
 
       {comparison ? (
-        <section aria-label="Comparaison avec la periode precedente" className="bo-stack">
+        <section aria-label="Comparaison avec la période précédente" className="bo-stack">
           <div className={styles.sectionHead}>
-            <h2 className="bo-section-title">Comparaison avec la periode precedente</h2>
-            <Button href="/reports/export" variant="secondary" size="sm">Exporter le rapport d'activite indicatif (CSV)</Button>
+            <h2 className="bo-section-title">Comparaison avec la période précédente</h2>
+            <Button href="/reports/export" variant="secondary" size="sm">Exporter le rapport d'activité indicatif (CSV)</Button>
           </div>
-          <StatStrip items={comparisonStats} label="Comparaison avec la periode precedente" />
+          <StatStrip items={comparisonStats} label="Comparaison avec la période précédente" />
         </section>
       ) : null}
 
@@ -204,14 +212,14 @@ export default async function BrokerCrmPage({ searchParams }: { searchParams: Pr
           <DataTable
             columns={[
               { key: "advisor", header: "Conseiller", render: (row) => advisorDisplayName(teamMembers, row.advisorId) },
-              { key: "received", header: "Recus", numeric: true, align: "right", render: (row) => row.received },
-              { key: "accepted", header: "Acceptes", numeric: true, align: "right", render: (row) => row.accepted },
-              { key: "won", header: "Gagnes", numeric: true, align: "right", render: (row) => row.won },
+              { key: "received", header: "Reçus", numeric: true, align: "right", render: (row) => row.received },
+              { key: "accepted", header: "Acceptés", numeric: true, align: "right", render: (row) => row.accepted },
+              { key: "won", header: "Gagnés", numeric: true, align: "right", render: (row) => row.won },
               { key: "lost", header: "Perdus", numeric: true, align: "right", render: (row) => row.lost },
               { key: "conversion", header: "Conversion", numeric: true, align: "right", render: (row) => `${Math.round(row.conversionRate * 100)}%` },
               {
                 key: "firstAction",
-                header: "Premiere action",
+                header: "Première action",
                 numeric: true,
                 align: "right",
                 render: (row) => (row.averageFirstActionMinutes === null ? "-" : `${row.averageFirstActionMinutes} min`)
@@ -220,7 +228,7 @@ export default async function BrokerCrmPage({ searchParams }: { searchParams: Pr
             items={advisors.data}
             getKey={(row) => row.advisorId}
             aria-label="Performance par conseiller"
-            emptyLabel="Aucun conseiller mesure."
+            emptyLabel="Aucun conseiller mesuré."
             dense
           />
         </Card>
@@ -235,18 +243,18 @@ export default async function BrokerCrmPage({ searchParams }: { searchParams: Pr
           <StatStrip
             label="Consommation du mois"
             items={[
-              { label: "Leads recus (mois)", value: statement.data.leadsReceived },
-              { label: "Leads factures (brouillon)", value: statement.data.billableLeadCount, tone: "info" },
+              { label: "Leads reçus (mois)", value: statement.data.leadsReceived },
+              { label: "Leads facturés (brouillon)", value: statement.data.billableLeadCount, tone: "info" },
               { label: "Leads non facturables", value: statement.data.nonBillableLeadCount },
-              { label: "Contestations creditees", value: statement.data.disputeCreditCount, tone: statement.data.disputeCreditCount > 0 ? "warning" : "neutral" },
-              { label: "Credits pack restants", value: statement.data.packCreditsRemaining },
-              { label: "Montant estime", value: `${statement.data.estimatedAmount.toLocaleString("fr-FR").replace(/\u202f|\u00a0/g, " ")} ${statement.data.currency}`, helper: "Estimation indicative" }
+              { label: "Contestations créditées", value: statement.data.disputeCreditCount, tone: statement.data.disputeCreditCount > 0 ? "warning" : "neutral" },
+              { label: "Crédits pack restants", value: statement.data.packCreditsRemaining },
+              { label: "Montant estimé", value: `${statement.data.estimatedAmount.toLocaleString("fr-FR").replace(/\u202f|\u00a0/g, " ")} ${statement.data.currency}`, helper: "Estimation indicative" }
             ]}
           />
           <Cluster>
             <Badge tone={statement.data.billingEnabled ? "info" : "disabled"}>{statement.data.billingEnabled ? "Facturation active" : "Facturation inactive"}</Badge>
-            <Badge tone="disabled">Paiement en ligne desactive</Badge>
-            {statement.data.draft ? <Badge tone="disabled">{`Brouillon ${statement.data.draft.status}`}</Badge> : null}
+            <Badge tone="disabled">Paiement en ligne désactivé</Badge>
+            {statement.data.draft ? <Badge tone="disabled">{draftStatusLabel(statement.data.draft.status)}</Badge> : null}
             <span className={styles.muted}>{statement.data.notice || "Brouillon non facturable: estimation du mois en cours, aucun encaissement en ligne."}</span>
           </Cluster>
         </section>
@@ -264,12 +272,11 @@ export default async function BrokerCrmPage({ searchParams }: { searchParams: Pr
           <DescriptionList
             columns={2}
             items={[
-              { term: "Assistance", value: <Badge tone={aiAssistance.data.enabled ? "success" : "disabled"}>{aiAssistance.data.enabled ? "Activee" : "Desactivee"}</Badge> },
-              { term: "Appel a un modele", value: <Badge tone={aiAssistance.data.modelCall ? "info" : "disabled"}>{aiAssistance.data.modelCall ? "Oui" : "Non"}</Badge> },
-              { term: "Decision", value: <Badge tone="warning">validation humaine obligatoire</Badge> }
+              { term: "Assistance", value: <Badge tone={aiAssistance.data.enabled ? "success" : "disabled"}>{aiAssistance.data.enabled ? "Activée" : "Désactivée"}</Badge> },
+              { term: "Appel à un modèle", value: <Badge tone={aiAssistance.data.modelCall ? "info" : "disabled"}>{aiAssistance.data.modelCall ? "Oui" : "Non"}</Badge> },
+              { term: "Décision", value: <Badge tone="warning">validation humaine obligatoire</Badge> }
             ]}
           />
-          <p className="bo-ref">enabled: {String(aiAssistance.data.enabled)} · modelCall: {String(aiAssistance.data.modelCall)}</p>
           <p className={styles.muted}>{aiAssistance.data.message}</p>
           {aiOptOut.status === "success" ? (
             <TenantWriteGuard readOnly={isTenantReadOnly(session.profile)}>
@@ -278,22 +285,22 @@ export default async function BrokerCrmPage({ searchParams }: { searchParams: Pr
               <input
                 type="hidden"
                 name="reason"
-                value={aiOptOut.data.optedOut ? "Reactivation de l'assistance IA par le cabinet" : "Opt-out de l'assistance IA par le cabinet"}
+                value={aiOptOut.data.optedOut ? "Réactivation de l'assistance IA par le cabinet" : "Opt-out de l'assistance IA par le cabinet"}
               />
               <Cluster>
                 <Badge tone={aiOptOut.data.optedOut ? "warning" : "neutral"}>
-                  {aiOptOut.data.optedOut ? "Cabinet en opt-out IA" : "Assistance IA autorisee pour le cabinet"}
+                  {aiOptOut.data.optedOut ? "Cabinet en opt-out IA" : "Assistance IA autorisée pour le cabinet"}
                 </Badge>
                 <Button type="submit" variant="secondary" size="sm">
-                  {aiOptOut.data.optedOut ? "Reactiver l'assistance IA" : "Refuser l'assistance IA (opt-out cabinet)"}
+                  {aiOptOut.data.optedOut ? "Réactiver l'assistance IA" : "Refuser l'assistance IA (opt-out cabinet)"}
                 </Button>
               </Cluster>
             </form>
             </TenantWriteGuard>
           ) : null}
-          {aiNotice === "optout_saved" ? <Notice tone="success">Preference IA du cabinet enregistree et auditee.</Notice> : null}
+          {aiNotice === "optout_saved" ? <Notice tone="success">Préférence IA du cabinet enregistrée et auditée.</Notice> : null}
           {aiNotice === "suspended" ? <Notice tone="warning">{TENANT_SUSPENDED_MESSAGE}</Notice> : null}
-          {aiNotice === "forbidden" ? <Notice tone="danger">Seul le proprietaire du cabinet peut modifier la preference IA.</Notice> : null}
+          {aiNotice === "forbidden" ? <Notice tone="danger">Seul le propriétaire du cabinet peut modifier la préférence IA.</Notice> : null}
         </Card>
       ) : null}
     </PageStack>

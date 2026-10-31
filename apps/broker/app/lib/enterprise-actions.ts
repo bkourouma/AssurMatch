@@ -70,7 +70,7 @@ export async function createCustomRoleAction(formData: FormData): Promise<void> 
 export async function updateSlaAction(formData: FormData): Promise<void> {
   const minutes = Number(stringValue(formData.get("firstActionTargetMinutes")));
   if (!Number.isInteger(minutes) || minutes < 5) redirect("/enterprise?ent=invalid");
-  const result = await callEnterpriseApi("/broker/enterprise/sla", "PUT", { firstActionTargetMinutes: minutes, reason: stringValue(formData.get("reason")).trim() || "Mise a jour de l'engagement de reactivite" });
+  const result = await callEnterpriseApi("/broker/enterprise/sla", "PUT", { firstActionTargetMinutes: minutes, reason: stringValue(formData.get("reason")).trim() || "Mise à jour de l'engagement de réactivité" });
   if (result.status === 401) redirect(loginRedirect("/enterprise", "session_expired"));
   // Spec 051 R9: 422 SLA_TARGET_EXCEEDS_CONTRACT when the target is looser than the contractual one.
   redirect(`/enterprise?ent=${result.status === 422 ? "sla_contract" : outcome(result, "sla_saved")}`);
@@ -81,7 +81,7 @@ export async function updateBrandingAction(formData: FormData): Promise<void> {
   const displayLabel = stringValue(formData.get("displayLabel")).trim();
   const primaryColor = stringValue(formData.get("primaryColor")).trim();
   if (!displayLabel || !/^#[0-9a-fA-F]{6}$/.test(primaryColor)) redirect("/enterprise?ent=invalid");
-  const result = await callEnterpriseApi("/broker/enterprise/branding", "PUT", { displayLabel, primaryColor, reason: stringValue(formData.get("reason")).trim() || "Mise a jour de la charte interne" });
+  const result = await callEnterpriseApi("/broker/enterprise/branding", "PUT", { displayLabel, primaryColor, reason: stringValue(formData.get("reason")).trim() || "Mise à jour de la charte interne" });
   if (result.status === 401) redirect(loginRedirect("/enterprise", "session_expired"));
   redirect(`/enterprise?ent=${outcome(result, "branding_saved")}`);
 }

@@ -37,7 +37,7 @@ export async function updateNotificationPreferencesAction(formData: FormData): P
   const result = await callBrokerApi("/broker/notifications/preferences", "PUT", {
     sms: stringValue(formData.get("sms")) === "on",
     whatsapp: stringValue(formData.get("whatsapp")) === "on",
-    reason: stringValue(formData.get("reason")).trim() || "Mise a jour des canaux par le cabinet"
+    reason: stringValue(formData.get("reason")).trim() || "Mise à jour des canaux par le cabinet"
   });
   if (result.status === 401) redirect(loginRedirect("/notifications", "session_expired"));
   redirect(`/notifications?notif=${outcome(result, "preferences_saved")}`);

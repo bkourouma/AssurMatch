@@ -28,7 +28,7 @@ test("broker auth client exposes login MFA source markers", () => {
   expect(api).toContain("/auth/activate");
   expect(api).toContain("/auth/password-reset");
   expect(login).toContain("Activation requise");
-  expect(login).toContain("Compte verrouille");
+  expect(login).toContain("Compte verrouillé");
   expect(login).toContain("Compte suspendu");
   expect(login).toContain("/activate");
   expect(flow).toContain("ActivationForm");
@@ -43,7 +43,7 @@ test("broker auth completion and account pages exist", () => {
   expect(read("mfa/page.tsx")).toContain("MFA requise");
   expect(read("password-change/page.tsx")).toContain("Changer le mot de passe");
   expect(read("password-reset/page.tsx")).toContain("Consommer un jeton");
-  expect(read("account/page.tsx")).toContain("Securite du compte");
+  expect(read("account/page.tsx")).toContain("Sécurité du compte");
   expect(read("team/page.tsx")).toContain("Lecture tenant-safe");
 });
 

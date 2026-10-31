@@ -79,7 +79,7 @@ export function OfferActionResult({ state }: { state: BrokerOfferActionState }) 
 
 function ReasonField({ id, required }: { id: string; required: boolean }) {
   return (
-    <Field id={id} label={required ? "Motif (audite)" : "Commentaire (facultatif, audite)"} required={required} hint={required ? "Au moins 8 caractères, conservé dans le journal d'audit." : undefined}>
+    <Field id={id} label={required ? "Motif (audité)" : "Commentaire (facultatif, audité)"} required={required} hint={required ? "Au moins 8 caractères, conservé dans le journal d'audit." : undefined}>
       <Input {...fieldControlProps(id, { required, ...(required ? { hint: "x" } : {}) })} name="reason" {...(required ? { minLength: 8 } : {})} maxLength={500} />
     </Field>
   );

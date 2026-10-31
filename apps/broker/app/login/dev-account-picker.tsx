@@ -13,10 +13,10 @@ export function DevAccountPicker({ returnTo }: DevAccountPickerProps) {
   const formRef = useRef<HTMLFormElement>(null);
 
   return (
-    <Card title="Mode local" description="Disponible uniquement en local avec les donnees demo seed." muted aria-label="Connexion locale demo">
+    <Card title="Mode local" description="Disponible uniquement en local avec les données démo seed." muted aria-label="Connexion locale démo">
       <form ref={formRef} action={devDemoLoginAction}>
         <input type="hidden" name="returnTo" value={returnTo} />
-        <Field id="demo-account" label="Compte demo">
+        <Field id="demo-account" label="Compte démo">
           <Select
             id="demo-account"
             name="demoEmail"

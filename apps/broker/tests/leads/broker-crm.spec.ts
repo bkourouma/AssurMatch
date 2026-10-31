@@ -7,12 +7,12 @@ test("broker CRM pages stay in back-office surface", async () => {
   const detail = readFileSync("apps/broker/app/crm/leads/[leadAssignmentId]/page.tsx", "utf8");
 
   expect(dashboard).toContain("CRM Pro/Enterprise");
-  expect(dashboard).toContain("Aucune action CRM ne change les regles");
-  expect(list).toContain("Vue tableau des leads autorises");
+  expect(dashboard).toContain("Aucune action CRM ne change les règles");
+  expect(list).toContain("Vue tableau des leads autorisés");
   expect(list).toContain("Exporter (CSV)");
-  expect(detail).toContain("Notes, documents internes et taches ne sont jamais visibles cote Web Publique Client");
-  expect(detail).toContain("Reference devis");
-  expect(detail).toContain("CRM autorise");
+  expect(detail).toContain("Notes, documents internes et tâches ne sont jamais visibles côté Web Publique Client");
+  expect(detail).toContain("Référence devis");
+  expect(detail).toContain("CRM autorisé");
 });
 
 test("CRM list keeps linking each row to the lead detail route", async () => {
@@ -76,7 +76,7 @@ test("CRM lead detail offers note, task and reminder forms on the real detail pa
   expect(detail).toContain("action={addCrmLeadTaskAction}");
   expect(detail).toContain("action={addCrmLeadReminderAction}");
   expect(detail).toContain("Ajouter une note");
-  expect(detail).toContain("Ajouter une tache");
+  expect(detail).toContain("Ajouter une tâche");
   expect(detail).toContain("Ajouter un rappel");
   expect(detail).toContain('type="datetime-local" name="dueAt"');
 
@@ -86,7 +86,7 @@ test("CRM lead detail offers note, task and reminder forms on the real detail pa
 
   // Existing internal activity coming back from the detail endpoint is rendered.
   expect(detail).toContain("Notes internes");
-  expect(detail).toContain("Taches commerciales");
+  expect(detail).toContain("Tâches commerciales");
   expect(detail).toContain("Historique CRM");
 });
 

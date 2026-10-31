@@ -19,6 +19,7 @@ import {
 } from "../../lib/crm-list-query";
 import { crmExportHref } from "../../lib/lead-export-links";
 import { CRM_PIPELINE_STATUSES, crmStatusLabel } from "../../lib/lead-vocabulary";
+import { productLabel } from "../../lib/product-vocabulary";
 import { advisorDisplayName, teamAdvisorOptions } from "../../lib/team-options";
 import {
   Badge,
@@ -58,7 +59,7 @@ function crmColumns(withPriority: boolean): Array<DataTableColumn<CrmListRow>> {
   const columns: Array<DataTableColumn<CrmListRow>> = [
     { key: "reference", header: "Référence", render: (lead) => <span className="bo-ref">{lead.reference}</span> },
     { key: "country", header: "Pays", render: (lead) => lead.country },
-    { key: "product", header: "Produit", render: (lead) => lead.product },
+    { key: "product", header: "Produit", render: (lead) => productLabel(lead.product) },
     {
       key: "status",
       header: "Statut",
@@ -106,8 +107,8 @@ export default async function BrokerCrmLeadsPage({ searchParams }: { searchParam
     return (
       <PageStack>
         <PageHeader breadcrumb={[{ label: "CRM", href: "/crm" }, { label: "Vue tableau" }]} title="Leads CRM" />
-        <Notice tone="danger" title="Acces CRM refuse">
-          Acces CRM refuse, verifiez le plan, la MFA et le flag broker_crm_enabled. Aucune donnee CRM n'est affichee.
+        <Notice tone="danger" title="Accès CRM refusé">
+          Accès CRM refusé, vérifiez le plan, la MFA et le flag broker_crm_enabled. Aucune donnée CRM n'est affichée.
         </Notice>
       </PageStack>
     );
@@ -142,7 +143,7 @@ export default async function BrokerCrmLeadsPage({ searchParams }: { searchParam
       <PageHeader
         breadcrumb={[{ label: "CRM", href: "/crm" }, { label: "Vue tableau" }]}
         title="Leads CRM"
-        description="Vue tableau des leads autorises selon role, tenant, conseiller et permissions PII."
+        description="Vue tableau des leads autorisés selon rôle, tenant, conseiller et permissions PII."
         actions={
           canExport ? (
             <Cluster>
@@ -210,14 +211,14 @@ export default async function BrokerCrmLeadsPage({ searchParams }: { searchParam
             <Select id="crm-agency" name={AGENCY_PARAM} defaultValue={agency.selected} options={agency.options} />
           </Field>
         ) : null}
-        <Field id="crm-search" label="Recherche autorisee">
+        <Field id="crm-search" label="Recherche autorisée">
           <Input
             id="crm-search"
             name="q"
             type="search"
             defaultValue={query}
             maxLength={120}
-            placeholder="Nom, reference, telephone ou email selon permission"
+            placeholder="Nom, référence, téléphone ou email selon permission"
           />
         </Field>
         {/* The sort survives a filter change; a new filter always restarts at page 1. */}
@@ -225,7 +226,7 @@ export default async function BrokerCrmLeadsPage({ searchParams }: { searchParam
         {params.sort ? <input type="hidden" name="dir" value={state.direction} /> : null}
       </FilterBar>
 
-      {apiLeads.error ? <Notice tone="warning">API CRM indisponible. Aucune donnee protegee n'est affichee en mode erreur.</Notice> : null}
+      {apiLeads.error ? <Notice tone="warning">API CRM indisponible. Aucune donnée protégée n'est affichée en mode erreur.</Notice> : null}
 
       <DataTable
         columns={columns}
