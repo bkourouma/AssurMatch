@@ -70,7 +70,7 @@ export async function createAdminUserAction(_previous: UserActionState, formData
     revalidatePath("/users");
     return {
       status: "success",
-      message: `Utilisateur ${result.data.user.email} cree. Livraison activation: ${result.data.emailStatus}.`,
+      message: `Utilisateur ${result.data.user.email} créé. Livraison activation: ${result.data.emailStatus}.`,
       ...(result.data.token ? { token: result.data.token } : {}),
       expiresAt: result.data.expiresAt
     };
@@ -122,7 +122,7 @@ export async function passwordResetAction(_previous: UserActionState, formData: 
     const result = await issueAdminUserPasswordReset(stringValue(formData.get("userId")), stringValue(formData.get("reason")));
     return {
       status: "success",
-      message: `Reinitialisation demandee. Livraison: ${result.emailStatus}.`,
+      message: `Réinitialisation demandée. Livraison: ${result.emailStatus}.`,
       ...(result.token ? { token: result.token } : {}),
       expiresAt: result.expiresAt
     };

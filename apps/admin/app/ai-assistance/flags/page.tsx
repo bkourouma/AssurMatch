@@ -12,7 +12,7 @@ const PRODUCT_FLAG_LABELS: Record<string, string> = {
 };
 
 function ValueBadge({ value }: { value: boolean }) {
-  return <Badge tone={value ? "warning" : "disabled"}>{value ? "Actif" : "Desactive"}</Badge>;
+  return <Badge tone={value ? "warning" : "disabled"}>{value ? "Actif" : "Désactivé"}</Badge>;
 }
 
 function formatDate(value: string): string {
@@ -34,32 +34,32 @@ export default async function AiScopeFlagsPage() {
     <PageStack>
       <PageHeader
         breadcrumb={[{ label: "Plateforme" }, { label: "Assistance IA", href: "/ai-assistance" }, { label: "Flags IA" }]}
-        kicker="IA controlee"
+        kicker="IA contrôlée"
         title="Flags IA par pays et produit"
-        description="L'IA reste une assistance avec validation humaine. Depuis cet ecran, un flag par pays ou produit ne peut etre que desactive (motif audite) ; son activation est une decision de conformite appliquee par la commande d'exploitation. Aucun flag global n'est modifie ici."
+        description="L'IA reste une assistance avec validation humaine. Depuis cet écran, un flag par pays ou produit ne peut être que désactivé (motif audité) ; son activation est une décision de conformité appliquée par la commande d'exploitation. Aucun flag global n'est modifié ici."
       />
 
-      {flags.status === "forbidden" ? <StateMessage tone="danger">Acces refuse pour ce role admin.</StateMessage> : null}
-      {flags.status === "error" ? <StateMessage tone="danger">Flags IA indisponibles ({flags.error ?? "erreur"}). Reessayez plus tard.</StateMessage> : null}
+      {flags.status === "forbidden" ? <StateMessage tone="danger">Accès refusé pour ce rôle admin.</StateMessage> : null}
+      {flags.status === "error" ? <StateMessage tone="danger">Flags IA indisponibles ({flags.error ?? "erreur"}). Réessayez plus tard.</StateMessage> : null}
 
       {flags.status === "success" ? (
         <>
           <Card
             title="Flags globaux IA (lecture seule)"
-            description="Les flags globaux IA ne se changent pas ici : ils passent par la commande d'exploitation, avec reference de politique et approbateur."
+            description="Les flags globaux IA ne se changent pas ici : ils passent par la commande d'exploitation, avec référence de politique et approbateur."
           >
             <DataTable
               columns={[
                 { key: "key", header: "Flag", render: (flag) => <code>{flag.key}</code> },
-                { key: "value", header: "Etat", render: (flag) => <ValueBadge value={flag.value} /> }
+                { key: "value", header: "État", render: (flag) => <ValueBadge value={flag.value} /> }
               ]}
               items={globalFlags}
               getKey={(flag) => flag.key}
-              emptyLabel="Aucun flag global IA reference."
+              emptyLabel="Aucun flag global IA référence."
               aria-label="Flags globaux IA"
             />
             <p className="bo-description">Commande d'exploitation :</p>
-            <pre><code>npm run ops:apply-flag-policy -- --flag &lt;cle&gt; --value true --reference ... --approved-by ... --reason ...</code></pre>
+            <pre><code>npm run ops:apply-flag-policy -- --flag &lt;clé&gt; --value true --reference ... --approved-by ... --reason ...</code></pre>
           </Card>
 
           <Card title="Pays" description="Flag country_ai_enabled : ouvre l'assistance IA pour un pays.">
@@ -84,7 +84,7 @@ export default async function AiScopeFlagsPage() {
               ]}
               items={countries}
               getKey={(country) => country.id}
-              emptyLabel="Aucun pays reference."
+              emptyLabel="Aucun pays référence."
               aria-label="Flags IA par pays"
             />
           </Card>
@@ -92,11 +92,11 @@ export default async function AiScopeFlagsPage() {
           <Card title="Produits" description="Scoring IA et assistant de formulaire IA, produit par produit.">
             <DataTable
               columns={[
-                { key: "key", header: "Cle", render: (product) => <code>{product.key}</code> },
+                { key: "key", header: "Clé", render: (product) => <code>{product.key}</code> },
                 { key: "name", header: "Nom", render: (product) => product.name },
                 {
                   key: "sensitivity",
-                  header: "Sensibilite",
+                  header: "Sensibilité",
                   render: (product) => <Badge tone={product.sensitivity === "highly_sensitive" ? "danger" : "neutral"}>{product.sensitivity}</Badge>
                 },
                 {
@@ -132,29 +132,29 @@ export default async function AiScopeFlagsPage() {
               ]}
               items={products}
               getKey={(product) => product.id}
-              emptyLabel="Aucun produit reference."
+              emptyLabel="Aucun produit référence."
               aria-label="Flags IA par produit"
             />
           </Card>
 
-          <Card title="Historique recent" description="Derniers changements de flags IA, avec leur motif.">
+          <Card title="Historique récent" description="Derniers changements de flags IA, avec leur motif.">
             <DataTable
               columns={[
                 { key: "changedAt", header: "Date", render: (entry) => formatDate(entry.changedAt) },
                 { key: "key", header: "Flag", render: (entry) => <code>{entry.key}</code> },
-                { key: "scope", header: "Portee", render: (entry) => `${entry.scopeType}${entry.scopeId ? ` / ${entry.scopeId}` : ""}` },
+                { key: "scope", header: "Portée", render: (entry) => `${entry.scopeType}${entry.scopeId ? ` / ${entry.scopeId}` : ""}` },
                 { key: "value", header: "Valeur", render: (entry) => <ValueBadge value={entry.value} /> },
                 { key: "reason", header: "Motif", render: (entry) => entry.reason ?? "-" }
               ]}
               items={history}
               getKey={(entry) => `${entry.key}:${entry.scopeId ?? ""}:${entry.changedAt}`}
-              emptyLabel="Aucun changement enregistre."
+              emptyLabel="Aucun changement enregistré."
               aria-label="Historique des flags IA"
             />
           </Card>
 
           <StateMessage tone="warning">
-            L'IA est une assistance : toute sortie reste soumise a validation humaine. Aucun flag global n'est modifie depuis cet ecran.
+            L'IA est une assistance : toute sortie reste soumise à validation humaine. Aucun flag global n'est modifié depuis cet écran.
           </StateMessage>
         </>
       ) : null}

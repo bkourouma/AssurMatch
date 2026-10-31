@@ -11,7 +11,7 @@ import { CreateBrokerOfferForm } from "../offer-forms";
  * the broker coverage (`GET /broker/offers/coverage`: licence + active authorisations, non-public
  * countries included); the API re-runs the same check on create (422 OFFER_SCOPE_NOT_COVERED).
  */
-const BREADCRUMB = [{ label: "Activite" }, { label: "Mes offres", href: "/offers" }, { label: "Nouvelle offre" }];
+const BREADCRUMB = [{ label: "Activité" }, { label: "Mes offres", href: "/offers" }, { label: "Nouvelle offre" }];
 
 export default async function NewBrokerOfferPage() {
   const session = await readBackOfficeSession();

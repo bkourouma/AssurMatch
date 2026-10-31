@@ -59,9 +59,9 @@ const WRITE_CONTROLS = {
   status: "Enregistrer le statut",
   assign: "Assigner au conseiller",
   note: "Ajouter une note",
-  task: "Ajouter une tache",
+  task: "Ajouter une tâche",
   reminder: "Ajouter un rappel",
-  document: "Televerser le document interne",
+  document: "Téléverser le document interne",
   proposal: "Envoyer la proposition au visiteur"
 } as const;
 
@@ -91,7 +91,7 @@ test("PRO-ROLES-00 les comptes de l'équipe existent et le lead 2 est assigné �
   expect(optionLabel, "the agent is listed by name in the picker").toBeDefined();
   await picker.selectOption({ label: optionLabel as string });
   await assign.getByRole("button", { name: WRITE_CONTROLS.assign }).click();
-  await expect(owner.getByText("Lead assigne au conseiller.")).toBeVisible();
+  await expect(owner.getByText("Lead assigné au conseiller.")).toBeVisible();
   expect((await leadFootprint(ownerToken, ids.lead2 as string)).advisorId).toBe(agentActorId);
 });
 
@@ -115,7 +115,7 @@ test("PRO-ROLES-01 l'agent ne voit et ne modifie que ses leads assignés", async
 
   await test.step("la fiche d'un lead non assigné est refusée sans fuite de données", async () => {
     const page = await visit(browser, agentAccount, `/crm/leads/${ids.lead4}`);
-    await expect(page.getByText(/Acces refuse|Lead introuvable/u).first()).toBeVisible();
+    await expect(page.getByText(/Accès refusé|Lead introuvable/u).first()).toBeVisible();
     const body = await page.locator("body").innerText();
     expect(body).not.toContain(refs.lead4);
     expect(body).not.toContain(lead4Email);
@@ -125,11 +125,11 @@ test("PRO-ROLES-01 l'agent ne voit et ne modifie que ses leads assignés", async
 
   await test.step("la fiche du lead assigné offre statut, note, tâche, rappel mais pas l'assignation", async () => {
     const page = await visit(browser, agentAccount, `/crm/leads/${ids.lead2}`);
-    await expect(page.getByText("CRM autorise")).toBeVisible();
+    await expect(page.getByText("CRM autorisé")).toBeVisible();
     await expect(page.locator("#crm-new-status")).toBeEnabled();
     await expect(page.getByRole("button", { name: WRITE_CONTROLS.status })).toBeEnabled();
     // canAssignCrmLead is false for an agent: the card explains it and offers no form.
-    await expect(page.getByText("Votre role ne permet pas d'assigner ce lead.")).toBeVisible();
+    await expect(page.getByText("Votre rôle ne permet pas d'assigner ce lead.")).toBeVisible();
     await expect(page.getByRole("button", { name: WRITE_CONTROLS.assign })).toHaveCount(0);
     await expect(page.locator("#crm-advisor-id")).toHaveCount(0);
 
@@ -190,7 +190,7 @@ test("PRO-ROLES-02 le lecteur seul consulte tout le CRM mais ne peut rien écrir
     await expect(page.getByRole("button", { name: WRITE_CONTROLS.status })).toHaveCount(0);
     await expect(page.locator("#crm-new-status")).toHaveCount(0);
     await expect(page.getByRole("button", { name: WRITE_CONTROLS.assign })).toHaveCount(0);
-    await expect(page.getByText("Votre role ne permet pas d'assigner ce lead.")).toBeVisible();
+    await expect(page.getByText("Votre rôle ne permet pas d'assigner ce lead.")).toBeVisible();
 
     await page.goto(`/crm/leads/${ids.lead4}?tab=activite`);
     await expect(page.getByRole("heading", { name: "Notes internes" })).toBeVisible();
@@ -268,7 +268,7 @@ test("PRO-ROLES-03 le propriétaire Starter n'a aucun accès au CRM complet", as
 
   await test.step("les leads Starter restent utilisables en lecture", async () => {
     const page = await visit(browser, starter, "/leads");
-    await expect(page.getByRole("heading", { name: "Leads assignes" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Leads assignés" })).toBeVisible();
     await expect(page.getByRole("row").filter({ hasText: requireState(state, "quoteReference") }).first()).toBeVisible();
   });
 
@@ -298,7 +298,7 @@ test("PRO-ROLES-04 le propriétaire Pro voit les quatre leads et dispose de tous
   }
 
   await page.goto(`/crm/leads/${ids.lead4}`);
-  await expect(page.getByText("CRM autorise")).toBeVisible();
+  await expect(page.getByText("CRM autorisé")).toBeVisible();
   await expect(page.getByRole("button", { name: WRITE_CONTROLS.status })).toBeEnabled();
   await expect(page.locator("#crm-advisor-id")).toBeEnabled();
   await expect(page.getByRole("button", { name: WRITE_CONTROLS.assign })).toBeEnabled();

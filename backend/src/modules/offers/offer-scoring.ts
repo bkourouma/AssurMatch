@@ -3,7 +3,7 @@ import { scoringCriteria } from "../../../../packages/shared/contracts/quote.con
 import type { ScoringWeights } from "../../../../packages/shared/contracts/scoring-rule.contracts";
 import type { OfferRecord } from "./offers.module";
 
-export const SCORE_LABEL = "Score indicatif selon vos criteres, calcule par rapport aux offres affichees";
+export const SCORE_LABEL = "Score indicatif selon vos critères, calculé par rapport aux offres affichées";
 
 const PAYMENT_FLEXIBILITY_SCORE: Record<string, number> = { monthly: 1, quarterly: 0.75, semiannual: 0.5, annual: 0.25 };
 const PREFERENCE_CRITERION: Record<OfferPreference, Exclude<ScoringCriterion, "userPreferences" | "informationQuality">> = {
@@ -16,9 +16,9 @@ const PREFERENCE_CRITERION: Record<OfferPreference, Exclude<ScoringCriterion, "u
 const PREFERENCE_LABEL: Record<OfferPreference, string> = {
   price: "le prix",
   guarantees: "le niveau de garantie",
-  speed: "la rapidite de traitement",
+  speed: "la rapidité de traitement",
   deductible: "la franchise",
-  flexibility: "la flexibilite de paiement"
+  flexibility: "la flexibilité de paiement"
 };
 
 type CriterionScore = { score: number; explanation: string };
@@ -36,9 +36,9 @@ export function scoreOffers(offers: readonly OfferRecord[], weights: ScoringWeig
   for (const offer of offers) {
     const base: Record<Exclude<ScoringCriterion, "userPreferences">, CriterionScore> = {
       guaranteeLevel: scoreGuaranteeLevel(offer),
-      price: scoreLowerIsBetter(offer.indicativePriceMin, lowestPrice, "Prix indicatif", "prix indicatif non renseigne"),
-      deductible: scoreLowerIsBetter(offer.deductibleAmount, lowestDeductible, "Franchise", "franchise non renseignee"),
-      processingSpeed: scoreLowerIsBetter(offer.processingDelayDays, fastestDelay, "Delai moyen de traitement", "delai de traitement non renseigne"),
+      price: scoreLowerIsBetter(offer.indicativePriceMin, lowestPrice, "Prix indicatif", "prix indicatif non renseigné"),
+      deductible: scoreLowerIsBetter(offer.deductibleAmount, lowestDeductible, "Franchise", "franchise non renseignée"),
+      processingSpeed: scoreLowerIsBetter(offer.processingDelayDays, fastestDelay, "Délai moyen de traitement", "délai de traitement non renseigné"),
       paymentFlexibility: scorePaymentFlexibility(offer),
       informationQuality: scoreInformationQuality(offer)
     };
@@ -58,17 +58,17 @@ export function scoreOffers(offers: readonly OfferRecord[], weights: ScoringWeig
 }
 
 function scoreGuaranteeLevel(offer: OfferRecord): CriterionScore {
-  if (offer.guaranteeLevel === undefined) return { score: 0, explanation: "Niveau de garantie non renseigne par le courtier partenaire" };
-  return { score: offer.guaranteeLevel / 5, explanation: `Niveau de garantie ${offer.guaranteeLevel}/5 declare par le courtier partenaire` };
+  if (offer.guaranteeLevel === undefined) return { score: 0, explanation: "Niveau de garantie non renseigné par le courtier partenaire" };
+  return { score: offer.guaranteeLevel / 5, explanation: `Niveau de garantie ${offer.guaranteeLevel}/5 déclaré par le courtier partenaire` };
 }
 
 function scoreLowerIsBetter(value: number | undefined, best: number | undefined, label: string, missing: string): CriterionScore {
   if (value === undefined || best === undefined) return { score: 0, explanation: `${label}: ${missing}` };
-  if (value <= 0 || best <= 0) return { score: 1, explanation: `${label} nul ou le plus bas des offres affichees` };
+  if (value <= 0 || best <= 0) return { score: 1, explanation: `${label} nul ou le plus bas des offres affichées` };
   const score = Math.min(1, best / value);
   return {
     score,
-    explanation: score === 1 ? `${label} le plus bas des offres affichees` : `${label} ${round(value / best, 2)} fois le plus bas des offres affichees`
+    explanation: score === 1 ? `${label} le plus bas des offres affichées` : `${label} ${round(value / best, 2)} fois le plus bas des offres affichées`
   };
 }
 
@@ -76,7 +76,7 @@ function scorePaymentFlexibility(offer: OfferRecord): CriterionScore {
   const score = offer.paymentFlexibility ? PAYMENT_FLEXIBILITY_SCORE[offer.paymentFlexibility] ?? 0 : 0;
   return {
     score,
-    explanation: offer.paymentFlexibility ? `Paiement ${offer.paymentFlexibility} propose a titre indicatif` : "Flexibilite de paiement non renseignee"
+    explanation: offer.paymentFlexibility ? `Paiement ${offer.paymentFlexibility} proposé à titre indicatif` : "Flexibilité de paiement non renseignée"
   };
 }
 
@@ -84,14 +84,14 @@ function scoreInformationQuality(offer: OfferRecord): CriterionScore {
   const fields: Array<[string, boolean]> = [
     ["nom", Boolean(offer.name)],
     ["description", Boolean(offer.shortDescription)],
-    ["resume des garanties", Boolean(offer.guaranteeSummary)],
+    ["résumé des garanties", Boolean(offer.guaranteeSummary)],
     ["prix indicatif", offer.indicativePriceMin !== undefined],
     ["niveau de garantie", offer.guaranteeLevel !== undefined],
     ["franchise", offer.deductibleAmount !== undefined],
     ["plafond", offer.coverageCeiling !== undefined],
-    ["delai", offer.processingDelayDays !== undefined],
+    ["délai", offer.processingDelayDays !== undefined],
     ["paiement", Boolean(offer.paymentFlexibility)],
-    ["garanties detaillees", (offer.guarantees ?? []).length > 0],
+    ["garanties détaillées", (offer.guarantees ?? []).length > 0],
     ["exclusions", Boolean(offer.exclusionsSummary)],
     ["assureur", Boolean(offer.insurerName)],
     ["documents requis", (offer.requiredDocuments ?? []).length > 0],
@@ -101,17 +101,17 @@ function scoreInformationQuality(offer: OfferRecord): CriterionScore {
   const missing = fields.filter(([, present]) => !present).map(([label]) => label);
   return {
     score: filled / fields.length,
-    explanation: missing.length === 0 ? "Fiche complete" : `Fiche renseignee a ${filled}/${fields.length}; manque: ${missing.slice(0, 4).join(", ")}${missing.length > 4 ? "..." : ""}`
+    explanation: missing.length === 0 ? "Fiche complète" : `Fiche renseignée à ${filled}/${fields.length}; manque: ${missing.slice(0, 4).join(", ")}${missing.length > 4 ? "..." : ""}`
   };
 }
 
 function scoreUserPreferences(base: Record<Exclude<ScoringCriterion, "userPreferences">, CriterionScore>, preference?: OfferPreference): CriterionScore {
   if (preference) {
     const criterion = PREFERENCE_CRITERION[preference];
-    return { score: base[criterion].score, explanation: `Priorite visiteur: ${PREFERENCE_LABEL[preference]}` };
+    return { score: base[criterion].score, explanation: `Priorité visiteur: ${PREFERENCE_LABEL[preference]}` };
   }
   const values = Object.values(base).map((entry) => entry.score);
-  return { score: values.reduce((sum, value) => sum + value, 0) / values.length, explanation: "Aucune priorite exprimee: moyenne des autres criteres" };
+  return { score: values.reduce((sum, value) => sum + value, 0) / values.length, explanation: "Aucune priorité exprimée: moyenne des autres critères" };
 }
 
 function min(values: Array<number | undefined>): number | undefined {

@@ -16,7 +16,7 @@ test("admin AI assistance page exposes computed flags and human-validated insigh
   expect(api).toContain("/admin/ai/insights");
   expect(page).toContain("Assistance IA admin");
   expect(page).toContain("validation humaine obligatoire");
-  expect(page).toContain("Aucune decision automatisee");
+  expect(page).toContain("Aucune décision automatisée");
   expect(page).toContain("Valider l'insight");
   expect(page).toContain("{enabled ?");
   expect(actions).toContain('"use server"');
@@ -31,7 +31,7 @@ test("broker CRM page surfaces the computed AI assistance status and the partner
   expect(api).toContain("readBrokerAIAssistance");
   expect(api).toContain("/broker/crm/ai-assistance");
   expect(page).toContain("Assistance IA");
-  expect(page).toContain("aiAssistance.data.enabled ? \"Activee\" : \"Desactivee\"");
+  expect(page).toContain("aiAssistance.data.enabled ? \"Activée\" : \"Désactivée\"");
   expect(page).toContain("aiAssistance.data.modelCall ? \"Oui\" : \"Non\"");
   expect(page).toContain("validation humaine obligatoire");
 });

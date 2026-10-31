@@ -18,7 +18,7 @@ export interface PublicPartnerDirectoryContext {
 const DEFAULT_GLOBAL_FLAGS: Partial<Record<string, boolean>> = { public_comparator_enabled: true };
 const LIST_CACHE_TTL_SECONDS = 60;
 const PARTNER_DETAIL_DISCLAIMER =
-  "Ce courtier est un partenaire agree d'AssurMatch ; il est seul responsable de la confirmation des devis, garanties et conditions proposees.";
+  "Ce courtier est un partenaire agréé d'AssurMatch ; il est seul responsable de la confirmation des devis, garanties et conditions proposées.";
 
 /**
  * A licence covers a partner for its scope only while it has been validated and its expiry date

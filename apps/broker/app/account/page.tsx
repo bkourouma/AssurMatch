@@ -1,6 +1,8 @@
 import { redirect } from "next/navigation";
 import { MfaPanel, PasswordChangeForm } from "../auth-flow-form";
 import { isBrokerProfile, loginRedirect, readBackOfficeSession } from "../lib/backoffice-auth";
+import { PLAN_LABELS } from "../lib/self-service-messages";
+import { teamRoleLabel } from "../lib/team-options";
 import { Badge, Button, Card, DescriptionList, Grid, PageHeader, PageStack } from "../lib/ui/broker-ui";
 
 export default async function BrokerAccountPage() {
@@ -13,8 +15,8 @@ export default async function BrokerAccountPage() {
     <PageStack>
       <PageHeader
         breadcrumb={[{ label: "Compte" }, { label: "Compte" }]}
-        title="Securite du compte"
-        description="Mot de passe, MFA et informations du profil connecte."
+        title="Sécurité du compte"
+        description="Mot de passe, MFA et informations du profil connecté."
         actions={<Button href="/company" variant="secondary">Profil société</Button>}
       />
 
@@ -24,8 +26,8 @@ export default async function BrokerAccountPage() {
             items={[
               { term: "Acteur", value: session.profile.actorId ? <span className="bo-ref">{session.profile.actorId}</span> : "-" },
               { term: "Tenant", value: session.profile.partnerTenantId ? <span className="bo-ref">{session.profile.partnerTenantId}</span> : "-" },
-              { term: "Plan", value: <Badge tone="info">{session.profile.partnerPlan ?? "-"}</Badge> },
-              { term: "Roles", value: session.profile.roles.join(", ") }
+              { term: "Plan", value: <Badge tone="info">{session.profile.partnerPlan ? PLAN_LABELS[session.profile.partnerPlan] ?? session.profile.partnerPlan : "-"}</Badge> },
+              { term: "Rôles", value: teamRoleLabel(session.profile.roles) }
             ]}
           />
         </Card>

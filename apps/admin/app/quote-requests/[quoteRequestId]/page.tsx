@@ -4,6 +4,24 @@ import { Badge, Card, Cluster, DataTable, DescriptionList, PageHeader, PageStack
 import { QuoteReviewForm } from "../../lib/ui/operations-forms";
 import { LeadConversationsCard } from "./lead-conversations-card";
 import { assignmentStatusTones, quoteStatusTones, routingResultTones } from "../../lib/ui/operations-tones";
+import {
+  assignmentStatusLabel,
+  consentChannelLabel,
+  consentRecipientLabel,
+  consentStatusLabel,
+  documentKindLabel,
+  documentScanLabel,
+  documentStatusLabel,
+  duplicateStatusLabel,
+  productLabel,
+  quoteAnswerLabel,
+  quoteAnswerValueLabel,
+  quoteStatusLabel,
+  routingReasonLabel,
+  routingReasonsLabel,
+  routingResultLabel,
+  routingStatusLabel
+} from "../../lib/ui/operations-labels";
 
 /**
  * Spec 056 (H-01): quote request record. Consent summary, every routing decision with the excluded
@@ -30,16 +48,16 @@ export default async function AdminQuoteRequestDetailPage({
       <PageHeader
         breadcrumb={[
           { label: "Pilotage" },
-          { label: "Operations", href: "/operations" },
+          { label: "Opérations", href: "/operations" },
           { label: "Demandes de devis", href: "/quote-requests" },
-          { label: "Detail" }
+          { label: "Détail" }
         ]}
-        title={detail ? `Demande ${detail.publicReference}` : "Detail demande de devis"}
-        description="Consentement, routage, affectations et documents du prospect. Chaque decision affichee ici est journalisee."
+        title={detail ? `Demande ${detail.publicReference}` : "Détail demande de devis"}
+        description="Consentement, routage, affectations et documents du prospect. Chaque décision affichée ici est journalisée."
         actions={
           detail ? (
             <Cluster>
-              <Badge tone={quoteStatusTones[detail.status] ?? "neutral"}>{detail.status}</Badge>
+              <Badge tone={quoteStatusTones[detail.status] ?? "neutral"} title={detail.status}>{quoteStatusLabel(detail.status)}</Badge>
               {detail.reviewOpen ? <Badge tone="warning">En revue manuelle</Badge> : null}
             </Cluster>
           ) : null
@@ -47,14 +65,14 @@ export default async function AdminQuoteRequestDetailPage({
       />
 
       {detailResult.status === "unauthenticated" ? <StateMessage tone="danger">Session admin requise.</StateMessage> : null}
-      {detailResult.status === "forbidden" ? <StateMessage tone="danger">Acces refuse : role non autorise ou demande hors de votre perimetre pays (refus audite).</StateMessage> : null}
+      {detailResult.status === "forbidden" ? <StateMessage tone="danger">Accès refusé : rôle non autorisé ou demande hors de votre périmètre pays (refus audité).</StateMessage> : null}
       {detailResult.status === "not_found" ? <StateMessage tone="danger">Demande de devis introuvable.</StateMessage> : null}
       {detailResult.status === "error" ? <StateMessage tone="danger">Fiche indisponible : {detailResult.error}</StateMessage> : null}
 
       <Split>
         <Stack>
           {detail && (detail.reviewOpen || detail.reviewedAt) ? (
-            <Card title="Revue manuelle" description="Decision persistee et auditee : router, assigner, marquer non routable ou doublon.">
+            <Card title="Revue manuelle" description="Décision persistée et auditée : router, assigner, marquer non routable ou doublon.">
               {detail.reviewedAt ? (
                 <DescriptionList
                   columns={2}
@@ -74,14 +92,14 @@ export default async function AdminQuoteRequestDetailPage({
               columns={2}
               items={[
                 { term: "Demande de devis", value: <code className="bo-break">{quoteRequestId}</code> },
-                { term: "Reference", value: detail ? <span className="bo-ref">{detail.publicReference}</span> : "-" },
-                { term: "Pays / produit", value: detail ? `${detail.countryCode ?? "-"} / ${detail.productKey ?? "-"}` : "-" },
-                { term: "Statut", value: detail ? <Badge tone={quoteStatusTones[detail.status] ?? "neutral"}>{detail.status}</Badge> : "-" },
-                { term: "Routage", value: detail?.routingStatus ?? "-" },
-                { term: "Doublon", value: detail ? `${detail.duplicateStatus}${detail.duplicateOfQuoteRequestId ? ` (origine ${detail.duplicateOfQuoteRequestId.slice(0, 8)})` : ""}` : "-" },
-                { term: "Motif de refus", value: detail?.refusalReason ?? "-" },
-                { term: "Recue le", value: formatDateTime(detail?.createdAt) },
-                { term: "Documents references", value: documents.status === "success" ? documents.data.items.length : "-" }
+                { term: "Référence", value: detail ? <span className="bo-ref">{detail.publicReference}</span> : "-" },
+                { term: "Pays / produit", value: detail ? `${detail.countryCode ?? "-"} / ${productLabel(detail.productKey)}` : "-" },
+                { term: "Statut", value: detail ? <Badge tone={quoteStatusTones[detail.status] ?? "neutral"} title={detail.status}>{quoteStatusLabel(detail.status)}</Badge> : "-" },
+                { term: "Routage", value: detail ? routingStatusLabel(detail.routingStatus) : "-" },
+                { term: "Doublon", value: detail ? `${duplicateStatusLabel(detail.duplicateStatus)}${detail.duplicateOfQuoteRequestId ? ` (origine ${detail.duplicateOfQuoteRequestId.slice(0, 8)})` : ""}` : "-" },
+                { term: "Motif de refus", value: routingReasonLabel(detail?.refusalReason) },
+                { term: "Reçue le", value: formatDateTime(detail?.createdAt) },
+                { term: "Documents référencés", value: documents.status === "success" ? documents.data.items.length : "-" }
               ]}
             />
           </Card>
@@ -109,25 +127,25 @@ export default async function AdminQuoteRequestDetailPage({
         <Stack>
           {detail ? (
             <>
-              <Card title="Consentement de transmission" description="Historise dans ConsentRecord; aucune transmission sans consentement accorde.">
+              <Card title="Consentement de transmission" description="Historisé dans ConsentRecord; aucune transmission sans consentement accordé.">
                 <DescriptionList
                   items={[
-                    { term: "Statut", value: <Badge tone={detail.consent.status === "granted" ? "success" : "danger"}>{detail.consent.status ?? "inconnu"}</Badge> },
-                    { term: "Destinataire prevu", value: detail.consent.intendedRecipient ?? "-" },
-                    { term: "Accorde le", value: formatDateTime(detail.consent.grantedAt) },
-                    { term: "Retire le", value: formatDateTime(detail.consent.withdrawnAt) },
-                    { term: "Canal", value: detail.consent.channel ?? "-" }
+                    { term: "Statut", value: <Badge tone={detail.consent.status === "granted" ? "success" : "danger"} title={detail.consent.status ?? undefined}>{consentStatusLabel(detail.consent.status)}</Badge> },
+                    { term: "Destinataire prévu", value: consentRecipientLabel(detail.consent.intendedRecipient) },
+                    { term: "Accordé le", value: formatDateTime(detail.consent.grantedAt) },
+                    { term: "Retiré le", value: formatDateTime(detail.consent.withdrawnAt) },
+                    { term: "Canal", value: consentChannelLabel(detail.consent.channel) }
                   ]}
                 />
               </Card>
-              <Card title="Prospect" description={detail.piiMasked ? "Coordonnees masquees pour votre role (support)." : "Donnees personnelles : usage strictement operationnel."}>
-                {detail.anonymized ? <StateMessage>Demande anonymisee (politique de conservation) : coordonnees supprimees.</StateMessage> : null}
+              <Card title="Prospect" description={detail.piiMasked ? "Coordonnées masquées pour votre rôle (support)." : "Données personnelles : usage strictement opérationnel."}>
+                {detail.anonymized ? <StateMessage>Demande anonymisée (politique de conservation) : coordonnées supprimées.</StateMessage> : null}
                 <DescriptionList
                   items={[
                     { term: "Nom", value: detail.contact?.displayName ?? "-" },
                     { term: "E-mail", value: detail.contact?.email ?? "-" },
-                    { term: "Telephone", value: detail.contact?.phone ?? "-" },
-                    ...Object.entries(detail.answers).map(([key, value]) => ({ term: key, value: typeof value === "string" ? value : JSON.stringify(value) }))
+                    { term: "Téléphone", value: detail.contact?.phone ?? "-" },
+                    ...Object.entries(detail.answers).map(([key, value]) => ({ term: quoteAnswerLabel(key), value: quoteAnswerValueLabel(key, value) }))
                   ]}
                 />
               </Card>
@@ -138,11 +156,11 @@ export default async function AdminQuoteRequestDetailPage({
 
       {detail ? (
         <>
-          <Card title="Decisions de routage" description="Courtiers partenaires retenus, candidats exclus et raisons (journal opposable).">
+          <Card title="Décisions de routage" description="Courtiers partenaires retenus, candidats exclus et raisons (journal opposable).">
             <DataTable
               columns={[
                 { key: "date", header: "Date", render: (decision) => formatDateTime(decision.createdAt) },
-                { key: "result", header: "Resultat", render: (decision) => <Badge tone={routingResultTones[decision.result] ?? "neutral"}>{decision.result}</Badge> },
+                { key: "result", header: "Résultat", render: (decision) => <Badge tone={routingResultTones[decision.result] ?? "neutral"} title={decision.result}>{routingResultLabel(decision.result)}</Badge> },
                 { key: "candidates", header: "Candidats", render: (decision) => decision.candidateCount, numeric: true, align: "right" },
                 { key: "selected", header: "Retenus", render: (decision) => decision.selectedPartners.map((partner) => partner.legalName ?? partner.partnerTenantId.slice(0, 8)).join(", ") || "-" },
                 {
@@ -150,15 +168,15 @@ export default async function AdminQuoteRequestDetailPage({
                   header: "Exclus et raisons",
                   render: (decision) => decision.excludedCandidates.length === 0
                     ? "-"
-                    : decision.excludedCandidates.map((candidate) => `${candidate.legalName ?? candidate.partnerTenantId.slice(0, 8)} : ${candidate.reasons.join(", ")}`).join(" ; ")
+                    : decision.excludedCandidates.map((candidate) => `${candidate.legalName ?? candidate.partnerTenantId.slice(0, 8)} : ${routingReasonsLabel(candidate.reasons)}`).join(" ; ")
                 },
-                { key: "reasons", header: "Raisons", render: (decision) => decision.reasons.join(", ") || "-" }
+                { key: "reasons", header: "Raisons", render: (decision) => routingReasonsLabel(decision.reasons) }
               ]}
               items={detail.routingDecisions}
               getKey={(decision) => decision.id}
-              emptyLabel="Aucune decision de routage enregistree."
-              emptyDescription="Le moteur de routage n'a pas encore traite cette demande."
-              aria-label="Decisions de routage"
+              emptyLabel="Aucune décision de routage enregistrée."
+              emptyDescription="Le moteur de routage n'a pas encore traité cette demande."
+              aria-label="Décisions de routage"
             />
           </Card>
 
@@ -166,16 +184,16 @@ export default async function AdminQuoteRequestDetailPage({
             <DataTable
               columns={[
                 { key: "partner", header: "Courtier partenaire", render: (assignment) => assignment.partnerLegalName ?? assignment.partnerTenantId.slice(0, 8) },
-                { key: "status", header: "Statut", render: (assignment) => <Badge tone={assignmentStatusTones[assignment.status] ?? "neutral"}>{assignment.status}</Badge> },
-                { key: "reason", header: "Motif", render: (assignment) => assignment.assignmentReason },
+                { key: "status", header: "Statut", render: (assignment) => <Badge tone={assignmentStatusTones[assignment.status] ?? "neutral"} title={assignment.status}>{assignmentStatusLabel(assignment.status)}</Badge> },
+                { key: "reason", header: "Motif", render: (assignment) => routingReasonLabel(assignment.assignmentReason) },
                 { key: "recipients", header: "Destinataires", render: (assignment) => assignment.recipientCount, numeric: true, align: "right" },
-                { key: "assigned", header: "Affecte le", render: (assignment) => formatDateTime(assignment.assignedAt) },
-                { key: "action", header: "Derniere action", render: (assignment) => formatDateTime(assignment.lastBrokerActionAt) }
+                { key: "assigned", header: "Affecté le", render: (assignment) => formatDateTime(assignment.assignedAt) },
+                { key: "action", header: "Dernière action", render: (assignment) => formatDateTime(assignment.lastBrokerActionAt) }
               ]}
               items={detail.assignments}
               getKey={(assignment) => assignment.id}
               emptyLabel="Aucune affectation."
-              emptyDescription="Une affectation apparait quand un courtier partenaire recoit la demande."
+              emptyDescription="Une affectation apparaît quand un courtier partenaire reçoit la demande."
               aria-label="Affectations de la demande"
             />
           </Card>
@@ -184,27 +202,27 @@ export default async function AdminQuoteRequestDetailPage({
 
       <LeadConversationsCard quoteRequestId={quoteRequestId} show={showConversations} />
 
-      <Card title="Documents du prospect" description="Fichiers decrits par leurs metadonnees uniquement, aucun contenu de fichier.">
+      <Card title="Documents du prospect" description="Fichiers décrits par leurs métadonnées uniquement, aucun contenu de fichier.">
         {documents.unauthenticated ? <StateMessage tone="danger">Session admin requise.</StateMessage> : null}
-        {documents.forbidden ? <StateMessage tone="danger">Acces documents refuse pour ce role admin.</StateMessage> : null}
+        {documents.forbidden ? <StateMessage tone="danger">Accès documents refusé pour ce rôle admin.</StateMessage> : null}
         {documents.status === "error" ? <StateMessage tone="danger">Documents indisponibles: {documents.error}</StateMessage> : null}
         <DataTable
           columns={[
-            { key: "label", header: "Libelle", render: (document) => document.label },
-            { key: "kind", header: "Type", render: (document) => document.documentKind },
+            { key: "label", header: "Libellé", render: (document) => document.label },
+            { key: "kind", header: "Type", render: (document) => documentKindLabel(document.documentKind) },
             { key: "file", header: "Fichier", render: (document) => `${document.fileName} (${document.mimeType}, ${Math.ceil(document.sizeBytes / 1024)} Ko)` },
             {
               key: "scan",
               header: "Scan",
               render: (document) => (
                 <Badge tone={documentScanTones[document.scanStatus] ?? "disabled"}>
-                  {document.scanStatus}{document.scanSignature ? ` (${document.scanSignature})` : ""}
+                  {documentScanLabel(document.scanStatus)}{document.scanSignature ? ` (${document.scanSignature})` : ""}
                 </Badge>
               )
             },
-            { key: "status", header: "Statut", render: (document) => document.status },
-            { key: "shared", header: "Transmis", render: (document) => (document.sharedWithBroker ? "courtier partenaire assigne" : "non") },
-            { key: "retention", header: "Retention", render: (document) => document.retentionUntil.slice(0, 10) },
+            { key: "status", header: "Statut", render: (document) => documentStatusLabel(document.status) },
+            { key: "shared", header: "Transmis", render: (document) => (document.sharedWithBroker ? "courtier partenaire assigné" : "non") },
+            { key: "retention", header: "Rétention", render: (document) => document.retentionUntil.slice(0, 10) },
             { key: "checksum", header: "Empreinte", render: (document) => <span className="bo-ref">{document.checksum.slice(0, 12)}</span> }
           ]}
           items={documents.data.items}
@@ -212,7 +230,7 @@ export default async function AdminQuoteRequestDetailPage({
           emptyLabel="Aucun document fourni par le prospect."
           aria-label="Documents du prospect"
         />
-        <StateMessage>Les fichiers ne sont jamais telecharges depuis le back-office plateforme; seul le courtier partenaire assigne y accede via son CRM apres verification antivirus.</StateMessage>
+        <StateMessage>Les fichiers ne sont jamais téléchargés depuis le back-office plateforme; seul le courtier partenaire assigné y accède via son CRM après vérification antivirus.</StateMessage>
       </Card>
     </PageStack>
   );

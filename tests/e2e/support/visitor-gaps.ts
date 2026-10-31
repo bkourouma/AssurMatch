@@ -79,7 +79,7 @@ export async function globalFlagIsOn(page: Page, key: string): Promise<boolean> 
   await page.goto("/feature-flags");
   const row = rowWith(page, key);
   await expect(row, `flag ${key} listed`).toBeVisible();
-  return await row.getByRole("button", { name: "Desactiver", exact: true }).isVisible();
+  return await row.getByRole("button", { name: "Désactiver", exact: true }).isVisible();
 }
 
 export interface OfferTypeOptions {

@@ -20,7 +20,7 @@ import {
 
 const initialState: UserActionState = { status: "idle" };
 
-const TOKEN_LABEL = "Jeton temporaire a transmettre par canal interne securise:";
+const TOKEN_LABEL = "Jeton temporaire à transmettre par canal interne sécurisé:";
 
 function noticeState(state: UserActionState) {
   return {
@@ -54,19 +54,19 @@ export function CreateUserForm({ partners = [] }: { partners?: PartnerChoice[] }
   };
 
   return (
-    <Card title="Creer un utilisateur">
+    <Card title="Créer un utilisateur">
       <Form action={formAction}>
         <ActionNotice state={noticeState(state)} tokenLabel={TOKEN_LABEL} expiresLabel="expire" />
         <Field id={ids.email} label="Email" required>
           <Input {...fieldControlProps(ids.email, { required: true })} name="email" type="email" />
         </Field>
-        <Field id={ids.displayName} label="Nom affiche" required>
+        <Field id={ids.displayName} label="Nom affiché" required>
           <Input {...fieldControlProps(ids.displayName, { required: true })} name="displayName" />
         </Field>
-        <Field id={ids.phone} label="Telephone E.164">
+        <Field id={ids.phone} label="Téléphone E.164">
           <Input {...fieldControlProps(ids.phone)} name="phone" placeholder="+2250000000000" />
         </Field>
-        <CheckboxGroup legend="Roles" name="roles" options={adminRoleOptions.map((role) => ({ value: role, label: role }))} />
+        <CheckboxGroup legend="Rôles" name="roles" options={adminRoleOptions.map((role) => ({ value: role, label: role }))} />
         <Field id={ids.partnerTenantId} label="Courtier de rattachement" hint="Obligatoire pour un rôle courtier, interdit pour un rôle admin.">
           <Select {...fieldControlProps(ids.partnerTenantId, { hint: "x" })} name="partnerTenantId" defaultValue="">
             <option value="">Aucun (utilisateur admin)</option>
@@ -83,7 +83,7 @@ export function CreateUserForm({ partners = [] }: { partners?: PartnerChoice[] }
           <Textarea {...fieldControlProps(ids.reason, { required: true })} name="reason" minLength={5} />
         </Field>
         <FormActions>
-          <Button type="submit" pending={pending} pendingLabel="Creation...">Creer et emettre activation</Button>
+          <Button type="submit" pending={pending} pendingLabel="Création...">Créer et émettre activation</Button>
         </FormActions>
       </Form>
     </Card>
@@ -97,15 +97,15 @@ export function PasswordResetForm({ userId }: { userId: string }) {
 
   return (
     <Card
-      title="Reinitialisation mot de passe"
-      description="Le jeton emis est a usage unique et doit etre transmis par un canal interne securise."
+      title="Réinitialisation mot de passe"
+      description="Le jeton émis est à usage unique et doit être transmis par un canal interne sécurisé."
     >
       <ConfirmDialog
-        triggerLabel="Emettre un jeton"
+        triggerLabel="Émettre un jeton"
         triggerVariant="secondary"
-        title="Reinitialisation mot de passe"
-        description="Emettre un jeton invalide le mot de passe courant de l'utilisateur. La raison est auditee."
-        confirmLabel="Emettre un jeton"
+        title="Réinitialisation mot de passe"
+        description="Émettre un jeton invalide le mot de passe courant de l'utilisateur. La raison est auditée."
+        confirmLabel="Émettre un jeton"
         cancelLabel="Annuler"
         tone="danger"
         formAction={formAction}

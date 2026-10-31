@@ -4,6 +4,7 @@ import { loginRedirect, readBackOfficeSession } from "../lib/backoffice-auth";
 import { canExportStarterLeads } from "../lib/broker-permissions";
 import { starterExportHref } from "../lib/lead-export-links";
 import { starterStatusLabel } from "../lib/lead-vocabulary";
+import { productLabel } from "../lib/product-vocabulary";
 import {
   Badge,
   Button,
@@ -43,9 +44,9 @@ function optionsOf(
 }
 
 const columns: Array<DataTableColumn<LeadSummaryViewModel>> = [
-  { key: "reference", header: "Reference", render: (lead) => <span className="bo-ref">{lead.reference}</span>, sortable: true, sortValue: (lead) => lead.reference },
+  { key: "reference", header: "Référence", render: (lead) => <span className="bo-ref">{lead.reference}</span>, sortable: true, sortValue: (lead) => lead.reference },
   { key: "country", header: "Pays", render: (lead) => lead.country },
-  { key: "product", header: "Produit", render: (lead) => lead.product, sortable: true, sortValue: (lead) => lead.product },
+  { key: "product", header: "Produit", render: (lead) => productLabel(lead.product), sortable: true, sortValue: (lead) => productLabel(lead.product) },
   {
     key: "status",
     header: "Statut",
@@ -86,9 +87,9 @@ export default async function BrokerLeadsPage({ searchParams }: { searchParams?:
   return (
     <PageStack>
       <PageHeader
-        breadcrumb={[{ label: "Activite", href: "/" }, { label: "Leads" }]}
-        title="Leads assignes"
-        description="Le courtier voit uniquement les leads qui lui sont assignes. Les donnees personnelles ne sont affichees qu'apres controle du tenant connecte."
+        breadcrumb={[{ label: "Activité", href: "/" }, { label: "Leads" }]}
+        title="Leads assignés"
+        description="Le courtier voit uniquement les leads qui lui sont assignés. Les données personnelles ne sont affichées qu'après contrôle du tenant connecté."
         actions={
           canExport ? (
             <Cluster>
@@ -105,7 +106,7 @@ export default async function BrokerLeadsPage({ searchParams }: { searchParams?:
         action="/leads"
         label="Filtres leads"
         submitLabel="Filtrer"
-        resetLabel="Reinitialiser"
+        resetLabel="Réinitialiser"
         resetHref="/leads"
         activeCount={activeCount}
         autoSubmit
@@ -119,7 +120,7 @@ export default async function BrokerLeadsPage({ searchParams }: { searchParams?:
           />
         </Field>
         <Field id="leads-product" label="Produit">
-          <Select id="leads-product" name="product" defaultValue={product} options={optionsOf(leads, (lead) => lead.product, "Tous")} />
+          <Select id="leads-product" name="product" defaultValue={product} options={optionsOf(leads, (lead) => lead.product, "Tous", productLabel)} />
         </Field>
         <Field id="leads-country" label="Pays">
           <Select id="leads-country" name="country" defaultValue={country} options={optionsOf(leads, (lead) => lead.country, "Tous")} />
@@ -130,10 +131,10 @@ export default async function BrokerLeadsPage({ searchParams }: { searchParams?:
       </FilterBar>
 
       {apiLeads.forbidden ? (
-        <Notice tone="danger">Acces refuse ou MFA requis pour ce portail. Aucune donnee protegee n'est affichee.</Notice>
+        <Notice tone="danger">Accès refusé ou MFA requis pour ce portail. Aucune donnée protégée n'est affichée.</Notice>
       ) : null}
       {apiLeads.error && !apiLeads.forbidden ? (
-        <Notice tone="warning">API leads indisponible. Aucune donnee protegee n'est affichee en mode erreur.</Notice>
+        <Notice tone="warning">API leads indisponible. Aucune donnée protégée n'est affichée en mode erreur.</Notice>
       ) : null}
 
       {!apiLeads.forbidden ? (
@@ -141,14 +142,14 @@ export default async function BrokerLeadsPage({ searchParams }: { searchParams?:
           columns={columns}
           items={visible}
           getKey={(lead) => lead.id}
-          aria-label="Leads assignes"
-          emptyLabel="Aucun lead autorise a afficher."
+          aria-label="Leads assignés"
+          emptyLabel="Aucun lead autorisé à afficher."
           emptyDescription={
             activeCount > 0
-              ? "Aucun lead ne correspond a ces filtres. Reinitialisez-les pour revoir tous vos leads."
+              ? "Aucun lead ne correspond à ces filtres. Réinitialisez-les pour revoir tous vos leads."
               : "Les leads qu'AssurMatch vous assigne apparaissent ici, avec une notification. Ouvrez-en un pour l'accepter ou le rejeter."
           }
-          emptyAction={activeCount > 0 ? <Button href="/leads" variant="secondary" size="sm">Reinitialiser les filtres</Button> : undefined}
+          emptyAction={activeCount > 0 ? <Button href="/leads" variant="secondary" size="sm">Réinitialiser les filtres</Button> : undefined}
           getRowHref={(lead) => `/leads/${lead.id}`}
           sort={table.sort}
           sortHref={table.sortHref}
@@ -163,8 +164,8 @@ export default async function BrokerLeadsPage({ searchParams }: { searchParams?:
       ) : null}
 
       <Notice tone="neutral" title="Limites Starter">
-        Aucun Kanban, assignation equipe ou CRM avance n'est active pour le portail Starter. Le CRM complet est disponible avec le plan Pro.
-        Export controle par permission et audit.
+        Aucun Kanban, assignation équipe ou CRM avancé n'est active pour le portail Starter. Le CRM complet est disponible avec le plan Pro.
+        Export contrôle par permission et audit.
       </Notice>
     </PageStack>
   );

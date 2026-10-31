@@ -250,7 +250,7 @@ test("LOT3-04 assignation : le sélecteur propose l'équipe du cabinet par noms,
     expect(labels.join(" ")).not.toContain(enterprise.owner.email);
     await select.selectOption({ label: labels.find((label) => /Aya Agent/u.test(label)) as string });
     await page.getByRole("button", { name: "Assigner au conseiller" }).click();
-    await expect(page.getByText("Lead assigne au conseiller.")).toBeVisible();
+    await expect(page.getByText("Lead assigné au conseiller.")).toBeVisible();
     await expect(page.getByText(/Conseiller actuel : Aya Agent/u)).toBeVisible();
     expect((await leadFootprint(ownerToken, leadId)).advisorId).toBe(agentActorId);
   });

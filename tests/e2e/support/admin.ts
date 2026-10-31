@@ -21,11 +21,11 @@ export async function setCatalogFlag(scope: Page | Locator, key: string, enable:
 export async function setGlobalFlag(page: Page, key: string, enable: boolean, reason: string): Promise<void> {
   await page.goto("/feature-flags");
   const row = rowWith(page, key);
-  const button = row.getByRole("button", { name: enable ? "Activer" : "Desactiver", exact: true });
+  const button = row.getByRole("button", { name: enable ? "Activer" : "Désactiver", exact: true });
   if (!(await button.isVisible())) return;
   await fillReason(row, reason);
   await button.click();
-  await expect(rowWith(page, key).getByRole("button", { name: enable ? "Desactiver" : "Activer", exact: true })).toBeVisible();
+  await expect(rowWith(page, key).getByRole("button", { name: enable ? "Désactiver" : "Activer", exact: true })).toBeVisible();
 }
 
 export async function openCountry(page: Page, isoCode: string): Promise<string> {
@@ -49,7 +49,7 @@ export async function changeStatus(page: Page, cardTitle: string, status: string
   const offered = await select.locator("option").evaluateAll((options) => options.map((option) => (option as HTMLOptionElement).value));
   if (!offered.includes(status)) {
     // The current status is never offered: re-running a step finds it already applied.
-    await expect(card(page, "Synthese")).toContainText(status);
+    await expect(card(page, "Synthèse")).toContainText(status);
     return;
   }
   await select.selectOption(status);
@@ -94,13 +94,13 @@ export async function createAndPublishQuoteForm(page: Page, input: QuoteFormInpu
   await create.getByLabel("Produit (UUID)").fill(input.productId);
   await create.getByLabel("Langue").fill(input.language);
   await create.getByLabel("Version").fill(input.version);
-  await create.getByLabel("Texte de consentement publie (UUID)").fill(input.consentTextId);
+  await create.getByLabel("Texte de consentement publié (UUID)").fill(input.consentTextId);
   await create.getByLabel(/^Champs/).fill(input.fields.join("\n"));
   await fillReason(create, reason);
-  await create.getByRole("button", { name: "Creer le brouillon" }).click();
+  await create.getByRole("button", { name: "Créer le brouillon" }).click();
   await expectActionSuccess(create, `create quote form ${input.version}`);
   // "Brouillon cree: <id>. ..." - the publish form lists drafts by id only.
-  const created = (await create.locator(".bo-notice").first().innerText()).match(/Brouillon cree: ([0-9a-f-]{36})/)?.[1];
+  const created = (await create.locator(".bo-notice").first().innerText()).match(/Brouillon créé: ([0-9a-f-]{36})/)?.[1];
   if (!created) throw new Error("quote form id missing from the creation notice");
 
   await page.goto("/quote-form-definitions");

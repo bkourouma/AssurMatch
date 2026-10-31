@@ -20,26 +20,26 @@ function text(value: FormDataEntryValue | null): string {
 
 function refusal(result: OperationsWriteResult<unknown>): OperationsActionState {
   const reasons: Record<number, string> = {
-    0: "API indisponible : reessayez plus tard.",
-    400: "Saisie invalide : le motif doit compter au moins 8 caracteres.",
-    401: "Session expiree : reconnectez-vous.",
-    403: "Action refusee pour votre role ou hors de votre perimetre pays (refus audite).",
-    404: "Element introuvable (reference ou identifiant inconnu).",
-    409: "Conflit : l'element a deja ete traite ou la cible est identique.",
-    422: "Refus de conformite : consentement absent ou retire, ou courtier partenaire non eligible. Rien n'a ete transmis."
+    0: "API indisponible : réessayez plus tard.",
+    400: "Saisie invalide : le motif doit compter au moins 8 caractères.",
+    401: "Session expirée : reconnectez-vous.",
+    403: "Action refusée pour votre rôle ou hors de votre périmètre pays (refus audité).",
+    404: "Élément introuvable (référence ou identifiant inconnu).",
+    409: "Conflit : l'élément a déjà été traité ou la cible est identique.",
+    422: "Refus de conformité : consentement absent ou retiré, ou courtier partenaire non éligible. Rien n'a été transmis."
   };
   const base = reasons[result.status] ?? `Refus de l'API (${result.status}).`;
-  return { status: "error", message: result.message && result.status !== 0 ? `${base} Detail : ${result.message}` : base };
+  return { status: "error", message: result.message && result.status !== 0 ? `${base} Détail : ${result.message}` : base };
 }
 
 export async function decideQuoteReviewAction(_previous: OperationsActionState, formData: FormData): Promise<OperationsActionState> {
   const quoteRequestId = text(formData.get("quoteRequestId"));
   const decision = REVIEW_DECISIONS.find((value) => value === text(formData.get("decision"))) as ReviewDecision | undefined;
   const reason = text(formData.get("reason"));
-  if (!quoteRequestId || !decision) return { status: "error", message: "Decision de revue invalide." };
+  if (!quoteRequestId || !decision) return { status: "error", message: "Décision de revue invalide." };
   const partnerTenantId = text(formData.get("partnerTenantId"));
   const duplicateOfReference = text(formData.get("duplicateOfReference"));
-  if (decision === "assign" && !partnerTenantId) return { status: "error", message: "Choisissez un courtier partenaire eligible." };
+  if (decision === "assign" && !partnerTenantId) return { status: "error", message: "Choisissez un courtier partenaire éligible." };
   const result = await decideQuoteReview(quoteRequestId, {
     decision,
     reason,
@@ -50,7 +50,7 @@ export async function decideQuoteReviewAction(_previous: OperationsActionState, 
   revalidatePath("/operations/quote-review");
   revalidatePath("/quote-requests");
   revalidatePath(`/quote-requests/${quoteRequestId}`);
-  return { status: "success", message: `Decision enregistree : statut ${result.data.status}, routage ${result.data.routingStatus}.` };
+  return { status: "success", message: `Décision enregistrée : statut ${result.data.status}, routage ${result.data.routingStatus}.` };
 }
 
 export async function reassignLeadAssignmentAction(_previous: OperationsActionState, formData: FormData): Promise<OperationsActionState> {
@@ -60,7 +60,7 @@ export async function reassignLeadAssignmentAction(_previous: OperationsActionSt
   const result = await reassignLeadAssignment(assignmentId, { partnerTenantId, reason: text(formData.get("reason")) });
   if (!result.ok || !result.data) return refusal(result);
   revalidatePath("/lead-assignments");
-  return { status: "success", message: `Lead reaffecte (statut ${result.data.status}). L'ancien courtier perd l'acces.` };
+  return { status: "success", message: `Lead réaffecté (statut ${result.data.status}). L'ancien courtier perd l'accès.` };
 }
 
 export async function updateContactMessageStatusAction(_previous: OperationsActionState, formData: FormData): Promise<OperationsActionState> {

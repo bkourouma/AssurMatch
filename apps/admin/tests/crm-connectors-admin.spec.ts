@@ -21,9 +21,9 @@ test("CRM connectors page: sections, read-only activation card and session guard
   expect(page).toContain("crm_connector_enabled");
   expect(page).toContain("npm run ops:apply-flag-policy -- --flag crm_connector_enabled --value true --reference ... --approved-by ... --reason ...");
   expect(page).toContain("ASSURMATCH_CRM_CONNECTOR_DELIVERY_ENABLED");
-  expect(page).toContain("etat du flag non lisible avec ce role");
-  expect(page).toContain("Acces refuse : droit partners:update et MFA requis.");
-  expect(page).toContain("jamais de nom, d'e-mail, de telephone ni de texte libre");
+  expect(page).toContain("état du flag non lisible avec ce rôle");
+  expect(page).toContain("Accès refusé : droit partners:update et MFA requis.");
+  expect(page).toContain("jamais de nom, d'e-mail, de téléphone ni de texte libre");
   expect(page).toContain("Historique des livraisons");
   expect(page).toContain("urlHost");
   expect(page).toContain("authHeaderConfigured");
@@ -41,7 +41,7 @@ test("CRM connectors use the dedicated routes and never touch feature flags", ()
   expect(actions).toContain('"PATCH"');
   expect(actions).toContain("rotateSecret: true");
   expect(actions).toContain("loginRedirect(PAGE_PATH");
-  expect(actions).toContain("Action refusee : MFA ou role insuffisant.");
+  expect(actions).toContain("Action refusée : MFA ou rôle insuffisant.");
   expect(actions).toContain("crmsec_");
   expect(api).toContain("/admin/crm-connectors");
   expect(api).toContain("/admin/crm-connectors/deliveries");
@@ -63,7 +63,7 @@ test("signing secret is shown once and never leaks; auth header value is write-o
   const forms = source(FILES[1]!);
   const actions = source(FILES[2]!);
   expect(forms).toMatch(/^"use client";/);
-  expect(forms).toContain("Ce secret n&apos;est affiche qu&apos;une seule fois. Copiez-le maintenant.");
+  expect(forms).toContain("Ce secret n&apos;est affiché qu&apos;une seule fois. Copiez-le maintenant.");
   expect(forms).toContain("data-secret-reveal");
   expect(forms).toContain("navigator.clipboard.writeText");
   expect(forms).toContain("data-crm-form=");

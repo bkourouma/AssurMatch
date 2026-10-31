@@ -96,7 +96,7 @@ export async function passwordChangeAction(_previous: AuthFlowState, formData: F
     await changePassword(stringValue(formData.get("oldPassword")), stringValue(formData.get("newPassword")));
     // The API revokes every trusted device on a password change (FR-A06).
     await clearTrustedDeviceCookie();
-    return { status: "success", message: "Mot de passe modifie." };
+    return { status: "success", message: "Mot de passe modifié." };
   } catch (error) {
     return errorState(error);
   }
@@ -106,7 +106,7 @@ export async function passwordResetConsumeAction(_previous: AuthFlowState, formD
   try {
     await consumePasswordReset(stringValue(formData.get("token")), stringValue(formData.get("newPassword")));
     await clearTrustedDeviceCookie();
-    return { status: "success", message: "Mot de passe reinitialise. Vous pouvez vous connecter." };
+    return { status: "success", message: "Mot de passe réinitialisé. Vous pouvez vous connecter." };
   } catch (error) {
     return errorState(error);
   }

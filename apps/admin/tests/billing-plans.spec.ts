@@ -15,8 +15,8 @@ test("admin billing page manages plans, drafts and packs without any payment con
   expect(api).toContain("/admin/billing/packs");
   expect(page).toContain("Tarifs par plan et pays");
   expect(page).toContain("Brouillons mensuels non facturables");
-  expect(page).toContain("Packs de leads prepayes");
-  expect(page).toContain("prime n'est collectee par AssurMatch");
+  expect(page).toContain("Packs de leads prépayés");
+  expect(page).toContain("prime n'est collectée par AssurMatch");
   expect(actions).toContain('"use server"');
   expect(actions).toContain("/admin/billing/invoices/recompute");
 });
@@ -27,9 +27,9 @@ test("broker CRM page shows lead consumption without payment wording (DASH-B-008
 
   expect(api).toContain("/broker/billing/statement");
   expect(page).toContain("Consommation et facturation");
-  expect(page).toContain("Leads factures (brouillon)");
-  expect(page).toContain("Credits pack restants");
-  expect(page).toContain("Paiement en ligne desactive");
+  expect(page).toContain("Leads facturés (brouillon)");
+  expect(page).toContain("Crédits pack restants");
+  expect(page).toContain("Paiement en ligne désactivé");
 });
 
 // Spec 060: issuing invoices is now legitimate (manual invoicing, decision D-8); online payment and

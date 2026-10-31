@@ -59,11 +59,23 @@ describe("visitor step e-mails (spec 054 R10)", () => {
 
   it("never announces a request in manual review, not transmitted or received as transmitted (FR-010)", () => {
     for (const step of ["received", "in_review", "not_transmitted"] as const) {
-      expect(render(step, "fr").body.toLowerCase(), step).not.toMatch(/a ete transmise|ete transmise a/);
+      expect(render(step, "fr").body.toLowerCase(), step).not.toMatch(/a été transmise|été transmise à/);
       expect(render(step, "en").body.toLowerCase(), step).not.toMatch(/has been forwarded/);
     }
     expect(render("in_review", "fr").body).toContain("en cours de vérification");
     expect(render("in_review", "en").body).toContain("checking it");
+  });
+
+  it("keeps the accents of the French copy (subjects and body lines)", () => {
+    expect(render("received", "fr").subject).toBe("Votre demande de devis QR-2026-ABCDEF12 est bien reçue");
+    expect(render("consent_withdrawn", "fr").subject).toBe("Retrait de votre consentement confirmé (QR-2026-ABCDEF12)");
+    expect(render("tracking_link", "fr").body).toContain("Vous avez demandé un nouveau lien");
+    // The word stems that lost their accent in the past: no French step may bring them back.
+    const unaccented = /\b(recue|recu|confirme \(|demande un nouveau|resulte|etre|equipe|verification|reponse|telephone)\b/i;
+    for (const step of STEPS) {
+      const email = render(step, "fr", "Courtier X");
+      expect(`${email.subject}\n${email.body}`, step).not.toMatch(unaccented);
+    }
   });
 
   it("carries no form answer and no contact detail other than the recipient", () => {

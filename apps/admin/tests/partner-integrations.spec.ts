@@ -18,12 +18,12 @@ test("admin partner integrations page exposes API key and webhook guardrails", (
   expect(api).toContain("/admin/partner-integrations/webhook-allowlist");
   expect(api).toContain("/admin/partner-integrations/webhook-deliveries");
   expect(page).toContain("Partner API et webhooks");
-  expect(page).toContain("partner_api_enabled: desactive par defaut");
-  expect(page).toContain("partner_webhooks_enabled: desactive par defaut");
-  expect(page).toContain("cles hachees Argon2");
+  expect(page).toContain("partner_api_enabled: désactivé par défaut");
+  expect(page).toContain("partner_webhooks_enabled: désactivé par défaut");
+  expect(page).toContain("clés hachées Argon2");
   expect(page).toContain("secrets webhook chiffres");
   expect(page).toContain("allow-list tenant obligatoire");
-  expect(page).toContain("redirects HTTP bloques");
+  expect(page).toContain("redirects HTTP bloqués");
   expect(page).toContain("lead.assigned");
   expect(page).toContain("notification.failed");
   expect(page).not.toContain("signingSecret");
@@ -54,12 +54,12 @@ test("partner integrations screen is actionable and shows secrets only once", ()
   expect(actions).toContain("/test");
   expect(actions).toContain("partner_webhooks_enabled");
   expect(actions).toContain('revalidatePath(PAGE_PATH)');
-  expect(actions).toContain("Action refusee : MFA ou role insuffisant");
-  expect(actions).toContain("Integrations indisponibles");
-  expect(forms).toContain("Ce secret n&apos;est affiche qu&apos;une seule fois. Copiez-le maintenant.");
+  expect(actions).toContain("Action refusée : MFA ou rôle insuffisant");
+  expect(actions).toContain("Intégrations indisponibles");
+  expect(forms).toContain("Ce secret n&apos;est affiché qu&apos;une seule fois. Copiez-le maintenant.");
   expect(forms).toContain("navigator.clipboard.writeText");
-  expect(forms).toContain("Envoyer un evenement de test");
-  expect(forms).toContain("Revoquer");
+  expect(forms).toContain("Envoyer un événement de test");
+  expect(forms).toContain("Révoquer");
 
   // The secret stays inside the action state and the client component.
   expect(page).not.toContain("rawKey");

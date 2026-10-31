@@ -521,11 +521,11 @@ export class PartnerApplicationsService {
     return {
       status: "received",
       publicReference,
-      message: "Votre candidature a bien ete recue. Notre equipe conformite va l'etudier et vous contactera par e-mail pour demander une copie de votre licence.",
+      message: "Votre candidature a bien été reçue. Notre équipe conformité va l'étudier et vous contactera par e-mail pour demander une copie de votre licence.",
       nextSteps: [
-        "Surveillez votre e-mail: nous vous ecrirons pour demander une copie de votre licence, car aucun depot de fichier n'est disponible sur ce formulaire.",
-        "Notre equipe conformite examine votre dossier avant toute activation.",
-        "Aucun compte partenaire n'est cree tant que votre dossier n'a pas ete valide."
+        "Surveillez votre e-mail: nous vous écrirons pour demander une copie de votre licence, car aucun dépôt de fichier n'est disponible sur ce formulaire.",
+        "Notre équipe conformité examine votre dossier avant toute activation.",
+        "Aucun compte partenaire n'est créé tant que votre dossier n'a pas été validé."
       ]
     };
   }

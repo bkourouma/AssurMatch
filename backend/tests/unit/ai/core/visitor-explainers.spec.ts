@@ -103,7 +103,7 @@ describe("TemplateAiProvider visitor explainers", () => {
     expect(fr).toContain("Responsabilite civile");
     expect(fr).toContain("Bris de glace");
     expect(fr).toContain("120 000 XOF");
-    expect(fr).toContain("a confirmer par le courtier partenaire");
+    expect(fr).toContain("à confirmer par le courtier partenaire");
     expect(en).toContain("Guarantees listed as included: Responsabilite civile");
     expect(en).toContain("to be confirmed by the partner broker");
     for (const [type, text] of [["visitor_guarantee_explainer", fr], ["visitor_guarantee_explainer", en]] as const) {
@@ -116,8 +116,8 @@ describe("TemplateAiProvider visitor explainers", () => {
     const en = (await provider.generate(request("visitor_compare_explainer", compareInput, "en"))).text;
     expect(fr).toContain("le prix indicatif le plus bas est celui de l'offre 2".replace(/^l/, "L"));
     expect(fr).toContain("Franchise: identique");
-    expect(fr).toContain("le delai de traitement le plus court".replace(/^l/, "L") + " est partage par les offres 2 et 3");
-    expect(fr).toContain('Garantie "Bris de glace": incluse dans l\'offre 1; non incluse dans l\'offre 2; non precisee pour l\'offre 3.');
+    expect(fr).toContain("le délai de traitement le plus court".replace(/^l/, "L") + " est partagé par les offres 2 et 3");
+    expect(fr).toContain('Garantie "Bris de glace": incluse dans l\'offre 1; non incluse dans l\'offre 2; non précisée pour l\'offre 3.');
     expect(en).toContain("The lowest indicative price is that of offer 2");
     expect(en).toContain('Guarantee "Bris de glace": included in offer 1; not included in offer 2; not specified for offer 3.');
     for (const text of [fr, en]) {

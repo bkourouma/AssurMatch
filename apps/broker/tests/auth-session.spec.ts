@@ -125,12 +125,12 @@ test("broker pages render access denied states instead of protected fallback dat
   const detailPage = source("apps/broker/app/leads/[leadAssignmentId]/page.tsx");
   const crmDetailPage = source("apps/broker/app/crm/leads/[leadAssignmentId]/page.tsx");
 
-  expect(leadsPage).toContain("Aucune donnee protegee");
+  expect(leadsPage).toContain("Aucune donnée protégée");
   expect(leadsPage).not.toContain("fallbackLeads");
-  expect(crmPage).toContain("Aucune donnee CRM");
+  expect(crmPage).toContain("Aucune donnée CRM");
   expect(crmPage).not.toContain("fallbackLeads");
-  expect(detailPage).toContain("Acces refuse");
-  expect(crmDetailPage).toContain("Acces CRM refuse");
+  expect(detailPage).toContain("Accès refusé");
+  expect(crmDetailPage).toContain("Accès CRM refusé");
 });
 
 test("broker session cookie name is distinct from the admin back-office cookie", async () => {
@@ -230,8 +230,8 @@ test("broker MFA verification form offers the unchecked trust checkbox and forwa
   // Existing field ids and button text used by the e2e helpers stay in place.
   expect(panel).toContain('id="mfa-code"');
   expect(panel).toContain('name="kind"');
-  expect(panel).toContain("Verifier MFA");
-  expect(panel).toContain("Generer secret et codes de secours");
+  expect(panel).toContain("Vérifier MFA");
+  expect(panel).toContain("Générer secret et codes de secours");
 
   expect(verify).toContain('formData.get("trustDevice") === "on"');
   expect(verify).toContain("deviceLabelFromUserAgent");

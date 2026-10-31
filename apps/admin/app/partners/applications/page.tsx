@@ -113,7 +113,7 @@ export default async function PartnerApplicationsPage({
         action="/partners/applications"
         label="Filtres candidatures"
         submitLabel="Filtrer"
-        resetLabel="Reinitialiser"
+        resetLabel="Réinitialiser"
         resetHref="/partners/applications"
         activeCount={activeFilters}
         autoSubmit
@@ -138,7 +138,7 @@ export default async function PartnerApplicationsPage({
         items={rows}
         getKey={(application) => application.id}
         emptyLabel="Aucune candidature pour ces filtres."
-        emptyDescription={activeFilters > 0 ? "Reinitialisez les filtres pour revoir toutes les candidatures." : "Les candidatures deposees depuis le site public apparaissent ici."}
+        emptyDescription={activeFilters > 0 ? "Réinitialisez les filtres pour revoir toutes les candidatures." : "Les candidatures déposées depuis le site public apparaissent ici."}
         aria-label="Candidatures courtiers"
         sort={table.sort}
         sortHref={table.sortHref}

@@ -167,7 +167,7 @@ test("W064-00 le cabinet Enterprise est créé avec son manager, son agent, son 
     const assign = owner.locator("form").filter({ has: owner.locator("#crm-advisor-id") });
     await assign.locator("#crm-advisor-id").selectOption(advisorId);
     await assign.getByRole("button", { name: "Assigner au conseiller" }).click();
-    await expect(owner.getByText("Lead assigne au conseiller.")).toBeVisible();
+    await expect(owner.getByText("Lead assigné au conseiller.")).toBeVisible();
     expect((await leadFootprint(ownerToken, leadId)).advisorId).toBe(advisorId);
   }
   saveWorld(WORLD_KEY, world);
@@ -188,7 +188,7 @@ test("W064-01 les exports CSV: bouton selon le rôle, filtres actifs respectés,
     await expect(exportLink(owner)).toBeVisible();
     await expect(owner.getByText(NO_EXPORT_NOTICE)).toHaveCount(0);
     await expect(owner.getByText("Export audité")).toBeVisible();
-    for (const reference of Object.values(refs)) await expect(owner.getByRole("table", { name: "Leads assignes" })).toContainText(reference);
+    for (const reference of Object.values(refs)) await expect(owner.getByRole("table", { name: "Leads assignés" })).toContainText(reference);
 
     const file = await downloadExport(owner, exportLink(owner));
     expect(file.filename).toMatch(/^leads-starter-\d{4}-\d{2}-\d{2}\.csv$/u);
@@ -265,7 +265,7 @@ test("W064-01 les exports CSV: bouton selon le rôle, filtres actifs respectés,
     expect(referencesOfExport(searched, "reference")).toEqual([refs.lead3]);
 
     await page.goto("/leads");
-    await expect(page.getByRole("heading", { name: "Leads assignes" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Leads assignés" })).toBeVisible();
     await expect(exportLink(page)).toHaveCount(0);
     await expect(page.getByText(NO_EXPORT_NOTICE)).toBeVisible();
     const token = await bearerToken(page);
@@ -275,7 +275,7 @@ test("W064-01 les exports CSV: bouton selon le rôle, filtres actifs respectés,
 
   await test.step("agent: aucun bouton d'export (Starter et CRM), l'API et le relais du back-office répondent 403", async () => {
     const page = await visit(browser, agent, "/leads");
-    await expect(page.getByRole("heading", { name: "Leads assignes" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Leads assignés" })).toBeVisible();
     await expect(exportLink(page)).toHaveCount(0);
     await expect(page.getByText(NO_EXPORT_NOTICE)).toBeVisible();
     await page.goto("/crm/leads?agence=all");
@@ -334,16 +334,16 @@ test("W064-02 un rôle personnalisé restreint l'agent sans nouvelle connexion, 
 
   await test.step("le propriétaire crée un rôle qui n'accorde ni CRM ni modification de lead", async () => {
     const owner = await visit(browser, world.owner, "/enterprise");
-    const roles = card(owner, "Roles personnalises");
+    const roles = card(owner, "Rôles personnalisés");
     if ((await rowWith(roles, roleName).count()) === 0 || !(await rowWith(roles, roleName).isVisible())) {
       await owner.locator("#role-name").fill(roleName);
       await owner.getByLabel("broker_leads:read", { exact: true }).check();
       await owner.getByLabel("notifications:read", { exact: true }).check();
       await owner.locator("#role-reason").fill(WORLD_REASON);
-      await owner.getByRole("button", { name: "Creer le role" }).click();
+      await owner.getByRole("button", { name: "Créer le rôle" }).click();
       await owner.waitForURL(/\/enterprise\?ent=role_created/u);
     }
-    const row = rowWith(card(owner, "Roles personnalises"), roleName);
+    const row = rowWith(card(owner, "Rôles personnalisés"), roleName);
     await expect(row).toContainText("broker_leads:read, notifications:read");
     await expect(row).not.toContainText("broker_crm");
   });
@@ -410,11 +410,11 @@ test("W064-02 un rôle personnalisé restreint l'agent sans nouvelle connexion, 
 
   await test.step("l'interface de l'agent suit après rechargement, le reste de son accès est conservé", async () => {
     await agentPage.goto("/crm/leads?agence=all");
-    await expect(agentPage.getByText("Acces CRM refuse").first()).toBeVisible();
+    await expect(agentPage.getByText("Accès CRM refusé").first()).toBeVisible();
     await expect(agentPage.getByRole("table", { name: "Leads CRM" })).toHaveCount(0);
     await expect(agentPage.getByText(refs.lead1)).toHaveCount(0);
     await agentPage.goto("/leads");
-    await expect(agentPage.getByRole("heading", { name: "Leads assignes" })).toBeVisible();
+    await expect(agentPage.getByRole("heading", { name: "Leads assignés" })).toBeVisible();
     await expect(agentPage.getByText(refs.lead1).first()).toBeVisible();
     // Never an elevation: the owner still reads the whole CRM.
     const ownerToken = await tokenFor(browser, world.owner);
@@ -434,7 +434,7 @@ test("W064-02 un rôle personnalisé restreint l'agent sans nouvelle connexion, 
     await expect(leadsTable(agentPage)).toContainText(refs.lead1);
     // The role stays listed on the Enterprise page, with no member left.
     const enterprise = await visit(browser, world.owner, "/enterprise");
-    await expect(rowWith(card(enterprise, "Roles personnalises"), roleName)).toBeVisible();
+    await expect(rowWith(card(enterprise, "Rôles personnalisés"), roleName)).toBeVisible();
   });
 });
 
@@ -453,7 +453,7 @@ test("W064-03 le filtre Agence du CRM Enterprise restreint l'affichage sans deve
     await agencies().locator("#agency-name").fill(name);
     await agencies().locator("#agency-country").fill("CI");
     await agencies().locator("#agency-reason").fill(WORLD_REASON);
-    await agencies().getByRole("button", { name: "Creer une agence" }).click();
+    await agencies().getByRole("button", { name: "Créer une agence" }).click();
     await owner.waitForURL(/\/enterprise\?ent=agency_created/u);
   }
   world.data.agencyPlateau = plateau;
@@ -710,7 +710,7 @@ test("W064-06 la charte du cabinet Enterprise s'applique à l'en-tête du back-o
     await expect(owner.locator("[data-broker-brand='custom']")).toHaveCount(0);
   }
   expect(await saveBranding(owner, "#0b3d91"), "branding saved").toBe(true);
-  await expect(owner.locator(".bo-notice").first()).toContainText("Charte du portail courtier enregistree.");
+  await expect(owner.locator(".bo-notice").first()).toContainText("Charte du portail courtier enregistrée.");
   const shell = owner.locator("[data-broker-shell]");
   await expect(shell).toContainText(label);
   await expect(shell).toContainText("Plateforme technique AssurMatch");

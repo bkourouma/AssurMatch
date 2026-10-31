@@ -1,10 +1,10 @@
 export const brokerDemoAccounts = [
-  { email: "starter.owner@broker.example", label: "Starter owner", helper: "Portail Starter, leads simples, CRM bloque" },
+  { email: "starter.owner@broker.example", label: "Starter owner", helper: "Portail Starter, leads simples, CRM bloqué" },
   { email: "pro.owner@broker.example", label: "Pro owner", helper: "CRM complet et dashboard Pro" },
   { email: "pro.manager@broker.example", label: "Pro manager", helper: "Vue manager et assignation CRM" },
-  { email: "pro.agent@broker.example", label: "Pro agent", helper: "Vue agent sur les leads assignes" },
+  { email: "pro.agent@broker.example", label: "Pro agent", helper: "Vue agent sur les leads assignés" },
   { email: "pro.readonly@broker.example", label: "Pro read-only", helper: "Lecture seule broker" },
-  { email: "enterprise.owner@broker.example", label: "Enterprise owner", helper: "Tenant Enterprise et donnees avancees" }
+  { email: "enterprise.owner@broker.example", label: "Enterprise owner", helper: "Tenant Enterprise et données avancées" }
 ] as const;
 
 export type BrokerDemoAccountEmail = (typeof brokerDemoAccounts)[number]["email"];

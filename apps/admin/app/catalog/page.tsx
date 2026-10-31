@@ -14,7 +14,7 @@ const catalogSections: CatalogSection[] = [
   { key: "countries", title: "Pays", href: "/catalog/countries", description: "Fiche, statut, flags pays, liaisons produits et résumé de la checklist." },
   { key: "products", title: "Produits", href: "/catalog/products", description: "Fiche produit et flags globaux (le flag effectif combine produit et liaison pays)." },
   { key: "categories", title: "Catégories", href: "/catalog/categories", description: "Catégories de produits : création en brouillon, activation, retrait refusé tant que des produits y sont rattachés." },
-  { key: "regimes", title: "Regimes reglementaires", href: "/catalog/regimes", description: "Régimes référencés par les pays ; un régime référencé ne peut pas être retiré." },
+  { key: "regimes", title: "Régimes réglementaires", href: "/catalog/regimes", description: "Régimes référencés par les pays ; un régime référencé ne peut pas être retiré." },
   { key: "consent", title: "Consentements", href: "/consent-texts", description: "Textes versionnés, empreinte calculée par le serveur, publication réservée à la conformité." },
   { key: "forms", title: "Formulaires devis", href: "/quote-form-definitions", description: "Formulaires par pays, produit et langue, liés à un consentement publié." }
 ];
@@ -33,7 +33,7 @@ export default async function CatalogFoundationPage() {
       <PageHeader
         breadcrumb={[{ label: "Configuration" }, { label: "Catalogue" }]}
         title="Catalogue socle"
-        description="Pays, regimes et produits, avec exposition publique desactivee par defaut et controlee par les flags existants."
+        description="Pays, régimes et produits, avec exposition publique désactivée par défaut et contrôlée par les flags existants."
       />
 
       <Notice tone="warning" title="Ouverture au public">
@@ -51,12 +51,12 @@ export default async function CatalogFoundationPage() {
         <StateMessage tone="danger">Accès au catalogue refusé pour ce rôle admin.</StateMessage>
       ) : (
         <StatStrip
-          label="Synthese catalogue"
+          label="Synthèse catalogue"
           items={[
             { label: "Pays", value: countries.data.length, href: "/catalog/countries" },
-            { label: "Pays publics", value: publicCountries, tone: publicCountries > 0 ? "warning" : "neutral", helper: "Exposes aux visiteurs" },
+            { label: "Pays publics", value: publicCountries, tone: publicCountries > 0 ? "warning" : "neutral", helper: "Exposés aux visiteurs" },
             { label: "Produits", value: products.data.length, href: "/catalog/products" },
-            { label: "Regimes", value: regimes.data.length, href: "/catalog/regimes" }
+            { label: "Régimes", value: regimes.data.length, href: "/catalog/regimes" }
           ]}
         />
       )}

@@ -18,7 +18,7 @@ test("AI scope flags page exposes the sections, the ops command and the complian
   expect(page).toContain("Flags globaux IA (lecture seule)");
   expect(page).toContain("npm run ops:apply-flag-policy -- --flag");
   expect(page).toContain("--approved-by");
-  expect(page).toContain("Historique recent");
+  expect(page).toContain("Historique récent");
   expect(page).toContain("Pays");
   expect(page).toContain("Produits");
   expect(page).toContain("validation humaine");
@@ -33,7 +33,7 @@ test("AI scope flags page exposes the sections, the ops command and the complian
   expect(form).not.toContain("Confirmer l'activation");
   expect(form).not.toContain("Activer");
   expect(form).not.toContain('name="reference"');
-  expect(form).toContain("Produit hautement sensible : activation IA refusee sans exception documentee");
+  expect(form).toContain("Produit hautement sensible : activation IA refusée sans exception documentée");
 });
 
 test("AI scope flag changes go through the dedicated route, never PATCH /feature-flags", () => {

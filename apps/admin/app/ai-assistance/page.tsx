@@ -4,11 +4,11 @@ import { requestAdminInsightAction, validateAdminInsightAction } from "../lib/ai
 import { Badge, Button, Card, Cluster, DataTable, DescriptionList, EmptyState, Form, Input, PageHeader, PageStack, Split, Stack, StateMessage } from "../lib/ui/admin-ui";
 
 const INSIGHT_LABELS: Record<string, string> = {
-  admin_risk_triage: "Triage des risques de conformite",
-  activation_gap_summary: "Ecarts d'activation",
-  offer_consistency_check: "Coherence d'une offre",
+  admin_risk_triage: "Triage des risques de conformité",
+  activation_gap_summary: "Écarts d'activation",
+  offer_consistency_check: "Cohérence d'une offre",
   offer_summary: "Résumé d'une offre",
-  activity_report: "Rapport d'activite",
+  activity_report: "Rapport d'activité",
   suspicious_leads: "Demandes suspectes"
 };
 
@@ -19,10 +19,10 @@ const DISPLAY_ONLY_LABELS: Record<string, string> = {
 
 const NOTICES: Record<string, string> = {
   queued: "Insight IA demande. Rechargez la page dans quelques secondes pour le consulter.",
-  validated: "Decision de validation humaine enregistree et auditee.",
+  validated: "Décision de validation humaine enregistrée et auditée.",
   quota: "Quota quotidien d'assistance IA atteint.",
-  disabled: "Assistance IA desactivee par les feature flags.",
-  forbidden: "Action refusee: role AI Admin requis.",
+  disabled: "Assistance IA désactivée par les feature flags.",
+  forbidden: "Action refusée: rôle AI Admin requis.",
   error: "Assistance IA temporairement indisponible."
 };
 
@@ -36,9 +36,9 @@ export default async function AdminAIAssistancePage({ searchParams }: { searchPa
       <PageHeader
         breadcrumb={[{ label: "Plateforme" }, { label: "Assistance IA" }]}
         title="Assistance IA admin"
-        description="Insights IA indicatifs pour prioriser une revue humaine. Aucune decision automatisee, aucune donnee prospect envoyee au modele."
+        description="Insights IA indicatifs pour prioriser une revue humaine. Aucune décision automatisée, aucune donnée prospect envoyée au modèle."
       />
-      {assistance.forbidden ? <StateMessage tone="danger">Acces assistance IA refuse pour ce role admin.</StateMessage> : null}
+      {assistance.forbidden ? <StateMessage tone="danger">Accès assistance IA refusé pour ce rôle admin.</StateMessage> : null}
       {assistance.status === "error" ? <StateMessage tone="danger">Assistance IA indisponible: {assistance.error}</StateMessage> : null}
       {ai && NOTICES[ai] ? <StateMessage tone={ai === "queued" || ai === "validated" ? "info" : "warning"}>{NOTICES[ai]}</StateMessage> : null}
       {assistance.status === "success" ? (
@@ -47,15 +47,15 @@ export default async function AdminAIAssistancePage({ searchParams }: { searchPa
             <Stack>
             <Card
               title="Flags IA par pays et produit"
-              description="Etat et changement des flags IA par pays et par produit, par une voie de conformite auditee (MFA, reference de politique, approbateur, motif)."
+              description="État et changement des flags IA par pays et par produit, par une voie de conformité auditée (MFA, référence de politique, approbateur, motif)."
             >
               <Link href="/ai-assistance/flags">Ouvrir les flags IA par pays et produit</Link>
             </Card>
 
             {enabled ? (
               <Card
-                title="Demander un insight IA a valider"
-                description="Chaque insight est une aide a la priorisation: l'administrateur valide ou ecarte, aucune alerte, offre ou activation n'est modifiee automatiquement."
+                title="Demander un insight IA à valider"
+                description="Chaque insight est une aide à la priorisation: l'administrateur valide ou écarte, aucune alerte, offre ou activation n'est modifiée automatiquement."
               >
                 <Cluster>
                   {Object.entries(INSIGHT_LABELS).filter(([assistType]) => assistance.data.availableAssistTypes.includes(assistType)).map(([assistType, label]) => (
@@ -74,13 +74,13 @@ export default async function AdminAIAssistancePage({ searchParams }: { searchPa
             {insights.status === "success" && insights.data.length === 0 ? (
               <EmptyState
                 icon="sparkles"
-                title="Aucun insight recent"
-                description={enabled ? "Demandez un insight ci-dessus : il apparaitra ici pour validation humaine." : "L'assistance IA est desactivee : aucun insight ne peut etre demande."}
+                title="Aucun insight récent"
+                description={enabled ? "Demandez un insight ci-dessus : il apparaîtra ici pour validation humaine." : "L'assistance IA est désactivée : aucun insight ne peut être demande."}
               />
             ) : null}
 
             {insights.status === "success" && insights.data.length > 0 ? (
-              <Card title="Insights recents">
+              <Card title="Insights récents">
                 <ul className="bo-list">
                   {insights.data.map((insight) => (
                     <li key={insight.id}>
@@ -91,14 +91,14 @@ export default async function AdminAIAssistancePage({ searchParams }: { searchPa
                           {insight.humanValidationStatus !== "not_required" ? <Badge tone={insight.humanValidationStatus === "pending" ? "warning" : "info"}>validation: {insight.humanValidationStatus}</Badge> : null}
                         </Cluster>
                         {insight.status === "completed" && insight.outputText ? <p>{insight.outputText}</p> : null}
-                        {insight.status === "refused" ? <p className="bo-description">Insight retenu par les garde-fous ou assistance desactivee ({insight.refusalReason ?? "refus"}).</p> : null}
+                        {insight.status === "refused" ? <p className="bo-description">Insight retenu par les garde-fous ou assistance désactivée ({insight.refusalReason ?? "refus"}).</p> : null}
                         {insight.status === "completed" && insight.humanValidationStatus === "pending" ? (
                           <Cluster>
                             {(["approved", "rejected"] as const).map((decision) => (
                               <Form key={decision} action={validateAdminInsightAction}>
                                 <input type="hidden" name="insightId" value={insight.id} />
                                 <input type="hidden" name="decision" value={decision} />
-                                <Button type="submit" variant="secondary" size="sm">{decision === "approved" ? "Valider l'insight" : "Ecarter l'insight"}</Button>
+                                <Button type="submit" variant="secondary" size="sm">{decision === "approved" ? "Valider l'insight" : "Écarter l'insight"}</Button>
                               </Form>
                             ))}
                           </Cluster>
@@ -114,10 +114,10 @@ export default async function AdminAIAssistancePage({ searchParams }: { searchPa
 
             <Card title="Garde-fous">
               <Cluster>
-                <Badge tone={assistance.data.enabled ? "warning" : "disabled"}>enabled: {String(assistance.data.enabled)}</Badge>
-                <Badge tone={assistance.data.modelCall ? "warning" : "disabled"}>modelCall: {String(assistance.data.modelCall)}</Badge>
+                <Badge tone={assistance.data.enabled ? "warning" : "disabled"}>Assistance IA : {assistance.data.enabled ? "activée" : "désactivée"}</Badge>
+                <Badge tone={assistance.data.modelCall ? "warning" : "disabled"}>Appel à un modèle IA : {assistance.data.modelCall ? "oui" : "non"}</Badge>
                 <Badge tone="warning">validation humaine obligatoire</Badge>
-                <Badge tone="info">audit metadata_only</Badge>
+                <Badge tone="info">Audit : métadonnées uniquement</Badge>
               </Cluster>
               <p className="bo-description">{assistance.data.message}</p>
               <DescriptionList
@@ -135,12 +135,12 @@ export default async function AdminAIAssistancePage({ searchParams }: { searchPa
               <DataTable
                 columns={[
                   { key: "key", header: "Flag", render: (flag) => <span className="bo-ref">{flag.key}</span> },
-                  { key: "value", header: "Etat", render: (flag) => <Badge tone={flag.value ? "warning" : "disabled"}>{flag.value ? "actif" : "desactive"}</Badge> },
+                  { key: "value", header: "État", render: (flag) => <Badge tone={flag.value ? "warning" : "disabled"}>{flag.value ? "actif" : "désactivé"}</Badge> },
                   { key: "required", header: "Requis", render: (flag) => flag.required ? "oui" : "non" }
                 ]}
                 items={assistance.data.flags}
                 getKey={(flag) => flag.key}
-                emptyLabel="Aucun flag IA reference."
+                emptyLabel="Aucun flag IA référence."
                 aria-label="Flags de l'assistance IA"
               />
             </Card>

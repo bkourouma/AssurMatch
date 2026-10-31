@@ -85,7 +85,7 @@ test("the offer page shows published vs pending, the diff, the history and compl
   }
   const forms = source("apps/admin/app/offers/offer-forms.tsx");
   for (const marker of [
-    "Motif (audite)",
+    "Motif (audité)",
     "ConfirmDialog",
     "data-compliance-only",
     "name=\"guaranteeLabel\"",

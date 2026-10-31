@@ -17,8 +17,8 @@ test("admin api client exposes readAdminDashboard and readComplianceAlerts", () 
 test("admin home page renders dashboard summary section", () => {
   const home = source("apps/admin/app/page.tsx");
   expect(home).toContain("readAdminDashboard");
-  expect(home).toContain("Dashboard plateforme synthese");
-  expect(home).toContain("Acces dashboard plateforme refuse");
+  expect(home).toContain("Dashboard plateforme synthèse");
+  expect(home).toContain("Accès dashboard plateforme refusé");
 });
 
 test("admin dashboard page renders aggregates and feature flag summary", () => {
@@ -26,15 +26,15 @@ test("admin dashboard page renders aggregates and feature flag summary", () => {
   expect(dashboard).toContain("Dashboard plateforme");
   expect(dashboard).toContain("Volumes de leads");
   expect(dashboard).toContain("Feature flags sensibles");
-  expect(dashboard).toContain("Alertes conformite");
+  expect(dashboard).toContain("Alertes conformité");
   expect(dashboard).toContain("signaux de pilotage");
 });
 
 test("admin compliance alerts page paginates and refuses without admin", () => {
   const page = source("apps/admin/app/dashboard/compliance-alerts/page.tsx");
   expect(page).toContain("readComplianceAlerts");
-  expect(page).toContain("Acces refuse");
-  expect(page).toContain("Categorie");
+  expect(page).toContain("Accès refusé");
+  expect(page).toContain("Catégorie");
 });
 
 test("admin dashboard pages avoid forbidden wording", () => {

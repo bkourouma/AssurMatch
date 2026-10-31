@@ -22,17 +22,17 @@ export default async function AdminLoginPage({ searchParams }: LoginPageProps) {
     <>
       <h1 className="bo-auth__title">Connexion admin</h1>
 
-      {reason === "session_expired" ? <Notice tone="info">Votre session a expire. Connectez-vous a nouveau.</Notice> : null}
-      {reason === "session_required" ? <Notice tone="info">Connectez-vous pour acceder a l'administration.</Notice> : null}
-      {mfa === "required" ? <Notice tone="danger">MFA requise. L'acces admin reste bloque tant que la verification MFA n'est pas terminee.</Notice> : null}
-      {error === "activation_required" ? <Notice tone="danger">Activation requise. Ouvrez l'ecran d'activation avec le jeton fourni par votre administrateur.</Notice> : null}
-      {error === "mfa_required" ? <Notice tone="danger">MFA requise. Terminez la verification MFA avant d'ouvrir les espaces admin.</Notice> : null}
-      {error === "locked" ? <Notice tone="danger">Compte verrouille. Contactez un Super Admin ou un administrateur conformite.</Notice> : null}
-      {error === "suspended" ? <Notice tone="danger">Compte suspendu. Contactez un administrateur habilite.</Notice> : null}
-      {error === "validation_error" ? <Notice tone="danger">Verifiez le format de l'email et du mot de passe.</Notice> : null}
-      {error === "dev_login_missing_seed" ? <Notice tone="danger">Donnees demo locales absentes. Relancez le seed broker demo.</Notice> : null}
-      {error === "dev_login_database" ? <Notice tone="danger">Base locale indisponible pour le selecteur demo.</Notice> : null}
-      {error && !["activation_required", "mfa_required", "locked", "suspended", "validation_error", "dev_login_missing_seed", "dev_login_database", "dev_login_disabled", "dev_login_invalid"].includes(error) ? <Notice tone="danger">Acces refuse ou identifiants invalides.</Notice> : null}
+      {reason === "session_expired" ? <Notice tone="info">Votre session a expiré. Connectez-vous à nouveau.</Notice> : null}
+      {reason === "session_required" ? <Notice tone="info">Connectez-vous pour accéder à l'administration.</Notice> : null}
+      {mfa === "required" ? <Notice tone="danger">MFA requise. L'accès admin reste bloqué tant que la vérification MFA n'est pas terminée.</Notice> : null}
+      {error === "activation_required" ? <Notice tone="danger">Activation requise. Ouvrez l'écran d'activation avec le jeton fourni par votre administrateur.</Notice> : null}
+      {error === "mfa_required" ? <Notice tone="danger">MFA requise. Terminez la vérification MFA avant d'ouvrir les espaces admin.</Notice> : null}
+      {error === "locked" ? <Notice tone="danger">Compte verrouillé. Contactez un Super Admin ou un administrateur conformité.</Notice> : null}
+      {error === "suspended" ? <Notice tone="danger">Compte suspendu. Contactez un administrateur habilité.</Notice> : null}
+      {error === "validation_error" ? <Notice tone="danger">Vérifiez le format de l'email et du mot de passe.</Notice> : null}
+      {error === "dev_login_missing_seed" ? <Notice tone="danger">Données démo locales absentes. Relancez le seed broker démo.</Notice> : null}
+      {error === "dev_login_database" ? <Notice tone="danger">Base locale indisponible pour le sélecteur démo.</Notice> : null}
+      {error && !["activation_required", "mfa_required", "locked", "suspended", "validation_error", "dev_login_missing_seed", "dev_login_database", "dev_login_disabled", "dev_login_invalid"].includes(error) ? <Notice tone="danger">Accès refusé ou identifiants invalides.</Notice> : null}
 
       {isLocalAdminDemoLoginEnabled() ? <DevAccountPicker returnTo={returnTo} /> : null}
 
@@ -56,7 +56,7 @@ export default async function AdminLoginPage({ searchParams }: LoginPageProps) {
       </Form>
 
       <p className="bo-auth__footer">
-        <a href={`/activate?returnTo=${encodeURIComponent(returnTo)}`}>Activer un compte</a> · <a href="/password-reset">Consommer un jeton de reinitialisation</a>
+        <a href={`/activate?returnTo=${encodeURIComponent(returnTo)}`}>Activer un compte</a> · <a href="/password-reset">Consommer un jeton de réinitialisation</a>
       </p>
     </>
   );

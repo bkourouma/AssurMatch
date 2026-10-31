@@ -15,7 +15,7 @@ export function MessagingTestForm({ channels }: { channels: string[] }) {
 
   return (
     <Form action={formAction} data-messaging-test-form="true" autoComplete="off">
-      <Notice tone="info">Reserve au super admin, MFA requis. Le destinataire n'est jamais affiche en clair.</Notice>
+      <Notice tone="info">Réservé au super admin, MFA requis. Le destinataire n'est jamais affiché en clair.</Notice>
       {state.status !== "idle" ? (
         <Notice tone={state.status === "success" ? "success" : "danger"}>
           <p>{state.message}</p>
@@ -33,13 +33,13 @@ export function MessagingTestForm({ channels }: { channels: string[] }) {
           {channels.map((channel) => <option key={channel} value={channel}>{CHANNEL_LABELS[channel] ?? channel}</option>)}
         </Select>
       </Field>
-      <Field id={`${base}-recipient`} label="Destinataire" hint="Numero au format international, transmis uniquement au service d'envoi." required>
+      <Field id={`${base}-recipient`} label="Destinataire" hint="Numéro au format international, transmis uniquement au service d'envoi." required>
         <Input {...fieldControlProps(`${base}-recipient`, { required: true })} name="recipient" type="tel" minLength={5} maxLength={120} autoComplete="off" />
       </Field>
-      <Field id={`${base}-scopeId`} label="Identifiant de portee" hint="Identifiant du destinataire ou du partenaire concerne par le test." required>
+      <Field id={`${base}-scopeId`} label="Identifiant de portée" hint="Identifiant du destinataire ou du partenaire concerne par le test." required>
         <Input {...fieldControlProps(`${base}-scopeId`, { required: true })} name="scopeId" autoComplete="off" />
       </Field>
-      <Field id={`${base}-reason`} label="Motif (audite)" required>
+      <Field id={`${base}-reason`} label="Motif (audité)" required>
         <Input {...fieldControlProps(`${base}-reason`, { required: true })} name="reason" minLength={3} maxLength={300} />
       </Field>
       <FormActions>

@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { isBrokerProfile, loginRedirect, readBackOfficeSession } from "./lib/backoffice-auth";
 import { logoutAction } from "./lib/backoffice-session-actions";
+import { productLabel } from "./lib/product-vocabulary";
 import { listStarterLeads, readBrokerDashboard } from "./lib/broker-api";
 import { AttentionList, Button, Card, DataTable, Notice, PageHeader, PageStack, StatStrip, StatusBadge, starterStatusLabels } from "./lib/ui/broker-ui";
 import type { DataTableColumn } from "./lib/ui/broker-ui";
@@ -23,9 +24,9 @@ export default async function BrokerShellPage({ searchParams }: BrokerShellPageP
     return (
       <PageStack>
         <PageHeader
-          breadcrumb={[{ label: "Activite" }, { label: "Dashboard" }]}
+          breadcrumb={[{ label: "Activité" }, { label: "Dashboard" }]}
           title="MFA requise"
-          description="Votre profil est reconnu, mais l'acces au portail courtier reste bloque tant que la MFA n'est pas verifiee."
+          description="Votre profil est reconnu, mais l'accès au portail courtier reste bloqué tant que la MFA n'est pas vérifiée."
         />
         <form action={logoutAction}>
           <Button type="submit" variant="secondary">Retour au login</Button>
@@ -37,9 +38,9 @@ export default async function BrokerShellPage({ searchParams }: BrokerShellPageP
     return (
       <PageStack>
         <PageHeader
-          breadcrumb={[{ label: "Activite" }, { label: "Dashboard" }]}
-          title="Acces refuse"
-          description="Ce compte ne dispose pas d'un acces courtier autorise."
+          breadcrumb={[{ label: "Activité" }, { label: "Dashboard" }]}
+          title="Accès refusé"
+          description="Ce compte ne dispose pas d'un accès courtier autorisé."
         />
         <form action={logoutAction}>
           <Button type="submit" variant="secondary">Changer de compte</Button>
@@ -51,7 +52,7 @@ export default async function BrokerShellPage({ searchParams }: BrokerShellPageP
   return (
     <PageStack>
       <PageHeader
-        breadcrumb={[{ label: "Activite" }, { label: "Dashboard" }]}
+        breadcrumb={[{ label: "Activité" }, { label: "Dashboard" }]}
         title="Portail courtier"
         description="Suivi des leads transmis par AssurMatch. Le courtier partenaire reste responsable de la prise de contact et de la suite commerciale."
         actions={<Button href="/leads">Voir les leads</Button>}
@@ -76,10 +77,10 @@ export default async function BrokerShellPage({ searchParams }: BrokerShellPageP
 async function BrokerDashboardSection() {
   const dashboard = await readBrokerDashboard();
   if (dashboard.unauthenticated) {
-    return <Notice tone="info">Session expiree. Reconnectez-vous pour voir le dashboard.</Notice>;
+    return <Notice tone="info">Session expirée. Reconnectez-vous pour voir le dashboard.</Notice>;
   }
   if (dashboard.forbidden) {
-    return <Notice tone="danger">Acces dashboard refuse. Le flag broker_dashboard_enabled est ferme ou la MFA est requise.</Notice>;
+    return <Notice tone="danger">Accès dashboard refusé. Le flag broker_dashboard_enabled est ferme ou la MFA est requise.</Notice>;
   }
   if (dashboard.status === "error") {
     return <Notice tone="warning">Dashboard indisponible: {dashboard.error ?? "erreur inconnue"}.</Notice>;
@@ -104,14 +105,14 @@ async function BrokerDashboardSection() {
           <ul>
             {dashboard.data.licenseAlerts.map((alert) => (
               <li key={alert.licenseId}>
-                {alert.countryCode} - licence {alert.status === "expired" ? "expiree" : "expirant prochainement"} (
+                {alert.countryCode} - licence {alert.status === "expired" ? "expirée" : "expirant prochainement"} (
                 {new Date(alert.expiresAt).toISOString().slice(0, 10)})
               </li>
             ))}
           </ul>
         </Card>
       ) : (
-        <Notice tone="info" title="Licences">Aucune alerte licence exposee pour ce tenant.</Notice>
+        <Notice tone="info" title="Licences">Aucune alerte licence exposée pour ce tenant.</Notice>
       )}
     </>
   );
@@ -120,8 +121,8 @@ async function BrokerDashboardSection() {
 const WAITING_STATUSES = new Set(["assigned", "seen", "received", "broker_notified"]);
 
 const waitingColumns: Array<DataTableColumn<LeadSummaryViewModel>> = [
-  { key: "reference", header: "Reference", render: (lead) => <a className="bo-ref" href={`/leads/${encodeURIComponent(lead.id)}`}>{lead.reference}</a> },
-  { key: "product", header: "Produit", render: (lead) => `${lead.product} / ${lead.country}` },
+  { key: "reference", header: "Référence", render: (lead) => <a className="bo-ref" href={`/leads/${encodeURIComponent(lead.id)}`}>{lead.reference}</a> },
+  { key: "product", header: "Produit", render: (lead) => `${productLabel(lead.product)} / ${lead.country}` },
   { key: "status", header: "Statut", render: (lead) => <StatusBadge status={lead.status} labels={starterStatusLabels} tones={{ [lead.status]: lead.statusTone }} /> },
   { key: "date", header: "Assigné le", render: (lead) => lead.assignedAt }
 ];

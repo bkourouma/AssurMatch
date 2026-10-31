@@ -14,10 +14,10 @@ test("billing foundation page stays free of online payment", () => {
   expect(api).toContain("readBillingFoundation");
   expect(api).toContain("/admin/billing/foundation");
   expect(page).toContain("Facturation des courtiers");
-  expect(page).toContain("Aucun paiement en ligne et aucune prime d'assurance ne sont encaisses par AssurMatch");
-  expect(page).toContain("Reference non facturable");
-  expect(page).toContain("payments_enabled: desactive");
-  expect(page).toContain("collection: desactivee");
+  expect(page).toContain("Aucun paiement en ligne et aucune prime d'assurance ne sont encaissés par AssurMatch");
+  expect(page).toContain("Référence non facturable");
+  expect(page).toContain("payments_enabled: désactivé");
+  expect(page).toContain("collection: désactivée");
   expect(page).not.toContain("writeAdmin");
   expect(page).not.toContain("POST");
   expect(page).not.toContain("PATCH");

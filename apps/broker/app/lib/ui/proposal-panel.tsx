@@ -54,7 +54,7 @@ function ProposalItem({ proposal, channel, leadAssignmentId, canWithdraw }: { pr
         items={[
           { term: "Prime indicative", value: formatPremium(proposal.priceMin, proposal.priceMax, proposal.currency) },
           { term: "Valable jusqu'au", value: formatDate(proposal.validUntil) },
-          { term: "Garanties principales", value: proposal.guarantees.length > 0 ? proposal.guarantees.join(", ") : "Non precisees" },
+          { term: "Garanties principales", value: proposal.guarantees.length > 0 ? proposal.guarantees.join(", ") : "Non précisées" },
           {
             term: "Document",
             value: proposal.document
@@ -62,24 +62,24 @@ function ProposalItem({ proposal, channel, leadAssignmentId, canWithdraw }: { pr
               : "Aucun"
           },
           ...(proposal.viewedAt ? [{ term: "Vue par le visiteur", value: formatDate(proposal.viewedAt) }] : []),
-          ...(proposal.withdrawnAt ? [{ term: "Retiree le", value: `${formatDate(proposal.withdrawnAt)}${proposal.withdrawReason ? ` - ${proposal.withdrawReason}` : ""}` }] : [])
+          ...(proposal.withdrawnAt ? [{ term: "Retirée le", value: `${formatDate(proposal.withdrawnAt)}${proposal.withdrawReason ? ` - ${proposal.withdrawReason}` : ""}` }] : [])
         ]}
       />
       <p className={styles.muted}>{proposal.nonContractualNotice}</p>
       {proposal.responses.length > 0 ? (
         <div className={styles.entry}>
-          <h4 className={styles.entryTitle}>Reponses du visiteur</h4>
+          <h4 className={styles.entryTitle}>Réponses du visiteur</h4>
           <ol className="bo-list">
             {proposal.responses.map((response) => (
               <li key={response.id}>
                 <span className="bo-ref">{formatDate(response.createdAt)}</span> - {VISITOR_RESPONSE_LABELS[response.type] ?? response.type}
-                {response.callbackSlot ? ` (creneau : ${response.callbackSlot})` : ""}
+                {response.callbackSlot ? ` (créneau : ${response.callbackSlot})` : ""}
                 {response.declineReason ? ` (motif : ${DECLINE_REASON_LABELS[response.declineReason] ?? response.declineReason})` : ""}
                 {response.question ? ` : « ${response.question} »` : ""}
               </li>
             ))}
           </ol>
-          <p className={styles.muted}>La derniere reponse fait foi. Repondez par une nouvelle proposition ou hors plateforme.</p>
+          <p className={styles.muted}>La dernière réponse fait foi. Répondez par une nouvelle proposition ou hors plateforme.</p>
         </div>
       ) : null}
       {canWithdraw && proposal.status !== "withdrawn" ? (
@@ -87,7 +87,7 @@ function ProposalItem({ proposal, channel, leadAssignmentId, canWithdraw }: { pr
           <ConfirmDialog
             triggerLabel="Retirer cette proposition"
             title="Retirer la proposition"
-            description="Une proposition envoyee n'est jamais modifiee. Retirez-la puis envoyez-en une nouvelle si besoin. Le visiteur ne la verra plus."
+            description="Une proposition envoyée n'est jamais modifiée. Retirez-la puis envoyez-en une nouvelle si besoin. Le visiteur ne la verra plus."
             confirmLabel="Retirer"
             cancelLabel="Annuler"
             tone="danger"
@@ -120,15 +120,15 @@ export function ProposalPanel({ channel, leadAssignmentId, data, canMutate, tena
         {PROPOSAL_NON_CONTRACTUAL_NOTICE}. AssurMatch ne compare, ne classe ni ne recommande les propositions ; aucune signature ni aucun paiement.
       </Notice>
       {suggestedStatusLabel ? (
-        <Notice tone="info" title="Statut suggere">
-          Le visiteur a repondu. Statut suivant suggere : {suggestedStatusLabel}. Le statut CRM n'est jamais modifie automatiquement.
+        <Notice tone="info" title="Statut suggéré">
+          Le visiteur a répondu. Statut suivant suggéré : {suggestedStatusLabel}. Le statut CRM n'est jamais modifié automatiquement.
         </Notice>
       ) : null}
       {data.blockers.map((blocker) => (
         <Notice key={blocker} tone="warning">{PROPOSAL_BLOCKER_LABELS[blocker] ?? blocker}</Notice>
       ))}
       <div className={styles.entryHead}>
-        <h3 className={styles.entryTitle}>Propositions envoyees</h3>
+        <h3 className={styles.entryTitle}>Propositions envoyées</h3>
         <Badge tone={data.activeCount >= data.maxActive ? "warning" : "neutral"}>{`Propositions actives : ${data.activeCount} / ${data.maxActive}`}</Badge>
       </div>
       {data.items.length > 0 ? (
@@ -140,7 +140,7 @@ export function ProposalPanel({ channel, leadAssignmentId, data, canMutate, tena
           ))}
         </ul>
       ) : (
-        <p className={styles.muted}>Aucune proposition envoyee pour ce lead. Le visiteur la retrouve dans son espace de suivi des l&apos;envoi.</p>
+        <p className={styles.muted}>Aucune proposition envoyée pour ce lead. Le visiteur la retrouve dans son espace de suivi dès l&apos;envoi.</p>
       )}
       {canMutate || tenantReadOnly ? (
         <TenantWriteGuard readOnly={tenantReadOnly || !data.canSend}>
@@ -149,7 +149,7 @@ export function ProposalPanel({ channel, leadAssignmentId, data, canMutate, tena
               <h3 className={styles.entryTitle}>Nouvelle proposition</h3>
             </FormRow>
             <FormRow full>
-              <Field id={`${channel}-proposal-message`} label="Message au visiteur" required requiredLabel="obligatoire" hint={`${PROPOSAL_MESSAGE_MAX} caracteres au maximum. Aucune promesse de souscription.`}>
+              <Field id={`${channel}-proposal-message`} label="Message au visiteur" required requiredLabel="obligatoire" hint={`${PROPOSAL_MESSAGE_MAX} caractères au maximum. Aucune promesse de souscription.`}>
                 <Textarea id={`${channel}-proposal-message`} name="message" required maxLength={PROPOSAL_MESSAGE_MAX} rows={5} aria-label="Message de la proposition" />
               </Field>
             </FormRow>
@@ -163,7 +163,7 @@ export function ProposalPanel({ channel, leadAssignmentId, data, canMutate, tena
               <Select id={`${channel}-proposal-currency`} name="currency" defaultValue="XOF" aria-label="Devise" options={PROPOSAL_CURRENCIES.map((currency) => ({ value: currency, label: currency }))} />
             </Field>
             <Field id={`${channel}-proposal-valid`} label="Valable jusqu'au" required requiredLabel="obligatoire">
-              <Input id={`${channel}-proposal-valid`} name="validUntil" type="date" required min={minDate} aria-label="Date de validite" />
+              <Input id={`${channel}-proposal-valid`} name="validUntil" type="date" required min={minDate} aria-label="Date de validité" />
             </Field>
             <FormRow full>
               <Field id={`${channel}-proposal-guarantees`} label="Principales garanties" hint={`Une garantie par ligne, ${PROPOSAL_GUARANTEES_MAX} au maximum.`}>
@@ -181,7 +181,7 @@ export function ProposalPanel({ channel, leadAssignmentId, data, canMutate, tena
           </form>
         </TenantWriteGuard>
       ) : (
-        <Notice tone="info" title="Lecture seule">Votre role ne permet pas d&apos;envoyer de proposition.</Notice>
+        <Notice tone="info" title="Lecture seule">Votre rôle ne permet pas d&apos;envoyer de proposition.</Notice>
       )}
     </Stack>
   );

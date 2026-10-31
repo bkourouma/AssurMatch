@@ -51,7 +51,7 @@ export async function validateLeadAiAction(formData: FormData): Promise<void> {
 /** Partner-level AI opt-out preference (owner only). */
 export async function setAiOptOutAction(formData: FormData): Promise<void> {
   const optOut = stringValue(formData.get("optOut")) === "true";
-  const reason = stringValue(formData.get("reason")).trim() || (optOut ? "Opt-out partenaire depuis le CRM" : "Reactivation partenaire depuis le CRM");
+  const reason = stringValue(formData.get("reason")).trim() || (optOut ? "Opt-out partenaire depuis le CRM" : "Réactivation partenaire depuis le CRM");
   const result = await callBrokerApi("/broker/crm/ai/opt-out", "PUT", { optOut, reason });
   if (result.status === 401) redirect(loginRedirect("/crm", "session_expired"));
   redirect(`/crm?ai=${result.status === 200 || result.status === 201 ? "optout_saved" : outcome(result)}`);

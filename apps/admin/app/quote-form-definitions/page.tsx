@@ -60,7 +60,7 @@ const columns: Array<DataTableColumn<QuoteFormDefinitionData>> = [
   },
   {
     key: "publishedAt",
-    header: "Publie le",
+    header: "Publié le",
     render: (form) => form.publishedAt?.slice(0, 10) ?? "-",
     sortable: true,
     sortValue: (form) => form.publishedAt ?? null
@@ -96,28 +96,28 @@ export default async function AdminQuoteFormDefinitionsPage({
       <PageHeader
         breadcrumb={[{ label: "Catalogue" }, { label: "Formulaires devis" }]}
         title="Formulaires de demande de devis"
-        description="Definitions versionnees par pays, produit et langue. Un formulaire n'est expose aux visiteurs qu'une fois publie et lie a un texte de consentement publie."
-        actions={forms.status === "success" ? <Button href="#creer-formulaire">Creer un brouillon</Button> : null}
+        description="Définitions versionnées par pays, produit et langue. Un formulaire n'est exposé aux visiteurs qu'une fois publié et lié à un texte de consentement publié."
+        actions={forms.status === "success" ? <Button href="#creer-formulaire">Créer un brouillon</Button> : null}
       />
 
       {forms.unauthenticated ? <StateMessage tone="danger">Session admin requise.</StateMessage> : null}
-      {forms.forbidden ? <StateMessage tone="danger">Acces aux formulaires de devis refuse pour ce role admin.</StateMessage> : null}
+      {forms.forbidden ? <StateMessage tone="danger">Accès aux formulaires de devis refusé pour ce rôle admin.</StateMessage> : null}
       {forms.status === "error" ? <StateMessage tone="danger">Formulaires indisponibles: {forms.error}</StateMessage> : null}
 
       {forms.status === "success" ? (
         <>
           {published.length === 0 ? (
             <StateMessage tone="warning">
-              Aucune version publiee: la demande de devis est indisponible pour tous les pays et produits. La checklist d'activation le signale comme bloquant.
+              Aucune version publiée: la demande de devis est indisponible pour tous les pays et produits. La checklist d'activation le signale comme bloquant.
             </StateMessage>
           ) : null}
 
           <StatStrip
-            label="Synthese formulaires"
+            label="Synthèse formulaires"
             items={[
-              { label: "Versions publiees", value: published.length, tone: published.length > 0 ? "success" : "warning" },
+              { label: "Versions publiées", value: published.length, tone: published.length > 0 ? "success" : "warning" },
               { label: "Brouillons", value: drafts.length },
-              { label: "Parcours exposes", value: exposedScopes.size, tone: exposedScopes.size > 0 ? "success" : "warning" },
+              { label: "Parcours exposés", value: exposedScopes.size, tone: exposedScopes.size > 0 ? "success" : "warning" },
               { label: "Consentement remplacé", value: superseded.length, tone: superseded.length > 0 ? "warning" : "neutral" }
             ]}
           />
@@ -132,7 +132,7 @@ export default async function AdminQuoteFormDefinitionsPage({
             action="/quote-form-definitions"
             label="Filtres formulaires de devis"
             submitLabel="Filtrer"
-            resetLabel="Reinitialiser"
+            resetLabel="Réinitialiser"
             resetHref="/quote-form-definitions"
             activeCount={(statusFilter ? 1 : 0) + (languageFilter ? 1 : 0)}
             autoSubmit
@@ -154,8 +154,8 @@ export default async function AdminQuoteFormDefinitionsPage({
             columns={columns}
             items={rows}
             getKey={(form) => form.id}
-            emptyLabel="Aucune definition: le parcours de demande de devis reste indisponible cote public."
-            emptyDescription="Creez un brouillon ci-dessous, liez-le a un consentement publie, puis publiez-le."
+            emptyLabel="Aucune définition: le parcours de demande de devis reste indisponible côté public."
+            emptyDescription="Créez un brouillon ci-dessous, liez-le à un consentement publié, puis publiez-le."
             aria-label="Versions de formulaire de devis"
             sort={table.sort}
             sortHref={table.sortHref}
@@ -168,12 +168,12 @@ export default async function AdminQuoteFormDefinitionsPage({
             }}
           />
 
-          <Notice tone="neutral" title="Regles de publication">
+          <Notice tone="neutral" title="Règles de publication">
             <ul className="bo-list">
-              <li>Le texte de consentement doit etre publie, de finalite transmission de lead, et de meme langue, pays et produit (ou sans produit).</li>
-              <li>Les libelles de champ sont exposes aux visiteurs: le vocabulaire reglemente y est refuse.</li>
+              <li>Le texte de consentement doit être publié, de finalité transmission de lead, et de même langue, pays et produit (ou sans produit).</li>
+              <li>Les libellés de champ sont exposés aux visiteurs: le vocabulaire réglementé y est refusé.</li>
               <li>Un champ sensible n'est publiable que si le flag produit correspondant est ouvert.</li>
-              <li>Une seule version publiee par pays, produit et langue: publier retire la precedente.</li>
+              <li>Une seule version publiée par pays, produit et langue: publier retire la précédente.</li>
             </ul>
           </Notice>
 

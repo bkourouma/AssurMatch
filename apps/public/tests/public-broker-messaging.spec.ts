@@ -302,6 +302,16 @@ test("the French copy keeps its accents and neither language uses a curly apostr
   }
 });
 
+test("the French fallback messages of the public API client keep their accents", () => {
+  const api = readSources([publicFile("lib/public-api.ts"), publicFile("lib/seo.ts"), publicFile("components/site/platform-status-notice.tsx")]);
+  for (const accented of ["Réessayez plus tard.", "Document reçu.", "Message reçu. Notre équipe vous répondra.", "Candidature reçue.", "ne peut pas être envoyée", "courtiers partenaires autorisés."]) {
+    expect(api, accented).toContain(accented);
+  }
+  for (const unaccented of ["Reessayez", "Document recu", "Message recu", "Candidature recue", "pas etre", "partenaires autorises", "numero de telephone", "est enregistre"]) {
+    expect(api, unaccented).not.toContain(unaccented);
+  }
+});
+
 test("the catalogue never promises a purchase, a contract or an accepted cover", () => {
   const catalogue = (["fr", "en"] as const).flatMap((locale) => NAMESPACES.flatMap((name) => leaves(namespace(locale, name)))).join("\n").toLowerCase();
   const sources = readSources([...components, helpers]).toLowerCase();

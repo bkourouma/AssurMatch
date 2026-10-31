@@ -124,7 +124,7 @@ export default async function ConsentTextsPage({
           action="/consent-texts"
           label="Filtres textes de consentement"
           submitLabel="Filtrer"
-          resetLabel="Reinitialiser"
+          resetLabel="Réinitialiser"
           resetHref="/consent-texts"
           activeCount={activeCount}
           autoSubmit

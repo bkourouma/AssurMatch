@@ -13,8 +13,8 @@ test("broker notifications page exposes a tenant inbox and optional channel pref
 
   expect(api).toContain("/broker/notifications/inbox");
   expect(api).toContain("/broker/notifications/preferences");
-  expect(page).toContain("Notifications operationnelles");
-  expect(page).toContain("Boite de reception");
+  expect(page).toContain("Notifications opérationnelles");
+  expect(page).toContain("Boîte de réception");
   expect(page).toContain("email: toujours actif");
   expect(page).toContain("Accepter les notifications WhatsApp");
   expect(actions).toContain('"use server"');
@@ -30,7 +30,7 @@ test("admin messaging page shows channel capability and masked recipients only",
   expect(page).toContain("Messaging SMS et WhatsApp");
   expect(page).toContain("Envoi possible");
   expect(page).toContain("recipientMasked");
-  expect(page).toContain("Aucun secret fournisseur n'est expose");
+  expect(page).toContain("Aucun secret fournisseur n'est exposé");
 });
 
 test("notification copy stays operational and avoids regulated or promotional wording", () => {

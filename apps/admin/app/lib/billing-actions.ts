@@ -90,7 +90,7 @@ const ISO_DAY = /^\d{4}-\d{2}-\d{2}$/;
 /** Spec 060 J-01: issues the numbered invoice of a monthly draft (finance or super admin). */
 export async function issueInvoiceAction(formData: FormData): Promise<void> {
   const draftId = stringValue(formData.get("draftId")).trim();
-  const reason = stringValue(formData.get("reason")).trim() || "Emission de la facture mensuelle";
+  const reason = stringValue(formData.get("reason")).trim() || "Émission de la facture mensuelle";
   if (!UUID.test(draftId)) redirect("/billing?tab=factures&billing=invalid");
   const status = await callBillingApi("/admin/billing/issued-invoices", "POST", { draftId, reason });
   if (status === 401) redirect(loginRedirect("/billing?tab=factures", "session_expired"));

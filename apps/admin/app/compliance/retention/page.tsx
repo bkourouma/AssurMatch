@@ -41,35 +41,35 @@ import {
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 const RETENTION_NOTICES: Record<string, { tone: NoticeTone; text: string }> = {
-  policy_saved: { tone: "info", text: "Duree de conservation enregistree et auditee." },
-  policy_removed: { tone: "info", text: "Surcharge retiree: le niveau suivant (pays, global puis defaut) s'applique de nouveau." },
-  preview_created: { tone: "info", text: "Previsualisation creee: aucune donnee n'a ete modifiee. Verifiez les comptes puis approuvez le lot avant son expiration." },
-  erasure_created: { tone: "info", text: "Previsualisation d'effacement creee: aucune donnee n'a ete modifiee. Un lot vide signifie qu'aucune donnee ne correspond." },
-  batch_executed: { tone: "success", text: "Lot approuve et execute: les donnees selectionnees ont ete anonymisees. Les comptes finaux figurent dans le tableau." },
-  invalid: { tone: "warning", text: "Saisie incomplete: verifiez la categorie, le lot et le motif." },
-  invalid_days: { tone: "warning", text: "Duree invalide: saisissez un nombre entier de jours entre 30 et 3650." },
-  invalid_reason: { tone: "warning", text: "Motif invalide: au moins 8 caracteres et au plus 500." },
-  reason_contact: { tone: "warning", text: "Le motif ne doit contenir ni adresse e-mail ni numero de telephone: il est conserve durablement comme preuve." },
-  invalid_subject: { tone: "warning", text: "Identification invalide: choisissez reference publique ou e-mail et saisissez une valeur valide." },
-  forbidden: { tone: "danger", text: "Action refusee: MFA verifiee et role de conformite requis." },
+  policy_saved: { tone: "info", text: "Durée de conservation enregistrée et auditée." },
+  policy_removed: { tone: "info", text: "Surcharge retirée: le niveau suivant (pays, global puis défaut) s'applique de nouveau." },
+  preview_created: { tone: "info", text: "Prévisualisation créée: aucune donnée n'a été modifiée. Vérifiez les comptes puis approuvez le lot avant son expiration." },
+  erasure_created: { tone: "info", text: "Prévisualisation d'effacement créée: aucune donnée n'a été modifiée. Un lot vide signifie qu'aucune donnée ne correspond." },
+  batch_executed: { tone: "success", text: "Lot approuvé et exécuté: les données sélectionnées ont été anonymisées. Les comptes finaux figurent dans le tableau." },
+  invalid: { tone: "warning", text: "Saisie incomplète: vérifiez la catégorie, le lot et le motif." },
+  invalid_days: { tone: "warning", text: "Durée invalide: saisissez un nombre entier de jours entre 30 et 3650." },
+  invalid_reason: { tone: "warning", text: "Motif invalide: au moins 8 caractères et au plus 500." },
+  reason_contact: { tone: "warning", text: "Le motif ne doit contenir ni adresse e-mail ni numéro de téléphone: il est conservé durablement comme preuve." },
+  invalid_subject: { tone: "warning", text: "Identification invalide: choisissez référence publique ou e-mail et saisissez une valeur valide." },
+  forbidden: { tone: "danger", text: "Action refusée: MFA vérifiée et rôle de conformité requis." },
   not_found: { tone: "warning", text: "Lot introuvable." },
-  conflict: { tone: "warning", text: "Lot non approuvable: il a expire, a deja ete execute ou a ete refuse. Lancez une nouvelle previsualisation." },
+  conflict: { tone: "warning", text: "Lot non approuvable: il a expiré, a déjà été exécuté ou a été refusé. Lancez une nouvelle prévisualisation." },
   disabled: {
     tone: "warning",
-    text: "Approbation refusee: retention_purge_enabled est desactive. Le lot a ete marque refuse; apres activation par la procedure de conformite, une nouvelle previsualisation sera necessaire."
+    text: "Approbation refusée: retention_purge_enabled est désactivé. Le lot a été marqué refusé; après activation par la procédure de conformité, une nouvelle prévisualisation sera nécessaire."
   },
-  error: { tone: "danger", text: "Service de retention temporairement indisponible." }
+  error: { tone: "danger", text: "Service de rétention temporairement indisponible." }
 };
 
 const CATEGORY_LABELS: Record<RetentionSubjectKey, string> = {
   quote_requests: "Demandes de devis et prospects",
   quote_documents: "Documents de devis",
   contact_messages: "Messages de contact",
-  partner_applications: "Candidatures partenaires refusees",
+  partner_applications: "Candidatures partenaires refusées",
   waitlist: "Liste d'attente",
   ai_traces: "Traces IA",
   webhook_payloads: "Contenus des webhooks partenaires",
-  messaging_references: "References de messagerie",
+  messaging_references: "Références de messagerie",
   prospects: "Prospects sans demande",
   satisfaction_feedback: "Avis de satisfaction",
   // Spec 062: provisional durations, pending legal validation (see PROVISIONAL_CATEGORIES).
@@ -83,25 +83,25 @@ const PROVISIONAL_CATEGORIES = new Set<string>(["lead_message_threads", "lead_do
 const PROVISIONAL_NOTE = "durée provisoire, en attente de validation juridique";
 
 const ANCHOR_LABELS: Record<RetentionPolicyItemData["anchor"], string> = {
-  last_activity: "Depuis la derniere activite du dossier (devis ou action courtier)",
-  created_at: "Depuis la date de creation",
+  last_activity: "Depuis la dernière activité du dossier (devis ou action courtier)",
+  created_at: "Depuis la date de création",
   reviewed_at: "Depuis la date de revue de la candidature",
   country_public_since: "Depuis l'ouverture publique du pays",
-  occurred_at: "Depuis la date de l'evenement IA",
+  occurred_at: "Depuis la date de l'événement IA",
   submitted_at: "Depuis la date de soumission"
 };
 
 const SOURCE_LABELS: Record<RetentionPolicyItemData["source"], { tone: Tone; label: string }> = {
-  default: { tone: "neutral", label: "Defaut" },
+  default: { tone: "neutral", label: "Défaut" },
   global: { tone: "info", label: "Surcharge globale" },
   country: { tone: "warning", label: "Surcharge pays" }
 };
 
 const STATUS_LABELS: Record<string, { tone: Tone; label: string }> = {
-  previewed: { tone: "info", label: "Previsualise" },
-  executed: { tone: "success", label: "Execute" },
-  refused: { tone: "danger", label: "Refuse" },
-  expired: { tone: "disabled", label: "Expire" },
+  previewed: { tone: "info", label: "Prévisualisé" },
+  executed: { tone: "success", label: "Exécuté" },
+  refused: { tone: "danger", label: "Refusé" },
+  expired: { tone: "disabled", label: "Expiré" },
   interrupted: { tone: "warning", label: "Interrompu" }
 };
 
@@ -144,7 +144,7 @@ export default async function DataRetentionPage({ searchParams }: { searchParams
   const policyColumns: Array<DataTableColumn<RetentionPolicyItemData>> = [
     {
       key: "category",
-      header: "Categorie",
+      header: "Catégorie",
       render: (item) => (
         <>
           <strong>{CATEGORY_LABELS[item.category] ?? item.category}</strong>
@@ -156,17 +156,17 @@ export default async function DataRetentionPage({ searchParams }: { searchParams
         </>
       )
     },
-    { key: "duration", header: "Duree", render: (item) => `${item.retentionDays} jours`, numeric: true },
+    { key: "duration", header: "Durée", render: (item) => `${item.retentionDays} jours`, numeric: true },
     { key: "source", header: "Source", render: (item) => <Badge tone={SOURCE_LABELS[item.source].tone}>{SOURCE_LABELS[item.source].label}</Badge> },
-    { key: "anchor", header: "Point de depart", render: (item) => ANCHOR_LABELS[item.anchor] },
+    { key: "anchor", header: "Point de départ", render: (item) => ANCHOR_LABELS[item.anchor] },
     {
       key: "levels",
       header: "Niveaux",
-      render: (item) => `defaut ${item.defaultRetentionDays} / global ${item.globalRetentionDays ?? "-"} / pays ${item.countryRetentionDays ?? "-"}`
+      render: (item) => `défaut ${item.defaultRetentionDays} / global ${item.globalRetentionDays ?? "-"} / pays ${item.countryRetentionDays ?? "-"}`
     },
     {
       key: "lastOverride",
-      header: "Derniere surcharge",
+      header: "Dernière surcharge",
       render: (item) =>
         item.overrideUpdatedAt ? <span className="bo-break">{`${formatDate(item.overrideUpdatedAt)} - ${item.overrideReason ?? ""}`}</span> : "-"
     },
@@ -211,7 +211,7 @@ export default async function DataRetentionPage({ searchParams }: { searchParams
     {
       key: "kind",
       header: "Type",
-      render: (batch) => (batch.kind === "erasure" ? `Effacement (${batch.erasureLookup === "email" ? "par e-mail" : "par reference"})` : "Retention")
+      render: (batch) => (batch.kind === "erasure" ? `Effacement (${batch.erasureLookup === "email" ? "par e-mail" : "par référence"})` : "Rétention")
     },
     {
       key: "status",
@@ -220,38 +220,38 @@ export default async function DataRetentionPage({ searchParams }: { searchParams
         <Stack>
           {statusBadge(batch.status)}
           {PARTIAL_STATUSES.has(batch.status) ? (
-            <span>Execution arretee: les comptes montrent ce qui a ete fait; une nouvelle previsualisation est necessaire pour le reste.</span>
+            <span>Exécution arrêtée: les comptes montrent ce qui a été fait; une nouvelle prévisualisation est nécessaire pour le reste.</span>
           ) : null}
         </Stack>
       )
     },
-    { key: "scope", header: "Portee", render: (batch) => (batch.kind === "erasure" ? "Personne" : countryLabel(batch.countryId)) },
+    { key: "scope", header: "Portée", render: (batch) => (batch.kind === "erasure" ? "Personne" : countryLabel(batch.countryId)) },
     {
       key: "counts",
-      header: "Comptes par categorie",
+      header: "Comptes par catégorie",
       render: (batch) =>
         batch.counts.length === 0 ? (
-          "Aucune donnee"
+          "Aucune donnée"
         ) : (
           <ul className="bo-list">
             {batch.counts.map((count) => (
               <li key={count.subject}>
-                {CATEGORY_LABELS[count.subject]}: {count.selected} selectionnes
+                {CATEGORY_LABELS[count.subject]}: {count.selected} sélectionnés
                 {batch.status === "executed" || PARTIAL_STATUSES.has(batch.status)
-                  ? `, ${count.anonymized} anonymises, ${count.skipped} ignores, ${count.failed} en echec`
+                  ? `, ${count.anonymized} anonymisés, ${count.skipped} ignorés, ${count.failed} en échec`
                   : ""}
-                {count.moreRemaining ? " (reste a traiter)" : ""}
+                {count.moreRemaining ? " (reste à traiter)" : ""}
               </li>
             ))}
           </ul>
         )
     },
     { key: "total", header: "Total", render: (batch) => batch.totalSelected, numeric: true },
-    { key: "remaining", header: "Reste", render: (batch) => (batch.moreRemaining ? <Badge tone="warning">Nouveau lot necessaire</Badge> : "Non") },
-    { key: "createdAt", header: "Cree", render: (batch) => formatDate(batch.createdAt) },
+    { key: "remaining", header: "Reste", render: (batch) => (batch.moreRemaining ? <Badge tone="warning">Nouveau lot nécessaire</Badge> : "Non") },
+    { key: "createdAt", header: "Créé", render: (batch) => formatDate(batch.createdAt) },
     {
       key: "deadline",
-      header: "Expiration / execution",
+      header: "Expiration / exécution",
       render: (batch) => (batch.status === "previewed" ? formatDate(batch.previewExpiresAt) : formatDate(batch.executedAt ?? batch.approvedAt))
     },
     { key: "reason", header: "Motif", render: (batch) => <span className="bo-break">{batch.approvalReason ?? batch.reason}</span> },
@@ -266,7 +266,7 @@ export default async function DataRetentionPage({ searchParams }: { searchParams
               triggerLabel="Approuver et anonymiser"
               triggerVariant="danger"
               title="Approuver et anonymiser ce lot"
-              description={`${batch.totalSelected} element(s) selectionne(s) seront anonymises definitivement. Cette action ne peut pas etre annulee.`}
+              description={`${batch.totalSelected} élément(s) sélectionné(s) seront anonymisés définitivement. Cette action ne peut pas être annulée.`}
               confirmLabel="Approuver et anonymiser"
               cancelLabel="Annuler"
               tone="danger"
@@ -279,7 +279,7 @@ export default async function DataRetentionPage({ searchParams }: { searchParams
             </ConfirmDialog>
           );
         }
-        return batch.status === "previewed" ? "Expire: nouvelle previsualisation necessaire" : "-";
+        return batch.status === "previewed" ? "Expiré: nouvelle prévisualisation nécessaire" : "-";
       }
     }
   ];
@@ -287,31 +287,31 @@ export default async function DataRetentionPage({ searchParams }: { searchParams
   return (
     <PageStack>
       <PageHeader
-        breadcrumb={[{ label: "Pilotage" }, { label: "Conformite", href: "/compliance" }, { label: "Conservation des donnees" }]}
+        breadcrumb={[{ label: "Pilotage" }, { label: "Conformité", href: "/compliance" }, { label: "Conservation des données" }]}
         title="Conservation et anonymisation"
-        description="Durees de conservation, lots d'anonymisation et effacement sur demande. Chaque lot est previsualise puis approuve manuellement avec un motif : aucune purge automatique."
+        description="Durées de conservation, lots d'anonymisation et effacement sur demande. Chaque lot est prévisualisé puis approuvé manuellement avec un motif : aucune purge automatique."
         actions={
           <>
             <Button href="/compliance/data-requests" variant="secondary">Demandes de données des visiteurs</Button>
-            <Button href="/compliance" variant="secondary">Retour conformite</Button>
+            <Button href="/compliance" variant="secondary">Retour conformité</Button>
           </>
         }
       />
 
       {policies.unauthenticated || batches.unauthenticated ? <StateMessage tone="danger">Session admin requise.</StateMessage> : null}
       {policies.forbidden || batches.forbidden ? (
-        <StateMessage tone="danger">Acces refuse: MFA verifiee et role de conformite requis pour la retention.</StateMessage>
+        <StateMessage tone="danger">Accès refusé: MFA vérifiée et rôle de conformité requis pour la rétention.</StateMessage>
       ) : null}
       {policies.status === "error" || batches.status === "error" ? (
-        <StateMessage tone="danger">Retention indisponible: {policies.error ?? batches.error}</StateMessage>
+        <StateMessage tone="danger">Rétention indisponible: {policies.error ?? batches.error}</StateMessage>
       ) : null}
       {notice ? <StateMessage tone={notice.tone}>{notice.text}</StateMessage> : null}
 
       {loaded && !purgeEnabled ? (
         <div data-retention-marker="purge-disabled-notice">
-          <StateMessage tone="warning" title="Purge desactivee (retention_purge_enabled)">
-            Mode previsualisation uniquement: les durees se reglent et les lots se previsualisent, mais toute approbation est refusee et le lot est
-            alors marque refuse. Une fois le flag active par la procedure de conformite, lancez une nouvelle previsualisation avant d&apos;approuver.
+          <StateMessage tone="warning" title="Purge désactivée (retention_purge_enabled)">
+            Mode prévisualisation uniquement: les durées se règlent et les lots se prévisualisent, mais toute approbation est refusée et le lot est
+            alors marqué refusé. Une fois le flag activé par la procédure de conformité, lancez une nouvelle prévisualisation avant d&apos;approuver.
           </StateMessage>
         </div>
       ) : null}
@@ -319,26 +319,26 @@ export default async function DataRetentionPage({ searchParams }: { searchParams
       {loaded ? (
         <>
           <StatStrip
-            label="Synthese retention"
+            label="Synthèse rétention"
             items={[
-              { label: "Purge", value: purgeEnabled ? "Active" : "Desactivee", tone: purgeEnabled ? "warning" : "disabled", helper: "retention_purge_enabled" },
-              { label: "Lots a approuver", value: openBatches, tone: openBatches > 0 ? "info" : "neutral", helper: "Previsualises, non expires" },
-              { label: "Lots recents", value: batchItems.length, helper: "50 derniers lots" }
+              { label: "Purge", value: purgeEnabled ? "Active" : "Désactivée", tone: purgeEnabled ? "warning" : "disabled", helper: "retention_purge_enabled" },
+              { label: "Lots à approuver", value: openBatches, tone: openBatches > 0 ? "info" : "neutral", helper: "Prévisualisés, non expirés" },
+              { label: "Lots récents", value: batchItems.length, helper: "50 derniers lots" }
             ]}
           />
 
-          <Card title="Durees de conservation" description="Priorite: surcharge pays, puis surcharge globale, puis defaut. Bornes: 30 a 3650 jours.">
+          <Card title="Durées de conservation" description="Priorité: surcharge pays, puis surcharge globale, puis défaut. Bornes: 30 à 3650 jours.">
             <Stack>
               <FilterBar
                 action="/compliance/retention"
-                label="Portee des durees de conservation"
+                label="Portée des durées de conservation"
                 submitLabel="Afficher"
                 resetLabel="Global"
                 resetHref="/compliance/retention"
                 activeCount={countryId ? 1 : 0}
                 autoSubmit
               >
-                <Field id="retention-scope" label="Portee">
+                <Field id="retention-scope" label="Portée">
                   <Select
                     {...fieldControlProps("retention-scope")}
                     name="countryId"
@@ -348,22 +348,22 @@ export default async function DataRetentionPage({ searchParams }: { searchParams
                 </Field>
               </FilterBar>
               <p>
-                Portee affichee: <strong>{countryId ? `pays ${countryLabel(countryId)}` : "global"}</strong>.
+                Portée affichée: <strong>{countryId ? `pays ${countryLabel(countryId)}` : "global"}</strong>.
               </p>
               <DataTable
                 columns={policyColumns}
                 items={policies.data.items}
                 getKey={(item) => item.category}
                 emptyLabel="Aucune politique disponible."
-                aria-label="Durees de conservation par categorie"
+                aria-label="Durées de conservation par catégorie"
               />
             </Stack>
           </Card>
 
           <Grid columns="two">
             <Card
-              title="Previsualiser un lot de retention"
-              description="Selectionne les donnees arrivees a echeance (500 au plus par categorie). Aucune donnee n'est modifiee a cette etape; le lot expire apres 24 heures. Les webhooks et references de messagerie ne sont selectionnes que par une previsualisation globale."
+              title="Prévisualiser un lot de rétention"
+              description="Sélectionne les données arrivées à échéance (500 au plus par catégorie). Aucune donnée n'est modifiée à cette étape; le lot expire après 24 heures. Les webhooks et références de messagerie ne sont sélectionnés que par une prévisualisation globale."
             >
               <Form action={previewRetention}>
                 <Field id="retention-preview-country" label="Pays (optionnel)">
@@ -375,7 +375,7 @@ export default async function DataRetentionPage({ searchParams }: { searchParams
                   />
                 </Field>
                 <CheckboxGroup
-                  legend="Categories (aucune cochee = toutes)"
+                  legend="Catégories (aucune cochée = toutes)"
                   name="categories"
                   options={RETENTION_CATEGORY_KEYS.map((category) => ({ value: category, label: CATEGORY_LABELS[category] }))}
                 />
@@ -385,18 +385,18 @@ export default async function DataRetentionPage({ searchParams }: { searchParams
                     name="reason"
                     minLength={8}
                     maxLength={500}
-                    placeholder="Motif de la previsualisation"
+                    placeholder="Motif de la prévisualisation"
                   />
                 </Field>
                 <FormActions>
-                  <Button type="submit" variant="secondary">Previsualiser</Button>
+                  <Button type="submit" variant="secondary">Prévisualiser</Button>
                 </FormActions>
               </Form>
             </Card>
 
             <Card
-              title="Previsualiser un effacement sur demande"
-              description="Pour une demande d'effacement recue par e-mail, telephone ou courrier. Les durees de conservation ne s'appliquent pas. L'adresse e-mail sert uniquement a la recherche: elle n'est ni enregistree sur le lot ni affichee sur cette page. Ne recopiez ni e-mail ni telephone dans le motif."
+              title="Prévisualiser un effacement sur demande"
+              description="Pour une demande d'effacement reçue par e-mail, téléphone ou courrier. Les durées de conservation ne s'appliquent pas. L'adresse e-mail sert uniquement à la recherche: elle n'est ni enregistrée sur le lot ni affichée sur cette page. Ne recopiez ni e-mail ni téléphone dans le motif."
             >
               <Form action={previewErasure}>
                 <RadioGroup
@@ -404,11 +404,11 @@ export default async function DataRetentionPage({ searchParams }: { searchParams
                   name="lookup"
                   defaultValue="public_reference"
                   options={[
-                    { value: "public_reference", label: "Reference publique de la demande" },
+                    { value: "public_reference", label: "Référence publique de la demande" },
                     { value: "email", label: "Adresse e-mail" }
                   ]}
                 />
-                <Field id="retention-erasure-identifier" label="Reference ou e-mail" required>
+                <Field id="retention-erasure-identifier" label="Référence ou e-mail" required>
                   <Input {...fieldControlProps("retention-erasure-identifier", { required: true })} name="identifier" autoComplete="off" maxLength={254} />
                 </Field>
                 <Field id="retention-erasure-reason" label="Motif" required>
@@ -417,11 +417,11 @@ export default async function DataRetentionPage({ searchParams }: { searchParams
                     name="reason"
                     minLength={8}
                     maxLength={500}
-                    placeholder="Motif (sans e-mail ni telephone)"
+                    placeholder="Motif (sans e-mail ni téléphone)"
                   />
                 </Field>
                 <FormActions>
-                  <Button type="submit" variant="secondary">Previsualiser l&apos;effacement</Button>
+                  <Button type="submit" variant="secondary">Prévisualiser l&apos;effacement</Button>
                 </FormActions>
               </Form>
             </Card>
@@ -429,14 +429,14 @@ export default async function DataRetentionPage({ searchParams }: { searchParams
 
           <Card
             title="Lots d'anonymisation"
-            description="Comptes et metadonnees uniquement: aucun identifiant de personne n'est affiche. Approuver un lot anonymise definitivement les donnees selectionnees."
+            description="Comptes et métadonnées uniquement: aucun identifiant de personne n'est affiché. Approuver un lot anonymise définitivement les données sélectionnées."
           >
             <DataTable
               columns={batchColumns}
               items={batchItems}
               getKey={(batch) => batch.id}
-              emptyLabel="Aucun lot previsualise."
-              emptyDescription="Previsualisez un lot de retention ou un effacement ci-dessus : il apparaitra ici pour approbation."
+              emptyLabel="Aucun lot prévisualisé."
+              emptyDescription="Prévisualisez un lot de rétention ou un effacement ci-dessus : il apparaîtra ici pour approbation."
               aria-label="Lots d'anonymisation"
             />
           </Card>

@@ -38,7 +38,7 @@ const sensitiveActions = ["suspend", "lock", "mfa-reset", "delete"];
 
 const TABS = [
   { key: "profil", label: "Profil et scopes" },
-  { key: "roles", label: "Roles" },
+  { key: "roles", label: "Rôles" },
   { key: "actions", label: "Actions sensibles" }
 ];
 
@@ -63,7 +63,7 @@ export default async function UserDetailPage({ params, searchParams }: UserDetai
     return (
       <PageStack>
         <PageHeader
-          breadcrumb={[{ label: "Plateforme" }, { label: "Utilisateurs", href: "/users" }, { label: "Detail" }]}
+          breadcrumb={[{ label: "Plateforme" }, { label: "Utilisateurs", href: "/users" }, { label: "Détail" }]}
           title="Utilisateur introuvable"
           actions={<Button href="/users" variant="secondary">Retour utilisateurs</Button>}
         />
@@ -89,17 +89,17 @@ export default async function UserDetailPage({ params, searchParams }: UserDetai
         }
       />
 
-      {notice ? <StateMessage>Action terminee: {notice}.</StateMessage> : null}
-      {result.forbidden ? <StateMessage tone="danger">Acces refuse pour ce profil utilisateur.</StateMessage> : null}
-      {result.status === "error" ? <StateMessage tone="warning">Detail indisponible: {result.error}.</StateMessage> : null}
+      {notice ? <StateMessage>Action terminée: {notice}.</StateMessage> : null}
+      {result.forbidden ? <StateMessage tone="danger">Accès refusé pour ce profil utilisateur.</StateMessage> : null}
+      {result.status === "error" ? <StateMessage tone="warning">Détail indisponible: {result.error}.</StateMessage> : null}
 
-      <Card title="Etat du compte">
+      <Card title="État du compte">
         <DescriptionList
           columns={2}
           items={[
             { term: "Statut", value: <StatusBadge status={user.status} tones={userStatusTones} /> },
             { term: "MFA", value: <StatusBadge status={user.mfaStatus} tones={mfaStatusTones} /> },
-            { term: "Echecs login", value: String(user.failedLoginCount ?? 0) },
+            { term: "Échecs login", value: String(user.failedLoginCount ?? 0) },
             { term: "Tenant", value: user.partnerTenantId ? <code className="bo-break">{user.partnerTenantId}</code> : "-" }
           ]}
         />
@@ -114,10 +114,10 @@ export default async function UserDetailPage({ params, searchParams }: UserDetai
         <Card title="Profil et scopes">
           <Form action={updateAdminUserProfileAction}>
             <input type="hidden" name="userId" value={user.id} />
-            <Field id="user-display-name" label="Nom affiche" required>
+            <Field id="user-display-name" label="Nom affiché" required>
               <Input {...fieldControlProps("user-display-name", { required: true })} name="displayName" defaultValue={user.displayName} />
             </Field>
-            <Field id="user-phone" label="Telephone E.164">
+            <Field id="user-phone" label="Téléphone E.164">
               <Input {...fieldControlProps("user-phone")} name="phone" defaultValue={user.phone ?? ""} />
             </Field>
             <Field id="user-country-scopes" label="Scopes pays">
@@ -130,18 +130,18 @@ export default async function UserDetailPage({ params, searchParams }: UserDetai
               <Textarea {...fieldControlProps("user-profile-reason", { required: true })} name="reason" minLength={5} />
             </Field>
             <FormActions>
-              <Button type="submit">Mettre a jour</Button>
+              <Button type="submit">Mettre à jour</Button>
             </FormActions>
           </Form>
         </Card>
       ) : null}
 
       {tab === "roles" ? (
-        <Card title="Roles">
+        <Card title="Rôles">
           <Form action={updateAdminUserRolesAction}>
             <input type="hidden" name="userId" value={user.id} />
             <CheckboxGroup
-              legend="Roles"
+              legend="Rôles"
               name="roles"
               options={adminRoleOptions.map((role) => ({ value: role, label: role }))}
               defaultValues={user.roles}
@@ -150,7 +150,7 @@ export default async function UserDetailPage({ params, searchParams }: UserDetai
               <Textarea {...fieldControlProps("user-roles-reason", { required: true })} name="reason" minLength={5} />
             </Field>
             <FormActions>
-              <Button type="submit">Mettre a jour les roles</Button>
+              <Button type="submit">Mettre à jour les rôles</Button>
             </FormActions>
           </Form>
         </Card>
@@ -182,7 +182,7 @@ export default async function UserDetailPage({ params, searchParams }: UserDetai
                   triggerLabel={`Confirmer ${action}`}
                   triggerVariant="danger"
                   title={`Confirmer ${action}`}
-                  description={`Cette action est auditee et s'applique immediatement au compte ${user.email}.`}
+                  description={`Cette action est auditée et s'applique immédiatement au compte ${user.email}.`}
                   confirmLabel={`Confirmer ${action}`}
                   cancelLabel="Annuler"
                   tone="danger"

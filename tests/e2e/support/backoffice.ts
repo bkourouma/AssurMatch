@@ -41,7 +41,7 @@ export async function activateWithMfa(page: Page, activationLink: string, passwo
   await page.locator("#activate-password").fill(password);
   await page.getByRole("button", { name: /Activer/u }).click();
   await page.waitForURL(/\/mfa/u);
-  await page.getByRole("button", { name: /Generer secret/u }).click();
+  await page.getByRole("button", { name: /G[ée]n[ée]rer secret/u }).click();
   const secretLine = page.getByText(/Secret TOTP/u);
   await expect(secretLine).toBeVisible();
   const secret = (await secretLine.locator("code").textContent())?.trim() ?? "";
@@ -94,7 +94,7 @@ export async function expectMfaPromptOnLogin(page: Page, account: BackOfficeAcco
   await submitPasswordStep(page, account, returnTo);
   await expect(page).toHaveURL(/\/mfa/u);
   await expect(page.locator("#mfa-code")).toBeVisible();
-  await expect(page.getByRole("button", { name: /Generer secret/u })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: /G[ée]n[ée]rer secret/u })).toHaveCount(0);
   await expect(page.getByLabel(TRUST_DEVICE_LABEL)).not.toBeChecked();
 }
 

@@ -8,6 +8,7 @@ import type { ComplianceAlertsData } from "./lib/admin-api";
 import { AttentionList, Badge, Button, Card, Cluster, DataTable, Form, FormActions, Grid, PageHeader, PageStack, StateMessage, StatStrip } from "./lib/ui/admin-ui";
 import type { DataTableColumn } from "./lib/ui/admin-ui";
 import { quoteStatusTones } from "./lib/ui/operations-tones";
+import { quoteStatusLabel } from "./lib/ui/operations-labels";
 import { dashboardAttention, dashboardStats, flagTone, sensitiveFeatureFlagKeys } from "./lib/ui/admin-view-models";
 
 export default async function AdminHomePage() {
@@ -19,7 +20,7 @@ export default async function AdminHomePage() {
         <PageHeader
           breadcrumb={[{ label: "Pilotage" }, { label: "Dashboard" }]}
           title="MFA requise"
-          description="L'acces admin reste bloque tant que la MFA n'est pas verifiee."
+          description="L'accès admin reste bloqué tant que la MFA n'est pas vérifiée."
         />
         <Form action={logoutAction}>
           <FormActions align="start">
@@ -34,8 +35,8 @@ export default async function AdminHomePage() {
       <PageStack>
         <PageHeader
           breadcrumb={[{ label: "Pilotage" }, { label: "Dashboard" }]}
-          title="Acces refuse"
-          description="Ce compte ne dispose pas d'un acces admin autorise."
+          title="Accès refusé"
+          description="Ce compte ne dispose pas d'un accès admin autorisé."
         />
         <Form action={logoutAction}>
           <FormActions align="start">
@@ -58,30 +59,30 @@ export default async function AdminHomePage() {
         description="Ce qui demande une action, puis les volumes de la fenêtre. Les modules sensibles restent contrôlés par les règles et flags existants."
       />
 
-      {health.forbidden ? <StateMessage tone="warning">Acces sante systeme refuse pour ce role admin.</StateMessage> : null}
-      {health.error && !health.forbidden ? <StateMessage tone="warning">Sante systeme indisponible: {health.error}</StateMessage> : null}
+      {health.forbidden ? <StateMessage tone="warning">Accès santé système refusé pour ce rôle admin.</StateMessage> : null}
+      {health.error && !health.forbidden ? <StateMessage tone="warning">Santé système indisponible: {health.error}</StateMessage> : null}
       {dashboard.forbidden ? (
-        <StateMessage tone="danger">Acces dashboard plateforme refuse pour ce role admin.</StateMessage>
+        <StateMessage tone="danger">Accès dashboard plateforme refusé pour ce rôle admin.</StateMessage>
       ) : dashboard.status === "error" ? (
-        <StateMessage tone="danger" title="Dashboard indisponible">L'API admin ne repond pas correctement: {dashboard.error}</StateMessage>
+        <StateMessage tone="danger" title="Dashboard indisponible">L'API admin ne répond pas correctement: {dashboard.error}</StateMessage>
       ) : (
         <>
-          <section aria-label="Dashboard plateforme synthese" className="bo-stack">
+          <section aria-label="Dashboard plateforme synthèse" className="bo-stack">
             <Card title="À traiter" description="Les files qui attendent une décision, les plus urgentes en premier.">
               <AttentionList items={dashboardAttention(dashboard.data)} />
             </Card>
             <StatStrip items={dashboardStats(dashboard.data)} label="Volumes et scope" />
           </section>
-          <Grid columns="two" as="section" aria-label="Activite recente">
+          <Grid columns="two" as="section" aria-label="Activité récente">
             <RecentQuoteRequests />
             <RecentAlerts />
           </Grid>
-          <section aria-label="Synthese conformite et flags sensibles">
+          <section aria-label="Synthèse conformité et flags sensibles">
             <Card title="Feature flags sensibles (lecture seule)">
               <Cluster>
                 {sensitiveFeatureFlagKeys.map((key) => {
                   const flag = dashboard.data.sensitiveFeatureFlags.find((item) => item.key === key);
-                  return <Badge key={key} tone={flagTone(flag?.value ?? false)}>{key}: {flag?.value ? "actif" : "desactive"}</Badge>;
+                  return <Badge key={key} tone={flagTone(flag?.value ?? false)}>{key}: {flag?.value ? "actif" : "désactivé"}</Badge>;
                 })}
               </Cluster>
             </Card>
@@ -93,8 +94,8 @@ export default async function AdminHomePage() {
 }
 
 const quoteColumns: Array<DataTableColumn<QuoteRequestRow>> = [
-  { key: "reference", header: "Reference", render: (row) => <a className="bo-ref" href={`/quote-requests/${encodeURIComponent(row.id)}`}>{row.publicReference}</a> },
-  { key: "status", header: "Statut", render: (row) => <Badge tone={quoteStatusTones[row.status] ?? "neutral"}>{row.status}</Badge> },
+  { key: "reference", header: "Référence", render: (row) => <a className="bo-ref" href={`/quote-requests/${encodeURIComponent(row.id)}`}>{row.publicReference}</a> },
+  { key: "status", header: "Statut", render: (row) => <Badge tone={quoteStatusTones[row.status] ?? "neutral"} title={row.status}>{quoteStatusLabel(row.status)}</Badge> },
   { key: "created", header: "Reçue le", render: (row) => formatDateTime(row.createdAt) }
 ];
 
@@ -139,7 +140,7 @@ async function RecentAlerts() {
         items={result.data.items}
         getKey={(row) => row.id}
         emptyLabel="Aucune alerte"
-        aria-label="Dernieres alertes conformite"
+        aria-label="Dernières alertes conformité"
       />
     </Card>
   );

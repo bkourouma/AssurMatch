@@ -86,7 +86,7 @@ async function acceptStarterLead(page: Page, account: BackOfficeAccount, assignm
   const accept = actions.getByRole("button", { name: "Accepter", exact: true });
   if ((await accept.count()) === 0) return;
   await accept.click();
-  await expect(page.getByText("Lead accepte.")).toBeVisible();
+  await expect(page.getByText("Lead accepté.")).toBeVisible();
 }
 
 /** Pro: moves the lead to the CRM status "Accepte" (the conversation opens on any status but "nouveau"). */

@@ -17,9 +17,9 @@ test("admin scoring page exposes weighted rules, offer validation and suspension
   expect(api).toContain("/validate");
   expect(api).toContain("/suspend");
   expect(page).toContain("Score indicatif et offres");
-  expect(page).toContain("ne designe jamais une meilleure offre");
+  expect(page).toContain("ne désigne jamais une meilleure offre");
   expect(forms).toContain("Poids (total 100)");
-  expect(forms).toContain("Motif (audite)");
+  expect(forms).toContain("Motif (audité)");
   expect(actions).toContain("doivent totaliser 100");
   expect(shell).toContain("/scoring");
 });

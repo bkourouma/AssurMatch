@@ -11,10 +11,10 @@ interface Props {
 
 /** Spec 061 FR-004: outcome of the acknowledgement server action. */
 const ALERT_NOTICES: Record<string, { tone: "success" | "warning" | "danger"; text: string }> = {
-  acknowledged: { tone: "success", text: "Alerte acquittee. L'acquittement et son motif sont audites." },
-  already: { tone: "warning", text: "Cette alerte etait deja acquittee." },
-  invalid: { tone: "warning", text: "Motif d'acquittement requis (8 caracteres minimum)." },
-  forbidden: { tone: "danger", text: "Acquittement reserve aux administrateurs plateforme et conformite (MFA requise)." },
+  acknowledged: { tone: "success", text: "Alerte acquittée. L'acquittement et son motif sont audités." },
+  already: { tone: "warning", text: "Cette alerte était déjà acquittée." },
+  invalid: { tone: "warning", text: "Motif d'acquittement requis (8 caractères minimum)." },
+  forbidden: { tone: "danger", text: "Acquittement réservé aux administrateurs plateforme et conformité (MFA requise)." },
   not_found: { tone: "warning", text: "Alerte introuvable." },
   error: { tone: "danger", text: "Acquittement indisponible pour le moment." }
 };
@@ -28,7 +28,7 @@ function detailsLabel(details: Record<string, string | number | boolean>): strin
   return entries.length === 0 ? "-" : entries.map(([key, value]) => `${key}: ${String(value)}`).join(", ");
 }
 
-const breadcrumb = [{ label: "Pilotage" }, { label: "Conformite", href: "/compliance" }, { label: "Alertes conformite" }];
+const breadcrumb = [{ label: "Pilotage" }, { label: "Conformité", href: "/compliance" }, { label: "Alertes conformité" }];
 
 export default async function ComplianceAlertsPage({ searchParams }: Props) {
   const session = await readBackOfficeSession();
@@ -43,7 +43,7 @@ export default async function ComplianceAlertsPage({ searchParams }: Props) {
   if (session.status !== "authenticated" || !isAdminProfile(session.profile)) {
     return (
       <PageStack>
-        <PageHeader breadcrumb={breadcrumb} title="Acces refuse" />
+        <PageHeader breadcrumb={breadcrumb} title="Accès refusé" />
       </PageStack>
     );
   }
@@ -57,14 +57,14 @@ export default async function ComplianceAlertsPage({ searchParams }: Props) {
   if (alerts.forbidden) {
     return (
       <PageStack>
-        <PageHeader breadcrumb={breadcrumb} title="Acces refuse" />
+        <PageHeader breadcrumb={breadcrumb} title="Accès refusé" />
       </PageStack>
     );
   }
   if (alerts.status === "error") {
     return (
       <PageStack>
-        <PageHeader breadcrumb={breadcrumb} title="Alertes conformite" />
+        <PageHeader breadcrumb={breadcrumb} title="Alertes conformité" />
         <StateMessage tone="warning">Alertes indisponibles: {alerts.error}</StateMessage>
       </PageStack>
     );
@@ -78,21 +78,21 @@ export default async function ComplianceAlertsPage({ searchParams }: Props) {
     <PageStack>
       <PageHeader
         breadcrumb={breadcrumb}
-        title="Alertes conformite"
-        description="Les alertes du worker a acquitter, puis le journal des evenements de conformite."
+        title="Alertes conformité"
+        description="Les alertes du worker à acquitter, puis le journal des événements de conformité."
         actions={center.status === "error" ? null : <Badge tone={center.data.open > 0 ? "warning" : "neutral"}>{`${center.data.open} ouverte${center.data.open > 1 ? "s" : ""}`}</Badge>}
       />
       {alertNotice ? <Notice tone={alertNotice.tone}>{alertNotice.text}</Notice> : null}
       <Card
         title="Centre d'alertes"
-        description="Licences J-60/J-30/J-7, offres expirees, pays publics sans courtier actif, leads non routes sur 24 h, taux de litige, worker inactif. Une alerte est levee une fois par jour et par cible ; l'acquittement exige un motif et est audite."
+        description="Licences J-60/J-30/J-7, offres expirées, pays publics sans courtier actif, leads non routés sur 24 h, taux de litige, worker inactif. Une alerte est levée une fois par jour et par cible ; l'acquittement exige un motif et est audité."
       >
         <section aria-label="Centre d'alertes" data-alerts-center className="bo-stack">
           <Tabs
             label="Filtre des alertes"
             items={[
               { label: "Ouvertes", href: "/dashboard/compliance-alerts?alertStatus=open", current: alertStatus === "open" },
-              { label: "Acquittees", href: "/dashboard/compliance-alerts?alertStatus=acknowledged", current: alertStatus === "acknowledged" },
+              { label: "Acquittées", href: "/dashboard/compliance-alerts?alertStatus=acknowledged", current: alertStatus === "acknowledged" },
               { label: "Toutes", href: "/dashboard/compliance-alerts?alertStatus=all", current: alertStatus === "all" }
             ]}
           />
@@ -101,19 +101,19 @@ export default async function ComplianceAlertsPage({ searchParams }: Props) {
           ) : (
             <DataTable
               columns={[
-                { key: "lastSeenAt", header: "Derniere detection", render: (item) => formatDateTime(item.lastSeenAt) },
+                { key: "lastSeenAt", header: "Dernière détection", render: (item) => formatDateTime(item.lastSeenAt) },
                 { key: "label", header: "Alerte", render: (item) => item.label },
-                { key: "severity", header: "Gravite", render: (item) => <StatusBadge status={item.severity} tones={SEVERITY_TONES} /> },
+                { key: "severity", header: "Gravité", render: (item) => <StatusBadge status={item.severity} tones={SEVERITY_TONES} /> },
                 { key: "status", header: "Statut", render: (item) => <StatusBadge status={item.status} tones={ALERT_STATUS_TONES} /> },
                 { key: "target", header: "Cible", render: (item) => <span className="bo-ref">{`${item.targetType}/${item.targetId ?? "-"}`}</span> },
-                { key: "details", header: "Details", render: (item) => detailsLabel(item.details) },
+                { key: "details", header: "Détails", render: (item) => detailsLabel(item.details) },
                 {
                   key: "action",
                   header: "Acquittement",
                   render: (item) => item.status === "open" ? (
                     <Form action={acknowledgeAlertAction} data-alert-ack={item.id}>
                       <input type="hidden" name="alertId" value={item.id} />
-                      <Input name="reason" aria-label="Motif d'acquittement (audite)" placeholder="Motif (audite)" minLength={8} required />
+                      <Input name="reason" aria-label="Motif d'acquittement (audité)" placeholder="Motif (audité)" minLength={8} required />
                       <FormActions>
                         <Button type="submit" size="sm" variant="secondary">Acquitter</Button>
                       </FormActions>
@@ -124,25 +124,25 @@ export default async function ComplianceAlertsPage({ searchParams }: Props) {
               items={center.data.items}
               getKey={(item) => item.id}
               emptyLabel="Aucune alerte pour ce filtre."
-              emptyDescription={alertStatus === "open" ? "Rien a acquitter : le worker n'a leve aucune alerte ouverte." : undefined}
+              emptyDescription={alertStatus === "open" ? "Rien à acquitter : le worker n'a levé aucune alerte ouverte." : undefined}
               aria-label="Centre d'alertes"
             />
           )}
         </section>
       </Card>
-      <Card title="Journal conformite" description={`Evenements traces (consentement, RBAC, CRM ferme, inter-tenant). Page ${data.page} sur ${lastPage}.`}>
+      <Card title="Journal conformité" description={`Événements tracés (consentement, RBAC, CRM fermé, inter-tenant). Page ${data.page} sur ${lastPage}.`}>
         <DataTable
           columns={[
             { key: "occurredAt", header: "Date", render: (item) => formatDateTime(item.occurredAt) },
-            { key: "category", header: "Categorie", render: (item) => item.category },
+            { key: "category", header: "Catégorie", render: (item) => item.category },
             { key: "reason", header: "Raison", render: (item) => item.reason },
             { key: "target", header: "Cible", render: (item) => `${item.targetType}/${item.targetId ?? "-"}` },
             { key: "tenant", header: "Tenant", render: (item) => (item.partnerTenantId ? <span className="bo-ref">{item.partnerTenantId}</span> : "-") }
           ]}
           items={data.items}
           getKey={(item) => item.id}
-          emptyLabel="Aucune alerte conformite dans la fenetre."
-          aria-label="Alertes conformite"
+          emptyLabel="Aucune alerte conformité dans la fenêtre."
+          aria-label="Alertes conformité"
           pagination={{
             page: data.page,
             pageSize: data.pageSize,

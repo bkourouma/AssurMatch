@@ -4,6 +4,7 @@ import { useActionState } from "react";
 import type { AdminProspectListItem } from "../../../../packages/shared/contracts/admin-operations.contracts";
 import { Badge, Button, Card, DataTable, Field, Form, FormActions, Input, StateMessage, fieldControlProps, type DataTableColumn } from "../lib/ui/admin-ui";
 import { searchProspectsByContactAction, type ProspectContactSearchState } from "./search-action";
+import { productLabel } from "../lib/ui/operations-labels";
 
 /**
  * Spec 073 x lot 8: exact e-mail / phone search. The value goes to the server action in the POST
@@ -19,21 +20,21 @@ function day(value: string | null | undefined): string {
 
 const columns: Array<DataTableColumn<AdminProspectListItem>> = [
   { key: "name", header: "Nom", render: (row) => row.displayName ?? "-" },
-  { key: "email", header: "E-mail (masque)", render: (row) => row.email ?? "-" },
-  { key: "phone", header: "Telephone (masque)", render: (row) => row.phone ?? "-" },
-  { key: "scope", header: "Pays / produit", render: (row) => `${row.countryCode ?? "-"} / ${row.productKey ?? "-"}` },
+  { key: "email", header: "E-mail (masqué)", render: (row) => row.email ?? "-" },
+  { key: "phone", header: "Téléphone (masqué)", render: (row) => row.phone ?? "-" },
+  { key: "scope", header: "Pays / produit", render: (row) => `${row.countryCode ?? "-"} / ${productLabel(row.productKey)}` },
   { key: "quotes", header: "Demandes de devis", render: (row) => row.quoteRequestCount, numeric: true, align: "right" },
-  { key: "state", header: "Etat", render: (row) => (row.anonymized ? <Badge tone="neutral">Anonymise</Badge> : <Badge tone="success">Actif</Badge>) },
-  { key: "created", header: "Cree le", render: (row) => day(row.createdAt) }
+  { key: "state", header: "État", render: (row) => (row.anonymized ? <Badge tone="neutral">Anonymisé</Badge> : <Badge tone="success">Actif</Badge>) },
+  { key: "created", header: "Créé le", render: (row) => day(row.createdAt) }
 ];
 
 export function ProspectContactSearch() {
   const [state, formAction, pending] = useActionState(searchProspectsByContactAction, initialState);
   return (
     <>
-      <Card title="Recherche par e-mail ou telephone" description="Correspondance exacte. La valeur saisie est envoyee dans le corps de la requete, jamais dans l'adresse de la page, et n'est ni conservee ni journalisee.">
+      <Card title="Recherche par e-mail ou téléphone" description="Correspondance exacte. La valeur saisie est envoyée dans le corps de la requête, jamais dans l'adresse de la page, et n'est ni conservée ni journalisée.">
         <Form action={formAction} data-prospect-contact-search="073">
-          <Field id="prospect-contact" label="E-mail ou telephone exact">
+          <Field id="prospect-contact" label="E-mail ou téléphone exact">
             <Input {...fieldControlProps("prospect-contact")} name="contact" type="search" autoComplete="off" maxLength={200} placeholder="+2250102030405" />
           </Field>
           <FormActions>
@@ -47,16 +48,16 @@ export function ProspectContactSearch() {
       ) : null}
 
       {state.status === "success" ? (
-        <Card as="section" aria-label="Prospects trouves par e-mail ou telephone" title={`${state.result.total} prospect(s) pour ce contact`}>
+        <Card as="section" aria-label="Prospects trouvés par e-mail ou téléphone" title={`${state.result.total} prospect(s) pour ce contact`}>
           <DataTable
             columns={columns}
             items={state.result.items}
             getKey={(row) => row.id}
             getRowHref={(row) => `/prospects/${row.id}`}
             emptyLabel="Aucun prospect pour ce contact."
-            aria-label="Prospects trouves par contact"
+            aria-label="Prospects trouvés par contact"
           />
-          {state.result.total > state.result.items.length ? <StateMessage>Seuls les {state.result.items.length} plus recents sont affiches.</StateMessage> : null}
+          {state.result.total > state.result.items.length ? <StateMessage>Seuls les {state.result.items.length} plus récents sont affichés.</StateMessage> : null}
         </Card>
       ) : null}
     </>

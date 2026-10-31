@@ -28,7 +28,7 @@ test("admin auth client exposes login MFA source markers", () => {
   expect(api).toContain("/auth/activate");
   expect(api).toContain("/auth/password-reset");
   expect(login).toContain("Activation requise");
-  expect(login).toContain("Compte verrouille");
+  expect(login).toContain("Compte verrouillé");
   expect(login).toContain("Compte suspendu");
   expect(login).toContain("/activate");
   expect(flow).toContain("ActivationForm");

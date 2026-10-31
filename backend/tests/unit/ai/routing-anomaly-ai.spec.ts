@@ -104,7 +104,7 @@ describe("Routing Anomaly AI Insight (admin_platform)", () => {
     expect(completed.status).toBe("completed");
     expect(completed.disclaimer).toBe(AI_ASSISTANCE_DISCLAIMER);
     expect(completed.humanValidationStatus).toBe("pending");
-    expect(completed.outputText).toContain("Analyse indicative du routage: 2 anomalie(s) detectee(s)");
+    expect(completed.outputText).toContain("Analyse indicative du routage: 2 anomalie(s) détectée(s)");
     expect(completed.outputText).toContain("1 critique(s)");
   });
 

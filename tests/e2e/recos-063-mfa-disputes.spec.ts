@@ -224,7 +224,7 @@ test("DSP-01 Starter : le titulaire conteste un lead depuis sa fiche ; statut «
   await dialog.locator("#dispute-reason").selectOption("lead_quality");
   await dialog.locator("#dispute-comment").fill("Coordonnées incohérentes (E2E 063)");
   await dialog.getByRole("button", { name: "Contester le lead" }).last().click();
-  await expect(page.getByText("Contestation enregistree et historisee")).toBeVisible();
+  await expect(page.getByText("Contestation enregistrée et historisée")).toBeVisible();
 
   const status = card(page, "Contestation de ce lead");
   await expect(status).toContainText("Ouverte");
@@ -304,25 +304,25 @@ test("DSP-03 la finance prépare les voies de crédit : tarifs Starter et Pro, b
     await tariff.locator("#billing-per-lead").fill(price.perLead);
     await tariff.locator("#billing-plan-reason").fill(`Tarif ${price.plan} CI (E2E 063)`);
     await tariff.getByRole("button", { name: "Enregistrer le tarif" }).click();
-    await expect(admin.getByText("Tarif de plan enregistre et audite.")).toBeVisible();
+    await expect(admin.getByText("Tarif de plan enregistré et audité.")).toBeVisible();
   }
 
   await admin.goto(`${e2eEnv.adminUrl}/billing?tab=brouillons`);
   const drafts = card(admin, "Brouillons mensuels non facturables");
   await drafts.locator("#billing-draft-reason").fill("Brouillons avant décisions de contestation (E2E 063)");
   await drafts.getByRole("button", { name: "Recalculer les brouillons" }).click();
-  await expect(admin.getByText(/Brouillons recalcules/u)).toBeVisible();
+  await expect(admin.getByText(/Brouillons recalculés/u)).toBeVisible();
 
   // Pro firm: the month is invoiced BEFORE its dispute is decided -> partial credit note path.
   await admin.goto(`${e2eEnv.adminUrl}/billing?tab=factures`);
-  const issue = card(admin, "Emettre la facture d'un brouillon");
+  const issue = card(admin, "Émettre la facture d'un brouillon");
   const option = issue.locator("#invoice-draft option").filter({ hasText: pro.partnerName }).first();
   await expect(option).toHaveCount(1);
   await issue.locator("#invoice-draft").selectOption((await option.getAttribute("value")) as string);
   await issue.locator("#invoice-reason").fill("Facture mensuelle avant avoir de contestation (E2E 063)");
-  await issue.getByRole("button", { name: "Emettre la facture" }).click();
-  await expect(admin.getByText("Facture numerotee emise, PDF archive et courtier notifie.")).toBeVisible();
-  const row = card(admin, "Factures B2B numerotees").getByRole("row").filter({ hasText: pro.partnerName }).first();
+  await issue.getByRole("button", { name: "Émettre la facture" }).click();
+  await expect(admin.getByText("Facture numérotée émise, PDF archivé et courtier notifié.")).toBeVisible();
+  const row = card(admin, "Factures B2B numérotées").getByRole("row").filter({ hasText: pro.partnerName }).first();
   const invoiceNumber = ((await row.innerText()).match(/CI-\d{4}-\d{6}/u) ?? [])[0] as string;
   expect(invoiceNumber, "numbered invoice of the Pro firm").toBeTruthy();
   pro.data.invoiceNumber = invoiceNumber;
@@ -386,7 +386,7 @@ test("DSP-04 la finance lit la liste et le détail, refuse un motif trop court, 
   await admin.goto(`${e2eEnv.adminUrl}/billing?tab=brouillons`);
   const draftTable = card(admin, "Brouillons mensuels non facturables").getByRole("table");
   const columns = await draftTable.getByRole("columnheader").allInnerTexts();
-  const creditedColumn = columns.findIndex((header) => /Contestations creditees/iu.test(header));
+  const creditedColumn = columns.findIndex((header) => /Contestations créditées/iu.test(header));
   expect(creditedColumn, "column of credited disputes").toBeGreaterThanOrEqual(0);
   const draftCells = await draftTable.getByRole("row").filter({ hasText: starter.partnerName }).first().getByRole("cell").allInnerTexts();
   expect(draftCells[creditedColumn]?.trim(), "the refreshed draft credits the accepted dispute").toBe("1");
@@ -471,8 +471,8 @@ test("DSP-05 les courtiers voient statut, motif de décision et crédit, la noti
   await expect(proStatus.getByRole("link", { name: "Télécharger l'avoir (PDF)" })).toBeVisible();
   await proPage.goto(`${e2eEnv.brokerUrl}/billing`);
   await expect(card(proPage, "Contestations").getByRole("row").filter({ hasText: p.refA })).toContainText(`Avoir partiel émis`);
-  await expect(card(proPage, "Releve de compte")).toContainText(`Avoir ${creditNote} (contestation, facture ${pro.data.invoiceNumber})`);
-  await expect(card(proPage, "Releve de compte")).not.toContainText(/Avoir CI-AV-\d{4}-\d{5,} \(annule/u);
+  await expect(card(proPage, "Relevé de compte")).toContainText(`Avoir ${creditNote} (contestation, facture ${pro.data.invoiceNumber})`);
+  await expect(card(proPage, "Relevé de compte")).not.toContainText(/Avoir CI-AV-\d{4}-\d{5,} \(annule/u);
   await proPage.context().close();
 
   // Idempotence (finance token): same decision -> same credit note; the other decision -> 409; no second note.
@@ -492,7 +492,7 @@ test("DSP-05 les courtiers voient statut, motif de décision et crédit, la noti
 
   const proBroker = await brokerPage(browser);
   await openAs(proBroker, pro.owner, "/billing");
-  const statement = await card(proBroker, "Releve de compte").innerText();
+  const statement = await card(proBroker, "Relevé de compte").innerText();
   expect(new Set(statement.match(/CI-AV-\d{4}-\d{5,}/gu) ?? []).size, "exactly one credit note after the replay").toBe(1);
   await proBroker.context().close();
   await admin.context().close();

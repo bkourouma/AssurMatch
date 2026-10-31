@@ -8,10 +8,10 @@ function source(path: string): string {
 test("a shared lead is disclosed to its partner without revealing the co-recipients", () => {
   const detail = source("apps/broker/app/crm/leads/[leadAssignmentId]/page.tsx");
 
-  expect(detail).toContain("Exclusivite");
-  expect(detail).toContain("Lead partage avec");
-  expect(detail).toContain("tarif reduit");
-  expect(detail).toContain("L'identite des autres courtiers n'est pas communiquee");
+  expect(detail).toContain("Exclusivité");
+  expect(detail).toContain("Lead partagé avec");
+  expect(detail).toContain("tarif réduit");
+  expect(detail).toContain("L'identité des autres courtiers n'est pas communiquée");
   expect(detail).toContain("Lead exclusif");
 });
 

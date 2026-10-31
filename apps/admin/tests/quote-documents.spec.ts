@@ -8,7 +8,7 @@ test("admin quote request detail lists prospect documents as metadata only", () 
   expect(api).toContain("readAdminQuoteDocuments");
   expect(api).toContain("/documents");
   expect(page).toContain("Documents du prospect");
-  expect(page).toContain("metadonnees uniquement");
+  expect(page).toContain("métadonnées uniquement");
   expect(page).not.toContain("storageKey");
   expect(page).not.toContain("download");
 });

@@ -13,7 +13,7 @@ const columns: Array<DataTableColumn<RoutingHistoryRow>> = [
   { key: "date", header: "Date", render: (row) => formatDateTime(row.createdAt) },
   { key: "request", header: "Demande", render: (row) => <a href={`/quote-requests/${row.quoteRequestId}`}><span className="bo-ref">{row.publicReference ?? row.quoteRequestId.slice(0, 8)}</span></a> },
   { key: "scope", header: "Pays / produit", render: (row) => `${row.countryCode ?? "-"} / ${row.productKey ?? "-"}` },
-  { key: "result", header: "Resultat", render: (row) => <Badge tone={routingResultTones[row.result] ?? "neutral"}>{row.result}</Badge> },
+  { key: "result", header: "Résultat", render: (row) => <Badge tone={routingResultTones[row.result] ?? "neutral"}>{row.result}</Badge> },
   { key: "candidates", header: "Candidats", render: (row) => row.candidateCount, numeric: true, align: "right" },
   { key: "selected", header: "Retenus", render: (row) => row.selectedPartners.map((partner) => partner.legalName ?? partner.partnerTenantId.slice(0, 8)).join(", ") || "-" },
   {
@@ -37,16 +37,16 @@ export default async function RoutingHistoryPage({ searchParams }: { searchParam
       <PageHeader
         breadcrumb={[{ label: "Catalogue" }, { label: "Routage", href: "/routing" }, { label: "Historique" }]}
         title="Historique de routage"
-        description="Decisions de routage journalisees, y compris les refus : courtiers partenaires retenus, candidats exclus et raisons."
+        description="Décisions de routage journalisées, y compris les refus : courtiers partenaires retenus, candidats exclus et raisons."
         actions={<Button href="/routing/anomalies" variant="secondary">Anomalies de routage</Button>}
       />
 
       {result.status === "unauthenticated" ? <StateMessage tone="danger">Session admin requise.</StateMessage> : null}
-      {result.status === "forbidden" ? <StateMessage tone="danger">Historique de routage non accessible pour ce role admin.</StateMessage> : null}
+      {result.status === "forbidden" ? <StateMessage tone="danger">Historique de routage non accessible pour ce rôle admin.</StateMessage> : null}
       {result.status === "error" ? <StateMessage tone="danger">Historique indisponible : {result.error}</StateMessage> : null}
 
-      <FilterBar action="/routing/history" label="Filtres historique de routage" submitLabel="Filtrer" resetLabel="Reinitialiser" resetHref="/routing/history" activeCount={Object.values(filters).filter(Boolean).length}>
-        <Field id="rh-result" label="Resultat">
+      <FilterBar action="/routing/history" label="Filtres historique de routage" submitLabel="Filtrer" resetLabel="Réinitialiser" resetHref="/routing/history" activeCount={Object.values(filters).filter(Boolean).length}>
+        <Field id="rh-result" label="Résultat">
           <Select {...fieldControlProps("rh-result")} name="result" defaultValue={filters.result ?? ""}>
             <option value="">Tous</option>
             <option value="assigned">assigned</option>
@@ -70,15 +70,15 @@ export default async function RoutingHistoryPage({ searchParams }: { searchParam
         columns={columns}
         items={result.data.items}
         getKey={(row) => row.id}
-        emptyLabel="Aucune decision de routage pour ces filtres."
-        emptyDescription="Elargissez la periode ou reinitialisez les filtres."
-        aria-label="Historique des decisions de routage"
+        emptyLabel="Aucune décision de routage pour ces filtres."
+        emptyDescription="Élargissez la période ou réinitialisez les filtres."
+        aria-label="Historique des décisions de routage"
         pagination={{
           page,
           pageSize: result.data.pageSize,
           total: result.data.total,
           hrefFor: (target) => pageHref("/routing/history", filters, target),
-          label: (from, to, total) => `${from}-${to} sur ${total} decisions`
+          label: (from, to, total) => `${from}-${to} sur ${total} décisions`
         }}
       />
     </PageStack>

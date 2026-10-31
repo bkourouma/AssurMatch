@@ -29,6 +29,7 @@ import {
   disputeReasonLabel
 } from "../lib/dispute-vocabulary";
 import type { AdminApiState, AdminLeadDispute, AdminLeadDisputeList } from "../lib/admin-api";
+import { productLabel } from "../lib/ui/operations-labels";
 
 /** Filters of the disputes tab, as typed in the query string (dates are `YYYY-MM-DD`). */
 export interface DisputeTabFilters {
@@ -193,7 +194,7 @@ function DisputeDetail({ detail, canDecide, backHref }: { detail: AdminApiState<
         items={[
           { term: "Référence du lead", value: <code>{dispute.publicReference ?? dispute.leadAssignmentId}</code> },
           { term: "Cabinet", value: dispute.partnerName ?? dispute.partnerTenantId },
-          { term: "Pays / produit", value: `${dispute.countryCode ?? "-"} / ${dispute.productKey ?? "-"}` },
+          { term: "Pays / produit", value: `${dispute.countryCode ?? "-"} / ${productLabel(dispute.productKey)}` },
           { term: "Origine", value: DISPUTE_SOURCE_LABELS[dispute.source] ?? dispute.source },
           { term: "Lead reçu le", value: day(dispute.assignedAt) },
           { term: "Contestation déposée le", value: day(dispute.createdAt) },

@@ -13,16 +13,16 @@ export function DevAccountPicker({ returnTo }: DevAccountPickerProps) {
   const formRef = useRef<HTMLFormElement>(null);
 
   return (
-    <Card as="section" aria-label="Connexion locale demo" title="Mode local" muted>
+    <Card as="section" aria-label="Connexion locale démo" title="Mode local" muted>
       <Form ref={formRef} action={devDemoLoginAction}>
         <input type="hidden" name="returnTo" value={returnTo} />
         <Field
           id="dev-demo-account"
-          label="Compte demo"
-          hint="Disponible uniquement en local avec les donnees demo seed."
+          label="Compte démo"
+          hint="Disponible uniquement en local avec les données démo seed."
         >
           <Select
-            {...fieldControlProps("dev-demo-account", { hint: "Disponible uniquement en local avec les donnees demo seed." })}
+            {...fieldControlProps("dev-demo-account", { hint: "Disponible uniquement en local avec les données démo seed." })}
             name="demoEmail"
             defaultValue=""
             onChange={(event) => {

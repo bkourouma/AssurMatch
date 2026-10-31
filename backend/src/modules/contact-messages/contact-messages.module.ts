@@ -159,7 +159,7 @@ export class ContactMessagesService {
     return {
       status: "received",
       publicReference: record.publicReference,
-      message: "Votre message a bien ete recu et sera lu par notre equipe."
+      message: "Votre message a bien été reçu et sera lu par notre équipe."
     };
   }
 

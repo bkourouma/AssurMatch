@@ -68,13 +68,13 @@ test("F1-03 la console admin des demandes signale la seconde en possible_duplica
   await rowWith(admin, second.reference).getByRole("link").first().click();
   await admin.waitForURL(/\/quote-requests\/[0-9a-f-]{36}/u);
   await expect(admin.getByText(second.reference).first()).toBeVisible();
-  await expect(admin.getByText(/possible_duplicate/u).first()).toBeVisible();
+  await expect(admin.getByText(/Doublon possible/u).first()).toBeVisible();
   // The request is not blocked as a duplicate: it was routed like any other.
-  await expect(admin.getByText("duplicate", { exact: true })).toHaveCount(0);
+  await expect(admin.getByText(/Doublon bloqué/u)).toHaveCount(0);
 
   await openAs(admin, superAdminAccount(), `/quote-requests?reference=${encodeURIComponent(first.reference)}`);
   await rowWith(admin, first.reference).getByRole("link").first().click();
   await admin.waitForURL(/\/quote-requests\/[0-9a-f-]{36}/u);
-  await expect(admin.getByText(/possible_duplicate/u)).toHaveCount(0);
+  await expect(admin.getByText(/Doublon possible/u)).toHaveCount(0);
   await admin.context().close();
 });

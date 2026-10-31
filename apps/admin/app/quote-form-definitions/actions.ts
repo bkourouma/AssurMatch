@@ -70,7 +70,7 @@ export async function createQuoteFormDefinitionAction(_previous: QuoteFormAction
       reason: stringValue(formData.get("reason"))
     });
     revalidatePath("/quote-form-definitions");
-    return { status: "success", message: `Brouillon cree: ${form.id}. Il n'est pas encore expose aux visiteurs.` };
+    return { status: "success", message: `Brouillon créé: ${form.id}. Il n'est pas encore exposé aux visiteurs.` };
   } catch (error) {
     return actionError(error);
   }
@@ -80,7 +80,7 @@ export async function publishQuoteFormDefinitionAction(_previous: QuoteFormActio
   try {
     const form = await publishQuoteFormDefinition(stringValue(formData.get("formId")), stringValue(formData.get("reason")));
     revalidatePath("/quote-form-definitions");
-    return { status: "success", message: `Version ${form.version} publiee. Toute version precedente pour ce pays/produit/langue est retiree.` };
+    return { status: "success", message: `Version ${form.version} publiée. Toute version précédente pour ce pays/produit/langue est retirée.` };
   } catch (error) {
     return actionError(error);
   }
@@ -90,7 +90,7 @@ export async function retireQuoteFormDefinitionAction(_previous: QuoteFormAction
   try {
     const form = await retireQuoteFormDefinition(stringValue(formData.get("formId")), stringValue(formData.get("reason")));
     revalidatePath("/quote-form-definitions");
-    return { status: "success", message: `Version ${form.version} retiree. Le formulaire n'est plus expose aux visiteurs.` };
+    return { status: "success", message: `Version ${form.version} retirée. Le formulaire n'est plus exposé aux visiteurs.` };
   } catch (error) {
     return actionError(error);
   }

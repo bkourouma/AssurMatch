@@ -52,7 +52,7 @@ test("conversion and refusal are compliance only and conversion opens the new pa
   const forms = source("apps/admin/app/partners/applications/application-forms.tsx");
   expect(forms).toContain("data-compliance-only=\"application-convert\"");
   expect(forms).toContain("data-compliance-only=\"application-reject\"");
-  expect(forms).toContain("label=\"Motif (audite)\"");
+  expect(forms).toContain("label=\"Motif (audité)\"");
   expect(forms).toContain("name=\"rejectionReasonCode\"");
   expect(forms).not.toContain("assurmatch_admin_token");
 });

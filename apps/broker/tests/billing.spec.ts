@@ -16,7 +16,7 @@ test("broker billing page is available to every plan and lists invoices, balance
   expect(api).toContain("/broker/billing/account");
   expect(api).toContain("/broker/billing/statement");
   expect(page).toContain("Facturation du cabinet");
-  expect(page).toContain("Solde a regler");
+  expect(page).toContain("Solde à régler");
   expect(page).toContain("Factures et avoirs");
   expect(page).toContain("Packs de leads");
   expect(page).toContain("/billing/invoices/${invoice.id}/pdf");

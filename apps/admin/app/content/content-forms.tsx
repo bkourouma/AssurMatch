@@ -203,7 +203,7 @@ const workflowCopy = {
 const workflowHelp: Record<keyof typeof workflowCopy, string> = {
   submit: "Le contenu est contrôlé (texte brut, formulations réglementées) puis attend un second acteur.",
   withdraw: "Le contenu redevient un brouillon modifiable.",
-  approve: "Publie le contenu sur le site public. La version publiée précédente de la même clé est archivée dans la même opération.",
+  approve: "Publié le contenu sur le site public. La version publiée précédente de la même clé est archivée dans la même opération.",
   reject: "Le contenu redevient un brouillon ; le motif est conservé dans la traçabilité.",
   archive: "Le contenu n'est plus affiché sur le site public, qui retombe sur son texte d'origine.",
   revise: "Crée un brouillon de version suivante ; la version publiée reste en ligne jusqu'à l'approbation de la nouvelle."

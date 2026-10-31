@@ -12,8 +12,8 @@ test("broker CRM AI panel is gated by assistance status and keeps humans in cont
   const crm = source("apps/broker/app/crm/page.tsx");
 
   expect(panel).toContain("if (!enabled) return null");
-  expect(panel).toContain("Suggestions IA a valider");
-  expect(panel).toContain("le courtier decide");
+  expect(panel).toContain("Suggestions IA à valider");
+  expect(panel).toContain("le courtier décide");
   expect(panel).toContain("Valider la suggestion");
   expect(detail).toContain("readCrmLeadDetail(leadAssignmentId)");
   expect(detail).toContain("listLeadAiInteractions(leadAssignmentId)");

@@ -82,18 +82,18 @@ test("AI-02 une clé API partenaire est créée : le secret n'est affiché qu'un
   await form.locator("input[name='name']").fill(`Cle E2E ${suffix}`);
   await form.locator("input[name='scopes'][value='leads:read_assigned']").check();
   await fillReason(form, REASON);
-  await form.getByRole("button", { name: "Creer la cle API" }).click();
+  await form.getByRole("button", { name: "Créer la clé API" }).click();
 
-  await expect(form.getByText("n'est affiche qu'une seule fois")).toBeVisible();
+  await expect(form.getByText("n'est affiché qu'une seule fois")).toBeVisible();
   const rawKey = ((await form.locator("code[data-secret-value='true']").textContent()) ?? "").trim();
   expect(rawKey).toMatch(/^am_pk_/u);
 
   // After a reload the secret is gone from the page; only the non-secret prefix is listed.
   await page.reload();
-  await expect(page.getByText("n'est affiche qu'une seule fois")).toHaveCount(0);
+  await expect(page.getByText("n'est affiché qu'une seule fois")).toHaveCount(0);
   await expect(page.locator("[data-secret-value]")).toHaveCount(0);
   expect(await page.content()).not.toContain(rawKey);
-  const row = page.getByRole("table", { name: "Cles API partenaires" }).getByRole("row").filter({ hasText: `Cle E2E ${suffix}` });
+  const row = page.getByRole("table", { name: "Clés API partenaires" }).getByRole("row").filter({ hasText: `Cle E2E ${suffix}` });
   await expect(row).toContainText(rawKey.slice(0, 16));
   await expect(row).toContainText("leads:read_assigned");
 
@@ -122,9 +122,9 @@ test("AI-03 un endpoint webhook est créé (désactivé, secret une seule fois) 
   await form.locator("input[name='url']").fill(url);
   await form.locator("input[name='eventTypes'][value='lead.assigned']").check();
   await fillReason(form, REASON);
-  await form.getByRole("button", { name: "Creer l'endpoint" }).click();
+  await form.getByRole("button", { name: "Créer l'endpoint" }).click();
 
-  await expect(form.getByText("n'est affiche qu'une seule fois")).toBeVisible();
+  await expect(form.getByText("n'est affiché qu'une seule fois")).toBeVisible();
   const signingSecret = ((await form.locator("code[data-secret-value='true']").textContent()) ?? "").trim();
   expect(signingSecret).toMatch(/^whsec_/u);
 
@@ -134,11 +134,11 @@ test("AI-03 un endpoint webhook est créé (désactivé, secret une seule fois) 
   const row = page.getByRole("table", { name: "Endpoints webhook" }).getByRole("row").filter({ hasText: url });
   await expect(row).toBeVisible();
   // Created disabled: nothing is sent until an operator activates it, and the flag is closed anyway.
-  await expect(row).toContainText(/disabled|desactive|inactif/iu);
+  await expect(row).toContainText(/disabled|désactiv|inactif/iu);
 
   // The test send from the screen is refused, with the flag named in the notice.
   const testForm = row.locator("form[data-integration-form='webhook-endpoint-test']");
-  await testForm.getByRole("button", { name: "Envoyer un evenement de test" }).click();
+  await testForm.getByRole("button", { name: "Envoyer un événement de test" }).click();
   await expect(testForm.locator(".bo-notice[data-tone='danger']").first()).toContainText("partner_webhooks_enabled");
 
   // Same answer from the API, and no delivery row is created.
