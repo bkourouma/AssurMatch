@@ -217,7 +217,7 @@ export function starterEventLabel(value?: string | undefined): string {
 
 export function crmStatusLabel(value?: string | undefined): string {
   if (!value) return "-";
-  return CRM_STATUS_LABELS[value as CrmPipelineStatus] ?? value;
+  return CRM_STATUS_LABELS[value as CrmPipelineStatus] ?? STARTER_STATUS_LABELS[value] ?? value; // statut d'affectation hors pipeline CRM (assigned, seen...): libellé Starter partagé
 }
 
 export function crmReasonLabel(value?: string | undefined): string {
