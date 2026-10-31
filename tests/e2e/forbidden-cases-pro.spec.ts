@@ -117,7 +117,7 @@ test("SC-10-LIC-3 la tâche planifiée lève l'alerte conformité, notifie le co
 
   const broker = await appPage(browser, e2eEnv.brokerUrl);
   await openAs(broker, world.owner, "/notifications");
-  const inbox = card(broker, "Boite de reception");
+  const inbox = card(broker, "Boîte de réception");
   await expect(inbox).toContainText("Licence bientôt expirée");
   await expect(inbox).toContainText(`expire le ${expiresOn}`);
   await broker.context().close();
@@ -208,7 +208,7 @@ test("SC-10-WD-1 un lead est transmis puis accepté par le courtier ; la preuve 
   await expect(card(broker, "Contact consenti")).toContainText(quote.email);
   await expect(card(broker, "Contact consenti")).toContainText(quote.phone);
   await card(broker, "Actions Starter").getByRole("button", { name: "Accepter", exact: true }).click();
-  await expect(card(broker, "Informations utiles")).toContainText("Accepte");
+  await expect(card(broker, "Informations utiles")).toContainText("Accepté");
   await expect(card(broker, "Actions Starter").getByRole("button", { name: "Clôturer" }).first()).toBeVisible();
   await broker.context().close();
   saveWorld(WITHDRAWAL_WORLD, world);
@@ -286,29 +286,29 @@ test("SC-10-WD-4 côté courtier : lead clôturé, coordonnées masquées, actio
 
   const broker = await appPage(browser, e2eEnv.brokerUrl);
   await openAs(broker, world.owner, `/leads/${world.data.assignmentId}`);
-  await expect(card(broker, "Informations utiles")).toContainText("Cloture");
+  await expect(card(broker, "Informations utiles")).toContainText("Clôturé");
 
   // Product rule (spec 055 FR-001 / LeadContactPolicy): the contact is masked for the broker after a withdrawal.
   const contact = card(broker, "Contact consenti");
-  await expect(contact).toContainText("a retire son consentement");
+  await expect(contact).toContainText("a retiré son consentement");
   await expect(contact).toContainText(`${localPart.slice(0, 2)}***@${domain}`);
   await expect(contact).not.toContainText(visitorEmail);
   await expect(contact).not.toContainText(world.data.leadPhone as string);
 
   // Closed lead: no broker action, no new proposal.
   const actions = card(broker, "Actions Starter");
-  await expect(actions).toContainText("Ce lead est cloture");
+  await expect(actions).toContainText("Ce lead est clôturé");
   await expect(actions.getByRole("button", { name: "Accepter", exact: true })).toHaveCount(0);
   await expect(actions.getByRole("button", { name: "Clôturer" })).toHaveCount(0);
   const reply = card(broker, "Répondre au visiteur");
-  await expect(reply).toContainText("a retire son consentement : aucune proposition ne peut etre envoyee");
+  await expect(reply).toContainText("a retiré son consentement : aucune proposition ne peut être envoyée");
   await expect(reply.getByRole("button", { name: "Envoyer la proposition au visiteur" })).toBeDisabled();
 
   // The lead list shows it closed, and the broker inbox carries the withdrawal notice.
   await openAs(broker, world.owner, "/leads");
-  await expect(broker.getByRole("row").filter({ hasText: reference }).first()).toContainText("Cloture");
+  await expect(broker.getByRole("row").filter({ hasText: reference }).first()).toContainText("Clôturé");
   await openAs(broker, world.owner, "/notifications");
-  const inbox = card(broker, "Boite de reception");
+  const inbox = card(broker, "Boîte de réception");
   await expect(inbox).toContainText("Consentement retiré par le visiteur");
   await expect(inbox).toContainText(reference);
   await broker.context().close();

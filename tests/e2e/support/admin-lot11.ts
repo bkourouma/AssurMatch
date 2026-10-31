@@ -43,12 +43,12 @@ export async function adminWithRole(browser: Browser, superAdmin: BackOfficeAcco
   const adminContext = await newAppContext(browser, e2eEnv.adminUrl);
   const admin = await adminContext.newPage();
   await openAs(admin, superAdmin, "/users");
-  const create = admin.locator("form").filter({ has: admin.getByRole("button", { name: "Creer et emettre activation" }) });
+  const create = admin.locator("form").filter({ has: admin.getByRole("button", { name: "Créer et émettre activation" }) });
   await create.locator("input[name='email']").fill(email);
   await create.locator("input[name='displayName']").fill(`${label} E2E`);
   await create.locator(`input[name='roles'][value='${role}']`).check();
   await create.locator("textarea[name='reason']").fill("Parcours E2E lot 11c - compte de test");
-  await create.getByRole("button", { name: "Creer et emettre activation" }).click();
+  await create.getByRole("button", { name: "Créer et émettre activation" }).click();
   const mail = await waitForMail({ to: email });
   const link = extractLink(mail, /\/activate\?token=/u);
   await adminContext.close();

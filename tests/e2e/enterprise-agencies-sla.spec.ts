@@ -62,11 +62,11 @@ function agenciesCard(page: Page) {
 }
 
 function slaCard(page: Page) {
-  return card(page, "Engagement de reactivite (SLA)");
+  return card(page, "Engagement de réactivité (SLA)");
 }
 
 function slaTarget(page: Page) {
-  return slaCard(page).locator("li.bo-stats__cell").filter({ hasText: "Objectif premiere action" });
+  return slaCard(page).locator("li.bo-stats__cell").filter({ hasText: "Objectif première action" });
 }
 
 async function submitSla(page: Page, minutes: number, reason: string): Promise<void> {
@@ -104,7 +104,7 @@ test("ENT-00 le courtier Enterprise est créé par l'admin, activé par son prop
   await expect(owner.getByRole("heading", { name: "Organisation du cabinet" })).toBeVisible();
   await expect(agenciesCard(owner)).toBeVisible();
   await expect(slaCard(owner)).toBeVisible();
-  await expect(card(owner, "Roles personnalises")).toBeVisible();
+  await expect(card(owner, "Rôles personnalisés")).toBeVisible();
   await expect(card(owner, "Charte du portail courtier")).toBeVisible();
 });
 
@@ -122,9 +122,9 @@ test("ENT-01 le propriétaire crée deux agences, elles apparaissent dans la lis
     await agencies.locator("#agency-country").fill("ci");
     await agencies.locator("#agency-city").fill(agency.city);
     await agencies.locator("#agency-reason").fill(WORLD_REASON);
-    await agencies.getByRole("button", { name: "Creer une agence" }).click();
+    await agencies.getByRole("button", { name: "Créer une agence" }).click();
     await owner.waitForURL(/\/enterprise\?ent=agency_created/u);
-    await expect(notice(owner)).toContainText("Agence creee et auditee.");
+    await expect(notice(owner)).toContainText("Agence créée et auditée.");
     await expect(notice(owner)).toHaveAttribute("data-tone", "success");
     const row = rowWith(agenciesCard(owner), agency.name);
     await expect(row).toContainText(`CI - ${agency.city}`);
@@ -156,9 +156,9 @@ test("ENT-02 les saisies invalides sont refusées dans l'interface et ne créent
     await agencies.locator("#agency-name").fill(attempt.name);
     await agencies.locator("#agency-country").fill(attempt.country);
     await agencies.locator("#agency-reason").fill(attempt.reason);
-    await agencies.getByRole("button", { name: "Creer une agence" }).click();
+    await agencies.getByRole("button", { name: "Créer une agence" }).click();
     await owner.waitForURL(/\/enterprise\?ent=invalid/u);
-    await expect(notice(owner), attempt.what).toContainText("Saisie incomplete.");
+    await expect(notice(owner), attempt.what).toContainText("Saisie incomplète.");
     await expect(notice(owner), attempt.what).toHaveAttribute("data-tone", "warning");
   }
   await expect(owner.getByText(`Agence Refusée ${suffix}`)).toHaveCount(0);
@@ -223,7 +223,7 @@ test("ENT-03 le propriétaire rattache un membre de l'équipe à une agence, le 
     await fillReason(dialog, WORLD_REASON);
   }, "Rattacher");
   await owner.waitForURL(/\/enterprise\?ent=member_assigned/u);
-  await expect(notice(owner)).toContainText("Membre rattache a l'agence.");
+  await expect(notice(owner)).toContainText("Membre rattaché à l'agence.");
   await expect(rowWith(agenciesCard(owner), agencyPlateau)).toContainText("1 membre(s)");
 
   await openAs(owner, world.owner, ENTERPRISE_PATH);
@@ -241,9 +241,9 @@ test("ENT-04 un manager consulte l'espace Enterprise mais ne peut pas créer d'a
   await agencies.locator("#agency-name").fill(`Agence Manager ${suffix}`);
   await agencies.locator("#agency-country").fill("CI");
   await agencies.locator("#agency-reason").fill(WORLD_REASON);
-  await agencies.getByRole("button", { name: "Creer une agence" }).click();
+  await agencies.getByRole("button", { name: "Créer une agence" }).click();
   await page.waitForURL(/\/enterprise\?ent=forbidden/u);
-  await expect(notice(page)).toContainText("Action reservee au proprietaire d'un cabinet Enterprise.");
+  await expect(notice(page)).toContainText("Action réservée au propriétaire d'un cabinet Enterprise.");
   await expect(page.getByText(`Agence Manager ${suffix}`)).toHaveCount(0);
 });
 
@@ -262,7 +262,7 @@ test("ENT-05 l'admin fixe l'objectif SLA contractuel sur la fiche du courtier et
 
   // The platform SLA table of the directory shows the partner with the same objective.
   await openAs(admin, superAdminAccount(), "/partners");
-  const slaTable = card(admin, "Engagement de reactivite (SLA) par partenaire");
+  const slaTable = card(admin, "Engagement de réactivité (SLA) par partenaire");
   const row = rowWith(slaTable, world.partnerName);
   await expect(row).toContainText("enterprise");
   await expect(row).toContainText(`${CONTRACTUAL_SLA} min`);
@@ -285,21 +285,21 @@ test("ENT-06 le propriétaire voit l'objectif SLA contractuel, refuse un objecti
 
   // Aligned on the contractual target (idempotent): never rejected, and equal to the admin figure.
   await submitSla(owner, CONTRACTUAL_SLA, WORLD_REASON);
-  await expect(notice(owner)).toContainText("Engagement de reactivite enregistre.");
+  await expect(notice(owner)).toContainText("Engagement de réactivité enregistré.");
   await expect(slaTarget(owner)).toContainText(`${CONTRACTUAL_SLA} min`);
-  await expect(slaCard(owner)).toContainText("Leads mesures");
+  await expect(slaCard(owner)).toContainText("Leads mesurés");
   await expect(slaCard(owner)).toContainText("Taux de respect");
 
   // A looser target than the contract is refused (422) and the stored target does not move.
   await submitSla(owner, LOOSER_SLA, WORLD_REASON);
-  await expect(notice(owner)).toContainText("Objectif refuse");
+  await expect(notice(owner)).toContainText("Objectif refusé");
   await expect(notice(owner)).toHaveAttribute("data-tone", "warning");
   await openAs(owner, world.owner, ENTERPRISE_PATH);
   await expect(slaTarget(owner)).toContainText(`${CONTRACTUAL_SLA} min`);
 
   // A tighter target is accepted and persists after a clean reload.
   await submitSla(owner, TIGHTER_SLA, WORLD_REASON);
-  await expect(notice(owner)).toContainText("Engagement de reactivite enregistre.");
+  await expect(notice(owner)).toContainText("Engagement de réactivité enregistré.");
   await expect(notice(owner)).toHaveAttribute("data-tone", "success");
   await openAs(owner, world.owner, ENTERPRISE_PATH);
   await expect(slaTarget(owner)).toContainText(`${TIGHTER_SLA} min`);
@@ -314,7 +314,7 @@ test("ENT-07 l'admin retrouve la cible contractuelle du courtier (le contrat pri
   await expect(card(admin, "Synthèse")).toContainText("SLA mesuré (30 j)");
 
   await openAs(admin, superAdminAccount(), "/partners");
-  const row = rowWith(card(admin, "Engagement de reactivite (SLA) par partenaire"), world.partnerName);
+  const row = rowWith(card(admin, "Engagement de réactivité (SLA) par partenaire"), world.partnerName);
   await expect(row).toBeVisible();
   // Observation for the report: the table shows the contractual target (admin source of truth), the
   // broker page shows the tighter 30 min target.
@@ -327,7 +327,7 @@ test("ENT-08 un courtier Starter n'a pas les fonctions Enterprise : la page l'ex
   const page = await openEnterprise(browser, "starter", starter);
   await expect(page.getByRole("heading", { name: "Espace Enterprise indisponible" })).toBeVisible();
   await expect(page.getByText("Plan Enterprise requis")).toBeVisible();
-  await expect(page.getByText("Votre plan actuel donne acces aux leads et au CRM selon vos permissions.")).toBeVisible();
+  await expect(page.getByText("Votre plan actuel donne accès aux leads et au CRM selon vos permissions.")).toBeVisible();
   // Nothing of the Enterprise space is rendered: no agency form, no SLA form.
   await expect(page.locator("#agency-name")).toHaveCount(0);
   await expect(page.locator("#sla-target")).toHaveCount(0);

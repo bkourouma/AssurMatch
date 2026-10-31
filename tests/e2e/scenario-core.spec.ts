@@ -83,7 +83,7 @@ test("SC-01b ouvrir la Côte d'Ivoire, Auto et Voyage : consentements, formulair
   // One published quote form per product and language, each bound to the consent of its language.
   const fields: Record<string, Record<"fr" | "en", string[]>> = {
     auto: {
-      fr: ["vehicle_use|Usage du vehicule|select|true|public|prive,professionnel", "vehicle_brand|Marque du vehicule|text|false|public|"],
+      fr: ["vehicle_use|Usage du véhicule|select|true|public|prive,professionnel", "vehicle_brand|Marque du véhicule|text|false|public|"],
       en: ["vehicle_use|Vehicle use|select|true|public|private,business", "vehicle_brand|Vehicle make|text|false|public|"]
     },
     voyage: {
@@ -362,12 +362,12 @@ test("SC-04b un Compliance Admin invité active son compte et valide l'offre, qu
   const admin = await adminPage(browser);
   const complianceEmail = `compliance.${uniqueSuffix()}@e2e.assurmatch.test`;
   await openAs(admin, superAdmin(), "/users");
-  const create = admin.locator("form").filter({ has: admin.getByRole("button", { name: "Creer et emettre activation" }) });
+  const create = admin.locator("form").filter({ has: admin.getByRole("button", { name: "Créer et émettre activation" }) });
   await create.locator("input[name='email']").fill(complianceEmail);
   await create.locator("input[name='displayName']").fill("Conformite E2E");
   await create.locator("input[name='roles'][value='compliance_admin']").check();
   await create.locator("textarea[name='reason']").fill(REASON);
-  await create.getByRole("button", { name: "Creer et emettre activation" }).click();
+  await create.getByRole("button", { name: "Créer et émettre activation" }).click();
   const mail = await waitForMail({ to: complianceEmail });
   const link = extractLink(mail, /\/activate\?token=/u);
   await admin.context().close();
@@ -534,10 +534,10 @@ test("SC-07 le visiteur répond « intéressé » depuis son espace de suivi ; l
   const broker = await (await newAppContext(browser, e2eEnv.brokerUrl)).newPage();
   await openAs(broker, owner, `/leads/${leadAssignmentId}`);
   const answers = card(broker, "Répondre au visiteur");
-  await expect(answers).toContainText(/Interess[ée] : demande a etre rappele \(creneau : demain entre 10 h et 12 h\)/u);
+  await expect(answers).toContainText(/Intéressé : demande à être rappelé \(créneau : demain entre 10 h et 12 h\)/u);
   // The answer is historised and the status is only suggested, never applied automatically.
-  await expect(answers).toContainText("La derniere reponse fait foi");
-  await expect(card(broker, "Informations utiles")).not.toContainText(/Gagn|Clotur|Perdu/u);
+  await expect(answers).toContainText("La dernière réponse fait foi");
+  await expect(card(broker, "Informations utiles")).not.toContainText(/Gagn|Clôtur|Perdu/u);
   await broker.context().close();
 });
 
@@ -562,10 +562,10 @@ test("SC-08 le courtier Starter clôture le lead « gagné », le visiteur est i
     await dialog.locator("#close-outcome").selectOption("gagne");
     await dialog.locator("#close-comment").fill("Contrat signe par le visiteur chez l'assureur partenaire");
   }, "Clôturer le lead");
-  await expect(broker.getByText("Lead cloture avec son issue")).toBeVisible();
-  await expect(card(broker, "Informations utiles")).toContainText("Cloture");
-  await expect(card(broker, "Historique minimal")).toContainText("issue: Gagne");
-  await expect(card(broker, "Actions Starter")).toContainText("Ce lead est cloture");
+  await expect(broker.getByText("Lead clôturé avec son issue")).toBeVisible();
+  await expect(card(broker, "Informations utiles")).toContainText("Clôturé");
+  await expect(card(broker, "Historique minimal")).toContainText("issue: Gagné");
+  await expect(card(broker, "Actions Starter")).toContainText("Ce lead est clôturé");
   await broker.context().close();
 
   // 2. Spec 054: the visitor is told the request is closed (without the commercial outcome).
@@ -602,27 +602,27 @@ test("SC-08 le courtier Starter clôture le lead « gagné », le visiteur est i
   await tariff.locator("#billing-per-lead").fill("5000");
   await tariff.locator("#billing-plan-reason").fill("Tarif Starter CI de lancement");
   await tariff.getByRole("button", { name: "Enregistrer le tarif" }).click();
-  await expect(admin.getByText("Tarif de plan enregistre et audite.")).toBeVisible();
+  await expect(admin.getByText("Tarif de plan enregistré et audité.")).toBeVisible();
 
   await admin.goto("/billing?tab=brouillons");
   const drafts = card(admin, "Brouillons mensuels non facturables");
   await drafts.locator("#billing-draft-reason").fill("Cloture mensuelle E2E");
   await drafts.getByRole("button", { name: "Recalculer les brouillons" }).click();
-  await expect(admin.getByText(/Brouillons recalcules/u)).toBeVisible();
+  await expect(admin.getByText(/Brouillons recalculés/u)).toBeVisible();
 
   await admin.goto("/billing?tab=factures");
-  const issue = card(admin, "Emettre la facture d'un brouillon");
+  const issue = card(admin, "Émettre la facture d'un brouillon");
   const draftOption = issue.locator("#invoice-draft option").filter({ hasText: partnerName }).first();
   await expect(draftOption).toHaveCount(1);
   await issue.locator("#invoice-draft").selectOption(await draftOption.getAttribute("value") as string);
   await issue.locator("#invoice-reason").fill("Facture mensuelle E2E");
-  await issue.getByRole("button", { name: "Emettre la facture" }).click();
-  await expect(admin.getByText("Facture numerotee emise, PDF archive et courtier notifie.")).toBeVisible();
-  const invoiceRow = card(admin, "Factures B2B numerotees").getByRole("row").filter({ hasText: partnerName }).first();
+  await issue.getByRole("button", { name: "Émettre la facture" }).click();
+  await expect(admin.getByText("Facture numérotée émise, PDF archivé et courtier notifié.")).toBeVisible();
+  const invoiceRow = card(admin, "Factures B2B numérotées").getByRole("row").filter({ hasText: partnerName }).first();
   const invoiceNumber = ((await invoiceRow.innerText()).match(/CI-\d{4}-\d{6}/u) ?? [])[0] as string;
   expect(invoiceNumber, "numbered invoice CI-YYYY-NNNNNN").toBeTruthy();
 
-  const payment = card(admin, "Enregistrer un paiement recu");
+  const payment = card(admin, "Enregistrer un paiement reçu");
   const invoiceOption = payment.locator("#payment-invoice option").filter({ hasText: invoiceNumber }).first();
   const due = Number(((await invoiceOption.innerText()).match(/reste ([\d\s\u202f\u00a0.]+)/u)?.[1] ?? "").replace(/\D/gu, ""));
   expect(due, "amount due of the invoice").toBeGreaterThan(0);
@@ -632,14 +632,14 @@ test("SC-08 le courtier Starter clôture le lead « gagné », le visiteur est i
   await payment.locator("#payment-method").selectOption("bank_transfer");
   await payment.locator("#payment-reference").fill(`VIR-E2E-${quoteReference}`);
   await payment.getByRole("button", { name: "Enregistrer le paiement" }).click();
-  await expect(admin.getByText("Paiement recu hors plateforme enregistre et audite.")).toBeVisible();
-  await expect(card(admin, "Factures B2B numerotees").getByRole("row").filter({ hasText: invoiceNumber })).toContainText("payee");
+  await expect(admin.getByText("Paiement reçu hors plateforme enregistré et audité.")).toBeVisible();
+  await expect(card(admin, "Factures B2B numérotées").getByRole("row").filter({ hasText: invoiceNumber })).toContainText("payée");
   await admin.context().close();
 
   // 5. G-05: the broker sees the invoice, settled, on /billing (Starter plan included).
   const brokerBilling = await (await newAppContext(browser, e2eEnv.brokerUrl)).newPage();
   await openAs(brokerBilling, owner, "/billing");
   const invoices = card(brokerBilling, "Factures et avoirs");
-  await expect(invoices.getByRole("row").filter({ hasText: invoiceNumber })).toContainText("reglee");
+  await expect(invoices.getByRole("row").filter({ hasText: invoiceNumber })).toContainText("réglée");
   await brokerBilling.context().close();
 });

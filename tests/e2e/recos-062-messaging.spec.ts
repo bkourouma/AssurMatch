@@ -167,7 +167,7 @@ test("MSG-00 le Super Admin ouvre la messagerie courtier-visiteur ; un cabinet S
   const admin = await appPage(browser, e2eEnv.adminUrl);
   await openAs(admin, superAdminAccount(), "/feature-flags");
   await setGlobalFlag(admin, MESSAGING_FLAG, true, WORLD_REASON);
-  await expect(admin.getByRole("row").filter({ hasText: MESSAGING_FLAG }).getByRole("button", { name: "Desactiver", exact: true })).toBeVisible();
+  await expect(admin.getByRole("row").filter({ hasText: MESSAGING_FLAG }).getByRole("button", { name: "Désactiver", exact: true })).toBeVisible();
   await admin.context().close();
 
   const starter = await ensureFirm(browser, activeRun().starter, "starter", STARTER_LABEL);
@@ -515,7 +515,7 @@ test("MSG-05 messagerie coupée par l'admin : plus aucune écriture (courtier, v
   }
 
   // Back ON: the broker can write again and the visitor sees the form again.
-  await expect(admin.getByRole("row").filter({ hasText: MESSAGING_FLAG }).getByRole("button", { name: "Desactiver", exact: true })).toBeVisible();
+  await expect(admin.getByRole("row").filter({ hasText: MESSAGING_FLAG }).getByRole("button", { name: "Désactiver", exact: true })).toBeVisible();
   await expect
     .poll(async () => {
       await openConversation(broker, world.owner, "starter", leadA.assignmentId);

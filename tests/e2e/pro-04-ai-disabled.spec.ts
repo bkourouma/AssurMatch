@@ -36,14 +36,14 @@ const AI_FLAG_KEYS = [
 
 /** Buttons of the lead AI panel (lead-ai-panel.tsx) and of its human validation. */
 const AI_ACTION_LABELS = [
-  "Resume du lead",
+  "Résumé du lead",
   "Score indicatif du lead",
-  "Prochaine action suggeree",
+  "Prochaine action suggérée",
   "Brouillon de message de relance",
   "Classification indicative",
   "Indice de doublon",
   "Valider la suggestion",
-  "Ecarter la suggestion"
+  "Écarter la suggestion"
 ];
 
 const LEAD_TABS = ["", "?tab=propositions", "?tab=activite", "?tab=historique"];
@@ -67,7 +67,7 @@ async function expectNoAiAction(page: Page): Promise<void> {
     await expect(page.getByRole("button", { name: label, exact: true }), `button ${label}`).toHaveCount(0);
   }
   await expect(page.locator("input[name='assistType']")).toHaveCount(0);
-  await expect(page.getByText("Assistance IA d'aide a la comprehension")).toHaveCount(0);
+  await expect(page.getByText("Assistance IA d'aide à la compréhension")).toHaveCount(0);
   await expect(page.getByText("Aucune suggestion IA pour ce lead.")).toHaveCount(0);
 }
 
@@ -81,7 +81,7 @@ test("PRO-AI-01 tous les flags IA sont désactivés dans l'écran admin des feat
   const listed = (await aiCodes.allInnerTexts()).map((text) => text.trim());
   for (const key of listed) {
     const row = admin.getByRole("row").filter({ has: admin.locator("code", { hasText: new RegExp(`^${key}$`, "u") }) }).first();
-    await expect(row.getByText("Desactive", { exact: true }), `${key} is off`).toBeVisible();
+    await expect(row.getByText("Désactivé", { exact: true }), `${key} is off`).toBeVisible();
     await expect(row.getByText("Actif", { exact: true }), `${key} is not on`).toHaveCount(0);
   }
   // Flags that never appear as a row are fail-closed (default false): the reference note names them.
@@ -92,11 +92,11 @@ test("PRO-AI-01 tous les flags IA sont désactivés dans l'écran admin des feat
   const sensitive = card(admin, "Modules sensibles (lecture seule)");
   await expect(sensitive).toBeVisible();
   await expect(sensitive.getByRole("button")).toHaveCount(0);
-  await expect(admin.getByText("Cette interface ne cree aucun bouton d'activation pour les modules reglementes.")).toBeVisible();
+  await expect(admin.getByText("Cette interface ne crée aucun bouton d'activation pour les modules réglementés.")).toBeVisible();
   await admin.context().close();
 });
 
-test("PRO-AI-02 le CRM Pro n'offre aucune action IA et la carte Assistance IA annonce enabled: false", async ({ browser }) => {
+test("PRO-AI-02 le CRM Pro n'offre aucune action IA et la carte Assistance IA annonce Assistance désactivée et aucun appel à un modèle", async ({ browser }) => {
   const ids = await assignmentIdsFor(browser);
   lead4Id = ids.lead4 as string;
 
@@ -106,17 +106,17 @@ test("PRO-AI-02 le CRM Pro n'offre aucune action IA et la carte Assistance IA an
   await page.waitForLoadState("networkidle");
   const aiCard = card(page, "Assistance IA");
   await expect(aiCard).toBeVisible();
-  await expect(aiCard).toContainText("enabled: false");
-  await expect(aiCard).toContainText("modelCall: false");
+  await expect(aiCard).toContainText(/Assistance\s*Désactivée/u);
+  await expect(aiCard).toContainText(/Appel à un modèle\s*Non/u);
   await expect(aiCard).toContainText("validation humaine obligatoire");
-  await expect(aiCard.getByText("Assistance IA desactivee par les feature flags", { exact: false })).toBeVisible();
+  await expect(aiCard.getByText("Assistance IA désactivée par les feature flags", { exact: false })).toBeVisible();
   await expectNoAiAction(page);
 
   // The four tabs of the lead sheet: no AI panel, no AI form.
   for (const tab of LEAD_TABS) {
     await page.goto(`/crm/leads/${lead4Id}${tab}`);
     await page.waitForLoadState("networkidle");
-    await expect(page.getByText("CRM autorise")).toBeVisible();
+    await expect(page.getByText("CRM autorisé")).toBeVisible();
     await expectNoAiAction(page);
   }
   recorder.stop();
