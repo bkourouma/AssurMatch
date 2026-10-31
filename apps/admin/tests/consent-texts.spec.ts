@@ -30,7 +30,7 @@ test("creation never sends a hash and starts from a template", () => {
   expect(forms).toContain("applyTemplate");
   expect(forms).toContain("bodyTemplate");
   expect(forms).toContain("name=\"content\"");
-  expect(forms).toContain("Motif (audite)");
+  expect(forms).toContain("Motif (audité)");
   for (const name of ["purpose", "countryId", "productId", "channel", "recipientCategory", "language", "version", "reason"]) {
     expect(forms).toContain(`name="${name}"`);
   }

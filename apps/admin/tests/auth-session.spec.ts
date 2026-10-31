@@ -73,8 +73,8 @@ test("admin home handles 401 and 403 states without exposing partial success", a
   const pageSource = source("apps/admin/app/page.tsx");
 
   expect(pageSource).toContain("readBackOfficeSession");
-  expect(pageSource).toContain("Acces refuse");
-  expect(pageSource).toContain("Acces sante systeme refuse");
+  expect(pageSource).toContain("Accès refusé");
+  expect(pageSource).toContain("Accès santé système refusé");
   expect(pageSource).toContain("logoutAction");
 });
 
@@ -175,8 +175,8 @@ test("admin MFA verification form offers the unchecked trust checkbox and forwar
   // Existing field ids and button text used by the e2e helpers stay in place.
   expect(panel).toContain('id="mfa-code"');
   expect(panel).toContain('name="kind"');
-  expect(panel).toContain("Verifier MFA");
-  expect(panel).toContain("Generer secret et codes de secours");
+  expect(panel).toContain("Vérifier MFA");
+  expect(panel).toContain("Générer secret et codes de secours");
 
   expect(verify).toContain('formData.get("trustDevice") === "on"');
   expect(verify).toContain("deviceLabelFromUserAgent");

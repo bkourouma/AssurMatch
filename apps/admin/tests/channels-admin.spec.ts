@@ -20,19 +20,19 @@ test("channels page calls the messaging endpoints and guards the session", () =>
   expect(page).toContain("mfa_required");
   expect(page).toContain("/mfa?returnTo=");
   expect(page).toContain("isAdminProfile");
-  expect(page).toContain("Acces refuse pour ce role admin (journal d'audit en lecture requis).");
+  expect(page).toContain("Accès refusé pour ce rôle admin (journal d'audit en lecture requis).");
 });
 
 test("channels page exposes the sections, labels and the read-only ops command", () => {
   const page = source(PAGE);
   expect(page).toContain("Canaux SMS et WhatsApp");
   expect(page).toContain("File de reprise");
-  expect(page).toContain("50 dernieres lignes");
+  expect(page).toContain("50 dernières lignes");
   expect(page).toContain("4 tentatives");
   expect(page).toContain("1, 5 puis 30 minutes");
-  expect(page).toContain("Message SMS/WhatsApp en echec definitif");
-  expect(page).toContain("Etat des canaux");
-  expect(page).toContain("Dernieres diffusions (destinataire masque)");
+  expect(page).toContain("Message SMS/WhatsApp en échec définitif");
+  expect(page).toContain("État des canaux");
+  expect(page).toContain("Dernières diffusions (destinataire masqué)");
   expect(page).toContain('href="/messaging"');
   expect(page).toContain('href="/connecteurs-crm"');
   expect(page).toContain("npm run ops:apply-flag-policy -- --flag sms_enabled --value true --reference ... --approved-by ... --reason ...");

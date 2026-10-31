@@ -27,8 +27,8 @@ export default async function CatalogRegimesPage() {
   return (
     <PageStack>
       <PageHeader
-        breadcrumb={[{ label: "Catalogue", href: "/catalog" }, { label: "Regimes" }]}
-        title="Regimes reglementaires"
+        breadcrumb={[{ label: "Catalogue", href: "/catalog" }, { label: "Régimes" }]}
+        title="Régimes réglementaires"
         description="Régimes référencés par les pays. Un régime référencé par un pays ne peut pas être retiré ; un pays sans régime reste bloqué par la checklist."
         actions={regimes.status === "success" ? <Button href="#creer-regime">Créer un régime</Button> : null}
       />
@@ -51,7 +51,7 @@ export default async function CatalogRegimesPage() {
             items={regimes.data}
             getKey={(regime) => regime.id}
             emptyLabel="Aucun régime : les pays ne peuvent pas passer la checklist d'activation."
-            aria-label="Regimes reglementaires"
+            aria-label="Régimes réglementaires"
           />
 
           <div id="creer-regime"><CreateRegimeForm /></div>

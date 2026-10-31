@@ -14,11 +14,11 @@ test("routing page offers the non-transmissive precheck with a permanent simulat
 
   expect(api).toContain("/admin/routing/precheck");
   expect(page).toContain("RoutingPrecheckForm");
-  expect(forms).toContain("Simulation : aucun courtier notifie, aucun lead transmis.");
+  expect(forms).toContain("Simulation : aucun courtier notifié, aucun lead transmis.");
   expect(forms).toContain("Identifiant de consentement");
   expect(actions).toContain("precheckRoutingAction");
-  expect(actions).toContain("Non eligible");
-  expect(actions).toContain("Eligible.");
+  expect(actions).toContain("Non éligible");
+  expect(actions).toContain("Éligible.");
 });
 
 test("messaging page sends a test message through the server action without echoing the recipient", () => {

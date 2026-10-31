@@ -60,7 +60,7 @@ export default async function PartnerApplicationDetailPage({ params }: Applicati
     return (
       <PageStack>
         <PageHeader
-          breadcrumb={[{ label: "Partenaires" }, { label: "Candidatures", href: "/partners/applications" }, { label: "Detail" }]}
+          breadcrumb={[{ label: "Partenaires" }, { label: "Candidatures", href: "/partners/applications" }, { label: "Détail" }]}
           title="Candidature indisponible"
           actions={<Button href="/partners/applications" variant="secondary">Retour aux candidatures</Button>}
         />

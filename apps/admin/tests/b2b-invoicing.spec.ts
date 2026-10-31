@@ -14,10 +14,10 @@ test("admin billing page issues invoices, records manual payments and credit not
   expect(api).toContain("/admin/billing/accounts/");
   expect(page).toContain('{ key: "factures", label: "Factures" }');
   expect(page).toContain('{ key: "comptes", label: "Comptes" }');
-  expect(page).toContain("Emettre la facture d'un brouillon");
-  expect(page).toContain("Enregistrer un paiement recu");
-  expect(page).toContain("Emettre un avoir");
-  expect(page).toContain("Attribuer un pack apres paiement constate");
+  expect(page).toContain("Émettre la facture d'un brouillon");
+  expect(page).toContain("Enregistrer un paiement reçu");
+  expect(page).toContain("Émettre un avoir");
+  expect(page).toContain("Attribuer un pack après paiement constaté");
   expect(page).toContain("/billing/invoices/${invoice.id}/pdf");
   for (const method of ["bank_transfer", "mobile_money", "cheque", "other"]) expect(page).toContain(`"${method}"`);
   expect(actions).toContain('"use server"');

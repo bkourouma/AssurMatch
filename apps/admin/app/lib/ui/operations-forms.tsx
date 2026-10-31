@@ -20,8 +20,8 @@ export interface ReviewCandidate {
 }
 
 const decisionLabels: Record<string, string> = {
-  route: "Router par le moteur (regles et eligibilite)",
-  assign: "Assigner a un courtier partenaire eligible",
+  route: "Router par le moteur (règles et éligibilité)",
+  assign: "Assigner à un courtier partenaire éligible",
   non_routable: "Marquer non routable",
   duplicate: "Marquer doublon"
 };
@@ -41,7 +41,7 @@ export function QuoteReviewForm({ quoteRequestId, candidates }: { quoteRequestId
     <Form action={formAction} data-operations-form="quote-review">
       <ActionNotice state={state} />
       <input type="hidden" name="quoteRequestId" value={quoteRequestId} />
-      <Field id={ids.decision} label="Decision" required>
+      <Field id={ids.decision} label="Décision" required>
         <Select
           {...fieldControlProps(ids.decision, { required: true })}
           name="decision"
@@ -51,7 +51,7 @@ export function QuoteReviewForm({ quoteRequestId, candidates }: { quoteRequestId
         />
       </Field>
       {decision === "assign" ? (
-        <Field id={ids.partner} label="Courtier partenaire eligible" required>
+        <Field id={ids.partner} label="Courtier partenaire éligible" required>
           <Select
             {...fieldControlProps(ids.partner, { required: true })}
             name="partnerTenantId"
@@ -60,19 +60,19 @@ export function QuoteReviewForm({ quoteRequestId, candidates }: { quoteRequestId
         </Field>
       ) : null}
       {decision === "assign" && eligible.length === 0 ? (
-        <Notice tone="danger">Aucun courtier partenaire eligible : verifier licences, autorisations et quotas.</Notice>
+        <Notice tone="danger">Aucun courtier partenaire éligible : vérifier licences, autorisations et quotas.</Notice>
       ) : null}
       {decision === "duplicate" ? (
-        <Field id={ids.duplicate} label="Reference de la demande d'origine (optionnelle)">
+        <Field id={ids.duplicate} label="Référence de la demande d'origine (optionnelle)">
           <Input {...fieldControlProps(ids.duplicate)} name="duplicateOfReference" placeholder="QR-2026-XXXXXXXX" maxLength={64} />
         </Field>
       ) : null}
-      <Field id={ids.reason} label="Motif (audite, 8 caracteres minimum)" required>
+      <Field id={ids.reason} label="Motif (audité, 8 caractères minimum)" required>
         <Input {...fieldControlProps(ids.reason, { required: true })} name="reason" minLength={8} maxLength={500} />
       </Field>
       <FormActions>
         <Button type="submit" size="sm" pending={pending} pendingLabel="Enregistrement..." disabled={decision === "assign" && eligible.length === 0}>
-          Enregistrer la decision
+          Enregistrer la décision
         </Button>
       </FormActions>
     </Form>
@@ -95,17 +95,17 @@ export function ReassignAssignmentForm({ assignmentId, partners }: { assignmentI
       <datalist id={ids.list}>
         {partners.map((partner) => <option key={partner.id} value={partner.id}>{partner.legalName}</option>)}
       </datalist>
-      <Field id={ids.reason} label="Motif (audite)" required>
+      <Field id={ids.reason} label="Motif (audité)" required>
         <Input {...fieldControlProps(ids.reason, { required: true })} name="reason" minLength={8} maxLength={500} />
       </Field>
       <FormActions>
-        <Button type="submit" size="sm" variant="secondary" pending={pending} pendingLabel="Reaffectation...">Reaffecter</Button>
+        <Button type="submit" size="sm" variant="secondary" pending={pending} pendingLabel="Réaffectation...">Réaffecter</Button>
       </FormActions>
     </Form>
   );
 }
 
-const contactStatusLabels: Record<string, string> = { new: "Nouveau", handled: "Traite", spam: "Spam" };
+const contactStatusLabels: Record<string, string> = { new: "Nouveau", handled: "Traité", spam: "Spam" };
 
 /** Spec 056 (H-04): status of a contact message; the transition is audited without the message body. */
 export function ContactStatusForm({ messageId, current }: { messageId: string; current: string }) {
@@ -129,7 +129,7 @@ export function ContactStatusForm({ messageId, current }: { messageId: string; c
         <Input {...fieldControlProps(ids.reason)} name="reason" maxLength={500} />
       </Field>
       <FormActions>
-        <Button type="submit" size="sm" variant="secondary" pending={pending} pendingLabel="Mise a jour...">Mettre a jour</Button>
+        <Button type="submit" size="sm" variant="secondary" pending={pending} pendingLabel="Mise à jour...">Mettre à jour</Button>
       </FormActions>
     </Form>
   );

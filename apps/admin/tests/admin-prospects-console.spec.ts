@@ -26,7 +26,7 @@ test("prospects list filters, paginates and never shows a clear contact", () => 
   expect(page).toContain("getRowHref");
   expect(page).toContain("pagination");
   expect(page).toContain("Aucun prospect pour ces filtres.");
-  for (const state of ["Session admin requise", "Acces aux prospects refuse", "Prospects indisponibles"]) {
+  for (const state of ["Session admin requise", "Accès aux prospects refusé", "Prospects indisponibles"]) {
     expect(page, state).toContain(state);
   }
   expect(page).not.toContain("emailNormalized");
@@ -37,8 +37,8 @@ test("prospect detail shows the reveal state, anonymised notice and linked quote
   const detail = source("apps/admin/app/prospects/[id]/page.tsx");
   expect(detail).toContain("readProspectDetail");
   expect(detail).toContain("piiRevealed");
-  expect(detail).toContain("Prospect anonymise");
-  expect(detail).toContain("Demandes de devis liees");
+  expect(detail).toContain("Prospect anonymisé");
+  expect(detail).toContain("Demandes de devis liées");
   expect(detail).toContain("Prospect introuvable");
 });
 

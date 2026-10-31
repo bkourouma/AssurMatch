@@ -46,7 +46,7 @@ export async function createScoringRuleAction(_previous: ScoringActionState, for
       reason: stringValue(formData.get("reason"))
     });
     revalidatePath("/scoring");
-    return { status: "success", message: `Regle de scoring creee (version ${rule.version}).` };
+    return { status: "success", message: `Règle de scoring créée (version ${rule.version}).` };
   } catch (error) {
     return actionError(error);
   }
@@ -70,7 +70,7 @@ export async function updateScoringRuleAction(_previous: ScoringActionState, for
       reason: stringValue(formData.get("reason"))
     });
     revalidatePath("/scoring");
-    return { status: "success", message: `Regle mise a jour (version ${rule.version}, ${rule.status}).` };
+    return { status: "success", message: `Règle mise à jour (version ${rule.version}, ${rule.status}).` };
   } catch (error) {
     return actionError(error);
   }
@@ -84,7 +84,7 @@ export async function validateOfferAction(_previous: ScoringActionState, formDat
     revalidatePath("/scoring");
     revalidatePath("/offers");
     const name = offer.published?.content.name ?? offer.pending?.content.name ?? offer.publicKey;
-    return { status: "success", message: `Offre ${name}: ${decision === "validated" ? "validee" : "refusee"} (${offer.status}).` };
+    return { status: "success", message: `Offre ${name}: ${decision === "validated" ? "validée" : "refusée"} (${offer.status}).` };
   } catch (error) {
     return actionError(error);
   }
@@ -96,7 +96,7 @@ export async function suspendOfferAction(_previous: ScoringActionState, formData
     revalidatePath("/scoring");
     revalidatePath("/offers");
     const name = offer.published?.content.name ?? offer.pending?.content.name ?? offer.publicKey;
-    return { status: "success", message: `Offre ${name} suspendue: retiree du comparateur public.` };
+    return { status: "success", message: `Offre ${name} suspendue: retirée du comparateur public.` };
   } catch (error) {
     return actionError(error);
   }

@@ -17,11 +17,11 @@ test("admin routing page exposes rules, manual queue and reassignment through th
   expect(api).toContain("/admin/routing-rules");
   expect(api).toContain("/admin/routing/pending");
   expect(api).toContain("/reassign");
-  expect(page).toContain("Regles de routage");
+  expect(page).toContain("Règles de routage");
   expect(page).toContain("Assignation manuelle");
   expect(forms).toContain("round_robin");
-  expect(forms).toContain("Courtier partenaire eligible");
-  expect(forms).toContain("Motif (audite)");
+  expect(forms).toContain("Courtier partenaire éligible");
+  expect(forms).toContain("Motif (audité)");
   expect(actions).toContain("revalidatePath(\"/routing\")");
   expect(shell).toContain("/routing");
 });

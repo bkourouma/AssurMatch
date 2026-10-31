@@ -64,16 +64,16 @@ export default async function RoutingAnomaliesPage({ searchParams }: { searchPar
       <PageHeader
         breadcrumb={[{ label: "Catalogue" }, { label: "Routage", href: "/routing" }, { label: "Anomalies" }]}
         title="Anomalies de routage"
-        description="Detection deterministe des anomalies de routage (spec 049), complétée par une analyse IA optionnelle à valider. Aide operationnelle : aucune decision de routage n'est prise automatiquement."
+        description="Détection déterministe des anomalies de routage (spec 049), complétée par une analyse IA optionnelle à valider. Aide opérationnelle : aucune décision de routage n'est prise automatiquement."
         actions={<Button href="/routing/history" variant="secondary">Historique de routage</Button>}
       />
 
       {report.status === "unauthenticated" ? <StateMessage tone="danger">Session admin requise.</StateMessage> : null}
-      {report.status === "forbidden" ? <StateMessage tone="danger">Anomalies de routage non accessibles pour ce role admin.</StateMessage> : null}
+      {report.status === "forbidden" ? <StateMessage tone="danger">Anomalies de routage non accessibles pour ce rôle admin.</StateMessage> : null}
       {report.status === "error" ? <StateMessage tone="danger">Rapport indisponible : {report.error}</StateMessage> : null}
 
       <StatStrip
-        label="Synthese anomalies"
+        label="Synthèse anomalies"
         items={[
           { label: "Anomalies", value: data.totalAnomalies, tone: data.totalAnomalies > 0 ? "warning" : "neutral" },
           { label: "Critiques", value: data.criticalCount, tone: data.criticalCount > 0 ? "danger" : "neutral" },
@@ -87,20 +87,20 @@ export default async function RoutingAnomaliesPage({ searchParams }: { searchPar
         </Notice>
       ) : null}
 
-      <Card title="Anomalies detectees" description={`Rapport genere le ${formatDateTime(data.generatedAt)}.`}>
+      <Card title="Anomalies détectées" description={`Rapport généré le ${formatDateTime(data.generatedAt)}.`}>
         <DataTable
           columns={[
-            { key: "severity", header: "Severite", render: (anomaly) => <Badge tone={anomaly.severity === "critical" ? "danger" : "warning"}>{anomaly.severity}</Badge> },
+            { key: "severity", header: "Sévérité", render: (anomaly) => <Badge tone={anomaly.severity === "critical" ? "danger" : "warning"}>{anomaly.severity}</Badge> },
             { key: "type", header: "Type", render: (anomaly) => <span className="bo-ref">{anomaly.type}</span> },
             { key: "scope", header: "Pays / produit", render: (anomaly) => `${anomaly.country ?? "-"} / ${anomaly.product ?? "-"}` },
-            { key: "details", header: "Details", render: (anomaly) => anomaly.details },
-            { key: "metric", header: "Mesure", render: (anomaly) => (anomaly.metricValue !== undefined ? `${anomaly.metricValue}${anomaly.metricThreshold !== undefined ? ` / seuil ${anomaly.metricThreshold}` : ""}` : "-") },
-            { key: "detected", header: "Detectee le", render: (anomaly) => formatDateTime(anomaly.detectedAt) }
+            { key: "details", header: "Détails", render: (anomaly) => anomaly.details },
+            { key: "metric", header: "Mesuré", render: (anomaly) => (anomaly.metricValue !== undefined ? `${anomaly.metricValue}${anomaly.metricThreshold !== undefined ? ` / seuil ${anomaly.metricThreshold}` : ""}` : "-") },
+            { key: "detected", header: "Détectée le", render: (anomaly) => formatDateTime(anomaly.detectedAt) }
           ]}
           items={data.anomalies}
           getKey={(anomaly) => anomaly.id}
-          emptyLabel="Aucune anomalie de routage detectee."
-          emptyDescription="Le routage suit ses regles sans ecart sur la fenetre analysee."
+          emptyLabel="Aucune anomalie de routage détectée."
+          emptyDescription="Le routage suit ses règles sans écart sur la fenêtre analysée."
           aria-label="Anomalies de routage"
         />
       </Card>

@@ -65,7 +65,7 @@ export async function createRoutingRuleAction(_previous: RoutingActionState, for
       reason: stringValue(formData.get("reason"))
     });
     revalidatePath("/routing");
-    return { status: "success", message: `Regle ${rule.mode} creee (version ${rule.version}).` };
+    return { status: "success", message: `Règle ${rule.mode} créée (version ${rule.version}).` };
   } catch (error) {
     return actionError(error);
   }
@@ -90,7 +90,7 @@ export async function updateRoutingRuleAction(_previous: RoutingActionState, for
       reason: stringValue(formData.get("reason"))
     });
     revalidatePath("/routing");
-    return { status: "success", message: `Regle mise a jour (version ${rule.version}, ${rule.status}).` };
+    return { status: "success", message: `Règle mise à jour (version ${rule.version}, ${rule.status}).` };
   } catch (error) {
     return actionError(error);
   }
@@ -103,7 +103,7 @@ export async function assignPendingQuoteAction(_previous: RoutingActionState, fo
       reason: stringValue(formData.get("reason"))
     });
     revalidatePath("/routing");
-    return { status: "success", message: `Demande assignee au courtier partenaire ${result.partnerTenantId.slice(0, 8)}.` };
+    return { status: "success", message: `Demande assignée au courtier partenaire ${result.partnerTenantId.slice(0, 8)}.` };
   } catch (error) {
     return actionError(error);
   }
@@ -117,7 +117,7 @@ export async function reassignLeadAction(_previous: RoutingActionState, formData
     });
     revalidatePath("/routing");
     revalidatePath("/lead-assignments");
-    return { status: "success", message: `Lead reassigne vers ${result.partnerTenantId.slice(0, 8)} (statut ${result.status}).` };
+    return { status: "success", message: `Lead réassigné vers ${result.partnerTenantId.slice(0, 8)} (statut ${result.status}).` };
   } catch (error) {
     return actionError(error);
   }
@@ -125,7 +125,7 @@ export async function reassignLeadAction(_previous: RoutingActionState, formData
 
 // Lot 6 (spec 073 T402)
 const precheckReasonLabels: Record<string, string> = {
-  consent_missing_or_out_of_scope: "consentement absent ou hors perimetre"
+  consent_missing_or_out_of_scope: "consentement absent ou hors périmètre"
 };
 
 /** Simulation only: no broker is notified and no lead is transmitted. */
@@ -138,9 +138,9 @@ export async function precheckRoutingAction(_previous: RoutingActionState, formD
       productId: stringValue(formData.get("productId")),
       ...(consentRecordId ? { consentRecordId } : {})
     });
-    if (result.result === "eligible") return { status: "success", message: "Eligible." };
+    if (result.result === "eligible") return { status: "success", message: "Éligible." };
     const reasons = result.reasons.map((reason) => precheckReasonLabels[reason] ?? reason).join(", ");
-    return { status: "error", message: `Non eligible${reasons ? ` : ${reasons}` : ""}.` };
+    return { status: "error", message: `Non éligible${reasons ? ` : ${reasons}` : ""}.` };
   } catch (error) {
     return actionError(error);
   }

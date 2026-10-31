@@ -46,7 +46,7 @@ export async function searchProspectsAction(formData: FormData): Promise<void> {
 export async function searchProspectsByContactAction(_previous: ProspectContactSearchState, formData: FormData): Promise<ProspectContactSearchState> {
   const contact = text(formData, "contact").slice(0, 200);
   if (!contact || !looksLikeProspectContact(contact)) {
-    return { status: "invalid", message: "Saisissez une adresse e-mail complete ou un numero de telephone (au moins 7 chiffres)." };
+    return { status: "invalid", message: "Saisissez une adresse e-mail complète ou un numéro de téléphone (au moins 7 chiffres)." };
   }
   const token = await getBackOfficeToken();
   if (!token) return { status: "unauthenticated", message: "Session admin requise." };
@@ -57,9 +57,9 @@ export async function searchProspectsByContactAction(_previous: ProspectContactS
       body: JSON.stringify({ contact, page: 1, pageSize: 50 }),
       cache: "no-store"
     });
-    if (response.status === 401) return { status: "unauthenticated", message: "Session expiree : reconnectez-vous." };
-    if (response.status === 403) return { status: "forbidden", message: "Acces aux prospects refuse pour ce role admin. Le refus est journalise." };
-    if (response.status === 400) return { status: "invalid", message: "Recherche refusee par l'API : e-mail ou telephone invalide." };
+    if (response.status === 401) return { status: "unauthenticated", message: "Session expirée : reconnectez-vous." };
+    if (response.status === 403) return { status: "forbidden", message: "Accès aux prospects refusé pour ce rôle admin. Le refus est journalisé." };
+    if (response.status === 400) return { status: "invalid", message: "Recherche refusée par l'API : e-mail ou téléphone invalide." };
     if (!response.ok) return { status: "error", message: `Recherche indisponible (api_${response.status}).` };
     return { status: "success", result: await response.json() as AdminPage<AdminProspectListItem> };
   } catch {

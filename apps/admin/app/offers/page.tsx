@@ -201,7 +201,7 @@ export default async function AdminOffersPage({
         action="/offers"
         label="Filtres offres"
         submitLabel="Filtrer"
-        resetLabel="Reinitialiser"
+        resetLabel="Réinitialiser"
         resetHref={queue ? "/offers?queue=submitted" : "/offers"}
         activeCount={activeFilters}
       >
@@ -254,7 +254,7 @@ export default async function AdminOffersPage({
         items={rows}
         getKey={(offer) => offer.id}
         emptyLabel={queue ? "Aucune version en attente de validation." : "Aucune offre pour ces filtres."}
-        emptyDescription={queue ? "Les versions soumises par les courtiers ou preparees ici apparaissent dans cette file." : activeFilters > 0 ? "Reinitialisez les filtres pour revoir tout le catalogue." : undefined}
+        emptyDescription={queue ? "Les versions soumises par les courtiers ou préparées ici apparaissent dans cette file." : activeFilters > 0 ? "Réinitialisez les filtres pour revoir tout le catalogue." : undefined}
         aria-label="Offres indicatives"
         sort={table.sort}
         sortHref={table.sortHref}

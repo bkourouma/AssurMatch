@@ -31,11 +31,11 @@ export function ScopeFlagForm({ scopeType, scopeId, scopeLabel, flagKey, current
       <Stack>
         {state.status === "success" ? <Notice tone="success">{state.message}</Notice> : null}
         {activationBlocked ? (
-          <small className="bo-description">Produit hautement sensible : activation IA refusee sans exception documentee</small>
+          <small className="bo-description">Produit hautement sensible : activation IA refusée sans exception documentée</small>
         ) : (
           <small className="bo-description">
-            Activation par la commande d'exploitation uniquement (decision de conformite, reference de politique et approbateur) :
-            <pre><code>{`npm run ops:apply-flag-policy -- --flag ${flagKey} --scope-type ${scopeType} --scope-id ${scopeId} --value true --reference <reference de politique> --approved-by "<nom, role>" --reason "<motif>"`}</code></pre>
+            Activation par la commande d'exploitation uniquement (décision de conformité, référence de politique et approbateur) :
+            <pre><code>{`npm run ops:apply-flag-policy -- --flag ${flagKey} --scope-type ${scopeType} --scope-id ${scopeId} --value true --reference <référence de politique> --approved-by "<nom, rôle>" --reason "<motif>"`}</code></pre>
           </small>
         )}
       </Stack>
@@ -46,8 +46,8 @@ export function ScopeFlagForm({ scopeType, scopeId, scopeLabel, flagKey, current
     <Stack>
       {state.status !== "idle" ? <Notice tone={state.status === "success" ? "success" : "danger"}>{state.message}</Notice> : null}
       {!open ? (
-        <Button type="button" size="sm" variant="secondary" aria-label={`Desactiver ${flagKey} pour ${scopeLabel}`} onClick={() => setOpen(true)}>
-          Desactiver
+        <Button type="button" size="sm" variant="secondary" aria-label={`Désactiver ${flagKey} pour ${scopeLabel}`} onClick={() => setOpen(true)}>
+          Désactiver
         </Button>
       ) : (
         <Form action={formAction} data-ai-scope-flag-form={`${scopeType}:${scopeId}:${flagKey}`}>
@@ -55,11 +55,11 @@ export function ScopeFlagForm({ scopeType, scopeId, scopeLabel, flagKey, current
           <input type="hidden" name="scopeId" value={scopeId} />
           <input type="hidden" name="key" value={flagKey} />
           <input type="hidden" name="value" value="false" />
-          <Field id={`${base}-reason`} label="Motif (audite)" required>
+          <Field id={`${base}-reason`} label="Motif (audité)" required>
             <Input {...fieldControlProps(`${base}-reason`, { required: true })} name="reason" minLength={8} maxLength={500} />
           </Field>
           <FormActions>
-            <Button type="submit" size="sm" variant="secondary" pending={pending} pendingLabel="Envoi...">Confirmer la desactivation</Button>
+            <Button type="submit" size="sm" variant="secondary" pending={pending} pendingLabel="Envoi...">Confirmer la désactivation</Button>
             <Button type="button" size="sm" variant="secondary" onClick={() => setOpen(false)}>Annuler</Button>
           </FormActions>
         </Form>

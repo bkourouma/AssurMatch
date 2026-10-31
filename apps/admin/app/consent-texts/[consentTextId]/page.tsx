@@ -46,7 +46,7 @@ export default async function ConsentTextDetailPage({ params, searchParams }: Co
     return (
       <PageStack>
         <PageHeader
-          breadcrumb={[{ label: "Catalogue", href: "/catalog" }, { label: "Consentements", href: "/consent-texts" }, { label: "Detail" }]}
+          breadcrumb={[{ label: "Catalogue", href: "/catalog" }, { label: "Consentements", href: "/consent-texts" }, { label: "Détail" }]}
           title="Texte indisponible"
           actions={<Button href="/consent-texts" variant="secondary">Retour aux textes</Button>}
         />
@@ -83,7 +83,7 @@ export default async function ConsentTextDetailPage({ params, searchParams }: Co
         </Notice>
       ) : null}
 
-      <Card title="Synthese">
+      <Card title="Synthèse">
         <DescriptionList
           columns={2}
           items={[

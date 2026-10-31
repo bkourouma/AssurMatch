@@ -65,14 +65,14 @@ test("the admin navigation reaches every catalogue screen", () => {
   }
   const hub = source("apps/admin/app/catalog/page.tsx");
   expect(hub).toContain("Catalogue socle");
-  expect(hub).toContain("exposition publique desactivee");
+  expect(hub).toContain("exposition publique désactivée");
   expect(hub).toContain("checklist d&apos;activation");
 });
 
 test("every catalogue mutation asks for an audited reason and edits carry the concurrency token", () => {
   const forms = source("apps/admin/app/catalog/catalog-forms.tsx");
   const actions = source("apps/admin/app/lib/catalog-actions.ts");
-  expect(forms).toContain("Motif (audite)");
+  expect(forms).toContain("Motif (audité)");
   expect(forms).toContain("name=\"expectedUpdatedAt\" value={country.updatedAt}");
   expect(forms).toContain("name=\"expectedUpdatedAt\" value={product.updatedAt}");
   expect(forms).toContain("name=\"expectedUpdatedAt\" value={regime.updatedAt}");
@@ -156,7 +156,7 @@ test("the feature flag screen toggles global non-sensitive flags only", () => {
   expect(page).toContain("flag.scopeType === \"global\"");
   expect(page).toContain("isSensitiveFlagKey(flag.key, sensitiveFeatureFlagKeys)");
   expect(page).toContain("Flags pays et produits (lecture seule)");
-  expect(forms).toContain("Motif (audite)");
+  expect(forms).toContain("Motif (audité)");
   expect(forms).not.toMatch(/<Switch\b|\bSwitch,/);
   expect(actions).toContain("if (isSensitiveFlagKey(key)) return { status: \"error\", message: SENSITIVE_FLAG_EXPLANATION }");
 });
@@ -197,5 +197,5 @@ test("quote form administration filters by language and flags superseded consent
   expect(page).toContain("form.consentSuperseded");
   expect(page).toContain("Consentement remplacé");
   expect(page).toContain("name=\"language\"");
-  expect(forms).toContain("Les champs generiques");
+  expect(forms).toContain("Les champs génériques");
 });

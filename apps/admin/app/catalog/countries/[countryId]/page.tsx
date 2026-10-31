@@ -72,7 +72,7 @@ export default async function CatalogCountryDetailPage({ params }: CountryDetail
     return (
       <PageStack>
         <PageHeader
-          breadcrumb={[{ label: "Catalogue", href: "/catalog" }, { label: "Pays", href: "/catalog/countries" }, { label: "Detail" }]}
+          breadcrumb={[{ label: "Catalogue", href: "/catalog" }, { label: "Pays", href: "/catalog/countries" }, { label: "Détail" }]}
           title="Pays indisponible"
           actions={<Button href="/catalog/countries" variant="secondary">Retour aux pays</Button>}
         />
@@ -108,7 +108,7 @@ export default async function CatalogCountryDetailPage({ params }: CountryDetail
       />
 
       <Split>
-        <Card title="Synthese">
+        <Card title="Synthèse">
           <DescriptionList
             columns={2}
             items={[

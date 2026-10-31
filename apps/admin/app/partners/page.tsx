@@ -65,7 +65,7 @@ const slaColumns: Array<DataTableColumn<AdminPartnerSlaRowData>> = [
   },
   {
     key: "average",
-    header: "Delai moyen",
+    header: "Délai moyen",
     render: (row) => (row.averageFirstActionMinutes === null ? "-" : `${row.averageFirstActionMinutes} min`),
     numeric: true,
     align: "right",
@@ -232,7 +232,7 @@ export default async function PartnerDirectoryPage({
         action="/partners"
         label="Filtres courtiers"
         submitLabel="Filtrer"
-        resetLabel="Reinitialiser"
+        resetLabel="Réinitialiser"
         resetHref="/partners"
         activeCount={activeFilters}
         autoSubmit
@@ -266,7 +266,7 @@ export default async function PartnerDirectoryPage({
         items={directoryRows}
         getKey={(partner) => partner.id}
         emptyLabel="Aucun courtier pour ces filtres."
-        emptyDescription={activeFilters > 0 ? "Reinitialisez les filtres pour revoir tout l'annuaire." : canPrepare ? "Creez le premier courtier avec le formulaire ci-dessous, ou convertissez une candidature." : "Aucun courtier n'est encore enregistre dans votre perimetre."}
+        emptyDescription={activeFilters > 0 ? "Réinitialisez les filtres pour revoir tout l'annuaire." : canPrepare ? "Créez le premier courtier avec le formulaire ci-dessous, ou convertissez une candidature." : "Aucun courtier n'est encore enregistré dans votre périmètre."}
         aria-label="Annuaire des courtiers"
         sort={directoryTable.sort}
         sortHref={directoryTable.sortHref}
@@ -282,15 +282,15 @@ export default async function PartnerDirectoryPage({
       {canPrepare ? <div id="creer-courtier"><CreatePartnerForm countries={countryChoices} /></div> : null}
 
       <Card
-        title="Engagement de reactivite (SLA) par partenaire"
-        description="Delai de premiere action mesure sur les 30 derniers jours, rapporte a la cible contractuelle quand elle existe. Indicateur de suivi: aucune suspension automatique n'est declenchee par ce tableau."
+        title="Engagement de réactivité (SLA) par partenaire"
+        description="Délai de première action mesuré sur les 30 derniers jours, rapporte à la cible contractuelle quand elle existe. Indicateur de suivi: aucune suspension automatique n'est déclenchée par ce tableau."
       >
         <DataTable
           columns={slaColumns}
           items={slaRows}
           getKey={(row) => row.partnerTenantId}
-          emptyLabel="Aucun partenaire mesure."
-          aria-label="Engagement de reactivite par partenaire"
+          emptyLabel="Aucun partenaire mesuré."
+          aria-label="Engagement de réactivité par partenaire"
         />
       </Card>
     </PageStack>

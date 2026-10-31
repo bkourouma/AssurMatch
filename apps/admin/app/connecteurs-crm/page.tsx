@@ -48,34 +48,34 @@ export default async function CrmConnectorsPage() {
     <PageStack>
       <PageHeader
         breadcrumb={[{ label: "Partenaires" }, { label: "Connecteurs CRM" }]}
-        kicker="Canaux et integrations"
+        kicker="Canaux et intégrations"
         title="Connecteurs CRM"
-        description="Transmission sortante des evenements lead.assigned et lead.status_changed vers le CRM d'un partenaire. Les connecteurs sont crees desactives ; la charge utile est minimisee : jamais de nom, d'e-mail, de telephone ni de texte libre. Chaque action exige un motif audite."
+        description="Transmission sortante des événements lead.assigned et lead.status_changed vers le CRM d'un partenaire. Les connecteurs sont créés désactivés ; la charge utile est minimisée : jamais de nom, d'e-mail, de téléphone ni de texte libre. Chaque action exige un motif audité."
       />
 
-      <nav aria-label="Ecrans lies">
-        <Link href="/channels">Canaux de messagerie</Link> · <Link href="/partner-integrations">Integrations partenaires</Link>
+      <nav aria-label="Écrans liés">
+        <Link href="/channels">Canaux de messagerie</Link> · <Link href="/partner-integrations">Intégrations partenaires</Link>
       </nav>
 
-      {connectors.status === "forbidden" ? <StateMessage tone="danger">Acces refuse : droit partners:update et MFA requis.</StateMessage> : null}
-      {connectors.status === "error" ? <StateMessage tone="danger">Connecteurs CRM indisponibles ({connectors.error ?? "erreur"}). Reessayez plus tard.</StateMessage> : null}
+      {connectors.status === "forbidden" ? <StateMessage tone="danger">Accès refusé : droit partners:update et MFA requis.</StateMessage> : null}
+      {connectors.status === "error" ? <StateMessage tone="danger">Connecteurs CRM indisponibles ({connectors.error ?? "erreur"}). Réessayez plus tard.</StateMessage> : null}
 
       <Card
         title="Activation (hors HTTP)"
-        description="L'envoi vers les CRM est ferme par defaut. Son ouverture est une decision d'exploitation appliquee par commande, avec reference de politique et approbateur ; aucun bouton de cet ecran ne l'ouvre."
+        description="L'envoi vers les CRM est fermé par défaut. Son ouverture est une décision d'exploitation appliquée par commande, avec référence de politique et approbateur ; aucun bouton de cet écran ne l'ouvre."
       >
         <p>
-          Etat du flag <code>crm_connector_enabled</code> :{" "}
+          État du flag <code>crm_connector_enabled</code> :{" "}
           {flag.readable ? (
-            <Badge tone={flag.value ? "warning" : "disabled"}>{flag.value ? "Actif" : "Desactive"}</Badge>
+            <Badge tone={flag.value ? "warning" : "disabled"}>{flag.value ? "Actif" : "Désactivé"}</Badge>
           ) : (
-            <span data-crm-flag-state="unreadable">etat du flag non lisible avec ce role</span>
+            <span data-crm-flag-state="unreadable">état du flag non lisible avec ce rôle</span>
           )}
         </p>
         <p className="bo-description">Commande d'exploitation :</p>
         <pre><code>npm run ops:apply-flag-policy -- --flag crm_connector_enabled --value true --reference ... --approved-by ... --reason ...</code></pre>
         <p className="bo-description">
-          Le worker de livraison reste inactif tant que la variable <code>ASSURMATCH_CRM_CONNECTOR_DELIVERY_ENABLED</code> n'est pas positionnee sur son environnement.
+          Le worker de livraison reste inactif tant que la variable <code>ASSURMATCH_CRM_CONNECTOR_DELIVERY_ENABLED</code> n'est pas positionnée sur son environnement.
         </p>
       </Card>
 
@@ -86,13 +86,13 @@ export default async function CrmConnectorsPage() {
             items={[
               { label: "Connecteurs", value: connectors.data.total },
               { label: "Actifs", value: items.filter((connector) => connector.status === "active").length, tone: "success" },
-              { label: "Livraisons en echec ou dead_letter", value: failedDeliveries, tone: "warning" }
+              { label: "Livraisons en échec ou dead_letter", value: failedDeliveries, tone: "warning" }
             ]}
           />
 
-          {partners.length === 0 ? <StateMessage tone="warning">Liste des partenaires indisponible : creation impossible pour le moment.</StateMessage> : null}
+          {partners.length === 0 ? <StateMessage tone="warning">Liste des partenaires indisponible : création impossible pour le moment.</StateMessage> : null}
 
-          <Card title="Creer un connecteur CRM" description="Le connecteur est cree desactive. Le secret de signature n'est affiche qu'une seule fois.">
+          <Card title="Créer un connecteur CRM" description="Le connecteur est créé désactivé. Le secret de signature n'est affiché qu'une seule fois.">
             <CreateCrmConnectorForm partners={partners} />
           </Card>
 
@@ -101,10 +101,10 @@ export default async function CrmConnectorsPage() {
               columns={[
                 { key: "name", header: "Nom", render: (connector) => <strong>{connector.name}</strong> },
                 { key: "partner", header: "Partenaire", render: (connector) => partnerLabels.get(connector.partnerTenantId) ?? <code>{connector.partnerTenantId}</code> },
-                { key: "host", header: "Hote", render: (connector) => <code>{connector.urlHost}</code> },
-                { key: "events", header: "Evenements", render: (connector) => connector.eventTypes.join(", ") },
+                { key: "host", header: "Hôte", render: (connector) => <code>{connector.urlHost}</code> },
+                { key: "events", header: "Événements", render: (connector) => connector.eventTypes.join(", ") },
                 { key: "status", header: "Statut", render: (connector) => <StatusBadge status={connector.status} tones={integrationStatusTones} /> },
-                { key: "auth", header: "En-tete d'auth", render: (connector) => (connector.authHeaderConfigured ? "Oui" : "Non") },
+                { key: "auth", header: "En-tête d'auth", render: (connector) => (connector.authHeaderConfigured ? "Oui" : "Non") },
                 {
                   key: "actions",
                   header: "Actions",
@@ -118,26 +118,26 @@ export default async function CrmConnectorsPage() {
               ]}
               items={items}
               getKey={(connector) => connector.id}
-              emptyLabel="Aucun connecteur CRM configure."
+              emptyLabel="Aucun connecteur CRM configuré."
               aria-label="Connecteurs CRM"
             />
           </Card>
 
-          <Card title="Historique des livraisons" description="Metadonnees uniquement : aucun contenu de lead n'est affiche.">
-            {deliveries.status === "forbidden" ? <StateMessage tone="danger">Acces refuse : droit partners:update et MFA requis.</StateMessage> : null}
+          <Card title="Historique des livraisons" description="Métadonnées uniquement : aucun contenu de lead n'est affiché.">
+            {deliveries.status === "forbidden" ? <StateMessage tone="danger">Accès refusé : droit partners:update et MFA requis.</StateMessage> : null}
             {deliveries.status === "error" ? <StateMessage tone="danger">Historique des livraisons indisponible.</StateMessage> : null}
             <DataTable
               columns={[
-                { key: "event", header: "Evenement", render: (delivery) => <code>{delivery.eventType}</code> },
+                { key: "event", header: "Événement", render: (delivery) => <code>{delivery.eventType}</code> },
                 { key: "status", header: "Statut", render: (delivery) => <StatusBadge status={delivery.status} tones={integrationStatusTones} /> },
                 { key: "attempts", header: "Tentatives", render: (delivery) => delivery.attemptCount },
                 { key: "next", header: "Prochaine tentative", render: (delivery) => formatDate(delivery.nextAttemptAt) },
-                { key: "response", header: "Classe de reponse", render: (delivery) => delivery.lastResponseClass ?? "-" },
+                { key: "response", header: "Classe de réponse", render: (delivery) => delivery.lastResponseClass ?? "-" },
                 { key: "date", header: "Date", render: (delivery) => formatDate(delivery.createdAt) }
               ]}
               items={deliveryItems}
               getKey={(delivery) => delivery.id}
-              emptyLabel="Aucune livraison CRM journalisee."
+              emptyLabel="Aucune livraison CRM journalisée."
               aria-label="Livraisons CRM"
             />
           </Card>

@@ -49,7 +49,7 @@ function listValue(formData: FormData, name: string, allowed: Set<string>): stri
 function reasonError(reason: string): IntegrationActionState | undefined {
   return reason.length >= REASON_MIN_LENGTH
     ? undefined
-    : { status: "error", message: `Motif obligatoire : au moins ${REASON_MIN_LENGTH} caracteres, conserve dans l'audit.` };
+    : { status: "error", message: `Motif obligatoire : au moins ${REASON_MIN_LENGTH} caractères, conservé dans l'audit.` };
 }
 
 async function callApi(path: string, method: "POST" | "PATCH", body: Record<string, unknown>): Promise<ApiCall> {
@@ -88,13 +88,13 @@ function sanitizeServerMessage(body: unknown): string | undefined {
 }
 
 function failure(call: ApiCall): IntegrationActionState {
-  if (call.status === 403) return { status: "error", message: "Action refusee : MFA ou role insuffisant." };
+  if (call.status === 403) return { status: "error", message: "Action refusée : MFA ou rôle insuffisant." };
   if (call.status === 400 || call.status === 422) {
     const detail = sanitizeServerMessage(call.body);
-    return { status: "error", message: detail ? `Demande refusee : ${detail}` : "Demande refusee : verifiez les champs saisis." };
+    return { status: "error", message: detail ? `Demande refusée : ${detail}` : "Demande refusée : vérifiez les champs saisis." };
   }
-  if (call.status === 404) return { status: "error", message: "Element introuvable : rechargez la page." };
-  return { status: "error", message: "Integrations indisponibles." };
+  if (call.status === 404) return { status: "error", message: "Élément introuvable : rechargez la page." };
+  return { status: "error", message: "Intégrations indisponibles." };
 }
 
 function guard(call: ApiCall): void {
@@ -117,18 +117,18 @@ export async function createPartnerApiKeyAction(_previous: IntegrationActionStat
   const name = text(formData, "name");
   const scopes = listValue(formData, "scopes", API_SCOPES);
   if (!UUID.test(partnerTenantId)) return { status: "error", message: "Choisissez un partenaire." };
-  if (!name) return { status: "error", message: "Nom de cle obligatoire." };
+  if (!name) return { status: "error", message: "Nom de clé obligatoire." };
   if (scopes.length === 0) return { status: "error", message: "Choisissez au moins un scope." };
   const call = await callApi("/api-keys", "POST", { partnerTenantId, name, scopes, reason });
   guard(call);
   if (!isOk(call)) return failure(call);
   const payload = (call.body ?? {}) as { rawKey?: unknown; restrictions?: unknown };
   revalidatePath(PAGE_PATH);
-  if (typeof payload.rawKey !== "string") return { status: "success", message: "Cle API creee." };
+  if (typeof payload.rawKey !== "string") return { status: "success", message: "Clé API créée." };
   return {
     status: "success",
-    message: "Cle API creee.",
-    secret: { kind: "api_key", label: "Cle API", value: payload.rawKey, restrictions: stringArray(payload.restrictions) }
+    message: "Clé API créée.",
+    secret: { kind: "api_key", label: "Clé API", value: payload.rawKey, restrictions: stringArray(payload.restrictions) }
   };
 }
 
@@ -137,12 +137,12 @@ export async function revokePartnerApiKeyAction(_previous: IntegrationActionStat
   const invalid = reasonError(reason);
   if (invalid) return invalid;
   const id = text(formData, "id");
-  if (!UUID.test(id)) return { status: "error", message: "Cle introuvable." };
+  if (!UUID.test(id)) return { status: "error", message: "Clé introuvable." };
   const call = await callApi(`/api-keys/${id}/revoke`, "POST", { reason });
   guard(call);
   if (!isOk(call)) return failure(call);
   revalidatePath(PAGE_PATH);
-  return { status: "success", message: "Cle API revoquee." };
+  return { status: "success", message: "Clé API révoquée." };
 }
 
 export async function createPartnerWebhookEndpointAction(_previous: IntegrationActionState, formData: FormData): Promise<IntegrationActionState> {
@@ -155,7 +155,7 @@ export async function createPartnerWebhookEndpointAction(_previous: IntegrationA
   const eventTypes = listValue(formData, "eventTypes", EVENT_TYPES);
   if (!UUID.test(partnerTenantId)) return { status: "error", message: "Choisissez un partenaire." };
   if (!url.startsWith("https://")) return { status: "error", message: "L'URL doit commencer par https://." };
-  if (eventTypes.length === 0) return { status: "error", message: "Choisissez au moins un evenement." };
+  if (eventTypes.length === 0) return { status: "error", message: "Choisissez au moins un événement." };
   const call = await callApi("/webhook-endpoints", "POST", {
     partnerTenantId,
     url,
@@ -167,10 +167,10 @@ export async function createPartnerWebhookEndpointAction(_previous: IntegrationA
   if (!isOk(call)) return failure(call);
   const payload = (call.body ?? {}) as { signingSecret?: unknown; restrictions?: unknown };
   revalidatePath(PAGE_PATH);
-  if (typeof payload.signingSecret !== "string") return { status: "success", message: "Endpoint webhook cree (desactive par defaut)." };
+  if (typeof payload.signingSecret !== "string") return { status: "success", message: "Endpoint webhook créé (désactivé par défaut)." };
   return {
     status: "success",
-    message: "Endpoint webhook cree (desactive par defaut).",
+    message: "Endpoint webhook créé (désactivé par défaut).",
     secret: { kind: "webhook_signing_secret", label: "Secret de signature", value: payload.signingSecret, restrictions: stringArray(payload.restrictions) }
   };
 }
@@ -203,7 +203,7 @@ export async function createPartnerWebhookAllowlistAction(_previous: Integration
   guard(call);
   if (!isOk(call)) return failure(call);
   revalidatePath(PAGE_PATH);
-  return { status: "success", message: "Origine ajoutee a la liste d'autorisation." };
+  return { status: "success", message: "Origine ajoutée à la liste d'autorisation." };
 }
 
 export async function revokePartnerWebhookAllowlistAction(_previous: IntegrationActionState, formData: FormData): Promise<IntegrationActionState> {
@@ -216,7 +216,7 @@ export async function revokePartnerWebhookAllowlistAction(_previous: Integration
   guard(call);
   if (!isOk(call)) return failure(call);
   revalidatePath(PAGE_PATH);
-  return { status: "success", message: "Origine revoquee." };
+  return { status: "success", message: "Origine révoquée." };
 }
 
 function testEventState(body: unknown): IntegrationActionState {
@@ -224,15 +224,15 @@ function testEventState(body: unknown): IntegrationActionState {
   const responseClass = typeof result.responseClass === "string" ? result.responseClass : "";
   const duration = typeof result.durationMs === "number" ? ` en ${result.durationMs} ms` : "";
   if (result.outcome === "delivered") {
-    return { status: "success", message: `Evenement de test livre${duration}${responseClass ? ` (reponse ${responseClass})` : ""}.` };
+    return { status: "success", message: `Événement de test livré${duration}${responseClass ? ` (réponse ${responseClass})` : ""}.` };
   }
   if (result.outcome === "refused") {
-    if (responseClass === "feature_disabled") return { status: "error", message: "Envoi sortant desactive par le flag partner_webhooks_enabled." };
-    if (responseClass === "rate_limited") return { status: "error", message: "Limite d'envois de test atteinte : reessayez plus tard." };
-    if (responseClass === "endpoint_policy_blocked") return { status: "error", message: "Envoi bloque par la politique de l'endpoint (HTTPS et liste d'autorisation)." };
-    return { status: "error", message: "Envoi de test refuse." };
+    if (responseClass === "feature_disabled") return { status: "error", message: "Envoi sortant désactivé par le flag partner_webhooks_enabled." };
+    if (responseClass === "rate_limited") return { status: "error", message: "Limite d'envois de test atteinte : réessayez plus tard." };
+    if (responseClass === "endpoint_policy_blocked") return { status: "error", message: "Envoi bloqué par la politique de l'endpoint (HTTPS et liste d'autorisation)." };
+    return { status: "error", message: "Envoi de test refusé." };
   }
-  return { status: "error", message: `Echec de livraison de l'evenement de test${responseClass ? ` (${responseClass})` : ""}.` };
+  return { status: "error", message: `Échec de livraison de l'événement de test${responseClass ? ` (${responseClass})` : ""}.` };
 }
 
 export async function sendPartnerWebhookTestEventAction(_previous: IntegrationActionState, formData: FormData): Promise<IntegrationActionState> {

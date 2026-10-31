@@ -74,17 +74,17 @@ export default async function ActivationChecklistPage({
       <PageHeader
         breadcrumb={[{ label: "Plateforme" }, { label: "Activation" }]}
         title="Checklist technique d'activation"
-        description="Verification lecture seule des preconditions techniques pays, produit, consentement, formulaire, partenaire, licence, offre et flags avant exposition publique."
+        description="Vérification lecture seule des préconditions techniques pays, produit, consentement, formulaire, partenaire, licence, offre et flags avant exposition publique."
       />
       <StateMessage tone="warning">
-        Cette surface ne modifie aucun flag, pays, produit, partenaire, licence, offre ou formulaire. Elle ne remplace pas le go/no-go conformite, juridique, support ou operations.
+        Cette surface ne modifie aucun flag, pays, produit, partenaire, licence, offre ou formulaire. Elle ne remplace pas le go/no-go conformité, juridique, support ou opérations.
       </StateMessage>
 
       <FilterBar
         action="/activation-checklist"
         label="Filtres checklist d'activation"
         submitLabel="Filtrer"
-        resetLabel="Reinitialiser"
+        resetLabel="Réinitialiser"
         resetHref="/activation-checklist"
         activeCount={activeCount}
         autoSubmit
@@ -104,16 +104,16 @@ export default async function ActivationChecklistPage({
       </FilterBar>
 
       {checklist.unauthenticated ? <StateMessage tone="danger">Session admin requise.</StateMessage> : null}
-      {checklist.forbidden ? <StateMessage tone="danger">Acces checklist refuse pour ce role admin ou hors perimetre.</StateMessage> : null}
+      {checklist.forbidden ? <StateMessage tone="danger">Accès checklist refusé pour ce rôle admin ou hors périmètre.</StateMessage> : null}
       {checklist.status === "error" ? <StateMessage tone="danger">Checklist indisponible: {checklist.error}</StateMessage> : null}
 
       {checklist.status === "success" ? (
         <>
           <StatStrip
-            label="Synthese checklist activation"
+            label="Synthèse checklist activation"
             items={[
-              { label: "Prets techniquement", value: checklist.data.summary.passed, tone: "success" },
-              { label: "A surveiller", value: checklist.data.summary.warning, tone: checklist.data.summary.warning > 0 ? "warning" : "neutral" },
+              { label: "Prêts techniquement", value: checklist.data.summary.passed, tone: "success" },
+              { label: "À surveiller", value: checklist.data.summary.warning, tone: checklist.data.summary.warning > 0 ? "warning" : "neutral" },
               { label: "Bloquants", value: checklist.data.summary.blocked, tone: checklist.data.summary.blocked > 0 ? "danger" : "neutral" }
             ]}
           />
@@ -133,7 +133,7 @@ export default async function ActivationChecklistPage({
               },
               {
                 key: "controls",
-                header: "Controles",
+                header: "Contrôles",
                 render: (section) => (
                   <ul className="bo-list">
                     {section.controls.map((control) => {
@@ -158,8 +158,8 @@ export default async function ActivationChecklistPage({
             ]}
             items={checklist.data.sections as ActivationChecklistSection[]}
             getKey={(section) => section.key}
-            emptyLabel="Aucune precondition d'activation disponible."
-            aria-label="Preconditions techniques d'activation"
+            emptyLabel="Aucune précondition d'activation disponible."
+            aria-label="Préconditions techniques d'activation"
           />
         </>
       ) : null}

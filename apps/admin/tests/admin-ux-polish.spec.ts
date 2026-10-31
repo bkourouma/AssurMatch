@@ -21,7 +21,7 @@ test("admin shell exposes sidebar, header, logout and required navigation", () =
   // table, the admin wording and the admin logout action.
   expect(shell).toContain("AppShell");
   expect(shell).toContain("logoutAction");
-  expect(shell).toContain("logoutLabel=\"Deconnexion\"");
+  expect(shell).toContain("logoutLabel=\"Déconnexion\"");
   expect(shell).toContain("Back-office Admin");
   for (const label of ["Dashboard", "Catalogue", "Partenaires", "Utilisateurs", "Feature flags", "Conformité", "Opérations"]) {
     expect(shell).toContain(label);
@@ -38,7 +38,7 @@ test("the shared shell keeps the admin and the courtier back-offices separate", 
   for (const brokerRoute of ["/leads", "/crm", "/enterprise", "/notifications"]) {
     expect(shell).not.toContain(brokerRoute);
   }
-  for (const surfaceWord of ["Navigation admin principale", "Deconnexion", "/quote-form-definitions", "/users\""]) {
+  for (const surfaceWord of ["Navigation admin principale", "Déconnexion", "/quote-form-definitions", "/users\""]) {
     expect(appShell).not.toContain(surfaceWord);
   }
 });

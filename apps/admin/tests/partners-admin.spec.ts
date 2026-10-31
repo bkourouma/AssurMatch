@@ -80,7 +80,7 @@ test("the directory keeps the SLA table and offers the filters of US7", () => {
     "name=\"plan\"",
     "Licence expirant sous N jours",
     "licenseExpiringWithinDays: expiring",
-    "Engagement de reactivite (SLA) par partenaire",
+    "Engagement de réactivité (SLA) par partenaire",
     "readPartnerSla",
     "Expiré",
     "CreatePartnerForm",
@@ -122,7 +122,7 @@ test("the partner page covers every US7 section with fix anchors", () => {
 test("every partner mutation asks for an audited reason of at least 8 characters", () => {
   const forms = source("apps/admin/app/partners/partner-forms.tsx");
   const actions = source("apps/admin/app/lib/partner-actions.ts");
-  expect(forms).toContain("label=\"Motif (audite)\"");
+  expect(forms).toContain("label=\"Motif (audité)\"");
   expect(forms).toContain("name=\"reason\" minLength={8}");
   expect(actions).toContain("const REASON_MIN_LENGTH = 8;");
   const exported = actions.match(/export async function \w+/g) ?? [];

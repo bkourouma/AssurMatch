@@ -22,11 +22,11 @@ import { assignPendingQuoteAction, createRoutingRuleAction, precheckRoutingActio
 const initialState: RoutingActionState = { status: "idle" };
 
 const modeOptions: Array<{ value: string; label: string }> = [
-  { value: "first_eligible", label: "Premier eligible (comportement historique)" },
-  { value: "round_robin", label: "Round-robin (le moins recemment servi)" },
-  { value: "priority", label: "Priorite commerciale (ordre configure)" },
-  { value: "capacity", label: "Capacite (quota mensuel restant)" },
-  { value: "performance", label: "Performance (taux d'acceptation, reactivite)" },
+  { value: "first_eligible", label: "Premier éligible (comportement historique)" },
+  { value: "round_robin", label: "Round-robin (le moins récemment servi)" },
+  { value: "priority", label: "Priorité commerciale (ordre configuré)" },
+  { value: "capacity", label: "Capacité (quota mensuel restant)" },
+  { value: "performance", label: "Performance (taux d'acceptation, réactivité)" },
   { value: "exclusive", label: "Exclusif (un seul courtier partenaire)" },
   { value: "manual", label: "Manuel (assignation par un admin)" },
   { value: "multi_send", label: "Multi-courtiers (si le flag est ouvert et si le visiteur l'accepte)" },
@@ -36,7 +36,7 @@ const modeOptions: Array<{ value: string; label: string }> = [
 function ModeSelect({ id, name, required }: { id: string; name: string; required?: boolean }) {
   return (
     <Select {...fieldControlProps(id, { required })} name={name} defaultValue={required ? "round_robin" : ""}>
-      {required ? null : <option value="">(inchange)</option>}
+      {required ? null : <option value="">(inchangé)</option>}
       {modeOptions.map((option) => (
         <option key={option.value} value={option.value}>{option.label}</option>
       ))}
@@ -59,7 +59,7 @@ export function CreateRoutingRuleForm() {
   };
 
   return (
-    <Card title="Creer une regle de routage">
+    <Card title="Créer une règle de routage">
       <Form action={formAction} data-routing-form="create">
         <ActionNotice state={state} />
         <Field id={ids.countryId} label="Pays (UUID)" required>
@@ -72,23 +72,23 @@ export function CreateRoutingRuleForm() {
           <ModeSelect id={ids.mode} name="mode" required />
         </Field>
         <Notice tone="info">{AI_ASSISTED_MODE_NOTE}</Notice>
-        <Field id={ids.priorities} label="Priorites (partnerId:priorite, une par ligne, mode priorite)">
+        <Field id={ids.priorities} label="Priorités (partnerId:priorité, une par ligne, mode priorité)">
           <Textarea {...fieldControlProps(ids.priorities)} name="priorities" rows={3} />
         </Field>
         <Field id={ids.exclusive} label="Courtier partenaire exclusif (UUID, mode exclusif)">
           <Input {...fieldControlProps(ids.exclusive)} name="exclusivePartnerTenantId" />
         </Field>
-        <Field id={ids.maxRecipients} label="Nombre maximum de courtiers (mode multi-courtiers, 2 a 5)">
+        <Field id={ids.maxRecipients} label="Nombre maximum de courtiers (mode multi-courtiers, 2 à 5)">
           <Input {...fieldControlProps(ids.maxRecipients)} name="maxRecipients" type="number" min={2} max={5} defaultValue={3} />
         </Field>
         <Field id={ids.description} label="Description">
           <Input {...fieldControlProps(ids.description)} name="description" maxLength={500} />
         </Field>
-        <Field id={ids.reason} label="Motif (audite)" required>
+        <Field id={ids.reason} label="Motif (audité)" required>
           <Input {...fieldControlProps(ids.reason, { required: true })} name="reason" />
         </Field>
         <FormActions>
-          <Button type="submit" pending={pending} pendingLabel="Creation...">Creer la regle</Button>
+          <Button type="submit" pending={pending} pendingLabel="Création...">Créer la règle</Button>
         </FormActions>
       </Form>
     </Card>
@@ -109,10 +109,10 @@ export function UpdateRoutingRuleForm({ ruleIds }: { ruleIds: string[] }) {
   };
 
   return (
-    <Card title="Mettre a jour une regle">
+    <Card title="Mettre à jour une règle">
       <Form action={formAction} data-routing-form="update">
         <ActionNotice state={state} />
-        <Field id={ids.ruleId} label="Regle" required>
+        <Field id={ids.ruleId} label="Règle" required>
           <Select {...fieldControlProps(ids.ruleId, { required: true })} name="ruleId" options={ruleIds.map((id) => ({ value: id, label: id }))} />
         </Field>
         <Field id={ids.mode} label="Mode">
@@ -120,13 +120,13 @@ export function UpdateRoutingRuleForm({ ruleIds }: { ruleIds: string[] }) {
         </Field>
         <Field id={ids.status} label="Statut">
           <Select {...fieldControlProps(ids.status)} name="status" defaultValue="">
-            <option value="">(inchange)</option>
+            <option value="">(inchangé)</option>
             <option value="active">active</option>
-            <option value="disabled">desactivee</option>
+            <option value="disabled">désactivée</option>
           </Select>
         </Field>
         <Notice tone="info">{AI_ASSISTED_MODE_NOTE}</Notice>
-        <Field id={ids.priorities} label="Priorites (partnerId:priorite, une par ligne)">
+        <Field id={ids.priorities} label="Priorités (partnerId:priorité, une par ligne)">
           <Textarea {...fieldControlProps(ids.priorities)} name="priorities" rows={3} />
         </Field>
         <Field id={ids.exclusive} label="Courtier partenaire exclusif (UUID)">
@@ -135,11 +135,11 @@ export function UpdateRoutingRuleForm({ ruleIds }: { ruleIds: string[] }) {
         <Field id={ids.description} label="Description">
           <Input {...fieldControlProps(ids.description)} name="description" maxLength={500} />
         </Field>
-        <Field id={ids.reason} label="Motif (audite)" required>
+        <Field id={ids.reason} label="Motif (audité)" required>
           <Input {...fieldControlProps(ids.reason, { required: true })} name="reason" />
         </Field>
         <FormActions>
-          <Button type="submit" pending={pending} pendingLabel="Mise a jour..." disabled={ruleIds.length === 0}>Mettre a jour</Button>
+          <Button type="submit" pending={pending} pendingLabel="Mise à jour..." disabled={ruleIds.length === 0}>Mettre à jour</Button>
         </FormActions>
       </Form>
     </Card>
@@ -174,7 +174,7 @@ export function AssignPendingQuoteForm({ quote }: { quote: PendingManualQuoteDat
           )}
         </Notice>
       ) : null}
-      <Field id={ids.partner} label="Courtier partenaire eligible" required>
+      <Field id={ids.partner} label="Courtier partenaire éligible" required>
         <Select
           {...fieldControlProps(ids.partner, { required: true })}
           name="partnerTenantId"
@@ -183,14 +183,14 @@ export function AssignPendingQuoteForm({ quote }: { quote: PendingManualQuoteDat
           options={eligible.map((candidate) => ({ value: candidate.partnerTenantId, label: `${candidate.legalName} (${candidate.plan})` }))}
         />
       </Field>
-      <Field id={ids.reason} label="Motif (audite)" required>
+      <Field id={ids.reason} label="Motif (audité)" required>
         <Input {...fieldControlProps(ids.reason, { required: true })} name="reason" />
       </Field>
       <FormActions>
         <Button type="submit" size="sm" pending={pending} pendingLabel="Assignation..." disabled={eligible.length === 0}>Assigner</Button>
       </FormActions>
       {eligible.length === 0 ? (
-        <Notice tone="danger">Aucun courtier partenaire eligible: verifier licences, autorisations et quotas.</Notice>
+        <Notice tone="danger">Aucun courtier partenaire éligible: vérifier licences, autorisations et quotas.</Notice>
       ) : null}
     </Form>
   );
@@ -203,15 +203,15 @@ export function ReassignLeadForm() {
 
   return (
     <Card
-      title="Reassigner un lead"
-      description="Le nouveau courtier partenaire doit etre eligible (licence, autorisations, quota). L'ancien perd l'acces au lead et le nouveau est notifie."
+      title="Réassigner un lead"
+      description="Le nouveau courtier partenaire doit être éligible (licence, autorisations, quota). L'ancien perd l'accès au lead et le nouveau est notifié."
     >
       <ConfirmDialog
-        triggerLabel="Reassigner un lead"
+        triggerLabel="Réassigner un lead"
         triggerVariant="secondary"
-        title="Reassigner un lead"
-        description="Le nouveau courtier partenaire doit etre eligible (licence, autorisations, quota). L'ancien perd l'acces au lead et le nouveau est notifie."
-        confirmLabel="Reassigner"
+        title="Réassigner un lead"
+        description="Le nouveau courtier partenaire doit être éligible (licence, autorisations, quota). L'ancien perd l'accès au lead et le nouveau est notifié."
+        confirmLabel="Réassigner"
         cancelLabel="Annuler"
         tone="danger"
         formAction={formAction}
@@ -224,7 +224,7 @@ export function ReassignLeadForm() {
         <Field id={ids.partner} label="Nouveau courtier partenaire (UUID)" required>
           <Input {...fieldControlProps(ids.partner, { required: true })} name="partnerTenantId" />
         </Field>
-        <Field id={ids.reason} label="Motif (audite)" required>
+        <Field id={ids.reason} label="Motif (audité)" required>
           <Input {...fieldControlProps(ids.reason, { required: true })} name="reason" />
         </Field>
       </ConfirmDialog>
@@ -239,9 +239,9 @@ export function RoutingPrecheckForm() {
   const ids = { partner: `${base}-partner`, country: `${base}-country`, product: `${base}-product`, consent: `${base}-consent` };
 
   return (
-    <Card title="Pre-controle de routage" description="Verifie l'eligibilite d'un courtier partenaire pour un pays, un produit et un consentement. Chaque verification est auditee.">
+    <Card title="Pré-contrôle de routage" description="Vérifie l'éligibilité d'un courtier partenaire pour un pays, un produit et un consentement. Chaque vérification est auditée.">
       <Form action={formAction} data-routing-form="precheck">
-        <Notice tone="info">Simulation : aucun courtier notifie, aucun lead transmis.</Notice>
+        <Notice tone="info">Simulation : aucun courtier notifié, aucun lead transmis.</Notice>
         <ActionNotice state={state} />
         <Field id={ids.partner} label="Courtier partenaire (UUID)" required>
           <Input {...fieldControlProps(ids.partner, { required: true })} name="partnerTenantId" />
@@ -256,7 +256,7 @@ export function RoutingPrecheckForm() {
           <Input {...fieldControlProps(ids.consent)} name="consentRecordId" />
         </Field>
         <FormActions>
-          <Button type="submit" pending={pending} pendingLabel="Verification...">Verifier l'eligibilite</Button>
+          <Button type="submit" pending={pending} pendingLabel="Vérification...">Vérifier l'éligibilité</Button>
         </FormActions>
       </Form>
     </Card>

@@ -43,7 +43,7 @@ test("quote requests console lists, filters and opens a record without contact d
   expect(list).not.toContain("emailNormalized");
 
   const detail = source("apps/admin/app/quote-requests/[quoteRequestId]/page.tsx");
-  for (const section of ["Consentement de transmission", "Decisions de routage", "Exclus et raisons", "Affectations", "Offre choisie par le visiteur", "Revue manuelle", "Documents du prospect"]) {
+  for (const section of ["Consentement de transmission", "Décisions de routage", "Exclus et raisons", "Affectations", "Offre choisie par le visiteur", "Revue manuelle", "Documents du prospect"]) {
     expect(detail, section).toContain(section);
   }
   expect(detail).toContain("piiMasked");
@@ -52,7 +52,7 @@ test("quote requests console lists, filters and opens a record without contact d
 
 test("manual review queue persists audited decisions through the API (H-02)", () => {
   const page = source("apps/admin/app/operations/quote-review/page.tsx");
-  expect(page).toContain("Revue operationnelle devis");
+  expect(page).toContain("Revue opérationnelle devis");
   expect(page).toContain("readQuoteReviewQueue");
   expect(page).toContain("QuoteReviewForm");
   const forms = source("apps/admin/app/lib/ui/operations-forms.tsx");
@@ -60,7 +60,7 @@ test("manual review queue persists audited decisions through the API (H-02)", ()
     expect(forms, decision).toContain(`${decision}:`);
   }
   expect(forms).toContain("data-operations-form=\"quote-review\"");
-  expect(forms).toContain("Motif (audite");
+  expect(forms).toContain("Motif (audité");
   expect(forms).toContain("candidate.eligible");
 });
 

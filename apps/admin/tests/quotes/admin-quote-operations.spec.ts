@@ -11,6 +11,6 @@ test("admin quote operations pages expose offers, requests and review state", as
 
   expect(source).toContain("Offres indicatives");
   expect(source).toContain("Demandes de devis");
-  expect(source).toContain("Revue operationnelle devis");
+  expect(source).toContain("Revue opérationnelle devis");
   expect(source).toContain("Routage des leads");
 });

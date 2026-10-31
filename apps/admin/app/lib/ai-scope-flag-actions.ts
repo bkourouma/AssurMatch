@@ -27,12 +27,12 @@ function failure(message: string): AiScopeFlagActionState {
 
 function refusalMessage(code: string | undefined): string {
   if (code === "SENSITIVE_PRODUCT_AI_REQUIRES_EXCEPTION") {
-    return "Produit hautement sensible : activation IA refusee sans exception documentee.";
+    return "Produit hautement sensible : activation IA refusée sans exception documentée.";
   }
   if (code === "ACTIVATION_VIA_OPS_ONLY") {
-    return "Activation impossible depuis cet ecran : elle passe par la commande d'exploitation npm run ops:apply-flag-policy.";
+    return "Activation impossible depuis cet écran : elle passe par la commande d'exploitation npm run ops:apply-flag-policy.";
   }
-  return "Changement refuse par les regles de conformite : verifiez le motif et vos droits.";
+  return "Changement refusé par les règles de conformité : vérifiez le motif et vos droits.";
 }
 
 /** Reads the API error code (reason, code, or the code prefixing the message: the HTTP error filter keeps only its own codes), compared case-insensitively. */
@@ -61,9 +61,9 @@ export async function applyAiScopeFlagAction(_previous: AiScopeFlagActionState, 
   const reason = text(formData, "reason");
 
   const validKey = scopeType === "country" ? COUNTRY_KEYS.has(key) : scopeType === "product" ? PRODUCT_KEYS.has(key) : false;
-  if (!validKey || scopeId.length === 0) return failure("Demande invalide : portee ou flag inconnu.");
+  if (!validKey || scopeId.length === 0) return failure("Demande invalide : portée ou flag inconnu.");
   if (reason.length < REASON_MIN_LENGTH || reason.length > REASON_MAX_LENGTH) {
-    return failure(`Motif obligatoire : entre ${REASON_MIN_LENGTH} et ${REASON_MAX_LENGTH} caracteres, conserve dans l'audit.`);
+    return failure(`Motif obligatoire : entre ${REASON_MIN_LENGTH} et ${REASON_MAX_LENGTH} caractères, conservé dans l'audit.`);
   }
   if (value) return failure(refusalMessage("ACTIVATION_VIA_OPS_ONLY"));
 
@@ -79,18 +79,18 @@ export async function applyAiScopeFlagAction(_previous: AiScopeFlagActionState, 
       cache: "no-store"
     });
   } catch {
-    return failure("Service indisponible : le changement n'a pas ete applique. Reessayez plus tard.");
+    return failure("Service indisponible : le changement n'a pas été appliqué. Réessayez plus tard.");
   }
 
   if (response.status === 401) redirect(loginRedirect(FLAGS_PATH, "session_expired"));
   if (response.status === 403) {
     const code = await readRefusalCode(response);
     if (code) return failure(refusalMessage(code));
-    return failure("Action refusee : role (super admin, conformite ou AI Admin), MFA ou portee insuffisants.");
+    return failure("Action refusée : rôle (super admin, conformité ou AI Admin), MFA ou portée insuffisants.");
   }
   if (response.status === 422) return failure(refusalMessage(await readRefusalCode(response)));
-  if (!response.ok) return failure("Changement non applique : erreur inattendue du service. Reessayez plus tard.");
+  if (!response.ok) return failure("Changement non appliqué : erreur inattendue du service. Réessayez plus tard.");
 
   revalidatePath(FLAGS_PATH);
-  return { status: "success", message: "Flag IA desactive et audite." };
+  return { status: "success", message: "Flag IA désactivé et audité." };
 }

@@ -112,7 +112,7 @@ export function PartnerActionResult({ state, partner }: { state: PartnerActionSt
 
 function ReasonField({ id }: { id: string }) {
   return (
-    <Field id={id} label="Motif (audite)" required hint="Au moins 8 caractères, conservé dans le journal d'audit.">
+    <Field id={id} label="Motif (audité)" required hint="Au moins 8 caractères, conservé dans le journal d'audit.">
       <Input {...fieldControlProps(id, { required: true, hint: "x" })} name="reason" minLength={8} />
     </Field>
   );

@@ -167,14 +167,14 @@ export function AdminShell({
       navigation={adminNavigation}
       user={user}
       logoutAction={logoutAction}
-      logoutLabel="Deconnexion"
+      logoutLabel="Déconnexion"
       envBadge={badge}
       pathname={pathname}
       navLabel="Navigation admin principale"
       menuOpenLabel="Ouvrir la navigation admin"
       menuCloseLabel="Fermer la navigation admin"
-      userMenuLabel="Utilisateur connecte"
-      themePicker={{ cookieName: ADMIN_THEME_COOKIE, current: theme ?? "clair", label: "Theme" }}
+      userMenuLabel="Utilisateur connecté"
+      themePicker={{ cookieName: ADMIN_THEME_COOKIE, current: theme ?? "clair", label: "Thème" }}
       breadcrumbLabel="Fil d'Ariane admin"
       dataAttributes={{ "data-admin-shell": "true" }}
     >

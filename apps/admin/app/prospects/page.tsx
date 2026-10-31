@@ -5,6 +5,7 @@ import { readBackOfficeSession } from "../lib/backoffice-auth";
 import { searchProspectsAction } from "./search-action";
 import { ProspectContactSearch } from "./contact-search";
 import { looksLikeProspectContact } from "../../../../packages/shared/security/prospect-contact-search";
+import { productLabel } from "../lib/ui/operations-labels";
 
 /**
  * Spec 073 (FR-001 a FR-005): prospects console. A row never carries a clear e-mail or phone: the
@@ -21,13 +22,13 @@ const NAME_SEARCH_ROLES = new Set(["super_admin", "support_admin"]);
 
 const columns: Array<DataTableColumn<ProspectRow>> = [
   { key: "name", header: "Nom", render: (row) => row.displayName ?? "-" },
-  { key: "email", header: "E-mail (masque)", render: (row) => row.email ?? "-" },
-  { key: "phone", header: "Telephone (masque)", render: (row) => row.phone ?? "-" },
-  { key: "scope", header: "Pays / produit", render: (row) => `${row.countryCode ?? "-"} / ${row.productKey ?? "-"}` },
+  { key: "email", header: "E-mail (masqué)", render: (row) => row.email ?? "-" },
+  { key: "phone", header: "Téléphone (masqué)", render: (row) => row.phone ?? "-" },
+  { key: "scope", header: "Pays / produit", render: (row) => `${row.countryCode ?? "-"} / ${productLabel(row.productKey)}` },
   { key: "consents", header: "Consentements", render: (row) => row.consentCount, numeric: true, align: "right" },
   { key: "quotes", header: "Demandes de devis", render: (row) => row.quoteRequestCount, numeric: true, align: "right" },
-  { key: "state", header: "Etat", render: (row) => (row.anonymized ? <Badge tone="neutral">Anonymise</Badge> : <Badge tone="success">Actif</Badge>) },
-  { key: "created", header: "Cree le", render: (row) => formatDateTime(row.createdAt) }
+  { key: "state", header: "État", render: (row) => (row.anonymized ? <Badge tone="neutral">Anonymisé</Badge> : <Badge tone="success">Actif</Badge>) },
+  { key: "created", header: "Créé le", render: (row) => formatDateTime(row.createdAt) }
 ];
 
 export default async function AdminProspectsPage({ searchParams }: { searchParams?: Promise<Record<string, string | string[] | undefined>> }) {
@@ -50,14 +51,14 @@ export default async function AdminProspectsPage({ searchParams }: { searchParam
   return (
     <PageStack>
       <PageHeader
-        breadcrumb={[{ label: "Pilotage" }, { label: "Operations", href: "/operations" }, { label: "Prospects" }]}
+        breadcrumb={[{ label: "Pilotage" }, { label: "Opérations", href: "/operations" }, { label: "Prospects" }]}
         title="Prospects"
-        description="Recherche paginee des prospects dans votre perimetre pays et produit. Les coordonnees sont masquees dans la liste; la fiche les affiche en clair uniquement pour les roles autorises, avec journal d'audit."
+        description="Recherche paginée des prospects dans votre périmètre pays et produit. Les coordonnées sont masquées dans la liste; la fiche les affiche en clair uniquement pour les rôles autorisés, avec journal d'audit."
       />
       <OperationsTabs current="/prospects" />
 
       {result.status === "unauthenticated" ? <StateMessage tone="danger">Session admin requise.</StateMessage> : null}
-      {result.status === "forbidden" ? <StateMessage tone="danger">Acces aux prospects refuse pour ce role admin.</StateMessage> : null}
+      {result.status === "forbidden" ? <StateMessage tone="danger">Accès aux prospects refusé pour ce rôle admin.</StateMessage> : null}
       {result.status === "error" ? <StateMessage tone="danger">Prospects indisponibles : {result.error}</StateMessage> : null}
 
       <Card>
@@ -71,10 +72,10 @@ export default async function AdminProspectsPage({ searchParams }: { searchParam
           <Field id="prospect-country" label="Pays (code ISO)">
             <Input {...fieldControlProps("prospect-country")} name="country" defaultValue={filters.country ?? ""} maxLength={3} placeholder="CI" />
           </Field>
-          <Field id="prospect-product" label="Produit (cle)">
+          <Field id="prospect-product" label="Produit (clé)">
             <Input {...fieldControlProps("prospect-product")} name="product" defaultValue={filters.product ?? ""} placeholder="auto" />
           </Field>
-          <Field id="prospect-anonymized" label="Prospects anonymises">
+          <Field id="prospect-anonymized" label="Prospects anonymisés">
             <Select {...fieldControlProps("prospect-anonymized")} name="includeAnonymized" defaultValue={filters.includeAnonymized ?? ""}>
               <option value="">Exclure</option>
               <option value="true">Inclure</option>
@@ -82,14 +83,14 @@ export default async function AdminProspectsPage({ searchParams }: { searchParam
           </Field>
           <div className="bo-filters__actions">
             <button className="bo-button" data-variant="secondary" data-size="sm" type="submit">Filtrer</button>
-            <a className="bo-button" data-variant="tertiary" data-size="sm" href="/prospects">Reinitialiser</a>
+            <a className="bo-button" data-variant="tertiary" data-size="sm" href="/prospects">Réinitialiser</a>
             {activeFilters > 0 ? <span className="bo-filters__count">{activeFilters}</span> : null}
           </div>
         </form>
       </Card>
 
       {contactNotice ? (
-        <StateMessage tone="warning">Un e-mail ou un telephone saisi dans le champ nom n'est pas recherche (il apparaitrait dans l'adresse de la page) : utilisez la recherche par e-mail ou telephone.</StateMessage>
+        <StateMessage tone="warning">Un e-mail ou un téléphone saisi dans le champ nom n'est pas recherché (il apparaîtrait dans l'adresse de la page) : utilisez la recherche par e-mail ou téléphone.</StateMessage>
       ) : null}
 
       {canSearchByName ? <ProspectContactSearch /> : null}

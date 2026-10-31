@@ -18,10 +18,10 @@ test("the admin screen administers quote form definitions through the admin API"
   expect(api).toContain("retireQuoteFormDefinition");
   expect(api).toContain("/admin/quote-form-definitions");
   expect(page).toContain("Formulaires de demande de devis");
-  expect(forms).toContain("Creer un brouillon");
+  expect(forms).toContain("Créer un brouillon");
   expect(forms).toContain("Publier une version");
   expect(forms).toContain("Retirer une version");
-  expect(forms).toContain("Motif (audite)");
+  expect(forms).toContain("Motif (audité)");
   expect(actions).toContain("revalidatePath(\"/quote-form-definitions\")");
   // The screen was a stub that nothing linked to, so reachability is part of the fix.
   expect(shell).toContain("href: \"/quote-form-definitions\"");
@@ -33,9 +33,9 @@ test("publishing states plainly that it exposes the form and rotates the version
 
   expect(forms).toContain("Publier expose ce formulaire aux visiteurs");
   expect(forms).toContain("lie la version du texte de consentement");
-  expect(forms).toContain("est retiree dans la meme operation");
-  expect(forms).toContain("toujours cree en brouillon");
-  expect(page).toContain("Une seule version publiee par pays, produit et langue");
+  expect(forms).toContain("est retirée dans la même opération");
+  expect(forms).toContain("toujours créé en brouillon");
+  expect(page).toContain("Une seule version publiée par pays, produit et langue");
   expect(page).toContain("Un champ sensible n'est publiable que si le flag produit correspondant est ouvert");
 });
 
@@ -43,7 +43,7 @@ test("the screen warns when no version is published, matching the activation che
   const page = source("apps/admin/app/quote-form-definitions/page.tsx");
 
   expect(page).toContain("la demande de devis est indisponible");
-  expect(page).toContain("le parcours de demande de devis reste indisponible cote public");
+  expect(page).toContain("le parcours de demande de devis reste indisponible côté public");
 });
 
 test("quote form administration copy avoids regulated or promotional wording", () => {

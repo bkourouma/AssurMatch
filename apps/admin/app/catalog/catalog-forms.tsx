@@ -62,7 +62,7 @@ export interface SelectChoice {
 
 function ReasonField({ id }: { id: string }) {
   return (
-    <Field id={id} label="Motif (audite)" required hint="Au moins 8 caractères, conservé dans le journal d'audit.">
+    <Field id={id} label="Motif (audité)" required hint="Au moins 8 caractères, conservé dans le journal d'audit.">
       <Input {...fieldControlProps(id, { required: true, hint: "x" })} name="reason" minLength={8} />
     </Field>
   );
@@ -253,7 +253,7 @@ export function FlagToggleForm({ target, countryId, productId, flagKey, label, c
       {productId ? <input type="hidden" name="productId" value={productId} /> : null}
       <input type="hidden" name="key" value={flagKey} />
       <input type="hidden" name="value" value={String(nextValue)} />
-      <Field id={`${base}-reason`} label="Motif (audite)" required>
+      <Field id={`${base}-reason`} label="Motif (audité)" required>
         <Input {...fieldControlProps(`${base}-reason`, { required: true })} name="reason" minLength={8} />
       </Field>
       <FormActions>
@@ -304,7 +304,7 @@ export function RetireCountryLinkForm({ countryId, productId, productName }: { c
         <CatalogActionResult state={state} scope={{ countryId, productId }} />
         <input type="hidden" name="countryId" value={countryId} />
         <input type="hidden" name="productId" value={productId} />
-        <Field id={`${base}-reason`} label="Motif (audite)" required>
+        <Field id={`${base}-reason`} label="Motif (audité)" required>
           <Input {...fieldControlProps(`${base}-reason`, { required: true })} name="reason" minLength={8} />
         </Field>
       </ConfirmDialog>
@@ -505,7 +505,7 @@ export function RetireRegimeForm({ regime }: { regime: AdminRegulatoryRegimeData
       >
         <CatalogActionResult state={state} />
         <input type="hidden" name="regimeId" value={regime.id} />
-        <Field id={`${base}-reason`} label="Motif (audite)" required>
+        <Field id={`${base}-reason`} label="Motif (audité)" required>
           <Input {...fieldControlProps(`${base}-reason`, { required: true })} name="reason" minLength={8} />
         </Field>
       </ConfirmDialog>

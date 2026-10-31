@@ -21,13 +21,13 @@ export default async function ConsentRecordsPage() {
   return (
     <PageStack>
       <PageHeader
-        breadcrumb={[{ label: "Pilotage" }, { label: "Conformite", href: "/compliance" }, { label: "Preuves de consentement" }]}
+        breadcrumb={[{ label: "Pilotage" }, { label: "Conformité", href: "/compliance" }, { label: "Preuves de consentement" }]}
         title="Preuves de consentement"
-        description="Retrouvez la preuve d'un consentement : texte accepte, finalite, destinataire prevu et dates. Chaque recherche est journalisee."
+        description="Retrouvez la preuve d'un consentement : texte accepté, finalité, destinataire prévu et dates. Chaque recherche est journalisée."
       />
       {session.status !== "authenticated" ? <StateMessage tone="danger">Session admin requise.</StateMessage> : null}
       {session.status === "authenticated" && !allowed ? (
-        <StateMessage tone="danger">Recherche reservee a la conformite (compliance_admin) et au Super Admin.</StateMessage>
+        <StateMessage tone="danger">Recherche réservée à la conformité (compliance_admin) et au Super Admin.</StateMessage>
       ) : null}
       {allowed ? <ConsentRecordSearch countries={options} /> : null}
     </PageStack>

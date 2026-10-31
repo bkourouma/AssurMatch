@@ -4,11 +4,11 @@ export default function ComplianceEvidencePage() {
   return (
     <PageStack>
       <PageHeader
-        breadcrumb={[{ label: "Pilotage" }, { label: "Conformite" }]}
-        title="Preuves de conformite"
-        description="Les registres de preuve : consentements, audits, alertes et conservation des donnees."
+        breadcrumb={[{ label: "Pilotage" }, { label: "Conformité" }]}
+        title="Preuves de conformité"
+        description="Les registres de preuve : consentements, audits, alertes et conservation des données."
       />
-      <StateMessage>Cette page ne cree ni ne modifie aucune preuve : elle mene aux registres existants.</StateMessage>
+      <StateMessage>Cette page ne crée ni ne modifie aucune preuve : elle mène aux registres existants.</StateMessage>
       <Card title="Registres">
         <DescriptionList
           items={[
@@ -16,7 +16,7 @@ export default function ComplianceEvidencePage() {
               term: "Consentements et audits",
               value: (
                 <Stack>
-                  <p>Les preuves critiques sont conservees selon la retention applicable et masquees dans les logs.</p>
+                  <p>Les preuves critiques sont conservées selon la rétention applicable et masquées dans les logs.</p>
                   <Cluster>
                     <Badge tone="success">Historique opposable</Badge>
                     <Button href="/compliance/consent-records" variant="secondary" size="sm">Rechercher une preuve de consentement</Button>
@@ -29,7 +29,7 @@ export default function ComplianceEvidencePage() {
               term: "Alertes",
               value: (
                 <Stack>
-                  <p>Les alertes conformite visibles restent issues des traces existantes.</p>
+                  <p>Les alertes conformité visibles restent issues des traces existantes.</p>
                   <Cluster>
                     <Button href="/dashboard/compliance-alerts" variant="secondary" size="sm">Voir les alertes</Button>
                   </Cluster>
@@ -40,9 +40,9 @@ export default function ComplianceEvidencePage() {
               term: "Conservation et anonymisation",
               value: (
                 <Stack>
-                  <p>Durees de conservation par categorie, lots d&apos;anonymisation previsualises puis approuves, effacement sur demande.</p>
+                  <p>Durées de conservation par catégorie, lots d&apos;anonymisation prévisualisés puis approuvés, effacement sur demande.</p>
                   <Cluster>
-                    <Button href="/compliance/retention" variant="secondary" size="sm">Gerer la retention</Button>
+                    <Button href="/compliance/retention" variant="secondary" size="sm">Gérer la rétention</Button>
                   </Cluster>
                 </Stack>
               )
