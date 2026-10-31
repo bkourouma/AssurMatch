@@ -9,7 +9,7 @@ const countryId = "country-ci";
 const partnerId = "00000000-0000-4000-8000-000000000301";
 const productKey = "auto";
 
-function makeService(audit = new AuditLogWriter()) {
+function makeService(audit = new AuditLogWriter(), quotesOverride?: unknown[]) {
   const now = new Date();
   const past = new Date(now.getTime() - 5 * 24 * 60 * 60 * 1000);
   audit.write({
@@ -46,7 +46,7 @@ function makeService(audit = new AuditLogWriter()) {
       list: async () => [{ id: "decision-1", result: "blocked", reasons: ["consent_missing"], createdAt: past }]
     } as never,
     quoteRequests: {
-      list: async () => [
+      list: async () => quotesOverride ?? [
         { id: "quote-1", countryId, productKey, createdAt: past },
         { id: "quote-2", countryId, productKey, createdAt: past }
       ]
@@ -83,6 +83,26 @@ describe("AdminDashboardService", () => {
     expect(dashboard.complianceAlertCounts.crmFlagClosed).toBe(1);
     expect(dashboard.sensitiveFeatureFlags).toContainEqual({ key: "broker_dashboard_enabled", scopeType: "global", scopeId: null, value: true });
     expect(audit.search({ action: DashboardAuditActions.adminDashboardRead })[0]?.result).toBe("success");
+  });
+
+  it("resolves the product breakdown from productId when the stored quote carries no productKey", async () => {
+    // The Prisma quote repository strips `productKey` on write: rows only carry `productId`.
+    const past = new Date(Date.now() - 24 * 60 * 60 * 1000);
+    const service = makeService(new AuditLogWriter(), [
+      { id: "quote-1", countryId, productId: "product-auto", createdAt: past },
+      { id: "quote-2", countryId, productId: "product-auto", createdAt: past },
+      { id: "quote-3", countryId, productId: "product-unlisted", createdAt: past }
+    ]);
+    const unscoped: ActorContext = { actorId: "admin", roles: ["super_admin"], mfaVerified: true };
+    const scoped: ActorContext = { actorId: "admin-scoped", roles: ["super_admin"], productScopes: [productKey], mfaVerified: true };
+
+    const all = await service.dashboard(unscoped, {});
+    expect(all.byProduct).toContainEqual({ productKey, total: 2 });
+    expect(all.byProduct).toContainEqual({ productKey: "unknown", total: 1 });
+
+    // A product-scoped admin used to get an empty breakdown: "unknown" is outside the scope.
+    const inScope = await service.dashboard(scoped, {});
+    expect(inScope.byProduct).toEqual([{ productKey, total: 2 }]);
   });
 
   it("refuses Admin Pays partner filters outside scoped licensed countries", async () => {
