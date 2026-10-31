@@ -87,7 +87,7 @@ describe("PublicOfferCatalogService comparison criteria", () => {
     const response = await catalog.compare({ ids: `${ids.premium},${ids.budget},${ids.fast}` }, undefined, context);
     offerCompareResponseSchema.parse(response);
     expect(response.items).toHaveLength(3);
-    expect(response.disclaimer).toContain("a confirmer par le courtier partenaire");
+    expect(response.disclaimer).toContain("à confirmer par le courtier partenaire");
     const guaranteeRow = response.rows.find((row) => row.key === "guarantee:vol")!;
     expect(guaranteeRow.values[ids.premium]).toBe(true);
     expect(guaranteeRow.values[ids.budget]).toBe(false);

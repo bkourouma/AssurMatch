@@ -6,7 +6,7 @@ import { Notice } from "../ui/notice";
  * "plateforme technique" and "comparaison indicative" required by Constitution principle I.
  */
 const FR_PLATFORM_STATUS =
-  "AssurMatch est une plateforme technique de comparaison indicative et de mise en relation avec des courtiers partenaires autorises.";
+  "AssurMatch est une plateforme technique de comparaison indicative et de mise en relation avec des courtiers partenaires autorisés.";
 
 export function PlatformStatusNotice({ tone = "info" }: { tone?: "info" | "indicative" }) {
   const t = useTranslations("Common");

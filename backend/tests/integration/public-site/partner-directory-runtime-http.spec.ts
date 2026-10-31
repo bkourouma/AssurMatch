@@ -81,7 +81,7 @@ describe("public partner directory runtime HTTP", () => {
     const body = await detail.json() as PublicPartner & { products: Array<{ key: string; name: string }>; disclaimer: string };
     expect(body.id).toBe(seed.partner.id);
     expect(body.products).toEqual([{ key: "auto", name: "Assurance auto" }]);
-    expect(body.disclaimer).toContain("partenaire agree");
+    expect(body.disclaimer).toContain("partenaire agréé");
     for (const key of FORBIDDEN_KEYS) {
       expect(Object.keys(body), key).not.toContain(key);
     }

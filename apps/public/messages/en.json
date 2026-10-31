@@ -622,8 +622,13 @@
     "options": {
       "contact_preference": {
         "phone": "Phone",
+        "telephone": "Phone",
         "email": "Email",
         "whatsapp": "WhatsApp"
+      },
+      "vehicle_use": {
+        "prive": "Private",
+        "professionnel": "Business"
       },
       "desired_timing": {
         "immediate": "As early as possible",

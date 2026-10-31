@@ -65,7 +65,7 @@ describe("OFFER-010 offer AI summary", () => {
     const completed = await adminAi.read(queued.id, admin);
     expect(completed.status).toBe("completed");
     expect(completed.humanValidationStatus).toBe("pending");
-    expect(completed.outputText).toContain("Resume indicatif de l'offre");
+    expect(completed.outputText).toContain("Résumé indicatif de l'offre");
 
     expect(await service.forAdmin(OFFER_ID, admin)).toMatchObject({ enabled: true, available: false, reasons: ["no_validated_summary"] });
     expect((await service.forBroker(OFFER_ID, broker("tenant-a"))).summary).toBeUndefined();
@@ -73,7 +73,7 @@ describe("OFFER-010 offer AI summary", () => {
     await adminAi.validate(queued.id, { decision: "approved" }, admin);
     const adminView = await controller.adminRead(admin, OFFER_ID);
     expect(adminView).toMatchObject({ enabled: true, available: true, label: OFFER_AI_SUMMARY_LABEL });
-    expect(adminView.summary).toContain("Resume indicatif de l'offre");
+    expect(adminView.summary).toContain("Résumé indicatif de l'offre");
     const brokerView = await controller.brokerRead(broker("tenant-a"), OFFER_ID);
     expect(brokerView.available).toBe(true);
     expect(brokerView.summary).toBe(adminView.summary);
@@ -130,7 +130,7 @@ describe("OFFER-010 offer AI summary", () => {
     expect(input).toContain(offer.publicKey);
     expect(input).not.toContain("tenant-a");
     expect(input).not.toMatch(/@|\+225|prospect|lead/i);
-    expect(JSON.stringify(audit.all())).not.toContain("Resume indicatif");
+    expect(JSON.stringify(audit.all())).not.toContain("Résumé indicatif");
   });
 
   it("guardrails refuse a summary that promises a guarantee", () => {

@@ -11,8 +11,8 @@ export const FORBIDDEN_REGULATED_WORDING = [
 export const SAFE_PUBLIC_CTA = [
   "Comparer les offres",
   "Demander un devis",
-  "Etre rappele par un courtier agree",
-  "Etre rappele par un courtier partenaire"
+  "Être rappelé par un courtier agréé",
+  "Être rappelé par un courtier partenaire"
 ] as const;
 
 export function findForbiddenWording(text: string): string[] {

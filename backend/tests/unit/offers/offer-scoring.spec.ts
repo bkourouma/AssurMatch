@@ -45,7 +45,7 @@ describe("scoreOffers", () => {
     const bare = scores.get("bare")!;
     const guarantee = bare.breakdown.find((line) => line.criterion === "guaranteeLevel")!;
     expect(guarantee.score).toBe(0);
-    expect(guarantee.explanation).toContain("non renseigne");
+    expect(guarantee.explanation).toContain("non renseigné");
     expect(bare.breakdown.find((line) => line.criterion === "price")!.score).toBe(1);
   });
 

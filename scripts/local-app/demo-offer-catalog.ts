@@ -66,14 +66,14 @@ const VOYAGE_EXCLUSIONS =
   "Exclusions indicatives: affections connues avant le départ, sports extrêmes non déclarés, voyages vers une zone déconseillée. Liste complète à confirmer par le courtier partenaire.";
 
 const AUTO_DOCUMENTS = [
-  "Pièce d'identité en cours de validite",
+  "Pièce d'identité en cours de validité",
   "Permis de conduire",
   "Carte grise du véhicule",
   "Relevé d'information du précédent assureur"
 ];
 
 const VOYAGE_DOCUMENTS = [
-  "Passeport en cours de validite",
+  "Passeport en cours de validité",
   "Réservation ou billet de transport",
   "Justificatif des dates de séjour"
 ];
@@ -243,7 +243,7 @@ export const DEMO_OFFER_SPECS: DemoOfferSpec[] = [
     publicKey: "local-demo-voyage-enterprise",
     name: "Voyage Assistance Local",
     shortDescription:
-      "Formule voyage d'affaires avec assistance etendue, présentée à titre indicatif pour la démonstration locale.",
+      "Formule voyage d'affaires avec assistance étendue, présentée à titre indicatif pour la démonstration locale.",
     guaranteeSummary:
       "Frais médicaux, rapatriement, bagages, annulation, retard de vol et responsabilité civile. Étendue exacte à confirmer par le courtier partenaire.",
     insurerName: "Assureur Demo Atlantique",

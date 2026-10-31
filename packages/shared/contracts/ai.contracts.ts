@@ -16,7 +16,7 @@ export const aiInteractionStatusSchema = z.enum(["queued", "completed", "refused
 export const aiHumanValidationStatusSchema = z.enum(["not_required", "pending", "approved", "rejected"]);
 
 /** Fixed wording appended to every AI output (Constitution V: assistance, never a decision). */
-export const AI_ASSISTANCE_DISCLAIMER = "Assistance IA indicative: le courtier partenaire confirmera les conditions, le devis et l'eligibilite.";
+export const AI_ASSISTANCE_DISCLAIMER = "Assistance IA indicative: le courtier partenaire confirmera les conditions, le devis et l'éligibilité.";
 
 export const aiInteractionSchema = z.object({
   id: uuidSchema,

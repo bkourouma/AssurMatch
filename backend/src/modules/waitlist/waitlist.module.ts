@@ -172,7 +172,7 @@ export class WaitlistService {
       status: "accepted",
       countryCode,
       message:
-        "Merci, votre adresse est enregistree: nous vous informerons par e-mail a l'ouverture d'AssurMatch dans ce pays, sans aucun engagement de votre part ni de la notre."
+        "Merci, votre adresse est enregistrée: nous vous informerons par e-mail à l'ouverture d'AssurMatch dans ce pays, sans aucun engagement de votre part ni de la nôtre."
     };
   }
 }

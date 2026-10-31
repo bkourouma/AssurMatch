@@ -261,7 +261,7 @@ export class QuoteEmailTemplateService {
       `Les informations consenties sont consultables dans votre back-office: ${this.brokerLink()}`,
       "Elles ne sont pas reprises dans cet email: leur consultation est tracée et limitée à votre cabinet.",
       "",
-      "Notification opérationnelle. Aucun engagement contractuel ne resulte de ce message.",
+      "Notification opérationnelle. Aucun engagement contractuel ne résulte de ce message.",
       PLATFORM_DISCLAIMER
     ];
     return this.assertSafe({
@@ -273,7 +273,7 @@ export class QuoteEmailTemplateService {
         `<p>${escapeHtml(headline)}</p>`,
         `<p><a href="${escapeHtml(this.brokerLink())}">Consulter le lead dans votre back-office</a></p>`,
         "<p>Les informations consenties ne sont pas reprises dans cet email: leur consultation est tracée et limitée à votre cabinet.</p>",
-        "<p>Notification opérationnelle. Aucun engagement contractuel ne resulte de ce message.</p>",
+        "<p>Notification opérationnelle. Aucun engagement contractuel ne résulte de ce message.</p>",
         `<p>${escapeHtml(PLATFORM_DISCLAIMER)}</p>`
       ]),
       purpose: "quote_broker_lead"
@@ -294,7 +294,7 @@ export class QuoteEmailTemplateService {
       "Elle n'est pas reprise dans cet email: sa consultation est tracée et limitée à votre cabinet.",
       "Le statut du lead n'est pas modifié automatiquement: c'est à vous de le faire évoluer.",
       "",
-      "Notification opérationnelle. Aucun engagement contractuel ne resulte de ce message.",
+      "Notification opérationnelle. Aucun engagement contractuel ne résulte de ce message.",
       PLATFORM_DISCLAIMER
     ];
     return this.assertSafe({
@@ -317,7 +317,7 @@ export class QuoteEmailTemplateService {
       "",
       `Consultez le détail dans votre back-office: ${link}`,
       "",
-      "Notification opérationnelle. Aucun engagement contractuel ne resulte de ce message.",
+      "Notification opérationnelle. Aucun engagement contractuel ne résulte de ce message.",
       PLATFORM_DISCLAIMER
     ];
     return this.assertSafe({
@@ -328,7 +328,7 @@ export class QuoteEmailTemplateService {
         `<p>Bonjour ${escapeHtml(context.partnerLegalName)},</p>`,
         `<p>${escapeHtml(copy.line)}</p>`,
         `<p><a href="${escapeHtml(link)}">Consulter le détail dans votre back-office</a></p>`,
-        "<p>Notification opérationnelle. Aucun engagement contractuel ne resulte de ce message.</p>",
+        "<p>Notification opérationnelle. Aucun engagement contractuel ne résulte de ce message.</p>",
         `<p>${escapeHtml(PLATFORM_DISCLAIMER)}</p>`
       ]),
       purpose: "broker_alert"
@@ -381,7 +381,7 @@ export class QuoteEmailTemplateService {
     switch (context.step) {
       case "received":
         return {
-          subject: `Votre demande de devis ${context.publicReference} est bien recue`,
+          subject: `Votre demande de devis ${context.publicReference} est bien reçue`,
           lines: [
             `Nous avons bien reçu votre demande de devis ${scope}.`,
             "Nous recherchons un courtier partenaire éligible pour ce pays et ce produit. Vous serez prévenu par e-mail à chaque étape.",
@@ -452,7 +452,7 @@ export class QuoteEmailTemplateService {
         };
       case "consent_withdrawn":
         return {
-          subject: `Retrait de votre consentement confirme (${context.publicReference})`,
+          subject: `Retrait de votre consentement confirmé (${context.publicReference})`,
           lines: [
             `Nous confirmons le retrait de votre consentement pour votre demande de devis ${scope}.`,
             "La demande est clôturée et chaque courtier partenaire concerné a été informé qu'il ne doit plus la traiter.",
@@ -532,7 +532,7 @@ export class QuoteEmailTemplateService {
         return {
           subject: `Votre lien de suivi (${context.publicReference})`,
           lines: [
-            "Vous avez demande un nouveau lien pour suivre votre demande de devis.",
+            "Vous avez demandé un nouveau lien pour suivre votre demande de devis.",
             "Si vous n'êtes pas à l'origine de cette demande, ignorez simplement ce message.",
             ""
           ]

@@ -437,7 +437,7 @@ export class ProductsService {
       name: product.name,
       comparisonEnabled: state.comparisonEnabled,
       quoteEnabled: state.quoteEnabled,
-      indicativeNotice: "Les offres et prix affiches sont indicatifs et a confirmer par le courtier partenaire."
+      indicativeNotice: "Les offres et prix affichés sont indicatifs et à confirmer par le courtier partenaire."
     };
   }
 

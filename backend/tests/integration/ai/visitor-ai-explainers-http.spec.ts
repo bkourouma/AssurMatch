@@ -90,7 +90,7 @@ describe("visitor offer explainers runtime HTTP", () => {
     expect(done.status).toBe("completed");
     expect(done.outputText).toContain("Auto Confort");
     expect(done.outputText).toContain("Bris de glace");
-    expect(done.outputText).toContain("a confirmer par le courtier partenaire");
+    expect(done.outputText).toContain("à confirmer par le courtier partenaire");
     expect(done.outputText).toContain(done.disclaimer);
     expect(done.outputText).not.toContain("example.test");
     expect(done.outputText).not.toContain("01 02 03");
@@ -137,7 +137,7 @@ describe("visitor offer explainers runtime HTTP", () => {
     const done = await readInteraction(harness, interaction.id);
     expect(done.status).toBe("completed");
     expect(done.outputText).toContain("Le prix indicatif le plus bas est celui de l'offre 2");
-    expect(done.outputText).toContain("a confirmer par le courtier partenaire");
+    expect(done.outputText).toContain("à confirmer par le courtier partenaire");
     expect(done.outputText).not.toMatch(/meilleur|conseill/i);
     const request = spy.mock.calls[0]?.[0] as AiGenerateRequest;
     for (const secret of [seed.offer.id, cheaper.id, seed.partner.id, "Broker CI Runtime"]) expect(request.user).not.toContain(secret);
