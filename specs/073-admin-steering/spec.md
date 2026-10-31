@@ -1,6 +1,7 @@
 # Feature Specification: Pilotage admin (KPI PRD §21, page Prospects, visites, alertes IA, contrôleurs admin non branchés)
 
-**Status**: Implemented (lot 6 « Pilotage admin » mandaté par le superviseur le 2026-10-22 ; spec standard, aucun `[NEEDS CLARIFICATION]` ; hypothèse métier H5 appliquée et signalée)
+**Status**: Implemented (lot 6 « Pilotage admin » mandaté par le superviseur le 2026-10-22 ; spec standard, aucun `[NEEDS CLARIFICATION]` ; hypothèse métier H5 (à valider) appliquée et signalée)
+**Statut des hypothèses** : hypothèse de travail, à valider par le propriétaire.
 **Input**: PRD §21 (dashboard admin plateforme), PRD complétion v0.3 H-01, H-08, H-09 ; specs 012 (dashboard), 036 (insights IA admin), 049 (anomalies de routage), 056 (consoles d'opérations), 060 (facturation B2B manuelle), 061 (alertes planifiées), 063 (contestations de leads).
 **Impacted surfaces**: Backend API (nouveau module de comptage des visites, console Prospects, extension du dashboard admin, route de pré-contrôle de routage), shared packages (`dashboard.contracts.ts`, `admin-operations.contracts.ts`, `visit-stats.contracts.ts`), base de données / Prisma (migration réservée `0036_admin_steering`, table `VisitCounter`), Back-office Plateforme/Admin (dashboard, `/prospects`, `/messaging`, `/routing`). **Web Publique Client : un seul montage minimal** (une balise de comptage sans UI, un fichier + une ligne de layout), nécessaire pour que le KPI « visiteurs » ne reste pas à zéro ; à signaler au superviseur. Back-office courtier : aucun changement. Les parcours visiteur (anonymes) et les parcours admin restent séparés.
 
@@ -28,7 +29,7 @@ Le PRD §21 liste 15 KPI pour le dashboard admin. Le dashboard actuel (spec 012)
 - **FR-004.** Chaque ligne indique : id, nom d'affichage (masqué partiellement hors rôles PII), pays (ISO), produit, date de création, nombre de consentements, nombre de demandes de devis liées, état d'anonymisation.
 - **FR-005 (écran).** `/prospects` affiche filtres, tableau, pagination, état vide et erreurs ; un panneau de détail est atteignable depuis chaque ligne.
 
-### Comptage des visites (hypothèse H5)
+### Comptage des visites (hypothèse H5, à valider)
 - **FR-006.** Table `VisitCounter` (`day` date UTC, `page` clé énumérée, `count`), clé unique `(day, page)`. Aucune autre colonne : ni IP, ni agent utilisateur, ni référent, ni identifiant, ni cookie.
 - **FR-007.** `POST /public-stats/visits` (public, sans corps sensible) accepte `{ page }` où `page` appartient à une liste fermée (`home`, `countries`, `country`, `product`, `offers`, `offer`, `compare`, `quote_form`, `quote_submitted`, `tracking`, `other`) ; toute autre valeur est refusée ; réponse 204. Incrément atomique (upsert) ; plafond global par page et par minute (anti-gonflage) sans stocker d'identifiant du visiteur.
 - **FR-008.** La balise publique (composant client sans UI) envoie une visite par navigation, ne s'exécute pas si le navigateur envoie « Do Not Track », n'utilise ni cookie ni stockage local, n'envoie que la clé de page déduite du chemin (jamais l'URL, la référence de demande ou un paramètre). Désactivable côté serveur par `ASSURMATCH_VISIT_COUNTER_ENABLED=false`.
@@ -63,7 +64,7 @@ Extension **additive** de la réponse `GET /admin/dashboard` (champs optionnels,
 - KPI du dashboard courtier (lot 3).
 
 ## Questions et hypothèses (à valider par le propriétaire du produit)
-- **H5.** Comptage des visites = compteur serveur agrégé par jour et par page, sans cookie ni donnée personnelle, libellé « pages vues ».
+- **H5 (à valider).** Comptage des visites = compteur serveur agrégé par jour et par page, sans cookie ni donnée personnelle, libellé « pages vues ».
 - **H6 (conversion).** Taux visite → demande = demandes créées / pages vues (toutes pages) ; alternative : rapporter au nombre de vues de la page d'accueil seule.
 - **H7 (CA).** CA affiché uniquement au `super_admin` ; `finance_admin` n'accède pas au dashboard (règle existante de la spec 012) et garde ses écrans de facturation.
 - **H8.** Le détail d'un prospect en clair est réservé à `super_admin` et `support_admin`.
