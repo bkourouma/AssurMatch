@@ -103,7 +103,7 @@ const fr: Guide[] = [
     productKey: "voyage",
     keyPoints: [
       "Frais médicaux, rapatriement, annulation et bagages : l'étendue exacte dépend de chaque offre.",
-      "Un visa Schengen impose une couverture minimale et une durée qui couvre tout le séjour.",
+      "Un visa Schengen peut exiger une couverture minimale et une durée qui couvre tout le séjour ; les exigences varient selon le pays et le consulat.",
       "Le délai de traitement affiché est celui de l'étude de la demande, pas un délai de remboursement.",
       "Les exclusions courantes méritent d'être lues avant de comparer sur le seul prix."
     ],
@@ -125,7 +125,7 @@ const fr: Guide[] = [
         id: "visa-schengen",
         heading: "Le cas particulier du visa Schengen",
         body: [
-          "Un visa Schengen exige en général une assurance voyage avec un montant minimal de couverture médicale et de rapatriement, souvent autour de 30 000 euros, valable pour toute la durée du séjour prévu dans l'espace Schengen. Une couverture insuffisante ou une date de fin antérieure à la date de retour peut entraîner un refus de visa ou un problème à l'entrée du territoire. Vérifiez ce montant et cette durée avant de choisir une offre, en particulier lorsque la date de départ est proche."
+          "Un visa Schengen exige en général une assurance voyage avec un montant minimal de couverture médicale et de rapatriement, souvent autour de 30 000 euros (à confirmer auprès du consulat), valable pour toute la durée du séjour prévu dans l'espace Schengen. Les exigences varient selon le pays et le consulat, et évoluent : vérifiez le montant et la durée de couverture auprès du consulat ou de l'ambassade compétent. AssurMatch ne garantit pas l'acceptation d'un dossier de visa. Vérifiez ce montant et cette durée avant de choisir une offre, en particulier lorsque la date de départ est proche."
         ]
       },
       {
@@ -522,7 +522,7 @@ const en: Guide[] = [
     productKey: "voyage",
     keyPoints: [
       "Medical costs, repatriation, cancellation and baggage: the exact scope depends on each offer.",
-      "A Schengen visa requires a minimum level of cover and a duration that covers the whole trip.",
+      "A Schengen visa may require a minimum level of cover and a duration that covers the whole trip; requirements vary by country and consulate.",
       "The processing time shown is for reviewing the request, not a reimbursement time.",
       "Common exclusions are worth reading before comparing on price alone."
     ],
@@ -544,7 +544,7 @@ const en: Guide[] = [
         id: "visa-schengen",
         heading: "The particular case of the Schengen visa",
         body: [
-          "A Schengen visa generally requires travel insurance with a minimum amount of medical and repatriation cover, often around 30,000 euros, valid for the whole duration of the planned stay in the Schengen area. Insufficient cover or an end date earlier than the return date can lead to a visa refusal or a problem entering the territory. Check this amount and this duration before choosing an offer, particularly when the departure date is close."
+          "A Schengen visa generally requires travel insurance with a minimum amount of medical and repatriation cover, often around 30,000 euros (to be confirmed with the consulate), valid for the whole duration of the planned stay in the Schengen area. Requirements vary by country and consulate, and change over time: check the amount and the duration of cover with the competent consulate or embassy. AssurMatch does not guarantee that a visa application will be accepted. Check this amount and this duration before choosing an offer, particularly when the departure date is close."
         ]
       },
       {
