@@ -33,9 +33,9 @@ export async function sendMessagingTestAction(_previous: MessagingTestActionStat
   const reason = text(formData, "reason");
 
   if (!CHANNELS.has(channel)) return failure("Canal invalide : choisissez SMS ou WhatsApp.");
-  if (recipient.length < 5 || recipient.length > 120) return failure("Destinataire obligatoire (5 a 120 caracteres).");
-  if (scopeId.length === 0) return failure("Identifiant de portee obligatoire.");
-  if (reason.length < 3 || reason.length > 300) return failure("Motif obligatoire (3 a 300 caracteres), conserve dans l'audit.");
+  if (recipient.length < 5 || recipient.length > 120) return failure("Destinataire obligatoire (5 à 120 caractères).");
+  if (scopeId.length === 0) return failure("Identifiant de portée obligatoire.");
+  if (reason.length < 3 || reason.length > 300) return failure("Motif obligatoire (3 à 300 caractères), conservé dans l'audit.");
 
   const token = await getBackOfficeToken();
   if (!token) redirect(loginRedirect("/messaging", "session_required"));
@@ -49,20 +49,20 @@ export async function sendMessagingTestAction(_previous: MessagingTestActionStat
       cache: "no-store"
     });
   } catch {
-    return failure("Service indisponible : le message de test n'a pas ete envoye.");
+    return failure("Service indisponible : le message de test n'a pas été envoyé.");
   }
 
   if (response.status === 401) redirect(loginRedirect("/messaging", "session_expired"));
-  if (response.status === 403) return failure("Action refusee : reservee au super admin, MFA requis.");
-  if (response.status === 422) return failure("Message de test refuse : verifiez le canal, le destinataire et la portee.");
-  if (!response.ok) return failure("Message de test non envoye : erreur inattendue du service.");
+  if (response.status === 403) return failure("Action refusée : réservée au super admin, MFA requis.");
+  if (response.status === 422) return failure("Message de test refusé : vérifiez le canal, le destinataire et la portée.");
+  if (!response.ok) return failure("Message de test non envoyé : erreur inattendue du service.");
 
   try {
     const body = await response.json() as { status?: unknown; recipientMasked?: unknown; reason?: unknown };
     const status = typeof body.status === "string" ? body.status : "unknown";
     return {
       status: status === "sent" ? "success" : "error",
-      message: status === "sent" ? "Message de test envoye." : "Message de test non envoye.",
+      message: status === "sent" ? "Message de test envoyé." : "Message de test non envoyé.",
       delivery: {
         status,
         recipientMasked: typeof body.recipientMasked === "string" ? body.recipientMasked : "-",
@@ -70,6 +70,6 @@ export async function sendMessagingTestAction(_previous: MessagingTestActionStat
       }
     };
   } catch {
-    return failure("Reponse du service illisible.");
+    return failure("Réponse du service illisible.");
   }
 }

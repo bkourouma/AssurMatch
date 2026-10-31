@@ -18,7 +18,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
   const profile = session.status === "authenticated" || session.status === "mfa_required" ? session.profile : undefined;
   // The actor id is a UUID: it is shortened so the account menu stays readable, the role leads.
   const primaryRole = profile?.roles[0]?.replaceAll("_", " ");
-  const label = primaryRole ? primaryRole.charAt(0).toUpperCase() + primaryRole.slice(1) : "Admin connecte";
+  const label = primaryRole ? primaryRole.charAt(0).toUpperCase() + primaryRole.slice(1) : "Admin connecté";
   const user = profile
     ? {
         label,

@@ -49,12 +49,12 @@ test("broker dashboard and account surfaces use polished primitives", () => {
   // The dashboard figures are one StatStrip fed by the view model (no grid of equal KPI cards).
   expect(home).toContain("dashboardStats");
   expect(home).toContain("Leads à traiter");
-  expect(account).toContain("Securite du compte");
+  expect(account).toContain("Sécurité du compte");
   expect(account).toContain("DescriptionList");
   // Spec 053: the team page is functional (no more "Module indisponible" placeholder).
   expect(team).not.toContain("Module indisponible");
   expect(team).toContain("readBrokerTeam");
-  expect(team).toContain("Permissions conservees");
+  expect(team).toContain("Permissions conservées");
 });
 
 test("Starter CRM entry points show required Pro availability message", () => {
@@ -68,7 +68,7 @@ test("Starter CRM entry points show required Pro availability message", () => {
   }
   expect(crm.indexOf("const session = await readBackOfficeSession();")).toBeLessThan(crm.indexOf("const dashboard = await readBrokerDashboardWithComparison(filterQuery);"));
   expect(crm.indexOf("if (isStarterCrmDenied(session.profile))")).toBeLessThan(crm.indexOf("const dashboard = await readBrokerDashboardWithComparison(filterQuery);"));
-  expect(detail).toContain("ne presente pas Kanban");
+  expect(detail).toContain("ne présente pas Kanban");
 });
 
 test("Pro and Enterprise CRM surfaces are gated by plan/flag availability", () => {
@@ -78,12 +78,12 @@ test("Pro and Enterprise CRM surfaces are gated by plan/flag availability", () =
 
   expect(crm).toContain("broker_crm_enabled");
   expect(crm).toContain("Module indisponible");
-  expect(crmList).toContain("Acces CRM refuse");
+  expect(crmList).toContain("Accès CRM refusé");
   expect(crmList).toContain("flag broker_crm_enabled");
   expect(crmList.indexOf("if (apiLeads.forbidden)")).toBeLessThan(crmList.indexOf("const leads = apiLeads.data.items.map(leadSummary);"));
   expect(crmList.indexOf("if (apiLeads.forbidden)")).toBeLessThan(crmList.indexOf("<PageHeader"));
   expect(crmDetail).toContain("isStarterCrmDenied");
-  expect(crmDetail).toContain("CRM autorise");
+  expect(crmDetail).toContain("CRM autorisé");
 });
 
 test("broker source avoids public/admin leakage and forbidden wording", () => {

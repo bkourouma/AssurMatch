@@ -57,12 +57,12 @@ const columns: Array<DataTableColumn<AdminUser>> = [
     sortable: true,
     sortValue: (user) => user.displayName
   },
-  { key: "roles", header: "Roles", render: (user) => roleLabel(user.roles), sortable: true, sortValue: (user) => user.roles.join(", ") },
+  { key: "roles", header: "Rôles", render: (user) => roleLabel(user.roles), sortable: true, sortValue: (user) => user.roles.join(", ") },
   { key: "status", header: "Statut", render: (user) => <StatusBadge status={user.status} tones={userStatusTones} />, sortable: true, sortValue: (user) => user.status },
   { key: "mfa", header: "MFA", render: (user) => <StatusBadge status={user.mfaStatus} tones={mfaStatusTones} />, sortable: true, sortValue: (user) => user.mfaStatus },
   {
     key: "lastLogin",
-    header: "Derniere connexion",
+    header: "Dernière connexion",
     render: (user) => formatDate(user.lastLoginAt),
     sortable: true,
     sortValue: (user) => user.lastLoginAt ?? null
@@ -106,26 +106,26 @@ export default async function UserManagementPage({ searchParams }: UsersPageProp
     <PageStack>
       <PageHeader
         breadcrumb={[{ label: "Plateforme" }, { label: "Utilisateurs" }]}
-        title="Utilisateurs et roles"
-        description="Comptes, roles, scopes, statuts et MFA. Chaque changement est valide et audite cote API."
-        actions={<Button href="#creer-utilisateur">Creer un utilisateur</Button>}
+        title="Utilisateurs et rôles"
+        description="Comptes, rôles, scopes, statuts et MFA. Chaque changement est validé et audité côté API."
+        actions={<Button href="#creer-utilisateur">Créer un utilisateur</Button>}
       />
 
-      {notice ? <StateMessage>Action terminee: {notice}.</StateMessage> : null}
-      {users.forbidden ? <StateMessage tone="danger">Acces refuse: votre role ne permet pas de lire les utilisateurs.</StateMessage> : null}
+      {notice ? <StateMessage>Action terminée: {notice}.</StateMessage> : null}
+      {users.forbidden ? <StateMessage tone="danger">Accès refusé: votre rôle ne permet pas de lire les utilisateurs.</StateMessage> : null}
       {users.status === "error" ? <StateMessage tone="danger">Liste indisponible: {users.error}.</StateMessage> : null}
 
       <FilterBar
         action="/users"
         label="Filtres utilisateurs"
         submitLabel="Filtrer"
-        resetLabel="Reinitialiser"
+        resetLabel="Réinitialiser"
         resetHref="/users"
         activeCount={activeFilters}
         autoSubmit
       >
         <Field id="users-search" label="Recherche">
-          <Input {...fieldControlProps("users-search")} name="search" defaultValue={search} placeholder="Email, nom, tenant, role" />
+          <Input {...fieldControlProps("users-search")} name="search" defaultValue={search} placeholder="Email, nom, tenant, rôle" />
         </Field>
         <Field id="users-status" label="Statut">
           <Select {...fieldControlProps("users-status")} name="status" defaultValue={status}>
@@ -133,7 +133,7 @@ export default async function UserManagementPage({ searchParams }: UsersPageProp
             {userStatusOptions.map((option) => <option key={option} value={option}>{option}</option>)}
           </Select>
         </Field>
-        <Field id="users-role" label="Role">
+        <Field id="users-role" label="Rôle">
           <Select {...fieldControlProps("users-role")} name="role" defaultValue={role}>
             <option value="">Tous</option>
             {adminRoleOptions.map((option) => <option key={option} value={option}>{option}</option>)}
@@ -146,7 +146,7 @@ export default async function UserManagementPage({ searchParams }: UsersPageProp
         items={rows}
         getKey={(user) => user.id}
         emptyLabel="Aucun utilisateur pour ces filtres."
-        emptyDescription={activeFilters > 0 ? "Reinitialisez les filtres pour revoir tous les comptes." : "Creez le premier compte avec le formulaire ci-dessous."}
+        emptyDescription={activeFilters > 0 ? "Réinitialisez les filtres pour revoir tous les comptes." : "Créez le premier compte avec le formulaire ci-dessous."}
         aria-label="Liste utilisateurs"
         sort={table.sort}
         sortHref={table.sortHref}

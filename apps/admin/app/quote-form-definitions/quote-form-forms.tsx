@@ -39,7 +39,7 @@ export function CreateQuoteFormDefinitionForm() {
   };
 
   return (
-    <Card title="Creer un brouillon">
+    <Card title="Créer un brouillon">
       <Form action={formAction} data-quote-form="create">
         <ActionNotice state={state} />
         <Field id={ids.countryId} label="Pays (UUID)" required>
@@ -54,31 +54,31 @@ export function CreateQuoteFormDefinitionForm() {
         <Field id={ids.version} label="Version" required>
           <Input {...fieldControlProps(ids.version, { required: true })} name="version" />
         </Field>
-        <Field id={ids.consentTextId} label="Texte de consentement publie (UUID)" required>
+        <Field id={ids.consentTextId} label="Texte de consentement publié (UUID)" required>
           <Input {...fieldControlProps(ids.consentTextId, { required: true })} name="consentTextId" />
         </Field>
-        <Field id={ids.fields} label="Champs (une ligne par champ: cle|libelle|type|obligatoire|sensibilite|options)" required>
+        <Field id={ids.fields} label="Champs (une ligne par champ: clé|libellé|type|obligatoire|sensibilité|options)" required>
           <Textarea
             {...fieldControlProps(ids.fields, { required: true })}
             name="fields"
             rows={4}
-            placeholder="vehicle_use|Usage du vehicule|select|true|public|prive,professionnel"
+            placeholder="vehicle_use|Usage du véhicule|select|true|public|prive,professionnel"
           />
         </Field>
-        <Field id={ids.dataMinimizationNotes} label="Note de minimisation des donnees">
+        <Field id={ids.dataMinimizationNotes} label="Note de minimisation des données">
           <Input {...fieldControlProps(ids.dataMinimizationNotes)} name="dataMinimizationNotes" maxLength={500} />
         </Field>
-        <Field id={ids.reason} label="Motif (audite)" required>
+        <Field id={ids.reason} label="Motif (audité)" required>
           <Input {...fieldControlProps(ids.reason, { required: true })} name="reason" />
         </Field>
-        <p className="bo-description">Un formulaire est toujours cree en brouillon: la publication est un acte distinct et audite.</p>
+        <p className="bo-description">Un formulaire est toujours créé en brouillon: la publication est un acte distinct et audité.</p>
         <p className="bo-description">
-          Les champs generiques (ville, preference de contact, delai souhaite, budget, langue preferee, source) sont ajoutes d&apos;office
-          par le serveur, libelles dans la langue du formulaire; nom, e-mail et telephone restent les champs de contact du parcours. Ne
+          Les champs génériques (ville, préférence de contact, délai souhaite, budget, langue préférée, source) sont ajoutés d&apos;office
+          par le serveur, libellés dans la langue du formulaire; nom, e-mail et téléphone restent les champs de contact du parcours. Ne
           saisissez ici que les champs propres au produit.
         </p>
         <FormActions>
-          <Button type="submit" pending={pending} pendingLabel="Creation...">Creer le brouillon</Button>
+          <Button type="submit" pending={pending} pendingLabel="Création...">Créer le brouillon</Button>
         </FormActions>
       </Form>
     </Card>
@@ -101,11 +101,11 @@ export function PublishQuoteFormDefinitionForm({ formIds }: { formIds: string[] 
             options={formIds.map((id) => ({ value: id, label: id }))}
           />
         </Field>
-        <Field id={ids.reason} label="Motif (audite)" required>
+        <Field id={ids.reason} label="Motif (audité)" required>
           <Input {...fieldControlProps(ids.reason, { required: true })} name="reason" />
         </Field>
         <Notice tone="warning">
-          Publier expose ce formulaire aux visiteurs et lie la version du texte de consentement. La version publiee precedente pour le meme pays, produit et langue est retiree dans la meme operation.
+          Publier expose ce formulaire aux visiteurs et lie la version du texte de consentement. La version publiée précédente pour le même pays, produit et langue est retirée dans la même opération.
         </Notice>
         <FormActions>
           <Button type="submit" pending={pending} pendingLabel="Publication..." disabled={formIds.length === 0}>Publier</Button>
@@ -121,17 +121,17 @@ export function RetireQuoteFormDefinitionForm({ formIds }: { formIds: string[] }
   const ids = { formId: `${base}-form`, reason: `${base}-reason` };
 
   return (
-    <Card title="Retirer une version" description="Retirer coupe l'exposition publique du formulaire; l'historique des versions est conserve.">
+    <Card title="Retirer une version" description="Retirer coupe l'exposition publique du formulaire; l'historique des versions est conservé.">
       <ActionNotice state={state} />
       {formIds.length === 0 ? (
-        <p className="bo-description">Aucune version a retirer.</p>
+        <p className="bo-description">Aucune version à retirer.</p>
       ) : (
         <FormActions>
           <ConfirmDialog
             triggerLabel="Retirer"
             triggerVariant="danger"
             title="Retirer une version de formulaire"
-            description="Le formulaire choisi n'est plus expose au public. L'historique des versions est conserve."
+            description="Le formulaire choisi n'est plus exposé au public. L'historique des versions est conservé."
             confirmLabel="Retirer"
             cancelLabel="Annuler"
             tone="danger"
@@ -146,7 +146,7 @@ export function RetireQuoteFormDefinitionForm({ formIds }: { formIds: string[] }
                 options={formIds.map((id) => ({ value: id, label: id }))}
               />
             </Field>
-            <Field id={ids.reason} label="Motif (audite)" required>
+            <Field id={ids.reason} label="Motif (audité)" required>
               <Input {...fieldControlProps(ids.reason, { required: true })} name="reason" />
             </Field>
           </ConfirmDialog>

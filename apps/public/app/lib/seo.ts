@@ -81,7 +81,7 @@ export function organizationJsonLd(locale: AppLocale): JsonLd {
     logo: new URL("/logo-assurmatch.png", siteUrl).toString(),
     description:
       locale === "fr"
-        ? "Plateforme technique de comparaison indicative d'offres d'assurance et de mise en relation avec des courtiers partenaires autorises."
+        ? "Plateforme technique de comparaison indicative d'offres d'assurance et de mise en relation avec des courtiers partenaires autorisés."
         : "Technical platform for indicative insurance offer comparison and introduction to authorised partner brokers."
   };
 }

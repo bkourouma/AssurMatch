@@ -24,30 +24,30 @@ export const STARTER_REASON_LABELS: Record<StarterActionReason, string> = {
 };
 
 export const STARTER_STATUS_LABELS: Record<string, string> = {
-  assigned: "Assigne",
-  broker_notified: "Courtier notifie",
+  assigned: "Assigné",
+  broker_notified: "Courtier notifié",
   seen: "Vu",
-  accepted: "Accepte",
-  rejected: "Rejete",
-  disputed: "Conteste",
-  closed: "Cloture"
+  accepted: "Accepté",
+  rejected: "Rejeté",
+  disputed: "Contesté",
+  closed: "Clôturé"
 };
 
 export const STARTER_EVENT_LABELS: Record<string, string> = {
-  assigned: "Lead assigne par le routage",
-  reassigned: "Lead reassigne",
-  viewed: "Detail consulte et marque vu",
-  accepted: "Lead accepte par le courtier",
-  rejected: "Lead rejete avec motif",
-  disputed: "Lead conteste avec motif",
-  closed: "Lead cloture par le courtier",
+  assigned: "Lead assigné par le routage",
+  reassigned: "Lead réassigné",
+  viewed: "Détail consulté et marqué vu",
+  accepted: "Lead accepté par le courtier",
+  rejected: "Lead rejeté avec motif",
+  disputed: "Lead contesté avec motif",
+  closed: "Lead clôturé par le courtier",
   notification_read: "Notification lue",
-  exported: "Lead exporte",
-  blocked: "Action bloquee",
+  exported: "Lead exporté",
+  blocked: "Action bloquée",
   // Spec 055: boucle de reponse au visiteur.
-  proposal_sent: "Proposition envoyee au visiteur",
-  proposal_withdrawn: "Proposition retiree",
-  visitor_responded: "Reponse du visiteur recue"
+  proposal_sent: "Proposition envoyée au visiteur",
+  proposal_withdrawn: "Proposition retirée",
+  visitor_responded: "Réponse du visiteur reçue"
 };
 
 /** Statuts terminaux Starter: plus aucune action courtier n'est possible. */
@@ -62,7 +62,7 @@ export const STARTER_CLOSE_OUTCOMES = ["gagne", "perdu", "sans_suite"] as const;
 export type StarterCloseOutcome = (typeof STARTER_CLOSE_OUTCOMES)[number];
 
 export const STARTER_CLOSE_OUTCOME_LABELS: Record<StarterCloseOutcome, string> = {
-  gagne: "Gagne",
+  gagne: "Gagné",
   perdu: "Perdu",
   sans_suite: "Sans suite"
 };
@@ -102,20 +102,20 @@ export type CrmPipelineStatus = (typeof CRM_PIPELINE_STATUSES)[number];
 
 export const CRM_STATUS_LABELS: Record<CrmPipelineStatus, string> = {
   nouveau: "Nouveau",
-  accepte: "Accepte",
-  contact_tente: "Contact tente",
-  contacte: "Contacte",
-  qualifie: "Qualifie",
-  documents_demandes: "Documents demandes",
-  devis_en_preparation: "Devis en preparation",
-  devis_envoye: "Devis envoye",
-  negociation: "Negociation",
-  gagne: "Gagne",
+  accepte: "Accepté",
+  contact_tente: "Contact tenté",
+  contacte: "Contacté",
+  qualifie: "Qualifié",
+  documents_demandes: "Documents demandés",
+  devis_en_preparation: "Devis en préparation",
+  devis_envoye: "Devis envoyé",
+  negociation: "Négociation",
+  gagne: "Gagné",
   perdu: "Perdu",
   doublon: "Doublon",
   injoignable: "Injoignable",
   hors_cible: "Hors cible",
-  rejete_conteste: "Rejete ou conteste"
+  rejete_conteste: "Rejeté ou contesté"
 };
 
 /** Statuts de perte ou de contestation: le contrat exige un motif allowliste. */
@@ -152,16 +152,16 @@ export const CRM_REASON_LABELS: Record<CrmOutcomeReason, string> = {
 
 export const CRM_EVENT_LABELS: Record<string, string> = {
   status_changed: "Changement de statut",
-  note_created: "Note interne ajoutee",
-  task_created: "Tache commerciale creee",
-  reminder_created: "Rappel programme",
-  assigned: "Lead assigne a un conseiller",
-  document_added: "Document interne ajoute",
-  proposal_added: "Reference de devis ajoutee",
+  note_created: "Note interne ajoutée",
+  task_created: "Tâche commerciale créée",
+  reminder_created: "Rappel programmé",
+  assigned: "Lead assigné à un conseiller",
+  document_added: "Document interne ajouté",
+  proposal_added: "Référence de devis ajoutée",
   disputed: "Contestation ouverte",
-  exported: "Export realise",
-  proposal_sent: "Proposition envoyee au visiteur",
-  proposal_withdrawn: "Proposition retiree"
+  exported: "Export réalisé",
+  proposal_sent: "Proposition envoyée au visiteur",
+  proposal_withdrawn: "Proposition retirée"
 };
 
 export function isStarterActionReason(value: string): value is StarterActionReason {
@@ -183,6 +183,23 @@ export function renderAnswerValue(value: unknown): string {
   return JSON.stringify(value);
 }
 
+/** Libellé d'une question du formulaire de devis: la clé de l'API n'est jamais montrée telle quelle. */
+export const ANSWER_LABELS: Record<string, string> = {
+  usage: "Usage",
+  budget: "Budget indicatif",
+  vehicle_count: "Nombre de véhicules",
+  vehicle_use: "Usage du véhicule",
+  contact_preference: "Préférence de contact",
+  coverage_extension: "Extension de couverture"
+};
+
+export function answerLabel(key: string): string {
+  const known = ANSWER_LABELS[key];
+  if (known) return known;
+  const spaced = key.replace(/[_-]+/g, " ").trim();
+  return spaced ? spaced.charAt(0).toUpperCase() + spaced.slice(1) : key;
+}
+
 export function starterStatusLabel(value?: string | undefined): string {
   if (!value) return "-";
   return STARTER_STATUS_LABELS[value] ?? value;
@@ -200,7 +217,7 @@ export function starterEventLabel(value?: string | undefined): string {
 
 export function crmStatusLabel(value?: string | undefined): string {
   if (!value) return "-";
-  return CRM_STATUS_LABELS[value as CrmPipelineStatus] ?? value;
+  return CRM_STATUS_LABELS[value as CrmPipelineStatus] ?? STARTER_STATUS_LABELS[value] ?? value; // statut d'affectation hors pipeline CRM (assigned, seen...): libellé Starter partagé
 }
 
 export function crmReasonLabel(value?: string | undefined): string {

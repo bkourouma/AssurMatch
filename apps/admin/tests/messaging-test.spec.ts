@@ -17,7 +17,7 @@ test("messaging page exposes the test send card with the super admin note", () =
   expect(page).toContain("Envoi de test");
   expect(page).toContain("MessagingTestForm");
   expect(form).toContain("Envoyer un message de test");
-  expect(form).toContain("Reserve au super admin, MFA requis");
+  expect(form).toContain("Réservé au super admin, MFA requis");
   expect(form).toContain("recipientMasked");
   expect(form).toContain('name="recipient"');
   expect(form).toContain('name="scopeId"');

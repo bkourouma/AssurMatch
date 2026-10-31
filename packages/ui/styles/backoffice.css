@@ -384,13 +384,17 @@ samp {
 
 /* ---------- Sidebar navigation ---------- */
 
+/* One shrinkable column: an implicit "auto" column grows to the widest entry (label + badge) and the
+   rail then clips the badge instead of letting the label give way. */
 .bo-nav {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: var(--bo-s5);
 }
 
 .bo-nav__group {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: 1px;
 }
 
@@ -430,6 +434,11 @@ samp {
   transform: scaleX(0.3);
   transform-origin: left center;
   transition: transform 0.2s var(--bo-ease), background-color 0.12s var(--bo-ease);
+}
+
+/* An entry with a plan badge reclaims a few pixels so the label keeps its full width. */
+.bo-nav__link:has(.bo-nav__badge) {
+  padding-right: var(--bo-s3);
 }
 
 .bo-nav__link svg {
@@ -1087,6 +1096,8 @@ samp {
 .bo-kpi {
   min-width: 0;
   display: grid;
+  /* One column that can shrink: an implicit "auto" column grows to its widest word and spills. */
+  grid-template-columns: minmax(0, 1fr);
   align-content: start;
   gap: var(--bo-s1);
   padding: var(--bo-s4);
@@ -1103,16 +1114,6 @@ samp {
   color: var(--bo-ink-3);
   font-size: var(--bo-fs);
   font-weight: 500;
-}
-
-.bo-kpi__value {
-  margin: 0;
-  font-family: var(--bo-mono);
-  font-size: var(--bo-fs-stat);
-  font-variant-numeric: tabular-nums;
-  font-weight: 300;
-  letter-spacing: -0.03em;
-  line-height: 1.1;
 }
 
 .bo-kpi__helper {
@@ -1158,6 +1159,7 @@ samp {
   position: relative;
   min-width: 0;
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   align-content: start;
   gap: var(--bo-s1);
   padding: var(--bo-s4) var(--bo-s4) var(--bo-s5);
@@ -1175,14 +1177,69 @@ samp {
   font-weight: 500;
 }
 
+/* ---------- Headline figure (KPI card value, stat strip value) ---------- */
+/* The value always stays inside its tile. A figure steps down a size until it fits the narrowest
+   tile (data-size, chosen from the text by FigureValue) and shows a trailing unit (XOF, %, min)
+   smaller on the same line; words are set in the interface face, never in mono. */
+
+.bo-kpi__value,
 .bo-stats__value {
+  --bo-fig-scale: 1;
+  min-width: 0;
+  max-width: 100%;
   margin: 0;
   font-family: var(--bo-mono);
-  font-size: var(--bo-fs-stat);
+  font-size: calc(var(--bo-fs-stat) * var(--bo-fig-scale));
   font-variant-numeric: tabular-nums;
   font-weight: 300;
   letter-spacing: -0.03em;
   line-height: 1.1;
+  overflow-wrap: anywhere;
+}
+
+.bo-kpi__value[data-size="md"],
+.bo-stats__value[data-size="md"] {
+  --bo-fig-scale: 0.75;
+}
+
+.bo-kpi__value[data-size="sm"],
+.bo-stats__value[data-size="sm"] {
+  --bo-fig-scale: 0.58;
+}
+
+.bo-kpi__value[data-size="xs"],
+.bo-stats__value[data-size="xs"] {
+  --bo-fig-scale: 0.46;
+}
+
+.bo-kpi__value[data-kind="text"],
+.bo-stats__value[data-kind="text"] {
+  font-family: var(--bo-font);
+  font-size: var(--bo-fs-section);
+  font-weight: 400;
+  letter-spacing: 0;
+  line-height: 1.25;
+  /* Interface face, not mono: the text may wrap between words, never mid-tile. */
+  overflow-wrap: break-word;
+}
+
+.bo-figure__main,
+.bo-figure__unit {
+  white-space: nowrap;
+}
+
+.bo-figure__unit {
+  /* The unit is a legend beside the figure: 40% of the figure, never under the 14px floor. */
+  color: var(--bo-ink-3);
+  font-size: max(14px, 0.4em);
+  font-weight: 400;
+  letter-spacing: 0;
+}
+
+/* The smallest size has nothing left to give: let a very long figure break rather than spill. */
+.bo-kpi__value[data-size="xs"] .bo-figure__main,
+.bo-stats__value[data-size="xs"] .bo-figure__main {
+  white-space: normal;
 }
 
 .bo-stats__helper {

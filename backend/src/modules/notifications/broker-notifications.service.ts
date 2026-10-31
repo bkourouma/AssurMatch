@@ -63,7 +63,7 @@ export class BrokerNotificationsService {
       scopeId: parsed.scopeId,
       recipient: parsed.recipient,
       template: "messaging_channel_test",
-      body: "Notification operationnelle de test AssurMatch. Aucun engagement contractuel."
+      body: "Notification opérationnelle de test AssurMatch. Aucun engagement contractuel."
     }, actor);
   }
 

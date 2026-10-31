@@ -65,7 +65,7 @@ export function CreateConsentTextForm({ templates, countries, products }: {
       <Form action={formAction} data-consent-form="create">
         <CatalogActionResult state={state} />
         <Field id={`${base}-template`} label="Partir d'un modèle" hint="Préremplit la finalité, la langue et le contenu ; tout reste modifiable.">
-          <Select {...fieldControlProps(`${base}-template`, { hint: "modele" })} value={templateKey} onChange={(event) => applyTemplate(event.target.value)}>
+          <Select {...fieldControlProps(`${base}-template`, { hint: "modèle" })} value={templateKey} onChange={(event) => applyTemplate(event.target.value)}>
             <option value="">Aucun modèle</option>
             {templates.map((candidate) => (
               <option key={candidate.templateKey} value={candidate.templateKey}>{`${candidate.templateKey} (${candidate.purpose}, ${candidate.language})`}</option>
@@ -121,7 +121,7 @@ export function CreateConsentTextForm({ templates, countries, products }: {
             onChange={(event) => setContent(event.target.value)}
           />
         </Field>
-        <Field id={`${base}-reason`} label="Motif (audite)" required>
+        <Field id={`${base}-reason`} label="Motif (audité)" required>
           <Input {...fieldControlProps(`${base}-reason`, { required: true })} name="reason" minLength={8} />
         </Field>
         <FormActions>
@@ -156,7 +156,7 @@ export function PublishConsentTextForm({ consentTextId, version }: { consentText
         {/* The dialog stays open after submit: the refusal and its blockers are shown inside it too. */}
         <CatalogActionResult state={state} />
         <input type="hidden" name="consentTextId" value={consentTextId} />
-        <Field id={`${base}-reason`} label="Motif (audite)" required>
+        <Field id={`${base}-reason`} label="Motif (audité)" required>
           <Input {...fieldControlProps(`${base}-reason`, { required: true })} name="reason" minLength={8} />
         </Field>
       </ConfirmDialog>
@@ -184,7 +184,7 @@ export function RetireConsentTextForm({ consentTextId }: { consentTextId: string
         >
           <CatalogActionResult state={state} />
           <input type="hidden" name="consentTextId" value={consentTextId} />
-          <Field id={`${base}-reason`} label="Motif (audite)" required>
+          <Field id={`${base}-reason`} label="Motif (audité)" required>
             <Input {...fieldControlProps(`${base}-reason`, { required: true })} name="reason" minLength={8} />
           </Field>
         </ConfirmDialog>

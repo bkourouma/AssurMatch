@@ -22,9 +22,9 @@ export interface PartnerOption {
 }
 
 const SCOPE_OPTIONS = [
-  { value: "leads:read_assigned", label: "leads:read_assigned", hint: "Lire les leads attribues" },
+  { value: "leads:read_assigned", label: "leads:read_assigned", hint: "Lire les leads attribués" },
   { value: "notifications:read", label: "notifications:read", hint: "Lire les notifications" },
-  { value: "webhooks:manage", label: "webhooks:manage", hint: "Gerer ses webhooks" }
+  { value: "webhooks:manage", label: "webhooks:manage", hint: "Gérer ses webhooks" }
 ];
 
 const EVENT_OPTIONS = [
@@ -49,7 +49,7 @@ function PartnerSelect({ id, partners }: { id: string; partners: PartnerOption[]
 
 function ReasonField({ id, defaultValue }: { id: string; defaultValue?: string }) {
   return (
-    <Field id={id} label="Motif (audite)" required>
+    <Field id={id} label="Motif (audité)" required>
       <Input {...fieldControlProps(id, { required: true })} name="reason" minLength={8} {...(defaultValue ? { defaultValue } : {})} />
     </Field>
   );
@@ -72,7 +72,7 @@ function SecretReveal({ secret }: { secret: NonNullable<IntegrationActionState["
   return (
     <Notice tone="warning" data-secret-reveal={secret.kind}>
       <p>
-        <strong>Ce secret n&apos;est affiche qu&apos;une seule fois. Copiez-le maintenant.</strong>
+        <strong>Ce secret n&apos;est affiché qu&apos;une seule fois. Copiez-le maintenant.</strong>
       </p>
       <p>{secret.label} :</p>
       <p>
@@ -82,7 +82,7 @@ function SecretReveal({ secret }: { secret: NonNullable<IntegrationActionState["
         Copier
       </Button>
       {copyState === "copied" ? <p role="status">Copie dans le presse-papiers.</p> : null}
-      {copyState === "failed" ? <p role="status">Copie impossible : selectionnez le secret et copiez-le manuellement.</p> : null}
+      {copyState === "failed" ? <p role="status">Copie impossible : sélectionnez le secret et copiez-le manuellement.</p> : null}
       {secret.restrictions.length > 0 ? (
         <ul className="bo-list">
           {secret.restrictions.map((restriction) => (
@@ -102,14 +102,14 @@ export function CreateApiKeyForm({ partners }: { partners: PartnerOption[] }) {
       <CatalogActionResult state={state} />
       {state.secret ? <SecretReveal secret={state.secret} /> : null}
       <PartnerSelect id={`${base}-partner`} partners={partners} />
-      <Field id={`${base}-name`} label="Nom de la cle" required>
+      <Field id={`${base}-name`} label="Nom de la clé" required>
         <Input {...fieldControlProps(`${base}-name`, { required: true })} name="name" maxLength={120} />
       </Field>
       <CheckboxGroup legend="Scopes" name="scopes" options={SCOPE_OPTIONS} columns={1} />
       <ReasonField id={`${base}-reason`} />
       <FormActions>
-        <Button type="submit" pending={pending} pendingLabel="Creation...">
-          Creer la cle API
+        <Button type="submit" pending={pending} pendingLabel="Création...">
+          Créer la clé API
         </Button>
       </FormActions>
     </Form>
@@ -126,7 +126,7 @@ export function RevokeApiKeyForm({ keyId }: { keyId: string }) {
       <ReasonField id={`${base}-reason`} />
       <FormActions>
         <Button type="submit" size="sm" variant="secondary" pending={pending} pendingLabel="Envoi...">
-          Revoquer
+          Révoquer
         </Button>
       </FormActions>
     </Form>
@@ -147,11 +147,11 @@ export function CreateWebhookEndpointForm({ partners }: { partners: PartnerOptio
       <Field id={`${base}-description`} label="Description (facultatif)">
         <Input {...fieldControlProps(`${base}-description`)} name="description" maxLength={240} />
       </Field>
-      <CheckboxGroup legend="Evenements autorises" name="eventTypes" options={EVENT_OPTIONS} columns={1} />
+      <CheckboxGroup legend="Événements autorisés" name="eventTypes" options={EVENT_OPTIONS} columns={1} />
       <ReasonField id={`${base}-reason`} />
       <FormActions>
-        <Button type="submit" pending={pending} pendingLabel="Creation...">
-          Creer l&apos;endpoint
+        <Button type="submit" pending={pending} pendingLabel="Création...">
+          Créer l&apos;endpoint
         </Button>
       </FormActions>
     </Form>
@@ -187,7 +187,7 @@ export function TestEventForm({ endpointId }: { endpointId: string }) {
       <ReasonField id={`${base}-reason`} defaultValue="Test de connectivite" />
       <FormActions>
         <Button type="submit" size="sm" variant="secondary" pending={pending} pendingLabel="Envoi...">
-          Envoyer un evenement de test
+          Envoyer un événement de test
         </Button>
       </FormActions>
     </Form>
@@ -227,7 +227,7 @@ export function RevokeAllowlistForm({ entryId }: { entryId: string }) {
       <ReasonField id={`${base}-reason`} />
       <FormActions>
         <Button type="submit" size="sm" variant="secondary" pending={pending} pendingLabel="Envoi...">
-          Revoquer
+          Révoquer
         </Button>
       </FormActions>
     </Form>

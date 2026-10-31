@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { FigureValue } from "./figure";
 import { Icon } from "./icons";
 import type { Tone } from "./badge";
 
@@ -20,7 +21,7 @@ export function KpiCard({ label, value, helper, tone = "neutral", trend }: KpiCa
     <article className="bo-kpi" data-tone={tone} aria-label={label}>
       <div>
         <p className="bo-kpi__label">{label}</p>
-        <p className="bo-kpi__value">{value}</p>
+        <FigureValue className="bo-kpi__value" value={value} />
       </div>
       {trend ? (
         <p className="bo-kpi__trend" data-direction={trend.direction}>

@@ -13,15 +13,15 @@ export const PROPOSAL_DOCUMENT_MAX_BYTES = 5 * 1024 * 1024;
 export const PROPOSAL_CURRENCIES = ["XOF", "XAF", "EUR", "USD", "GNF", "CDF", "MAD"] as const;
 
 export const PROPOSAL_STATUS_LABELS: Record<string, string> = {
-  sent: "Envoyee",
+  sent: "Envoyée",
   viewed: "Vue par le visiteur",
-  responded: "Reponse du visiteur",
-  withdrawn: "Retiree",
-  expired: "Expiree"
+  responded: "Réponse du visiteur",
+  withdrawn: "Retirée",
+  expired: "Expirée"
 };
 
 export const VISITOR_RESPONSE_LABELS: Record<string, string> = {
-  interested: "Interesse : demande a etre rappele",
+  interested: "Intéressé : demande à être rappelé",
   declined: "Ne donne pas suite",
   question: "Question du visiteur"
 };
@@ -29,34 +29,34 @@ export const VISITOR_RESPONSE_LABELS: Record<string, string> = {
 export const DECLINE_REASON_LABELS: Record<string, string> = {
   price: "Prix",
   guarantees: "Garanties",
-  delay: "Delai",
-  already_insured: "Deja assure",
+  delay: "Délai",
+  already_insured: "Déjà assuré",
   other: "Autre"
 };
 
 export const PROPOSAL_BLOCKER_LABELS: Record<string, string> = {
-  not_accepted: "Acceptez d'abord le lead pour pouvoir repondre au visiteur.",
-  lead_closed: "Ce lead est cloture : aucune nouvelle proposition n'est possible.",
-  consent_withdrawn: "Le visiteur a retire son consentement : aucune proposition ne peut etre envoyee.",
+  not_accepted: "Acceptez d'abord le lead pour pouvoir répondre au visiteur.",
+  lead_closed: "Ce lead est clôturé : aucune nouvelle proposition n'est possible.",
+  consent_withdrawn: "Le visiteur a retiré son consentement : aucune proposition ne peut être envoyée.",
   limit_reached: "10 propositions actives au maximum : retirez-en une avant d'en envoyer une nouvelle."
 };
 
 /** Retour affiche apres l'envoi, le retrait ou un refus de l'API (parametre `proposal=`). */
 export const PROPOSAL_NOTICES: Record<string, { tone: "info" | "warning" | "danger"; message: string }> = {
-  sent: { tone: "info", message: "Proposition envoyee. Le visiteur est prevenu par e-mail et la voit dans son espace de suivi." },
-  withdrawn: { tone: "info", message: "Proposition retiree. Elle n'est plus visible du visiteur ; vous pouvez en envoyer une nouvelle." },
-  not_accepted: { tone: "warning", message: "Le lead doit etre accepte avant toute proposition." },
-  lead_closed: { tone: "warning", message: "Ce lead est cloture : aucune proposition ne peut etre envoyee." },
-  consent_withdrawn: { tone: "warning", message: "Le consentement du visiteur n'est plus actif : envoi refuse." },
+  sent: { tone: "info", message: "Proposition envoyée. Le visiteur est prévenu par e-mail et la voit dans son espace de suivi." },
+  withdrawn: { tone: "info", message: "Proposition retirée. Elle n'est plus visible du visiteur ; vous pouvez en envoyer une nouvelle." },
+  not_accepted: { tone: "warning", message: "Le lead doit être accepté avant toute proposition." },
+  lead_closed: { tone: "warning", message: "Ce lead est clôturé : aucune proposition ne peut être envoyée." },
+  consent_withdrawn: { tone: "warning", message: "Le consentement du visiteur n'est plus actif : envoi refusé." },
   limit_reached: { tone: "warning", message: "Limite de 10 propositions actives atteinte pour ce lead." },
-  forbidden_wording: { tone: "warning", message: "Envoi refuse : le texte contient une formulation interdite." },
-  quarantined: { tone: "danger", message: "Envoi refuse : le fichier n'a pas passe l'antivirus. Il n'a pas ete conserve." },
-  document_invalid: { tone: "warning", message: "Fichier refuse : PDF de 5 Mo au maximum uniquement." },
-  invalid: { tone: "warning", message: "Saisie refusee : message, prime ou fourchette, devise et date de validite future sont obligatoires." },
-  forbidden: { tone: "warning", message: "Action refusee par vos permissions, votre tenant ou votre MFA." },
+  forbidden_wording: { tone: "warning", message: "Envoi refusé : le texte contient une formulation interdite." },
+  quarantined: { tone: "danger", message: "Envoi refusé : le fichier n'a pas passé l'antivirus. Il n'a pas été conservé." },
+  document_invalid: { tone: "warning", message: "Fichier refusé : PDF de 5 Mo au maximum uniquement." },
+  invalid: { tone: "warning", message: "Saisie refusée : message, prime ou fourchette, devise et date de validité future sont obligatoires." },
+  forbidden: { tone: "warning", message: "Action refusée par vos permissions, votre tenant ou votre MFA." },
   suspended: { tone: "warning", message: "Compte suspendu : consultation seule. Contactez AssurMatch." },
   not_found: { tone: "warning", message: "Proposition introuvable pour ce lead." },
-  error: { tone: "danger", message: "Envoi indisponible pour le moment. Aucune proposition n'a ete envoyee." }
+  error: { tone: "danger", message: "Envoi indisponible pour le moment. Aucune proposition n'a été envoyée." }
 };
 
 const CODE_OUTCOMES: Record<string, string> = {

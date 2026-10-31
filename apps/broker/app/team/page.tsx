@@ -15,7 +15,7 @@ import { CustomRoleForm, InviteMemberForm, MemberActionForm } from "./team-forms
  * deactivate, reactivate and change roles. Guards: never oneself, never the last owner, never a
  * manager on an owner; the owner role is an AssurMatch decision. MFA stays mandatory.
  */
-const BREADCRUMB = [{ label: "Organisation" }, { label: "Equipe" }];
+const BREADCRUMB = [{ label: "Organisation" }, { label: "Équipe" }];
 
 const STATUS_TONES: Record<string, "success" | "warning" | "danger" | "disabled" | "info"> = {
   active: "success",
@@ -83,7 +83,7 @@ export default async function BrokerTeamPage({ searchParams }: { searchParams: P
     <PageStack>
       <PageHeader
         breadcrumb={BREADCRUMB}
-        title="Equipe"
+        title="Équipe"
         description="Lecture tenant-safe des utilisateurs de votre cabinet. Toute invitation, désactivation ou changement de rôle est audité ; la MFA reste obligatoire pour chacun."
         actions={canManage && !readOnlyTenant ? <Button href="#inviter">Inviter un collaborateur</Button> : null}
       />
@@ -93,7 +93,7 @@ export default async function BrokerTeamPage({ searchParams }: { searchParams: P
         <Notice tone={roleNotice === "assigned" || roleNotice === "cleared" ? "success" : "warning"}>{ROLE_NOTICES[roleNotice]}</Notice>
       ) : null}
       {!canManage && !readOnlyTenant ? (
-        <Notice tone="info" title="Permissions conservees">Lecture seule : seuls le propriétaire et les managers gèrent l&apos;équipe.</Notice>
+        <Notice tone="info" title="Permissions conservées">Lecture seule : seuls le propriétaire et les managers gèrent l&apos;équipe.</Notice>
       ) : null}
       {teamResult.status === "error" ? <StateMessage tone="danger">L&apos;équipe n&apos;a pas pu être chargée. Réessayez dans quelques instants.</StateMessage> : null}
 

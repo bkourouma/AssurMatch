@@ -91,13 +91,13 @@ export default async function BrokerOfferPage({ params, searchParams }: BrokerOf
   const { offerId } = await params;
   const query = searchParams ? await searchParams : {};
   const path = `/offers/${encodeURIComponent(offerId)}`;
-  const breadcrumb = [{ label: "Activite" }, { label: "Mes offres", href: "/offers" }, { label: "Offre" }];
+  const breadcrumb = [{ label: "Activité" }, { label: "Mes offres", href: "/offers" }, { label: "Offre" }];
   const session = await readBackOfficeSession();
   if (session.status === "unauthenticated" || session.status === "expired") redirect(loginRedirect(path, session.status));
   if (session.status !== "authenticated" || !canReadOffers(session.profile)) {
     return (
       <PageStack>
-        <PageHeader breadcrumb={breadcrumb} title="Acces refuse" description="La consultation des offres exige une session courtier authentifiee et la MFA verifiee." />
+        <PageHeader breadcrumb={breadcrumb} title="Accès refusé" description="La consultation des offres exige une session courtier authentifiée et la MFA vérifiée." />
       </PageStack>
     );
   }
@@ -132,7 +132,7 @@ export default async function BrokerOfferPage({ params, searchParams }: BrokerOf
   return (
     <PageStack>
       <PageHeader
-        breadcrumb={[{ label: "Activite" }, { label: "Mes offres", href: "/offers" }, { label: offerDisplayName(offer) }]}
+        breadcrumb={[{ label: "Activité" }, { label: "Mes offres", href: "/offers" }, { label: offerDisplayName(offer) }]}
         kicker={offerTypeLabel(offer.offerType)}
         title={offerDisplayName(offer)}
         description={`${scope ? `${scope.countryLabel} · ${scope.productLabel}` : OFFER_SCOPE_OUTSIDE_COVERAGE}. Offre indicative : prix à confirmer par le courtier partenaire.`}

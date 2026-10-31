@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { loginRedirect, readBackOfficeSession } from "../../lib/backoffice-auth";
 import { isNotFoundState, readLeadProposals, readStarterLeadDetail, readStarterLeadHistory } from "../../lib/broker-api";
+import { productLabel } from "../../lib/product-vocabulary";
 import { PROPOSAL_NOTICES, VISITOR_RESPONSE_LABELS } from "../../lib/proposal-vocabulary";
 import { ProposalPanel } from "../../lib/ui/proposal-panel";
 import { LeadConversationSection } from "../../lib/ui/conversation-panel";
@@ -15,6 +16,7 @@ import {
   STARTER_FINAL_STATUSES,
   STARTER_REASON_LABELS,
   DISPUTE_FINAL_DECISION_NOTICE,
+  answerLabel,
   renderAnswerValue,
   starterCloseOutcomeLabel,
   starterEventLabel,
@@ -45,38 +47,38 @@ import { disputeAvailability, formatDate, statusTone } from "../../lib/ui/broker
 import styles from "../../lib/ui/broker-screens.module.css";
 
 const NOTICES: Record<string, { tone: "info" | "warning" | "danger"; message: string }> = {
-  accepted: { tone: "info", message: "Lead accepte. L'action est historisee avec acteur et date." },
-  rejected: { tone: "info", message: "Lead rejete avec motif. L'action est historisee." },
-  disputed: { tone: "info", message: "Contestation enregistree et historisee. Le traitement suit le workflow existant." },
-  closed: { tone: "info", message: "Lead cloture avec son issue. Le visiteur est informe que sa demande est cloturee; l'action est historisee." },
-  outcome_required: { tone: "warning", message: "Choisissez l'issue de la cloture: gagne, perdu ou sans suite." },
-  conflict: { tone: "warning", message: "Cloture refusee: le lead doit etre accepte et ne pas etre deja cloture." },
+  accepted: { tone: "info", message: "Lead accepté. L'action est historisée avec acteur et date." },
+  rejected: { tone: "info", message: "Lead rejeté avec motif. L'action est historisée." },
+  disputed: { tone: "info", message: "Contestation enregistrée et historisée. Le traitement suit le workflow existant." },
+  closed: { tone: "info", message: "Lead clôturé avec son issue. Le visiteur est informé que sa demande est clôturée; l'action est historisée." },
+  outcome_required: { tone: "warning", message: "Choisissez l'issue de la clôture: gagné, perdu ou sans suite." },
+  conflict: { tone: "warning", message: "Clôture refusée: le lead doit être accepté et ne pas être déjà clôturé." },
   reason_required: { tone: "warning", message: "Un motif allowliste est obligatoire pour rejeter ou contester un lead." },
   // Spec 063 (CRM-012): fenêtre de 30 jours et contestation unique.
   dispute_window_expired: { tone: "warning", message: "Contestation refusée : la fenêtre de 30 jours suivant la réception du lead est close." },
   dispute_exists: { tone: "warning", message: "Contestation refusée : ce lead a déjà fait l'objet d'une contestation." },
-  forbidden: { tone: "warning", message: "Action refusee: vos permissions, votre tenant ou votre MFA ne l'autorisent pas." },
+  forbidden: { tone: "warning", message: "Action refusée: vos permissions, votre tenant ou votre MFA ne l'autorisent pas." },
   // Spec 051 FR-021: 403 PARTNER_SUSPENDED.
   suspended: { tone: "warning", message: TENANT_SUSPENDED_MESSAGE },
-  not_found: { tone: "warning", message: "Ce lead n'existe pas ou ne vous est pas assigne." },
-  invalid: { tone: "warning", message: "Saisie refusee par l'API. Verifiez le motif selectionne." },
-  error: { tone: "danger", message: "Action indisponible pour le moment. Aucun changement n'a ete enregistre." }
+  not_found: { tone: "warning", message: "Ce lead n'existe pas ou ne vous est pas assigné." },
+  invalid: { tone: "warning", message: "Saisie refusée par l'API. Vérifiez le motif sélectionné." },
+  error: { tone: "danger", message: "Action indisponible pour le moment. Aucun changement n'a été enregistré." }
 };
 
 const CONTACT_LABELS: Record<string, string> = {
   fullName: "Nom",
   // Spec 059: the public form sends `displayName`; the raw key was shown to the broker.
   displayName: "Nom",
-  firstName: "Prenom",
+  firstName: "Prénom",
   lastName: "Nom",
   email: "Email",
   emailMasked: "Email",
-  phone: "Telephone",
-  phoneMasked: "Telephone",
+  phone: "Téléphone",
+  phoneMasked: "Téléphone",
   city: "Ville",
-  preferredChannel: "Canal prefere",
-  preferredContactChannel: "Canal prefere",
-  preferredContactTime: "Creneau prefere"
+  preferredChannel: "Canal préféré",
+  preferredContactChannel: "Canal préféré",
+  preferredContactTime: "Créneau préféré"
 };
 
 const REASON_OPTIONS = STARTER_ACTION_REASONS.map((reason) => ({ value: reason, label: STARTER_REASON_LABELS[reason] }));
@@ -97,13 +99,13 @@ export default async function BrokerLeadDetailPage({
     return (
       <PageStack>
         <PageHeader
-          breadcrumb={[{ label: "Activite", href: "/" }, { label: "Leads", href: "/leads" }, { label: "Detail" }]}
-          title="Acces refuse"
-          description="Le detail du lead reste masque tant que la session, la MFA et le tenant courtier ne sont pas valides."
+          breadcrumb={[{ label: "Activité", href: "/" }, { label: "Leads", href: "/leads" }, { label: "Détail" }]}
+          title="Accès refusé"
+          description="Le détail du lead reste masqué tant que la session, la MFA et le tenant courtier ne sont pas valides."
           actions={<Button href="/leads" variant="secondary" size="sm">Retour aux leads</Button>}
         />
-        <Notice tone="warning" title="Detail du lead assigne indisponible">
-          Aucune donnee protegee n'est affichee. Verifiez votre session et votre MFA, puis rechargez la page.
+        <Notice tone="warning" title="Détail du lead assigne indisponible">
+          Aucune donnée protégée n'est affichée. Vérifiez votre session et votre MFA, puis rechargez la page.
         </Notice>
       </PageStack>
     );
@@ -142,27 +144,27 @@ export default async function BrokerLeadDetailPage({
   return (
     <PageStack>
       <PageHeader
-        breadcrumb={[{ label: "Activite", href: "/" }, { label: "Leads", href: "/leads" }, { label: reference ?? "Detail" }]}
-        title={reference ?? "Detail du lead assigne"}
-        description="Toute consultation detail est auditee et marque le lead comme vu lors du premier acces autorise."
+        breadcrumb={[{ label: "Activité", href: "/" }, { label: "Leads", href: "/leads" }, { label: reference ?? "Détail" }]}
+        title={reference ?? "Détail du lead assigné"}
+        description="Toute consultation détail est auditée et marque le lead comme vu lors du premier accès autorisé."
         actions={headerActions}
       />
 
       {noticeEntry ? <Notice tone={noticeEntry.tone}>{noticeEntry.message}</Notice> : null}
 
       {detail.status === "forbidden" ? (
-        <Notice tone="warning" title="Acces refuse">
-          Ce lead n'est pas accessible avec votre tenant, vos permissions ou votre MFA. Aucune donnee protegee n'est affichee.
+        <Notice tone="warning" title="Accès refusé">
+          Ce lead n'est pas accessible avec votre tenant, vos permissions ou votre MFA. Aucune donnée protégée n'est affichée.
         </Notice>
       ) : null}
       {notFound ? (
         <Notice tone="warning" title="Lead introuvable">
-          Aucun lead ne correspond a cette reference pour votre cabinet.
+          Aucun lead ne correspond à cette référence pour votre cabinet.
         </Notice>
       ) : null}
       {detail.status === "error" && !notFound ? (
         <Notice tone="danger" title="Lead indisponible">
-          Le detail du lead est temporairement indisponible. Aucune donnee protegee n'est affichee en mode erreur.
+          Le détail du lead est temporairement indisponible. Aucune donnée protégée n'est affichée en mode erreur.
         </Notice>
       ) : null}
 
@@ -173,14 +175,14 @@ export default async function BrokerLeadDetailPage({
             <DescriptionList
               columns={2}
               items={[
-                { term: "Reference", value: <span className="bo-ref">{reference}</span> },
+                { term: "Référence", value: <span className="bo-ref">{reference}</span> },
                 {
                   term: "Statut",
                   value: <StatusBadge status={lead.status} labels={starterStatusLabels} tones={{ [lead.status]: statusTone(lead.status) }} />
                 },
                 { term: "Pays", value: lead.countryCode || "-" },
-                { term: "Produit", value: lead.productKey || "-" },
-                { term: "Recu le", value: formatDate(lead.assignedAt) },
+                { term: "Produit", value: lead.productKey ? productLabel(lead.productKey) : "-" },
+                { term: "Reçu le", value: formatDate(lead.assignedAt) },
                 { term: "Vu le", value: lead.seenAt ? formatDate(lead.seenAt) : lead.seen ? "Oui" : "Pas encore" }
               ]}
             />
@@ -188,9 +190,9 @@ export default async function BrokerLeadDetailPage({
 
           <Card title="Contact consenti">
             {contactMasked ? (
-              <Notice tone="warning">Le visiteur a retire son consentement : ses coordonnees sont masquees et ne doivent plus etre utilisees.</Notice>
+              <Notice tone="warning">Le visiteur a retiré son consentement : ses coordonnées sont masquées et ne doivent plus être utilisées.</Notice>
             ) : (
-              <p className={styles.muted}>Coordonnees completes visibles par votre cabinet, courtier affecte. Chaque consultation est auditee.</p>
+              <p className={styles.muted}>Coordonnées complètes visibles par votre cabinet, courtier affecté. Chaque consultation est auditée.</p>
             )}
             {contactEntries.length > 0 ? (
               <DescriptionList>
@@ -205,7 +207,7 @@ export default async function BrokerLeadDetailPage({
               </DescriptionList>
             ) : (
               <p className={styles.muted}>
-                Aucun champ de contact n'est expose pour ce lead. Les coordonnees ne sont affichees que si le lead est assigne au tenant connecte et que le consentement le permet.
+                Aucun champ de contact n'est exposé pour ce lead. Les coordonnées ne sont affichées que si le lead est assigné au tenant connecté et que le consentement le permet.
               </p>
             )}
           </Card>
@@ -213,11 +215,11 @@ export default async function BrokerLeadDetailPage({
         <Split>
           <Stack>
             {answerEntries.length > 0 ? (
-              <Card title="Reponses consenties">
+              <Card title="Réponses consenties">
                 <DescriptionList columns={2}>
                   {answerEntries.map(([key, value]) => (
                     <div key={key}>
-                      <dt>{key}</dt>
+                      <dt>{answerLabel(key)}</dt>
                       <dd>{renderAnswerValue(value)}</dd>
                     </div>
                   ))}
@@ -226,7 +228,7 @@ export default async function BrokerLeadDetailPage({
             ) : null}
 
             <div id="repondre-au-visiteur">
-              <Card title="Répondre au visiteur" description="Proposition simple et non contractuelle : message, prime indicative ou fourchette, garanties, validite et PDF facultatif.">
+              <Card title="Répondre au visiteur" description="Proposition simple et non contractuelle : message, prime indicative ou fourchette, garanties, validité et PDF facultatif.">
                 {proposalNoticeEntry ? <Notice tone={proposalNoticeEntry.tone}>{proposalNoticeEntry.message}</Notice> : null}
                 {proposals.status === "success" ? (
                   <ProposalPanel channel="starter" leadAssignmentId={lead.leadAssignmentId} data={proposals.data} canMutate={canMutate} tenantReadOnly={tenantReadOnly} />
@@ -258,7 +260,7 @@ export default async function BrokerLeadDetailPage({
                     <ConfirmDialog
                       triggerLabel="Rejeter avec motif"
                       title="Rejeter avec motif"
-                      description="Le rejet exige un motif allowliste. L'action est historisee avec acteur, date et motif."
+                      description="Le rejet exige un motif allowliste. L'action est historisée avec acteur, date et motif."
                       confirmLabel="Rejeter le lead"
                       cancelLabel="Annuler"
                       tone="danger"
@@ -317,7 +319,7 @@ export default async function BrokerLeadDetailPage({
                         triggerLabel="Clôturer"
                         triggerVariant="primary"
                         title="Clôturer le lead"
-                        description="Indiquez l'issue de votre suivi. Le visiteur est informe que sa demande est cloturee, sans le detail de l'issue. L'action est historisee et definitive."
+                        description="Indiquez l'issue de votre suivi. Le visiteur est informé que sa demande est clôturée, sans le détail de l'issue. L'action est historisée et définitive."
                         confirmLabel="Clôturer le lead"
                         cancelLabel="Annuler"
                         formAction={closeStarterLeadAction}
@@ -328,21 +330,21 @@ export default async function BrokerLeadDetailPage({
                             id="close-outcome"
                             name="outcome" required
                             defaultValue=""
-                            aria-label="Issue de la cloture"
+                            aria-label="Issue de la clôture"
                             placeholder="Choisir une issue"
                             options={OUTCOME_OPTIONS}
                           />
                         </Field>
                         <Field id="close-comment" label="Commentaire interne">
-                          <Input id="close-comment" name="comment" maxLength={500} placeholder="Optionnel" aria-label="Commentaire de cloture" />
+                          <Input id="close-comment" name="comment" maxLength={500} placeholder="Optionnel" aria-label="Commentaire de clôture" />
                         </Field>
                       </ConfirmDialog>
-                      <span>Lead accepte: cloturez-le une fois le suivi termine (gagne, perdu ou sans suite).</span>
+                      <span>Lead accepté: clôturez-le une fois le suivi terminé (gagné, perdu ou sans suite).</span>
                     </Cluster>
                   ) : null}
 
                   <p className={styles.muted}>
-                    Ces actions suivent le workflow existant: rejet et contestation exigent un motif allowliste et toute contestation est historisee.
+                    Ces actions suivent le workflow existant: rejet et contestation exigent un motif allowliste et toute contestation est historisée.
                   </p>
                 </>
               ) : (
@@ -354,10 +356,10 @@ export default async function BrokerLeadDetailPage({
                   </Cluster>
                   <Notice tone="info" title="Lecture seule">
                     {isFinal
-                      ? "Ce lead est cloture: aucune action courtier n'est plus possible."
+                      ? "Ce lead est clôturé: aucune action courtier n'est plus possible."
                       : tenantReadOnly
                         ? TENANT_SUSPENDED_MESSAGE
-                        : "Votre role ne permet pas d'agir sur ce lead. Les actions restent visibles en lecture seule."}
+                        : "Votre rôle ne permet pas d'agir sur ce lead. Les actions restent visibles en lecture seule."}
                   </Notice>
                 </>
               )}
@@ -365,7 +367,7 @@ export default async function BrokerLeadDetailPage({
                 items={[
                   {
                     term: "Plan Starter",
-                    value: "Le CRM complet est disponible avec le plan Pro. Le portail Starter ne presente pas Kanban, pipeline avance, taches, rappels ou assignation equipe comme disponibles."
+                    value: "Le CRM complet est disponible avec le plan Pro. Le portail Starter ne présente pas Kanban, pipeline avancé, tâches, rappels ou assignation équipe comme disponibles."
                   }
                 ]}
               />
@@ -390,7 +392,7 @@ export default async function BrokerLeadDetailPage({
                   ))}
                 </ol>
               ) : (
-                <p className={styles.muted}>Aucun evenement historise pour ce lead.</p>
+                <p className={styles.muted}>Aucun événement historisé pour ce lead.</p>
               )}
             </Card>
           </Stack>

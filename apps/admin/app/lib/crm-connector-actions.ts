@@ -48,7 +48,7 @@ function listValue(formData: FormData, name: string, allowed: Set<string>): stri
 function reasonError(reason: string): CrmActionState | undefined {
   return reason.length >= REASON_MIN_LENGTH
     ? undefined
-    : { status: "error", message: `Motif obligatoire : au moins ${REASON_MIN_LENGTH} caracteres, conserve dans l'audit.` };
+    : { status: "error", message: `Motif obligatoire : au moins ${REASON_MIN_LENGTH} caractères, conservé dans l'audit.` };
 }
 
 async function callApi(path: string, method: "POST" | "PATCH", body: Record<string, unknown>): Promise<ApiCall> {
@@ -87,13 +87,13 @@ function sanitizeServerMessage(body: unknown): string | undefined {
 }
 
 function failure(call: ApiCall): CrmActionState {
-  if (call.status === 403) return { status: "error", message: "Action refusee : MFA ou role insuffisant." };
+  if (call.status === 403) return { status: "error", message: "Action refusée : MFA ou rôle insuffisant." };
   if (call.status === 400 || call.status === 422) {
     const detail = sanitizeServerMessage(call.body);
-    return { status: "error", message: detail ? `Demande refusee : ${detail}` : "Demande refusee : verifiez les champs saisis." };
+    return { status: "error", message: detail ? `Demande refusée : ${detail}` : "Demande refusée : vérifiez les champs saisis." };
   }
   if (call.status === 404) return { status: "error", message: "Connecteur introuvable : rechargez la page." };
-  if (call.status === 409) return { status: "error", message: "Conflit : le connecteur a change entre-temps, rechargez la page." };
+  if (call.status === 409) return { status: "error", message: "Conflit : le connecteur a changé entre-temps, rechargez la page." };
   return { status: "error", message: "Connecteurs CRM indisponibles." };
 }
 
@@ -133,11 +133,11 @@ export async function createCrmConnectorAction(_previous: CrmActionState, formDa
   if (!UUID.test(partnerTenantId)) return { status: "error", message: "Choisissez un partenaire." };
   if (!name) return { status: "error", message: "Nom du connecteur obligatoire." };
   if (!url.startsWith("https://")) return { status: "error", message: "L'URL doit commencer par https://." };
-  if (eventTypes.length === 0) return { status: "error", message: "Choisissez au moins un evenement." };
+  if (eventTypes.length === 0) return { status: "error", message: "Choisissez au moins un événement." };
   if (Boolean(authHeaderName) !== Boolean(authHeaderValue)) {
-    return { status: "error", message: "L'en-tete d'authentification exige un nom et une valeur ensemble." };
+    return { status: "error", message: "L'en-tête d'authentification exige un nom et une valeur ensemble." };
   }
-  if (authHeaderName && !HEADER_NAME.test(authHeaderName)) return { status: "error", message: "Nom d'en-tete d'authentification invalide." };
+  if (authHeaderName && !HEADER_NAME.test(authHeaderName)) return { status: "error", message: "Nom d'en-tête d'authentification invalide." };
   const call = await callApi("", "POST", {
     partnerTenantId,
     name,
@@ -149,7 +149,7 @@ export async function createCrmConnectorAction(_previous: CrmActionState, formDa
   guard(call);
   if (!isOk(call)) return failure(call);
   revalidatePath(PAGE_PATH);
-  return secretState("Connecteur CRM cree (desactive par defaut).", call.body);
+  return secretState("Connecteur CRM créé (désactivé par défaut).", call.body);
 }
 
 export async function updateCrmConnectorStatusAction(_previous: CrmActionState, formData: FormData): Promise<CrmActionState> {
@@ -163,7 +163,7 @@ export async function updateCrmConnectorStatusAction(_previous: CrmActionState, 
   guard(call);
   if (!isOk(call)) return failure(call);
   revalidatePath(PAGE_PATH);
-  const label = status === "active" ? "Connecteur active." : status === "suspended" ? "Connecteur suspendu." : "Connecteur desactive.";
+  const label = status === "active" ? "Connecteur active." : status === "suspended" ? "Connecteur suspendu." : "Connecteur désactivé.";
   return { status: "success", message: label };
 }
 
@@ -177,5 +177,5 @@ export async function rotateCrmConnectorSecretAction(_previous: CrmActionState, 
   guard(call);
   if (!isOk(call)) return failure(call);
   revalidatePath(PAGE_PATH);
-  return secretState("Secret de signature renouvele.", call.body);
+  return secretState("Secret de signature renouvelé.", call.body);
 }

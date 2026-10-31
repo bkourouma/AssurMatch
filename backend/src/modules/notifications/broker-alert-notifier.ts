@@ -115,7 +115,7 @@ export class BrokerAlertNotifier {
         partnerTenantId: input.partnerTenantId,
         recipient: phone,
         template: input.type,
-        body: `AssurMatch: ${input.title}. Detail dans votre back-office. Notification operationnelle, aucun engagement contractuel.`
+        body: `AssurMatch: ${input.title}. Détail dans votre back-office. Notification opérationnelle, aucun engagement contractuel.`
       }, actor);
     }
     return channels.length;

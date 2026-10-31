@@ -32,10 +32,10 @@ export async function searchConsentRecordsAction(_previous: ConsentRecordSearchS
   const purpose = text(formData, "purpose");
   const status = text(formData, "status");
   const page = Number.parseInt(text(formData, "page") || "1", 10);
-  if (publicReference && !REFERENCE.test(publicReference)) return { status: "invalid", message: "Reference invalide : format attendu QR-AAAA-XXXXXXXX." };
+  if (publicReference && !REFERENCE.test(publicReference)) return { status: "invalid", message: "Référence invalide : format attendu QR-AAAA-XXXXXXXX." };
   if (email && (!EMAIL.test(email) || email.length > 254)) return { status: "invalid", message: "Adresse e-mail invalide." };
   if (countryId && !UUID.test(countryId)) return { status: "invalid", message: "Pays invalide." };
-  if (!publicReference && !email && !countryId) return { status: "invalid", message: "Indiquez au moins une reference de demande, une adresse e-mail ou un pays." };
+  if (!publicReference && !email && !countryId) return { status: "invalid", message: "Indiquez au moins une référence de demande, une adresse e-mail ou un pays." };
 
   const body = {
     ...(publicReference ? { publicReference } : {}),
@@ -55,9 +55,9 @@ export async function searchConsentRecordsAction(_previous: ConsentRecordSearchS
       body: JSON.stringify(body),
       cache: "no-store"
     });
-    if (response.status === 401) return { status: "unauthenticated", message: "Session expiree : reconnectez-vous." };
-    if (response.status === 403) return { status: "forbidden", message: "Recherche reservee a la conformite et au Super Admin, avec MFA verifiee. Le refus est journalise." };
-    if (response.status === 400) return { status: "invalid", message: "Criteres refuses par l'API." };
+    if (response.status === 401) return { status: "unauthenticated", message: "Session expirée : reconnectez-vous." };
+    if (response.status === 403) return { status: "forbidden", message: "Recherche réservée à la conformité et au Super Admin, avec MFA vérifiée. Le refus est journalisé." };
+    if (response.status === 400) return { status: "invalid", message: "Critères refusés par l'API." };
     if (!response.ok) return { status: "error", message: `Recherche indisponible (api_${response.status}).` };
     return { status: "success", result: await response.json() as AdminConsentRecordSearchResult, byEmail: Boolean(email) };
   } catch {

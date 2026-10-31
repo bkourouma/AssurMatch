@@ -31,7 +31,7 @@ export default async function BrokerCompanyPage() {
   if (!canReadAccount(session.profile)) {
     return (
       <PageStack>
-        <PageHeader breadcrumb={BREADCRUMB} title="Acces refuse" description="La consultation du profil société exige un rôle courtier." />
+        <PageHeader breadcrumb={BREADCRUMB} title="Accès refusé" description="La consultation du profil société exige un rôle courtier." />
       </PageStack>
     );
   }

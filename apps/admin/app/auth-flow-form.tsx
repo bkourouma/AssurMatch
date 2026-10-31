@@ -69,16 +69,16 @@ export function MfaPanel({ returnTo, mfaEnrolled = false, showEnrollment }: { re
     <>
       {enrollmentVisible ? (
         <Form action={enrollAction}>
-          <h2 className="bo-section-title">Enrolement MFA</h2>
+          <h2 className="bo-section-title">Enrôlement MFA</h2>
           <FlowNotice state={enrollState} />
           <FormActions>
-            <Button type="submit" fullWidth pending={enrollPending} pendingLabel="Generation...">Generer secret et codes de secours</Button>
+            <Button type="submit" fullWidth pending={enrollPending} pendingLabel="Génération...">Générer secret et codes de secours</Button>
           </FormActions>
         </Form>
       ) : null}
       <Form action={verifyAction}>
         <input type="hidden" name="returnTo" value={returnTo} />
-        <h2 className="bo-section-title">Verification MFA</h2>
+        <h2 className="bo-section-title">Vérification MFA</h2>
         <FlowNotice state={verifyState} />
         <Field id="mfa-code" label="Code" required>
           <Input {...fieldControlProps("mfa-code", { required: true })} name="code" minLength={6} maxLength={10} />
@@ -101,7 +101,7 @@ export function MfaPanel({ returnTo, mfaEnrolled = false, showEnrollment }: { re
           hint="Le code ne vous sera plus demandé sur cet appareil pendant 30 jours. Ne cochez pas sur un ordinateur partagé."
         />
         <FormActions>
-          <Button type="submit" fullWidth pending={verifyPending} pendingLabel="Verification...">Verifier MFA</Button>
+          <Button type="submit" fullWidth pending={verifyPending} pendingLabel="Vérification...">Vérifier MFA</Button>
         </FormActions>
       </Form>
     </>
@@ -156,7 +156,7 @@ export function PasswordResetConsumeForm({ token }: { token: string }) {
   return (
     <Form action={formAction}>
       <FlowNotice state={state} />
-      <Field id="password-reset-token" label="Jeton reinitialisation" required>
+      <Field id="password-reset-token" label="Jeton réinitialisation" required>
         <Input {...fieldControlProps("password-reset-token", { required: true })} name="token" defaultValue={token} />
       </Field>
       <Field id="password-reset-new" label="Nouveau mot de passe" required>
@@ -169,7 +169,7 @@ export function PasswordResetConsumeForm({ token }: { token: string }) {
         />
       </Field>
       <FormActions>
-        <Button type="submit" fullWidth pending={pending} pendingLabel="Reinitialisation...">Consommer le jeton</Button>
+        <Button type="submit" fullWidth pending={pending} pendingLabel="Réinitialisation...">Consommer le jeton</Button>
       </FormActions>
     </Form>
   );

@@ -22,7 +22,7 @@ describe("broker CRM constitutional exclusions", () => {
 
   it("keeps regulated issuance wording out of CRM UI", async () => {
     const crmDetail = readFileSync("apps/broker/app/crm/leads/[leadAssignmentId]/page.tsx", "utf8");
-    expect(crmDetail).toContain("pas une emission contractuelle");
+    expect(crmDetail).toContain("pas une émission contractuelle");
     expect(crmDetail).not.toContain("Souscrire maintenant");
     expect(crmDetail).not.toContain("contrat valide");
   });

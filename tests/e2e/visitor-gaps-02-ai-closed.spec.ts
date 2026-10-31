@@ -61,7 +61,7 @@ test("VGA-02 un appel direct est refusé « ai_disabled », sans texte ni appel 
   const probes: Array<[string, Record<string, unknown>]> = [
     ["visitor_guarantee_explainer", { countryCode: "CI", productKey: "auto", offerId: first, language: "fr" }],
     ["visitor_compare_explainer", { countryCode: "CI", productKey: "auto", offerIds: [first, second], language: "fr" }],
-    ["visitor_form_help", { countryCode: "CI", productKey: "auto", fieldKey: "vehicle_use", fieldLabel: "Usage du vehicule", language: "fr" }]
+    ["visitor_form_help", { countryCode: "CI", productKey: "auto", fieldKey: "vehicle_use", fieldLabel: "Usage du véhicule", language: "fr" }]
   ];
   for (const [assistType, json] of probes) {
     const result = await publicCall("POST", `/ai/visitor/${assistType}`, { json });

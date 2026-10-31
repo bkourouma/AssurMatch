@@ -341,7 +341,7 @@ test("VG-06 relance « documents manquants » (lecture seule) : demande ouverte,
   const accept = actions.getByRole("button", { name: "Accepter", exact: true });
   if ((await accept.count()) > 0) {
     await accept.click();
-    await expect(broker.getByText("Lead accepte.")).toBeVisible();
+    await expect(broker.getByText("Lead accepté.")).toBeVisible();
   }
   // The visitor e-mail of the lead is read on the lead page ("Contact consenti").
   const contact = card(broker, "Contact consenti");

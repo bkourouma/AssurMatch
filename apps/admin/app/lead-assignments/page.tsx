@@ -3,6 +3,7 @@ import { Badge, DataTable, Field, FilterBar, Input, PageHeader, PageStack, Selec
 import { ReassignAssignmentForm } from "../lib/ui/operations-forms";
 import { OperationsTabs } from "../lib/ui/operations-tabs";
 import { assignmentStatusTones } from "../lib/ui/operations-tones";
+import { productLabel } from "../lib/ui/operations-labels";
 
 /**
  * Spec 056 (H-03): lead assignments with the partner's name and status, never the visitor's contact
@@ -14,12 +15,12 @@ const statusOptions = ["assigned", "broker_notified", "seen", "accepted", "recei
 
 const columns: Array<DataTableColumn<LeadAssignmentRow>> = [
   { key: "reference", header: "Demande", render: (row) => <a className="bo-ref" href={`/quote-requests/${row.quoteRequestId}`}>{row.publicReference ?? row.quoteRequestId.slice(0, 8)}</a> },
-  { key: "scope", header: "Pays / produit", render: (row) => `${row.countryCode ?? "-"} / ${row.productKey ?? "-"}` },
+  { key: "scope", header: "Pays / produit", render: (row) => `${row.countryCode ?? "-"} / ${productLabel(row.productKey)}` },
   { key: "partner", header: "Courtier partenaire", render: (row) => row.partnerLegalName ?? row.partnerTenantId.slice(0, 8) },
   { key: "status", header: "Statut", render: (row) => <Badge tone={assignmentStatusTones[row.status] ?? "neutral"}>{row.status}</Badge> },
   { key: "recipients", header: "Destinataires", render: (row) => row.recipientCount, numeric: true, align: "right" },
-  { key: "assigned", header: "Affecte le", render: (row) => formatDateTime(row.assignedAt) },
-  { key: "action", header: "Derniere action courtier", render: (row) => formatDateTime(row.lastBrokerActionAt) }
+  { key: "assigned", header: "Affecté le", render: (row) => formatDateTime(row.assignedAt) },
+  { key: "action", header: "Dernière action courtier", render: (row) => formatDateTime(row.lastBrokerActionAt) }
 ];
 
 export default async function AdminLeadAssignmentsPage({ searchParams }: { searchParams?: Promise<Record<string, string | string[] | undefined>> }) {
@@ -40,17 +41,17 @@ export default async function AdminLeadAssignmentsPage({ searchParams }: { searc
   return (
     <PageStack>
       <PageHeader
-        breadcrumb={[{ label: "Pilotage" }, { label: "Operations", href: "/operations" }, { label: "Assignations" }]}
+        breadcrumb={[{ label: "Pilotage" }, { label: "Opérations", href: "/operations" }, { label: "Assignations" }]}
         title="Routage des leads"
-        description="Courtier assigne et statut de chaque lead, avec reaffectation auditee. Les coordonnees du visiteur ne sont jamais listees ici."
+        description="Courtier assigné et statut de chaque lead, avec réaffectation auditée. Les coordonnées du visiteur ne sont jamais listées ici."
       />
       <OperationsTabs current="/lead-assignments" />
 
       {result.status === "unauthenticated" ? <StateMessage tone="danger">Session admin requise.</StateMessage> : null}
-      {result.status === "forbidden" ? <StateMessage tone="danger">Acces aux affectations refuse pour ce role admin.</StateMessage> : null}
+      {result.status === "forbidden" ? <StateMessage tone="danger">Accès aux affectations refusé pour ce rôle admin.</StateMessage> : null}
       {result.status === "error" ? <StateMessage tone="danger">Affectations indisponibles : {result.error}</StateMessage> : null}
 
-      <FilterBar action="/lead-assignments" label="Filtres affectations" submitLabel="Filtrer" resetLabel="Reinitialiser" resetHref="/lead-assignments" activeCount={activeFilters}>
+      <FilterBar action="/lead-assignments" label="Filtres affectations" submitLabel="Filtrer" resetLabel="Réinitialiser" resetHref="/lead-assignments" activeCount={activeFilters}>
         <Field id="la-status" label="Statut">
           <Select {...fieldControlProps("la-status")} name="status" defaultValue={filters.status ?? ""}>
             <option value="">Tous</option>
@@ -60,7 +61,7 @@ export default async function AdminLeadAssignmentsPage({ searchParams }: { searc
         <Field id="la-country" label="Pays (code ISO)">
           <Input {...fieldControlProps("la-country")} name="countryCode" defaultValue={filters.countryCode ?? ""} maxLength={3} />
         </Field>
-        <Field id="la-product" label="Produit (cle)">
+        <Field id="la-product" label="Produit (clé)">
           <Input {...fieldControlProps("la-product")} name="productKey" defaultValue={filters.productKey ?? ""} />
         </Field>
         <Field id="la-partner" label="Courtier partenaire (UUID)">
@@ -79,11 +80,11 @@ export default async function AdminLeadAssignmentsPage({ searchParams }: { searc
         items={result.data.items}
         getKey={(row) => row.id}
         emptyLabel="Aucune affectation pour ces filtres."
-        emptyDescription={activeFilters > 0 ? "Elargissez la periode ou reinitialisez les filtres." : "Les affectations apparaissent ici des que le routage attribue une demande a un courtier partenaire."}
+        emptyDescription={activeFilters > 0 ? "Élargissez la période ou réinitialisez les filtres." : "Les affectations apparaissent ici dès que le routage attribue une demande à un courtier partenaire."}
         aria-label="Affectations de leads"
         rowActions={(row) => (
           <details>
-            <summary>Reaffecter</summary>
+            <summary>Réaffecter</summary>
             <ReassignAssignmentForm assignmentId={row.id} partners={partners.filter((partner) => partner.id !== row.partnerTenantId)} />
           </details>
         )}

@@ -7,7 +7,7 @@ type Language = "fr" | "en";
 type Row = { key: string; label: string; values: Array<string | number | boolean | null> };
 
 const CONFIRM = {
-  fr: "Ces informations sont indicatives et a confirmer par le courtier partenaire.",
+  fr: "Ces informations sont indicatives et à confirmer par le courtier partenaire.",
   en: "This information is indicative and to be confirmed by the partner broker."
 } as const;
 
@@ -49,16 +49,16 @@ export function renderGuaranteeExplainer(input: Record<string, unknown>, languag
   const excluded = guarantees.filter((guarantee) => guarantee.included !== true).map(labelOf);
   const parts: string[] = [];
   parts.push(fr
-    ? `Voici, en langage simple, ce que les informations publiees indiquent pour l'offre "${name}"${insurer ? ` (assureur: ${insurer})` : ""}.`
+    ? `Voici, en langage simple, ce que les informations publiées indiquent pour l'offre "${name}"${insurer ? ` (assureur: ${insurer})` : ""}.`
     : `Here, in plain language, is what the published information says about the offer "${name}"${insurer ? ` (insurer: ${insurer})` : ""}.`);
   const summary = text(offer.guaranteeSummary) ?? text(offer.shortDescription);
-  if (summary) parts.push(fr ? `Resume: ${summary}` : `Summary: ${summary}`);
+  if (summary) parts.push(fr ? `Résumé: ${summary}` : `Summary: ${summary}`);
   parts.push(included.length > 0
-    ? (fr ? `Garanties indiquees comme incluses: ${joinList(included, language)}.` : `Guarantees listed as included: ${joinList(included, language)}.`)
-    : (fr ? "Aucune garantie incluse n'est detaillee dans les informations publiees." : "No included guarantee is detailed in the published information."));
-  if (excluded.length > 0) parts.push(fr ? `Garanties indiquees comme non incluses: ${joinList(excluded, language)}.` : `Guarantees listed as not included: ${joinList(excluded, language)}.`);
+    ? (fr ? `Garanties indiquées comme incluses: ${joinList(included, language)}.` : `Guarantees listed as included: ${joinList(included, language)}.`)
+    : (fr ? "Aucune garantie incluse n'est détaillée dans les informations publiées." : "No included guarantee is detailed in the published information."));
+  if (excluded.length > 0) parts.push(fr ? `Garanties indiquées comme non incluses: ${joinList(excluded, language)}.` : `Guarantees listed as not included: ${joinList(excluded, language)}.`);
   const exclusions = text(offer.exclusionsSummary);
-  if (exclusions) parts.push(fr ? `Exclusions mentionnees: ${exclusions}` : `Exclusions mentioned: ${exclusions}`);
+  if (exclusions) parts.push(fr ? `Exclusions mentionnées: ${exclusions}` : `Exclusions mentioned: ${exclusions}`);
   const deductible = amount(offer.deductibleAmount, currency);
   const ceiling = amount(offer.coverageCeiling, currency);
   const delay = days(offer.processingDelayDays, language);
@@ -67,10 +67,10 @@ export function renderGuaranteeExplainer(input: Record<string, unknown>, languag
   const figures: string[] = [];
   if (deductible) figures.push(fr ? `franchise: ${deductible}` : `deductible: ${deductible}`);
   if (ceiling) figures.push(fr ? `plafond: ${ceiling}` : `ceiling: ${ceiling}`);
-  if (delay) figures.push(fr ? `delai moyen de traitement: ${delay}` : `average processing time: ${delay}`);
-  if (min) figures.push(fr ? `prix indicatif a partir de ${min}${max ? ` jusqu'a ${max}` : ""}` : `indicative price from ${min}${max ? ` up to ${max}` : ""}`);
-  if (figures.length > 0) parts.push(`${fr ? "Reperes chiffres" : "Key figures"}: ${figures.join("; ")}.`);
-  parts.push(fr ? `Cette reformulation ne cree aucune couverture. ${CONFIRM.fr}` : `This rewording does not create any coverage. ${CONFIRM.en}`);
+  if (delay) figures.push(fr ? `délai moyen de traitement: ${delay}` : `average processing time: ${delay}`);
+  if (min) figures.push(fr ? `prix indicatif à partir de ${min}${max ? ` jusqu'à ${max}` : ""}` : `indicative price from ${min}${max ? ` up to ${max}` : ""}`);
+  if (figures.length > 0) parts.push(`${fr ? "Repères chiffrés" : "Key figures"}: ${figures.join("; ")}.`);
+  parts.push(fr ? `Cette reformulation ne crée aucune couverture. ${CONFIRM.fr}` : `This rewording does not create any coverage. ${CONFIRM.en}`);
   return parts.join(" ");
 }
 
@@ -88,8 +88,8 @@ function offersAt(indexes: number[], language: Language): string {
 const EXTREMES = [
   { key: "price", pick: "min", unit: "money", fr: "le prix indicatif le plus bas", en: "the lowest indicative price", labelFr: "Prix indicatif", labelEn: "Indicative price" },
   { key: "deductible", pick: "min", unit: "money", fr: "la franchise la plus basse", en: "the lowest deductible", labelFr: "Franchise", labelEn: "Deductible" },
-  { key: "ceiling", pick: "max", unit: "money", fr: "le plafond de garantie le plus eleve", en: "the highest coverage ceiling", labelFr: "Plafond de garantie", labelEn: "Coverage ceiling" },
-  { key: "processingDelay", pick: "min", unit: "days", fr: "le delai de traitement le plus court", en: "the shortest processing time", labelFr: "Delai de traitement", labelEn: "Processing time" }
+  { key: "ceiling", pick: "max", unit: "money", fr: "le plafond de garantie le plus élevé", en: "the highest coverage ceiling", labelFr: "Plafond de garantie", labelEn: "Coverage ceiling" },
+  { key: "processingDelay", pick: "min", unit: "days", fr: "le délai de traitement le plus court", en: "the shortest processing time", labelFr: "Délai de traitement", labelEn: "Processing time" }
 ] as const;
 
 export function renderCompareExplainer(input: Record<string, unknown>, language: Language): string {
@@ -101,7 +101,7 @@ export function renderCompareExplainer(input: Record<string, unknown>, language:
   const count = Array.isArray(input.offers) ? input.offers.length : Math.max(0, ...rows.map((row) => row.values.length));
   const parts: string[] = [];
   parts.push(fr
-    ? `Comparaison factuelle de ${count} offres, designees offre 1 a offre ${count} dans l'ordre de votre selection. Elle decrit des ecarts, sans classement ni recommandation.`
+    ? `Comparaison factuelle de ${count} offres, désignées offre 1 à offre ${count} dans l'ordre de votre sélection. Elle décrit des écarts, sans classement ni recommandation.`
     : `Factual comparison of ${count} offers, labelled offer 1 to offer ${count} in the order you selected them. It describes differences only, with no ranking and no recommendation.`);
 
   for (const extreme of EXTREMES) {
@@ -120,7 +120,7 @@ export function renderCompareExplainer(input: Record<string, unknown>, language:
     } else {
       const single = winners.length === 1;
       parts.push(fr
-        ? `${label}: ${detail}. ${capitalize(extreme.fr)} ${single ? "est celui de" : "est partage par"} ${offersAt(winners, language)}.`
+        ? `${label}: ${detail}. ${capitalize(extreme.fr)} ${single ? "est celui de" : "est partagé par"} ${offersAt(winners, language)}.`
         : `${label}: ${detail}. ${capitalize(extreme.en)} ${single ? "is that of" : "is shared by"} ${offersAt(winners, language)}.`);
     }
   }
@@ -138,12 +138,12 @@ export function renderCompareExplainer(input: Record<string, unknown>, language:
     const segments: string[] = [];
     if (included.length > 0) segments.push(fr ? `incluse dans ${offersAt(included, language)}` : `included in ${offersAt(included, language)}`);
     if (notIncluded.length > 0) segments.push(fr ? `non incluse dans ${offersAt(notIncluded, language)}` : `not included in ${offersAt(notIncluded, language)}`);
-    if (unknown.length > 0) segments.push(fr ? `non precisee pour ${offersAt(unknown, language)}` : `not specified for ${offersAt(unknown, language)}`);
+    if (unknown.length > 0) segments.push(fr ? `non précisée pour ${offersAt(unknown, language)}` : `not specified for ${offersAt(unknown, language)}`);
     parts.push(fr ? `Garantie "${label}": ${segments.join("; ")}.` : `Guarantee "${label}": ${segments.join("; ")}.`);
   }
-  if (common.length > 0) parts.push(fr ? `Garanties indiquees comme incluses dans toutes les offres: ${joinList(common, language)}.` : `Guarantees listed as included in every offer: ${joinList(common, language)}.`);
+  if (common.length > 0) parts.push(fr ? `Garanties indiquées comme incluses dans toutes les offres: ${joinList(common, language)}.` : `Guarantees listed as included in every offer: ${joinList(common, language)}.`);
   parts.push(fr
-    ? `Le choix d'une offre depend de votre situation et vous appartient. ${CONFIRM.fr}`
+    ? `Le choix d'une offre dépend de votre situation et vous appartient. ${CONFIRM.fr}`
     : `The choice of an offer depends on your situation and is yours to make. ${CONFIRM.en}`);
   return parts.join(" ");
 }

@@ -5,6 +5,7 @@ import type { DragEvent } from "react";
 import { moveCrmLeadStatusAction } from "../../lib/kanban-actions";
 import { KANBAN_READ_ONLY_MESSAGE, KANBAN_SAME_COLUMN_MESSAGE, canConfirmKanbanReason, decideKanbanDrop, effectiveKanbanTarget, failKanbanMove, moveCardBetweenColumns, settleKanbanMove, withoutKanbanTarget } from "../../lib/kanban-moves";
 import type { KanbanColumns, KanbanMessage } from "../../lib/kanban-moves";
+import { productLabel } from "../../lib/product-vocabulary";
 import { CRM_OUTCOME_REASONS, CRM_PIPELINE_STATUSES, CRM_REASON_LABELS, CRM_STATUS_LABELS } from "../../lib/lead-vocabulary";
 import type { CrmPipelineStatus } from "../../lib/lead-vocabulary";
 import { Badge, Button, Field, Notice, Select } from "../../lib/ui/broker-ui";
@@ -194,7 +195,7 @@ export function KanbanBoard({ columns: initial, canMove }: KanbanBoardProps) {
                           onDragEnd={canMove ? () => { setDragging(undefined); setOverColumn(undefined); } : undefined}
                           style={{ cursor: canMove ? "grab" : undefined, opacity: dragging?.id === card.id ? 0.5 : 1 }}
                         >
-                          <a href={`/crm/leads/${card.id}`}>{card.reference}</a> - {card.product} / {card.country}
+                          <a href={`/crm/leads/${card.id}`}>{card.reference}</a> - {productLabel(card.product)} / {card.country}
                           {card.advisor ? ` - ${card.advisor}` : ""}
                           {canMove ? (
                             <div>

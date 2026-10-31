@@ -53,6 +53,8 @@ describe("QuoteEmailTemplateService (spec 044)", () => {
     expect(email.body).toContain("QR-2026-ABCDEF12");
     expect(email.body).toContain("http://broker.test/leads");
     expect(email.body).toContain("ne sont pas reprises dans cet email");
+    expect(email.body).toContain("Aucun engagement contractuel ne résulte de ce message.");
+    expect(email.subject).toBe("Nouveau lead assigné QR-2026-ABCDEF12");
     // D1: email leaves every access control the platform applies to this data.
     const rendered = `${email.subject} ${email.body} ${email.html ?? ""}`;
     for (const leaked of ["visiteur@example.test", "+2250102030405", "professionnel", "175000"]) {

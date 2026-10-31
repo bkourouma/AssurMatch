@@ -75,7 +75,9 @@ export class AdminDashboardService {
     if (query.country) scopeInput.country = query.country;
     if (query.product) scopeInput.product = query.product;
     if (query.partnerId) scopeInput.partnerId = query.partnerId;
-    const scopedActor = await this.actorWithScopeCodes(actor);
+    // The catalog is read once per request and shared by scope resolution, quote product keys and active counters.
+    const catalogProducts = await this.deps.products.listAdmin();
+    const scopedActor = await this.actorWithScopeCodes(actor, catalogProducts);
     const scope = this.deps.access.resolveAdminScope(scopedActor, role, scopeInput);
     if (role === "finance_admin" || role === "content_admin") {
       this.deps.access.refuseAdmin(actor, "restricted_admin_dashboard_unavailable");
@@ -89,7 +91,10 @@ export class AdminDashboardService {
       : null;
 
     const allAssignments = await this.deps.assignments.list();
-    const allQuoteRequests = await this.deps.quoteRequests.list();
+    // The Prisma repository strips `productKey` on write, so quote rows only carry `productId`: resolve the key
+    // through the catalog, otherwise every quote lands in "unknown" and is dropped from the scoped breakdown.
+    const productKeyById = this.buildProductKeyMap(catalogProducts);
+    const allQuoteRequests = (await this.deps.quoteRequests.list()).map((quote) => this.withProductKey(quote, productKeyById));
     const allDecisions = await this.deps.decisions.list();
     const allPartners = await this.deps.partners.list();
     const allOffers = await this.deps.offers.repository.list();
@@ -132,7 +137,7 @@ export class AdminDashboardService {
     this.deps.access.recordAdminSuccess(actor, scope, window);
 
     // Lot 6 (spec 073 T302)
-    const extra = await this.buildExtraKpis(actor, scope, window, { received, assignmentsInWindow, allAssignments, countryMap });
+    const extra = await this.buildExtraKpis(actor, scope, window, { received, assignmentsInWindow, allAssignments, countryMap, products: catalogProducts });
     // Lot 6 (end)
 
     const response: AdminDashboardResponse = {
@@ -218,7 +223,7 @@ export class AdminDashboardService {
     actor: ActorContext,
     scope: ResolvedAdminScope,
     window: ResolvedDashboardWindow,
-    context: { received: number; assignmentsInWindow: LeadAssignmentRecord[]; allAssignments: LeadAssignmentRecord[]; countryMap: Map<string, string> }
+    context: { received: number; assignmentsInWindow: LeadAssignmentRecord[]; allAssignments: LeadAssignmentRecord[]; countryMap: Map<string, string>; products: Awaited<ReturnType<AdminDashboardServiceDeps["products"]["listAdmin"]>> }
   ): Promise<Partial<AdminDashboardResponse>> {
     const extra: Partial<AdminDashboardResponse> = {};
 
@@ -241,7 +246,8 @@ export class AdminDashboardService {
     extra.visitToRequestRate = visits && !filtered ? visitToRequestRate(context.received, visits.total) : null;
 
     // Active countries and products: same publication rules as the public counters.
-    const [countries, products] = await Promise.all([this.deps.countries.listAdmin(), this.deps.products.listAdmin()]);
+    const countries = await this.deps.countries.listAdmin();
+    const products = context.products;
     extra.activeCountries = countActiveCountries(countries, { public_comparator_enabled: this.flagOn("public_comparator_enabled") }, scope);
     extra.activeProducts = countActiveProducts(products as never, scope);
 
@@ -332,17 +338,28 @@ export class AdminDashboardService {
   }
   // Lot 6 (end)
 
-  private async actorWithScopeCodes(actor: ActorContext): Promise<ActorContext> {
+  private async actorWithScopeCodes(actor: ActorContext, products: Array<{ id: string; key: string }>): Promise<ActorContext> {
     if (!actor.countryScopes?.length && !actor.productScopes?.length) return actor;
-    const [countries, products] = await Promise.all([
-      this.deps.countries.listAdmin(),
-      this.deps.products.listAdmin()
-    ]);
+    const countries = await this.deps.countries.listAdmin();
     return {
       ...actor,
       countryScopes: resolveScopeCodes(actor.countryScopes, countryCatalog(countries)),
       productScopes: resolveScopeCodes(actor.productScopes, productCatalog(products))
     };
+  }
+
+  private buildProductKeyMap(products: Array<{ id: string; key: string }>): Map<string, string> {
+    const map = new Map<string, string>();
+    for (const product of products) map.set(product.id, product.key);
+    return map;
+  }
+
+  /** Adds the catalog `productKey` to a quote that only carries `productId`; a quote that already has one is untouched. */
+  private withProductKey<T>(quote: T, productKeyById: Map<string, string>): T {
+    const record = quote as { productId?: string; productKey?: string };
+    if (record.productKey || !record.productId) return quote;
+    const productKey = productKeyById.get(record.productId);
+    return productKey ? { ...quote, productKey } : quote;
   }
 
   private async buildCountryIsoMap(): Promise<Map<string, string>> {

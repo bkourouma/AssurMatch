@@ -9,7 +9,7 @@ test("admin users page exposes rich user management shell", async () => {
 
   expect(source).toContain("Recherche");
   expect(source).toContain("Statut");
-  expect(source).toContain("Role");
+  expect(source).toContain("Rôle");
   expect(source).toContain("CreateUserForm");
   expect(detail).toContain("Profil et scopes");
   expect(detail).toContain("Actions sensibles");

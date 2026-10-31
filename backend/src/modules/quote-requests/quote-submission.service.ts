@@ -1050,7 +1050,7 @@ export class QuoteSubmissionService {
         status: "cancelled",
         publicReference: quote.publicReference,
         alreadyWithdrawn: true,
-        message: "Votre demande a deja ete annulee; le courtier partenaire en avait ete informe."
+        message: "Votre demande a déjà été annulée; le courtier partenaire en avait été informé."
       };
     }
 
@@ -1093,7 +1093,7 @@ export class QuoteSubmissionService {
       status: "cancelled",
       publicReference: quote.publicReference,
       alreadyWithdrawn: false,
-      message: "Votre demande a ete annulee et le courtier partenaire a ete informe de votre retrait de consentement."
+      message: "Votre demande a été annulée et le courtier partenaire a été informé de votre retrait de consentement."
     };
   }
 
@@ -1162,7 +1162,7 @@ export class QuoteSubmissionService {
       publicReference: "duplicate",
       status: "duplicate",
       routed: false,
-      message: "Une demande recente similaire existe deja; aucun courtier partenaire n'est notifie une seconde fois.",
+      message: "Une demande récente similaire existe déjà; aucun courtier partenaire n'est notifié une seconde fois.",
       verificationToken: "duplicate"
     };
   }

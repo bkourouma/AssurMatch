@@ -106,7 +106,7 @@ const JSON_SCHEMAS: Partial<Record<AiAssistTypeCatalog, (value: unknown) => unkn
   lead_classification: (value) => aiLeadClassificationSchema.parse(value)
 };
 const DEFAULT_QUOTAS: Record<AiSurface, number> = { visitor: 40, broker_crm: 200, admin_platform: 300 };
-const ASSISTANCE_LABEL = "Assistance IA d'aide a la comprehension";
+const ASSISTANCE_LABEL = "Assistance IA d'aide à la compréhension";
 export const AI_PARTNER_OPT_OUT_FLAG = "ai_partner_opt_out";
 
 /**

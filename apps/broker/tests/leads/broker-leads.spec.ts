@@ -8,15 +8,15 @@ test("broker lead pages show only assigned lead surfaces", async () => {
 
   expect(dashboard).toContain("Portail courtier");
   expect(dashboard).toContain("Le CRM complet est disponible avec le plan Pro.");
-  expect(list).toContain("uniquement les leads qui lui sont assignes");
+  expect(list).toContain("uniquement les leads qui lui sont assignés");
   expect(list).toContain("Aucun Kanban");
   expect(list).toContain("Exporter (CSV)");
-  expect(detail).toContain("Detail du lead assigne");
+  expect(detail).toContain("Détail du lead assigné");
   expect(detail).toContain("Accepter");
   expect(detail).toContain("Rejeter avec motif");
   expect(detail).toContain("Contester avec motif");
-  expect(detail).toContain("Toute consultation detail est auditee");
-  expect(detail).toContain("ne presente pas Kanban");
+  expect(detail).toContain("Toute consultation détail est auditée");
+  expect(detail).toContain("ne présente pas Kanban");
 });
 
 test("starter lead list links each row to the real lead assignment id", async () => {
@@ -49,7 +49,7 @@ test("starter lead detail reads the real API instead of a hardcoded mock", async
   expect(detail).toContain("lead.productKey");
   expect(detail).toContain("lead.assignedAt");
   expect(detail).toContain("Contact consenti");
-  expect(detail).toContain("Reponses consenties");
+  expect(detail).toContain("Réponses consenties");
   expect(detail).toContain("Historique minimal");
 
   // The back link stays available.
@@ -90,7 +90,7 @@ test("starter lead detail degrades safely on forbidden, not found and API errors
   expect(detail).toContain("Lead introuvable");
   expect(detail).toContain("Lead indisponible");
   expect(detail).toContain("<Notice tone=");
-  expect(detail).toContain("Aucune donnee protegee n'est affichee");
+  expect(detail).toContain("Aucune donnée protégée n'est affichée");
   expect(detail).toContain("loginRedirect");
 });
 

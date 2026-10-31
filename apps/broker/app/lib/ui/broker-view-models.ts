@@ -46,11 +46,11 @@ export function statusTone(status: string): Tone {
 export function dashboardKpis(data: BrokerDashboardData): KpiViewModel[] {
   const starter = data.starter;
   return [
-    { label: "Leads recus", value: starter.received, helper: "Leads visibles pour ce tenant", tone: "info" },
-    { label: "Acceptes", value: starter.accepted, helper: "Actions courtier historisees", tone: "success" },
-    { label: "Rejetes", value: starter.rejected, helper: "Avec motif lorsque requis", tone: "danger" },
-    { label: "Contestes", value: starter.disputed, helper: "Traitement selon workflow existant", tone: "warning" },
-    { label: "En attente", value: starter.pendingAction, helper: "Leads sans action recente", tone: "neutral" },
+    { label: "Leads reçus", value: starter.received, helper: "Leads visibles pour ce tenant", tone: "info" },
+    { label: "Acceptés", value: starter.accepted, helper: "Actions courtier historisées", tone: "success" },
+    { label: "Rejetés", value: starter.rejected, helper: "Avec motif lorsque requis", tone: "danger" },
+    { label: "Contestés", value: starter.disputed, helper: "Traitement selon workflow existant", tone: "warning" },
+    { label: "En attente", value: starter.pendingAction, helper: "Leads sans action récente", tone: "neutral" },
     // Spec 062 (E-08): only when the API sends the additive measure.
     ...(typeof starter.firstVisibleReplyMeasured === "number"
       ? [{
@@ -66,12 +66,12 @@ export function dashboardKpis(data: BrokerDashboardData): KpiViewModel[] {
 export function crmKpis(data: BrokerDashboardData): KpiViewModel[] {
   const crm = data.crm;
   if (!crm) return [
-    { label: "CRM complet", value: "Indisponible", helper: data.plan === "starter" ? "Le CRM complet est disponible avec le plan Pro." : "Flag broker_crm_enabled ferme ou scope indisponible", tone: "disabled" }
+    { label: "CRM complet", value: "Indisponible", helper: data.plan === "starter" ? "Le CRM complet est disponible avec le plan Pro." : "Flag broker_crm_enabled fermé ou scope indisponible", tone: "disabled" }
   ];
 
   return [
-    { label: "Taches a venir", value: crm.upcomingTasks, helper: "Activites CRM existantes", tone: crm.upcomingTasks > 0 ? "info" : "neutral" },
-    { label: "Rappels a venir", value: crm.upcomingReminders, helper: "Relances configurees", tone: crm.upcomingReminders > 0 ? "warning" : "neutral" },
+    { label: "Tâches à venir", value: crm.upcomingTasks, helper: "Activités CRM existantes", tone: crm.upcomingTasks > 0 ? "info" : "neutral" },
+    { label: "Rappels à venir", value: crm.upcomingReminders, helper: "Relances configurées", tone: crm.upcomingReminders > 0 ? "warning" : "neutral" },
     { label: "Statuts pipeline", value: crm.pipeline.length, helper: "Groupes visibles selon permissions", tone: "neutral" },
     { label: "Produits suivis", value: crm.conversionByProduct.length, helper: "Conversions indicatives internes", tone: "neutral" }
   ];

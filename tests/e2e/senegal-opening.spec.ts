@@ -30,7 +30,7 @@ test.describe.configure({ mode: "serial" });
 const REASON = "Ouverture du Sénégal E2E spec 065";
 const SN_QUOTE_FIELDS: Record<string, Record<"fr" | "en", string[]>> = {
   auto: {
-    fr: ["vehicle_use|Usage du vehicule|select|true|public|prive,professionnel", "vehicle_brand|Marque du vehicule|text|false|public|"],
+    fr: ["vehicle_use|Usage du véhicule|select|true|public|prive,professionnel", "vehicle_brand|Marque du véhicule|text|false|public|"],
     en: ["vehicle_use|Vehicle use|select|true|public|private,business", "vehicle_brand|Vehicle make|text|false|public|"]
   },
   voyage: {
@@ -83,7 +83,7 @@ test("SN-02 le Sénégal : régime CIMA, XOF, +221 ; un formulaire de devis publ
   const countryId = await openCountry(admin, "SN");
 
   // Reference data of the seed (spec 051): the regime comes from the regulatory family.
-  const identity = card(admin, "Synthese");
+  const identity = card(admin, "Synthèse");
   await expect(identity).toContainText("CIMA");
   await expect(identity).toContainText("cima");
   await expect(identity).toContainText("fr, en");
@@ -151,7 +151,7 @@ test("SN-03 produits Auto et Voyage, statut pilote du Sénégal et flags pays et
   }
 
   await admin.goto(`/catalog/countries/${countryId}`);
-  await expect(card(admin, "Synthese")).toContainText("pilot");
+  await expect(card(admin, "Synthèse")).toContainText("pilot");
   // The public exposure of the country stays closed: it is the compliance go/no-go of SN-05.
   await expect(admin.locator('form[data-catalog-flag-form="country_public_enabled"]').first().getByRole("button", { name: /^Activer :/u })).toBeVisible();
   await admin.context().close();
@@ -220,7 +220,7 @@ test("SN-05 interdit : sans courtier ni offre, l'ouverture publique du Sénégal
 
   // Nothing changed: the country is still a pilot and the public exposure flag is still closed.
   await compliance.goto(`/catalog/countries/${countryId}`);
-  await expect(card(compliance, "Synthese")).toContainText("pilot");
+  await expect(card(compliance, "Synthèse")).toContainText("pilot");
   await expect(compliance.locator('form[data-catalog-flag-form="country_public_enabled"]').first().getByRole("button", { name: /^Activer :/u })).toBeVisible();
   await compliance.goto("/compliance/audit-logs");
   await expect(compliance.getByText(/country\.status_changed|catalog/u).first()).toBeVisible();
@@ -300,7 +300,7 @@ test("SN-09 la conformité ouvre le Sénégal au public (checklist verte) : offr
   await changeStatus(admin, "Statut du pays", "public", REASON);
   await admin.goto(`/catalog/countries/${countryId}`);
   await expect(card(admin, "Checklist d'activation du pays")).toContainText("Aucun contrôle bloquant");
-  await expect(card(admin, "Synthese")).toContainText("public");
+  await expect(card(admin, "Synthèse")).toContainText("public");
   await admin.context().close();
 
   const visitor = await appPage(browser, e2eEnv.publicUrl);
@@ -323,7 +323,7 @@ test("SN-09 la conformité ouvre le Sénégal au public (checklist verte) : offr
   const offerId = new URL(href, e2eEnv.publicUrl).searchParams.get("offerId");
   expect(offerId, "the quote link carries the offer").toBeTruthy();
   const expectations = {
-    fr: { path: `/pays/SN/produits/auto/devis?offerId=${offerId}`, label: "Usage du vehicule", consent: "En cochant cette case" },
+    fr: { path: `/pays/SN/produits/auto/devis?offerId=${offerId}`, label: "Usage du véhicule", consent: "En cochant cette case" },
     en: { path: `/en/countries/SN/products/auto/quote?offerId=${offerId}`, label: "Vehicle use", consent: "By checking this box" }
   } as const;
   for (const language of LANGUAGES) {

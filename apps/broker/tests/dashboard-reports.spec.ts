@@ -12,7 +12,7 @@ test("broker CRM page shows period comparison, advisor performance and an authen
 
   expect(api).toContain("/broker/dashboard/advisors");
   expect(api).toContain("compare=previous");
-  expect(page).toContain("Comparaison avec la periode precedente");
+  expect(page).toContain("Comparaison avec la période précédente");
   expect(page).toContain("Performance par conseiller");
   expect(page).toContain('href="/reports/export"');
   // The export must go through the app route so the httpOnly session token is attached.

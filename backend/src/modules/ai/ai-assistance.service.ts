@@ -52,8 +52,8 @@ export class AIAssistanceService {
         noAutomatedDecision: true
       },
       message: enabled
-        ? `Assistance IA active (${provider}): sorties indicatives, donnees minimisees, validation humaine obligatoire pour les suggestions sensibles.`
-        : "Assistance IA desactivee par les feature flags: aucun appel modele, aucune decision automatisee, validation humaine obligatoire."
+        ? `Assistance IA active (${provider}): sorties indicatives, données minimisées, validation humaine obligatoire pour les suggestions sensibles.`
+        : "Assistance IA désactivée par les feature flags: aucun appel modèle, aucune décision automatisée, validation humaine obligatoire."
     };
     this.deps.audit.write({
       actor,

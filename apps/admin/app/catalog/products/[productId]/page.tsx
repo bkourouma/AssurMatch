@@ -55,7 +55,7 @@ export default async function CatalogProductDetailPage({ params }: ProductDetail
     return (
       <PageStack>
         <PageHeader
-          breadcrumb={[{ label: "Catalogue", href: "/catalog" }, { label: "Produits", href: "/catalog/products" }, { label: "Detail" }]}
+          breadcrumb={[{ label: "Catalogue", href: "/catalog" }, { label: "Produits", href: "/catalog/products" }, { label: "Détail" }]}
           title="Produit indisponible"
           actions={<Button href="/catalog/products" variant="secondary">Retour aux produits</Button>}
         />
@@ -83,7 +83,7 @@ export default async function CatalogProductDetailPage({ params }: ProductDetail
       />
 
       <Split>
-        <Card title="Synthese">
+        <Card title="Synthèse">
           <DescriptionList
             columns={2}
             items={[

@@ -19,24 +19,31 @@ export const sensitiveFeatureFlagKeys = [
 
 export function dashboardKpis(data: AdminDashboardData): DashboardKpiView[] {
   return [
-    { label: "Leads reçus", value: data.leadVolumes.received, helper: "Demandes recues sur la fenetre", tone: "info" },
-    { label: "Leads transmis", value: data.leadVolumes.transmitted, helper: "Transmissions deja effectuees", tone: "success" },
-    { label: "Leads refusés", value: data.leadVolumes.refused, helper: "Demandes refusees ou bloquees", tone: "warning" },
+    { label: "Leads reçus", value: data.leadVolumes.received, helper: "Demandes reçues sur la fenêtre", tone: "info" },
+    { label: "Leads transmis", value: data.leadVolumes.transmitted, helper: "Transmissions déjà effectuées", tone: "success" },
+    { label: "Leads refusés", value: data.leadVolumes.refused, helper: "Demandes refusées ou bloquées", tone: "warning" },
     { label: "Leads non routés", value: data.leadVolumes.nonRouted, helper: "À traiter sans forcer le routage", tone: data.leadVolumes.nonRouted > 0 ? "warning" : "neutral" },
-    { label: "Licences expirées", value: data.licenseAlerts.expired, helper: "Partenaires a bloquer selon regles existantes", tone: data.licenseAlerts.expired > 0 ? "danger" : "success" },
-    { label: "Licences à moins de 30 jours", value: data.licenseAlerts.expiringSoon, helper: "Alertes conformite a anticiper", tone: data.licenseAlerts.expiringSoon > 0 ? "warning" : "success" },
-    { label: "Pays actifs", value: data.scope.countries.length, helper: "Scope visible pour ce role admin", tone: "neutral" },
-    { label: "Produits actifs", value: data.scope.products.length, helper: "Produits visibles pour ce role admin", tone: "neutral" },
+    { label: "Licences expirées", value: data.licenseAlerts.expired, helper: "Partenaires à bloquer selon règles existantes", tone: data.licenseAlerts.expired > 0 ? "danger" : "success" },
+    { label: "Licences à moins de 30 jours", value: data.licenseAlerts.expiringSoon, helper: "Alertes conformité à anticiper", tone: data.licenseAlerts.expiringSoon > 0 ? "warning" : "success" },
+    { label: "Pays actifs", value: data.scope.countries.length, helper: "Scope visible pour ce rôle admin", tone: "neutral" },
+    { label: "Produits actifs", value: data.scope.products.length, helper: "Produits visibles pour ce rôle admin", tone: "neutral" },
     { label: "Partenaires actifs", value: data.partners.active, helper: `${data.partners.inactive} inactifs`, tone: "info" },
     { label: "Offres expirées", value: data.expiredOffersStillReferenced, helper: "Références à vérifier avant exposition", tone: data.expiredOffersStillReferenced > 0 ? "warning" : "success" }
   ];
 }
 
 // Lot 6 (spec 073 T304): the 15 KPI of the PRD section 21, with explicit states instead of misleading zeros.
-export const NOT_MEASURED = "Non mesure";
-export const SUPER_ADMIN_ONLY = "Reserve au super admin";
-export const AI_RESTRICTED = "Reserve aux roles IA et conformite";
-export const AI_DISABLED = "IA desactivee";
+export const NOT_MEASURED = "Non mesuré";
+// A text state shown as a KPI value must stay short (it is rendered in the tile's big figure):
+// the full explanation goes in the helper line (`*_NOTE`).
+export const SUPER_ADMIN_ONLY = "Réservé";
+export const SUPER_ADMIN_ONLY_NOTE = "Réservé au super admin";
+export const AI_RESTRICTED = "Réservé";
+export const AI_RESTRICTED_NOTE = "Réservé aux rôles IA et conformité";
+/** Sentence for cards and notices. */
+export const AI_DISABLED = "IA désactivée";
+/** Short form for a KPI tile. */
+export const AI_DISABLED_TILE = "Désactivée";
 
 function percent(rate: number | null | undefined): string {
   return rate === null || rate === undefined ? NOT_MEASURED : `${(rate * 100).toFixed(1).replace(".", ",")} %`;
@@ -48,9 +55,9 @@ function amounts(rows: Array<{ currency: string; value: number }> | undefined): 
 }
 
 export function aiValidationLabel(status: string): string {
-  if (status === "pending") return "A valider";
-  if (status === "approved") return "Valide";
-  if (status === "rejected") return "Rejete";
+  if (status === "pending") return "À valider";
+  if (status === "approved") return "Validé";
+  if (status === "rejected") return "Rejeté";
   if (status === "not_required") return "Validation non requise";
   return status;
 }
@@ -67,28 +74,33 @@ export function dashboardPrdKpis(data: AdminDashboardData): DashboardKpiView[] {
   const quality = data.leadQuality;
   let aiValue: string = NOT_MEASURED;
   let aiTone: Tone = "disabled";
-  if (data.aiEnabled === false) aiValue = AI_DISABLED;
-  else if (data.aiRestricted) aiValue = AI_RESTRICTED;
-  else if (data.aiSummary) {
+  let aiHelper = "Dernier rapport d'activité, validation humaine requise";
+  if (data.aiEnabled === false) {
+    aiValue = AI_DISABLED_TILE;
+    aiHelper = AI_DISABLED;
+  } else if (data.aiRestricted) {
+    aiValue = AI_RESTRICTED;
+    aiHelper = AI_RESTRICTED_NOTE;
+  } else if (data.aiSummary) {
     aiValue = aiValidationLabel(data.aiSummary.status);
     aiTone = data.aiSummary.status === "pending" ? "warning" : "info";
   }
   return [
-    { label: "Visites (pages vues)", value: data.visits ? data.visits.total : NOT_MEASURED, helper: data.visits ? "Compteur agrege sans donnee personnelle" : "Compteur absent, desactive ou vide", tone: data.visits ? "info" : "disabled" },
-    { label: "Demandes creees", value: data.leadVolumes.received, helper: "Demandes recues sur la fenetre", tone: "info" },
-    { label: "Taux visite vers demande", value: percent(data.visitToRequestRate), helper: data.visits && (data.visitToRequestRate === null || data.visitToRequestRate === undefined) ? "Non mesure sous filtre pays / produit / partenaire (visites non filtrees)" : "Demandes creees / pages vues", tone: data.visitToRequestRate === null || data.visitToRequestRate === undefined ? "disabled" : "info" },
-    { label: "Leads routes", value: data.leadVolumes.transmitted, helper: "Transmissions deja effectuees", tone: "success" },
-    { label: "Leads non routes", value: data.leadVolumes.nonRouted, helper: "A traiter sans forcer le routage", tone: data.leadVolumes.nonRouted > 0 ? "warning" : "neutral" },
+    { label: "Visites (pages vues)", value: data.visits ? data.visits.total : NOT_MEASURED, helper: data.visits ? "Compteur agrégé sans donnée personnelle" : "Compteur absent, désactivé ou vide", tone: data.visits ? "info" : "disabled" },
+    { label: "Demandes créées", value: data.leadVolumes.received, helper: "Demandes reçues sur la fenêtre", tone: "info" },
+    { label: "Taux visite vers demande", value: percent(data.visitToRequestRate), helper: data.visits && (data.visitToRequestRate === null || data.visitToRequestRate === undefined) ? "Non mesuré sous filtre pays / produit / partenaire (visites non filtrées)" : "Demandes créées / pages vues", tone: data.visitToRequestRate === null || data.visitToRequestRate === undefined ? "disabled" : "info" },
+    { label: "Leads routés", value: data.leadVolumes.transmitted, helper: "Transmissions déjà effectuées", tone: "success" },
+    { label: "Leads non routés", value: data.leadVolumes.nonRouted, helper: "À traiter sans forcer le routage", tone: data.leadVolumes.nonRouted > 0 ? "warning" : "neutral" },
     { label: "Partenaires actifs", value: data.partners.active, helper: `${data.partners.inactive} inactifs`, tone: "info" },
-    { label: "Pays actifs", value: measuredOrNot(data.activeCountries), helper: "Parcours public ouvert, dans le perimetre", tone: "neutral" },
-    { label: "Produits actifs", value: measuredOrNot(data.activeProducts), helper: "Produits publics, dans le perimetre", tone: "neutral" },
-    { label: "CA abonnement", value: revenueRow("subscription"), helper: "Factures emises sur la fenetre, sans conversion de devise", tone: revenueTone },
-    { label: "CA leads", value: revenueRow("leads"), helper: "Leads factures nets des avoirs, sans conversion de devise", tone: revenueTone },
-    { label: "SLA courtier", value: sla && sla.averageFirstActionMinutes !== null ? `${sla.averageFirstActionMinutes} min` : NOT_MEASURED, helper: sla ? `Premiere action moyenne, ${sla.measured} lead(s) mesure(s)` : "Delai moyen de premiere action", tone: sla && sla.averageFirstActionMinutes !== null ? "info" : "disabled" },
-    { label: "Qualite leads", value: percent(quality?.disputeRate), helper: quality ? `Taux de contestation: ${quality.disputed} contestation(s) pour ${quality.transmitted} lead(s) transmis` : "Taux de contestation", tone: quality?.disputeRate ? "warning" : quality ? "success" : "disabled" },
-    { label: "Alertes conformite", value: complianceTotal, helper: "Refus audites sur la fenetre", tone: complianceTotal > 0 ? "warning" : "success" },
-    { label: "Offres expirees", value: data.expiredOffersStillReferenced, helper: "References a verifier avant exposition", tone: data.expiredOffersStillReferenced > 0 ? "warning" : "success" },
-    { label: "Synthese IA", value: aiValue, helper: "Dernier rapport d'activite, validation humaine requise", tone: aiTone }
+    { label: "Pays actifs", value: measuredOrNot(data.activeCountries), helper: "Parcours public ouvert, dans le périmètre", tone: "neutral" },
+    { label: "Produits actifs", value: measuredOrNot(data.activeProducts), helper: "Produits publics, dans le périmètre", tone: "neutral" },
+    { label: "CA abonnement", value: revenueRow("subscription"), helper: data.revenueRestricted ? SUPER_ADMIN_ONLY_NOTE : "Factures émises sur la fenêtre, sans conversion de devise", tone: revenueTone },
+    { label: "CA leads", value: revenueRow("leads"), helper: data.revenueRestricted ? SUPER_ADMIN_ONLY_NOTE : "Leads facturés nets des avoirs, sans conversion de devise", tone: revenueTone },
+    { label: "SLA courtier", value: sla && sla.averageFirstActionMinutes !== null ? `${sla.averageFirstActionMinutes} min` : NOT_MEASURED, helper: sla ? `Première action moyenne, ${sla.measured} lead(s) mesuré(s)` : "Délai moyen de première action", tone: sla && sla.averageFirstActionMinutes !== null ? "info" : "disabled" },
+    { label: "Qualité leads", value: percent(quality?.disputeRate), helper: quality ? `Taux de contestation: ${quality.disputed} contestation(s) pour ${quality.transmitted} lead(s) transmis` : "Taux de contestation", tone: quality?.disputeRate ? "warning" : quality ? "success" : "disabled" },
+    { label: "Alertes conformité", value: complianceTotal, helper: "Refus audités sur la fenêtre", tone: complianceTotal > 0 ? "warning" : "success" },
+    { label: "Offres expirées", value: data.expiredOffersStillReferenced, helper: "Références à vérifier avant exposition", tone: data.expiredOffersStillReferenced > 0 ? "warning" : "success" },
+    { label: "Synthèse IA", value: aiValue, helper: aiHelper, tone: aiTone }
   ];
 }
 // Lot 6 (end)
@@ -98,7 +110,7 @@ export function flagTone(value: boolean): Tone {
 }
 
 export function roleLabel(roles: string[]): string {
-  return roles.length > 0 ? roles.join(", ") : "Role non renseigne";
+  return roles.length > 0 ? roles.join(", ") : "Rôle non renseigné";
 }
 
 /** Queues an operator can act on today. A queue with nothing in it stays visible but quiet. */
@@ -161,7 +173,7 @@ export function dashboardStats(data: AdminDashboardData): StatItem[] {
     { label: "Leads transmis", value: data.leadVolumes.transmitted, tone: "success" },
     { label: "Leads refusés", value: data.leadVolumes.refused, tone: data.leadVolumes.refused > 0 ? "warning" : "neutral" },
     { label: "Partenaires actifs", value: data.partners.active, helper: `${data.partners.inactive} inactifs` },
-    { label: "Pays actifs", value: data.scope.countries.length, helper: "Scope de ce role" },
-    { label: "Produits actifs", value: data.scope.products.length, helper: "Scope de ce role" }
+    { label: "Pays actifs", value: data.scope.countries.length, helper: "Scope de ce rôle" },
+    { label: "Produits actifs", value: data.scope.products.length, helper: "Scope de ce rôle" }
   ];
 }

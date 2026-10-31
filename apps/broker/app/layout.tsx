@@ -10,6 +10,7 @@ import { agenciesOverviewAccess } from "./lib/agencies-overview";
 import { TENANT_SUSPENDED_MESSAGE, isTenantReadOnly } from "./lib/broker-permissions";
 import { BrokerShell } from "./lib/ui/broker-shell";
 import { BROKER_THEME_COOKIE } from "./lib/theme-cookie";
+import { teamRoleLabel } from "./lib/team-options";
 
 /**
  * Spec 064 FR-009: the Enterprise charte (label and colour) only decorates the broker back-office header.
@@ -34,11 +35,11 @@ export default async function BrokerLayout({ children }: { children: React.React
   // The chosen theme lives in a cookie so the server renders it: no flash of the default theme.
   const theme = themeByValue((await cookies()).get(BROKER_THEME_COOKIE)?.value);
   const profile = session.status === "authenticated" || session.status === "mfa_required" ? session.profile : undefined;
-  const label = profile?.displayName ?? profile?.actorId ?? "Courtier connecte";
+  const label = profile?.displayName ?? profile?.actorId ?? "Courtier connecté";
   const user = profile
     ? {
         label,
-        role: profile.roles.join(", "),
+        role: teamRoleLabel(profile.roles),
         initials: initialsOf(label)
       }
     : undefined;

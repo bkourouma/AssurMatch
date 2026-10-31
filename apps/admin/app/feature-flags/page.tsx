@@ -17,7 +17,7 @@ function scopeHref(flag: AdminFeatureFlagData): string {
 }
 
 function ValueBadge({ value }: { value: boolean }) {
-  return <Badge tone={value ? "warning" : "disabled"}>{value ? "Actif" : "Desactive"}</Badge>;
+  return <Badge tone={value ? "warning" : "disabled"}>{value ? "Actif" : "Désactivé"}</Badge>;
 }
 
 export default async function FeatureFlagsPage() {
@@ -42,14 +42,14 @@ export default async function FeatureFlagsPage() {
         title="Feature flags"
         description="Flags globaux, pays, produits, partenaires et modules. Les modules sensibles restent fail-closed et auditables."
       />
-      <StateMessage tone="warning">Cette interface ne cree aucun bouton d&apos;activation pour les modules reglementes.</StateMessage>
+      <StateMessage tone="warning">Cette interface ne crée aucun bouton d&apos;activation pour les modules réglementés.</StateMessage>
 
       {flags.forbidden ? <StateMessage tone="danger">{adminReadErrorMessage("access_denied")}</StateMessage> : null}
       {flags.status === "error" ? <StateMessage tone="danger">{adminReadErrorMessage(flags.error)}</StateMessage> : null}
 
       <Card
-        title="Desactivation rapide"
-        description="Seuls les flags globaux non sensibles se basculent ici, avec un motif audite."
+        title="Désactivation rapide"
+        description="Seuls les flags globaux non sensibles se basculent ici, avec un motif audité."
       >
         <DataTable
           columns={[
@@ -67,8 +67,8 @@ export default async function FeatureFlagsPage() {
                 </>
               )
             },
-            { key: "value", header: "Etat", render: (flag) => <ValueBadge value={flag.value} /> },
-            { key: "changed", header: "Modifie le", render: (flag) => formatDate(flag.changedAt) },
+            { key: "value", header: "État", render: (flag) => <ValueBadge value={flag.value} /> },
+            { key: "changed", header: "Modifié le", render: (flag) => formatDate(flag.changedAt) },
             { key: "reason", header: "Dernier motif", render: (flag) => flag.reason ?? "-" },
             { key: "action", header: "Action", render: (flag) => <GlobalFlagToggleForm flagId={flag.id} flagKey={flag.key} currentValue={flag.value} /> }
           ]}
@@ -79,36 +79,36 @@ export default async function FeatureFlagsPage() {
         />
       </Card>
 
-      <Card title="Modules sensibles (lecture seule)" description="Flags reglementes, IA, paiement, signature, sinistres, assureurs et webhooks : aucune bascule depuis cette interface.">
+      <Card title="Modules sensibles (lecture seule)" description="Flags réglementés, IA, paiement, signature, sinistres, assureurs et webhooks : aucune bascule depuis cette interface.">
         <DataTable
           columns={[
             { key: "flag", header: "Flag", render: (flag) => <span className="bo-ref">{flag.key}</span> },
-            { key: "value", header: "Etat", render: (flag) => <ValueBadge value={flag.value} /> },
-            { key: "control", header: "Controle", render: () => "Aucune activation par cette interface : procedure de conformite" }
+            { key: "value", header: "État", render: (flag) => <ValueBadge value={flag.value} /> },
+            { key: "control", header: "Contrôle", render: () => "Aucune activation par cette interface : procédure de conformité" }
           ]}
           items={sensitiveGlobal}
           getKey={(flag) => flag.id}
-          emptyLabel="Aucun flag sensible enregistre."
+          emptyLabel="Aucun flag sensible enregistré."
           aria-label="Modules sensibles"
         />
         {referenceOnlyKeys.length > 0 ? (
           <p className="bo-description">
-            {`Flags sensibles de reference non enregistres (donc desactives, fail-closed) : ${referenceOnlyKeys.join(", ")}.`}
+            {`Flags sensibles de référence non enregistrés (donc désactivés, fail-closed) : ${referenceOnlyKeys.join(", ")}.`}
           </p>
         ) : null}
       </Card>
 
-      <Card title="Flags pays et produits (lecture seule)" description="Historique ecrit par le catalogue. Ils se modifient depuis les fiches pays et produits, ou leurs conditions d'activation s'appliquent.">
+      <Card title="Flags pays et produits (lecture seule)" description="Historique écrit par le catalogue. Ils se modifient depuis les fiches pays et produits, ou leurs conditions d'activation s'appliquent.">
         <DataTable
           columns={[
             { key: "flag", header: "Flag", render: (flag) => <span className="bo-ref">{flag.key}</span> },
-            { key: "scope", header: "Portee", render: (flag) => <>{flag.scopeType}{flag.scopeId ? <> <span className="bo-ref">{flag.scopeId.slice(0, 8)}</span></> : null}</> },
-            { key: "value", header: "Etat", render: (flag) => <ValueBadge value={flag.value} /> },
+            { key: "scope", header: "Portée", render: (flag) => <>{flag.scopeType}{flag.scopeId ? <> <span className="bo-ref">{flag.scopeId.slice(0, 8)}</span></> : null}</> },
+            { key: "value", header: "État", render: (flag) => <ValueBadge value={flag.value} /> },
             { key: "link", header: "", render: (flag) => <Button href={scopeHref(flag)} size="sm" variant="secondary">Ouvrir dans le catalogue</Button> }
           ]}
           items={scoped}
           getKey={(flag) => flag.id}
-          emptyLabel="Aucun flag pays ou produit enregistre."
+          emptyLabel="Aucun flag pays ou produit enregistré."
           aria-label="Flags pays et produits"
         />
       </Card>

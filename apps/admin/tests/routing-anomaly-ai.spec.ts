@@ -13,14 +13,14 @@ test("routing anomalies page keeps the deterministic report intact (spec 064 FR-
   const page = source(PAGE);
   expect(page).toContain("readRoutingAnomalies");
   expect(page).toContain("Anomalies de routage");
-  expect(page).toContain("Anomalies detectees");
+  expect(page).toContain("Anomalies détectées");
   expect(page).toContain("Recommandations");
   expect(page).toContain("data.totalAnomalies");
   expect(page).toContain("data.criticalCount");
   expect(page).toContain("data.warningCount");
   expect(page).toContain("data.anomalies");
   // The deterministic card renders before the AI card, which only degrades on its own.
-  expect(page.indexOf(`<Card title="Anomalies detectees"`)).toBeLessThan(page.indexOf(`title="Analyse IA (assistance)"`));
+  expect(page.indexOf(`<Card title="Anomalies détectées"`)).toBeLessThan(page.indexOf(`title="Analyse IA (assistance)"`));
 });
 
 test("the AI analysis card is labelled as indicative assistance and states its guardrails", () => {
@@ -66,7 +66,7 @@ test("analyses are listed with human validation and no execution control", () =>
   expect(page).toContain("requestRoutingAnomalyAnalysisAction");
   expect(page).toContain("insight.outputText");
   expect(page).toContain("insight.refusalReason");
-  for (const forbidden of ["reassign", "Réaffecter", "Reaffecter", "Appliquer automatiquement"]) {
+  for (const forbidden of ["reassign", "Réaffecter", "Réaffecter", "Appliquer automatiquement"]) {
     expect(page, forbidden).not.toContain(forbidden);
   }
 });

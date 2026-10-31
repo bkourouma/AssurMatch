@@ -26,12 +26,12 @@ const LEAD1_STEPS = ["accepte", "contacte", "qualifie", "devis_envoye", "negocia
 
 const STATUS_LABELS: Record<string, string> = {
   nouveau: "Nouveau",
-  accepte: "Accepte",
-  contacte: "Contacte",
-  qualifie: "Qualifie",
-  devis_envoye: "Devis envoye",
-  negociation: "Negociation",
-  gagne: "Gagne",
+  accepte: "Accepté",
+  contacte: "Contacté",
+  qualifie: "Qualifié",
+  devis_envoye: "Devis envoyé",
+  negociation: "Négociation",
+  gagne: "Gagné",
   perdu: "Perdu"
 };
 
@@ -53,7 +53,7 @@ function statusKey(label: string): string {
 }
 
 const NOTES_TITLE = labelRx("Notes internes");
-const TASKS_TITLE = labelRx("Taches commerciales");
+const TASKS_TITLE = labelRx("Tâches commerciales");
 const REMINDERS_TITLE = labelRx("Rappels");
 
 function ownerPage(browser: Browser): Promise<Page> {
@@ -136,7 +136,7 @@ async function ensureTask(page: Page, account: BackOfficeAccount, assignmentId: 
   const tasks = card(page, TASKS_TITLE);
   await tasks.locator("#crm-task-title").fill(TASK_TITLE);
   await tasks.locator("#crm-task-due").fill(due.input);
-  await submitCrmForm(page, tasks.getByRole("button", { name: "Ajouter une tache" }), "task_created");
+  await submitCrmForm(page, tasks.getByRole("button", { name: "Ajouter une tâche" }), "task_created");
   await expect(page.locator(".bo-notice").filter({ hasText: /T[aâ]che commerciale cr/u }), "result notice").not.toHaveCount(0);
   await openLead(page, account, assignmentId, "activite");
   await expect(card(page, TASKS_TITLE).getByRole("listitem").filter({ hasText: TASK_TITLE })).toContainText(due.date);
@@ -205,8 +205,8 @@ async function readDashboard(page: Page, account: BackOfficeAccount): Promise<Da
   }
   return {
     pipeline,
-    upcomingTasks: await kpiValue(page, "Taches a venir"),
-    upcomingReminders: await kpiValue(page, "Rappels a venir"),
+    upcomingTasks: await kpiValue(page, "Tâches à venir"),
+    upcomingReminders: await kpiValue(page, "Rappels à venir"),
     pipelineKpi: await kpiValue(page, "Statuts pipeline")
   };
 }
@@ -239,7 +239,7 @@ test("PRO-CRM-01 le lead apparaît dans la liste CRM et dans le Kanban (colonne 
   const firstRun = world.data.crmBefore === undefined;
   await openAs(page, world.owner, "/crm/kanban");
   await expect(page.getByRole("heading", { level: 1, name: "Vue Kanban" })).toBeVisible();
-  await expect(page.getByText("Acces CRM refuse")).toHaveCount(0);
+  await expect(page.getByText("Accès CRM refusé")).toHaveCount(0);
   for (const index of [1, 2, 3]) {
     const reference = world.data[`lead${index}Ref`] as string;
     const assignmentId = world.data[`lead${index}AssignmentId`] as string;
@@ -286,7 +286,7 @@ test("PRO-CRM-02 lead1 : pipeline étape par étape, note interne, tâche et rap
   }
   // Won needs no reason: the sheet keeps the final status and no loss reason is attached to it.
   await openLead(page, world.owner, leadId);
-  await expect(currentStatusCell(page)).toHaveText(labelRx("Gagne"));
+  await expect(currentStatusCell(page)).toHaveText(labelRx("Gagné"));
 
   // Activity tab: note, task (with its due date) and reminder (with its date and message).
   await openLead(page, world.owner, leadId, "activite");
@@ -323,7 +323,7 @@ test("PRO-CRM-03 lead2 : le propriétaire l'assigne à l'agent de l'équipe, l'a
 
   const page = await ownerPage(browser);
   await openLead(page, world.owner, leadId);
-  const assignCard = card(page, labelRx("Conseiller assigne"));
+  const assignCard = card(page, labelRx("Conseiller assigné"));
   await expect(assignCard.getByRole("button", { name: "Assigner au conseiller" })).toBeVisible();
   if ((await assignCard.getByText(`Conseiller actuel : ${AGENT_NAME}`).count()) === 0) {
     // Options read "<name> (<role>)": pick the one that starts with the agent name.
@@ -334,11 +334,11 @@ test("PRO-CRM-03 lead2 : le propriétaire l'assigne à l'agent de l'équipe, l'a
     await submitCrmForm(page, assignCard.getByRole("button", { name: "Assigner au conseiller" }), "assigned");
     await expect(page.locator(".bo-notice").filter({ hasText: /Lead assign/u }), "result notice").not.toHaveCount(0);
   }
-  await expect(card(page, labelRx("Conseiller assigne")).getByText(`Conseiller actuel : ${AGENT_NAME}`)).toBeVisible();
+  await expect(card(page, labelRx("Conseiller assigné")).getByText(`Conseiller actuel : ${AGENT_NAME}`)).toBeVisible();
   await expect(page.locator("dl.bo-dl > div").filter({ has: page.locator("dt", { hasText: /^Conseiller$/u }) }).locator("dd")).toHaveText(AGENT_NAME);
 
   // History and list show the assignment.
-  expectInOrder(await historyEntries(page, world.owner, leadId), [new RegExp(loose("Lead assigne a un conseiller"), "u")]);
+  expectInOrder(await historyEntries(page, world.owner, leadId), [new RegExp(loose("Lead assigné à un conseiller"), "u")]);
   await openAs(page, world.owner, "/crm/leads");
   await expect(page.getByRole("row").filter({ hasText: world.data.lead2Ref as string })).toContainText(AGENT_NAME);
   await page.context().close();
@@ -390,11 +390,11 @@ test("PRO-CRM-05 historique complet de lead1 dans l'ordre chronologique et indic
   expectInOrder(entries, [
     statusChange("nouveau", "accepte"),
     statusChange("accepte", "contacte"),
-    new RegExp(loose("Note interne ajoutee"), "u"),
+    new RegExp(loose("Note interne ajoutée"), "u"),
     statusChange("contacte", "qualifie"),
-    new RegExp(loose("Tache commerciale creee"), "u"),
+    new RegExp(loose("Tâche commerciale créée"), "u"),
     statusChange("qualifie", "devis_envoye"),
-    new RegExp(loose("Rappel programme"), "u"),
+    new RegExp(loose("Rappel programmé"), "u"),
     statusChange("devis_envoye", "negociation"),
     statusChange("negociation", "gagne")
   ]);
@@ -431,6 +431,6 @@ test("PRO-CRM-05 historique complet de lead1 dans l'ordre chronologique et indic
 
   // Kanban: lead1 is in the Gagné column.
   await openAs(page, world.owner, "/crm/kanban");
-  await expect(kanbanColumn(page, "Gagne").locator(`a[href='/crm/leads/${leadId}']`)).toHaveText(world.data.lead1Ref as string);
+  await expect(kanbanColumn(page, "Gagné").locator(`a[href='/crm/leads/${leadId}']`)).toHaveText(world.data.lead1Ref as string);
   await page.context().close();
 });

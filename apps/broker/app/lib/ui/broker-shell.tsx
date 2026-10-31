@@ -32,7 +32,9 @@ const authRoutePrefixes = ["/login", "/mfa", "/activate", "/password-change", "/
 const SCOPE = "Back-office Courtier";
 const PRO_BADGE = "Pro";
 const PRO_HINT = "Disponible avec le plan Pro";
-const ENTERPRISE_BADGE = "Enterprise";
+// Short on purpose: the 256px rail has to fit "Analyse des pertes" and the badge on one line. The full
+// plan name stays in the disabled entry's title ("Disponible avec le plan Enterprise").
+const ENTERPRISE_BADGE = "Ent.";
 const LOSS_ANALYSIS_LABEL = "Analyse des pertes";
 const AGENCIES_OVERVIEW_LABEL = "Vue multi-agences";
 const AGENCIES_OVERVIEW_HREF = "/enterprise/agencies";
@@ -134,14 +136,14 @@ export function BrokerShell({ children, user, plan, showAgenciesOverview, brandi
       navigation={brokerNavigation(plan, showAgenciesOverview === true)}
       user={user}
       logoutAction={logoutAction}
-      logoutLabel="Deconnexion"
+      logoutLabel="Déconnexion"
       envBadge={envBadge}
       pathname={pathname}
       navLabel="Navigation courtier principale"
       menuOpenLabel="Ouvrir le menu courtier"
       menuCloseLabel="Fermer le menu courtier"
       userMenuLabel="Menu du compte courtier"
-      themePicker={{ cookieName: BROKER_THEME_COOKIE, current: theme ?? "clair", label: "Theme" }}
+      themePicker={{ cookieName: BROKER_THEME_COOKIE, current: theme ?? "clair", label: "Thème" }}
       breadcrumbLabel="Fil d'Ariane"
       dataAttributes={{ "data-broker-shell": "true", ...(accentCss ? { "data-broker-brand": "custom" } : {}) }}
     >

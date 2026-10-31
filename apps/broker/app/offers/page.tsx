@@ -37,7 +37,7 @@ import styles from "../lib/ui/broker-screens.module.css";
  * only the owner and the managers create and edit them (never while the partner is suspended).
  * Offres indicatives : prix à confirmer par le courtier partenaire.
  */
-const BREADCRUMB = [{ label: "Activite" }, { label: "Mes offres" }];
+const BREADCRUMB = [{ label: "Activité" }, { label: "Mes offres" }];
 
 function firstParam(value: string | string[] | undefined): string {
   return Array.isArray(value) ? value[0] ?? "" : value ?? "";
@@ -64,7 +64,7 @@ export default async function BrokerOffersPage({
   if (session.status !== "authenticated" || !canReadOffers(session.profile)) {
     return (
       <PageStack>
-        <PageHeader breadcrumb={BREADCRUMB} title="Acces refuse" description="La consultation des offres exige une session courtier authentifiee et la MFA verifiee." />
+        <PageHeader breadcrumb={BREADCRUMB} title="Accès refusé" description="La consultation des offres exige une session courtier authentifiée et la MFA vérifiée." />
       </PageStack>
     );
   }
@@ -144,7 +144,7 @@ export default async function BrokerOffersPage({
       ) : null}
       <Notice tone="neutral">Offre indicative : prix à confirmer par le courtier partenaire. Aucune offre ne vaut devis ferme ni contrat.</Notice>
 
-      <FilterBar action="/offers" label="Filtres offres" submitLabel="Filtrer" resetLabel="Reinitialiser" resetHref="/offers" activeCount={(status ? 1 : 0) + (offerType ? 1 : 0)} autoSubmit>
+      <FilterBar action="/offers" label="Filtres offres" submitLabel="Filtrer" resetLabel="Réinitialiser" resetHref="/offers" activeCount={(status ? 1 : 0) + (offerType ? 1 : 0)} autoSubmit>
         <Field id="broker-offers-status" label="Statut">
           <Select {...fieldControlProps("broker-offers-status")} name="status" defaultValue={status ?? ""}>
             <option value="">Tous</option>
@@ -168,7 +168,7 @@ export default async function BrokerOffersPage({
         emptyLabel={status || offerType ? "Aucune offre avec ce filtre." : "Aucune offre pour le moment."}
         emptyDescription={
           status || offerType
-            ? "Choisissez un autre filtre ou reinitialisez le filtre."
+            ? "Choisissez un autre filtre ou réinitialisez le filtre."
             : canWrite
               ? "Créez une offre indicative : elle est enregistrée en brouillon puis publiée après validation par AssurMatch."
               : "Le propriétaire ou un manager du cabinet crée les offres ; elles apparaîtront ici."

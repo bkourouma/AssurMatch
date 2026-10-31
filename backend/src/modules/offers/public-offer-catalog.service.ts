@@ -27,8 +27,8 @@ export interface PublicOfferVisibilityContext {
   resolveScoringWeights?: (countryId: string, productId: string) => Promise<ScoringWeights> | ScoringWeights;
 }
 
-const INDICATIVE_DISCLAIMER = "offre indicative a confirmer par le courtier partenaire";
-const COMPARE_DISCLAIMER = "Comparaison indicative: prix, garanties et delais sont a confirmer par le courtier partenaire responsable de chaque offre.";
+const INDICATIVE_DISCLAIMER = "offre indicative à confirmer par le courtier partenaire";
+const COMPARE_DISCLAIMER = "Comparaison indicative: prix, garanties et délais sont à confirmer par le courtier partenaire responsable de chaque offre.";
 const PAYMENT_LABEL: Record<string, string> = { annual: "annuel", semiannual: "semestriel", quarterly: "trimestriel", monthly: "mensuel" };
 
 interface EnrichedOffer {
@@ -301,15 +301,15 @@ export class PublicOfferCatalogService {
     return [
       row("partner", "Courtier partenaire responsable", (entry) => entry.partnerName ?? (entry.offer.partnerTenantId ? "courtier partenaire" : null)),
       row("insurer", "Assureur porteur du risque", (entry) => entry.offer.insurerName ?? null),
-      row("price", "Prix indicatif (a partir de)", (entry) => entry.offer.indicativePriceMin ?? null),
+      row("price", "Prix indicatif (à partir de)", (entry) => entry.offer.indicativePriceMin ?? null),
       row("priceMax", "Prix indicatif maximum", (entry) => entry.offer.indicativePriceMax ?? null),
       row("guaranteeLevel", "Niveau de garantie (1-5)", (entry) => entry.offer.guaranteeLevel ?? null),
       row("deductible", "Franchise", (entry) => entry.offer.deductibleAmount ?? null),
       row("ceiling", "Plafond de garantie", (entry) => entry.offer.coverageCeiling ?? null),
-      row("processingDelay", "Delai moyen de traitement (jours)", (entry) => entry.offer.processingDelayDays ?? null),
-      row("paymentFlexibility", "Flexibilite de paiement", (entry) => entry.offer.paymentFlexibility ? PAYMENT_LABEL[entry.offer.paymentFlexibility] ?? entry.offer.paymentFlexibility : null),
-      row("sponsored", "Sponsorise", (entry) => entry.offer.isSponsored),
-      row("validUntil", "Validite", (entry) => entry.offer.validUntil.toISOString().slice(0, 10)),
+      row("processingDelay", "Délai moyen de traitement (jours)", (entry) => entry.offer.processingDelayDays ?? null),
+      row("paymentFlexibility", "Flexibilité de paiement", (entry) => entry.offer.paymentFlexibility ? PAYMENT_LABEL[entry.offer.paymentFlexibility] ?? entry.offer.paymentFlexibility : null),
+      row("sponsored", "Sponsorisé", (entry) => entry.offer.isSponsored),
+      row("validUntil", "Validité", (entry) => entry.offer.validUntil.toISOString().slice(0, 10)),
       row("score", "Score indicatif", (entry) => entry.score?.total ?? null),
       ...[...guaranteeKeys.entries()].map(([key, label]) => row(`guarantee:${key}`, `Garantie: ${label}`, (entry) => {
         const guarantee = (entry.offer.guarantees ?? []).find((candidate) => candidate.key === key);

@@ -24,7 +24,7 @@ const EVENT_OPTIONS = [
 
 function ReasonField({ id }: { id: string }) {
   return (
-    <Field id={id} label="Motif (audite)" required>
+    <Field id={id} label="Motif (audité)" required>
       <Input {...fieldControlProps(id, { required: true })} name="reason" minLength={8} />
     </Field>
   );
@@ -47,7 +47,7 @@ export function SecretReveal({ secret }: { secret: NonNullable<CrmActionState["s
   return (
     <Notice tone="warning" data-secret-reveal={secret.kind}>
       <p>
-        <strong>Ce secret n&apos;est affiche qu&apos;une seule fois. Copiez-le maintenant.</strong>
+        <strong>Ce secret n&apos;est affiché qu&apos;une seule fois. Copiez-le maintenant.</strong>
       </p>
       <p>{secret.label} :</p>
       <p>
@@ -57,7 +57,7 @@ export function SecretReveal({ secret }: { secret: NonNullable<CrmActionState["s
         Copier
       </Button>
       {copyState === "copied" ? <p role="status">Copie dans le presse-papiers.</p> : null}
-      {copyState === "failed" ? <p role="status">Copie impossible : selectionnez le secret et copiez-le manuellement.</p> : null}
+      {copyState === "failed" ? <p role="status">Copie impossible : sélectionnez le secret et copiez-le manuellement.</p> : null}
       {secret.restrictions.length > 0 ? (
         <ul className="bo-list">
           {secret.restrictions.map((restriction) => (
@@ -91,17 +91,17 @@ export function CreateCrmConnectorForm({ partners }: { partners: PartnerOption[]
       <Field id={`${base}-url`} label="URL du CRM (HTTPS)" required>
         <Input {...fieldControlProps(`${base}-url`, { required: true })} name="url" type="url" placeholder="https://" />
       </Field>
-      <CheckboxGroup legend="Evenements transmis" name="eventTypes" options={EVENT_OPTIONS} columns={1} />
-      <Field id={`${base}-header-name`} label="Nom de l'en-tete d'authentification (facultatif)">
+      <CheckboxGroup legend="Événements transmis" name="eventTypes" options={EVENT_OPTIONS} columns={1} />
+      <Field id={`${base}-header-name`} label="Nom de l'en-tête d'authentification (facultatif)">
         <Input {...fieldControlProps(`${base}-header-name`)} name="authHeaderName" maxLength={64} autoComplete="off" placeholder="X-Api-Key" />
       </Field>
-      <Field id={`${base}-header-value`} label="Valeur de l'en-tete (jamais reaffichee)">
+      <Field id={`${base}-header-value`} label="Valeur de l'en-tête (jamais réaffichée)">
         <Input {...fieldControlProps(`${base}-header-value`)} name="authHeaderValue" type="password" autoComplete="off" maxLength={512} />
       </Field>
       <ReasonField id={`${base}-reason`} />
       <FormActions>
-        <Button type="submit" pending={pending} pendingLabel="Creation...">
-          Creer le connecteur
+        <Button type="submit" pending={pending} pendingLabel="Création...">
+          Créer le connecteur
         </Button>
       </FormActions>
     </Form>
@@ -129,7 +129,7 @@ export function CrmStatusForm({ connectorId, status }: { connectorId: string; st
         ) : null}
         {status !== "disabled" ? (
           <Button type="submit" name="status" value="disabled" size="sm" variant="secondary" pending={pending} pendingLabel="Envoi...">
-            Desactiver
+            Désactiver
           </Button>
         ) : null}
       </FormActions>

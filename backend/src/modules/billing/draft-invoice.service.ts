@@ -60,7 +60,7 @@ export function setupFeeInvoicedPort(invoicing: Pick<InvoicingRepository, "listI
  * Spec 060: the draft is still an estimate; the invoice is issued separately by finance (manual
  * invoicing, decision D-8) and paid outside the platform.
  */
-const DRAFT_NOTICE = "Brouillon non facturable: estimation du mois en cours, aucun encaissement en ligne et aucune prime collectee par AssurMatch. La facture du mois est emise separement par la finance.";
+const DRAFT_NOTICE = "Brouillon non facturable: estimation du mois en cours, aucun encaissement en ligne et aucune prime collectée par AssurMatch. La facture du mois est émise séparément par la finance.";
 
 /**
  * Monthly draft per partner: subscription + billable leads - accepted disputes - pack credits.

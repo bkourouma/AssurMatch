@@ -27,17 +27,17 @@ test("retention page shows the flag-off notice and the two-step workflow", () =>
 
   expect(page).toContain('data-retention-marker="purge-disabled-notice"');
   expect(page).toContain("retention_purge_enabled");
-  expect(page).toContain("nouvelle previsualisation");
-  expect(page).toContain("Durees de conservation");
-  expect(page).toContain("Previsualiser un lot de retention");
-  expect(page).toContain("Previsualiser un effacement sur demande");
+  expect(page).toContain("nouvelle prévisualisation");
+  expect(page).toContain("Durées de conservation");
+  expect(page).toContain("Prévisualiser un lot de rétention");
+  expect(page).toContain("Prévisualiser un effacement sur demande");
   expect(page).toContain(`title="Lots d'anonymisation"`);
   // The irreversible approval now goes through a confirmation dialog whose form posts to approveBatch,
   // with the audited reason field inside the dialog.
   expect(page).toContain("formAction={approveBatch}");
   expect(page).toContain("<ConfirmDialog");
   expect(page).toContain('name="reason" minLength={8}');
-  expect(page).toContain("n'est ni enregistree sur le lot ni affichee");
+  expect(page).toContain("n'est ni enregistrée sur le lot ni affichée");
 });
 
 test("retention surfaces never echo an erasure e-mail back to the page", () => {

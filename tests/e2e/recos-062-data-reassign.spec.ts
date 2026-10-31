@@ -141,7 +141,7 @@ test("DR-02 le visiteur dépose une demande d'effacement : référence DR- à l'
   const contact = card(brokerPage, "Contact consenti");
   await expect(contact).toContainText(lead().email as string);
   await expect(contact).toContainText(lead().phone as string);
-  await expect(brokerPage.getByText(/introuvable|Acces refuse|masquees/u)).toHaveCount(0);
+  await expect(brokerPage.getByText(/introuvable|Accès refusé|masquées/u)).toHaveCount(0);
 });
 
 test("DR-03 une seconde demande d'effacement ouverte est refusée avec la référence existante (écran et API)", async ({ browser }) => {
@@ -224,7 +224,7 @@ test("DR-04 la conformité retrouve la demande, la prend en charge, prépare l'a
   await page.goto("/compliance/data-requests");
   await expect(page.getByRole("table", { name: "Demandes de données des visiteurs" }).getByRole("row").filter({ hasText: drReference })).toContainText("Traitée");
   await page.goto("/compliance/retention");
-  await expect(page.getByText(/Effacement \(par reference\)/u).first()).toBeVisible();
+  await expect(page.getByText(/Effacement \(par référence\)/u).first()).toBeVisible();
   await page.context().close();
 });
 
@@ -319,7 +319,7 @@ test("DR-07 préparation de la réaffectation : le courtier 1 accepte, écrit, d
   const assignmentId = lead().assignmentId as string;
   const owner = await visit(browser, firm1.owner, `/leads/${assignmentId}`);
   await card(owner, "Actions Starter").getByRole("button", { name: "Accepter", exact: true }).click();
-  await expect(owner.getByText("Lead accepte.")).toBeVisible();
+  await expect(owner.getByText("Lead accepté.")).toBeVisible();
 
   const token = await tokenFor(browser, firm1.owner);
   const sent = await apiCall(token, "POST", `/broker/starter/leads/${assignmentId}/conversation/messages`, { body: BROKER_MESSAGE, clientRequestId: `dr-${suffix}` });
@@ -361,7 +361,7 @@ test("DR-08 l'admin réaffecte le lead du cabinet 1 au cabinet 2 avec un motif",
   const form = row.locator("form[data-operations-form='reassign']");
   await form.locator("input[name='partnerTenantId']").fill(firm2.partnerId);
   await form.locator("input[name='reason']").fill(REASSIGN_REASON);
-  await form.getByRole("button", { name: "Reaffecter" }).click();
+  await form.getByRole("button", { name: "Réaffecter" }).click();
   // The list is filtered on firm 1: once reassigned, the row (and its success notice) leaves it.
   await expect(page.getByRole("row").filter({ hasText: lead().reference as string })).toHaveCount(0);
 
@@ -382,7 +382,7 @@ test("DR-09 l'ancien courtier ne voit plus rien : écran et API refusés, aucune
 
   // Screen: the lead page is a refusal, the list does not hold the lead any more.
   const page = await visit(browser, firm1.owner, `/leads/${assignmentId}`);
-  await expect(page.getByText(/Acces refuse|Lead introuvable|n.existe pas ou ne vous est pas assigne/u).first()).toBeVisible();
+  await expect(page.getByText(/Accès refusé|Lead introuvable|n.existe pas ou ne vous est pas assigné/u).first()).toBeVisible();
   const body = await page.locator("body").innerText();
   for (const secret of leaks) expect(body, `old broker's page must not show "${secret}"`).not.toContain(secret);
   await expect(card(page, "Contact consenti")).toHaveCount(0);
@@ -420,12 +420,12 @@ test("DR-10 le nouveau courtier voit le lead, repart d'une conversation vide, pu
 
   const page = await visit(browser, firm2.owner, `/leads/${assignmentId}`);
   await expect(card(page, "Contact consenti")).toContainText(lead().email as string);
-  await expect(page.getByText(/Acces refuse|Lead introuvable/u)).toHaveCount(0);
+  await expect(page.getByText(/Accès refusé|Lead introuvable/u)).toHaveCount(0);
   // Not accepted yet: no conversation to write in, and nothing of the previous broker's.
   const bodyBefore = await page.locator("body").innerText();
   for (const secret of history) expect(bodyBefore, `new broker's page must not show "${secret}"`).not.toContain(secret);
   await card(page, "Actions Starter").getByRole("button", { name: "Accepter", exact: true }).click();
-  await expect(page.getByText("Lead accepte.")).toBeVisible();
+  await expect(page.getByText("Lead accepté.")).toBeVisible();
 
   const conversation = page.locator("#conversation");
   await expect(conversation).toContainText("Aucun message échangé avec le visiteur pour ce lead.");

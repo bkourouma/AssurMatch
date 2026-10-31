@@ -38,10 +38,10 @@ const criterionLabels: Record<ScoringCriterionKey, string> = {
   guaranteeLevel: "Niveau de garantie",
   price: "Prix",
   deductible: "Franchise",
-  processingSpeed: "Rapidite de traitement",
-  paymentFlexibility: "Flexibilite de paiement",
-  informationQuality: "Qualite des informations",
-  userPreferences: "Preferences visiteur"
+  processingSpeed: "Rapidité de traitement",
+  paymentFlexibility: "Flexibilité de paiement",
+  informationQuality: "Qualité des informations",
+  userPreferences: "Préférences visiteur"
 };
 
 function WeightInputs({ idBase, defaults, required }: { idBase: string; defaults?: ScoringWeightsData; required: boolean }) {
@@ -72,7 +72,7 @@ export function CreateScoringRuleForm({ defaults }: { defaults: ScoringWeightsDa
   const ids = { countryId: `${base}-country`, productId: `${base}-product`, description: `${base}-description`, reason: `${base}-reason` };
 
   return (
-    <Card title="Creer une regle de scoring">
+    <Card title="Créer une règle de scoring">
       <Form action={formAction} data-scoring-form="create">
         <ActionNotice state={state} />
         <Field id={ids.countryId} label="Pays (UUID, vide = tous)">
@@ -85,11 +85,11 @@ export function CreateScoringRuleForm({ defaults }: { defaults: ScoringWeightsDa
         <Field id={ids.description} label="Description">
           <Input {...fieldControlProps(ids.description)} name="description" maxLength={500} />
         </Field>
-        <Field id={ids.reason} label="Motif (audite)" required>
+        <Field id={ids.reason} label="Motif (audité)" required>
           <Input {...fieldControlProps(ids.reason, { required: true })} name="reason" />
         </Field>
         <FormActions>
-          <Button type="submit" pending={pending} pendingLabel="Creation...">Creer la regle</Button>
+          <Button type="submit" pending={pending} pendingLabel="Création...">Créer la règle</Button>
         </FormActions>
       </Form>
     </Card>
@@ -102,28 +102,28 @@ export function UpdateScoringRuleForm({ ruleIds }: { ruleIds: string[] }) {
   const ids = { ruleId: `${base}-rule`, status: `${base}-status`, description: `${base}-description`, reason: `${base}-reason` };
 
   return (
-    <Card title="Mettre a jour une regle">
+    <Card title="Mettre à jour une règle">
       <Form action={formAction} data-scoring-form="update">
         <ActionNotice state={state} />
-        <Field id={ids.ruleId} label="Regle" required>
+        <Field id={ids.ruleId} label="Règle" required>
           <Select {...fieldControlProps(ids.ruleId, { required: true })} name="ruleId" options={ruleIds.map((id) => ({ value: id, label: id }))} />
         </Field>
         <Field id={ids.status} label="Statut">
           <Select {...fieldControlProps(ids.status)} name="status" defaultValue="">
-            <option value="">(inchange)</option>
+            <option value="">(inchangé)</option>
             <option value="active">active</option>
-            <option value="disabled">desactivee</option>
+            <option value="disabled">désactivée</option>
           </Select>
         </Field>
         <WeightInputs idBase={base} required={false} />
         <Field id={ids.description} label="Description">
           <Input {...fieldControlProps(ids.description)} name="description" maxLength={500} />
         </Field>
-        <Field id={ids.reason} label="Motif (audite)" required>
+        <Field id={ids.reason} label="Motif (audité)" required>
           <Input {...fieldControlProps(ids.reason, { required: true })} name="reason" />
         </Field>
         <FormActions>
-          <Button type="submit" pending={pending} pendingLabel="Mise a jour..." disabled={ruleIds.length === 0}>Mettre a jour</Button>
+          <Button type="submit" pending={pending} pendingLabel="Mise à jour..." disabled={ruleIds.length === 0}>Mettre à jour</Button>
         </FormActions>
       </Form>
     </Card>
@@ -145,23 +145,23 @@ export function OfferDecisionForm({ offerId, offerName }: { offerId: string; off
       <Form action={validateAction} data-scoring-form="validate-offer">
         <ActionNotice state={validateState} />
         <input type="hidden" name="offerId" value={offerId} />
-        <Field id={ids.decision} label={`Decision ${offerName}`}>
+        <Field id={ids.decision} label={`Décision ${offerName}`}>
           <Select
             {...fieldControlProps(ids.decision)}
             name="validationStatus"
             defaultValue="validated"
-            aria-label={`Decision ${offerName}`}
+            aria-label={`Décision ${offerName}`}
             options={[
               { value: "validated", label: "Valider (publiable)" },
               { value: "rejected", label: "Rejeter" }
             ]}
           />
         </Field>
-        <Field id={ids.decisionReason} label="Motif (audite)" required>
-          <Input {...fieldControlProps(ids.decisionReason, { required: true })} name="reason" placeholder="Motif (audite)" />
+        <Field id={ids.decisionReason} label="Motif (audité)" required>
+          <Input {...fieldControlProps(ids.decisionReason, { required: true })} name="reason" placeholder="Motif (audité)" />
         </Field>
         <FormActions>
-          <Button type="submit" size="sm" pending={validating} pendingLabel="...">Appliquer la decision</Button>
+          <Button type="submit" size="sm" pending={validating} pendingLabel="...">Appliquer la décision</Button>
         </FormActions>
       </Form>
       <ActionNotice state={suspendState} />
@@ -170,7 +170,7 @@ export function OfferDecisionForm({ offerId, offerName }: { offerId: string; off
           triggerLabel="Suspendre (retrait public)"
           triggerVariant="danger"
           title={`Suspendre ${offerName}`}
-          description="L'offre est retiree immediatement du comparateur public. La suspension est auditee avec son motif."
+          description="L'offre est retirée immédiatement du comparateur public. La suspension est auditée avec son motif."
           confirmLabel="Suspendre"
           cancelLabel="Annuler"
           tone="danger"
@@ -179,8 +179,8 @@ export function OfferDecisionForm({ offerId, offerName }: { offerId: string; off
         >
           <ActionNotice state={suspendState} />
           <input type="hidden" name="offerId" value={offerId} />
-          <Field id={ids.suspendReason} label="Motif de suspension (audite)" required>
-            <Input {...fieldControlProps(ids.suspendReason, { required: true })} name="reason" placeholder="Motif de suspension (audite)" />
+          <Field id={ids.suspendReason} label="Motif de suspension (audité)" required>
+            <Input {...fieldControlProps(ids.suspendReason, { required: true })} name="reason" placeholder="Motif de suspension (audité)" />
           </Field>
         </ConfirmDialog>
       </FormActions>

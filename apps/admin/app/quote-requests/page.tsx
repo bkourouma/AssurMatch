@@ -1,6 +1,7 @@
 import { firstValue, formatDateTime, pageHref, pageNumber, readQuoteRequests, type QuoteRequestRow } from "../lib/operations-api";
 import { Badge, DataTable, Field, FilterBar, Input, PageHeader, PageStack, Select, StateMessage, fieldControlProps, type DataTableColumn } from "../lib/ui/admin-ui";
 import { quoteStatusTones } from "../lib/ui/operations-tones";
+import { productLabel, quoteStatusLabel, routingStatusLabel } from "../lib/ui/operations-labels";
 import { OperationsTabs } from "../lib/ui/operations-tabs";
 
 /**
@@ -13,13 +14,13 @@ const statusOptions = ["created", "manual_review", "routed", "non_routable", "du
 const routingStatusOptions = ["not_started", "assigned", "blocked", "no_broker_available", "manual_review_required", "pending_manual_assignment"];
 
 const columns: Array<DataTableColumn<QuoteRequestRow>> = [
-  { key: "reference", header: "Reference", render: (row) => <span className="bo-ref">{row.publicReference}</span> },
-  { key: "scope", header: "Pays / produit", render: (row) => `${row.countryCode ?? row.countryId.slice(0, 8)} / ${row.productKey ?? row.productId.slice(0, 8)}` },
-  { key: "status", header: "Statut", render: (row) => <Badge tone={quoteStatusTones[row.status] ?? "neutral"}>{row.status}</Badge> },
-  { key: "routing", header: "Routage", render: (row) => row.routingStatus },
+  { key: "reference", header: "Référence", render: (row) => <span className="bo-ref">{row.publicReference}</span> },
+  { key: "scope", header: "Pays / produit", render: (row) => `${row.countryCode ?? row.countryId.slice(0, 8)} / ${row.productKey ? productLabel(row.productKey) : row.productId.slice(0, 8)}` },
+  { key: "status", header: "Statut", render: (row) => <Badge tone={quoteStatusTones[row.status] ?? "neutral"} title={row.status}>{quoteStatusLabel(row.status)}</Badge> },
+  { key: "routing", header: "Routage", render: (row) => routingStatusLabel(row.routingStatus) },
   { key: "assignments", header: "Affectations", render: (row) => row.assignmentCount, numeric: true, align: "right" },
   { key: "reason", header: "Motif", render: (row) => row.refusalReason ?? "-" },
-  { key: "created", header: "Recue le", render: (row) => formatDateTime(row.createdAt) }
+  { key: "created", header: "Reçue le", render: (row) => formatDateTime(row.createdAt) }
 ];
 
 export default async function AdminQuoteRequestsPage({ searchParams }: { searchParams?: Promise<Record<string, string | string[] | undefined>> }) {
@@ -40,30 +41,30 @@ export default async function AdminQuoteRequestsPage({ searchParams }: { searchP
   return (
     <PageStack>
       <PageHeader
-        breadcrumb={[{ label: "Pilotage" }, { label: "Operations", href: "/operations" }, { label: "Demandes de devis" }]}
+        breadcrumb={[{ label: "Pilotage" }, { label: "Opérations", href: "/operations" }, { label: "Demandes de devis" }]}
         title="Demandes de devis"
-        description="Les demandes recues dans votre perimetre pays et leur routage. Les coordonnees du prospect restent dans la fiche."
+        description="Les demandes reçues dans votre périmètre pays et leur routage. Les coordonnées du prospect restent dans la fiche."
       />
       <OperationsTabs current="/quote-requests" />
 
       {result.status === "unauthenticated" ? <StateMessage tone="danger">Session admin requise.</StateMessage> : null}
-      {result.status === "forbidden" ? <StateMessage tone="danger">Acces aux demandes de devis refuse pour ce role admin.</StateMessage> : null}
+      {result.status === "forbidden" ? <StateMessage tone="danger">Accès aux demandes de devis refusé pour ce rôle admin.</StateMessage> : null}
       {result.status === "error" ? <StateMessage tone="danger">Demandes indisponibles : {result.error}</StateMessage> : null}
 
-      <FilterBar action="/quote-requests" label="Filtres demandes de devis" submitLabel="Filtrer" resetLabel="Reinitialiser" resetHref="/quote-requests" activeCount={activeFilters}>
-        <Field id="qr-reference" label="Reference">
+      <FilterBar action="/quote-requests" label="Filtres demandes de devis" submitLabel="Filtrer" resetLabel="Réinitialiser" resetHref="/quote-requests" activeCount={activeFilters}>
+        <Field id="qr-reference" label="Référence">
           <Input {...fieldControlProps("qr-reference")} name="reference" defaultValue={filters.reference ?? ""} placeholder="QR-2026-" />
         </Field>
         <Field id="qr-status" label="Statut">
           <Select {...fieldControlProps("qr-status")} name="status" defaultValue={filters.status ?? ""}>
             <option value="">Tous</option>
-            {statusOptions.map((option) => <option key={option} value={option}>{option}</option>)}
+            {statusOptions.map((option) => <option key={option} value={option}>{quoteStatusLabel(option)}</option>)}
           </Select>
         </Field>
         <Field id="qr-routing" label="Statut de routage">
           <Select {...fieldControlProps("qr-routing")} name="routingStatus" defaultValue={filters.routingStatus ?? ""}>
             <option value="">Tous</option>
-            {routingStatusOptions.map((option) => <option key={option} value={option}>{option}</option>)}
+            {routingStatusOptions.map((option) => <option key={option} value={option}>{routingStatusLabel(option)}</option>)}
           </Select>
         </Field>
         <Field id="qr-country" label="Pays (UUID)">
@@ -86,7 +87,7 @@ export default async function AdminQuoteRequestsPage({ searchParams }: { searchP
         getKey={(row) => row.id}
         getRowHref={(row) => `/quote-requests/${row.id}`}
         emptyLabel="Aucune demande de devis pour ces filtres."
-        emptyDescription={activeFilters > 0 ? "Elargissez la periode ou reinitialisez les filtres." : "Les demandes apparaissent ici des qu'un visiteur de votre perimetre en soumet une."}
+        emptyDescription={activeFilters > 0 ? "Élargissez la période ou réinitialisez les filtres." : "Les demandes apparaissent ici dès qu'un visiteur de votre périmètre en soumet une."}
         aria-label="Demandes de devis"
         pagination={{
           page,

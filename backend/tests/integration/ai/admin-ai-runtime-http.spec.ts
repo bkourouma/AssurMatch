@@ -39,13 +39,13 @@ describe("admin AI insights runtime HTTP", () => {
 
     const report = aiInteractionSchema.parse(await readJson(await harness.request("/admin/ai/insights/activity_report", { method: "POST", headers: { ...actorHeaders(superAdmin), ...json }, body: "{}" })));
     await harness.runtime.aiGateway.processPending();
-    expect(aiInteractionSchema.parse(await readJson(await harness.request(`/admin/ai/insights/${report.id}`, { headers: actorHeaders(superAdmin) }))).outputText).toContain("Rapport d'activite");
+    expect(aiInteractionSchema.parse(await readJson(await harness.request(`/admin/ai/insights/${report.id}`, { headers: actorHeaders(superAdmin) }))).outputText).toContain("Rapport d'activité");
 
     const offerInsight = aiInteractionSchema.parse(await readJson(await harness.request("/admin/ai/insights/offer_consistency_check", { method: "POST", headers: { ...actorHeaders(aiAdmin), ...json }, body: JSON.stringify({ offerId: seed.offer.id }) })));
     await harness.runtime.aiGateway.processPending();
     const offerDone = aiInteractionSchema.parse(await readJson(await harness.request(`/admin/ai/insights/${offerInsight.id}`, { headers: actorHeaders(aiAdmin) })));
     expect(offerDone.status).toBe("completed");
-    expect(offerDone.outputText).toContain("Verification indicative de l'offre");
+    expect(offerDone.outputText).toContain("Vérification indicative de l'offre");
 
     const validated = aiInteractionSchema.parse(await readJson(await harness.request(`/admin/ai/insights/${triage.id}/validation`, { method: "POST", headers: { ...actorHeaders(aiAdmin), ...json }, body: JSON.stringify({ decision: "approved" }) })));
     expect(validated.humanValidationStatus).toBe("approved");

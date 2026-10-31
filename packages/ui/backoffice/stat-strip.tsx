@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import type { Tone } from "./badge";
+import { FigureValue } from "./figure";
 
 export interface StatItem {
   label: string;
@@ -30,7 +31,7 @@ export function StatStrip({ items, label }: StatStripProps) {
             <span className="bo-stats__dot" aria-hidden="true" />
             {item.label}
           </p>
-          <p className="bo-stats__value">{item.value}</p>
+          <FigureValue className="bo-stats__value" value={item.value} />
           {item.helper ? <p className="bo-stats__helper">{item.helper}</p> : null}
           {item.href ? <a className="bo-stats__link" href={item.href} aria-label={item.label} /> : null}
         </li>
