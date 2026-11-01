@@ -281,7 +281,9 @@ jobs:
   verify-preproduction:
     needs: deploy-preproduction
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    # Four URLs x 10 tries x (10 s timeout + 6 s pause) in the worst case: enough room for the job
+    # to print which URL failed instead of being cancelled.
+    timeout-minutes: 12
     env:
       API_URL: ${{ vars.PREPROD_API_URL }}
       PUBLIC_URL: ${{ vars.PREPROD_PUBLIC_URL }}
