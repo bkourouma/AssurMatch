@@ -1,0 +1,156 @@
+# AssurMatch — PREPRODUCTION stack on the Alliance VPS (147.93.44.169).
+#
+#   https://assurmatch.allianceconsultants.net             Web Publique Client      127.0.0.1:3601
+#   https://backoffice-assurmatch.allianceconsultants.net  Back-office Plateforme   127.0.0.1:3602
+#   https://pro-assurmatch.allianceconsultants.net         Broker Back-office       127.0.0.1:3603
+#   https://api-assurmatch.allianceconsultants.net         Backend API              127.0.0.1:3600
+#   Mailpit (captured e-mails, never delivered)            SSH tunnel only          127.0.0.1:3625
+#
+# Driven by scripts/preprod/deploy.sh (CI job `deploy-preproduction`, self-hosted runner
+# `assurmatch-preprod` on the VPS), which copies this file to
+# /home/deployer/apps/assurmatch-preprod/docker-compose.yml and runs it there. Host nginx terminates
+# TLS (deploy/nginx/assurmatch-preprod*.conf). Runbook: docs/runbooks/deployment.md.
+#
+# Variables (exported by deploy.sh; by hand, export them before any docker compose command):
+#   ASSURMATCH_REGISTRY       image registry/owner, default ghcr.io/bkourouma
+#   ASSURMATCH_IMAGE_TAG      API + worker image tag, sha-<commit>                 (required)
+#   ASSURMATCH_FRONTEND_TAG   public/admin/broker image tag, sha-<commit>          (required)
+#   ASSURMATCH_ENV_DIR        api.env, worker.env, public.env, admin.env, broker.env, postgres.env,
+#                             default ./env (created by scripts/preprod/bootstrap-env.sh)
+#
+# Differences with docker-compose.production.yml: bundled PostgreSQL, Mailpit instead of a real
+# e-mail provider (nothing leaves the server), no ClamAV (uploads stay disabled in preproduction,
+# and the VPS is shared with other applications).
+
+name: assurmatch-preprod
+
+x-restart: &restart
+  restart: unless-stopped
+
+x-logging: &logging
+  logging:
+    driver: json-file
+    options:
+      max-size: "20m"
+      max-file: "5"
+
+services:
+  postgres:
+    <<: [*restart, *logging]
+    image: postgres:18-alpine
+    container_name: assurmatch-preprod-postgres
+    env_file:
+      - ${ASSURMATCH_ENV_DIR:-./env}/postgres.env
+    volumes:
+      - postgres-data:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U \"$${POSTGRES_USER}\" -d \"$${POSTGRES_DB}\""]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  redis:
+    <<: [*restart, *logging]
+    image: redis:8-alpine
+    container_name: assurmatch-preprod-redis
+    command: ["redis-server", "--appendonly", "yes", "--save", "300", "10"]
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+
+  mailpit:
+    <<: [*restart, *logging]
+    image: axllent/mailpit:latest
+    container_name: assurmatch-preprod-mailpit
+    environment:
+      MP_DATABASE: /data/mailpit.db
+      MP_MAX_MESSAGES: "5000"
+      MP_SMTP_AUTH_ACCEPT_ANY: "1"
+      MP_SMTP_AUTH_ALLOW_INSECURE: "1"
+    volumes:
+      - mailpit-data:/data
+    # Web UI on the loopback only: ssh -L 8025:127.0.0.1:3625 alliance, then http://localhost:8025
+    ports:
+      - "127.0.0.1:${ASSURMATCH_MAILPIT_HOST_PORT:-3625}:8025"
+    healthcheck:
+      test: ["CMD", "/mailpit", "readyz"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+
+  api:
+    <<: [*restart, *logging]
+    image: ${ASSURMATCH_REGISTRY:-ghcr.io/bkourouma}/assurmatch:${ASSURMATCH_IMAGE_TAG:?set ASSURMATCH_IMAGE_TAG (sha-<commit>)}
+    container_name: assurmatch-preprod-api
+    env_file:
+      - ${ASSURMATCH_ENV_DIR:-./env}/api.env
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      mailpit:
+        condition: service_started
+    ports:
+      - "127.0.0.1:${ASSURMATCH_API_HOST_PORT:-3600}:3600"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:3600/readyz >/dev/null || exit 1"]
+      interval: 30s
+      timeout: 5s
+      start_period: 40s
+      retries: 3
+
+  worker:
+    <<: [*restart, *logging]
+    image: ${ASSURMATCH_REGISTRY:-ghcr.io/bkourouma}/assurmatch:${ASSURMATCH_IMAGE_TAG:?set ASSURMATCH_IMAGE_TAG (sha-<commit>)}
+    container_name: assurmatch-preprod-worker
+    command: ["node", "--import", "tsx", "scripts/worker/assurmatch-worker.ts"]
+    env_file:
+      - ${ASSURMATCH_ENV_DIR:-./env}/worker.env
+    depends_on:
+      api:
+        condition: service_healthy
+    stop_signal: SIGTERM
+    stop_grace_period: 40s
+    healthcheck:
+      test: ["CMD", "node", "scripts/worker/worker-healthcheck.mjs"]
+      interval: 30s
+      timeout: 5s
+      start_period: 60s
+      retries: 3
+
+  public:
+    <<: [*restart, *logging]
+    image: ${ASSURMATCH_REGISTRY:-ghcr.io/bkourouma}/assurmatch-public:${ASSURMATCH_FRONTEND_TAG:?set ASSURMATCH_FRONTEND_TAG (sha-<commit>)}
+    container_name: assurmatch-preprod-public
+    env_file:
+      - ${ASSURMATCH_ENV_DIR:-./env}/public.env
+    ports:
+      - "127.0.0.1:${ASSURMATCH_PUBLIC_HOST_PORT:-3601}:3601"
+
+  admin:
+    <<: [*restart, *logging]
+    image: ${ASSURMATCH_REGISTRY:-ghcr.io/bkourouma}/assurmatch-backoffice:${ASSURMATCH_FRONTEND_TAG:?set ASSURMATCH_FRONTEND_TAG (sha-<commit>)}
+    container_name: assurmatch-preprod-admin
+    env_file:
+      - ${ASSURMATCH_ENV_DIR:-./env}/admin.env
+    ports:
+      - "127.0.0.1:${ASSURMATCH_ADMIN_HOST_PORT:-3602}:3602"
+
+  broker:
+    <<: [*restart, *logging]
+    image: ${ASSURMATCH_REGISTRY:-ghcr.io/bkourouma}/assurmatch-broker:${ASSURMATCH_FRONTEND_TAG:?set ASSURMATCH_FRONTEND_TAG (sha-<commit>)}
+    container_name: assurmatch-preprod-broker
+    env_file:
+      - ${ASSURMATCH_ENV_DIR:-./env}/broker.env
+    ports:
+      - "127.0.0.1:${ASSURMATCH_BROKER_HOST_PORT:-3603}:3603"
+
+volumes:
+  postgres-data:
+  redis-data:
+  mailpit-data:

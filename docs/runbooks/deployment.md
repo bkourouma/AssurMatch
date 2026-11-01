@@ -2,78 +2,183 @@
 
 > Production has its own approved, manual job since spec 057: see `deployment-production.md`.
 
+## Topology
+
+Alliance VPS `147.93.44.169` (`ssh alliance`: user `deployer`, port 2222), shared with the other
+Alliance applications. Host nginx terminates TLS; every container binds to `127.0.0.1` only.
+
+| URL | Surface | Container | Port |
+| --- | --- | --- | --- |
+| `https://assurmatch.allianceconsultants.net` | Web Publique Client | `assurmatch-preprod-public` | 3601 |
+| `https://backoffice-assurmatch.allianceconsultants.net` | Back-office Plateforme | `assurmatch-preprod-admin` | 3602 |
+| `https://pro-assurmatch.allianceconsultants.net` | Broker Back-office | `assurmatch-preprod-broker` | 3603 |
+| `https://api-assurmatch.allianceconsultants.net` | Backend API | `assurmatch-preprod-api` | 3600 |
+| SSH tunnel only | Mailpit (captured e-mails) | `assurmatch-preprod-mailpit` | 3625 |
+
+Plus `assurmatch-preprod-worker` (no port, one replica), `assurmatch-preprod-postgres` and
+`assurmatch-preprod-redis` (compose network only). Compose file: `docker-compose.preprod-vps.yml`,
+project `assurmatch-preprod`, run from `/home/deployer/apps/assurmatch-preprod`:
+
+```
+/home/deployer/apps/assurmatch-preprod/
+  docker-compose.yml, deploy.sh, pre-deploy-check.sh, backup-db.sh   copied by each deployment
+  .env                 deployed image tags (compose interpolation for manual commands)
+  deploy-history.log   one line per successful deployment
+  env/                 api.env worker.env public.env admin.env broker.env postgres.env (0700 / 0600)
+  backups/             postgres-<label>-<date>.sql.gz (0700)
+```
+
+Preproduction e-mails go to Mailpit and are **never delivered**. Read them through a tunnel:
+`ssh -L 8025:127.0.0.1:3625 alliance`, then `http://localhost:8025`.
+
 ## When
 
-Every push on `main` triggers `.github/workflows/ci.yml`: it verifies, scans for secrets and publishes the four `sha-<commit>` images to GHCR (API, public, back-office, broker; the preproduction job still deploys the first three). **It does not deploy by default.**
+Every push on `main` triggers `.github/workflows/ci.yml`: verify, secret-scan, then the four
+`sha-<commit>` images are published to GHCR (API, public, back-office, broker; the frontends compile
+the `PREPROD_*_URL` repository variables). With the repository variable `PREPROD_AUTO_DEPLOY=true`,
+`deploy-preproduction` then deploys on the VPS and `verify-preproduction` checks the public URLs.
 
-Deploying needs the self-hosted runner `assurmatch-preprod` to be online, and is opt-in:
+- **Automatic on merge** (default once the runner is online): `PREPROD_AUTO_DEPLOY=true`. Set it to
+  anything else before taking the runner down.
+- **Manual**: Actions > CI > "Run workflow", select the ref, tick `deploy_preproduction`. Deploys the
+  SHA of that ref.
 
-- **Manual (default way).** Actions > CI > "Run workflow", select the ref, tick `deploy_preproduction`. This rebuilds and deploys the SHA of that ref.
-- **Automatic on merge.** Set the repository variable `PREPROD_AUTO_DEPLOY` to `true` (Settings > Secrets and variables > Actions > Variables). Only while the runner is online; set it back to anything else before taking the runner down.
+Why it stays switchable: when `assurmatch-preprod` is offline, GitHub does not fail the deploy job. It
+keeps it queued for the 24 h maximum, then cancels it, and the whole run turns red even though
+everything else passed. With deployment off, a push ends on `preproduction-deploy-skipped`, which names
+the published image tag.
 
-Why it is opt-in: when `assurmatch-preprod` is offline, GitHub does not fail the deploy job. It keeps it queued for the 24 h maximum, then cancels it, and the whole run turns red even though everything else passed. `timeout-minutes` bounds execution, not queue time. A push to `main` with deployment off ends on a `preproduction-deploy-skipped` job that emits a notice naming the published image tag.
+## What a deployment does
 
-## Before deploying
+`scripts/preprod/deploy.sh`, on the runner (checkout of the commit), as `deployer`:
 
-Check the runner state: Settings > Actions > Runners, or
+1. copies the compose file and the preprod scripts into `/home/deployer/apps/assurmatch-preprod`;
+2. `pre-deploy-check.sh`: env files present, mode 0600, mandatory variables, `APP_ENV=preproduction`,
+   a database URL naming a preproduction database, no secret in the frontends, no forbidden module;
+3. pulls the five application images of the commit;
+4. starts PostgreSQL, Redis and Mailpit (no-op when healthy);
+5. dumps the database (`backups/postgres-pre-deploy-*.sql.gz`) when a deployment is recorded — a failed
+   dump stops everything before any change;
+6. `prisma migrate deploy` + `migrate status` with the **new** API image; on the first deployment only,
+   the idempotent reference seed (`ASSURMATCH_SEED_REFERENCE=1` forces it again);
+7. swaps api, worker, public, admin, broker;
+8. health: API `/readyz`, public `/`, admin `/login`, broker `/login`, worker running without restart;
+9. success: records the tags in `.env` and `deploy-history.log`; failure: restarts the previous tags
+   (containers only — migrations are never reverted, they must stay backward compatible) and fails.
 
-```bash
-gh api repos/bkourouma/AssurMatch/actions/runners \
-  -q '.total_count, (.runners[] | "\(.name)\t\(.status)\t\(.busy)")'
-```
+## Host preparation (one time, done 2026-11-01)
 
-Three states, three different fixes:
+1. **DNS** (Hostinger, zone `allianceconsultants.net`): A records to `147.93.44.169` for `assurmatch`,
+   `backoffice-assurmatch`, `api-assurmatch` and `pro-assurmatch`.
+2. **Env files**: from a checkout on the VPS, `sh scripts/preprod/bootstrap-env.sh`. Secrets are
+   generated on the host, existing files are never overwritten. Keep a copy of `env/` in the secret
+   store: losing `ENCRYPTION_KEY` or the PII keys makes the data unreadable.
+3. **nginx + TLS**:
+   ```bash
+   sudo cp deploy/nginx/security-headers.conf /etc/nginx/snippets/assurmatch-security-headers.conf
+   # HTTP-only first (the default server answers 444 to unknown hosts), then one certificate per name:
+   sudo certbot certonly --webroot -w /var/www/html -d assurmatch.allianceconsultants.net
+   sudo certbot certonly --webroot -w /var/www/html -d backoffice-assurmatch.allianceconsultants.net
+   sudo certbot certonly --webroot -w /var/www/html -d api-assurmatch.allianceconsultants.net
+   sudo cp deploy/nginx/assurmatch-preprod.conf /etc/nginx/sites-available/assurmatch-preprod
+   sudo ln -sfn /etc/nginx/sites-available/assurmatch-preprod /etc/nginx/sites-enabled/
+   sudo nginx -t && sudo systemctl reload nginx
+   ```
+   Broker: same with `pro-assurmatch.allianceconsultants.net` and `assurmatch-preprod-broker.conf`,
+   once its DNS record exists.
+4. **Daily backup** (crontab of `deployer`):
+   `30 2 * * * sh /home/deployer/apps/assurmatch-preprod/backup-db.sh >> /home/deployer/apps/assurmatch-preprod/backups/backup.log 2>&1`
+5. **Repository variables** (Settings > Secrets and variables > Actions > Variables):
+   `PREPROD_API_URL=https://api-assurmatch.allianceconsultants.net`,
+   `PREPROD_PUBLIC_URL=https://assurmatch.allianceconsultants.net`,
+   `PREPROD_ADMIN_URL=https://backoffice-assurmatch.allianceconsultants.net`,
+   `PREPROD_BROKER_URL=https://pro-assurmatch.allianceconsultants.net`, then `PREPROD_AUTO_DEPLOY=true`.
+   Changing a URL needs a rebuild: the frontends compile them.
+6. **Runner** (below), then **first Super Admin** (below).
 
-| Output | Meaning | Fix |
-| --- | --- | --- |
-| an `assurmatch-preprod` row, `online` | ready | deploy |
-| an `assurmatch-preprod` row, `offline` | registered, agent stopped | start the service on the host: `sudo ./svc.sh start` |
-| no `assurmatch-preprod` row (`total_count: 0`) | not registered at all | re-register it, see below |
+## Runner
 
-Either of the last two means the deploy job sits in the queue for 24 h, then gets cancelled and turns the whole run red.
-
-### Re-registering the runner
-
-The registration token is short-lived and belongs to a repository admin: generate it from Settings > Actions > Runners > "New self-hosted runner", use it directly on the host, never commit or paste it elsewhere.
-
-On the preproduction host, in the runner directory:
-
-```bash
-./config.sh --url https://github.com/bkourouma/AssurMatch \
-  --token <REGISTRATION_TOKEN> \
-  --name assurmatch-preprod \
-  --labels assurmatch-preprod \
-  --unattended
-sudo ./svc.sh install
-sudo ./svc.sh start
-```
-
-- **The `assurmatch-preprod` label is mandatory.** The deploy job declares `runs-on: [self-hosted, assurmatch-preprod]`; without that exact label GitHub never assigns it the job, whatever the runner is named.
-- Install it as a service (`svc.sh install`), not `./run.sh`: a foreground runner does not survive a host reboot and you land back on the 24 h queue.
-
-Then verify before deploying:
+Check its state: Settings > Actions > Runners, or
 
 ```bash
 gh api repos/bkourouma/AssurMatch/actions/runners \
   -q '.runners[] | "\(.name)\t\(.status)\t\([.labels[].name] | join(","))"'
 ```
 
-Expect one `assurmatch-preprod` row, `online`, carrying both `self-hosted` and `assurmatch-preprod` in its labels.
+| Output | Meaning | Fix |
+| --- | --- | --- |
+| an `assurmatch-preprod` row, `online` | ready | deploy |
+| an `assurmatch-preprod` row, `offline` | registered, agent stopped | `cd ~/actions-runner-assurmatch && sudo ./svc.sh start` |
+| no `assurmatch-preprod` row | not registered | register it, see below |
 
-## Steps
+Registering (directory `/home/deployer/actions-runner-assurmatch`, same runner version as the other
+runners of the host). The registration token is short-lived and belongs to a repository admin
+(`gh api -X POST repos/bkourouma/AssurMatch/actions/runners/registration-token -q .token`): use it
+directly on the host, never commit or paste it elsewhere.
 
-1. Confirm CI verify is green.
-2. Confirm the three image tags `sha-<short>` were pushed to GHCR.
-3. Watch the SSH deploy step: it pulls three images, swaps three containers (`assurmatch-app`, `assurmatch-public`, `assurmatch-backoffice`), runs health checks, prunes.
-4. Verify externally:
-   ```bash
-   curl -fsS https://api-assurmatch.allianceconsultants.net/healthz
-   curl -fsS https://api-assurmatch.allianceconsultants.net/readyz
-   curl -I https://assurmatch.allianceconsultants.net
-   curl -I https://backoffice-assurmatch.allianceconsultants.net
-   ```
-5. Spot-check `docker logs assurmatch-app` for boot errors.
+```bash
+./config.sh --url https://github.com/bkourouma/AssurMatch --token <REGISTRATION_TOKEN> \
+  --name assurmatch-preprod --labels assurmatch-preprod --work _work --unattended
+sudo ./svc.sh install deployer
+sudo ./svc.sh start
+```
 
-## Rollback (auto)
+- **The `assurmatch-preprod` label is mandatory**: the deploy job declares
+  `runs-on: [self-hosted, assurmatch-preprod]`.
+- Install it as a service, not `./run.sh`: a foreground runner does not survive a reboot.
+- The repository is public and the runner has the server in hand: no job targeting it may ever run on
+  `pull_request`. Keep fork pull requests behind approval (Settings > Actions > General > "Require
+  approval for all external contributors").
 
-If any health check fails, the deploy script exits non-zero. The previous image is still tagged `latest` in GHCR; rerun the rollback runbook.
+## First Super Admin
+
+Once, after the first deployment (`docs/runbooks/bootstrap-admin.md`):
+
+```bash
+cd /home/deployer/apps/assurmatch-preprod
+docker compose run --rm --no-deps api node --import tsx scripts/ops/bootstrap-super-admin.ts \
+  --email <e-mail> --display-name "<First Last>"
+```
+
+The command prints a one-time `https://backoffice-assurmatch.allianceconsultants.net/activate?token=...`
+link (password, then MFA enrolment). Further accounts are created from the back-office; their
+invitation e-mails land in Mailpit.
+
+## Operations
+
+```bash
+cd /home/deployer/apps/assurmatch-preprod
+docker compose ps
+docker compose logs --tail 100 api worker
+curl -fsS http://127.0.0.1:3600/readyz
+```
+
+Manual rollback to a known commit (images still on the host, or `docker login ghcr.io` first):
+
+```bash
+cd /home/deployer/apps/assurmatch-preprod
+ASSURMATCH_IMAGE_TAG=sha-<good-commit> sh deploy.sh
+```
+
+Restore a dump (the dumps drop and recreate every object; data written since the dump is lost):
+
+```bash
+cd /home/deployer/apps/assurmatch-preprod
+docker compose stop api worker
+gunzip -c backups/postgres-<label>-<date>.sql.gz | docker exec -i assurmatch-preprod-postgres \
+  sh -c 'psql -v ON_ERROR_STOP=1 -U "$POSTGRES_USER" -d "$POSTGRES_DB"'
+docker compose start api worker
+```
+
+External checks:
+
+```bash
+curl -fsS https://api-assurmatch.allianceconsultants.net/readyz
+curl -fsSI https://assurmatch.allianceconsultants.net
+curl -fsSI https://backoffice-assurmatch.allianceconsultants.net/login
+curl -fsSI https://pro-assurmatch.allianceconsultants.net/login
+```
+
+The first preproduction attempt (May 2026, `docker run` of three containers) left
+`/home/deployer/apps/assurmatch` (old env file and data) and the Docker network `assurmatch-preprod`
+on the host. The compose stack does not use them.
