@@ -38,6 +38,14 @@ function parse<T>(schema: ZodType<T>, input: unknown): T {
   return result.data;
 }
 
+/**
+ * Timestamp of a write on `insurer`: never equal to (nor before) the `updatedAt` it replaces, so two
+ * writes within the same millisecond still change the concurrency token that `update` compares.
+ */
+function stamp(insurer: InsurerRecord): Date {
+  return new Date(Math.max(Date.now(), insurer.updatedAt.getTime() + 1));
+}
+
 export function toAdminInsurerView(insurer: InsurerRecord): AdminInsurerView {
   return {
     id: insurer.id,
@@ -139,7 +147,7 @@ export class InsurersService {
       name: parsed.name,
       approvalNumber: approvalNumber || undefined,
       status: parsed.status,
-      updatedAt: new Date()
+      updatedAt: stamp(insurer)
     });
     this.audit.write({
       actor,
@@ -166,7 +174,7 @@ export class InsurersService {
       this.refused(actor, insurer, insurer.countryId, "retire", "insurer_already_retired");
       throw insurerConflict("Insurer transition invalid: the insurer is already retired");
     }
-    const saved = await this.repository.update(insurer.id, { status: "retired", updatedAt: new Date() });
+    const saved = await this.repository.update(insurer.id, { status: "retired", updatedAt: stamp(insurer) });
     this.audit.write({
       actor,
       action: InsurerAuditActions.retired,
