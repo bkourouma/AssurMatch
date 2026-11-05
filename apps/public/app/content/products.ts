@@ -169,7 +169,7 @@ const fr: Record<string, ProductContent> = {
       {
         question: "Le visa de destination est-il vérifié par AssurMatch ?",
         answer:
-          "Non. AssurMatch ne vérifie aucun document de voyage ; c'est le courtier partenaire qui vous précise les pièces nécessaires à la souscription."
+          "Non. AssurMatch ne vérifie aucun document de voyage ; c'est le courtier partenaire qui vous précise les pièces nécessaires à la souscription. Un contrat souscrit via un courtier partenaire ne garantit pas l'obtention du visa."
       },
       {
         question: "Un séjour prolongé au-delà de la date prévue reste-t-il couvert ?",
@@ -321,7 +321,7 @@ const en: Record<string, ProductContent> = {
       {
         question: "Is the destination visa checked by AssurMatch?",
         answer:
-          "No. AssurMatch does not check any travel document; the partner broker tells you which documents are required to take out cover."
+          "No. AssurMatch does not check any travel document; the partner broker tells you which documents are required to take out cover. A contract taken out through a partner broker does not guarantee that a visa will be granted."
       },
       {
         question: "Is an extended stay beyond the planned date still covered?",
