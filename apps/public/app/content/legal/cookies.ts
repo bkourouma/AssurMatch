@@ -3,38 +3,38 @@ import type { ContentLocale, LegalPage } from "../types";
 const fr: LegalPage = {
   slug: "cookies",
   title: "Cookies",
-  description: "Le seul cookie utilisé par AssurMatch aujourd'hui, et pourquoi.",
-  updatedAt: "2026-09-19",
+  description: "Les cookies déposés par AssurMatch à la date de cette page, et pourquoi.",
+  updatedAt: "2026-10-08",
   summary: [
-    "AssurMatch utilise un seul cookie, appelé am_pays.",
-    "Il retient uniquement le pays que vous avez choisi, pendant 180 jours.",
-    "Il ne contient aucune donnée personnelle : juste un code pays à deux lettres.",
-    "Le site ne dépose aujourd'hui aucun cookie de publicité ni de mesure d'audience.",
-    "Ce cookie est strictement nécessaire : il ne demande pas de bandeau de consentement."
+    "À la date de cette page, le site dépose deux cookies : am_pays (le pays choisi, 180 jours) et NEXT_LOCALE (la langue, le temps de la session du navigateur).",
+    "Ils servent uniquement à la navigation : am_pays contient un code pays à deux lettres, NEXT_LOCALE un code de langue ; ni l'un ni l'autre ne contient d'information qui vous identifie directement.",
+    "Nous les considérons comme strictement nécessaires : ils peuvent être exemptés de consentement selon la réglementation applicable.",
+    "À notre connaissance, le site ne dépose aucun cookie de publicité ni de mesure d'audience à cette date.",
+    "Cette page est mise à jour si nos pratiques changent."
   ],
   sections: [
     {
       id: "cookie-fonctionnel",
-      heading: "Le cookie que nous utilisons",
+      heading: "Les cookies que nous utilisons",
       body: [
-        "AssurMatch dépose aujourd'hui un seul cookie, nommé am_pays. Il mémorise le pays choisi par le visiteur pour que la navigation reste cohérente d'une page à l'autre, sans avoir à le resélectionner à chaque visite.",
-        "Ce cookie est conservé 180 jours, s'applique à l'ensemble du site et n'est transmis à aucun autre site. Il ne contient aucune donnée personnelle identifiante : uniquement un code pays à deux lettres."
+        "À la date de cette page, AssurMatch dépose deux cookies. Le premier, am_pays, mémorise le pays choisi par le visiteur pour que la navigation reste cohérente d'une page à l'autre, sans avoir à le resélectionner à chaque visite. Le second, NEXT_LOCALE, mémorise la langue d'affichage (français ou anglais) le temps de la session du navigateur.",
+        "am_pays est conservé 180 jours ; NEXT_LOCALE est supprimé à la fermeture du navigateur. Ils s'appliquent à l'ensemble du site et ne sont pas transmis à un autre site. Ils ne contiennent qu'un code pays à deux lettres et un code de langue, sans information qui vous identifie directement. Nous les considérons comme strictement nécessaires au fonctionnement du site ; ils peuvent être exemptés de consentement selon la réglementation applicable."
       ]
     },
     {
       id: "pas-de-suivi",
       heading: "Ce que nous ne faisons pas",
       body: [
-        "Le site ne dépose aujourd'hui aucun cookie de mesure d'audience, de publicité ou de suivi entre sites. Aucune donnée de navigation n'est partagée avec un tiers à des fins de ciblage.",
-        "Si cela devait changer, cette page serait mise à jour et un bandeau de consentement serait affiché avant le dépôt de tout cookie non strictement nécessaire."
+        "À notre connaissance et à la date de cette page, le site ne dépose pas de cookie de mesure d'audience, de publicité ou de suivi entre sites, et nous ne partageons pas de données de navigation à des fins publicitaires.",
+        "Cette page est mise à jour si nos pratiques changent. Avant tout dépôt d'un cookie qui ne serait pas strictement nécessaire, nous recueillerions votre consentement, conformément à la réglementation applicable."
       ]
     },
     {
       id: "gestion",
       heading: "Comment le désactiver",
       body: [
-        "Le cookie am_pays étant strictement nécessaire au fonctionnement du sélecteur de pays, il ne requiert pas de consentement préalable.",
-        "Il peut néanmoins être supprimé à tout moment depuis les réglages du navigateur. Sans lui, AssurMatch retente une détection du pays à chaque visite à partir d'informations techniques de connexion, ou demande simplement au visiteur de choisir son pays."
+        "Ces cookies étant considérés comme strictement nécessaires à la navigation (sélecteur de pays et langue), ils peuvent être exemptés de consentement préalable selon la réglementation applicable.",
+        "Ils peuvent néanmoins être supprimés à tout moment depuis les réglages du navigateur. Sans am_pays, AssurMatch retente une détection du pays à chaque visite à partir d'informations techniques de connexion, ou demande simplement au visiteur de choisir son pays."
       ]
     }
   ]
@@ -43,38 +43,38 @@ const fr: LegalPage = {
 const en: LegalPage = {
   slug: "cookies",
   title: "Cookies",
-  description: "The one cookie AssurMatch uses today, and why.",
-  updatedAt: "2026-09-19",
+  description: "The cookies AssurMatch sets as of the date of this page, and why.",
+  updatedAt: "2026-10-08",
   summary: [
-    "AssurMatch uses a single cookie, called am_pays.",
-    "It only remembers the country you chose, for 180 days.",
-    "It contains no personal data: just a two-letter country code.",
-    "The site does not set any advertising or audience-measurement cookie today.",
-    "This cookie is strictly necessary: it does not require a consent banner."
+    "As of the date of this page, the site sets two cookies: am_pays (the country you chose, 180 days) and NEXT_LOCALE (the language, for the browser session).",
+    "They are used for navigation only: am_pays holds a two-letter country code and NEXT_LOCALE a language code; neither holds information that directly identifies you.",
+    "We consider them strictly necessary: they may be exempt from consent under the applicable regulations.",
+    "To our knowledge, the site sets no advertising or audience-measurement cookie as of that date.",
+    "This page is updated if our practices change."
   ],
   sections: [
     {
       id: "cookie-fonctionnel",
-      heading: "The cookie we use",
+      heading: "The cookies we use",
       body: [
-        "AssurMatch currently sets a single cookie, named am_pays. It remembers the country the visitor chose so that browsing stays consistent from page to page, without having to reselect it on every visit.",
-        "This cookie is kept for 180 days, applies to the whole site and is never sent to another site. It contains no identifying personal data — only a two-letter country code."
+        "As of the date of this page, AssurMatch sets two cookies. The first, am_pays, remembers the country the visitor chose so that browsing stays consistent from page to page, without having to reselect it on every visit. The second, NEXT_LOCALE, remembers the display language (French or English) for the browser session.",
+        "am_pays is kept for 180 days; NEXT_LOCALE is deleted when the browser is closed. They apply to the whole site and are not sent to another site. They only hold a two-letter country code and a language code, with no information that directly identifies you. We consider them strictly necessary for the site to work; they may be exempt from consent under the applicable regulations."
       ]
     },
     {
       id: "pas-de-suivi",
       heading: "What we do not do",
       body: [
-        "The site does not currently set any analytics, advertising or cross-site tracking cookie. No browsing data is shared with a third party for targeting purposes.",
-        "Should this change, this page would be updated and a consent banner would be shown before any non strictly necessary cookie is set."
+        "To our knowledge and as of the date of this page, the site sets no audience-measurement, advertising or cross-site tracking cookie, and we do not share browsing data for advertising purposes.",
+        "This page is updated if our practices change. Before any cookie that is not strictly necessary is set, we would ask for your consent, in line with the applicable regulations."
       ]
     },
     {
       id: "gestion",
       heading: "How to turn it off",
       body: [
-        "Because am_pays is strictly necessary for the country selector to work, it does not require prior consent.",
-        "It can still be removed at any time from the browser's settings. Without it, AssurMatch simply tries to detect the country again on each visit from technical connection information, or asks the visitor to choose it."
+        "As these cookies are considered strictly necessary for navigation (country selector and language), they may be exempt from prior consent under the applicable regulations.",
+        "They can still be removed at any time from the browser's settings. Without am_pays, AssurMatch simply tries to detect the country again on each visit from technical connection information, or asks the visitor to choose it."
       ]
     }
   ]
