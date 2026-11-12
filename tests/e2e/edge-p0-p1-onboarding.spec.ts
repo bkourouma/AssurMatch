@@ -123,16 +123,9 @@ test.describe("Candidature publique : validation côté client (aucune soumissio
     await expect(page.locator("#am-apply-legalname-error")).toHaveText("Ce champ est obligatoire.");
     await expect(page.locator("#am-apply-legalname-error")).toHaveAttribute("role", "alert");
     await expect(activeStep(page, 1)).toBeVisible();
-    // The banner "Le formulaire contient des erreurs..." lives in the Notice of step 4 only (hidden while on step 1).
+    // Fixed (lot 7): the error banner is rendered on the step where the errors are, visible and announced.
     const banner = page.getByText("Le formulaire contient des erreurs. Corrigez les champs signalés.");
-    const bannerVisible = await banner.first().isVisible().catch(() => false);
-    if (!bannerVisible) {
-      test.info().annotations.push({
-        type: "anomaly",
-        description:
-          "Mineure: le bandeau « Le formulaire contient des erreurs » est rendu dans le panneau de l'étape 4 (apps/public/app/components/forms/partner-application-form.tsx:732-736) alors que l'erreur est posée aux étapes 1-3 (ligne 296) : le panneau est display:none (styles/brokers.css:696), le bandeau n'est jamais visible ni annoncé aux étapes 1 à 3. Correctif: rendre le Notice hors des panneaux ou au-dessus du fieldset actif."
-      });
-    }
+    await expect(banner.first(), "banner visible on step 1").toBeVisible();
     // Step 2: name, e-mail and phone empty.
     await step1(page);
     await next(page);
@@ -323,13 +316,8 @@ test.describe("Candidature publique : API et soumissions (budget 3 par heure)", 
     const message = String(rec(multi.body).message);
     for (const field of ["legalName", "licenseNumber", "monthlyCapacity", "message"]) expect(message, field).toContain(field);
     const code = String(rec(multi.body).code);
-    if (code !== "VALIDATION_FAILED") {
-      test.info().annotations.push({
-        type: "anomaly",
-        description: `Mineure: une erreur de validation qui cite licenseNumber répond le code ${code} (LICENSE_BLOCKED) au lieu de VALIDATION_FAILED : error-response.filter.ts:62-69 classe le code par expressions régulières sur le message (/license/i). Correctif: lever une HttpException avec code VALIDATION_FAILED explicite dans PartnerApplicationsService.parseInput (partner-applications.module.ts:537-544).`
-      });
-    }
-    expect.soft(code, "validation errors carry VALIDATION_FAILED").toBe("VALIDATION_FAILED");
+    // Fixed (lot 5): a validation error that quotes licenseNumber keeps VALIDATION_FAILED (was LICENSE_BLOCKED).
+    expect(code, "validation errors carry VALIDATION_FAILED").toBe("VALIDATION_FAILED");
 
     const cases: Array<[string, Record<string, unknown>, string]> = [
       ["raison sociale 1 caractère", { legalName: "A" }, "legalName"],
@@ -719,13 +707,8 @@ test.describe("Fiche courtier : documents (E-P1-05)", () => {
     await page.goto(`/partners/${pid()}`);
     const second = card(page, "Téléverser un document");
     const preselected = await second.getByLabel("Type de document").inputValue();
-    if (preselected !== "") {
-      test.info().annotations.push({
-        type: "anomaly",
-        description: `Majeure (formulaires de décision de conformité): le placeholder des listes est une option value="" disabled sans selected (packages/ui/backoffice/form/controls.tsx:34-38): le navigateur présélectionne la première option activée. « Type de document » est donc déjà « ${preselected} » sans choix de l'opérateur (un dépôt sans choix de type devient une preuve d'agrément), idem « Motif de refus » d'une candidature (« Licence invérifiable » présélectionné), le document du contrat, les pays et produits. Le message « Choisissez le type de document. » (documents/route.ts:65) est inatteignable depuis l'écran. Correctif: option value="" disabled hidden + defaultValue="" sur le select.`
-      });
-    }
-    expect.soft(preselected, "no document type is preselected by the placeholder").toBe("");
+    // Fixed (lot 7): the placeholder stays selected (value ""), so no document type is chosen on behalf of the operator.
+    expect(preselected, "no document type is preselected by the placeholder").toBe("");
     // The route handler's own message, reached with the browser's fetch (same cookies and CSRF header as the form).
     const typeless = await page.evaluate(async ({ id, bytes }) => {
       const body = new FormData();
@@ -946,15 +929,11 @@ test.describe("Fiche courtier : statut, activation, utilisateurs, contrat (E-P1-
     expect(notice.tone).toBe("danger");
     const token = await adminBearerToken(page);
     const direct = await api(token, "POST", `/admin/partners/${pid()}/users`, { email: existing, displayName: "Doublon Admin", role: "broker_owner_starter", reason: REASON_OK });
-    if (direct.status !== 409 || /prisma/iu.test(direct.text)) {
-      test.info().annotations.push({
-        type: "anomaly",
-        description: `Majeure: inviter un e-mail déjà utilisé répond ${direct.status} ${direct.text.slice(0, 220)} : l'erreur d'unicité Prisma (P2002) remonte brute (nom de méthode Prisma et contrainte User_email_key exposés) avec le code VALIDATION_FAILED, l'écran affiche « Données invalides : ... le motif doit contenir au moins 8 caractères » (message trompeur) au lieu du conflit neutre 409. Code: PrismaUsersRepository.create ne contrôle pas l'unicité de l'e-mail (backend/src/modules/users/users.repository.ts:147-150, alors que MemoryUsersRepository la contrôle ligne 52), appelé par PartnerAdminService.inviteUser (partners/partner-admin.service.ts:537) via provisionUser. Correctif: findByEmail avant création (ou capturer P2002) et lever un conflit 409 « User email already exists » neutre; ne jamais renvoyer le message Prisma.`
-      });
-    }
-    expect.soft(direct.status, "invitation of a used e-mail is a neutral 409 conflict").toBe(409);
-    expect.soft(direct.text, "no ORM detail leaks").not.toMatch(/prisma|User_email_key/iu);
-    expect.soft(notice.text, "neutral French conflict message").toBe("Conflit : cet élément existe déjà ou son état actuel ne permet pas cette action. Rechargez la page pour voir l'état à jour.");
+    // Fixed (lot 5): 409 EMAIL_ALREADY_USED with a French "déjà utilisée" notice, no ORM detail.
+    expect(direct.status, direct.text).toBe(409);
+    expect(rec(direct.body).code).toBe("EMAIL_ALREADY_USED");
+    expect(direct.text, "no ORM detail leaks").not.toMatch(/prisma|User_email_key/iu);
+    expect(notice.text, "readable conflict message").toBe("Cette adresse e-mail est déjà utilisée.");
     expect(notice.text, "the refusal does not name the account").not.toContain(existing);
     await page.waitForTimeout(8_000);
     const after = (await searchMessages(`to:"${existing}"`)).filter((mail) => !before.has(mail.ID));

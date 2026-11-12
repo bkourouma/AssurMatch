@@ -65,6 +65,7 @@ export function backendEnv() {
     EMAIL_SMTP_HOST: "127.0.0.1",
     EMAIL_SMTP_PORT: String(ports.mailpitSmtp),
     EMAIL_PREVIEW_MODE: "false",
+    EMAIL_SEND_TIMEOUT_MS: "20000",
     APP_BASE_URL: urls.admin,
     PUBLIC_APP_URL: urls.public,
     BROKER_APP_URL: urls.broker,

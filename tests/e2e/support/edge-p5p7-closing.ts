@@ -1,7 +1,8 @@
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { expect, type Browser, type Page } from "@playwright/test";
-import { activateWithMfa, e2ePassword, newAppContext, openAs, type BackOfficeAccount } from "./backoffice";
+import { activateWithMfa, e2ePassword, newAppContext, type BackOfficeAccount } from "./backoffice";
+import { openAs } from "./edge-p5p7-login";
 import { e2eEnv } from "./env";
 import { extractLink, waitForMail, type MailMessage, type MailSummary } from "./mailpit";
 import { card, confirmInDialog, uniqueSuffix } from "./ui";

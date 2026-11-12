@@ -721,7 +721,6 @@ test("E-P4-01i courtier suspendu par le Super Admin (monde l3vb) : validation bl
 // ------------------------------------------------------------------------------ session expirée
 
 test("E-P4-session session expirée sur une décision admin : message « Session expirée… » ou redirection /login, l'offre ne change pas", async ({ browser }) => {
-  test.fail(true, "ANOMALIE A-L3V-01 : sans cookie de session, la décision d'une offre (action serveur) est redirigée par le middleware vers /login ; le client Next ne sait pas suivre cette redirection et affiche « Une erreur est survenue / Le back-office est momentanément indisponible » au lieu de « Session expirée… » (apps/admin/middleware.ts:55). Le motif saisi est perdu.");
   test.setTimeout(5 * 60_000);
   const offer = await submittedOffer("Session");
   const context = await newAppContext(browser, e2eEnv.adminUrl);
@@ -741,6 +740,7 @@ test("E-P4-session session expirée sur une décision admin : message « Session
     expect(await statusOf(await complianceToken(), offer.id)).toBe("submitted");
     // Expected: the "Session expirée" message of the action, or the redirection to /login?reason=...
     const informed = where.pathname.startsWith("/login") || /Session expirée/u.test(`${outcome.message} ${screen}`);
+    expect(screen, "pas de page d'erreur générique").not.toContain("Une erreur est survenue");
     expect(informed, `ni redirection /login ni « Session expirée » : ${where.pathname}${where.search} / ${screen.slice(0, 200)}`).toBe(true);
   } finally {
     await context.close();

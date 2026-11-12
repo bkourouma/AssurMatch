@@ -75,6 +75,9 @@ export class UsersService {
   async create(input: UserCreateDto, actor: ActorContext): Promise<UserAccount> {
     const parsed = userCreateSchema.parse(input);
     const now = new Date();
+    const emailAlreadyUsed = () => new ConflictException({ code: ErrorCodes.EMAIL_ALREADY_USED, message: "This e-mail address is already in use" });
+    // Pre-check for the common case; the catch below covers a concurrent insert (raw P2002 / "already exists").
+    if (await this.repository.findByEmail(parsed.email)) throw emailAlreadyUsed();
     const user = await this.repository.create({
       id: parsed.id ?? crypto.randomUUID(),
       email: parsed.email,
@@ -91,6 +94,10 @@ export class UsersService {
       mfaBackupCodesHashes: [],
       createdAt: now,
       updatedAt: now
+    }).catch((error: unknown) => {
+      const record = error as { code?: unknown; message?: unknown } | null;
+      if (record !== null && typeof record === "object" && (record.code === "P2002" || (typeof record.message === "string" && /unique constraint|already exists/i.test(record.message)))) throw emailAlreadyUsed();
+      throw error;
     });
     await this.audit.writeAsync({
       actor,

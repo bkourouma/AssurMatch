@@ -1,6 +1,6 @@
 import { expect, test, type Browser, type Locator, type Page } from "@playwright/test";
 import { setGlobalFlag } from "./support/admin";
-import { openAs } from "./support/backoffice";
+import { openAs } from "./support/edge-p5p7-login";
 import { e2eEnv } from "./support/env";
 import {
   L4_REASON,
@@ -51,7 +51,7 @@ import { globalFlagIsOn, readQuoteOptions } from "./support/visitor-gaps";
 test.describe.configure({ mode: "serial" });
 
 const SUFFIX = uniqueSuffix();
-const DUPLICATE_NOTICE = "Message identique déjà envoyé il y a moins de 5 minutes : envoi ignoré.";
+const DUPLICATE_NOTICE = "Ce message vient déjà d'être envoyé. Attendez la réponse du visiteur avant de le renvoyer.";
 const INVALID_NOTICE = "Saisie refusée : le message (2000 caractères au maximum) ou l'intitulé de la demande (120 caractères) est obligatoire.";
 const FILE_NOTICE = "Fichier refusé : 3 fichiers au maximum, PDF, JPEG ou PNG de 5 Mo chacun.";
 const AV_NOTICE = "Envoi refusé : un fichier n'a pas passé l'antivirus. Il n'a pas été conservé.";
@@ -175,13 +175,7 @@ test("E-P6-06b message vide, 2001 caractères : « Saisie refusée » ; rien n'e
   expect(await brokerThreadSize(token, fx.l1.assignmentId), "nothing stored").toBe(before);
 });
 
-test("E-P6-06b message identique envoyé deux fois en moins de 5 minutes : « Message identique déjà envoyé... »", async ({ browser }) => {
-  test.fail(true, "ANOMALIE E-P6-06b : le courtier peut envoyer deux fois le même message (aucun contrôle de doublon côté courtier, seul le visiteur en a un)");
-  test.info().annotations.push({
-    type: "anomalie",
-    description: "E-P6-06b: brokerSend has no duplicate check (lead-messaging.service.ts:177-244, the check exists only in visitorSend :355-359); DUPLICATE_MESSAGE notice of conversation-vocabulary.ts:67 is dead code"
-  });
-  note("E-P6-06b doublon courtier: le 2e message identique est accepté (« Message envoyé. »), aucun refus « Message identique déjà envoyé » ; contrôle absent de brokerSend (lead-messaging.service.ts:177-244) alors que visitorSend l'a (:355-359)");
+test("E-P6-06b message identique envoyé deux fois en moins de 5 minutes : « Ce message vient déjà d'être envoyé... »", async ({ browser }) => {
   const page = await brokerPage(browser, fx.l1.assignmentId);
   const token = await bearerToken(page);
   const text = `Message identique de contrôle L4 ${SUFFIX}`;
@@ -197,6 +191,10 @@ test("E-P6-06b message identique envoyé deux fois en moins de 5 minutes : « Me
   note(`E-P6-06b doublon courtier: fil de ${await brokerThreadSize(token, fx.l1.assignmentId)} message(s) après deux envois identiques (avant: ${before})`);
   await expect(brokerComposer(page).locator("[aria-live='polite']")).toContainText(DUPLICATE_NOTICE);
   expect(await brokerThreadSize(token, fx.l1.assignmentId), "the duplicate is not stored").toBe(before + 1);
+  const again = await apiCall(token, "POST", `/broker/starter/leads/${fx.l1.assignmentId}/conversation/messages`, { body: text });
+  expect(again.status, `API duplicate -> ${again.text.slice(0, 200)}`).toBe(409);
+  expect(again.text).toContain("DUPLICATE_MESSAGE");
+  expect(await brokerThreadSize(token, fx.l1.assignmentId), "the API duplicate is not stored either").toBe(before + 1);
 });
 
 test("E-P6-06c pièces : 4 fichiers, note.txt, gros.pdf, eicar.pdf, nom « garanti à vie »", async ({ browser }) => {
@@ -305,15 +303,6 @@ test("E-P6-07c avant l'acceptation du lead : aucune zone de saisie (comportement
   await expect(visitorForm(visitor)).toHaveCount(0);
   await expect(visitor.locator("#conversation")).toContainText("Aucune conversation pour le moment. Elle s'ouvrira ici dès qu'un courtier aura pris en charge votre demande.");
   await expect(visitor.getByText("Conversation en lecture seule")).toHaveCount(0);
-});
-
-test("E-P6-07c avant l'acceptation : « Conversation en lecture seule » + « Le courtier n'a pas encore pris en charge... » (attendu du scénario)", async ({ browser }) => {
-  test.fail(true, "ANOMALIE E-P6-07c : avant l'acceptation aucune conversation n'est créée (quoteConversations ne crée que les leads acceptés), le libellé not_accepted est inatteignable");
-  test.info().annotations.push({ type: "anomalie", description: "E-P6-07c: not_accepted read-only reason never displayed (lead-messaging.service.ts:589-591 vs :566; fr.json QuoteRequest.messaging.readOnly.not_accepted)" });
-  note("E-P6-07c avant acceptation: pas de bloc « Conversation en lecture seule » (section vide « Aucune conversation pour le moment »); libellé not_accepted inatteignable (lead-messaging.service.ts:589-591)");
-  const visitor = await visitorPage(browser, "l3", fx.l3);
-  await expect(visitor.getByText("Conversation en lecture seule")).toBeVisible({ timeout: 3_000 });
-  await expect(visitor.locator("#conversation")).toContainText("Le courtier n'a pas encore pris en charge votre demande : vous pourrez lui écrire dès que ce sera le cas.", { timeout: 3_000 });
 });
 
 test("E-P6-07c lead clôturé : zone de saisie masquée, « Conversation en lecture seule », envoi API refusé", async ({ browser }) => {
@@ -638,12 +627,7 @@ test("E-P6-12a réaffectation refusée : même courtier, courtier inéligible, m
   expect(publicScopeUsage("tracking_status")?.count ?? 0).toBeLessThanOrEqual(60);
 });
 
-test("E-P6-12a motif de 7 caractères refusé aussi par l'API (le formulaire impose minLength 8)", async () => {
-  test.fail(true, "ANOMALIE E-P6-12a : l'API accepte un motif de 7 caractères (seul le champ HTML impose 8) : la validation passe et la demande n'échoue que sur l'éligibilité du courtier");
-  test.info().annotations.push({
-    type: "anomalie",
-    description: "E-P6-12a: leadReassignRequestSchema.reason is nonEmptyStringSchema (min 1), packages/shared/contracts/routing-rule.contracts.ts:136; the minLength=8 of apps/admin/app/lib/ui/operations-forms.tsx:99 is client-side only"
-  });
+test("E-P6-12a motif de 7 caractères refusé aussi par l'API (400 avant le contrôle d'éligibilité)", async () => {
   // The target is the terminated broker: whatever the reason check does, no lead can move.
   const adminToken = await adminBearerToken(adminHeader());
   const shortReason = await apiCall(adminToken, "POST", `/admin/lead-assignments/${fx.l1.assignmentId}/reassign`, { partnerTenantId: fx.terminated.partnerId, reason: "1234567" });

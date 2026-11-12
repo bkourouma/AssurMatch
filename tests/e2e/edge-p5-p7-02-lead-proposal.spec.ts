@@ -1,5 +1,6 @@
 import { expect, test, type Browser, type Page } from "@playwright/test";
-import { openAs, type BackOfficeAccount } from "./support/backoffice";
+import { type BackOfficeAccount } from "./support/backoffice";
+import { openAs } from "./support/edge-p5p7-login";
 import {
   ensureRateBudget,
   ensureL4Firm,
@@ -59,6 +60,8 @@ const FORMULA = `=HYPERLINK("http://x.test","a")`;
 const NO_DOC_REFUSAL = "Fichier refusé : PDF de 5 Mo au maximum uniquement.";
 const VIRUS_REFUSAL = "Envoi refusé : le fichier n'a pas passé l'antivirus. Il n'a pas été conservé.";
 const WORDING_REFUSAL = "Envoi refusé : le texte contient une formulation interdite.";
+const VALIDITY_REFUSAL = "La date de validité doit être postérieure à aujourd'hui.";
+const OVERSIZE_REFUSAL = "Fichier refusé : taille maximale 5 Mo.";
 const INVALID_REFUSAL = "Saisie refusée : message, prime ou fourchette, devise et date de validité future sont obligatoires.";
 const SENT_NOTICE = "Proposition envoyée. Le visiteur est prévenu par e-mail et la voit dans son espace de suivi.";
 const NOT_RESPONDABLE = "Cette proposition ne peut plus recevoir de réponse (retirée, expirée ou plus active). Rechargez la page pour voir son état.";
@@ -162,15 +165,14 @@ test("E-P6-02a « Rejeter avec motif » sans motif refusé, avec « Doublon » a
 
 });
 
-test("E-P6-02a (anomalie) l'acceptation d'un lead rejeté est refusée par l'API", async ({ browser }) => {
+test("E-P6-02a l'acceptation d'un lead rejeté est refusée par l'API", async ({ browser }) => {
   test.setTimeout(8 * 60_000);
-  test.fail(true, "ANOMALIE E-P6-02a : POST /broker/starter/leads/:id/accept sur un lead rejeté répond 201 et le repasse « accepted » (aucun contrôle de transition)");
-  test.info().annotations.push({ type: "anomalie", description: "E-P6-02a: accept after reject -> 201, lead back to accepted (broker-starter-leads.service.ts accept has no source-status guard)" });
   const target = await lead(browser, "rejected");
   const token = await ownerToken(browser);
   const accept = await apiCall(token, "POST", `/broker/starter/leads/${target.assignmentId}/accept`, {});
   note(`ANOMALIE E-P6-02a accept after reject via API -> ${brief(accept)}`);
-  expect(accept.status, `accept after reject must be refused: ${brief(accept)}`).toBeGreaterThanOrEqual(400);
+  expect(accept.status, `accept after reject must be refused: ${brief(accept)}`).toBe(409);
+  expect(errorCodeOf(accept)).toBe("LEAD_STATUS_NOT_ACCEPTABLE");
 });
 
 test("E-P6-02c « Accepter » depuis deux onglets : une seule acceptation", async ({ browser }) => {
@@ -196,21 +198,22 @@ test("E-P6-02c « Accepter » depuis deux onglets : une seule acceptation", asyn
   const events = itemsOf(history).filter((event) => event.eventType === "accepted").length;
   cases.acceptedEvents = String(events);
   note(`E-P6-02c accepted events after two simultaneous accepts: ${events}`);
-  // A later call on an already accepted lead (observed, asserted in the anomaly test below).
+  // A later call on an already accepted lead (observed, asserted in the idempotence test below).
   const third = await apiCall(token, "POST", `/broker/starter/leads/${target.assignmentId}/accept`, {});
   cases.acceptAgain = brief(third);
   note(`E-P6-02c accept on an already accepted lead -> ${brief(third)}`);
 });
 
-test("E-P6-02c (anomalie) deux acceptations simultanées ou répétées ne laissent qu'un seul événement « accepted »", async ({ browser }) => {
+test("E-P6-02c deux acceptations simultanées ou répétées ne laissent qu'un seul événement « accepted »", async ({ browser }) => {
   test.setTimeout(8 * 60_000);
-  test.fail(true, "ANOMALIE E-P6-02c : « Accepter » n'est pas idempotent, chaque appel sur un lead déjà accepté renvoie 201 et ajoute un événement d'historique");
-  test.info().annotations.push({ type: "anomalie", description: "E-P6-02c: repeated/simultaneous accept -> several 'accepted' history events (second call not refused)" });
   const target = await lead(browser, "race");
   const token = await ownerToken(browser);
   const history = await apiCall(token, "GET", `/broker/starter/leads/${target.assignmentId}/history`);
   const events = itemsOf(history).filter((event) => event.eventType === "accepted").length;
   expect(events, `exactly one "accepted" event (history: ${brief(history)})`).toBe(1);
+  const again = await apiCall(token, "POST", `/broker/starter/leads/${target.assignmentId}/accept`, {});
+  expect(again.status, `second accept: ${brief(again)}`).toBe(409);
+  expect(errorCodeOf(again)).toBe("LEAD_ALREADY_ACCEPTED");
 });
 
 test("E-P6-02c « Clôturer » un lead non accepté : 409 LEAD_NOT_ACCEPTED, bouton absent", async ({ browser }) => {
@@ -271,7 +274,8 @@ test("E-P6-03a champs vides, minimum > maximum, prime négative, validité pass�
   ];
   for (const [label, fields] of refused) {
     const text = await submitProposalOnScreen(page, (await firmA(browser)).owner, target.assignmentId, fields);
-    expect(text, label).toBe(INVALID_REFUSAL);
+    // Since lot 7 a past validity has its own readable message.
+    expect(text, label).toBe(label === "validité passée" ? VALIDITY_REFUSAL : INVALID_REFUSAL);
   }
   // The browser itself also blocks an empty submit (required fields): no navigation, no request.
   await openAs(page, (await firmA(browser)).owner, `/leads/${target.assignmentId}`);
@@ -283,15 +287,13 @@ test("E-P6-03a champs vides, minimum > maximum, prime négative, validité pass�
 
 test("E-P6-03a validité « aujourd'hui » refusée (champ « Valable jusqu'au » : minimum demain)", async ({ browser }) => {
   test.setTimeout(8 * 60_000);
-  test.fail(true, "ANOMALIE E-P6-03a : une validité « aujourd'hui » est acceptée (fin de journée UTC), alors que la date minimale annoncée est demain");
-  test.info().annotations.push({ type: "anomalie", description: "E-P6-03a: validUntil = today accepted -> proposal valid until 23:59:59Z tonight (proposal-vocabulary.ts buildProposalPayload only requires > now)" });
   const target = await lead(browser, "main");
   const owner = (await firmA(browser)).owner;
   const page = await ownerPage(browser, `/leads/${target.assignmentId}`);
   const before = proposalRowCount(target.assignmentId);
   const text = await submitProposalOnScreen(page, owner, target.assignmentId, { message: "Validité aujourd'hui.", min: "90000", max: "110000", currency: "XOF", valid: isoDay(0) });
   note(`E-P6-03a validity today -> "${text}" rows ${before} -> ${proposalRowCount(target.assignmentId)}`);
-  expect(text, "a validity of today must be refused").toBe(INVALID_REFUSAL);
+  expect(text, "a validity of today must be refused").toBe(VALIDITY_REFUSAL);
   expect(proposalRowCount(target.assignmentId)).toBe(before);
 });
 
@@ -341,10 +343,8 @@ test("E-P6-03c PDF : note.txt, gros.pdf (5 Mo + 1), faux.pdf refusés ; eicar.pd
   expect(ok).toBe(SENT_NOTICE);
 });
 
-test("E-P6-03c (anomalie) gros.pdf (5 Mo + 1 octet) : libellé « Fichier refusé » plutôt que « Saisie refusée »", async ({ browser }) => {
+test("E-P6-03c gros.pdf (5 Mo + 1 octet) : libellé « Fichier refusé » plutôt que « Saisie refusée »", async ({ browser }) => {
   test.setTimeout(8 * 60_000);
-  test.fail(true, "ANOMALIE E-P6-03c : un PDF de 5 Mo + 1 octet est refusé par l'API en 413 mais l'écran affiche « Saisie refusée : message, prime ou fourchette... » au lieu de « Fichier refusé : PDF de 5 Mo au maximum uniquement. »");
-  test.info().annotations.push({ type: "anomalie", description: "E-P6-03c: oversize PDF -> API 413, screen shows the generic invalid-input notice (proposal-vocabulary.ts proposalOutcome maps 413 to invalid)" });
   const target = await lead(browser, "main");
   const owner = (await firmA(browser)).owner;
   const token = await ownerToken(browser);
@@ -357,7 +357,8 @@ test("E-P6-03c (anomalie) gros.pdf (5 Mo + 1 octet) : libellé « Fichier refus�
   note(`E-P6-03c gros.pdf screen -> "${text}"`);
   await page.screenshot({ path: "test-results/edge-p5p7-02/evidence-E-P6-03c-gros-pdf.png" });
   expect(proposalRowCount(target.assignmentId), "oversize file stores nothing").toBe(before);
-  expect(text, "gros.pdf").toBe(NO_DOC_REFUSAL);
+  expect(text, "gros.pdf").toBe(OVERSIZE_REFUSAL);
+  expect(direct.status, "API answers 413").toBe(413);
 });
 
 test("E-P6-03g double clic sur « Envoyer la proposition au visiteur » : une seule proposition ; XSS du message échappé côté visiteur et courtier", async ({ browser }) => {
@@ -803,10 +804,8 @@ test("RSP-03 largeur 375 px : /leads, fiche du lead et panneau de proposition sa
   await context.close();
 });
 
-test("RSP-03 (anomalie) une réponse du visiteur d'un seul mot de 500 caractères ne fait pas défiler horizontalement la fiche du lead à 375 px", async ({ browser }) => {
+test("RSP-03 une réponse du visiteur d'un seul mot de 500 caractères ne fait pas défiler horizontalement la fiche du lead à 375 px", async ({ browser }) => {
   test.setTimeout(8 * 60_000);
-  test.fail(true, "ANOMALIE RSP-03 : la liste « Réponses du visiteur » ne coupe pas un mot très long (question de 500 caractères sans espace) : la fiche du lead déborde de la largeur de l'écran à 375 px");
-  test.info().annotations.push({ type: "anomalie", description: "RSP-03: long unbroken visitor question/slot overflows the lead page at 375 px (proposal-panel.tsx 'Réponses du visiteur' <li> has no overflow-wrap)" });
   const target = await lead(browser, "main");
   const owner: BackOfficeAccount = (await firmA(browser)).owner;
   const context = await browser.newContext({ baseURL: e2eEnv.brokerUrl, viewport: { width: 375, height: 812 }, locale: "fr-FR", timezoneId: "Africa/Abidjan" });

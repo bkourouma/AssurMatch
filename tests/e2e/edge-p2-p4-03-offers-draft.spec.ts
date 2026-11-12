@@ -266,62 +266,36 @@ test("E-P3-01g « souscrire maintenant » et « acheter maintenant » : formulat
     const form = await fillCreateForm(page, formValues({ name, shortDescription: `Votre assurance auto : ${phrase} en ligne.` }));
     const outcome = await submitCreateForm(page, form);
     expect(outcome.offerId).toBeUndefined();
-    expect(outcome.message).toBe(`Formulation réglementée interdite détectée : « ${phrase.toLowerCase()} ». Reformulez le champ concerné.`);
+    expect(outcome.message).toBe(`Formulation interdite : « ${phrase.toLowerCase()} ». Reformulez le champ concerné.`);
     const api = await offerApi(token, "POST", "/broker/offers", createPayload(scope, { name, shortDescription: phrase }));
-    expect(api.status, describeResult(api)).toBe(400);
-    expect(errorOf(api).message).toContain("Forbidden regulated wording");
+    expect(api.status, describeResult(api)).toBe(422);
+    expect(errorOf(api).code, describeResult(api)).toBe("FORBIDDEN_WORDING");
     expect(await offerNames(token)).not.toContain(name);
   }
 });
 
-test("E-P3-01h « contrat validé » (accent) : qualifier le constat 16.2 / H8 jusqu'à la revue de conformité", async ({ browser }) => {
-  test.fail(true, "ANOMALIE E-P3-01h : « contrat validé » (accent) passe la création, la soumission ET la validation « Valider et publier » : la formulation interdite est publiée (content-safety.ts:1-9, offer-content.ts:119, aucun contrôle à la revue dans offer-lifecycle.service.ts:validationBlockers)");
+test("E-P3-01h « contrat validé » (accent) refusé à la création (422 FORBIDDEN_WORDING) ; « couverture garantie » et « taux garanti » acceptés", async ({ browser }) => {
   const token = await tokenFor(browser, A.owner);
   // Control: the same phrase without the accent is refused at the entry.
   const control = await offerApi(token, "POST", "/broker/offers", createPayload(scope, { name: offerName("H8-controle"), shortDescription: "Un contrat valide pour vous." }));
-  expect(control.status, `sans accent : ${describeResult(control)}`).toBe(400);
-  expect(errorOf(control).message).toContain("Forbidden regulated wording");
+  note(`H8 contrôle sans accent : ${describeResult(control)}`);
+  expect(control.status, `sans accent : ${describeResult(control)}`).toBe(422);
+  expect(errorOf(control).code).toBe("FORBIDDEN_WORDING");
 
   const name = offerName("H8");
   const created = await offerApi(token, "POST", "/broker/offers", createPayload(scope, { name, shortDescription: "Avec ce contrat validé, vous êtes couvert dès aujourd'hui." }));
-  const observed: string[] = [`création avec accent : ${describeResult(created)}`];
-  expect(created.status, "H8 : la création avec l'accent est acceptée (liste étroite)").toBe(201);
-  const id = String(rec(created.body).id);
-  let refusedAtReview: string | undefined;
-  try {
-    const submit = await offerApi(token, "POST", `/broker/offers/${id}/submit`, {});
-    observed.push(`soumission : ${describeResult(submit)}`);
-    expect(submit.status, "soumission acceptée").toBe(200);
+  note(`H8 avec accent : ${describeResult(created)}`);
+  expect(created.status, `avec accent : ${describeResult(created)}`).toBe(422);
+  expect(errorOf(created).code, "code d'erreur").toBe("FORBIDDEN_WORDING");
+  expect(await offerNames(token), "aucune offre enregistrée").not.toContain(name);
 
-    const admin = await visit(browser, complianceAccount(), `/offers/${id}`);
-    watchDialogs(admin);
-    try {
-      await confirmInDialog(admin, admin.locator("[data-offer-decision='validate']"), "Valider et publier", (dialog) => fillReason(dialog, REASON));
-    } catch (error) {
-      refusedAtReview = error instanceof Error ? error.message : String(error);
-    }
-    observed.push(refusedAtReview ? `validation refusée : ${refusedAtReview}` : "validation : « Valider et publier » acceptée, l'offre est publiée");
-    if (!refusedAtReview) {
-      await expect.poll(async () => (await publicListing()).some((offer) => offer.id === id), { timeout: 90_000, intervals: [2_000, 5_000] }).toBe(true);
-      const detail = await offerApi(undefined, "GET", `/offers/${id}`);
-      const visible = detail.text.includes("contrat validé");
-      observed.push(`catalogue public : offre listée ; texte « contrat validé » dans le détail public (API) : ${visible ? "oui" : "non"}`);
-      const visitor = await appPage(browser, e2eEnv.publicUrl);
-      try {
-        await visitor.goto(`/offres/${id}`);
-        const pageText = await visitor.locator("body").innerText();
-        observed.push(`page /offres/${id} : « contrat validé » affiché : ${pageText.includes("contrat validé") ? "oui" : "non"}`);
-      } finally {
-        await visitor.context().close();
-      }
-    }
-  } finally {
-    // Never leave a regulated wording on the shared public catalogue.
-    await offerApi(token, "POST", `/broker/offers/${id}/withdraw`, { reason: `Nettoyage ${L3}`, target: (await brokerOffer(token, id)).status === "published" ? "offer" : "pending" });
-    note(observed.join(" | "));
-    note("Comparaison : la messagerie utilise findForbiddenWordingAnyLanguage (normalisation NFKC/diacritiques/tirets, content-safety.ts:234, appelée par lead-messaging.service.ts:196) ; les offres n'utilisent que findForbiddenWording (content-safety.ts:18, texte brut en minuscules, 7 expressions) via refineOfferContent (offer-content.ts:119). Correctif : appeler findForbiddenWordingAnyLanguage dans refineOfferContent ET ajouter un contrôle de formulation dans validationBlockers (offer-lifecycle.service.ts) pour couvrir les versions déjà stockées.");
+  // Lot 10: the narrow filter must not block ordinary commercial French (false positives).
+  for (const [tag, text] of [["couverture", "Une couverture garantie par votre assureur selon les conditions du contrat."], ["taux", "Un taux garanti sur la durée de la première année."]] as const) {
+    const fpName = offerName(`H8-fp-${tag}`);
+    const fp = await offerApi(token, "POST", "/broker/offers", createPayload(scope, { name: fpName, shortDescription: text }));
+    note(`H8 faux positif « ${tag} » : ${describeResult(fp)}`);
+    expect(fp.status, `« ${text} » ne doit pas être bloqué : ${describeResult(fp)}`).toBe(201);
   }
-  expect(refusedAtReview, "la revue de conformité doit refuser une formulation réglementée interdite").toBeTruthy();
 });
 
 test("E-P3-01i deux offres au même nom : créées, clé publique suffixée -2 (constat H9)", async ({ browser }) => {
@@ -445,9 +419,9 @@ test("E-P3-01k / T-04 / T-05 XSS et SQL dans Nom, Description, Source : texte in
 });
 
 test("E-P3-01k-bis / T-04 aucune charge XSS ne s'exécute sur la fiche publique /offres/<id>", async () => {
-  test.fail(true, "ANOMALIE E-P3-01k-bis : XSS stocké sur la fiche publique d'une offre : JsonLd échappe « < » avec la chaîne littérale unicode-escape u003c (en JavaScript elle vaut le caractère « < » lui-même : remplacement sans effet) donc « </script> » dans le nom ferme le bloc ld+json et le HTML qui suit (img onerror de la description) s'exécute (apps/public/app/components/ui/json-ld.tsx:7)");
   note(`Extrait du HTML serveur de /offres/<id> autour de la charge : ${publicDetailLdJson}`);
   expect(publicDetailDialogs, "aucune boîte de dialogue sur la fiche publique").toEqual([]);
+  expect(publicDetailLdJson, "le JSON-LD n'a aucun « < » brut (échappé en u003c) : le bloc ld+json ne peut pas être refermé").not.toMatch(/<\/script|<img/u);
 });
 
 test("E-P3-01l double clic sur « Créer le brouillon » : une seule offre", async ({ browser }) => {

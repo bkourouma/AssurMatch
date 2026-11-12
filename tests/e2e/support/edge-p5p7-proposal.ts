@@ -1,6 +1,7 @@
 import { spawnSync } from "node:child_process";
 import { expect, request, type Browser, type Locator, type Page } from "@playwright/test";
-import { openAs, type BackOfficeAccount } from "./backoffice";
+import type { BackOfficeAccount } from "./backoffice";
+import { openAs } from "./edge-p5p7-login";
 import { e2eEnv } from "./env";
 import { quoteSlot } from "./edge-p5p7-support";
 import { extractLink, waitForMail } from "./mailpit";

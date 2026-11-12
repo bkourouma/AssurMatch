@@ -121,9 +121,12 @@ test.describe("consent texts (E-P0-03)", () => {
 
     // The scenario names the accented form: it is the one the editors actually write.
     const accented = await publishOnScreen(browser, page, "Je consens a la transmission a {{brokerName}}. Contrat validé. AssurMatch assure le role technique, ni courtier ni assureur.", "contrat-accent");
-    if (accented.screen === PUBLISHED_MARKER) {
-      anomaly("consent publication accepts « contrat validé » (accent): packages/shared/contracts/consent-content.ts:77 calls the raw findForbiddenWording (lower-case + includes, accent-sensitive) instead of findForbiddenWordingAnyLanguage (content-safety.ts:233, accent-insensitive) used elsewhere. Proposed fix: replace the call by findForbiddenWordingAnyLanguage(content). The published text is retired by the cleanup of this spec.");
-    }
+    // Fixed (lot 6/10): the accented form is refused like the plain one; the API keeps CONSENT_TEXT_INVALID (422) with the wording in the details.
+    expect(accented.screen, "accented wording must not publish").not.toBe(PUBLISHED_MARKER);
+    const accentedApi = await api(accented.apiToken, "POST", `/admin/consent-texts/${accented.id}/publish`, { reason: EDGE_REASON });
+    expectStatus(accentedApi, 422, "publish with « contrat validé »");
+    expect(rec(accentedApi.body).code).toBe("CONSENT_TEXT_INVALID");
+    expect(accentedApi.text).toMatch(/wording|contrat valid/iu);
     expect(accented.screen, "« contrat validé » must be refused as regulated wording").toContain(LABELS.forbidden);
   });
 
@@ -199,10 +202,10 @@ test.describe("quote form labels (E-P0-04)", () => {
 
     // The message is the quality criterion of this case: the scenario expects the regulated wording to be named.
     const wordingNamed = /formulation (interdite|réglementée)/iu.test(shown);
-    if (!wordingNamed || api400.status === 400) {
-      anomaly(`quote form publication with a regulated label is refused with HTTP ${api400.status} ${String(rec(api400.body).code)} and the publish form shows the raw text « ${shown} » (no explanation, no named wording). quote-form-definition.service.ts:371-374 throws a bare Error (mapped to 400 VALIDATION_FAILED) instead of a 422 FORBIDDEN_WORDING (the admin message table already maps this code, catalog-messages.ts:« Texte refusé : il contient une formulation interdite », but the quote-form publish action prints the raw api_<status>: apps/admin/app/quote-form-definitions/actions.ts:28-29 actionError + lib/admin-api.ts:92/116 throw api_<status>). Proposed fix: throw unprocessable(ErrorCodes.FORBIDDEN_WORDING, ..., { wording }).`);
-    }
-    expect.soft(wordingNamed, `screen message should name the regulated wording, got: ${shown}`).toBe(true);
+    // Fixed (lot 6): 422 FORBIDDEN_WORDING (was a bare 400) and the screen names the regulated wording.
+    expect(api400.status, `publish API refusal: ${api400.text.slice(0, 200)}`).toBe(422);
+    expect(rec(api400.body).code).toBe("FORBIDDEN_WORDING");
+    expect(wordingNamed, `screen message should name the regulated wording, got: ${shown}`).toBe(true);
     expectAudit("quote form publication refused (label)", "quote_form.publication_refused", formId as string);
   });
 
@@ -217,10 +220,8 @@ test.describe("quote form labels (E-P0-04)", () => {
     expectStatus(created, 201, "create the draft");
     const formId = String(rec(created.body).id);
     const publish = await api(token, "POST", `/admin/quote-form-definitions/${formId}/publish`, { reason: EDGE_REASON });
-    if (publish.status < 300) {
-      anomaly("quote form publication accepts the label « Votre contrat validé » (accent): quote-form-definition.service.ts:371 uses the raw findForbiddenWording (accent-sensitive, content-safety.ts:17) instead of findForbiddenWordingAnyLanguage. Proposed fix: use findForbiddenWordingAnyLanguage(field.label). The published form (sandbox country ZR) is retired by the cleanup.");
-    }
-    expect(publish.status, `publish -> ${publish.status} ${publish.text.slice(0, 200)}`).toBeGreaterThanOrEqual(400);
+    expect(publish.status, `publish -> ${publish.status} ${publish.text.slice(0, 200)}`).toBe(422);
+    expect(rec(publish.body).code).toBe("FORBIDDEN_WORDING");
   });
 });
 

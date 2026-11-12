@@ -29,9 +29,9 @@ import { uniqueSuffix } from "./support/ui";
 // test makes Playwright restart the worker anyway; the world (accounts, targets) therefore lives in a state file
 // (support/edge-p0p1-users-support.ts) and the file order puts the green cases first, the security findings last.
 
-const FORBIDDEN_WRITE = "Action refusée : droits insuffisants ou hors périmètre.";
+// RBAC_DENIED is now mapped to this wording by the admin server actions (lot 7).
+const FORBIDDEN_WRITE = "Vous n'avez pas le droit d'effectuer cette action.";
 const FORBIDDEN_READ = "Accès refusé : droits insuffisants ou hors périmètre.";
-const CONFLICT = "Conflit : cet élément existe déjà ou son état actuel ne permet pas cette action.";
 const SQL_STRINGS = ["'; DROP TABLE leads;--", "' OR '1'='1"];
 const XSS = "<script>alert(1)</script>";
 
@@ -91,7 +91,7 @@ test("SETUP comptes jetables : admin_pays CI, compliance, support, finance, 2 su
 // E-P0-07 : création d'utilisateurs
 // ---------------------------------------------------------------------------------------------------------------------
 
-test("E-P0-07a e-mail déjà utilisé : message de conflit (409 User email already exists)", async ({ browser }) => {
+test("E-P0-07a e-mail déjà utilisé : 409 EMAIL_ALREADY_USED, message lisible, aucun détail ORM", async ({ browser }) => {
   const w = await world(browser);
   const token = await superToken(browser);
   const direct = await api(token, "POST", "/admin/users", {
@@ -108,16 +108,10 @@ test("E-P0-07a e-mail déjà utilisé : message de conflit (409 User email alrea
   const message = await submitCreateForm(page, { email: w.accounts.ap.email, displayName: `${w.tag} doublon`, roles: ["content_admin"] });
   console.log(`[users] E-P0-07a screen -> ${message}`);
   note("screen", message);
-  if (direct.status !== 409) {
-    anomaly(
-      `MAJEUR : e-mail déjà utilisé → HTTP ${direct.status} VALIDATION_FAILED avec le message brut de Prisma (« Unique constraint failed on the constraint: User_email_key ») au lieu de 409 « User email already exists » ; l'écran affiche alors « ${message.slice(0, 90)} » (faux motif). ` +
-        "Cause : backend/src/modules/users/users.repository.ts:141-146 PrismaUsersRepository.create n'a pas le contrôle d'unicité de MemoryUsersRepository (l.52) ; la violation P2002 retombe dans backend/src/modules/common/filters/error-response.filter.ts:92-106 (message contenant « Invalid » → 400, code VALIDATION_FAILED). " +
-        "Correctif : dans PrismaUsersRepository.create, vérifier findByEmail (ou intercepter P2002) et lever un ConflictException « User email already exists » (409) sans exposer le message Prisma."
-    );
-  }
   expectStatus(direct, 409, "create with a used e-mail");
-  expect(direct.text).toContain("User email already exists");
-  expect(message).toContain(CONFLICT);
+  expect(rec(direct.body).code).toBe("EMAIL_ALREADY_USED");
+  expect(direct.text, "no ORM detail leaks").not.toMatch(/prisma|User_email_key|Unique constraint/iu);
+  expect(message).toContain("Cette adresse e-mail est déjà utilisée.");
 });
 
 test("E-P0-07b rôle courtier sans courtier, rôle admin avec courtier : messages du formulaire et refus API 422", async ({ browser }) => {
@@ -254,13 +248,19 @@ test("E-P0-02b aucun bouton pour les modules réglementés ; PATCH true refusé"
   expectStatus(list, 200, "list feature flags");
   const flags = itemsOfBody(list.body);
   const results: string[] = [];
-  for (const key of ["billing_enabled", "satisfaction_survey_enabled", "multi_broker_routing_enabled"]) {
+  // ai_summary_enabled is a sensitive flag since lot 5 (opened by ops:apply-flag-policy only).
+  for (const key of ["billing_enabled", "satisfaction_survey_enabled", "multi_broker_routing_enabled", "ai_summary_enabled"]) {
     const flag = flags.find((entry) => entry.key === key && entry.scopeType === "global");
     if (!flag) {
       hypothesis(`${key} n'est pas enregistré dans la table des flags (fail-closed) : aucune ligne à patcher, un PATCH d'un id inconnu donne 404.`);
       const unknown = await api(token, "PATCH", "/admin/feature-flags/00000000-0000-4000-8000-0000000000bb", { value: true, reason: EDGE_REASON });
       results.push(`${key}: not registered, unknown id -> ${unknown.status}`);
       expect([403, 404]).toContain(unknown.status);
+      continue;
+    }
+    if (flag.value === true) {
+      note("not-run", `${key} is already true on this stack: no activation to attempt (NOT RUN for this flag).`);
+      results.push(`${key}: NOT RUN, already true`);
       continue;
     }
     let activated = false;
@@ -321,7 +321,7 @@ test("E-P0-07e support_admin : /partners, /feature-flags, /billing en refus (éc
   expect(await flagsPage.locator("form[data-feature-flag-form]").count()).toBe(0);
   const billingPage = await openPage(browser, w.accounts.su, "/billing");
   screens.push(`/billing: ${await pageText(billingPage, 200)}`);
-  await expect(billingPage.getByText("Accès billing refusé pour ce rôle admin.")).toBeVisible();
+  await expect(billingPage.getByText("Votre rôle ne permet pas d'accéder à la facturation.")).toBeVisible();
   note("screens", screens.join(" || "));
 
   const sa = await superToken(browser);
@@ -606,7 +606,8 @@ test("SEC-SELF-1a un Super Admin jetable se suspend lui-même : API", async ({ b
       note("token after self-suspension", `GET /admin/users -> ${still.status}`);
       anomaly(`MAJEUR : un super_admin se suspend lui-même (HTTP ${attempt.status}). ${SELF_CAUSE}`);
     }
-    expect(attempt.status).toBeGreaterThanOrEqual(400);
+    expect(attempt.status, attempt.text).toBe(409);
+    expect(rec(attempt.body).code).toBe("SELF_ACTION_FORBIDDEN");
     expect(done, "self-suspension must be refused").toBe(false);
   } finally {
     if (done) await lifecycle(sa, w.accounts.s2.id, "unsuspend");
@@ -623,7 +624,8 @@ test("SEC-SELF-1b un Super Admin jetable s'auto-verrouille : API", async ({ brow
   note("api", `${attempt.status} ${attempt.text.slice(0, 120)} -> status ${after.status}`);
   try {
     if (done) anomaly(`MAJEUR : un super_admin s'auto-verrouille (HTTP ${attempt.status}). ${SELF_CAUSE}`);
-    expect(attempt.status).toBeGreaterThanOrEqual(400);
+    expect(attempt.status, attempt.text).toBe(409);
+    expect(rec(attempt.body).code).toBe("SELF_ACTION_FORBIDDEN");
     expect(done, "self-lock must be refused").toBe(false);
   } finally {
     if (done) await lifecycle(sa, w.accounts.s2.id, "unlock");
@@ -640,7 +642,8 @@ test("SEC-SELF-1c un Super Admin jetable retire son propre rôle super_admin : A
   note("api", `${attempt.status} ${attempt.text.slice(0, 120)} -> roles ${after.roles.join("+")}`);
   try {
     if (done) anomaly(`MAJEUR : un super_admin retire son propre rôle super_admin (HTTP ${attempt.status}). ${SELF_CAUSE}`);
-    expect(attempt.status).toBeGreaterThanOrEqual(400);
+    expect(attempt.status, attempt.text).toBe(409);
+    expect(rec(attempt.body).code).toBe("SELF_ACTION_FORBIDDEN");
     expect(done, "removing its own super_admin role must be refused").toBe(false);
   } finally {
     if (done) await roleUpdate(sa, w.accounts.s2.id, ["super_admin"]);
@@ -656,16 +659,37 @@ test("SEC-SELF-1d un Super Admin jetable s'auto-supprime : API (compte S3, irré
   const done = after.status === "deleted";
   note("api", `${attempt.status} ${attempt.text.slice(0, 120)} -> status ${after.status} (S3 is throwaway: left deleted if it went through)`);
   if (done) anomaly(`MAJEUR : un super_admin s'auto-supprime (HTTP ${attempt.status}, compte S3 jetable laissé supprimé). ${SELF_CAUSE}`);
-  expect(attempt.status).toBeGreaterThanOrEqual(400);
+  expect(attempt.status, attempt.text).toBe(409);
+  expect(rec(attempt.body).code).toBe("SELF_ACTION_FORBIDDEN");
   expect(done, "self-deletion must be refused").toBe(false);
 });
 
-// Not executed: it would have to be played on the shared Super Admin or on a throwaway stack.
-test.skip("SEC-LAST-1 protection du dernier super admin : non exécuté sur pile partagée, à rejouer sur pile jetable", () => {
-  // Code reading: no guard exists. backend/src/modules/users/admin-users.controller.ts:171-177 (suspend), :187-193 (lock),
-  // :211-217 (delete), admin-user-roles.controller.ts:15-23 and users.module.ts:59-73 (updateRoles) never count the active
-  // super_admin accounts. Proposed fix: before suspend, lock, delete or removal of super_admin on a super_admin target, count the
-  // active super_admin users (status active, not deleted) and refuse with 409 (code LAST_SUPER_ADMIN) when the target is the last one.
+// SEC-LAST-1 (409 LAST_SUPER_ADMIN) is not executed: the guard only answers once the target is the last ACTIVE super_admin of the
+// whole stack, and only another active super_admin may act on a super_admin (self actions answer SELF_ACTION_FORBIDDEN first).
+// Reaching that state means suspending the shared Super Admin of the scenario (used by every other runner and by the other lots),
+// which would break them. It can be played on a throwaway stack only. SEC-SELF-1 above exercises the neighbouring guard.
+test.skip("SEC-LAST-1 protection du dernier super admin : non exécuté (exigerait de suspendre le Super Admin partagé)", () => {
+  // see the comment above
+});
+
+// ---------------------------------------------------------------------------------------------------------------------
+// SEC-LEAK-1 : GET /admin/users ne renvoie aucun secret
+// ---------------------------------------------------------------------------------------------------------------------
+
+test("SEC-LEAK-1 GET /admin/users et /admin/users/:id : aucun secret (hash, secret MFA, codes de secours, jeton de reset)", async ({ browser }) => {
+  const w = await world(browser);
+  const token = await superToken(browser);
+  const list = await api(token, "GET", "/admin/users?page=1&pageSize=100");
+  expectStatus(list, 200, "list users");
+  const detail = await api(token, "GET", `/admin/users/${w.accounts.su.id}`);
+  expectStatus(detail, 200, "user detail");
+  for (const result of [list, detail]) {
+    expect(result.text, "no secret in the admin user views").not.toMatch(/passwordHash|mfaSecretEncrypted|mfaBackupCodesHashes|passwordResetTokenHash|mfaLastTotpCounter/u);
+  }
+  // A role without users:read (finance_admin) does not read the list either.
+  const finance = await api(await tokenOf(browser, w.accounts.fa), "GET", "/admin/users?page=1&pageSize=5");
+  note("finance_admin GET /admin/users", `${finance.status}`);
+  expect([401, 403], finance.text.slice(0, 160)).toContain(finance.status);
 });
 
 // ---------------------------------------------------------------------------------------------------------------------

@@ -47,7 +47,7 @@ describe("admin users runtime controller", () => {
     const controller = new AdminUsersController(users, audit);
 
     await controller.create(superAdminActor, createInput("duplicate@example.com"));
-    await expect(controller.create(superAdminActor, createInput("duplicate@example.com"))).rejects.toThrow(/already exists/);
+    await expect(controller.create(superAdminActor, createInput("duplicate@example.com"))).rejects.toThrow(/already in use/);
     await expect(controller.create(adminPaysActor, createInput("out-of-scope@example.com", [countryB]))).rejects.toThrow(/RBAC denied/);
     await expect(controller.create(brokerActor, createInput("broker-denied@example.com"))).rejects.toThrow(/RBAC denied/);
 

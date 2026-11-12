@@ -483,7 +483,6 @@ async function openTeam(browser: Parameters<typeof visit>[0], account: BackOffic
 }
 
 test("E-P2-06a inviter un e-mail déjà utilisé : 409 neutre, l'adresse n'est pas révélée", async ({ browser }) => {
-  test.fail(true, "ANOMALIE L3-A01 : inviter une adresse déjà utilisée répond 400 VALIDATION_FAILED avec le texte brut de l'erreur Prisma (« Invalid `prisma.user.create()` invocation… User_email_key ») au lieu du 409 neutre ; broker-team.service.ts:89 ne reconnaît que le message du dépôt mémoire (« already exists »), pas l'erreur P2002 de PrismaUsersRepository.create");
   const page = await openTeam(browser);
   const token = await bearerToken(page);
   const own = await call(token, "POST", "/broker/team", { email: agent.email, displayName: "Doublon API L3", role: "broker_agent" });
@@ -497,13 +496,15 @@ test("E-P2-06a inviter un e-mail déjà utilisé : 409 neutre, l'adresse n'est p
   const notice = await submitAndRead(invite, invite.getByRole("button", { name: "Inviter", exact: true }));
   NOTE(`Message réel (écran) : « ${notice.text} »`);
   expect(notice.tone).toBe("danger");
-  expect(notice.text).toBe("Action impossible dans l'état actuel (déjà autorisé, déjà traité ou adresse indisponible).");
+  expect(notice.text).toBe("Cette adresse e-mail est déjà utilisée.");
   expect(notice.text).not.toContain(agent.email);
 
   expect(own.status, own.text).toBe(409);
+  expect(own.text).toContain("EMAIL_ALREADY_USED");
   expect(own.text.toLowerCase(), "aucun détail interne (Prisma, contrainte SQL) dans la réponse").not.toMatch(/prisma|constraint|user_email_key/u);
   expect(foreign.status, "e-mail du propriétaire d'un autre courtier").toBe(409);
-  expect(foreign.text, "même réponse pour un compte de ce cabinet et d'un autre").toBe(own.text);
+  const withoutCorrelation = (text: string): string => text.replace(/"correlationId":"[^"]*"/u, "");
+  expect(withoutCorrelation(foreign.text), "même réponse pour un compte de ce cabinet et d'un autre").toBe(withoutCorrelation(own.text));
   expect(own.text).not.toContain(agent.email);
   expect(foreign.text).not.toContain(other.owner.email);
 });
@@ -845,8 +846,7 @@ test("E-P2-03c cookies de session distincts : admin puis courtier dans le même 
   void sessionPage;
 });
 
-test("E-P2-03c' un jeton courtier (agent, lecteur) sur GET /admin/users ne doit exposer aucun secret de compte", async ({ browser }) => {
-  test.fail(true, "ANOMALIE L3-A02 : GET /admin/users et GET /admin/users/:id répondent 200 à n'importe quel rôle courtier (admin-users.controller.ts:227-229, « actor.partnerTenantId ») avec l'objet UserAccount complet : passwordHash (argon2id), mfaSecretEncrypted, mfaBackupCodesHashes, passwordResetTokenHash, failedLoginCount ; un agent lit ainsi les secrets du propriétaire de son cabinet");
+test("E-P2-03c' un jeton courtier (agent, lecteur) sur GET /admin/users est refusé (403) et n'expose aucun secret de compte", async ({ browser }) => {
   const sensitive = /passwordHash|mfaSecretEncrypted|mfaBackupCodesHashes|passwordResetTokenHash/u;
   const lines: string[] = [];
   const leaks: string[] = [];
@@ -856,6 +856,8 @@ test("E-P2-03c' un jeton courtier (agent, lecteur) sur GET /admin/users ne doit 
     const list = await call(token, "GET", "/admin/users");
     const detail = await call(token, "GET", `/admin/users/${ownerId}`);
     lines.push(`${role} : liste ${list.status}, détail du propriétaire ${detail.status}`);
+    expect(list.status, `${role} : GET /admin/users`).toBe(403);
+    expect(detail.status, `${role} : GET /admin/users/:id`).toBe(403);
     for (const [name, result] of [["liste", list], ["détail", detail]] as const) {
       if (result.status === 200 && sensitive.test(result.text)) leaks.push(`${role}/${name}: ${[...new Set(result.text.match(new RegExp(sensitive.source, "gu")) ?? [])].join(",")}`);
     }

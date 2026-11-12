@@ -1,5 +1,3 @@
-import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
-import path from "node:path";
 import { expect, test, type BrowserContext, type Page } from "@playwright/test";
 import { appUrl, e2ePassword, freshTotp, newAppContext, verifyTotp, type BackOfficeAccount } from "./backoffice";
 import { EDGE_REASON, L2_TAG } from "./edge-p0p1-accounts";
@@ -7,7 +5,7 @@ import { e2eEnv } from "./env";
 import { extractLink, waitForMail } from "./mailpit";
 import { uniqueSuffix } from "./ui";
 import type { Browser } from "@playwright/test";
-import { openAs } from "./backoffice";
+import { login, openAs } from "./backoffice";
 
 // Helpers of edge-p0-p1-auth.spec.ts (admin app authentication edge cases): raw password step of the login
 // screen that leaves the page wherever the app sends it, text of the notices, an "observation" log that is
@@ -101,6 +99,26 @@ export async function submitActivation(context: BrowserContext, token: string, p
   return { page, url: new URL(page.url()), notices: await noticeTexts(page), hasSession: (await adminCookie(context)) !== undefined };
 }
 
+/**
+ * Password + TOTP login of a shared account that other runners use at the same time: the API refuses a TOTP time
+ * step already used for the account, so a login can fail on "Code de vérification incorrect" through no fault of
+ * the product. Retries the whole login (next steps) a few times before giving up.
+ */
+export async function resilientLogin(page: Page, account: BackOfficeAccount, returnTo = "/"): Promise<void> {
+  for (let attempt = 0; ; attempt += 1) {
+    try {
+      await login(page, account, returnTo);
+      return;
+    } catch (error) {
+      // Only the TOTP replay is retried (page left on /mfa, or the wrong-code notice shown); anything else
+      // (wrong password, broken assertion) is rethrown at once.
+      const onMfa = new URL(page.url()).pathname.startsWith("/mfa");
+      const wrongCode = await page.getByText("Code de vérification incorrect").first().isVisible().catch(() => false);
+      if (attempt >= 2 || !(onMfa || wrongCode)) throw error;
+    }
+  }
+}
+
 /** TOTP code that is valid for at least a few more seconds. */
 export async function currentCode(secret: string): Promise<string> {
   return freshTotp(secret);
@@ -113,26 +131,4 @@ export function classifyText(text: string): string {
   if (/^(api_\d+|validation_error|invalid_session|invalid_credentials|account_\w+|action_failed|session_required)$/u.test(text)) return "(a) texte technique brut";
   if (/^[A-Z][A-Za-z ]+$/u.test(text) && !/[àâçéèêëîïôûù]/u.test(text)) return "(a) message serveur anglais brut";
   return "(c) message lisible, a valider par le produit";
-}
-
-// Verdicts handed from the serial tests to the "open findings" tests (a failure restarts the worker, module state is lost).
-const verdictFile = path.resolve("test-results", "e2e-edge-p0p1", process.env.EDGE_OUT ?? "default", "auth-verdicts.json");
-
-function readVerdicts(): Record<string, unknown> {
-  try {
-    return JSON.parse(readFileSync(verdictFile, "utf8")) as Record<string, unknown>;
-  } catch {
-    return {};
-  }
-}
-
-export function saveVerdict(key: string, value: unknown): void {
-  mkdirSync(path.dirname(verdictFile), { recursive: true });
-  writeFileSync(verdictFile, JSON.stringify({ ...readVerdicts(), [key]: value }, null, 2));
-}
-
-export function loadVerdict<T>(key: string): T {
-  const value = readVerdicts()[key];
-  if (value === undefined) throw new Error(`verdict "${key}" missing: run the whole file (the serial group records it)`);
-  return value as T;
 }

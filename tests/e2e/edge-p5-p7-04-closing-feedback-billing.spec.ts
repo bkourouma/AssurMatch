@@ -187,11 +187,12 @@ test("E-P7-02a avis : sans note, commentaire de 1001 caractères", async ({ brow
   const visitor = await appPage(browser, e2eEnv.publicUrl);
 
   // Server: no rating -> refused with the documented sentence (valid token, survey still open).
-  ensureRateBudget("consent_withdrawal", 5, 1, "E-P7-02a API without rating");
+  ensureRateBudget("satisfaction_survey_response", 5, 1, "E-P7-02a API without rating");
   const noRating = await publicCall("POST", `/satisfaction-surveys/${reference}`, { token: links.token, json: { comment: "sans note" } });
   note(`E-P7-02a API sans note -> ${noRating.status} ${withoutCorrelation(noRating.text).slice(0, 220)}`);
   expect(noRating.status, `survey without rating -> ${noRating.text.slice(0, 200)}`).toBeGreaterThanOrEqual(400);
-  expect(noRating.text).toContain("Rating must be an integer between 1 and 5");
+  expect(noRating.status).toBe(400);
+  expect(noRating.text).toContain("VALIDATION_FAILED");
 
   // Screen: "Choisissez une note de 1 à 5." and no request leaves the page.
   await visitor.goto(links.feedbackLink);
@@ -211,7 +212,7 @@ test("E-P7-02a avis : sans note, commentaire de 1001 caractères", async ({ brow
   note(`E-P7-02a commentaire de 1001 caractères saisi : le champ en garde ${typed.length}`);
   expect(typed.length).toBeLessThanOrEqual(1000);
   await visitor.getByLabel("4 - Satisfait").check({ force: true });
-  ensureRateBudget("consent_withdrawal", 5, 1, "E-P7-02a UI submit");
+  ensureRateBudget("satisfaction_survey_response", 5, 1, "E-P7-02a UI submit");
   const submitted = visitor.waitForRequest((request) => request.method() === "POST" && request.url().includes("/satisfaction-surveys/"));
   await visitor.getByRole("button", { name: "Envoyer mon avis" }).click();
   const sent = JSON.parse((await submitted).postData() ?? "{}") as { rating?: number; comment?: string };
@@ -256,7 +257,7 @@ test("E-P7-02b avis : lien rouvert, jeton falsifié, référence inconnue, secon
   expect(statusForged.text).toBe(statusOk.text);
   expect(statusUnknown.text).toBe(statusOk.text);
 
-  ensureRateBudget("consent_withdrawal", 5, 1, "E-P7-02b second POST");
+  ensureRateBudget("satisfaction_survey_response", 5, 1, "E-P7-02b second POST");
   const second = await publicCall("POST", `/satisfaction-surveys/${links.reference}`, { token: links.token, json: { rating: 1, comment: "second envoi", flaggedConcern: true } });
   expect(second.status, `second POST -> ${second.text.slice(0, 200)}`).toBe(200);
   const confirmation = second.body as { status?: string; alreadySubmitted?: boolean };
@@ -289,7 +290,7 @@ test("E-P7-02c note 1 ou case « signaler un problème » : alerte conformité c
     await expect(visitor.getByLabel("Je souhaite signaler un problème avec le courtier partenaire")).toBeVisible();
     await visitor.getByLabel(rating).check({ force: true });
     if (flag) await visitor.getByLabel("Je souhaite signaler un problème avec le courtier partenaire").check();
-    ensureRateBudget("consent_withdrawal", 5, 1, "E-P7-02c submit");
+    ensureRateBudget("satisfaction_survey_response", 5, 1, "E-P7-02c submit");
     await visitor.getByRole("button", { name: "Envoyer mon avis" }).click();
     await expect(visitor.getByText("Merci pour votre avis")).toBeVisible();
     await visitor.context().close();
@@ -376,17 +377,12 @@ test("E-P7-02d /desinscription : jeton absent, falsifié, valide ; les e-mails d
 });
 
 test("E-P7-02a (statut HTTP) une note absente ou un jeton falsifié sur POST doit être un refus client (4xx), pas une erreur serveur", async ({ browser }) => {
-  test.fail(true, "ANOMALIE E-P7-02a : POST /satisfaction-surveys/:ref répond 500 INTERNAL_ERROR pour une note absente (message « Rating must be an integer between 1 and 5 ») et pour un jeton falsifié ; une saisie ou un lien invalide est une erreur client (400/404)");
-  test.info().annotations.push({
-    type: "anomalie",
-    description: "E-P7-02a: satisfaction-surveys.service.ts:110-146 throw plain Error (UNAVAILABLE_MESSAGE / 'Rating must be an integer...') that the HTTP wiring (runtime-http-wiring.module.ts:1026-1033) does not map: 500 INTERNAL_ERROR instead of 400/404"
-  });
   const d = await lead(browser, "d");
   const links = await waitSurveyLinks(d.email);
-  ensureRateBudget("consent_withdrawal", 5, 2, "E-P7-02a statuses");
+  ensureRateBudget("satisfaction_survey_response", 5, 2, "E-P7-02a statuses");
   const noRating = await publicCall("POST", `/satisfaction-surveys/${links.reference}`, { token: links.token, json: { comment: "sans note" } });
   const forged = await publicCall("POST", `/satisfaction-surveys/${links.reference}`, { token: `${links.token.slice(0, -4)}AAAA`, json: { rating: 3 } });
-  note(`ANOMALIE E-P7-02a : POST sans note -> ${noRating.status} ${withoutCorrelation(noRating.text).slice(0, 160)} ; POST jeton falsifié -> ${forged.status} ${withoutCorrelation(forged.text).slice(0, 160)} (satisfaction-surveys.service.ts:110-146 ; runtime-http-wiring.module.ts:1026-1033 ne mappe pas ces erreurs)`);
+  note(`E-P7-02a : POST sans note -> ${noRating.status} ${withoutCorrelation(noRating.text).slice(0, 160)} ; POST jeton falsifié -> ${forged.status} ${withoutCorrelation(forged.text).slice(0, 160)}`);
   expect(noRating.status, `no rating -> ${noRating.text.slice(0, 200)}`).toBe(400);
   expect(forged.status, `forged token -> ${forged.text.slice(0, 200)}`).toBe(404);
 });
@@ -466,11 +462,6 @@ test("T-03 accès croisés visiteur par API : 404 VISITOR_ACCESS_DENIED « Quote
 });
 
 test("T-03 (documents d'un autre visiteur) la liste des pièces répond le même 404 neutre VISITOR_ACCESS_DENIED", async ({ browser }) => {
-  test.fail(true, "ANOMALIE T-03 : GET /quote-requests/:ref/documents refuse avec 404 NOT_FOUND « Quote request not found » (même corps pour tous les cas, donc aucun oracle) au lieu du 404 neutre VISITOR_ACCESS_DENIED « Quote status not available » des autres routes visiteur");
-  test.info().annotations.push({
-    type: "anomalie",
-    description: "T-03: quote-documents.service.ts:314-316 authenticate() throws Error('Quote request not found'); the other visitor routes answer VISITOR_ACCESS_DENIED (quote-submission.service.ts:145)"
-  });
   const a = await lead(browser, "a");
   const b = await lead(browser, "b");
   const path = `/quote-requests/${b.reference}/documents`;
@@ -612,22 +603,21 @@ test("E-P7-03 préparation : compte Finance Admin, tarif Starter CI, brouillon d
   expect(drafts[0]?.totalAmount, "draft of l4f is not empty").toBeGreaterThan(0);
 });
 
-test("E-P7-03 (rôle FA) le Finance Admin enregistre un tarif et recalcule les brouillons (scénario P7-03)", async ({ browser }) => {
-  test.fail(true, "ANOMALIE P7-03 : finance_admin n'a pas la permission billing:* (réservée au Super Admin) ; PUT /admin/billing/plans et POST /admin/billing/invoices/recompute répondent 403 au Finance Admin alors que le scénario et l'écran « Tarifs » / « Recalculer les brouillons » le lui proposent");
-  test.info().annotations.push({
-    type: "anomalie",
-    description: "P7-03: billing-plans.service.ts:126 and draft-invoice.service.ts:413 require 'billing:*', which finance_admin does not hold (assurmatch-role-matrix.ts:37); the screen answers « Action refusée: rôle Finance Admin ou Super Admin requis. » to a Finance Admin (apps/admin/app/billing/page.tsx:BILLING_NOTICES.forbidden)"
-  });
-  const plans = await financeApi(browser, "GET", "/admin/billing/plans");
-  const list = (Array.isArray(plans.body) ? plans.body : ((plans.body as { items?: unknown[] }).items ?? [])) as Array<{ plan: string; countryCode: string; monthlySubscription: number; perLeadPrice: number; setupFee?: number }>;
-  const starter = list.find((entry) => entry.plan === "starter" && entry.countryCode === "CI");
+test("E-P7-03 (rôle FA, H-A) le Finance Admin ne modifie ni les tarifs ni ne recalcule les brouillons : 403, aucune écriture (tarifs inchangés)", async ({ browser }) => {
+  type Plan = { plan: string; countryCode: string; monthlySubscription: number; perLeadPrice: number; setupFee?: number };
+  const listOf = (body: unknown): Plan[] => (Array.isArray(body) ? body : ((body as { items?: unknown[] }).items ?? [])) as Plan[];
+  const before = await adminApi(await adminSessionToken(browser, superAdminAccount()), "GET", "/admin/billing/plans");
+  const starter = listOf(before.body).find((entry) => entry.plan === "starter" && entry.countryCode === "CI");
   expect(starter, "starter/CI tariff").toBeDefined();
-  // Same values as today: nothing changes if the call were accepted.
-  const put = await financeApi(browser, "PUT", "/admin/billing/plans", { plan: "starter", countryCode: "CI", monthlySubscription: starter?.monthlySubscription ?? 0, perLeadPrice: starter?.perLeadPrice ?? 0, setupFee: starter?.setupFee ?? 0, reason: "Verification du droit FA (valeurs inchangees) lot 4" });
-  const recompute = await financeApi(browser, "POST", "/admin/billing/invoices/recompute", { partnerId: billingFirm.partnerId, reason: "Verification du droit FA lot 4" });
-  note(`ANOMALIE P7-03 : Finance Admin PUT tarif -> ${put.status} ${withoutCorrelation(put.text).slice(0, 140)} ; recalcul des brouillons -> ${recompute.status} ${withoutCorrelation(recompute.text).slice(0, 140)} (billing-plans.service.ts:126, draft-invoice.service.ts:413, assurmatch-role-matrix.ts:37)`);
-  expect(put.status, `FA tariff -> ${put.text.slice(0, 160)}`).toBeLessThan(300);
-  expect(recompute.status, `FA recompute -> ${recompute.text.slice(0, 160)}`).toBeLessThan(300);
+  // Same values as today: nothing would change even if the call were accepted.
+  const put = await financeApi(browser, "PUT", "/admin/billing/plans", { plan: "starter", countryCode: "CI", monthlySubscription: starter?.monthlySubscription ?? 0, perLeadPrice: starter?.perLeadPrice ?? 0, setupFee: starter?.setupFee ?? 0, reason: "Verification du droit FA (refus attendu) lot 9" });
+  const recompute = await financeApi(browser, "POST", "/admin/billing/invoices/recompute", { partnerId: billingFirm.partnerId, reason: "Verification du droit FA lot 9" });
+  note(`E-P7-03 (H-A) Finance Admin PUT tarif -> ${put.status} ${withoutCorrelation(put.text).slice(0, 140)} ; recalcul des brouillons -> ${recompute.status} ${withoutCorrelation(recompute.text).slice(0, 140)}`);
+  expect(put.status, `FA tariff -> ${put.text.slice(0, 160)}`).toBe(403);
+  expect(recompute.status, `FA recompute -> ${recompute.text.slice(0, 160)}`).toBe(403);
+  // No write happened: the tariff list read again is identical to the one read before the attempts.
+  const after = await adminApi(await adminSessionToken(browser, superAdminAccount()), "GET", "/admin/billing/plans");
+  expect(listOf(after.body), "tariffs unchanged after the refused FA calls").toEqual(listOf(before.body));
 });
 
 test("E-P7-03a brouillon vide -> 409 « Invoice conflict: empty_draft » ; billing_disabled et mentions légales : non exécutables", async ({ browser }) => {
@@ -744,19 +734,14 @@ test("E-P7-03b paiements refusés : reste dû dépassé, date future ; facture p
   // The owner of l4f sees it settled and can download the PDF.
   const broker = await visit(browser, billingFirm.owner, "/billing");
   await expect(broker.getByRole("table", { name: "Factures du cabinet" }).getByRole("row").filter({ hasText: invoice.number }).first()).toContainText("réglée");
-  await expect(broker.getByText("Aucun paiement en ligne, aucune prime d'assurance encaissee par AssurMatch.")).toBeVisible();
+  await expect(broker.getByText("aucune prime d'assurance encaissée par AssurMatch.")).toBeVisible();
 });
 
 test("P7-03 (libellé courtier) « Facturation manuelle: aucun paiement en ligne, aucune prime d'assurance encaissée par AssurMatch. »", async ({ browser }) => {
-  test.fail(true, "ANOMALIE P7-03 : le bandeau de /billing côté courtier vient de l'API sans accents (« encaissee », « reglement ») et ne reprend pas la phrase du scénario");
-  test.info().annotations.push({
-    type: "anomalie",
-    description: "P7-03: invoicing.service.ts:59-60 STATEMENT_NOTICE is ASCII ('Facturation manuelle: reglement par virement ... aucune prime d'assurance encaissee par AssurMatch.') and apps/broker/app/billing/page.tsx:124 shows account.data.notice instead of its accented fallback"
-  });
   const broker = await visit(browser, billingFirm.owner, "/billing");
   const text = (await broker.locator("main").innerText()).replace(/s+/gu, " ");
-  note(`ANOMALIE P7-03 bandeau courtier : « ${text.match(/Facturation manuelle[^.]*.[^.]*./u)?.[0] ?? "?"} » (invoicing.service.ts:59-60)`);
-  await expect(broker.getByText("Facturation manuelle: aucun paiement en ligne, aucune prime d'assurance encaissée par AssurMatch.")).toBeVisible({ timeout: 3_000 });
+  note(`P7-03 bandeau courtier : « ${text.match(/Facturation manuelle[^.]*.[^.]*./u)?.[0] ?? "?"} »`);
+  await expect(broker.getByText("Facturation manuelle: aucun paiement en ligne, aucune prime d'assurance encaissée par AssurMatch.")).toBeVisible();
 });
 
 test("E-P7-03c avoir sur facture non réglée (annulation) puis paiement sur facture annulée", async ({ browser }) => {
@@ -812,7 +797,7 @@ test("E-P7-03d /billing : rôles sans droit, sans MFA, agent courtier, facture d
 
   for (const [label, account] of [["compliance_admin", compliance], ["support_admin", support]] as const) {
     const page = await visit(browser, account, "/billing");
-    await expect(page.getByText("Accès billing refusé pour ce rôle admin.")).toBeVisible();
+    await expect(page.getByText("Votre rôle ne permet pas d'accéder à la facturation.")).toBeVisible();
     const token = await adminBearerToken(page);
     const list = await adminApi(token, "GET", "/admin/billing/issued-invoices");
     const issue = await adminApi(token, "POST", "/admin/billing/issued-invoices", { draftId: "00000000-0000-4000-8000-000000000000", reason: "Test de rôle lot 4" });
@@ -828,14 +813,14 @@ test("E-P7-03d /billing : rôles sans droit, sans MFA, agent courtier, facture d
   // Observation: a Finance Admin without country scope is refused by the whole screen (billing foundation needs a scope).
   const unscoped = await ensureAdminAccount(browser, "finance_admin", "l4finance");
   const unscopedPage = await visit(browser, unscoped, "/billing");
-  await expect(unscopedPage.getByText("Accès billing refusé pour ce rôle admin.")).toBeVisible();
+  await expect(unscopedPage.getByText("Aucun périmètre pays n'est affecté à votre compte : demandez-le à un administrateur plateforme.")).toBeVisible();
+  await expect(unscopedPage.getByText("Votre rôle ne permet pas d'accéder à la facturation.")).toHaveCount(0);
   const unscopedToken = await adminBearerToken(unscopedPage);
   const foundation = await adminApi(unscopedToken, "GET", "/admin/billing/foundation");
   const unscopedInvoices = await adminApi(unscopedToken, "GET", "/admin/billing/issued-invoices");
-  note(`E-P7-03d finance_admin sans périmètre pays : écran « Accès billing refusé pour ce rôle admin. » ; /foundation -> ${foundation.status} ${withoutCorrelation(foundation.text).slice(0, 120)} ; /issued-invoices -> ${unscopedInvoices.status} (billing-foundation.service.ts:135-137 missing_billing_scope : l'écran impute à tort le refus au rôle)`);
-  test.info().annotations.push({ type: "constat", description: "E-P7-03d: a Finance Admin created without country scope gets 'Accès billing refusé pour ce rôle admin.' (missing_billing_scope, billing-foundation.service.ts:135-137) although the role is right" });
+  note(`E-P7-03d finance_admin sans périmètre pays : écran « Aucun périmètre pays n'est affecté à votre compte... » ; /foundation -> ${foundation.status} ${withoutCorrelation(foundation.text).slice(0, 120)} ; /issued-invoices -> ${unscopedInvoices.status}`);
   expect(foundation.status).toBe(403);
-  expect(foundation.text).toContain("missing_billing_scope");
+  expect(foundation.text).toContain("BILLING_SCOPE_MISSING");
 
   // Without MFA: the password step only (no code): the app keeps the visitor on /mfa and the API refuses the token.
   const noMfa = await appPage(browser, e2eEnv.adminUrl);

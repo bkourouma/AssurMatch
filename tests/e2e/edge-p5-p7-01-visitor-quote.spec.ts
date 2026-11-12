@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { openAs } from "./support/backoffice";
+import { openAs } from "./support/edge-p5p7-login";
 import {
   DEFAULT_NEED,
   directQuote,
@@ -64,11 +64,6 @@ const captured = new Map<string, string>();
 
 async function capture(name: string, page: Page): Promise<void> {
   captured.set(name, await page.locator("body").innerText());
-}
-
-function anomaly(id: string, description: string): void {
-  test.info().annotations.push({ type: "anomalie", description: `${id} : ${description}` });
-  note(`ANOMALIE ${id} : ${description}`);
 }
 
 test.beforeAll(async ({ browser }) => {
@@ -273,9 +268,7 @@ test("E-P5-02d budget : un texte ne peut pas être saisi dans le champ nombre", 
   await visitor.close();
 });
 
-test("E-P5-02d anomalie : un budget négatif n'est pas refusé côté client", async ({ browser }) => {
-  test.fail(true, "ANOMALIE E-P5-02d : le budget négatif (-5) passe l'étape 1 sans message (aucun min sur le champ, validateNeed ne contrôle que l'obligation)");
-  anomaly("E-P5-02d", "budget négatif accepté par le client (quote-form.tsx:151-153 sans min ; quote-form.tsx:372-384 ne valide que les champs obligatoires)");
+test("E-P5-02d un budget négatif est refusé côté client dès l'étape 1", async ({ browser }) => {
   const visitor = await openVisitor(browser);
   const { page } = visitor;
   await openQuote(page, FR_QUOTE_PATH(offerId));
@@ -497,7 +490,9 @@ test("T-04 aucun dangerouslySetInnerHTML dans les apps hors le JSON-LD échappé
   const hits = filesContaining("dangerouslySetInnerHTML", ["apps/public/app", "apps/broker/app", "apps/admin/app", "packages/ui"]);
   note(`T-04 dangerouslySetInnerHTML : ${hits.join(", ") || "aucun"}`);
   expect(hits).toEqual(["apps/public/app/components/ui/json-ld.tsx"]);
-  expect(filesContaining('.replace(/</g, "\\u003c")', ["apps/public/app/components/ui"])).toEqual(["apps/public/app/components/ui/json-ld.tsx"]);
+  // The escape lives in the serializer used by json-ld.tsx (the former inline replace had no effect).
+  expect(filesContaining('.replace(/</g, "\\\\u003c")', ["apps/public/app/components/ui"])).toEqual(["apps/public/app/components/ui/json-ld-serialize.ts"]);
+  expect(filesContaining("serializeJsonLd(data)", ["apps/public/app/components/ui"])).toContain("apps/public/app/components/ui/json-ld.tsx");
 });
 
 test("E-P4-03c produit inconnu : « Demande de devis indisponible » et API 404/422 (équivalent, voyage est public ici)", async ({ browser }) => {
@@ -523,16 +518,14 @@ test("E-P4-03c produit inconnu : « Demande de devis indisponible » et API 404/
   });
   note(`E-P4-03c API produit inconnu -> ${result.status} ${result.text}`);
   evidence.unknownProduct = { status: result.status, text: result.text };
-  expect(result.text).toContain("Country or product is not available");
+  expect(result.status, `unknown product -> ${result.text}`).toBe(404);
+  expect(result.text).toContain("PRODUCT_NOT_FOUND");
 });
 
-test("E-P4-03c anomalie : un produit inconnu à l'envoi du devis répond 500 au lieu de 404/422", async () => {
-  test.fail(evidence.unknownProduct !== undefined && evidence.unknownProduct.status >= 500, "ANOMALIE E-P4-03c : POST /quote-requests sur un produit inconnu répond 500 (code COUNTRY_DISABLED) ; le scénario attend 404 ou 422");
+test("E-P4-03c un produit inconnu à l'envoi du devis répond 404 PRODUCT_NOT_FOUND (plus de 500)", async () => {
   expect(evidence.unknownProduct, "needs the E-P4-03c screen test").toBeDefined();
-  if ((evidence.unknownProduct?.status ?? 0) >= 500) {
-    anomaly("E-P4-03c", `produit inconnu -> HTTP ${evidence.unknownProduct?.status} ${evidence.unknownProduct?.text} (quote-submission.service.ts:316 throw Error brut ; error-response.filter.ts:119-131 sans motif « not available »)`);
-  }
-  expect([404, 422]).toContain(evidence.unknownProduct?.status);
+  expect(evidence.unknownProduct?.status).toBe(404);
+  expect(evidence.unknownProduct?.text).toContain("PRODUCT_NOT_FOUND");
 });
 
 test("E-P5-03i Voyage sans courtier : prémisse absente sur cette pile (le produit voyage est routable)", async () => {
@@ -601,20 +594,15 @@ test("E-P5-03g honeypot answers.website : qualification de la réponse, aucune d
   evidence.honeypot = { status: result.status, text: result.text };
   note(`E-P5-03g honeypot -> ${result.status} ${result.text}`);
   expect(result.text, "a blocked submission never carries a reference").not.toMatch(/QR-/u);
-  expect(result.status, "the blocked submission is not accepted").not.toBe(201);
-  expect(result.text).toContain("Spam submission blocked");
+  expect(result.status, "the blocked submission is a client error").toBe(400);
   // Nothing is e-mailed to the spammer.
   await new Promise((resolve) => setTimeout(resolve, 4_000));
   expect(await searchMessages(`to:"${identity.email}"`)).toHaveLength(0);
 });
 
-test("E-P5-03g anomalie : le honeypot répond en erreur serveur (5xx) au lieu d'un refus 4xx", async () => {
-  test.fail(evidence.honeypot !== undefined && evidence.honeypot.status >= 500, "ANOMALIE E-P5-03g : « Spam submission blocked » est lancé comme Error brute : aucun motif du filtre ne le classe, la réponse est un 500 INTERNAL_ERROR");
+test("E-P5-03g le honeypot répond un refus 400 (plus de 500)", async () => {
   expect(evidence.honeypot, "needs E-P5-03g qualification").toBeDefined();
-  if ((evidence.honeypot?.status ?? 0) >= 500) {
-    anomaly("E-P5-03g", `honeypot -> HTTP ${evidence.honeypot?.status} ${evidence.honeypot?.text} (backend/src/modules/quote-requests/public-anti-spam.service.ts:9 + common/filters/error-response.filter.ts:119-131)`);
-  }
-  expect(evidence.honeypot?.status).toBeLessThan(500);
+  expect(evidence.honeypot?.status).toBe(400);
 });
 
 test("E-P5-02e qualification : taille de answers acceptée (10 000, 90 000, 200 000 caractères) et champs obligatoires absents", async () => {
@@ -641,31 +629,22 @@ test("E-P5-02e qualification : taille de answers acceptée (10 000, 90 000, 200 
   expect(bare.status, "no server error").toBeLessThan(500);
 });
 
-test("E-P5-02e anomalie : un corps trop volumineux (200 000 caractères) répond 500 au lieu de 413", async () => {
-  test.fail(evidence.answers200k !== undefined && evidence.answers200k.status >= 500, "ANOMALIE E-P5-02e : POST /quote-requests de 200 000 caractères répond 500 INTERNAL_ERROR « request entity too large » (erreur du body parser non reconnue comme 413)");
+test("E-P5-02e un corps trop volumineux (200 000 caractères) répond 413 PAYLOAD_TOO_LARGE", async () => {
   expect(evidence.answers200k, "needs E-P5-02e qualification").toBeDefined();
-  if ((evidence.answers200k?.status ?? 0) >= 500) {
-    anomaly("E-P5-02e", `corps > 100 kb -> HTTP ${evidence.answers200k?.status} ${evidence.answers200k?.text} (error-response.filter.ts:119-131 : l'erreur body-parser porte status 413 mais n'est pas une HttpException, donc 500)`);
-  }
   expect(evidence.answers200k?.status, "an oversized body is a client error").toBe(413);
+  expect(evidence.answers200k?.text).toContain("PAYLOAD_TOO_LARGE");
 });
 
-test("E-P5-02e anomalie : answers n'a aucune borne côté serveur", async () => {
-  test.fail(evidence.answers90k !== undefined && evidence.answers90k.status === 201, "ANOMALIE E-P5-02e : 90 000 caractères dans un seul champ sont acceptés (201) ; seule la limite de corps HTTP de 100 kb arrête l'envoi");
+test("E-P5-02e answers est borné côté serveur (90 000 caractères refusés)", async () => {
   expect(evidence.answers90k, "needs E-P5-02e qualification").toBeDefined();
-  if (evidence.answers90k?.status === 201) {
-    anomaly("E-P5-02e", `answers non borné : 10 000 -> ${evidence.answers10k?.status}, 90 000 -> ${evidence.answers90k.status}, 200 000 -> ${evidence.answers200k?.status} (packages/shared/contracts/quote.contracts.ts:288 z.record(z.string(), z.unknown()))`);
-  }
-  expect(evidence.answers90k?.status, "a bounded API refuses an oversized free field").toBeGreaterThanOrEqual(400);
+  expect(evidence.answers90k?.status, "a bounded API refuses an oversized free field").toBe(422);
+  expect(evidence.answers90k?.text).toContain("VALIDATION_FAILED");
 });
 
-test("E-P5-02e anomalie : les champs obligatoires du produit ne sont pas contrôlés côté serveur", async () => {
-  test.fail(evidence.missingRequired !== undefined && evidence.missingRequired.status === 201, "ANOMALIE E-P5-02e : POST /quote-requests sans vehicle_use, city ni contact_preference est accepté (201)");
+test("E-P5-02e les champs obligatoires du produit sont contrôlés côté serveur (422 VALIDATION_FAILED)", async () => {
   expect(evidence.missingRequired, "needs E-P5-02e qualification").toBeDefined();
-  if (evidence.missingRequired?.status === 201) {
-    anomaly("E-P5-02e", "demande sans réponses obligatoires acceptée par l'API (aucun contrôle de required du formulaire publié : quote-submission.service.ts:297-367)");
-  }
-  expect(evidence.missingRequired?.status, "the server enforces the required answers of the published form").toBeGreaterThanOrEqual(400);
+  expect(evidence.missingRequired?.status, "the server enforces the required answers of the published form").toBe(422);
+  expect(evidence.missingRequired?.text).toContain("VALIDATION_FAILED");
 });
 
 test("E-P5-02d + T-04 XSS dans marque, ville et prénom : accepté, jamais exécuté (écran, suivi, e-mails, courtier, admin)", async ({ browser }) => {
@@ -742,19 +721,19 @@ function assertMailEscaped(mail: MailMessage, label: string): void {
   note(`E-P5-02d ${label} : sujet « ${mail.Subject} » ; charge reprise dans le corps : ${escaped ? "oui, echappee" : "non"}`);
 }
 
-test("E-P5-02d + T-05 chaînes SQL et budget négatif dans le devis : acceptés comme une saisie banale, aucun 500", async ({ browser }) => {
+test("E-P5-02d + T-05 chaînes SQL dans le devis : acceptées comme une saisie banale, aucun 500", async ({ browser }) => {
   test.setTimeout(10 * 60_000);
   const identity = visitorIdentity("l4sql", { firstName: "Robert'); DROP TABLE users;--" });
   const visitor = await openVisitor(browser);
   const { page } = visitor;
-  await reachConsent(visitor, identity, { use: "prive", brand: SQL_DROP, city: SQL_OR, contact: "email", budget: "-5" });
+  await reachConsent(visitor, identity, { use: "prive", brand: SQL_DROP, city: SQL_OR, contact: "email", budget: "250000" });
   await expect(page.locator(".am-quote-review")).toContainText(SQL_DROP);
   const response = await sendFromConsent(page);
   expect(response.status(), await response.text()).toBe(201);
   const reference = await confirmedReference(page);
   expect(reference).toMatch(/^QR-\d{4}-[A-Z0-9]{8}$/u);
   const message = (await page.locator(FINEPRINT).first().innerText()).trim();
-  note(`T-05 devis SQL : ${reference}, budget -5 accepte par le serveur (201), message "${message}"`);
+  note(`T-05 devis SQL : ${reference}, budget 250000, message "${message}"`);
   expect(message, "same confirmation as an ordinary input").toBe(captured.get("confirmation-message") ?? message);
   await visitor.close();
 
@@ -767,8 +746,6 @@ test("E-P5-02d + T-05 chaînes SQL et budget négatif dans le devis : acceptés 
   const refs = await leadReferences(brokerPage);
   expect(refs, "the new lead is listed").toContain(reference);
   expect(refs, "the earlier (XSS) lead is still listed").toContain(evidence.xss?.reference ?? "missing");
-  const budgetShown = await brokerPage.goto(`/leads/${assignmentId}`).then(() => brokerPage.locator("main").innerText());
-  note(`T-05 budget -5 sur la fiche courtier : ${/-\s?5/u.test(budgetShown) ? "affiche" : "non affiche"}`);
   await brokerPage.context().close();
 });
 
@@ -833,7 +810,7 @@ test("E-P5-03c double clic sur « Envoyer ma demande » : une seule demande", as
   await visitor.close();
 });
 
-test("E-P5-03d doublon sous 30 jours : message du serveur, aucun second lead ni e-mail", async ({ browser }) => {
+test("E-P5-03d doublon sous 30 jours : « demande déjà reçue », ni référence ni lien, aucun second lead ni e-mail", async ({ browser }) => {
   test.setTimeout(10 * 60_000);
   expect(evidence.sent, "needs E-P5-03c").toBeDefined();
   const sent = evidence.sent as NonNullable<typeof evidence.sent>;
@@ -841,17 +818,22 @@ test("E-P5-03d doublon sous 30 jours : message du serveur, aucun second lead ni 
   const { page } = visitor;
   await reachConsent(visitor, sent.identity);
   const response = await sendFromConsent(page);
-  const body = (await response.json()) as { publicReference: string; status: string; routed: boolean; verificationToken: string; message: string };
-  note(`E-P5-03d API doublon -> ${response.status()} ${JSON.stringify({ ...body, verificationToken: body.verificationToken === "duplicate" ? "duplicate" : "<jeton>" })}`);
+  const body = (await response.json()) as { publicReference?: string; status: string; routed?: boolean; verificationToken?: string; message?: string };
+  note(`E-P5-03d API doublon -> ${response.status()} ${JSON.stringify({ ...body, verificationToken: body.verificationToken ? "<jeton>" : undefined })}`);
   expect(response.status()).toBe(201);
-  expect(body.status).toBe("duplicate");
-  expect(body.routed).toBe(false);
-  const duplicateText = "Une demande récente similaire existe déjà; aucun courtier partenaire n'est notifié une seconde fois.";
+  expect(body.status).toBe("duplicate_ignored");
+  expect(body.publicReference ?? "", "no reference for an ignored duplicate").toBe("");
+  expect(body.verificationToken ?? "", "no token for an ignored duplicate").toBe("");
+  const duplicateText = "Votre demande a déjà été reçue. Consultez l'e-mail de confirmation pour son suivi.";
   await expect(page.getByText(duplicateText)).toBeVisible();
-  const reference = await confirmedReference(page);
-  const href = (await page.getByRole("link", { name: /Suivre ma demande/u }).first().getAttribute("href")) ?? "";
-  evidence.duplicate = { reference, message: duplicateText, href };
-  note(`E-P5-03d ecran : reference affichee « ${reference} », lien « ${href} »`);
+  await expect(page.locator(".am-j-reference__value")).toHaveCount(0);
+  const bodyText = await page.locator("main").innerText();
+  expect(bodyText.toLowerCase(), "the word duplicate is never shown").not.toContain("duplicate");
+  expect(bodyText).not.toContain("Référence publique");
+  const links = await page.locator("a[href*='token=']").count();
+  expect(links, "no tracking link with a token is offered").toBe(0);
+  evidence.duplicate = { reference: "", message: duplicateText, href: "" };
+  note("E-P5-03d ecran : message « demande déjà reçue », aucune référence, aucun lien de suivi");
   await page.screenshot({ path: "test-results/edge-p5p7-01/evidence-E-P5-03d-duplicate.png" });
   await visitor.close();
 
@@ -863,27 +845,6 @@ test("E-P5-03d doublon sous 30 jours : message du serveur, aucun second lead ni 
   await new Promise((resolve) => setTimeout(resolve, 5_000));
   const mails = (await searchMessages(`to:"${sent.identity.email}"`)).filter((mail) => /bien reçue/iu.test(mail.Subject));
   expect(mails, "no second confirmation e-mail").toHaveLength(1);
-});
-
-test("E-P5-03d le lien de suivi du doublon ne mène à aucune demande (écran neutre)", async ({ browser }) => {
-  expect(evidence.duplicate, "needs E-P5-03d").toBeDefined();
-  const visitor = await openVisitor(browser);
-  const { page } = visitor;
-  // A token of 8 characters is below the 16-character floor: it does not count against the 60 views per hour.
-  await page.goto(evidence.duplicate?.href ?? "/");
-  await expect(page.getByText("Ce lien de suivi ne permet pas d'afficher une demande")).toBeVisible();
-  await expect(page.getByRole("link", { name: "Recevoir un nouveau lien" }).first()).toBeVisible();
-  note(`E-P5-03d lien « ${new URL(page.url()).pathname}${new URL(page.url()).search} » -> ecran neutre`);
-  await visitor.close();
-});
-
-test("E-P5-03d anomalie : la référence affichée au visiteur est « duplicate » et son lien est mort", async () => {
-  test.fail(evidence.duplicate !== undefined && evidence.duplicate.reference === "duplicate", "ANOMALIE E-P5-03d : la confirmation affiche « Référence publique : duplicate » et propose un lien ?token=duplicate qui ne mène à rien");
-  expect(evidence.duplicate, "needs E-P5-03d").toBeDefined();
-  if (evidence.duplicate?.reference === "duplicate") {
-    anomaly("E-P5-03d", `référence affichée « duplicate », lien « ${evidence.duplicate.href} » (quote-submission.service.ts:1160-1167 duplicateConfirmation ; quote-form.tsx:613-616 et 649-660 affichent la valeur telle quelle)`);
-  }
-  expect(evidence.duplicate?.reference, "the visitor is shown a real public reference or no reference at all").toMatch(/^QR-\d{4}-[A-Z0-9]{8}$/u);
 });
 
 test("E-P5-03j + I18N-01/02/03 parcours en anglais jusqu'à la confirmation", async ({ browser }) => {
@@ -913,10 +874,10 @@ test("E-P5-03j + I18N-01/02/03 parcours en anglais jusqu'à la confirmation", as
   expect(reference).toMatch(/^QR-\d{4}-[A-Z0-9]{8}$/u);
   await expect(page.getByText(`Your request has been sent to ${firm.partnerName}.`)).toBeVisible();
 
-  // I18N-03: the server sentence stays French and is marked lang="fr" (H15).
-  const sentence = page.locator("section.am-j-sent .am-j-fineprint span[lang='fr']");
-  await expect(sentence).toContainText("Votre demande indicative a été transmise au courtier partenaire identifié.");
-  note("I18N-03 phrase de confirmation du serveur en francais sur /en, balisee lang=fr (H15, ui/backend-text.tsx:12)");
+  // I18N-03: since lot 7 the server sentence is no longer shown on /en: an English sentence replaces it (H15 closed).
+  await expect(page.locator("section.am-j-sent .am-j-fineprint").first()).toContainText("Request transmitted according to your consent.");
+  await expect(page.locator("section.am-j-sent [lang='fr']")).toHaveCount(0);
+  note("I18N-03 phrase de confirmation en anglais sur /en (api.quoteTransmitted), plus de texte serveur francais");
   await capture("confirmation-en", page);
   expect(await page.locator("html").getAttribute("lang")).toBe("en");
 

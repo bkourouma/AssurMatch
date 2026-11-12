@@ -5,20 +5,18 @@ import { EDGE_REASON, createAdminAccount, sharedSuperAdmin, userIdByEmail, type 
 import {
   adminContext,
   adminCookie,
-  anomaly,
   classifyText,
   currentCode,
-  hypothesis,
   inviteAdmin,
   noticeTexts,
   observations,
   observe,
   passwordStep,
-  loadVerdict,
-  saveVerdict,
+  resilientLogin,
   submitActivation
 } from "./support/edge-p0p1-auth-support";
 import { e2eEnv } from "./support/env";
+import { extractLink, messageIdsTo, waitForMail } from "./support/mailpit";
 import { closeSessions, sessionPage } from "./support/pro-roles";
 import { adminBearerToken } from "./support/recos-062b";
 import { loadJourneyState, requireState } from "./support/journey-state";
@@ -29,6 +27,8 @@ import { uniqueSuffix } from "./support/ui";
 // Every failing attempt targets a THROWAWAY account created here; shared accounts only log in validly.
 
 
+const INVALID_TOKEN = { status: 400, codes: ["INVALID_TOKEN", "VALIDATION_FAILED"] };
+const PASSWORD_POLICY = { status: 400, codes: ["PASSWORD_POLICY"] };
 const WRONG_PASSWORD = "Mauvais-mot-de-passe-1!";
 const GOOD_NEW_PASSWORD = `E2e-Inv-${Math.random().toString(36).slice(2, 10)}-Pw!7`;
 
@@ -70,10 +70,16 @@ test("E-P0-01a mauvais mot de passe: pas de session, message identique pour un e
   const ghost = await passwordStep(unknown, `inconnu.${uniqueSuffix()}@e2e.assurmatch.test`, WRONG_PASSWORD);
   observe("E-P0-01a", "compte existant", `${wrong.result.url.pathname}${wrong.result.url.search} | ${wrong.result.notices.join(" / ")}`);
   observe("E-P0-01a", "e-mail inexistant", `${ghost.result.url.pathname}${ghost.result.url.search} | ${ghost.result.notices.join(" / ")}`);
-  anomaly(
-    "MINEURE (UX): un mauvais mot de passe repond 400 VALIDATION_FAILED 'Invalid credentials' (backend auth.module.ts:96/113, converti par error-response.filter.ts:119-131) au lieu de 401; " +
-      "l'ecran affiche donc 'Vérifiez le format de l'email et du mot de passe.' (error=validation_error) alors que le format est correct. Message non revelateur (OK) mais trompeur; correctif: lever UnauthorizedException et afficher 'Identifiants invalides'."
-  );
+  // Fixed (lots 5 and 7): 401 INVALID_CREDENTIALS and a readable notice, identical for a known and an unknown e-mail.
+  const apiKnown = await api(undefined, "POST", "/auth/login", { email: main.email, password: WRONG_PASSWORD });
+  const apiGhost = await api(undefined, "POST", "/auth/login", { email: `inconnu.${uniqueSuffix()}@e2e.assurmatch.test`, password: WRONG_PASSWORD });
+  observe("E-P0-01a", "API mauvais mot de passe (existant / inexistant)", `${apiKnown.status} ${apiKnown.text.slice(0, 100)} / ${apiGhost.status} ${apiGhost.text.slice(0, 100)}`);
+  expect(apiKnown.status, apiKnown.text).toBe(401);
+  expect(apiGhost.status, apiGhost.text).toBe(401);
+  expect(rec(apiKnown.body).code).toBe("INVALID_CREDENTIALS");
+  expect(rec(apiGhost.body).code).toBe("INVALID_CREDENTIALS");
+  expect(wrong.result.notices, "readable message").toEqual(["Identifiants invalides."]);
+  expect(wrong.result.url.searchParams.get("error")).toBe("invalid_credentials");
   expect(wrong.result.hasSession, "no session cookie after a wrong password").toBe(false);
   expect(ghost.result.hasSession).toBe(false);
   expect(wrong.result.url.searchParams.get("error"), "an error is signalled").toBeTruthy();
@@ -127,9 +133,7 @@ test("E-P0-01d /mfa: mauvais code 000000, on reste sur /mfa, aucune session MFA"
   await page.goto(`${e2eEnv.adminUrl}/feature-flags`);
   const afterUrl = new URL(page.url());
   observe("E-P0-01d", "ouverture de /feature-flags avec une session sans MFA", `${afterUrl.pathname}${afterUrl.search} | ${(await noticeTexts(page)).join(" / ") || "aucun avis affiche"}`);
-  if (new URL(page.url()).searchParams.get("reason") === "mfa_required" && (await noticeTexts(page)).length === 0) {
-    anomaly("MINEURE (UX): redirection /login?reason=mfa_required sans aucun avis (login/page.tsx ne gere que error=mfa_required et mfa=required, pas reason=mfa_required; middleware.ts:loginUrl).");
-  }
+  expect((await noticeTexts(page)).join(" "), "the redirection explains that a second factor is required").toMatch(/deux étapes|MFA|vérification/iu);
   expect(afterUrl.pathname).toBe("/login");
   await context.close();
 });
@@ -179,7 +183,7 @@ test("E-P0-01g session absente puis expiree: motifs de redirection et retour a l
   expect(url.searchParams.get("returnTo")).toBe("/feature-flags");
   await expect(page.getByText("Votre session a expiré. Connectez-vous à nouveau.")).toBeVisible();
 
-  await login(page, superAdmin, "/feature-flags");
+  await resilientLogin(page, superAdmin, "/feature-flags");
   await page.waitForURL((target) => target.pathname === "/feature-flags");
   expect(new URL(page.url()).pathname, "back on the requested page after login + MFA").toBe("/feature-flags");
   await context.close();
@@ -205,16 +209,18 @@ test("E-P0-01h un compte broker valide sur l'app admin: access_denied, aucune se
   if (token) {
     const probe = await api(token, "GET", "/admin/users?page=1&pageSize=1");
     observe("E-P0-01h", "API /admin/users avec le jeton du courtier", `${probe.status} ${probe.text.slice(0, 300)}`);
+    expect(probe.text).not.toMatch(/passwordHash|mfaSecretEncrypted|mfaBackupCodesHashes|passwordResetTokenHash/u);
     for (const path of ["/admin/feature-flags", "/admin/audit-logs", "/admin/operations/audit-logs?pageSize=1", "/admin/partners"]) {
       const other = await api(token, "GET", path);
       observe("E-P0-01h", `API ${path} avec le jeton du courtier`, `${other.status} ${other.text.slice(0, 160)}`);
+      expect([401, 403], `${path}: ${other.text.slice(0, 120)}`).toContain(other.status);
     }
+    // H-B (retained): a broker token no longer reads /admin/users (the team list stays on /broker/team) and never sees secrets.
     const wide = await api(token, "GET", "/admin/users?page=1&pageSize=100");
-    const rows = itemsOfBody(wide.body);
-    const foreign = rows.filter((row) => row.partnerTenantId !== (rows[0] ?? {}).partnerTenantId || !String(row.roles).startsWith("broker_"));
-    observe("E-P0-01h", "GET /admin/users avec un jeton courtier", `${wide.status}, ${rows.length} ligne(s), lignes hors tenant ou non courtier=${foreign.length}`);
-    hypothesis("GET /admin/users repond 200 a un jeton courtier (liste limitee a son tenant): lecture d'equipe voulue ou a fermer, a trancher par le produit.");
-    expect(foreign, "the broker token only sees its own tenant, never an admin account").toHaveLength(0);
+    observe("E-P0-01h", "GET /admin/users avec un jeton courtier", `${wide.status} ${wide.text.slice(0, 120)}`);
+    expect([401, 403], wide.text).toContain(wide.status);
+    expect(wide.text).not.toMatch(/passwordHash|mfaSecretEncrypted|mfaBackupCodesHashes|passwordResetTokenHash/u);
+    expect(rec(wide.body).code).toBe("RBAC_DENIED");
     const flags = await api(token, "GET", "/admin/feature-flags");
     expect([401, 403]).toContain(flags.status);
     const partners = await api(token, "GET", "/admin/partners");
@@ -228,7 +234,8 @@ test("Verrouillage admin: 5 echecs -> locked, le bon mot de passe est refuse, de
   for (let attempt = 0; attempt < 5; attempt += 1) {
     const result = await api(undefined, "POST", "/auth/login", { email: lock.email, password: `${WRONG_PASSWORD}${attempt}` });
     statuses.push(`${result.status}`);
-    expect(result.status).toBeGreaterThanOrEqual(400);
+    expect(result.status, result.text).toBe(401);
+    expect(rec(result.body).code).toBe("INVALID_CREDENTIALS");
   }
   observe("Verrouillage", "statuts des 5 echecs", statuses.join(","));
   const token = await saToken();
@@ -239,20 +246,18 @@ test("Verrouillage admin: 5 echecs -> locked, le bon mot de passe est refuse, de
 
   const direct = await api(undefined, "POST", "/auth/login", { email: lock.email, password: lock.password });
   observe("Verrouillage", "bon mot de passe via l'API", `${direct.status} ${direct.text.slice(0, 120)}`);
-  expect(direct.status).toBeGreaterThanOrEqual(400);
+  // H-C (retained): anti-enumeration, the locked account answers like a wrong password (401 INVALID_CREDENTIALS), no "Compte verrouillé" notice.
+  expect(direct.status, direct.text).toBe(401);
+  expect(rec(direct.body).code).toBe("INVALID_CREDENTIALS");
 
   const context = await adminContext(browser);
   const { result, page } = await passwordStep(context, lock.email, lock.password);
   const lockedNotice = result.notices.some((text) => /Compte verrouill/u.test(text));
   observe("Verrouillage", "bon mot de passe via l'ecran", `${result.url.pathname}${result.url.search} | ${result.notices.join(" / ")} | avis "Compte verrouille" affiche=${lockedNotice}`);
   expect(result.hasSession).toBe(false);
-  expect(result.url.searchParams.get("error")).toBeTruthy();
-  if (!lockedNotice) {
-    hypothesis(
-      "Le backend repond 401 'Invalid credentials' pour un compte locked (auth.module.ts:102-104) alors que l'app admin n'affiche l'avis 'Compte verrouille' que sur 423 " +
-        "(admin-api.ts:64, login/page.tsx:30): l'avis n'est jamais affiche; message generique volontaire (anti-enumeration) ou avis mort a trancher par le produit."
-    );
-  }
+  expect(result.url.searchParams.get("error")).toBe("invalid_credentials");
+  expect(result.notices).toEqual(["Identifiants invalides."]);
+  expect(lockedNotice, "no account-locked notice (anti-enumeration)").toBe(false);
   await context.close();
 
   // Unlock through /users/[userId] (restorative action, plain form).
@@ -285,13 +290,19 @@ test("Compte suspendu: statut et texte de la connexion, puis reactivation", asyn
   try {
     const direct = await api(undefined, "POST", "/auth/login", { email: susp.email, password: susp.password });
     observe("Suspendu", "API POST /auth/login", `${direct.status} ${direct.text.slice(0, 200)}`);
-    saveVerdict("suspendedLogin", { status: direct.status, text: direct.text.slice(0, 160) });
-    expect(direct.status, "a suspended account never gets a token").toBeGreaterThanOrEqual(400);
+    // H-C: 403 ACCOUNT_SUSPENDED only after the correct password (never a 500).
+    expect(direct.status, "a suspended account never gets a token (and never a 5xx)").toBe(403);
+    expect(rec(direct.body).code).toBe("ACCOUNT_SUSPENDED");
+    const wrongPw = await api(undefined, "POST", "/auth/login", { email: susp.email, password: WRONG_PASSWORD });
+    observe("Suspendu", "API mauvais mot de passe sur compte suspendu", `${wrongPw.status} ${wrongPw.text.slice(0, 120)}`);
+    expect(wrongPw.status, "the suspension is not revealed without the right password").toBe(401);
+    expect(rec(wrongPw.body).code).toBe("INVALID_CREDENTIALS");
     const context = await adminContext(browser);
     const { result } = await passwordStep(context, susp.email, susp.password);
     observe("Suspendu", "ecran de connexion", `${result.url.pathname}${result.url.search} | ${result.notices.join(" / ")}`);
     expect(result.hasSession).toBe(false);
     expect(result.url.searchParams.get("error")).toBeTruthy();
+    expect(classifyText(result.notices.join(" ")), "readable notice").toMatch(/^\(c\)/u);
     await context.close();
   } finally {
     await openAs(saPage, superAdmin, `/users/${userId}?tab=actions`);
@@ -314,26 +325,26 @@ test("T-09 messages d'authentification reellement affiches (admin)", async ({ br
   const context = await adminContext(browser);
   const rows: Array<{ cas: string; ecran: string; api: string; classe: string }> = [];
 
-  const probe = async (cas: string, tok: string, pw: string, mustRefuse = true) => {
+  const probe = async (cas: string, tok: string, pw: string, expected: { status: number; codes: string[] }) => {
     const ui = await submitActivation(context, tok, pw);
     const direct = await api(undefined, "POST", "/auth/activate", { token: tok, password: pw });
     const ecran = `${ui.url.pathname} | ${ui.notices.join(" / ")}`;
     rows.push({ cas, ecran, api: `${direct.status} ${direct.text.slice(0, 100)}`, classe: classifyText(ui.notices.join(" ")) });
-    if (mustRefuse) {
-      expect(ui.hasSession, `${cas}: no session`).toBe(false);
-      expect(ui.url.pathname, `${cas}: no MFA step`).not.toMatch(/^\/mfa/u);
-      expect(direct.status, `${cas}: API refuses`).toBeGreaterThanOrEqual(400);
-    }
+    expect(ui.hasSession, `${cas}: no session`).toBe(false);
+    expect(ui.url.pathname, `${cas}: no MFA step`).not.toMatch(/^\/mfa/u);
+    expect(direct.status, `${cas}: API refuses (${direct.text.slice(0, 120)})`).toBe(expected.status);
+    expect(expected.codes, `${cas}: error code ${String(rec(direct.body).code)}`).toContain(String(rec(direct.body).code));
+    expect(classifyText(ui.notices.join(" ")), `${cas}: readable notice (${ui.notices.join(" / ")})`).toMatch(/^\(c\)/u);
     await ui.page.close();
     return { ui, direct };
   };
 
-  const forged = await probe("jeton falsifie (aleatoire) + mot de passe valide", `forge-${uniqueSuffix()}-${"x".repeat(40)}`, GOOD_NEW_PASSWORD);
-  const tampered = await probe("jeton valide modifie d'un caractere", flipped, GOOD_NEW_PASSWORD);
-  await probe("jeton mal forme (caracteres speciaux)", "!!!\"><img src=x onerror=alert(1)>", GOOD_NEW_PASSWORD);
-  await probe("jeton mal forme (3000 caracteres)", "a".repeat(3000), GOOD_NEW_PASSWORD);
-  await probe("mot de passe de la liste noire (assurmatch123), jeton valide", token, "assurmatch123");
-  await probe("mot de passe egal a l'e-mail, jeton valide", token, invite.email);
+  const forged = await probe("jeton falsifie (aleatoire) + mot de passe valide", `forge-${uniqueSuffix()}-${"x".repeat(40)}`, GOOD_NEW_PASSWORD, INVALID_TOKEN);
+  const tampered = await probe("jeton valide modifie d'un caractere", flipped, GOOD_NEW_PASSWORD, INVALID_TOKEN);
+  await probe("jeton mal forme (caracteres speciaux)", "!!!\"><img src=x onerror=alert(1)>", GOOD_NEW_PASSWORD, INVALID_TOKEN);
+  await probe("jeton mal forme (3000 caracteres)", "a".repeat(3000), GOOD_NEW_PASSWORD, INVALID_TOKEN);
+  await probe("mot de passe de la liste noire (assurmatch123), jeton valide", token, "assurmatch123", PASSWORD_POLICY);
+  await probe("mot de passe egal a l'e-mail, jeton valide", token, invite.email, PASSWORD_POLICY);
 
   // The two refusals above must not have consumed the token: a good password still activates the account.
   const good = await submitActivation(await adminContext(browser), token, GOOD_NEW_PASSWORD);
@@ -351,8 +362,12 @@ test("T-09 messages d'authentification reellement affiches (admin)", async ({ br
     api: `${reusedApi.status} ${reusedApi.text.slice(0, 100)}`,
     classe: classifyText(reusedUi.notices.join(" "))
   });
-  const reusedAccepted = reusedUi.hasSession || reusedApi.status < 300;
   await reusedContext.close();
+  // One-shot token (lot 5): refused once consumed, same neutral answer as a forged token.
+  expect(reusedUi.hasSession, "a consumed activation token opens no session").toBe(false);
+  expect(reusedApi.status, reusedApi.text).toBe(400);
+  expect(rec(reusedApi.body).code).toBe("INVALID_TOKEN");
+  expect(reusedUi.notices, "used token and tampered token are refused without distinction").toEqual(tampered.ui.notices);
 
   const resetContext = await adminContext(browser);
   const resetPage = await resetContext.newPage();
@@ -370,12 +385,11 @@ test("T-09 messages d'authentification reellement affiches (admin)", async ({ br
 
   console.table(rows);
   for (const row of rows) observe("T-09", row.cas, `ecran=[${row.ecran}] api=[${row.api}] classe=${row.classe}`);
-  saveVerdict("activationReuse", { accepted: reusedAccepted, session: reusedUi.hasSession, apiStatus: reusedApi.status, notices: reusedUi.notices, tamperedNotices: tampered.ui.notices });
   expect(forged.ui.notices, "forged and tampered tokens are refused without distinction").toEqual(tampered.ui.notices);
   const raw = rows.filter((row) => row.classe.startsWith("(a)"));
-  if (raw.length > 0) {
-    anomaly(`MINEURE (UX): ${raw.length} message(s) d'authentification bruts affiches a l'ecran (${raw.map((row) => row.ecran.split("| ")[1]).join(" ; ")}). Source: apps/admin/app/lib/auth-flow-actions.ts:27-56, admin-api.ts:1229-1243.`);
-  }
+  expect(raw.map((row) => row.ecran), "no raw technical message is shown to the user").toEqual([]);
+  expect(resetApi.status, resetApi.text).toBe(400);
+  expect(rec(resetApi.body).code).toBe("INVALID_TOKEN");
 });
 
 test("T-01 (partie auth) les actions d'authentification sont journalisees pour les comptes jetables", async () => {
@@ -422,13 +436,48 @@ test("T-01 (partie auth) les actions d'authentification sont journalisees pour l
   await expect(saPage.getByText("user.locked_after_failed_logins").first()).toBeVisible();
 });
 
+test("T-09b jeton de reinitialisation: usage unique, la suspension survit a une reinitialisation", async () => {
+  const token = await saToken();
+  const userId = await userIdByEmail(token, susp.email);
+  const issue = async (): Promise<string> => {
+    const before = await messageIdsTo(susp.email);
+    const issued = await api(token, "POST", `/admin/users/${userId}/password-reset`, { reason: EDGE_REASON });
+    expect(issued.status, issued.text).toBeLessThan(300);
+    const mail = await waitForMail({ to: susp.email, body: /password-reset[?]token=/u, exclude: before });
+    return new URL(extractLink(mail, /password-reset[?]token=/u)).searchParams.get("token") as string;
+  };
+  const newPassword = `E2e-Rst-${Math.random().toString(36).slice(2, 10)}-Pw!7`;
+
+  // 1. a token issued, then the account is suspended: the reset is accepted (H-I: a reset is not an unlock) but the suspension is kept.
+  const first = await issue();
+  expect((await api(token, "POST", `/admin/users/${userId}/suspend`, { reason: EDGE_REASON })).status).toBeLessThan(300);
+  try {
+    const consumed = await api(undefined, "POST", "/auth/password-reset", { token: first, newPassword });
+    observe("T-09b", "jeton de reinitialisation, compte suspendu", `${consumed.status} ${consumed.text.slice(0, 100)}`);
+    expect(consumed.status, consumed.text).toBeLessThan(300);
+    const login = await api(undefined, "POST", "/auth/login", { email: susp.email, password: newPassword });
+    observe("T-09b", "connexion avec le nouveau mot de passe, compte toujours suspendu", `${login.status} ${login.text.slice(0, 100)}`);
+    expect(login.status, "the reset does not lift a suspension").toBe(403);
+    expect(rec(login.body).code).toBe("ACCOUNT_SUSPENDED");
+    const reused = await api(undefined, "POST", "/auth/password-reset", { token: first, newPassword: `${newPassword}y` });
+    expect(reused.status, "the token is consumed even on a suspended account").toBe(400);
+    expect(rec(reused.body).code).toBe("INVALID_TOKEN");
+  } finally {
+    expect((await api(token, "POST", `/admin/users/${userId}/unsuspend`, { reason: EDGE_REASON })).status).toBeLessThan(300);
+  }
+
+  // 2. a fresh token works once, then is refused.
+  const second = await issue();
+  const used = await api(undefined, "POST", "/auth/password-reset", { token: second, newPassword });
+  observe("T-09b", "jeton de reinitialisation, 1er usage", `${used.status} ${used.text.slice(0, 100)}`);
+  expect(used.status, used.text).toBeLessThan(300);
+  const again = await api(undefined, "POST", "/auth/password-reset", { token: second, newPassword: `${newPassword}x` });
+  observe("T-09b", "jeton de reinitialisation, 2e usage", `${again.status} ${again.text.slice(0, 100)}`);
+  expect(again.status, again.text).toBe(400);
+  expect(rec(again.body).code).toBe("INVALID_TOKEN");
 });
 
-// Open security findings, kept out of the serial group: they stay red while the defects stand, and a red test
-// in a serial group would skip everything after it. Verdicts of the serial tests travel through a file because
-// Playwright starts a new worker after a failure.
-test.describe("Constats ouverts (rouges tant que non corriges)", () => {
-test("E-P0-01e rejeu d'un code TOTP deja accepte dans la meme fenetre de 30 s (constat H4)", async () => {
+test("E-P0-01e rejeu d'un code TOTP deja accepte dans la meme fenetre de 30 s: refuse (H4 corrige)", async () => {
   const first = await api(undefined, "POST", "/auth/login", { email: main.email, password: main.password });
   expect(first.status, `login 1 -> ${first.text.slice(0, 120)}`).toBeLessThan(300);
   const second = await api(undefined, "POST", "/auth/login", { email: main.email, password: main.password });
@@ -438,39 +487,8 @@ test("E-P0-01e rejeu d'un code TOTP deja accepte dans la meme fenetre de 30 s (c
   expect(accepted.status, `first use of the code -> ${accepted.text.slice(0, 120)}`).toBeLessThan(300);
   const replay = await api(String(rec(second.body).accessToken), "POST", "/auth/mfa/verify", { code, kind: "totp" });
   observe("E-P0-01e", "rejeu du meme code TOTP (nouvelle connexion)", `${replay.status} ${replay.text.slice(0, 120)}`);
-  if (replay.status < 300) {
-    anomaly(
-      "MAJEURE / SECURITE (H4): un code TOTP deja accepte est rejoue avec succes dans la meme fenetre (API /auth/mfa/verify -> " +
-        `${replay.status}). Code fautif: backend/src/modules/auth/mfa.service.ts:43 (verify() sans memoire du dernier compteur, epochTolerance 30). ` +
-        "Correctif propose: stocker par utilisateur le dernier compteur TOTP accepte (colonne mfaLastUsedCounter) et refuser tout compteur <= au dernier."
-    );
-  }
   expect(replay.status, "a TOTP code that was already accepted must be refused").toBeGreaterThanOrEqual(400);
+  expect(replay.status).toBeLessThan(500);
 });
 
-test("Compte suspendu: la connexion ne doit pas repondre par une erreur serveur 500", async () => {
-  const verdict = loadVerdict<{ status: number; text: string }>("suspendedLogin");
-  if (verdict.status >= 500) {
-    anomaly(
-      `MINEURE (UX/robustesse): la connexion d'un compte suspendu repond ${verdict.status} ${verdict.text}. Code: backend/src/modules/auth/auth.module.ts:98-100 ` +
-        "(throw new Error('Account suspended') sans exception HTTP typee, converti en INTERNAL_ERROR). Cote ecran: /login?error=error puis 'Accès refusé ou identifiants invalides.' " +
-        "(l'avis 'Compte suspendu' de login/page.tsx:31 n'est jamais atteint car admin-api.ts:63 attend un 403). Correctif: lever ForbiddenException({ code: 'ACCOUNT_SUSPENDED' }) (403)."
-    );
-  }
-  expect(verdict.status, "suspended login must not be a 5xx").toBeLessThan(500);
-});
-
-test("T-09 un jeton d'activation deja consomme doit etre refuse (constat de securite)", async () => {
-  const verdict = loadVerdict<{ accepted: boolean; session: boolean; apiStatus: number; notices: string[]; tamperedNotices: string[] }>("activationReuse");
-  if (verdict.accepted) {
-    anomaly(
-      `BLOQUANTE/SECURITE: un jeton d'activation deja consomme est accepte une seconde fois (ecran: session ouverte=${verdict.session}, API /auth/activate -> ${verdict.apiStatus}). ` +
-        "Le lien d'activation reste rejouable: il redefinit le mot de passe d'un compte deja actif (l'etape MFA reste exigee). " +
-        "Code probable: backend/src/modules/auth/auth.module.ts:154-170 (activate() ne controle ni le statut du compte ni l'expiration) et users.activateWithPassword qui n'efface pas le hash du jeton. " +
-        "Correctif: effacer hash + expiration du jeton dans activateWithPassword, refuser si le compte n'est plus 'invited', controler isExpired()."
-    );
-  }
-  expect(verdict.accepted, "a consumed activation token must be refused").toBe(false);
-  expect(verdict.notices, "used token and tampered token are refused without distinction").toEqual(verdict.tamperedNotices);
-});
 });

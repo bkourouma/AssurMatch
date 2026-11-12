@@ -137,13 +137,14 @@ test("E-P2-01b mot de passe = e-mail / nom affiché / liste noire (assurmatch123
     seen.push(`${entry.label}: « ${text(outcome)} »`);
     expect(outcome.path, `${entry.label}: stays on the activation screen`).toBe("/activate");
     expect(outcome.hasSession, `${entry.label}: no session cookie`).toBe(false);
-    expect(text(outcome), `${entry.label}: observed raw text (H13)`).toBe("api_500");
+    expect(text(outcome), `${entry.label}: lisible, pas de texte technique (H13 corrigé)`).toBe("Ce mot de passe ne respecte pas la politique de sécurité : choisissez-en un plus long et plus varié.");
     const api = await apiCall(undefined, "POST", "/auth/activate", { token: target.token, password: entry.password });
     recordMessage("E-P2-01b", `API POST /auth/activate, ${entry.label}`, refusalSignature(api), `HTTP ${api.status}`);
     seen.push(`API ${api.status} ${refusalSignature(api)}`);
-    expect(api.status, `${entry.label}: observed HTTP status of the policy refusal (H13)`).toBe(500);
+    expect(api.status, `${entry.label}: refus de politique = 400 (H13 corrigé)`).toBe(400);
+    expect(asRecord(api.body).code, `${entry.label}: code d'erreur`).toBe("PASSWORD_POLICY");
   }
-  constat(`H13 : le refus de la politique de mot de passe sort en HTTP 500 INTERNAL_ERROR (Error simple non classé par statusForError, backend/src/modules/common/filters/error-response.filter.ts:125-130 ; message masqué car il contient « password ») et l'écran affiche le texte brut « api_500 » (auth-flow-actions.ts:27-56). Refus, aucune session, jeton non consommé. ${seen.join(" | ")}`);
+  constat(`H13 corrigé : le refus de la politique de mot de passe répond 400 PASSWORD_POLICY et l'écran affiche un message lisible. ${seen.join(" | ")}`);
   // The token is still unconsumed: the account is still waiting for its activation.
   expect(userRow(target.email).hasToken, "activation token not consumed by the refusals").toBe(true);
   await page.context().close();
@@ -273,7 +274,6 @@ test("E-P2-01e jeton altéré d'un caractère : même refus qu'un jeton inconnu,
 
 test("E-P2-01e (jeton utilisé) rouvrir le lien d'activation déjà utilisé est refusé, comme un jeton altéré", async ({ browser }) => {
   test.setTimeout(3 * 60_000);
-  test.fail(true, "ANOMALIE L3A-03 : un jeton d'activation (ou de réinitialisation) déjà consommé reste valable jusqu'à son expiration (30 min) et se rejoue autant de fois qu'on veut (HTTP 201 + session). Cause : activateWithPassword / consumePasswordReset font `delete user.passwordResetTokenHash`, mais UsersRepository.toPrisma (backend/src/modules/users/users.repository.ts:245-246) renvoie `undefined`, que Prisma ignore : la colonne n'est jamais effacée (SELECT : passwordResetTokenHash reste renseigné après l'activation).");
   const used = member("used");
   // Same password as the account's: the replay (if accepted) must not change what the next cases rely on.
   const reuse = await submitActivation(await brokerPage(browser), used.link, usedPasswordHolder.password);
@@ -282,7 +282,9 @@ test("E-P2-01e (jeton utilisé) rouvrir le lien d'activation déjà utilisé est
   recordMessage("E-P2-01e", "API POST /auth/activate avec un jeton DÉJÀ UTILISÉ", `HTTP ${api.status}`, userRow(used.email).hasToken ? "hash du jeton toujours en base après usage" : "hash effacé");
   expect(reuse.hasSession, "a used token opens no session").toBe(false);
   expect(reuse.path).toBe("/activate");
-  expect(api.status, "API refuses a used token").toBeGreaterThanOrEqual(400);
+  expect(api.status, "API refuses a used token (400 INVALID_TOKEN)").toBe(400);
+  expect(asRecord(api.body).code, "code d'erreur d'un jeton déjà utilisé").toBe("INVALID_TOKEN");
+  expect(userRow(used.email).hasToken, "le hash du jeton est effacé après usage").toBe(false);
 });
 
 const usedPasswordHolder: { password: string; secret: string } = { password: "", secret: "" };
@@ -330,7 +332,7 @@ test("E-P2-02a code TOTP erroné et code de moins de 6 caractères : on reste su
   mfaPage = page;
 });
 
-test("E-P2-02b rejeu du même code TOTP (UI et API) : constat de sécurité H4, rejeu accepté", async ({ browser }) => {
+test("E-P2-02b rejeu du même code TOTP (UI et API) : refusé (usage unique, H4 corrigé)", async ({ browser }) => {
   test.setTimeout(4 * 60_000);
   const account = member("used");
   const { password, secret } = usedPasswordHolder;
@@ -357,9 +359,11 @@ test("E-P2-02b rejeu du même code TOTP (UI et API) : constat de sécurité H4, 
   recordMessage("E-P2-02b", "rejeu du code TOTP déjà accepté (UI)", uiReplay.path.startsWith("/mfa") ? `refusé: ${text(uiReplay)}` : `accepté, redirigé vers ${uiReplay.path}`, `âge du code ${Math.round((Date.now() - issuedAt) / 1000)} s`);
   await page.context().close();
 
-  constat(`H4 / E-P0-01e : le code TOTP n'est pas à usage unique. Rejeu API HTTP ${apiReplay.status}; rejeu UI ${uiReplay.path.startsWith("/mfa") ? "refusé" : "accepté"} (backend/src/modules/auth/mfa.service.ts:43, fenêtre ±30 s sans mémoire du dernier compteur). Attendu prudent : refus.`);
-  expect([200, 201], "observed behaviour: the replayed code is accepted by the API").toContain(apiReplay.status);
-  expect(uiReplay.path.startsWith("/mfa"), "observed behaviour: the replayed code is accepted by the screen").toBe(false);
+  constat(`H4 / E-P0-01e corrigé : le code TOTP est à usage unique. Rejeu API HTTP ${apiReplay.status} ${String(asRecord(apiReplay.body).code ?? "")}; rejeu UI ${uiReplay.path.startsWith("/mfa") ? "refusé" : "ACCEPTÉ"}.`);
+  expect(apiReplay.status, "le code déjà accepté est refusé par l'API").toBeGreaterThanOrEqual(400);
+  expect(apiReplay.status, "refus client, pas une erreur serveur").toBeLessThan(500);
+  expect(uiReplay.path.startsWith("/mfa"), "le code rejoué est refusé par l'écran (on reste sur /mfa)").toBe(true);
+  expect(uiReplay.notices.length, "un refus est affiché").toBeGreaterThan(0);
 });
 
 // ---------------------------------------------------------------------------------------------
@@ -436,10 +440,10 @@ test("E-P2-02c 5 échecs (3 mots de passe + 2 codes MFA, compteur partagé) : co
   await fresh.context().close();
 });
 
-test("E-P2-02c (texte) le refus d'un compte verrouillé affiche « Accès refusé ou identifiants invalides. »", async () => {
-  test.fail(true, "ANOMALIE L3A-01 : un mauvais mot de passe ou un compte verrouillé affiche « Vérifiez le format de l'email et du mot de passe. » : l'API répond 400 (backend/src/modules/common/filters/error-response.filter.ts:125 statusForError : « Invalid credentials » contient « invalid ») et le courtier traduit tout 400 en validation_error (apps/broker/app/lib/broker-api.ts:23) ; la branche 401 « invalid_credentials » (broker-api.ts:27) n'est jamais atteinte et le message générique « Accès refusé ou identifiants invalides. » (login/page.tsx) n'est jamais montré.");
+test("E-P2-02c (texte) le refus d'un compte verrouillé affiche « Identifiants invalides. » (anti-énumération)", async () => {
   const shown = lockState.refusal?.notices.join(" ") ?? "";
-  expect(shown).toBe("Accès refusé ou identifiants invalides.");
+  expect(shown).toBe("Identifiants invalides.");
+  expect(shown, "pas d'avis « verrouillé »").not.toMatch(/verrouill/iu);
 });
 
 test("E-P2-02c (déblocage) l'admin débloque le compte (/users/[userId], unlock) : la connexion est rétablie", async ({ browser }) => {
@@ -525,7 +529,6 @@ test("E-P2-03a (action) un formulaire soumis après suppression du cookie : « S
   test.setTimeout(3 * 60_000);
   const page = ownerSession;
   if (!page) throw new Error("E-P2-03a did not leave the owner session");
-  test.fail(true, "ANOMALIE L3A-02 : sans cookie de session, la requête POST de l'action serveur (/company « Enregistrer ») est redirigée par le middleware vers /login ; le client Next ne suit pas cette redirection et l'écran affiche la page d'erreur « Une erreur est survenue / Votre espace courtier est momentanément indisponible » au lieu de « Session expirée : reconnectez-vous puis recommencez. » (apps/broker/middleware.ts:74, message prévu apps/broker/app/lib/self-service-messages.ts:132) ; même défaut que apps/admin/middleware.ts:55.");
   await page.goto(`${e2eEnv.brokerUrl}/company`);
   await expect(page.getByRole("button", { name: "Enregistrer" })).toBeVisible();
   await page.locator("input[name='city']").fill("Abidjan");
@@ -534,9 +537,12 @@ test("E-P2-03a (action) un formulaire soumis après suppression du cookie : « S
   await page.getByRole("button", { name: "Enregistrer" }).click();
   await page.waitForTimeout(2_500);
   const where = new URL(page.url());
-  const screen = (await page.locator("body").innerText().catch(() => "")).replace(/\s+/gu, " ").slice(0, 300);
+  const fullScreen = (await page.locator("body").innerText().catch(() => "")).replace(/\s+/gu, " ");
+  const notices = await noticeTexts(page).catch(() => [] as string[]);
+  const screen = `${notices.join(" / ")} || ${fullScreen}`.slice(0, 900);
   recordMessage("E-P2-03a", "/company « Enregistrer » après suppression du cookie", screen, `${where.pathname}${where.search}`);
-  const informed = where.pathname.startsWith("/login") || /Session expirée/u.test(screen);
+  const informed = where.pathname.startsWith("/login") || notices.some((notice) => /Session expirée/u.test(notice));
+  expect(await page.getByText("Une erreur est survenue"), "pas de page d'erreur générique").toHaveCount(0);
   expect(informed, `ni redirection /login ni « Session expirée » : ${where.pathname}${where.search} / ${screen}`).toBe(true);
   await page.context().close();
   ownerSession = undefined;
@@ -616,7 +622,6 @@ test("E-P2-03b /password-reset : un jeton valide change le mot de passe (« Mot 
 
 test("E-P2-03b (second usage) le même jeton de réinitialisation est refusé une seconde fois", async ({ browser }) => {
   test.setTimeout(3 * 60_000);
-  test.fail(true, "ANOMALIE L3A-03 : même cause que pour le jeton d'activation : le jeton de réinitialisation consommé n'est pas effacé en base (users.repository.ts:245-246, `undefined` ignoré par Prisma, users.module.ts:129-130) ; il reste rejouable jusqu'à son expiration (30 min).");
   const page = await brokerPage(browser);
   await page.goto(`${e2eEnv.brokerUrl}/password-reset?token=${encodeURIComponent(resetState.token)}`);
   // Same password as the first use: if the replay is accepted, the account is left as it was.
@@ -633,7 +638,7 @@ test("E-P2-03b (second usage) le même jeton de réinitialisation est refusé un
 // T-05 injection strings in the login e-mail
 // ---------------------------------------------------------------------------------------------
 
-test("T-05 e-mail de /login : ' OR '1'='1 et '; DROP TABLE leads;-- : aucune erreur 500, réponse identique à un e-mail inconnu banal", async ({ browser }) => {
+test("T-05 e-mail de /login : ' OR '1'='1 et '; DROP TABLE leads;-- : aucune erreur 500, refus de format lisible (400), jamais d'erreur technique", async ({ browser }) => {
   test.setTimeout(4 * 60_000);
   await waitForAuthBudget({ login: 4, mfa: 0 });
   const password = "Mot-de-passe-inconnu-L3";
@@ -652,14 +657,16 @@ test("T-05 e-mail de /login : ' OR '1'='1 et '; DROP TABLE leads;-- : aucune err
     await expect(page.getByText("Une erreur est survenue"), `${label}: no error page`).toHaveCount(0);
   }
   const [baseline, ...injections] = outcomes;
+  expect(text(baseline?.outcome as ScreenOutcome), "e-mail inconnu : refus générique").toBe("Identifiants invalides.");
   for (const entry of injections) {
-    expect(text(entry.outcome), `${entry.label}: same notice as an ordinary unknown e-mail`).toBe(text(baseline?.outcome as ScreenOutcome));
-    expect(entry.outcome.search, `${entry.label}: same redirect as an ordinary unknown e-mail`).toBe((baseline?.outcome as ScreenOutcome).search);
+    // Not a valid e-mail address: refused by format validation (400), which reveals nothing about any account.
+    expect(text(entry.outcome), `${entry.label}: refus de format lisible, jamais une erreur technique`).toBe("Vérifiez le format de l'e-mail et du mot de passe.");
+    expect(entry.outcome.search, `${entry.label}: redirection de validation`).toContain("error=validation_error");
   }
   const api = await apiCall(undefined, "POST", "/auth/login", { email: "'; DROP TABLE leads;--", password });
   recordMessage("T-05", "API POST /auth/login avec '; DROP TABLE leads;--", refusalSignature(api), `HTTP ${api.status}`);
   expect(api.status, "never a server error").toBeLessThan(500);
-  expect(api.status).toBeGreaterThanOrEqual(400);
+  expect([400, 401], "400 (format) or 401 (identifiants invalides)").toContain(api.status);
   await page.context().close();
 });
 
