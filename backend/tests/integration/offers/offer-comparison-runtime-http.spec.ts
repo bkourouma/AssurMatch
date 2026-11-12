@@ -117,7 +117,8 @@ describe("offer comparison runtime HTTP", () => {
       headers: { ...actorHeaders(superAdmin), "content-type": "application/json" },
       body: JSON.stringify({ countryId: seed.country.id, productId: seed.product.id, name: "Contrat valide immediatement", currency: "XOF", validFrom: "2026-01-01T00:00:00.000Z", validUntil: "2030-01-01T00:00:00.000Z", reason: "forbidden wording" })
     });
-    expect(forbidden.status).toBe(400);
+    expect(forbidden.status).toBe(422);
+    expect(await forbidden.json()).toMatchObject({ code: "FORBIDDEN_WORDING", details: { wording: ["contrat valide"] } });
 
     const offer = await createOffer(harness, seed, "Suspendable", { guaranteeLevel: 3, indicativePriceMin: 15000 });
     expect((await readJson<Array<{ name: string }>>(await harness.request("/countries/CI/products/auto/offers"))).some((item) => item.name === "Suspendable")).toBe(true);

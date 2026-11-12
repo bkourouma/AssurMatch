@@ -35,7 +35,7 @@ describe("PiiMinimizer", () => {
       email: "ama@example.test",
       contact: { phone: "+2250102030405", displayName: "Ama Kone" },
       need: "Contactez-moi sur ama@example.test ou au 07 01 02 03 04, plaque 12345678",
-      answers: { vehicle_use: "prive" }
+      answers: { vehicle_use: "prive", city: "Abidjan", contact_preference: "email" }
     });
     expect(JSON.stringify(minimized)).not.toContain("example.test");
     expect(JSON.stringify(minimized)).not.toContain("0102030405");
@@ -103,7 +103,7 @@ describe("AiGateway", () => {
     expect(refused.outputText).toBeNull();
 
     const failing = await gatewayWith(stubProvider(new Error("provider down")));
-    const fallback = await failing.gateway.run({ assistType: "visitor_request_summary", surface: "visitor", actor: superAdminActor, input: { productKey: "auto", countryCode: "CI", answers: { vehicle_use: "prive" } }, scope: {}, quotaKey: "ip-4" });
+    const fallback = await failing.gateway.run({ assistType: "visitor_request_summary", surface: "visitor", actor: superAdminActor, input: { productKey: "auto", countryCode: "CI", answers: { vehicle_use: "prive", city: "Abidjan", contact_preference: "email" } }, scope: {}, quotaKey: "ip-4" });
     expect(fallback.status).toBe("completed");
     expect(fallback.fallback).toBe(true);
     expect(fallback.provider).toBe("template");

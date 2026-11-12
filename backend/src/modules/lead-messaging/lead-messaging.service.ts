@@ -199,6 +199,12 @@ export class LeadMessagingService {
     if (wording.length > 0) {
       refuse(ErrorCodes.FORBIDDEN_WORDING, "forbidden_wording", forbiddenWordingError(wording), { wordingCount: wording.length, ...(fileNameWording.length > 0 ? { inFileName: true } : {}) });
     }
+    // A-06b: same duplicate rule as the visitor side (same body, same sender, same conversation, 5-minute window); a retry carrying the same clientRequestId is a replay, not a duplicate.
+    const thread = await this.repository.listForConversation(assignment.id, assignment.partnerTenantId);
+    const lastBroker = [...thread].reverse().find((message) => message.senderType === "broker");
+    if (lastBroker && !(input.clientRequestId && lastBroker.clientRequestId === input.clientRequestId) && lastBroker.body === input.body && this.now().getTime() - lastBroker.createdAt.getTime() < LEAD_MESSAGE_DUPLICATE_WINDOW_MINUTES * 60_000) {
+      refuse(ErrorCodes.DUPLICATE_MESSAGE, "duplicate_message", conflict(ErrorCodes.DUPLICATE_MESSAGE, "The same message was just sent"));
+    }
     if (await this.repository.countForConversation(assignment.id, assignment.partnerTenantId) >= LEAD_MESSAGE_THREAD_MAX) {
       refuse(ErrorCodes.THREAD_LIMIT_REACHED, "thread_limit_reached", conflict(ErrorCodes.THREAD_LIMIT_REACHED, `At most ${LEAD_MESSAGE_THREAD_MAX} messages per conversation`));
     }

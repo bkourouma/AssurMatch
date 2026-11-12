@@ -223,7 +223,7 @@ describe("MFA bypass fix and trusted devices over the real HTTP runtime (spec 06
 
     const wrong = await httpLogin(harness, session.user.email, "definitely the wrong one", session.deviceToken);
 
-    expect(wrong.status).toBe(400); // existing mapping of "Invalid credentials"
+    expect(wrong.status).toBe(401); // INVALID_CREDENTIALS
     expect(wrong.body).not.toHaveProperty("accessToken");
     expect((await harness.runtime.users.service.require(session.user.id)).failedLoginCount).toBe(1);
     // The device itself is still valid afterwards.
@@ -235,8 +235,8 @@ describe("MFA bypass fix and trusted devices over the real HTTP runtime (spec 06
     harness = await createRuntimeHttpHarness();
     const session = await trustedBrokerSession("device-limit@example.com");
 
-    expect((await httpLogin(harness, session.user.email, "wrong password one", session.deviceToken)).status).toBe(400);
-    expect((await httpLogin(harness, session.user.email, "wrong password two", session.deviceToken)).status).toBe(400);
+    expect((await httpLogin(harness, session.user.email, "wrong password one", session.deviceToken)).status).toBe(401);
+    expect((await httpLogin(harness, session.user.email, "wrong password two", session.deviceToken)).status).toBe(401);
     // Blocked before the password or the device is even looked at.
     const blocked = await httpLogin(harness, session.user.email, PASSWORD, session.deviceToken);
     expect(blocked.status).toBe(429);

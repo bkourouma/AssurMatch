@@ -1,4 +1,5 @@
 import {
+  findOfferContentForbiddenWording,
   hasIndicativeDisclaimer,
   offerCompleteness,
   type BrokerOfferCoverageItem,
@@ -8,7 +9,7 @@ import type { OfferType } from "../../../../packages/shared/contracts/offer-cont
 import { AuditLogWriter } from "../audit-logs/audit-log-writer.service";
 import { QuoteAuditActions } from "../audit-logs/quote-audit-actions";
 import type { ActorContext } from "../common/types";
-import { OfferErrorCodes, offerConflict, offerForbidden, offerUnprocessable } from "./offer-errors";
+import { OfferErrorCodes, offerConflict, offerForbidden, offerForbiddenWording, offerUnprocessable } from "./offer-errors";
 import { OFFER_CONTENT_KEYS, pendingVersion, publishedVersion, versionContent } from "./offer-views";
 import type { OfferPatch, OfferRecord, OfferVersionContent, OfferVersionRecord } from "./offers.module";
 import type { OffersRepository } from "./offers.repository";
@@ -260,6 +261,12 @@ export class OfferLifecycleService {
       this.refused(actor, offer, "submit", "offer_incomplete", { missing: completeness.missing });
       throw offerUnprocessable(OfferErrorCodes.incomplete, "Offer is incomplete", completeness.missing.map((field) => ({ code: "missing_field", field })));
     }
+    // The stored draft is checked too: a version saved before a rule existed cannot slip through.
+    const wording = findOfferContentForbiddenWording(pending);
+    if (wording.length > 0) {
+      this.refused(actor, offer, "submit", "forbidden_wording", { wording });
+      throw offerForbiddenWording(wording);
+    }
     const now = new Date();
     const version = await this.repository.updateVersion(pending.id, { status: "submitted", submittedAt: now, completenessScore: completeness.score, updatedAt: now });
     await this.history(offer.id, "submitted", { status: "draft" }, { versionNumber: version.versionNumber, status: "submitted" }, reason, actor);
@@ -279,6 +286,7 @@ export class OfferLifecycleService {
   /** FR-012: controls a version must pass to be published (or a suspended offer to be reinstated). */
   async validationBlockers(offer: OfferRecord, version: OfferVersionRecord, now = new Date()): Promise<OfferBlocker[]> {
     const blockers: OfferBlocker[] = [];
+    for (const wording of findOfferContentForbiddenWording(version)) blockers.push({ code: "forbidden_wording", field: wording });
     const completeness = offerCompleteness(version, now);
     for (const field of completeness.missing) {
       if (field !== "validUntil") blockers.push({ code: "missing_field", field });
@@ -298,6 +306,14 @@ export class OfferLifecycleService {
     return blockers;
   }
 
+  /** Stored content is re-read at decision time: a forbidden expression blocks validation and reinstatement. */
+  private assertNoForbiddenWording(offer: OfferRecord, version: OfferVersionRecord, actor: ActorContext, action: string): void {
+    const wording = findOfferContentForbiddenWording(version);
+    if (wording.length === 0) return;
+    this.refused(actor, offer, action, "forbidden_wording", { wording });
+    throw offerForbiddenWording(wording);
+  }
+
   /**
    * Publishes the submitted version (copy into `Offer`, previous published version archived), or
    * reinstates a suspended offer after the same controls.
@@ -308,6 +324,7 @@ export class OfferLifecycleService {
     const published = publishedVersion(offer, versions);
     const now = new Date();
     if (pending?.status === "submitted") {
+      this.assertNoForbiddenWording(offer, pending, actor, "validate");
       const blockers = await this.validationBlockers(offer, pending, now);
       if (blockers.length) {
         this.refused(actor, offer, "validate", "validation_blocked", { blockers });
@@ -352,6 +369,7 @@ export class OfferLifecycleService {
       return offer;
     }
     if (offer.status === "suspended" && published) {
+      this.assertNoForbiddenWording(offer, published, actor, "reinstate");
       const blockers = await this.validationBlockers(offer, published, now);
       if (blockers.length) {
         this.refused(actor, offer, "reinstate", "validation_blocked", { blockers });

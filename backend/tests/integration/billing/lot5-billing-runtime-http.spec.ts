@@ -293,7 +293,7 @@ describe("lot 5 (spec 071) add-ons, setup fee and subscription over HTTP", () =>
           productKey: "auto",
           formDefinitionId: context.seed.form.id,
           contact: { displayName: `Visitor ${suffix}`, email: `visitor${suffix}@example.test`, phone: `+22501020304${suffix.padStart(2, "0")}` },
-          answers: { vehicle_use: "prive" },
+          answers: { vehicle_use: "prive", city: "Abidjan", contact_preference: "email" },
           consent: { accepted: true, consentTextId: context.seed.consentText.id, version: "v1", contentHash: context.seed.consentText.contentHash },
           ipAddress: `203.0.113.${suffix}`,
           sessionId: `lot5-session-${suffix}`

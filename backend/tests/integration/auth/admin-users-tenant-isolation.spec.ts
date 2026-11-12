@@ -23,8 +23,10 @@ describe("admin users tenant and scope isolation", () => {
     const broker: ActorContext = { actorId: "broker-actor", roles: ["broker_owner_pro"], partnerTenantId: brokerTenant, mfaVerified: true };
 
     expect((await controller.list(adminPays)).map((user) => user.id)).toEqual([ciUser.id]);
-    expect((await controller.list(broker)).map((user) => user.id)).toEqual([brokerUser.id]);
+    // Lot 5: a broker never reads /admin/users (its team goes through /broker/team).
+    await expect(controller.list(broker)).rejects.toThrow(/RBAC denied/);
+    await expect(controller.detail(broker, brokerUser.id)).rejects.toThrow(/RBAC denied/);
     await expect(controller.detail(adminPays, snUser.id)).rejects.toThrow(/RBAC denied/);
-    await expect(controller.detail(broker, otherBroker.id)).rejects.toThrow(/RBAC denied/);
+    expect(otherBroker.id).toBeDefined();
   });
 });

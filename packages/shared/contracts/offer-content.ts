@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { dateTimeStringSchema, nonEmptyStringSchema, reasonSchema, uuidSchema } from "../validation/common.schemas";
-import { findForbiddenWording } from "./content-safety";
+import { findRegulatedWordingAnyLanguage } from "./content-safety";
 
 /**
  * Spec 052 R3: the content of an offer version, shared by the API, the admin back-office and the
@@ -84,9 +84,28 @@ interface RefinableContent {
   validUntil?: string | undefined;
 }
 
-/** FR-005: forbidden wording on every text field, price order and date order. */
-export function refineOfferContent(value: RefinableContent, ctx: z.RefinementCtx): void {
-  const text = [
+/** Text fields of an offer version read by the wording control (input, stored version or offer row). */
+export interface OfferTextContent {
+  name?: string | undefined;
+  shortDescription?: string | undefined;
+  guaranteeSummary?: string | undefined;
+  sponsorLabel?: string | undefined;
+  insurerName?: string | undefined;
+  exclusionsSummary?: string | undefined;
+  sourceOfInformation?: string | undefined;
+  pricingUnit?: string | undefined;
+  publicDisclaimers?: string[] | undefined;
+  requiredDocuments?: string[] | undefined;
+  guarantees?: Array<{ label: string; detail?: string | undefined }> | undefined;
+}
+
+/**
+ * Regulated wording found in any text field of an offer version (accent, case, spacing and English
+ * insensitive: "contrat validé" is "contrat valide"). Shared by the input contract, the submission,
+ * the validation and the public publication policy, so stored versions are held to the same rule.
+ */
+export function findOfferContentForbiddenWording(value: OfferTextContent): string[] {
+  const texts = [
     value.name,
     value.shortDescription,
     value.guaranteeSummary,
@@ -98,11 +117,16 @@ export function refineOfferContent(value: RefinableContent, ctx: z.RefinementCtx
     ...(value.publicDisclaimers ?? []),
     ...(value.requiredDocuments ?? []),
     ...(value.guarantees ?? []).flatMap((guarantee) => [guarantee.label, guarantee.detail])
-  ]
-    .filter((item): item is string => Boolean(item))
-    .join(" ");
-  const forbidden = findForbiddenWording(text);
-  if (forbidden.length > 0) ctx.addIssue({ code: "custom", message: `Forbidden regulated wording: ${forbidden.join(", ")}` });
+  ].filter((item): item is string => Boolean(item));
+  // Field by field: a phrase must not be assembled from the end of one field and the start of the next.
+  return [...new Set(texts.flatMap((text) => findRegulatedWordingAnyLanguage(text)))];
+}
+
+/** FR-005: forbidden wording on every text field, price order and date order. */
+export function refineOfferContent(value: RefinableContent, ctx: z.RefinementCtx): void {
+  const forbidden = findOfferContentForbiddenWording(value);
+  // `params.wording` lets the HTTP layer raise a typed 422 FORBIDDEN_WORDING naming the expressions.
+  if (forbidden.length > 0) ctx.addIssue({ code: "custom", message: `Forbidden regulated wording: ${forbidden.join(", ")}`, params: { wording: forbidden } });
   if (value.validFrom && value.validUntil && new Date(value.validUntil) <= new Date(value.validFrom)) {
     ctx.addIssue({ code: "custom", message: "validUntil must be after validFrom" });
   }

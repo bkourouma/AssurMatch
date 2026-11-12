@@ -9,7 +9,7 @@ describe("public quote anti-spam", () => {
     const payload = validQuotePayload(seed) as QuoteRequestCreateDto;
     payload.answers = { ...payload.answers, website: "spam.example" };
 
-    await expect(seed.app.quoteRequests.publicController.submit(payload, superAdminActor)).rejects.toThrow("Spam submission blocked");
+    await expect(seed.app.quoteRequests.publicController.submit(payload, superAdminActor)).rejects.toThrow("Request could not be processed");
     expect(await seed.app.leads.assignments.list()).toHaveLength(0);
     expect(await seed.app.notifications.service.list()).toHaveLength(0);
     expect(seed.app.quoteAiSummary.list()).toHaveLength(0);

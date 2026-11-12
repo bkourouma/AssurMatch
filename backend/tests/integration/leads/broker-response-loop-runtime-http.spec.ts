@@ -99,7 +99,7 @@ describe("broker response loop runtime HTTP (spec 055)", () => {
         productKey: "auto",
         formDefinitionId: seed.form.id,
         contact: { displayName: "Awa Visiteur", email, phone: "+2250102030455" },
-        answers: { vehicle_use: "prive" },
+        answers: { vehicle_use: "prive", city: "Abidjan", contact_preference: "email" },
         consent: { accepted: true, consentTextId: seed.consentText.id, version: "v1", contentHash: seed.consentText.contentHash },
         ipAddress: "203.0.113.55",
         sessionId: `session-${email}`

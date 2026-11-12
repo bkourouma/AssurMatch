@@ -9,6 +9,17 @@ export interface AuthTokenDeliveryResult {
   token?: string;
 }
 
+/**
+ * The plain-text token (activation / password reset) may only travel in an API response outside
+ * production-like environments (local, test, staging / e2e, runtime-smoke). Rule: `APP_ENV ?? NODE_ENV
+ * ?? "local"` is neither `production` nor `preproduction`. Deliberately not `isProductionLike()`: the
+ * e2e stack runs NODE_ENV=production with APP_ENV=staging and relies on the token. Read at call time.
+ */
+export function exposeAuthTokensInResponse(env: NodeJS.ProcessEnv = process.env): boolean {
+  const appEnv = env.APP_ENV ?? env.NODE_ENV ?? "local";
+  return appEnv !== "production" && appEnv !== "preproduction";
+}
+
 export class UserAuthNotificationService {
   private readonly templates = new AuthEmailTemplateService();
 
@@ -32,13 +43,15 @@ export class UserAuthNotificationService {
   }
 
   private async deliver(payload: AuthEmailPayload, token: string): Promise<AuthTokenDeliveryResult> {
-    if (!this.sender) return { emailStatus: "not_configured", token };
+    const withToken = (emailStatus: AuthTokenDeliveryResult["emailStatus"]): AuthTokenDeliveryResult =>
+      exposeAuthTokensInResponse() ? { emailStatus, token } : { emailStatus };
+    if (!this.sender) return withToken("not_configured");
     try {
       const result = await this.sender.send(payload);
-      if (result && result.status !== "sent") return { emailStatus: result.status, token };
+      if (result && result.status !== "sent") return withToken(result.status);
       return { emailStatus: "sent" };
     } catch {
-      return { emailStatus: "failed", token };
+      return withToken("failed");
     }
   }
 }

@@ -1,4 +1,6 @@
+import { ConflictException } from "@nestjs/common";
 import { AuditLogWriter } from "../audit-logs/audit-log-writer.service";
+import { leadTransitionRefusal } from "./lead-status-transitions";
 import { QuoteAuditActions } from "../audit-logs/quote-audit-actions";
 import type { ActorContext } from "../common/types";
 import { MemoryLeadAssignmentsRepository, type LeadAssignmentsRepository } from "./lead-assignments.repository";
@@ -162,8 +164,28 @@ export class LeadAssignmentService {
     return assignment;
   }
 
+  /**
+   * Moves the status through the transition table (lead-status-transitions.ts): a refused move is a
+   * 409, audited as refused, and changes nothing (no timestamp, no event). The Starter accept/reject
+   * paths serialise per lead on top of this check; the generic route has no in-process lock (the
+   * domain services must stay stateless, see the domain-repository-memory guardrail).
+   */
   async updateStatus(id: string, status: LeadAssignmentStatus, actor: ActorContext, reason: string): Promise<LeadAssignmentRecord> {
     const assignment = await this.require(id);
+    const refusal = leadTransitionRefusal(assignment.status, status);
+    if (refusal) {
+      this.audit.write({
+        actor,
+        action: QuoteAuditActions.brokerLeadStatusUpdated,
+        targetType: "LeadAssignment",
+        targetId: assignment.id,
+        scope: { partnerTenantId: assignment.partnerTenantId },
+        result: "refused",
+        reason: refusal.reason,
+        context: { status: assignment.status, requestedStatus: status }
+      });
+      throw new ConflictException({ code: refusal.code, message: refusal.message });
+    }
     const now = new Date();
     assignment.status = status;
     assignment.lastBrokerActionAt = now;

@@ -41,7 +41,7 @@ describe("broker CRM AI assistance runtime HTTP", () => {
       countryCode: "CI",
       productKey: "auto",
       contact: { displayName: "Ama Kone", email: "ama.kone@example.test", phone: "+2250102030405" },
-      answers: { vehicle_use: "prive", vehicle_year: "2019", parking: "" }
+      answers: { vehicle_use: "prive", city: "Abidjan", contact_preference: "email", vehicle_year: "2019", parking: "" }
     }, owner);
     await harness.runtime.leads.assignments.create({
       quoteRequestId: "q-ai-2",
@@ -51,7 +51,7 @@ describe("broker CRM AI assistance runtime HTTP", () => {
       countryCode: "CI",
       productKey: "auto",
       contact: { email: "AMA.KONE@example.test", phone: "01 02 03 04 05" },
-      answers: { vehicle_use: "pro" }
+      answers: { vehicle_use: "pro", city: "Abidjan", contact_preference: "email" }
     }, owner);
 
     const queued = await harness.request(`/broker/crm/leads/${lead.id}/ai/lead_summary`, { method: "POST", headers: { ...actorHeaders(owner), ...json }, body: "{}" });

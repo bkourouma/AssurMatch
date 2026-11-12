@@ -15,12 +15,12 @@ describe("auth password reset flow", () => {
     const admin = new AdminUsersController(users, audit, auth.passwordReset);
     const user = await users.create({ email: "reset-user@example.com", displayName: "Reset User", roles: ["support_admin"] }, superAdminActor);
     await users.setPassword(user.id, await auth.passwordHashing.hash("old password 123"));
-    await users.lock(user.id, "manual-test-lock");
+    await users.lock(user.id, "failed-login-threshold");
 
     const prior = await admin.issuePasswordReset(superAdminActor, user.id, { reason: "First reset request for test" });
     const issued = await admin.issuePasswordReset(superAdminActor, user.id, { reason: "Second reset request for test" });
 
-    await expect(auth.service.resetPassword({ token: prior.token ?? "", newPassword: "new reset password 123" })).rejects.toThrow(/Invalid password reset token/);
+    await expect(auth.service.resetPassword({ token: prior.token ?? "", newPassword: "new reset password 123" })).rejects.toThrow(/Invalid or expired link/);
     await auth.service.resetPassword({ token: issued.token ?? "", newPassword: "new reset password 123" });
 
     const updated = await users.require(user.id);
@@ -29,7 +29,7 @@ describe("auth password reset flow", () => {
     expect(updated.passwordResetTokenHash).toBeUndefined();
     expect(updated.lockedAt).toBeUndefined();
     expect(await auth.passwordHashing.verify(updated.passwordHash, "new reset password 123")).toBe(true);
-    await expect(auth.service.resetPassword({ token: issued.token ?? "", newPassword: "another reset password 123" })).rejects.toThrow(/Invalid password reset token/);
+    await expect(auth.service.resetPassword({ token: issued.token ?? "", newPassword: "another reset password 123" })).rejects.toThrow(/Invalid or expired link/);
     expect(audit.search({ action: AuthAuditActions.userPasswordResetIssued, targetId: user.id })).toHaveLength(2);
     expect(audit.search({ action: AuthAuditActions.userPasswordResetConsumed, targetId: user.id })).toHaveLength(1);
     expect(audit.search({ action: AuthAuditActions.userPasswordResetInvalid })).toHaveLength(2);
@@ -45,7 +45,7 @@ describe("auth password reset flow", () => {
     const issued = reset.issueToken(new Date(Date.now() - 60 * 60 * 1000));
     await users.setPasswordResetToken(user.id, issued.tokenHash, issued.expiresAt);
 
-    await expect(auth.service.resetPassword({ token: issued.token, newPassword: "new reset password 123" })).rejects.toThrow(/Invalid password reset token/);
+    await expect(auth.service.resetPassword({ token: issued.token, newPassword: "new reset password 123" })).rejects.toThrow(/Invalid or expired link/);
 
     expect((await users.require(user.id)).passwordResetTokenHash).toBe(issued.tokenHash);
     expect(await auth.passwordHashing.verify((await users.require(user.id)).passwordHash, "old password 123")).toBe(true);

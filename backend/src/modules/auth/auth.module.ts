@@ -11,7 +11,7 @@ import { PasswordHashingService } from "./password-hashing.service";
 import { PasswordPolicyService } from "./password-policy.service";
 import { PasswordResetService } from "./password-reset.service";
 import { UserAuthNotificationService, type AuthEmailDeliveryPort } from "../notifications/user-auth-notification.service";
-import { ForbiddenException, UnauthorizedException } from "@nestjs/common";
+import { BadRequestException, ForbiddenException, UnauthorizedException } from "@nestjs/common";
 import { ErrorCodes } from "../../../../packages/shared/contracts/error-codes";
 import type { PartnerTenantStatusPort } from "../partners/partner-tenant-status.service";
 import { TrustedDeviceService } from "./trusted-device.service";
@@ -74,6 +74,16 @@ export interface VerifyMfaOptions {
   deviceLabel?: string | undefined;
 }
 
+/** One response for every bad-credential case (unknown e-mail, wrong password, locked, deleted). */
+function invalidCredentials(): UnauthorizedException {
+  return new UnauthorizedException({ code: ErrorCodes.INVALID_CREDENTIALS, message: "Invalid credentials" });
+}
+
+/** One response for every unusable action link (forged, expired, already used, wrong account state). */
+function invalidActionToken(): BadRequestException {
+  return new BadRequestException({ code: ErrorCodes.INVALID_TOKEN, message: "Invalid or expired link" });
+}
+
 export class AuthService {
   constructor(
     private readonly users: UsersService,
@@ -93,24 +103,39 @@ export class AuthService {
     if (!user) {
       await this.passwordHashing.verifyBogus(parsed.password);
       await this.audit.writeAsync({ action: AuthAuditActions.userLoginFailed, targetType: "User", targetId: "unknown", result: "refused", context: { email: parsed.email } });
-      throw new Error("Invalid credentials");
+      throw invalidCredentials();
     }
-    if (user.status === "suspended") {
-      await this.audit.writeAsync({ action: AuthAuditActions.userLoginRefusedSuspended, targetType: "User", targetId: user.id, result: "refused", context: { email: user.email } });
-      throw new Error("Account suspended");
-    }
+    // A locked or deleted account answers exactly like a wrong password, even with the right one: the
+    // response must not reveal the state of the account (the bogus verify evens out the timing).
     if (user.status === "locked" || user.status === "deleted") {
+      await this.passwordHashing.verifyBogus(parsed.password);
       await this.audit.writeAsync({ action: AuthAuditActions.userLoginFailed, targetType: "User", targetId: user.id, result: "refused", context: { email: user.email, status: user.status } });
-      throw new Error("Invalid credentials");
+      throw invalidCredentials();
     }
+    // The password is verified before the status is read: "suspended" is only ever disclosed to someone
+    // who holds the right password.
     if (!await this.passwordHashing.verify(user.passwordHash, parsed.password)) {
+      if (user.status === "suspended") {
+        // A suspended account is neither counted nor locked: the answer stays the neutral one.
+        await this.audit.writeAsync({ action: AuthAuditActions.userLoginFailed, targetType: "User", targetId: user.id, result: "refused", context: { email: user.email, status: user.status } });
+        throw invalidCredentials();
+      }
+      if (!user.passwordHash) {
+        // An invited account has no password to guess: not counted, never locked, same neutral answer.
+        await this.audit.writeAsync({ action: AuthAuditActions.userLoginFailed, targetType: "User", targetId: user.id, result: "refused", context: { email: user.email, status: user.status } });
+        throw invalidCredentials();
+      }
       const failed = await this.users.incrementFailedLogin(user.id);
       await this.audit.writeAsync({ action: AuthAuditActions.userLoginFailed, targetType: "User", targetId: user.id, result: "refused", context: { email: user.email, failedLoginCount: failed.failedLoginCount } });
       if (failed.failedLoginCount >= this.lockoutThreshold()) {
         await this.users.lock(user.id, "failed-login-threshold");
         await this.audit.writeAsync({ action: AuthAuditActions.userLockedAfterFailedLogins, targetType: "User", targetId: user.id, result: "success", context: { email: user.email } });
       }
-      throw new Error("Invalid credentials");
+      throw invalidCredentials();
+    }
+    if (user.status === "suspended") {
+      await this.audit.writeAsync({ action: AuthAuditActions.userLoginRefusedSuspended, targetType: "User", targetId: user.id, result: "refused", context: { email: user.email } });
+      throw new ForbiddenException({ code: ErrorCodes.ACCOUNT_SUSPENDED, message: "Account suspended" });
     }
     // Spec 051 FR-022: checked only once the password is proven, with a neutral message, so the
     // response tells nothing about the partner to someone who does not hold the credentials.
@@ -155,9 +180,11 @@ export class AuthService {
     const parsed = activateRequestSchema.parse(input);
     const tokenHash = this.passwordReset.hashToken(parsed.token);
     const user = await this.users.findByPasswordResetTokenHash(tokenHash);
-    if (!user) {
-      await this.audit.writeAsync({ action: AuthAuditActions.userPasswordResetInvalid, targetType: "User", targetId: "unknown", result: "refused", context: {} });
-      throw new Error("Invalid activation token");
+    // Only an invited account is activated by a link, and only before the link expires; a used,
+    // forged, expired or misdirected token all get the same answer.
+    if (!user || user.status !== "invited" || this.passwordReset.isExpired(user.passwordResetTokenExpiresAt)) {
+      await this.audit.writeAsync({ action: AuthAuditActions.userPasswordResetInvalid, targetType: "User", targetId: user?.id ?? "unknown", result: "refused", context: { flow: "activation" } });
+      throw invalidActionToken();
     }
     const passwordHash = await this.passwordReset.hashNewPassword(parsed.password, user);
     const activated = await this.users.activateWithPassword(user.id, passwordHash);
@@ -194,7 +221,7 @@ export class AuthService {
     const user = await this.users.findByPasswordResetTokenHash(tokenHash);
     if (!user || this.passwordReset.isExpired(user.passwordResetTokenExpiresAt)) {
       await this.audit.writeAsync({ action: AuthAuditActions.userPasswordResetInvalid, targetType: "User", targetId: user?.id ?? "unknown", result: "refused", context: {} });
-      throw new Error("Invalid password reset token");
+      throw invalidActionToken();
     }
     const passwordHash = await this.passwordReset.hashNewPassword(parsed.newPassword, user);
     await this.users.consumePasswordReset(user.id, passwordHash);
@@ -224,16 +251,27 @@ export class AuthService {
 
   async verifyMfa(user: UserAccount, _challengeId: string, code: string, kind: "totp" | "backup" = "totp", options: VerifyMfaOptions = {}): Promise<AuthSession> {
     const result = await this.mfa.verify(user, code, kind);
-    if (!result.verified) {
+    // A TOTP code is single-use: the time step that validated it is remembered (atomically, by the
+    // users service) and a second presentation of the same step is refused like a wrong code.
+    const replayed = result.verified && kind === "totp" && result.totpCounter !== undefined && !await this.users.claimTotpCounter(user.id, result.totpCounter);
+    // A backup code is single-use too: the consumption is atomic and only one of two simultaneous requests wins.
+    const backupLost = result.verified && kind === "backup" && (!result.consumedBackupCodeHash || !await this.users.consumeBackupCode(user.id, result.consumedBackupCodeHash));
+    if (replayed) {
+      // A legitimate replay (same code on two devices within its 30 s step) is refused and audited but
+      // does not feed the lockout counter: the code was valid, only already used.
+      await this.audit.writeAsync({ action: AuthAuditActions.userMfaFailed, targetType: "User", targetId: user.id, result: "refused", reason: "totp_replay", context: { email: user.email, failedLoginCount: user.failedLoginCount, kind } });
+      throw new Error("Invalid MFA code");
+    }
+    if (!result.verified || backupLost) {
       const failed = await this.users.incrementFailedLogin(user.id);
-      await this.audit.writeAsync({ action: AuthAuditActions.userMfaFailed, targetType: "User", targetId: user.id, result: "refused", context: { email: user.email, failedLoginCount: failed.failedLoginCount, kind } });
+      await this.audit.writeAsync({ action: AuthAuditActions.userMfaFailed, targetType: "User", targetId: user.id, result: "refused", ...(backupLost ? { reason: "backup_code_reused" } : {}), context: { email: user.email, failedLoginCount: failed.failedLoginCount, kind } });
       if (failed.failedLoginCount >= this.lockoutThreshold()) {
         await this.users.lock(user.id, "failed-mfa-threshold");
         await this.audit.writeAsync({ action: AuthAuditActions.userLockedAfterFailedLogins, targetType: "User", targetId: user.id, result: "success", context: { email: user.email, source: "mfa" } });
       }
       throw new Error("Invalid MFA code");
     }
-    const verifiedUser = await this.users.markMfaVerified(user.id, result.backupCodeHashes);
+    const verifiedUser = await this.users.markMfaVerified(user.id);
     await this.audit.writeAsync({ action: AuthAuditActions.userMfaVerified, targetType: "User", targetId: user.id, result: "success", context: { email: user.email, kind } });
     // Spec 063 FR-A02: the clear token leaves the server once, in this response.
     const device = options.trustDevice === true ? await this.trustedDevices.issue(user.id, options.deviceLabel) : undefined;

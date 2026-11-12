@@ -58,9 +58,9 @@ describe("visitor consent withdrawal", () => {
     const { seed, quoteRequests, confirmation, quote } = await submitWithdrawableQuote();
     expect(confirmation.routed).toBe(true);
 
-    const result = await quoteRequests.submissions.withdrawConsent(confirmation.publicReference, confirmation.verificationToken, withdrawalContext());
+    const result = await quoteRequests.submissions.withdrawConsent(confirmation.publicReference!, confirmation.verificationToken!, withdrawalContext());
 
-    expect(result).toMatchObject({ status: "cancelled", publicReference: confirmation.publicReference, alreadyWithdrawn: false });
+    expect(result).toMatchObject({ status: "cancelled", publicReference: confirmation.publicReference!, alreadyWithdrawn: false });
     expect(result.message).toContain("courtier partenaire");
 
     const consentRecord = await seed.app.consent.service.findRecord(quote.consentRecordId);
@@ -80,7 +80,7 @@ describe("visitor consent withdrawal", () => {
     const withdrawalNotice = inbox.find((notification) => notification.type === "lead_consent_withdrawn");
     expect(withdrawalNotice).toBeDefined();
     expect(withdrawalNotice?.targetId).toBe(assignments[0]?.id);
-    expect(withdrawalNotice?.body).toContain(confirmation.publicReference);
+    expect(withdrawalNotice?.body).toContain(confirmation.publicReference!);
 
     expect(actionCount(seed, "consent.withdrawn_by_visitor")).toBe(2);
     expect(actionCount(seed, "quote_request.cancelled_by_visitor")).toBe(1);
@@ -89,15 +89,15 @@ describe("visitor consent withdrawal", () => {
 
   it("is idempotent: a second withdrawal changes nothing further", async () => {
     const { seed, quoteRequests, confirmation, quote } = await submitWithdrawableQuote();
-    await quoteRequests.submissions.withdrawConsent(confirmation.publicReference, confirmation.verificationToken, withdrawalContext());
+    await quoteRequests.submissions.withdrawConsent(confirmation.publicReference!, confirmation.verificationToken!, withdrawalContext());
 
     const firstRecord = await seed.app.consent.service.findRecord(quote.consentRecordId);
     const firstWithdrawnAt = firstRecord?.withdrawnAt;
     const inboxBefore = (await seed.app.notifications.dispatch.listInApp(seed.partnerTenantId)).length;
 
-    const second = await quoteRequests.submissions.withdrawConsent(confirmation.publicReference, confirmation.verificationToken, withdrawalContext());
+    const second = await quoteRequests.submissions.withdrawConsent(confirmation.publicReference!, confirmation.verificationToken!, withdrawalContext());
 
-    expect(second).toMatchObject({ status: "cancelled", publicReference: confirmation.publicReference, alreadyWithdrawn: true });
+    expect(second).toMatchObject({ status: "cancelled", publicReference: confirmation.publicReference!, alreadyWithdrawn: true });
     const secondRecord = await seed.app.consent.service.findRecord(quote.consentRecordId);
     expect(secondRecord?.withdrawnAt).toBe(firstWithdrawnAt);
     expect(actionCount(seed, "consent.withdrawn_by_visitor")).toBe(2);
@@ -109,9 +109,9 @@ describe("visitor consent withdrawal", () => {
   it("answers a wrong token exactly as an unknown reference, revealing nothing", async () => {
     const { quoteRequests, confirmation } = await submitWithdrawableQuote();
 
-    const wrongToken = await messageOf(quoteRequests.submissions.withdrawConsent(confirmation.publicReference, "not-the-token", withdrawalContext()));
-    const unknownReference = await messageOf(quoteRequests.submissions.withdrawConsent("QR-2026-UNKNOWN", confirmation.verificationToken, withdrawalContext()));
-    const unknownStatus = await messageOf(quoteRequests.submissions.status("QR-2026-UNKNOWN", confirmation.verificationToken));
+    const wrongToken = await messageOf(quoteRequests.submissions.withdrawConsent(confirmation.publicReference!, "not-the-token", withdrawalContext()));
+    const unknownReference = await messageOf(quoteRequests.submissions.withdrawConsent("QR-2026-UNKNOWN", confirmation.verificationToken!, withdrawalContext()));
+    const unknownStatus = await messageOf(quoteRequests.submissions.status("QR-2026-UNKNOWN", confirmation.verificationToken!));
 
     expect(wrongToken).toBe(unknownReference);
     expect(wrongToken).toBe(unknownStatus);
@@ -122,7 +122,7 @@ describe("visitor consent withdrawal", () => {
     const before = await seed.app.consent.service.findRecord(quote.consentRecordId);
     expect(before).toBeDefined();
 
-    await quoteRequests.submissions.withdrawConsent(confirmation.publicReference, confirmation.verificationToken, withdrawalContext());
+    await quoteRequests.submissions.withdrawConsent(confirmation.publicReference!, confirmation.verificationToken!, withdrawalContext());
 
     const after = await seed.app.consent.service.findRecord(quote.consentRecordId);
     expect(after).toBeDefined();
@@ -144,7 +144,7 @@ describe("visitor consent withdrawal", () => {
       })
     });
 
-    const result = await quoteRequests.submissions.withdrawConsent(confirmation.publicReference, confirmation.verificationToken, withdrawalContext());
+    const result = await quoteRequests.submissions.withdrawConsent(confirmation.publicReference!, confirmation.verificationToken!, withdrawalContext());
 
     expect(result.alreadyWithdrawn).toBe(false);
     expect((await seed.app.consent.service.findRecord(quote.consentRecordId))?.status).toBe("withdrawn");
@@ -161,12 +161,12 @@ describe("visitor consent withdrawal", () => {
     const { quoteRequests, confirmation } = await submitWithdrawableQuote();
 
     for (let attempt = 0; attempt < 5; attempt += 1) {
-      await quoteRequests.submissions.withdrawConsent(confirmation.publicReference, confirmation.verificationToken, withdrawalContext());
+      await quoteRequests.submissions.withdrawConsent(confirmation.publicReference!, confirmation.verificationToken!, withdrawalContext());
     }
 
-    await expect(quoteRequests.submissions.withdrawConsent(confirmation.publicReference, confirmation.verificationToken, withdrawalContext()))
+    await expect(quoteRequests.submissions.withdrawConsent(confirmation.publicReference!, confirmation.verificationToken!, withdrawalContext()))
       .rejects.toThrow("Rate limit exceeded for public submissions");
-    await expect(quoteRequests.submissions.withdrawConsent(confirmation.publicReference, confirmation.verificationToken, withdrawalContext("203.0.113.99")))
+    await expect(quoteRequests.submissions.withdrawConsent(confirmation.publicReference!, confirmation.verificationToken!, withdrawalContext("203.0.113.99")))
       .resolves.toMatchObject({ alreadyWithdrawn: true });
   });
 });

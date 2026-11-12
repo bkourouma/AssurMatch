@@ -99,6 +99,35 @@ interface Refusal {
 }
 
 /**
+ * True for a duplicate-e-mail failure of the user creation path, whatever its shape: the domain
+ * ConflictException (EMAIL_ALREADY_USED), a raw Prisma unique violation (P2002 / "Unique constraint failed")
+ * or the in-memory repository's "User email already exists".
+ */
+export function isEmailAlreadyUsedError(error: unknown): boolean {
+  if (error === null || typeof error !== "object") return false;
+  const record = error as { code?: unknown; message?: unknown; response?: unknown };
+  if (record.code === "P2002") return true;
+  const response = record.response;
+  if (response !== null && typeof response === "object" && (response as { code?: unknown }).code === ErrorCodes.EMAIL_ALREADY_USED) return true;
+  return typeof record.message === "string" && /unique constraint|already exists/i.test(record.message);
+}
+
+/** Writes whose right is decided by role alone before the target is known (see `assertCanWrite`). */
+export type PartnerWriteKind = "create" | "update" | "authorize_country" | "authorize_product" | "withdraw_country" | "withdraw_product" | "create_license" | "record_contract" | "invite_user";
+
+const PARTNER_WRITE_RULES: Record<PartnerWriteKind, { permissions: string[]; action: string }> = {
+  create: { permissions: ["partners:create"], action: "partner.create_refused" },
+  update: { permissions: ["partners:update"], action: "partner.update_refused" },
+  authorize_country: { permissions: ["partners:update"], action: "partner.country_authorization_refused" },
+  authorize_product: { permissions: ["partners:update"], action: "partner.product_authorization_refused" },
+  withdraw_country: { permissions: ["partners:update"], action: "partner.country_authorization_withdraw_refused" },
+  withdraw_product: { permissions: ["partners:update"], action: "partner.product_authorization_withdraw_refused" },
+  create_license: { permissions: ["licenses:create"], action: "partner_license.create_refused" },
+  record_contract: { permissions: ["partners:update"], action: "partner.contract_refused" },
+  invite_user: { permissions: ["users:create", "partners:update"], action: "partner.user_invite_refused" }
+};
+
+/**
  * Spec 051: orchestration behind the `/admin/partners` routes. Controllers stay thin; this service
  * applies the RBAC matrix (R13), the explicit compliance-only rules, the country scope of the Admin
  * Pays, the lifecycle rules (R2-R7) and returns admin views. Every refusal is audited.
@@ -126,6 +155,17 @@ export class PartnerAdminService {
 
   private can(actor: ActorContext, permission: string, countryId: string | undefined | null): boolean {
     return this.rbac.can(actor, permission) && this.inCountryScope(actor, countryId);
+  }
+
+  /**
+   * Role-only precheck for the write routes, called by the HTTP controller BEFORE it parses the body, so an
+   * actor without the right (support_admin...) gets 403 RBAC_DENIED (and an audited refusal) rather than a
+   * 400 that leaks the schema. The service methods re-check the role AND the country scope afterwards.
+   */
+  assertCanWrite(actor: ActorContext, kind: PartnerWriteKind, targetId = "unknown"): void {
+    const rule = PARTNER_WRITE_RULES[kind];
+    if (rule.permissions.some((permission) => this.rbac.can(actor, permission))) return;
+    this.require(actor, false, { action: rule.action, targetType: "PartnerTenant", targetId, refusal: "rbac_denied" });
   }
 
   private require(actor: ActorContext, allowed: boolean, refusal: Refusal): void {
@@ -534,7 +574,15 @@ export class PartnerAdminService {
       throw partnerUnprocessable(ErrorCodes.PARTNER_USER_INVALID, `The owner role of a ${partner.plan} partner is ${ownerRoleForPlan(partner.plan)}`);
     }
     if (!this.deps.provisionUser) throw new Error("Partner user invitation is not configured");
-    const created = await this.deps.provisionUser(actor, { email: parsed.email, displayName: parsed.displayName, role: parsed.role, partnerTenantId: partnerId, reason: parsed.reason });
+    let created: Awaited<ReturnType<NonNullable<PartnerAdminServiceDeps["provisionUser"]>>>;
+    try {
+      created = await this.deps.provisionUser(actor, { email: parsed.email, displayName: parsed.displayName, role: parsed.role, partnerTenantId: partnerId, reason: parsed.reason });
+    } catch (error) {
+      if (!isEmailAlreadyUsedError(error)) throw error;
+      this.refuse(actor, { ...refusal, refusal: "email_already_used" });
+      // Never the raw ORM text: a neutral 409 with a stable code.
+      throw partnerConflict("This e-mail address is already in use", ErrorCodes.EMAIL_ALREADY_USED);
+    }
     this.deps.audit.write({
       actor,
       action: "partner.user_invited",

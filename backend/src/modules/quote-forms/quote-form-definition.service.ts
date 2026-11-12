@@ -5,7 +5,7 @@ import {
   type QuoteFormFieldDto
 } from "../../../../packages/shared/contracts/quote.contracts";
 import { NotFoundException, UnprocessableEntityException } from "@nestjs/common";
-import { findForbiddenWording } from "../../../../packages/shared/contracts/content-safety";
+import { findRegulatedWordingAnyLanguage } from "../../../../packages/shared/contracts/content-safety";
 import { resolveConsentContent } from "../../../../packages/shared/contracts/consent-content";
 import { ErrorCodes } from "../../../../packages/shared/contracts/error-codes";
 import { roleHasPermission, type AssurMatchRole } from "../../../../packages/shared/rbac/assurmatch-role-matrix";
@@ -151,6 +151,20 @@ export const QuoteFormAuditActions = {
   retired: "quote_form.retired",
   publicationRefused: "quote_form.publication_refused"
 } as const;
+
+/**
+ * Regulated wording in the texts a visitor reads on the form: field labels and the choices of a
+ * select (accent, case, spacing and English insensitive). Field by field, so a phrase is never
+ * assembled across two texts.
+ */
+export function findQuoteFormForbiddenWording(fields: readonly QuoteFormFieldDto[]): string[] {
+  const texts = fields.flatMap((field) => [field.label, ...(field.options ?? [])]);
+  return [...new Set(texts.flatMap((text) => findRegulatedWordingAnyLanguage(text)))];
+}
+
+function forbiddenWordingRefusal(message: string, wording: readonly string[]): UnprocessableEntityException {
+  return new UnprocessableEntityException({ code: ErrorCodes.FORBIDDEN_WORDING, message: `${message}: ${wording.join(", ")}`, details: { wording: [...wording] } });
+}
 
 export class QuoteFormDefinitionService {
   constructor(
@@ -368,10 +382,10 @@ export class QuoteFormDefinitionService {
         message: `Quote form publication refused: the consent text ${mismatch} does not match the form`
       });
     }
-    const wording = form.fields.flatMap((field) => findForbiddenWording(field.label));
+    const wording = findQuoteFormForbiddenWording(form.fields);
     if (wording.length > 0) {
       this.refusePublication(form, actor, "forbidden_public_wording", { wording });
-      throw new Error("Quote form publication refused: invalid public wording in field labels");
+      throw forbiddenWordingRefusal("Quote form publication refused: invalid public wording in field labels", wording);
     }
     if (form.fields.some((field) => field.sensitivity === "sensitive") && !this.sensitiveDataEnabled(form.productId)) {
       this.refusePublication(form, actor, "sensitive_fields_not_enabled");

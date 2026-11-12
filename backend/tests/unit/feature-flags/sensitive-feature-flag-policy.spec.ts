@@ -21,7 +21,7 @@ describe("sensitive feature flag mutation policy", () => {
     ];
 
     for (const key of protectedKeys) expect(isSensitiveFeatureFlagKey(key)).toBe(true);
-    expect(isSensitiveFeatureFlagKey("ai_summary_enabled")).toBe(false);
+    expect(isSensitiveFeatureFlagKey("ai_summary_enabled")).toBe(true);
     expect(isSensitiveFeatureFlagKey("public_comparator_enabled")).toBe(false);
   });
 
@@ -50,5 +50,21 @@ describe("sensitive feature flag mutation policy", () => {
 
   it("protects the per-country and per-product AI flags (lot 7)", () => {
     for (const key of ["country_ai_enabled", "product_ai_scoring_enabled", "product_ai_form_assistant_enabled"]) expect(isSensitiveFeatureFlagKey(key)).toBe(true);
+  });
+  it("protects ai_summary_enabled like the other AI flags: refused true/false, rapid disable only, policy path covers it", () => {
+    for (const value of [true, false]) {
+      const decision = evaluateFeatureFlagMutation({ key: "ai_summary_enabled", scopeType: "global", value });
+      expect(decision.allowed).toBe(false);
+      if (decision.allowed) throw new Error("ai_summary_enabled mutation should be refused");
+      expect(decision.reason).toBe(sensitiveFeatureFlagRefusalReason);
+    }
+    expect(evaluateFeatureFlagMutation({ key: "ai_summary_enabled", scopeType: "global", value: false, allowSensitiveDisable: true })).toEqual({ allowed: true });
+    expect(evaluateFeatureFlagMutation({ key: "ai_summary_enabled", scopeType: "global", value: true, allowSensitiveDisable: true }).allowed).toBe(false);
+    expect(POLICY_ACTIVATABLE_FLAGS).toContain("ai_summary_enabled");
+  });
+
+  it("keeps ai_partner_opt_out mutable (it only restricts AI usage)", () => {
+    expect(isSensitiveFeatureFlagKey("ai_partner_opt_out")).toBe(false);
+    for (const value of [true, false]) expect(evaluateFeatureFlagMutation({ key: "ai_partner_opt_out", scopeType: "partner", scopeId: "t1", value })).toEqual({ allowed: true });
   });
 });

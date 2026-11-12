@@ -30,6 +30,14 @@ export class BillingPlansService {
     return (await this.deps.repository.listPlanPrices()).map((record) => this.toDto(record));
   }
 
+  /**
+   * Access precheck (MFA, then role) for the HTTP controller to run BEFORE it parses the body, so a role
+   * without billing write access gets the audited 403 rather than a 400. `upsert` checks it again.
+   */
+  assertWriteAccess(actor: ActorContext): void {
+    this.assertAccess(actor, "write");
+  }
+
   async upsert(input: BillingPlanPriceUpsert, actor: ActorContext): Promise<BillingPlanPrice> {
     this.assertAccess(actor, "write");
     const parsed = billingPlanPriceUpsertSchema.parse(input);

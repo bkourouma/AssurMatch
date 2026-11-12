@@ -56,8 +56,8 @@ export interface InvoiceDocumentFile {
 
 type AdminPermission = "billing:read" | "billing:invoice_issue" | "billing:payment_record" | "billing:credit_note";
 
-const STATEMENT_NOTICE =
-  "Facturation manuelle: reglement par virement bancaire ou mobile money hors plateforme. Aucun paiement en ligne, aucune prime d'assurance encaissee par AssurMatch.";
+export const STATEMENT_NOTICE =
+  "Facturation manuelle: aucun paiement en ligne, aucune prime d'assurance encaissée par AssurMatch. Règlement par virement bancaire ou mobile money hors plateforme.";
 
 /**
  * Spec 060 (PRD v0.3 EPIC J, G-05): issues numbered invoices from monthly drafts, records payments

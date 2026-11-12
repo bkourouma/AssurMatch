@@ -1,4 +1,4 @@
-import { generate } from "otplib";
+import { totp } from "../helpers/mfa-login";
 import { afterEach, describe, expect, it } from "vitest";
 import { AuditLogWriter } from "../../../src/modules/audit-logs/audit-log-writer.service";
 import { AuthAuditActions } from "../../../src/modules/audit-logs/auth-audit-actions";
@@ -13,7 +13,7 @@ import { superAdminActor } from "../helpers/enterprise-seed";
 const PASSWORD = "valid password 123";
 
 async function code(secret: string): Promise<string> {
-  return generate({ secret, strategy: "totp", digits: 6, period: 30 });
+  return totp(secret);
 }
 
 function harness() {
@@ -173,6 +173,8 @@ describe("MFA login and trusted devices (spec 063, scenarios A1-A7)", () => {
         await auth.service.resetPassword({ token: issued.token, newPassword: "reset valid password 789" });
       }],
       ["activation by password", "password_reset", async ({ auth, users }, user) => {
+        // An activation link only works for an invited account.
+        await users.update({ ...(await users.require(user.id)), status: "invited" });
         const issued = new PasswordResetService().issueToken();
         await users.setPasswordResetToken(user.id, issued.tokenHash, issued.expiresAt);
         await auth.service.activate({ token: issued.token, password: "activated password 123" });

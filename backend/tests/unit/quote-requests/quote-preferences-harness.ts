@@ -138,7 +138,7 @@ export async function createPreferencesHarness(options: { manualReview?: boolean
       formDefinitionId,
       language: "fr",
       contact: { displayName: `Visiteur ${sequence}`, email: `visiteur067-${sequence}@example.test`, phone: `+2250708091${String(sequence).padStart(3, "0")}` },
-      answers: { vehicle_use: "prive" },
+      answers: { vehicle_use: "prive", city: "Abidjan", contact_preference: "email" },
       consent: { accepted: true, consentTextId, version: "v1", contentHash: "hash-v1", multiBrokerAccepted: multiBrokerAccepted ?? false },
       ...rest
     } as QuoteRequestCreateDto;

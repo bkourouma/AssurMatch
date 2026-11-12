@@ -268,6 +268,45 @@ export const quoteMarketingSourceSchema = z.object({
   referrerHost: z.string().trim().max(255).optional()
 });
 
+/**
+ * Bounds of the visitor `answers` record (lot 4 A-02e1): at most 100 keys, a key of at most 100
+ * characters, a string value of at most 2000 characters, 50 000 characters once serialised. Nested
+ * values (arrays, objects) count through the serialised total only. The refusal names `answers`.
+ */
+export const QUOTE_ANSWERS_MAX_KEYS = 100;
+export const QUOTE_ANSWERS_MAX_KEY_LENGTH = 100;
+export const QUOTE_ANSWERS_MAX_VALUE_LENGTH = 2000;
+export const QUOTE_ANSWERS_MAX_SERIALIZED_LENGTH = 50_000;
+
+export const quoteAnswersSchema = z.record(z.string(), z.unknown()).default({}).superRefine((answers, ctx) => {
+  const keys = Object.keys(answers);
+  if (keys.length > QUOTE_ANSWERS_MAX_KEYS) {
+    ctx.addIssue({ code: "custom", message: `answers: at most ${QUOTE_ANSWERS_MAX_KEYS} entries` });
+  }
+  for (const key of keys) {
+    if (key.length > QUOTE_ANSWERS_MAX_KEY_LENGTH) {
+      ctx.addIssue({ code: "custom", message: `answers: a key is longer than ${QUOTE_ANSWERS_MAX_KEY_LENGTH} characters` });
+      break;
+    }
+  }
+  for (const [key, value] of Object.entries(answers)) {
+    if (typeof value === "string" && value.length > QUOTE_ANSWERS_MAX_VALUE_LENGTH) {
+      ctx.addIssue({ code: "custom", message: `answers.${key.slice(0, 40)}: longer than ${QUOTE_ANSWERS_MAX_VALUE_LENGTH} characters` });
+      break;
+    }
+  }
+  let serialized: number;
+  try {
+    serialized = JSON.stringify(answers).length;
+  } catch {
+    ctx.addIssue({ code: "custom", message: "answers: not serialisable" });
+    return;
+  }
+  if (serialized > QUOTE_ANSWERS_MAX_SERIALIZED_LENGTH) {
+    ctx.addIssue({ code: "custom", message: `answers: more than ${QUOTE_ANSWERS_MAX_SERIALIZED_LENGTH} characters in total` });
+  }
+});
+
 export const quoteRequestCreateSchema = z.object({
   countryCode: isoCountrySchema,
   productKey: nonEmptyStringSchema,
@@ -285,7 +324,7 @@ export const quoteRequestCreateSchema = z.object({
   /** Spec 050 R6: language of the submitted form; consent is checked against the form of this language. */
   language: quoteLanguageSchema.default("fr"),
   contact: quoteContactSchema,
-  answers: z.record(z.string(), z.unknown()).default({}),
+  answers: quoteAnswersSchema,
   consent: z.object({
     accepted: z.literal(true),
     consentTextId: uuidSchema,
@@ -302,12 +341,15 @@ export const quoteRequestCreateSchema = z.object({
 });
 
 export const quoteConfirmationSchema = z.object({
-  publicReference: nonEmptyStringSchema,
-  status: z.enum(["routed", "non_routable", "manual_review", "duplicate"]),
+  /** Absent on `duplicate_ignored`: no request was created, so there is nothing to follow. */
+  publicReference: nonEmptyStringSchema.optional(),
+  /** `duplicate_ignored` (lot 4 A-03d): HTTP 200, no request created, no access token, no tracking link. */
+  status: z.enum(["routed", "non_routable", "manual_review", "duplicate", "duplicate_ignored"]),
   routed: z.boolean(),
   brokerName: z.string().optional(),
   message: nonEmptyStringSchema,
-  verificationToken: nonEmptyStringSchema,
+  /** Absent on `duplicate_ignored`. */
+  verificationToken: nonEmptyStringSchema.optional(),
   /**
    * Spec 052 R7 / FR-019: `true` when the broker of the selected offer received the request, `false`
    * when it was routed to another eligible partner (or the offer was ignored), `null` without offer.

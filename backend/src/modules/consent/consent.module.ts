@@ -100,6 +100,8 @@ export class ConsentService {
         throw new UnprocessableEntityException({
           code: ErrorCodes.CONSENT_TEXT_INVALID,
           message: `Consent text cannot be published: ${issues.map((issue) => issue.detail ? `${issue.code} (${issue.detail})` : issue.code).join(", ")}`,
+          // Non-sensitive: the expressions found, relayed by the error filter next to the blockers.
+          ...(issues.some((issue) => issue.code === "forbidden_wording") ? { details: { wording: issues.filter((issue) => issue.code === "forbidden_wording" && issue.detail).map((issue) => issue.detail as string) } } : {}),
           blockers: issues.map((issue) => ({ section: "consent_text", control: issue.code, label: CONSENT_ISSUE_LABELS[issue.code], evidence: issue.detail ?? "" }))
         });
       }

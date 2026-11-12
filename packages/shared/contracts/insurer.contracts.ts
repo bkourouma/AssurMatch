@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { dateTimeStringSchema, nonEmptyStringSchema, reasonSchema, uuidSchema } from "../validation/common.schemas";
-import { findForbiddenWording } from "./content-safety";
+import { findRegulatedWordingAnyLanguage } from "./content-safety";
 
 /**
  * Spec 070 (PRD section 8): the insurer referential, per country. An offer links to an insurer
@@ -23,7 +23,7 @@ const insurerNameSchema = nonEmptyStringSchema.max(120);
 const approvalNumberSchema = z.string().trim().max(60);
 
 function refineInsurerText(value: { name?: string | undefined; approvalNumber?: string | undefined }, ctx: z.RefinementCtx): void {
-  const forbidden = findForbiddenWording([value.name, value.approvalNumber].filter(Boolean).join(" "));
+  const forbidden = findRegulatedWordingAnyLanguage([value.name, value.approvalNumber].filter(Boolean).join(" "));
   if (forbidden.length > 0) ctx.addIssue({ code: "custom", message: `Forbidden regulated wording: ${forbidden.join(", ")}` });
 }
 

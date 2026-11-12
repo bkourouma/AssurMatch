@@ -1,21 +1,68 @@
 import { userCreateSchema, type UserCreateDto } from "../../../../packages/shared/contracts/auth.contracts";
+import { ConflictException, ForbiddenException } from "@nestjs/common";
+import { ErrorCodes } from "../../../../packages/shared/contracts/error-codes";
 import type { AssurMatchRole } from "../../../../packages/shared/rbac/assurmatch-role-matrix";
 import { AuditLogWriter } from "../audit-logs/audit-log-writer.service";
 import { AuthAuditActions } from "../audit-logs/auth-audit-actions";
 import type { ActorContext } from "../common/types";
-import { MemoryUsersRepository, type UserAccount, type UsersRepository } from "./users.repository";
+import { MemoryUsersRepository, UserNotFoundError, type UserAccount, type UsersRepository } from "./users.repository";
 import type { TrustedDeviceRevoker } from "../auth/trusted-device.service";
 
 export type { UserAccount } from "./users.repository";
 
 /** Statuses after which a still-trusted browser must not skip the second factor (spec 063 FR-A06). */
+/** Lock reasons written by the login / MFA lockout (auth.module.ts); every other reason is an admin lock. */
+const AUTOMATIC_LOCK_REASONS: ReadonlySet<string> = new Set(["failed-login-threshold", "failed-mfa-threshold"]);
 const ACCESS_ENDING_STATUSES = new Set<UserAccount["status"]>(["suspended", "locked", "deleted"]);
 
 export class UsersService {
   /** Spec 063: ends the trusted devices of a user whose credentials or access change. */
   private trustedDevices?: TrustedDeviceRevoker | undefined;
 
+  /** Listeners told right after any change of status, roles or credentials (immediate access-cache invalidation). */
+  private readonly accessListeners: Array<(userId: string) => void> = [];
+
   constructor(private readonly audit: AuditLogWriter, private readonly repository: UsersRepository = new MemoryUsersRepository()) {}
+
+  /** Subscribes to access changes (suspend, lock, delete, roles, activation, reset). Never throws into the caller. */
+  onAccessChange(listener: (userId: string) => void): void {
+    this.accessListeners.push(listener);
+  }
+
+  private notifyAccessChange(userId: string): void {
+    for (const listener of this.accessListeners) {
+      try {
+        listener(userId);
+      } catch {
+        // an observer must never break the write that already succeeded
+      }
+    }
+  }
+
+  /** Atomic TOTP replay guard: true only if `counter` is strictly greater than the last accepted one. */
+  async claimTotpCounter(userId: string, counter: number): Promise<boolean> {
+    return this.repository.claimTotpCounter(userId, counter);
+  }
+
+  /** Atomic single-use backup code: true only for the one caller that blanked the entry holding `hash`. */
+  async consumeBackupCode(userId: string, hash: string): Promise<boolean> {
+    return this.repository.consumeBackupCode(userId, hash);
+  }
+
+  /**
+   * SEC-LAST-1: refuses (409 LAST_SUPER_ADMIN) an action that would leave no active super_admin.
+   * `stillSuperAdmin` is whether the target remains an active super_admin after the action.
+   */
+  private async assertNotLastSuperAdmin(target: UserAccount, stillSuperAdmin: boolean): Promise<void> {
+    if (stillSuperAdmin) return;
+    if (target.status !== "active" || !target.roles.includes("super_admin")) return;
+    const others = (await this.repository.list()).filter((user) =>
+      user.id !== target.id && user.status === "active" && !user.deletedAt && user.roles.includes("super_admin")
+    );
+    if (others.length === 0) {
+      throw new ConflictException({ code: ErrorCodes.LAST_SUPER_ADMIN, message: "The last active super administrator cannot be removed" });
+    }
+  }
 
   setTrustedDeviceRevoker(revoker: TrustedDeviceRevoker | undefined): void {
     this.trustedDevices = revoker;
@@ -58,8 +105,10 @@ export class UsersService {
 
   async updateRoles(userId: string, roles: AssurMatchRole[], reason: string, actor: ActorContext): Promise<UserAccount> {
     const user = await this.require(userId);
+    await this.assertNotLastSuperAdmin(user, roles.includes("super_admin"));
     user.roles = roles;
     const updated = await this.repository.update(user);
+    this.notifyAccessChange(userId);
     await this.audit.writeAsync({
       actor,
       action: AuthAuditActions.userRoleChanged,
@@ -98,6 +147,9 @@ export class UsersService {
       if (statusEnded) await this.revokeTrustedDevices(updated.id, updated.status === "suspended" ? "suspended" : updated.status === "locked" ? "locked" : "deleted");
       else if (before.passwordHash !== updated.passwordHash) await this.revokeTrustedDevices(updated.id, "password_change");
       else if (before.mfaSecretEncrypted !== updated.mfaSecretEncrypted) await this.revokeTrustedDevices(updated.id, updated.mfaSecretEncrypted ? "mfa_reenrolled" : "mfa_reset");
+      if (before.status !== updated.status || [...before.roles].sort().join(",") !== [...updated.roles].sort().join(",")) this.notifyAccessChange(updated.id);
+    } else {
+      this.notifyAccessChange(updated.id);
     }
     return updated;
   }
@@ -128,13 +180,16 @@ export class UsersService {
     delete user.lastFailedLoginAt;
     delete user.passwordResetTokenHash;
     delete user.passwordResetTokenExpiresAt;
-    if (user.status === "locked") {
+    // Only an AUTOMATIC lock (failed-login / failed-MFA threshold) is lifted by a proven password reset;
+    // a lock set by an admin (any other reason) and a suspension are kept: the reset is not an unlock.
+    if (user.status === "locked" && user.lockedReason !== undefined && AUTOMATIC_LOCK_REASONS.has(user.lockedReason)) {
       user.status = "active";
       delete user.lockedAt;
       delete user.lockedReason;
     }
     const updated = await this.repository.update(user);
     await this.revokeTrustedDevices(userId, "password_reset");
+    this.notifyAccessChange(userId);
     return updated;
   }
 
@@ -149,6 +204,8 @@ export class UsersService {
 
   async activateWithPassword(userId: string, passwordHash: string): Promise<UserAccount> {
     const user = await this.require(userId);
+    // Only an invited account is activated by its token: a locked, suspended, active or deleted account never is.
+    if (user.status !== "invited") throw new ForbiddenException({ code: ErrorCodes.INVALID_TOKEN, message: "Invalid activation token" });
     user.passwordHash = passwordHash;
     user.passwordChangedAt = new Date();
     user.passwordChangeRequired = false;
@@ -157,6 +214,7 @@ export class UsersService {
     delete user.passwordResetTokenExpiresAt;
     const updated = await this.repository.update(user);
     await this.revokeTrustedDevices(userId, "password_reset");
+    this.notifyAccessChange(userId);
     return updated;
   }
 
@@ -181,9 +239,11 @@ export class UsersService {
     const reenrolled = Boolean(user.mfaSecretEncrypted);
     user.mfaSecretEncrypted = encryptedSecret;
     user.mfaSecretIssuedAt = new Date();
+    delete user.mfaLastTotpCounter;
     user.mfaBackupCodesHashes = backupCodeHashes;
     user.mfaStatus = "enrolled";
     const updated = await this.repository.update(user);
+    await this.repository.clearTotpCounter(userId);
     if (reenrolled) await this.revokeTrustedDevices(userId, "mfa_reenrolled");
     return updated;
   }
@@ -200,6 +260,9 @@ export class UsersService {
 
   async incrementFailedLogin(userId: string, now = new Date()): Promise<UserAccount> {
     const user = await this.require(userId);
+    // An account without a password (a still-invited one) has nothing to guess: it is never counted nor
+    // locked (a lock would make the activation link unusable and the unlock would skip the password).
+    if (!user.passwordHash) return user;
     user.failedLoginCount += 1;
     user.lastFailedLoginAt = now;
     return this.repository.update(user);
@@ -207,45 +270,56 @@ export class UsersService {
 
   async lock(userId: string, reason: string): Promise<UserAccount> {
     const user = await this.require(userId);
+    await this.assertNotLastSuperAdmin(user, false);
     user.status = "locked";
     user.lockedAt = new Date();
     user.lockedReason = reason;
     const updated = await this.repository.update(user);
     await this.revokeTrustedDevices(userId, "locked");
+    this.notifyAccessChange(userId);
     return updated;
   }
 
   /** `revocationReason` is "deactivated" when the owner of a broker firm deactivates a team member. */
   async suspend(userId: string, revocationReason: "suspended" | "deactivated" = "suspended"): Promise<UserAccount> {
     const user = await this.require(userId);
+    await this.assertNotLastSuperAdmin(user, false);
     user.status = "suspended";
     const updated = await this.repository.update(user);
     await this.revokeTrustedDevices(userId, revocationReason);
+    this.notifyAccessChange(userId);
     return updated;
   }
 
   async unsuspend(userId: string): Promise<UserAccount> {
     const user = await this.require(userId);
     user.status = "active";
-    return this.repository.update(user);
+    const updated = await this.repository.update(user);
+    this.notifyAccessChange(userId);
+    return updated;
   }
 
   async unlock(userId: string): Promise<UserAccount> {
     const user = await this.require(userId);
-    user.status = "active";
+    // An account that never got a password goes back to "invited" (its activation link), never "active".
+    user.status = user.passwordHash ? "active" : "invited";
     delete user.lockedAt;
     delete user.lockedReason;
     user.failedLoginCount = 0;
-    return this.repository.update(user);
+    const updated = await this.repository.update(user);
+    this.notifyAccessChange(userId);
+    return updated;
   }
 
   async softDelete(userId: string): Promise<UserAccount> {
     const user = await this.require(userId);
+    await this.assertNotLastSuperAdmin(user, false);
     user.status = "deleted";
     user.deletedAt = new Date();
     user.email = `${user.id}@deleted.assurmatch.local`;
     const updated = await this.repository.update(user);
     await this.revokeTrustedDevices(userId, "deleted");
+    this.notifyAccessChange(userId);
     return updated;
   }
 
@@ -253,16 +327,18 @@ export class UsersService {
     const user = await this.require(userId);
     delete user.mfaSecretEncrypted;
     delete user.mfaSecretIssuedAt;
+    delete user.mfaLastTotpCounter;
     user.mfaBackupCodesHashes = [];
     user.mfaStatus = "required";
     const updated = await this.repository.update(user);
+    await this.repository.clearTotpCounter(userId);
     await this.revokeTrustedDevices(userId, "mfa_reset");
     return updated;
   }
 
   async require(id: string): Promise<UserAccount> {
     const user = await this.repository.findById(id);
-    if (!user) throw new Error(`User ${id} not found`);
+    if (!user) throw new UserNotFoundError(id);
     return user;
   }
 }

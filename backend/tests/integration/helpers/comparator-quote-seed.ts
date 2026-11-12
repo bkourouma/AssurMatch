@@ -254,7 +254,7 @@ export function validQuotePayload(seed: ComparatorSeed) {
       email: "visitor@example.com",
       phone: "+2250102030405"
     },
-    answers: { vehicle_use: "prive" },
+    answers: { vehicle_use: "prive", city: "Abidjan", contact_preference: "email" },
     consent: {
       accepted: true,
       consentTextId: seed.consentTextId,

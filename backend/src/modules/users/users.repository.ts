@@ -25,6 +25,8 @@ export interface UserAccount {
   lockedReason?: string;
   mfaSecretEncrypted?: string;
   mfaSecretIssuedAt?: Date;
+  /** Last accepted TOTP time-step counter (replay protection); undefined = never. */
+  mfaLastTotpCounter?: number;
   mfaBackupCodesHashes: string[];
   passwordResetTokenHash?: string;
   passwordResetTokenExpiresAt?: Date;
@@ -35,6 +37,14 @@ export interface UserAccount {
   updatedAt: Date;
 }
 
+/** Thrown by `UsersService.require` for an unknown id: the only error a caller may read as "no such user". */
+export class UserNotFoundError extends Error {
+  constructor(id: string) {
+    super(`User ${id} not found`);
+    this.name = "UserNotFoundError";
+  }
+}
+
 export interface UsersRepository {
   readonly mode: "memory-test" | "prisma-runtime";
   create(user: UserAccount): Promise<UserAccount>;
@@ -42,6 +52,15 @@ export interface UsersRepository {
   findById(id: string): Promise<UserAccount | undefined>;
   findByEmail(email: string): Promise<UserAccount | undefined>;
   list(): Promise<UserAccount[]>;
+  /** Atomic: accepts (and remembers) the counter only if strictly greater than the last one. */
+  claimTotpCounter(userId: string, counter: number): Promise<boolean>;
+  /** Clears the TOTP replay counter (MFA reset / new enrolment): the only other writer besides `claimTotpCounter`. */
+  clearTotpCounter(userId: string): Promise<void>;
+  /**
+   * Atomic single-use backup code: blanks the entry holding `hash` and answers true only for the one
+   * caller that did it; a concurrent or later presentation of the same code answers false.
+   */
+  consumeBackupCode(userId: string, hash: string): Promise<boolean>;
 }
 
 export class MemoryUsersRepository implements UsersRepository {
@@ -55,8 +74,13 @@ export class MemoryUsersRepository implements UsersRepository {
   }
 
   async update(user: UserAccount): Promise<UserAccount> {
-    if (!this.users.has(user.id)) throw new Error(`User ${user.id} not found`);
-    this.users.set(user.id, { ...user, updatedAt: new Date() });
+    const stored = this.users.get(user.id);
+    if (!stored) throw new UserNotFoundError(user.id);
+    // Like Prisma's update, a generic write never touches the TOTP counter (claim/clear own it).
+    const next: UserAccount = { ...user, updatedAt: new Date() };
+    if (stored.mfaLastTotpCounter === undefined) delete next.mfaLastTotpCounter;
+    else next.mfaLastTotpCounter = stored.mfaLastTotpCounter;
+    this.users.set(user.id, next);
     return this.require(user.id);
   }
 
@@ -75,9 +99,34 @@ export class MemoryUsersRepository implements UsersRepository {
     return [...this.users.values()].map((user) => ({ ...user }));
   }
 
+  async claimTotpCounter(userId: string, counter: number): Promise<boolean> {
+    const user = this.users.get(userId);
+    if (!user) return false;
+    if (user.mfaLastTotpCounter !== undefined && user.mfaLastTotpCounter !== null && user.mfaLastTotpCounter >= counter) return false;
+    user.mfaLastTotpCounter = counter;
+    return true;
+  }
+
+  async clearTotpCounter(userId: string): Promise<void> {
+    const user = this.users.get(userId);
+    if (user) delete user.mfaLastTotpCounter;
+  }
+
+  async consumeBackupCode(userId: string, hash: string): Promise<boolean> {
+    // Synchronous between the read and the write: no await, so two callers cannot both see the code.
+    const user = this.users.get(userId);
+    if (!user || !hash) return false;
+    const index = user.mfaBackupCodesHashes.indexOf(hash);
+    if (index < 0) return false;
+    const next = [...user.mfaBackupCodesHashes];
+    next[index] = "";
+    user.mfaBackupCodesHashes = next;
+    return true;
+  }
+
   private async require(id: string): Promise<UserAccount> {
     const user = await this.findById(id);
-    if (!user) throw new Error(`User ${id} not found`);
+    if (!user) throw new UserNotFoundError(id);
     return user;
   }
 }
@@ -88,6 +137,7 @@ interface PrismaUserDelegate {
   findFirst(input: unknown): Promise<PrismaUserRow | null>;
   create(input: unknown): Promise<unknown>;
   update(input: unknown): Promise<PrismaUserRow>;
+  updateMany(input: unknown): Promise<{ count: number }>;
 }
 
 interface PrismaRoleDelegate {
@@ -125,6 +175,7 @@ interface PrismaUserRow {
   lockedReason?: string | null;
   mfaSecretEncrypted?: string | null;
   mfaSecretIssuedAt?: Date | null;
+  mfaLastTotpCounter?: number | null;
   mfaBackupCodesHashes: string[];
   passwordResetTokenHash?: string | null;
   passwordResetTokenExpiresAt?: Date | null;
@@ -171,13 +222,41 @@ export class PrismaUsersRepository implements UsersRepository {
     return rows.map((row) => this.toDomain(row, row.partnerTenantId ? partnerPlans.get(row.partnerTenantId) : undefined));
   }
 
+  async claimTotpCounter(userId: string, counter: number): Promise<boolean> {
+    const result = await this.delegate.updateMany({
+      where: { id: userId, OR: [{ mfaLastTotpCounter: null }, { mfaLastTotpCounter: { lt: counter } }] },
+      data: { mfaLastTotpCounter: counter }
+    });
+    return result.count > 0;
+  }
+
+  async clearTotpCounter(userId: string): Promise<void> {
+    await this.delegate.updateMany({ where: { id: userId }, data: { mfaLastTotpCounter: null } });
+  }
+
+  async consumeBackupCode(userId: string, hash: string): Promise<boolean> {
+    if (!hash) return false;
+    // Compare-and-swap on the whole array: the write only lands if nobody changed it since the read.
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      const row = await this.delegate.findUnique({ where: { id: userId }, select: { mfaBackupCodesHashes: true } });
+      const current = row?.mfaBackupCodesHashes ?? [];
+      const index = current.indexOf(hash);
+      if (index < 0) return false;
+      const next = [...current];
+      next[index] = "";
+      const result = await this.delegate.updateMany({ where: { id: userId, mfaBackupCodesHashes: { equals: current } }, data: { mfaBackupCodesHashes: next } });
+      if (result.count > 0) return true;
+    }
+    return false;
+  }
+
   async findManyRaw(): Promise<unknown[]> {
     return this.delegate.findMany();
   }
 
   private async requireById(id: string): Promise<UserAccount> {
     const user = await this.findById(id);
-    if (!user) throw new Error(`User ${id} not found`);
+    if (!user) throw new UserNotFoundError(id);
     return user;
   }
 
@@ -207,16 +286,34 @@ export class PrismaUsersRepository implements UsersRepository {
     return (client as { partnerTenant?: PrismaPartnerTenantDelegate }).partnerTenant;
   }
 
+  /**
+   * Rewrites the roles only when they changed, and then inside one transaction, so that a failure in the
+   * middle can no longer leave the user without any role (a role-less user is refused at the guard).
+   */
   private async replaceRoles(userId: string, roles: AssurMatchRole[], reason: string): Promise<void> {
-    await this.userRoleDelegate.deleteMany({ where: { userId } });
-    for (const roleKey of roles) {
-      const role = await this.roleDelegate.upsert({
-        where: { key: roleKey },
-        create: { key: roleKey, name: roleKey, description: roleKey, isSystemRole: true },
-        update: { name: roleKey, description: roleKey, isSystemRole: true }
-      });
-      await this.userRoleDelegate.create({ data: { userId, roleId: role.id, reason } });
-    }
+    const current = await this.delegate.findUnique({ where: { id: userId }, include: this.includeRoles() });
+    const currentKeys = (current?.userRoles ?? []).map((userRole) => userRole.role?.key).filter((key): key is AssurMatchRole => !!key);
+    if (currentKeys.length === roles.length && [...currentKeys].sort().join(",") === [...roles].sort().join(",")) return;
+    const client = this.prisma.requireRuntimeClient();
+    const run = async (roleDelegate: PrismaRoleDelegate, userRoleDelegate: PrismaUserRoleDelegate): Promise<void> => {
+      await userRoleDelegate.deleteMany({ where: { userId } });
+      for (const roleKey of roles) {
+        const role = await roleDelegate.upsert({
+          where: { key: roleKey },
+          create: { key: roleKey, name: roleKey, description: roleKey, isSystemRole: true },
+          update: { name: roleKey, description: roleKey, isSystemRole: true }
+        });
+        await userRoleDelegate.create({ data: { userId, roleId: role.id, reason } });
+      }
+    };
+    const interactive = (client as unknown as { $transaction?: (callback: (tx: Record<string, unknown>) => Promise<void>) => Promise<void> }).$transaction;
+    if (typeof interactive !== "function") return run(this.roleDelegate, this.userRoleDelegate);
+    await interactive.call(client, (tx) => {
+      const txRole = tx.role as PrismaRoleDelegate | undefined;
+      const txUserRole = tx.userRole as PrismaUserRoleDelegate | undefined;
+      if (!txRole || !txUserRole) throw new Error("Prisma transaction delegates are not available");
+      return run(txRole, txUserRole);
+    });
   }
 
   private includeRoles(): Record<string, unknown> {
@@ -227,24 +324,25 @@ export class PrismaUsersRepository implements UsersRepository {
     return {
       id: user.id,
       email: user.email.toLowerCase(),
-      phone: user.phone,
+      phone: user.phone ?? null,
       displayName: user.displayName,
       status: user.status,
       mfaStatus: user.mfaStatus,
-      lastLoginAt: user.lastLoginAt,
-      passwordHash: user.passwordHash,
+      lastLoginAt: user.lastLoginAt ?? null,
+      passwordHash: user.passwordHash ?? null,
       passwordChangedAt: user.passwordChangedAt,
       passwordChangeRequired: user.passwordChangeRequired,
       failedLoginCount: user.failedLoginCount,
-      lastFailedLoginAt: user.lastFailedLoginAt,
-      lockedAt: user.lockedAt,
-      lockedReason: user.lockedReason,
-      mfaSecretEncrypted: user.mfaSecretEncrypted,
-      mfaSecretIssuedAt: user.mfaSecretIssuedAt,
+      lastFailedLoginAt: user.lastFailedLoginAt ?? null,
+      lockedAt: user.lockedAt ?? null,
+      lockedReason: user.lockedReason ?? null,
+      mfaSecretEncrypted: user.mfaSecretEncrypted ?? null,
+      mfaSecretIssuedAt: user.mfaSecretIssuedAt ?? null,
+      mfaLastTotpCounter: user.mfaLastTotpCounter ?? null,
       mfaBackupCodesHashes: user.mfaBackupCodesHashes,
-      passwordResetTokenHash: user.passwordResetTokenHash,
-      passwordResetTokenExpiresAt: user.passwordResetTokenExpiresAt,
-      deletedAt: user.deletedAt,
+      passwordResetTokenHash: user.passwordResetTokenHash ?? null,
+      passwordResetTokenExpiresAt: user.passwordResetTokenExpiresAt ?? null,
+      deletedAt: user.deletedAt ?? null,
       lastLoginIpHash: user.lastLoginIpHash,
       partnerTenantId: user.partnerTenantId,
       countryScopes: user.countryScopes,
@@ -258,6 +356,9 @@ export class PrismaUsersRepository implements UsersRepository {
     const data = this.toPrisma(user);
     delete data.id;
     delete data.createdAt;
+    // The replay counter is written only by claimTotpCounter / clearTotpCounter: a generic write of a
+    // stale object must never roll it back.
+    delete data.mfaLastTotpCounter;
     return data;
   }
 
@@ -306,6 +407,7 @@ export class PrismaUsersRepository implements UsersRepository {
       ...(row.lockedReason ? { lockedReason: row.lockedReason } : {}),
       ...(row.mfaSecretEncrypted ? { mfaSecretEncrypted: row.mfaSecretEncrypted } : {}),
       ...(row.mfaSecretIssuedAt ? { mfaSecretIssuedAt: row.mfaSecretIssuedAt } : {}),
+      ...(row.mfaLastTotpCounter !== null && row.mfaLastTotpCounter !== undefined ? { mfaLastTotpCounter: row.mfaLastTotpCounter } : {}),
       mfaBackupCodesHashes: row.mfaBackupCodesHashes,
       ...(row.passwordResetTokenHash ? { passwordResetTokenHash: row.passwordResetTokenHash } : {}),
       ...(row.passwordResetTokenExpiresAt ? { passwordResetTokenExpiresAt: row.passwordResetTokenExpiresAt } : {}),

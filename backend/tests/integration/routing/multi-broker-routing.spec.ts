@@ -212,7 +212,7 @@ describe("multi-broker routing (spec 042)", () => {
         countryCode: "CI",
         productKey: "auto",
         contact: { email: `p${index}@example.test` },
-        answers: { vehicle_use: "prive" },
+        answers: { vehicle_use: "prive", city: "Abidjan", contact_preference: "email" },
         consentRecordId: `consent-${index}`,
         recipientCount
       }, superAdmin);

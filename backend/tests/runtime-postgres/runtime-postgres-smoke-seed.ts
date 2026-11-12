@@ -152,7 +152,7 @@ export async function seedRuntimeSmokeData(runtime: AssurMatchRuntime, run: Runt
     countryCode: run.countryCode,
     productKey: run.productKey,
     contact: { displayName: `${run.prefix} Starter Lead`, email: run.email, phone: run.phone },
-    answers: { vehicle_use: "prive" }
+    answers: { vehicle_use: "prive", city: "Abidjan", contact_preference: "email" }
   }, admin);
   const proLead = await runtime.leads.assignments.create({
     quoteRequestId: crypto.randomUUID(),
@@ -162,7 +162,7 @@ export async function seedRuntimeSmokeData(runtime: AssurMatchRuntime, run: Runt
     countryCode: run.countryCode,
     productKey: run.productKey,
     contact: { displayName: `${run.prefix} Pro Lead`, email: `pro-${run.email}`, phone: run.phone },
-    answers: { vehicle_use: "prive" }
+    answers: { vehicle_use: "prive", city: "Abidjan", contact_preference: "email" }
   }, admin);
 
   return {

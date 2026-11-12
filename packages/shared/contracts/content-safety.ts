@@ -224,6 +224,103 @@ function containsPhrase(normalizedText: string, normalizedPhrase: string, promis
   return new RegExp(`(?<![\\p{L}\\p{N}])${words.join(" ")}(?![\\p{L}\\p{N}])`, "u").test(normalizedText);
 }
 
+/** Same whole-phrase pattern as `containsPhrase`, compiled once (see the narrow regulated filter). */
+function compilePhrase(normalizedPhrase: string, suffix = ""): RegExp {
+  const words = normalizedPhrase.split(" ").map((word) => (/^[a-z]+$/.test(word) ? `${escapeRegExp(word)}s?` : escapeRegExp(word)));
+  return new RegExp(`(?<![\\p{L}\\p{N}])${words.join(" ")}(?![\\p{L}\\p{N}])${suffix}`, "u");
+}
+
+/**
+ * Normal form that keeps the accents (NFKC, invisible characters, case, separators), used only to tell
+ * the participle "contrat validé" (a claim, always refused) from the adjective "contrat valide".
+ */
+function normalizeKeepingAccents(value: string): string {
+  return value
+    .normalize("NFKC")
+    .replace(/[\p{Cf}­]/gu, "")
+    .replace(/[‘’ʼ`´]/g, "'")
+    .toLocaleLowerCase("fr-FR")
+    .replace(/[\p{Pd}−_]+/gu, " ")
+    .replace(/\s+/gu, " ")
+    .trim();
+}
+
+const CONTRACT_VALIDE_FR = "contrat valide";
+const VALID_CONTRACT_EN = "valid contract";
+/** Adjectival continuations that make « contrat valide » a condition, not a claim (text already normalised). */
+const CONTRACT_VALIDE_FR_RE = compilePhrase(CONTRACT_VALIDE_FR, "(?! (?:jusqu|a partir|depuis|requis|necessaire|exige|obligatoire))");
+const VALID_CONTRACT_EN_RE = compilePhrase(VALID_CONTRACT_EN, "(?! (?:required|needed|necessary|mandatory|until|through|upon)(?![\\p{L}\\p{N}]))");
+/** The participle (accent kept): "contrat validé / validée / validés / validées". */
+const CONTRAT_VALIDE_PARTICIPLE_RE = /(?<![\p{L}\p{N}])contrats? valid(?:é|ée|és|ées)(?![\p{L}\p{N}])/u;
+
+const NARROW_PLAIN_FR = FORBIDDEN_REGULATED_WORDING.filter((phrase) => phrase !== CONTRACT_VALIDE_FR);
+const NARROW_PLAIN_FR_KEYS = NARROW_PLAIN_FR.map(normalizeWordingText);
+const NARROW_PHRASES = [...FORBIDDEN_ENGLISH_WORDING.filter((phrase) => phrase !== VALID_CONTRACT_EN), ...FORBIDDEN_MESSAGING_PHRASES];
+const NARROW_PHRASE_RES = NARROW_PHRASES.map((phrase) => compilePhrase(normalizeWordingText(phrase)));
+
+// Sized for a public catalogue re-evaluated on every request (100 offers x ~15 texts): a smaller memo
+// would be flushed by each pass. Texts longer than REGULATED_CACHE_MAX_TEXT are never memoised.
+const REGULATED_CACHE_MAX = 5000;
+const REGULATED_CACHE_MAX_TEXT = 2000;
+const regulatedCache = new Map<string, readonly string[]>();
+
+function computeRegulatedWording(text: string): string[] {
+  const found: string[] = [];
+  const seen = new Set<string>();
+  const add = (wording: string): void => {
+    const key = normalizeWordingText(wording);
+    if (seen.has(key)) return;
+    seen.add(key);
+    found.push(wording);
+  };
+  const lowered = text.toLocaleLowerCase("fr-FR");
+  // Raw (accented) hits first so the canonical form keeps the accent the author typed, as the legacy guard does.
+  for (const phrase of NARROW_PLAIN_FR) if (lowered.includes(phrase)) add(phrase);
+  const normalized = normalizeWordingText(text);
+  NARROW_PLAIN_FR.forEach((phrase, index) => {
+    if (normalized.includes(NARROW_PLAIN_FR_KEYS[index] as string)) add(phrase);
+  });
+  if (CONTRAT_VALIDE_PARTICIPLE_RE.test(normalizeKeepingAccents(text)) || CONTRACT_VALIDE_FR_RE.test(normalized)) add(CONTRACT_VALIDE_FR);
+  if (VALID_CONTRACT_EN_RE.test(normalized)) add(VALID_CONTRACT_EN);
+  NARROW_PHRASES.forEach((phrase, index) => {
+    if ((NARROW_PHRASE_RES[index] as RegExp).test(normalized)) add(phrase);
+  });
+  return found;
+}
+
+/**
+ * NARROW regulatory filter for offers, consent texts, insurers and quote-form labels: the constitution
+ * list (« acheter maintenant », « souscrire maintenant », « contrat valide », « garantie acceptée »,
+ * « la meilleure assurance du marché »), its English equivalents and the imperative / English variants,
+ * WITHOUT the broker-messaging promise lists (`FORBIDDEN_MESSAGING_WORDS`, `FORBIDDEN_MESSAGING_PROMISES_FR`),
+ * so « Couverture garantie en cas de vol » or « Guaranteed cover for theft » stay publishable. Broker
+ * messaging keeps `findForbiddenWordingAnyLanguage`.
+ *
+ * « contrat valide » / « valid contract » stay refused as a claim, but not as an adjective with a
+ * condition: they pass when immediately followed by `jusqu'…`, `à partir`, `depuis`, `requis`, `nécessaire`,
+ * `exigé`, `obligatoire` (EN: `required`, `needed`, `necessary`, `mandatory`, `until`, `through`, `upon`).
+ * The accented participle « contrat validé » is always refused. Accent, case, spacing, separator and
+ * invisible-character insensitive. Returns canonical list entries, deduplicated, in a stable order.
+ * Results are memoised per text (bounded cache).
+ */
+export function findRegulatedWordingAnyLanguage(text: string): string[] {
+  if (text.length > REGULATED_CACHE_MAX_TEXT) return computeRegulatedWording(text);
+  const cached = regulatedCache.get(text);
+  if (cached) return [...cached];
+  const result = computeRegulatedWording(text);
+  if (regulatedCache.size >= REGULATED_CACHE_MAX) {
+    const oldest = regulatedCache.keys().next();
+    if (!oldest.done) regulatedCache.delete(oldest.value);
+  }
+  regulatedCache.set(text, result);
+  return [...result];
+}
+
+/** Test hook: empties the memo of `findRegulatedWordingAnyLanguage`. */
+export function clearRegulatedWordingCache(): void {
+  regulatedCache.clear();
+}
+
 /**
  * Spec 055 FR-004 + spec 062 R4: the French regulated list plus its English equivalents, case- and
  * accent-insensitive ("contrat validé" is "contrat valide"), robust to invisible characters, full-width

@@ -13,7 +13,10 @@ describe("quote duplicate detection", () => {
 
     const duplicate = await seed.app.quoteRequests.publicController.submit(duplicatePayload as QuoteRequestCreateDto, superAdminActor);
 
-    expect(duplicate.status).toBe("duplicate");
+    expect(duplicate.status).toBe("duplicate_ignored");
+    expect(duplicate.message.toLowerCase()).not.toContain("duplicate");
+    expect(duplicate.publicReference).toBeUndefined();
+    expect(duplicate.verificationToken).toBeUndefined();
     expect(await seed.app.leads.assignments.list()).toHaveLength(1);
   });
 });

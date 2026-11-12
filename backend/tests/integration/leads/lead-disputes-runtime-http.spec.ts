@@ -49,7 +49,7 @@ describe("lead disputes runtime HTTP (spec 063, CRM-012)", () => {
       productKey: "auto",
       publicReference: reference,
       contact: { email: "kofi.secret@example.test", phone: "+2250102030405", displayName: "Kofi Secret" },
-      answers: { vehicle_use: "prive" },
+      answers: { vehicle_use: "prive", city: "Abidjan", contact_preference: "email" },
       consentRecordId: "consent-063",
       ...extra
     }, superAdmin);

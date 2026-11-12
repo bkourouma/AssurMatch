@@ -41,7 +41,7 @@ describe("billing plans, drafts and packs runtime HTTP", () => {
       countryCode: "CI",
       productKey: "auto",
       contact: { email: "ama@example.test", phone: "+2250102030405" },
-      answers: { vehicle_use: "prive" },
+      answers: { vehicle_use: "prive", city: "Abidjan", contact_preference: "email" },
       consentRecordId: "consent-1"
     }, superAdmin);
     await harness.runtime.leads.assignments.create({
@@ -91,7 +91,7 @@ describe("billing plans, drafts and packs runtime HTTP", () => {
       countryCode: "CI",
       productKey: "auto",
       contact: { email: "kofi@example.test" },
-      answers: { vehicle_use: "prive" },
+      answers: { vehicle_use: "prive", city: "Abidjan", contact_preference: "email" },
       consentRecordId: "consent-2"
     }, superAdmin);
     await harness.runtime.leads.brokerCrmActivity.addDispute(lead.id, { reason: "wrong_scope", comment: "Hors zone couverte" }, broker);

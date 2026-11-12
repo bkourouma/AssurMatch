@@ -23,7 +23,7 @@ async function submitQuote(harness: RuntimeHttpHarness, seed: Awaited<ReturnType
       productKey: "auto",
       formDefinitionId: seed.form.id,
       contact: { displayName: `Visitor ${suffix}`, email: `docs${suffix}@example.test`, phone: `+22501020305${suffix.padStart(2, "0")}` },
-      answers: { vehicle_use: "prive" },
+      answers: { vehicle_use: "prive", city: "Abidjan", contact_preference: "email" },
       consent: { accepted: true, consentTextId: seed.consentText.id, version: "v1", contentHash: seed.consentText.contentHash },
       ipAddress: `203.0.113.${suffix}`,
       sessionId: `documents-session-${suffix}`
@@ -113,6 +113,13 @@ describe("visitor quote documents runtime HTTP", () => {
       expect.arrayContaining(["upload_disabled", "quote_token_invalid", "mime_not_allowed", "content_mismatch", "too_many_documents"])
     );
     expect((await harness.request(`/quote-requests/${quote.publicReference}/documents`)).status).toBe(404);
+    // Lot 4 A-02doc: the same neutral refusal as every other visitor route (anti-enumeration).
+    const withoutToken = await harness.request(`/quote-requests/${quote.publicReference}/documents`);
+    const wrongToken = await harness.request(`/quote-requests/${quote.publicReference}/documents?token=wrong-token`);
+    const unknownReference = await harness.request(`/quote-requests/QR-0000-UNKNOWN/documents?token=wrong-token`);
+    const bodies = await Promise.all([withoutToken, wrongToken, unknownReference].map((response) => response.json()));
+    for (const body of bodies) expect(body).toMatchObject({ code: "VISITOR_ACCESS_DENIED", message: "Quote status not available" });
+    expect(new Set([withoutToken.status, wrongToken.status, unknownReference.status])).toEqual(new Set([404]));
   });
 
   it("exposes metadata to admins with RBAC and shares later when a parked quote is assigned", async () => {

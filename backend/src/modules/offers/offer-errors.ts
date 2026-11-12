@@ -40,6 +40,18 @@ export function offerUnprocessable(code: string, message: string, blockers: Offe
   return new UnprocessableEntityException({ code, message, ...(blockers.length ? { blockers } : {}) });
 }
 
+/**
+ * Regulated wording found in offer content (input or stored version): 422 `FORBIDDEN_WORDING`, the
+ * expressions named in `details.wording` (the only shape `error-response.filter.ts` relays).
+ */
+export function offerForbiddenWording(wording: readonly string[]): UnprocessableEntityException {
+  return new UnprocessableEntityException({
+    code: ErrorCodes.FORBIDDEN_WORDING,
+    message: `Forbidden regulated wording: ${wording.join(", ")}`,
+    details: { wording: [...wording] }
+  });
+}
+
 export function offerInvalid(message: string): BadRequestException {
   return new BadRequestException({ code: OfferErrorCodes.validationFailed, message });
 }

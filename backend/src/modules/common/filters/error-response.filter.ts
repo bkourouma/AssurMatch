@@ -64,6 +64,7 @@ const PUBLIC_BLOCKERS: Array<[RegExp, ErrorCode]> = [
   [/country/i, ErrorCodes.COUNTRY_DISABLED],
   [/product/i, ErrorCodes.PRODUCT_DISABLED],
   [/consent/i, ErrorCodes.CONSENT_REQUIRED],
+  // Only the routing-blocker refusals (422/403) are LICENSE_BLOCKED; see `isLicenseBlocker`.
   [/license/i, ErrorCodes.LICENSE_BLOCKED],
   [/rate/i, ErrorCodes.RATE_LIMITED],
   [/feature|disabled/i, ErrorCodes.FEATURE_DISABLED]
@@ -76,12 +77,40 @@ const PUBLIC_BLOCKERS: Array<[RegExp, ErrorCode]> = [
  */
 const UNMATCHED_ROUTE_MESSAGE = /^Cannot [A-Z]+ \//;
 
+const LICENSE_BLOCKER_MESSAGE = /licen[sc]e (blocked|not valid|expired|required)|blocked/i;
+
+function isLicenseBlocker(message: string, status: number): boolean {
+  return (status === HttpStatus.UNPROCESSABLE_ENTITY || status === HttpStatus.FORBIDDEN) && LICENSE_BLOCKER_MESSAGE.test(message);
+}
+
+/**
+ * Errors raised by the Express/Nest body parser are plain objects or `Error`s carrying `type`,
+ * `status` and `expose` (never an `HttpException`): an oversized body (`entity.too.large`, 413) or a
+ * malformed JSON body (`entity.parse.failed`, 400) is a client error, not a server failure.
+ */
+function bodyParserStatus(error: unknown): number | undefined {
+  if (!error || typeof error !== "object" || error instanceof HttpException) return undefined;
+  const record = error as { type?: unknown; status?: unknown; statusCode?: unknown; expose?: unknown };
+  const type = typeof record.type === "string" ? record.type : "";
+  if (type === "entity.too.large") return HttpStatus.PAYLOAD_TOO_LARGE;
+  if (type === "entity.parse.failed") return HttpStatus.BAD_REQUEST;
+  const status = typeof record.status === "number" ? record.status : typeof record.statusCode === "number" ? record.statusCode : undefined;
+  if (status === HttpStatus.PAYLOAD_TOO_LARGE) return status;
+  if (status !== undefined && status >= 400 && status < 500 && (record.expose === true || type.startsWith("entity.") || type.startsWith("encoding.") || type.startsWith("request."))) return status;
+  return undefined;
+}
+
 export function toSafeErrorResponse(
   error: unknown,
   correlationId: string,
   status: number = statusForError(error)
 ): SafeErrorResponse {
-  const message = error instanceof Error ? error.message : "Unexpected error";
+  const parserStatus = bodyParserStatus(error);
+  const message = parserStatus === HttpStatus.PAYLOAD_TOO_LARGE
+    ? "Request body too large"
+    : parserStatus !== undefined
+      ? "Malformed request body"
+      : error instanceof Error ? error.message : "Unexpected error";
   const safeMessage = SENSITIVE_PATTERNS.some((pattern) => pattern.test(message))
     ? "The request could not be processed safely"
     : message;
@@ -99,7 +128,15 @@ export function toSafeErrorResponse(
 
 function codeForError(error: unknown, message: string, status: number): ErrorCode {
   if (error instanceof NotFoundException && UNMATCHED_ROUTE_MESSAGE.test(message)) return ErrorCodes.NOT_FOUND;
-  const blocker = PUBLIC_BLOCKERS.find(([pattern]) => pattern.test(message))?.[1];
+  if (status === HttpStatus.PAYLOAD_TOO_LARGE) return ErrorCodes.PAYLOAD_TOO_LARGE;
+  if (bodyParserStatus(error) !== undefined) return ErrorCodes.VALIDATION_FAILED;
+  // Spec e2e T-09: the plain `Error`s thrown by the guards and services get their dedicated codes.
+  if (status === HttpStatus.UNAUTHORIZED && /^authentication required/i.test(message)) return ErrorCodes.AUTH_REQUIRED;
+  if (status === HttpStatus.FORBIDDEN) {
+    if (/^mfa required/i.test(message)) return ErrorCodes.MFA_REQUIRED;
+    if (/rbac|denied|forbidden/i.test(message)) return ErrorCodes.RBAC_DENIED;
+  }
+  const blocker = PUBLIC_BLOCKERS.find(([pattern, code]) => pattern.test(message) && (code !== ErrorCodes.LICENSE_BLOCKED || isLicenseBlocker(message, status)))?.[1];
   if (blocker) return blocker;
   if (status === HttpStatus.NOT_FOUND) return ErrorCodes.NOT_FOUND;
   if (status >= HttpStatus.INTERNAL_SERVER_ERROR) return ErrorCodes.INTERNAL_ERROR;
@@ -116,8 +153,10 @@ function codeForError(error: unknown, message: string, status: number): ErrorCod
 const QUOTE_NOT_AVAILABLE_MESSAGE = "Quote status not available";
 const SATISFACTION_NOT_AVAILABLE_MESSAGE = "Ce questionnaire n'est plus disponible.";
 
-function statusForError(error: unknown): number {
+export function statusForError(error: unknown): number {
   if (error instanceof HttpException) return error.getStatus();
+  const parserStatus = bodyParserStatus(error);
+  if (parserStatus !== undefined) return parserStatus;
   const message = error instanceof Error ? error.message : "";
   if (message === QUOTE_NOT_AVAILABLE_MESSAGE || message === SATISFACTION_NOT_AVAILABLE_MESSAGE) return HttpStatus.NOT_FOUND;
   if (/rate limit/i.test(message)) return HttpStatus.TOO_MANY_REQUESTS;

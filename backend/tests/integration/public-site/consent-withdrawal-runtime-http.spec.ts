@@ -24,7 +24,7 @@ describe("visitor consent withdrawal runtime HTTP", () => {
         productKey: "auto",
         formDefinitionId: seed.form.id,
         contact: { displayName: "Visitor", email: "retrait@example.com", phone: "+2250102030405" },
-        answers: { vehicle_use: "prive" },
+        answers: { vehicle_use: "prive", city: "Abidjan", contact_preference: "email" },
         consent: { accepted: true, consentTextId: seed.consentText.id, version: "v1", contentHash: seed.consentText.contentHash },
         ipAddress: "203.0.113.60",
         sessionId: "runtime-session-withdrawal"

@@ -4,9 +4,11 @@ export const featureFlagMutationRefusedAction = "feature_flag.change_refused";
 export const sensitiveFeatureFlagRefusalReason = "explicit_policy_required_for_sensitive_feature_flag";
 
 // ai_partner_opt_out restricts AI usage (partner opt-out), so it stays freely mutable.
+// ai_summary_enabled is NOT exempt: it opens visitor and admin AI summaries, so (like every other ai_ flag)
+// it opens only through the compliance policy path (POLICY_ACTIVATABLE_FLAGS); rapid disable stays allowed.
 // broker_weekly_ai_summary_enabled is an AI flag (constitution v1.4.0): explicitly protected below, so it
 // opens only through the compliance policy path.
-const aiFlagsWithExplicitMutationPolicy = new Set(["ai_summary_enabled", "ai_partner_opt_out"]);
+const aiFlagsWithExplicitMutationPolicy = new Set(["ai_partner_opt_out"]);
 
 const explicitlyProtectedFeatureFlags = new Set([
   "payments_enabled",

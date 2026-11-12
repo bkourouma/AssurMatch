@@ -162,7 +162,7 @@ describe("the published form's answers reach the broker (spec 043)", () => {
         productKey: seed.product.key,
         formDefinitionId: seed.form.id,
         contact: { displayName: "Visiteur Reponses", email: "reponses@visitor.example", phone: "+2250102030455" },
-        answers: { vehicle_use: "prive" },
+        answers: { vehicle_use: "prive", city: "Abidjan", contact_preference: "email" },
         consent: {
           accepted: true,
           consentTextId: seed.consentText.id,

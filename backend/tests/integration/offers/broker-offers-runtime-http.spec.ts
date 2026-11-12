@@ -75,8 +75,8 @@ describe("spec 052 broker offers runtime HTTP", () => {
     expect(await otherProduct.json()).toMatchObject({ code: "OFFER_SCOPE_NOT_COVERED", blockers: expect.arrayContaining([{ code: "partner_product_not_authorized" }]) });
 
     const forbidden = await call(harness, owner, "POST", "/broker/offers", completeContent(seed, { shortDescription: "Souscrire maintenant en ligne" }));
-    expect(forbidden.status).toBe(400);
-    expect((await forbidden.json() as { message: string }).message).toContain("souscrire maintenant");
+    expect(forbidden.status).toBe(422);
+    expect(await forbidden.json()).toMatchObject({ code: "FORBIDDEN_WORDING", message: expect.stringContaining("souscrire maintenant"), details: { wording: ["souscrire maintenant"] } });
     const sponsored = await call(harness, owner, "POST", "/broker/offers", completeContent(seed, { isSponsored: true }));
     expect(sponsored.status).toBe(403);
 

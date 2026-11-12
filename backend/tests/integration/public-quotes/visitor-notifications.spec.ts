@@ -34,7 +34,7 @@ describe("visitor quote notifications", () => {
     duplicatePayload.ipAddress = "203.0.113.12";
     duplicatePayload.sessionId = "session-duplicate";
     const confirmation = await duplicate.app.quoteRequests.publicController.submit(duplicatePayload as QuoteRequestCreateDto, superAdminActor);
-    expect(confirmation.status).toBe("duplicate");
+    expect(confirmation.status).toBe("duplicate_ignored");
     expect((await duplicate.app.notifications.service.list()).filter((notification) => notification.type === "broker_lead_assigned")).toHaveLength(1);
   });
 });
