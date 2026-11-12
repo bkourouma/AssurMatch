@@ -4,6 +4,7 @@
  * mirror `billing-addons.contracts.ts` and `billing-plan-change.contracts.ts`; they are duplicated on
  * purpose because the Next app does not load runtime modules outside its own directory.
  */
+import { ERROR_MESSAGES, billingForbiddenMessage } from "../lib/auth-error-messages";
 
 export const BILLING_LINE_KIND_LABELS: Record<string, string> = {
   subscription: "Abonnement mensuel",
@@ -78,11 +79,12 @@ export const SUBSCRIPTION_ROUTING_NOTICE =
 /** Reasons of the machine API failures, worded for finance. */
 export function lot5ErrorMessage(status: number, code?: string): string {
   if (status === 401) return "Session expirée : reconnectez-vous puis recommencez.";
+  if (code === "BILLING_SCOPE_MISSING") return billingForbiddenMessage(code);
   if (status === 403) return "Action refusée : rôle Finance Admin ou Super Admin requis.";
   if (status === 404) return "Élément introuvable : rechargez la page.";
   if (status === 409) return "Action impossible dans l'état actuel (module déjà affecté, demande déjà traitée ou état identique).";
   if (status === 422) return "Demande refusée : le module de facturation est désactivé ou une règle métier n'est pas respectée.";
   if (status === 400) return "Saisie invalide : vérifiez les champs et le motif (3 caractères au moins).";
   if (status === 0) return "API indisponible : réessayez dans quelques instants.";
-  return `Erreur inattendue de l'API (${status}${code ? ` ${code}` : ""}).`;
+  return ERROR_MESSAGES.fallback;
 }

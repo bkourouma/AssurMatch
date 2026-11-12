@@ -4,6 +4,7 @@ import { readAdminAlerts, readComplianceAlerts } from "../../lib/admin-api";
 import { acknowledgeAlertAction } from "../../lib/alert-actions";
 import { formatDateTime } from "../../lib/operations-api";
 import { Badge, Button, Card, DataTable, Form, FormActions, Input, Notice, PageHeader, PageStack, StateMessage, StatusBadge, Tabs } from "../../lib/ui/admin-ui";
+import { readFailureDetail } from "../../lib/auth-error-messages";
 
 interface Props {
   searchParams: Promise<{ page?: string; pageSize?: string; alert?: string; alertStatus?: string }>;
@@ -65,7 +66,7 @@ export default async function ComplianceAlertsPage({ searchParams }: Props) {
     return (
       <PageStack>
         <PageHeader breadcrumb={breadcrumb} title="Alertes conformité" />
-        <StateMessage tone="warning">Alertes indisponibles: {alerts.error}</StateMessage>
+        <StateMessage tone="warning">Alertes indisponibles. {readFailureDetail(alerts.error)}</StateMessage>
       </PageStack>
     );
   }
@@ -97,7 +98,7 @@ export default async function ComplianceAlertsPage({ searchParams }: Props) {
             ]}
           />
           {center.status === "error" ? (
-            <StateMessage tone="warning">Centre d&apos;alertes indisponible: {center.error}</StateMessage>
+            <StateMessage tone="warning">Centre d&apos;alertes indisponible. {readFailureDetail(center.error)}</StateMessage>
           ) : (
             <DataTable
               columns={[

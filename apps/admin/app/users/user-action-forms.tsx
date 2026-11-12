@@ -80,7 +80,7 @@ export function CreateUserForm({ partners = [] }: { partners?: PartnerChoice[] }
           <Input {...fieldControlProps(ids.productScopes)} name="productScopes" placeholder="UUID, UUID" />
         </Field>
         <Field id={ids.reason} label="Raison auditable" required>
-          <Textarea {...fieldControlProps(ids.reason, { required: true })} name="reason" minLength={5} />
+          <Textarea {...fieldControlProps(ids.reason, { required: true })} name="reason" minLength={8} />
         </Field>
         <FormActions>
           <Button type="submit" pending={pending} pendingLabel="Création...">Créer et émettre activation</Button>
@@ -114,7 +114,7 @@ export function PasswordResetForm({ userId }: { userId: string }) {
         <input type="hidden" name="userId" value={userId} />
         <ActionNotice state={noticeState(state)} tokenLabel={TOKEN_LABEL} expiresLabel="expire" />
         <Field id={reasonId} label="Raison auditable" required>
-          <Textarea {...fieldControlProps(reasonId, { required: true })} name="reason" minLength={5} />
+          <Textarea {...fieldControlProps(reasonId, { required: true })} name="reason" minLength={8} />
         </Field>
       </ConfirmDialog>
     </Card>

@@ -196,7 +196,7 @@ export default async function PublicQuotePage({
       }
     }, { forwardedFor });
 
-    if (response.status !== "success" || !response.publicReference) {
+    if (response.status !== "success" || !response.publicReference || !response.verificationToken) {
       backToQuote(response.messageKey ?? "quoteRejected");
       return;
     }

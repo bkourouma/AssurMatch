@@ -30,6 +30,7 @@ import {
 } from "../lib/dispute-vocabulary";
 import type { AdminApiState, AdminLeadDispute, AdminLeadDisputeList } from "../lib/admin-api";
 import { productLabel } from "../lib/ui/operations-labels";
+import { readFailureDetail } from "../lib/auth-error-messages";
 
 /** Filters of the disputes tab, as typed in the query string (dates are `YYYY-MM-DD`). */
 export interface DisputeTabFilters {
@@ -149,7 +150,7 @@ export function DisputesPanel({ filters, list, detail, partners, canDecide, page
         </FilterBar>
 
         {list.status === "forbidden" ? <StateMessage tone="danger">Les contestations ne sont pas accessibles pour ce rôle admin.</StateMessage> : null}
-        {list.status === "error" ? <StateMessage tone="danger">Contestations indisponibles ({list.error}).</StateMessage> : null}
+        {list.status === "error" ? <StateMessage tone="danger">Contestations indisponibles. {readFailureDetail(list.error)}</StateMessage> : null}
 
         <DataTable
           columns={disputeColumns(filters)}
@@ -179,7 +180,7 @@ function DisputeDetail({ detail, canDecide, backHref }: { detail: AdminApiState<
     return <StateMessage tone="danger">Cette contestation n'est pas accessible pour ce rôle admin ou ce périmètre pays.</StateMessage>;
   }
   if (detail.status !== "success" || !detail.data) {
-    return <StateMessage tone="warning">Contestation introuvable ou indisponible ({detail.error ?? "api_404"}).</StateMessage>;
+    return <StateMessage tone="warning">Contestation introuvable ou indisponible. {readFailureDetail(detail.error)}</StateMessage>;
   }
   const dispute = detail.data;
   const decided = dispute.status !== "opened";

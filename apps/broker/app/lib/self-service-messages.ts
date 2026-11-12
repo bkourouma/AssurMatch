@@ -1,3 +1,4 @@
+import { AUTH_MESSAGES } from "./auth-error-messages";
 import { TENANT_SUSPENDED_MESSAGE } from "./broker-permissions";
 
 /**
@@ -120,14 +121,19 @@ export const SELF_SERVICE_ERROR_MESSAGES: Record<string, string> = {
   LICENSE_EXPIRED: "La date d'expiration du renouvellement doit être future.",
   DOCUMENT_INVALID: "Fichier refusé : PDF, JPEG ou PNG de 5 Mo au plus, au contenu conforme à son type.",
   DOCUMENT_STORAGE_NOT_CONFIGURED: "Dépôt indisponible : le stockage des documents n'est pas configuré. Contactez AssurMatch.",
+  EMAIL_ALREADY_USED: AUTH_MESSAGES.emailAlreadyUsed,
+  RBAC_DENIED: AUTH_MESSAGES.rbacDenied,
+  PAYLOAD_TOO_LARGE: AUTH_MESSAGES.payloadTooLarge,
   TEAM_LAST_OWNER: "Le dernier propriétaire actif ne peut pas être désactivé.",
   TEAM_SELF_ACTION: "Vous ne pouvez pas modifier votre propre accès ni votre propre rôle."
 };
 
-export function selfServiceErrorMessage(result: { status: number; code?: string | undefined; suspended?: boolean | undefined }): string {
+export function selfServiceErrorMessage(result: { status: number; code?: string | undefined; message?: string | undefined; suspended?: boolean | undefined }): string {
   if (result.suspended) return TENANT_SUSPENDED_MESSAGE;
   const message = result.code ? SELF_SERVICE_ERROR_MESSAGES[result.code] : undefined;
   if (message) return message;
+  // Legacy API (before lot 5): a duplicate e-mail on a team invitation came back as a raw 400/409 text.
+  if ((result.status === 400 || result.status === 409) && result.message && /e-?mail.*(already|exist|unique|used|utilis)|unique constraint.*e-?mail|already.*e-?mail/i.test(result.message)) return AUTH_MESSAGES.emailAlreadyUsed;
   if (result.status === 400) return "Données invalides : vérifiez les champs (e-mail, téléphone au format +225..., justification de 10 caractères au moins, motif de 8 caractères au moins).";
   if (result.status === 401 || result.code === "session_required") return "Session expirée : reconnectez-vous puis recommencez.";
   if (result.status === 403) return "Action refusée : seuls le propriétaire et les managers du courtier peuvent faire cette action.";
@@ -136,7 +142,7 @@ export function selfServiceErrorMessage(result: { status: number; code?: string 
   if (result.status === 413) return "Fichier trop volumineux : 5 Mo au maximum.";
   if (result.status === 422) return "Demande refusée : vérifiez les valeurs saisies.";
   if (result.status === 0) return "API indisponible : réessayez dans quelques instants.";
-  return `Erreur inattendue de l'API (${result.status}${result.code ? ` ${result.code}` : ""}).`;
+  return AUTH_MESSAGES.fallback;
 }
 
 export function selfServiceFormatDate(value?: string | null): string {

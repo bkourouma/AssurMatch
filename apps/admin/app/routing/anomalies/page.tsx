@@ -4,6 +4,7 @@ import { formatDateTime, readRoutingAnomalies } from "../../lib/operations-api";
 import { requestRoutingAnomalyAnalysisAction, validateRoutingAnomalyAnalysisAction } from "../../lib/routing-anomaly-actions";
 import { routingAnomalyAiDisabledReason } from "./ai-state";
 import { Badge, Button, Card, Cluster, DataTable, Form, Notice, PageHeader, PageStack, Stack, StateMessage, StatStrip } from "../../lib/ui/admin-ui";
+import { readFailureDetail } from "../../lib/auth-error-messages";
 
 /**
  * Spec 056 (H-06): screen of the deterministic routing anomaly detector of spec 049 (rules
@@ -70,7 +71,7 @@ export default async function RoutingAnomaliesPage({ searchParams }: { searchPar
 
       {report.status === "unauthenticated" ? <StateMessage tone="danger">Session admin requise.</StateMessage> : null}
       {report.status === "forbidden" ? <StateMessage tone="danger">Anomalies de routage non accessibles pour ce rôle admin.</StateMessage> : null}
-      {report.status === "error" ? <StateMessage tone="danger">Rapport indisponible : {report.error}</StateMessage> : null}
+      {report.status === "error" ? <StateMessage tone="danger">Rapport indisponible. {readFailureDetail(report.error)}</StateMessage> : null}
 
       <StatStrip
         label="Synthèse anomalies"
@@ -124,7 +125,7 @@ export default async function RoutingAnomaliesPage({ searchParams }: { searchPar
           </Form>
 
           <h3>Analyses récentes</h3>
-          {insights?.status === "error" ? <StateMessage tone="warning">Analyses IA indisponibles : {insights.error}. Le rapport déterministe ci-dessus reste valable.</StateMessage> : null}
+          {insights?.status === "error" ? <StateMessage tone="warning">Analyses IA indisponibles. {readFailureDetail(insights.error)}. Le rapport déterministe ci-dessus reste valable.</StateMessage> : null}
           {analyses.length === 0 && insights?.status === "success" ? <p className="bo-description">Aucune analyse IA des anomalies de routage pour le moment.</p> : null}
           {analyses.length > 0 ? (
             <ul className="bo-list" aria-label="Analyses IA des anomalies de routage">

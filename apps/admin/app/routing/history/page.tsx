@@ -2,6 +2,7 @@ import { firstValue, formatDateTime, pageHref, pageNumber, readRoutingHistory, t
 import { Badge, Button, DataTable, Field, FilterBar, Input, PageHeader, PageStack, Select, StateMessage, fieldControlProps, type DataTableColumn } from "../../lib/ui/admin-ui";
 import { candidateReasonLabel } from "../routing-labels";
 import { routingResultTones } from "../../lib/ui/operations-tones";
+import { readFailureDetail } from "../../lib/auth-error-messages";
 
 /**
  * Spec 056 (H-06): history of routing decisions, refusals included (principle VII): candidates,
@@ -43,7 +44,7 @@ export default async function RoutingHistoryPage({ searchParams }: { searchParam
 
       {result.status === "unauthenticated" ? <StateMessage tone="danger">Session admin requise.</StateMessage> : null}
       {result.status === "forbidden" ? <StateMessage tone="danger">Historique de routage non accessible pour ce rôle admin.</StateMessage> : null}
-      {result.status === "error" ? <StateMessage tone="danger">Historique indisponible : {result.error}</StateMessage> : null}
+      {result.status === "error" ? <StateMessage tone="danger">Historique indisponible. {readFailureDetail(result.error)}</StateMessage> : null}
 
       <FilterBar action="/routing/history" label="Filtres historique de routage" submitLabel="Filtrer" resetLabel="Réinitialiser" resetHref="/routing/history" activeCount={Object.values(filters).filter(Boolean).length}>
         <Field id="rh-result" label="Résultat">

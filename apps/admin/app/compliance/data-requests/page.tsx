@@ -2,6 +2,7 @@ import { DATA_REQUEST_STATUS_KEYS, DATA_REQUEST_TYPE_KEYS, readDataRequests, typ
 import { DATA_REQUEST_STATUS_LABELS, DATA_REQUEST_TYPE_LABELS, formatDataRequestDate } from "../../lib/data-request-labels";
 import { firstValue, toQueryString } from "../../lib/operations-api";
 import { Badge, Button, Card, DataTable, Field, FilterBar, PageHeader, PageStack, Select, Stack, StateMessage, fieldControlProps, type DataTableColumn } from "../../lib/ui/admin-ui";
+import { readFailureDetail } from "../../lib/auth-error-messages";
 
 /**
  * Spec 062 (D-10): queue of the data-subject requests (access, rectification, erasure) created by
@@ -62,7 +63,7 @@ export default async function DataRequestsPage({ searchParams }: { searchParams?
 
       {result.unauthenticated ? <StateMessage tone="danger">Session admin requise.</StateMessage> : null}
       {result.forbidden ? <StateMessage tone="danger">Accès refusé : MFA vérifiée et rôle de conformité ou de support requis pour consulter cette file.</StateMessage> : null}
-      {result.status === "error" ? <StateMessage tone="danger">File des demandes indisponible : {result.error}</StateMessage> : null}
+      {result.status === "error" ? <StateMessage tone="danger">File des demandes indisponible. {readFailureDetail(result.error)}</StateMessage> : null}
 
       <Card>
         <FilterBar

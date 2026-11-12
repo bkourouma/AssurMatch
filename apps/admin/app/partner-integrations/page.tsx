@@ -22,6 +22,7 @@ import {
   RevokeApiKeyForm,
   TestEventForm
 } from "./integration-forms";
+import { readFailureDetail } from "../lib/auth-error-messages";
 
 export default async function PartnerIntegrationsPage() {
   const [integrations, partnersState] = await Promise.all([readPartnerIntegrations(), readAdminPartners()]);
@@ -37,7 +38,7 @@ export default async function PartnerIntegrationsPage() {
 
       {integrations.unauthenticated ? <StateMessage tone="danger">Session admin requise.</StateMessage> : null}
       {integrations.forbidden ? <StateMessage tone="danger">Accès intégrations refusé pour ce rôle admin.</StateMessage> : null}
-      {integrations.status === "error" ? <StateMessage tone="danger">Intégrations indisponibles: {integrations.error}</StateMessage> : null}
+      {integrations.status === "error" ? <StateMessage tone="danger">Intégrations indisponibles. {readFailureDetail(integrations.error)}</StateMessage> : null}
 
       {integrations.status === "success" ? (
         <>

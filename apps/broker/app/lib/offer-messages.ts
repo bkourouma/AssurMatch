@@ -16,6 +16,7 @@ import {
   type OfferVersionStatus
 } from "../../../../packages/shared/contracts/offer-content";
 import type { OfferContent } from "../../../../packages/shared/contracts/offer-content";
+import { AUTH_MESSAGES } from "./auth-error-messages";
 import { TENANT_SUSPENDED_MESSAGE } from "./broker-permissions";
 
 export { OFFER_INDICATIVE_DISCLAIMERS, offerCompleteness };
@@ -178,12 +179,27 @@ export const OFFER_ERROR_MESSAGES: Record<string, string> = {
   OFFER_INSURER_INVALID: "Assureur refusé : il est introuvable, suspendu ou rattaché à un autre pays que l'offre. Choisissez un assureur actif du pays de l'offre ou saisissez son nom."
 };
 
-export function offerWriteErrorMessage(result: { status: number; code?: string | undefined; message?: string | undefined; suspended?: boolean | undefined }): string {
+/** « Formulation interdite : "garanti". Reformulez ce champ. », naming every refused expression. */
+function forbiddenWordingText(wording: readonly string[]): string {
+  const named = wording.map((entry) => entry.trim()).filter(Boolean);
+  if (named.length === 0) return "Formulation réglementée interdite détectée. Reformulez le champ concerné.";
+  return `Formulation interdite : ${named.map((entry) => `« ${entry} »`).join(", ")}. Reformulez le champ concerné.`;
+}
+
+/** Expressions refused by the wording guard: `wording` (from `details.wording` of the 422), else the legacy message text. */
+export function forbiddenWordingOf(result: { wording?: readonly string[] | undefined; message?: string | undefined }): string[] {
+  if (result.wording && result.wording.length > 0) return [...result.wording];
+  const legacy = result.message?.match(/Forbidden regulated wording:\s*([^;]+)/i);
+  return legacy?.[1] ? legacy[1].split(",").map((entry) => entry.trim()).filter(Boolean) : [];
+}
+
+export function offerWriteErrorMessage(result: { status: number; code?: string | undefined; message?: string | undefined; wording?: readonly string[] | undefined; suspended?: boolean | undefined }): string {
   if (result.suspended) return TENANT_SUSPENDED_MESSAGE;
+  if (result.code === "FORBIDDEN_WORDING") return forbiddenWordingText(forbiddenWordingOf(result));
   const message = result.code ? OFFER_ERROR_MESSAGES[result.code] : undefined;
   if (message) return message;
-  const forbidden = result.message?.match(/Forbidden regulated wording:\s*([^;]+)/i);
-  if (result.status === 400 && forbidden) return `Formulation réglementée interdite détectée : « ${forbidden[1]?.trim()} ». Reformulez le champ concerné.`;
+  const forbidden = forbiddenWordingOf(result);
+  if ((result.status === 400 || result.status === 422) && forbidden.length > 0) return forbiddenWordingText(forbidden);
   if (result.status === 400 && result.message && /indicativePriceMin must not exceed/i.test(result.message)) {
     return "Prix invalide : la prime minimale dépasse la prime maximale.";
   }
@@ -198,7 +214,7 @@ export function offerWriteErrorMessage(result: { status: number; code?: string |
   if (result.status === 404) return OFFER_ERROR_MESSAGES.NOT_FOUND ?? "Offre introuvable.";
   if (result.status === 409) return OFFER_ERROR_MESSAGES.OFFER_TRANSITION_INVALID ?? "Conflit : rechargez la page.";
   if (result.status === 0) return "API indisponible : réessayez dans quelques instants.";
-  return `Erreur inattendue de l'API (${result.status}${result.code ? ` ${result.code}` : ""}).`;
+  return AUTH_MESSAGES.fallback;
 }
 
 /* ------------------------------------------------------------------------------- formatting */

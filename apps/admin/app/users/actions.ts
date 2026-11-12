@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createAdminUser, issueAdminUserPasswordReset, runAdminUserAction, updateAdminUser, updateAdminUserRoles } from "../lib/admin-api";
 import { adminWriteErrorMessage } from "../lib/catalog-messages";
+import { errorNoticeKey, friendlyErrorMessage } from "../lib/auth-error-messages";
 
 export interface UserActionState {
   status: "idle" | "success" | "error";
@@ -36,8 +37,13 @@ function formRoles(formData: FormData): string[] {
 function actionError(error: unknown): UserActionState {
   return {
     status: "error",
-    message: error instanceof Error ? error.message : "action_failed"
+    message: friendlyErrorMessage(error)
   };
+}
+
+/** Redirect-style actions never throw a raw exception: the failure goes back to the page as `?error=<key>` (readable notice). */
+function failureRedirect(userId: string, error: unknown): never {
+  redirect(`/users/${encodeURIComponent(userId)}?error=${errorNoticeKey(error)}`);
 }
 
 export async function createAdminUserAction(_previous: UserActionState, formData: FormData): Promise<UserActionState> {
@@ -83,15 +89,19 @@ export async function updateAdminUserProfileAction(formData: FormData): Promise<
   const userId = stringValue(formData.get("userId"));
   const displayName = optionalString(formData.get("displayName"));
   const phone = optionalString(formData.get("phone"));
-  await updateAdminUser(userId, {
-    ...(displayName ? { displayName } : {}),
-    ...(phone ? { phone } : {}),
-    scopes: {
-      countryIds: csvValues(formData.get("countryScopes")),
-      productIds: csvValues(formData.get("productScopes"))
-    },
-    reason: stringValue(formData.get("reason"))
-  });
+  try {
+    await updateAdminUser(userId, {
+      ...(displayName ? { displayName } : {}),
+      ...(phone ? { phone } : {}),
+      scopes: {
+        countryIds: csvValues(formData.get("countryScopes")),
+        productIds: csvValues(formData.get("productScopes"))
+      },
+      reason: stringValue(formData.get("reason"))
+    });
+  } catch (error) {
+    failureRedirect(userId, error);
+  }
   revalidatePath("/users");
   revalidatePath(`/users/${userId}`);
   redirect(`/users/${encodeURIComponent(userId)}?notice=profile_updated`);
@@ -99,10 +109,14 @@ export async function updateAdminUserProfileAction(formData: FormData): Promise<
 
 export async function updateAdminUserRolesAction(formData: FormData): Promise<void> {
   const userId = stringValue(formData.get("userId"));
-  await updateAdminUserRoles(userId, {
-    roles: formRoles(formData),
-    reason: stringValue(formData.get("reason"))
-  });
+  try {
+    await updateAdminUserRoles(userId, {
+      roles: formRoles(formData),
+      reason: stringValue(formData.get("reason"))
+    });
+  } catch (error) {
+    failureRedirect(userId, error);
+  }
   revalidatePath("/users");
   revalidatePath(`/users/${userId}`);
   redirect(`/users/${encodeURIComponent(userId)}?notice=roles_updated`);
@@ -111,7 +125,11 @@ export async function updateAdminUserRolesAction(formData: FormData): Promise<vo
 export async function adminUserLifecycleAction(formData: FormData): Promise<void> {
   const userId = stringValue(formData.get("userId"));
   const action = stringValue(formData.get("action")) as "suspend" | "unsuspend" | "lock" | "unlock" | "mfa-reset" | "delete";
-  await runAdminUserAction(userId, action, stringValue(formData.get("reason")));
+  try {
+    await runAdminUserAction(userId, action, stringValue(formData.get("reason")));
+  } catch (error) {
+    failureRedirect(userId, error);
+  }
   revalidatePath("/users");
   revalidatePath(`/users/${userId}`);
   redirect(`/users/${encodeURIComponent(userId)}?notice=${encodeURIComponent(action)}`);

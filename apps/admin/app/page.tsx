@@ -10,6 +10,7 @@ import type { DataTableColumn } from "./lib/ui/admin-ui";
 import { quoteStatusTones } from "./lib/ui/operations-tones";
 import { quoteStatusLabel } from "./lib/ui/operations-labels";
 import { dashboardAttention, dashboardStats, flagTone, sensitiveFeatureFlagKeys } from "./lib/ui/admin-view-models";
+import { readFailureDetail } from "./lib/auth-error-messages";
 
 export default async function AdminHomePage() {
   const session = await readBackOfficeSession();
@@ -60,11 +61,11 @@ export default async function AdminHomePage() {
       />
 
       {health.forbidden ? <StateMessage tone="warning">Accès santé système refusé pour ce rôle admin.</StateMessage> : null}
-      {health.error && !health.forbidden ? <StateMessage tone="warning">Santé système indisponible: {health.error}</StateMessage> : null}
+      {health.error && !health.forbidden ? <StateMessage tone="warning">Santé système indisponible. {readFailureDetail(health.error)}</StateMessage> : null}
       {dashboard.forbidden ? (
         <StateMessage tone="danger">Accès dashboard plateforme refusé pour ce rôle admin.</StateMessage>
       ) : dashboard.status === "error" ? (
-        <StateMessage tone="danger" title="Dashboard indisponible">L'API admin ne répond pas correctement: {dashboard.error}</StateMessage>
+        <StateMessage tone="danger" title="Dashboard indisponible">L'API admin ne répond pas correctement. {readFailureDetail(dashboard.error)}</StateMessage>
       ) : (
         <>
           <section aria-label="Dashboard plateforme synthèse" className="bo-stack">

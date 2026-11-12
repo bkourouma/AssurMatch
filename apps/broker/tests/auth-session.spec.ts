@@ -64,7 +64,9 @@ test("broker runtime client uses bearer authorization and no simulation headers"
 });
 
 test("broker middleware redirects absent or invalid sessions and blocks Starter CRM", async () => {
-  const middlewareSource = source("apps/broker/middleware.ts");
+  // The decision logic lives in the pure policy module (apps/broker/app/lib/middleware-policy.ts).
+  const middlewareSource = `${source("apps/broker/middleware.ts")}
+${source("apps/broker/app/lib/middleware-policy.ts")}`;
 
   expect(middlewareSource).toContain("/auth/me");
   expect(middlewareSource).toContain("session_expired");

@@ -8,6 +8,9 @@ export interface DashboardKpiView {
   tone: Tone;
 }
 
+// Reference list of flags shown read-only on /feature-flags even when the API does not list them yet. The sensitivity rule itself
+// lives in catalog-messages.ts (mirror of backend sensitive-feature-flag-policy.ts): every ai_* flag except ai_partner_opt_out
+// (including ai_summary_enabled) opens only through the compliance policy path, never through the generic toggle.
 export const sensitiveFeatureFlagKeys = [
   "payments_enabled",
   "e_signature_enabled",

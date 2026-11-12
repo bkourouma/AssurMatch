@@ -1219,6 +1219,7 @@
     "rateLimited": "Trop de demandes. Réessayez plus tard.",
     "quoteRejected": "La demande de devis ne peut pas être envoyée avec ces informations.",
     "confirmationFailed": "La confirmation n'a pas pu être générée.",
+    "quoteAlreadyReceived": "Votre demande a déjà été reçue. Consultez l'e-mail de confirmation pour son suivi.",
     "quoteTransmitted": "Demande transmise selon votre consentement.",
     "aiRateLimited": "Trop de demandes d'assistance. Réessayez plus tard.",
     "aiDisabled": "L'assistant de lecture n'est pas disponible pour ce pays ou ce produit.",
@@ -1250,6 +1251,7 @@
     "sending": "Envoi en cours.",
     "success": "Envoyé.",
     "fieldRequired": "Ce champ est obligatoire. Indiquez une valeur avant de continuer.",
+    "negativeNumber": "Cette valeur ne peut pas être négative. Indiquez un nombre positif ou nul.",
     "invalidEmail": "Adresse e-mail invalide. Vérifiez le format, par exemple nom@domaine.com.",
     "invalidPhone": "Numéro de téléphone invalide. Utilisez le format international, par exemple +225XXXXXXXXX."
   },

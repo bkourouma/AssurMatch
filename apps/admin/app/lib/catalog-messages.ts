@@ -12,6 +12,7 @@ import type {
   ProductCatalogToggleableFlag
 } from "../../../../packages/shared/contracts/catalog.contracts";
 import type { AdminWriteBlocker, AdminWriteResult } from "./admin-api";
+import { ERROR_MESSAGES, authErrorMessage, forbiddenWordingMessage, wordingFromDetails } from "./auth-error-messages";
 
 export const COUNTRY_TOGGLEABLE_FLAGS = [
   "country_public_enabled",
@@ -134,8 +135,11 @@ export const PARTNER_ERROR_MESSAGES: Record<string, string> = {
  * Translates an API refusal into an operator message. 422 refusals keep their `blockers`, which the
  * screen lists separately; the message only says why the list is there.
  */
-export function adminWriteErrorMessage(result: Pick<AdminWriteResult<unknown>, "status" | "code" | "message">): string {
+export function adminWriteErrorMessage(result: Pick<AdminWriteResult<unknown>, "status" | "code" | "message"> & { details?: Record<string, unknown> | undefined }): string {
   const code = result.code ?? "";
+  if (code === "INVALID_CREDENTIALS" || code === "ACCOUNT_SUSPENDED" || code === "PASSWORD_POLICY" || code === "EMAIL_ALREADY_USED" || code === "RBAC_DENIED") {
+    return authErrorMessage({ status: result.status, code });
+  }
   if (result.status === 401 || code === "session_required" || code === "AUTH_REQUIRED") {
     return "Session expirée : reconnectez-vous puis recommencez.";
   }
@@ -146,7 +150,10 @@ export function adminWriteErrorMessage(result: Pick<AdminWriteResult<unknown>, "
   if (code === "CATALOG_FLAG_NOT_TOGGLEABLE") return SENSITIVE_FLAG_EXPLANATION;
   if (code === "CATALOG_CATEGORY_IN_USE") return "Retrait refusé : des produits sont rattachés à cette catégorie. Rattachez-les à une autre catégorie puis recommencez.";
   if (code === "PRODUCT_CATEGORY_INVALID") return "Catégorie invalide : elle doit exister et être active (une catégorie créée en brouillon doit d'abord être activée).";
-  if (code === "FORBIDDEN_WORDING") return "Texte refusé : il contient une formulation interdite (promesse, garantie ou incitation non conforme). Reformulez-le.";
+  if (code === "FORBIDDEN_WORDING") {
+    const wording = wordingFromDetails(result.details);
+    return wording && wording.length > 0 ? forbiddenWordingMessage(wording) : "Texte refusé : il contient une formulation interdite (promesse, garantie ou incitation non conforme). Reformulez-le.";
+  }
   if (result.status === 403) return "Action refusée : droits insuffisants ou hors périmètre.";
   if (code === "CATALOG_UPDATE_CONFLICT") {
     return "Conflit de mise à jour : la fiche a été modifiée depuis son chargement. Rechargez la page puis recommencez.";
@@ -167,7 +174,7 @@ export function adminWriteErrorMessage(result: Pick<AdminWriteResult<unknown>, "
     return "Données invalides : vérifiez les champs saisis (le motif doit contenir au moins 8 caractères).";
   }
   if (result.status === 0) return "API indisponible : réessayez dans quelques instants.";
-  return `Erreur inattendue de l'API (${result.status}${code ? ` ${code}` : ""}).`;
+  return ERROR_MESSAGES.fallback;
 }
 
 /** Same messages for the read helpers, which report `access_denied` / `api_<status>`. */
@@ -175,7 +182,7 @@ export function adminReadErrorMessage(error: string | undefined): string {
   if (error === "access_denied") return "Accès refusé : droits insuffisants ou hors périmètre.";
   if (error === "session_required" || error === "session_expired") return "Session admin requise.";
   if (error === "api_404") return "Élément introuvable.";
-  return `Données indisponibles (${error ?? "erreur inconnue"}).`;
+  return ERROR_MESSAGES.dataUnavailable;
 }
 
 /* ---------------------------------------------------------------------------------------------
@@ -237,7 +244,8 @@ export function correctionTarget(control: string, scope: CorrectionScope): Corre
  * read-only here, whatever the backend would accept.
  * ------------------------------------------------------------------------------------------- */
 
-const AI_FLAGS_WITH_EXPLICIT_POLICY = new Set(["ai_summary_enabled", "ai_partner_opt_out"]);
+// Mirrors the backend: ai_summary_enabled is no longer exempt (it opens through the compliance policy path only).
+const AI_FLAGS_WITH_EXPLICIT_POLICY = new Set(["ai_partner_opt_out"]);
 
 export const EXPLICITLY_SENSITIVE_FLAG_KEYS = [
   "payments_enabled",
@@ -259,7 +267,11 @@ export const EXPLICITLY_SENSITIVE_FLAG_KEYS = [
   "satisfaction_survey_enabled",
   "ai_routing_anomaly_detection_enabled",
   "ai_assisted_routing_enabled",
-  "broker_weekly_ai_summary_enabled"
+  "broker_weekly_ai_summary_enabled",
+  "crm_connector_enabled",
+  "country_ai_enabled",
+  "product_ai_scoring_enabled",
+  "product_ai_form_assistant_enabled"
 ] as const;
 
 const REGULATED_FLAG_KEY_FRAGMENTS = [

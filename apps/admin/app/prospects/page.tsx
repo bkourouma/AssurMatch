@@ -6,6 +6,7 @@ import { searchProspectsAction } from "./search-action";
 import { ProspectContactSearch } from "./contact-search";
 import { looksLikeProspectContact } from "../../../../packages/shared/security/prospect-contact-search";
 import { productLabel } from "../lib/ui/operations-labels";
+import { readFailureDetail } from "../lib/auth-error-messages";
 
 /**
  * Spec 073 (FR-001 a FR-005): prospects console. A row never carries a clear e-mail or phone: the
@@ -59,7 +60,7 @@ export default async function AdminProspectsPage({ searchParams }: { searchParam
 
       {result.status === "unauthenticated" ? <StateMessage tone="danger">Session admin requise.</StateMessage> : null}
       {result.status === "forbidden" ? <StateMessage tone="danger">Accès aux prospects refusé pour ce rôle admin.</StateMessage> : null}
-      {result.status === "error" ? <StateMessage tone="danger">Prospects indisponibles : {result.error}</StateMessage> : null}
+      {result.status === "error" ? <StateMessage tone="danger">Prospects indisponibles. {readFailureDetail(result.error)}</StateMessage> : null}
 
       <Card>
         {/* POST (server action) then redirect: only a name fragment and the scope filters reach the URL. */}

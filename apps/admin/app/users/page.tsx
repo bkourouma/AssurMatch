@@ -24,6 +24,7 @@ import {
 } from "../lib/ui/admin-ui";
 import type { DataTableColumn } from "../lib/ui/admin-ui";
 import { roleLabel } from "../lib/ui/admin-view-models";
+import { readFailureDetail } from "../lib/auth-error-messages";
 
 interface UsersPageProps {
   searchParams?: Promise<Record<string, string | string[] | undefined>>;
@@ -113,7 +114,7 @@ export default async function UserManagementPage({ searchParams }: UsersPageProp
 
       {notice ? <StateMessage>Action terminée: {notice}.</StateMessage> : null}
       {users.forbidden ? <StateMessage tone="danger">Accès refusé: votre rôle ne permet pas de lire les utilisateurs.</StateMessage> : null}
-      {users.status === "error" ? <StateMessage tone="danger">Liste indisponible: {users.error}.</StateMessage> : null}
+      {users.status === "error" ? <StateMessage tone="danger">Liste indisponible. {readFailureDetail(users.error)}</StateMessage> : null}
 
       <FilterBar
         action="/users"

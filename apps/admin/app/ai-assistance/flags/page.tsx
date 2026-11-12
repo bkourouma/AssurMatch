@@ -3,6 +3,7 @@ import { readAiScopeFlags } from "../../lib/ai-scope-flags-api";
 import { isAdminProfile, loginRedirect, readBackOfficeSession } from "../../lib/backoffice-auth";
 import { Badge, Card, DataTable, PageHeader, PageStack, StateMessage } from "../../lib/ui/admin-ui";
 import { ScopeFlagForm } from "./scope-flag-form";
+import { readFailureDetail } from "../../lib/auth-error-messages";
 
 const PAGE_PATH = "/ai-assistance/flags";
 
@@ -40,7 +41,7 @@ export default async function AiScopeFlagsPage() {
       />
 
       {flags.status === "forbidden" ? <StateMessage tone="danger">Accès refusé pour ce rôle admin.</StateMessage> : null}
-      {flags.status === "error" ? <StateMessage tone="danger">Flags IA indisponibles ({flags.error ?? "erreur"}). Réessayez plus tard.</StateMessage> : null}
+      {flags.status === "error" ? <StateMessage tone="danger">Flags IA indisponibles. {readFailureDetail(flags.error)}</StateMessage> : null}
 
       {flags.status === "success" ? (
         <>

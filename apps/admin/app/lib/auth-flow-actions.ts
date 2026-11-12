@@ -3,6 +3,7 @@
 import { cookies, headers } from "next/headers";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
+import { ERROR_MESSAGES, authErrorMessage, friendlyErrorMessage, type AuthErrorContext } from "./auth-error-messages";
 import { activateWithToken, changePassword, consumePasswordReset, enrollMfa, revokeTrustedDevices, verifyMfa } from "./admin-api";
 import {
   BACKOFFICE_TOKEN_COOKIE,
@@ -24,11 +25,8 @@ function stringValue(value: FormDataEntryValue | null): string {
   return typeof value === "string" ? value.trim() : "";
 }
 
-function errorState(error: unknown): AuthFlowState {
-  return {
-    status: "error",
-    message: error instanceof Error ? error.message : "action_failed"
-  };
+function errorState(error: unknown, context: AuthErrorContext = "generic"): AuthFlowState {
+  return { status: "error", message: friendlyErrorMessage(error, context) };
 }
 
 async function setBackOfficeCookie(accessToken: string): Promise<void> {
@@ -47,9 +45,11 @@ async function setBackOfficeCookie(accessToken: string): Promise<void> {
 export async function activateAction(_previous: AuthFlowState, formData: FormData): Promise<AuthFlowState> {
   const returnTo = sanitizeReturnTo(stringValue(formData.get("returnTo")));
   const session = await activateWithToken(stringValue(formData.get("token")), stringValue(formData.get("password")));
-  if (session.status === "validation_error") return { status: "error", message: "validation_error" };
-  if (session.status !== "success" && session.status !== "mfa_required") return { status: "error", message: session.error ?? session.status };
-  if (!session.accessToken) return { status: "error", message: "invalid_session" };
+  if (session.status !== "success" && session.status !== "mfa_required") {
+    // Activation: a refused password (400/422) reads as the password policy, any other refusal as an unusable link.
+    return { status: "error", message: authErrorMessage({ status: session.httpStatus, code: session.code }, "activate") };
+  }
+  if (!session.accessToken) return { status: "error", message: ERROR_MESSAGES.fallback };
   await setBackOfficeCookie(session.accessToken);
   // Activation sets a new password: the API revokes every trusted device, so drop the stale local cookie too.
   await clearTrustedDeviceCookie();
@@ -82,11 +82,11 @@ export async function verifyMfaAction(_previous: AuthFlowState, formData: FormDa
       stringValue(formData.get("kind")) === "backup" ? "backup" : "totp",
       trustDevice ? { trustDevice, deviceLabel: deviceLabel ?? "" } : {}
     );
-    if (!session.accessToken) return { status: "error", message: "invalid_session" };
+    if (!session.accessToken) return { status: "error", message: ERROR_MESSAGES.fallback };
     await setBackOfficeCookie(session.accessToken);
     if (trustDevice && session.trustedDevice?.token) await setTrustedDeviceCookie(session.trustedDevice.token, session.trustedDevice.expiresAt);
   } catch (error) {
-    return errorState(error);
+    return errorState(error, "mfa");
   }
   redirect(returnTo);
 }
@@ -98,7 +98,7 @@ export async function passwordChangeAction(_previous: AuthFlowState, formData: F
     await clearTrustedDeviceCookie();
     return { status: "success", message: "Mot de passe modifié." };
   } catch (error) {
-    return errorState(error);
+    return errorState(error, "password_change");
   }
 }
 
@@ -108,7 +108,7 @@ export async function passwordResetConsumeAction(_previous: AuthFlowState, formD
     await clearTrustedDeviceCookie();
     return { status: "success", message: "Mot de passe réinitialisé. Vous pouvez vous connecter." };
   } catch (error) {
-    return errorState(error);
+    return errorState(error, "reset");
   }
 }
 

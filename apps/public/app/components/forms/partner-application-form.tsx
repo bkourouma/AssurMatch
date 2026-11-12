@@ -392,6 +392,13 @@ export function PartnerApplicationForm({ countries, productsByCountry, plans, la
         />
       </div>
 
+      {/* Outside the step panels so it stays visible on every step (panels are display:none when inactive). */}
+      {state.status === "error" ? (
+        <Notice tone="error" role="alert">
+          {state.message}
+        </Notice>
+      ) : null}
+
       <fieldset className="am-formstepper__panel" data-step-panel="1" data-step-active={String(currentStep === 1)}>
         <legend className="am-formsection__legend" tabIndex={-1}>
           {labels.identityLegend}
@@ -727,12 +734,6 @@ export function PartnerApplicationForm({ countries, productsByCountry, plans, la
             <Icon name="alert" size={16} />
             {fieldErrors.consent}
           </p>
-        ) : null}
-
-        {state.status === "error" ? (
-          <Notice tone="error" role="alert">
-            {state.message}
-          </Notice>
         ) : null}
 
         <div className="am-cluster">

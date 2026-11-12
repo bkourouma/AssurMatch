@@ -1,5 +1,6 @@
 import { backOfficeApiBaseUrl, getBackOfficeToken } from "./backoffice-auth";
 import { PARTNER_SUSPENDED_CODE } from "./broker-write";
+import { extractForbiddenWording } from "./conversation-vocabulary";
 import type {
   BrokerOfferCoverageItem,
   BrokerOfferView,
@@ -67,6 +68,8 @@ export interface BrokerOfferWriteResult<T> {
   data?: T;
   code?: string;
   message?: string;
+  /** `details.wording` of a 422 FORBIDDEN_WORDING refusal. */
+  wording?: string[];
   blockers: OfferBlocker[];
   suspended: boolean;
 }
@@ -100,6 +103,7 @@ export async function writeBrokerOffer<T = BrokerOfferView>(path: string, method
       status: response.status,
       ...(code ? { code } : {}),
       ...(typeof record.message === "string" ? { message: record.message } : {}),
+      ...(code === "FORBIDDEN_WORDING" ? { wording: extractForbiddenWording(payload) } : {}),
       blockers: toBlockers(record.blockers),
       suspended: response.status === 403 && code === PARTNER_SUSPENDED_CODE
     };

@@ -2,6 +2,7 @@ import { formatDateTime, readProspectDetail } from "../../lib/operations-api";
 import { Badge, Card, DataTable, DescriptionList, PageHeader, PageStack, StateMessage, type DataTableColumn } from "../../lib/ui/admin-ui";
 import { OperationsTabs } from "../../lib/ui/operations-tabs";
 import { productLabel } from "../../lib/ui/operations-labels";
+import { readFailureDetail } from "../../lib/auth-error-messages";
 
 /**
  * Spec 073 (FR-002, FR-005): prospect record. Clear contact values are returned by the API only to
@@ -39,7 +40,7 @@ export default async function AdminProspectDetailPage({ params }: { params: Prom
       {result.status === "unauthenticated" ? <StateMessage tone="danger">Session admin requise.</StateMessage> : null}
       {result.status === "forbidden" ? <StateMessage tone="danger">Accès refusé : rôle non autorisé ou prospect hors de votre périmètre (refus audité).</StateMessage> : null}
       {result.status === "not_found" ? <StateMessage tone="danger">Prospect introuvable.</StateMessage> : null}
-      {result.status === "error" ? <StateMessage tone="danger">Fiche indisponible : {result.error}</StateMessage> : null}
+      {result.status === "error" ? <StateMessage tone="danger">Fiche indisponible. {readFailureDetail(result.error)}</StateMessage> : null}
       {detail?.anonymized ? <StateMessage tone="warning">Prospect anonymisé : aucune coordonnée n'est conservée.</StateMessage> : null}
       {detail && !detail.anonymized && !detail.piiRevealed ? <StateMessage tone="info">Coordonnées masquées pour votre rôle.</StateMessage> : null}
 

@@ -3,6 +3,8 @@
  * kinds. Pure module (no server import) so the static specs can read it directly.
  */
 
+import { AUTH_MESSAGES } from "../lib/auth-error-messages";
+
 export const BILLING_LINE_KIND_LABELS: Record<string, string> = {
   subscription: "Abonnement mensuel",
   billable_leads: "Leads facturables",
@@ -49,5 +51,5 @@ export function planChangeErrorMessage(result: { status: number; suspended?: boo
   if (result.status === 409) return "Action impossible dans l'état actuel (une demande est déjà en attente, le plan demandé est déjà le vôtre ou la demande est déjà traitée).";
   if (result.status === 422) return "Demande refusée : vérifiez les valeurs saisies.";
   if (result.status === 0) return "API indisponible : réessayez dans quelques instants.";
-  return `Erreur inattendue de l'API (${result.status}).`;
+  return AUTH_MESSAGES.fallback;
 }

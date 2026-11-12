@@ -60,6 +60,9 @@ const NOTICES: Record<string, { tone: "info" | "warning" | "danger"; message: st
   disputed: { tone: "info", message: "Contestation enregistrée et historisée. La finance AssurMatch statuera ; vous serez notifié de la décision." },
   dispute_window_expired: { tone: "warning", message: "Contestation refusée : la fenêtre de 30 jours suivant la réception du lead est close." },
   dispute_exists: { tone: "warning", message: "Contestation refusée : ce lead a déjà fait l'objet d'une contestation." },
+  conflict: { tone: "warning", message: "Action refusée : l'état du lead a changé entre-temps ou ne permet pas cette action. Rechargez la page." },
+  already_accepted: { tone: "warning", message: "Ce lead est déjà accepté : aucune nouvelle acceptation n'a été enregistrée." },
+  not_acceptable: { tone: "warning", message: "Ce lead ne peut plus être accepté dans son état actuel. Rechargez la page." },
   forbidden: { tone: "warning", message: "Action refusée par vos permissions CRM, votre tenant ou votre MFA." },
   // Spec 051 FR-021: 403 PARTNER_SUSPENDED.
   suspended: { tone: "warning", message: TENANT_SUSPENDED_MESSAGE },
@@ -69,6 +72,7 @@ const NOTICES: Record<string, { tone: "info" | "warning" | "danger"; message: st
   document_added: { tone: "info", message: "Document interne ajouté après analyse antivirus. Il n'est jamais visible du visiteur." },
   quarantined: { tone: "danger", message: "Document refusé : il n'a pas passé l'antivirus et n'a pas été conservé." },
   document_invalid: { tone: "warning", message: "Document refusé : PDF, JPEG ou PNG de 5 Mo au maximum." },
+  file_too_large: { tone: "warning", message: "Fichier refusé : taille maximale 5 Mo." },
   invalid: { tone: "warning", message: "Saisie refusée par l'API. Vérifiez les champs obligatoires." },
   error: { tone: "danger", message: "Action CRM indisponible pour le moment. Aucun changement n'a été enregistré." }
 };

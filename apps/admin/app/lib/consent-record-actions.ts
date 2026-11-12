@@ -58,7 +58,7 @@ export async function searchConsentRecordsAction(_previous: ConsentRecordSearchS
     if (response.status === 401) return { status: "unauthenticated", message: "Session expirée : reconnectez-vous." };
     if (response.status === 403) return { status: "forbidden", message: "Recherche réservée à la conformité et au Super Admin, avec MFA vérifiée. Le refus est journalisé." };
     if (response.status === 400) return { status: "invalid", message: "Critères refusés par l'API." };
-    if (!response.ok) return { status: "error", message: `Recherche indisponible (api_${response.status}).` };
+    if (!response.ok) return { status: "error", message: "Recherche indisponible pour le moment. Réessayez dans un instant." };
     return { status: "success", result: await response.json() as AdminConsentRecordSearchResult, byEmail: Boolean(email) };
   } catch {
     return { status: "error", message: "Recherche indisponible pour le moment." };

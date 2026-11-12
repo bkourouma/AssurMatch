@@ -13,6 +13,7 @@ import {
   type PublicQuoteLanguage
 } from "../lib/public-api";
 import { defaultDocumentLabel, formatNameList, joinPersonName, readMarketingSource } from "../lib/quote-journey";
+import { validateNeedAnswers } from "../lib/quote-submission";
 import { visitorAiAnswers } from "../lib/visitor-ai-answers";
 import { QuoteDocumentsStep, type StagedDocument } from "./forms/quote-documents-step";
 import { InitialsTile } from "./journey/tiles";
@@ -149,7 +150,12 @@ function QuoteFormFieldInput({
 
   return (
     <Field id={id} label={label} required={field.required} requiredLabel={requiredLabel} error={error}>
-      <input {...fieldControlProps(id, { required: field.required, error })} name={name} type={inputType} />
+      <input
+        {...fieldControlProps(id, { required: field.required, error })}
+        name={name}
+        type={inputType}
+        {...(field.type === "number" ? { min: 0 } : {})}
+      />
     </Field>
   );
 }
@@ -324,6 +330,8 @@ export function QuoteFormShell({
     message?: string;
     publicReference?: string;
     verificationToken?: string;
+    /** A repeated request: no reference and no tracking link, only the plain sentence in `message`. */
+    alreadyReceived?: boolean;
     /** The product accepts optional documents: only then does the tracking link say so. */
     documentsEnabled?: boolean;
     selectedOfferPartnerRetained?: boolean | null;
@@ -371,13 +379,14 @@ export function QuoteFormShell({
   function validateNeed(): Record<string, string> {
     if (!formRef.current) return {};
     const formData = new FormData(formRef.current);
-    const errors: Record<string, string> = {};
-    for (const field of quoteForm.fields) {
-      if (!field.required || field.type === "checkbox") continue;
-      const raw = formData.get(`answer_${field.key}`);
-      const value = typeof raw === "string" ? raw.trim() : "";
-      if (!value) errors[field.key] = forms("fieldRequired");
-    }
+    const errors = validateNeedAnswers(
+      quoteForm.fields,
+      (name) => {
+        const raw = formData.get(name);
+        return typeof raw === "string" ? raw : "";
+      },
+      { required: forms("fieldRequired"), negative: forms("negativeNumber") }
+    );
     setNeedErrors(errors);
     return errors;
   }
@@ -566,6 +575,11 @@ export function QuoteFormShell({
       });
       return;
     }
+    if (response.status === "duplicate") {
+      setStagedDocuments([]);
+      setResult({ status: "success", alreadyReceived: true, message: api("quoteAlreadyReceived"), publicReference: "" });
+      return;
+    }
     setResult({ status: "error", message: api(response.messageKey) });
   }
 
@@ -609,10 +623,16 @@ export function QuoteFormShell({
         <section className="am-j-sent" aria-label={t("successTitle")}>
           <IconTile name="check-circle" tone="success" size="lg" />
           <h2 className="am-j-sent__title">{t("successTitle")}</h2>
-          <div className="am-j-reference am-sign">
-            <p className="am-j-reference__label">{t("successPrefix")}</p>
-            <p className="am-j-reference__value am-tabular">{result.publicReference}</p>
-          </div>
+          {result.alreadyReceived || !result.publicReference ? (
+            <Notice tone="info" role="status">
+              {result.message ?? api("quoteAlreadyReceived")}
+            </Notice>
+          ) : (
+            <div className="am-j-reference am-sign">
+              <p className="am-j-reference__label">{t("successPrefix")}</p>
+              <p className="am-j-reference__value am-tabular">{result.publicReference}</p>
+            </div>
+          )}
           {offerRouting ? (
             <Notice tone="info" role="status">
               {offerRouting}
@@ -640,12 +660,12 @@ export function QuoteFormShell({
                 : t("documentsSomeFailed", { sent: result.documentsSent ?? 0, failed: result.documentsFailed ?? 0 })}
             </Notice>
           ) : null}
-          {result.message ? (
+          {result.message && !result.alreadyReceived ? (
             <p className="am-j-fineprint">
-              <BackendText>{result.message}</BackendText>
+              {locale === "fr" ? <BackendText>{result.message}</BackendText> : api("quoteTransmitted")}
             </p>
           ) : null}
-          {result.verificationToken ? (
+          {result.verificationToken && result.publicReference ? (
             <p>
               <Link
                 href={{

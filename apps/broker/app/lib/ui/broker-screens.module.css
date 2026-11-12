@@ -19,6 +19,12 @@
   overflow-wrap: anywhere;
 }
 
+/* List of typed content (visitor answers, proposals): a long unbroken token wraps instead of overflowing at 375px. */
+.wrapList > li {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
 /* Heading of a page section that is not a card (a stat strip, a board): title left, action right. */
 .sectionHead {
   display: flex;

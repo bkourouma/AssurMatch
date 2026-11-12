@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { friendlyErrorMessage } from "../lib/auth-error-messages";
 import { assignPendingQuote, createRoutingRule, reassignLead, runRoutingPrecheck, updateRoutingRule, type RoutingRuleMode } from "../lib/admin-api";
 
 export interface RoutingActionState {
@@ -38,7 +39,7 @@ function prioritiesValue(value: FormDataEntryValue | null): Array<{ partnerTenan
 }
 
 function actionError(error: unknown): RoutingActionState {
-  return { status: "error", message: error instanceof Error ? error.message : "action_failed" };
+  return { status: "error", message: friendlyErrorMessage(error) };
 }
 
 /** Spec 042: recipient cap for `multi_send`; anything outside 2-5 is left to the server default. */
@@ -50,7 +51,7 @@ function maxRecipientsValue(value: FormDataEntryValue | null): number | undefine
 export async function createRoutingRuleAction(_previous: RoutingActionState, formData: FormData): Promise<RoutingActionState> {
   try {
     const mode = modeValue(formData.get("mode"));
-    if (!mode) return { status: "error", message: "mode_invalid" };
+    if (!mode) return { status: "error", message: "Choisissez le mode de routage." };
     const productId = optionalString(formData.get("productId"));
     const exclusivePartnerTenantId = optionalString(formData.get("exclusivePartnerTenantId"));
     const description = optionalString(formData.get("description"));
@@ -74,7 +75,7 @@ export async function createRoutingRuleAction(_previous: RoutingActionState, for
 export async function updateRoutingRuleAction(_previous: RoutingActionState, formData: FormData): Promise<RoutingActionState> {
   try {
     const ruleId = stringValue(formData.get("ruleId"));
-    if (!ruleId) return { status: "error", message: "rule_required" };
+    if (!ruleId) return { status: "error", message: "Choisissez la règle à modifier." };
     const mode = modeValue(formData.get("mode"));
     const status = stringValue(formData.get("status"));
     const prioritiesRaw = stringValue(formData.get("priorities"));

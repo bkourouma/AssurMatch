@@ -16,6 +16,7 @@ import {
   checklistStatusTones,
   fieldControlProps
 } from "../lib/ui/admin-ui";
+import { readFailureDetail } from "../lib/auth-error-messages";
 
 function firstParam(value: string | string[] | undefined): string {
   return Array.isArray(value) ? value[0] ?? "" : value ?? "";
@@ -105,7 +106,7 @@ export default async function ActivationChecklistPage({
 
       {checklist.unauthenticated ? <StateMessage tone="danger">Session admin requise.</StateMessage> : null}
       {checklist.forbidden ? <StateMessage tone="danger">Accès checklist refusé pour ce rôle admin ou hors périmètre.</StateMessage> : null}
-      {checklist.status === "error" ? <StateMessage tone="danger">Checklist indisponible: {checklist.error}</StateMessage> : null}
+      {checklist.status === "error" ? <StateMessage tone="danger">Checklist indisponible. {readFailureDetail(checklist.error)}</StateMessage> : null}
 
       {checklist.status === "success" ? (
         <>

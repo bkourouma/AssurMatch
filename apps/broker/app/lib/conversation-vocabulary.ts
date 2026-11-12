@@ -64,7 +64,7 @@ export const CONVERSATION_NOTICES: Record<string, { tone: ConversationNoticeTone
   read_only: { tone: "warning", message: "La conversation est en lecture seule : envoi refusé." },
   messaging_disabled: { tone: "warning", message: "La messagerie avec les visiteurs est temporairement désactivée par AssurMatch." },
   thread_limit: { tone: "warning", message: "Limite de messages atteinte pour cette conversation (300 messages)." },
-  duplicate: { tone: "warning", message: "Message identique déjà envoyé il y a moins de 5 minutes : envoi ignoré." },
+  duplicate: { tone: "warning", message: "Ce message vient déjà d'être envoyé. Attendez la réponse du visiteur avant de le renvoyer." },
   consent_withdrawn: { tone: "warning", message: "Le consentement du visiteur n'est plus actif : envoi refusé." },
   request_limit: { tone: "warning", message: "Limite de 10 demandes de documents ouvertes atteinte pour ce lead." },
   request_not_open: { tone: "warning", message: "Cette demande de document n'est plus ouverte." },
@@ -125,6 +125,7 @@ export function conversationOutcome(result: { status: number; code?: string | un
   if (result.status === 200 || result.status === 201) return success;
   if (result.code && CODE_OUTCOMES[result.code]) return CODE_OUTCOMES[result.code]!;
   if (result.status === 429) return "rate_limited";
+  if (result.status === 409 && (!result.code || /duplicate/i.test(result.code))) return "duplicate";
   if (result.status === 403) return "forbidden";
   if (result.status === 404) return "not_found";
   if (result.status === 400 || result.status === 413 || result.status === 422) return "invalid";

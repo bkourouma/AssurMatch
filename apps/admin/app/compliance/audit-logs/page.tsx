@@ -2,6 +2,7 @@ import { readBackOfficeSession } from "../../lib/backoffice-auth";
 import { firstValue, formatDateTime, pageHref, pageNumber, readAuditLogs, toQueryString, type AuditLogRow } from "../../lib/operations-api";
 import { Badge, Button, DataTable, Field, FilterBar, Input, PageHeader, PageStack, Select, StateMessage, fieldControlProps, type DataTableColumn } from "../../lib/ui/admin-ui";
 import { auditResultTones } from "../../lib/ui/operations-tones";
+import { readFailureDetail } from "../../lib/auth-error-messages";
 
 /**
  * Spec 056 (H-05): audit-log search over the durable store (actor, action prefix, target, result,
@@ -48,7 +49,7 @@ export default async function AdminAuditLogsPage({ searchParams }: { searchParam
 
       {result.status === "unauthenticated" ? <StateMessage tone="danger">Session admin requise.</StateMessage> : null}
       {result.status === "forbidden" ? <StateMessage tone="danger">Journaux d'audit non accessibles pour ce rôle admin.</StateMessage> : null}
-      {result.status === "error" ? <StateMessage tone="danger">Journaux indisponibles : {result.error}</StateMessage> : null}
+      {result.status === "error" ? <StateMessage tone="danger">Journaux indisponibles. {readFailureDetail(result.error)}</StateMessage> : null}
       {!canExport ? <StateMessage>Export réservé à la conformité et au Super Admin.</StateMessage> : null}
 
       <FilterBar action="/compliance/audit-logs" label="Filtres journaux d'audit" submitLabel="Rechercher" resetLabel="Réinitialiser" resetHref="/compliance/audit-logs" activeCount={Object.values(filters).filter(Boolean).length}>
