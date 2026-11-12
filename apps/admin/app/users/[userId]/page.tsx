@@ -117,7 +117,7 @@ export default async function UserDetailPage({ params, searchParams }: UserDetai
           <Form action={updateAdminUserProfileAction}>
             <input type="hidden" name="userId" value={user.id} />
             <Field id="user-display-name" label="Nom affiché" required>
-              <Input {...fieldControlProps("user-display-name", { required: true })} name="displayName" defaultValue={user.displayName} />
+              <Input {...fieldControlProps("user-display-name", { required: true })} name="displayName" minLength={2} defaultValue={user.displayName} />
             </Field>
             <Field id="user-phone" label="Téléphone E.164">
               <Input {...fieldControlProps("user-phone")} name="phone" defaultValue={user.phone ?? ""} />

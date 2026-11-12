@@ -781,6 +781,10 @@
         "headline": "Request closed",
         "body": "Work on this request is over. You can submit a new request at any time."
       },
+      "consent_withdrawn": {
+        "headline": "Consent withdrawn: request closed",
+        "body": "You withdrew your consent. This request is no longer passed on and will not be handled further. You can submit a new request at any time."
+      },
       "not_transmitted": {
         "headline": "Request not passed on",
         "body": "No eligible partner broker could be identified for this request. No callback is promised."
@@ -889,8 +893,8 @@
       }
     },
     "access": {
-      "title": "This tracking link cannot display a request",
-      "body": "The link may be incomplete or no longer valid. You can receive a new link at the e-mail address used for your request.",
+      "title": "This link is no longer valid",
+      "body": "Use the link in the most recent e-mail we sent you to follow your request.",
       "cta": "Receive a new link",
       "rateLimited": "Too many views in a short time. Try again in a few minutes.",
       "unavailable": "Tracking is temporarily unavailable. Try again in a few minutes."

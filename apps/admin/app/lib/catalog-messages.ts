@@ -13,6 +13,7 @@ import type {
 } from "../../../../packages/shared/contracts/catalog.contracts";
 import type { AdminWriteBlocker, AdminWriteResult } from "./admin-api";
 import { ERROR_MESSAGES, authErrorMessage, forbiddenWordingMessage, wordingFromDetails } from "./auth-error-messages";
+import { reasonRuleFromBackendMessage } from "./user-input-checks";
 
 export const COUNTRY_TOGGLEABLE_FLAGS = [
   "country_public_enabled",
@@ -171,6 +172,8 @@ export function adminWriteErrorMessage(result: Pick<AdminWriteResult<unknown>, "
   if (result.status === 422) return "Action refusée par une règle métier.";
   if (result.status === 404) return "Élément introuvable : il a peut-être été supprimé ou est hors périmètre.";
   if (result.status === 400 || code === "VALIDATION_FAILED") {
+    const reasonRule = reasonRuleFromBackendMessage(result.message);
+    if (reasonRule) return reasonRule;
     return "Données invalides : vérifiez les champs saisis (le motif doit contenir au moins 8 caractères).";
   }
   if (result.status === 0) return "API indisponible : réessayez dans quelques instants.";

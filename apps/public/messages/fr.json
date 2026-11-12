@@ -781,6 +781,10 @@
         "headline": "Demande clôturée",
         "body": "Le traitement de cette demande est terminé. Vous pouvez déposer une nouvelle demande à tout moment."
       },
+      "consent_withdrawn": {
+        "headline": "Consentement retiré : demande clôturée",
+        "body": "Vous avez retiré votre consentement. Cette demande n'est plus transmise et ne sera plus traitée. Vous pouvez déposer une nouvelle demande à tout moment."
+      },
       "not_transmitted": {
         "headline": "Demande non transmise",
         "body": "Aucun courtier partenaire éligible n'a pu être identifié pour cette demande. Aucune promesse de rappel n'est faite."
@@ -889,8 +893,8 @@
       }
     },
     "access": {
-      "title": "Ce lien de suivi ne permet pas d'afficher une demande",
-      "body": "Le lien est peut-être incomplet ou n'est plus valable. Vous pouvez recevoir un nouveau lien à l'adresse e-mail utilisée pour votre demande.",
+      "title": "Ce lien n'est plus valable",
+      "body": "Utilisez le lien du dernier e-mail reçu de notre part pour suivre votre demande.",
       "cta": "Recevoir un nouveau lien",
       "rateLimited": "Trop de consultations en peu de temps. Réessayez dans quelques minutes.",
       "unavailable": "Le suivi est temporairement indisponible. Réessayez dans quelques minutes."

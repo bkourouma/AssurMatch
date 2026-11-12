@@ -61,7 +61,7 @@ export function CreateUserForm({ partners = [] }: { partners?: PartnerChoice[] }
           <Input {...fieldControlProps(ids.email, { required: true })} name="email" type="email" />
         </Field>
         <Field id={ids.displayName} label="Nom affiché" required>
-          <Input {...fieldControlProps(ids.displayName, { required: true })} name="displayName" />
+          <Input {...fieldControlProps(ids.displayName, { required: true })} name="displayName" minLength={2} />
         </Field>
         <Field id={ids.phone} label="Téléphone E.164">
           <Input {...fieldControlProps(ids.phone)} name="phone" placeholder="+2250000000000" />

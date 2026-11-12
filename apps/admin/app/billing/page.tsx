@@ -51,6 +51,9 @@ const BILLING_NOTICES: Record<string, string> = {
   disabled: "Module billing désactivé ou configuration de facturation incomplète (billing_enabled, mentions légales, TVA du pays).",
   forbidden: "Action refusée: rôle Finance Admin ou Super Admin requis.",
   invalid: "Saisie incomplète: vérifiez le plan, le pays et le motif.",
+  invalid_country: "Le code pays doit comporter 2 lettres (ex. : CI).",
+  invalid_reason: "Le motif doit contenir au moins 3 caractères.",
+  credit_note_reason: "Le motif de l'avoir doit contenir au moins 8 caractères.",
   error: "Billing temporairement indisponible.",
   // Spec 063 (CRM-012): decision on a lead dispute.
   dispute_accepted: "Contestation acceptée et auditée. Le cabinet est notifié ; le crédit appliqué est indiqué ci-dessous.",
@@ -295,8 +298,16 @@ export default async function BillingFoundationPage({
                     ]}
                   />
                 </Field>
-                <Field id="billing-country" label="Pays (ISO)">
-                  <Input {...fieldControlProps("billing-country")} name="countryCode" maxLength={2} placeholder="CI" />
+                <Field id="billing-country" label="Pays (ISO)" hint="Code pays sur 2 lettres, par exemple CI.">
+                  <Input
+                    {...fieldControlProps("billing-country", { hint: "Code pays sur 2 lettres, par exemple CI." })}
+                    name="countryCode"
+                    minLength={2}
+                    maxLength={2}
+                    pattern="[A-Za-z]{2}"
+                    title="Code pays sur 2 lettres, par exemple CI."
+                    placeholder="Ex. : CI"
+                  />
                 </Field>
                 <Field id="billing-subscription" label="Abonnement mensuel">
                   <Input {...fieldControlProps("billing-subscription")} name="monthlySubscription" type="number" min={0} step={100} defaultValue={0} />
@@ -308,7 +319,7 @@ export default async function BillingFoundationPage({
                   <Input {...fieldControlProps("billing-setup")} name="setupFee" type="number" min={0} step={100} defaultValue={0} />
                 </Field>
                 <Field id="billing-plan-reason" label="Motif">
-                  <Input {...fieldControlProps("billing-plan-reason")} name="reason" placeholder="Motif du changement de tarif" />
+                  <Input {...fieldControlProps("billing-plan-reason", { required: true })} name="reason" minLength={3} maxLength={300} placeholder="Ex. : Révision annuelle des tarifs" />
                 </Field>
                 <FormActions>
                   <Button type="submit" variant="secondary">Enregistrer le tarif</Button>
@@ -452,7 +463,7 @@ export default async function BillingFoundationPage({
                       />
                     </Field>
                     <Field id="credit-note-reason" label="Motif de l'avoir">
-                      <Input {...fieldControlProps("credit-note-reason")} name="reason" placeholder="Erreur sur la période facturée" />
+                      <Input {...fieldControlProps("credit-note-reason", { required: true })} name="reason" minLength={8} maxLength={300} placeholder="Ex. : Erreur sur la période facturée" />
                     </Field>
                   </ConfirmDialog>
                 </Cluster>
@@ -519,7 +530,7 @@ export default async function BillingFoundationPage({
                   <Input {...fieldControlProps("billing-pack-credits")} name="credits" type="number" min={1} step={1} defaultValue={10} />
                 </Field>
                 <Field id="billing-pack-reason" label="Motif">
-                  <Input {...fieldControlProps("billing-pack-reason")} name="reason" placeholder="Motif du pack" />
+                  <Input {...fieldControlProps("billing-pack-reason", { required: true })} name="reason" minLength={3} maxLength={300} placeholder="Ex. : Pack réglé par virement" />
                 </Field>
                 <Field id="billing-pack-invoice" label="Facture réglée (optionnel)">
                   <Select
@@ -595,7 +606,7 @@ function AccountPanel({ account }: { account: AccountStatementData }) {
             <Input {...fieldControlProps("account-pack-credits")} name="credits" type="number" min={1} step={1} defaultValue={10} />
           </Field>
           <Field id="account-pack-reason" label="Motif">
-            <Input {...fieldControlProps("account-pack-reason")} name="reason" placeholder="Pack règle par virement" />
+            <Input {...fieldControlProps("account-pack-reason", { required: true })} name="reason" minLength={3} maxLength={300} placeholder="Ex. : Pack réglé par virement" />
           </Field>
           <FormActions>
             <Button type="submit" variant="secondary">Attribuer le pack</Button>

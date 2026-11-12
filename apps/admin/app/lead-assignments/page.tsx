@@ -3,7 +3,7 @@ import { Badge, DataTable, Field, FilterBar, Input, PageHeader, PageStack, Selec
 import { ReassignAssignmentForm } from "../lib/ui/operations-forms";
 import { OperationsTabs } from "../lib/ui/operations-tabs";
 import { assignmentStatusTones } from "../lib/ui/operations-tones";
-import { productLabel } from "../lib/ui/operations-labels";
+import { assignmentStatusLabel, productLabel } from "../lib/ui/operations-labels";
 import { readFailureDetail } from "../lib/auth-error-messages";
 
 /**
@@ -18,7 +18,7 @@ const columns: Array<DataTableColumn<LeadAssignmentRow>> = [
   { key: "reference", header: "Demande", render: (row) => <a className="bo-ref" href={`/quote-requests/${row.quoteRequestId}`}>{row.publicReference ?? row.quoteRequestId.slice(0, 8)}</a> },
   { key: "scope", header: "Pays / produit", render: (row) => `${row.countryCode ?? "-"} / ${productLabel(row.productKey)}` },
   { key: "partner", header: "Courtier partenaire", render: (row) => row.partnerLegalName ?? row.partnerTenantId.slice(0, 8) },
-  { key: "status", header: "Statut", render: (row) => <Badge tone={assignmentStatusTones[row.status] ?? "neutral"}>{row.status}</Badge> },
+  { key: "status", header: "Statut", render: (row) => <Badge tone={assignmentStatusTones[row.status] ?? "neutral"} title={row.status}>{assignmentStatusLabel(row.status)}</Badge> },
   { key: "recipients", header: "Destinataires", render: (row) => row.recipientCount, numeric: true, align: "right" },
   { key: "assigned", header: "Affecté le", render: (row) => formatDateTime(row.assignedAt) },
   { key: "action", header: "Dernière action courtier", render: (row) => formatDateTime(row.lastBrokerActionAt) }
@@ -56,7 +56,7 @@ export default async function AdminLeadAssignmentsPage({ searchParams }: { searc
         <Field id="la-status" label="Statut">
           <Select {...fieldControlProps("la-status")} name="status" defaultValue={filters.status ?? ""}>
             <option value="">Tous</option>
-            {statusOptions.map((option) => <option key={option} value={option}>{option}</option>)}
+            {statusOptions.map((option) => <option key={option} value={option}>{assignmentStatusLabel(option)}</option>)}
           </Select>
         </Field>
         <Field id="la-country" label="Pays (code ISO)">
@@ -83,8 +83,9 @@ export default async function AdminLeadAssignmentsPage({ searchParams }: { searc
         emptyLabel="Aucune affectation pour ces filtres."
         emptyDescription={activeFilters > 0 ? "Élargissez la période ou réinitialisez les filtres." : "Les affectations apparaissent ici dès que le routage attribue une demande à un courtier partenaire."}
         aria-label="Affectations de leads"
+        className="lead-assignments-table"
         rowActions={(row) => (
-          <details>
+          <details className="lead-assignments-reassign">
             <summary>Réaffecter</summary>
             <ReassignAssignmentForm assignmentId={row.id} partners={partners.filter((partner) => partner.id !== row.partnerTenantId)} />
           </details>

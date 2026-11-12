@@ -138,8 +138,14 @@ export function DisputesPanel({ filters, list, detail, partners, canDecide, page
               options={partners.map((partner) => ({ value: partner.partnerId, label: partner.partnerName }))}
             />
           </Field>
-          <Field id="dispute-filter-country" label="Pays (ISO)">
-            <Input {...fieldControlProps("dispute-filter-country")} name="countryCode" maxLength={2} defaultValue={filters.countryCode} placeholder="CI" />
+          <Field id="dispute-filter-country" label="Pays (ISO)" hint="Code pays sur 2 lettres, par exemple CI.">
+            <Input
+              {...fieldControlProps("dispute-filter-country", { hint: "Code pays sur 2 lettres, par exemple CI." })}
+              name="countryCode"
+              maxLength={2}
+              defaultValue={filters.countryCode}
+              placeholder="Ex. : CI"
+            />
           </Field>
           <Field id="dispute-filter-from" label="Du">
             <Input {...fieldControlProps("dispute-filter-from")} name="from" type="date" defaultValue={filters.from} />

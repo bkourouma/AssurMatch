@@ -203,7 +203,11 @@ export default async function PublicQuoteTrackingPage({
   }
 
   const status: PublicQuoteStatus = isOneOf(QUOTE_STATUSES, view.status) ? view.status : "received";
-  const statusVisual = STATUS_VISUALS[status];
+  // The API keeps the pipeline status (e.g. "transmitted") after a withdrawal and reports the
+  // withdrawal separately in `consent.withdrawn`; the headline must follow the withdrawal, otherwise
+  // the visitor reads "Demande transmise" about a request that is no longer passed on.
+  const headlineKey: PublicQuoteStatus | "consent_withdrawn" = view.consent.withdrawn ? "consent_withdrawn" : status;
+  const statusVisual = headlineKey === "consent_withdrawn" ? { icon: "x-circle" as IconName, tone: "neutral" as IconTileTone } : STATUS_VISUALS[status];
   const expiry = formatDate(view.tokenExpiresAt);
   const withdrawnAt = formatDate(view.consent.withdrawnAt);
   const timeline = view.timeline.filter((entry) => isOneOf(TIMELINE_STEPS, entry.step));
@@ -323,15 +327,15 @@ export default async function PublicQuoteTrackingPage({
             </div>
           </div>
 
-          <div className="am-j-panel" role="status" data-status={status}>
+          <div className="am-j-panel" role="status" data-status={headlineKey}>
             <div className="am-j-panel__head">
               <IconTile name={statusVisual.icon} tone={statusVisual.tone} size="lg" />
               <div>
                 <p className="am-j-fineprint">{t("statusLabel")}</p>
-                <h2 className="am-j-panel__title">{t(`status.${status}.headline`)}</h2>
+                <h2 className="am-j-panel__title">{t(`status.${headlineKey}.headline`)}</h2>
               </div>
             </div>
-            <p className="am-j-panel__lead">{t(`status.${status}.body`)}</p>
+            <p className="am-j-panel__lead">{t(`status.${headlineKey}.body`)}</p>
           </div>
 
           {view.consent.withdrawn ? (

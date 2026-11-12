@@ -1904,8 +1904,10 @@ samp {
 }
 
 .bo-field__control::placeholder {
-  color: var(--bo-ink-3);
-  opacity: 0.8;
+  /* Visibly an example, never a typed value: paler than the ink of a value, italic, still >= 3:1 on --bo-inset. */
+  color: color-mix(in oklch, var(--bo-ink-3) 80%, var(--bo-inset));
+  font-style: italic;
+  opacity: 1;
 }
 
 .bo-field__control:hover:not(:disabled) {
@@ -2378,6 +2380,42 @@ select.bo-field__control {
   color: var(--bo-ink-2);
   font-weight: 600;
   cursor: pointer;
+}
+
+/* ---------- Lead assignments table (admin /lead-assignments) ---------- */
+/* Status badge never breaks; the action cell stacks the reassign form and its message, wrapped, never clipped. */
+
+.lead-assignments-table .bo-badge {
+  white-space: nowrap;
+}
+
+.lead-assignments-table td {
+  vertical-align: top;
+}
+
+.lead-assignments-table td:last-child {
+  width: 22rem;
+  max-width: 22rem;
+  text-align: left;
+}
+
+.lead-assignments-table .bo-table__actions {
+  display: block;
+}
+
+.lead-assignments-reassign {
+  min-width: 0;
+}
+
+.lead-assignments-reassign[open] > summary {
+  margin-bottom: var(--bo-s3);
+}
+
+.lead-assignments-reassign .bo-form,
+.lead-assignments-reassign .bo-notice {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  white-space: normal;
 }
 
 /* ---------- Responsive ---------- */

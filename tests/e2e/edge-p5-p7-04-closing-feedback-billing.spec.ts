@@ -35,7 +35,7 @@ test.describe.configure({ mode: "serial" });
 
 const SUFFIX = uniqueSuffix();
 const RUN_START = new Date().toISOString();
-const NEUTRAL_TRACKING = "Ce lien de suivi ne permet pas d'afficher une demande";
+const NEUTRAL_TRACKING = "Ce lien n'est plus valable";
 const SURVEY_GONE = "Ce questionnaire n'est plus disponible";
 const CONFLICT_NOTICE = "Opération refusée: état de la facture incompatible (déjà facturé, déjà payée, montant supérieur au solde ou facture non réglée).";
 

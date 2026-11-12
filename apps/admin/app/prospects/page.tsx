@@ -70,8 +70,14 @@ export default async function AdminProspectsPage({ searchParams }: { searchParam
               <Input {...fieldControlProps("prospect-search")} name="search" defaultValue={filters.search ?? ""} autoComplete="off" />
             </Field>
           ) : null}
-          <Field id="prospect-country" label="Pays (code ISO)">
-            <Input {...fieldControlProps("prospect-country")} name="country" defaultValue={filters.country ?? ""} maxLength={3} placeholder="CI" />
+          <Field id="prospect-country" label="Pays (code ISO)" hint="Code pays sur 2 lettres, par exemple CI.">
+            <Input
+              {...fieldControlProps("prospect-country", { hint: "Code pays sur 2 lettres, par exemple CI." })}
+              name="country"
+              defaultValue={filters.country ?? ""}
+              maxLength={3}
+              placeholder="Ex. : CI"
+            />
           </Field>
           <Field id="prospect-product" label="Produit (clé)">
             <Input {...fieldControlProps("prospect-product")} name="product" defaultValue={filters.product ?? ""} placeholder="auto" />

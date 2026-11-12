@@ -18,6 +18,7 @@ import {
 import type { AdminOfferContent, AdminWriteResult } from "./admin-api";
 import { adminWriteErrorMessage } from "./catalog-messages";
 import { ERROR_MESSAGES, forbiddenWordingMessage, wordingFromDetails } from "./auth-error-messages";
+import { reasonRuleFromBackendMessage } from "./user-input-checks";
 
 export { OFFER_INDICATIVE_DISCLAIMERS, offerCompleteness };
 export type { OfferCompleteness };
@@ -214,6 +215,8 @@ export function offerWriteErrorMessage(result: Pick<AdminWriteResult<unknown>, "
     return "Dates incohérentes : la fin de validité doit être postérieure au début.";
   }
   if (result.status === 400) {
+    const reasonRule = reasonRuleFromBackendMessage(result.message);
+    if (reasonRule) return reasonRule;
     return "Données invalides : vérifiez les champs (dates, prix minimal inférieur au maximal, 50 garanties au plus, motif de 8 caractères au moins).";
   }
   return adminWriteErrorMessage(result);
@@ -428,6 +431,8 @@ export function insurerWriteErrorMessage(
   const forbidden = forbiddenWordingOf(result);
   if ((result.status === 400 || result.status === 422) && forbidden.length > 0) return forbiddenWordingMessage(forbidden);
   if (result.status === 400 || result.status === 422) {
+    const reasonRule = reasonRuleFromBackendMessage(result.message);
+    if (reasonRule) return reasonRule;
     return "Données invalides : vérifiez le nom, le code (minuscules, chiffres et tirets) et le motif (8 caractères au moins).";
   }
   if (result.status === 0) return "API indisponible : réessayez dans quelques instants.";

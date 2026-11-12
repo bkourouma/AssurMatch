@@ -47,14 +47,22 @@ export function AddOnPriceForm() {
         <Field id={ids.plan} label="Plan" required>
           <Select {...fieldControlProps(ids.plan, { required: true })} name="plan" defaultValue="pro" options={PLAN_OPTIONS} />
         </Field>
-        <Field id={ids.country} label="Pays (code ISO)" required>
-          <Input {...fieldControlProps(ids.country, { required: true })} name="countryCode" maxLength={2} placeholder="CI" />
+        <Field id={ids.country} label="Pays (code ISO)" required hint="Code pays sur 2 lettres, par exemple CI.">
+          <Input
+            {...fieldControlProps(ids.country, { required: true, hint: "Code pays sur 2 lettres, par exemple CI." })}
+            name="countryCode"
+            minLength={2}
+            maxLength={2}
+            pattern="[A-Za-z]{2}"
+            title="Code pays sur 2 lettres, par exemple CI."
+            placeholder="Ex. : CI"
+          />
         </Field>
         <Field id={ids.amount} label="Montant mensuel (XOF)" required>
           <Input {...fieldControlProps(ids.amount, { required: true })} name="monthlyAmount" type="number" min={0} max={10000000} step={100} defaultValue={0} />
         </Field>
         <Field id={ids.reason} label="Motif (audité)" required>
-          <Input {...fieldControlProps(ids.reason, { required: true })} name="reason" placeholder="Motif du tarif" />
+          <Input {...fieldControlProps(ids.reason, { required: true })} name="reason" minLength={3} maxLength={300} placeholder="Ex. : Tarif 2026 négocié" />
         </Field>
         <Checkbox name="enabled" label="Activé" hint="Décoché : le prix est enregistré mais le module n'est pas proposé." />
         <FormActions>
@@ -80,7 +88,7 @@ export function AddOnPriceToggleForm({ price }: { price: { kind: string; plan: s
       <input type="hidden" name="monthlyAmount" value={price.monthlyAmount ?? 0} />
       <input type="hidden" name="enabled" value={price.enabled ? "false" : "true"} />
       <Field id={reasonId} label="Motif (audité)" required>
-        <Input {...fieldControlProps(reasonId, { required: true })} name="reason" />
+        <Input {...fieldControlProps(reasonId, { required: true })} name="reason" minLength={3} maxLength={300} />
       </Field>
       <FormActions>
         <Button type="submit" size="sm" variant={price.enabled ? "danger" : "secondary"} pending={pending} pendingLabel="Enregistrement...">
@@ -113,7 +121,7 @@ export function AssignAddOnForm({ partners }: { partners: Lot5PartnerChoice[] })
           <Select {...fieldControlProps(ids.kind, { required: true })} name="kind" defaultValue="api" options={ADD_ON_KIND_OPTIONS} />
         </Field>
         <Field id={ids.reason} label="Motif (audité)" required>
-          <Input {...fieldControlProps(ids.reason, { required: true })} name="reason" placeholder="Motif de l'affectation" />
+          <Input {...fieldControlProps(ids.reason, { required: true })} name="reason" minLength={3} maxLength={300} placeholder="Ex. : Option demandée par le cabinet" />
         </Field>
         <FormActions>
           <Button type="submit" variant="secondary" pending={pending} pendingLabel="Affectation..." disabled={partners.length === 0}>Affecter le module</Button>
@@ -133,7 +141,7 @@ export function EndAddOnForm({ addOnId }: { addOnId: string }) {
       <ActionNotice state={state} />
       <input type="hidden" name="addOnId" value={addOnId} />
       <Field id={reasonId} label="Motif (audité)" required>
-        <Input {...fieldControlProps(reasonId, { required: true })} name="reason" />
+        <Input {...fieldControlProps(reasonId, { required: true })} name="reason" minLength={3} maxLength={300} />
       </Field>
       <FormActions>
         <Button type="submit" size="sm" variant="danger" pending={pending} pendingLabel="Fin en cours...">Terminer l'affectation</Button>
@@ -166,7 +174,7 @@ export function SubscriptionForm({
         <Input {...fieldControlProps(ids.expires)} name="contractExpiresAt" type="date" defaultValue={contractExpiresAt ?? ""} />
       </Field>
       <Field id={ids.reason} label="Motif (audité)" required>
-        <Input {...fieldControlProps(ids.reason, { required: true })} name="reason" placeholder="Motif du changement d'état" />
+        <Input {...fieldControlProps(ids.reason, { required: true })} name="reason" minLength={3} maxLength={300} placeholder="Ex. : Impayé constaté" />
       </Field>
       <FormActions>
         <Button type="submit" variant="secondary" pending={pending} pendingLabel="Enregistrement...">Enregistrer l'état</Button>
