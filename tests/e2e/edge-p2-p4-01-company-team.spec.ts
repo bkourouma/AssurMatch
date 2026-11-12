@@ -496,7 +496,7 @@ test("E-P2-06a inviter un e-mail déjà utilisé : 409 neutre, l'adresse n'est p
   const notice = await submitAndRead(invite, invite.getByRole("button", { name: "Inviter", exact: true }));
   NOTE(`Message réel (écran) : « ${notice.text} »`);
   expect(notice.tone).toBe("danger");
-  expect(notice.text).toBe("Cette adresse e-mail est déjà utilisée.");
+  expect(notice.text).toBe("Cette adresse e-mail ne peut pas être invitée. Vérifiez-la ou utilisez une autre adresse.");
   expect(notice.text).not.toContain(agent.email);
 
   expect(own.status, own.text).toBe(409);

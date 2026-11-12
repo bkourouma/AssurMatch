@@ -9,7 +9,7 @@ export interface ScoringActionState {
   message?: string;
 }
 
-export const scoringCriterionKeys: ScoringCriterionKey[] = ["guaranteeLevel", "price", "deductible", "processingSpeed", "paymentFlexibility", "informationQuality", "userPreferences"];
+const scoringCriterionKeys: ScoringCriterionKey[] = ["guaranteeLevel", "price", "deductible", "processingSpeed", "paymentFlexibility", "informationQuality", "userPreferences"];
 
 function stringValue(value: FormDataEntryValue | null): string {
   return typeof value === "string" ? value.trim() : "";

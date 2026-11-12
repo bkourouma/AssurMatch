@@ -28,6 +28,7 @@ import {
   type PartnerStatus,
   type PartnerUserRole
 } from "./admin-api";
+import { partnerUserDisplayNameError } from "./user-input-checks";
 import { adminWriteErrorMessage } from "./catalog-messages";
 import {
   PARTNER_CAPACITY_OPTIONS,
@@ -307,6 +308,8 @@ export async function invitePartnerUserAction(_previous: PartnerActionState, for
   if (badId) return badId;
   const role = text(formData, "role");
   if (!(PARTNER_USER_ROLE_OPTIONS as readonly string[]).includes(role)) return { status: "error", message: "Choisissez un rôle courtier." };
+  const nameError = partnerUserDisplayNameError(text(formData, "displayName"));
+  if (nameError) return { status: "error", message: nameError };
   const result = await inviteAdminPartnerUser(partnerId, {
     email: text(formData, "email"),
     displayName: text(formData, "displayName"),
