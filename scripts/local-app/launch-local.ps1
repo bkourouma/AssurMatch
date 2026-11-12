@@ -55,6 +55,9 @@ $CommonEnv = @(
   "set `"BACKOFFICE_APP_URL=$AdminUrl`"",
   "set `"BROKER_APP_URL=$BrokerUrl`"",
   "set `"PUBLIC_APP_URL=$PublicUrl`"",
+  # The visitor's browser calls the API cross-origin from the public site, so its origin must be in the
+  # API CORS allowlist; the built-in local default only knows port 3601. Loopback names of that port only.
+  "set `"CORS_ORIGINS=$PublicUrl,http://localhost:$PublicPort`"",
   # Spec 048: the survey leaves at once locally (24 h in production); the API re-reads flags every 5 s.
   "set `"ASSURMATCH_SATISFACTION_SURVEY_DELAY_MINUTES=$SurveyDelayMinutes`"",
   'set "ASSURMATCH_FEATURE_FLAG_REFRESH_SECONDS=5"'

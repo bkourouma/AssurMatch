@@ -112,6 +112,13 @@ export const PROOF_MAX_BYTES = 5 * 1024 * 1024;
 export const PROOF_ACCEPT = "application/pdf,image/jpeg,image/png";
 export const UPLOAD_CSRF_HEADER = "x-assurmatch-upload";
 
+/**
+ * Same neutral wording as the API (`broker-team.service.ts`: "This e-mail address cannot be invited")
+ * for EVERY address that cannot be invited. It must never say that an account already exists: a
+ * manager could otherwise probe which addresses are registered with AssurMatch (enumeration).
+ */
+export const TEAM_INVITE_UNAVAILABLE_MESSAGE = "Cette adresse e-mail ne peut pas être invitée. Vérifiez-la ou utilisez une autre adresse.";
+
 export const SELF_SERVICE_ERROR_MESSAGES: Record<string, string> = {
   PARTNER_SUSPENDED: TENANT_SUSPENDED_MESSAGE,
   PARTNER_REQUEST_PENDING: "Une demande identique est déjà en attente de décision d'AssurMatch.",
@@ -121,7 +128,7 @@ export const SELF_SERVICE_ERROR_MESSAGES: Record<string, string> = {
   LICENSE_EXPIRED: "La date d'expiration du renouvellement doit être future.",
   DOCUMENT_INVALID: "Fichier refusé : PDF, JPEG ou PNG de 5 Mo au plus, au contenu conforme à son type.",
   DOCUMENT_STORAGE_NOT_CONFIGURED: "Dépôt indisponible : le stockage des documents n'est pas configuré. Contactez AssurMatch.",
-  EMAIL_ALREADY_USED: AUTH_MESSAGES.emailAlreadyUsed,
+  EMAIL_ALREADY_USED: TEAM_INVITE_UNAVAILABLE_MESSAGE,
   RBAC_DENIED: AUTH_MESSAGES.rbacDenied,
   PAYLOAD_TOO_LARGE: AUTH_MESSAGES.payloadTooLarge,
   TEAM_LAST_OWNER: "Le dernier propriétaire actif ne peut pas être désactivé.",
@@ -133,7 +140,7 @@ export function selfServiceErrorMessage(result: { status: number; code?: string 
   const message = result.code ? SELF_SERVICE_ERROR_MESSAGES[result.code] : undefined;
   if (message) return message;
   // Legacy API (before lot 5): a duplicate e-mail on a team invitation came back as a raw 400/409 text.
-  if ((result.status === 400 || result.status === 409) && result.message && /e-?mail.*(already|exist|unique|used|utilis)|unique constraint.*e-?mail|already.*e-?mail/i.test(result.message)) return AUTH_MESSAGES.emailAlreadyUsed;
+  if ((result.status === 400 || result.status === 409) && result.message && /e-?mail.*(already|exist|unique|used|utilis)|unique constraint.*e-?mail|already.*e-?mail/i.test(result.message)) return TEAM_INVITE_UNAVAILABLE_MESSAGE;
   if (result.status === 400) return "Données invalides : vérifiez les champs (e-mail, téléphone au format +225..., justification de 10 caractères au moins, motif de 8 caractères au moins).";
   if (result.status === 401 || result.code === "session_required") return "Session expirée : reconnectez-vous puis recommencez.";
   if (result.status === 403) return "Action refusée : seuls le propriétaire et les managers du courtier peuvent faire cette action.";

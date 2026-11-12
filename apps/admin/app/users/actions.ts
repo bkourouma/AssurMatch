@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { createAdminUser, issueAdminUserPasswordReset, runAdminUserAction, updateAdminUser, updateAdminUserRoles } from "../lib/admin-api";
 import { adminWriteErrorMessage } from "../lib/catalog-messages";
 import { errorNoticeKey, friendlyErrorMessage } from "../lib/auth-error-messages";
+import { adminUserScopeAndReasonError } from "../lib/user-input-checks";
 
 export interface UserActionState {
   status: "idle" | "success" | "error";
@@ -59,6 +60,9 @@ export async function createAdminUserAction(_previous: UserActionState, formData
   if (!brokerRole && partnerTenantId) {
     return { status: "error", message: "Un rôle admin ne peut pas être rattaché à un courtier : retirez le courtier ou choisissez un rôle courtier." };
   }
+  // The API answers one generic 400 for every invalid field: name the wrong one here instead.
+  const fieldError = adminUserScopeAndReasonError({ countryIds: csvValues(formData.get("countryScopes")), productIds: csvValues(formData.get("productScopes")), reason: stringValue(formData.get("reason")) });
+  if (fieldError) return { status: "error", message: fieldError };
   try {
     const result = await createAdminUser({
       email: stringValue(formData.get("email")),
