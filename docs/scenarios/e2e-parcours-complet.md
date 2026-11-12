@@ -398,11 +398,11 @@ Pré-requis : SA ouvre `broker_visitor_messaging_enabled` (fermé par défaut, m
 | E-P7-02b | V1 | Public | Rouvrir le lien après envoi ; jeton falsifié ou expiré (30 jours) ; référence inconnue ; second `POST` | Même écran « Ce questionnaire n'est plus disponible » (« Le lien est peut-être incomplet, a expiré ou a déjà été utilisé. ») ; second `POST` : confirmation précédente (`alreadySubmitted`), rien de modifié ; sans lien valide : aucune donnée de la demande | P : visitor-tracking (page sans lien valide) |
 | E-P7-02c | V1, CA | Public, Admin | Note de 1 ou 2, ou case « Je souhaite signaler un problème avec le courtier partenaire » | Une alerte conformité est créée et visible côté admin | N |
 | E-P7-02d | V1 | Public | `/desinscription?token=` : jeton absent, falsifié, valide | Absent ou mal formé : « Ce lien n'est pas valide » ; valide : « Confirmer la désinscription » puis « Désinscription enregistrée » ; falsifié refusé (HMAC) ; les e-mails de suivi de la demande continuent | N |
-| P7-03 | FA | Admin | `/billing` : onglet « Tarifs » (Starter CI, « Enregistrer le tarif »), « Recalculer les brouillons », « Émettre la facture », « Enregistrer le paiement » (virement) | Facture `CI-AAAA-NNNNNN` « payée » ; côté courtier `/billing` : « réglée », « Télécharger le PDF » ; « Facturation manuelle: aucun paiement en ligne, aucune prime d'assurance encaissée par AssurMatch. » | C : scenario-core SC-08 |
+| P7-03 | SA (Finance Admin : 403 sur les tarifs et le recalcul, H-A) | Admin | `/billing` : onglet « Tarifs » (Starter CI, « Enregistrer le tarif »), « Recalculer les brouillons », « Émettre la facture », « Enregistrer le paiement » (virement) | Facture `CI-AAAA-NNNNNN` « payée » ; côté courtier `/billing` : « réglée », « Télécharger le PDF » ; « Facturation manuelle: aucun paiement en ligne, aucune prime d'assurance encaissée par AssurMatch. » | C : scenario-core SC-08 |
 | E-P7-03a | FA | Admin | Émettre avec `billing_enabled` fermé ; brouillon vide ; mentions légales incomplètes | 422 (« billing_disabled ») ; 409 « Invoice conflict: empty_draft » ; hors local : 422 « Invoicing configuration incomplete: … » (en local, mentions imprimées « [A COMPLETER] ») | N |
 | E-P7-03b | FA | Admin | Paiement supérieur au reste dû ; date future ; facture déjà payée ou annulée | 409 « Invoice conflict: amount_exceeds_balance », « payment_date_in_future », « invoice_already_paid », « invoice_cancelled » **[À CONFIRMER : texte affiché]** | N |
 | E-P7-03c | FA | Admin | « Émettre l'avoir » sur une facture non réglée ; sur une facture réglée | Avoir `CI-AV-AAAA-NNNNNN` (annulation intégrale) ; facture réglée : refusé | P : recos-063 DSP-03 à DSP-05 (avoirs partiels des litiges) |
-| E-P7-03d | CA, SU, AGT | Admin, Broker | Ouvrir `/billing` avec un rôle sans droit ; sans MFA | Admin : refus 403 ; « Vérification MFA requise avant cette action. » ; courtier agent : « Accès réservé » ; facture d'un autre courtier introuvable | N |
+| E-P7-03d | CA, SU, AGT, FA | Admin, Broker | Ouvrir `/billing` avec un rôle sans droit ; sans MFA ; Finance Admin : enregistrer un tarif ou recalculer les brouillons (hypothèse H-A, **À valider** côté produit : comportement actuel figé par les tests, aucun élargissement de privilèges) | Admin : refus 403 (`BILLING_SCOPE_MISSING` sans périmètre de facturation) ; Finance Admin : 403 sur les tarifs et le recalcul ; « Vérification MFA requise avant cette action. » ; courtier agent : « Accès réservé » ; facture d'un autre courtier introuvable | N |
 | E-P7-03e | PROP, FA | Broker, Admin | Demande de changement de plan (« Plan souhaité », « Justification (10 caractères au minimum) ») ; manager et agent ; décision admin | Propriétaire seul : « Envoyer la demande », « Annuler la demande » ; autres : « Action refusée : seul le propriétaire du cabinet peut demander un changement de plan. » ; acceptée : effet au prochain cycle, notification « Changement de plan accepte » | C : pro-06-plan-change-addons PLAN-01 à PLAN-04 |
 
 ## 13. Cas transversaux (sécurité, accès croisés, injection, accessibilité, responsive, langues)
@@ -598,3 +598,23 @@ Tous les cas nominaux (`P0-01` à `P7-03`), plus :
 - Rien de personnel du visiteur dans l'URL (le jeton seul est autorisé) ni dans les journaux.
 - Aucun e-mail de messagerie, de documents demandés ou de demande de données ne reprend de contenu saisi.
 - Les trois applications ne partagent aucun cookie.
+
+### 16.4 Résultat de l'exécution
+
+- Scénario nominal (`scenario-core.spec.ts`) : 12/12 verts.
+- Cas limites : les 12 specs `edge-p0-p1-*`, `edge-p2-p4-*` et `edge-p5-p7-*` ont été rejouées sur une pile reconstruite ; plus aucun `test.fail`. Les ~60 anomalies confirmées ont été corrigées, par thème :
+  - authentification : jetons d'activation et de réinitialisation à usage unique, rejeu TOTP, messages d'erreur lisibles (identifiants invalides, compte suspendu, politique de mot de passe), expiration de session ;
+  - rôles et comptes : fuite de secrets par `GET /admin/users`, escalade de rôle, auto-actions (suspension, retrait, suppression de soi), dernier Super Admin, e-mail déjà utilisé, périmètre pays de l'Admin Pays ;
+  - contenu et conformité réglementaire : formulations interdites (offres, consentements, formulaires de devis, assureurs), masquage des offres publiées non conformes, XSS stocké (JSON-LD), feature flag IA sensible ;
+  - devis et leads : transitions de statut (rejet, acceptation idempotente), doublon de message courtier, doublon de devis, honeypot, produit inconnu, champs obligatoires et bornes, avis visiteur ;
+  - facturation : refus par périmètre (`BILLING_SCOPE_MISSING`), bandeau accentué ; Finance Admin inchangé (H-A) ;
+  - interface : listes déroulantes non présélectionnées, validité de proposition à partir de demain, débordement à 375 px, libellé « Fichier refusé ».
+- Cas non exécutés (le suivi indique « skips justifiés » ; motifs détaillés connus pour une partie seulement) : limites de débit (E-P0-01c, E-P1-01j, T-06 : elles bloquent l'IP, à rejouer sur pile jetable) ; SEC-LAST-1 et E-P1-03b (à rejouer sur pile jetable) ; E-P2-06c' ; E-P5-02g (flag d'upload fermé) ; E-P7-03a `billing_disabled` ; T-06 et T-09 ; cas d'horloge (expiration à 30 jours). Motif précis à compléter pour E-P2-06c', `billing_disabled`, T-09.
+- Risques résiduels connus :
+  - course sur les codes de secours MFA (`markMfaVerified` réécrit encore le tableau) ;
+  - verrou d'acceptation des leads en mémoire (mono-instance) ;
+  - `LAST_SUPER_ADMIN` non transactionnel ;
+  - CMS et mentions légales : ancien filtre de formulations, plus large ;
+  - `bootstrap-super-admin` imprime le jeton (commande d'exploitation) ;
+  - `PATCH` générique du statut CRM sans contrôle de transition ;
+  - message `FORBIDDEN_WORDING` en anglais côté CMS.

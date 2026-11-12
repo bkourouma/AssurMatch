@@ -1,3 +1,5 @@
+> **Ancien scénario : certains pas sont inexacts ; la référence est `e2e-parcours-complet.md` (voir section 16.1).**
+
 # Scénario E2E — Courtier ajouté → société configurée → offres validées → visiteur → devis → réponse
 
 Mis à jour le 2026-10-15 (messagerie, documents demandés et demandes de données : spec 062). Remplace la version du 2026-09, dont les écarts (onboarding du courtier, offres en libre-service, réponse au visiteur) sont comblés par les specs 051 à 055, 059 et 060.
