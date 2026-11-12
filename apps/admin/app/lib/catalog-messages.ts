@@ -174,7 +174,8 @@ export function adminWriteErrorMessage(result: Pick<AdminWriteResult<unknown>, "
   if (result.status === 400 || code === "VALIDATION_FAILED") {
     const reasonRule = reasonRuleFromBackendMessage(result.message);
     if (reasonRule) return reasonRule;
-    return "Données invalides : vérifiez les champs saisis (le motif doit contenir au moins 8 caractères).";
+    // Generic 400: the API does not say which field is wrong, so no single field is named here.
+    return "Données invalides : vérifiez les champs saisis (e-mail, nom, périmètres, motif d'au moins 8 caractères).";
   }
   if (result.status === 0) return "API indisponible : réessayez dans quelques instants.";
   return ERROR_MESSAGES.fallback;

@@ -34,9 +34,12 @@ const modeOptions: Array<{ value: string; label: string }> = [
 ];
 
 function ModeSelect({ id, name, required }: { id: string; name: string; required?: boolean }) {
+  // Creating a rule: the mode is a mandatory, explicit choice. The shared Select shows its "Choisir..."
+  // placeholder, so the submitted value is never a silent default that differs from the first option shown.
+  if (required) return <Select {...fieldControlProps(id, { required })} name={name} options={modeOptions} />;
   return (
-    <Select {...fieldControlProps(id, { required })} name={name} defaultValue={required ? "round_robin" : ""}>
-      {required ? null : <option value="">(inchangé)</option>}
+    <Select {...fieldControlProps(id)} name={name} defaultValue="">
+      <option value="">(inchangé)</option>
       {modeOptions.map((option) => (
         <option key={option.value} value={option.value}>{option.label}</option>
       ))}
