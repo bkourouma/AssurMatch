@@ -28,7 +28,7 @@ async function submitQuote(harness: RuntimeHttpHarness, seed: Seed, index: numbe
       productKey: "auto",
       formDefinitionId: seed.form.id,
       contact: { displayName: `Visiteur ${index}`, email: `visiteur${index}@example.com`, phone: `+22501020304${10 + index}` },
-      answers: { vehicle_use: "prive" },
+      answers: { vehicle_use: "prive", city: "Abidjan", contact_preference: "email" },
       consent: { accepted: true, consentTextId: seed.consentText.id, version: "v1", contentHash: seed.consentText.contentHash },
       ipAddress: `203.0.113.${100 + index}`,
       sessionId: `admin-ops-session-${index}`
@@ -120,7 +120,7 @@ describe("spec 056 admin operations consoles (runtime HTTP)", () => {
     }>(await get(harness, `/admin/operations/quote-requests/${quoteId}`, SUPER_ADMIN));
     expect(detail.consent.status).toBe("granted");
     expect(detail.contact.email).toBe("visiteur1@example.com");
-    expect(detail.answers).toEqual({ vehicle_use: "prive" });
+    expect(detail.answers).toEqual({ vehicle_use: "prive", city: "Abidjan", contact_preference: "email" });
     expect(detail.routingDecisions[0]).toMatchObject({ result: "assigned" });
     expect(detail.routingDecisions[0]?.selectedPartners[0]?.legalName).toBe("Broker CI Runtime");
     expect(detail.assignments[0]).toMatchObject({ partnerLegalName: "Broker CI Runtime" });
@@ -134,7 +134,7 @@ describe("spec 056 admin operations consoles (runtime HTTP)", () => {
     expect(supportRaw).not.toContain("prive");
     const supportDetail = JSON.parse(supportRaw) as { piiMasked: boolean; answers: Record<string, unknown> };
     expect(supportDetail.piiMasked).toBe(true);
-    expect(supportDetail.answers).toEqual({ vehicle_use: "[masque]" });
+    expect(supportDetail.answers).toEqual({ vehicle_use: "[masque]", city: "[masque]", contact_preference: "[masque]" });
 
     expect((await readJson<{ total: number }>(await get(harness, "/admin/operations/quote-requests", ADMIN_PAYS_CI))).total).toBe(1);
     expect((await readJson<{ total: number }>(await get(harness, "/admin/operations/quote-requests", ADMIN_PAYS_SN))).total).toBe(0);

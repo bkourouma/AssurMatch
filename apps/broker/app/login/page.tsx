@@ -1,3 +1,4 @@
+import { loginErrorNotice, loginReasonNotice } from "../lib/auth-error-messages";
 import { loginAction } from "../lib/backoffice-session-actions";
 import { isLocalBrokerDemoLoginEnabled } from "../lib/dev-demo-accounts";
 import { Button, Field, Form, FormActions, Input, Notice } from "../lib/ui/broker-ui";
@@ -11,45 +12,28 @@ function firstParam(value: string | string[] | undefined): string | undefined {
   return Array.isArray(value) ? value[0] : value;
 }
 
-const KNOWN_ERRORS = [
-  "activation_required",
-  "mfa_required",
-  "locked",
-  "suspended",
-  "validation_error",
-  "dev_login_missing_seed",
-  "dev_login_database",
-  "dev_login_disabled",
-  "dev_login_invalid"
-];
-
 export default async function BrokerLoginPage({ searchParams }: LoginPageProps) {
   const params = searchParams ? await searchParams : {};
   const returnTo = firstParam(params.returnTo) ?? "/";
   const error = firstParam(params.error);
   const reason = firstParam(params.reason);
   const mfa = firstParam(params.mfa);
+  const reasonNotice = loginReasonNotice(reason);
+  const errorNotice = loginErrorNotice(error);
 
   return (
     <>
       <h1 className="bo-auth__title">Connexion</h1>
-      {reason === "session_expired" ? <Notice tone="info">Votre session a expiré. Connectez-vous à nouveau.</Notice> : null}
-      {reason === "session_required" ? <Notice tone="info">Connectez-vous pour accéder au back-office.</Notice> : null}
+      {reasonNotice ? (
+        <Notice tone={reasonNotice.tone}>
+          {reasonNotice.message}
+          {reason === "mfa_required" ? <>{" "}<a href={`/mfa?returnTo=${encodeURIComponent(returnTo)}`}>Saisir mon code de vérification</a></> : null}
+        </Notice>
+      ) : null}
       {mfa === "required" ? (
         <Notice tone="danger">MFA requise. Votre profil est reconnu, mais l'accès protégé reste bloqué tant que la vérification MFA n'est pas terminée.</Notice>
       ) : null}
-      {error === "activation_required" ? (
-        <Notice tone="danger">Activation requise. Ouvrez l'écran d'activation avec le jeton fourni par votre administrateur.</Notice>
-      ) : null}
-      {error === "mfa_required" ? (
-        <Notice tone="danger">MFA requise. Terminez la vérification MFA avant d'ouvrir le back-office courtier.</Notice>
-      ) : null}
-      {error === "locked" ? <Notice tone="danger">Compte verrouillé. Contactez votre administrateur plateforme.</Notice> : null}
-      {error === "suspended" ? <Notice tone="danger">Compte suspendu. Contactez votre responsable habilité.</Notice> : null}
-      {error === "validation_error" ? <Notice tone="danger">Vérifiez le format de l'email et du mot de passe.</Notice> : null}
-      {error === "dev_login_missing_seed" ? <Notice tone="danger">Données démo locales absentes. Relancez le seed broker démo.</Notice> : null}
-      {error === "dev_login_database" ? <Notice tone="danger">Base locale indisponible pour le sélecteur démo.</Notice> : null}
-      {error && !KNOWN_ERRORS.includes(error) ? <Notice tone="danger">Accès refusé ou identifiants invalides.</Notice> : null}
+      {errorNotice ? <Notice tone={errorNotice.tone}>{errorNotice.message}</Notice> : null}
 
       {isLocalBrokerDemoLoginEnabled() ? <DevAccountPicker returnTo={returnTo} /> : null}
 

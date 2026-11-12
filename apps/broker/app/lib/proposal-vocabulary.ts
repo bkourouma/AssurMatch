@@ -52,6 +52,8 @@ export const PROPOSAL_NOTICES: Record<string, { tone: "info" | "warning" | "dang
   forbidden_wording: { tone: "warning", message: "Envoi refusé : le texte contient une formulation interdite." },
   quarantined: { tone: "danger", message: "Envoi refusé : le fichier n'a pas passé l'antivirus. Il n'a pas été conservé." },
   document_invalid: { tone: "warning", message: "Fichier refusé : PDF de 5 Mo au maximum uniquement." },
+  file_too_large: { tone: "warning", message: "Fichier refusé : taille maximale 5 Mo." },
+  validity_past: { tone: "warning", message: "La date de validité doit être postérieure à aujourd'hui." },
   invalid: { tone: "warning", message: "Saisie refusée : message, prime ou fourchette, devise et date de validité future sont obligatoires." },
   forbidden: { tone: "warning", message: "Action refusée par vos permissions, votre tenant ou votre MFA." },
   suspended: { tone: "warning", message: "Compte suspendu : consultation seule. Contactez AssurMatch." },
@@ -78,11 +80,13 @@ export function proposalOutcome(result: { status: number; code?: string | undefi
   if (result.code && CODE_OUTCOMES[result.code]) return CODE_OUTCOMES[result.code]!;
   if (result.status === 403) return "forbidden";
   if (result.status === 404) return "not_found";
-  if (result.status === 400 || result.status === 413 || result.status === 422) return "invalid";
+  if (result.status === 413 || result.code === "PAYLOAD_TOO_LARGE") return "file_too_large";
+  if (result.status === 400 || result.status === 422) return "invalid";
   return "error";
 }
 
-export type ProposalPayloadResult = { ok: true; payload: Record<string, unknown> } | { ok: false };
+/** `reason: "validity"` : the only fault is a validity date that is today or in the past. */
+export type ProposalPayloadResult = { ok: true; payload: Record<string, unknown> } | { ok: false; reason?: "validity" };
 
 function text(form: FormData, key: string): string {
   const value = form.get(key);
@@ -110,7 +114,10 @@ export function buildProposalPayload(form: FormData, now: Date = new Date()): Pr
   if (!message || (priceMin === undefined && priceMax === undefined) || Number.isNaN(priceMin) || Number.isNaN(priceMax)) return { ok: false };
   if (priceMin !== undefined && priceMax !== undefined && priceMin > priceMax) return { ok: false };
   if (!/^[A-Z]{3}$/.test(currency) || guarantees.length > PROPOSAL_GUARANTEES_MAX || guarantees.some((item) => item.length > PROPOSAL_GUARANTEE_MAX_LENGTH)) return { ok: false };
-  if (!validUntil || validUntil.getTime() <= now.getTime()) return { ok: false };
+  if (!validUntil) return { ok: false };
+  // Same rule as the `min` attribute of the date field: the earliest valid day is tomorrow.
+  const tomorrow = new Date(now.getTime() + 24 * 3600 * 1000).toISOString().slice(0, 10);
+  if (validDate < tomorrow) return { ok: false, reason: "validity" };
   return {
     ok: true,
     payload: {

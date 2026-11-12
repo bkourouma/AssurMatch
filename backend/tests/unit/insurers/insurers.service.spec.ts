@@ -42,7 +42,7 @@ describe("spec 070 insurer referential", () => {
     const { service } = setup();
     await expect(service.create(input({ code: "Not Valid!" }), superAdmin)).rejects.toMatchObject({ status: 400 });
     await expect(service.create(input({ reason: "court" }), superAdmin)).rejects.toMatchObject({ status: 400 });
-    await expect(service.create(input({ name: "Acheter maintenant assurance" }), superAdmin)).rejects.toMatchObject({ status: 400 });
+    await expect(service.create(input({ name: "Acheter maintenant assurance" }), superAdmin)).rejects.toMatchObject({ status: 422, response: { code: "FORBIDDEN_WORDING", details: { wording: expect.any(Array) } } });
     await expect(service.create(input({ unknown: true }), superAdmin)).rejects.toMatchObject({ status: 400 });
   });
 

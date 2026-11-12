@@ -109,7 +109,7 @@ async function submitQuote(
       productKey: "auto",
       formDefinitionId: seed.form.id,
       contact: { displayName: `Visiteur ${suffix}`, email: `visiteur067-${suffix}@example.test`, phone: `+22507080920${suffix}`, ...contact },
-      answers: { vehicle_use: "prive" },
+      answers: { vehicle_use: "prive", city: "Abidjan", contact_preference: "email" },
       consent: { accepted: true, consentTextId: seed.consentText.id, version: "v1", contentHash: seed.consentText.contentHash, ...consent },
       ipAddress: `198.51.100.${sequence}`,
       sessionId: `journey-067-${suffix}`,

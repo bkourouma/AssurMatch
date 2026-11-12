@@ -13,7 +13,7 @@ describe("runtime public abuse controls", () => {
 
     await expect(rateLimit.assertAllowed("127.0.0.1", "ci", "auto")).resolves.toBeUndefined();
     await expect(rateLimit.assertAllowed("127.0.0.1", "ci", "auto")).rejects.toThrow("Rate limit exceeded");
-    await expect(antiSpam.assertClean({ sessionId: "s1", answers: { website: "bot" } })).rejects.toThrow("Spam submission blocked");
+    await expect(antiSpam.assertClean({ sessionId: "s1", answers: { website: "bot" } })).rejects.toThrow("Request could not be processed");
     await expect(duplicate.evaluate("ci", "auto", "contact-hash")).resolves.toBe("unique");
     await expect(duplicate.evaluate("ci", "auto", "contact-hash")).resolves.toBe("blocked_duplicate");
   });

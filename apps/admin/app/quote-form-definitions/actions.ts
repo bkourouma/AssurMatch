@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { friendlyErrorMessage } from "../lib/auth-error-messages";
 import {
   createQuoteFormDefinition,
   publishQuoteFormDefinition,
@@ -26,7 +27,7 @@ function optionalString(value: FormDataEntryValue | null): string | undefined {
 }
 
 function actionError(error: unknown): QuoteFormActionState {
-  return { status: "error", message: error instanceof Error ? error.message : "action_failed" };
+  return { status: "error", message: friendlyErrorMessage(error) };
 }
 
 /**
@@ -57,7 +58,7 @@ function fieldsValue(value: FormDataEntryValue | null): QuoteFormFieldInput[] {
 export async function createQuoteFormDefinitionAction(_previous: QuoteFormActionState, formData: FormData): Promise<QuoteFormActionState> {
   try {
     const fields = fieldsValue(formData.get("fields"));
-    if (fields.length === 0) return { status: "error", message: "fields_invalid" };
+    if (fields.length === 0) return { status: "error", message: "Ajoutez au moins un champ valide (une ligne « clé|libellé|type|obligatoire|sensibilité|options »)." };
     const dataMinimizationNotes = optionalString(formData.get("dataMinimizationNotes"));
     const form = await createQuoteFormDefinition({
       countryId: stringValue(formData.get("countryId")),

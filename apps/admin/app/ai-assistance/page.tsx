@@ -2,6 +2,7 @@ import Link from "next/link";
 import { listAdminAiInsights, readAdminAIAssistance } from "../lib/admin-api";
 import { requestAdminInsightAction, validateAdminInsightAction } from "../lib/ai-insight-actions";
 import { Badge, Button, Card, Cluster, DataTable, DescriptionList, EmptyState, Form, Input, PageHeader, PageStack, Split, Stack, StateMessage } from "../lib/ui/admin-ui";
+import { readFailureDetail } from "../lib/auth-error-messages";
 
 const INSIGHT_LABELS: Record<string, string> = {
   admin_risk_triage: "Triage des risques de conformité",
@@ -39,7 +40,7 @@ export default async function AdminAIAssistancePage({ searchParams }: { searchPa
         description="Insights IA indicatifs pour prioriser une revue humaine. Aucune décision automatisée, aucune donnée prospect envoyée au modèle."
       />
       {assistance.forbidden ? <StateMessage tone="danger">Accès assistance IA refusé pour ce rôle admin.</StateMessage> : null}
-      {assistance.status === "error" ? <StateMessage tone="danger">Assistance IA indisponible: {assistance.error}</StateMessage> : null}
+      {assistance.status === "error" ? <StateMessage tone="danger">Assistance IA indisponible. {readFailureDetail(assistance.error)}</StateMessage> : null}
       {ai && NOTICES[ai] ? <StateMessage tone={ai === "queued" || ai === "validated" ? "info" : "warning"}>{NOTICES[ai]}</StateMessage> : null}
       {assistance.status === "success" ? (
         <>

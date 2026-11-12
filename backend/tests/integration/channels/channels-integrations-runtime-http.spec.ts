@@ -147,7 +147,7 @@ describe("channels and integrations runtime HTTP (lot 10)", () => {
       countryCode: "CI",
       productKey: "auto",
       contact: { email: "ama@example.test", phone: PHONE },
-      answers: { vehicle_use: "prive" }
+      answers: { vehicle_use: "prive", city: "Abidjan", contact_preference: "email" }
     }, superAdmin);
 
     // Flag closed (default): nothing is prepared, nothing is sent.

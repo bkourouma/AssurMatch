@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { friendlyErrorMessage } from "../lib/auth-error-messages";
 import { createScoringRule, suspendAdminOffer, updateScoringRule, validateAdminOffer, type ScoringCriterionKey, type ScoringWeightsData } from "../lib/admin-api";
 
 export interface ScoringActionState {
@@ -26,13 +27,13 @@ function weightsValue(formData: FormData): ScoringWeightsData | undefined {
 }
 
 function actionError(error: unknown): ScoringActionState {
-  return { status: "error", message: error instanceof Error ? error.message : "action_failed" };
+  return { status: "error", message: friendlyErrorMessage(error) };
 }
 
 export async function createScoringRuleAction(_previous: ScoringActionState, formData: FormData): Promise<ScoringActionState> {
   try {
     const weights = weightsValue(formData);
-    if (!weights) return { status: "error", message: "weights_required" };
+    if (!weights) return { status: "error", message: "Saisissez les poids des critères." };
     const total = scoringCriterionKeys.reduce((sum, key) => sum + weights[key], 0);
     if (total !== 100) return { status: "error", message: `Les poids doivent totaliser 100 (actuellement ${total}).` };
     const countryId = optionalString(formData.get("countryId"));
@@ -55,7 +56,7 @@ export async function createScoringRuleAction(_previous: ScoringActionState, for
 export async function updateScoringRuleAction(_previous: ScoringActionState, formData: FormData): Promise<ScoringActionState> {
   try {
     const ruleId = stringValue(formData.get("ruleId"));
-    if (!ruleId) return { status: "error", message: "rule_required" };
+    if (!ruleId) return { status: "error", message: "Choisissez la règle à modifier." };
     const weights = weightsValue(formData);
     if (weights) {
       const total = scoringCriterionKeys.reduce((sum, key) => sum + weights[key], 0);
@@ -79,7 +80,7 @@ export async function updateScoringRuleAction(_previous: ScoringActionState, for
 export async function validateOfferAction(_previous: ScoringActionState, formData: FormData): Promise<ScoringActionState> {
   try {
     const decision = stringValue(formData.get("validationStatus"));
-    if (decision !== "validated" && decision !== "rejected") return { status: "error", message: "decision_invalid" };
+    if (decision !== "validated" && decision !== "rejected") return { status: "error", message: "Choisissez une décision : valider ou rejeter." };
     const offer = await validateAdminOffer(stringValue(formData.get("offerId")), { validationStatus: decision, reason: stringValue(formData.get("reason")) });
     revalidatePath("/scoring");
     revalidatePath("/offers");

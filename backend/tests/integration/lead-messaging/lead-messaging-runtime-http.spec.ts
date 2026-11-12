@@ -114,7 +114,7 @@ describe("broker <-> visitor messaging runtime HTTP (spec 062)", () => {
         productKey: "auto",
         formDefinitionId: seed.form.id,
         contact: { displayName: "Awa Visiteur", email, phone: "+2250102030462" },
-        answers: { vehicle_use: "prive" },
+        answers: { vehicle_use: "prive", city: "Abidjan", contact_preference: "email" },
         consent: { accepted: true, consentTextId: seed.consentText.id, version: "v1", contentHash: seed.consentText.contentHash },
         ipAddress: "203.0.113.62",
         sessionId: `session-${email}`

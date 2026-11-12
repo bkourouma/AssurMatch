@@ -26,7 +26,8 @@ function text(formData: FormData, name: string): string {
 }
 
 function refused<T>(result: SelfServiceWriteResult<T>, returnTo: string): SelfServiceActionState {
-  if (result.status === 401) redirect(loginRedirect(returnTo, "session_expired"));
+  // No cookie at all (server action reached without a session): answer with the message, never write.
+  if (result.status === 401 && result.code !== "session_required") redirect(loginRedirect(returnTo, "session_expired"));
   return { status: "error", message: selfServiceErrorMessage(result) };
 }
 

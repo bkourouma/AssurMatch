@@ -1,5 +1,6 @@
 import { timingSafeEqual } from "node:crypto";
-import { NotFoundException } from "@nestjs/common";
+import { BadRequestException, NotFoundException, UnprocessableEntityException } from "@nestjs/common";
+import { ErrorCodes } from "../../../../packages/shared/contracts/error-codes";
 import { MAX_QUOTE_OFFERS, quoteRequestCreateSchema, type QuoteConfirmation, type QuoteMarketingSource, type QuoteRequestCreateDto } from "../../../../packages/shared/contracts/quote.contracts";
 import type { ConsentWithdrawalResponse } from "../../../../packages/shared/contracts/public-site.contracts";
 import {
@@ -307,13 +308,22 @@ export class QuoteSubmissionService {
         reason: "validation_failed",
         context: {}
       });
-      throw new Error("Quote request validation failed");
+      const paths = [...new Set(parsedResult.error.issues.map((issue) => issue.path.join(".") || "body"))].slice(0, 10);
+      const answerIssues = parsedResult.error.issues.filter((issue) => issue.path[0] === "answers").map((issue) => issue.message).slice(0, 3);
+      // An out-of-bounds `answers` record is refused on its content: 422 naming `answers`; other malformed fields stay 400.
+      const ExceptionType = answerIssues.length > 0 ? UnprocessableEntityException : BadRequestException;
+      throw new ExceptionType({
+        code: ErrorCodes.VALIDATION_FAILED,
+        message: `Quote request validation failed: ${paths.join(", ")}${answerIssues.length ? ` (${answerIssues.join("; ")})` : ""}`
+      });
     }
     const parsed = parsedResult.data;
     const country = await this.deps.findCountryByCode(parsed.countryCode);
     const linkedProduct = await this.deps.findProductByKey(parsed.productKey);
-    if (!country || !linkedProduct || !linkedProduct.countryIds.includes(country.id)) {
-      throw new Error("Country or product is not available");
+    // Lot 4 A-04c3: an unknown country or product is a 404, never a 500.
+    if (!country) throw new NotFoundException({ code: ErrorCodes.COUNTRY_DISABLED, message: "Country is not available" });
+    if (!linkedProduct || !linkedProduct.countryIds.includes(country.id)) {
+      throw new NotFoundException({ code: ErrorCodes.PRODUCT_NOT_FOUND, message: "Product not found" });
     }
     // Spec 050 R2: the product as seen from this country (product flag AND country link flag).
     const product = { ...linkedProduct, flags: effectiveProductFlags(linkedProduct, countryLinkFor(linkedProduct, country.id)) };
@@ -341,6 +351,27 @@ export class QuoteSubmissionService {
       if (error instanceof NotFoundException) return undefined;
       throw error;
     });
+    if (publicForm && publicForm.formDefinitionId === parsed.formDefinitionId) {
+      // Lot 4 A-02e2 / A-02d: the required fields of the published form are checked server side.
+      const invalid = invalidAnswerFields(Array.isArray(publicForm.fields) ? publicForm.fields : [], parsed.answers);
+      if (invalid.length > 0) {
+        this.audit.write({
+          actor,
+          action: QuoteAuditActions.quoteRequestRefused,
+          targetType: "QuoteRequest",
+          targetId: "draft",
+          scope: { countryId: country.id, productId: product.id },
+          result: "refused",
+          reason: "required_fields_invalid",
+          context: { fields: invalid }
+        });
+        throw new UnprocessableEntityException({
+          code: ErrorCodes.VALIDATION_FAILED,
+          message: `Quote request validation failed: required or invalid answers: ${invalid.join(", ")}`,
+          details: { reason: "answers_invalid" }
+        });
+      }
+    }
     if (!publicForm || publicForm.formDefinitionId !== parsed.formDefinitionId || publicForm.consent.consentTextId !== parsed.consent.consentTextId || publicForm.consent.contentHash !== parsed.consent.contentHash) {
       this.audit.write({
         actor,
@@ -1158,12 +1189,11 @@ export class QuoteSubmissionService {
   }
 
   private duplicateConfirmation(): QuoteConfirmation {
+    // Lot 4 A-03d: HTTP 200, no reference (the original request is not known here), no token, no link.
     return {
-      publicReference: "duplicate",
-      status: "duplicate",
+      status: "duplicate_ignored",
       routed: false,
-      message: "Une demande récente similaire existe déjà; aucun courtier partenaire n'est notifié une seconde fois.",
-      verificationToken: "duplicate"
+      message: "Une demande récente similaire existe déjà; aucun courtier partenaire n'est notifié une seconde fois."
     };
   }
 
@@ -1183,6 +1213,31 @@ function routableWithPreferences(quote: QuoteRequestRecord, preferred: readonly 
     preferredPartnerTenantIds: preferred.map((item) => item.partnerTenantId),
     ...(chosen ? { chosenBrokerPartnerTenantId: chosen.partnerTenantId } : {})
   };
+}
+
+/**
+ * Lot 4: keys of the published form's answers that are missing (required, absent or blank) or
+ * invalid (a number field that is negative or not a number). The definition has no conditional
+ * visibility, so every required field applies. Checkboxes: an unchecked box (`false`) is a valid answer.
+ */
+export function invalidAnswerFields(
+  fields: ReadonlyArray<{ key: string; type: string; required: boolean }>,
+  answers: Record<string, unknown>
+): string[] {
+  const invalid: string[] = [];
+  for (const field of fields) {
+    const value = answers[field.key];
+    const blank = value === undefined || value === null || (typeof value === "string" && value.trim() === "");
+    if (blank) {
+      if (field.required) invalid.push(field.key);
+      continue;
+    }
+    if (field.type === "number") {
+      const numeric = typeof value === "number" ? value : typeof value === "string" ? Number(value) : Number.NaN;
+      if (!Number.isFinite(numeric) || numeric < 0) invalid.push(field.key);
+    }
+  }
+  return invalid;
 }
 
 /** Constant-time equality of two hex digests of the same length. */

@@ -1,4 +1,4 @@
-import { BadRequestException, ConflictException, ForbiddenException, NotFoundException } from "@nestjs/common";
+import { BadRequestException, ConflictException, ForbiddenException, NotFoundException, UnprocessableEntityException } from "@nestjs/common";
 import { ErrorCodes } from "../../../../packages/shared/contracts/error-codes";
 
 /** Spec 070: insurer refusals carry an explicit `code`, so the HTTP status never depends on a message. */
@@ -23,4 +23,13 @@ export function insurerConflict(message: string): ConflictException {
 
 export function insurerInvalid(message: string): BadRequestException {
   return new BadRequestException({ code: InsurerErrorCodes.validationFailed, message });
+}
+
+/** Regulated wording in an insurer name or approval number: 422 `FORBIDDEN_WORDING` naming the expressions (same shape as the offers). */
+export function insurerForbiddenWording(wording: readonly string[]): UnprocessableEntityException {
+  return new UnprocessableEntityException({
+    code: ErrorCodes.FORBIDDEN_WORDING,
+    message: `Forbidden regulated wording: ${wording.join(", ")}`,
+    details: { wording: [...wording] }
+  });
 }

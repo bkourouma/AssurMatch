@@ -74,7 +74,7 @@ export function contentReadErrorMessage(error: string | undefined): string {
   if (!error) return "Contenu indisponible.";
   if (error === "access_denied") return "Accès à la gestion du contenu refusé pour ce rôle (réservé aux rôles contenu, conformité et super administrateur).";
   if (error === "session_required" || error === "session_expired") return "Session admin requise.";
-  return `Contenu indisponible (${error}).`;
+  return "Contenu indisponible pour le moment. Réessayez dans un instant.";
 }
 
 interface ErrorLike {
@@ -106,7 +106,7 @@ export function contentErrorMessage(error: unknown): string {
   }
   if (raw === "access_denied") return "Accès refusé.";
   if (raw.startsWith("form_")) return raw.slice(5);
-  return raw ? `Action impossible (${raw}).` : "Action impossible.";
+  return "Action impossible. Réessayez dans un instant.";
 }
 
 export type ContentAction = "edit" | "submit" | "withdraw" | "approve" | "reject" | "archive" | "revise";

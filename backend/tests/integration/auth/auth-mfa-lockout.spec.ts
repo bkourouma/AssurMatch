@@ -1,4 +1,4 @@
-import { generate } from "otplib";
+import { totp } from "../helpers/mfa-login";
 import { afterEach, describe, expect, it } from "vitest";
 import { AuditLogWriter } from "../../../src/modules/audit-logs/audit-log-writer.service";
 import { AuthModule } from "../../../src/modules/auth/auth.module";
@@ -15,7 +15,7 @@ async function enrolledAccount() {
   await users.setPassword(created.id, await auth.passwordHashing.hash(PASSWORD));
   await users.update({ ...(await users.require(created.id)), status: "active" });
   const enrollment = await auth.service.enrollMfa(await users.require(created.id));
-  const validCode = () => generate({ secret: enrollment.secret, strategy: "totp", digits: 6, period: 30 });
+  const validCode = () => totp(enrollment.secret);
   await auth.service.verifyMfa(await users.require(created.id), "", await validCode());
   return { users, auth, user: await users.require(created.id), validCode };
 }

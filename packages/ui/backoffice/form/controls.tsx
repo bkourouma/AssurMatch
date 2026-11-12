@@ -23,17 +23,56 @@ export interface SelectOption {
 
 export interface SelectProps extends Omit<ComponentProps<"select">, "children"> {
   options?: SelectOption[] | undefined;
-  /** Rendered as a disabled first entry with an empty value. */
+  /**
+   * Rendered as a disabled first entry with an empty value, selected until the user chooses. A `required`
+   * select that carries no value, no `defaultValue` and no empty option gets "Choisir…" automatically, so that
+   * the browser blocks the submission instead of silently sending the first option.
+   */
   placeholder?: string | undefined;
   children?: ReactNode;
 }
 
+export const SELECT_DEFAULT_PLACEHOLDER = "Choisir…";
+
+/** Pure decision behind `Select`: which placeholder is shown, whether it is hidden, and the uncontrolled default value. */
+export function resolveSelectPlaceholder(input: {
+  placeholder?: string | undefined;
+  required?: boolean | undefined;
+  multiple?: boolean | undefined;
+  size?: number | undefined;
+  value?: unknown;
+  defaultValue?: unknown;
+  hasEmptyOption: boolean;
+}): { label: string | undefined; hidden: boolean; defaultValue: "" | undefined } {
+  const uncontrolled = input.value === undefined && input.defaultValue === undefined;
+  const single = !input.multiple && (input.size === undefined || input.size <= 1);
+  const auto = input.required === true && uncontrolled && single && !input.hasEmptyOption;
+  const label = input.placeholder ?? (auto ? SELECT_DEFAULT_PLACEHOLDER : undefined);
+  return {
+    label,
+    // A required select hides its placeholder from the list (a choice is mandatory); a filter keeps it visible.
+    hidden: label !== undefined && input.required === true,
+    defaultValue: label !== undefined && uncontrolled ? "" : undefined
+  };
+}
+
 export function Select({ options, placeholder, children, className, ...rest }: SelectProps) {
+  // Children may carry their own empty option (e.g. "Aucune"): never add a second placeholder then.
+  const hasEmptyOption = options?.some((option) => option.value === "") === true || children !== undefined;
+  const resolved = resolveSelectPlaceholder({
+    placeholder,
+    required: rest.required,
+    multiple: rest.multiple,
+    size: rest.size,
+    value: rest.value,
+    defaultValue: rest.defaultValue,
+    hasEmptyOption
+  });
   return (
-    <select className={control(className)} {...rest}>
-      {placeholder ? (
-        <option value="" disabled>
-          {placeholder}
+    <select className={control(className)} {...rest} {...(resolved.defaultValue !== undefined ? { defaultValue: resolved.defaultValue } : {})}>
+      {resolved.label ? (
+        <option value="" disabled hidden={resolved.hidden}>
+          {resolved.label}
         </option>
       ) : null}
       {options?.map((option) => (

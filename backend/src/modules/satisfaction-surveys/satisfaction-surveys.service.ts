@@ -1,3 +1,5 @@
+import { BadRequestException, NotFoundException } from "@nestjs/common";
+import { ErrorCodes } from "../../../../packages/shared/contracts/error-codes";
 import { SatisfactionAuditActions } from "../audit-logs/satisfaction-audit-actions";
 import type { AuditLogWriter } from "../audit-logs/audit-log-writer.service";
 import type { PublicAbuseGuardService } from "../common/abuse/public-abuse-guard.service";
@@ -37,6 +39,17 @@ export interface SurveySubmissionConfirmation {
 }
 
 const UNAVAILABLE_MESSAGE = "Ce questionnaire n'est plus disponible.";
+/** A-07a: one neutral 404 for every unusable link (unknown, forged, expired, withdrawn): no enumeration oracle. */
+const SURVEY_LINK_NOT_FOUND_MESSAGE = "Survey link not found";
+/**
+ * The survey answer has its own per-IP counter (it used to share `consent_withdrawal`). The scope is only
+ * a Redis key suffix for the guard; it is listed in PUBLIC_ABUSE_SCOPES.
+ */
+export const SATISFACTION_SURVEY_RESPONSE_SCOPE = "satisfaction_survey_response";
+
+function surveyLinkNotFound(): NotFoundException {
+  return new NotFoundException({ code: ErrorCodes.NOT_FOUND, message: SURVEY_LINK_NOT_FOUND_MESSAGE });
+}
 
 function escapeHtml(text: string): string {
   return text
@@ -99,7 +112,7 @@ export class SatisfactionSurveysService {
   ): Promise<SurveySubmissionConfirmation> {
     if (this.deps.abuseGuard && ipAddress) {
       await this.deps.abuseGuard.assertAllowed({
-        scope: "consent_withdrawal",
+        scope: SATISFACTION_SURVEY_RESPONSE_SCOPE,
         ipAddress,
         limitPerWindow: 10,
         windowSeconds: 3600
@@ -107,25 +120,25 @@ export class SatisfactionSurveysService {
     }
 
     if (!token) {
-      throw new Error(UNAVAILABLE_MESSAGE);
+      throw surveyLinkNotFound();
     }
 
     const survey = await this.deps.repository.findByPublicReference(publicReference);
     if (!survey) {
       this.auditInvalidLink(publicReference, "unknown_reference");
-      throw new Error(UNAVAILABLE_MESSAGE);
+      throw surveyLinkNotFound();
     }
 
     const isValidToken = this.deps.tokenService.verifyToken(token, survey.tokenHash);
     if (!isValidToken) {
       this.auditInvalidLink(publicReference, "invalid_token");
-      throw new Error(UNAVAILABLE_MESSAGE);
+      throw surveyLinkNotFound();
     }
 
     const now = new Date();
     if (survey.expiresAt && survey.expiresAt < now) {
       this.auditInvalidLink(publicReference, "expired_link");
-      throw new Error(UNAVAILABLE_MESSAGE);
+      throw surveyLinkNotFound();
     }
 
     // D8: immutability. If already submitted, return prior confirmation and mutate nothing.
@@ -139,11 +152,12 @@ export class SatisfactionSurveysService {
     }
 
     if (survey.status === "skipped" || survey.status === "expired") {
-      throw new Error(UNAVAILABLE_MESSAGE);
+      throw surveyLinkNotFound();
     }
 
-    if (!Number.isInteger(input.rating) || input.rating < 1 || input.rating > 5) {
-      throw new Error("Rating must be an integer between 1 and 5");
+    const rating = input?.rating;
+    if (typeof rating !== "number" || !Number.isInteger(rating) || rating < 1 || rating > 5) {
+      throw new BadRequestException({ code: ErrorCodes.VALIDATION_FAILED, message: "rating must be an integer between 1 and 5" });
     }
 
     const rawComment = typeof input.comment === "string" ? input.comment.trim().slice(0, 1000) : null;

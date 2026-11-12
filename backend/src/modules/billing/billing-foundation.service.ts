@@ -1,3 +1,5 @@
+import { ForbiddenException } from "@nestjs/common";
+import { ErrorCodes } from "../../../../packages/shared/contracts/error-codes";
 import type { BillingFoundationQuery, BillingFoundationResponse } from "../../../../packages/shared/contracts/billing.contracts";
 import type { AuditLogWriter } from "../audit-logs/audit-log-writer.service";
 import type { ActorContext } from "../common/types";
@@ -176,6 +178,10 @@ export class BillingFoundationService {
       reason,
       context: {}
     });
+    // A scope-less account is not a role problem: distinct code and message, same 403 (the HttpException keeps its explicit code).
+    if (reason === "missing_billing_scope") {
+      throw new ForbiddenException({ code: ErrorCodes.BILLING_SCOPE_MISSING, message: "Billing access refused: no billing scope assigned to this account" });
+    }
     throw new BillingAccessRefusedError(reason);
   }
 

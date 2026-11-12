@@ -131,9 +131,12 @@ export const manualAssignResponseSchema = z.object({
   status: z.literal("routed")
 });
 
+/** A-12a: the reassignment reason is part of the audit trail, so it needs at least 8 characters (after trim), like the admin form field. */
+export const LEAD_REASSIGN_REASON_MIN_LENGTH = 8;
+
 export const leadReassignRequestSchema = z.object({
   partnerTenantId: uuidSchema,
-  reason: nonEmptyStringSchema
+  reason: z.string().trim().min(LEAD_REASSIGN_REASON_MIN_LENGTH, `reason must contain at least ${LEAD_REASSIGN_REASON_MIN_LENGTH} characters`)
 });
 
 export const leadReassignResponseSchema = z.object({

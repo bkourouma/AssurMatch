@@ -92,7 +92,7 @@ describe("PiiMinimizer sensitive data", () => {
       need: "Je suis diabétique, carte 4111 1111 1111 1111",
       notes: ["mdp: azerty123"],
       card: 4111111111111111,
-      answers: { vehicle_use: "prive" }
+      answers: { vehicle_use: "prive", city: "Abidjan", contact_preference: "email" }
     });
     const serialized = JSON.stringify(minimized);
     expect(serialized).not.toMatch(/4111|azerty123|diab/i);

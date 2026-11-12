@@ -27,6 +27,7 @@ import {
   Textarea,
   fieldControlProps
 } from "../../../lib/ui/admin-ui";
+import { readFailureDetail } from "../../../lib/auth-error-messages";
 
 /**
  * Spec 062 (D-10): one data-subject request. The visitor's own text (personal data) is rendered
@@ -86,7 +87,7 @@ export default async function DataRequestDetailPage({
       {result?.forbidden ? (
         <StateMessage tone="danger">Accès refusé : MFA vérifiée et rôle de conformité ou de support requis (refus audité).</StateMessage>
       ) : null}
-      {result?.status === "error" && result.error !== "api_404" ? <StateMessage tone="danger">Demande indisponible : {result.error}</StateMessage> : null}
+      {result?.status === "error" && result.error !== "api_404" ? <StateMessage tone="danger">Demande indisponible. {readFailureDetail(result.error)}</StateMessage> : null}
       {notice ? <StateMessage tone={notice.tone}>{notice.text}</StateMessage> : null}
 
       {request ? (

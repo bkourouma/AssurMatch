@@ -66,7 +66,7 @@ async function submitQuote(harness: RuntimeHttpHarness, seed: Seed, selectedOffe
       formDefinitionId: seed.form.id,
       ...(selectedOfferId ? { selectedOfferId } : {}),
       contact: { displayName: `Visiteur ${suffix}`, email: `visiteur052-${suffix}@example.test`, phone: `+22507080910${suffix}` },
-      answers: { vehicle_use: "prive" },
+      answers: { vehicle_use: "prive", city: "Abidjan", contact_preference: "email" },
       consent: { accepted: true, consentTextId: seed.consentText.id, version: "v1", contentHash: seed.consentText.contentHash },
       ipAddress: `198.51.100.${sequence}`,
       sessionId: `offer-session-${suffix}`

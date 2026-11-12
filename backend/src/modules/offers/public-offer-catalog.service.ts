@@ -39,11 +39,12 @@ interface EnrichedOffer {
 }
 
 export class PublicOfferCatalogService {
-  private readonly policy = new OfferPublicationPolicy();
+  private readonly policy: OfferPublicationPolicy;
 
   private readonly repository: OffersRepository;
 
   constructor(repositoryOrOffers: OffersRepository | OfferRecord[], private readonly audit: AuditLogWriter) {
+    this.policy = new OfferPublicationPolicy(audit);
     if (Array.isArray(repositoryOrOffers)) {
       const repository = new MemoryOffersRepository();
       for (const offer of repositoryOrOffers) void repository.create(offer);

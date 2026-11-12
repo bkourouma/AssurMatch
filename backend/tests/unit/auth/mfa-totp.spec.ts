@@ -28,9 +28,12 @@ describe("MfaService TOTP", () => {
     const nextStepToken = await generate({ secret: enrollment.secret, strategy: "totp", digits: 6, period: 30, epoch: now + 30 });
 
     expect(enrollment.otpauthUri).toContain("otpauth://totp/");
-    expect(await service.verify({ ...user, mfaSecretEncrypted: enrollment.encryptedSecret, mfaBackupCodesHashes: enrollment.backupCodeHashes }, token)).toEqual({ verified: true });
-    expect(await service.verify({ ...user, mfaSecretEncrypted: enrollment.encryptedSecret, mfaBackupCodesHashes: enrollment.backupCodeHashes }, previousStepToken)).toEqual({ verified: true });
-    expect(await service.verify({ ...user, mfaSecretEncrypted: enrollment.encryptedSecret, mfaBackupCodesHashes: enrollment.backupCodeHashes }, nextStepToken)).toEqual({ verified: true });
+    expect(await service.verify({ ...user, mfaSecretEncrypted: enrollment.encryptedSecret, mfaBackupCodesHashes: enrollment.backupCodeHashes }, token)).toMatchObject({ verified: true });
+    expect(await service.verify({ ...user, mfaSecretEncrypted: enrollment.encryptedSecret, mfaBackupCodesHashes: enrollment.backupCodeHashes }, previousStepToken)).toMatchObject({ verified: true });
+    expect(await service.verify({ ...user, mfaSecretEncrypted: enrollment.encryptedSecret, mfaBackupCodesHashes: enrollment.backupCodeHashes }, nextStepToken)).toMatchObject({ verified: true });
+    const accepted = await service.verify({ ...user, mfaSecretEncrypted: enrollment.encryptedSecret, mfaBackupCodesHashes: enrollment.backupCodeHashes }, token);
+    expect(accepted.totpCounter).toBe(Math.floor(now / 30));
+    expect((await service.verify({ ...user, mfaSecretEncrypted: enrollment.encryptedSecret, mfaBackupCodesHashes: enrollment.backupCodeHashes }, previousStepToken)).totpCounter).toBe(Math.floor(now / 30) - 1);
     expect(await service.verify({ ...user, mfaSecretEncrypted: enrollment.encryptedSecret, mfaBackupCodesHashes: enrollment.backupCodeHashes }, "000000")).toEqual({ verified: false });
   }, 20_000);
 });

@@ -24,10 +24,25 @@ export async function newAppContext(browser: Browser, baseURL: string): Promise<
   return browser.newContext({ baseURL, locale: "fr-FR", timezoneId: "Africa/Abidjan" });
 }
 
-/** Generates a TOTP that is not about to expire (avoids a code issued in the last second of a step). */
+/**
+ * Last TOTP time step submitted per secret by this process. The API now refuses to accept the same time step twice
+ * for one account (TOTP replay protection, migration 0041): a second login in the same 30 s step, or a code reused
+ * by the next screen, would be rejected as "Code de vérification incorrect". So each code is taken from a step
+ * strictly after the previous one, waiting for the next step when needed.
+ */
+const lastUsedTotpStep = new Map<string, number>();
+const currentStep = () => Math.floor(Date.now() / 1000 / 30);
+
+/** Generates a TOTP that is not about to expire and whose time step has not been used before by this process. */
 export async function freshTotp(secret: string): Promise<string> {
+  const last = lastUsedTotpStep.get(secret) ?? -1;
+  if (currentStep() <= last) {
+    const untilNextStep = (last + 1) * 30_000 - Date.now();
+    await new Promise((resolve) => setTimeout(resolve, untilNextStep + 250));
+  }
   const remaining = 30 - Math.floor(Date.now() / 1000) % 30;
   if (remaining < 4) await new Promise((resolve) => setTimeout(resolve, remaining * 1000 + 250));
+  lastUsedTotpStep.set(secret, currentStep());
   return totp(secret);
 }
 
@@ -58,12 +73,21 @@ export const TRUST_DEVICE_LABEL = /Faire confiance à cet appareil pendant 30 jo
  * checkbox is ticked (unchecked by default), so the browser context then skips the code at its next login.
  */
 export async function verifyTotp(page: Page, secret: string, options: { trustDevice?: boolean } = {}): Promise<void> {
-  await page.locator("#mfa-code").fill(await freshTotp(secret));
   const trustBox = page.getByLabel(TRUST_DEVICE_LABEL);
-  if (options.trustDevice) await trustBox.check();
-  else await expect(trustBox).not.toBeChecked();
-  await page.getByRole("button", { name: /Verifier MFA|Vérifier/u }).click();
-  await page.waitForURL((url) => !url.pathname.startsWith("/mfa"));
+  // A code can still be refused when another process (parallel specs sharing one account) used the same time
+  // step first: retry up to twice with the next step before giving up.
+  for (let attempt = 0; ; attempt += 1) {
+    await page.locator("#mfa-code").fill(await freshTotp(secret));
+    if (options.trustDevice) await trustBox.check();
+    else await expect(trustBox).not.toBeChecked();
+    await page.getByRole("button", { name: /Verifier MFA|Vérifier/u }).click();
+    try {
+      await page.waitForURL((url) => !url.pathname.startsWith("/mfa"), { timeout: attempt < 2 ? 8_000 : 60_000 });
+      return;
+    } catch (error) {
+      if (attempt >= 2 || !(await page.getByText(/Code de vérification incorrect/u).isVisible().catch(() => false))) throw error;
+    }
+  }
 }
 
 /** Fills and submits the password step of the login screen, leaving the page wherever the app sends it. */

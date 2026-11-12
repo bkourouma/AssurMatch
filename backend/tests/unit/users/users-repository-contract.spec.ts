@@ -31,7 +31,7 @@ describe("UsersRepository contract", () => {
     const service = createService();
     const input = { email: "person@example.com", displayName: "Person Example", roles: ["support_admin"], scopes: { countryIds: [], productIds: [] } };
     await service.create(input, admin);
-    await expect(service.create(input, admin)).rejects.toThrow(/already exists/);
+    await expect(service.create(input, admin)).rejects.toThrow(/already in use/);
   });
 
   it("filters soft-deleted users from list and findByEmail", async () => {

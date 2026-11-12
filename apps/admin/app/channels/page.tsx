@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { readChannelOutbox, readMessagingDeliveries, readMessagingProviders } from "../lib/channels-api";
 import { isAdminProfile, loginRedirect, readBackOfficeSession } from "../lib/backoffice-auth";
 import { Badge, Card, DataTable, PageHeader, PageStack, StateMessage, StatStrip, StatusBadge, type Tone } from "../lib/ui/admin-ui";
+import { readFailureDetail } from "../lib/auth-error-messages";
 
 const PAGE_PATH = "/channels";
 const SAMPLE_NOTE = "50 dernières lignes";
@@ -61,7 +62,7 @@ export default async function ChannelsPage() {
       />
 
       {outbox.status === "forbidden" ? <StateMessage tone="danger">{ACCESS_DENIED}</StateMessage> : null}
-      {outbox.status === "error" ? <StateMessage tone="danger">File de reprise indisponible ({outbox.error ?? "erreur"}). Réessayez plus tard.</StateMessage> : null}
+      {outbox.status === "error" ? <StateMessage tone="danger">File de reprise indisponible. {readFailureDetail(outbox.error)}</StateMessage> : null}
 
       {outbox.status === "success" ? (
         <>
@@ -101,7 +102,7 @@ export default async function ChannelsPage() {
 
       <Card title="État des canaux" description="Lecture seule : l'activation d'un canal passe par la commande d'exploitation, avec référence de politique et approbateur.">
         {providers.status === "forbidden" ? <StateMessage tone="danger">{ACCESS_DENIED}</StateMessage> : null}
-        {providers.status === "error" ? <StateMessage tone="danger">État des canaux indisponible ({providers.error ?? "erreur"}).</StateMessage> : null}
+        {providers.status === "error" ? <StateMessage tone="danger">État des canaux indisponible. {readFailureDetail(providers.error)}</StateMessage> : null}
         {providers.status === "success" ? (
           <DataTable
             columns={[
@@ -123,7 +124,7 @@ export default async function ChannelsPage() {
 
       <Card title="Dernières diffusions (destinataire masqué)" description="Journal des envois SMS et WhatsApp, destinataire masqué.">
         {deliveries.status === "forbidden" ? <StateMessage tone="danger">{ACCESS_DENIED}</StateMessage> : null}
-        {deliveries.status === "error" ? <StateMessage tone="danger">Diffusions indisponibles ({deliveries.error ?? "erreur"}).</StateMessage> : null}
+        {deliveries.status === "error" ? <StateMessage tone="danger">Diffusions indisponibles. {readFailureDetail(deliveries.error)}</StateMessage> : null}
         {deliveries.status === "success" ? (
           <DataTable
             columns={[

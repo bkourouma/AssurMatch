@@ -12,6 +12,7 @@ import {
   ruleStatusTones
 } from "../lib/ui/admin-ui";
 import { CreateScoringRuleForm, OfferDecisionForm, UpdateScoringRuleForm } from "./scoring-forms";
+import { readFailureDetail } from "../lib/auth-error-messages";
 
 function offerLabel(offer: AdminOfferData): string {
   return offer.published?.content.name ?? offer.pending?.content.name ?? offer.publicKey;
@@ -34,7 +35,7 @@ export default async function ScoringPage() {
 
       {rules.unauthenticated ? <StateMessage tone="danger">Session admin requise.</StateMessage> : null}
       {rules.forbidden ? <StateMessage tone="danger">Accès scoring refusé pour ce rôle admin.</StateMessage> : null}
-      {rules.status === "error" ? <StateMessage tone="danger">Règles indisponibles: {rules.error}</StateMessage> : null}
+      {rules.status === "error" ? <StateMessage tone="danger">Règles indisponibles. {readFailureDetail(rules.error)}</StateMessage> : null}
 
       {rules.status === "success" ? (
         <>

@@ -56,6 +56,16 @@ export type LeadProposalBlocker = z.output<typeof leadProposalBlockerSchema>;
 const amountSchema = z.coerce.number().nonnegative().max(1_000_000_000_000);
 
 /**
+ * A-03a2: the validity of a proposal is at least tomorrow, on the UTC calendar day: the broker form sends
+ * the picked day as `YYYY-MM-DDT23:59:59Z` (apps/broker/app/lib/proposal-vocabulary.ts), so "today" would
+ * silently expire tonight at 23:59:59 UTC. A `validUntil` before 00:00:00 UTC of the next day is refused.
+ */
+export function startOfTomorrowUtc(nowMs: number): number {
+  const now = new Date(nowMs);
+  return Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + 1);
+}
+
+/**
  * `POST /broker/{starter|crm}/leads/:leadId/proposals` (JSON body, or multipart with a `payload`
  * JSON field and an optional `file` PDF). The forbidden-wording guard runs in the service so the
  * refusal names the wording (`FORBIDDEN_WORDING`).
@@ -74,8 +84,8 @@ export const leadProposalCreateSchema = z.object({
   if (value.priceMin !== undefined && value.priceMax !== undefined && value.priceMin > value.priceMax) {
     ctx.addIssue({ code: "custom", path: ["priceMax"], message: "priceMin must not exceed priceMax" });
   }
-  if (new Date(value.validUntil).getTime() <= Date.now()) {
-    ctx.addIssue({ code: "custom", path: ["validUntil"], message: "validUntil must be in the future" });
+  if (new Date(value.validUntil).getTime() < startOfTomorrowUtc(Date.now())) {
+    ctx.addIssue({ code: "custom", path: ["validUntil"], message: "validUntil must be tomorrow or later (UTC calendar day)" });
   }
 });
 

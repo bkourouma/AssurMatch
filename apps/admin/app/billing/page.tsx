@@ -37,6 +37,7 @@ import {
 } from "../lib/ui/admin-ui";
 import type { DataTableColumn } from "../lib/ui/admin-ui";
 import type { AccountStatementData, DraftInvoiceData, IssuedInvoiceData } from "../lib/admin-api";
+import { billingForbiddenMessage, readFailureDetail } from "../lib/auth-error-messages";
 
 const BILLING_NOTICES: Record<string, string> = {
   plan_saved: "Tarif de plan enregistré et audité.",
@@ -208,8 +209,13 @@ export default async function BillingFoundationPage({
       />
 
       {billing.unauthenticated ? <StateMessage tone="danger">Session admin requise.</StateMessage> : null}
-      {billing.forbidden ? <StateMessage tone="danger">Accès billing refusé pour ce rôle admin.</StateMessage> : null}
-      {billing.status === "error" ? <StateMessage tone="danger">Billing indisponible: {billing.error}</StateMessage> : null}
+      {billing.forbidden ? (
+        <StateMessage tone="danger">
+          {billingForbiddenMessage(billing.code)}
+          {billing.code === "MFA_REQUIRED" ? <> <a href="/mfa?returnTo=%2Fbilling">Ouvrir la vérification en deux étapes</a></> : null}
+        </StateMessage>
+      ) : null}
+      {billing.status === "error" ? <StateMessage tone="danger">Billing indisponible. {readFailureDetail(billing.error)}</StateMessage> : null}
       {notice && BILLING_NOTICES[notice] ? <StateMessage tone={SUCCESS_NOTICES.has(notice) ? "info" : "warning"}>{BILLING_NOTICES[notice]}</StateMessage> : null}
 
       {billing.status === "success" ? (
@@ -474,7 +480,7 @@ export default async function BillingFoundationPage({
                 </Form>
               </Card>
               {account?.status === "success" && account.data ? <AccountPanel account={account.data} /> : null}
-              {account && account.status !== "success" ? <StateMessage tone="danger">État des comptes indisponible ({account.error}).</StateMessage> : null}
+              {account && account.status !== "success" ? <StateMessage tone="danger">État des comptes indisponible. {readFailureDetail(account.error)}</StateMessage> : null}
             </>
           ) : null}
 

@@ -39,7 +39,7 @@ function quotePayload(seed: Awaited<ReturnType<typeof seedPublicRuntime>>, form:
     productKey: "auto",
     formDefinitionId: form.formDefinitionId,
     contact: { displayName: "Visitor", email: "visitor.en@example.com", phone: "07 00 00 00 00" },
-    answers: { vehicle_use: "private" },
+    answers: { vehicle_use: "private", city: "Abidjan", contact_preference: "email" },
     consent: { accepted: true, consentTextId: form.consent.consentTextId, version: form.consent.version, contentHash: form.consent.contentHash },
     ipAddress: "203.0.113.20",
     sessionId: "language-session",

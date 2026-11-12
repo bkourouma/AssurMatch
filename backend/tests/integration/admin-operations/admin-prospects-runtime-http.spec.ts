@@ -31,7 +31,7 @@ async function submitQuote(harness: RuntimeHttpHarness, seed: Seed): Promise<voi
       productKey: "auto",
       formDefinitionId: seed.form.id,
       contact: { displayName: "Visiteur Un", email: EMAIL, phone: PHONE },
-      answers: { vehicle_use: "prive" },
+      answers: { vehicle_use: "prive", city: "Abidjan", contact_preference: "email" },
       consent: { accepted: true, consentTextId: seed.consentText.id, version: "v1", contentHash: seed.consentText.contentHash },
       ipAddress: "203.0.113.101",
       sessionId: "admin-prospects-session-1"

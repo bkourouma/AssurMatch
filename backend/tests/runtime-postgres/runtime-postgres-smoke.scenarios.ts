@@ -180,7 +180,7 @@ async function smokeQuoteWithConsent(harness: RuntimePostgresSmokeHarness, run: 
       selectedOfferId: seed.offerId,
       formDefinitionId: seed.formDefinitionId,
       contact: { displayName: `${run.prefix} Prospect`, email: run.email, phone: run.phone },
-      answers: { vehicle_use: "prive" },
+      answers: { vehicle_use: "prive", city: "Abidjan", contact_preference: "email" },
       consent: {
         accepted: true,
         consentTextId: seed.consentTextId,
@@ -223,7 +223,7 @@ async function smokeQuoteWithoutConsent(harness: RuntimePostgresSmokeHarness, ru
       productKey: run.productKey,
       formDefinitionId: crypto.randomUUID(),
       contact: { displayName: `${run.prefix} No Consent`, email: `no-consent-${run.email}`, phone: run.phone },
-      answers: { vehicle_use: "prive" }
+      answers: { vehicle_use: "prive", city: "Abidjan", contact_preference: "email" }
     })
   });
   assert.ok(response.status >= 400, `POST /quote-requests without consent should be refused, got ${response.status}`);

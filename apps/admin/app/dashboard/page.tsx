@@ -4,6 +4,7 @@ import { readAdminDashboard } from "../lib/admin-api";
 import { AttentionList, Badge, Button, Card, Cluster, DataTable, Grid, PageHeader, PageStack, StateMessage, StatStrip } from "../lib/ui/admin-ui";
 import { AI_DISABLED, aiValidationLabel, dashboardAttention, dashboardPrdKpis, flagTone, sensitiveFeatureFlagKeys } from "../lib/ui/admin-view-models";
 import { productLabel } from "../lib/ui/operations-labels";
+import { readFailureDetail } from "../lib/auth-error-messages";
 
 const breadcrumb = [{ label: "Pilotage" }, { label: "Dashboard" }];
 
@@ -37,7 +38,7 @@ export default async function AdminDashboardPage() {
     return (
       <PageStack>
         <PageHeader breadcrumb={breadcrumb} title="Dashboard plateforme" />
-        <StateMessage tone="danger">Dashboard indisponible: {dashboard.error}</StateMessage>
+        <StateMessage tone="danger">Dashboard indisponible. {readFailureDetail(dashboard.error)}</StateMessage>
       </PageStack>
     );
   }

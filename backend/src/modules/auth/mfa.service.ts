@@ -15,6 +15,10 @@ export interface MfaChallenge {
 export interface MfaVerifyResult {
   verified: boolean;
   backupCodeHashes?: string[];
+  /** Backup code only: the stored hash that matched; the caller must consume it atomically (`consumeBackupCode`). */
+  consumedBackupCodeHash?: string;
+  /** TOTP only: the time step (epoch seconds / 30) that validated the code, to refuse its replay. */
+  totpCounter?: number;
 }
 
 export class MfaService {
@@ -40,8 +44,11 @@ export class MfaService {
     if (kind === "backup") return this.verifyBackupCode(user, code);
     if (!user.mfaSecretEncrypted) return { verified: false };
     const secret = this.encryption.decrypt(user.mfaSecretEncrypted);
-    const result = await verify({ token: code, secret, strategy: "totp", digits: 6, period: 30, epochTolerance: 30 });
-    return { verified: result.valid };
+    // The epoch is fixed once so the matched step is exact: step = floor(epoch / 30) + delta.
+    const epoch = Math.floor(Date.now() / 1000);
+    const result = await verify({ token: code, secret, strategy: "totp", digits: 6, period: 30, epochTolerance: 30, epoch });
+    if (!result.valid) return { verified: false };
+    return { verified: true, totpCounter: Math.floor(epoch / 30) + result.delta };
   }
 
   private async verifyBackupCode(user: UserAccount, code: string): Promise<MfaVerifyResult> {
@@ -50,7 +57,7 @@ export class MfaService {
       if (hash && await this.hashing.verify(hash, code)) {
         const next = [...user.mfaBackupCodesHashes];
         next[index] = "";
-        return { verified: true, backupCodeHashes: next };
+        return { verified: true, backupCodeHashes: next, consumedBackupCodeHash: hash };
       }
     }
     return { verified: false };

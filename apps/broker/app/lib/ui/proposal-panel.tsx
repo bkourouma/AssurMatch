@@ -69,7 +69,7 @@ function ProposalItem({ proposal, channel, leadAssignmentId, canWithdraw }: { pr
       {proposal.responses.length > 0 ? (
         <div className={styles.entry}>
           <h4 className={styles.entryTitle}>Réponses du visiteur</h4>
-          <ol className="bo-list">
+          <ol className={`bo-list ${styles.wrapList}`}>
             {proposal.responses.map((response) => (
               <li key={response.id}>
                 <span className="bo-ref">{formatDate(response.createdAt)}</span> - {VISITOR_RESPONSE_LABELS[response.type] ?? response.type}
@@ -132,7 +132,7 @@ export function ProposalPanel({ channel, leadAssignmentId, data, canMutate, tena
         <Badge tone={data.activeCount >= data.maxActive ? "warning" : "neutral"}>{`Propositions actives : ${data.activeCount} / ${data.maxActive}`}</Badge>
       </div>
       {data.items.length > 0 ? (
-        <ul className="bo-list">
+        <ul className={`bo-list ${styles.wrapList}`}>
           {data.items.map((proposal) => (
             <li key={proposal.id}>
               <ProposalItem proposal={proposal} channel={channel} leadAssignmentId={leadAssignmentId} canWithdraw={canMutate} />

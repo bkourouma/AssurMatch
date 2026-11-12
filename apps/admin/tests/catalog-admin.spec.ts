@@ -174,7 +174,12 @@ test("the admin sensitivity mirror agrees with the backend policy", () => {
     "quote_request_enabled",
     "sponsored_offers_enabled",
     "billing_enabled",
-    "claims_enabled"
+    "claims_enabled",
+    "crm_connector_enabled",
+    "country_ai_enabled",
+    "product_ai_scoring_enabled",
+    "product_ai_form_assistant_enabled",
+    "broker_weekly_ai_summary_enabled"
   ]) {
     expect(isSensitiveFlagKey(key), key).toBe(isSensitiveFeatureFlagKey(key));
   }

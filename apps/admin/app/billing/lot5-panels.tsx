@@ -46,6 +46,7 @@ import {
   SUBSCRIPTION_STATUS_TONES,
   billingLineKindLabel
 } from "./lot5-labels";
+import { readFailureDetail } from "../lib/auth-error-messages";
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const PLAN_CHANGE_STATUSES = new Set(["pending", "accepted", "refused", "cancelled"]);
@@ -62,7 +63,7 @@ function readFailure(label: string, state: { status: string; error?: string | un
   if (state.status === "success") return null;
   if (state.status === "forbidden") return <StateMessage tone="warning">{label} : accès refusé pour ce rôle.</StateMessage>;
   if (state.status === "unauthenticated") return <StateMessage tone="danger">Session admin requise.</StateMessage>;
-  return <StateMessage tone="danger">{label} indisponible ({state.error ?? "erreur"}).</StateMessage>;
+  return <StateMessage tone="danger">{label} indisponible. {readFailureDetail(state.error)}</StateMessage>;
 }
 
 /** Draft lines of every partner, with the Lot 5 kinds (`setup_fee`, `add_on`) worded for finance. */

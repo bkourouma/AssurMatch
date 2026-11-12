@@ -13,7 +13,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ lea
   if (!isSameOrigin(request)) return new Response("forbidden_origin", { status: 403 });
   const form = await request.formData();
   const built = buildProposalPayload(form);
-  if (!built.ok) return seeOther(request, `/leads/${leadAssignmentId}?proposal=invalid`);
+  if (built.ok === false) return seeOther(request, `/leads/${leadAssignmentId}?proposal=${built.reason === "validity" ? "validity_past" : "invalid"}`);
   const upstream = new FormData();
   upstream.append("payload", JSON.stringify(built.payload));
   const file = form.get("file");

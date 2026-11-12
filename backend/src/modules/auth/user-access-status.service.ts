@@ -1,4 +1,5 @@
-import type { UserAccount } from "../users/users.repository";
+import { ServiceUnavailableException } from "@nestjs/common";
+import { UserNotFoundError, type UserAccount } from "../users/users.repository";
 
 /** Same short TTL as the partner status cache (spec 051 R12); an explicit invalidation is immediate. */
 export const USER_ACCESS_STATUS_TTL_MS = 30_000;
@@ -30,14 +31,27 @@ export class UserAccessStatusService implements UserAccessStatusPort {
     private readonly users: { require(id: string): Promise<UserAccount> },
     private readonly ttlMs = USER_ACCESS_STATUS_TTL_MS,
     private readonly now: () => number = Date.now
-  ) {}
+  ) {
+    // Immediate effect of a suspension, lock, deletion or role change made through the users service.
+    (users as { onAccessChange?: (listener: (userId: string) => void) => void }).onAccessChange?.((userId) => this.invalidate(userId));
+  }
 
   async snapshot(userId: string): Promise<UserAccessSnapshot | undefined> {
     const cached = this.cache.get(userId);
     if (cached && cached.expiresAt > this.now()) return cached.snapshot;
-    const user = await this.users.require(userId).catch(() => undefined);
+    let user: UserAccount | undefined;
+    try {
+      user = await this.users.require(userId);
+    } catch (error) {
+      // Only "no such user" means "not restricted" (test-runtime simulation headers). Any other failure
+      // (database down, timeout) is NOT cached and fails closed: the guard answers 503, never a pass.
+      if (!(error instanceof UserNotFoundError)) {
+        throw new ServiceUnavailableException({ code: "SERVICE_UNAVAILABLE", message: "Access check unavailable" });
+      }
+    }
     const snapshot = user ? { status: user.status, roles: [...user.roles] } : undefined;
-    this.cache.set(userId, { snapshot, expiresAt: this.now() + this.ttlMs });
+    // A snapshot without any role proves nothing yet (partial read): never cached, re-read next time.
+    if (!snapshot || snapshot.roles.length > 0) this.cache.set(userId, { snapshot, expiresAt: this.now() + this.ttlMs });
     return snapshot;
   }
 

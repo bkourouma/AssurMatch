@@ -16,10 +16,13 @@ import { BrokerStarterAccessPolicy } from "./broker-starter-access-policy";
 import { BrokerStarterHistoryService } from "./broker-starter-history.service";
 import { LeadAssignmentService, type LeadAssignmentRecord, type LeadAssignmentStatus } from "./lead-assignment.service";
 import { LeadDisputesService } from "./lead-disputes.service";
+import { REJECTABLE_STATUSES, leadTransitionRefusal, type LeadTransitionRefusal } from "./lead-status-transitions";
 
 const FINAL_STATUSES = new Set<LeadAssignmentStatus>(["closed"]);
 /** Only a lead the broker took on can be closed with an outcome. */
 const CLOSABLE_STATUSES = new Set<LeadAssignmentStatus>(["accepted", "received", "contacted"]);
+/** Only a lead still waiting for the broker's decision can be accepted (A-02a: a rejected lead no longer can). */
+const ACCEPTABLE_STATUSES = new Set<LeadAssignmentStatus>(["assigned", "broker_notified", "seen"]);
 
 export class BrokerStarterLeadActionsService {
   constructor(
@@ -63,13 +66,74 @@ export class BrokerStarterLeadActionsService {
     });
   }
 
+  /**
+   * Accepting is guarded on the source status and serialised per lead (check then update inside the
+   * same critical section), so two successive or concurrent calls can never both succeed: the second
+   * one is refused with 409 and writes no history, audit entry or event.
+   */
   accept(id: string, actor: ActorContext): Promise<LeadAssignmentRecord> {
-    return this.transition(id, actor, "accepted", QuoteAuditActions.brokerStarterLeadAccepted, {});
+    return this.serialised(id, async () => {
+      const assignment = await this.assignments.require(id);
+      this.access.assertMutationAccess(actor, assignment);
+      if (!ACCEPTABLE_STATUSES.has(assignment.status)) {
+        const already = assignment.status === "accepted";
+        this.audit.write({
+          actor,
+          action: QuoteAuditActions.brokerStarterLeadAccepted,
+          targetType: "LeadAssignment",
+          targetId: assignment.id,
+          scope: { partnerTenantId: assignment.partnerTenantId },
+          result: "refused",
+          reason: already ? "lead_already_accepted" : "lead_status_not_acceptable",
+          context: { status: assignment.status }
+        });
+        throw already
+          ? new ConflictException({ code: ErrorCodes.LEAD_ALREADY_ACCEPTED, message: "Lead already accepted" })
+          : new ConflictException({ code: ErrorCodes.LEAD_STATUS_NOT_ACCEPTABLE, message: "Lead cannot be accepted from its current status" });
+      }
+      return this.transition(id, actor, "accepted", QuoteAuditActions.brokerStarterLeadAccepted, {});
+    });
   }
 
+  private readonly leadLocks = new Map<string, Promise<unknown>>();
+
+  private serialised<T>(id: string, task: () => Promise<T>): Promise<T> {
+    const previous = this.leadLocks.get(id) ?? Promise.resolve();
+    const run = previous.then(task, task);
+    const tail = run.catch(() => undefined);
+    this.leadLocks.set(id, tail);
+    void tail.then(() => {
+      if (this.leadLocks.get(id) === tail) this.leadLocks.delete(id);
+    });
+    return run;
+  }
+
+  /**
+   * Rejecting is only possible while the lead still waits for the broker's decision: a rejected,
+   * accepted, disputed or closed lead answers 409 and writes no history, event or success audit.
+   */
   reject(id: string, input: BrokerStarterLeadActionRequest, actor: ActorContext): Promise<LeadAssignmentRecord> {
     const parsed = this.requireReason(input);
-    return this.transition(id, actor, "rejected", QuoteAuditActions.brokerStarterLeadRejected, parsed);
+    return this.serialised(id, async () => {
+      const assignment = await this.assignments.require(id);
+      this.access.assertMutationAccess(actor, assignment);
+      if (!REJECTABLE_STATUSES.has(assignment.status)) {
+        const refusal = leadTransitionRefusal(assignment.status, "rejected") as LeadTransitionRefusal;
+        const already = assignment.status === "rejected";
+        this.audit.write({
+          actor,
+          action: QuoteAuditActions.brokerStarterLeadRejected,
+          targetType: "LeadAssignment",
+          targetId: assignment.id,
+          scope: { partnerTenantId: assignment.partnerTenantId },
+          result: "refused",
+          reason: already ? "lead_already_rejected" : refusal.reason,
+          context: { status: assignment.status }
+        });
+        throw new ConflictException({ code: refusal.code, message: already ? "Lead already rejected" : refusal.message });
+      }
+      return this.transition(id, actor, "rejected", QuoteAuditActions.brokerStarterLeadRejected, parsed);
+    });
   }
 
   /**
@@ -80,8 +144,23 @@ export class BrokerStarterLeadActionsService {
     const parsed = this.requireReason(input);
     const assignment = await this.assignments.require(id);
     this.access.assertMutationAccess(actor, assignment);
-    if (FINAL_STATUSES.has(assignment.status)) {
-      throw new Error("Final lead cannot be mutated");
+    // A closed lead is final; an already disputed one is refused by `disputes.open` (DISPUTE_ALREADY_EXISTS).
+    // Every other status can be contested within the unchanged 30-day window (accepted, rejected, ...).
+    if (assignment.status !== "disputed") {
+      const refusal = leadTransitionRefusal(assignment.status, "disputed");
+      if (refusal) {
+        this.audit.write({
+          actor,
+          action: QuoteAuditActions.brokerStarterLeadDisputed,
+          targetType: "LeadAssignment",
+          targetId: assignment.id,
+          scope: { partnerTenantId: assignment.partnerTenantId },
+          result: "refused",
+          reason: refusal.reason,
+          context: { status: assignment.status }
+        });
+        throw new ConflictException({ code: refusal.code, message: refusal.message });
+      }
     }
     const previousStatus = assignment.status;
     await this.disputes.open({ assignment, source: "starter", reason: parsed.reason, ...(parsed.comment ? { comment: parsed.comment } : {}), actor });

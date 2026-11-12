@@ -7,6 +7,8 @@ export const QuoteAuditActions = {
   offerAdminCreated: "offer.admin_created",
   offerAdminValidated: "offer.admin_validated",
   offerAdminSuspended: "offer.admin_suspended",
+  /** A published offer withheld from the public because its stored text carries regulated wording (written once per offer version). */
+  offerHiddenForbiddenWording: "offer.hidden_forbidden_wording",
   quoteFormExposed: "quote_form.exposed",
   quoteFormRefused: "quote_form.refused",
   quoteRequestRefused: "quote_request.refused",

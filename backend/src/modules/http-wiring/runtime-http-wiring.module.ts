@@ -6,6 +6,7 @@ import { adminAlertAcknowledgeSchema, adminAlertsQuerySchema } from "../../../..
 import { BadRequestException, Body, ConflictException, Controller, Delete, ForbiddenException, Get, Header, HttpCode, InternalServerErrorException, Module, NotFoundException, Param, Patch, Post, Put, Query, Req, StreamableFile, UnprocessableEntityException, UploadedFile, UseGuards, UseInterceptors } from "@nestjs/common";
 import { FileInterceptor } from "@nestjs/platform-express";
 import { z } from "zod";
+import { ErrorCodes } from "../../../../packages/shared/contracts/error-codes";
 import { QUOTE_DOCUMENT_MAX_BYTES } from "../../../../packages/shared/contracts/quote-document.contracts";
 import type { UploadedDocumentFile } from "../quote-documents/quote-documents.service";
 import { LEAD_DOCUMENT_MAX_BYTES, LEAD_PROPOSAL_DOCUMENT_MAX_BYTES, leadDocumentUploadSchema, leadProposalCreateSchema, leadProposalWithdrawSchema, visitorProposalResponseCreateSchema } from "../../../../packages/shared/contracts/lead-proposals";
@@ -657,21 +658,25 @@ export class BrokerTeamController {
 
   invite(input: unknown, request: AssurMatchHttpRequest) {
     const actor = brokerWriteActor(request);
+    this.runtime.brokerTeam.assertCanManageTeam(actor, "broker_team.invite_refused");
     return this.runtime.brokerTeam.invite(actor, parseHttpInput(brokerTeamInviteSchema, input ?? {}));
   }
 
   deactivate(id: string, input: unknown, request: AssurMatchHttpRequest) {
     const actor = brokerWriteActor(request);
+    this.runtime.brokerTeam.assertCanManageTeam(actor, "broker_team.action_refused", id);
     return this.runtime.brokerTeam.deactivate(actor, parseParam("id", id, optionalUuidParamSchema), parseHttpInput(brokerTeamActionSchema, input ?? {}));
   }
 
   reactivate(id: string, input: unknown, request: AssurMatchHttpRequest) {
     const actor = brokerWriteActor(request);
+    this.runtime.brokerTeam.assertCanManageTeam(actor, "broker_team.action_refused", id);
     return this.runtime.brokerTeam.reactivate(actor, parseParam("id", id, optionalUuidParamSchema), parseHttpInput(brokerTeamActionSchema, input ?? {}));
   }
 
   changeRole(id: string, input: unknown, request: AssurMatchHttpRequest) {
     const actor = brokerWriteActor(request);
+    this.runtime.brokerTeam.assertCanManageTeam(actor, "broker_team.action_refused", id);
     return this.runtime.brokerTeam.changeRole(actor, parseParam("id", id, optionalUuidParamSchema), parseHttpInput(brokerTeamRoleChangeSchema, input ?? {}));
   }
 }
@@ -953,6 +958,20 @@ export class PublicQuoteRequestsController {
     // never from the body. Before, `ipAddress` was whatever the body said - absent from the public
     // form - so every visitor shared the "unknown" bucket of the per-IP quote rate limit (5 per
     // minute per country x product for the whole country) and anyone could pick their own bucket.
+    // An out-of-bounds `answers` record is a well-formed request refused on its content: 422
+    // VALIDATION_FAILED naming `answers` (like the missing required answers of the service), not the
+    // generic 400 whose zod issues the error filter does not relay. Other malformed fields stay 400.
+    const parsedInput = quoteRequestCreateSchema.safeParse(input);
+    if (!parsedInput.success) {
+      const answerIssues = parsedInput.error.issues.filter((issue) => issue.path[0] === "answers").map((issue) => issue.message).slice(0, 3);
+      if (answerIssues.length > 0) {
+        throw new UnprocessableEntityException({
+          code: ErrorCodes.VALIDATION_FAILED,
+          message: `Quote request validation failed: answers (${answerIssues.join("; ")})`,
+          details: { reason: "answers_invalid" }
+        });
+      }
+    }
     return this.runtime.quoteRequests.submissions.submit({ ...parseHttpInput(quoteRequestCreateSchema, input), ipAddress: clientIp(request) }, actorFromRequest(request));
   }
 
@@ -1636,7 +1655,10 @@ export class AdminBillingFoundationController {
   }
 
   upsertPlan(input: unknown, request: AssurMatchHttpRequest) {
-    return this.runtime.billing.plans.upsert(parseHttpInput(billingPlanPriceUpsertSchema, input), protectedActorFromRequest(request));
+    const actor = protectedActorFromRequest(request);
+    // Access (MFA then role) before the body: a support_admin gets the audited 403, never a 400.
+    this.runtime.billing.plans.assertWriteAccess(actor);
+    return this.runtime.billing.plans.upsert(parseHttpInput(billingPlanPriceUpsertSchema, input), actor);
   }
 
   listInvoices(request: AssurMatchHttpRequest, query: Record<string, string>) {
@@ -1833,7 +1855,9 @@ export class AdminPartnersHttpController {
   }
 
   create(request: AssurMatchHttpRequest, input: unknown) {
-    return this.runtime.partnerAdmin.create(protectedActorFromRequest(request), parseHttpInput(partnerAdminCreateSchema, input));
+    const actor = protectedActorFromRequest(request);
+    this.runtime.partnerAdmin.assertCanWrite(actor, "create");
+    return this.runtime.partnerAdmin.create(actor, parseHttpInput(partnerAdminCreateSchema, input));
   }
 
   detail(id: string, request: AssurMatchHttpRequest) {
@@ -1841,7 +1865,9 @@ export class AdminPartnersHttpController {
   }
 
   update(id: string, request: AssurMatchHttpRequest, input: unknown) {
-    return this.runtime.partnerAdmin.update(protectedActorFromRequest(request), parseParam("id", id, uuidSchema), parseHttpInput(partnerAdminUpdateSchema, input));
+    const actor = protectedActorFromRequest(request);
+    this.runtime.partnerAdmin.assertCanWrite(actor, "update", id);
+    return this.runtime.partnerAdmin.update(actor, parseParam("id", id, uuidSchema), parseHttpInput(partnerAdminUpdateSchema, input));
   }
 
   status(id: string, request: AssurMatchHttpRequest, input: unknown) {
@@ -1849,23 +1875,33 @@ export class AdminPartnersHttpController {
   }
 
   authorizeCountry(id: string, request: AssurMatchHttpRequest, input: unknown) {
-    return this.runtime.partnerAdmin.authorizeCountry(protectedActorFromRequest(request), parseParam("id", id, uuidSchema), parseHttpInput(partnerCountryAuthorizationSchema, input));
+    const actor = protectedActorFromRequest(request);
+    this.runtime.partnerAdmin.assertCanWrite(actor, "authorize_country", id);
+    return this.runtime.partnerAdmin.authorizeCountry(actor, parseParam("id", id, uuidSchema), parseHttpInput(partnerCountryAuthorizationSchema, input));
   }
 
   withdrawCountry(id: string, countryId: string, request: AssurMatchHttpRequest, input: unknown) {
-    return this.runtime.partnerAdmin.withdrawAuthorization(protectedActorFromRequest(request), parseParam("id", id, uuidSchema), "country", parseParam("countryId", countryId, uuidSchema), parseHttpInput(partnerActionReasonSchema, input));
+    const actor = protectedActorFromRequest(request);
+    this.runtime.partnerAdmin.assertCanWrite(actor, "withdraw_country", id);
+    return this.runtime.partnerAdmin.withdrawAuthorization(actor, parseParam("id", id, uuidSchema), "country", parseParam("countryId", countryId, uuidSchema), parseHttpInput(partnerActionReasonSchema, input));
   }
 
   authorizeProduct(id: string, request: AssurMatchHttpRequest, input: unknown) {
-    return this.runtime.partnerAdmin.authorizeProduct(protectedActorFromRequest(request), parseParam("id", id, uuidSchema), parseHttpInput(partnerProductAuthorizationSchema, input));
+    const actor = protectedActorFromRequest(request);
+    this.runtime.partnerAdmin.assertCanWrite(actor, "authorize_product", id);
+    return this.runtime.partnerAdmin.authorizeProduct(actor, parseParam("id", id, uuidSchema), parseHttpInput(partnerProductAuthorizationSchema, input));
   }
 
   withdrawProduct(id: string, productId: string, request: AssurMatchHttpRequest, input: unknown) {
-    return this.runtime.partnerAdmin.withdrawAuthorization(protectedActorFromRequest(request), parseParam("id", id, uuidSchema), "product", parseParam("productId", productId, uuidSchema), parseHttpInput(partnerActionReasonSchema, input));
+    const actor = protectedActorFromRequest(request);
+    this.runtime.partnerAdmin.assertCanWrite(actor, "withdraw_product", id);
+    return this.runtime.partnerAdmin.withdrawAuthorization(actor, parseParam("id", id, uuidSchema), "product", parseParam("productId", productId, uuidSchema), parseHttpInput(partnerActionReasonSchema, input));
   }
 
   createLicense(id: string, request: AssurMatchHttpRequest, input: unknown) {
-    return this.runtime.partnerAdmin.createLicense(protectedActorFromRequest(request), parseParam("id", id, uuidSchema), parseHttpInput(partnerLicenseCreateSchema, input));
+    const actor = protectedActorFromRequest(request);
+    this.runtime.partnerAdmin.assertCanWrite(actor, "create_license", id);
+    return this.runtime.partnerAdmin.createLicense(actor, parseParam("id", id, uuidSchema), parseHttpInput(partnerLicenseCreateSchema, input));
   }
 
   validateLicense(id: string, licenseId: string, request: AssurMatchHttpRequest, input: unknown) {
@@ -1905,12 +1941,16 @@ export class AdminPartnersHttpController {
   }
 
   recordContract(id: string, request: AssurMatchHttpRequest, input: unknown) {
-    return this.runtime.partnerAdmin.recordContract(protectedActorFromRequest(request), parseParam("id", id, uuidSchema), parseHttpInput(partnerContractCreateSchema, input));
+    const actor = protectedActorFromRequest(request);
+    this.runtime.partnerAdmin.assertCanWrite(actor, "record_contract", id);
+    return this.runtime.partnerAdmin.recordContract(actor, parseParam("id", id, uuidSchema), parseHttpInput(partnerContractCreateSchema, input));
   }
 
   /** FR-018: invitation from the partner page (existing activation path). */
   inviteUser(id: string, request: AssurMatchHttpRequest, input: unknown) {
-    return this.runtime.partnerAdmin.inviteUser(protectedActorFromRequest(request), parseParam("id", id, uuidSchema), parseHttpInput(partnerUserInviteSchema, input));
+    const actor = protectedActorFromRequest(request);
+    this.runtime.partnerAdmin.assertCanWrite(actor, "invite_user", id);
+    return this.runtime.partnerAdmin.inviteUser(actor, parseParam("id", id, uuidSchema), parseHttpInput(partnerUserInviteSchema, input));
   }
 }
 

@@ -13,7 +13,7 @@ import type { CountriesService } from "../countries/countries.module";
 import type { LeadAssignmentRecord, LeadAssignmentService } from "../leads/lead-assignment.service";
 import type { NotificationsService } from "../notifications/notifications.module";
 import type { ProductsService } from "../products/products.module";
-import type { QuoteRequestRecord, QuoteSubmissionService } from "../quote-requests/quote-submission.service";
+import { visitorAccessDenied, type QuoteRequestRecord, type QuoteSubmissionService } from "../quote-requests/quote-submission.service";
 import type { DocumentStoragePort } from "./document-storage.port";
 import { QuoteDocumentAuditActions } from "./quote-documents-audit-actions";
 import { MemoryQuoteDocumentsRepository, type QuoteDocumentRecord, type QuoteDocumentsRepository } from "./quote-documents.repository";
@@ -313,7 +313,8 @@ export class QuoteDocumentsService {
     const quote = await this.deps.submissions.authenticateVisitor(publicReference, token);
     if (!quote) {
       this.deps.audit.write({ actor, action: QuoteDocumentAuditActions.refused, targetType: "QuoteRequest", targetId: publicReference, result: "refused", reason: "quote_token_invalid", context: {} });
-      throw new Error("Quote request not found");
+      // Lot 4 A-02doc: same neutral 404 VISITOR_ACCESS_DENIED as every other visitor route.
+      throw visitorAccessDenied();
     }
     return quote;
   }

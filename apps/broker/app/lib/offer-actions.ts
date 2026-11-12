@@ -26,7 +26,7 @@ function text(formData: FormData, name: string): string {
 }
 
 function refused<T>(result: BrokerOfferWriteResult<T>, returnTo: string): BrokerOfferActionState {
-  if (result.status === 401) redirect(loginRedirect(returnTo, "session_expired"));
+  if (result.status === 401 && result.code !== "session_required") redirect(loginRedirect(returnTo, "session_expired"));
   return {
     status: "error",
     message: offerWriteErrorMessage(result),

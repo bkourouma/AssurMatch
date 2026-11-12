@@ -15,6 +15,7 @@ import {
   integrationStatusTones
 } from "../lib/ui/admin-ui";
 import { CreateCrmConnectorForm, CrmStatusForm, RotateSecretForm } from "./crm-forms";
+import { readFailureDetail } from "../lib/auth-error-messages";
 
 const PAGE_PATH = "/connecteurs-crm";
 
@@ -58,7 +59,7 @@ export default async function CrmConnectorsPage() {
       </nav>
 
       {connectors.status === "forbidden" ? <StateMessage tone="danger">Accès refusé : droit partners:update et MFA requis.</StateMessage> : null}
-      {connectors.status === "error" ? <StateMessage tone="danger">Connecteurs CRM indisponibles ({connectors.error ?? "erreur"}). Réessayez plus tard.</StateMessage> : null}
+      {connectors.status === "error" ? <StateMessage tone="danger">Connecteurs CRM indisponibles. {readFailureDetail(connectors.error)}</StateMessage> : null}
 
       <Card
         title="Activation (hors HTTP)"

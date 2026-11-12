@@ -4,6 +4,7 @@ import { ReassignAssignmentForm } from "../lib/ui/operations-forms";
 import { OperationsTabs } from "../lib/ui/operations-tabs";
 import { assignmentStatusTones } from "../lib/ui/operations-tones";
 import { productLabel } from "../lib/ui/operations-labels";
+import { readFailureDetail } from "../lib/auth-error-messages";
 
 /**
  * Spec 056 (H-03): lead assignments with the partner's name and status, never the visitor's contact
@@ -49,7 +50,7 @@ export default async function AdminLeadAssignmentsPage({ searchParams }: { searc
 
       {result.status === "unauthenticated" ? <StateMessage tone="danger">Session admin requise.</StateMessage> : null}
       {result.status === "forbidden" ? <StateMessage tone="danger">Accès aux affectations refusé pour ce rôle admin.</StateMessage> : null}
-      {result.status === "error" ? <StateMessage tone="danger">Affectations indisponibles : {result.error}</StateMessage> : null}
+      {result.status === "error" ? <StateMessage tone="danger">Affectations indisponibles. {readFailureDetail(result.error)}</StateMessage> : null}
 
       <FilterBar action="/lead-assignments" label="Filtres affectations" submitLabel="Filtrer" resetLabel="Réinitialiser" resetHref="/lead-assignments" activeCount={activeFilters}>
         <Field id="la-status" label="Statut">

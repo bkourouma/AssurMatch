@@ -20,7 +20,7 @@ describe("no-consent repository blocker", () => {
         productKey: "auto",
         formDefinitionId: seed.form.id,
         contact: { displayName: "Visitor", email: "visitor@example.com", phone: "+2250102030405" },
-        answers: { vehicle_use: "prive" },
+        answers: { vehicle_use: "prive", city: "Abidjan", contact_preference: "email" },
         consent: {
           accepted: false,
           consentTextId: seed.consentText.id,

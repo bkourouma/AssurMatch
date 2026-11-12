@@ -17,6 +17,7 @@ import {
 } from "../../../../packages/shared/contracts/offer-content";
 import type { AdminOfferContent, AdminWriteResult } from "./admin-api";
 import { adminWriteErrorMessage } from "./catalog-messages";
+import { ERROR_MESSAGES, forbiddenWordingMessage, wordingFromDetails } from "./auth-error-messages";
 
 export { OFFER_INDICATIVE_DISCLAIMERS, offerCompleteness };
 export type { OfferCompleteness };
@@ -192,11 +193,20 @@ export const OFFER_ERROR_MESSAGES: Record<string, string> = {
   OFFER_INSURER_INVALID: "Assureur refusé : il est introuvable, suspendu ou rattaché à un autre pays que l'offre. Choisissez un assureur actif du pays de l'offre ou saisissez son nom."
 };
 
-export function offerWriteErrorMessage(result: Pick<AdminWriteResult<unknown>, "status" | "code" | "message">): string {
+/** Expressions refused by the wording guard: `details.wording` (422 FORBIDDEN_WORDING), else the legacy message text. */
+export function forbiddenWordingOf(result: { details?: Record<string, unknown> | undefined; message?: string | undefined }): string[] {
+  const named = wordingFromDetails(result.details);
+  if (named && named.length > 0) return named;
+  const legacy = result.message?.match(/Forbidden regulated wording:\s*([^;]+)/i);
+  return legacy?.[1] ? legacy[1].split(",").map((entry) => entry.trim()).filter(Boolean) : [];
+}
+
+export function offerWriteErrorMessage(result: Pick<AdminWriteResult<unknown>, "status" | "code" | "message"> & { details?: Record<string, unknown> | undefined }): string {
+  if (result.code === "FORBIDDEN_WORDING") return forbiddenWordingMessage(forbiddenWordingOf(result));
   const message = result.code ? OFFER_ERROR_MESSAGES[result.code] : undefined;
   if (message) return message;
-  const forbidden = result.message?.match(/Forbidden regulated wording:\s*([^;]+)/i);
-  if (result.status === 400 && forbidden) return `Formulation réglementée interdite détectée : « ${forbidden[1]?.trim()} ». Reformulez le champ concerné.`;
+  const forbidden = forbiddenWordingOf(result);
+  if ((result.status === 400 || result.status === 422) && forbidden.length > 0) return forbiddenWordingMessage(forbidden);
   if (result.status === 400 && result.message && /indicativePriceMin must not exceed/i.test(result.message)) {
     return "Prix invalide : la prime minimale dépasse la prime maximale.";
   }
@@ -403,9 +413,10 @@ export const INSURER_EDIT_STATUS_OPTIONS = ["active", "suspended"] as const;
 export const INSURER_STATUS_HINT = "Un assureur suspendu ou retiré ne peut plus être choisi pour une nouvelle offre ; les offres existantes gardent son nom.";
 
 export function insurerWriteErrorMessage(
-  result: { status: number; code?: string | undefined; message?: string | undefined },
+  result: { status: number; code?: string | undefined; message?: string | undefined; details?: Record<string, unknown> | undefined },
   operation: "create" | "update" | "retire"
 ): string {
+  if (result.code === "FORBIDDEN_WORDING") return forbiddenWordingMessage(forbiddenWordingOf(result));
   if (result.status === 401 || result.code === "session_required") return "Session expirée : reconnectez-vous puis recommencez.";
   if (result.status === 403) return "Action refusée : droits insuffisants ou hors périmètre pays.";
   if (result.status === 404) return "Assureur introuvable ou hors de votre périmètre.";
@@ -414,13 +425,13 @@ export function insurerWriteErrorMessage(
       ? "Ce code existe déjà pour ce pays : choisissez un autre code (le couple pays + code est unique)."
       : "Conflit : la fiche a été modifiée depuis son chargement. Rechargez la page puis recommencez.";
   }
-  const forbidden = result.message?.match(/Forbidden regulated wording:\s*([^;]+)/i);
-  if (result.status === 400 && forbidden) return `Formulation réglementée interdite détectée : « ${forbidden[1]?.trim()} ». Reformulez le champ concerné.`;
+  const forbidden = forbiddenWordingOf(result);
+  if ((result.status === 400 || result.status === 422) && forbidden.length > 0) return forbiddenWordingMessage(forbidden);
   if (result.status === 400 || result.status === 422) {
     return "Données invalides : vérifiez le nom, le code (minuscules, chiffres et tirets) et le motif (8 caractères au moins).";
   }
   if (result.status === 0) return "API indisponible : réessayez dans quelques instants.";
-  return `Erreur inattendue de l'API (${result.status}${result.code ? ` ${result.code}` : ""}).`;
+  return ERROR_MESSAGES.fallback;
 }
 
 /* --------------------------------------------------------------- AI summary (OFFER-010) */

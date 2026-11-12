@@ -1,5 +1,6 @@
 import { readAdminLeadConversations, type AdminConversationData } from "../../lib/admin-api";
 import { Badge, Card, Stack, StateMessage } from "../../lib/ui/admin-ui";
+import { readFailureDetail } from "../../lib/auth-error-messages";
 
 /**
  * Spec 062: read-only view of the broker/visitor conversations of a quote request, for the
@@ -93,7 +94,7 @@ export async function LeadConversationsCard({ quoteRequestId, show }: { quoteReq
         {result.forbidden ? (
           <StateMessage tone="warning">Les échanges courtier / visiteur ne sont pas accessibles pour ce rôle admin (refus audité).</StateMessage>
         ) : null}
-        {result.status === "error" ? <StateMessage tone="danger">Échanges indisponibles : {result.error}</StateMessage> : null}
+        {result.status === "error" ? <StateMessage tone="danger">Échanges indisponibles. {readFailureDetail(result.error)}</StateMessage> : null}
         {masked ? <StateMessage tone="info">Contenu masqué pour votre rôle (support) : seuls l&apos;expéditeur, les horodatages et le nombre de pièces jointes sont visibles.</StateMessage> : null}
         {result.status === "success" && conversations.length === 0 ? <p>Aucune conversation pour cette demande.</p> : null}
         {conversations.map((conversation) => (

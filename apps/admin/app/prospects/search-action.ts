@@ -60,7 +60,7 @@ export async function searchProspectsByContactAction(_previous: ProspectContactS
     if (response.status === 401) return { status: "unauthenticated", message: "Session expirée : reconnectez-vous." };
     if (response.status === 403) return { status: "forbidden", message: "Accès aux prospects refusé pour ce rôle admin. Le refus est journalisé." };
     if (response.status === 400) return { status: "invalid", message: "Recherche refusée par l'API : e-mail ou téléphone invalide." };
-    if (!response.ok) return { status: "error", message: `Recherche indisponible (api_${response.status}).` };
+    if (!response.ok) return { status: "error", message: "Recherche indisponible pour le moment. Réessayez dans un instant." };
     return { status: "success", result: await response.json() as AdminPage<AdminProspectListItem> };
   } catch {
     // Never the error message: it could quote the request.

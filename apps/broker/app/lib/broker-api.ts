@@ -1,4 +1,5 @@
 import { backOfficeApiBaseUrl, getBackOfficeToken } from "./backoffice-auth";
+import { AuthApiError, readErrorCode } from "./auth-error-messages";
 import type { BrokerLeadDisputeView, LeadDisputeWindow } from "../../../../packages/shared/contracts/lead-disputes.contracts";
 
 export const BROKER_AUTH_SOURCE_MARKER = "broker-auth-client:014";
@@ -11,6 +12,9 @@ export interface BackOfficeLoginResult {
   trustedDeviceRejected?: boolean;
   trustedDeviceUsed?: boolean;
   error?: string;
+  /** Activation only: HTTP status and machine code of a refusal, mapped to a French message by the action. */
+  httpStatus?: number;
+  code?: string;
 }
 
 export async function loginBackOffice(email: string, password: string, trustedDeviceToken?: string): Promise<BackOfficeLoginResult> {
@@ -20,12 +24,16 @@ export async function loginBackOffice(email: string, password: string, trustedDe
     body: JSON.stringify(trustedDeviceToken ? { email, password, trustedDeviceToken } : { email, password }),
     cache: "no-store"
   });
-  if (response.status === 400 || response.status === 422) return { status: "validation_error", error: `api_${response.status}` };
-  if (response.status === 403) return { status: "suspended", error: "account_suspended" };
-  if (response.status === 423) return { status: "locked", error: "account_locked" };
-  if (response.status === 428) return { status: "activation_required", error: "activation_required" };
-  if (response.status === 401) return { status: "invalid_credentials", error: "invalid_credentials" };
-  if (!response.ok) return { status: "error", error: `api_${response.status}` };
+  if (!response.ok) {
+    const code = await readErrorCode(response);
+    // Lot 5 codes first; the legacy status mapping stays as a fallback. An unknown e-mail, a wrong
+    // password and a locked account all end on the same neutral message (anti-enumeration).
+    if (code === "INVALID_CREDENTIALS" || response.status === 401 || response.status === 423) return { status: "invalid_credentials", error: "invalid_credentials" };
+    if (code === "ACCOUNT_SUSPENDED" || response.status === 403) return { status: "suspended", error: "account_suspended" };
+    if (response.status === 428) return { status: "activation_required", error: "activation_required" };
+    if (response.status === 400 || response.status === 422) return { status: "validation_error", error: `api_${response.status}` };
+    return { status: "error", error: `api_${response.status}` };
+  }
   const session = await response.json() as { accessToken?: string; mfaRequired?: boolean; trustedDeviceRejected?: boolean; trustedDeviceUsed?: boolean };
   if (!session.accessToken) return { status: "error", error: "invalid_session" };
   return session.mfaRequired ? { status: "mfa_required", ...session } : { status: "success", ...session };
@@ -50,7 +58,7 @@ export async function enrollMfa() {
     headers: { Authorization: `Bearer ${token}` },
     cache: "no-store"
   });
-  if (!response.ok) throw new Error(`api_${response.status}`);
+  if (!response.ok) throw new AuthApiError(response.status, await readErrorCode(response));
   return response.json() as Promise<{ secret: string; otpauthUri: string; backupCodes: string[] }>;
 }
 
@@ -74,7 +82,7 @@ export async function verifyMfa(
     body: JSON.stringify(options.trustDevice ? { code, kind, trustDevice: true, deviceLabel: options.deviceLabel } : { code, kind }),
     cache: "no-store"
   });
-  if (!response.ok) throw new Error(`api_${response.status}`);
+  if (!response.ok) throw new AuthApiError(response.status, await readErrorCode(response));
   return response.json() as Promise<VerifyMfaResult>;
 }
 
@@ -129,7 +137,7 @@ export async function changePassword(oldPassword: string, newPassword: string): 
     body: JSON.stringify({ oldPassword, newPassword }),
     cache: "no-store"
   });
-  if (!response.ok) throw new Error(`api_${response.status}`);
+  if (!response.ok) throw new AuthApiError(response.status, await readErrorCode(response));
 }
 
 export async function activateWithToken(token: string, password: string): Promise<BackOfficeLoginResult> {
@@ -139,8 +147,10 @@ export async function activateWithToken(token: string, password: string): Promis
     body: JSON.stringify({ token, password }),
     cache: "no-store"
   });
-  if (response.status === 400 || response.status === 422) return { status: "validation_error", error: `api_${response.status}` };
-  if (!response.ok) return { status: "error", error: `api_${response.status}` };
+  if (!response.ok) {
+    const code = await readErrorCode(response);
+    return { status: "error", error: `api_${response.status}`, httpStatus: response.status, ...(code ? { code } : {}) };
+  }
   const session = await response.json() as { accessToken?: string; mfaRequired?: boolean };
   if (!session.accessToken) return { status: "error", error: "invalid_session" };
   return session.mfaRequired ? { status: "mfa_required", ...session } : { status: "success", ...session };
@@ -153,7 +163,7 @@ export async function consumePasswordReset(token: string, newPassword: string): 
     body: JSON.stringify({ token, newPassword }),
     cache: "no-store"
   });
-  if (!response.ok) throw new Error(`api_${response.status}`);
+  if (!response.ok) throw new AuthApiError(response.status, await readErrorCode(response));
 }
 
 export interface BrokerApiState<T> {

@@ -1,6 +1,7 @@
 import { readMessagingDeliveries, readMessagingProviders } from "../lib/admin-api";
 import { Badge, Card, DataTable, Notice, PageHeader, PageStack, StateMessage } from "../lib/ui/admin-ui";
 import { MessagingTestForm } from "./messaging-test-form";
+import { readFailureDetail } from "../lib/auth-error-messages";
 
 export default async function AdminMessagingPage() {
   const [providers, deliveries] = await Promise.all([readMessagingProviders(), readMessagingDeliveries()]);
@@ -13,7 +14,7 @@ export default async function AdminMessagingPage() {
         description="État des canaux optionnels. Un canal n'envoie que si son flag est actif, un fournisseur est configuré et le destinataire a donné son accord. Aucun secret fournisseur n'est exposé."
       />
       {providers.forbidden ? <StateMessage tone="danger">Accès messaging refusé pour ce rôle admin.</StateMessage> : null}
-      {providers.status === "error" ? <StateMessage tone="danger">Messaging indisponible: {providers.error}</StateMessage> : null}
+      {providers.status === "error" ? <StateMessage tone="danger">Messaging indisponible. {readFailureDetail(providers.error)}</StateMessage> : null}
 
       {providers.status === "success" ? (
         <>

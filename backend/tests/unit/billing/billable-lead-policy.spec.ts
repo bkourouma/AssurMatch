@@ -42,7 +42,7 @@ function lead(overrides: Partial<LeadAssignmentRecord> = {}): LeadAssignmentReco
     countryCode: "CI",
     productKey: "auto",
     contact: { email: "ama@example.test", phone: "+2250102030405" },
-    answers: { vehicle_use: "prive" },
+    answers: { vehicle_use: "prive", city: "Abidjan", contact_preference: "email" },
     consentRecordId: "consent-1",
     createdAt: now,
     updatedAt: now,

@@ -13,6 +13,7 @@ import {
 import type { PendingManualQuoteData } from "../lib/admin-api";
 import { AI_ASSISTED_MODE_LABEL, AI_ASSISTED_MODE_NOTE, candidateReasonLabel, parkedReasonLabel, qualityScoreLabel } from "./routing-labels";
 import { AssignPendingQuoteForm, CreateRoutingRuleForm, ReassignLeadForm, RoutingPrecheckForm, UpdateRoutingRuleForm } from "./routing-forms";
+import { readFailureDetail } from "../lib/auth-error-messages";
 
 const modeLabels: Record<RoutingRuleData["mode"], string> = {
   first_eligible: "Premier éligible",
@@ -69,7 +70,7 @@ export default async function RoutingPage() {
 
       {unauthenticated ? <StateMessage tone="danger">Session admin requise.</StateMessage> : null}
       {forbidden ? <StateMessage tone="danger">Accès routage refusé pour ce rôle admin.</StateMessage> : null}
-      {rules.status === "error" ? <StateMessage tone="danger">Règles indisponibles: {rules.error}</StateMessage> : null}
+      {rules.status === "error" ? <StateMessage tone="danger">Règles indisponibles. {readFailureDetail(rules.error)}</StateMessage> : null}
 
       {rules.status === "success" ? (
         <>

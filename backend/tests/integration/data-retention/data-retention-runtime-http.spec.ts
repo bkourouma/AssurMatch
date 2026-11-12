@@ -27,7 +27,7 @@ describe("data retention runtime HTTP (spec 046)", () => {
         productKey: "auto",
         formDefinitionId: seed.form.id,
         contact: { displayName: "Visiteur Retention", email: VISITOR_EMAIL, phone: "+2250102030405" },
-        answers: { vehicle_use: "prive" },
+        answers: { vehicle_use: "prive", city: "Abidjan", contact_preference: "email" },
         consent: { accepted: true, consentTextId: seed.consentText.id, version: "v1", contentHash: seed.consentText.contentHash },
         ipAddress: "203.0.113.70",
         sessionId: "runtime-session-retention"

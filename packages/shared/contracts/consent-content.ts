@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { findForbiddenWording } from "./content-safety";
+import { findRegulatedWordingAnyLanguage } from "./content-safety";
 
 /**
  * Spec 050 R5: consent text content helpers shared by the API and the seed scripts.
@@ -74,7 +74,7 @@ export function findConsentContentIssues(input: { purpose: string; content?: str
   if (input.contentHash !== undefined && input.contentHash !== consentContentHash(content)) {
     issues.push({ code: "content_hash_mismatch" });
   }
-  for (const wording of findForbiddenWording(content)) issues.push({ code: "forbidden_wording", detail: wording });
+  for (const wording of findRegulatedWordingAnyLanguage(content)) issues.push({ code: "forbidden_wording", detail: wording });
   if (input.purpose === "lead_transmission") {
     if (!/\{\{\s*brokerName\s*\}\}/.test(content)) issues.push({ code: "recipient_variable_missing", detail: "{{brokerName}}" });
     if (!/assurmatch/i.test(content)) issues.push({ code: "technical_role_missing", detail: "AssurMatch" });

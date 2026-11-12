@@ -4,6 +4,7 @@ import { QuoteReviewForm } from "../../lib/ui/operations-forms";
 import { OperationsTabs } from "../../lib/ui/operations-tabs";
 import { quoteStatusTones } from "../../lib/ui/operations-tones";
 import { productLabel } from "../../lib/ui/operations-labels";
+import { readFailureDetail } from "../../lib/auth-error-messages";
 
 /**
  * Spec 056 (H-02): queue of requests held for manual review, either because the product forces a
@@ -29,7 +30,7 @@ export default async function AdminQuoteReviewPage({ searchParams }: { searchPar
 
       {queue.status === "unauthenticated" ? <StateMessage tone="danger">Session admin requise.</StateMessage> : null}
       {queue.status === "forbidden" ? <StateMessage tone="danger">File de revue non accessible pour ce rôle admin.</StateMessage> : null}
-      {queue.status === "error" ? <StateMessage tone="danger">File de revue indisponible : {queue.error}</StateMessage> : null}
+      {queue.status === "error" ? <StateMessage tone="danger">File de revue indisponible. {readFailureDetail(queue.error)}</StateMessage> : null}
 
       <StateMessage>
         Router ou assigner exige le droit d'affectation (Super Admin, Admin Pays) et un consentement accordé; marquer non routable ou doublon est ouvert à la conformité. Le support consulte sans décider.

@@ -22,6 +22,7 @@ import {
   routingResultLabel,
   routingStatusLabel
 } from "../../lib/ui/operations-labels";
+import { readFailureDetail } from "../../lib/auth-error-messages";
 
 /**
  * Spec 056 (H-01): quote request record. Consent summary, every routing decision with the excluded
@@ -67,7 +68,7 @@ export default async function AdminQuoteRequestDetailPage({
       {detailResult.status === "unauthenticated" ? <StateMessage tone="danger">Session admin requise.</StateMessage> : null}
       {detailResult.status === "forbidden" ? <StateMessage tone="danger">Accès refusé : rôle non autorisé ou demande hors de votre périmètre pays (refus audité).</StateMessage> : null}
       {detailResult.status === "not_found" ? <StateMessage tone="danger">Demande de devis introuvable.</StateMessage> : null}
-      {detailResult.status === "error" ? <StateMessage tone="danger">Fiche indisponible : {detailResult.error}</StateMessage> : null}
+      {detailResult.status === "error" ? <StateMessage tone="danger">Fiche indisponible. {readFailureDetail(detailResult.error)}</StateMessage> : null}
 
       <Split>
         <Stack>
@@ -205,7 +206,7 @@ export default async function AdminQuoteRequestDetailPage({
       <Card title="Documents du prospect" description="Fichiers décrits par leurs métadonnées uniquement, aucun contenu de fichier.">
         {documents.unauthenticated ? <StateMessage tone="danger">Session admin requise.</StateMessage> : null}
         {documents.forbidden ? <StateMessage tone="danger">Accès documents refusé pour ce rôle admin.</StateMessage> : null}
-        {documents.status === "error" ? <StateMessage tone="danger">Documents indisponibles: {documents.error}</StateMessage> : null}
+        {documents.status === "error" ? <StateMessage tone="danger">Documents indisponibles. {readFailureDetail(documents.error)}</StateMessage> : null}
         <DataTable
           columns={[
             { key: "label", header: "Libellé", render: (document) => document.label },

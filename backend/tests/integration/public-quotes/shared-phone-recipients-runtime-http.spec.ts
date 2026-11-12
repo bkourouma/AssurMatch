@@ -63,7 +63,7 @@ describe("quote requests sharing a phone number (spec 066 F1)", () => {
         productKey: "auto",
         formDefinitionId: seed.form.id,
         contact: { displayName: input.name, email: input.email, phone: input.phone ?? SHARED_PHONE },
-        answers: { vehicle_use: "prive" },
+        answers: { vehicle_use: "prive", city: "Abidjan", contact_preference: "email" },
         consent: { accepted: true, consentTextId: seed.consentText.id, version: "v1", contentHash: seed.consentText.contentHash },
         ipAddress: input.ip,
         sessionId: `session-${input.email}`
@@ -155,7 +155,7 @@ describe("quote requests sharing a phone number (spec 066 F1)", () => {
     const again = await submit(active, seed, { email: "awa@example.com", name: "Awa Premiere", ip: "203.0.113.73" });
     expect(first.status).toBe(201);
     expect(again.status).toBe(201);
-    expect(again.body.status).toBe("duplicate");
+    expect(again.body.status).toBe("duplicate_ignored");
     expect(await active.runtime.quoteRequests.submissions.list()).toHaveLength(1);
     expect(await active.runtime.prospects.service.list()).toHaveLength(1);
   });

@@ -30,6 +30,9 @@ function outcome(result: BrokerWriteResult, success: string): string {
   // Spec 063 FR-B01/FR-B02: contestation hors fenetre de 30 jours ou deja deposee.
   if (status === 409 && result.code === "DISPUTE_WINDOW_EXPIRED") return "dispute_window_expired";
   if (status === 409 && result.code === "DISPUTE_ALREADY_EXISTS") return "dispute_exists";
+  // Lot 6: acceptation d'un lead deja accepte, ou dans un statut qui ne s'accepte pas (409 a code explicite).
+  if (status === 409 && result.code === "LEAD_ALREADY_ACCEPTED") return "already_accepted";
+  if (status === 409 && result.code === "LEAD_STATUS_NOT_ACCEPTABLE") return "not_acceptable";
   // Spec 059 (suite): 409 LEAD_NOT_ACCEPTED / LEAD_CLOSED a la cloture.
   if (status === 409) return "conflict";
   if (status === 404) return "not_found";

@@ -36,6 +36,8 @@ x-backend-env: &backend-env
   EMAIL_SMTP_HOST: 127.0.0.1
   EMAIL_SMTP_PORT: ${ASSURMATCH_E2E_MAILPIT_SMTP_PORT:-48025}
   EMAIL_PREVIEW_MODE: "false"
+  # Default is 5000 ms: too short for the SMTP hand-off when many runners activate accounts at once.
+  EMAIL_SEND_TIMEOUT_MS: "20000"
   APP_BASE_URL: http://127.0.0.1:${ASSURMATCH_E2E_ADMIN_PORT:-48602}
   PUBLIC_APP_URL: http://127.0.0.1:${ASSURMATCH_E2E_PUBLIC_PORT:-48601}
   BROKER_APP_URL: http://127.0.0.1:${ASSURMATCH_E2E_BROKER_PORT:-48603}

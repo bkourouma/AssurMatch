@@ -20,7 +20,8 @@ describe("admin users lifecycle", () => {
       mfaStatus: "verified",
       mfaSecretEncrypted: "encrypted-secret",
       mfaSecretIssuedAt: new Date(),
-      mfaBackupCodesHashes: ["hash"]
+      mfaBackupCodesHashes: ["hash"],
+      passwordHash: "hash:password"
     });
 
     expect((await controller.suspend(complianceActor, user.id, { reason: "Compliance requested suspension" })).status).toBe("suspended");
@@ -29,12 +30,16 @@ describe("admin users lifecycle", () => {
     await users.incrementFailedLogin(user.id);
     const unlocked = await controller.unlock(complianceActor, user.id, { reason: "Manual security unlock" });
     expect(unlocked.status).toBe("active");
-    expect(unlocked.failedLoginCount).toBe(0);
+    expect(unlocked).not.toHaveProperty("failedLoginCount");
+    expect((await users.require(user.id)).failedLoginCount).toBe(0);
     const mfaReset = await controller.resetMfa(complianceActor, user.id, { reason: "Lost authenticator reset" });
 
     expect(mfaReset.mfaStatus).toBe("required");
-    expect(mfaReset.mfaSecretEncrypted).toBeUndefined();
-    expect(mfaReset.mfaBackupCodesHashes).toEqual([]);
+    expect(mfaReset).not.toHaveProperty("mfaSecretEncrypted");
+    expect(mfaReset).not.toHaveProperty("mfaBackupCodesHashes");
+    const stored = await users.require(user.id);
+    expect(stored.mfaSecretEncrypted).toBeUndefined();
+    expect(stored.mfaBackupCodesHashes).toEqual([]);
     expect(audit.search({ action: AuthAuditActions.userSuspended, targetId: user.id })).toHaveLength(1);
     expect(audit.search({ action: AuthAuditActions.userUnsuspended, targetId: user.id })).toHaveLength(1);
     expect(audit.search({ action: AuthAuditActions.userLocked, targetId: user.id })).toHaveLength(1);

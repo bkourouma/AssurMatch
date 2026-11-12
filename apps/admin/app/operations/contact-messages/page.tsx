@@ -3,6 +3,7 @@ import { Badge, Card, DescriptionList, EmptyState, Field, FilterBar, Grid, PageH
 import { ContactStatusForm } from "../../lib/ui/operations-forms";
 import { OperationsTabs } from "../../lib/ui/operations-tabs";
 import { contactStatusTones } from "../../lib/ui/operations-tones";
+import { readFailureDetail } from "../../lib/auth-error-messages";
 
 /**
  * Spec 056 (H-04): contact inbox (super, compliance and support admins). Status changes are
@@ -29,7 +30,7 @@ export default async function AdminContactMessagesPage({ searchParams }: { searc
 
       {result.status === "unauthenticated" ? <StateMessage tone="danger">Session admin requise.</StateMessage> : null}
       {result.status === "forbidden" ? <StateMessage tone="danger">Messages de contact non accessibles pour ce rôle admin.</StateMessage> : null}
-      {result.status === "error" ? <StateMessage tone="danger">Messages indisponibles : {result.error}</StateMessage> : null}
+      {result.status === "error" ? <StateMessage tone="danger">Messages indisponibles. {readFailureDetail(result.error)}</StateMessage> : null}
 
       <FilterBar action="/operations/contact-messages" label="Filtres messages" submitLabel="Filtrer" resetLabel="Réinitialiser" resetHref="/operations/contact-messages" activeCount={activeFilters} autoSubmit>
         <Field id="cm-status" label="Statut">

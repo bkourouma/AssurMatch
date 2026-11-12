@@ -14,7 +14,7 @@ import {
 import { roleHasPermission } from "../../../../packages/shared/rbac/assurmatch-role-matrix";
 import { AuditLogWriter } from "../audit-logs/audit-log-writer.service";
 import type { ActorContext } from "../common/types";
-import { OfferErrorCodes, offerForbidden, offerInvalid, offerNotFound, offerUnprocessable } from "./offer-errors";
+import { OfferErrorCodes, offerForbidden, offerForbiddenWording, offerInvalid, offerNotFound, offerUnprocessable } from "./offer-errors";
 import { OfferAuditActions, OfferLifecycleService } from "./offer-lifecycle.service";
 import { daysUntil, effectiveOfferStatus, pendingVersion, publishedVersion, toAdminOfferDetail, toAdminOfferListItem } from "./offer-views";
 import type { OfferRecord, OfferVersionContent } from "./offers.module";
@@ -26,6 +26,12 @@ const DEFAULT_ADMIN_REASON = "Administration de l'offre";
 export function parseOfferInput<T>(schema: ZodType<T>, input: unknown): T {
   const result = schema.safeParse(input);
   if (!result.success) {
+    // A forbidden-wording issue (offer-content.ts) is raised as a typed 422 naming the expressions.
+    const wording = [...new Set(result.error.issues.flatMap((issue) => {
+      const found = (issue as { params?: { wording?: unknown } }).params?.wording;
+      return Array.isArray(found) ? found.filter((item): item is string => typeof item === "string") : [];
+    }))];
+    if (wording.length > 0) throw offerForbiddenWording(wording);
     throw offerInvalid(`Validation failed: ${result.error.issues.map((issue) => (issue.path.length ? `${issue.path.join(".")}: ${issue.message}` : issue.message)).join("; ")}`);
   }
   return result.data;

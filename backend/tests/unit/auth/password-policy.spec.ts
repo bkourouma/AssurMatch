@@ -1,3 +1,4 @@
+import { BadRequestException } from "@nestjs/common";
 import { describe, expect, it } from "vitest";
 import { PasswordPolicyService } from "../../../src/modules/auth/password-policy.service";
 
@@ -10,10 +11,15 @@ describe("PasswordPolicyService", () => {
 
   it("rejects short passwords", () => {
     expect(() => service.assertAcceptable("short")).toThrow(/at least 12/);
+    try { service.assertAcceptable("short"); } catch (error) {
+      expect(error).toBeInstanceOf(BadRequestException);
+      expect((error as BadRequestException).getResponse()).toMatchObject({ code: "PASSWORD_POLICY" });
+      expect((error as Error).message).not.toMatch(/password|token|secret/i);
+    };
   });
 
   it("rejects passwords matching identity data", () => {
-    expect(() => service.assertAcceptable("person@example.com", { email: "person@example.com" })).toThrow(/email/);
+    expect(() => service.assertAcceptable("person@example.com", { email: "person@example.com" })).toThrow(/e-mail/);
     expect(() => service.assertAcceptable("Person Example", { displayName: "Person Example" })).toThrow(/display name/);
   });
 

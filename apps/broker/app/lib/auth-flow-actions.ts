@@ -4,6 +4,7 @@ import { cookies, headers } from "next/headers";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { activateWithToken, changePassword, consumePasswordReset, enrollMfa, revokeTrustedDevices, verifyMfa } from "./broker-api";
+import { AUTH_MESSAGES, authErrorMessage, authErrorMessageFromUnknown, type AuthErrorContext } from "./auth-error-messages";
 import {
   BACKOFFICE_TOKEN_COOKIE,
   clearTrustedDeviceCookie,
@@ -24,11 +25,9 @@ function stringValue(value: FormDataEntryValue | null): string {
   return typeof value === "string" ? value.trim() : "";
 }
 
-function errorState(error: unknown): AuthFlowState {
-  return {
-    status: "error",
-    message: error instanceof Error ? error.message : "action_failed"
-  };
+/** Never exposes an exception text or an API code: only a readable French message. */
+function errorState(error: unknown, context: AuthErrorContext): AuthFlowState {
+  return { status: "error", message: authErrorMessageFromUnknown(error, context) };
 }
 
 async function setBackOfficeCookie(accessToken: string): Promise<void> {
@@ -47,9 +46,10 @@ async function setBackOfficeCookie(accessToken: string): Promise<void> {
 export async function activateAction(_previous: AuthFlowState, formData: FormData): Promise<AuthFlowState> {
   const returnTo = sanitizeReturnTo(stringValue(formData.get("returnTo")));
   const session = await activateWithToken(stringValue(formData.get("token")), stringValue(formData.get("password")));
-  if (session.status === "validation_error") return { status: "error", message: "validation_error" };
-  if (session.status !== "success" && session.status !== "mfa_required") return { status: "error", message: session.error ?? session.status };
-  if (!session.accessToken) return { status: "error", message: "invalid_session" };
+  if (session.status !== "success" && session.status !== "mfa_required") {
+    return { status: "error", message: authErrorMessage({ status: session.httpStatus, code: session.code, context: "activate" }) };
+  }
+  if (!session.accessToken) return { status: "error", message: AUTH_MESSAGES.fallback };
   await setBackOfficeCookie(session.accessToken);
   // Activation sets a new password: the API revokes every trusted device, so drop the stale local cookie too.
   await clearTrustedDeviceCookie();
@@ -61,13 +61,13 @@ export async function enrollMfaAction(_previous: AuthFlowState): Promise<AuthFlo
     const challenge = await enrollMfa();
     return {
       status: "success",
-      message: "MFA enrollment challenge issued.",
+      message: "Secret et codes de secours générés. Conservez-les maintenant : ils ne seront plus affichés.",
       secret: challenge.secret,
       otpauthUri: challenge.otpauthUri,
       backupCodes: challenge.backupCodes
     };
   } catch (error) {
-    return errorState(error);
+    return errorState(error, "mfa");
   }
 }
 
@@ -82,11 +82,11 @@ export async function verifyMfaAction(_previous: AuthFlowState, formData: FormDa
       stringValue(formData.get("kind")) === "backup" ? "backup" : "totp",
       trustDevice ? { trustDevice, deviceLabel: deviceLabel ?? "" } : {}
     );
-    if (!session.accessToken) return { status: "error", message: "invalid_session" };
+    if (!session.accessToken) return { status: "error", message: AUTH_MESSAGES.fallback };
     await setBackOfficeCookie(session.accessToken);
     if (trustDevice && session.trustedDevice?.token) await setTrustedDeviceCookie(session.trustedDevice.token, session.trustedDevice.expiresAt);
   } catch (error) {
-    return errorState(error);
+    return errorState(error, "mfa");
   }
   redirect(returnTo);
 }
@@ -98,7 +98,7 @@ export async function passwordChangeAction(_previous: AuthFlowState, formData: F
     await clearTrustedDeviceCookie();
     return { status: "success", message: "Mot de passe modifié." };
   } catch (error) {
-    return errorState(error);
+    return errorState(error, "password_change");
   }
 }
 
@@ -108,14 +108,14 @@ export async function passwordResetConsumeAction(_previous: AuthFlowState, formD
     await clearTrustedDeviceCookie();
     return { status: "success", message: "Mot de passe réinitialisé. Vous pouvez vous connecter." };
   } catch (error) {
-    return errorState(error);
+    return errorState(error, "password_reset");
   }
 }
 
 /** "Révoquer tous les appareils de confiance" (FR-A06): server-side revocation, then forget the local cookie. */
 export async function revokeTrustedDevicesAction(_previous: AuthFlowState): Promise<AuthFlowState> {
   const result = await revokeTrustedDevices();
-  if (result.ok === false) return { status: "error", message: result.error === "session_required" ? "Session expirée. Reconnectez-vous." : "Révocation impossible pour le moment. Réessayez plus tard." };
+  if (result.ok === false) return { status: "error", message: result.error === "session_required" ? AUTH_MESSAGES.sessionExpired : AUTH_MESSAGES.fallback };
   await clearTrustedDeviceCookie();
   revalidatePath("/account/security");
   return {

@@ -33,13 +33,13 @@ export class AuthRequiredHttpGuard implements CanActivate {
   }
 
   /**
-   * Spec 053 R6 / FR-011: a broker user deactivated (or whose role changed) by the partner's owner
-   * loses the access of a still valid token at the next request. An unknown user id (simulation
-   * headers of the test runtime) is not restricted.
+   * Spec 053 R6 / FR-011: a user (broker or administrator) suspended, locked, deleted or whose roles
+   * changed since the token was issued loses the access of a still valid token at the next request.
+   * An unknown user id (simulation headers of the test runtime) is not restricted.
    */
   private async assertUserAccess(actor: ActorContext): Promise<void> {
     const port = this.runtime?.userAccessStatus;
-    if (!actor.partnerTenantId || !actor.actorId || !port) return;
+    if (!actor.actorId || !port) return;
     const snapshot = await port.snapshot(actor.actorId);
     if (snapshot && userAccessRevoked(snapshot, actor.roles)) {
       throw new UnauthorizedException({ code: ErrorCodes.AUTH_REQUIRED, message: "Authentication required" });

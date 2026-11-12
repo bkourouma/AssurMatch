@@ -524,6 +524,7 @@ model User {
   lockedReason   String?
   mfaSecretEncrypted String?
   mfaSecretIssuedAt DateTime?
+  mfaLastTotpCounter Int?
   mfaBackupCodesHashes String[] @default([])
   passwordResetTokenHash String?
   passwordResetTokenExpiresAt DateTime?

@@ -3,6 +3,7 @@ import { Badge, DataTable, Field, FilterBar, Input, PageHeader, PageStack, Selec
 import { quoteStatusTones } from "../lib/ui/operations-tones";
 import { productLabel, quoteStatusLabel, routingStatusLabel } from "../lib/ui/operations-labels";
 import { OperationsTabs } from "../lib/ui/operations-tabs";
+import { readFailureDetail } from "../lib/auth-error-messages";
 
 /**
  * Spec 056 (H-01): quote requests console. Rows carry routing facts only; the record (consent,
@@ -49,7 +50,7 @@ export default async function AdminQuoteRequestsPage({ searchParams }: { searchP
 
       {result.status === "unauthenticated" ? <StateMessage tone="danger">Session admin requise.</StateMessage> : null}
       {result.status === "forbidden" ? <StateMessage tone="danger">Accès aux demandes de devis refusé pour ce rôle admin.</StateMessage> : null}
-      {result.status === "error" ? <StateMessage tone="danger">Demandes indisponibles : {result.error}</StateMessage> : null}
+      {result.status === "error" ? <StateMessage tone="danger">Demandes indisponibles. {readFailureDetail(result.error)}</StateMessage> : null}
 
       <FilterBar action="/quote-requests" label="Filtres demandes de devis" submitLabel="Filtrer" resetLabel="Réinitialiser" resetHref="/quote-requests" activeCount={activeFilters}>
         <Field id="qr-reference" label="Référence">

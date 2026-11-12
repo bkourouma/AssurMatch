@@ -55,7 +55,7 @@ async function submitQuote(harness: RuntimeHttpHarness, seed: Awaited<ReturnType
       productKey: "auto",
       formDefinitionId: seed.form.id,
       contact: { displayName: `Visitor ${suffix}`, email: `visitor${suffix}@example.test`, phone: `+22501020304${suffix.padStart(2, "0")}` },
-      answers: { vehicle_use: "prive" },
+      answers: { vehicle_use: "prive", city: "Abidjan", contact_preference: "email" },
       consent: { accepted: true, consentTextId: seed.consentText.id, version: "v1", contentHash: seed.consentText.contentHash },
       ipAddress: `203.0.113.${suffix}`,
       sessionId: `routing-session-${suffix}`
@@ -217,7 +217,7 @@ describe("routing rules runtime HTTP", () => {
         productKey: "auto",
         formDefinitionId: seed.form.id,
         contact: { displayName: "Visitor 7", email: "visitor7@example.test", phone: "+2250102030407" },
-        answers: { vehicle_use: "prive" },
+        answers: { vehicle_use: "prive", city: "Abidjan", contact_preference: "email" },
         consent: { accepted: true, consentTextId: seed.consentText.id, version: "v1", contentHash: seed.consentText.contentHash },
         ipAddress: "203.0.113.7",
         sessionId: "routing-session-7"
@@ -229,7 +229,7 @@ describe("routing rules runtime HTTP", () => {
     const same = await harness.request(`/admin/lead-assignments/${assignment!.id}/reassign`, {
       method: "POST",
       headers: { ...actorHeaders(superAdmin), "content-type": "application/json" },
-      body: JSON.stringify({ partnerTenantId: partnerA.id, reason: "No-op" })
+      body: JSON.stringify({ partnerTenantId: partnerA.id, reason: "No-op, same partner" })
     });
     expect(same.status).toBe(409);
 

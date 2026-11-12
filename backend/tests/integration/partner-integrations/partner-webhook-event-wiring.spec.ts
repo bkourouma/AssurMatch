@@ -40,7 +40,7 @@ describe("partner webhook event wiring", () => {
       countryCode: "CI",
       productKey: "auto",
       contact: { email: "ama@example.test", phone: "+2250102030405" },
-      answers: { vehicle_use: "prive" }
+      answers: { vehicle_use: "prive", city: "Abidjan", contact_preference: "email" }
     }, superAdmin);
     expect(assignment.id).toBeTruthy();
 
@@ -89,7 +89,7 @@ describe("partner webhook event wiring", () => {
       countryCode: "CI",
       productKey: "auto",
       contact: { email: "kofi@example.test" },
-      answers: { vehicle_use: "prive" }
+      answers: { vehicle_use: "prive", city: "Abidjan", contact_preference: "email" }
     }, superAdmin);
 
     const statusResponse = await harness.request(`/broker/crm/leads/${assignment.id}/status`, { method: "POST", headers: { ...actorHeaders(broker), ...json }, body: JSON.stringify({ status: "contacte" }) });

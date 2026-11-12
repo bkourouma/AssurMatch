@@ -11,7 +11,8 @@ import {
 import { roleHasPermission } from "../../../../packages/shared/rbac/assurmatch-role-matrix";
 import { AuditLogWriter } from "../audit-logs/audit-log-writer.service";
 import type { ActorContext } from "../common/types";
-import { insurerConflict, insurerForbidden, insurerInvalid, insurerNotFound } from "./insurer-errors";
+import { findRegulatedWordingAnyLanguage } from "../../../../packages/shared/contracts/content-safety";
+import { insurerConflict, insurerForbidden, insurerForbiddenWording, insurerInvalid, insurerNotFound } from "./insurer-errors";
 import type { InsurerRecord, InsurersRepository } from "./insurers.repository";
 
 export const InsurerAuditActions = {
@@ -33,6 +34,9 @@ export interface InsurerLookup {
 function parse<T>(schema: ZodType<T>, input: unknown): T {
   const result = schema.safeParse(input ?? {});
   if (!result.success) {
+    const record = input && typeof input === "object" ? (input as Record<string, unknown>) : {};
+    const wording = findRegulatedWordingAnyLanguage([record.name, record.approvalNumber].filter((value): value is string => typeof value === "string" && value.length > 0).join(" "));
+    if (wording.length > 0) throw insurerForbiddenWording(wording);
     throw insurerInvalid(`Validation failed: ${result.error.issues.map((issue) => (issue.path.length ? `${issue.path.join(".")}: ${issue.message}` : issue.message)).join("; ")}`);
   }
   return result.data;

@@ -26,6 +26,7 @@ import {
   mfaStatusTones,
   userStatusTones
 } from "../../lib/ui/admin-ui";
+import { errorNoticeText, readFailureDetail } from "../../lib/auth-error-messages";
 
 interface UserDetailPageProps {
   params: Promise<{ userId: string }>;
@@ -55,6 +56,7 @@ export default async function UserDetailPage({ params, searchParams }: UserDetai
 
   const paramsValue = searchParams ? await searchParams : {};
   const notice = firstParam(paramsValue.notice);
+  const errorNotice = errorNoticeText(firstParam(paramsValue.error));
   const requestedTab = firstParam(paramsValue.tab);
   const tab = TABS.some((entry) => entry.key === requestedTab) ? requestedTab : "profil";
   const result = await readAdminUser(userId);
@@ -89,9 +91,10 @@ export default async function UserDetailPage({ params, searchParams }: UserDetai
         }
       />
 
-      {notice ? <StateMessage>Action terminée: {notice}.</StateMessage> : null}
+      {errorNotice ? <StateMessage tone="danger">{errorNotice}</StateMessage> : null}
+      {notice && !errorNotice ? <StateMessage>Action terminée: {notice}.</StateMessage> : null}
       {result.forbidden ? <StateMessage tone="danger">Accès refusé pour ce profil utilisateur.</StateMessage> : null}
-      {result.status === "error" ? <StateMessage tone="warning">Détail indisponible: {result.error}.</StateMessage> : null}
+      {result.status === "error" ? <StateMessage tone="warning">Détail indisponible. {readFailureDetail(result.error)}</StateMessage> : null}
 
       <Card title="État du compte">
         <DescriptionList
@@ -99,7 +102,6 @@ export default async function UserDetailPage({ params, searchParams }: UserDetai
           items={[
             { term: "Statut", value: <StatusBadge status={user.status} tones={userStatusTones} /> },
             { term: "MFA", value: <StatusBadge status={user.mfaStatus} tones={mfaStatusTones} /> },
-            { term: "Échecs login", value: String(user.failedLoginCount ?? 0) },
             { term: "Tenant", value: user.partnerTenantId ? <code className="bo-break">{user.partnerTenantId}</code> : "-" }
           ]}
         />
@@ -127,7 +129,7 @@ export default async function UserDetailPage({ params, searchParams }: UserDetai
               <Input {...fieldControlProps("user-product-scopes")} name="productScopes" defaultValue={user.productScopes.join(", ")} />
             </Field>
             <Field id="user-profile-reason" label="Raison auditable" required>
-              <Textarea {...fieldControlProps("user-profile-reason", { required: true })} name="reason" minLength={5} />
+              <Textarea {...fieldControlProps("user-profile-reason", { required: true })} name="reason" minLength={8} />
             </Field>
             <FormActions>
               <Button type="submit">Mettre à jour</Button>
@@ -147,7 +149,7 @@ export default async function UserDetailPage({ params, searchParams }: UserDetai
               defaultValues={user.roles}
             />
             <Field id="user-roles-reason" label="Raison auditable" required>
-              <Textarea {...fieldControlProps("user-roles-reason", { required: true })} name="reason" minLength={5} />
+              <Textarea {...fieldControlProps("user-roles-reason", { required: true })} name="reason" minLength={8} />
             </Field>
             <FormActions>
               <Button type="submit">Mettre à jour les rôles</Button>
@@ -169,7 +171,7 @@ export default async function UserDetailPage({ params, searchParams }: UserDetai
                   <input type="hidden" name="userId" value={user.id} />
                   <input type="hidden" name="action" value={action} />
                   <Field id={`user-reason-${action}`} label={`Raison pour ${action}`} required>
-                    <Textarea {...fieldControlProps(`user-reason-${action}`, { required: true })} name="reason" minLength={5} />
+                    <Textarea {...fieldControlProps(`user-reason-${action}`, { required: true })} name="reason" minLength={8} />
                   </Field>
                   <FormActions align="start">
                     <Button type="submit" variant="secondary" size="sm">Confirmer {action}</Button>
@@ -192,7 +194,7 @@ export default async function UserDetailPage({ params, searchParams }: UserDetai
                   <input type="hidden" name="userId" value={user.id} />
                   <input type="hidden" name="action" value={action} />
                   <Field id={`user-reason-${action}`} label={`Raison pour ${action}`} required>
-                    <Textarea {...fieldControlProps(`user-reason-${action}`, { required: true })} name="reason" minLength={5} />
+                    <Textarea {...fieldControlProps(`user-reason-${action}`, { required: true })} name="reason" minLength={8} />
                   </Field>
                 </ConfirmDialog>
               ))}

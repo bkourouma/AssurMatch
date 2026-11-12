@@ -45,6 +45,8 @@ describe("auth MFA runtime flow", () => {
       expect((await users.require(backupUser.id)).mfaBackupCodesHashes[0]).toBe("");
       await expect(auth.service.verifyMfa(await users.require(backupUser.id), "", backupEnrollment.backupCodes[0] ?? "", "backup")).rejects.toThrow(/Invalid MFA/);
 
+      // A password-less (invited) account is never counted nor locked: the locked user has a password, as after a login.
+      await users.setPassword(lockedUser.id, "hash:password");
       await auth.service.enrollMfa(await users.require(lockedUser.id));
       await expect(auth.service.verifyMfa(await users.require(lockedUser.id), "", "000000")).rejects.toThrow(/Invalid MFA/);
       await expect(auth.service.verifyMfa(await users.require(lockedUser.id), "", "000000")).rejects.toThrow(/Invalid MFA/);

@@ -1,3 +1,4 @@
+import { resolveQuoteSubmitOutcome } from "./quote-submission";
 import type { OfferCompareResponse, OfferDetail, OfferSummary, QuoteOptionsResponse, QuoteRequestCreateDto } from "../../../../packages/shared/contracts/quote.contracts";
 import type { QuoteDocumentsResponse } from "../../../../packages/shared/contracts/quote-document.contracts";
 import type { PartnerApplicationCreateDto } from "../../../../packages/shared/contracts/partner-application.contracts";
@@ -111,7 +112,7 @@ export type PublicQuoteFormResult =
   | { status: "error"; error: string };
 
 export interface PublicQuoteSubmitState {
-  status: "success" | "error" | "rate_limited";
+  status: "success" | "error" | "rate_limited" | "duplicate";
   publicReference?: string;
   /** Visitor-only token to read the request status and attach optional documents. */
   verificationToken?: string;
@@ -460,7 +461,8 @@ export async function submitPublicQuoteRequest(input: QuoteRequestCreateDto, opt
       }
       return { status: "error", error: `api_${response.status}`, messageKey: "quoteRejected", publicMessage: "La demande de devis ne peut pas être envoyée avec ces informations." };
     }
-    const body = await response.json() as {
+    const body = await response.json().catch(() => null) as {
+      status?: unknown;
       publicReference?: string;
       message?: string;
       selectedOfferPartnerRetained?: unknown;
@@ -469,13 +471,18 @@ export async function submitPublicQuoteRequest(input: QuoteRequestCreateDto, opt
       retainedPartnerCount?: unknown;
       additionalOffersIgnored?: unknown;
     };
-    if (!body.publicReference) {
+    if (!body) {
       return { status: "error", error: "missing_public_reference", messageKey: "confirmationFailed", publicMessage: "La confirmation n'a pas pu être générée." };
+    }
+    // A repeated request carries no tracking token (or says so): never a code, never an empty link.
+    const outcome = resolveQuoteSubmitOutcome(body);
+    if (outcome.kind === "already_received") {
+      return { status: "duplicate", messageKey: "quoteAlreadyReceived", publicMessage: "Votre demande a déjà été reçue. Consultez l'e-mail de confirmation pour son suivi." };
     }
     return {
       status: "success",
-      publicReference: body.publicReference,
-      ...(typeof (body as { verificationToken?: unknown }).verificationToken === "string" ? { verificationToken: (body as { verificationToken: string }).verificationToken } : {}),
+      publicReference: outcome.publicReference,
+      verificationToken: outcome.verificationToken,
       selectedOfferPartnerRetained: typeof body.selectedOfferPartnerRetained === "boolean" ? body.selectedOfferPartnerRetained : null,
       chosenPartnerRetained: typeof body.chosenPartnerRetained === "boolean" ? body.chosenPartnerRetained : null,
       ...(typeof body.requestedPartnerCount === "number" ? { requestedPartnerCount: body.requestedPartnerCount } : {}),

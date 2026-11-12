@@ -1,4 +1,5 @@
 import { backOfficeApiBaseUrl, getBackOfficeToken } from "./backoffice-auth";
+import { AdminApiError, forbiddenCode, readErrorBody } from "./auth-error-messages";
 import type { AdminAlertsListResponse } from "../../../../packages/shared/contracts/admin-alerts.contracts";
 import type {
   AdminCountryProductLinkView,
@@ -50,21 +51,40 @@ export interface BackOfficeLoginResult {
   trustedDeviceRejected?: boolean;
   trustedDeviceUsed?: boolean;
   error?: string;
+  /** HTTP status and error `code` of an API refusal; the screens map them with `authErrorMessage`. */
+  httpStatus?: number;
+  code?: string;
+}
+
+/** Builds the typed error of a refused API response (status + body `code`; the technical `message` is never shown). */
+async function apiErrorFrom(response: Response): Promise<AdminApiError> {
+  const body = readErrorBody(await response.json().catch(() => undefined));
+  return new AdminApiError(response.status, body.code, body.details);
 }
 
 export async function loginBackOffice(email: string, password: string, trustedDeviceToken?: string): Promise<BackOfficeLoginResult> {
-  const response = await fetch(`${backOfficeApiBaseUrl()}/auth/login`, {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify(trustedDeviceToken ? { email, password, trustedDeviceToken } : { email, password }),
-    cache: "no-store"
-  });
-  if (response.status === 400 || response.status === 422) return { status: "validation_error", error: `api_${response.status}` };
-  if (response.status === 403) return { status: "suspended", error: "account_suspended" };
-  if (response.status === 423) return { status: "locked", error: "account_locked" };
-  if (response.status === 428) return { status: "activation_required", error: "activation_required" };
-  if (response.status === 401) return { status: "invalid_credentials", error: "invalid_credentials" };
-  if (!response.ok) return { status: "error", error: `api_${response.status}` };
+  let response: Response;
+  try {
+    response = await fetch(`${backOfficeApiBaseUrl()}/auth/login`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(trustedDeviceToken ? { email, password, trustedDeviceToken } : { email, password }),
+      cache: "no-store"
+    });
+  } catch {
+    return { status: "error", error: "api_unavailable" };
+  }
+  if (!response.ok) {
+    const { code } = readErrorBody(await response.json().catch(() => undefined));
+    const refusal = { httpStatus: response.status, ...(code ? { code } : {}) };
+    // INVALID_CREDENTIALS, 401 and 423 all read "Identifiants invalides." (no account enumeration, no "locked" notice).
+    if (code === "INVALID_CREDENTIALS" || response.status === 401) return { status: "invalid_credentials", error: "invalid_credentials", ...refusal };
+    if (code === "ACCOUNT_SUSPENDED" || response.status === 403) return { status: "suspended", error: "account_suspended", ...refusal };
+    if (response.status === 423) return { status: "locked", error: "account_locked", ...refusal };
+    if (response.status === 428) return { status: "activation_required", error: "activation_required", ...refusal };
+    if (response.status === 400 || response.status === 422) return { status: "validation_error", error: `api_${response.status}`, ...refusal };
+    return { status: "error", error: `api_${response.status}`, ...refusal };
+  }
   const session = await response.json() as { accessToken?: string; mfaRequired?: boolean; trustedDeviceRejected?: boolean; trustedDeviceUsed?: boolean };
   if (!session.accessToken) return { status: "error", error: "invalid_session" };
   return session.mfaRequired ? { status: "mfa_required", ...session } : { status: "success", ...session };
@@ -89,7 +109,7 @@ export async function enrollMfa() {
     headers: { Authorization: `Bearer ${token}` },
     cache: "no-store"
   });
-  if (!response.ok) throw new Error(`api_${response.status}`);
+  if (!response.ok) throw await apiErrorFrom(response);
   return response.json() as Promise<{ secret: string; otpauthUri: string; backupCodes: string[] }>;
 }
 
@@ -113,7 +133,7 @@ export async function verifyMfa(
     body: JSON.stringify(options.trustDevice ? { code, kind, trustDevice: true, deviceLabel: options.deviceLabel } : { code, kind }),
     cache: "no-store"
   });
-  if (!response.ok) throw new Error(`api_${response.status}`);
+  if (!response.ok) throw await apiErrorFrom(response);
   return response.json() as Promise<VerifyMfaResult>;
 }
 
@@ -168,7 +188,7 @@ export async function changePassword(oldPassword: string, newPassword: string): 
     body: JSON.stringify({ oldPassword, newPassword }),
     cache: "no-store"
   });
-  if (!response.ok) throw new Error(`api_${response.status}`);
+  if (!response.ok) throw await apiErrorFrom(response);
 }
 
 export async function readAdminHealth(): Promise<{ ok: boolean; error?: string; unauthenticated?: boolean; forbidden?: boolean }> {
@@ -194,6 +214,8 @@ export interface AdminApiState<T> {
   error?: string;
   unauthenticated?: boolean;
   forbidden?: boolean;
+  /** Error `code` of a 403 (e.g. `BILLING_SCOPE_MISSING`, `MFA_REQUIRED`), when the API gives one. */
+  code?: string;
 }
 
 export interface AdminDashboardData {
@@ -252,7 +274,6 @@ export interface AdminUser {
   passwordChangedAt?: string | null;
   lockedAt?: string | null;
   deletedAt?: string | null;
-  failedLoginCount?: number;
   passwordChangeRequired?: boolean;
   lockedReason?: string | null;
 }
@@ -483,7 +504,10 @@ async function readAdmin<T>(path: string, fallback: T): Promise<AdminApiState<T>
       cache: "no-store"
     });
     if (response.status === 401) return { status: "unauthenticated", data: fallback, unauthenticated: true, error: "session_expired" };
-    if (response.status === 403) return { status: "forbidden", data: fallback, forbidden: true, error: "access_denied" };
+    if (response.status === 403) {
+      const code = forbiddenCode(await response.json().catch(() => undefined));
+      return { status: "forbidden", data: fallback, forbidden: true, error: "access_denied", ...(code ? { code } : {}) };
+    }
     if (!response.ok) return { status: "error", data: fallback, error: `api_${response.status}` };
     return { status: "success", data: await response.json() as T };
   } catch (error) {
@@ -500,9 +524,11 @@ async function writeAdmin<T>(path: string, method: "POST" | "PATCH" | "DELETE", 
     body: JSON.stringify(body),
     cache: "no-store"
   });
-  if (response.status === 401) throw new Error("session_expired");
-  if (response.status === 403) throw new Error("access_denied");
-  if (!response.ok) throw new Error(`api_${response.status}`);
+  if (!response.ok) {
+    const error = await apiErrorFrom(response);
+    // Legacy technical messages are kept (source markers, callers matching them); the screens use status + code.
+    throw response.status === 401 ? Object.assign(error, { message: "session_expired" }) : response.status === 403 ? Object.assign(error, { message: "access_denied" }) : error;
+  }
   return response.json() as Promise<T>;
 }
 
@@ -1220,14 +1246,23 @@ export function issueAdminUserPasswordReset(userId: string, reason: string) {
 }
 
 export async function activateWithToken(token: string, password: string): Promise<BackOfficeLoginResult> {
-  const response = await fetch(`${backOfficeApiBaseUrl()}/auth/activate`, {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify({ token, password }),
-    cache: "no-store"
-  });
-  if (response.status === 400 || response.status === 422) return { status: "validation_error", error: `api_${response.status}` };
-  if (!response.ok) return { status: "error", error: `api_${response.status}` };
+  let response: Response;
+  try {
+    response = await fetch(`${backOfficeApiBaseUrl()}/auth/activate`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ token, password }),
+      cache: "no-store"
+    });
+  } catch {
+    return { status: "error", error: "api_unavailable" };
+  }
+  if (!response.ok) {
+    const { code } = readErrorBody(await response.json().catch(() => undefined));
+    const refusal = { httpStatus: response.status, ...(code ? { code } : {}) };
+    if (response.status === 400 || response.status === 422) return { status: "validation_error", error: `api_${response.status}`, ...refusal };
+    return { status: "error", error: `api_${response.status}`, ...refusal };
+  }
   const session = await response.json() as { accessToken?: string; mfaRequired?: boolean };
   if (!session.accessToken) return { status: "error", error: "invalid_session" };
   return session.mfaRequired ? { status: "mfa_required", ...session } : { status: "success", ...session };
@@ -1240,7 +1275,7 @@ export async function consumePasswordReset(token: string, newPassword: string): 
     body: JSON.stringify({ token, newPassword }),
     cache: "no-store"
   });
-  if (!response.ok) throw new Error(`api_${response.status}`);
+  if (!response.ok) throw await apiErrorFrom(response);
 }
 
 /* ---------------------------------------------------------------------------------------------
@@ -1266,6 +1301,8 @@ export interface AdminWriteResult<T> {
   data?: T;
   code?: string;
   message?: string;
+  /** Non-sensitive refusal details (e.g. `{ wording: [...] }` of FORBIDDEN_WORDING). */
+  details?: Record<string, unknown>;
   blockers: AdminWriteBlocker[];
   /** Spec 052: offer refusals (422 `OFFER_INCOMPLETE`, `OFFER_VALIDATION_BLOCKED`, `OFFER_SCOPE_NOT_COVERED`) carry `{ code, field? }`. */
   offerBlockers?: OfferBlocker[];
@@ -1317,6 +1354,7 @@ async function toAdminWriteResult<T>(response: Response): Promise<AdminWriteResu
     status: response.status,
     ...(typeof record.code === "string" ? { code: record.code } : {}),
     ...(typeof record.message === "string" ? { message: record.message } : {}),
+    ...(readErrorBody(payload).details ? { details: readErrorBody(payload).details as Record<string, unknown> } : {}),
     blockers: toBlockers(record.blockers),
     ...(toOfferBlockers(record.blockers).length > 0 ? { offerBlockers: toOfferBlockers(record.blockers) } : {}),
     availableLanguages: Array.isArray(record.availableLanguages)

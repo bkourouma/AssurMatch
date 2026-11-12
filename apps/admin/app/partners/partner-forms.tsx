@@ -408,6 +408,8 @@ async function postDocument(partnerId: string, formData: FormData): Promise<Part
   const file = formData.get("file");
   if (!(file instanceof File) || file.size === 0) return { status: "error", message: "Choisissez un fichier (PDF, JPEG ou PNG)." };
   if (file.size > DOCUMENT_MAX_BYTES) return { status: "error", message: "Fichier trop volumineux : 5 Mo au maximum." };
+  // No document type is preselected: an empty choice is refused here, as the route handler does.
+  if (String(formData.get("documentType") ?? "").trim() === "") return { status: "error", message: "Choisissez le type de document." };
   try {
     // Same-origin admin route handler: it adds the session token server side.
     const response = await fetch(`/partners/${encodeURIComponent(partnerId)}/documents`, {

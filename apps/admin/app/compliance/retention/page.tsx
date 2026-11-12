@@ -6,6 +6,7 @@ import {
   type RetentionPolicyItemData,
   type RetentionSubjectKey
 } from "../../lib/admin-api";
+import { readFailureDetail } from "../../lib/auth-error-messages";
 import { approveBatch, previewErasure, previewRetention, removePolicyOverride, savePolicyOverride } from "../../lib/retention-actions";
 import {
   Badge,
@@ -303,7 +304,7 @@ export default async function DataRetentionPage({ searchParams }: { searchParams
         <StateMessage tone="danger">Accès refusé: MFA vérifiée et rôle de conformité requis pour la rétention.</StateMessage>
       ) : null}
       {policies.status === "error" || batches.status === "error" ? (
-        <StateMessage tone="danger">Rétention indisponible: {policies.error ?? batches.error}</StateMessage>
+        <StateMessage tone="danger">Rétention indisponible. {readFailureDetail(policies.error ?? batches.error)}</StateMessage>
       ) : null}
       {notice ? <StateMessage tone={notice.tone}>{notice.text}</StateMessage> : null}
 

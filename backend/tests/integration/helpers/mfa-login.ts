@@ -1,4 +1,5 @@
 import { generate } from "otplib";
+import { vi } from "vitest";
 import type { RuntimeHttpHarness } from "../runtime-http-test-utils";
 
 /** Spec 063: what a client receives from `POST /auth/login` and `POST /auth/mfa/verify`. */
@@ -15,8 +16,23 @@ export function jsonHeaders(accessToken?: string): Record<string, string> {
   return { "content-type": "application/json", ...(accessToken ? { authorization: `Bearer ${accessToken}` } : {}) };
 }
 
+const lastTotpStep = new Map<string, number>();
+
+/**
+ * A TOTP code is single-use per account (replay guard): each call returns the code of the next
+ * unused time step inside the accepted window (previous, current, next), so a test that verifies
+ * several times with the same secret never replays a step.
+ */
 export async function totp(secret: string): Promise<string> {
-  return generate({ secret, strategy: "totp", digits: 6, period: 30 });
+  const current = Math.floor(Date.now() / 30_000);
+  const step = Math.max(current - 1, (lastTotpStep.get(secret) ?? Number.NEGATIVE_INFINITY) + 1);
+  if (step > current + 1) {
+    // Window exhausted for this secret: move the (Date only) clock one step forward, as real time would.
+    vi.useFakeTimers({ toFake: ["Date"], now: Date.now() + 30_000 });
+    return totp(secret);
+  }
+  lastTotpStep.set(secret, step);
+  return generate({ secret, strategy: "totp", digits: 6, period: 30, epoch: step * 30 });
 }
 
 export async function httpLogin(harness: RuntimeHttpHarness, email: string, password: string, trustedDeviceToken?: string): Promise<{ status: number; body: HttpAuthSession }> {

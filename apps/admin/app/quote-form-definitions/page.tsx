@@ -22,6 +22,7 @@ import {
 } from "../lib/ui/admin-ui";
 import type { DataTableColumn } from "../lib/ui/admin-ui";
 import { CreateQuoteFormDefinitionForm, PublishQuoteFormDefinitionForm, RetireQuoteFormDefinitionForm } from "./quote-form-forms";
+import { readFailureDetail } from "../lib/auth-error-messages";
 
 const statusOptions = ["published", "draft", "suspended", "retired"];
 const languageOptions = ["fr", "en"];
@@ -102,7 +103,7 @@ export default async function AdminQuoteFormDefinitionsPage({
 
       {forms.unauthenticated ? <StateMessage tone="danger">Session admin requise.</StateMessage> : null}
       {forms.forbidden ? <StateMessage tone="danger">Accès aux formulaires de devis refusé pour ce rôle admin.</StateMessage> : null}
-      {forms.status === "error" ? <StateMessage tone="danger">Formulaires indisponibles: {forms.error}</StateMessage> : null}
+      {forms.status === "error" ? <StateMessage tone="danger">Formulaires indisponibles. {readFailureDetail(forms.error)}</StateMessage> : null}
 
       {forms.status === "success" ? (
         <>

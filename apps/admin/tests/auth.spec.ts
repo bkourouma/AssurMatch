@@ -27,9 +27,13 @@ test("admin auth client exposes login MFA source markers", () => {
   expect(api).toContain("/auth/password-change");
   expect(api).toContain("/auth/activate");
   expect(api).toContain("/auth/password-reset");
-  expect(login).toContain("Activation requise");
-  expect(login).toContain("Compte verrouillé");
-  expect(login).toContain("Compte suspendu");
+  const messages = read("lib/auth-error-messages.ts");
+  expect(login).toContain("loginNotices");
+  expect(messages).toContain("Activation requise");
+  // Anti-énumération : plus d'avis « Compte verrouillé », même texte que pour un mauvais mot de passe.
+  expect(messages).not.toContain("Compte verrouillé");
+  expect(messages).toContain("Identifiants invalides.");
+  expect(messages).toContain("Ce compte est suspendu. Contactez votre administrateur.");
   expect(login).toContain("/activate");
   expect(flow).toContain("ActivationForm");
   expect(flow).toContain("MfaPanel");

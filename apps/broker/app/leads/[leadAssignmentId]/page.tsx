@@ -52,12 +52,14 @@ const NOTICES: Record<string, { tone: "info" | "warning" | "danger"; message: st
   disputed: { tone: "info", message: "Contestation enregistrée et historisée. Le traitement suit le workflow existant." },
   closed: { tone: "info", message: "Lead clôturé avec son issue. Le visiteur est informé que sa demande est clôturée; l'action est historisée." },
   outcome_required: { tone: "warning", message: "Choisissez l'issue de la clôture: gagné, perdu ou sans suite." },
-  conflict: { tone: "warning", message: "Clôture refusée: le lead doit être accepté et ne pas être déjà clôturé." },
+  already_accepted: { tone: "warning", message: "Ce lead est déjà accepté : aucune nouvelle acceptation n'a été enregistrée." },
+  not_acceptable: { tone: "warning", message: "Ce lead ne peut plus être accepté dans son état actuel (rejeté, clôturé ou contesté). Rechargez la page." },
+  conflict: { tone: "warning", message: "Clôture refusée : le lead doit être accepté et ne pas être déjà clôturé." },
   reason_required: { tone: "warning", message: "Un motif allowliste est obligatoire pour rejeter ou contester un lead." },
   // Spec 063 (CRM-012): fenêtre de 30 jours et contestation unique.
   dispute_window_expired: { tone: "warning", message: "Contestation refusée : la fenêtre de 30 jours suivant la réception du lead est close." },
   dispute_exists: { tone: "warning", message: "Contestation refusée : ce lead a déjà fait l'objet d'une contestation." },
-  forbidden: { tone: "warning", message: "Action refusée: vos permissions, votre tenant ou votre MFA ne l'autorisent pas." },
+  forbidden: { tone: "warning", message: "Action refusée : vos permissions, votre tenant ou votre MFA ne l'autorisent pas." },
   // Spec 051 FR-021: 403 PARTNER_SUSPENDED.
   suspended: { tone: "warning", message: TENANT_SUSPENDED_MESSAGE },
   not_found: { tone: "warning", message: "Ce lead n'existe pas ou ne vous est pas assigné." },

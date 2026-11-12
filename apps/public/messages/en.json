@@ -1219,6 +1219,7 @@
     "rateLimited": "Too many requests. Please try again later.",
     "quoteRejected": "The quote request cannot be sent with this information.",
     "confirmationFailed": "The confirmation could not be generated.",
+    "quoteAlreadyReceived": "We have already received your request. Check your confirmation email to follow it.",
     "quoteTransmitted": "Request transmitted according to your consent.",
     "aiRateLimited": "Too many assistance requests. Please try again later.",
     "aiDisabled": "The reading assistant is not available for this country or this product.",
@@ -1250,6 +1251,7 @@
     "sending": "Sending.",
     "success": "Sent.",
     "fieldRequired": "This field is required. Provide a value before continuing.",
+    "negativeNumber": "This value cannot be negative. Enter zero or a positive number.",
     "invalidEmail": "Invalid email address. Check the format, for example name@domain.com.",
     "invalidPhone": "Invalid phone number. Use the international format, for example +225XXXXXXXXX."
   },

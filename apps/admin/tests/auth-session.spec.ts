@@ -60,7 +60,8 @@ test("admin runtime client uses bearer authorization and no simulation headers",
 });
 
 test("admin middleware redirects invalid sessions and blocks broker profiles", async () => {
-  const middlewareSource = source("apps/admin/middleware.ts");
+  const middlewareSource = `${source("apps/admin/middleware.ts")}
+${source("apps/admin/app/lib/middleware-policy.ts")}`;
 
   expect(middlewareSource).toContain("/auth/me");
   expect(middlewareSource).toContain("session_expired");

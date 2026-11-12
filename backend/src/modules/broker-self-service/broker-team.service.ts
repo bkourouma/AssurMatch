@@ -9,7 +9,7 @@ import { ErrorCodes } from "../../../../packages/shared/contracts/error-codes";
 import { roleHasPermission, type AssurMatchRole } from "../../../../packages/shared/rbac/assurmatch-role-matrix";
 import type { AuditLogWriter } from "../audit-logs/audit-log-writer.service";
 import type { ActorContext } from "../common/types";
-import { PARTNER_OWNER_ROLES } from "../partners/partner-admin.service";
+import { PARTNER_OWNER_ROLES, isEmailAlreadyUsedError } from "../partners/partner-admin.service";
 import { partnerConflict, partnerForbidden, partnerNotFound, partnerUnprocessable } from "../partners/partner-errors";
 import type { AdminUserCreateResponse, PartnerUserProvisionInput } from "../users/admin-users.controller";
 import type { UserAccount, UsersService } from "../users/users.module";
@@ -57,6 +57,15 @@ export class BrokerTeamService {
     throw partnerForbidden();
   }
 
+  /**
+   * Role-only precheck for the write routes, called by the HTTP controller BEFORE it parses the body (403
+   * RBAC_DENIED and an audited refusal rather than a 400 for a reader or an agent). The service methods
+   * run the same check again with the target.
+   */
+  assertCanManageTeam(actor: ActorContext, action: string = BrokerTeamAuditActions.actionRefused, targetId = "team"): void {
+    this.requireTeam(actor, "broker_team:write", action, targetId);
+  }
+
   private refuse(actor: ActorContext, action: string, targetId: string, refusal: string, context: Record<string, unknown> = {}): void {
     this.deps.audit.write({
       actor,
@@ -86,10 +95,10 @@ export class BrokerTeamService {
     try {
       created = await this.deps.provisionUser(actor, { email: parsed.email, displayName: parsed.displayName, role: parsed.role, partnerTenantId, reason });
     } catch (error) {
-      if (error instanceof Error && /already exists/i.test(error.message)) {
+      if (isEmailAlreadyUsedError(error)) {
         this.refuse(actor, BrokerTeamAuditActions.inviteRefused, "invite", "email_unavailable", { role: parsed.role });
         // Neutral: never tells which partner (if any) already uses the address.
-        throw partnerConflict("This e-mail address cannot be invited");
+        throw partnerConflict("This e-mail address cannot be invited", ErrorCodes.EMAIL_ALREADY_USED);
       }
       throw error;
     }
