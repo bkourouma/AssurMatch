@@ -25,7 +25,7 @@ test("the tracking space reads the public status API with the token, server-side
   expect(lib).toContain('{ status: "denied" }');
 
   // Status headline, brokers, timeline, technical role, expiry hint, documents and withdrawal.
-  for (const marker of ["status.${status}.headline", "brokers.status.", "timeline.steps.", 't("role")', 't("expiry"', "QuoteDocumentUpload", "<ConsentWithdrawal", "IndicativeOfferNotice"]) {
+  for (const marker of ["status.${headlineKey}.headline", "consent_withdrawn", "brokers.status.", "timeline.steps.", 't("role")', 't("expiry"', "QuoteDocumentUpload", "<ConsentWithdrawal", "IndicativeOfferNotice"]) {
     expect(page).toContain(marker);
   }
   // A missing token or a refusal leads to the neutral message and the tracking-link page.

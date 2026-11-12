@@ -40,7 +40,9 @@ export async function upsertAddOnPriceAction(_previous: Lot5ActionState, formDat
   const countryCode = text(formData, "countryCode").toUpperCase();
   const reason = text(formData, "reason");
   const monthlyAmount = Number(text(formData, "monthlyAmount"));
-  if (!ADD_ON_KINDS.has(kind) || !PLANS.has(plan) || !/^[A-Z]{2}$/.test(countryCode) || reason.length < REASON_MIN_LENGTH) return invalid;
+  if (!/^[A-Z]{2}$/.test(countryCode)) return { status: "error", message: "Le code pays doit comporter 2 lettres (ex. : CI)." };
+  if (reason.length < REASON_MIN_LENGTH) return { status: "error", message: "Le motif doit contenir au moins 3 caractères." };
+  if (!ADD_ON_KINDS.has(kind) || !PLANS.has(plan)) return invalid;
   if (!Number.isFinite(monthlyAmount) || monthlyAmount < 0 || monthlyAmount > 10_000_000) return invalid;
   const result = await writeLot5("/admin/billing/add-on-prices", "PUT", {
     kind,

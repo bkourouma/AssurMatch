@@ -162,6 +162,8 @@ const ERROR_NOTICE_KEYS: Record<string, string> = {
   payload_too_large: ERROR_MESSAGES.payloadTooLarge,
   password_policy: ERROR_MESSAGES.passwordPolicy,
   invalid_input: ERROR_MESSAGES.invalidInput,
+  name_too_short: "Le nom doit contenir au moins 2 caractères.",
+  reason_too_short: "Le motif doit contenir au moins 8 caractères.",
   conflict: ERROR_MESSAGES.conflict,
   self_action: ERROR_MESSAGES.selfActionForbidden,
   last_super_admin: ERROR_MESSAGES.lastSuperAdmin,

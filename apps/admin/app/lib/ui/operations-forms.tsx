@@ -7,6 +7,7 @@ import {
   updateContactMessageStatusAction,
   type OperationsActionState
 } from "../operations-actions";
+import { REASON_MAX_LENGTH, REASON_MIN_LENGTH } from "../operations-validation";
 import { ActionNotice, Button, Field, Form, FormActions, Input, Notice, Select, fieldControlProps } from "./admin-ui";
 
 const initialState: OperationsActionState = { status: "idle" };
@@ -68,7 +69,7 @@ export function QuoteReviewForm({ quoteRequestId, candidates }: { quoteRequestId
         </Field>
       ) : null}
       <Field id={ids.reason} label="Motif (audité, 8 caractères minimum)" required>
-        <Input {...fieldControlProps(ids.reason, { required: true })} name="reason" minLength={8} maxLength={500} />
+        <Input {...fieldControlProps(ids.reason, { required: true })} name="reason" minLength={REASON_MIN_LENGTH} maxLength={REASON_MAX_LENGTH} />
       </Field>
       <FormActions>
         <Button type="submit" size="sm" pending={pending} pendingLabel="Enregistrement..." disabled={decision === "assign" && eligible.length === 0}>
@@ -95,8 +96,8 @@ export function ReassignAssignmentForm({ assignmentId, partners }: { assignmentI
       <datalist id={ids.list}>
         {partners.map((partner) => <option key={partner.id} value={partner.id}>{partner.legalName}</option>)}
       </datalist>
-      <Field id={ids.reason} label="Motif (audité)" required>
-        <Input {...fieldControlProps(ids.reason, { required: true })} name="reason" minLength={8} maxLength={500} />
+      <Field id={ids.reason} label="Motif (audité, 8 caractères minimum)" required>
+        <Input {...fieldControlProps(ids.reason, { required: true })} name="reason" minLength={REASON_MIN_LENGTH} maxLength={REASON_MAX_LENGTH} />
       </Field>
       <FormActions>
         <Button type="submit" size="sm" variant="secondary" pending={pending} pendingLabel="Réaffectation...">Réaffecter</Button>

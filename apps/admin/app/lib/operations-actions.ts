@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { refusalMessage, validateOptionalReason, validateRequiredReason } from "./operations-validation";
 import { decideQuoteReview, reassignLeadAssignment, updateContactMessageStatus, type OperationsWriteResult } from "./operations-api";
 
 /** Spec 056: result of a console action; a refusal is shown with its reason, never thrown. */
@@ -19,17 +20,7 @@ function text(value: FormDataEntryValue | null): string {
 }
 
 function refusal(result: OperationsWriteResult<unknown>): OperationsActionState {
-  const reasons: Record<number, string> = {
-    0: "API indisponible : réessayez plus tard.",
-    400: "Saisie invalide : le motif doit compter au moins 8 caractères.",
-    401: "Session expirée : reconnectez-vous.",
-    403: "Action refusée pour votre rôle ou hors de votre périmètre pays (refus audité).",
-    404: "Élément introuvable (référence ou identifiant inconnu).",
-    409: "Conflit : l'élément a déjà été traité ou la cible est identique.",
-    422: "Refus de conformité : consentement absent ou retiré, ou courtier partenaire non éligible. Rien n'a été transmis."
-  };
-  const base = reasons[result.status] ?? `Refus de l'API (${result.status}).`;
-  return { status: "error", message: result.message && result.status !== 0 ? `${base} Détail : ${result.message}` : base };
+  return { status: "error", message: refusalMessage(result.status) };
 }
 
 export async function decideQuoteReviewAction(_previous: OperationsActionState, formData: FormData): Promise<OperationsActionState> {
@@ -40,6 +31,8 @@ export async function decideQuoteReviewAction(_previous: OperationsActionState, 
   const partnerTenantId = text(formData.get("partnerTenantId"));
   const duplicateOfReference = text(formData.get("duplicateOfReference"));
   if (decision === "assign" && !partnerTenantId) return { status: "error", message: "Choisissez un courtier partenaire éligible." };
+  const reasonError = validateRequiredReason(reason);
+  if (reasonError) return { status: "error", message: reasonError };
   const result = await decideQuoteReview(quoteRequestId, {
     decision,
     reason,
@@ -57,7 +50,10 @@ export async function reassignLeadAssignmentAction(_previous: OperationsActionSt
   const assignmentId = text(formData.get("assignmentId"));
   const partnerTenantId = text(formData.get("partnerTenantId"));
   if (!assignmentId || !partnerTenantId) return { status: "error", message: "Affectation et courtier partenaire requis." };
-  const result = await reassignLeadAssignment(assignmentId, { partnerTenantId, reason: text(formData.get("reason")) });
+  const reason = text(formData.get("reason"));
+  const reasonError = validateRequiredReason(reason);
+  if (reasonError) return { status: "error", message: reasonError };
+  const result = await reassignLeadAssignment(assignmentId, { partnerTenantId, reason });
   if (!result.ok || !result.data) return refusal(result);
   revalidatePath("/lead-assignments");
   return { status: "success", message: `Lead réaffecté (statut ${result.data.status}). L'ancien courtier perd l'accès.` };
@@ -68,6 +64,8 @@ export async function updateContactMessageStatusAction(_previous: OperationsActi
   const status = CONTACT_STATUSES.find((value) => value === text(formData.get("status"))) as ContactStatus | undefined;
   if (!messageId || !status) return { status: "error", message: "Statut de message invalide." };
   const reason = text(formData.get("reason"));
+  const reasonError = validateOptionalReason(reason);
+  if (reasonError) return { status: "error", message: reasonError };
   const result = await updateContactMessageStatus(messageId, { status, ...(reason ? { reason } : {}) });
   if (!result.ok || !result.data) return refusal(result);
   revalidatePath("/operations/contact-messages");
