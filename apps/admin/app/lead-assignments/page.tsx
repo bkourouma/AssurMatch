@@ -18,7 +18,7 @@ const columns: Array<DataTableColumn<LeadAssignmentRow>> = [
   { key: "reference", header: "Demande", render: (row) => <a className="bo-ref" href={`/quote-requests/${row.quoteRequestId}`}>{row.publicReference ?? row.quoteRequestId.slice(0, 8)}</a> },
   { key: "scope", header: "Pays / produit", render: (row) => `${row.countryCode ?? "-"} / ${productLabel(row.productKey)}` },
   { key: "partner", header: "Courtier partenaire", render: (row) => row.partnerLegalName ?? row.partnerTenantId.slice(0, 8) },
-  { key: "status", header: "Statut", render: (row) => <Badge tone={assignmentStatusTones[row.status] ?? "neutral"} title={row.status}>{assignmentStatusLabel(row.status)}</Badge> },
+  { key: "status", header: "Statut", render: (row) => <Badge tone={assignmentStatusTones[row.status] ?? "neutral"}>{assignmentStatusLabel(row.status)}</Badge> },
   { key: "recipients", header: "Destinataires", render: (row) => row.recipientCount, numeric: true, align: "right" },
   { key: "assigned", header: "Affecté le", render: (row) => formatDateTime(row.assignedAt) },
   { key: "action", header: "Dernière action courtier", render: (row) => formatDateTime(row.lastBrokerActionAt) }

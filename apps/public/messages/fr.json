@@ -448,7 +448,8 @@
     },
     "empty": {
       "title": "Aucune offre indicative pour ces critères",
-      "description": "Modifiez vos filtres ou élargissez votre recherche. Une offre sponsorisée est affichée uniquement avec sa mention."
+      "description": "Modifiez vos filtres ou élargissez votre recherche. Une offre sponsorisée est affichée uniquement avec sa mention.",
+      "guarantee": "Aucune offre n'inclut cette garantie pour le moment."
     },
     "fineprint": "Le score est indicatif, calculé selon vos critères par rapport aux offres affichées. Une offre sponsorisée est toujours signalée. Aucune offre expirée ou non validée n'est affichée.",
     "priceHint": "Ce montant est indicatif : le prix exact dépend des informations que vous donnerez au courtier partenaire.",
@@ -894,6 +895,8 @@
     },
     "access": {
       "title": "Ce lien n'est plus valable",
+      "rateLimitedTitle": "Trop de tentatives",
+      "unavailableTitle": "Service momentanément indisponible",
       "body": "Utilisez le lien du dernier e-mail reçu de notre part pour suivre votre demande.",
       "cta": "Recevoir un nouveau lien",
       "rateLimited": "Trop de consultations en peu de temps. Réessayez dans quelques minutes.",

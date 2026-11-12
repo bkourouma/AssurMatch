@@ -75,7 +75,7 @@ export default async function AdminProspectsPage({ searchParams }: { searchParam
               {...fieldControlProps("prospect-country", { hint: "Code pays sur 2 lettres, par exemple CI." })}
               name="country"
               defaultValue={filters.country ?? ""}
-              maxLength={3}
+              maxLength={2}
               placeholder="Ex. : CI"
             />
           </Field>

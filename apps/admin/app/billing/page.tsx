@@ -318,7 +318,7 @@ export default async function BillingFoundationPage({
                 <Field id="billing-setup" label="Frais d'installation">
                   <Input {...fieldControlProps("billing-setup")} name="setupFee" type="number" min={0} step={100} defaultValue={0} />
                 </Field>
-                <Field id="billing-plan-reason" label="Motif">
+                <Field id="billing-plan-reason" label="Motif" required>
                   <Input {...fieldControlProps("billing-plan-reason", { required: true })} name="reason" minLength={3} maxLength={300} placeholder="Ex. : Révision annuelle des tarifs" />
                 </Field>
                 <FormActions>
@@ -462,7 +462,7 @@ export default async function BillingFoundationPage({
                         options={cancellableInvoices.map((invoice) => ({ value: invoice.id, label: `${invoice.number} - ${invoice.customer.legalName} - ${xof(invoice.totalAmount)}` }))}
                       />
                     </Field>
-                    <Field id="credit-note-reason" label="Motif de l'avoir">
+                    <Field id="credit-note-reason" label="Motif de l'avoir" required>
                       <Input {...fieldControlProps("credit-note-reason", { required: true })} name="reason" minLength={8} maxLength={300} placeholder="Ex. : Erreur sur la période facturée" />
                     </Field>
                   </ConfirmDialog>
@@ -529,7 +529,7 @@ export default async function BillingFoundationPage({
                 <Field id="billing-pack-credits" label="Crédits">
                   <Input {...fieldControlProps("billing-pack-credits")} name="credits" type="number" min={1} step={1} defaultValue={10} />
                 </Field>
-                <Field id="billing-pack-reason" label="Motif">
+                <Field id="billing-pack-reason" label="Motif" required>
                   <Input {...fieldControlProps("billing-pack-reason", { required: true })} name="reason" minLength={3} maxLength={300} placeholder="Ex. : Pack réglé par virement" />
                 </Field>
                 <Field id="billing-pack-invoice" label="Facture réglée (optionnel)">
@@ -605,7 +605,7 @@ function AccountPanel({ account }: { account: AccountStatementData }) {
           <Field id="account-pack-credits" label="Crédits">
             <Input {...fieldControlProps("account-pack-credits")} name="credits" type="number" min={1} step={1} defaultValue={10} />
           </Field>
-          <Field id="account-pack-reason" label="Motif">
+          <Field id="account-pack-reason" label="Motif" required>
             <Input {...fieldControlProps("account-pack-reason", { required: true })} name="reason" minLength={3} maxLength={300} placeholder="Ex. : Pack réglé par virement" />
           </Field>
           <FormActions>

@@ -400,7 +400,7 @@ export default async function PublicOffersPage({
             tone="muted"
             align="center"
             title={t("empty.title")}
-            description={guaranteeFilter ? t("guaranteeEmpty") : t("empty.description")}
+            description={guaranteeFilter ? t("empty.guarantee") : t("empty.description")}
             action={
               <Button
                 variant="secondary"
