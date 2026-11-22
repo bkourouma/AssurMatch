@@ -295,7 +295,7 @@ export default async function PublicQuotePage({
               }
             />
           ) : (
-            <QuoteBlockedState />
+            <QuoteBlockedState countryCode={countryCode} productKey={productKey} />
           )}
         </div>
       </Section>

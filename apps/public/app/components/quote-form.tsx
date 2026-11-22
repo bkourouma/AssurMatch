@@ -1,7 +1,7 @@
 "use client";
 
 import { useLocale, useMessages, useTranslations } from "next-intl";
-import { useEffect, useRef, useState, type FormEvent, type RefObject } from "react";
+import { useEffect, useRef, useState, type FormEvent, type KeyboardEvent, type RefObject } from "react";
 import { Link } from "../../i18n/navigation";
 import {
   quoteDocumentUploadEnabled,
@@ -16,6 +16,7 @@ import { defaultDocumentLabel, formatNameList, joinPersonName, readMarketingSour
 import { validateNeedAnswers } from "../lib/quote-submission";
 import { visitorAiAnswers } from "../lib/visitor-ai-answers";
 import { QuoteDocumentsStep, type StagedDocument } from "./forms/quote-documents-step";
+import { CopyReference } from "./journey/copy-reference";
 import { InitialsTile } from "./journey/tiles";
 import { IndicativeOfferNotice } from "./public-journey";
 import { VisitorAiAssistant } from "./visitor-ai-assistant";
@@ -294,6 +295,9 @@ export function QuoteFormShell({
   const contactHeadingRef = useRef<HTMLHeadingElement>(null);
   const documentsHeadingRef = useRef<HTMLHeadingElement>(null);
   const verifyHeadingRef = useRef<HTMLHeadingElement>(null);
+  const successHeadingRef = useRef<HTMLHeadingElement>(null);
+  // Fields to focus once a step becomes visible after a failed validation (instead of its heading).
+  const pendingFieldFocus = useRef<string[] | null>(null);
 
   // Spec 067: what the server says about this request. Everything below is a convenience, the server decides.
   const options = quoteOptions ?? null;
@@ -357,6 +361,18 @@ export function QuoteFormShell({
   useEffect(() => {
     if (shownStep.current === step) return;
     shownStep.current = step;
+    // A failed validation sent the visitor back to a step: land on the first field to fix, not on the heading.
+    const pendingNames = pendingFieldFocus.current;
+    pendingFieldFocus.current = null;
+    if (pendingNames && formRef.current) {
+      for (const name of pendingNames) {
+        const field = formRef.current.elements.namedItem(name);
+        if (field instanceof HTMLElement) {
+          field.focus();
+          return;
+        }
+      }
+    }
     const target =
       step === "need"
         ? needHeadingRef.current
@@ -440,6 +456,51 @@ export function QuoteFormShell({
     }
   }
 
+  /** Shows a step and lands on the first field to fix (immediately when that step is already open). */
+  function showStepWithFocus(target: StepId, names: string[]) {
+    if (step === target) {
+      focusFirstInvalidField(names);
+      return;
+    }
+    pendingFieldFocus.current = names;
+    setStep(target);
+  }
+
+  /** Clears a field's error as soon as the visitor edits it, so a stale message never contradicts the new value. */
+  function clearFieldError(target: EventTarget) {
+    if (!(target instanceof HTMLInputElement || target instanceof HTMLSelectElement || target instanceof HTMLTextAreaElement)) return;
+    const name = target.name;
+    if (name.startsWith("answer_")) {
+      const key = name.slice("answer_".length);
+      setNeedErrors((current) => {
+        if (!(key in current)) return current;
+        const next = { ...current };
+        delete next[key];
+        return next;
+      });
+    } else if (name === "email" || name === "phone") {
+      setContactErrors((current) => {
+        if (!(name in current)) return current;
+        const next = { ...current };
+        delete next[name];
+        return next;
+      });
+    }
+  }
+
+  /**
+   * Enter inside a field of an early step means "continue", never "send": the only submit button sits
+   * on the last step, so the browser's implicit submission would otherwise jump the visitor ahead.
+   */
+  function handleFormKeyDown(event: KeyboardEvent<HTMLFormElement>) {
+    if (!jsEnabled || event.key !== "Enter" || event.nativeEvent.isComposing) return;
+    if (!(event.target instanceof HTMLInputElement) || event.target.type === "file" || step === "consent") return;
+    event.preventDefault();
+    if (step === "need") goToStep2();
+    else if (step === "contact") goToReview();
+    else goToConsent();
+  }
+
   function goToStep2() {
     const errors = validateNeed();
     if (Object.keys(errors).length > 0) {
@@ -482,7 +543,8 @@ export function QuoteFormShell({
     if (Object.keys(needIssues).length > 0 || Object.keys(contactIssues).length > 0) {
       // A field left blank while the visitor jumped straight to consent (e.g. keyboard "Enter"):
       // send them back to the first step in error rather than submitting an incomplete request.
-      setStep(Object.keys(needIssues).length > 0 ? "need" : "contact");
+      if (Object.keys(needIssues).length > 0) showStepWithFocus("need", Object.keys(needIssues).map((key) => `answer_${key}`));
+      else showStepWithFocus("contact", ["email", "phone"].filter((name) => name in contactIssues));
       return;
     }
     // currentTarget is null once the event has been through an await, so the element is captured first.
@@ -586,6 +648,12 @@ export function QuoteFormShell({
   const pending = result.status === "submitting";
   const sent = result.status === "success";
 
+  // The form is replaced by the confirmation: without this, focus falls back to the page start and a
+  // screen-reader user hears nothing; a sighted visitor on a phone is left below the new panel.
+  useEffect(() => {
+    if (sent) successHeadingRef.current?.focus();
+  }, [sent]);
+
   // The stepper lives here rather than on the page: only this boundary knows the request went
   // through, and the journey is only at step 4 once it has.
   const stepIds: StepId[] = documentsStep ? ["need", "contact", "documents", "consent"] : ["need", "contact", "consent"];
@@ -622,7 +690,9 @@ export function QuoteFormShell({
         {stepper}
         <section className="am-j-sent" aria-label={t("successTitle")}>
           <IconTile name="check-circle" tone="success" size="lg" />
-          <h2 className="am-j-sent__title">{t("successTitle")}</h2>
+          <h2 className="am-j-sent__title" tabIndex={-1} ref={successHeadingRef}>
+            {t("successTitle")}
+          </h2>
           {result.alreadyReceived || !result.publicReference ? (
             <Notice tone="info" role="status">
               {result.message ?? api("quoteAlreadyReceived")}
@@ -630,7 +700,10 @@ export function QuoteFormShell({
           ) : (
             <div className="am-j-reference am-sign">
               <p className="am-j-reference__label">{t("successPrefix")}</p>
-              <p className="am-j-reference__value am-tabular">{result.publicReference}</p>
+              <div className="am-j-reference__row">
+                <p className="am-j-reference__value am-tabular">{result.publicReference}</p>
+                <CopyReference value={result.publicReference} label={t("copyReference")} copiedLabel={t("referenceCopied")} />
+              </div>
             </div>
           )}
           {offerRouting ? (
@@ -710,7 +783,11 @@ export function QuoteFormShell({
         className="am-j-form am-quote-form"
         data-enhanced={jsEnabled ? "true" : undefined}
         onSubmit={submit}
-        onChange={syncAssistAnswers}
+        onChange={(event) => {
+          syncAssistAnswers();
+          clearFieldError(event.target);
+        }}
+        onKeyDown={handleFormKeyDown}
         {...(formAction ? { action: formAction } : {})}
       >
         {/* No-JavaScript action (D6): the further offers travel as hidden fields and only count with the dedicated authorisation. */}
@@ -800,6 +877,9 @@ export function QuoteFormShell({
                 name="email"
                 type="email"
                 autoComplete="email"
+                inputMode="email"
+                autoCapitalize="none"
+                spellCheck={false}
               />
             </Field>
             <Field
@@ -1020,7 +1100,18 @@ export function QuoteFormShell({
   );
 }
 
-export function QuoteBlockedState() {
+export function QuoteBlockedState({ countryCode, productKey }: { countryCode?: string; productKey?: string } = {}) {
   const t = useTranslations("QuoteForm");
-  return <EmptyState icon="lock" tone="muted" align="center" title={t("blocked.title")} description={t("blocked.description")} />;
+  // A dead end names its way out: back to the product page when the route is known.
+  const action =
+    countryCode && productKey ? (
+      <Button
+        variant="secondary"
+        href={{ pathname: "/countries/[countryCode]/products/[productKey]", params: { countryCode, productKey } }}
+        icon={<Icon name="arrow-left" size={18} />}
+      >
+        {t("blocked.back")}
+      </Button>
+    ) : undefined;
+  return <EmptyState icon="lock" tone="muted" align="center" title={t("blocked.title")} description={t("blocked.description")} action={action} />;
 }

@@ -206,6 +206,13 @@
   }
 }
 
+/* "Open the form in another language": every link is a full-size tap target. */
+.am-empty ul a {
+  display: inline-flex;
+  min-height: 44px;
+  align-items: center;
+}
+
 /* Optional assistance, outside the form: it never blocks or gates the request. */
 .am-quote-assist {
   display: grid;
