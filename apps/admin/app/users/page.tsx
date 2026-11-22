@@ -3,7 +3,8 @@ import { isAdminProfile, loginRedirect, readBackOfficeSession } from "../lib/bac
 import { readAdminPartners, readAdminUsers, type AdminUser } from "../lib/admin-api";
 import { partnerStatusLabel } from "../lib/partner-messages";
 import { CreateUserForm } from "./user-action-forms";
-import { adminRoleOptions, userStatusOptions } from "./user-options";
+import { adminRoleOptions, userNoticeLabel, userStatusLabel, userStatusOptions } from "./user-options";
+import { ActiveFilters, hrefWithout, type ActiveFilterItem } from "../lib/ui/active-filters";
 import {
   Button,
   DataTable,
@@ -50,7 +51,7 @@ const columns: Array<DataTableColumn<AdminUser>> = [
     header: "Utilisateur",
     render: (user) => (
       <>
-        <a href={`/users/${encodeURIComponent(user.id)}`}><strong>{user.displayName}</strong></a>
+        <strong>{user.displayName}</strong>
         <div className="bo-description">{user.email}</div>
         {user.partnerTenantId ? <div className="bo-description">Tenant <span className="bo-ref">{user.partnerTenantId}</span></div> : null}
       </>
@@ -67,8 +68,7 @@ const columns: Array<DataTableColumn<AdminUser>> = [
     render: (user) => formatDate(user.lastLoginAt),
     sortable: true,
     sortValue: (user) => user.lastLoginAt ?? null
-  },
-  { key: "detail", header: "", align: "right", render: (user) => <Button href={`/users/${encodeURIComponent(user.id)}`} size="sm" variant="tertiary">Ouvrir</Button> }
+  }
 ];
 
 export default async function UserManagementPage({ searchParams }: UsersPageProps) {
@@ -102,6 +102,11 @@ export default async function UserManagementPage({ searchParams }: UsersPageProp
   });
   const rows = paginateItems(sortItems(filtered, columns, table.sort), table.page, table.pageSize);
   const activeFilters = [search, status, role].filter(Boolean).length;
+  const removeHref = (drop: string) => hrefWithout("/users", params, drop);
+  const activeFilterItems: ActiveFilterItem[] = [];
+  if (search) activeFilterItems.push({ label: "Recherche", value: search, removeHref: removeHref("search") });
+  if (status) activeFilterItems.push({ label: "Statut", value: userStatusLabel(status), removeHref: removeHref("status") });
+  if (role) activeFilterItems.push({ label: "Rôle", value: role, removeHref: removeHref("role") });
 
   return (
     <PageStack>
@@ -112,7 +117,7 @@ export default async function UserManagementPage({ searchParams }: UsersPageProp
         actions={<Button href="#creer-utilisateur">Créer un utilisateur</Button>}
       />
 
-      {notice ? <StateMessage>Action terminée: {notice}.</StateMessage> : null}
+      {notice ? <StateMessage>Action terminée : {userNoticeLabel(notice)}.</StateMessage> : null}
       {users.forbidden ? <StateMessage tone="danger">Accès refusé: votre rôle ne permet pas de lire les utilisateurs.</StateMessage> : null}
       {users.status === "error" ? <StateMessage tone="danger">Liste indisponible. {readFailureDetail(users.error)}</StateMessage> : null}
 
@@ -131,7 +136,7 @@ export default async function UserManagementPage({ searchParams }: UsersPageProp
         <Field id="users-status" label="Statut">
           <Select {...fieldControlProps("users-status")} name="status" defaultValue={status}>
             <option value="">Tous</option>
-            {userStatusOptions.map((option) => <option key={option} value={option}>{option}</option>)}
+            {userStatusOptions.map((option) => <option key={option} value={option}>{userStatusLabel(option)}</option>)}
           </Select>
         </Field>
         <Field id="users-role" label="Rôle">
@@ -141,6 +146,7 @@ export default async function UserManagementPage({ searchParams }: UsersPageProp
           </Select>
         </Field>
       </FilterBar>
+      <ActiveFilters items={activeFilterItems} />
 
       <DataTable
         columns={columns}
@@ -148,6 +154,8 @@ export default async function UserManagementPage({ searchParams }: UsersPageProp
         getKey={(user) => user.id}
         emptyLabel="Aucun utilisateur pour ces filtres."
         emptyDescription={activeFilters > 0 ? "Réinitialisez les filtres pour revoir tous les comptes." : "Créez le premier compte avec le formulaire ci-dessous."}
+        emptyAction={activeFilters > 0 ? <Button href="/users" variant="secondary">Réinitialiser les filtres</Button> : <Button href="#creer-utilisateur">Créer un utilisateur</Button>}
+        getRowHref={(user) => `/users/${encodeURIComponent(user.id)}`}
         aria-label="Liste utilisateurs"
         sort={table.sort}
         sortHref={table.sortHref}

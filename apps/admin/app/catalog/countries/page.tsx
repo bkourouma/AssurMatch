@@ -1,17 +1,23 @@
 import { redirect } from "next/navigation";
 import { readAdminCountries, readRegulatoryRegimes, type AdminCountryData } from "../../lib/admin-api";
 import { isAdminProfile, loginRedirect, readBackOfficeSession } from "../../lib/backoffice-auth";
-import { adminReadErrorMessage, flagLabel } from "../../lib/catalog-messages";
+import { CATALOG_STATUS_LABELS, COUNTRY_STATUS_OPTIONS, adminReadErrorMessage, flagLabel, labelWithCode } from "../../lib/catalog-messages";
+import { ActiveFilters, hrefWithout } from "../../lib/ui/active-filters";
 import {
   Badge,
   Button,
   Cluster,
   DataTable,
+  Field,
+  FilterBar,
+  Input,
   PageHeader,
   PageStack,
+  Select,
   StateMessage,
   StatusBadge,
   catalogStatusTones,
+  fieldControlProps,
   paginateItems,
   readTableParams,
   sortItems
@@ -20,6 +26,10 @@ import type { DataTableColumn } from "../../lib/ui/admin-ui";
 import { CreateCountryForm } from "../catalog-forms";
 
 const KEY_FLAGS = ["country_public_enabled", "country_quote_enabled", "country_comparison_enabled"] as const;
+
+function firstParam(value: string | string[] | undefined): string {
+  return Array.isArray(value) ? value[0] ?? "" : value ?? "";
+}
 
 export default async function CatalogCountriesPage({
   searchParams
@@ -35,6 +45,18 @@ export default async function CatalogCountriesPage({
   const [countries, regimes] = await Promise.all([readAdminCountries(), readRegulatoryRegimes()]);
   if (countries.unauthenticated) redirect(loginRedirect("/catalog/countries", countries.error ?? "session_required"));
   const regimeNames = new Map(regimes.data.map((regime) => [regime.id, regime.name]));
+  const query = firstParam(params.q).trim();
+  const statusParam = firstParam(params.status);
+  const statusFilter = (COUNTRY_STATUS_OPTIONS as readonly string[]).includes(statusParam) ? statusParam : "";
+  const filteredCountries = countries.data.filter((country) => {
+    if (statusFilter && country.status !== statusFilter) return false;
+    if (query && !`${country.name} ${country.isoCode}`.toLowerCase().includes(query.toLowerCase())) return false;
+    return true;
+  });
+  const activeFilterItems = [
+    ...(query ? [{ label: "Recherche", value: query, removeHref: hrefWithout("/catalog/countries", params, "q") }] : []),
+    ...(statusFilter ? [{ label: "Statut", value: labelWithCode(CATALOG_STATUS_LABELS, statusFilter), removeHref: hrefWithout("/catalog/countries", params, "status") }] : [])
+  ];
 
   const columns: Array<DataTableColumn<AdminCountryData>> = [
     {
@@ -77,7 +99,7 @@ export default async function CatalogCountriesPage({
   ];
 
   const table = readTableParams(params, { pathname: "/catalog/countries", defaultSort: { key: "iso", direction: "asc" }, pageSize: 25 });
-  const rows = paginateItems(sortItems(countries.data, columns, table.sort), table.page, table.pageSize);
+  const rows = paginateItems(sortItems(filteredCountries, columns, table.sort), table.page, table.pageSize);
   const regimeChoices = regimes.data.filter((regime) => regime.status !== "retired").map((regime) => ({ value: regime.id, label: `${regime.name} (${regime.key})` }));
 
   return (
@@ -93,23 +115,38 @@ export default async function CatalogCountriesPage({
       {countries.status === "error" ? <StateMessage tone="danger">{adminReadErrorMessage(countries.error)}</StateMessage> : null}
 
       {countries.status === "success" ? (
-        <DataTable
-          columns={columns}
-          items={rows}
-          getKey={(country) => country.id}
-          emptyLabel="Aucun pays dans votre périmètre."
-          emptyDescription="Créez un pays avec le formulaire ci-dessous ; il restera fermé au public."
-          aria-label="Pays du catalogue"
-          sort={table.sort}
-          sortHref={table.sortHref}
-          pagination={{
-            page: table.page,
-            pageSize: table.pageSize,
-            total: countries.data.length,
-            hrefFor: table.pageHref,
-            label: (from, to, total) => `${from}-${to} sur ${total} pays`
-          }}
-        />
+        <>
+          <FilterBar action="/catalog/countries" label="Filtres pays" submitLabel="Filtrer" resetLabel="Réinitialiser" resetHref="/catalog/countries" activeCount={activeFilterItems.length} autoSubmit>
+            <Field id="countries-q" label="Recherche" hint="Nom ou code ISO.">
+              <Input {...fieldControlProps("countries-q", { hint: "x" })} name="q" type="search" defaultValue={query} />
+            </Field>
+            <Field id="countries-status" label="Statut">
+              <Select {...fieldControlProps("countries-status")} name="status" defaultValue={statusFilter}>
+                <option value="">Tous</option>
+                {COUNTRY_STATUS_OPTIONS.map((option) => <option key={option} value={option}>{labelWithCode(CATALOG_STATUS_LABELS, option)}</option>)}
+              </Select>
+            </Field>
+          </FilterBar>
+          <ActiveFilters items={activeFilterItems} />
+          <DataTable
+            columns={columns}
+            items={rows}
+            getKey={(country) => country.id}
+            emptyLabel={activeFilterItems.length > 0 ? "Aucun pays pour ces filtres." : "Aucun pays dans votre périmètre."}
+            emptyDescription={activeFilterItems.length > 0 ? "Retirez un filtre ou réinitialisez la recherche." : "Créez un pays avec le formulaire ci-dessous ; il restera fermé au public."}
+            emptyAction={activeFilterItems.length > 0 ? <Button href="/catalog/countries" variant="secondary" size="sm">Réinitialiser les filtres</Button> : <Button href="#creer-pays" size="sm">Créer un pays</Button>}
+            aria-label="Pays du catalogue"
+            sort={table.sort}
+            sortHref={table.sortHref}
+            pagination={{
+              page: table.page,
+              pageSize: table.pageSize,
+              total: filteredCountries.length,
+              hrefFor: table.pageHref,
+              label: (from, to, total) => `${from}-${to} sur ${total} pays`
+            }}
+          />
+        </>
       ) : null}
 
       {countries.status === "success" ? <div id="creer-pays"><CreateCountryForm regimes={regimeChoices} /></div> : null}

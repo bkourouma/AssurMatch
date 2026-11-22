@@ -99,6 +99,23 @@ function offerTitle(offer: AdminOfferDetailView): string {
   return offer.published?.content.name ?? offer.pending?.content.name ?? offer.publicKey;
 }
 
+/** « Statut : X, prochaine étape : Y », derived from the same conditions as the action buttons. */
+function offerNextStep(offer: AdminOfferDetailView, roles: string[]): string {
+  const pendingStatus = offer.pending?.status;
+  const canDecide = canDecideOffer(roles);
+  if (offer.status === "withdrawn") return "aucune, l'offre est retirée.";
+  if (pendingStatus === "submitted") {
+    return canDecide ? "Valider et publier, ou Refuser la version soumise (conformité)." : "en attente de la décision de la conformité.";
+  }
+  if (offer.status === "suspended") return canDecide ? "Valider pour lever la suspension (conformité)." : "en attente de la conformité pour lever la suspension.";
+  if (pendingStatus === "draft") {
+    return canSubmitOffer(roles) ? "Soumettre à la conformité quand la complétude minimale est atteinte." : "soumission à la conformité par un préparateur.";
+  }
+  if (offer.status === "published") return "aucune action en attente. Modifier l'offre crée une nouvelle version à valider.";
+  if (offer.status === "expired") return "Modifier l'offre pour prolonger sa validité, puis la soumettre.";
+  return "Modifier l'offre, puis la soumettre à la conformité.";
+}
+
 export default async function AdminOfferPage({ params, searchParams }: OfferPageProps) {
   const { offerId } = await params;
   const query = searchParams ? await searchParams : {};
@@ -159,15 +176,19 @@ export default async function AdminOfferPage({ params, searchParams }: OfferPage
         }
       />
       {notice ? <Notice tone="success">{notice}</Notice> : null}
+      <p data-offer-next-step="true">
+        <strong>{`Statut : ${OFFER_STATUS_LABELS[offer.status] ?? offer.status}`}</strong>
+        {` - prochaine étape : ${offerNextStep(offer, roles)}`}
+      </p>
       {offer.suspensionReason ? <Notice tone="danger" title="Offre suspendue">{offer.suspensionReason}</Notice> : null}
       {offer.lastDecisionReason && !offer.suspensionReason ? <Notice tone="warning" title="Dernier motif communiqué au courtier">{offer.lastDecisionReason}</Notice> : null}
 
       <Card title="Actions" description="Validation, refus et suspension : conformité uniquement (compliance_admin, super_admin). Chaque action est auditée avec son motif.">
         <Cluster>
-          {canSubmitOffer(roles) && pending?.status === "draft" ? <OfferDecisionForm offerId={offer.id} action="submit" /> : null}
-          {canDecide && (pending?.status === "submitted" || offer.status === "suspended") ? <OfferDecisionForm offerId={offer.id} action="validate" /> : null}
-          {canDecide && pending?.status === "submitted" ? <OfferDecisionForm offerId={offer.id} action="reject" /> : null}
-          {canDecide && published && offer.status !== "suspended" && offer.status !== "withdrawn" ? <OfferDecisionForm offerId={offer.id} action="suspend" /> : null}
+          {canSubmitOffer(roles) && pending?.status === "draft" ? <OfferDecisionForm offerId={offer.id} action="submit" offerName={offerTitle(offer)} /> : null}
+          {canDecide && (pending?.status === "submitted" || offer.status === "suspended") ? <OfferDecisionForm offerId={offer.id} action="validate" offerName={offerTitle(offer)} /> : null}
+          {canDecide && pending?.status === "submitted" ? <OfferDecisionForm offerId={offer.id} action="reject" offerName={offerTitle(offer)} /> : null}
+          {canDecide && published && offer.status !== "suspended" && offer.status !== "withdrawn" ? <OfferDecisionForm offerId={offer.id} action="suspend" offerName={offerTitle(offer)} /> : null}
           {!canDecide ? <Badge tone="disabled">Décisions réservées à la conformité</Badge> : null}
         </Cluster>
       </Card>

@@ -9,7 +9,9 @@ import {
   documentKindLabel,
   formatVersionValue,
   versionFieldLabel,
+  PRODUCT_STATUS_OPTIONS,
   canApprovePublicActivation,
+  catalogNextStep,
   flagLabel,
   formatDate
 } from "../../../lib/catalog-messages";
@@ -72,13 +74,15 @@ export default async function CatalogProductDetailPage({ params }: ProductDetail
   const legalNotice = product.legalNotice ?? {};
   const requiredKinds = product.requiredDocumentKinds ?? [];
   const flagValue = (key: string) => product.flags[key as keyof typeof product.flags] === true;
+  const nextStatuses = PRODUCT_STATUS_OPTIONS.filter((status) => status !== product.status && (status !== "public" || canApproveCompliance));
+  const linkHint = product.countryIds.length === 0 ? " Aucun pays lié : liez-le depuis une fiche pays avant toute ouverture." : "";
 
   return (
     <PageStack>
       <PageHeader
         breadcrumb={[{ label: "Catalogue", href: "/catalog" }, { label: "Produits", href: "/catalog/products" }, { label: product.key }]}
         title={`${product.name} (${product.key})`}
-        description="Les flags globaux s'appliquent à tous les pays ; une suspension globale coupe le produit partout. Les flags par pays se règlent sur la fiche pays."
+        description={`${catalogNextStep("product", product.status, nextStatuses)}${linkHint} Les flags globaux s'appliquent à tous les pays ; une suspension globale coupe le produit partout.`}
         actions={<StatusBadge status={product.status} tones={catalogStatusTones} />}
       />
 

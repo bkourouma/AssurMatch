@@ -74,7 +74,7 @@ test("the offer page shows published vs pending, the diff, the history and compl
     "Version en cours",
     "offer.diff",
     "Historique des versions",
-    "canDecide && pending?.status === \"submitted\" ? <OfferDecisionForm offerId={offer.id} action=\"reject\" />",
+    "canDecide && pending?.status === \"submitted\" ? <OfferDecisionForm offerId={offer.id} action=\"reject\" offerName={offerTitle(offer)} />",
     "action=\"validate\"",
     "action=\"suspend\"",
     "action=\"submit\"",

@@ -9,12 +9,17 @@ import {
 } from "../lib/admin-api";
 import { isAdminProfile, loginRedirect, readBackOfficeSession } from "../lib/backoffice-auth";
 import {
+  CONSENT_PURPOSE_LABELS,
   CONSENT_PURPOSE_OPTIONS,
+  CONSENT_STATUS_LABELS,
   CONSENT_STATUS_OPTIONS,
+  LANGUAGE_LABELS,
   LANGUAGE_OPTIONS,
   adminReadErrorMessage,
-  formatDate
+  formatDate,
+  labelWithCode
 } from "../lib/catalog-messages";
+import { ActiveFilters, hrefWithout } from "../lib/ui/active-filters";
 import {
   Badge,
   Button,
@@ -101,6 +106,13 @@ export default async function ConsentTextsPage({
     { key: "publishedAt", header: "Publié le", render: (text) => formatDate(text.publishedAt), sortable: true, sortValue: (text) => text.publishedAt ?? null }
   ];
 
+  const activeFilterItems = [
+    ...(filters.countryId ? [{ label: "Pays", value: countryChoices.find((choice) => choice.value === filters.countryId)?.label ?? filters.countryId.slice(0, 8), removeHref: hrefWithout("/consent-texts", params, "countryId") }] : []),
+    ...(filters.productId ? [{ label: "Produit", value: productChoices.find((choice) => choice.value === filters.productId)?.label ?? filters.productId.slice(0, 8), removeHref: hrefWithout("/consent-texts", params, "productId") }] : []),
+    ...(filters.purpose ? [{ label: "Finalité", value: labelWithCode(CONSENT_PURPOSE_LABELS, filters.purpose), removeHref: hrefWithout("/consent-texts", params, "purpose") }] : []),
+    ...(filters.language ? [{ label: "Langue", value: labelWithCode(LANGUAGE_LABELS, filters.language), removeHref: hrefWithout("/consent-texts", params, "language") }] : []),
+    ...(filters.status ? [{ label: "Statut", value: labelWithCode(CONSENT_STATUS_LABELS, filters.status), removeHref: hrefWithout("/consent-texts", params, "status") }] : [])
+  ];
   const table = readTableParams(params, { pathname: "/consent-texts", defaultSort: { key: "publishedAt", direction: "desc" }, pageSize: 25 });
   const rows = paginateItems(sortItems(texts.data, columns, table.sort), table.page, table.pageSize);
 
@@ -144,27 +156,30 @@ export default async function ConsentTextsPage({
           <Field id="consent-purpose" label="Finalité">
             <Select {...fieldControlProps("consent-purpose")} name="purpose" defaultValue={filters.purpose}>
               <option value="">Toutes</option>
-              {CONSENT_PURPOSE_OPTIONS.map((option) => <option key={option} value={option}>{option}</option>)}
+              {CONSENT_PURPOSE_OPTIONS.map((option) => <option key={option} value={option}>{labelWithCode(CONSENT_PURPOSE_LABELS, option)}</option>)}
             </Select>
           </Field>
           <Field id="consent-language" label="Langue">
             <Select {...fieldControlProps("consent-language")} name="language" defaultValue={filters.language}>
               <option value="">Toutes</option>
-              {LANGUAGE_OPTIONS.map((option) => <option key={option} value={option}>{option}</option>)}
+              {LANGUAGE_OPTIONS.map((option) => <option key={option} value={option}>{labelWithCode(LANGUAGE_LABELS, option)}</option>)}
             </Select>
           </Field>
           <Field id="consent-status" label="Statut">
             <Select {...fieldControlProps("consent-status")} name="status" defaultValue={filters.status}>
               <option value="">Tous</option>
-              {CONSENT_STATUS_OPTIONS.map((option) => <option key={option} value={option}>{option}</option>)}
+              {CONSENT_STATUS_OPTIONS.map((option) => <option key={option} value={option}>{labelWithCode(CONSENT_STATUS_LABELS, option)}</option>)}
             </Select>
           </Field>
         </FilterBar>
+          <ActiveFilters items={activeFilterItems} />
           <DataTable
           columns={columns}
           items={rows}
           getKey={(text) => text.id}
-          emptyLabel="Aucun texte pour ces filtres : un produit sans consentement de transmission publié ne peut pas être ouvert au public."
+          emptyLabel={activeCount > 0 ? "Aucun texte pour ces filtres : un produit sans consentement de transmission publié ne peut pas être ouvert au public." : "Aucun texte de consentement : un produit sans consentement de transmission publié ne peut pas être ouvert au public."}
+          emptyDescription={activeCount > 0 ? "Retirez un filtre ou réinitialisez la recherche." : "Créez un brouillon avec le formulaire ci-dessous ; sa publication est réservée à la conformité."}
+          emptyAction={activeCount > 0 ? <Button href="/consent-texts" variant="secondary" size="sm">Réinitialiser les filtres</Button> : <Button href="#creer-texte" size="sm">Créer un texte</Button>}
           aria-label="Textes de consentement"
           sort={table.sort}
           sortHref={table.sortHref}

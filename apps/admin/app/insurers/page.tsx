@@ -4,12 +4,14 @@ import { isAdminProfile, loginRedirect, readBackOfficeSession } from "../lib/bac
 import { adminReadErrorMessage } from "../lib/catalog-messages";
 import { readAdminInsurers, type AdminInsurerView } from "../lib/lot4-offers-api";
 import { INSURER_STATUS_LABELS, INSURER_STATUS_OPTIONS, INSURER_STATUS_TONES } from "../lib/offer-messages";
+import { ActiveFilters, hrefWithout } from "../lib/ui/active-filters";
 import {
   Button,
   Card,
   DataTable,
   Field,
   FilterBar,
+  Input,
   Notice,
   PageHeader,
   PageStack,
@@ -79,8 +81,17 @@ export default async function AdminInsurersPage({
   ];
 
   const table = readTableParams(params, { pathname: "/insurers", defaultSort: { key: "name", direction: "asc" }, pageSize: 25 });
-  const rows = paginateItems(sortItems(insurers.data, columns, table.sort), table.page, table.pageSize);
-  const activeFilters = [countryId, status].filter((value) => value !== undefined).length;
+  const query = firstParam(params.q).trim();
+  const filteredInsurers = query
+    ? insurers.data.filter((insurer) => `${insurer.name} ${insurer.code} ${insurer.approvalNumber ?? ""}`.toLowerCase().includes(query.toLowerCase()))
+    : insurers.data;
+  const rows = paginateItems(sortItems(filteredInsurers, columns, table.sort), table.page, table.pageSize);
+  const activeFilterItems = [
+    ...(query ? [{ label: "Recherche", value: query, removeHref: hrefWithout("/insurers", params, "q") }] : []),
+    ...(countryId ? [{ label: "Pays", value: countryById.get(countryId)?.name ?? countryId.slice(0, 8), removeHref: hrefWithout("/insurers", params, "countryId") }] : []),
+    ...(status ? [{ label: "Statut", value: INSURER_STATUS_LABELS[status] ?? status, removeHref: hrefWithout("/insurers", params, "status") }] : [])
+  ];
+  const activeFilters = activeFilterItems.length;
 
   return (
     <PageStack>
@@ -93,7 +104,10 @@ export default async function AdminInsurersPage({
       />
       <Notice tone="info">Le code d&apos;un assureur est unique par pays et définitif. Chaque modification est auditée avec son motif.</Notice>
       <Card title="Référentiel des assureurs">
-        <FilterBar action="/insurers" label="Filtres assureurs" submitLabel="Filtrer" resetLabel="Réinitialiser" resetHref="/insurers" activeCount={activeFilters}>
+        <FilterBar action="/insurers" label="Filtres assureurs" submitLabel="Filtrer" resetLabel="Réinitialiser" resetHref="/insurers" activeCount={activeFilters} autoSubmit>
+          <Field id="insurers-q" label="Recherche" hint="Nom, code ou numéro d'agrément.">
+            <Input {...fieldControlProps("insurers-q", { hint: "x" })} name="q" type="search" defaultValue={query} />
+          </Field>
           <Field id="insurers-country" label="Pays">
             <Select {...fieldControlProps("insurers-country")} name="countryId" defaultValue={countryId ?? ""}>
               <option value="">Tous</option>
@@ -107,20 +121,23 @@ export default async function AdminInsurersPage({
             </Select>
           </Field>
         </FilterBar>
+        <ActiveFilters items={activeFilterItems} />
         {insurers.status === "forbidden" ? <StateMessage tone="danger">{adminReadErrorMessage("access_denied")}</StateMessage> : null}
         {insurers.status === "error" ? <StateMessage tone="danger">{adminReadErrorMessage(insurers.error)}</StateMessage> : null}
         <DataTable
           columns={columns}
           items={rows}
           getKey={(insurer) => insurer.id}
-          emptyLabel="Aucun assureur pour ces filtres."
+          emptyLabel={activeFilters > 0 ? "Aucun assureur pour ces filtres." : "Aucun assureur dans le référentiel."}
+          emptyDescription={activeFilters > 0 ? "Retirez un filtre ou réinitialisez la recherche." : "Ajoutez un assureur pour pouvoir le lier à une offre."}
+          emptyAction={activeFilters > 0 ? <Button href="/insurers" variant="secondary" size="sm">Réinitialiser les filtres</Button> : <Button href="/insurers/new" size="sm">Nouvel assureur</Button>}
           aria-label="Assureurs"
           sort={table.sort}
           sortHref={table.sortHref}
           pagination={{
             page: table.page,
             pageSize: table.pageSize,
-            total: insurers.data.length,
+            total: filteredInsurers.length,
             hrefFor: table.pageHref,
             label: (from, to, total) => `${from}-${to} sur ${total} assureurs`
           }}

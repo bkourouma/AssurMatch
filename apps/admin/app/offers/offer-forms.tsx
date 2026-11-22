@@ -35,6 +35,7 @@ import {
   Textarea,
   fieldControlProps
 } from "../lib/ui/admin-ui";
+import { UnsavedChangesNotice } from "../lib/ui/unsaved-changes-notice";
 
 /**
  * Spec 052 US2/US5: admin offer forms. Pattern A (`useActionState` + server actions of
@@ -162,7 +163,7 @@ function GuaranteesEditor({ base, initial, onChange }: { base: string; initial: 
             <Field id={`${base}-g-detail-${row.rowId}`} label="Détail">
               <Input {...fieldControlProps(`${base}-g-detail-${row.rowId}`)} name="guaranteeDetail" maxLength={300} defaultValue={row.detail} />
             </Field>
-            <Button type="button" size="sm" variant="tertiary" onClick={() => setRows((current) => current.filter((item) => item.rowId !== row.rowId))}>
+            <Button type="button" size="sm" variant="tertiary" aria-label={`Retirer la garantie ${index + 1}`} onClick={() => setRows((current) => current.filter((item) => item.rowId !== row.rowId))}>
               Retirer
             </Button>
           </Cluster>
@@ -370,7 +371,6 @@ export function CreateOfferForm({ partners, scopes, insurers }: {
   return (
     <Card title="Nouvelle offre pour un courtier" description="L'offre est créée en brouillon (version 1). Elle n'est publique qu'après validation par la conformité.">
       <Form action={formAction} ref={formRef} onInput={recompute} onChange={recompute} data-offer-form="create">
-        <OfferActionResult state={state} />
         <FormSection legend="Périmètre" description="Le courtier doit couvrir ce pays et ce produit (licence valide et autorisations actives).">
           <Field id={`${base}-partner`} label="Courtier" required>
             <Select {...fieldControlProps(`${base}-partner`, { required: true })} name="partnerTenantId" options={partners} placeholder="Choisir un courtier" defaultValue="" />
@@ -398,7 +398,9 @@ export function CreateOfferForm({ partners, scopes, insurers }: {
         />
         {offerType === "private" ? null : <SponsorshipFields base={base} content={undefined} />}
         <ReasonField id={`${base}-reason`} />
+        <OfferActionResult state={state} />
         <FormActions>
+          <UnsavedChangesNotice />
           <Button type="submit" pending={pending} pendingLabel="Création...">Créer le brouillon</Button>
         </FormActions>
       </Form>
@@ -435,7 +437,6 @@ export function EditOfferForm({ offer, content, hasPending, partners, insurers }
         : "Une nouvelle version est créée en brouillon ; la version publiée reste en ligne jusqu'à la validation de la nouvelle."}
     >
       <Form action={formAction} ref={formRef} onInput={recompute} onChange={recompute} data-offer-form="update">
-        <OfferActionResult state={state} />
         <input type="hidden" name="offerId" value={offer.id} />
         <input type="hidden" name="countryId" value={offer.countryId} />
         <input type="hidden" name="productId" value={offer.productId} />
@@ -461,7 +462,9 @@ export function EditOfferForm({ offer, content, hasPending, partners, insurers }
         />
         {offer.offerType === "private" ? null : <SponsorshipFields base={base} content={content} />}
         <ReasonField id={`${base}-reason`} />
+        <OfferActionResult state={state} />
         <FormActions>
+          <UnsavedChangesNotice />
           <Button type="submit" pending={pending} pendingLabel="Enregistrement...">Enregistrer la version</Button>
         </FormActions>
       </Form>
@@ -494,7 +497,7 @@ const DECISION_COPY = {
   }
 };
 
-export function OfferDecisionForm({ offerId, action }: { offerId: string; action: "submit" | "validate" | "reject" | "suspend" }) {
+export function OfferDecisionForm({ offerId, action, offerName }: { offerId: string; action: "submit" | "validate" | "reject" | "suspend"; offerName?: string | undefined }) {
   const [state, formAction] = useActionState(offerDecisionAction, initialState);
   const base = useId();
   const copy = DECISION_COPY[action];
@@ -505,8 +508,8 @@ export function OfferDecisionForm({ offerId, action }: { offerId: string; action
         <ConfirmDialog
           triggerLabel={copy.label}
           triggerVariant={copy.tone === "danger" ? "danger" : "primary"}
-          title={copy.label}
-          description={copy.description}
+          title={offerName ? `${copy.label} : ${offerName}` : copy.label}
+          description={offerName ? `Offre concernée : ${offerName}. ${copy.description}` : copy.description}
           confirmLabel={copy.label}
           cancelLabel="Annuler"
           tone={copy.tone}

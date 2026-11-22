@@ -2,17 +2,23 @@ import { redirect } from "next/navigation";
 import { readAdminCountries, readAdminProducts, type AdminProductData } from "../../lib/admin-api";
 import { readAdminProductCategories } from "../../lib/lot4-catalog-api";
 import { isAdminProfile, loginRedirect, readBackOfficeSession } from "../../lib/backoffice-auth";
-import { adminReadErrorMessage, flagLabel } from "../../lib/catalog-messages";
+import { CATALOG_STATUS_LABELS, PRODUCT_STATUS_OPTIONS, adminReadErrorMessage, flagLabel, labelWithCode } from "../../lib/catalog-messages";
+import { ActiveFilters, hrefWithout } from "../../lib/ui/active-filters";
 import {
   Badge,
   Button,
   Cluster,
   DataTable,
+  Field,
+  FilterBar,
+  Input,
   PageHeader,
   PageStack,
+  Select,
   StateMessage,
   StatusBadge,
   catalogStatusTones,
+  fieldControlProps,
   paginateItems,
   readTableParams,
   sortItems
@@ -21,6 +27,10 @@ import type { DataTableColumn } from "../../lib/ui/admin-ui";
 import { CreateProductForm } from "../catalog-forms";
 
 const KEY_FLAGS = ["product_public_enabled", "product_quote_enabled", "product_manual_review_required"] as const;
+
+function firstParam(value: string | string[] | undefined): string {
+  return Array.isArray(value) ? value[0] ?? "" : value ?? "";
+}
 
 export default async function CatalogProductsPage({
   searchParams
@@ -38,6 +48,18 @@ export default async function CatalogProductsPage({
   const activeCategories = categories.data.filter((category) => category.status === "active").map((category) => ({ value: category.id, label: category.name }));
   const categoryNames = new Map(categories.data.map((category) => [category.id, category.name]));
   const countryCodes = new Map(countries.data.map((country) => [country.id, country.isoCode]));
+  const query = firstParam(params.q).trim();
+  const statusParam = firstParam(params.status);
+  const statusFilter = (PRODUCT_STATUS_OPTIONS as readonly string[]).includes(statusParam) ? statusParam : "";
+  const filteredProducts = products.data.filter((product) => {
+    if (statusFilter && product.status !== statusFilter) return false;
+    if (query && !`${product.name} ${product.key}`.toLowerCase().includes(query.toLowerCase())) return false;
+    return true;
+  });
+  const activeFilterItems = [
+    ...(query ? [{ label: "Recherche", value: query, removeHref: hrefWithout("/catalog/products", params, "q") }] : []),
+    ...(statusFilter ? [{ label: "Statut", value: labelWithCode(CATALOG_STATUS_LABELS, statusFilter), removeHref: hrefWithout("/catalog/products", params, "status") }] : [])
+  ];
 
   const columns: Array<DataTableColumn<AdminProductData>> = [
     {
@@ -84,7 +106,7 @@ export default async function CatalogProductsPage({
   ];
 
   const table = readTableParams(params, { pathname: "/catalog/products", defaultSort: { key: "key", direction: "asc" }, pageSize: 25 });
-  const rows = paginateItems(sortItems(products.data, columns, table.sort), table.page, table.pageSize);
+  const rows = paginateItems(sortItems(filteredProducts, columns, table.sort), table.page, table.pageSize);
 
   return (
     <PageStack>
@@ -99,23 +121,38 @@ export default async function CatalogProductsPage({
       {products.status === "error" ? <StateMessage tone="danger">{adminReadErrorMessage(products.error)}</StateMessage> : null}
 
       {products.status === "success" ? (
-        <DataTable
-          columns={columns}
-          items={rows}
-          getKey={(product) => product.id}
-          emptyLabel="Aucun produit."
-          emptyDescription="Créez un produit avec le formulaire ci-dessous, puis liez-le à un pays depuis la fiche pays."
-          aria-label="Produits du catalogue"
-          sort={table.sort}
-          sortHref={table.sortHref}
-          pagination={{
-            page: table.page,
-            pageSize: table.pageSize,
-            total: products.data.length,
-            hrefFor: table.pageHref,
-            label: (from, to, total) => `${from}-${to} sur ${total} produits`
-          }}
-        />
+        <>
+          <FilterBar action="/catalog/products" label="Filtres produits" submitLabel="Filtrer" resetLabel="Réinitialiser" resetHref="/catalog/products" activeCount={activeFilterItems.length} autoSubmit>
+            <Field id="products-q" label="Recherche" hint="Nom ou clé du produit.">
+              <Input {...fieldControlProps("products-q", { hint: "x" })} name="q" type="search" defaultValue={query} />
+            </Field>
+            <Field id="products-status" label="Statut">
+              <Select {...fieldControlProps("products-status")} name="status" defaultValue={statusFilter}>
+                <option value="">Tous</option>
+                {PRODUCT_STATUS_OPTIONS.map((option) => <option key={option} value={option}>{labelWithCode(CATALOG_STATUS_LABELS, option)}</option>)}
+              </Select>
+            </Field>
+          </FilterBar>
+          <ActiveFilters items={activeFilterItems} />
+          <DataTable
+            columns={columns}
+            items={rows}
+            getKey={(product) => product.id}
+            emptyLabel={activeFilterItems.length > 0 ? "Aucun produit pour ces filtres." : "Aucun produit."}
+            emptyDescription={activeFilterItems.length > 0 ? "Retirez un filtre ou réinitialisez la recherche." : "Créez un produit avec le formulaire ci-dessous, puis liez-le à un pays depuis la fiche pays."}
+            emptyAction={activeFilterItems.length > 0 ? <Button href="/catalog/products" variant="secondary" size="sm">Réinitialiser les filtres</Button> : <Button href="#creer-produit" size="sm">Créer un produit</Button>}
+            aria-label="Produits du catalogue"
+            sort={table.sort}
+            sortHref={table.sortHref}
+            pagination={{
+              page: table.page,
+              pageSize: table.pageSize,
+              total: filteredProducts.length,
+              hrefFor: table.pageHref,
+              label: (from, to, total) => `${from}-${to} sur ${total} produits`
+            }}
+          />
+        </>
       ) : null}
 
       {products.status === "success" ? <div id="creer-produit"><CreateProductForm categories={activeCategories} /></div> : null}

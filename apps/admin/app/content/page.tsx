@@ -8,7 +8,8 @@ import {
   contentDate,
   contentKindLabel,
   contentLocaleLabel,
-  contentReadErrorMessage
+  contentReadErrorMessage,
+  contentStatusLabel
 } from "../lib/content-messages";
 import {
   Button,
@@ -28,6 +29,7 @@ import {
   sortItems
 } from "../lib/ui/admin-ui";
 import type { DataTableColumn } from "../lib/ui/admin-ui";
+import { ActiveFilters, hrefWithout, type ActiveFilterItem } from "../lib/ui/active-filters";
 
 function firstParam(value: string | string[] | undefined): string {
   return Array.isArray(value) ? value[0] ?? "" : value ?? "";
@@ -37,7 +39,7 @@ const columns: Array<DataTableColumn<ContentEntryView>> = [
   {
     key: "label",
     header: "Contenu",
-    render: (entry) => <a href={`/content/${encodeURIComponent(entry.id)}`}>{entry.label}</a>,
+    render: (entry) => <strong>{entry.label}</strong>,
     sortable: true,
     sortValue: (entry) => entry.label
   },
@@ -76,6 +78,14 @@ export default async function AdminContentPage({
     })
   ]);
   const canEdit = capabilities.status === "success" && capabilities.data.canEdit;
+
+  const removeHref = (drop: string) => hrefWithout("/content", params, drop);
+  const activeFilterItems: ActiveFilterItem[] = [];
+  if (kind) activeFilterItems.push({ label: "Type", value: contentKindLabel(kind), removeHref: removeHref("kind") });
+  if (locale) activeFilterItems.push({ label: "Langue", value: contentLocaleLabel(locale), removeHref: removeHref("locale") });
+  if (status) activeFilterItems.push({ label: "Statut", value: contentStatusLabel(status), removeHref: removeHref("status") });
+  if (countryCode) activeFilterItems.push({ label: "Pays", value: countryCode, removeHref: removeHref("countryCode") });
+  const hasFilters = activeFilterItems.length > 0;
 
   const table = readTableParams(params, {
     pathname: "/content",
@@ -131,11 +141,15 @@ export default async function AdminContentPage({
               <Input {...fieldControlProps("content-country")} name="countryCode" defaultValue={countryCode} maxLength={2} placeholder="SN" />
             </Field>
           </FilterBar>
+          <ActiveFilters items={activeFilterItems} />
           <DataTable
             columns={columns}
             items={rows}
             getKey={(entry) => entry.id}
-            emptyLabel="Aucun contenu : le site public affiche son contenu d'origine."
+            emptyLabel={hasFilters ? "Aucun contenu pour ces filtres." : "Aucun contenu : le site public affiche son contenu d'origine."}
+            emptyDescription={hasFilters ? "Réinitialisez les filtres pour revoir toutes les versions." : canEdit ? "Rédigez un premier brouillon : il ne sera affiché qu'après soumission et approbation d'un second acteur." : undefined}
+            emptyAction={hasFilters ? <Button href="/content" variant="secondary">Réinitialiser les filtres</Button> : canEdit ? <Button href="/content/new">Nouveau contenu</Button> : undefined}
+            getRowHref={(entry) => `/content/${encodeURIComponent(entry.id)}`}
             aria-label="Versions de contenu"
             sort={table.sort}
             sortHref={table.sortHref}

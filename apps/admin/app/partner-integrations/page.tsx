@@ -1,6 +1,7 @@
 import { readAdminPartners, readPartnerIntegrations } from "../lib/admin-api";
 import {
   Badge,
+  Button,
   Card,
   Cluster,
   DataTable,
@@ -24,9 +25,22 @@ import {
 } from "./integration-forms";
 import { readFailureDetail } from "../lib/auth-error-messages";
 
+/** Current state of a webhook endpoint and what to do next, worded for the operator (it decides nothing). */
+const ENDPOINT_NEXT_STEP: Record<string, string> = {
+  disabled: "créé désactivé, aucun envoi. Activer l'endpoint puis envoyer un événement de test.",
+  active: "envois autorisés (si le flag partner_webhooks_enabled est ouvert). Envoyer un événement de test pour vérifier.",
+  suspended: "envois en pause. Réactiver l'endpoint."
+};
+
 export default async function PartnerIntegrationsPage() {
   const [integrations, partnersState] = await Promise.all([readPartnerIntegrations(), readAdminPartners()]);
   const partners = (partnersState.status === "success" ? partnersState.data : []).map((partner) => ({ id: partner.id, label: partner.tradeName ?? partner.legalName }));
+  const partnerLabels = new Map(partners.map((partner) => [partner.id, partner.label]));
+  /** Partner name when the list is readable, the raw tenant id otherwise. */
+  const partnerCell = (partnerTenantId: string) => {
+    const name = partnerLabels.get(partnerTenantId);
+    return name ? <><strong>{name}</strong> <span className="bo-ref">{partnerTenantId.slice(0, 8)}</span></> : <span className="bo-ref">{partnerTenantId}</span>;
+  };
 
   return (
     <PageStack>
@@ -34,6 +48,7 @@ export default async function PartnerIntegrationsPage() {
         breadcrumb={[{ label: "Partenaires" }, { label: "Intégrations" }]}
         title="Partner API et webhooks"
         description="Gestion des clés API hachées, des endpoints webhook (désactivés par défaut, flags partner_api_enabled et partner_webhooks_enabled fermés par défaut) et journaux de livraison metadata-only. Chaque action exige un motif audité."
+        actions={integrations.status === "success" ? <Button href="#creer-cle-api">Créer une clé API</Button> : null}
       />
 
       {integrations.unauthenticated ? <StateMessage tone="danger">Session admin requise.</StateMessage> : null}
@@ -71,66 +86,90 @@ export default async function PartnerIntegrationsPage() {
 
           {partners.length === 0 ? <StateMessage tone="warning">Liste des partenaires indisponible : création impossible pour le moment.</StateMessage> : null}
 
+          <nav aria-label="Sections de la page">
+            <a href="#creer-cle-api">Créer une clé API</a> · <a href="#cles-api">Clés API</a> · <a href="#allow-list">Allow-list webhook</a> · <a href="#endpoints">Endpoints webhook</a> · <a href="#livraisons">Livraisons webhook</a>
+          </nav>
+
           <Grid columns="two">
-            <Card title="Créer une clé API">
-              <CreateApiKeyForm partners={partners} />
-            </Card>
-            <Card title="Créer un endpoint webhook">
-              <CreateWebhookEndpointForm partners={partners} />
-            </Card>
+            <div id="creer-cle-api">
+              <Card title="Créer une clé API" description="La clé est créée active ; la clé complète n'est montrée qu'à la création.">
+                <CreateApiKeyForm partners={partners} />
+              </Card>
+            </div>
+            <div id="creer-endpoint">
+              <Card title="Créer un endpoint webhook" description="À faire après l'ajout de l'origine dans l'allow-list : l'endpoint est créé désactivé.">
+                <CreateWebhookEndpointForm partners={partners} />
+              </Card>
+            </div>
           </Grid>
 
+          <div id="cles-api"></div>
           <Card title="Clés API">
             <DataTable
               columns={[
                 { key: "name", header: "Nom", render: (key) => <strong>{key.name}</strong> },
-                { key: "partner", header: "Partenaire", render: (key) => <span className="bo-ref">{key.partnerTenantId}</span> },
+                { key: "partner", header: "Partenaire", render: (key) => partnerCell(key.partnerTenantId) },
                 { key: "prefix", header: "Préfixe", render: (key) => <span className="bo-ref">{key.keyPrefix}</span> },
                 { key: "scopes", header: "Scopes", render: (key) => key.scopes.join(", ") },
                 { key: "status", header: "Statut", render: (key) => <StatusBadge status={key.status} tones={integrationStatusTones} /> },
-                { key: "actions", header: "Actions", render: (key) => key.status === "active" ? <RevokeApiKeyForm keyId={key.id} /> : "-" }
+                { key: "actions", header: "Actions", render: (key) => key.status === "active" ? <RevokeApiKeyForm keyId={key.id} keyLabel={`« ${key.name} » (${key.keyPrefix})`} /> : "-" }
               ]}
               items={integrations.data.apiKeys.items}
               getKey={(key) => key.id}
               emptyLabel="Aucune clé API partenaire configurée."
+              emptyDescription="Créez une clé pour donner un accès Partner API à un partenaire."
+              emptyAction={<Button href="#creer-cle-api" variant="secondary" size="sm">Créer une clé API</Button>}
               aria-label="Clés API partenaires"
             />
           </Card>
 
-          <Card title="Ajouter une origine autorisée">
+          <Card title="Ajouter une origine autorisée" description="À faire avant de créer un endpoint : l'origine de son URL doit figurer dans l'allow-list du partenaire.">
             <CreateAllowlistForm partners={partners} />
           </Card>
 
+          <div id="allow-list"></div>
           <Card title="Allow-list webhook">
             <DataTable
               columns={[
                 { key: "origin", header: "Origine", render: (entry) => <span className="bo-ref">{entry.origin}</span> },
                 { key: "path", header: "Chemin", render: (entry) => entry.path ? <span className="bo-ref">{entry.path}</span> : "tous chemins" },
-                { key: "partner", header: "Partenaire", render: (entry) => <span className="bo-ref">{entry.partnerTenantId}</span> },
+                { key: "partner", header: "Partenaire", render: (entry) => partnerCell(entry.partnerTenantId) },
                 { key: "status", header: "Statut", render: (entry) => <StatusBadge status={entry.status} tones={integrationStatusTones} /> },
-                { key: "actions", header: "Actions", render: (entry) => entry.status === "active" ? <RevokeAllowlistForm entryId={entry.id} /> : "-" }
+                { key: "actions", header: "Actions", render: (entry) => entry.status === "active" ? <RevokeAllowlistForm entryId={entry.id} entryLabel={`${entry.origin}${entry.path ?? ""} (${partnerLabels.get(entry.partnerTenantId) ?? entry.partnerTenantId.slice(0, 8)})`} /> : "-" }
               ]}
               items={integrations.data.webhookAllowlist.items}
               getKey={(entry) => entry.id}
               emptyLabel="Aucune origine webhook autorisée."
+              emptyDescription="Ajoutez d'abord l'origine HTTPS du partenaire, puis créez son endpoint."
+              emptyAction={<Button href="#creer-endpoint" variant="secondary" size="sm">Créer un endpoint webhook</Button>}
               aria-label="Allow-list webhook"
             />
           </Card>
 
+          <div id="endpoints"></div>
           <Card title="Endpoints webhook">
             <DataTable
               columns={[
                 { key: "url", header: "URL", render: (endpoint) => <span className="bo-ref">{endpoint.url}</span> },
-                { key: "partner", header: "Partenaire", render: (endpoint) => <span className="bo-ref">{endpoint.partnerTenantId}</span> },
+                { key: "partner", header: "Partenaire", render: (endpoint) => partnerCell(endpoint.partnerTenantId) },
                 { key: "events", header: "Événements", render: (endpoint) => endpoint.eventTypes.join(", ") },
                 { key: "secret", header: "Secret", render: () => <Badge tone="success">configuré</Badge> },
-                { key: "status", header: "Statut", render: (endpoint) => <StatusBadge status={endpoint.status} tones={integrationStatusTones} /> },
+                {
+                  key: "status",
+                  header: "Statut",
+                  render: (endpoint) => (
+                    <>
+                      <StatusBadge status={endpoint.status} tones={integrationStatusTones} />
+                      {ENDPOINT_NEXT_STEP[endpoint.status] ? <div className="bo-description">Prochaine étape : {ENDPOINT_NEXT_STEP[endpoint.status]}</div> : null}
+                    </>
+                  )
+                },
                 {
                   key: "actions",
                   header: "Actions",
                   render: (endpoint) => (
                     <>
-                      <EndpointStatusForm endpointId={endpoint.id} status={endpoint.status} />
+                      <EndpointStatusForm endpointId={endpoint.id} status={endpoint.status} endpointLabel={endpoint.url} />
                       <TestEventForm endpointId={endpoint.id} />
                     </>
                   )
@@ -139,15 +178,18 @@ export default async function PartnerIntegrationsPage() {
               items={integrations.data.webhookEndpoints.items}
               getKey={(endpoint) => endpoint.id}
               emptyLabel="Aucun endpoint webhook configuré."
+              emptyDescription="Créez un endpoint une fois l'origine du partenaire ajoutée à l'allow-list."
+              emptyAction={<Button href="#creer-endpoint" variant="secondary" size="sm">Créer un endpoint webhook</Button>}
               aria-label="Endpoints webhook"
             />
           </Card>
 
+          <div id="livraisons"></div>
           <Card title="Livraisons webhook">
             <DataTable
               columns={[
                 { key: "event", header: "Événement", render: (delivery) => <span className="bo-ref">{delivery.eventType}</span> },
-                { key: "partner", header: "Partenaire", render: (delivery) => <span className="bo-ref">{delivery.partnerTenantId}</span> },
+                { key: "partner", header: "Partenaire", render: (delivery) => partnerCell(delivery.partnerTenantId) },
                 { key: "status", header: "Statut", render: (delivery) => <StatusBadge status={delivery.status} tones={integrationStatusTones} /> },
                 { key: "attempts", header: "Tentatives", render: (delivery) => delivery.attemptCount, numeric: true, align: "right" },
                 { key: "idempotency", header: "Idempotence", render: (delivery) => <span className="bo-ref">{delivery.idempotencyKey}</span> }
@@ -155,6 +197,7 @@ export default async function PartnerIntegrationsPage() {
               items={integrations.data.webhookDeliveries.items}
               getKey={(delivery) => delivery.id}
               emptyLabel="Aucune livraison webhook journalisée."
+              emptyDescription="Les livraisons apparaissent dès qu'un endpoint actif reçoit un événement."
               aria-label="Livraisons webhook"
             />
           </Card>
