@@ -2,7 +2,7 @@ import { expect, request as playwrightRequest, type Browser, type Page } from "@
 import { openAs, type BackOfficeAccount } from "./backoffice";
 import { e2eEnv } from "./env";
 import { loadWorld, saveWorld, type BrokerWorld } from "./journey-state";
-import { card } from "./ui";
+import { card, starterActionsCard } from "./ui";
 import { appPage, provisionBroker, publishOffer, requestQuote } from "./world";
 
 // Spec 065 / lot 062: building blocks of recos-062-messaging.spec.ts (broker <-> visitor messaging).
@@ -82,7 +82,8 @@ async function locateAssignment(page: Page, account: BackOfficeAccount, referenc
 /** Starter: finds the lead and presses "Accepter" (idempotent: nothing to do when already accepted). */
 async function acceptStarterLead(page: Page, account: BackOfficeAccount, assignmentId: string): Promise<void> {
   await openAs(page, account, `/leads/${assignmentId}`);
-  const actions = card(page, "Actions Starter");
+  // Wait for the streamed content first: count() does not wait, and the loading skeleton has no button.
+  const actions = await starterActionsCard(page);
   const accept = actions.getByRole("button", { name: "Accepter", exact: true });
   if ((await accept.count()) === 0) return;
   await accept.click();

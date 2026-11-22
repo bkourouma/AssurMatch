@@ -6,7 +6,7 @@ import type { BackOfficeAccount } from "./backoffice";
 import { openAs } from "./edge-p5p7-login";
 import { e2eEnv } from "./env";
 import type { BrokerWorld } from "./journey-state";
-import { card } from "./ui";
+import { starterActionsCard } from "./ui";
 import { findAssignmentId, provisionBroker, publishOffer, requestQuote, type VisitorQuote } from "./world";
 
 // Lot 4 (edge cases of phases 5 to 7): shared building blocks of tests/e2e/edge-p5-p7-*.spec.ts.
@@ -168,7 +168,8 @@ export async function createLead(browser: Browser, firm: BrokerWorld, label: str
 /** Starter lead page: "Accepter" (nothing to do when already accepted). */
 export async function acceptStarterLead(page: Page, owner: BackOfficeAccount, assignmentId: string): Promise<void> {
   await openAs(page, owner, `/leads/${assignmentId}`);
-  const actions = card(page, "Actions Starter");
+  // Wait for the streamed content first: count() does not wait, and the loading skeleton has no button.
+  const actions = await starterActionsCard(page);
   const accept = actions.getByRole("button", { name: "Accepter", exact: true });
   if ((await accept.count()) === 0) return;
   await accept.click();

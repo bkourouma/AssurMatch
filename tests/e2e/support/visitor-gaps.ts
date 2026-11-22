@@ -194,6 +194,9 @@ export async function brokerSeesLead(page: Page, account: BackOfficeAccount, ref
   // One page is reused for several brokers: drop the previous session, or openAs keeps the previous broker logged in.
   await page.context().clearCookies();
   await openAs(page, account, "/leads");
+  // The list streams behind a loading skeleton: without this wait, count() can read the skeleton and
+  // `expectBrokerLacksLead` would pass whatever the broker holds.
+  await expect(page.getByRole("heading", { level: 1, name: "Leads assignés" })).toBeVisible({ timeout: 30_000 });
   return (await page.getByRole("row").filter({ hasText: reference }).count()) > 0;
 }
 

@@ -63,6 +63,21 @@ export function card(scope: Page | Locator, title: string | RegExp): Locator {
   return heading.first().locator("xpath=ancestor::*[contains(concat(' ', normalize-space(@class), ' '), ' bo-card ')][1]");
 }
 
+/**
+ * The "Actions Starter" card of a Starter lead page, once the page content is SHOWN.
+ *
+ * The lead routes stream behind a `loading.tsx` skeleton: when `goto` resolves (load event) or the URL
+ * changes, the real content can still sit in React's hidden streaming container (`<div hidden id="S:0">`)
+ * for a few hundred milliseconds. A non-waiting probe such as `count()` then sees no button at all, so
+ * an idempotent "accept if still acceptable" step would silently do nothing. The card is rendered for
+ * every lead the broker can read, so waiting for it to be visible is a safe "page is ready" signal.
+ */
+export async function starterActionsCard(page: Page): Promise<Locator> {
+  const actions = card(page, "Actions Starter");
+  await expect(actions, "the lead page content is shown (not the loading skeleton)").toBeVisible({ timeout: 30_000 });
+  return actions;
+}
+
 /** Table row (DataTable) containing every given cell text. */
 export function rowWith(scope: Page | Locator, ...cells: Array<string | RegExp>): Locator {
   let row = scope.getByRole("row");

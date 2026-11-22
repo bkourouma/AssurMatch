@@ -7,7 +7,7 @@ import { loadJourneyState, requireState, requireWorld, type BrokerWorld } from "
 import { extractLink, searchMessages, waitForMail } from "./support/mailpit";
 import { reviewQuote } from "./support/quote-form";
 import { publicCall } from "./support/recos-062b";
-import { card, uniqueSuffix } from "./support/ui";
+import { card, starterActionsCard, uniqueSuffix } from "./support/ui";
 import {
   consentAndSend,
   expectBrokerHasLead,
@@ -337,7 +337,8 @@ test("VG-06 relance « documents manquants » (lecture seule) : demande ouverte,
   await openAs(broker, y.owner, "/leads");
   await broker.getByRole("row").filter({ hasText: reference }).getByRole("link").first().click();
   await broker.waitForURL(/\/leads\/[0-9a-f-]{36}/u);
-  const actions = card(broker, "Actions Starter");
+  // Wait for the streamed content first: count() does not wait, and the loading skeleton has no button.
+  const actions = await starterActionsCard(broker);
   const accept = actions.getByRole("button", { name: "Accepter", exact: true });
   if ((await accept.count()) > 0) {
     await accept.click();
