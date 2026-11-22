@@ -116,7 +116,7 @@ export default async function AdminDashboardPage() {
             <li><a href="/partners?status=active">Partenaires actifs</a> : {data.partners.active}</li>
             <li>Partenaires inactifs : {data.partners.inactive}</li>
             <li><a href="/offers?status=expired">Offres expirées encore référencées</a> : {data.expiredOffersStillReferenced}</li>
-            <li><a href="/partners?expiring=30">Licences expirant dans 30 jours</a> : {data.licenseAlerts.expiringSoon}</li>
+            <li><a href="/partners?expiring=30">Licences expirant dans 30 jours</a>: {data.licenseAlerts.expiringSoon}</li>
           </ul>
         </Card>
       </Grid>

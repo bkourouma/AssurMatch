@@ -395,7 +395,7 @@ export default async function BrokerLeadDetailPage({
                     <ul className={leadStyles.unavailable}>
                       <li>
                         <Badge tone="disabled">Clôturer</Badge>
-                        <span className={leadStyles.hint}>Disponible une fois le lead accepté.</span>
+                        <span className={leadStyles.hint}>Disponible après l'acceptation du lead.</span>
                       </li>
                     </ul>
                   )}
