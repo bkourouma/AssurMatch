@@ -22,6 +22,7 @@ import type { ConversationChannel } from "../conversation-vocabulary";
 import { Badge, Card, ConfirmDialog, DescriptionList, Field, Input, Notice, Stack, Textarea, TenantWriteGuard } from "./broker-ui";
 import { ConversationForm } from "./conversation-form";
 import { formatDate } from "./broker-view-models";
+import leadStyles from "./lead-screens.module.css";
 
 export interface ConversationPanelProps {
   channel: ConversationChannel;
@@ -82,7 +83,11 @@ export function ConversationPanel({ channel, leadAssignmentId, conversation, can
     <Stack>
       {conversation.notice ? <Notice tone="info" title="Échange non contractuel">{conversation.notice}</Notice> : null}
       {banner ? <Notice tone="warning" title="Lecture seule">{banner}</Notice> : null}
-      {conversation.unreadCount > 0 ? <p><Badge tone="info">{conversation.unreadCount} nouveau(x) message(s) du visiteur</Badge></p> : null}
+      {conversation.unreadCount > 0 ? (
+        <p>
+          <Badge tone="info">{conversation.unreadCount === 1 ? "1 nouveau message du visiteur" : `${conversation.unreadCount} nouveaux messages du visiteur`}</Badge>
+        </p>
+      ) : null}
       {conversation.nextCursor ? <Notice tone="info">Seuls les messages les plus récents sont affichés.</Notice> : null}
       {messages.length > 0 ? (
         <ol aria-label="Fil de la conversation" style={{ listStyle: "none", margin: 0, padding: 0, display: "grid", gap: "var(--bo-space-3, 0.75rem)" }}>
@@ -93,16 +98,19 @@ export function ConversationPanel({ channel, leadAssignmentId, conversation, can
           ))}
         </ol>
       ) : (
-        <p>Aucun message échangé avec le visiteur pour ce lead.</p>
+        <>
+          <p>Aucun message échangé avec le visiteur pour ce lead.</p>
+          {!banner ? <p className={leadStyles.hint}>Écrivez-lui ci-dessous : il est prévenu par e-mail et lit votre message dans son espace de suivi.</p> : null}
+        </>
       )}
       {tenantReadOnly || (canMutate && conversation.canSend) ? (
         <TenantWriteGuard readOnly={tenantReadOnly}>
           <ConversationForm action={action} ariaLabel="Nouveau message au visiteur" submitLabel="Envoyer le message" pendingLabel="Envoi en cours…" idempotent>
             <Field id={`${fieldId}-body`} label="Message au visiteur" required requiredLabel="obligatoire" hint={`${LEAD_MESSAGE_BODY_MAX} caractères au maximum. Aucune promesse de couverture ni de prix ferme.`}>
-              <Textarea id={`${fieldId}-body`} name="body" required maxLength={LEAD_MESSAGE_BODY_MAX} rows={5} aria-label="Texte du message" />
+              <Textarea id={`${fieldId}-body`} name="body" required maxLength={LEAD_MESSAGE_BODY_MAX} rows={5} aria-describedby={`${fieldId}-body-hint`} />
             </Field>
             <Field id={`${fieldId}-files`} label="Pièces jointes facultatives" hint={`${LEAD_MESSAGE_ATTACHMENTS_MAX} fichiers au maximum, PDF, JPEG ou PNG, 5 Mo chacun, analysés par l'antivirus.`}>
-              <Input id={`${fieldId}-files`} name="files" type="file" multiple accept={LEAD_MESSAGE_ATTACHMENT_MIME_TYPES.join(",")} aria-label="Pièces jointes du message" />
+              <Input id={`${fieldId}-files`} name="files" type="file" multiple accept={LEAD_MESSAGE_ATTACHMENT_MIME_TYPES.join(",")} aria-describedby={`${fieldId}-files-hint`} />
             </Field>
           </ConversationForm>
         </TenantWriteGuard>
@@ -190,13 +198,13 @@ export function DocumentRequestsPanel({ channel, leadAssignmentId, data, canMuta
         <TenantWriteGuard readOnly={tenantReadOnly}>
           <ConversationForm action={action} ariaLabel="Nouvelle demande de document" submitLabel="Demander le document au visiteur" pendingLabel="Envoi en cours…">
             <Field id={`${fieldId}-label`} label="Document demandé" required requiredLabel="obligatoire" hint={`${DOCUMENT_REQUEST_LABEL_MAX} caractères au maximum. Exemple : carte grise du véhicule.`}>
-              <Input id={`${fieldId}-label`} name="label" required maxLength={DOCUMENT_REQUEST_LABEL_MAX} aria-label="Intitulé du document demandé" />
+              <Input id={`${fieldId}-label`} name="label" required maxLength={DOCUMENT_REQUEST_LABEL_MAX} aria-describedby={`${fieldId}-label-hint`} />
             </Field>
             <Field id={`${fieldId}-note`} label="Précision pour le visiteur" hint={`${DOCUMENT_REQUEST_NOTE_MAX} caractères au maximum. Ne demandez que le nécessaire.`}>
-              <Textarea id={`${fieldId}-note`} name="note" maxLength={DOCUMENT_REQUEST_NOTE_MAX} rows={3} aria-label="Précision sur le document demandé" />
+              <Textarea id={`${fieldId}-note`} name="note" maxLength={DOCUMENT_REQUEST_NOTE_MAX} rows={3} aria-describedby={`${fieldId}-note-hint`} />
             </Field>
-            <Field id={`${fieldId}-due`} label="À fournir avant le" hint="Facultatif.">
-              <Input id={`${fieldId}-due`} name="dueAt" type="date" min={minDate} aria-label="Date limite de fourniture" />
+            <Field id={`${fieldId}-due`} label="À fournir avant le" hint="Facultatif. Au plus tôt demain.">
+              <Input id={`${fieldId}-due`} name="dueAt" type="date" min={minDate} aria-describedby={`${fieldId}-due-hint`} />
             </Field>
           </ConversationForm>
         </TenantWriteGuard>

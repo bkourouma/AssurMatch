@@ -100,6 +100,19 @@ export const TEAM_INVITE_ROLE_OPTIONS = [
   { value: "broker_read_only", label: "Lecture seule" }
 ] as const;
 
+/** What each assignable role can do, in plain words (mirrors the role matrix of `broker-permissions.ts`). */
+export const TEAM_ROLE_DESCRIPTIONS: Record<string, string> = {
+  broker_manager: "Traite les leads (et le CRM selon le plan), gère les offres, la société et l'équipe.",
+  broker_agent: "Traite les leads et ses dossiers CRM assignés ; consulte les offres, la société et l'équipe sans les modifier.",
+  broker_read_only: "Consulte uniquement (leads, offres, société, équipe) : aucune modification possible."
+};
+
+/** Why a row of the team table offers no action (shown instead of an empty cell). */
+export const TEAM_ACTION_UNAVAILABLE_REASONS = {
+  self: "Votre propre accès : non modifiable par vous-même.",
+  owner: "Propriétaire : seul un propriétaire peut agir sur ce compte."
+} as const;
+
 export const TEAM_STATUS_LABELS: Record<string, string> = {
   invited: "Invité (activation en attente)",
   active: "Actif",
@@ -150,6 +163,28 @@ export function selfServiceErrorMessage(result: { status: number; code?: string 
   if (result.status === 422) return "Demande refusée : vérifiez les valeurs saisies.";
   if (result.status === 0) return "API indisponible : réessayez dans quelques instants.";
   return AUTH_MESSAGES.fallback;
+}
+
+/** Licences expiring within this many days are flagged (PRODUCT.md: licence expiry under 30 days). */
+export const LICENSE_EXPIRY_WARNING_DAYS = 30;
+
+/** Whole days from today (UTC) to a date; negative when the date is past; undefined when unreadable. */
+export function daysUntilDate(value?: string | null, now: Date = new Date()): number | undefined {
+  if (!value) return undefined;
+  const target = new Date(value.length === 10 ? `${value}T00:00:00.000Z` : value);
+  if (Number.isNaN(target.getTime())) return undefined;
+  const today = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
+  const day = Date.UTC(target.getUTCFullYear(), target.getUTCMonth(), target.getUTCDate());
+  return Math.round((day - today) / 86_400_000);
+}
+
+/** Expiry flag of a licence: undefined when nothing to flag (far expiry, or licence not in force). */
+export function licenseExpiryFlag(expirationDate: string | null | undefined, status: string, now: Date = new Date()): { tone: "warning" | "danger"; label: string } | undefined {
+  const days = daysUntilDate(expirationDate, now);
+  if (days === undefined) return undefined;
+  if (days < 0) return status === "valid" || status === "expired" ? { tone: "danger", label: "Expirée : à renouveler" } : undefined;
+  if (status !== "valid" || days > LICENSE_EXPIRY_WARNING_DAYS) return undefined;
+  return { tone: "warning", label: days === 0 ? "Expire aujourd'hui" : `Expire dans ${days} jour${days > 1 ? "s" : ""}` };
 }
 
 export function selfServiceFormatDate(value?: string | null): string {

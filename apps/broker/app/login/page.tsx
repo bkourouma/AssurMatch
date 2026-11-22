@@ -2,7 +2,10 @@ import { loginErrorNotice, loginReasonNotice } from "../lib/auth-error-messages"
 import { loginAction } from "../lib/backoffice-session-actions";
 import { isLocalBrokerDemoLoginEnabled } from "../lib/dev-demo-accounts";
 import { Button, Field, Form, FormActions, Input, Notice } from "../lib/ui/broker-ui";
+import polish from "../lib/ui/self-service-polish.module.css";
 import { DevAccountPicker } from "./dev-account-picker";
+
+export const metadata = { title: "Connexion" };
 
 interface LoginPageProps {
   searchParams?: Promise<Record<string, string | string[] | undefined>>;
@@ -24,6 +27,7 @@ export default async function BrokerLoginPage({ searchParams }: LoginPageProps) 
   return (
     <>
       <h1 className="bo-auth__title">Connexion</h1>
+      <p className={polish.lead}>Espace réservé aux courtiers partenaires AssurMatch. Utilisez l&apos;e-mail et le mot de passe de votre compte.</p>
       {reasonNotice ? (
         <Notice tone={reasonNotice.tone}>
           {reasonNotice.message}
@@ -40,7 +44,7 @@ export default async function BrokerLoginPage({ searchParams }: LoginPageProps) 
       <Form action={loginAction}>
         <input type="hidden" name="returnTo" value={returnTo} />
         <Field id="login-email" label="Email" required requiredLabel="obligatoire">
-          <Input id="login-email" name="email" type="email" autoComplete="email" required />
+          <Input id="login-email" name="email" type="email" autoComplete="username" autoCapitalize="none" spellCheck={false} required />
         </Field>
         <Field id="login-password" label="Mot de passe" required requiredLabel="obligatoire">
           <Input id="login-password" name="password" type="password" autoComplete="current-password" required minLength={12} />
@@ -50,11 +54,10 @@ export default async function BrokerLoginPage({ searchParams }: LoginPageProps) 
         </FormActions>
       </Form>
 
-      <p>
-        <a href={`/activate?returnTo=${encodeURIComponent(returnTo)}`}>Activer un compte</a>
-        {" · "}
-        <a href="/password-reset">Consommer un jeton de réinitialisation</a>
-      </p>
+      <ul className={polish.authLinks} aria-label="Autres actions de connexion">
+        <li><a href={`/activate?returnTo=${encodeURIComponent(returnTo)}`}>Activer mon compte avec un jeton d&apos;activation</a></li>
+        <li><a href="/password-reset">Mot de passe oublié ? Utiliser un jeton de réinitialisation</a></li>
+      </ul>
     </>
   );
 }

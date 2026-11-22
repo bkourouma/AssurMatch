@@ -3,12 +3,17 @@ import { isBrokerProfile, loginRedirect, readBackOfficeSession } from "../lib/ba
 import { readBrokerBillingAccount, readBrokerBillingStatement, readBrokerDisputes, type BrokerInvoiceData } from "../lib/broker-api";
 import { canReadBrokerBilling, isBrokerOwner, isTenantReadOnly } from "../lib/broker-permissions";
 import { InvoiceLinesSection, PlanChangeSection } from "./lot5-panels";
+import { PLAN_LABELS } from "./lot5-labels";
 import { DISPUTE_CREDIT_MODE_LABELS, disputeReasonLabel, disputeStatusLabel } from "../lib/lead-vocabulary";
-import { Badge, Card, Cluster, DataTable, Notice, PageHeader, PageStack, StatStrip } from "../lib/ui/broker-ui";
+import { Badge, Button, Card, Cluster, DataTable, Notice, PageHeader, PageStack, StatStrip } from "../lib/ui/broker-ui";
+import polish from "../lib/ui/self-service-polish.module.css";
+import { billingDate, billingMonth } from "./billing-format";
 import type { DataTableColumn } from "../lib/ui/broker-ui";
-import { disputeStatusTone, formatDate, formatXof } from "../lib/ui/broker-view-models";
+import { disputeStatusTone, formatXof } from "../lib/ui/broker-view-models";
 import type { BrokerLeadDisputeView } from "../../../../packages/shared/contracts/lead-disputes.contracts";
 import styles from "../lib/ui/broker-screens.module.css";
+
+export const metadata = { title: "Facturation" };
 
 const BREADCRUMB = [{ label: "Compte" }, { label: "Facturation" }];
 
@@ -21,25 +26,27 @@ const STATUS_LABELS: Record<BrokerInvoiceData["status"], string> = {
 const STATUS_TONES = { issued: "warning", partially_paid: "info", paid: "success", cancelled: "disabled" } as const;
 
 function xof(amount: number): string {
-  return `${amount.toLocaleString("fr-FR").replace(/\u202f|\u00a0/g, " ")} XOF`;
+  return `${amount.toLocaleString("fr-FR").replace(/\u202f|\u00a0/g, " ")} FCFA`;
 }
 
 const invoiceColumns: Array<DataTableColumn<BrokerInvoiceData>> = [
   { key: "number", header: "Facture", render: (invoice) => <span className="bo-ref">{invoice.number}</span> },
-  { key: "period", header: "Période", render: (invoice) => invoice.periodFrom.slice(0, 7) },
-  { key: "issuedAt", header: "Émise le", render: (invoice) => invoice.issuedAt.slice(0, 10) },
+  { key: "period", header: "Période", render: (invoice) => billingMonth(invoice.periodFrom) },
+  { key: "issuedAt", header: "Émise le", render: (invoice) => billingDate(invoice.issuedAt) },
   { key: "total", header: "Total TTC", render: (invoice) => xof(invoice.totalAmount), numeric: true, align: "right" },
   { key: "due", header: "Reste à régler", render: (invoice) => xof(invoice.amountDue), numeric: true, align: "right" },
-  { key: "dueDate", header: "Échéance", render: (invoice) => invoice.dueDate },
+  { key: "dueDate", header: "Échéance", render: (invoice) => billingDate(invoice.dueDate) },
   { key: "status", header: "Statut", render: (invoice) => <Badge tone={STATUS_TONES[invoice.status]}>{STATUS_LABELS[invoice.status]}</Badge> },
   {
     key: "pdf",
     header: "Documents",
     render: (invoice) => (
-      <Cluster>
-        <a href={`/billing/invoices/${invoice.id}/pdf`}>Télécharger le PDF</a>
-        {invoice.creditNote ? <a href={`/billing/credit-notes/${invoice.creditNote.id}/pdf`}>Avoir {invoice.creditNote.number}</a> : null}
-      </Cluster>
+      <div className={polish.cellLinks}>
+        <a href={`/billing/invoices/${invoice.id}/pdf`} aria-label={`Télécharger le PDF de la facture ${invoice.number}`}>Télécharger le PDF</a>
+        {invoice.creditNote ? (
+          <a href={`/billing/credit-notes/${invoice.creditNote.id}/pdf`} aria-label={`Avoir ${invoice.creditNote.number} (télécharger le PDF)`}>Avoir {invoice.creditNote.number}</a>
+        ) : null}
+      </div>
     )
   }
 ];
@@ -74,14 +81,14 @@ const disputeColumns: Array<DataTableColumn<BrokerLeadDisputeView>> = [
   },
   { key: "status", header: "Statut", render: (dispute) => <Badge tone={disputeStatusTone(dispute.status)}>{disputeStatusLabel(dispute.status)}</Badge> },
   { key: "reason", header: "Motif", render: (dispute) => disputeReasonLabel(dispute.reason) },
-  { key: "createdAt", header: "Déposée le", render: (dispute) => formatDate(dispute.createdAt) },
+  { key: "createdAt", header: "Déposée le", render: (dispute) => billingDate(dispute.createdAt) },
   {
     key: "decision",
     header: "Décision",
     render: (dispute) =>
       dispute.decidedAt ? (
         <span>
-          {formatDate(dispute.decidedAt)}
+          {billingDate(dispute.decidedAt)}
           {dispute.decisionReason ? ` - ${dispute.decisionReason}` : ""}
         </span>
       ) : (
@@ -105,26 +112,39 @@ export default async function BrokerBillingPage() {
   if (!canReadBrokerBilling(session.profile)) {
     return (
       <PageStack>
-        <PageHeader breadcrumb={BREADCRUMB} title="Accès réservé" description="La facturation du cabinet est consultable par le responsable du compte, les managers et les membres en lecture seule." />
+        <PageHeader
+          breadcrumb={BREADCRUMB}
+          title="Accès réservé"
+          description="La facturation du cabinet est consultable par le responsable du compte, les managers et les membres en lecture seule."
+          actions={<Button href="/" variant="secondary">Retour au tableau de bord</Button>}
+        />
       </PageStack>
     );
   }
 
   const [statement, account, disputes] = await Promise.all([readBrokerBillingStatement(), readBrokerBillingAccount(), readBrokerDisputes()]);
+  const isOwner = isBrokerOwner(session.profile);
+  const planName = session.profile.partnerPlan ? PLAN_LABELS[session.profile.partnerPlan] ?? session.profile.partnerPlan : undefined;
 
   return (
     <PageStack>
       <PageHeader
         breadcrumb={BREADCRUMB}
         title="Facturation du cabinet"
-        description="Factures AssurMatch, solde, consommation du mois et packs de leads. Le règlement se fait par virement bancaire ou mobile money, hors plateforme, en rappelant le numéro de facture."
+        description={`${planName ? `Plan ${planName}. ` : ""}Factures AssurMatch, solde, consommation du mois et packs de leads. Le règlement se fait par virement bancaire ou mobile money, hors plateforme, en rappelant le numéro de facture.`}
+        actions={isOwner ? <Button href="#plan-change" variant="secondary">Changer de plan</Button> : undefined}
       />
 
       <Notice tone="neutral">
         {account.data.notice || "Facturation manuelle: aucun paiement en ligne, aucune prime d'assurance encaissée par AssurMatch."}
       </Notice>
 
-      {account.status !== "success" ? <Notice tone="warning">État des comptes temporairement indisponible.</Notice> : null}
+      {account.status !== "success" ? (
+        <Notice tone="warning" title="Données de facturation indisponibles">
+          <p>État des comptes temporairement indisponible : les factures, le solde et le relevé ci-dessous peuvent être incomplets.</p>
+          <p><a href="/billing">Recharger la page</a></p>
+        </Notice>
+      ) : null}
 
       {account.status === "success" ? (
         <StatStrip
@@ -173,7 +193,12 @@ export default async function BrokerBillingPage() {
         title="Contestations"
         description="Les leads que votre cabinet a contestés, la décision de la finance AssurMatch et le crédit appliqué (brouillon de facture ou avoir partiel)."
       >
-        {disputes.status !== "success" ? <Notice tone="warning">Contestations temporairement indisponibles.</Notice> : null}
+        {disputes.status !== "success" ? (
+          <Notice tone="warning">
+            <p>Contestations temporairement indisponibles.</p>
+            <p><a href="/billing">Recharger la page</a></p>
+          </Notice>
+        ) : null}
         <DataTable
           columns={disputeColumns}
           items={disputes.data.items}
@@ -186,7 +211,7 @@ export default async function BrokerBillingPage() {
       <Card title="Relevé de compte" description="Facture au débit, avoir et règlement au crédit.">
         <DataTable
           columns={[
-            { key: "date", header: "Date", render: (entry) => entry.date.slice(0, 10) },
+            { key: "date", header: "Date", render: (entry) => billingDate(entry.date) },
             { key: "label", header: "Écriture", render: (entry) => entry.label },
             { key: "debit", header: "Débit", render: (entry) => (entry.debit ? xof(entry.debit) : "-"), numeric: true, align: "right" },
             { key: "credit", header: "Crédit", render: (entry) => (entry.credit ? xof(entry.credit) : "-"), numeric: true, align: "right" },
@@ -202,7 +227,7 @@ export default async function BrokerBillingPage() {
       <Card title="Packs de leads">
         <DataTable
           columns={[
-            { key: "grantedAt", header: "Attribué le", render: (pack) => pack.grantedAt.slice(0, 10) },
+            { key: "grantedAt", header: "Attribué le", render: (pack) => billingDate(pack.grantedAt) },
             { key: "granted", header: "Crédits", render: (pack) => pack.creditsGranted, numeric: true, align: "right" },
             { key: "consumed", header: "Consommés", render: (pack) => pack.creditsConsumed, numeric: true, align: "right" },
             { key: "remaining", header: "Restants", render: (pack) => pack.creditsRemaining, numeric: true, align: "right" },
@@ -217,7 +242,15 @@ export default async function BrokerBillingPage() {
 
       <InvoiceLinesSection invoices={account.data.invoices} />
 
-      {isBrokerOwner(session.profile) ? <PlanChangeSection currentPlan={session.profile.partnerPlan} readOnly={isTenantReadOnly(session.profile)} /> : null}
+      {isOwner ? (
+        <div id="plan-change">
+          <PlanChangeSection currentPlan={session.profile.partnerPlan} readOnly={isTenantReadOnly(session.profile)} />
+        </div>
+      ) : (
+        <Notice tone="info" title="Plan du cabinet">
+          Seul le propriétaire du cabinet peut demander un changement de plan. Demandez-le-lui si votre cabinet doit évoluer.
+        </Notice>
+      )}
     </PageStack>
   );
 }

@@ -11,8 +11,10 @@ import {
   Input,
   Notice,
   Select,
-  Stack
+  Stack,
+  fieldControlProps
 } from "./lib/ui/broker-ui";
+import polish from "./lib/ui/self-service-polish.module.css";
 import {
   activateAction,
   enrollMfaAction,
@@ -25,18 +27,28 @@ import {
 
 const initialAuthFlowState: AuthFlowState = { status: "idle" };
 
+const MFA_CODE_HINT = "Code à 6 chiffres de votre application, ou un code de secours (choisissez le type ci-dessous).";
+
 /** Rendu uniforme d'un resultat d'action d'authentification: rien tant que l'etat est inactif. */
 function FlowNotice({ state }: { state: AuthFlowState }) {
   if (state.status === "idle") return null;
   return (
     <Notice tone={state.status === "error" ? "danger" : "success"}>
       <p>{state.message}</p>
-      {state.secret ? <p>Secret TOTP: <code>{state.secret}</code></p> : null}
-      {state.otpauthUri ? <p>URI: <code>{state.otpauthUri}</code></p> : null}
+      {state.secret || state.otpauthUri ? (
+        <div className={polish.secretBlock}>
+          {state.secret ? <p>Secret TOTP: <code>{state.secret}</code></p> : null}
+          {state.otpauthUri ? <p>URI: <code>{state.otpauthUri}</code></p> : null}
+          <p>Ajoutez ce secret à votre application d&apos;authentification, puis saisissez le code qu&apos;elle affiche dans « Vérification MFA ».</p>
+        </div>
+      ) : null}
       {state.backupCodes?.length ? (
-        <ul>
-          {state.backupCodes.map((code) => <li key={code}><code>{code}</code></li>)}
-        </ul>
+        <div className={polish.secretBlock}>
+          <p>Codes de secours : conservez-les en lieu sûr, hors de cet appareil si possible.</p>
+          <ul className={polish.codeList}>
+            {state.backupCodes.map((code) => <li key={code}><code>{code}</code></li>)}
+          </ul>
+        </div>
       ) : null}
     </Notice>
   );
@@ -44,18 +56,26 @@ function FlowNotice({ state }: { state: AuthFlowState }) {
 
 export function ActivationForm({ returnTo, token }: { returnTo: string; token: string }) {
   const [state, formAction, pending] = useActionState(activateAction, initialAuthFlowState);
+  const tokenHint = token ? "Jeton déjà renseigné depuis votre lien d'activation." : "Jeton fourni par votre administrateur.";
   return (
     <Form action={formAction}>
       <input type="hidden" name="returnTo" value={returnTo} />
       <FlowNotice state={state} />
-      <Field id="activate-token" label="Jeton activation" required requiredLabel="obligatoire">
-        <Input id="activate-token" name="token" defaultValue={token} required />
+      <Field id="activate-token" label="Jeton d'activation" required requiredLabel="obligatoire" hint={tokenHint}>
+        <Input
+          {...fieldControlProps("activate-token", { hint: tokenHint, required: true })}
+          name="token"
+          defaultValue={token}
+          autoComplete="off"
+          autoCapitalize="none"
+          spellCheck={false}
+        />
       </Field>
       <Field id="activate-password" label="Nouveau mot de passe" required requiredLabel="obligatoire" hint="12 caractères minimum.">
-        <Input id="activate-password" name="password" type="password" autoComplete="new-password" required minLength={12} />
+        <Input {...fieldControlProps("activate-password", { hint: "12 caractères minimum.", required: true })} name="password" type="password" autoComplete="new-password" minLength={12} />
       </Field>
       <FormActions>
-        <Button type="submit" pending={pending} pendingLabel="Activation..." fullWidth>
+        <Button type="submit" pending={pending} pendingLabel="Activation en cours…" fullWidth>
           Activer et continuer vers MFA
         </Button>
       </FormActions>
@@ -76,25 +96,40 @@ export function MfaPanel({ returnTo, mfaEnrolled = false, showEnrollment }: { re
   return (
     <Stack>
       {enrollmentVisible ? (
-        <Card title="Enrôlement MFA">
+        <Card
+          title="Enrôlement MFA"
+          description={
+            showEnrollment
+              ? "Générer un nouveau secret remplace l'ancien et révoque vos appareils de confiance. Ajoutez ensuite le nouveau secret à votre application d'authentification."
+              : "Première étape : générez un secret et des codes de secours, ajoutez le secret à votre application d'authentification, puis validez avec un code dans « Vérification MFA »."
+          }
+        >
           <Form action={enrollAction}>
             <FlowNotice state={enrollState} />
             <FormActions>
-              <Button type="submit" variant="secondary" pending={enrollPending} pendingLabel="Generation...">
+              <Button type="submit" variant="secondary" pending={enrollPending} pendingLabel="Génération en cours…">
                 Générer secret et codes de secours
               </Button>
             </FormActions>
           </Form>
         </Card>
       ) : null}
-      <Card title="Vérification MFA">
+      <Card title="Vérification MFA" description="Saisissez le code à usage unique de votre application d'authentification, ou l'un de vos codes de secours.">
         <Form action={verifyAction}>
           <input type="hidden" name="returnTo" value={returnTo} />
           <FlowNotice state={verifyState} />
-          <Field id="mfa-code" label="Code" required requiredLabel="obligatoire">
-            <Input id="mfa-code" name="code" required minLength={6} maxLength={10} autoComplete="one-time-code" />
+          <Field id="mfa-code" label="Code" required requiredLabel="obligatoire" hint={MFA_CODE_HINT}>
+            <Input
+              {...fieldControlProps("mfa-code", { hint: MFA_CODE_HINT, required: true })}
+              name="code"
+              minLength={6}
+              maxLength={10}
+              autoComplete="one-time-code"
+              autoCapitalize="none"
+              spellCheck={false}
+            />
           </Field>
-          <Field id="mfa-kind" label="Type">
+          <Field id="mfa-kind" label="Type de code">
             <Select
               id="mfa-kind"
               name="kind"
@@ -112,7 +147,7 @@ export function MfaPanel({ returnTo, mfaEnrolled = false, showEnrollment }: { re
             hint="Le code ne vous sera plus demandé sur cet appareil pendant 30 jours. Ne cochez pas sur un ordinateur partagé."
           />
           <FormActions>
-            <Button type="submit" pending={verifyPending} pendingLabel="Verification...">
+            <Button type="submit" pending={verifyPending} pendingLabel="Vérification en cours…">
               Vérifier MFA
             </Button>
           </FormActions>
@@ -129,7 +164,7 @@ export function RevokeTrustedDevicesForm() {
     <Form action={formAction}>
       <FlowNotice state={state} />
       <FormActions>
-        <Button type="submit" variant="secondary" pending={pending} pendingLabel="Révocation...">
+        <Button type="submit" variant="secondary" pending={pending} pendingLabel="Révocation en cours…">
           Révoquer tous les appareils de confiance
         </Button>
       </FormActions>
@@ -146,10 +181,10 @@ export function PasswordChangeForm() {
         <Input id="password-old" name="oldPassword" type="password" autoComplete="current-password" required minLength={12} />
       </Field>
       <Field id="password-new" label="Nouveau mot de passe" required requiredLabel="obligatoire" hint="12 caractères minimum.">
-        <Input id="password-new" name="newPassword" type="password" autoComplete="new-password" required minLength={12} />
+        <Input {...fieldControlProps("password-new", { hint: "12 caractères minimum.", required: true })} name="newPassword" type="password" autoComplete="new-password" minLength={12} />
       </Field>
       <FormActions>
-        <Button type="submit" pending={pending} pendingLabel="Modification...">
+        <Button type="submit" pending={pending} pendingLabel="Modification en cours…">
           Changer le mot de passe
         </Button>
       </FormActions>
@@ -162,17 +197,29 @@ export function PasswordResetConsumeForm({ token }: { token: string }) {
   return (
     <Form action={formAction}>
       <FlowNotice state={state} />
-      <Field id="reset-token" label="Jeton réinitialisation" required requiredLabel="obligatoire">
-        <Input id="reset-token" name="token" defaultValue={token} required />
+      <Field id="reset-token" label="Jeton de réinitialisation" required requiredLabel="obligatoire" hint="Jeton reçu avec votre lien de réinitialisation.">
+        <Input
+          {...fieldControlProps("reset-token", { hint: "Jeton reçu avec votre lien de réinitialisation.", required: true })}
+          name="token"
+          defaultValue={token}
+          autoComplete="off"
+          autoCapitalize="none"
+          spellCheck={false}
+        />
       </Field>
       <Field id="reset-password" label="Nouveau mot de passe" required requiredLabel="obligatoire" hint="12 caractères minimum.">
-        <Input id="reset-password" name="newPassword" type="password" autoComplete="new-password" required minLength={12} />
+        <Input {...fieldControlProps("reset-password", { hint: "12 caractères minimum.", required: true })} name="newPassword" type="password" autoComplete="new-password" minLength={12} />
       </Field>
       <FormActions>
-        <Button type="submit" pending={pending} pendingLabel="Reinitialisation..." fullWidth>
+        <Button type="submit" pending={pending} pendingLabel="Réinitialisation en cours…" fullWidth>
           Consommer le jeton
         </Button>
       </FormActions>
+      {state.status === "success" ? (
+        <Button href="/login" variant="secondary" fullWidth>
+          Aller à la connexion
+        </Button>
+      ) : null}
     </Form>
   );
 }

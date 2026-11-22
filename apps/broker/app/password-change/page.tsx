@@ -1,6 +1,9 @@
 import { redirect } from "next/navigation";
 import { PasswordChangeForm } from "../auth-flow-form";
 import { loginRedirect, readBackOfficeSession } from "../lib/backoffice-auth";
+import polish from "../lib/ui/self-service-polish.module.css";
+
+export const metadata = { title: "Changer le mot de passe" };
 
 export default async function PasswordChangePage() {
   const session = await readBackOfficeSession();
@@ -9,6 +12,7 @@ export default async function PasswordChangePage() {
   return (
     <>
       <h1 className="bo-auth__title">Changer le mot de passe</h1>
+      <p className={polish.lead}>Votre nouveau mot de passe remplace l&apos;actuel et révoque tous vos appareils de confiance : le code MFA vous sera redemandé.</p>
       <PasswordChangeForm />
     </>
   );

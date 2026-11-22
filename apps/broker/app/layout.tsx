@@ -26,7 +26,8 @@ async function readEnterpriseBranding(): Promise<BrokerBranding | undefined> {
 }
 
 export const metadata = {
-  title: "AssurMatch Courtier",
+  // Each page names itself ("Facturation · AssurMatch Courtier") so the tab and the screen reader say where you are.
+  title: { default: "AssurMatch Courtier", template: "%s · AssurMatch Courtier" },
   description: "Back-office courtier AssurMatch"
 };
 

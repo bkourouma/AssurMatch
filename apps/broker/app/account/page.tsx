@@ -5,6 +5,8 @@ import { PLAN_LABELS } from "../lib/self-service-messages";
 import { teamRoleLabel } from "../lib/team-options";
 import { Badge, Button, Card, DescriptionList, Grid, PageHeader, PageStack } from "../lib/ui/broker-ui";
 
+export const metadata = { title: "Compte" };
+
 export default async function BrokerAccountPage() {
   const session = await readBackOfficeSession();
   if (session.status === "unauthenticated" || session.status === "expired") redirect(loginRedirect("/account", session.status));
@@ -21,17 +23,18 @@ export default async function BrokerAccountPage() {
       />
 
       <Grid columns="two">
-        <Card title="Profil">
+        <Card title="Profil" description="Les identifiants servent de référence si vous contactez le support AssurMatch.">
           <DescriptionList
             items={[
-              { term: "Acteur", value: session.profile.actorId ? <span className="bo-ref">{session.profile.actorId}</span> : "-" },
-              { term: "Tenant", value: session.profile.partnerTenantId ? <span className="bo-ref">{session.profile.partnerTenantId}</span> : "-" },
+              ...(session.profile.displayName ? [{ term: "Nom", value: session.profile.displayName }] : []),
+              { term: "Identifiant utilisateur", value: session.profile.actorId ? <span className="bo-ref">{session.profile.actorId}</span> : "-" },
+              { term: "Identifiant du cabinet", value: session.profile.partnerTenantId ? <span className="bo-ref bo-ref--wrap">{session.profile.partnerTenantId}</span> : "-" },
               { term: "Plan", value: <Badge tone="info">{session.profile.partnerPlan ? PLAN_LABELS[session.profile.partnerPlan] ?? session.profile.partnerPlan : "-"}</Badge> },
               { term: "Rôles", value: teamRoleLabel(session.profile.roles) }
             ]}
           />
         </Card>
-        <Card title="Mot de passe">
+        <Card title="Mot de passe" description="Changer votre mot de passe révoque aussi tous vos appareils de confiance.">
           <PasswordChangeForm />
         </Card>
       </Grid>

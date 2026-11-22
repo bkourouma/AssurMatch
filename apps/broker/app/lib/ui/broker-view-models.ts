@@ -34,6 +34,82 @@ export function formatDate(value?: string | null): string {
   return date.toISOString().slice(0, 10);
 }
 
+/** « 2026-11-25 10:00 UTC »: the date as everywhere else in the broker space, plus the hour (UTC) of a task or reminder. */
+export function formatDateTime(value?: string | null): string {
+  if (!value) return "-";
+  const date = new Date(value);
+  if (Number.isNaN(date.valueOf())) return String(value);
+  return `${date.toISOString().slice(0, 10)} ${date.toISOString().slice(11, 16)} UTC`;
+}
+
+/**
+ * Whole days between a lead's assignment date (« 2026-11-20 » or an ISO instant) and `now`, UTC.
+ * Display only: it names how long a lead has been waiting, it never decides anything. `undefined`
+ * when the date is missing or unreadable (the cell then shows « - », never a made-up delay).
+ */
+export function daysSince(value: string | null | undefined, now: Date): number | undefined {
+  if (!value || value === "-") return undefined;
+  const date = new Date(value);
+  if (Number.isNaN(date.valueOf())) return undefined;
+  const startOfDay = (input: Date) => Date.UTC(input.getUTCFullYear(), input.getUTCMonth(), input.getUTCDate());
+  return Math.max(0, Math.round((startOfDay(now) - startOfDay(date)) / 86_400_000));
+}
+
+/** « Aujourd'hui », « 1 jour », « 4 jours » : the waiting time of a lead in words. */
+export function formatWaiting(days: number | undefined): string {
+  if (days === undefined) return "-";
+  if (days === 0) return "Aujourd'hui";
+  return days === 1 ? "1 jour" : `${days} jours`;
+}
+
+/** The next dated commitment of a CRM lead (open task or reminder), shown in the « Prochaine action » block. */
+export interface CrmNextDeadline {
+  kind: "task" | "reminder";
+  label: string;
+  at: string;
+  overdue: boolean;
+}
+
+function readText(row: Record<string, unknown>, key: string): string {
+  const value = row[key];
+  return value === null || value === undefined ? "" : String(value);
+}
+
+function parsedTime(value: string): number | undefined {
+  if (!value) return undefined;
+  const time = new Date(value).valueOf();
+  return Number.isNaN(time) ? undefined : time;
+}
+
+/**
+ * Earliest open commitment of a lead: a task that is not completed and has a due date, or a reminder.
+ * An overdue task wins over a future one (it is the thing to do first). `undefined` when nothing is
+ * scheduled: the page then invites the broker to plan the next step instead of staying silent.
+ */
+export function nextCrmDeadline(
+  tasks: ReadonlyArray<Record<string, unknown>>,
+  reminders: ReadonlyArray<Record<string, unknown>>,
+  now: Date
+): CrmNextDeadline | undefined {
+  const candidates: CrmNextDeadline[] = [];
+  for (const task of tasks) {
+    if (readText(task, "completedAt")) continue;
+    const at = readText(task, "dueAt");
+    const time = parsedTime(at);
+    if (time === undefined) continue;
+    candidates.push({ kind: "task", label: readText(task, "title") || "Tâche commerciale", at, overdue: time < now.valueOf() });
+  }
+  for (const reminder of reminders) {
+    const at = readText(reminder, "remindAt");
+    const time = parsedTime(at);
+    // A reminder cannot be ticked off: a past one is history, only upcoming reminders count.
+    if (time === undefined || time < now.valueOf()) continue;
+    candidates.push({ kind: "reminder", label: readText(reminder, "message") || "Rappel", at, overdue: false });
+  }
+  candidates.sort((a, b) => new Date(a.at).valueOf() - new Date(b.at).valueOf());
+  return candidates.find((item) => item.overdue) ?? candidates[0];
+}
+
 export function statusTone(status: string): Tone {
   const normalized = status.toLowerCase();
   if (["accepted", "closed", "won", "gagne", "contacted"].includes(normalized)) return "success";
@@ -152,7 +228,7 @@ export function dashboardStats(data: BrokerDashboardData): StatItem[] {
 }
 
 export function formatXof(amount: number): string {
-  return `${amount.toLocaleString("fr-FR").replace(/\u202f|\u00a0/g, " ")} XOF`;
+  return `${amount.toLocaleString("fr-FR").replace(/\u202f|\u00a0/g, " ")} FCFA`;
 }
 
 /** Spec 063: « 14 novembre 2026 à 22:15 UTC », la limite exacte de la fenêtre de contestation. */

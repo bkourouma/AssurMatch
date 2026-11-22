@@ -46,18 +46,18 @@ import {
   crmStatusLabels
 } from "../../../lib/ui/broker-ui";
 import { DisputeStatusCard } from "../../../lib/ui/dispute-status-card";
-import { disputeAvailability, formatDate, statusTone } from "../../../lib/ui/broker-view-models";
+import { disputeAvailability, formatDate, formatDateTime, nextCrmDeadline, statusTone } from "../../../lib/ui/broker-view-models";
 import styles from "../../../lib/ui/broker-screens.module.css";
 import { LeadAiPanel } from "./lead-ai-panel";
 
-const NOTICES: Record<string, { tone: "info" | "warning" | "danger"; message: string }> = {
-  status_changed: { tone: "info", message: "Statut du lead mis à jour et historisé." },
-  note_created: { tone: "info", message: "Note interne ajoutée. Elle reste invisible côté Web Publique Client." },
-  task_created: { tone: "info", message: "Tâche commerciale créée pour votre cabinet." },
-  reminder_created: { tone: "info", message: "Rappel programmé pour votre cabinet." },
-  reason_required: { tone: "warning", message: "Un motif allowliste est obligatoire pour un statut de perte ou de contestation." },
+const NOTICES: Record<string, { tone: "success" | "info" | "warning" | "danger"; message: string }> = {
+  status_changed: { tone: "success", message: "Statut du lead mis à jour et historisé." },
+  note_created: { tone: "success", message: "Note interne ajoutée. Elle reste invisible côté Web Publique Client." },
+  task_created: { tone: "success", message: "Tâche commerciale créée pour votre cabinet." },
+  reminder_created: { tone: "success", message: "Rappel programmé pour votre cabinet." },
+  reason_required: { tone: "warning", message: "Un motif est obligatoire pour un statut de perte ou de contestation : choisissez-le dans « Changer le statut », puis enregistrez à nouveau. Le statut n'a pas été modifié." },
   // Spec 063 (CRM-012): contestation d'un lead.
-  disputed: { tone: "info", message: "Contestation enregistrée et historisée. La finance AssurMatch statuera ; vous serez notifié de la décision." },
+  disputed: { tone: "success", message: "Contestation enregistrée et historisée. La finance AssurMatch statuera ; vous serez notifié de la décision." },
   dispute_window_expired: { tone: "warning", message: "Contestation refusée : la fenêtre de 30 jours suivant la réception du lead est close." },
   dispute_exists: { tone: "warning", message: "Contestation refusée : ce lead a déjà fait l'objet d'une contestation." },
   conflict: { tone: "warning", message: "Action refusée : l'état du lead a changé entre-temps ou ne permet pas cette action. Rechargez la page." },
@@ -68,8 +68,8 @@ const NOTICES: Record<string, { tone: "info" | "warning" | "danger"; message: st
   suspended: { tone: "warning", message: TENANT_SUSPENDED_MESSAGE },
   not_found: { tone: "warning", message: "Ce lead n'existe pas ou n'est pas accessible pour votre cabinet." },
   // Spec 055 FR-010: assignation conseiller et documents internes analyses par l'antivirus.
-  assigned: { tone: "info", message: "Lead assigné au conseiller. Seul ce conseiller (et les managers) le voit parmi les agents." },
-  document_added: { tone: "info", message: "Document interne ajouté après analyse antivirus. Il n'est jamais visible du visiteur." },
+  assigned: { tone: "success", message: "Lead assigné au conseiller. Seul ce conseiller (et les managers) le voit parmi les agents." },
+  document_added: { tone: "success", message: "Document interne ajouté après analyse antivirus. Il n'est jamais visible du visiteur." },
   quarantined: { tone: "danger", message: "Document refusé : il n'a pas passé l'antivirus et n'a pas été conservé." },
   document_invalid: { tone: "warning", message: "Document refusé : PDF, JPEG ou PNG de 5 Mo au maximum." },
   file_too_large: { tone: "warning", message: "Fichier refusé : taille maximale 5 Mo." },
@@ -150,6 +150,15 @@ export default async function BrokerCrmLeadDetailPage({ params, searchParams }: 
   const disputes = lead?.disputes ?? [];
   const availability = disputeAvailability({ window: lead?.disputeWindow, hasDispute: disputes.length > 0, canMutate, tenantReadOnly });
   const reasonRequiredLabels = CRM_REASON_REQUIRED_STATUSES.map((status) => CRM_STATUS_LABELS[status]).join(", ");
+  const now = new Date();
+  const nextDeadline = nextCrmDeadline(tasks, reminders, now);
+  // One-tap contact for a phone: only the full contact of a visitor who has not withdrawn consent (masked values are never dialled).
+  const contactValue = (key: string): string | undefined => {
+    const entry = contactMasked ? undefined : contactEntries.find(([entryKey]) => entryKey === key);
+    return entry ? String(entry[1]) : undefined;
+  };
+  const phone = contactValue("phone");
+  const email = contactValue("email");
   const currentTab: TabKey = TABS.some((item) => item.key === tab) ? (tab as TabKey) : "synthese";
   const tabHref = (key: TabKey) => (key === "synthese" ? `/crm/leads/${leadAssignmentId}` : `/crm/leads/${leadAssignmentId}?tab=${key}`);
   const tabBadge = (key: TabKey): string | undefined => {
@@ -187,6 +196,42 @@ export default async function BrokerCrmLeadDetailPage({ params, searchParams }: 
 
       {lead ? (
         <>
+          {/* Prochaine action: what is scheduled next and the shortest ways to act on it, before any tab (a phone user sees it first). */}
+          <Card title="Prochaine action" aria-label="Prochaine action">
+            <div className={styles.nextAction}>
+              <div className={styles.nextActionText}>
+                {nextDeadline ? (
+                  <>
+                    <p className={styles.nextActionTitle}>
+                      {nextDeadline.kind === "task" ? "Tâche" : "Rappel"} : {nextDeadline.label}
+                    </p>
+                    <span className={nextDeadline.overdue ? styles.overdue : styles.muted}>
+                      {nextDeadline.overdue ? "En retard, échéance " : "Prévu le "}
+                      {formatDateTime(nextDeadline.at)}
+                    </span>
+                  </>
+                ) : (
+                  <>
+                    <p className={styles.nextActionTitle}>Aucune tâche ni rappel programmé</p>
+                    <span className={styles.muted}>
+                      {showForms ? "Planifiez la prochaine relance pour ne pas laisser ce lead sans suite." : "Votre rôle ne permet pas de planifier une suite sur ce lead."}
+                    </span>
+                  </>
+                )}
+              </div>
+              <Cluster>
+                {phone ? <Button href={`tel:${phone.replace(/[^+\d\s().-]/g, "")}`} variant="secondary" size="sm">Appeler</Button> : null}
+                {email ? <Button href={`mailto:${encodeURIComponent(email)}`} variant="secondary" size="sm">Écrire un email</Button> : null}
+                {showForms ? (
+                  <>
+                    <Button href={`${tabHref("activite")}#crm-plan`} variant="secondary" size="sm">Planifier une tâche</Button>
+                    <Button href="#crm-status" variant="secondary" size="sm">Modifier le statut</Button>
+                  </>
+                ) : null}
+              </Cluster>
+            </div>
+          </Card>
+
           <Tabs
             label="Sections de la fiche CRM"
             items={TABS.map((item) => ({ label: item.label, href: tabHref(item.key), current: item.key === currentTab, badge: tabBadge(item.key) }))}
@@ -317,7 +362,7 @@ export default async function BrokerCrmLeadDetailPage({ params, searchParams }: 
                 <>
                   <Card title="Notes internes">
                     {notes.length > 0 ? (
-                      <ul className="bo-list">
+                      <ul className={`bo-list ${styles.wrapList}`}>
                         {notes.map((note, index) => (
                           <li key={textOf(note, "id") || `note-${index}`}>
                             <span className={styles.entryMeta}>{formatDate(textOf(note, "createdAt"))}</span> - {textOf(note, "body")}
@@ -325,7 +370,7 @@ export default async function BrokerCrmLeadDetailPage({ params, searchParams }: 
                         ))}
                       </ul>
                     ) : (
-                      <p className={styles.muted}>Aucune note interne pour ce lead.</p>
+                      <p className={styles.muted}>Aucune note interne pour ce lead.{showForms ? " Notez ici ce qui a été dit lors de l'appel." : ""}</p>
                     )}
                     {showForms && lead ? (
                       <Form action={addCrmLeadNoteAction} className={styles.subsection}>
@@ -347,16 +392,20 @@ export default async function BrokerCrmLeadDetailPage({ params, searchParams }: 
                     ) : null}
                   </Card>
 
+                  <div id="crm-plan">
                   <Card title="Tâches commerciales">
                     {tasks.length > 0 ? (
-                      <ul className="bo-list">
-                        {tasks.map((task, index) => (
-                          <li key={textOf(task, "id") || `task-${index}`}>
-                            {textOf(task, "title")}
-                            {task.dueAt ? <span className={styles.entryMeta}>{` - échéance ${formatDate(textOf(task, "dueAt"))}`}</span> : ""}
-                            {task.completedAt ? <> <Badge tone="success">terminée</Badge></> : ""}
-                          </li>
-                        ))}
+                      <ul className={`bo-list ${styles.wrapList}`}>
+                        {tasks.map((task, index) => {
+                          const late = !task.completedAt && task.dueAt && new Date(textOf(task, "dueAt")).valueOf() < now.valueOf();
+                          return (
+                            <li key={textOf(task, "id") || `task-${index}`}>
+                              {textOf(task, "title")}
+                              {task.dueAt ? <span className={late ? styles.overdue : styles.entryMeta}>{` - ${late ? "en retard, échéance" : "échéance"} ${formatDateTime(textOf(task, "dueAt"))}`}</span> : ""}
+                              {task.completedAt ? <> <Badge tone="success">terminée</Badge></> : ""}
+                            </li>
+                          );
+                        })}
                       </ul>
                     ) : (
                       <p className={styles.muted}>Aucune tâche commerciale pour ce lead.</p>
@@ -376,19 +425,20 @@ export default async function BrokerCrmLeadDetailPage({ params, searchParams }: 
                       </Form>
                     ) : null}
                   </Card>
+                  </div>
 
                   <Card title="Rappels">
                     {reminders.length > 0 ? (
-                      <ul className="bo-list">
+                      <ul className={`bo-list ${styles.wrapList}`}>
                         {reminders.map((reminder, index) => (
                           <li key={textOf(reminder, "id") || `reminder-${index}`}>
-                            <span className={styles.entryMeta}>{formatDate(textOf(reminder, "remindAt"))}</span>
+                            <span className={styles.entryMeta}>{formatDateTime(textOf(reminder, "remindAt"))}</span>
                             {reminder.message ? ` - ${textOf(reminder, "message")}` : ""}
                           </li>
                         ))}
                       </ul>
                     ) : (
-                      <p className={styles.muted}>Aucun rappel programmé pour ce lead.</p>
+                      <p className={styles.muted}>Aucun rappel programmé pour ce lead.{showForms ? " Programmez une relance ci-dessous." : ""}</p>
                     )}
                     {showForms && lead ? (
                       <Form action={addCrmLeadReminderAction} columns={2} className={styles.subsection}>
@@ -421,10 +471,10 @@ export default async function BrokerCrmLeadDetailPage({ params, searchParams }: 
                 <>
                   <Card title="Historique CRM">
                     {history.length > 0 ? (
-                      <ol className="bo-list">
+                      <ol className={`bo-list ${styles.wrapList}`} aria-label="Événements du lead">
                         {history.map((event, index) => (
                           <li key={textOf(event, "id") || `event-${index}`}>
-                            <span className={styles.entryMeta}>{formatDate(textOf(event, "occurredAt"))}</span> - {crmEventLabel(textOf(event, "eventType"))}
+                            <span className={styles.timelineDate}>{formatDate(textOf(event, "occurredAt"))}</span> - {crmEventLabel(textOf(event, "eventType"))}
                             {event.previousStatus || event.nextStatus
                               ? ` (${crmStatusLabel(textOf(event, "previousStatus"))} -> ${crmStatusLabel(textOf(event, "nextStatus"))})`
                               : ""}
@@ -484,6 +534,7 @@ export default async function BrokerCrmLeadDetailPage({ params, searchParams }: 
 
             <Stack>
               {showForms && lead ? (
+                <div id="crm-status">
                 <Card title="Changer le statut">
                   <Form action={changeCrmLeadStatusAction}>
                     <input type="hidden" name="leadAssignmentId" value={lead.leadAssignmentId} />
@@ -499,7 +550,7 @@ export default async function BrokerCrmLeadDetailPage({ params, searchParams }: 
                     <Field
                       id="crm-status-reason"
                       label="Motif"
-                      hint={`Un motif allowliste est obligatoire pour les statuts suivants: ${reasonRequiredLabels}.`}
+                      hint={`Un motif est obligatoire pour les statuts suivants : ${reasonRequiredLabels}. Ils sortent le lead du suivi actif.`}
                     >
                       <Select
                         id="crm-status-reason"
@@ -517,8 +568,9 @@ export default async function BrokerCrmLeadDetailPage({ params, searchParams }: 
                       <Button type="submit">Enregistrer le statut</Button>
                     </FormActions>
                   </Form>
-                  <p className={styles.muted}>Le changement de statut est historisé avec acteur, date et motif.</p>
+                  <p className={styles.muted}>Le changement de statut est historisé avec acteur, date et motif. Vérifiez le motif avant d&apos;enregistrer un statut de sortie : la trace reste dans l&apos;historique même si vous corrigez ensuite.</p>
                 </Card>
+                </div>
               ) : null}
 
               {lead ? (

@@ -3,7 +3,7 @@ import { listStarterLeads } from "../lib/broker-api";
 import { loginRedirect, readBackOfficeSession } from "../lib/backoffice-auth";
 import { canExportStarterLeads } from "../lib/broker-permissions";
 import { starterExportHref } from "../lib/lead-export-links";
-import { starterStatusLabel } from "../lib/lead-vocabulary";
+import { STARTER_ACCEPTABLE_STATUSES, starterStatusLabel } from "../lib/lead-vocabulary";
 import { productLabel } from "../lib/product-vocabulary";
 import {
   Badge,
@@ -16,6 +16,7 @@ import {
   PageHeader,
   PageStack,
   Select,
+  StatStrip,
   StatusBadge,
   paginateItems,
   readTableParams,
@@ -25,8 +26,12 @@ import {
 import type { DataTableColumn } from "../lib/ui/broker-ui";
 import { leadSummary } from "../lib/ui/broker-view-models";
 import type { LeadSummaryViewModel } from "../lib/ui/broker-view-models";
+import { elapsedBetween, formatElapsed } from "../lib/ui/lead-timing";
+import styles from "../lib/ui/lead-screens.module.css";
 
 type QueryParams = Record<string, string | string[] | undefined>;
+
+const WAITING_STATUSES: readonly string[] = STARTER_ACCEPTABLE_STATUSES;
 
 function firstParam(value: string | string[] | undefined): string {
   return Array.isArray(value) ? value[0] ?? "" : value ?? "";
@@ -43,26 +48,51 @@ function optionsOf(
   return [{ value: "", label: allLabel }, ...values.map((value) => ({ value, label: label ? label(value) : value }))];
 }
 
-const columns: Array<DataTableColumn<LeadSummaryViewModel>> = [
-  { key: "reference", header: "Référence", render: (lead) => <span className="bo-ref">{lead.reference}</span>, sortable: true, sortValue: (lead) => lead.reference },
-  { key: "country", header: "Pays", render: (lead) => lead.country },
-  { key: "product", header: "Produit", render: (lead) => productLabel(lead.product), sortable: true, sortValue: (lead) => productLabel(lead.product) },
-  {
-    key: "status",
-    header: "Statut",
-    render: (lead) => <StatusBadge status={lead.status} labels={starterStatusLabels} tones={{ [lead.status]: lead.statusTone }} />,
-    sortable: true,
-    sortValue: (lead) => starterStatusLabel(lead.status)
-  },
-  { key: "date", header: "Date", render: (lead) => lead.assignedAt, sortable: true, sortValue: (lead) => lead.assignedAt },
-  { key: "seen", header: "Vu", render: (lead) => (lead.seen === "Oui" ? "Oui" : <Badge tone="info">Non vu</Badge>) }
-];
+/**
+ * `waitingMs` gives how long a lead has been waiting for a decision (undefined once it is decided):
+ * the broker sees at a glance which lead has waited longest. It is a real elapsed time, never a target.
+ */
+function buildColumns(waitingMs: (lead: LeadSummaryViewModel) => number | undefined): Array<DataTableColumn<LeadSummaryViewModel>> {
+  return [
+    { key: "reference", header: "Référence", render: (lead) => <span className="bo-ref">{lead.reference}</span>, sortable: true, sortValue: (lead) => lead.reference },
+    { key: "country", header: "Pays", render: (lead) => lead.country },
+    { key: "product", header: "Produit", render: (lead) => productLabel(lead.product), sortable: true, sortValue: (lead) => productLabel(lead.product) },
+    {
+      key: "status",
+      header: "Statut",
+      render: (lead) => <StatusBadge status={lead.status} labels={starterStatusLabels} tones={{ [lead.status]: lead.statusTone }} />,
+      sortable: true,
+      sortValue: (lead) => starterStatusLabel(lead.status)
+    },
+    { key: "date", header: "Date", render: (lead) => lead.assignedAt, sortable: true, sortValue: (lead) => lead.assignedAt },
+    {
+      key: "wait",
+      header: "Attente",
+      render: (lead) => {
+        const ms = waitingMs(lead);
+        return ms === undefined ? "-" : <span className="bo-ref" title="Temps écoulé depuis la réception, sans décision">{formatElapsed(ms)}</span>;
+      },
+      sortable: true,
+      sortValue: (lead) => waitingMs(lead) ?? -1
+    },
+    { key: "seen", header: "Vu", render: (lead) => (lead.seen === "Oui" ? "Oui" : <Badge tone="info">Non vu</Badge>) }
+  ];
+}
 
 export default async function BrokerLeadsPage({ searchParams }: { searchParams?: Promise<QueryParams> }) {
   const params = searchParams ? await searchParams : {};
   const apiLeads = await listStarterLeads();
   if (apiLeads.unauthenticated) redirect(loginRedirect("/leads", apiLeads.error ?? "session_required"));
   const leads = apiLeads.data.items.map(leadSummary);
+  // Elapsed time since reception, read from the raw ISO date (the view model only keeps the day).
+  const nowMs = Date.now();
+  const receivedById = new Map(apiLeads.data.items.map((item) => [String(item.id ?? item.leadAssignmentId ?? "lead"), String(item.assignedAt ?? "")]));
+  const waitingMs = (lead: LeadSummaryViewModel): number | undefined =>
+    WAITING_STATUSES.includes(lead.status) ? elapsedBetween(receivedById.get(lead.id), new Date(nowMs).toISOString()) : undefined;
+  const columns = buildColumns(waitingMs);
+  const waiting = leads.filter((lead) => WAITING_STATUSES.includes(lead.status));
+  const longestWait = waiting.map(waitingMs).reduce<number | undefined>((longest, ms) => (ms !== undefined && (longest === undefined || ms > longest) ? ms : longest), undefined);
+  const loadFailed = Boolean(apiLeads.error || apiLeads.forbidden);
   // Spec 064 FR-001: the export button is shown only to roles holding broker_leads:export (API re-checks and audits).
   const session = await readBackOfficeSession();
   const canExport = session.status === "authenticated" && canExportStarterLeads(session.profile);
@@ -102,70 +132,107 @@ export default async function BrokerLeadsPage({ searchParams }: { searchParams?:
         }
       />
 
-      <FilterBar
-        action="/leads"
-        label="Filtres leads"
-        submitLabel="Filtrer"
-        resetLabel="Réinitialiser"
-        resetHref="/leads"
-        activeCount={activeCount}
-        autoSubmit
-      >
-        <Field id="leads-status" label="Statut">
-          <Select
-            id="leads-status"
-            name="status"
-            defaultValue={status}
-            options={optionsOf(leads, (lead) => lead.status, "Tous", starterStatusLabel)}
-          />
-        </Field>
-        <Field id="leads-product" label="Produit">
-          <Select id="leads-product" name="product" defaultValue={product} options={optionsOf(leads, (lead) => lead.product, "Tous", productLabel)} />
-        </Field>
-        <Field id="leads-country" label="Pays">
-          <Select id="leads-country" name="country" defaultValue={country} options={optionsOf(leads, (lead) => lead.country, "Tous")} />
-        </Field>
-        <Field id="leads-date" label="Date">
-          <Select id="leads-date" name="date" defaultValue={date} options={optionsOf(leads, (lead) => lead.assignedAt, "Toutes")} />
-        </Field>
-      </FilterBar>
-
       {apiLeads.forbidden ? (
-        <Notice tone="danger">Accès refusé ou MFA requis pour ce portail. Aucune donnée protégée n'est affichée.</Notice>
+        <Notice tone="danger" title="Accès refusé">
+          Accès refusé ou MFA requis pour ce portail. Aucune donnée protégée n'est affichée.
+          <div className={styles.shortcuts}>
+            <Button href="/" variant="secondary">Retour à l'accueil</Button>
+          </div>
+        </Notice>
       ) : null}
       {apiLeads.error && !apiLeads.forbidden ? (
-        <Notice tone="warning">API leads indisponible. Aucune donnée protégée n'est affichée en mode erreur.</Notice>
+        <Notice tone="warning" title="Leads indisponibles">
+          API leads indisponible. Aucune donnée protégée n'est affichée en mode erreur. Vos leads ne sont pas perdus : réessayez dans un instant.
+          <div className={styles.shortcuts}>
+            <Button href="/leads" variant="secondary">Réessayer</Button>
+          </div>
+        </Notice>
       ) : null}
 
-      {!apiLeads.forbidden ? (
-        <DataTable
-          columns={columns}
-          items={visible}
-          getKey={(lead) => lead.id}
-          aria-label="Leads assignés"
-          emptyLabel="Aucun lead autorisé à afficher."
-          emptyDescription={
-            activeCount > 0
-              ? "Aucun lead ne correspond à ces filtres. Réinitialisez-les pour revoir tous vos leads."
-              : "Les leads qu'AssurMatch vous assigne apparaissent ici, avec une notification. Ouvrez-en un pour l'accepter ou le rejeter."
-          }
-          emptyAction={activeCount > 0 ? <Button href="/leads" variant="secondary" size="sm">Réinitialiser les filtres</Button> : undefined}
-          getRowHref={(lead) => `/leads/${lead.id}`}
-          sort={table.sort}
-          sortHref={table.sortHref}
-          pagination={{
-            page: table.page,
-            pageSize: table.pageSize,
-            total: filtered.length,
-            hrefFor: table.pageHref,
-            label: (from, to, total) => `${from}-${to} sur ${total} lead(s)`
-          }}
+      {!loadFailed && leads.length > 0 ? (
+        <StatStrip
+          label="Résumé de vos leads"
+          items={[
+            {
+              label: "À traiter",
+              value: waiting.length,
+              tone: waiting.length > 0 ? "warning" : "neutral",
+              helper: longestWait !== undefined ? `Le plus ancien attend depuis ${formatElapsed(longestWait)}` : "Aucun lead en attente de décision"
+            },
+            { label: "Non vus", value: leads.filter((lead) => lead.seen !== "Oui").length, tone: "info", helper: "Jamais ouverts" },
+            { label: "Acceptés", value: leads.filter((lead) => lead.status === "accepted").length, tone: "success", helper: "À suivre ou à clôturer", href: "/leads?status=accepted" },
+            { label: "Total", value: leads.length, helper: "Tous statuts confondus" }
+          ]}
         />
+      ) : null}
+
+      {!loadFailed ? (
+        <FilterBar
+          action="/leads"
+          label="Filtres leads"
+          submitLabel="Filtrer"
+          resetLabel="Réinitialiser"
+          resetHref="/leads"
+          activeCount={activeCount}
+          autoSubmit
+        >
+          <Field id="leads-status" label="Statut">
+            <Select
+              id="leads-status"
+              name="status"
+              defaultValue={status}
+              options={optionsOf(leads, (lead) => lead.status, "Tous", starterStatusLabel)}
+            />
+          </Field>
+          <Field id="leads-product" label="Produit">
+            <Select id="leads-product" name="product" defaultValue={product} options={optionsOf(leads, (lead) => lead.product, "Tous", productLabel)} />
+          </Field>
+          <Field id="leads-country" label="Pays">
+            <Select id="leads-country" name="country" defaultValue={country} options={optionsOf(leads, (lead) => lead.country, "Tous")} />
+          </Field>
+          <Field id="leads-date" label="Date de réception">
+            <Select id="leads-date" name="date" defaultValue={date} options={optionsOf(leads, (lead) => lead.assignedAt, "Toutes")} />
+          </Field>
+        </FilterBar>
+      ) : null}
+
+      {!loadFailed ? (
+        <div className={styles.leadTable}>
+          <DataTable
+            columns={columns}
+            items={visible}
+            getKey={(lead) => lead.id}
+            aria-label="Leads assignés"
+            emptyLabel="Aucun lead autorisé à afficher."
+            emptyDescription={
+              activeCount > 0
+                ? "Aucun lead ne correspond à ces filtres. Réinitialisez-les pour revoir tous vos leads."
+                : "Les leads qu'AssurMatch vous assigne apparaissent ici, avec une notification. Ouvrez-en un pour l'accepter ou le rejeter. Aucun lead n'arrive ? Vérifiez que vos offres sont publiées."
+            }
+            emptyAction={
+              activeCount > 0 ? (
+                <Button href="/leads" variant="secondary" size="sm">Réinitialiser les filtres</Button>
+              ) : (
+                <Button href="/offers" variant="secondary" size="sm">Vérifier mes offres</Button>
+              )
+            }
+            getRowHref={(lead) => `/leads/${lead.id}`}
+            sort={table.sort}
+            sortHref={table.sortHref}
+            pagination={{
+              page: table.page,
+              pageSize: table.pageSize,
+              total: filtered.length,
+              hrefFor: table.pageHref,
+              label: (from, to, total) => `${from}-${to} sur ${total} lead(s)`
+            }}
+          />
+        </div>
       ) : null}
 
       <Notice tone="neutral" title="Limites Starter">
         Aucun Kanban, assignation équipe ou CRM avancé n'est active pour le portail Starter. Le CRM complet est disponible avec le plan Pro.
-        Export contrôle par permission et audit.
+        L'export est contrôlé par permission et audité.
       </Notice>
     </PageStack>
   );
