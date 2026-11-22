@@ -327,7 +327,7 @@ test("ENT-08 un courtier Starter n'a pas les fonctions Enterprise : la page l'ex
   const page = await openEnterprise(browser, "starter", starter);
   await expect(page.getByRole("heading", { name: "Espace Enterprise indisponible" })).toBeVisible();
   await expect(page.getByText("Plan Enterprise requis")).toBeVisible();
-  await expect(page.getByText("Votre plan actuel donne accès aux leads et au CRM selon vos permissions.")).toBeVisible();
+  await expect(page.getByText("Votre plan actuel (Starter) donne accès aux leads de votre cabinet.")).toBeVisible();
   // Nothing of the Enterprise space is rendered: no agency form, no SLA form.
   await expect(page.locator("#agency-name")).toHaveCount(0);
   await expect(page.locator("#sla-target")).toHaveCount(0);
