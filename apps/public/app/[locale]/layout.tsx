@@ -50,7 +50,7 @@ export default async function LocaleLayout({ children, params }: { children: Rea
             <SkipLink label={t("skipToContent")} />
             <VisitBeacon />
             <SiteHeader locale={locale} />
-            <main className="am-main" id="contenu">
+            <main className="am-main" id="contenu" tabIndex={-1}>
               {children}
             </main>
             <LocalContactBlock />

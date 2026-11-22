@@ -77,7 +77,8 @@
       "sponsoredSentence": "The countries, products and offers on display depend on public activations. A sponsored offer is always labelled as such.",
       "allGuides": "All guides",
       "rights": "All rights reserved.",
-      "backToTop": "Back to top"
+      "backToTop": "Back to top",
+      "navLabel": "Footer links"
     }
   },
   "Common": {
@@ -1085,6 +1086,11 @@
         "error": "Your request could not be recorded. Please try again in a few moments."
       },
       "typeRequired": "Choose the type of request."
+    },
+    "refresh": {
+      "action": "Refresh the status",
+      "pending": "Refreshing.",
+      "done": "Status refreshed at {time}."
     }
   },
   "VisitorAi": {
@@ -1359,7 +1365,8 @@
     "lead": "Answers to the most frequent questions about AssurMatch.",
     "questionCount": "{count, plural, one {# question} other {# questions}}",
     "selectorLead": "Pick a country and a product to display the matching indicative offers.",
-    "relatedProduct": "Related product"
+    "relatedProduct": "Related product",
+    "themesLabel": "FAQ topics"
   },
   "Contact": {
     "title": "Contact",

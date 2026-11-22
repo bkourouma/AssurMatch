@@ -126,3 +126,17 @@ test("visitor tracking surfaces avoid forbidden wording and back-office imports"
   }
   expect(sources).not.toMatch(/apps\/(admin|broker|backoffice)|@assurmatch\/(admin|broker)/);
 });
+
+test("the tracking page mounts RefreshStatus with FR and EN copy, announced after the transition", () => {
+  const page = readSources([trackingPage]);
+  expect(page).toContain("<RefreshStatus");
+  for (const key of ["refresh.action", "refresh.pending", "refresh.done"]) expect(page).toContain(`t("${key}"`);
+  for (const locale of ["fr", "en"] as const) {
+    const refresh = (messagesJson(locale).QuoteRequest as { refresh?: Record<string, string> }).refresh;
+    for (const key of ["action", "pending", "done"]) expect(refresh?.[key], `${locale} QuoteRequest.refresh.${key}`).toBeTruthy();
+  }
+  const component = readSources([publicFile("components/tracking/refresh-status.tsx")]);
+  // Focus stays on the button (no `disabled`/`loading`), and the time is announced from an effect once settled.
+  expect(component).not.toMatch(/disabled=\{|loading=\{/);
+  expect(component).toContain("useEffect");
+});

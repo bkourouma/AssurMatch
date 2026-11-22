@@ -77,7 +77,8 @@
       "sponsoredSentence": "Les pays, produits et offres visibles dépendent des activations publiques. Une offre sponsorisée est toujours signalée.",
       "allGuides": "Tous les guides",
       "rights": "Tous droits réservés.",
-      "backToTop": "Retour en haut"
+      "backToTop": "Retour en haut",
+      "navLabel": "Liens du pied de page"
     }
   },
   "Common": {
@@ -1085,6 +1086,11 @@
         "error": "Votre demande n'a pas pu être enregistrée. Réessayez dans quelques instants."
       },
       "typeRequired": "Choisissez le type de demande."
+    },
+    "refresh": {
+      "action": "Actualiser le statut",
+      "pending": "Actualisation en cours.",
+      "done": "Statut actualisé à {time}."
     }
   },
   "VisitorAi": {
@@ -1359,7 +1365,8 @@
     "lead": "Les réponses aux questions les plus fréquentes sur AssurMatch.",
     "questionCount": "{count, plural, one {# question} other {# questions}}",
     "selectorLead": "Choisissez un pays et un produit pour afficher les offres indicatives correspondantes.",
-    "relatedProduct": "Produit concerné"
+    "relatedProduct": "Produit concerné",
+    "themesLabel": "Thèmes de la FAQ"
   },
   "Contact": {
     "title": "Contact",
