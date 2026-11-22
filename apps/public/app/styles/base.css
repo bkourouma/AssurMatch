@@ -196,6 +196,12 @@ textarea:focus-visible {
   outline-offset: 1px;
 }
 
+/* The main landmark is focusable only so the skip link lands inside the page (a skip link whose target
+   cannot take focus leaves some browsers on the link). A ring around the whole page would be noise. */
+main[tabindex="-1"]:focus-visible {
+  outline: none;
+}
+
 /* Browser surfaces: the selection is a strip of tape, the caret and the form accents are the link indigo. */
 ::selection {
   background: var(--am-selection);
@@ -407,5 +413,36 @@ samp {
     transition-delay: 0ms !important;
     animation-delay: 0ms !important;
     scroll-behavior: auto !important;
+  }
+}
+
+/* ---------- Print: legal pages and tracking pages get printed; the chrome and the cloth do not ---------- */
+
+@media print {
+  .am-skip-link,
+  .am-header,
+  .am-footer,
+  .am-localcontact,
+  .am-breadcrumb,
+  .am-article__toc,
+  .am-j-refresh {
+    display: none !important;
+  }
+
+  /* The cloth is dropped by the browser: nothing may rely on light text over it. */
+  .am-hero,
+  .am-hero__sheet {
+    background: none !important;
+  }
+
+  .am-hero :is(h1, p, li, span) {
+    color: CanvasText !important;
+  }
+
+  /* A printed page has no hover: show where a link goes when it leaves the site. */
+  .am-article__body a[href^="http"]::after {
+    content: " (" attr(href) ")";
+    font-size: 0.85em;
+    word-break: break-all;
   }
 }

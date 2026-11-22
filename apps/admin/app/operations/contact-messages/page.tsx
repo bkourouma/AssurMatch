@@ -1,6 +1,8 @@
 import { firstValue, formatDateTime, readContactMessages } from "../../lib/operations-api";
 import { Badge, Card, DescriptionList, EmptyState, Field, FilterBar, Grid, PageHeader, PageStack, Select, StateMessage, Stack, fieldControlProps } from "../../lib/ui/admin-ui";
 import { ContactStatusForm } from "../../lib/ui/operations-forms";
+import { ActiveFilters, type ActiveFilterChip } from "../../lib/ui/active-filters";
+import { contactAudienceLabel, contactStatusLabel } from "../../lib/ui/operations-labels";
 import { OperationsTabs } from "../../lib/ui/operations-tabs";
 import { contactStatusTones } from "../../lib/ui/operations-tones";
 import { readFailureDetail } from "../../lib/auth-error-messages";
@@ -13,11 +15,17 @@ import { readFailureDetail } from "../../lib/auth-error-messages";
 
 const audienceLabels: Record<string, string> = { visitor: "Visiteur", broker: "Courtier", insurer: "Assureur", press: "Presse" };
 
+
 export default async function AdminContactMessagesPage({ searchParams }: { searchParams?: Promise<Record<string, string | string[] | undefined>> }) {
   const params = searchParams ? await searchParams : {};
   const filters = { status: firstValue(params.status), audience: firstValue(params.audience) };
   const result = await readContactMessages(filters);
   const activeFilters = Object.values(filters).filter(Boolean).length;
+  const chips: ActiveFilterChip[] = [
+    ...(filters.status ? [{ key: "status", label: "Statut", value: contactStatusLabel(filters.status) }] : []),
+    ...(filters.audience ? [{ key: "audience", label: "Audience", value: contactAudienceLabel(filters.audience) }] : [])
+  ];
+  const newCount = result.status === "success" ? result.data.filter((message) => message.status === "new").length : 0;
 
   return (
     <PageStack>
@@ -25,6 +33,7 @@ export default async function AdminContactMessagesPage({ searchParams }: { searc
         breadcrumb={[{ label: "Pilotage" }, { label: "Opérations", href: "/operations" }, { label: "Messages de contact" }]}
         title="Messages de contact"
         description="Boîte de réception du formulaire de contact. Le statut (nouveau, traité, spam) change de façon auditée ; la réponse part de votre messagerie."
+        actions={result.status === "success" ? <Badge tone={newCount > 0 ? "warning" : "neutral"}>{`${result.data.length} message(s)${newCount > 0 ? ` dont ${newCount} nouveau(x)` : ""}`}</Badge> : null}
       />
       <OperationsTabs current="/operations/contact-messages" />
 
@@ -48,12 +57,13 @@ export default async function AdminContactMessagesPage({ searchParams }: { searc
           </Select>
         </Field>
       </FilterBar>
+      <ActiveFilters pathname="/operations/contact-messages" filters={filters} chips={chips} />
 
       {result.status === "success" && result.data.length === 0 ? (
         <EmptyState
           icon="message"
           title="Aucun message pour ces filtres."
-          description={activeFilters > 0 ? "Réinitialisez les filtres pour revoir toute la boîte de réception." : "Les messages envoyés depuis le formulaire de contact du site apparaissent ici."}
+          description={activeFilters > 0 ? "Retirez un filtre ci-dessus ou réinitialisez-les pour revoir toute la boîte de réception." : "Les messages envoyés depuis le formulaire de contact du site apparaissent ici."}
         />
       ) : null}
 
@@ -63,7 +73,7 @@ export default async function AdminContactMessagesPage({ searchParams }: { searc
             key={message.id}
             title={message.subject}
             description={`${audienceLabels[message.audience] ?? message.audience} - reçu le ${formatDateTime(message.createdAt)}`}
-            actions={<Badge tone={contactStatusTones[message.status] ?? "neutral"}>{message.status}</Badge>}
+            actions={<Badge tone={contactStatusTones[message.status] ?? "neutral"} title={message.status}>{contactStatusLabel(message.status)}</Badge>}
           >
             <Grid columns="two">
               <Stack>
@@ -78,7 +88,7 @@ export default async function AdminContactMessagesPage({ searchParams }: { searc
                       value: <a href={`mailto:${message.emailNormalized}?subject=${encodeURIComponent(`Re: ${message.subject} (${message.publicReference})`)}`}>Répondre par e-mail</a>
                     },
                     ...(message.handledAt ? [{ term: "Mis à jour le", value: formatDateTime(message.handledAt) }] : []),
-                    ...(message.statusReason ? [{ term: "Motif", value: message.statusReason }] : [])
+                    ...(message.statusReason ? [{ term: "Note interne", value: message.statusReason }] : [])
                   ]}
                 />
                 <p className="bo-break">{message.message}</p>

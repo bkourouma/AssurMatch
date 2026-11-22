@@ -2,7 +2,10 @@ import { loginAction } from "../lib/backoffice-session-actions";
 import { loginNotices } from "../lib/auth-error-messages";
 import { isLocalAdminDemoLoginEnabled } from "../lib/dev-demo-accounts";
 import { DevAccountPicker } from "./dev-account-picker";
-import { Button, Field, Form, FormActions, Input, Notice, fieldControlProps } from "../lib/ui/admin-ui";
+import { Field, Form, FormActions, Input, Notice, fieldControlProps } from "../lib/ui/admin-ui";
+import { AuthSubmitButton } from "../lib/ui/auth-submit-button";
+
+export const metadata = { title: "Connexion" };
 
 interface LoginPageProps {
   searchParams?: Promise<Record<string, string | string[] | undefined>>;
@@ -31,7 +34,7 @@ export default async function AdminLoginPage({ searchParams }: LoginPageProps) {
       <Form action={loginAction}>
         <input type="hidden" name="returnTo" value={returnTo} />
         <Field id="login-email" label="Email" required>
-          <Input {...fieldControlProps("login-email", { required: true })} name="email" type="email" autoComplete="email" />
+          <Input {...fieldControlProps("login-email", { required: true })} name="email" type="email" autoComplete="username" autoFocus spellCheck={false} />
         </Field>
         <Field id="login-password" label="Mot de passe" required>
           <Input
@@ -43,12 +46,12 @@ export default async function AdminLoginPage({ searchParams }: LoginPageProps) {
           />
         </Field>
         <FormActions>
-          <Button type="submit" fullWidth>Se connecter</Button>
+          <AuthSubmitButton pendingLabel="Connexion…">Se connecter</AuthSubmitButton>
         </FormActions>
       </Form>
 
       <p className="bo-auth__footer">
-        <a href={`/activate?returnTo=${encodeURIComponent(returnTo)}`}>Activer un compte</a> · <a href="/password-reset">Consommer un jeton de réinitialisation</a>
+        <a href={`/activate?returnTo=${encodeURIComponent(returnTo)}`}>Activer mon compte (lien d'invitation)</a> · <a href="/password-reset">Mot de passe oublié : utiliser un jeton de réinitialisation</a>
       </p>
     </>
   );

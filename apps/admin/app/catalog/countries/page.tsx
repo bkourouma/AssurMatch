@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 import { readAdminCountries, readRegulatoryRegimes, type AdminCountryData } from "../../lib/admin-api";
 import { isAdminProfile, loginRedirect, readBackOfficeSession } from "../../lib/backoffice-auth";
 import { CATALOG_STATUS_LABELS, COUNTRY_STATUS_OPTIONS, adminReadErrorMessage, flagLabel, labelWithCode } from "../../lib/catalog-messages";
-import { ActiveFilters, hrefWithout } from "../../lib/ui/active-filters";
+import { ActiveFilters, hrefWithout } from "../../lib/ui/active-filter-chips";
 import {
   Badge,
   Button,

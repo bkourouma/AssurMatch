@@ -29,7 +29,7 @@ import {
   sortItems
 } from "../lib/ui/admin-ui";
 import type { DataTableColumn } from "../lib/ui/admin-ui";
-import { ActiveFilters, hrefWithout, type ActiveFilterItem } from "../lib/ui/active-filters";
+import { ActiveFilters, hrefWithout, type ActiveFilterItem } from "../lib/ui/active-filter-chips";
 
 function firstParam(value: string | string[] | undefined): string {
   return Array.isArray(value) ? value[0] ?? "" : value ?? "";

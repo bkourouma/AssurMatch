@@ -1,46 +1,36 @@
-import { Badge, Cluster } from "./admin-ui";
+import { toQueryString } from "../operations-api";
+import { Cluster } from "./admin-ui";
 
-export interface ActiveFilterItem {
-  /** Visible name of the filter, e.g. "Statut". */
+export interface ActiveFilterChip {
+  /** Name of the query parameter the chip clears. */
+  key: string;
+  /** Human wording of the filter ("Statut"). */
   label: string;
-  /** Visible value, already humanised by the page, e.g. "Brouillon". */
+  /** Human wording of the value ("Routée"). */
   value: string;
-  /** Link that removes only this filter and keeps the others. */
-  removeHref: string;
 }
 
 /**
- * Summary of the filters applied to a list, one removable chip each. The query string stays the
- * single source of truth: a chip is a plain link, so it works without JavaScript and the filtered
- * view remains a shareable URL. Renders nothing when no filter is active.
+ * Summary of the filters currently applied to a console, each one removable with a single link. The
+ * filters stay in the query string (shareable view); a chip only drops its own key and the page
+ * number, so removing a filter never leaves the operator on an out-of-range page.
  */
-export function ActiveFilters({ items, label = "Filtres appliqués" }: { items: ActiveFilterItem[]; label?: string }) {
-  if (items.length === 0) return null;
+export function ActiveFilters({ pathname, filters, chips }: { pathname: string; filters: Record<string, string | undefined>; chips: ActiveFilterChip[] }) {
+  if (chips.length === 0) return null;
   return (
-    <Cluster aria-label={label} as="section">
-      <span className="bo-description">{label} :</span>
-      {items.map((item) => (
-        <Badge key={`${item.label}:${item.value}`} tone="info">
-          {item.label} : {item.value}
-          {" "}
-          <a href={item.removeHref} aria-label={`Retirer le filtre ${item.label} : ${item.value}`}>×</a>
-        </Badge>
+    <Cluster as="section" aria-label="Filtres appliqués">
+      <span className="bo-description">Filtres appliqués :</span>
+      {chips.map((chip) => (
+        <a
+          key={chip.key}
+          className="bo-filters__count"
+          href={`${pathname}${toQueryString({ ...filters, [chip.key]: undefined })}`}
+          aria-label={`Retirer le filtre ${chip.label} : ${chip.value}`}
+          title="Retirer ce filtre"
+        >
+          {`${chip.label} : ${chip.value} ×`}
+        </a>
       ))}
     </Cluster>
   );
-}
-
-/**
- * Builds the href of a list page with one query parameter dropped (and the page reset), keeping the
- * other filters and the sort.
- */
-export function hrefWithout(pathname: string, params: Record<string, string | string[] | undefined>, drop: string): string {
-  const query = new URLSearchParams();
-  for (const [key, raw] of Object.entries(params)) {
-    if (key === drop || key === "page" || key === "notice") continue;
-    const value = Array.isArray(raw) ? raw[0] : raw;
-    if (value) query.set(key, value);
-  }
-  const serialised = query.toString();
-  return serialised ? `${pathname}?${serialised}` : pathname;
 }

@@ -18,7 +18,7 @@ const DESTINATIONS: DirectoryItem[] = [
   { key: "compare", title: "Comparer les offres", icon: "search", externalHref: "/pays" },
   { key: "home", title: "Retour à l'accueil", icon: "home", externalHref: "/" },
   { key: "how-it-works", title: "Comment ça marche", icon: "compass", externalHref: "/comment-ca-marche" },
-  { key: "guides", title: "Guides", icon: "book-open", externalHref: "/guides" },
+  { key: "track", title: "Suivre ma demande", icon: "clock", externalHref: "/suivi" },
   { key: "faq", title: "FAQ", icon: "help-circle", externalHref: "/faq" },
   { key: "contact", title: "Contact", icon: "mail", externalHref: "/contact" }
 ];

@@ -4,6 +4,7 @@ import { resolveGuides } from "../../content/cms-content";
 import { guideReadingTimeMinutes } from "../../content/guides";
 import { Breadcrumb } from "../../components/ui/breadcrumb";
 import { Directory, type DirectoryItem } from "../../components/ui/directory";
+import { EmptyState } from "../../components/ui/empty-state";
 import { Hero } from "../../components/ui/hero";
 import { productPictogram } from "../../components/ui/pictogram";
 import { Section } from "../../components/ui/section";
@@ -68,7 +69,11 @@ export default async function GuidesIndexPage({ params }: { params: Promise<{ lo
       />
 
       <Section>
-        <Directory items={rows} label={t("title")} columns={2} className="am-guides-dir" />
+        {rows.length > 0 ? (
+          <Directory items={rows} label={t("title")} columns={2} className="am-guides-dir" />
+        ) : (
+          <EmptyState title={t("empty.title")} description={t("empty.description")} />
+        )}
       </Section>
     </>
   );

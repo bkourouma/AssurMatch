@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
-import type { CSSProperties, ReactNode } from "react";
+import { useEffect, useId, useRef, useState } from "react";
+import type { CSSProperties, KeyboardEvent as ReactKeyboardEvent, ReactNode } from "react";
 import { Icon } from "../icons";
 import { initialsOf } from "./initials";
 import { THEMES, themeByValue } from "../themes";
@@ -24,15 +24,32 @@ export interface UserMenuProps {
   themePicker?: { cookieName: string; current: ThemeValue; label: string } | undefined;
 }
 
+const MENU_ITEMS = '[role^="menuitem"], a[href], button:not([disabled])';
+
+/** Entries of the open menu, in DOM order: extra items, the theme options, then the logout button. */
+function menuItems(menu: HTMLElement | null): HTMLElement[] {
+  return menu ? Array.from(menu.querySelectorAll<HTMLElement>(MENU_ITEMS)) : [];
+}
+
 export function UserMenu({ label, role, initials, menuLabel, logoutLabel, logoutAction, children, placement = "down", themePicker }: UserMenuProps) {
   const [open, setOpen] = useState(false);
   const [theme, setTheme] = useState<string>(themePicker?.current ?? "clair");
   const containerRef = useRef<HTMLDivElement>(null);
+  const buttonRef = useRef<HTMLButtonElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
+  const menuId = `bo-user-menu-${useId()}`;
+
+  // The focus enters the menu on the first entry as soon as it opens.
+  useEffect(() => {
+    if (open) menuItems(menuRef.current)[0]?.focus();
+  }, [open]);
 
   useEffect(() => {
     if (!open) return;
     function onKeyDown(event: KeyboardEvent) {
-      if (event.key === "Escape") setOpen(false);
+      if (event.key !== "Escape") return;
+      setOpen(false);
+      buttonRef.current?.focus();
     }
     function onPointerDown(event: MouseEvent) {
       const node = containerRef.current;
@@ -56,15 +73,43 @@ export function UserMenu({ label, role, initials, menuLabel, logoutLabel, logout
     document.cookie = `${themePicker.cookieName}=${next.value}; path=/; max-age=31536000; samesite=lax`;
   }
 
+  // Arrow keys, Home and End move between the entries; Tab leaves the menu and closes it.
+  function onMenuKeyDown(event: ReactKeyboardEvent<HTMLDivElement>) {
+    if (event.key === "Tab") {
+      setOpen(false);
+      buttonRef.current?.focus();
+      return;
+    }
+    const items = menuItems(menuRef.current);
+    if (items.length === 0) return;
+    const index = items.indexOf(document.activeElement as HTMLElement);
+    let next: number | undefined;
+    if (event.key === "ArrowDown") next = index < 0 ? 0 : (index + 1) % items.length;
+    else if (event.key === "ArrowUp") next = index <= 0 ? items.length - 1 : index - 1;
+    else if (event.key === "Home") next = 0;
+    else if (event.key === "End") next = items.length - 1;
+    if (next === undefined) return;
+    event.preventDefault();
+    items[next]?.focus();
+  }
+
   return (
     <div className="bo-user-menu" data-placement={placement} ref={containerRef}>
       <button
         className="bo-user-menu__button"
+        ref={buttonRef}
         type="button"
         aria-label={menuLabel}
         aria-expanded={open}
         aria-haspopup="menu"
+        aria-controls={menuId}
         onClick={() => setOpen((previous) => !previous)}
+        onKeyDown={(event) => {
+          if (!open && (event.key === "ArrowDown" || event.key === "ArrowUp")) {
+            event.preventDefault();
+            setOpen(true);
+          }
+        }}
       >
         <span className="bo-user-menu__avatar" aria-hidden="true">
           {initials ?? initialsOf(label)}
@@ -76,7 +121,7 @@ export function UserMenu({ label, role, initials, menuLabel, logoutLabel, logout
         <Icon name={placement === "up" ? "chevronUpDown" : "chevronDown"} size={16} />
       </button>
       {open ? (
-        <div className="bo-menu" role="menu">
+        <div className="bo-menu" role="menu" id={menuId} aria-label={menuLabel} ref={menuRef} onKeyDown={onMenuKeyDown}>
           {children}
           {themePicker ? (
             <fieldset className="bo-themes">
@@ -87,7 +132,8 @@ export function UserMenu({ label, role, initials, menuLabel, logoutLabel, logout
                     key={item.value}
                     type="button"
                     className="bo-theme-option"
-                    aria-pressed={theme === item.value}
+                    role="menuitemradio"
+                    aria-checked={theme === item.value}
                     onClick={() => chooseTheme(item.value)}
                   >
                     <span

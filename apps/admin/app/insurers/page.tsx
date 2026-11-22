@@ -4,7 +4,7 @@ import { isAdminProfile, loginRedirect, readBackOfficeSession } from "../lib/bac
 import { adminReadErrorMessage } from "../lib/catalog-messages";
 import { readAdminInsurers, type AdminInsurerView } from "../lib/lot4-offers-api";
 import { INSURER_STATUS_LABELS, INSURER_STATUS_OPTIONS, INSURER_STATUS_TONES } from "../lib/offer-messages";
-import { ActiveFilters, hrefWithout } from "../lib/ui/active-filters";
+import { ActiveFilters, hrefWithout } from "../lib/ui/active-filter-chips";
 import {
   Button,
   Card,

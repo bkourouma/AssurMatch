@@ -43,7 +43,7 @@ import {
   sortItems
 } from "../lib/ui/admin-ui";
 import type { DataTableColumn } from "../lib/ui/admin-ui";
-import { ActiveFilters, hrefWithout, type ActiveFilterItem } from "../lib/ui/active-filters";
+import { ActiveFilters, hrefWithout, type ActiveFilterItem } from "../lib/ui/active-filter-chips";
 
 /**
  * Spec 052 US2/US5 (FR-010): offres indicatives. Filtered list restricted by the API to the

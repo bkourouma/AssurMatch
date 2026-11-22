@@ -373,7 +373,7 @@ test("T-09 messages d'authentification reellement affiches (admin)", async ({ br
   const resetPage = await resetContext.newPage();
   await resetPage.goto(`${e2eEnv.adminUrl}/password-reset?token=${encodeURIComponent(`invalide-${uniqueSuffix()}`)}`);
   await resetPage.locator("#password-reset-new").fill(GOOD_NEW_PASSWORD);
-  await resetPage.getByRole("button", { name: "Consommer le jeton" }).click();
+  await resetPage.getByRole("button", { name: "Réinitialiser le mot de passe" }).click();
   await expect.poll(async () => (await noticeTexts(resetPage)).length, { timeout: 20_000 }).toBeGreaterThan(0);
   const resetTexts = await noticeTexts(resetPage);
   const resetApi = await api(undefined, "POST", "/auth/password-reset", { token: `invalide-${uniqueSuffix()}`, newPassword: GOOD_NEW_PASSWORD });

@@ -19,10 +19,10 @@ export function DevAccountPicker({ returnTo }: DevAccountPickerProps) {
         <Field
           id="dev-demo-account"
           label="Compte démo"
-          hint="Disponible uniquement en local avec les données démo seed."
+          hint="Disponible uniquement en local avec les données démo seed. Le choix d'un compte ouvre aussitôt la session."
         >
           <Select
-            {...fieldControlProps("dev-demo-account", { hint: "Disponible uniquement en local avec les données démo seed." })}
+            {...fieldControlProps("dev-demo-account", { hint: "Disponible uniquement en local avec les données démo seed. Le choix d'un compte ouvre aussitôt la session." })}
             name="demoEmail"
             defaultValue=""
             onChange={(event) => {

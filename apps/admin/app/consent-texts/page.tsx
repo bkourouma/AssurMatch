@@ -19,7 +19,7 @@ import {
   formatDate,
   labelWithCode
 } from "../lib/catalog-messages";
-import { ActiveFilters, hrefWithout } from "../lib/ui/active-filters";
+import { ActiveFilters, hrefWithout } from "../lib/ui/active-filter-chips";
 import {
   Badge,
   Button,

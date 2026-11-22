@@ -10,6 +10,7 @@ import { PlatformStatusNotice } from "../../../components/site/platform-status-n
 import { BackendText } from "../../../components/ui/backend-text";
 import { Badge } from "../../../components/ui/badge";
 import { Breadcrumb } from "../../../components/ui/breadcrumb";
+import { Button } from "../../../components/ui/button";
 import { Directory, type DirectoryItem } from "../../../components/ui/directory";
 import { EmptyState } from "../../../components/ui/empty-state";
 import { Hero } from "../../../components/ui/hero";
@@ -259,10 +260,32 @@ async function OpenCountry({ locale, country, countryCode }: VariantProps) {
           <h2 className="am-j-signlist__title">{t("productsTitle")}</h2>
           <p className="am-j-signlist__lead">{t("productsLead")}</p>
           {products.status === "error" ? (
-            <EmptyState icon="wifi-off" title={t("productsError.title")} description={t("productsError.description")} />
+            <EmptyState
+              icon="wifi-off"
+              title={t("productsError.title")}
+              description={t("productsError.description")}
+              action={
+                <Button
+                  variant="secondary"
+                  href={{ pathname: "/countries/[countryCode]", params: { countryCode } }}
+                  icon={<Icon name="refresh" size={18} />}
+                >
+                  {t("retry")}
+                </Button>
+              }
+            />
           ) : null}
           {products.status !== "error" && products.data.length === 0 ? (
-            <EmptyState icon="package" title={t("productsEmpty.title")} description={t("productsEmpty.description")} />
+            <EmptyState
+              icon="package"
+              title={t("productsEmpty.title")}
+              description={t("productsEmpty.description")}
+              action={
+                <Button variant="secondary" href="/countries" icon={<Icon name="globe" size={18} />}>
+                  {countries("open.title")}
+                </Button>
+              }
+            />
           ) : null}
           <Directory items={productRows} label={t("productsTitle")} columns={2} surface="plate" />
           {comparable.length > 0 || quotable.length > 0 ? (

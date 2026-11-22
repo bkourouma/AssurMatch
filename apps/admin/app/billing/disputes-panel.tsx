@@ -31,7 +31,7 @@ import {
 import type { AdminApiState, AdminLeadDispute, AdminLeadDisputeList } from "../lib/admin-api";
 import { productLabel } from "../lib/ui/operations-labels";
 import { readFailureDetail } from "../lib/auth-error-messages";
-import { ActiveFilters, type ActiveFilterItem } from "../lib/ui/active-filters";
+import { ActiveFilters, type ActiveFilterItem } from "../lib/ui/active-filter-chips";
 
 /** Filters of the disputes tab, as typed in the query string (dates are `YYYY-MM-DD`). */
 export interface DisputeTabFilters {

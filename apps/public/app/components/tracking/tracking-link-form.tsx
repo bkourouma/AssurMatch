@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useState } from "react";
+import { FormEvent, useEffect, useRef, useState } from "react";
 import { useLocale } from "next-intl";
 import { toLocale } from "../../../i18n/routing";
 import { requestTrackingLink } from "../../lib/public-api";
@@ -46,6 +46,18 @@ export function TrackingLinkForm({ labels, defaultReference }: { labels: Trackin
   const [status, setStatus] = useState<FormStatus>("idle");
   const [errors, setErrors] = useState<FieldErrors>({});
   const locale = toLocale(useLocale());
+  const confirmationRef = useRef<HTMLDivElement>(null);
+  const previousStatus = useRef<FormStatus>("idle");
+
+  // The form disappears once the answer is in, which would drop keyboard and screen-reader focus on
+  // the page: move it to the confirmation, and back to the first field when the visitor starts again.
+  useEffect(() => {
+    const before = previousStatus.current;
+    previousStatus.current = status;
+    if (status === "confirmed") confirmationRef.current?.focus();
+    else if (before === "confirmed" && status === "idle") document.getElementById("tracking-reference")?.focus();
+    else if ((status === "rate_limited" || status === "error") && before === "submitting") document.getElementById("tracking-reference")?.focus();
+  }, [status]);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -60,7 +72,11 @@ export function TrackingLinkForm({ labels, defaultReference }: { labels: Trackin
     if (!REFERENCE_PATTERN.test(publicReference)) nextErrors.reference = labels.invalidReference;
     if (!EMAIL_PATTERN.test(email) || email.length > 254) nextErrors.email = labels.invalidEmail;
     setErrors(nextErrors);
-    if (nextErrors.reference || nextErrors.email) return;
+    if (nextErrors.reference || nextErrors.email) {
+      // A failed submit must not leave focus on the button: send it to the first field to fix.
+      document.getElementById(nextErrors.reference ? "tracking-reference" : "tracking-email")?.focus();
+      return;
+    }
 
     if (website) {
       setStatus("confirmed");
@@ -76,7 +92,7 @@ export function TrackingLinkForm({ labels, defaultReference }: { labels: Trackin
 
   if (status === "confirmed") {
     return (
-      <div className="am-stack">
+      <div className="am-stack" ref={confirmationRef} tabIndex={-1}>
         <Notice tone="success" title={labels.confirmationTitle} role="status">
           {labels.confirmationBody}
         </Notice>
@@ -107,6 +123,10 @@ export function TrackingLinkForm({ labels, defaultReference }: { labels: Trackin
           name="publicReference"
           type="text"
           autoComplete="off"
+          autoCapitalize="characters"
+          autoCorrect="off"
+          spellCheck={false}
+          enterKeyHint="next"
           maxLength={64}
           defaultValue={defaultReference ?? ""}
         />
@@ -116,7 +136,11 @@ export function TrackingLinkForm({ labels, defaultReference }: { labels: Trackin
           {...fieldControlProps("tracking-email", { error: errors.email, required: true })}
           name="email"
           type="email"
+          inputMode="email"
           autoComplete="email"
+          autoCapitalize="none"
+          spellCheck={false}
+          enterKeyHint="send"
           maxLength={254}
         />
       </Field>

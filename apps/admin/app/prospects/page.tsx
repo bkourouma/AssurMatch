@@ -1,6 +1,6 @@
 import { firstValue, formatDateTime, pageHref, pageNumber, readProspects, type ProspectRow } from "../lib/operations-api";
 import { Badge, Button, Card, DataTable, Field, Input, PageHeader, PageStack, Select, StateMessage, fieldControlProps, type DataTableColumn } from "../lib/ui/admin-ui";
-import { ActiveFilters, type ActiveFilterItem } from "../lib/ui/active-filters";
+import { ActiveFilters, type ActiveFilterItem } from "../lib/ui/active-filter-chips";
 import { OperationsTabs } from "../lib/ui/operations-tabs";
 import { readBackOfficeSession } from "../lib/backoffice-auth";
 import { searchProspectsAction } from "./search-action";

@@ -10,6 +10,8 @@ export interface NoticeProps {
   title?: string | undefined;
   /** Set to false to drop the leading glyph; the tone colour then carries the meaning alone. */
   icon?: boolean | undefined;
+  /** Overrides the announcement politeness: assertive for danger, polite for the other tones by default. */
+  live?: "polite" | "assertive" | "off" | undefined;
 }
 
 const TONE_ICONS: Record<NoticeTone, IconName> = {
@@ -24,11 +26,17 @@ const TONE_ICONS: Record<NoticeTone, IconName> = {
  * A notice is never closable: regulatory and error wording must stay visible for the whole journey.
  * A danger notice is announced as an alert, the other tones as a passive status.
  */
-export function Notice({ children, tone = "info", title, icon = true }: NoticeProps) {
+export function Notice({ children, tone = "info", title, icon = true, live }: NoticeProps) {
+  const politeness = live ?? (tone === "danger" ? "assertive" : "polite");
   return (
-    <div className="bo-notice" data-tone={tone} role={tone === "danger" ? "alert" : "status"}>
+    <div
+      className="bo-notice"
+      data-tone={tone}
+      role={tone === "danger" ? "alert" : "status"}
+      aria-live={politeness === "off" ? undefined : politeness}
+    >
       {icon ? (
-        <span className="bo-notice__icon">
+        <span className="bo-notice__icon" aria-hidden="true">
           <Icon name={TONE_ICONS[tone]} size={20} />
         </span>
       ) : null}

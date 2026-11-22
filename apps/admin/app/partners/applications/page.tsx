@@ -29,8 +29,8 @@ import {
   sortItems
 } from "../../lib/ui/admin-ui";
 import type { DataTableColumn } from "../../lib/ui/admin-ui";
-import { ActiveFilters, hrefWithout } from "../../lib/ui/active-filters";
-import type { ActiveFilterItem } from "../../lib/ui/active-filters";
+import { ActiveFilters, hrefWithout } from "../../lib/ui/active-filter-chips";
+import type { ActiveFilterItem } from "../../lib/ui/active-filter-chips";
 
 /**
  * Spec 051 US5/US7: broker applications received from the public site. Reading never activates

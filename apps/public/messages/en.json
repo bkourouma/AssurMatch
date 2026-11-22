@@ -77,7 +77,8 @@
       "sponsoredSentence": "The countries, products and offers on display depend on public activations. A sponsored offer is always labelled as such.",
       "allGuides": "All guides",
       "rights": "All rights reserved.",
-      "backToTop": "Back to top"
+      "backToTop": "Back to top",
+      "navLabel": "Footer links"
     }
   },
   "Common": {
@@ -278,7 +279,8 @@
       "title": "No publicly active country",
       "description": "No country is publicly activated at the moment."
     },
-    "fineprint": "Opening a country depends on authorised partner brokers being listed and validated offers being available."
+    "fineprint": "Opening a country depends on authorised partner brokers being listed and validated offers being available.",
+    "retry": "Try again"
   },
   "Country": {
     "kicker": "Country page",
@@ -324,7 +326,8 @@
     "contactLead": "A partner broker authorised for this country can take over your request.",
     "whatsapp": "Write on WhatsApp",
     "call": "Call {phone}",
-    "fineprint": "Indicative offer, indicative price to be confirmed by the partner broker. No expired or unvalidated offer is shown as available."
+    "fineprint": "Indicative offer, indicative price to be confirmed by the partner broker. No expired or unvalidated offer is shown as available.",
+    "retry": "Try again"
   },
   "Waitlist": {
     "title": "Waiting list — {country}",
@@ -449,7 +452,9 @@
     "empty": {
       "title": "No indicative offer for these criteria",
       "description": "Change your filters or widen your search. A sponsored offer is only displayed with its mention.",
-      "guarantee": "No offer includes this guarantee at the moment."
+      "guarantee": "No offer includes this guarantee at the moment.",
+      "otherProduct": "Choose another product",
+      "noFilters": "No indicative offer is published for this product at the moment. Choose another product or come back later."
     },
     "fineprint": "The score is indicative, computed from your criteria against the offers displayed. A sponsored offer is always flagged. No expired or unvalidated offer is displayed.",
     "priceHint": "This amount is indicative: the exact price depends on the information you give the partner broker.",
@@ -473,7 +478,8 @@
     },
     "compareBarMax": "4 offers selected (maximum reached).",
     "selectionAssist": "1 offer selected. Select at least one more indicative offer (2 to 4 in total) to start the comparison.",
-    "maxReachedHint": "Maximum of 4 offers reached. Remove one offer from the selection to add another."
+    "maxReachedHint": "Maximum of 4 offers reached. Remove one offer from the selection to add another.",
+    "retry": "Try again"
   },
   "Compare": {
     "kicker": "Indicative comparison",
@@ -539,7 +545,8 @@
     "quotePickHint": "Tick up to 3 offers. Each broker concerned will be named before your agreement, which you only give at the consent step.",
     "quotePickOption": "Include {name} in my request",
     "quotePickSubmit": "Continue to the quote request",
-    "quotePickLimit": "3 offers maximum per request."
+    "quotePickLimit": "3 offers maximum per request.",
+    "backToOffers": "Back to the list of offers"
   },
   "OfferDetail": {
     "kicker": "Indicative offer",
@@ -693,7 +700,8 @@
     "backToOffers": "Back to the offers",
     "blocked": {
       "title": "Quote request unavailable",
-      "description": "Quote requests are not available for this country or this product."
+      "description": "Quote requests are not available for this country or this product.",
+      "back": "Back to the product"
     },
     "languageUnavailable": {
       "title": "Form not available in English",
@@ -705,7 +713,9 @@
       }
     },
     "fineprint": "AssurMatch does not sell insurance and issues neither a policy nor a certificate. The responsible partner broker confirms the quote and the conditions.",
-    "commitmentLink": "Our commitments on your data"
+    "commitmentLink": "Our commitments on your data",
+    "copyReference": "Copy the reference",
+    "referenceCopied": "Reference copied"
   },
   "QuoteRequest": {
     "referenceLabel": "Public reference",
@@ -1076,6 +1086,11 @@
         "error": "Your request could not be recorded. Please try again in a few moments."
       },
       "typeRequired": "Choose the type of request."
+    },
+    "refresh": {
+      "action": "Refresh the status",
+      "pending": "Refreshing.",
+      "done": "Status refreshed at {time}."
     }
   },
   "VisitorAi": {
@@ -1329,7 +1344,11 @@
     "disclaimerTitle": "What this guide does not replace",
     "disclaimerBody": "This guide explains a general principle, not your personal situation. It does not replace the analysis of an authorised partner broker on your file, or legal advice on your contract. For an answer that is binding, compare offers and then request a quote: an authorised broker will confirm what applies to your case.",
     "productAuto": "Auto",
-    "productVoyage": "Travel"
+    "productVoyage": "Travel",
+    "empty": {
+      "title": "No guide published yet",
+      "description": "Practical guides will appear here once published. In the meantime, the \"How it works\" page explains the journey."
+    }
   },
   "Glossary": {
     "title": "Glossary",
@@ -1340,7 +1359,11 @@
     "indexLabel": "Alphabetical index",
     "termCount": "{count, plural, one {# term explained} other {# terms explained}}",
     "selectorLead": "Pick a country and a product to display the matching indicative offers.",
-    "seeAlso": "See also"
+    "seeAlso": "See also",
+    "empty": {
+      "title": "The glossary is empty for now",
+      "description": "Insurance terms will appear here once published."
+    }
   },
   "Faq": {
     "title": "FAQ",
@@ -1350,7 +1373,8 @@
     "lead": "Answers to the most frequent questions about AssurMatch.",
     "questionCount": "{count, plural, one {# question} other {# questions}}",
     "selectorLead": "Pick a country and a product to display the matching indicative offers.",
-    "relatedProduct": "Related product"
+    "relatedProduct": "Related product",
+    "themesLabel": "FAQ topics"
   },
   "Contact": {
     "title": "Contact",
@@ -1580,7 +1604,8 @@
     },
     "noCountries": {
       "title": "Applications temporarily unavailable",
-      "description": "No country is accepting a new broker application at the moment."
+      "description": "No country is accepting a new broker application at the moment.",
+      "action": "Contact AssurMatch"
     }
   },
   "BrokerLogin": {

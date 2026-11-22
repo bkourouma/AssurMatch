@@ -8,6 +8,7 @@ import { Button } from "../../components/ui/button";
 import { Directory, type DirectoryItem } from "../../components/ui/directory";
 import { EmptyState } from "../../components/ui/empty-state";
 import { Hero } from "../../components/ui/hero";
+import { Icon } from "../../components/ui/icons";
 import { Section } from "../../components/ui/section";
 import { listCountryDirectory, type CountryAvailability, type PublicCountryDirectoryItem } from "../../lib/public-api";
 import { buildMetadata, localeUrl } from "../../lib/seo";
@@ -92,9 +93,15 @@ export default async function PublicCountriesPage({ params }: { params: Promise<
             title={t("error.title")}
             description={t("error.description")}
             action={
-              <Button href="/" variant="secondary">
-                {common("home")}
-              </Button>
+              <div className="am-cluster">
+                {/* Same page again: the error is usually a passing one, so retrying comes first. */}
+                <Button href="/countries" icon={<Icon name="refresh" size={18} />}>
+                  {t("retry")}
+                </Button>
+                <Button href="/" variant="secondary">
+                  {common("home")}
+                </Button>
+              </div>
             }
           />
         </Section>

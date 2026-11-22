@@ -1,5 +1,5 @@
 import { readAdminCountries, readAdminProducts, readQuoteFormDefinitions, type QuoteFormDefinitionData } from "../lib/admin-api";
-import { ActiveFilters, hrefWithout, type ActiveFilterItem } from "../lib/ui/active-filters";
+import { ActiveFilters, hrefWithout, type ActiveFilterItem } from "../lib/ui/active-filter-chips";
 import {
   Badge,
   Button,

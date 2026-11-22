@@ -3,6 +3,7 @@ import { DATA_REQUEST_STATUS_LABELS, DATA_REQUEST_TYPE_LABELS, formatDataRequest
 import { firstValue, toQueryString } from "../../lib/operations-api";
 import { Badge, Button, Card, DataTable, Field, FilterBar, PageHeader, PageStack, Select, Stack, StateMessage, fieldControlProps, type DataTableColumn } from "../../lib/ui/admin-ui";
 import { readFailureDetail } from "../../lib/auth-error-messages";
+import { ActiveFilters, type ActiveFilterChip } from "../../lib/ui/active-filters";
 
 /**
  * Spec 062 (D-10): queue of the data-subject requests (access, rectification, erasure) created by
@@ -10,12 +11,13 @@ import { readFailureDetail } from "../../lib/auth-error-messages";
  * the deadlines: the visitor's text stays on the detail page, which the support role never receives.
  */
 
+/** A request that is still open and past its indicative deadline. */
+function isLate(item: DataRequestListItemData): boolean {
+  return Boolean(item.overdue) && (item.status === "received" || item.status === "in_review");
+}
+
 const columns: Array<DataTableColumn<DataRequestListItemData>> = [
-  {
-    key: "reference",
-    header: "Référence",
-    render: (item) => <a href={`/compliance/data-requests/${encodeURIComponent(item.id)}`}><code>{item.reference}</code></a>
-  },
+  { key: "reference", header: "Référence", render: (item) => <code>{item.reference}</code> },
   { key: "type", header: "Type", render: (item) => DATA_REQUEST_TYPE_LABELS[item.type] ?? item.type },
   {
     key: "status",
@@ -25,13 +27,13 @@ const columns: Array<DataTableColumn<DataRequestListItemData>> = [
       return <Badge tone={known?.tone ?? "neutral"}>{known?.label ?? item.status}</Badge>;
     }
   },
-  { key: "createdAt", header: "Reçue le", render: (item) => formatDataRequestDate(item.createdAt) },
   { key: "dueAt", header: "Échéance indicative", render: (item) => formatDataRequestDate(item.dueAt) },
   {
     key: "overdue",
     header: "Retard",
-    render: (item) => (item.overdue && (item.status === "received" || item.status === "in_review") ? <Badge tone="danger">En retard</Badge> : "—")
-  }
+    render: (item) => (isLate(item) ? <Badge tone="danger">En retard</Badge> : "—")
+  },
+  { key: "createdAt", header: "Reçue le", render: (item) => formatDataRequestDate(item.createdAt) }
 ];
 
 export default async function DataRequestsPage({ searchParams }: { searchParams?: Promise<Record<string, string | string[] | undefined>> }) {
@@ -47,9 +49,14 @@ export default async function DataRequestsPage({ searchParams }: { searchParams?
     ...(cursor ? { cursor } : {}),
     limit: 25
   });
-  const items = result.data.items;
+  // Late requests first on the page; the API order is kept inside each group.
+  const items = [...result.data.items].sort((left, right) => Number(isLate(right)) - Number(isLate(left)));
+  const chips: ActiveFilterChip[] = [
+    ...(status ? [{ key: "status", label: "Statut", value: DATA_REQUEST_STATUS_LABELS[status]?.label ?? status }] : []),
+    ...(type ? [{ key: "type", label: "Type", value: DATA_REQUEST_TYPE_LABELS[type] ?? type }] : [])
+  ];
   const nextCursor = result.data.nextCursor;
-  const overdueCount = items.filter((item) => item.overdue && (item.status === "received" || item.status === "in_review")).length;
+  const overdueCount = items.filter(isLate).length;
 
   return (
     <PageStack>
@@ -72,7 +79,7 @@ export default async function DataRequestsPage({ searchParams }: { searchParams?
           submitLabel="Filtrer"
           resetLabel="Réinitialiser"
           resetHref="/compliance/data-requests"
-          activeCount={[status, type].filter(Boolean).length}
+          activeCount={chips.length}
           autoSubmit
         >
           <Field id="dr-status" label="Statut">
@@ -98,15 +105,26 @@ export default async function DataRequestsPage({ searchParams }: { searchParams?
         <StateMessage tone="warning">{overdueCount} demande{overdueCount > 1 ? "s" : ""} de cette page dépasse{overdueCount > 1 ? "nt" : ""} l&apos;échéance indicative.</StateMessage>
       ) : null}
 
-      <Card title="File des demandes" description="Cliquez sur une référence pour ouvrir le détail, prendre en charge ou clôturer la demande.">
+      <ActiveFilters pathname="/compliance/data-requests" filters={{ status, type }} chips={chips} />
+
+      <Card title="File des demandes" description="Cliquez sur une référence pour ouvrir le détail, prendre en charge ou clôturer la demande. Les demandes en retard sont affichées en premier sur chaque page.">
         <Stack>
           <DataTable
             columns={columns}
             items={items}
             getKey={(item) => item.id}
+            getRowHref={(item) => `/compliance/data-requests/${encodeURIComponent(item.id)}`}
             emptyLabel="Aucune demande de données pour ces filtres."
+            emptyDescription={chips.length > 0 ? "Réinitialisez les filtres pour voir toute la file." : "Les demandes déposées par les visiteurs depuis leur espace de suivi apparaîtront ici."}
             aria-label="Demandes de données des visiteurs"
           />
+          {cursor ? (
+            <div>
+              <Button href={`/compliance/data-requests${toQueryString({ status, type })}`} variant="tertiary" size="sm">
+                Retour à la première page
+              </Button>
+            </div>
+          ) : null}
           {nextCursor ? (
             <div>
               <Button

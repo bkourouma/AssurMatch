@@ -48,6 +48,8 @@ export function SatisfactionSurveyForm({ publicReference, token, labels }: Satis
     const rating = Number(formData.get("rating"));
     if (!Number.isInteger(rating) || rating < 1 || rating > 5) {
       setRatingError(labels.ratingRequired);
+      // Keyboard and screen-reader users land on the group that needs an answer, not on the button.
+      event.currentTarget.querySelector<HTMLInputElement>('input[name="rating"]')?.focus();
       return;
     }
     setRatingError(undefined);

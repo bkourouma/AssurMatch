@@ -4,7 +4,7 @@ import { readAdminPartners, readAdminUsers, type AdminUser } from "../lib/admin-
 import { partnerStatusLabel } from "../lib/partner-messages";
 import { CreateUserForm } from "./user-action-forms";
 import { adminRoleOptions, userNoticeLabel, userStatusLabel, userStatusOptions } from "./user-options";
-import { ActiveFilters, hrefWithout, type ActiveFilterItem } from "../lib/ui/active-filters";
+import { ActiveFilters, hrefWithout, type ActiveFilterItem } from "../lib/ui/active-filter-chips";
 import {
   Button,
   DataTable,

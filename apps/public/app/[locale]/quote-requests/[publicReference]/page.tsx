@@ -19,6 +19,7 @@ import { QuoteDocumentUpload } from "../../../components/quote-document-upload";
 import { QuoteProposalCard, type QuoteProposalCardLabels } from "../../../components/tracking/quote-proposal-card";
 import type { ProposalResponseFormLabels } from "../../../components/tracking/proposal-response-form";
 import { MessagingSections } from "../../../components/tracking/messaging-sections";
+import { RefreshStatus } from "../../../components/tracking/refresh-status";
 import { hasProposals, QuoteProposalsSlot } from "../../../components/tracking/quote-proposals-slot";
 import { BackendText } from "../../../components/ui/backend-text";
 import { Breadcrumb } from "../../../components/ui/breadcrumb";
@@ -336,6 +337,14 @@ export default async function PublicQuoteTrackingPage({
             </div>
             <p className="am-j-panel__lead">{t(`status.${headlineKey}.body`)}</p>
           </div>
+
+          {/* A request that is still moving can change while the page is open: a visible way to re-read it. */}
+          {headlineKey === "closed" || headlineKey === "consent_withdrawn" || headlineKey === "not_transmitted" ? null : (
+            <RefreshStatus
+              locale={locale}
+              labels={{ refresh: t("refresh.action"), refreshing: t("refresh.pending"), refreshed: t("refresh.done", { time: "{time}" }) }}
+            />
+          )}
 
           {view.consent.withdrawn ? (
             <Notice tone="info" role="status">

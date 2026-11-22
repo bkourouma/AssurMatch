@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useId, useState } from "react";
 
 export interface SwitchProps {
   name: string;
@@ -18,21 +18,25 @@ export interface SwitchProps {
  */
 export function Switch({ name, label, defaultChecked = false, value = "on", disabled, describedBy }: SwitchProps) {
   const [checked, setChecked] = useState(defaultChecked);
+  const labelId = useId();
 
   return (
-    <span className="bo-switch-row">
+    <span className="bo-switch-row" data-disabled={disabled ? "true" : undefined}>
       <input type="hidden" name={name} value={checked ? value : ""} />
       <button
         className="bo-switch"
         type="button"
         role="switch"
         aria-checked={checked}
-        aria-label={label}
+        aria-labelledby={labelId}
         aria-describedby={describedBy}
         disabled={disabled}
         onClick={() => setChecked((previous) => !previous)}
       />
-      <span aria-hidden="true">{label}</span>
+      {/* The visible text names the switch and toggles it, like a native label. */}
+      <span className="bo-switch-row__label" id={labelId} onClick={disabled ? undefined : () => setChecked((previous) => !previous)}>
+        {label}
+      </span>
     </span>
   );
 }

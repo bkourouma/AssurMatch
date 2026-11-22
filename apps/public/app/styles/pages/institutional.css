@@ -328,6 +328,46 @@
   font-size: var(--am-caption-size);
 }
 
+/* Jump list to the themes: plain links, one line each on a phone, wrapped side by side from 768px. */
+.am-faq-themes {
+  margin: 0 0 var(--am-space-32);
+}
+
+.am-faq-themes ul {
+  display: flex;
+  flex-direction: column;
+  gap: var(--am-space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.am-faq-themes a {
+  display: flex;
+  min-height: 44px;
+  align-items: center;
+  padding: var(--am-space-8) var(--am-space-12);
+  border: 1px solid var(--am-rule);
+  border-radius: var(--am-radius-sm);
+  font-weight: 700;
+}
+
+.am-faq-themes a:hover {
+  background: var(--am-primary-50);
+}
+
+@media (min-width: 768px) {
+  .am-faq-themes ul {
+    flex-direction: row;
+    flex-wrap: wrap;
+    gap: var(--am-space-8);
+  }
+}
+
+.am-faq-group[id] {
+  scroll-margin-top: var(--am-space-16);
+}
+
 .am-faq-group {
   display: grid;
   gap: var(--am-space-12);

@@ -62,7 +62,7 @@ function ConversationBlock({ conversation, masked }: { conversation: AdminConver
   );
 }
 
-export async function LeadConversationsCard({ quoteRequestId, show }: { quoteRequestId: string; show: boolean }) {
+export async function LeadConversationsCard({ quoteRequestId, show, backQuery = "" }: { quoteRequestId: string; show: boolean; backQuery?: string }) {
   if (!show) {
     return (
       <Card
@@ -72,7 +72,13 @@ export async function LeadConversationsCard({ quoteRequestId, show }: { quoteReq
         <Stack>
           <p>Le contenu des échanges est consulté uniquement à la demande. L&apos;affichage ci-dessous est une consultation auditée.</p>
           <p>
-            <a href={`/quote-requests/${encodeURIComponent(quoteRequestId)}?conversations=1`} data-conversation-marker="load-audited">
+            <a
+              className="bo-button"
+              data-variant="secondary"
+              data-size="sm"
+              href={`/quote-requests/${encodeURIComponent(quoteRequestId)}?conversations=1${backQuery ? `&back=${encodeURIComponent(backQuery)}` : ""}`}
+              data-conversation-marker="load-audited"
+            >
               Afficher les échanges (consultation auditée)
             </a>
           </p>

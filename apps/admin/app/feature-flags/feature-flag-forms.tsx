@@ -21,11 +21,16 @@ export function GlobalFlagToggleForm({ flagId, flagKey, currentValue }: { flagId
       <input type="hidden" name="flagId" value={flagId} />
       <input type="hidden" name="key" value={flagKey} />
       <input type="hidden" name="value" value={String(nextValue)} />
-      <Field id={`${base}-reason`} label="Motif (audité)" required>
-        <Input {...fieldControlProps(`${base}-reason`, { required: true })} name="reason" minLength={8} />
+      <Field
+        id={`${base}-reason`}
+        label="Motif (obligatoire, audité)"
+        required
+        hint={`Passe « ${flagKey} » de ${currentValue ? "actif" : "désactivé"} à ${nextValue ? "actif" : "désactivé"}. Au moins 8 caractères.`}
+      >
+        <Input {...fieldControlProps(`${base}-reason`, { required: true, hint: "x" })} name="reason" minLength={8} />
       </Field>
       <FormActions>
-        <Button type="submit" size="sm" variant={nextValue ? "primary" : "secondary"} pending={pending} pendingLabel="Envoi...">
+        <Button type="submit" size="sm" variant={nextValue ? "primary" : "secondary"} pending={pending} pendingLabel="Enregistrement...">
           {nextValue ? "Activer" : "Désactiver"}
         </Button>
       </FormActions>
