@@ -7,6 +7,8 @@ import { PLAN_CHANGE_JUSTIFICATION_MAX_LENGTH, PLAN_CHANGE_JUSTIFICATION_MIN_LEN
 
 const initialState: PlanChangeActionState = { status: "idle" };
 
+const JUSTIFICATION_HINT = "Expliquez votre besoin (nombre d'agences ou de conseillers, fonctionnalités attendues).";
+
 export function PlanChangeRequestForm({ currentPlan, disabled }: { currentPlan: string | undefined; disabled: boolean }) {
   const [state, formAction, pending] = useActionState(requestPlanChangeAction, initialState);
   const base = useId();
@@ -21,9 +23,9 @@ export function PlanChangeRequestForm({ currentPlan, disabled }: { currentPlan: 
       <Field id={ids.plan} label="Plan souhaité" required>
         <Select {...fieldControlProps(ids.plan, { required: true })} name="requestedPlan" defaultValue="" placeholder="Choisir un plan" options={options} disabled={disabled} />
       </Field>
-      <Field id={ids.justification} label={`Justification (${PLAN_CHANGE_JUSTIFICATION_MIN_LENGTH} caractères au minimum)`} required>
+      <Field id={ids.justification} label={`Justification (${PLAN_CHANGE_JUSTIFICATION_MIN_LENGTH} caractères au minimum)`} required hint={JUSTIFICATION_HINT}>
         <Textarea
-          {...fieldControlProps(ids.justification, { required: true })}
+          {...fieldControlProps(ids.justification, { required: true, hint: JUSTIFICATION_HINT })}
           name="justification"
           rows={3}
           minLength={PLAN_CHANGE_JUSTIFICATION_MIN_LENGTH}
@@ -32,7 +34,7 @@ export function PlanChangeRequestForm({ currentPlan, disabled }: { currentPlan: 
         />
       </Field>
       <FormActions>
-        <Button type="submit" pending={pending} pendingLabel="Envoi..." disabled={disabled}>Envoyer la demande</Button>
+        <Button type="submit" pending={pending} pendingLabel="Envoi en cours…" disabled={disabled}>Envoyer la demande</Button>
       </FormActions>
     </Form>
   );
@@ -46,7 +48,7 @@ export function CancelPlanChangeForm({ requestId }: { requestId: string }) {
       <ActionNotice state={state} />
       <input type="hidden" name="requestId" value={requestId} />
       <FormActions>
-        <Button type="submit" size="sm" variant="secondary" pending={pending} pendingLabel="Annulation...">Annuler la demande</Button>
+        <Button type="submit" size="sm" variant="secondary" pending={pending} pendingLabel="Annulation en cours…">Annuler la demande</Button>
       </FormActions>
     </Form>
   );

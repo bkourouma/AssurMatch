@@ -145,14 +145,17 @@ export default async function BrokerCrmLeadsPage({ searchParams }: { searchParam
         title="Leads CRM"
         description="Vue tableau des leads autorisés selon rôle, tenant, conseiller et permissions PII."
         actions={
-          canExport ? (
-            <Cluster>
-              <Button href={exportHref} variant="secondary" size="sm">Exporter (CSV)</Button>
-              <Badge tone="info">Export audité</Badge>
-            </Cluster>
-          ) : (
-            <Badge tone="disabled">Export non autorisé pour votre rôle</Badge>
-          )
+          <Cluster>
+            {canExport ? (
+              <>
+                <Button href={exportHref} variant="secondary" size="sm">Exporter (CSV)</Button>
+                <Badge tone="info">Export audité</Badge>
+              </>
+            ) : (
+              <Badge tone="disabled">Export non autorisé pour votre rôle</Badge>
+            )}
+            <Button href="/crm/kanban" variant="secondary" size="sm">Vue Kanban</Button>
+          </Cluster>
         }
       />
 
@@ -226,7 +229,11 @@ export default async function BrokerCrmLeadsPage({ searchParams }: { searchParam
         {params.sort ? <input type="hidden" name="dir" value={state.direction} /> : null}
       </FilterBar>
 
-      {apiLeads.error ? <Notice tone="warning">API CRM indisponible. Aucune donnée protégée n'est affichée en mode erreur.</Notice> : null}
+      {apiLeads.error ? (
+        <Notice tone="warning" title="API CRM indisponible">
+          Aucune donnée protégée n&apos;est affichée en mode erreur. <a href="/crm/leads">Réessayer</a>
+        </Notice>
+      ) : null}
 
       <DataTable
         columns={columns}
@@ -234,7 +241,14 @@ export default async function BrokerCrmLeadsPage({ searchParams }: { searchParam
         getKey={(lead) => lead.id}
         aria-label="Leads CRM"
         emptyLabel={activeCount > 0 ? "Aucun résultat pour ce filtre : modifiez ou réinitialisez les filtres (produit et pays attendent une clé produit et un code pays exacts)." : "Aucun lead CRM autorisé à afficher."}
-        emptyAction={activeCount > 0 ? <Button href="/crm/leads" variant="secondary" size="sm">Réinitialiser les filtres</Button> : undefined}
+        emptyDescription={activeCount > 0 ? undefined : "Les leads qui vous sont assignés apparaîtront ici, selon votre rôle et votre conseiller."}
+        emptyAction={
+          activeCount > 0 ? (
+            <Button href="/crm/leads" variant="secondary" size="sm">Réinitialiser les filtres</Button>
+          ) : (
+            <Button href="/leads" variant="secondary" size="sm">Ouvrir les leads reçus</Button>
+          )
+        }
         getRowHref={(lead) => `/crm/leads/${lead.id}`}
         sort={{ key: state.sort, direction: state.direction }}
         sortHref={table.sortHref}

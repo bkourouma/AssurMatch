@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { FormEvent, ReactNode } from "react";
 import { describeConversationOutcome, formatWordingList, isSuccessOutcome } from "../conversation-vocabulary";
 import { Button, Notice } from "./broker-ui";
@@ -27,6 +27,8 @@ export interface ConversationFormProps {
   pendingLabel: string;
   /** Adds a `clientRequestId` (idempotent retry) kept until the send succeeds. */
   idempotent?: boolean;
+  /** One primary action per view: the composer is secondary unless the page says otherwise. */
+  submitVariant?: "primary" | "secondary";
   children: ReactNode;
 }
 
@@ -52,11 +54,17 @@ function safeLocation(value: unknown): string | undefined {
   }
 }
 
-export function ConversationForm({ action, ariaLabel, submitLabel, pendingLabel, idempotent = false, children }: ConversationFormProps) {
+export function ConversationForm({ action, ariaLabel, submitLabel, pendingLabel, idempotent = false, submitVariant = "secondary", children }: ConversationFormProps) {
   const router = useRouter();
   const requestId = useRef("");
+  const answerRegion = useRef<HTMLDivElement>(null);
   const [pending, setPending] = useState(false);
   const [answer, setAnswer] = useState<{ outcome: string; wording: string[] } | undefined>(undefined);
+
+  // The answer sits next to the send button: bring it into view on a phone, where the thread is long.
+  useEffect(() => {
+    if (answer) answerRegion.current?.scrollIntoView({ block: "nearest" });
+  }, [answer]);
 
   async function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -96,7 +104,8 @@ export function ConversationForm({ action, ariaLabel, submitLabel, pendingLabel,
 
   return (
     <form action={action} method="post" encType="multipart/form-data" className="bo-form" aria-label={ariaLabel} onSubmit={onSubmit} data-conversation-form="true">
-      <div aria-live="polite">
+      {children}
+      <div aria-live="polite" ref={answerRegion}>
         {described ? (
           <Notice tone={described.tone}>
             {described.message}
@@ -104,8 +113,9 @@ export function ConversationForm({ action, ariaLabel, submitLabel, pendingLabel,
           </Notice>
         ) : null}
       </div>
-      {children}
-      <Button type="submit" pending={pending} pendingLabel={pendingLabel}>{submitLabel}</Button>
+      <div>
+        <Button type="submit" variant={submitVariant} pending={pending} pendingLabel={pendingLabel}>{submitLabel}</Button>
+      </div>
     </form>
   );
 }

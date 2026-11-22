@@ -7,9 +7,10 @@ import {
   LICENSE_STATUS_LABELS,
   LICENSE_STATUS_TONES,
   SCAN_STATUS_LABELS,
+  licenseExpiryFlag,
   selfServiceFormatDate
 } from "../lib/self-service-messages";
-import { Badge, Card, Cluster, DescriptionList, EmptyState, Notice, PageHeader, PageStack, StateMessage, StatusBadge, TenantWriteGuard } from "../lib/ui/broker-ui";
+import { Badge, Button, Card, Cluster, DescriptionList, EmptyState, Notice, PageHeader, PageStack, StateMessage, StatusBadge, TenantWriteGuard } from "../lib/ui/broker-ui";
 import styles from "../lib/ui/broker-screens.module.css";
 import { RenewLicenseForm, UploadProofForm } from "./license-forms";
 
@@ -24,6 +25,8 @@ const BREADCRUMB = [{ label: "Organisation" }, { label: "Licences" }];
 function LicenseCard({ license, licenses, canWrite, readOnlyTenant, products }: { license: BrokerLicenseView; licenses: BrokerLicenseView[]; canWrite: boolean; readOnlyTenant: boolean; products: Array<{ value: string; label: string }> }) {
   const renews = license.renewsLicenseId ? licenses.find((entry) => entry.id === license.renewsLicenseId)?.licenseNumber ?? "-" : null;
   const pendingRenewal = license.pendingRenewalId ? licenses.find((entry) => entry.id === license.pendingRenewalId) : undefined;
+  const expiryFlag = licenseExpiryFlag(license.expirationDate, license.effectiveStatus);
+  const noActionAvailable = canWrite && !readOnlyTenant && !license.canUploadProof && !license.canRenew;
   return (
     <Card title={`Licence ${license.licenseNumber}`} actions={<StatusBadge status={license.effectiveStatus} labels={LICENSE_STATUS_LABELS} tones={LICENSE_STATUS_TONES} />}>
       <DescriptionList
@@ -33,12 +36,30 @@ function LicenseCard({ license, licenses, canWrite, readOnlyTenant, products }: 
           { term: "Pays", value: license.countryName ?? license.countryId },
           { term: "Produits", value: license.productNames.length ? license.productNames.join(", ") : "Tous les produits du pays" },
           { term: "Effet", value: selfServiceFormatDate(license.effectiveDate) },
-          { term: "Expiration", value: selfServiceFormatDate(license.expirationDate) },
+          {
+            term: "Expiration",
+            value: (
+              <>
+                {selfServiceFormatDate(license.expirationDate)}
+                {expiryFlag ? <> <Badge tone={expiryFlag.tone}>{expiryFlag.label}</Badge></> : null}
+              </>
+            )
+          },
           ...(renews ? [{ term: "Renouvelle", value: renews }] : []),
           ...(pendingRenewal ? [{ term: "Renouvellement en cours", value: `${pendingRenewal.licenseNumber} (${LICENSE_STATUS_LABELS[pendingRenewal.status] ?? pendingRenewal.status})` }] : [])
         ]}
       />
       {license.status === "pending_review" ? <Notice tone="info">En revue par la conformité AssurMatch : la licence n&apos;est pas utilisée pour le routage avant sa validation.</Notice> : null}
+      {expiryFlag && license.canRenew && canWrite && !readOnlyTenant ? (
+        <Notice tone={expiryFlag.tone === "danger" ? "danger" : "warning"}>
+          {expiryFlag.tone === "danger"
+            ? "Cette licence est échue : déposez le renouvellement ci-dessous pour retrouver la réception de demandes sur son périmètre."
+            : "Cette licence arrive à échéance : déposez le renouvellement ci-dessous avant la date d'expiration."}
+        </Notice>
+      ) : null}
+      {license.documents.length === 0 && license.canUploadProof && canWrite ? (
+        <p className={styles.muted}>Aucune preuve déposée pour cette licence.</p>
+      ) : null}
       {license.documents.length > 0 ? (
         <div className={styles.entry}>
           <h3 className={styles.entryTitle}>Preuves déposées</h3>
@@ -73,6 +94,11 @@ function LicenseCard({ license, licenses, canWrite, readOnlyTenant, products }: 
           {license.canRenew ? <RenewLicenseForm licenseId={license.id} licenseNumber={license.licenseNumber} products={products} /> : null}
         </TenantWriteGuard>
       ) : null}
+      {noActionAvailable ? (
+        <p className={styles.muted} data-license-no-action="true">
+          Aucune action possible pour cette licence dans son état actuel (renouvellement déjà en cours, licence révoquée ou remplacée).
+        </p>
+      ) : null}
     </Card>
   );
 }
@@ -95,6 +121,7 @@ export default async function BrokerLicensesPage() {
   if (licensesResult.status === "unauthenticated") redirect(loginRedirect("/licenses", licensesResult.error ?? "session_required"));
   const licenses = licensesResult.data;
   const products = catalogResult.data.products.map((product) => ({ value: product.id, label: product.name }));
+  const expiringCount = licenses.filter((license) => licenseExpiryFlag(license.expirationDate, license.effectiveStatus)).length;
 
   return (
     <PageStack>
@@ -105,7 +132,17 @@ export default async function BrokerLicensesPage() {
       />
       {readOnlyTenant ? <Notice tone="warning">{TENANT_SUSPENDED_MESSAGE}</Notice> : null}
       {!canWrite && !readOnlyTenant ? <Notice tone="info">Lecture seule : seuls le propriétaire et les managers déposent un renouvellement.</Notice> : null}
-      {licensesResult.status === "error" ? <StateMessage tone="danger">Les licences n&apos;ont pas pu être chargées. Réessayez dans quelques instants.</StateMessage> : null}
+      {licensesResult.status === "error" ? (
+        <StateMessage tone="danger">
+          <p>Les licences n&apos;ont pas pu être chargées. Réessayez dans quelques instants.</p>
+          <Button href="/licenses" variant="secondary" size="sm">Réessayer</Button>
+        </StateMessage>
+      ) : null}
+      {expiringCount > 0 ? (
+        <Notice tone="warning" title="Licences à renouveler">
+          {`${expiringCount} licence${expiringCount > 1 ? "s sont échues ou arrivent" : " est échue ou arrive"} à échéance sous 30 jours. Le renouvellement se dépose sur la fiche concernée, avec sa preuve.`}
+        </Notice>
+      ) : null}
       {licensesResult.status === "success" && licenses.length === 0 ? (
         <Card>
           <EmptyState

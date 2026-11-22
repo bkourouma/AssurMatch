@@ -14,7 +14,7 @@ export function AgencyFilterForm({ action, filter, fieldId = "agency-filter" }: 
         <Field id={fieldId} label="Agence" hint={AGENCY_DISPLAY_HINT}>
           <Select id={fieldId} name={AGENCY_PARAM} defaultValue={filter.selected} options={filter.options} />
         </Field>
-        <Button type="submit" variant="secondary" size="sm">Appliquer</Button>
+        <Button type="submit" variant="secondary">Appliquer le filtre</Button>
       </Cluster>
     </form>
   );

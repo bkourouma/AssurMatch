@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 import { AGENCIES_OVERVIEW_MESSAGES, agenciesOverviewAccess } from "../../lib/agencies-overview";
 import { loginRedirect, readBackOfficeSession } from "../../lib/backoffice-auth";
 import { readBrokerAgenciesOverview } from "../../lib/broker-api";
-import { Badge, Card, DataTable, Notice, PageHeader, PageStack } from "../../lib/ui/broker-ui";
+import { Badge, Button, Card, DataTable, Notice, PageHeader, PageStack } from "../../lib/ui/broker-ui";
 import { agencyRowLabel, formatCount, formatMinutes, formatRate } from "../../lib/ui/broker-view-models";
 
 /**
@@ -12,6 +12,8 @@ import { agencyRowLabel, formatCount, formatMinutes, formatRate } from "../../li
  * authority (Enterprise plan, roles seeing the whole tenant, audit); a refusal shows a generic message.
  */
 const PATH = "/enterprise/agencies";
+
+export const metadata = { title: "Vue multi-agences" };
 const BREADCRUMB = [{ label: "Organisation" }, { label: "Entreprise", href: "/enterprise" }, { label: "Vue multi-agences" }];
 
 export default async function BrokerAgenciesOverviewPage() {
@@ -21,7 +23,7 @@ export default async function BrokerAgenciesOverviewPage() {
   if (session.status !== "authenticated") {
     return (
       <PageStack>
-        <PageHeader breadcrumb={BREADCRUMB} kicker="Enterprise" title="Accès refusé" description="La vue multi-agences exige un courtier authentifié et la MFA vérifiée." />
+        <PageHeader breadcrumb={BREADCRUMB} title="Accès refusé" description="La vue multi-agences exige un courtier authentifié et la MFA vérifiée." actions={<Button href="/" variant="secondary">Retour au tableau de bord</Button>} />
       </PageStack>
     );
   }
@@ -32,12 +34,14 @@ export default async function BrokerAgenciesOverviewPage() {
       <PageStack>
         <PageHeader
           breadcrumb={BREADCRUMB}
-          kicker="Enterprise"
           title="Vue multi-agences"
           description="Comparaison des agences du cabinet : volumes, contact, conversion et délais."
           actions={<Badge tone="disabled">{access === "plan_required" ? "Plan Enterprise requis" : "Rôle non autorisé"}</Badge>}
         />
-        <Notice tone="info">{AGENCIES_OVERVIEW_MESSAGES[access]}</Notice>
+        <Notice tone="info" title={access === "plan_required" ? "Disponible avec le plan Enterprise" : "Réservé à certains rôles"}>
+          <p>{AGENCIES_OVERVIEW_MESSAGES[access]}</p>
+          <p><a href={access === "plan_required" ? "/billing" : "/"}>{access === "plan_required" ? "Voir la facturation et le plan du cabinet" : "Retour au tableau de bord"}</a></p>
+        </Notice>
       </PageStack>
     );
   }
@@ -49,7 +53,6 @@ export default async function BrokerAgenciesOverviewPage() {
     <PageStack>
       <PageHeader
         breadcrumb={BREADCRUMB}
-        kicker="Enterprise"
         title="Vue multi-agences"
         description="Comparaison des agences du cabinet sur la fenêtre du tableau de bord. La conversion est le rapport gagnés / reçus. Chiffres agrégés, aucune identité de prospect."
         actions={<Badge tone="info">Enterprise</Badge>}
@@ -57,7 +60,10 @@ export default async function BrokerAgenciesOverviewPage() {
       {overview.status === "forbidden" ? (
         <Notice tone="danger" title="Accès refusé">Cette vue est indisponible pour votre cabinet ou votre rôle. Aucune donnée n&apos;est affichée.</Notice>
       ) : overview.status === "error" ? (
-        <Notice tone="warning">La vue multi-agences est momentanément indisponible. Aucune donnée n&apos;est affichée.</Notice>
+        <Notice tone="warning">
+          <p>La vue multi-agences est momentanément indisponible. Aucune donnée n&apos;est affichée.</p>
+          <p><a href={PATH}>Recharger la page</a></p>
+        </Notice>
       ) : (
         <Card title="Agences du cabinet">
           <DataTable

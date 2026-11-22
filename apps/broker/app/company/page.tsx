@@ -10,6 +10,7 @@ import {
   REQUEST_STATUS_LABELS,
   REQUEST_STATUS_TONES,
   REQUEST_TYPE_LABELS,
+  licenseExpiryFlag,
   selfServiceFormatDate
 } from "../lib/self-service-messages";
 import { Badge, Button, Card, DataTable, DescriptionList, Grid, Notice, PageHeader, PageStack, StateMessage, StatusBadge, TenantWriteGuard } from "../lib/ui/broker-ui";
@@ -45,7 +46,10 @@ export default async function BrokerCompanyPage() {
     return (
       <PageStack>
         <PageHeader breadcrumb={BREADCRUMB} title="Profil indisponible" />
-        <StateMessage tone="danger">Le profil société n&apos;a pas pu être chargé. Réessayez dans quelques instants.</StateMessage>
+        <StateMessage tone="danger">
+          <p>Le profil société n&apos;a pas pu être chargé. Réessayez dans quelques instants.</p>
+          <Button href="/company" variant="secondary" size="sm">Réessayer</Button>
+        </StateMessage>
       </PageStack>
     );
   }
@@ -65,6 +69,7 @@ export default async function BrokerCompanyPage() {
     ...catalogResult.data.products.filter((product) => !authorizedProducts.has(product.id)).map((product) => ({ value: `product:${product.id}`, label: `Produit : ${product.name}` }))
   ];
   const requests = requestsResult.data;
+  const expiryFlag = licenseExpiryFlag(account.nextLicenseExpiration, "valid");
 
   return (
     <PageStack>
@@ -98,7 +103,15 @@ export default async function BrokerCompanyPage() {
               { term: "Quota mensuel", value: `${account.quotaMonthlyLeads} leads` },
               { term: "Capacité", value: CAPACITY_LABELS[account.capacityStatus] ?? account.capacityStatus },
               { term: "SLA contractuel", value: account.slaTargetMinutes ? `${account.slaTargetMinutes} min avant première action` : "Non fixé" },
-              { term: "Prochaine expiration de licence", value: selfServiceFormatDate(account.nextLicenseExpiration) }
+              {
+                term: "Prochaine expiration de licence",
+                value: (
+                  <>
+                    {selfServiceFormatDate(account.nextLicenseExpiration)}
+                    {expiryFlag ? <> <Badge tone={expiryFlag.tone}>{expiryFlag.label}</Badge></> : null}
+                  </>
+                )
+              }
             ]}
           />
         </Card>

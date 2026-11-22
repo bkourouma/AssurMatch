@@ -16,9 +16,10 @@ export function DevAccountPicker({ returnTo }: DevAccountPickerProps) {
     <Card title="Mode local" description="Disponible uniquement en local avec les données démo seed." muted aria-label="Connexion locale démo">
       <form ref={formRef} action={devDemoLoginAction}>
         <input type="hidden" name="returnTo" value={returnTo} />
-        <Field id="demo-account" label="Compte démo">
+        <Field id="demo-account" label="Compte démo" hint="La connexion se lance dès que vous choisissez un compte.">
           <Select
             id="demo-account"
+            aria-describedby="demo-account-hint"
             name="demoEmail"
             defaultValue=""
             placeholder="Choisir un compte et entrer"

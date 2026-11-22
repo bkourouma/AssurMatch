@@ -14,6 +14,7 @@ import {
   formatPriceRange,
   offerDisplayName,
   offerFormatDate,
+  offerStatusImplication,
   offerTypeLabel
 } from "../../lib/offer-messages";
 import {
@@ -146,6 +147,17 @@ export default async function BrokerOfferPage({ params, searchParams }: BrokerOf
         }
       />
       {notice ? <Notice tone="success">{notice}</Notice> : null}
+      {offerStatusImplication(offer.status, offer.offerType) ? (
+        <Notice tone="neutral" title={`Statut : ${OFFER_STATUS_LABELS[offer.status] ?? offer.status}`}>
+          {offerStatusImplication(offer.status, offer.offerType)}
+          {pending && published ? ` Une nouvelle version (v${pending.versionNumber}) est ${pending.status === "submitted" ? "en attente de validation" : "en brouillon"} : la version publiée reste en ligne d'ici là.` : ""}
+        </Notice>
+      ) : null}
+      {offer.expiringSoon && !expired && !withdrawn ? (
+        <Notice tone="warning" title="Échéance proche">
+          Passé la date de fin de validité, l&apos;offre n&apos;est plus affichée au public. {writer ? "Renouvelez-la avec de nouvelles dates avant l'échéance." : "Le propriétaire ou un manager du cabinet peut la renouveler."}
+        </Notice>
+      ) : null}
       {readOnlyTenant ? <Notice tone="warning">{TENANT_SUSPENDED_MESSAGE}</Notice> : null}
       {!writer ? <Notice tone="info">Consultation seule : seuls le propriétaire et les managers du cabinet modifient les offres.</Notice> : null}
       {offer.suspensionReason ? <Notice tone="danger" title="Offre suspendue par AssurMatch">{offer.suspensionReason}</Notice> : null}
@@ -177,9 +189,18 @@ export default async function BrokerOfferPage({ params, searchParams }: BrokerOf
         </Card>
       </Grid>
 
+      {writer && withdrawn ? (
+        <Notice tone="info" title="Offre retirée">
+          Elle n&apos;est plus modifiable ni soumise à validation. Son historique reste consultable ci-dessous.
+        </Notice>
+      ) : null}
+
       {writer && !withdrawn ? (
         <TenantWriteGuard readOnly={readOnlyTenant}>
           <Card title="Actions" description="Chaque action est auditée.">
+            {pending?.status === "submitted" ? (
+              <p className={styles.muted}>La version en cours est soumise : il n&apos;y a pas de nouvelle soumission possible tant qu&apos;AssurMatch n&apos;a pas décidé. La modifier la renvoie en brouillon.</p>
+            ) : null}
             <Cluster>
               {pending ? <WithdrawBrokerOfferForm offerId={offer.id} target="pending" /> : null}
               {published ? <WithdrawBrokerOfferForm offerId={offer.id} target="offer" /> : null}

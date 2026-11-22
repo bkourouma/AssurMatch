@@ -127,6 +127,112 @@
   font-size: var(--bo-fs);
 }
 
+/* The sideways-scrolling board is a focusable region so a keyboard user can scroll it (arrow keys). */
+.board:focus-visible {
+  outline: 2px solid var(--bo-accent);
+  outline-offset: 2px;
+}
+
+/* A card of the board: reference first, then the facts, then the move controls under a hairline. */
+.ticketRef {
+  display: inline-flex;
+  align-items: center;
+  min-height: 32px;
+  font-family: var(--bo-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+.ticketMeta {
+  color: var(--bo-ink-2);
+  overflow-wrap: anywhere;
+}
+
+.moveRow {
+  display: grid;
+  gap: var(--bo-s2);
+  margin-top: var(--bo-s2);
+  padding-top: var(--bo-s2);
+  border-top: 1px solid var(--bo-line);
+}
+
+.moveLabel {
+  color: var(--bo-ink-3);
+  font-size: var(--bo-fs);
+}
+
+.moveControls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--bo-s2);
+}
+
+.moveControls > :first-child {
+  flex: 1 1 140px;
+  min-width: 0;
+}
+
+/* The reason a move to a closing column needs: a plate above the board, never a floating box. */
+.reasonForm {
+  display: grid;
+  gap: var(--bo-s3);
+  margin-bottom: var(--bo-s4);
+  padding: var(--bo-s4);
+  border: 1px solid var(--bo-line-strong);
+  border-radius: var(--bo-r-panel);
+  background: var(--bo-surface);
+}
+
+.boardHint {
+  margin: 0 0 var(--bo-s3);
+  color: var(--bo-ink-3);
+  font-size: var(--bo-fs);
+}
+
+/* Dashboard table: the per-row call to action ("Traiter") is a real 40px target, not a bare link. */
+.rowAction {
+  display: inline-flex;
+  align-items: center;
+  min-height: 36px;
+  padding: 0 var(--bo-s2);
+  font-weight: 600;
+}
+
+/* « Prochaine action » of a CRM lead: facts on one side, the buttons that act on them on the other. */
+.nextAction {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--bo-s3) var(--bo-s5);
+}
+
+.nextActionText {
+  display: grid;
+  gap: var(--bo-s1);
+  min-width: 0;
+}
+
+.nextActionTitle {
+  margin: 0;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+/* A task past its due date: danger ink text, and the words « en retard » say it too (never colour alone, never a fill). */
+.overdue {
+  color: var(--bo-danger);
+  font-weight: 600;
+}
+
+/* Date of a history entry: mono, muted, tabular. */
+.timelineDate {
+  color: var(--bo-ink-3);
+  font-family: var(--bo-mono);
+  font-size: var(--bo-fs);
+  font-variant-numeric: tabular-nums;
+}
+
 @media (max-width: 760px) {
   .board {
     grid-auto-columns: minmax(78vw, 1fr);
@@ -136,5 +242,13 @@
     display: inline-flex;
     align-items: center;
     min-height: 44px;
+  }
+
+  .rowAction {
+    min-height: 44px;
+  }
+
+  .nextAction > :last-child {
+    width: 100%;
   }
 }
