@@ -25,7 +25,7 @@ test("the tracking space reads the public status API with the token, server-side
   expect(lib).toContain('{ status: "denied" }');
 
   // Status headline, brokers, timeline, technical role, expiry hint, documents and withdrawal.
-  for (const marker of ["status.${status}.headline", "brokers.status.", "timeline.steps.", 't("role")', 't("expiry"', "QuoteDocumentUpload", "<ConsentWithdrawal", "IndicativeOfferNotice"]) {
+  for (const marker of ["status.${headlineKey}.headline", "consent_withdrawn", "brokers.status.", "timeline.steps.", 't("role")', 't("expiry"', "QuoteDocumentUpload", "<ConsentWithdrawal", "IndicativeOfferNotice"]) {
     expect(page).toContain(marker);
   }
   // A missing token or a refusal leads to the neutral message and the tracking-link page.
@@ -125,4 +125,18 @@ test("visitor tracking surfaces avoid forbidden wording and back-office imports"
     expect(sources.toLowerCase()).not.toContain(forbidden);
   }
   expect(sources).not.toMatch(/apps\/(admin|broker|backoffice)|@assurmatch\/(admin|broker)/);
+});
+
+test("the tracking page mounts RefreshStatus with FR and EN copy, announced after the transition", () => {
+  const page = readSources([trackingPage]);
+  expect(page).toContain("<RefreshStatus");
+  for (const key of ["refresh.action", "refresh.pending", "refresh.done"]) expect(page).toContain(`t("${key}"`);
+  for (const locale of ["fr", "en"] as const) {
+    const refresh = (messagesJson(locale).QuoteRequest as { refresh?: Record<string, string> }).refresh;
+    for (const key of ["action", "pending", "done"]) expect(refresh?.[key], `${locale} QuoteRequest.refresh.${key}`).toBeTruthy();
+  }
+  const component = readSources([publicFile("components/tracking/refresh-status.tsx")]);
+  // Focus stays on the button (no `disabled`/`loading`), and the time is announced from an effect once settled.
+  expect(component).not.toMatch(/disabled=\{|loading=\{/);
+  expect(component).toContain("useEffect");
 });

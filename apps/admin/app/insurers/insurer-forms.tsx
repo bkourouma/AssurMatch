@@ -125,7 +125,7 @@ export function EditInsurerForm({ insurer }: { insurer: EditableInsurer }) {
   );
 }
 
-export function RetireInsurerForm({ insurerId }: { insurerId: string }) {
+export function RetireInsurerForm({ insurerId, insurerName }: { insurerId: string; insurerName: string }) {
   const [state, formAction] = useActionState(retireInsurerAction, initialState);
   const base = useId();
   return (
@@ -134,8 +134,8 @@ export function RetireInsurerForm({ insurerId }: { insurerId: string }) {
       <ConfirmDialog
         triggerLabel="Retirer l'assureur"
         triggerVariant="danger"
-        title="Retirer l'assureur"
-        description="L'assureur ne pourra plus être choisi pour une nouvelle offre."
+        title={`Retirer l'assureur ${insurerName}`}
+        description={`${insurerName} ne pourra plus être choisi pour une nouvelle offre. Les offres existantes gardent son nom.`}
         confirmLabel="Retirer l'assureur"
         cancelLabel="Annuler"
         tone="danger"

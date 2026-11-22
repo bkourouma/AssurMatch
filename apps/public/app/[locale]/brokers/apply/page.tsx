@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { toLocale, type AppLocale } from "../../../../i18n/routing";
 import { PartnerApplicationForm, type PartnerApplicationFormLabels, type PartnerApplicationProductOption } from "../../../components/forms/partner-application-form";
 import { Breadcrumb } from "../../../components/ui/breadcrumb";
+import { Button } from "../../../components/ui/button";
 import { EmptyState } from "../../../components/ui/empty-state";
 import { Hero } from "../../../components/ui/hero";
 import { Notice } from "../../../components/ui/notice";
@@ -274,7 +275,15 @@ export default async function BrokerApplyPage({
             </Notice>
           ) : null}
           {eligibleCountries.length === 0 ? (
-            <EmptyState title={t("noCountries.title")} description={t("noCountries.description")} />
+            <EmptyState
+              title={t("noCountries.title")}
+              description={t("noCountries.description")}
+              action={
+                <Button href="/contact" variant="secondary">
+                  {t("noCountries.action")}
+                </Button>
+              }
+            />
           ) : (
             <PartnerApplicationForm
               countries={eligibleCountries.map((country) => ({ isoCode: country.isoCode, name: country.name }))}

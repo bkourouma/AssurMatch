@@ -1,0 +1,116 @@
+/*
+ * Starter lead screens (list and detail): small layout helpers that `@assurmatch/ui` does not ship.
+ * Tokens only: no colour, size or radius of its own. State stays a form of line (the shared Badge and
+ * Notice), never a coloured fill.
+ */
+
+/* Secondary sentence under a control or a block: muted ink, never below 14px, capped line length. */
+.hint {
+  margin: 0;
+  max-width: 68ch;
+  color: var(--bo-ink-3);
+  font-size: var(--bo-fs);
+  line-height: 1.5;
+}
+
+/* In-page shortcuts under the "next step" sentence. */
+.shortcuts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--bo-s2);
+  margin-top: var(--bo-s3);
+}
+
+/* Actions that exist but cannot be used now: the name struck through, the reason beside it. */
+.unavailable {
+  display: grid;
+  gap: var(--bo-s2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.unavailable > li {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+/* History: one row per event, date in mono on the left, the sentence on the right. */
+.timeline {
+  display: grid;
+  gap: 0;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.timelineItem {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  gap: var(--bo-s1, 4px) var(--bo-s4);
+  padding: var(--bo-s3) 0;
+  border-bottom: 1px solid var(--bo-line);
+}
+
+.timelineItem:first-child {
+  padding-top: 0;
+}
+
+.timelineItem:last-child {
+  padding-bottom: 0;
+  border-bottom: 0;
+}
+
+.timelineDate {
+  font-family: var(--bo-mono);
+  font-size: var(--bo-fs);
+  color: var(--bo-ink-3);
+  white-space: nowrap;
+}
+
+.timelineBody {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.timelineTitle {
+  font-weight: 600;
+}
+
+.timelineDetail {
+  color: var(--bo-ink-2);
+  font-size: var(--bo-fs);
+}
+
+/* The list of leads: the reference link is a real touch target on a phone. */
+.leadTable {
+  min-width: 0;
+}
+
+/* Skeleton rows of a loading screen keep the page height steady. */
+.loading {
+  display: grid;
+  gap: var(--bo-s4);
+}
+
+@media (max-width: 900px) {
+  /* Small buttons (dialog triggers, shortcuts) rise to the 44px touch target of the phone layout. */
+  .touch :global(.bo-button[data-size="sm"]) {
+    min-height: 44px;
+  }
+
+  .leadTable :global(.bo-table td:first-child a) {
+    display: inline-flex;
+    align-items: center;
+    min-height: 44px;
+  }
+}
+
+@media (max-width: 520px) {
+  .timelineItem {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

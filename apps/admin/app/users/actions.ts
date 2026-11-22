@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { createAdminUser, issueAdminUserPasswordReset, runAdminUserAction, updateAdminUser, updateAdminUserRoles } from "../lib/admin-api";
 import { adminWriteErrorMessage } from "../lib/catalog-messages";
 import { errorNoticeKey, friendlyErrorMessage } from "../lib/auth-error-messages";
+import { adminUserScopeAndReasonError, displayNameError, reasonError } from "../lib/user-input-checks";
 
 export interface UserActionState {
   status: "idle" | "success" | "error";
@@ -50,6 +51,10 @@ export async function createAdminUserAction(_previous: UserActionState, formData
   const phone = optionalString(formData.get("phone"));
   const partnerTenantId = optionalString(formData.get("partnerTenantId"));
   const roles = formRoles(formData);
+  const nameError = displayNameError(stringValue(formData.get("displayName")));
+  if (nameError) return { status: "error", message: nameError };
+  const reasonProblem = reasonError(stringValue(formData.get("reason")));
+  if (reasonProblem) return { status: "error", message: reasonProblem };
   // Spec 051 R11: a broker role needs a partner and an admin role never has one. The API is the
   // authority (422 PARTNER_USER_INVALID); this only spares the operator an obvious refusal.
   const brokerRole = roles.some((role) => role.startsWith("broker_"));
@@ -59,6 +64,9 @@ export async function createAdminUserAction(_previous: UserActionState, formData
   if (!brokerRole && partnerTenantId) {
     return { status: "error", message: "Un rôle admin ne peut pas être rattaché à un courtier : retirez le courtier ou choisissez un rôle courtier." };
   }
+  // The API answers one generic 400 for every invalid field: name the wrong one here instead.
+  const fieldError = adminUserScopeAndReasonError({ countryIds: csvValues(formData.get("countryScopes")), productIds: csvValues(formData.get("productScopes")), reason: stringValue(formData.get("reason")) });
+  if (fieldError) return { status: "error", message: fieldError };
   try {
     const result = await createAdminUser({
       email: stringValue(formData.get("email")),
@@ -89,6 +97,9 @@ export async function updateAdminUserProfileAction(formData: FormData): Promise<
   const userId = stringValue(formData.get("userId"));
   const displayName = optionalString(formData.get("displayName"));
   const phone = optionalString(formData.get("phone"));
+  // A name is only sent when filled; a filled one still needs 2 characters (same rule as the creation).
+  if (displayName && displayNameError(displayName)) redirect(`/users/${encodeURIComponent(userId)}?error=name_too_short`);
+  if (reasonError(stringValue(formData.get("reason")))) redirect(`/users/${encodeURIComponent(userId)}?error=reason_too_short`);
   try {
     await updateAdminUser(userId, {
       ...(displayName ? { displayName } : {}),
@@ -109,6 +120,7 @@ export async function updateAdminUserProfileAction(formData: FormData): Promise<
 
 export async function updateAdminUserRolesAction(formData: FormData): Promise<void> {
   const userId = stringValue(formData.get("userId"));
+  if (reasonError(stringValue(formData.get("reason")))) redirect(`/users/${encodeURIComponent(userId)}?error=reason_too_short`);
   try {
     await updateAdminUserRoles(userId, {
       roles: formRoles(formData),
@@ -125,6 +137,7 @@ export async function updateAdminUserRolesAction(formData: FormData): Promise<vo
 export async function adminUserLifecycleAction(formData: FormData): Promise<void> {
   const userId = stringValue(formData.get("userId"));
   const action = stringValue(formData.get("action")) as "suspend" | "unsuspend" | "lock" | "unlock" | "mfa-reset" | "delete";
+  if (reasonError(stringValue(formData.get("reason")))) redirect(`/users/${encodeURIComponent(userId)}?error=reason_too_short`);
   try {
     await runAdminUserAction(userId, action, stringValue(formData.get("reason")));
   } catch (error) {

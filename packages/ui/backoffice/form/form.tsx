@@ -35,11 +35,13 @@ export function FormSection({ legend, description, children }: FormSectionProps)
 export interface FormActionsProps {
   children: ReactNode;
   align?: "end" | "start" | "between" | undefined;
+  /** Sticks the bar to the bottom of the viewport on narrow screens, for long forms. */
+  sticky?: boolean | undefined;
 }
 
-export function FormActions({ children, align = "end" }: FormActionsProps) {
+export function FormActions({ children, align = "end", sticky }: FormActionsProps) {
   return (
-    <div className="bo-form__actions" data-align={align === "end" ? undefined : align}>
+    <div className="bo-form__actions" data-align={align === "end" ? undefined : align} data-sticky={sticky ? "true" : undefined}>
       {children}
     </div>
   );

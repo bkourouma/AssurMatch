@@ -1,6 +1,7 @@
 import { readBackOfficeSession } from "../../lib/backoffice-auth";
 import { firstValue, formatDateTime, pageHref, pageNumber, readAuditLogs, toQueryString, type AuditLogRow } from "../../lib/operations-api";
 import { Badge, Button, DataTable, Field, FilterBar, Input, PageHeader, PageStack, Select, StateMessage, fieldControlProps, type DataTableColumn } from "../../lib/ui/admin-ui";
+import { ActiveFilters, type ActiveFilterChip } from "../../lib/ui/active-filters";
 import { auditResultTones } from "../../lib/ui/operations-tones";
 import { readFailureDetail } from "../../lib/auth-error-messages";
 
@@ -20,7 +21,7 @@ const columns: Array<DataTableColumn<AuditLogRow>> = [
   { key: "result", header: "Résultat", render: (row) => <Badge tone={auditResultTones[row.result] ?? "neutral"}>{row.result}</Badge> },
   { key: "reason", header: "Motif", render: (row) => row.reason ?? "-" },
   { key: "correlation", header: "Corrélation", render: (row) => (row.correlationId ? <span className="bo-ref">{row.correlationId.slice(0, 12)}</span> : "-") },
-  { key: "context", header: "Contexte", render: (row) => <code>{JSON.stringify(row.context).slice(0, 160)}</code> }
+  { key: "context", header: "Contexte", render: (row) => <code title={JSON.stringify(row.context)}>{JSON.stringify(row.context).slice(0, 160)}</code> }
 ];
 
 export default async function AdminAuditLogsPage({ searchParams }: { searchParams?: Promise<Record<string, string | string[] | undefined>> }) {
@@ -36,6 +37,16 @@ export default async function AdminAuditLogsPage({ searchParams }: { searchParam
   };
   const page = pageNumber(params.page);
   const [result, session] = await Promise.all([readAuditLogs({ ...filters, page, pageSize: 50 }), readBackOfficeSession()]);
+  const RESULT_LABELS: Record<string, string> = { success: "Réussi", refused: "Refusé", failed: "Échec" };
+  const chips: ActiveFilterChip[] = [
+    ...(filters.actorId ? [{ key: "actorId", label: "Acteur", value: filters.actorId }] : []),
+    ...(filters.action ? [{ key: "action", label: "Action", value: `${filters.action}…` }] : []),
+    ...(filters.targetType ? [{ key: "targetType", label: "Type de cible", value: filters.targetType }] : []),
+    ...(filters.targetId ? [{ key: "targetId", label: "Cible", value: filters.targetId }] : []),
+    ...(filters.result ? [{ key: "result", label: "Résultat", value: RESULT_LABELS[filters.result] ?? filters.result }] : []),
+    ...(filters.from ? [{ key: "from", label: "Du", value: filters.from }] : []),
+    ...(filters.to ? [{ key: "to", label: "Au", value: filters.to }] : [])
+  ];
   const canExport = session.status === "authenticated" && session.profile.roles.some((role) => EXPORT_ROLES.has(role));
 
   return (
@@ -50,27 +61,31 @@ export default async function AdminAuditLogsPage({ searchParams }: { searchParam
       {result.status === "unauthenticated" ? <StateMessage tone="danger">Session admin requise.</StateMessage> : null}
       {result.status === "forbidden" ? <StateMessage tone="danger">Journaux d'audit non accessibles pour ce rôle admin.</StateMessage> : null}
       {result.status === "error" ? <StateMessage tone="danger">Journaux indisponibles. {readFailureDetail(result.error)}</StateMessage> : null}
-      {!canExport ? <StateMessage>Export réservé à la conformité et au Super Admin.</StateMessage> : null}
+      {canExport ? (
+        <p className="bo-description">L'export CSV reprend les filtres appliqués ci-dessous (5 000 lignes au plus) ; chaque export est lui-même journalisé.</p>
+      ) : (
+        <StateMessage>Export réservé à la conformité et au Super Admin.</StateMessage>
+      )}
 
-      <FilterBar action="/compliance/audit-logs" label="Filtres journaux d'audit" submitLabel="Rechercher" resetLabel="Réinitialiser" resetHref="/compliance/audit-logs" activeCount={Object.values(filters).filter(Boolean).length}>
-        <Field id="al-actor" label="Acteur (identifiant)">
-          <Input {...fieldControlProps("al-actor")} name="actorId" defaultValue={filters.actorId ?? ""} />
+      <FilterBar action="/compliance/audit-logs" label="Filtres journaux d'audit" submitLabel="Rechercher" resetLabel="Réinitialiser" resetHref="/compliance/audit-logs" activeCount={chips.length}>
+        <Field id="al-actor" label="Acteur (identifiant)" hint="Identifiant complet de l'utilisateur.">
+          <Input {...fieldControlProps("al-actor", { hint: "Identifiant complet de l'utilisateur." })} name="actorId" defaultValue={filters.actorId ?? ""} />
         </Field>
-        <Field id="al-action" label="Action (préfixe)">
-          <Input {...fieldControlProps("al-action")} name="action" defaultValue={filters.action ?? ""} placeholder="quote_request" />
+        <Field id="al-action" label="Action (préfixe)" hint="Le début suffit : « billing. » liste toute la facturation.">
+          <Input {...fieldControlProps("al-action", { hint: "Le début suffit : « billing. » liste toute la facturation." })} name="action" defaultValue={filters.action ?? ""} placeholder="quote_request" />
         </Field>
         <Field id="al-target-type" label="Type de cible">
           <Input {...fieldControlProps("al-target-type")} name="targetType" defaultValue={filters.targetType ?? ""} placeholder="QuoteRequest" />
         </Field>
-        <Field id="al-target-id" label="Identifiant de cible">
-          <Input {...fieldControlProps("al-target-id")} name="targetId" defaultValue={filters.targetId ?? ""} />
+        <Field id="al-target-id" label="Identifiant de cible" hint="Identifiant complet de l'objet concerné.">
+          <Input {...fieldControlProps("al-target-id", { hint: "Identifiant complet de l'objet concerné." })} name="targetId" defaultValue={filters.targetId ?? ""} />
         </Field>
         <Field id="al-result" label="Résultat">
           <Select {...fieldControlProps("al-result")} name="result" defaultValue={filters.result ?? ""}>
             <option value="">Tous</option>
-            <option value="success">success</option>
-            <option value="refused">refused</option>
-            <option value="failed">failed</option>
+            <option value="success">Réussi (success)</option>
+            <option value="refused">Refusé (refused)</option>
+            <option value="failed">Échec (failed)</option>
           </Select>
         </Field>
         <Field id="al-from" label="Du">
@@ -81,12 +96,14 @@ export default async function AdminAuditLogsPage({ searchParams }: { searchParam
         </Field>
       </FilterBar>
 
+      <ActiveFilters pathname="/compliance/audit-logs" filters={filters} chips={chips} />
+
       <DataTable
         columns={columns}
         items={result.data.items}
         getKey={(row) => row.id}
         emptyLabel="Aucune entrée pour ces filtres."
-        emptyDescription="Élargissez la période ou raccourcissez le préfixe d'action."
+        emptyDescription="Élargissez la période, raccourcissez le préfixe d'action ou réinitialisez les filtres."
         aria-label="Journal d'audit"
         dense
         pagination={{

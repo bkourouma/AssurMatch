@@ -11,6 +11,7 @@ import {
   Button,
   Card,
   Cluster,
+  ConfirmDialog,
   DataTable,
   DescriptionList,
   Notice,
@@ -124,7 +125,11 @@ export default async function BrokerCrmPage({ searchParams }: { searchParams: Pr
             <Cluster>
               <Button href="/crm/kanban" variant="secondary">Vue Kanban</Button>
               <Button href="/crm/leads" variant="secondary">Vue tableau</Button>
-              {session.profile.partnerPlan === "enterprise" ? <Button href="/crm/loss-analysis" variant="secondary">Analyse des pertes</Button> : null}
+              {session.profile.partnerPlan === "enterprise" ? (
+                <Button href="/crm/loss-analysis" variant="secondary">Analyse des pertes</Button>
+              ) : (
+                <Badge tone="disabled">Analyse des pertes : plan Enterprise requis</Badge>
+              )}
             </Cluster>
           ) : (
             <Badge tone="disabled">Module indisponible</Badge>
@@ -171,8 +176,11 @@ export default async function BrokerCrmPage({ searchParams }: { searchParams: Pr
               ]}
               items={crm.pipeline}
               getKey={(row) => row.status}
+              /* The status opens the table filtered on it: from a figure to the leads behind it. */
+              getRowHref={(row) => `/crm/leads?status=${encodeURIComponent(row.status)}`}
               aria-label="Pipeline par statut"
               emptyLabel="Aucune activité CRM dans la fenêtre."
+              emptyDescription="Les statuts apparaissent dès qu'un lead est assigné à votre cabinet."
               dense
             />
           </Card>
@@ -280,22 +288,32 @@ export default async function BrokerCrmPage({ searchParams }: { searchParams: Pr
           <p className={styles.muted}>{aiAssistance.data.message}</p>
           {aiOptOut.status === "success" ? (
             <TenantWriteGuard readOnly={isTenantReadOnly(session.profile)}>
-            <form action={setAiOptOutAction}>
-              <input type="hidden" name="optOut" value={aiOptOut.data.optedOut ? "false" : "true"} />
-              <input
-                type="hidden"
-                name="reason"
-                value={aiOptOut.data.optedOut ? "Réactivation de l'assistance IA par le cabinet" : "Opt-out de l'assistance IA par le cabinet"}
-              />
-              <Cluster>
-                <Badge tone={aiOptOut.data.optedOut ? "warning" : "neutral"}>
-                  {aiOptOut.data.optedOut ? "Cabinet en opt-out IA" : "Assistance IA autorisée pour le cabinet"}
-                </Badge>
-                <Button type="submit" variant="secondary" size="sm">
-                  {aiOptOut.data.optedOut ? "Réactiver l'assistance IA" : "Refuser l'assistance IA (opt-out cabinet)"}
-                </Button>
-              </Cluster>
-            </form>
+              {aiOptOut.data.optedOut ? (
+                <form action={setAiOptOutAction}>
+                  <input type="hidden" name="optOut" value="false" />
+                  <input type="hidden" name="reason" value="Réactivation de l'assistance IA par le cabinet" />
+                  <Cluster>
+                    <Badge tone="warning">Cabinet en opt-out IA</Badge>
+                    <Button type="submit" variant="secondary" size="sm">Réactiver l&apos;assistance IA</Button>
+                  </Cluster>
+                </form>
+              ) : (
+                <Cluster>
+                  <Badge tone="neutral">Assistance IA autorisée pour le cabinet</Badge>
+                  {/* Refusing hides every AI suggestion for the whole cabinet: it is confirmed first (the action itself is unchanged). */}
+                  <ConfirmDialog
+                    triggerLabel="Refuser l'assistance IA (opt-out cabinet)"
+                    title="Refuser l'assistance IA pour le cabinet ?"
+                    description="Les suggestions IA seront masquées pour tous les utilisateurs du cabinet. Vous pourrez la réactiver à tout moment ; le choix est historisé. Réservé au propriétaire du cabinet."
+                    confirmLabel="Refuser l'assistance IA"
+                    cancelLabel="Annuler"
+                    formAction={setAiOptOutAction}
+                  >
+                    <input type="hidden" name="optOut" value="true" />
+                    <input type="hidden" name="reason" value="Opt-out de l'assistance IA par le cabinet" />
+                  </ConfirmDialog>
+                </Cluster>
+              )}
             </TenantWriteGuard>
           ) : null}
           {aiNotice === "optout_saved" ? <Notice tone="success">Préférence IA du cabinet enregistrée et auditée.</Notice> : null}

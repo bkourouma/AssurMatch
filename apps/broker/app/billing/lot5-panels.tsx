@@ -1,6 +1,7 @@
 import { Badge, Card, DataTable, Notice } from "../lib/ui/broker-ui";
 import type { DataTableColumn } from "../lib/ui/broker-ui";
 import { selfServiceFormatDate } from "../lib/self-service-messages";
+import polish from "../lib/ui/self-service-polish.module.css";
 import { readBrokerPlanChangeRequests, type PlanChangeRequest } from "./lot5-api";
 import { CancelPlanChangeForm, PlanChangeRequestForm } from "./lot5-forms";
 import {
@@ -12,7 +13,7 @@ import {
 } from "./lot5-labels";
 
 function xof(amount: number): string {
-  return `${amount.toLocaleString("fr-FR").replace(/\u202f|\u00a0/g, " ")} XOF`;
+  return `${amount.toLocaleString("fr-FR").replace(/\u202f|\u00a0/g, " ")} FCFA`;
 }
 
 function effectLabel(request: PlanChangeRequest): string {
@@ -49,7 +50,17 @@ export async function PlanChangeSection({ currentPlan, readOnly }: { currentPlan
       description={`Plan actuel : ${currentPlan ? PLAN_LABELS[currentPlan] ?? currentPlan : "non disponible"}. Un changement accepté prend effet au premier jour du cycle mensuel suivant.`}
     >
       <Notice tone="info">{PLAN_CHANGE_NO_PAYMENT_NOTICE}</Notice>
-      {requests.status === "error" ? <Notice tone="warning">Historique des demandes temporairement indisponible.</Notice> : null}
+      <ol className={polish.steps} aria-label="Déroulement d'une demande de changement de plan">
+        <li>Vous choisissez le plan souhaité et expliquez votre besoin.</li>
+        <li>L&apos;équipe AssurMatch étudie la demande et vous répond ici, avec un motif en cas de refus.</li>
+        <li>Si elle est acceptée, le nouveau plan s&apos;applique à partir du cycle mensuel suivant ; jusque-là, votre plan actuel reste en vigueur.</li>
+      </ol>
+      {requests.status === "error" ? (
+        <Notice tone="warning">
+          <p>Historique des demandes temporairement indisponible.</p>
+          <p><a href="/billing#plan-change">Recharger la page</a></p>
+        </Notice>
+      ) : null}
       {requests.status === "forbidden" ? <Notice tone="warning">Les demandes de changement de plan ne sont pas accessibles pour votre rôle.</Notice> : null}
       {readOnly ? <Notice tone="warning">Compte suspendu : consultation seule. Contactez AssurMatch.</Notice> : null}
       {hasPending ? <Notice tone="info">Une demande est déjà en attente : annulez-la pour en envoyer une nouvelle.</Notice> : null}

@@ -20,6 +20,7 @@ import {
 } from "../lib/catalog-actions";
 import { allowedCountryStatusTransitions } from "../../../../packages/shared/contracts/country-status-transitions";
 import {
+  CATALOG_STATUS_LABELS,
   CATEGORY_STATUS_OPTIONS,
   COUNTRY_STATUS_OPTIONS,
   DISCLAIMER_MAX_LENGTH,
@@ -27,11 +28,13 @@ import {
   LANGUAGE_OPTIONS,
   LEGAL_TEXT_MAX_LENGTH,
   PRODUCT_STATUS_OPTIONS,
-  REGULATORY_FAMILY_OPTIONS
+  REGULATORY_FAMILY_OPTIONS,
+  labelWithCode
 } from "../lib/catalog-messages";
 import { createProductCategoryAction, updateProductCategoryAction } from "../lib/lot4-catalog-actions";
 import { quoteDocumentKinds } from "../../../../packages/shared/contracts/quote-document.contracts";
 import { CatalogActionResult } from "../lib/ui/catalog-action-result";
+import { UnsavedChangesNotice } from "../lib/ui/unsaved-changes-notice";
 import {
   Button,
   Card,
@@ -41,6 +44,7 @@ import {
   Field,
   Form,
   FormActions,
+  FormSection,
   Input,
   Notice,
   Select,
@@ -78,31 +82,37 @@ function CountryFields({ country, regimes, ids }: {
 }) {
   return (
     <>
-      <Field id={ids.name ?? "name"} label="Nom" required>
-        <Input {...fieldControlProps(ids.name ?? "name", { required: true })} name="name" defaultValue={country?.name ?? ""} />
-      </Field>
-      <Field id={ids.currency ?? "currency"} label="Devise (ISO 4217)" required>
-        <Input {...fieldControlProps(ids.currency ?? "currency", { required: true })} name="currency" maxLength={3} defaultValue={country?.currency ?? "XOF"} />
-      </Field>
-      <CheckboxGroup legend="Langues" name="languages" options={languageChoices} defaultValues={country?.languages ?? ["fr"]} />
-      <Field id={ids.timezone ?? "timezone"} label="Fuseau horaire" required>
-        <Input {...fieldControlProps(ids.timezone ?? "timezone", { required: true })} name="timezone" defaultValue={country?.timezone ?? "Africa/Abidjan"} />
-      </Field>
-      <Field id={ids.family ?? "family"} label="Famille réglementaire" required>
-        <Select {...fieldControlProps(ids.family ?? "family", { required: true })} name="regulatoryFamily" options={familyChoices} defaultValue={country?.regulatoryFamily ?? "cima"} />
-      </Field>
-      <Field id={ids.regime ?? "regime"} label="Régime réglementaire">
-        <Select {...fieldControlProps(ids.regime ?? "regime")} name="regulatoryRegimeId" defaultValue={country?.regulatoryRegimeId ?? ""}>
-          <option value="">Non renseigné</option>
-          {regimes.map((regime) => <option key={regime.value} value={regime.value}>{regime.label}</option>)}
-        </Select>
-      </Field>
-      <Field id={ids.dial ?? "dial"} label="Indicatif téléphonique" hint="Par exemple +225. Vide : normalisation générique.">
-        <Input {...fieldControlProps(ids.dial ?? "dial", { hint: "x" })} name="phoneDialCode" pattern="\+\d{1,4}" defaultValue={country?.phoneDialCode ?? ""} />
-      </Field>
-      <Field id={ids.lengths ?? "lengths"} label="Longueurs du numéro national" hint="Chiffres sans indicatif, séparés par des virgules, par exemple 10 ou 8,9.">
-        <Input {...fieldControlProps(ids.lengths ?? "lengths", { hint: "x" })} name="phoneNationalLengths" defaultValue={country?.phoneNationalLengths.join(",") ?? ""} />
-      </Field>
+      <FormSection legend="Identité du pays">
+        <Field id={ids.name ?? "name"} label="Nom" required>
+          <Input {...fieldControlProps(ids.name ?? "name", { required: true })} name="name" defaultValue={country?.name ?? ""} />
+        </Field>
+        <Field id={ids.currency ?? "currency"} label="Devise (ISO 4217)" required hint="Trois lettres, par exemple XOF.">
+          <Input {...fieldControlProps(ids.currency ?? "currency", { required: true, hint: "x" })} name="currency" maxLength={3} defaultValue={country?.currency ?? "XOF"} />
+        </Field>
+        <CheckboxGroup legend="Langues" name="languages" options={languageChoices} defaultValues={country?.languages ?? ["fr"]} />
+        <Field id={ids.timezone ?? "timezone"} label="Fuseau horaire" required hint="Identifiant IANA, par exemple Africa/Abidjan.">
+          <Input {...fieldControlProps(ids.timezone ?? "timezone", { required: true, hint: "x" })} name="timezone" defaultValue={country?.timezone ?? "Africa/Abidjan"} />
+        </Field>
+      </FormSection>
+      <FormSection legend="Cadre réglementaire">
+        <Field id={ids.family ?? "family"} label="Famille réglementaire" required>
+          <Select {...fieldControlProps(ids.family ?? "family", { required: true })} name="regulatoryFamily" options={familyChoices} defaultValue={country?.regulatoryFamily ?? "cima"} />
+        </Field>
+        <Field id={ids.regime ?? "regime"} label="Régime réglementaire" hint="Sans régime, la checklist d'activation reste bloquée.">
+          <Select {...fieldControlProps(ids.regime ?? "regime", { hint: "x" })} name="regulatoryRegimeId" defaultValue={country?.regulatoryRegimeId ?? ""}>
+            <option value="">Non renseigné</option>
+            {regimes.map((regime) => <option key={regime.value} value={regime.value}>{regime.label}</option>)}
+          </Select>
+        </Field>
+      </FormSection>
+      <FormSection legend="Numéros de téléphone">
+        <Field id={ids.dial ?? "dial"} label="Indicatif téléphonique" hint="Par exemple +225. Vide : normalisation générique.">
+          <Input {...fieldControlProps(ids.dial ?? "dial", { hint: "x" })} name="phoneDialCode" pattern="\+\d{1,4}" defaultValue={country?.phoneDialCode ?? ""} />
+        </Field>
+        <Field id={ids.lengths ?? "lengths"} label="Longueurs du numéro national" hint="Chiffres sans indicatif, séparés par des virgules, par exemple 10 ou 8,9.">
+          <Input {...fieldControlProps(ids.lengths ?? "lengths", { hint: "x" })} name="phoneNationalLengths" defaultValue={country?.phoneNationalLengths.join(",") ?? ""} />
+        </Field>
+      </FormSection>
     </>
   );
 }
@@ -129,12 +139,15 @@ export function CreateCountryForm({ regimes }: { regimes: SelectChoice[] }) {
     <Card title="Créer un pays" description="Un pays est toujours créé en brouillon, tous ses flags fermés.">
       <Form action={formAction} data-catalog-form="country-create">
         <CatalogActionResult state={state} />
-        <Field id={ids.iso} label="Code ISO (2 lettres)" required>
-          <Input {...fieldControlProps(ids.iso, { required: true })} name="isoCode" maxLength={2} pattern="[A-Za-z]{2}" />
-        </Field>
+        <FormSection legend="Code pays">
+          <Field id={ids.iso} label="Code ISO (2 lettres)" required hint="Par exemple CI ou SN. Non modifiable ensuite.">
+            <Input {...fieldControlProps(ids.iso, { required: true, hint: "x" })} name="isoCode" maxLength={2} pattern="[A-Za-z]{2}" />
+          </Field>
+        </FormSection>
         <CountryFields regimes={regimes} ids={ids} />
         <ReasonField id={ids.reason} />
         <FormActions>
+          <UnsavedChangesNotice />
           <Button type="submit" pending={pending} pendingLabel="Création...">Créer le pays</Button>
         </FormActions>
       </Form>
@@ -154,6 +167,7 @@ export function EditCountryForm({ country, regimes }: { country: AdminCountryDat
         <CountryFields country={country} regimes={regimes} ids={ids} />
         <ReasonField id={ids.reason} />
         <FormActions>
+          <UnsavedChangesNotice />
           <Button type="submit" pending={pending} pendingLabel="Enregistrement...">Enregistrer</Button>
         </FormActions>
       </Form>
@@ -173,9 +187,9 @@ export function CountryStatusForm({ countryId, currentStatus, canApprovePublic }
   const options = COUNTRY_STATUS_OPTIONS
     .filter((status) => status !== currentStatus && allowed.has(status))
     .filter((status) => status !== "public" || canApprovePublic)
-    .map((status) => ({ value: status, label: status }));
+    .map((status) => ({ value: status, label: labelWithCode(CATALOG_STATUS_LABELS, status) }));
   return (
-    <Card title="Statut du pays">
+    <Card title="Statut du pays" description={options.length === 0 ? `Statut actuel : ${labelWithCode(CATALOG_STATUS_LABELS, currentStatus)}. Aucune transition disponible pour votre rôle.` : `Statut actuel : ${labelWithCode(CATALOG_STATUS_LABELS, currentStatus)}. Choisissez le prochain statut.`}>
       <Form action={formAction} data-catalog-form="country-status">
         <CatalogActionResult state={state} scope={{ countryId }} />
         <input type="hidden" name="countryId" value={countryId} />
@@ -207,9 +221,9 @@ export function ProductStatusForm({ productId, currentStatus, canApprovePublic }
   const options = PRODUCT_STATUS_OPTIONS
     .filter((status) => status !== currentStatus)
     .filter((status) => status !== "public" || canApprovePublic)
-    .map((status) => ({ value: status, label: status }));
+    .map((status) => ({ value: status, label: labelWithCode(CATALOG_STATUS_LABELS, status) }));
   return (
-    <Card title="Statut du produit">
+    <Card title="Statut du produit" description={options.length === 0 ? `Statut actuel : ${labelWithCode(CATALOG_STATUS_LABELS, currentStatus)}. Aucune transition disponible pour votre rôle.` : `Statut actuel : ${labelWithCode(CATALOG_STATUS_LABELS, currentStatus)}. Choisissez le prochain statut.`}>
       <Form action={formAction} data-catalog-form="product-status">
         <CatalogActionResult state={state} scope={{ productId }} />
         <input type="hidden" name="productId" value={productId} />
@@ -393,6 +407,7 @@ export function CreateProductForm({ categories = [] }: { categories?: SelectChoi
         <ProductFields base={base} categories={categories} />
         <ReasonField id={`${base}-reason`} />
         <FormActions>
+          <UnsavedChangesNotice />
           <Button type="submit" pending={pending} pendingLabel="Création...">Créer le produit</Button>
         </FormActions>
       </Form>
@@ -412,6 +427,7 @@ export function EditProductForm({ product, categories = [] }: { product: AdminPr
         <ProductFields product={product} base={base} categories={categories} />
         <ReasonField id={`${base}-reason`} />
         <FormActions>
+          <UnsavedChangesNotice />
           <Button type="submit" pending={pending} pendingLabel="Enregistrement...">Enregistrer</Button>
         </FormActions>
       </Form>
@@ -420,9 +436,9 @@ export function EditProductForm({ product, categories = [] }: { product: AdminPr
 }
 
 const regimeStatusChoices = [
-  { value: "draft", label: "draft" },
-  { value: "active", label: "active" },
-  { value: "suspended", label: "suspended" }
+  { value: "draft", label: labelWithCode(CATALOG_STATUS_LABELS, "draft") },
+  { value: "active", label: labelWithCode(CATALOG_STATUS_LABELS, "active") },
+  { value: "suspended", label: labelWithCode(CATALOG_STATUS_LABELS, "suspended") }
 ];
 
 function RegimeFields({ regime, base }: { regime?: AdminRegulatoryRegimeData; base: string }) {
@@ -495,7 +511,7 @@ export function RetireRegimeForm({ regime }: { regime: AdminRegulatoryRegimeData
       <CatalogActionResult state={state} />
       <ConfirmDialog
         triggerLabel="Retirer le régime"
-        title={`Retirer le régime ${regime.key}`}
+        title={`Retirer le régime ${regime.name} (${regime.key})`}
         description="Le retrait est refusé tant qu'un pays référence ce régime."
         confirmLabel="Retirer"
         cancelLabel="Annuler"

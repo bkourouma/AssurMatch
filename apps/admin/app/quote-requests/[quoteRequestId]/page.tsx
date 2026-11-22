@@ -1,8 +1,9 @@
 import { readAdminQuoteDocuments } from "../../lib/admin-api";
 import { formatDateTime, readQuoteRequestDetail, readQuoteReviewQueue } from "../../lib/operations-api";
-import { Badge, Card, Cluster, DataTable, DescriptionList, PageHeader, PageStack, Split, Stack, StateMessage, documentScanTones } from "../../lib/ui/admin-ui";
+import { Badge, Button, Card, Cluster, DataTable, DescriptionList, PageHeader, PageStack, Split, Stack, StateMessage, documentScanTones } from "../../lib/ui/admin-ui";
 import { QuoteReviewForm } from "../../lib/ui/operations-forms";
 import { LeadConversationsCard } from "./lead-conversations-card";
+import { safeBackQuery } from "./back-query";
 import { assignmentStatusTones, quoteStatusTones, routingResultTones } from "../../lib/ui/operations-tones";
 import {
   assignmentStatusLabel,
@@ -34,11 +35,15 @@ export default async function AdminQuoteRequestDetailPage({
   searchParams
 }: {
   params: Promise<{ quoteRequestId: string }>;
-  searchParams?: Promise<{ conversations?: string }>;
+  searchParams?: Promise<{ conversations?: string; back?: string }>;
 }) {
   const { quoteRequestId } = await params;
   // Conversation content is loaded (and audited by the API) only on an explicit action: `?conversations=1`.
   const showConversations = ((searchParams ? await searchParams : {}).conversations) === "1";
+  // `back` carries the filters of the list the operator came from; only a plain query string is accepted.
+  const rawBack = (searchParams ? await searchParams : {}).back;
+  const backQuery = safeBackQuery(rawBack);
+  const listHref = `/quote-requests${backQuery}`;
   const [detailResult, documents] = await Promise.all([readQuoteRequestDetail(quoteRequestId), readAdminQuoteDocuments(quoteRequestId)]);
   const detail = detailResult.data;
   const review = detail?.reviewOpen ? await readQuoteReviewQueue() : undefined;
@@ -50,18 +55,18 @@ export default async function AdminQuoteRequestDetailPage({
         breadcrumb={[
           { label: "Pilotage" },
           { label: "Opérations", href: "/operations" },
-          { label: "Demandes de devis", href: "/quote-requests" },
+          { label: "Demandes de devis", href: listHref },
           { label: "Détail" }
         ]}
         title={detail ? `Demande ${detail.publicReference}` : "Détail demande de devis"}
         description="Consentement, routage, affectations et documents du prospect. Chaque décision affichée ici est journalisée."
         actions={
-          detail ? (
-            <Cluster>
-              <Badge tone={quoteStatusTones[detail.status] ?? "neutral"} title={detail.status}>{quoteStatusLabel(detail.status)}</Badge>
-              {detail.reviewOpen ? <Badge tone="warning">En revue manuelle</Badge> : null}
-            </Cluster>
-          ) : null
+          <Cluster>
+            {detail ? <Badge tone={quoteStatusTones[detail.status] ?? "neutral"} title={detail.status}>{quoteStatusLabel(detail.status)}</Badge> : null}
+            {detail ? <Badge tone="neutral" title={detail.routingStatus}>{`Routage : ${routingStatusLabel(detail.routingStatus)}`}</Badge> : null}
+            {detail?.reviewOpen ? <Badge tone="warning">En revue manuelle</Badge> : null}
+            <Button href={listHref} variant="tertiary" size="sm">Retour à la liste</Button>
+          </Cluster>
         }
       />
 
@@ -84,7 +89,7 @@ export default async function AdminQuoteRequestDetailPage({
                   ]}
                 />
               ) : null}
-              {detail.reviewOpen && reviewItem ? <QuoteReviewForm quoteRequestId={detail.id} candidates={reviewItem.candidates} /> : null}
+              {detail.reviewOpen && reviewItem ? <QuoteReviewForm quoteRequestId={detail.id} candidates={reviewItem.candidates} reference={detail.publicReference} /> : null}
               {detail.reviewOpen && !reviewItem ? <StateMessage>Demande en revue : traitez-la depuis la file de revue.</StateMessage> : null}
             </Card>
           ) : null}
@@ -157,7 +162,7 @@ export default async function AdminQuoteRequestDetailPage({
 
       {detail ? (
         <>
-          <Card title="Décisions de routage" description="Courtiers partenaires retenus, candidats exclus et raisons (journal opposable).">
+          <Card title="Décisions de routage" description={`Courtiers partenaires retenus, candidats exclus et raisons (journal opposable). ${detail.routingDecisions.length} décision(s).`}>
             <DataTable
               columns={[
                 { key: "date", header: "Date", render: (decision) => formatDateTime(decision.createdAt) },
@@ -181,7 +186,7 @@ export default async function AdminQuoteRequestDetailPage({
             />
           </Card>
 
-          <Card title="Affectations">
+          <Card title="Affectations" description={`${detail.assignments.length} affectation(s) pour cette demande.`}>
             <DataTable
               columns={[
                 { key: "partner", header: "Courtier partenaire", render: (assignment) => assignment.partnerLegalName ?? assignment.partnerTenantId.slice(0, 8) },
@@ -201,7 +206,7 @@ export default async function AdminQuoteRequestDetailPage({
         </>
       ) : null}
 
-      <LeadConversationsCard quoteRequestId={quoteRequestId} show={showConversations} />
+      <LeadConversationsCard quoteRequestId={quoteRequestId} show={showConversations} backQuery={backQuery} />
 
       <Card title="Documents du prospect" description="Fichiers décrits par leurs métadonnées uniquement, aucun contenu de fichier.">
         {documents.unauthenticated ? <StateMessage tone="danger">Session admin requise.</StateMessage> : null}

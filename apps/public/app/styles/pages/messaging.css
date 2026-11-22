@@ -3,6 +3,18 @@
    Plain wayfinding: ruled lines and a navy rule, no bubbles, no shadows. Mobile first (375px).
    ========================================================================== */
 
+/* Refresh control under the status panel: the button and its polite "refreshed at" line. */
+.am-j-refresh {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--am-space-8) var(--am-space-16);
+  align-items: center;
+}
+
+.am-j-refresh p {
+  min-height: 1lh;
+}
+
 .am-msg {
   min-width: 0;
 }

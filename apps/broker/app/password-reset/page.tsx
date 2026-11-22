@@ -1,4 +1,7 @@
 import { PasswordResetConsumeForm } from "../auth-flow-form";
+import polish from "../lib/ui/self-service-polish.module.css";
+
+export const metadata = { title: "Réinitialiser le mot de passe" };
 
 interface PageProps {
   searchParams?: Promise<Record<string, string | string[] | undefined>>;
@@ -13,6 +16,7 @@ export default async function PasswordResetPage({ searchParams }: PageProps) {
   return (
     <>
       <h1 className="bo-auth__title">Consommer un jeton</h1>
+      <p className={polish.lead}>Saisissez le jeton de réinitialisation reçu, puis choisissez un nouveau mot de passe. Vous pourrez ensuite vous connecter.</p>
       <PasswordResetConsumeForm token={firstParam(params.token)} />
     </>
   );

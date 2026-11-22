@@ -14,7 +14,8 @@ export interface AuthShellProps {
 /** Centred authentication screen shared by both back-offices; it carries no auth logic at all. */
 export function AuthShell({ children, scope, homeHref, footer, dataAttributes }: AuthShellProps) {
   return (
-    <div className="bo-auth" {...dataAttributes}>
+    // The auth screens have no AppShell around them: this is their one main landmark.
+    <main className="bo-auth" {...dataAttributes}>
       <div className="bo-auth__panel">
         <div className="bo-auth__brand">
           {homeHref ? (
@@ -29,6 +30,6 @@ export function AuthShell({ children, scope, homeHref, footer, dataAttributes }:
         {children}
         {footer ? <div className="bo-auth__footer">{footer}</div> : null}
       </div>
-    </div>
+    </main>
   );
 }

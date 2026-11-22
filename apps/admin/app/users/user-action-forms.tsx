@@ -61,10 +61,10 @@ export function CreateUserForm({ partners = [] }: { partners?: PartnerChoice[] }
           <Input {...fieldControlProps(ids.email, { required: true })} name="email" type="email" />
         </Field>
         <Field id={ids.displayName} label="Nom affiché" required>
-          <Input {...fieldControlProps(ids.displayName, { required: true })} name="displayName" />
+          <Input {...fieldControlProps(ids.displayName, { required: true })} name="displayName" minLength={2} />
         </Field>
-        <Field id={ids.phone} label="Téléphone E.164">
-          <Input {...fieldControlProps(ids.phone)} name="phone" placeholder="+2250000000000" />
+        <Field id={ids.phone} label="Téléphone E.164" hint="Format international, par exemple +2250700000000.">
+          <Input {...fieldControlProps(ids.phone, { hint: "x" })} name="phone" placeholder="+2250000000000" />
         </Field>
         <CheckboxGroup legend="Rôles" name="roles" options={adminRoleOptions.map((role) => ({ value: role, label: role }))} />
         <Field id={ids.partnerTenantId} label="Courtier de rattachement" hint="Obligatoire pour un rôle courtier, interdit pour un rôle admin.">
@@ -73,14 +73,14 @@ export function CreateUserForm({ partners = [] }: { partners?: PartnerChoice[] }
             {partners.map((partner) => <option key={partner.value} value={partner.value}>{partner.label}</option>)}
           </Select>
         </Field>
-        <Field id={ids.countryScopes} label="Scopes pays">
-          <Input {...fieldControlProps(ids.countryScopes)} name="countryScopes" placeholder="UUID, UUID" />
+        <Field id={ids.countryScopes} label="Scopes pays" hint="Identifiants (UUID) séparés par des virgules.">
+          <Input {...fieldControlProps(ids.countryScopes, { hint: "x" })} name="countryScopes" placeholder="UUID, UUID" />
         </Field>
-        <Field id={ids.productScopes} label="Scopes produits">
-          <Input {...fieldControlProps(ids.productScopes)} name="productScopes" placeholder="UUID, UUID" />
+        <Field id={ids.productScopes} label="Scopes produits" hint="Identifiants (UUID) séparés par des virgules.">
+          <Input {...fieldControlProps(ids.productScopes, { hint: "x" })} name="productScopes" placeholder="UUID, UUID" />
         </Field>
-        <Field id={ids.reason} label="Raison auditable" required>
-          <Textarea {...fieldControlProps(ids.reason, { required: true })} name="reason" minLength={8} />
+        <Field id={ids.reason} label="Raison auditable" required hint="Au moins 8 caractères, conservée dans le journal d'audit.">
+          <Textarea {...fieldControlProps(ids.reason, { required: true, hint: "x" })} name="reason" minLength={8} />
         </Field>
         <FormActions>
           <Button type="submit" pending={pending} pendingLabel="Création...">Créer et émettre activation</Button>
@@ -90,7 +90,7 @@ export function CreateUserForm({ partners = [] }: { partners?: PartnerChoice[] }
   );
 }
 
-export function PasswordResetForm({ userId }: { userId: string }) {
+export function PasswordResetForm({ userId, userEmail }: { userId: string; userEmail?: string | undefined }) {
   const [state, formAction] = useActionState(passwordResetAction, initialState);
   const base = useId();
   const reasonId = `${base}-reason`;
@@ -103,8 +103,8 @@ export function PasswordResetForm({ userId }: { userId: string }) {
       <ConfirmDialog
         triggerLabel="Émettre un jeton"
         triggerVariant="secondary"
-        title="Réinitialisation mot de passe"
-        description="Émettre un jeton invalide le mot de passe courant de l'utilisateur. La raison est auditée."
+        title={userEmail ? `Réinitialisation mot de passe : ${userEmail}` : "Réinitialisation mot de passe"}
+        description={`Émettre un jeton invalide le mot de passe courant ${userEmail ? `de ${userEmail}` : "de l'utilisateur"}. La raison est auditée.`}
         confirmLabel="Émettre un jeton"
         cancelLabel="Annuler"
         tone="danger"

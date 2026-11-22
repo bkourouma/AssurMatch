@@ -34,8 +34,15 @@ export function ProspectContactSearch() {
     <>
       <Card title="Recherche par e-mail ou téléphone" description="Correspondance exacte. La valeur saisie est envoyée dans le corps de la requête, jamais dans l'adresse de la page, et n'est ni conservée ni journalisée.">
         <Form action={formAction} data-prospect-contact-search="073">
-          <Field id="prospect-contact" label="E-mail ou téléphone exact">
-            <Input {...fieldControlProps("prospect-contact")} name="contact" type="search" autoComplete="off" maxLength={200} placeholder="+2250102030405" />
+          <Field id="prospect-contact" label="E-mail ou téléphone exact" required hint="Adresse e-mail complète ou numéro au format international (ex. : +2250102030405). Aucune recherche partielle.">
+            <Input
+              {...fieldControlProps("prospect-contact", { required: true, hint: "Adresse e-mail complète ou numéro au format international (ex. : +2250102030405). Aucune recherche partielle." })}
+              name="contact"
+              type="search"
+              autoComplete="off"
+              maxLength={200}
+              placeholder="+2250102030405"
+            />
           </Field>
           <FormActions>
             <Button type="submit" size="sm" pending={pending} pendingLabel="Recherche...">Rechercher</Button>
@@ -55,6 +62,7 @@ export function ProspectContactSearch() {
             getKey={(row) => row.id}
             getRowHref={(row) => `/prospects/${row.id}`}
             emptyLabel="Aucun prospect pour ce contact."
+            emptyDescription="Vérifiez l'adresse ou le numéro saisi (correspondance exacte), ou essayez la recherche par nom dans les filtres ci-dessus."
             aria-label="Prospects trouvés par contact"
           />
           {state.result.total > state.result.items.length ? <StateMessage>Seuls les {state.result.items.length} plus récents sont affichés.</StateMessage> : null}

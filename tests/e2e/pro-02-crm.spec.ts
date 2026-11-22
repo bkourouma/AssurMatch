@@ -316,7 +316,7 @@ test("PRO-CRM-03 lead2 : le propriétaire l'assigne à l'agent de l'équipe, l'a
   // The assign form is a named picker (no raw id); the agent actor id is still read on /account to check the stored assignment.
   const agentPage = await ownerPage(browser);
   await openAs(agentPage, agent, "/account");
-  const actorCell = agentPage.locator("dl.bo-dl > div").filter({ has: agentPage.locator("dt", { hasText: /^Acteur$/u }) }).locator("dd");
+  const actorCell = agentPage.locator("dl.bo-dl > div").filter({ has: agentPage.locator("dt", { hasText: /^Identifiant utilisateur$/u }) }).locator("dd");
   await expect(actorCell).toHaveText(UUID);
   const agentId = (await actorCell.innerText()).trim();
   await agentPage.context().close();
@@ -365,7 +365,7 @@ test("PRO-CRM-04 lead3 : marqué Perdu avec un motif obligatoire, l'historique l
     const form = card(page, labelRx("Changer le statut"));
     await form.locator("#crm-new-status").selectOption("perdu");
     await submitCrmForm(page, form.getByRole("button", { name: "Enregistrer le statut" }), "reason_required");
-    await expect(page.locator(".bo-notice").filter({ hasText: /motif allowlist/u }), "result notice").not.toHaveCount(0);
+    await expect(page.locator(".bo-notice").filter({ hasText: /Un motif est obligatoire/u }), "result notice").not.toHaveCount(0);
     await expect(currentStatusCell(page)).toHaveText(labelRx("Nouveau"));
     await changeStatus(page, world.owner, leadId, "perdu", "price");
   }

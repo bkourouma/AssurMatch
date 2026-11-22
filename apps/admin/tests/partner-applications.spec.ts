@@ -43,8 +43,8 @@ test("conversion and refusal are compliance only and conversion opens the new pa
   expect(canReviewApplication(["support_admin"])).toBe(false);
   const detail = source("apps/admin/app/partners/applications/[applicationId]/page.tsx");
   expect(detail).toContain("{canDecide ? (");
-  expect(detail).toContain("<ConvertApplicationForm applicationId={application.id} />");
-  expect(detail).toContain("<RejectApplicationForm applicationId={application.id} />");
+  expect(detail).toContain("<ConvertApplicationForm applicationId={application.id} applicantName={applicantName}");
+  expect(detail).toContain("<RejectApplicationForm applicationId={application.id} applicantName={applicantName} />");
   expect(detail).toContain("application.status === \"received\" && canReview ? <ReviewApplicationForm");
   expect(detail).toContain("contactEmailMasked");
   const actions = source("apps/admin/app/lib/partner-actions.ts");

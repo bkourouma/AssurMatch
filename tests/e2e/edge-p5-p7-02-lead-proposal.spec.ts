@@ -149,7 +149,7 @@ test("E-P6-02a « Rejeter avec motif » sans motif refusé, avec « Doublon » a
     (form as HTMLFormElement).noValidate = true;
   });
   await dialog.getByRole("button", { name: "Rejeter le lead" }).click();
-  await expect(page.getByText("Un motif allowliste est obligatoire pour rejeter ou contester un lead.")).toBeVisible();
+  await expect(page.getByText("Un motif est obligatoire pour rejeter ou contester un lead.")).toBeVisible();
   await expect(card(page, "Actions Starter").getByRole("button", { name: "Accepter", exact: true })).toBeVisible();
 
   // With "Doublon".

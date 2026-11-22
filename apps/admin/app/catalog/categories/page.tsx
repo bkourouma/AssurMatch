@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 import { readAdminProductCategories } from "../../lib/lot4-catalog-api";
 import { isAdminProfile, loginRedirect, readBackOfficeSession } from "../../lib/backoffice-auth";
 import { CATEGORY_STATUS_LABELS, adminReadErrorMessage, formatDate } from "../../lib/catalog-messages";
-import { Badge, Card, DataTable, Notice, PageHeader, PageStack, StateMessage } from "../../lib/ui/admin-ui";
+import { Badge, Button, Card, DataTable, Notice, PageHeader, PageStack, StateMessage } from "../../lib/ui/admin-ui";
 import { CreateCategoryForm, EditCategoryForm } from "../catalog-forms";
 
 const categoryStatusTone = { draft: "neutral", active: "success", retired: "disabled" } as const;
@@ -27,6 +27,7 @@ export default async function CatalogCategoriesPage() {
         kicker="Catalogue"
         title="Catégories de produits"
         description="Regroupent les produits (auto, santé, voyage...). Une catégorie créée est en brouillon : activez-la pour la proposer sur la fiche produit."
+        actions={categories.status === "success" ? <Button href="#creer-categorie">Créer une catégorie</Button> : null}
       />
 
       {categories.forbidden ? <StateMessage tone="danger">{adminReadErrorMessage("access_denied")}</StateMessage> : null}
@@ -48,11 +49,12 @@ export default async function CatalogCategoriesPage() {
               items={categories.data}
               getKey={(category) => category.id}
               emptyLabel="Aucune catégorie : créez-en une puis activez-la pour la rattacher aux produits."
+              emptyAction={<Button href="#creer-categorie" size="sm">Créer une catégorie</Button>}
               aria-label="Catégories de produits"
             />
           </Card>
 
-          <CreateCategoryForm />
+          <div id="creer-categorie"><CreateCategoryForm /></div>
 
           {categories.data.map((category) => (
             <Card key={category.id} title={`Modifier ${category.name}`} description={`Clé ${category.key} (non modifiable). ${category.productCount} produit(s) rattaché(s).`}>

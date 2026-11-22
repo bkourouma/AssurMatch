@@ -4,6 +4,7 @@ import { formatDateTime, readRoutingAnomalies } from "../../lib/operations-api";
 import { requestRoutingAnomalyAnalysisAction, validateRoutingAnomalyAnalysisAction } from "../../lib/routing-anomaly-actions";
 import { routingAnomalyAiDisabledReason } from "./ai-state";
 import { Badge, Button, Card, Cluster, DataTable, Form, Notice, PageHeader, PageStack, Stack, StateMessage, StatStrip } from "../../lib/ui/admin-ui";
+import { PendingActionButton } from "../../lib/ui/pending-action-button";
 import { readFailureDetail } from "../../lib/auth-error-messages";
 
 /**
@@ -27,6 +28,16 @@ const NOTICES: Record<string, string> = {
   forbidden: "Action refusée : rôle AI Admin requis.",
   error: "Assistance IA temporairement indisponible."
 };
+
+const SEVERITY_LABELS: Record<string, string> = {
+  critical: "Critique",
+  warning: "Avertissement"
+};
+
+/** Critical anomalies come first, then the most recently detected. */
+function severityRank(severity: string): number {
+  return severity === "critical" ? 0 : 1;
+}
 
 const INSIGHT_STATUS_LABELS: Record<string, string> = {
   queued: "en cours",
@@ -58,6 +69,9 @@ export default async function RoutingAnomaliesPage({ searchParams }: { searchPar
     enabled: assistance?.status === "success" && assistance.data.enabled,
     availableAssistTypes: assistance?.status === "success" ? assistance.data.availableAssistTypes : []
   });
+  const sortedAnomalies = [...data.anomalies].sort(
+    (left, right) => severityRank(left.severity) - severityRank(right.severity) || Date.parse(right.detectedAt) - Date.parse(left.detectedAt)
+  );
   const analyses = insights?.status === "success" ? insights.data.filter((insight) => insight.assistType === AI_ASSIST_TYPE) : [];
 
   return (
@@ -88,17 +102,17 @@ export default async function RoutingAnomaliesPage({ searchParams }: { searchPar
         </Notice>
       ) : null}
 
-      <Card title="Anomalies détectées" description={`Rapport généré le ${formatDateTime(data.generatedAt)}.`}>
+      <Card title="Anomalies détectées" description={`Rapport généré le ${formatDateTime(data.generatedAt)}. Les anomalies critiques sont listées en premier, puis les plus récentes. Pour comprendre une décision de routage, ouvrez l'historique de routage.`}>
         <DataTable
           columns={[
-            { key: "severity", header: "Sévérité", render: (anomaly) => <Badge tone={anomaly.severity === "critical" ? "danger" : "warning"}>{anomaly.severity}</Badge> },
+            { key: "severity", header: "Sévérité", render: (anomaly) => <Badge tone={anomaly.severity === "critical" ? "danger" : "warning"}>{SEVERITY_LABELS[anomaly.severity] ?? anomaly.severity}</Badge> },
             { key: "type", header: "Type", render: (anomaly) => <span className="bo-ref">{anomaly.type}</span> },
             { key: "scope", header: "Pays / produit", render: (anomaly) => `${anomaly.country ?? "-"} / ${anomaly.product ?? "-"}` },
             { key: "details", header: "Détails", render: (anomaly) => anomaly.details },
             { key: "metric", header: "Mesuré", render: (anomaly) => (anomaly.metricValue !== undefined ? `${anomaly.metricValue}${anomaly.metricThreshold !== undefined ? ` / seuil ${anomaly.metricThreshold}` : ""}` : "-") },
             { key: "detected", header: "Détectée le", render: (anomaly) => formatDateTime(anomaly.detectedAt) }
           ]}
-          items={data.anomalies}
+          items={sortedAnomalies}
           getKey={(anomaly) => anomaly.id}
           emptyLabel="Aucune anomalie de routage détectée."
           emptyDescription="Le routage suit ses règles sans écart sur la fenêtre analysée."
@@ -119,14 +133,14 @@ export default async function RoutingAnomaliesPage({ searchParams }: { searchPar
           {ai && NOTICES[ai] ? <StateMessage tone={ai === "queued" || ai === "validated" ? "info" : "warning"}>{NOTICES[ai]}</StateMessage> : null}
           <Form action={requestRoutingAnomalyAnalysisAction}>
             <Cluster>
-              <Button type="submit" variant="secondary" disabled={disabledReason !== null} title={disabledReason ?? undefined}>Demander une analyse IA</Button>
+              <PendingActionButton variant="secondary" pendingLabel="Demande en cours..." disabled={disabledReason !== null} title={disabledReason ?? undefined}>Demander une analyse IA</PendingActionButton>
               {disabledReason ? <span id="routing-anomaly-ai-disabled" role="note" className="bo-description">{disabledReason}</span> : null}
             </Cluster>
           </Form>
 
           <h3>Analyses récentes</h3>
           {insights?.status === "error" ? <StateMessage tone="warning">Analyses IA indisponibles. {readFailureDetail(insights.error)}. Le rapport déterministe ci-dessus reste valable.</StateMessage> : null}
-          {analyses.length === 0 && insights?.status === "success" ? <p className="bo-description">Aucune analyse IA des anomalies de routage pour le moment.</p> : null}
+          {analyses.length === 0 && insights?.status === "success" ? <p className="bo-description">Aucune analyse IA des anomalies de routage pour le moment. Utilisez « Demander une analyse IA » pour en lancer une ; elle apparaîtra ici une fois traitée.</p> : null}
           {analyses.length > 0 ? (
             <ul className="bo-list" aria-label="Analyses IA des anomalies de routage">
               {analyses.map((insight) => (
@@ -148,7 +162,7 @@ export default async function RoutingAnomaliesPage({ searchParams }: { searchPar
                           <Form key={decision} action={validateRoutingAnomalyAnalysisAction}>
                             <input type="hidden" name="insightId" value={insight.id} />
                             <input type="hidden" name="decision" value={decision} />
-                            <Button type="submit" variant="secondary" size="sm">{decision === "approved" ? "Valider l'analyse" : "Écarter l'analyse"}</Button>
+                            <PendingActionButton variant="secondary" size="sm" pendingLabel="Enregistrement...">{decision === "approved" ? "Valider l'analyse" : "Écarter l'analyse"}</PendingActionButton>
                           </Form>
                         ))}
                       </Cluster>

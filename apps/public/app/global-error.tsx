@@ -54,16 +54,16 @@ export default function GlobalError({ error, reset }: { error: Error & { digest?
             <button
               type="button"
               onClick={reset}
-              style={{ background: "#12377f", color: "#ffffff", border: "2px solid #12377f", borderRadius: 6, padding: "12px 20px", fontSize: 16, fontWeight: 600, cursor: "pointer" }}
+              style={{ background: "#12377f", color: "#ffffff", border: "2px solid #12377f", borderRadius: 6, padding: "12px 20px", minHeight: 44, fontSize: 16, fontWeight: 600, cursor: "pointer" }}
             >
               {copy.retry}
             </button>
-            <a href="/" style={{ color: "#12377f", fontSize: 16, fontWeight: 600, textDecoration: "underline", padding: "12px 4px" }}>
+            <a href="/" style={{ display: "inline-flex", alignItems: "center", minHeight: 44, color: "#12377f", fontSize: 16, fontWeight: 600, textDecoration: "underline", padding: "0 4px" }}>
               {copy.home}
             </a>
           </div>
           {error.digest ? (
-            <p style={{ margin: "32px 0 0", fontSize: 12, color: "#475467" }}>
+            <p style={{ margin: "32px 0 0", fontSize: 14, color: "#475467" }}>
               {copy.reference} : {error.digest}
             </p>
           ) : null}

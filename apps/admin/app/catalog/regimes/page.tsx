@@ -51,6 +51,8 @@ export default async function CatalogRegimesPage() {
             items={regimes.data}
             getKey={(regime) => regime.id}
             emptyLabel="Aucun régime : les pays ne peuvent pas passer la checklist d'activation."
+            emptyDescription="Créez un régime, puis référencez-le sur la fiche d'un pays."
+            emptyAction={<Button href="#creer-regime" size="sm">Créer un régime</Button>}
             aria-label="Régimes réglementaires"
           />
 

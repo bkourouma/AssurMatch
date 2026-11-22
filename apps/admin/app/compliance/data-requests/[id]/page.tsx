@@ -15,6 +15,7 @@ import {
   Button,
   Card,
   Checkbox,
+  Cluster,
   DataTable,
   DescriptionList,
   Field,
@@ -28,6 +29,7 @@ import {
   fieldControlProps
 } from "../../../lib/ui/admin-ui";
 import { readFailureDetail } from "../../../lib/auth-error-messages";
+import { PendingActionButton } from "../../../lib/ui/pending-action-button";
 
 /**
  * Spec 062 (D-10): one data-subject request. The visitor's own text (personal data) is rendered
@@ -65,6 +67,12 @@ export default async function DataRequestDetailPage({
   const statusLabel = request ? DATA_REQUEST_STATUS_LABELS[request.status] : undefined;
   const history: HistoryRow[] = request?.history ?? [];
   const completesWithoutErasure = request?.type === "erasure" && !request.erasureBatchId;
+  const nextStep =
+    request?.status === "received"
+      ? "Étape suivante : prenez en charge la demande, puis clôturez-la comme traitée ou rejetez-la avec une note interne."
+      : request?.status === "in_review"
+        ? "Étape suivante : clôturez la demande comme traitée, ou rejetez-la avec une note interne."
+        : null;
   const showErasure = request?.type === "erasure" && request.erasureAllowed !== false && isOpen && canDecide;
 
   return (
@@ -92,6 +100,14 @@ export default async function DataRequestDetailPage({
 
       {request ? (
         <>
+          <Cluster>
+            <Badge tone={statusLabel?.tone ?? "neutral"}>{statusLabel?.label ?? request.status}</Badge>
+            <span>{DATA_REQUEST_TYPE_LABELS[request.type] ?? request.type}</span>
+            <span className="bo-description">Échéance indicative : {formatDataRequestDate(request.dueAt)}</span>
+            {request.overdue && isOpen ? <Badge tone="danger">En retard</Badge> : null}
+          </Cluster>
+          {canDecide && isOpen && nextStep ? <StateMessage tone="info">{nextStep}</StateMessage> : null}
+
           <Card title="Identification">
             <DescriptionList
               columns={2}
@@ -130,19 +146,6 @@ export default async function DataRequestDetailPage({
             </Card>
           </Grid>
 
-          <Card title="Historique">
-            <DataTable
-              columns={[
-                { key: "action", header: "Événement", render: (entry: HistoryRow) => DATA_REQUEST_HISTORY_LABELS[entry.action] ?? entry.action },
-                { key: "at", header: "Date", render: (entry: HistoryRow) => formatDataRequestDate(entry.at) }
-              ]}
-              items={history}
-              getKey={(entry: HistoryRow) => `${entry.action}-${entry.at}`}
-              emptyLabel="Aucun événement enregistré."
-              aria-label="Historique de la demande"
-            />
-          </Card>
-
           {request.erasureBatchId ? (
             <Card title="Lot d'effacement lié" description="Aperçu créé depuis cette demande (spec 046). L'approbation et l'exécution se font uniquement dans « Conservation des données ».">
               <DescriptionList items={[{ term: "Lot", value: <code>{request.erasureBatchId}</code> }]} />
@@ -155,12 +158,12 @@ export default async function DataRequestDetailPage({
           ) : null}
 
           {canDecide && isOpen ? (
-            <Card title="Traiter la demande" description="Chaque action est auditée. La clôture envoie au visiteur un e-mail qui renvoie vers son espace, sans le texte de la note.">
+            <Card title="Traiter la demande" description={`Demande ${request.reference} : chaque action est auditée. La clôture envoie au visiteur un e-mail qui renvoie vers son espace, sans le texte de la note.`}>
               {request.status === "received" ? (
                 <Form action={takeDataRequest}>
                   <input type="hidden" name="id" value={request.id} />
                   <FormActions align="start">
-                    <Button type="submit" variant="secondary">Prendre en charge</Button>
+                    <PendingActionButton variant="secondary" pendingLabel="Prise en charge...">Prendre en charge</PendingActionButton>
                   </FormActions>
                 </Form>
               ) : null}
@@ -178,8 +181,9 @@ export default async function DataRequestDetailPage({
                   </div>
                 ) : null}
                 <FormActions align="start">
-                  <Button type="submit">Clôturer comme traitée</Button>
+                  <PendingActionButton pendingLabel="Clôture...">Clôturer comme traitée</PendingActionButton>
                 </FormActions>
+                <p className="bo-description">Clôturer la demande {request.reference} envoie un e-mail de clôture au visiteur.</p>
               </Form>
 
               <Form action={rejectDataRequest}>
@@ -193,8 +197,9 @@ export default async function DataRequestDetailPage({
                   />
                 </Field>
                 <FormActions align="start">
-                  <Button type="submit" variant="danger">Rejeter la demande</Button>
+                  <PendingActionButton variant="danger" pendingLabel="Rejet...">Rejeter la demande</PendingActionButton>
                 </FormActions>
+                <p className="bo-description">Rejeter la demande {request.reference} la clôture aussi : le visiteur reçoit un e-mail de clôture, sans le texte de la note.</p>
               </Form>
             </Card>
           ) : null}
@@ -208,11 +213,23 @@ export default async function DataRequestDetailPage({
                 <input type="hidden" name="id" value={request.id} />
                 <Checkbox id="dr-erasure-ack" name="acknowledge" value="yes" required label="J'ai compris : cette action ne crée qu'un aperçu, rien n'est effacé." />
                 <FormActions align="start">
-                  <Button type="submit" variant="secondary">Créer l&apos;aperçu d&apos;effacement</Button>
+                  <PendingActionButton variant="secondary" pendingLabel="Création de l'aperçu...">Créer l&apos;aperçu d&apos;effacement</PendingActionButton>
                 </FormActions>
               </Form>
             </Card>
           ) : null}
+          <Card title="Historique">
+            <DataTable
+              columns={[
+                { key: "action", header: "Événement", render: (entry: HistoryRow) => DATA_REQUEST_HISTORY_LABELS[entry.action] ?? entry.action },
+                { key: "at", header: "Date", render: (entry: HistoryRow) => formatDataRequestDate(entry.at) }
+              ]}
+              items={history}
+              getKey={(entry: HistoryRow) => `${entry.action}-${entry.at}`}
+              emptyLabel="Aucun événement enregistré."
+              aria-label="Historique de la demande"
+            />
+          </Card>
         </>
       ) : null}
     </PageStack>

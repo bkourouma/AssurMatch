@@ -14,7 +14,8 @@ export function ComparisonBar({ count, countLabel, label, action }: ComparisonBa
   if (count < 2) return null;
   return (
     <div className="am-comparebar" role="region" aria-label={label}>
-      <p className="am-comparebar__count">
+      {/* Polite live region: the count changing from 2 to 3 to 4 is announced without moving focus. */}
+      <p className="am-comparebar__count" role="status">
         <Icon name="scale" size={20} />
         {countLabel}
       </p>

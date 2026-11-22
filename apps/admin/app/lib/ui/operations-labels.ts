@@ -270,3 +270,11 @@ export function quoteAnswerValueLabel(key: string, value: unknown): string {
   if (Array.isArray(value)) return value.map((item) => quoteAnswerValueLabel(key, item)).join(", ");
   return JSON.stringify(value);
 }
+
+// ---- contact inbox --------------------------------------------------------------------------
+
+export const CONTACT_STATUS_LABELS: Record<string, string> = { new: "Nouveau", handled: "Traité", spam: "Spam" };
+export const CONTACT_AUDIENCE_LABELS: Record<string, string> = { visitor: "Visiteur", broker: "Courtier", insurer: "Assureur", press: "Presse" };
+
+export const contactStatusLabel = (status: string | null | undefined) => labelOf(CONTACT_STATUS_LABELS, status);
+export const contactAudienceLabel = (audience: string | null | undefined) => labelOf(CONTACT_AUDIENCE_LABELS, audience);

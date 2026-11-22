@@ -4,9 +4,10 @@ import { DISPUTE_DECIDER_ROLES, DISPUTE_PAGE_SIZE } from "../lib/dispute-vocabul
 import { DisputesPanel } from "./disputes-panel";
 import { DraftLinesPanel, Lot5BillingPanels } from "./lot5-panels";
 import type { DisputeTabFilters } from "./disputes-panel";
+import { CreditNoteDialog } from "./credit-note-dialog";
+import { PendingForm, PendingSubmit } from "./pending-submit";
 import {
   grantLeadPackAction,
-  issueCreditNoteAction,
   issueInvoiceAction,
   recomputeDraftInvoicesAction,
   recordInvoicePaymentAction,
@@ -17,11 +18,12 @@ import {
   Button,
   Card,
   Cluster,
-  ConfirmDialog,
   DataTable,
   Field,
   Form,
   FormActions,
+  FormRow,
+  FormSection,
   Grid,
   Input,
   PageHeader,
@@ -51,6 +53,9 @@ const BILLING_NOTICES: Record<string, string> = {
   disabled: "Module billing désactivé ou configuration de facturation incomplète (billing_enabled, mentions légales, TVA du pays).",
   forbidden: "Action refusée: rôle Finance Admin ou Super Admin requis.",
   invalid: "Saisie incomplète: vérifiez le plan, le pays et le motif.",
+  invalid_country: "Le code pays doit comporter 2 lettres (ex. : CI).",
+  invalid_reason: "Le motif doit contenir au moins 3 caractères.",
+  credit_note_reason: "Le motif de l'avoir doit contenir au moins 8 caractères.",
   error: "Billing temporairement indisponible.",
   // Spec 063 (CRM-012): decision on a lead dispute.
   dispute_accepted: "Contestation acceptée et auditée. Le cabinet est notifié ; le crédit appliqué est indiqué ci-dessous.",
@@ -69,6 +74,21 @@ const TABS = [
   { key: "contestations", label: "Contestations" },
   { key: "packs", label: "Packs" }
 ];
+
+/**
+ * One line per tab: where the tab sits in the monthly cycle (tariffs, drafts, invoices, accounts) and
+ * the next step. Pure wording: it neither computes nor decides anything.
+ */
+const TAB_GUIDE: Record<string, { text: string; next?: string }> = {
+  suivi: { text: "Vue d'ensemble de la période courante. Étape suivante : vérifier les tarifs avant de recalculer les brouillons.", next: "tarifs" },
+  tarifs: { text: "Étape 1 du cycle mensuel : les tarifs alimentent les brouillons. Étape suivante : recalculer les brouillons.", next: "brouillons" },
+  brouillons: { text: "Étape 2 : un brouillon n'est pas une facture. Étape suivante : émettre la facture numérotée du brouillon.", next: "factures" },
+  factures: { text: "Étape 3 : émettre la facture, constater le paiement reçu hors plateforme, ou annuler par un avoir. Étape suivante : contrôler le compte du courtier.", next: "comptes" },
+  comptes: { text: "Choisissez un partenaire pour lire ses écritures et lui attribuer un pack après paiement constaté." },
+  contestations: { text: "Étape suivante : statuer sur les contestations ouvertes. Une décision est définitive et notifiée au cabinet." },
+  packs: { text: "Un pack crédite des leads prépayés après un paiement constaté hors plateforme ; il ne déclenche aucun encaissement." },
+  modules: { text: "Modules complémentaires, état d'abonnement et demandes de changement de plan (Finance Admin et Super Admin)." }
+};
 
 /** Lot 5 (spec 071): add-on prices, assignments, subscription state and plan-change inbox (`billing:plan_manage`). */
 const PLAN_MANAGER_ROLES = new Set(["finance_admin", "super_admin"]);
@@ -216,7 +236,7 @@ export default async function BillingFoundationPage({
         </StateMessage>
       ) : null}
       {billing.status === "error" ? <StateMessage tone="danger">Billing indisponible. {readFailureDetail(billing.error)}</StateMessage> : null}
-      {notice && BILLING_NOTICES[notice] ? <StateMessage tone={SUCCESS_NOTICES.has(notice) ? "info" : "warning"}>{BILLING_NOTICES[notice]}</StateMessage> : null}
+      {notice && BILLING_NOTICES[notice] ? <StateMessage tone={SUCCESS_NOTICES.has(notice) ? "success" : "warning"}>{BILLING_NOTICES[notice]}</StateMessage> : null}
 
       {billing.status === "success" ? (
         <>
@@ -233,6 +253,10 @@ export default async function BillingFoundationPage({
             label="Sections facturation"
             items={(canManagePlans ? [...TABS, MODULES_TAB] : TABS).map((entry) => ({ label: entry.label, href: hrefForTab(entry.key), current: entry.key === tab }))}
           />
+          <p className="bo-description" data-billing-tab-guide={tab}>
+            {TAB_GUIDE[tab]?.text}
+            {TAB_GUIDE[tab]?.next ? <> <a href={hrefForTab(TAB_GUIDE[tab]?.next ?? "suivi")}>Aller à l&apos;onglet {TABS.find((entry) => entry.key === TAB_GUIDE[tab]?.next)?.label}</a>.</> : null}
+          </p>
 
           {tab === "suivi" ? (
             <>
@@ -282,38 +306,52 @@ export default async function BillingFoundationPage({
                 emptyLabel="Aucun tarif défini."
                 aria-label="Tarifs par plan et pays"
               />
-              <Form action={upsertBillingPlanAction} columns={2}>
-                <Field id="billing-plan" label="Plan">
-                  <Select
-                    {...fieldControlProps("billing-plan")}
-                    name="plan"
-                    defaultValue="pro"
-                    options={[
-                      { value: "starter", label: "starter" },
-                      { value: "pro", label: "pro" },
-                      { value: "enterprise", label: "enterprise" }
-                    ]}
-                  />
-                </Field>
-                <Field id="billing-country" label="Pays (ISO)">
-                  <Input {...fieldControlProps("billing-country")} name="countryCode" maxLength={2} placeholder="CI" />
-                </Field>
-                <Field id="billing-subscription" label="Abonnement mensuel">
-                  <Input {...fieldControlProps("billing-subscription")} name="monthlySubscription" type="number" min={0} step={100} defaultValue={0} />
-                </Field>
-                <Field id="billing-per-lead" label="Prix par lead">
-                  <Input {...fieldControlProps("billing-per-lead")} name="perLeadPrice" type="number" min={0} step={100} defaultValue={0} />
-                </Field>
-                <Field id="billing-setup" label="Frais d'installation">
-                  <Input {...fieldControlProps("billing-setup")} name="setupFee" type="number" min={0} step={100} defaultValue={0} />
-                </Field>
-                <Field id="billing-plan-reason" label="Motif">
-                  <Input {...fieldControlProps("billing-plan-reason")} name="reason" placeholder="Motif du changement de tarif" />
-                </Field>
-                <FormActions>
-                  <Button type="submit" variant="secondary">Enregistrer le tarif</Button>
-                </FormActions>
-              </Form>
+              <PendingForm action={upsertBillingPlanAction} columns={2}>
+                <FormRow full>
+                  <FormSection legend="Ajouter ou modifier un tarif" description="Un tarif existant pour le même plan et le même pays est remplacé. Montants en XOF, hors taxes.">
+                    <Field id="billing-plan" label="Plan">
+                      <Select
+                        {...fieldControlProps("billing-plan")}
+                        name="plan"
+                        defaultValue="pro"
+                        options={[
+                          { value: "starter", label: "starter" },
+                          { value: "pro", label: "pro" },
+                          { value: "enterprise", label: "enterprise" }
+                        ]}
+                      />
+                    </Field>
+                    <Field id="billing-country" label="Pays (ISO)" required hint="Code pays sur 2 lettres, par exemple CI.">
+                      <Input
+                        {...fieldControlProps("billing-country", { hint: "Code pays sur 2 lettres, par exemple CI.", required: true })}
+                        name="countryCode"
+                        minLength={2}
+                        maxLength={2}
+                        pattern="[A-Za-z]{2}"
+                        title="Code pays sur 2 lettres, par exemple CI."
+                        placeholder="Ex. : CI"
+                      />
+                    </Field>
+                    <Field id="billing-subscription" label="Abonnement mensuel">
+                      <Input {...fieldControlProps("billing-subscription")} name="monthlySubscription" type="number" min={0} step={100} defaultValue={0} />
+                    </Field>
+                    <Field id="billing-per-lead" label="Prix par lead">
+                      <Input {...fieldControlProps("billing-per-lead")} name="perLeadPrice" type="number" min={0} step={100} defaultValue={0} />
+                    </Field>
+                    <Field id="billing-setup" label="Frais d'installation">
+                      <Input {...fieldControlProps("billing-setup")} name="setupFee" type="number" min={0} step={100} defaultValue={0} />
+                    </Field>
+                    <Field id="billing-plan-reason" label="Motif" required hint="3 caractères au moins. Le motif est conservé dans le journal d'audit.">
+                      <Input {...fieldControlProps("billing-plan-reason", { required: true, hint: "3 caractères au moins. Le motif est conservé dans le journal d'audit." })} name="reason" minLength={3} maxLength={300} placeholder="Ex. : Révision annuelle des tarifs" />
+                    </Field>
+                  </FormSection>
+                </FormRow>
+                <FormRow full>
+                  <FormActions>
+                    <PendingSubmit pendingLabel="Enregistrement...">Enregistrer le tarif</PendingSubmit>
+                  </FormActions>
+                </FormRow>
+              </PendingForm>
             </Card>
           ) : null}
 
@@ -334,6 +372,8 @@ export default async function BillingFoundationPage({
                 items={draftRows}
                 getKey={(draft) => draft.id}
                 emptyLabel="Aucun brouillon calculé."
+                emptyDescription="Vérifiez d'abord les tarifs du pays, puis utilisez « Recalculer les brouillons » ci-dessous."
+                emptyAction={<Button href="/billing?tab=tarifs" variant="secondary" size="sm">Vérifier les tarifs</Button>}
                 aria-label="Brouillons mensuels non facturables"
                 sort={table.sort}
                 sortHref={table.sortHref}
@@ -345,17 +385,32 @@ export default async function BillingFoundationPage({
                   label: (from, to, total) => `${from}-${to} sur ${total} brouillons`
                 }}
               />
-              <Form action={recomputeDraftInvoicesAction} columns={2}>
-                <Field id="billing-draft-partner" label="Partenaire (optionnel)">
-                  <Input {...fieldControlProps("billing-draft-partner")} name="partnerId" placeholder="Identifiant partenaire" />
+              <PendingForm action={recomputeDraftInvoicesAction} columns={2}>
+                <Field
+                  id="billing-draft-partner"
+                  label="Partenaire (optionnel)"
+                  hint="Choisissez un partenaire dans la liste proposée ou collez son identifiant ; laissez vide pour recalculer tous les partenaires. Un brouillon déjà facturé reste inchangé."
+                >
+                  <Input
+                    {...fieldControlProps("billing-draft-partner", { hint: "Choisissez un partenaire dans la liste proposée ou collez son identifiant ; laissez vide pour recalculer tous les partenaires. Un brouillon déjà facturé reste inchangé." })}
+                    name="partnerId"
+                    list="billing-draft-partner-options"
+                    placeholder="Identifiant partenaire"
+                    autoComplete="off"
+                  />
+                  <datalist id="billing-draft-partner-options">
+                    {billing.data.partners.map((partner) => <option key={partner.partnerId} value={partner.partnerId}>{partner.partnerName}</option>)}
+                  </datalist>
                 </Field>
-                <Field id="billing-draft-reason" label="Motif">
-                  <Input {...fieldControlProps("billing-draft-reason")} name="reason" placeholder="Motif du recalcul" />
+                <Field id="billing-draft-reason" label="Motif" hint="Facultatif : « Recalcul des brouillons mensuels » est utilisé par défaut.">
+                  <Input {...fieldControlProps("billing-draft-reason", { hint: "Facultatif : « Recalcul des brouillons mensuels » est utilisé par défaut." })} name="reason" placeholder="Motif du recalcul" />
                 </Field>
-                <FormActions>
-                  <Button type="submit" variant="secondary">Recalculer les brouillons</Button>
-                </FormActions>
-              </Form>
+                <FormRow full>
+                  <FormActions>
+                    <PendingSubmit pendingLabel="Recalcul en cours...">Recalculer les brouillons</PendingSubmit>
+                  </FormActions>
+                </FormRow>
+              </PendingForm>
             </Card>
             <DraftLinesPanel drafts={draftItems} />
             </>
@@ -372,89 +427,84 @@ export default async function BillingFoundationPage({
                   items={issuedItems}
                   getKey={(invoice) => invoice.id}
                   emptyLabel="Aucune facture numérotée."
+                  emptyDescription="Une facture se crée à partir d'un brouillon : émettez-en une avec le formulaire ci-dessous."
                   aria-label="Factures B2B numérotées"
                 />
               </Card>
 
               <Grid columns="two">
                 <Card title="Émettre la facture d'un brouillon" description="Fige le brouillon du mois, alloue le numéro, génère le PDF et notifie le courtier dans son espace.">
-                  <Form action={issueInvoiceAction}>
-                    <Field id="invoice-draft" label="Brouillon à facturer">
+                  <PendingForm action={issueInvoiceAction}>
+                    <Field
+                      id="invoice-draft"
+                      label="Brouillon à facturer"
+                      required
+                      hint={issuableDrafts.length ? "L'émission est définitive : le numéro est alloué et le courtier est notifié." : "Aucun brouillon facturable : recalculez d'abord les brouillons (onglet Brouillons)."}
+                    >
                       <Select
-                        {...fieldControlProps("invoice-draft")}
+                        {...fieldControlProps("invoice-draft", {
+                          required: true,
+                          hint: issuableDrafts.length ? "L'émission est définitive : le numéro est alloué et le courtier est notifié." : "Aucun brouillon facturable : recalculez d'abord les brouillons (onglet Brouillons)."
+                        })}
                         name="draftId"
                         defaultValue=""
                         placeholder={issuableDrafts.length ? "Choisir un brouillon" : "Aucun brouillon facturable"}
                         options={issuableDrafts.map((draft) => ({ value: draft.id, label: `${draft.partnerName} - ${draft.reference} - ${xof(draft.totalAmount)} HT` }))}
                       />
                     </Field>
-                    <Field id="invoice-reason" label="Motif">
-                      <Input {...fieldControlProps("invoice-reason")} name="reason" placeholder="Clôture mensuelle" />
+                    <Field id="invoice-reason" label="Motif" hint="Facultatif : « Émission de la facture mensuelle » est utilisé par défaut.">
+                      <Input {...fieldControlProps("invoice-reason", { hint: "Facultatif : « Émission de la facture mensuelle » est utilisé par défaut." })} name="reason" placeholder="Clôture mensuelle" />
                     </Field>
                     <FormActions>
-                      <Button type="submit">Émettre la facture</Button>
+                      <PendingSubmit pendingLabel="Émission...">Émettre la facture</PendingSubmit>
                     </FormActions>
-                  </Form>
+                  </PendingForm>
                 </Card>
 
                 <Card title="Enregistrer un paiement reçu" description="Constat d'un virement ou d'un mobile money reçu hors plateforme. Le montant ne peut pas dépasser le reste du.">
-                  <Form action={recordInvoicePaymentAction} columns={2}>
-                    <Field id="payment-invoice" label="Facture">
+                  <PendingForm action={recordInvoicePaymentAction} columns={2}>
+                    <Field id="payment-invoice" label="Facture" required>
                       <Select
-                        {...fieldControlProps("payment-invoice")}
+                        {...fieldControlProps("payment-invoice", { required: true })}
                         name="invoiceId"
                         defaultValue=""
                         placeholder={payableInvoices.length ? "Choisir une facture" : "Aucune facture à régler"}
                         options={payableInvoices.map((invoice) => ({ value: invoice.id, label: `${invoice.number} - ${invoice.customer.legalName} - reste ${xof(invoice.amountDue)}` }))}
                       />
                     </Field>
-                    <Field id="payment-amount" label="Montant reçu (XOF)">
-                      <Input {...fieldControlProps("payment-amount")} name="amount" type="number" min={1} step={1} />
+                    <Field id="payment-amount" label="Montant reçu (XOF)" required>
+                      <Input {...fieldControlProps("payment-amount", { required: true })} name="amount" type="number" min={1} step={1} />
                     </Field>
-                    <Field id="payment-date" label="Date de réception">
-                      <Input {...fieldControlProps("payment-date")} name="receivedAt" type="date" />
+                    <Field id="payment-date" label="Date de réception" required hint="La date ne peut pas être dans le futur.">
+                      <Input {...fieldControlProps("payment-date", { required: true, hint: "La date ne peut pas être dans le futur." })} name="receivedAt" type="date" />
                     </Field>
                     <Field id="payment-method" label="Moyen">
                       <Select {...fieldControlProps("payment-method")} name="method" defaultValue="bank_transfer" options={PAYMENT_METHOD_OPTIONS} />
                     </Field>
-                    <Field id="payment-reference" label="Référence du virement ou de la transaction">
-                      <Input {...fieldControlProps("payment-reference")} name="reference" placeholder="VIR-2026-10-001" />
+                    <Field id="payment-reference" label="Référence du virement ou de la transaction" required hint="2 caractères au moins.">
+                      <Input {...fieldControlProps("payment-reference", { required: true, hint: "2 caractères au moins." })} name="reference" minLength={2} placeholder="VIR-2026-10-001" />
                     </Field>
                     <Field id="payment-note" label="Note (optionnelle)">
                       <Input {...fieldControlProps("payment-note")} name="note" />
                     </Field>
                     <FormActions>
-                      <Button type="submit" variant="secondary">Enregistrer le paiement</Button>
+                      <PendingSubmit variant="secondary" pendingLabel="Enregistrement...">Enregistrer le paiement</PendingSubmit>
                     </FormActions>
-                  </Form>
+                  </PendingForm>
                 </Card>
               </Grid>
 
               <Card title="Émettre un avoir" description="Annule intégralement une facture non réglée avec un avoir numéroté (série AV). La facture reste consultable.">
                 <Cluster>
-                  <ConfirmDialog
-                    triggerLabel="Émettre l'avoir"
-                    triggerVariant="danger"
-                    title="Émettre un avoir"
-                    description="La facture choisie sera annulée intégralement par un avoir numéroté. Cette opération est définitive."
-                    confirmLabel="Émettre l'avoir"
-                    cancelLabel="Annuler"
-                    tone="danger"
-                    formAction={issueCreditNoteAction}
-                  >
-                    <Field id="credit-note-invoice" label="Facture à annuler">
-                      <Select
-                        {...fieldControlProps("credit-note-invoice")}
-                        name="invoiceId"
-                        defaultValue=""
-                        placeholder={cancellableInvoices.length ? "Choisir une facture" : "Aucune facture annulable"}
-                        options={cancellableInvoices.map((invoice) => ({ value: invoice.id, label: `${invoice.number} - ${invoice.customer.legalName} - ${xof(invoice.totalAmount)}` }))}
-                      />
-                    </Field>
-                    <Field id="credit-note-reason" label="Motif de l'avoir">
-                      <Input {...fieldControlProps("credit-note-reason")} name="reason" placeholder="Erreur sur la période facturée" />
-                    </Field>
-                  </ConfirmDialog>
+                  <CreditNoteDialog
+                    invoices={cancellableInvoices.map((invoice) => ({
+                      id: invoice.id,
+                      number: invoice.number,
+                      partnerName: invoice.customer.legalName,
+                      totalLabel: xof(invoice.totalAmount)
+                    }))}
+                  />
+                  {cancellableInvoices.length === 0 ? <span className="bo-description">Aucune facture annulable : seule une facture émise et non réglée peut être annulée.</span> : null}
                 </Cluster>
               </Card>
             </>
@@ -465,9 +515,9 @@ export default async function BillingFoundationPage({
               <Card title="État des comptes courtier" description="Écritures chronologiques: facture au débit, avoir et paiement au crédit.">
                 <Form method="get" action="/billing" columns={2}>
                   <input type="hidden" name="tab" value="comptes" />
-                  <Field id="account-partner" label="Partenaire">
+                  <Field id="account-partner" label="Partenaire" required>
                     <Select
-                      {...fieldControlProps("account-partner")}
+                      {...fieldControlProps("account-partner", { required: true })}
                       name="partner"
                       defaultValue={accountPartnerId}
                       placeholder="Choisir un partenaire"
@@ -479,6 +529,7 @@ export default async function BillingFoundationPage({
                   </FormActions>
                 </Form>
               </Card>
+              {!account ? <StateMessage tone="info">Choisissez un partenaire puis « Afficher le compte » pour lire ses écritures, son solde et lui attribuer un pack après paiement constaté.</StateMessage> : null}
               {account?.status === "success" && account.data ? <AccountPanel account={account.data} /> : null}
               {account && account.status !== "success" ? <StateMessage tone="danger">État des comptes indisponible. {readFailureDetail(account.error)}</StateMessage> : null}
             </>
@@ -499,7 +550,14 @@ export default async function BillingFoundationPage({
             <Card title="Packs de leads prépayés">
               <DataTable
                 columns={[
-                  { key: "partner", header: "Partenaire", render: (pack) => <span className="bo-ref">{pack.partnerId}</span> },
+                  {
+                    key: "partner",
+                    header: "Partenaire",
+                    render: (pack) => {
+                      const name = billing.data.partners.find((partner) => partner.partnerId === pack.partnerId)?.partnerName;
+                      return name ? <><strong>{name}</strong> <span className="bo-ref">{pack.partnerId.slice(0, 8)}</span></> : <span className="bo-ref">{pack.partnerId}</span>;
+                    }
+                  },
                   { key: "granted", header: "Crédits", render: (pack) => pack.creditsGranted, numeric: true, align: "right" },
                   { key: "consumed", header: "Consommés", render: (pack) => pack.creditsConsumed, numeric: true, align: "right" },
                   { key: "remaining", header: "Restants", render: (pack) => pack.creditsRemaining, numeric: true, align: "right" },
@@ -509,17 +567,27 @@ export default async function BillingFoundationPage({
                 items={packs.status === "success" ? packs.data : []}
                 getKey={(pack) => pack.id}
                 emptyLabel="Aucun pack accordé."
+                emptyDescription="Un pack se crédite après un paiement constaté hors plateforme : utilisez le formulaire ci-dessous."
                 aria-label="Packs de leads prépayés"
               />
-              <Form action={grantLeadPackAction} columns={2}>
-                <Field id="billing-pack-partner" label="Partenaire">
-                  <Input {...fieldControlProps("billing-pack-partner")} name="partnerId" placeholder="Identifiant partenaire" />
+              <PendingForm action={grantLeadPackAction} columns={2}>
+                <Field id="billing-pack-partner" label="Partenaire" required hint="Choisissez un partenaire dans la liste proposée ou collez son identifiant.">
+                  <Input
+                    {...fieldControlProps("billing-pack-partner", { required: true, hint: "Choisissez un partenaire dans la liste proposée ou collez son identifiant." })}
+                    name="partnerId"
+                    list="billing-pack-partner-options"
+                    placeholder="Identifiant partenaire"
+                    autoComplete="off"
+                  />
+                  <datalist id="billing-pack-partner-options">
+                    {billing.data.partners.map((partner) => <option key={partner.partnerId} value={partner.partnerId}>{partner.partnerName}</option>)}
+                  </datalist>
                 </Field>
-                <Field id="billing-pack-credits" label="Crédits">
-                  <Input {...fieldControlProps("billing-pack-credits")} name="credits" type="number" min={1} step={1} defaultValue={10} />
+                <Field id="billing-pack-credits" label="Crédits" required>
+                  <Input {...fieldControlProps("billing-pack-credits", { required: true })} name="credits" type="number" min={1} step={1} defaultValue={10} />
                 </Field>
-                <Field id="billing-pack-reason" label="Motif">
-                  <Input {...fieldControlProps("billing-pack-reason")} name="reason" placeholder="Motif du pack" />
+                <Field id="billing-pack-reason" label="Motif" required>
+                  <Input {...fieldControlProps("billing-pack-reason", { required: true })} name="reason" minLength={3} maxLength={300} placeholder="Ex. : Pack réglé par virement" />
                 </Field>
                 <Field id="billing-pack-invoice" label="Facture réglée (optionnel)">
                   <Select
@@ -534,10 +602,12 @@ export default async function BillingFoundationPage({
                     ]}
                   />
                 </Field>
-                <FormActions>
-                  <Button type="submit" variant="secondary">Créditer un pack</Button>
-                </FormActions>
-              </Form>
+                <FormRow full>
+                  <FormActions>
+                    <PendingSubmit pendingLabel="Crédit en cours...">Créditer un pack</PendingSubmit>
+                  </FormActions>
+                </FormRow>
+              </PendingForm>
             </Card>
           ) : null}
         </>
@@ -579,10 +649,10 @@ function AccountPanel({ account }: { account: AccountStatementData }) {
         <p className="bo-description">{account.notice}</p>
       </Card>
       <Card title="Attribuer un pack après paiement constaté" description="Le pack est lié à la facture réglée; aucun paiement n'est capturé par cette action.">
-        <Form action={grantLeadPackAction} columns={2}>
+        <PendingForm action={grantLeadPackAction} columns={2}>
           <input type="hidden" name="partnerId" value={account.partnerId} />
           <input type="hidden" name="returnTab" value="comptes" />
-          <Field id="account-pack-invoice" label="Facture réglée">
+          <Field id="account-pack-invoice" label="Facture réglée (facultatif)">
             <Select
               {...fieldControlProps("account-pack-invoice")}
               name="invoiceId"
@@ -591,16 +661,18 @@ function AccountPanel({ account }: { account: AccountStatementData }) {
               options={settled.map((invoice) => ({ value: invoice.id, label: `${invoice.number} - ${xof(invoice.amountPaid)} reçus` }))}
             />
           </Field>
-          <Field id="account-pack-credits" label="Crédits">
-            <Input {...fieldControlProps("account-pack-credits")} name="credits" type="number" min={1} step={1} defaultValue={10} />
+          <Field id="account-pack-credits" label="Crédits" required>
+            <Input {...fieldControlProps("account-pack-credits", { required: true })} name="credits" type="number" min={1} step={1} defaultValue={10} />
           </Field>
-          <Field id="account-pack-reason" label="Motif">
-            <Input {...fieldControlProps("account-pack-reason")} name="reason" placeholder="Pack règle par virement" />
+          <Field id="account-pack-reason" label="Motif" required>
+            <Input {...fieldControlProps("account-pack-reason", { required: true })} name="reason" minLength={3} maxLength={300} placeholder="Ex. : Pack réglé par virement" />
           </Field>
-          <FormActions>
-            <Button type="submit" variant="secondary">Attribuer le pack</Button>
-          </FormActions>
-        </Form>
+          <FormRow full>
+            <FormActions>
+              <PendingSubmit variant="secondary" pendingLabel="Attribution...">Attribuer le pack</PendingSubmit>
+            </FormActions>
+          </FormRow>
+        </PendingForm>
       </Card>
     </>
   );

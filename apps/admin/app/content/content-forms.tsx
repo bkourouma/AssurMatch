@@ -14,15 +14,18 @@ import {
   ActionNotice,
   Button,
   Card,
+  ConfirmDialog,
   Field,
   Form,
   FormActions,
+  FormSection,
   Input,
   Notice,
   Select,
   Textarea,
   fieldControlProps
 } from "../lib/ui/admin-ui";
+import { UnsavedChangesNotice } from "../lib/ui/unsaved-changes-notice";
 import { contentWorkflowAction, createContentEntryAction, updateContentEntryAction, type ContentActionState } from "./actions";
 import { SECTIONS_HELP, sectionsExample, type FormValues } from "./content-payload";
 
@@ -133,8 +136,8 @@ export function CreateContentEntryForm() {
   return (
     <Card title="Nouveau contenu">
       <Form action={formAction} data-content-form="create">
-        <ActionNotice state={state} />
         <EditorialHelp kind={kind} />
+        <FormSection legend="Identification" description="Type, langue et, pour une surcharge légale, la page et le pays concernés.">
         <Field id={ids.kind} label="Type de contenu" required>
           <Select
             {...fieldControlProps(ids.kind, { required: true })}
@@ -161,9 +164,14 @@ export function CreateContentEntryForm() {
             <Input {...fieldControlProps(ids.entryKey)} name="entryKey" maxLength={80} placeholder="comment-choisir-une-assurance-auto" />
           </Field>
         )}
-        <KindFields key={kind} kind={kind} base={base} values={{}} />
+        </FormSection>
+        <FormSection legend="Contenu" description="Texte brut uniquement. Les champs marqués d'un astérisque sont obligatoires.">
+          <KindFields key={kind} kind={kind} base={base} values={{}} />
+        </FormSection>
         <p className="bo-description">Le contenu est toujours créé en brouillon : la soumission puis l&apos;approbation sont des actes distincts et audités.</p>
+        <ActionNotice state={state} />
         <FormActions>
+          <UnsavedChangesNotice />
           <Button type="submit" pending={pending} pendingLabel="Création...">Créer le brouillon</Button>
         </FormActions>
       </Form>
@@ -178,12 +186,15 @@ export function EditContentEntryForm({ id, kind, values }: { id: string; kind: C
   return (
     <Card title="Modifier le brouillon">
       <Form action={formAction} data-content-form="edit">
-        <ActionNotice state={state} />
         <EditorialHelp kind={kind} />
         <input type="hidden" name="id" value={id} />
         <input type="hidden" name="kind" value={kind} />
-        <KindFields kind={kind} base={base} values={values} />
+        <FormSection legend="Contenu" description="Seule la version en brouillon se modifie. Enregistrer ne la publie pas.">
+          <KindFields kind={kind} base={base} values={values} />
+        </FormSection>
+        <ActionNotice state={state} />
         <FormActions>
+          <UnsavedChangesNotice />
           <Button type="submit" pending={pending} pendingLabel="Enregistrement...">Enregistrer le brouillon</Button>
         </FormActions>
       </Form>
@@ -203,17 +214,43 @@ const workflowCopy = {
 const workflowHelp: Record<keyof typeof workflowCopy, string> = {
   submit: "Le contenu est contrôlé (texte brut, formulations réglementées) puis attend un second acteur.",
   withdraw: "Le contenu redevient un brouillon modifiable.",
-  approve: "Publié le contenu sur le site public. La version publiée précédente de la même clé est archivée dans la même opération.",
+  approve: "Publie le contenu sur le site public. La version publiée précédente de la même clé est archivée dans la même opération.",
   reject: "Le contenu redevient un brouillon ; le motif est conservé dans la traçabilité.",
   archive: "Le contenu n'est plus affiché sur le site public, qui retombe sur son texte d'origine.",
   revise: "Crée un brouillon de version suivante ; la version publiée reste en ligne jusqu'à l'approbation de la nouvelle."
 };
 
-export function ContentWorkflowForm({ id, intent }: { id: string; intent: keyof typeof workflowCopy }) {
+export function ContentWorkflowForm({ id, intent, entryLabel }: { id: string; intent: keyof typeof workflowCopy; entryLabel?: string | undefined }) {
   const [state, formAction, pending] = useActionState(contentWorkflowAction, initialState);
   const base = useId();
   const copy = workflowCopy[intent];
   const noteId = `${base}-note`;
+
+  if (intent === "reject" || intent === "archive") {
+    return (
+      <Card title={copy.title}>
+        <p className="bo-description">{workflowHelp[intent]}</p>
+        <ConfirmDialog
+          triggerLabel={copy.button}
+          triggerVariant="danger"
+          title={entryLabel ? `${copy.title} : ${entryLabel}` : copy.title}
+          description={`${entryLabel ? `Contenu concerné : ${entryLabel}. ` : ""}${workflowHelp[intent]}`}
+          confirmLabel={copy.button}
+          cancelLabel="Annuler"
+          tone="danger"
+          formAction={formAction}
+          dataAttributes={{ "data-content-workflow": intent }}
+        >
+          <ActionNotice state={state} />
+          <input type="hidden" name="id" value={id} />
+          <input type="hidden" name="intent" value={intent} />
+          <Field id={noteId} label="Motif (obligatoire, audité)" required>
+            <Textarea {...fieldControlProps(noteId, { required: true })} name="note" rows={2} maxLength={1000} />
+          </Field>
+        </ConfirmDialog>
+      </Card>
+    );
+  }
 
   return (
     <Card title={copy.title}>

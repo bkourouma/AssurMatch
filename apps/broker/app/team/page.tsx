@@ -3,7 +3,7 @@ import { isBrokerProfile, loginRedirect, readBackOfficeSession } from "../lib/ba
 import { TENANT_SUSPENDED_MESSAGE, canManageTeam, isBrokerOwner, isTenantReadOnly } from "../lib/broker-permissions";
 import { readBrokerCustomRoles } from "../lib/broker-api";
 import { readBrokerTeam, type BrokerTeamMemberView } from "../lib/self-service-api";
-import { TEAM_ROLE_LABELS, TEAM_STATUS_LABELS, selfServiceFormatDate } from "../lib/self-service-messages";
+import { TEAM_ACTION_UNAVAILABLE_REASONS, TEAM_ROLE_LABELS, TEAM_STATUS_LABELS, selfServiceFormatDate } from "../lib/self-service-messages";
 import { Badge, Button, Card, Cluster, DataTable, Notice, PageHeader, PageStack, StateMessage, TenantWriteGuard } from "../lib/ui/broker-ui";
 import styles from "../lib/ui/broker-screens.module.css";
 import { CustomRoleForm, InviteMemberForm, MemberActionForm } from "./team-forms";
@@ -57,9 +57,11 @@ export default async function BrokerTeamPage({ searchParams }: { searchParams: P
   const customRoleOf = (memberId: string) => customRoles.find((role) => (role.memberIds ?? []).includes(memberId));
 
   const actionsFor = (member: BrokerTeamMemberView) => {
-    if (!canManage || member.isSelf) return null;
+    if (!canManage) return null;
+    // The reason replaces the buttons: an empty cell would read as a missing feature.
+    if (member.isSelf) return <span className={styles.entryMeta}>{TEAM_ACTION_UNAVAILABLE_REASONS.self}</span>;
     // A manager never acts on an owner; an owner's role is changed by AssurMatch only.
-    if (member.isOwner && !actorIsOwner) return null;
+    if (member.isOwner && !actorIsOwner) return <span className={styles.entryMeta}>{TEAM_ACTION_UNAVAILABLE_REASONS.owner}</span>;
     return (
       <Cluster>
         {member.status === "suspended"
@@ -95,7 +97,17 @@ export default async function BrokerTeamPage({ searchParams }: { searchParams: P
       {!canManage && !readOnlyTenant ? (
         <Notice tone="info" title="Permissions conservées">Lecture seule : seuls le propriétaire et les managers gèrent l&apos;équipe.</Notice>
       ) : null}
-      {teamResult.status === "error" ? <StateMessage tone="danger">L&apos;équipe n&apos;a pas pu être chargée. Réessayez dans quelques instants.</StateMessage> : null}
+      {teamResult.status === "error" ? (
+        <StateMessage tone="danger">
+          <p>L&apos;équipe n&apos;a pas pu être chargée. Réessayez dans quelques instants.</p>
+          <Button href="/team" variant="secondary" size="sm">Réessayer</Button>
+        </StateMessage>
+      ) : null}
+      {isEnterprise && canManage && !readOnlyTenant && customRolesResult?.status === "success" && customRoles.length === 0 ? (
+        <Notice tone="info">
+          Aucun rôle personnalisé n&apos;est défini pour votre cabinet : le bouton « Rôle personnalisé » apparaît dès qu&apos;un rôle existe (page Enterprise).
+        </Notice>
+      ) : null}
 
       <Card title="Membres" description="Le dernier propriétaire actif ne peut pas être désactivé ; personne ne modifie son propre accès.">
         <DataTable
@@ -128,6 +140,7 @@ export default async function BrokerTeamPage({ searchParams }: { searchParams: P
           getKey={(member) => member.id}
           emptyLabel="Aucun utilisateur."
           emptyDescription="Invitez un premier collaborateur : il reçoit l'e-mail d'activation puis enrôle sa MFA."
+          emptyAction={canManage && !readOnlyTenant ? <Button href="#inviter" variant="secondary" size="sm">Inviter un collaborateur</Button> : undefined}
           aria-label="Membres de l'équipe"
         />
       </Card>

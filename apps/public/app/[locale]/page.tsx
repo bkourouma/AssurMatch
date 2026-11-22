@@ -14,6 +14,7 @@ import { Route } from "../components/ui/route-line";
 import { Section } from "../components/ui/section";
 import { listGuides } from "../content/guides";
 import { formatDate } from "../lib/country-format";
+import { buildHomeFigures } from "../lib/home-stats";
 import { getPublicStats, listPublicProducts } from "../lib/public-api";
 import type { PublicStats } from "../lib/public-api";
 import { buildMetadata } from "../lib/seo";
@@ -37,22 +38,8 @@ export async function generateMetadata({ params }: { params: Promise<{ locale: s
   return buildMetadata({ title: t("title"), description: t("metaDescription"), href: "/", locale });
 }
 
-/**
- * A value is rendered only when the endpoint really sent a finite number, so a partial or degraded
- * response shows fewer figures rather than a zero the catalogue never reported.
- */
-function statValue(source: PublicStats | null, key: "openCountries" | "activeBrokers" | "validatedOffers"): number | undefined {
-  const value = source?.[key];
-  return typeof value === "number" && Number.isFinite(value) ? value : undefined;
-}
-
 function statDate(source: PublicStats | null): string | undefined {
   return typeof source?.computedAt === "string" ? source.computedAt : undefined;
-}
-
-/** D-Chiffres: three zeros hide the whole block rather than pass for a real state of the platform. */
-function allCountersZero(source: PublicStats | null): boolean {
-  return statValue(source, "openCountries") === 0 && statValue(source, "activeBrokers") === 0 && statValue(source, "validatedOffers") === 0;
 }
 
 export default async function PublicHomePage({ params }: { params: Promise<{ locale: string }> }) {
@@ -94,16 +81,9 @@ export default async function PublicHomePage({ params }: { params: Promise<{ loc
   // own plural ("1 pays ouvert", "3 courtiers partenaires actifs") and the line lists only the counts
   // the endpoint really sent.
   const stats = await getPublicStats();
-  const figureParts =
-    stats.status === "success" && !allCountersZero(stats.data)
-      ? [
-          { key: "countriesCount", value: statValue(stats.data, "openCountries") },
-          { key: "partnersCount", value: statValue(stats.data, "activeBrokers") },
-          { key: "offersCount", value: statValue(stats.data, "validatedOffers") }
-        ]
-          .filter((figure): figure is { key: "countriesCount" | "partnersCount" | "offersCount"; value: number } => figure.value !== undefined)
-          .map((figure) => t(`stats.${figure.key}`, { count: figure.value }))
-      : [];
+  const figureParts = buildHomeFigures(stats.status === "success" ? stats.data : null, visitor.directory).map((figure) =>
+    t(`stats.${figure.key}`, { count: figure.value })
+  );
   const figuresLine = figureParts.length > 0 ? new Intl.ListFormat(locale, { type: "conjunction" }).format(figureParts) : null;
   const computedAt = stats.status === "success" ? statDate(stats.data) : undefined;
 

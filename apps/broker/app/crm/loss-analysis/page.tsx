@@ -4,8 +4,9 @@ import { readBrokerAIAssistance, readBrokerAiOptOut, readLossAnalyses } from "..
 import type { BrokerAiInteraction } from "../../lib/broker-api";
 import { TENANT_SUSPENDED_MESSAGE, canRequestLossAnalysis, isTenantReadOnly } from "../../lib/broker-permissions";
 import { requestLossAnalysisAction, validateLossAnalysisAction } from "../../lib/loss-analysis-actions";
-import { Badge, Button, Card, Cluster, Notice, PageHeader, PageStack, Stack, TenantWriteGuard } from "../../lib/ui/broker-ui";
+import { Badge, Button, Card, Cluster, EmptyState, Notice, PageHeader, PageStack, Stack, TenantWriteGuard } from "../../lib/ui/broker-ui";
 import { formatDate } from "../../lib/ui/broker-view-models";
+import styles from "../../lib/ui/broker-screens.module.css";
 
 /**
  * Spec 064 FR-003: « Analyse des pertes » (assistance IA, Enterprise). The page reads the tenant's
@@ -112,7 +113,12 @@ export default async function BrokerLossAnalysisPage({ searchParams }: { searchP
           description="L'analyse des motifs de perte fait partie des options du plan Enterprise."
           actions={<Badge tone="disabled">Plan Enterprise requis</Badge>}
         />
-        <Notice tone="info">Votre plan actuel donne accès au CRM selon vos permissions, sans l&apos;analyse des pertes.</Notice>
+        <Notice tone="info" title="Fonction non incluse dans votre formule">
+          Votre plan actuel donne accès au CRM selon vos permissions, sans l&apos;analyse des pertes. Pour la débloquer, contactez le propriétaire du cabinet ou AssurMatch pour passer au plan Enterprise.
+        </Notice>
+        <div>
+          <Button href="/crm" variant="secondary">Retour au pipeline CRM</Button>
+        </div>
       </PageStack>
     );
   }
@@ -144,7 +150,11 @@ export default async function BrokerLossAnalysisPage({ searchParams }: { searchP
       />
 
       {aiNotice && NOTICES[aiNotice] ? (
-        <Notice tone={SUCCESS_NOTICES.has(aiNotice) ? "success" : aiNotice === "error" ? "danger" : "warning"}>{NOTICES[aiNotice]}</Notice>
+        <Notice tone={SUCCESS_NOTICES.has(aiNotice) ? "success" : aiNotice === "error" ? "danger" : "warning"}>
+          {NOTICES[aiNotice]}
+          {aiNotice === "queued" ? <> <a href={PAGE_PATH}>Actualiser la page</a></> : null}
+          {aiNotice === "session" ? <> <a href={loginRedirect(PAGE_PATH, "session_expired")}>Se reconnecter</a></> : null}
+        </Notice>
       ) : null}
 
       <Card title="Lancer une analyse" description="L'analyse est préparée en arrière-plan, puis proposée à votre validation.">
@@ -155,7 +165,7 @@ export default async function BrokerLossAnalysisPage({ searchParams }: { searchP
           <TenantWriteGuard readOnly={suspended}>
             <form action={requestLossAnalysisAction}>
               <Cluster>
-                <Button type="submit" variant="secondary" disabled={reason !== undefined || suspended}>
+                <Button type="submit" disabled={reason !== undefined || suspended}>
                   Lancer l&apos;analyse des pertes
                 </Button>
                 {suspended ? <Badge tone="disabled">Compte suspendu : consultation seule</Badge> : null}
@@ -164,11 +174,11 @@ export default async function BrokerLossAnalysisPage({ searchParams }: { searchP
           </TenantWriteGuard>
         ) : (
           <Cluster>
-            <Button type="button" variant="secondary" disabled>Lancer l&apos;analyse des pertes</Button>
-            <Badge tone="disabled">Lecture seule pour votre rôle</Badge>
+            <Button type="button" disabled>Lancer l&apos;analyse des pertes</Button>
+            <Badge tone="disabled">Lecture seule pour votre rôle : l&apos;analyse est lancée par un rôle autorisé de votre cabinet</Badge>
           </Cluster>
         )}
-        <p>Le contenu produit est une aide à la lecture. Le courtier valide ou écarte chaque analyse ; rien n&apos;est modifié sur vos leads.</p>
+        <p className={styles.muted}>Le contenu produit est une aide à la lecture. Le courtier valide ou écarte chaque analyse ; rien n&apos;est modifié sur vos leads.</p>
       </Card>
 
       <Card title="Analyses récentes" description="Les 10 dernières analyses de votre cabinet, de la plus récente à la plus ancienne.">
@@ -177,7 +187,10 @@ export default async function BrokerLossAnalysisPage({ searchParams }: { searchP
         ) : analyses.status === "error" ? (
           <Notice tone="warning">Les analyses n&apos;ont pas pu être chargées. Réessayez dans quelques instants.</Notice>
         ) : items.length === 0 ? (
-          <p>Aucune analyse des pertes pour le moment.</p>
+          <EmptyState
+            title="Aucune analyse des pertes pour le moment."
+            description={reason ? "Une analyse pourra être demandée dès que l'assistance IA sera de nouveau disponible." : "Lancez une analyse ci-dessus : le résultat apparaît ici, à valider ou écarter."}
+          />
         ) : (
           <Stack>
             {items.map((interaction) => (

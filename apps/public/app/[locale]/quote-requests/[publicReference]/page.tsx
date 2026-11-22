@@ -19,6 +19,7 @@ import { QuoteDocumentUpload } from "../../../components/quote-document-upload";
 import { QuoteProposalCard, type QuoteProposalCardLabels } from "../../../components/tracking/quote-proposal-card";
 import type { ProposalResponseFormLabels } from "../../../components/tracking/proposal-response-form";
 import { MessagingSections } from "../../../components/tracking/messaging-sections";
+import { RefreshStatus } from "../../../components/tracking/refresh-status";
 import { hasProposals, QuoteProposalsSlot } from "../../../components/tracking/quote-proposals-slot";
 import { BackendText } from "../../../components/ui/backend-text";
 import { Breadcrumb } from "../../../components/ui/breadcrumb";
@@ -31,6 +32,7 @@ import type { IconName } from "../../../components/ui/icons";
 import { Notice } from "../../../components/ui/notice";
 import { Section } from "../../../components/ui/section";
 import { getPublicQuoteStatus, listQuoteDocuments } from "../../../lib/public-api";
+import { headline } from "../../../lib/quote-headline";
 import { buildMetadata, localeUrl } from "../../../lib/seo";
 import type { PageMetadata } from "../../../lib/seo";
 import "../../../styles/pages/journey.css";
@@ -173,12 +175,10 @@ export default async function PublicQuoteTrackingPage({
 
   // No token, or any refusal of the API: one neutral message, whatever the reason.
   if (!token || !view) {
-    const message =
-      statusResult?.status === "rate_limited"
-        ? t("access.rateLimited")
-        : statusResult?.status === "error"
-          ? t("access.unavailable")
-          : t("access.body");
+    const accessState = statusResult?.status === "rate_limited" ? "rateLimited" : statusResult?.status === "error" ? "unavailable" : "invalid";
+    // The "link no longer valid" title is only true for a missing or refused token.
+    const accessTitle = accessState === "rateLimited" ? t("access.rateLimitedTitle") : accessState === "unavailable" ? t("access.unavailableTitle") : t("access.title");
+    const message = accessState === "rateLimited" ? t("access.rateLimited") : accessState === "unavailable" ? t("access.unavailable") : t("access.body");
     return (
       <>
         {hero}
@@ -188,7 +188,7 @@ export default async function PublicQuoteTrackingPage({
               icon="lock"
               tone="muted"
               align="center"
-              title={t("access.title")}
+              title={accessTitle}
               description={message}
               action={
                 <Button variant="primary" href="/track" icon={<Icon name="mail" size={18} />}>
@@ -203,7 +203,11 @@ export default async function PublicQuoteTrackingPage({
   }
 
   const status: PublicQuoteStatus = isOneOf(QUOTE_STATUSES, view.status) ? view.status : "received";
-  const statusVisual = STATUS_VISUALS[status];
+  // The API keeps the pipeline status (e.g. "transmitted") after a withdrawal and reports the
+  // withdrawal separately in `consent.withdrawn`; the headline must follow the withdrawal, otherwise
+  // the visitor reads "Demande transmise" about a request that is no longer passed on.
+  const headlineKey = headline({ status, consent: view.consent });
+  const statusVisual = headlineKey === "consent_withdrawn" ? { icon: "x-circle" as IconName, tone: "neutral" as IconTileTone } : STATUS_VISUALS[status];
   const expiry = formatDate(view.tokenExpiresAt);
   const withdrawnAt = formatDate(view.consent.withdrawnAt);
   const timeline = view.timeline.filter((entry) => isOneOf(TIMELINE_STEPS, entry.step));
@@ -323,16 +327,24 @@ export default async function PublicQuoteTrackingPage({
             </div>
           </div>
 
-          <div className="am-j-panel" role="status" data-status={status}>
+          <div className="am-j-panel" role="status" data-status={headlineKey}>
             <div className="am-j-panel__head">
               <IconTile name={statusVisual.icon} tone={statusVisual.tone} size="lg" />
               <div>
                 <p className="am-j-fineprint">{t("statusLabel")}</p>
-                <h2 className="am-j-panel__title">{t(`status.${status}.headline`)}</h2>
+                <h2 className="am-j-panel__title">{t(`status.${headlineKey}.headline`)}</h2>
               </div>
             </div>
-            <p className="am-j-panel__lead">{t(`status.${status}.body`)}</p>
+            <p className="am-j-panel__lead">{t(`status.${headlineKey}.body`)}</p>
           </div>
+
+          {/* A request that is still moving can change while the page is open: a visible way to re-read it. */}
+          {headlineKey === "closed" || headlineKey === "consent_withdrawn" || headlineKey === "not_transmitted" ? null : (
+            <RefreshStatus
+              locale={locale}
+              labels={{ refresh: t("refresh.action"), refreshing: t("refresh.pending"), refreshed: t("refresh.done", { time: "{time}" }) }}
+            />
+          )}
 
           {view.consent.withdrawn ? (
             <Notice tone="info" role="status">

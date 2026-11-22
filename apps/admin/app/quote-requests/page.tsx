@@ -1,7 +1,8 @@
-import { firstValue, formatDateTime, pageHref, pageNumber, readQuoteRequests, type QuoteRequestRow } from "../lib/operations-api";
+import { firstValue, formatDateTime, pageHref, pageNumber, readQuoteRequests, toQueryString, type QuoteRequestRow } from "../lib/operations-api";
 import { Badge, DataTable, Field, FilterBar, Input, PageHeader, PageStack, Select, StateMessage, fieldControlProps, type DataTableColumn } from "../lib/ui/admin-ui";
+import { ActiveFilters, type ActiveFilterChip } from "../lib/ui/active-filters";
 import { quoteStatusTones } from "../lib/ui/operations-tones";
-import { productLabel, quoteStatusLabel, routingStatusLabel } from "../lib/ui/operations-labels";
+import { productLabel, quoteStatusLabel, routingReasonLabel, routingStatusLabel } from "../lib/ui/operations-labels";
 import { OperationsTabs } from "../lib/ui/operations-tabs";
 import { readFailureDetail } from "../lib/auth-error-messages";
 
@@ -20,7 +21,7 @@ const columns: Array<DataTableColumn<QuoteRequestRow>> = [
   { key: "status", header: "Statut", render: (row) => <Badge tone={quoteStatusTones[row.status] ?? "neutral"} title={row.status}>{quoteStatusLabel(row.status)}</Badge> },
   { key: "routing", header: "Routage", render: (row) => routingStatusLabel(row.routingStatus) },
   { key: "assignments", header: "Affectations", render: (row) => row.assignmentCount, numeric: true, align: "right" },
-  { key: "reason", header: "Motif", render: (row) => row.refusalReason ?? "-" },
+  { key: "reason", header: "Motif de refus", render: (row) => routingReasonLabel(row.refusalReason) },
   { key: "created", header: "Reçue le", render: (row) => formatDateTime(row.createdAt) }
 ];
 
@@ -38,6 +39,20 @@ export default async function AdminQuoteRequestsPage({ searchParams }: { searchP
   const page = pageNumber(params.page);
   const result = await readQuoteRequests({ ...filters, page, pageSize: 50 });
   const activeFilters = Object.values(filters).filter(Boolean).length;
+  // The record page links back to this exact view (filters and page), so a long triage does not restart from scratch.
+  const backQuery = toQueryString({ ...filters, page: page > 1 ? page : undefined });
+  const chips: ActiveFilterChip[] = [
+    ...(filters.reference ? [{ key: "reference", label: "Référence", value: filters.reference }] : []),
+    ...(filters.status ? [{ key: "status", label: "Statut", value: quoteStatusLabel(filters.status) }] : []),
+    ...(filters.routingStatus ? [{ key: "routingStatus", label: "Routage", value: routingStatusLabel(filters.routingStatus) }] : []),
+    ...(filters.countryId ? [{ key: "countryId", label: "Pays", value: filters.countryId.slice(0, 8) }] : []),
+    ...(filters.productId ? [{ key: "productId", label: "Produit", value: filters.productId.slice(0, 8) }] : []),
+    ...(filters.from ? [{ key: "from", label: "Du", value: filters.from }] : []),
+    ...(filters.to ? [{ key: "to", label: "Au", value: filters.to }] : [])
+  ];
+  const invertedPeriod = Boolean(filters.from && filters.to && filters.from > filters.to);
+  const countryHint = "Identifiant du pays tel qu'indiqué dans le catalogue.";
+  const productHint = "Identifiant du produit tel qu'indiqué dans le catalogue.";
 
   return (
     <PageStack>
@@ -45,12 +60,14 @@ export default async function AdminQuoteRequestsPage({ searchParams }: { searchP
         breadcrumb={[{ label: "Pilotage" }, { label: "Opérations", href: "/operations" }, { label: "Demandes de devis" }]}
         title="Demandes de devis"
         description="Les demandes reçues dans votre périmètre pays et leur routage. Les coordonnées du prospect restent dans la fiche."
+        actions={result.status === "success" ? <Badge tone="neutral">{`${result.data.total} demande(s)${activeFilters > 0 ? " filtrée(s)" : ""}`}</Badge> : null}
       />
       <OperationsTabs current="/quote-requests" />
 
       {result.status === "unauthenticated" ? <StateMessage tone="danger">Session admin requise.</StateMessage> : null}
       {result.status === "forbidden" ? <StateMessage tone="danger">Accès aux demandes de devis refusé pour ce rôle admin.</StateMessage> : null}
       {result.status === "error" ? <StateMessage tone="danger">Demandes indisponibles. {readFailureDetail(result.error)}</StateMessage> : null}
+      {invertedPeriod ? <StateMessage tone="warning">La date « Du » est postérieure à la date « Au » : aucune demande ne peut correspondre. Corrigez la période.</StateMessage> : null}
 
       <FilterBar action="/quote-requests" label="Filtres demandes de devis" submitLabel="Filtrer" resetLabel="Réinitialiser" resetHref="/quote-requests" activeCount={activeFilters}>
         <Field id="qr-reference" label="Référence">
@@ -68,11 +85,11 @@ export default async function AdminQuoteRequestsPage({ searchParams }: { searchP
             {routingStatusOptions.map((option) => <option key={option} value={option}>{routingStatusLabel(option)}</option>)}
           </Select>
         </Field>
-        <Field id="qr-country" label="Pays (UUID)">
-          <Input {...fieldControlProps("qr-country")} name="countryId" defaultValue={filters.countryId ?? ""} />
+        <Field id="qr-country" label="Pays (identifiant)" hint={countryHint}>
+          <Input {...fieldControlProps("qr-country", { hint: countryHint })} name="countryId" defaultValue={filters.countryId ?? ""} />
         </Field>
-        <Field id="qr-product" label="Produit (UUID)">
-          <Input {...fieldControlProps("qr-product")} name="productId" defaultValue={filters.productId ?? ""} />
+        <Field id="qr-product" label="Produit (identifiant)" hint={productHint}>
+          <Input {...fieldControlProps("qr-product", { hint: productHint })} name="productId" defaultValue={filters.productId ?? ""} />
         </Field>
         <Field id="qr-from" label="Du">
           <Input {...fieldControlProps("qr-from")} name="from" type="date" defaultValue={filters.from ?? ""} />
@@ -81,12 +98,13 @@ export default async function AdminQuoteRequestsPage({ searchParams }: { searchP
           <Input {...fieldControlProps("qr-to")} name="to" type="date" defaultValue={filters.to ?? ""} />
         </Field>
       </FilterBar>
+      <ActiveFilters pathname="/quote-requests" filters={filters} chips={chips} />
 
       <DataTable
         columns={columns}
         items={result.data.items}
         getKey={(row) => row.id}
-        getRowHref={(row) => `/quote-requests/${row.id}`}
+        getRowHref={(row) => `/quote-requests/${row.id}${backQuery ? `?back=${encodeURIComponent(backQuery)}` : ""}`}
         emptyLabel="Aucune demande de devis pour ces filtres."
         emptyDescription={activeFilters > 0 ? "Élargissez la période ou réinitialisez les filtres." : "Les demandes apparaissent ici dès qu'un visiteur de votre périmètre en soumet une."}
         aria-label="Demandes de devis"

@@ -46,6 +46,7 @@ function withoutLeadingNumber(title: string): string {
 
 const QUOTE_PICK_FORM_ID = "am-quote-pick-form";
 const QUOTE_PICK_HINT_ID = "am-quote-pick-limit";
+const QUOTE_PICK_SECTION_ID = "am-quote-pick";
 /** Country and product of the list the selection came from, when the offers page passed them. */
 const ISO_CODE = /^[A-Za-z]{2}$/;
 const PRODUCT_KEY = /^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$/;
@@ -185,6 +186,19 @@ export default async function PublicComparePage({
   const items = comparison?.status === "success" ? comparison.data?.items ?? [] : [];
   const compared = comparison?.status === "success" && comparison.data ? comparison.data : null;
 
+  // The way back to the list the selection came from, when the offers page told us which list that was.
+  const backToOffers =
+    countryCode && productKey ? (
+      <Button
+        variant="secondary"
+        href={{ pathname: "/countries/[countryCode]/products/[productKey]/offers", params: { countryCode, productKey } }}
+        icon={<Icon name="arrow-left" size={18} />}
+      >
+        {t("backToOffers")}
+      </Button>
+    ) : null;
+  const canRequestQuote = Boolean(quoteAction) && items.length >= 2;
+
   const breadcrumb = (
     <Breadcrumb
       label={common("breadcrumbLabel")}
@@ -251,9 +265,11 @@ export default async function PublicComparePage({
             title={t("selectionError.title")}
             description={t("selectionError.description")}
             action={
-              <Button href="/countries" icon={<Icon name="globe" size={18} />}>
-                {t("seeCountries")}
-              </Button>
+              backToOffers ?? (
+                <Button href="/countries" icon={<Icon name="globe" size={18} />}>
+                  {t("seeCountries")}
+                </Button>
+              )
             }
           />
         </Section>
@@ -268,9 +284,11 @@ export default async function PublicComparePage({
             title={t("unavailable.title")}
             description={comparison.publicMessage ?? t("unavailable.description")}
             action={
-              <Button href="/countries" variant="secondary">
-                {t("seeCountries")}
-              </Button>
+              backToOffers ?? (
+                <Button href="/countries" variant="secondary">
+                  {t("seeCountries")}
+                </Button>
+              )
             }
           />
         </Section>
@@ -283,6 +301,18 @@ export default async function PublicComparePage({
               <Notice tone="indicative">
                 <BackendText>{compared.disclaimer}</BackendText>
               </Notice>
+
+              {/* The next move, before a long table: back to the list, or on to the request. */}
+              {backToOffers || canRequestQuote ? (
+                <div className="am-cluster">
+                  {canRequestQuote ? (
+                    <a className="am-button" data-variant="primary" href={`#${QUOTE_PICK_SECTION_ID}`}>
+                      <span>{common("requestQuote")}</span>
+                    </a>
+                  ) : null}
+                  {backToOffers}
+                </div>
+              ) : null}
 
               {/* Two structures, one visible at a time (CSS media query, FR-013): the desktop table
                   keeps its horizontal scroll for a wide row count, the mobile block below 768px never
@@ -401,7 +431,7 @@ export default async function PublicComparePage({
           </Section>
 
           {quoteAction && items.length >= 2 ? (
-            <Section title={t("quotePickTitle")} spacing="compact">
+            <Section id={QUOTE_PICK_SECTION_ID} title={t("quotePickTitle")} spacing="compact">
               <form id={QUOTE_PICK_FORM_ID} method="get" action={quoteAction} className="am-stack">
                 <p>
                   {t("quotePickHint")} <span id={QUOTE_PICK_HINT_ID}>{t("quotePickLimit")}</span>
@@ -409,7 +439,7 @@ export default async function PublicComparePage({
                 <ul className="am-stack">
                   {items.map((offer) => (
                     <li key={offer.id}>
-                      <label className="am-cluster">
+                      <label className="am-checkline">
                         <input type="checkbox" name="offerId" value={offer.id} />
                         <span>
                           <BackendText>{t("quotePickOption", { name: offer.name })}</BackendText>

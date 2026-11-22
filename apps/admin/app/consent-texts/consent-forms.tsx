@@ -2,9 +2,17 @@
 
 import { useActionState, useId, useState } from "react";
 import type { CatalogActionState } from "../lib/catalog-actions";
-import { CONSENT_CHANNEL_OPTIONS, CONSENT_PURPOSE_OPTIONS, LANGUAGE_OPTIONS } from "../lib/catalog-messages";
+import {
+  CONSENT_CHANNEL_OPTIONS,
+  CONSENT_PURPOSE_LABELS,
+  CONSENT_PURPOSE_OPTIONS,
+  LANGUAGE_LABELS,
+  LANGUAGE_OPTIONS,
+  labelWithCode
+} from "../lib/catalog-messages";
 import { createConsentTextAction, publishConsentTextAction, retireConsentTextAction } from "../lib/consent-actions";
 import { CatalogActionResult } from "../lib/ui/catalog-action-result";
+import { UnsavedChangesNotice } from "../lib/ui/unsaved-changes-notice";
 import {
   Button,
   Card,
@@ -12,6 +20,7 @@ import {
   Field,
   Form,
   FormActions,
+  FormSection,
   Input,
   Notice,
   Select,
@@ -64,6 +73,7 @@ export function CreateConsentTextForm({ templates, countries, products }: {
     <Card title="Créer un texte de consentement" description="Le texte est créé en brouillon. Sa publication est un acte distinct, réservé à la conformité.">
       <Form action={formAction} data-consent-form="create">
         <CatalogActionResult state={state} />
+        <FormSection legend="Point de départ">
         <Field id={`${base}-template`} label="Partir d'un modèle" hint="Préremplit la finalité, la langue et le contenu ; tout reste modifiable.">
           <Select {...fieldControlProps(`${base}-template`, { hint: "modèle" })} value={templateKey} onChange={(event) => applyTemplate(event.target.value)}>
             <option value="">Aucun modèle</option>
@@ -73,9 +83,11 @@ export function CreateConsentTextForm({ templates, countries, products }: {
           </Select>
         </Field>
         {template?.notes ? <p className="bo-description">{template.notes}</p> : null}
+        </FormSection>
+        <FormSection legend="Périmètre du texte" description="Finalité, pays, produit et langue déterminent les formulaires de devis qui pourront lier ce texte.">
         <Field id={`${base}-purpose`} label="Finalité" required>
           <Select {...fieldControlProps(`${base}-purpose`, { required: true })} name="purpose" value={purpose} onChange={(event) => setPurpose(event.target.value)}>
-            {CONSENT_PURPOSE_OPTIONS.map((option) => <option key={option} value={option}>{option}</option>)}
+            {CONSENT_PURPOSE_OPTIONS.map((option) => <option key={option} value={option}>{labelWithCode(CONSENT_PURPOSE_LABELS, option)}</option>)}
           </Select>
         </Field>
         <Field id={`${base}-country`} label="Pays" required>
@@ -101,12 +113,14 @@ export function CreateConsentTextForm({ templates, countries, products }: {
         </Field>
         <Field id={`${base}-language`} label="Langue" required>
           <Select {...fieldControlProps(`${base}-language`, { required: true })} name="language" value={language} onChange={(event) => setLanguage(event.target.value)}>
-            {LANGUAGE_OPTIONS.map((option) => <option key={option} value={option}>{option}</option>)}
+            {LANGUAGE_OPTIONS.map((option) => <option key={option} value={option}>{labelWithCode(LANGUAGE_LABELS, option)}</option>)}
           </Select>
         </Field>
         <Field id={`${base}-version`} label="Version" required hint="Unique par finalité, pays, produit et langue (par exemple 2026-10-v1).">
           <Input {...fieldControlProps(`${base}-version`, { required: true, hint: "version" })} name="version" />
         </Field>
+        </FormSection>
+        <FormSection legend="Texte et motif">
         <Field
           id={`${base}-content`}
           label="Contenu"
@@ -121,10 +135,12 @@ export function CreateConsentTextForm({ templates, countries, products }: {
             onChange={(event) => setContent(event.target.value)}
           />
         </Field>
-        <Field id={`${base}-reason`} label="Motif (audité)" required>
-          <Input {...fieldControlProps(`${base}-reason`, { required: true })} name="reason" minLength={8} />
+        <Field id={`${base}-reason`} label="Motif (audité)" required hint="Au moins 8 caractères, conservé dans le journal d'audit.">
+          <Input {...fieldControlProps(`${base}-reason`, { required: true, hint: "x" })} name="reason" minLength={8} />
         </Field>
+        </FormSection>
         <FormActions>
+          <UnsavedChangesNotice />
           <Button type="submit" pending={pending} pendingLabel="Création...">Créer le brouillon</Button>
         </FormActions>
       </Form>
@@ -164,7 +180,7 @@ export function PublishConsentTextForm({ consentTextId, version }: { consentText
   );
 }
 
-export function RetireConsentTextForm({ consentTextId }: { consentTextId: string }) {
+export function RetireConsentTextForm({ consentTextId, version }: { consentTextId: string; version: string }) {
   const [state, formAction] = useActionState(retireConsentTextAction, initialState);
   const base = useId();
   return (
@@ -174,7 +190,7 @@ export function RetireConsentTextForm({ consentTextId }: { consentTextId: string
         <ConfirmDialog
           triggerLabel="Retirer"
           triggerVariant="danger"
-          title="Retirer ce texte de consentement"
+          title={`Retirer le texte de consentement ${version}`}
           description="Le texte ne pourra plus être publié ni lié à un nouveau formulaire. Les preuves déjà recueillies restent valables."
           confirmLabel="Retirer"
           cancelLabel="Annuler"

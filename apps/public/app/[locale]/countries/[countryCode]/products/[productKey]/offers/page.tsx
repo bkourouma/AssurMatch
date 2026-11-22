@@ -144,6 +144,13 @@ export default async function PublicOffersPage({
   if (guaranteeFilter && !guaranteeOptions.has(guaranteeFilter)) guaranteeOptions.set(guaranteeFilter, guaranteeFilter);
   const guarantees = [...guaranteeOptions.entries()].sort((a, b) => a[1].localeCompare(b[1], locale));
 
+  /**
+   * The field hint always explains the filter. "No guarantee published" is only said next to the
+   * disabled select when offers are listed but none carries a guarantee; an empty list says it in
+   * the results area (empty state below), never as the help text of a filter.
+   */
+  const guaranteeHintText = guarantees.length === 0 && offers.data.length > 0 ? t("guaranteeEmpty") : t("guaranteeHint");
+
   /** The two GET forms are siblings, so each carries the other's values as hidden inputs. */
   const panelValues = panelFilterKeys
     .map((key) => ({ key, value: first(filters[key]) }))
@@ -213,13 +220,9 @@ export default async function PublicOffersPage({
                   ))}
                 </select>
               </Field>
-              <Field
-                id="am-filter-guarantee"
-                label={t("guarantee")}
-                hint={guarantees.length === 0 ? t("guaranteeEmpty") : t("guaranteeHint")}
-              >
+              <Field id="am-filter-guarantee" label={t("guarantee")} hint={guaranteeHintText}>
                 <select
-                  {...fieldControlProps("am-filter-guarantee", { hint: guarantees.length === 0 ? t("guaranteeEmpty") : t("guaranteeHint") })}
+                  {...fieldControlProps("am-filter-guarantee", { hint: guaranteeHintText })}
                   name="guarantee"
                   defaultValue={guaranteeFilter}
                   disabled={guarantees.length === 0}
@@ -251,6 +254,7 @@ export default async function PublicOffersPage({
                   {...fieldControlProps("am-filter-min-price", { hint: t("priceHint") })}
                   name="minPrice"
                   type="number"
+                  inputMode="numeric"
                   min="0"
                   defaultValue={first(filters.minPrice)}
                 />
@@ -260,6 +264,7 @@ export default async function PublicOffersPage({
                   {...fieldControlProps("am-filter-max-price", { hint: t("priceHint") })}
                   name="maxPrice"
                   type="number"
+                  inputMode="numeric"
                   min="0"
                   defaultValue={first(filters.maxPrice)}
                 />
@@ -282,6 +287,7 @@ export default async function PublicOffersPage({
                       {...fieldControlProps("am-filter-deductible", { hint: t("maxDeductibleHint") })}
                       name="maxDeductible"
                       type="number"
+                      inputMode="numeric"
                       min="0"
                       defaultValue={first(filters.maxDeductible)}
                     />
@@ -291,6 +297,7 @@ export default async function PublicOffersPage({
                       {...fieldControlProps("am-filter-processing", { hint: t("maxProcessingDaysHint") })}
                       name="maxProcessingDays"
                       type="number"
+                      inputMode="numeric"
                       min="0"
                       defaultValue={first(filters.maxProcessingDays)}
                     />
@@ -389,6 +396,19 @@ export default async function PublicOffersPage({
             align="center"
             title={t("error.title")}
             description={offers.publicMessage ?? t("error.description")}
+            action={
+              <Button
+                variant="secondary"
+                href={{
+                  pathname: "/countries/[countryCode]/products/[productKey]/offers",
+                  params: { countryCode, productKey },
+                  query: Object.fromEntries(Object.entries(filters).filter(([, value]) => value !== undefined && value !== ""))
+                }}
+                icon={<Icon name="refresh" size={18} />}
+              >
+                {t("retry")}
+              </Button>
+            }
           />
         ) : null}
         {offers.status !== "error" && offers.data.length === 0 ? (
@@ -397,17 +417,28 @@ export default async function PublicOffersPage({
             tone="muted"
             align="center"
             title={t("empty.title")}
-            description={t("empty.description")}
+            description={guaranteeFilter ? t("empty.guarantee") : activeFilters > 0 ? t("empty.description") : t("empty.noFilters")}
             action={
-              <Button
-                variant="secondary"
-                href={{
-                  pathname: "/countries/[countryCode]/products/[productKey]/offers",
-                  params: { countryCode, productKey }
-                }}
-              >
-                {t("reset")}
-              </Button>
+              // "Clear the filters" only when some are set; an empty catalogue names another way on instead.
+              activeFilters > 0 ? (
+                <Button
+                  variant="secondary"
+                  href={{
+                    pathname: "/countries/[countryCode]/products/[productKey]/offers",
+                    params: { countryCode, productKey }
+                  }}
+                >
+                  {t("reset")}
+                </Button>
+              ) : (
+                <Button
+                  variant="secondary"
+                  href={{ pathname: "/countries/[countryCode]", params: { countryCode } }}
+                  icon={<Icon name="arrow-left" size={18} />}
+                >
+                  {t("empty.otherProduct")}
+                </Button>
+              )
             }
           />
         ) : null}

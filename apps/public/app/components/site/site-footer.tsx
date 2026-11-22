@@ -49,7 +49,7 @@ export async function SiteFooter({ locale }: { locale: AppLocale }) {
             </div>
           </div>
 
-          <div className="am-footer__columns">
+          <nav className="am-footer__columns" aria-label={t("navLabel")}>
             <div className="am-footer__column">
               <h3>{t("columns.countries")}</h3>
               <ul className="am-footer__list">
@@ -146,7 +146,7 @@ export async function SiteFooter({ locale }: { locale: AppLocale }) {
                 </li>
               </ul>
             </div>
-          </div>
+          </nav>
         </div>
 
         <div className="am-footer__regulatory">

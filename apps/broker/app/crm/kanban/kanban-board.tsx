@@ -8,7 +8,7 @@ import type { KanbanColumns, KanbanMessage } from "../../lib/kanban-moves";
 import { productLabel } from "../../lib/product-vocabulary";
 import { CRM_OUTCOME_REASONS, CRM_PIPELINE_STATUSES, CRM_REASON_LABELS, CRM_STATUS_LABELS } from "../../lib/lead-vocabulary";
 import type { CrmPipelineStatus } from "../../lib/lead-vocabulary";
-import { Badge, Button, Field, Notice, Select } from "../../lib/ui/broker-ui";
+import { Badge, Button, Cluster, EmptyState, Field, Notice, Select } from "../../lib/ui/broker-ui";
 import styles from "../../lib/ui/broker-screens.module.css";
 
 export interface KanbanCardData {
@@ -120,15 +120,25 @@ export function KanbanBoard({ columns: initial, canMove }: KanbanBoardProps) {
     if (current) requestMove(current.id, current.from, to);
   }
 
+  const totalCards = CRM_PIPELINE_STATUSES.reduce((sum, status) => sum + (columns[status]?.length ?? 0), 0);
+
   return (
     <div>
-      {!canMove ? <Notice tone="info">{KANBAN_READ_ONLY_MESSAGE}</Notice> : null}
+      {!canMove ? <Notice tone="info" title="Lecture seule">{KANBAN_READ_ONLY_MESSAGE}</Notice> : null}
       <div role="status" aria-live="polite" aria-atomic="true">
-        {message ? <Notice tone={message.tone}>{message.text}</Notice> : null}
+        {message ? <Notice tone={message.tone}>{message.text}</Notice> : busy ? <p className={styles.boardHint}>Déplacement en cours...</p> : null}
       </div>
+      {totalCards === 0 ? (
+        <EmptyState
+          title="Aucun lead dans le pipeline"
+          description="Les leads qui vous sont assignés apparaissent ici, dans la colonne de leur statut."
+          action={<Button href="/leads" variant="secondary" size="sm">Ouvrir les leads reçus</Button>}
+        />
+      ) : null}
       {pendingReason ? (
         <form
           role="group"
+          className={styles.reasonForm}
           aria-label="Motif du changement de statut"
           onSubmit={(event) => {
             event.preventDefault();
@@ -148,21 +158,24 @@ export function KanbanBoard({ columns: initial, canMove }: KanbanBoardProps) {
               options={CRM_OUTCOME_REASONS.map((value) => ({ value, label: CRM_REASON_LABELS[value] }))}
             />
           </Field>
-          <Button type="submit" disabled={!canConfirmKanbanReason(reason, busy)}>Confirmer le déplacement</Button>{" "}
-          <Button
-            type="button"
-            variant="secondary"
-            onClick={() => {
-              setTargets((current) => withoutKanbanTarget(current, pendingReason.leadId));
-              setFocusRequest({ leadId: pendingReason.leadId, target: "control" });
-              setPendingReason(undefined);
-            }}
-          >
-            Annuler
-          </Button>
+          <Cluster>
+            <Button type="submit" disabled={!canConfirmKanbanReason(reason, busy)}>Confirmer le déplacement</Button>
+            <Button
+              type="button"
+              variant="secondary"
+              onClick={() => {
+                setTargets((current) => withoutKanbanTarget(current, pendingReason.leadId));
+                setFocusRequest({ leadId: pendingReason.leadId, target: "control" });
+                setPendingReason(undefined);
+              }}
+            >
+              Annuler
+            </Button>
+          </Cluster>
         </form>
       ) : null}
-      <div className={styles.board} aria-label="Colonnes du pipeline CRM">
+      {totalCards > 0 ? (
+      <div className={styles.board} role="region" tabIndex={0} aria-busy={busy} aria-label="Colonnes du pipeline CRM">
         {CRM_PIPELINE_STATUSES.map((status) => {
           const cards = columns[status] ?? [];
           return (
@@ -195,11 +208,15 @@ export function KanbanBoard({ columns: initial, canMove }: KanbanBoardProps) {
                           onDragEnd={canMove ? () => { setDragging(undefined); setOverColumn(undefined); } : undefined}
                           style={{ cursor: canMove ? "grab" : undefined, opacity: dragging?.id === card.id ? 0.5 : 1 }}
                         >
-                          <a href={`/crm/leads/${card.id}`}>{card.reference}</a> - {productLabel(card.product)} / {card.country}
-                          {card.advisor ? ` - ${card.advisor}` : ""}
+                          <a className={styles.ticketRef} href={`/crm/leads/${card.id}`}>{card.reference}</a>
+                          <span className={styles.ticketMeta}>
+                            {productLabel(card.product)} / {card.country}
+                            {card.advisor ? ` - ${card.advisor}` : ""}
+                          </span>
                           {canMove ? (
-                            <div>
-                              <label htmlFor={targetId}>Déplacer {card.reference} vers</label>
+                            <div className={styles.moveRow}>
+                              <label className={styles.moveLabel} htmlFor={targetId}>Déplacer {card.reference} vers</label>
+                              <div className={styles.moveControls}>
                               <Select
                                 id={targetId}
                                 value={target}
@@ -218,6 +235,7 @@ export function KanbanBoard({ columns: initial, canMove }: KanbanBoardProps) {
                               >
                                 Déplacer
                               </Button>
+                              </div>
                             </div>
                           ) : null}
                         </li>
@@ -231,6 +249,7 @@ export function KanbanBoard({ columns: initial, canMove }: KanbanBoardProps) {
           );
         })}
       </div>
+      ) : null}
     </div>
   );
 }

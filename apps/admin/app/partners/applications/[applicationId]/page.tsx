@@ -11,6 +11,7 @@ import {
   APPLICATION_STATUS_TONES,
   PARTNER_PLAN_LABELS,
   REJECTION_REASON_LABELS,
+  applicationNextStep,
   canDecidePartner,
   canReviewApplication,
   partnerFormatDate
@@ -72,6 +73,9 @@ export default async function PartnerApplicationDetailPage({ params }: Applicati
   const country = countries.data.find((entry) => entry.id === application.countryId);
   const productById = new Map(products.data.map((product) => [product.id, product]));
   const decided = application.status === "accepted" || application.status === "rejected";
+  const applicantName = application.tradeName || application.legalName;
+  const nextStep = applicationNextStep({ status: application.status, canReview, canDecide });
+  const reviewPending = application.status === "received" && canReview;
 
   return (
     <PageStack>
@@ -86,6 +90,10 @@ export default async function PartnerApplicationDetailPage({ params }: Applicati
           </Cluster>
         }
       />
+
+      <Notice tone={nextStep.tone}>
+        <strong>Statut : {APPLICATION_STATUS_LABELS[application.status] ?? application.status}</strong> — prochaine étape : {nextStep.text}
+      </Notice>
 
       <Split>
         <Stack>
@@ -125,7 +133,10 @@ export default async function PartnerApplicationDetailPage({ params }: Applicati
           </Card>
         </Stack>
 
-        <Card title="Décision">
+        <Card
+          title="Décision"
+          description={decided ? undefined : "La conversion et le refus sont définitifs et audités. Le refus est une action distincte, confirmée dans une fenêtre dédiée."}
+        >
           {decided ? (
             <>
               <Notice tone={application.status === "accepted" ? "success" : "info"}>
@@ -146,8 +157,8 @@ export default async function PartnerApplicationDetailPage({ params }: Applicati
               {application.status === "received" && canReview ? <ReviewApplicationForm applicationId={application.id} /> : null}
               {canDecide ? (
                 <Cluster>
-                  <ConvertApplicationForm applicationId={application.id} />
-                  <RejectApplicationForm applicationId={application.id} />
+                  <ConvertApplicationForm applicationId={application.id} applicantName={applicantName} primary={!reviewPending} />
+                  <RejectApplicationForm applicationId={application.id} applicantName={applicantName} />
                 </Cluster>
               ) : (
                 <p className="bo-description">La conversion et le refus sont réservés à la conformité (compliance_admin, super_admin).</p>

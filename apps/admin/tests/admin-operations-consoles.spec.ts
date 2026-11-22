@@ -60,7 +60,7 @@ test("manual review queue persists audited decisions through the API (H-02)", ()
     expect(forms, decision).toContain(`${decision}:`);
   }
   expect(forms).toContain("data-operations-form=\"quote-review\"");
-  expect(forms).toContain("Motif (audité");
+  expect(forms).toContain("Motif (obligatoire, audité");
   expect(forms).toContain("candidate.eligible");
 });
 
@@ -71,6 +71,12 @@ test("lead assignments console lists partner names and offers reassignment (H-03
   expect(page).toContain("partnerLegalName");
   expect(page).toContain("ReassignAssignmentForm");
   expect(page).not.toContain("contact.");
+  expect(page).toContain("assignmentStatusLabel(row.status)");
+  expect(page).toContain("lead-assignments-table");
+  const forms = source("apps/admin/app/lib/ui/operations-forms.tsx");
+  expect(forms).toContain("minLength={REASON_MIN_LENGTH}");
+  const actions = source("apps/admin/app/lib/operations-actions.ts");
+  expect(actions).not.toContain("Détail :");
 });
 
 test("contact inbox changes status with audit and replies by mailto only (H-04)", () => {

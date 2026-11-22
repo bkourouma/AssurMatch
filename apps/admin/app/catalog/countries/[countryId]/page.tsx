@@ -14,9 +14,11 @@ import {
   SENSITIVE_FLAG_EXPLANATION,
   adminReadErrorMessage,
   canApprovePublicActivation,
+  catalogNextStep,
   flagLabel,
   formatDate
 } from "../../../lib/catalog-messages";
+import { allowedCountryStatusTransitions } from "../../../../../../packages/shared/contracts/country-status-transitions";
 import { BlockersList } from "../../../lib/ui/catalog-action-result";
 import {
   Badge,
@@ -92,13 +94,15 @@ export default async function CatalogCountryDetailPage({ params }: CountryDetail
   const regimeName = country.regulatoryRegimeId ? regimesResult.data.find((regime) => regime.id === country.regulatoryRegimeId)?.name ?? country.regulatoryRegimeId : null;
   const readOnlyFlags = Object.keys(country.flags).filter((key) => !(COUNTRY_TOGGLEABLE_FLAGS as readonly string[]).includes(key));
   const checklist = country.checklist;
+  const nextStatuses = allowedCountryStatusTransitions(country.status).filter((status) => status !== country.status && (status !== "public" || canApprovePublic));
+  const blockerHint = checklist && !checklist.ready ? ` ${checklist.blockers.length} contrôle(s) bloquant(s) à lever avant l'ouverture au public.` : "";
 
   return (
     <PageStack>
       <PageHeader
         breadcrumb={[{ label: "Catalogue", href: "/catalog" }, { label: "Pays", href: "/catalog/countries" }, { label: country.isoCode }]}
         title={`${country.name} (${country.isoCode})`}
-        description="Chaque modification est auditée avec son motif. Une désactivation est immédiate ; une activation est soumise aux conditions de la checklist."
+        description={`${catalogNextStep("country", country.status, nextStatuses)}${blockerHint} Chaque modification est auditée avec son motif ; une désactivation est immédiate, une activation est soumise à la checklist.`}
         actions={
           <Cluster>
             <StatusBadge status={country.status} tones={catalogStatusTones} />
@@ -207,6 +211,7 @@ export default async function CatalogCountryDetailPage({ params }: CountryDetail
             getKey={(link) => link.productId}
             emptyLabel="Aucun produit lié : le pays ne propose aucun parcours."
             emptyDescription="Liez un produit avec le formulaire en bas de page ; la liaison se crée fermée."
+            emptyAction={<Button href="#lier-produit" size="sm">Lier un produit</Button>}
             aria-label="Liaisons pays produit"
           />
         </Card>
@@ -244,7 +249,7 @@ export default async function CatalogCountryDetailPage({ params }: CountryDetail
         );
       })}
 
-      <CreateCountryLinkForm countryId={country.id} products={linkableProducts} />
+      <div id="lier-produit"><CreateCountryLinkForm countryId={country.id} products={linkableProducts} /></div>
     </PageStack>
   );
 }

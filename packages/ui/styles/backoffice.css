@@ -61,7 +61,7 @@
 
   /* Lead wavelength: hue per app, lightness and chroma per mode */
   --bo-hue: 215;
-  --bo-accent-l: 0.5;
+  --bo-accent-l: 0.48;
   --bo-accent-c: 0.12;
   --bo-accent: oklch(var(--bo-accent-l) var(--bo-accent-c) var(--bo-hue));
   --bo-accent-hover: oklch(calc(var(--bo-accent-l) - 0.07) var(--bo-accent-c) var(--bo-hue));
@@ -301,6 +301,17 @@ samp {
   outline-offset: 2px;
 }
 
+/* An anchored field (error summary link, #id) must not hide under the sticky topbar + rule. */
+[id] {
+  scroll-margin-top: var(--bo-s4);
+}
+
+@media (max-width: 900px) {
+  [id] {
+    scroll-margin-top: calc(var(--bo-topbar) + 22px + var(--bo-s3));
+  }
+}
+
 /* ---------- Shell ---------- */
 
 .bo-shell {
@@ -326,6 +337,57 @@ samp {
 .bo-sidebar a {
   color: inherit;
   text-decoration: none;
+}
+
+/* Keyboard skip link: out of sight until it takes the focus, then it names the way to the content. */
+.bo-skip-link {
+  position: fixed;
+  top: var(--bo-s2);
+  left: var(--bo-s2);
+  z-index: 100;
+  display: inline-flex;
+  align-items: center;
+  min-height: 40px;
+  padding: 0 var(--bo-s4);
+  border: 1px solid var(--bo-line-strong);
+  border-radius: var(--bo-r-control);
+  background: var(--bo-surface);
+  color: var(--bo-ink);
+  font-size: var(--bo-fs);
+  font-weight: 600;
+  text-decoration: none;
+  transform: translateY(-200%);
+}
+
+.bo-skip-link:focus,
+.bo-skip-link:focus-visible {
+  transform: none;
+  color: var(--bo-ink);
+  text-decoration: none;
+}
+
+/* Close control of the drawer: only drawn where the sidebar is a drawer (under 900px). */
+.bo-sidebar__close {
+  position: absolute;
+  top: var(--bo-s2);
+  right: var(--bo-s2);
+  z-index: 1;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border: 1px solid var(--bo-line-strong);
+  border-radius: var(--bo-r-control);
+  background: transparent;
+  color: var(--bo-ink-2);
+  cursor: pointer;
+}
+
+.bo-sidebar__close:hover {
+  background: var(--bo-hover);
+  color: var(--bo-ink);
 }
 
 .bo-sidebar__brand {
@@ -467,20 +529,23 @@ samp {
   background: var(--bo-ink-3);
 }
 
-.bo-nav__link[aria-current="page"] {
+.bo-nav__link[aria-current="page"],
+.bo-nav__link[aria-current="true"] {
   background: var(--bo-surface);
   color: var(--bo-ink);
   font-weight: 600;
 }
 
-.bo-nav__link[aria-current="page"]::before {
+.bo-nav__link[aria-current="page"]::before,
+.bo-nav__link[aria-current="true"]::before {
   transform: scaleX(1);
   height: 2px;
   margin-top: -0.5px;
   background: var(--bo-accent);
 }
 
-.bo-nav__link[aria-current="page"] svg {
+.bo-nav__link[aria-current="page"] svg,
+.bo-nav__link[aria-current="true"] svg {
   color: var(--bo-accent);
 }
 
@@ -629,8 +694,8 @@ samp {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 36px;
-  height: 36px;
+  width: 44px;
+  height: 44px;
   padding: 0;
   border: 1px solid var(--bo-line-strong);
   border-radius: var(--bo-r-control);
@@ -783,7 +848,7 @@ samp {
   align-items: center;
   gap: var(--bo-s2);
   width: 100%;
-  min-height: 36px;
+  min-height: 40px;
   padding: var(--bo-s1) var(--bo-s2);
   border: 0;
   border-radius: var(--bo-r-control);
@@ -804,6 +869,16 @@ samp {
   max-width: 1440px;
   margin: 0 auto;
   padding: var(--bo-s6) var(--bo-s6) 72px;
+}
+
+/* Target of the skip link: it takes the focus but is not a control, so its ring sits inside the box
+   and the sticky ruler never hides what it lands on. */
+.bo-content:focus-visible {
+  outline-offset: -2px;
+}
+
+.bo-content {
+  scroll-margin-top: 22px;
 }
 
 .bo-scrim {
@@ -1431,6 +1506,16 @@ samp {
   font-weight: 600;
 }
 
+/* Tokens and one-time codes: selectable in one gesture, never overflowing the plate. */
+.bo-notice code,
+.bo-token {
+  overflow-wrap: anywhere;
+}
+
+.bo-token {
+  user-select: all;
+}
+
 .bo-notice[data-tone="info"] {
   border-color: var(--bo-line-strong);
 }
@@ -1494,7 +1579,34 @@ samp {
 }
 
 .bo-empty__action {
-  margin-top: var(--bo-s1);
+  margin-top: var(--bo-s3);
+}
+
+/* Tone is a line and an icon colour, never a fill. */
+.bo-empty[data-tone="info"] {
+  border-color: var(--bo-accent-line);
+}
+
+.bo-empty[data-tone="info"] .bo-empty__icon {
+  color: var(--bo-accent);
+}
+
+.bo-empty[data-tone="danger"] {
+  border-color: var(--bo-danger);
+}
+
+.bo-empty[data-tone="danger"] .bo-empty__icon {
+  color: var(--bo-danger);
+}
+
+.bo-empty[data-compact="true"] {
+  padding: var(--bo-s4) var(--bo-s4);
+}
+
+/* Inside a table cell the table already draws the frame. */
+.bo-table__empty .bo-empty {
+  border: 0;
+  background: transparent;
 }
 
 /* ---------- Button: the primary action is a solid bone plate ---------- */
@@ -1504,7 +1616,7 @@ samp {
   align-items: center;
   justify-content: center;
   gap: var(--bo-s2);
-  min-height: 36px;
+  min-height: 40px;
   padding: 0 16px;
   border: 1px solid var(--bo-ink);
   border-radius: var(--bo-r-control);
@@ -1568,8 +1680,13 @@ samp {
   color: oklch(1 0 0);
 }
 
+.bo-button:focus-visible {
+  outline: 2px solid var(--bo-accent);
+  outline-offset: 2px;
+}
+
 .bo-button[data-size="sm"] {
-  min-height: 30px;
+  min-height: 34px;
   padding: 0 var(--bo-s3);
 }
 
@@ -1580,8 +1697,19 @@ samp {
 .bo-button:disabled,
 .bo-button[aria-disabled="true"] {
   cursor: not-allowed;
-  opacity: 0.45;
+  opacity: 0.55;
   pointer-events: none;
+}
+
+/* A disabled button that explains itself keeps pointer events so its title stays reachable. */
+.bo-button[data-reason="true"]:disabled,
+.bo-button[data-reason="true"][aria-disabled="true"] {
+  pointer-events: auto;
+}
+
+.bo-button:disabled:hover,
+.bo-button[aria-disabled="true"]:hover {
+  text-decoration: none;
 }
 
 .bo-button[data-pending="true"] {
@@ -1611,6 +1739,35 @@ samp {
   overflow-x: auto;
   border: 1px solid var(--bo-line);
   border-radius: var(--bo-r-panel);
+  background-color: var(--bo-surface);
+  /* Overflow cue without a shadow in the flow: a thin edge line shows on a side only while content
+     hides past it. The local layers (surface colour) cover the scroll layers once that edge is
+     reached, so the line disappears at the end of the scroll. */
+  background-image:
+    linear-gradient(to right, var(--bo-surface), var(--bo-surface)),
+    linear-gradient(to left, var(--bo-surface), var(--bo-surface)),
+    linear-gradient(to right, var(--bo-line-strong), var(--bo-line-strong)),
+    linear-gradient(to left, var(--bo-line-strong), var(--bo-line-strong));
+  background-position: left center, right center, left center, right center;
+  background-size: 12px 100%, 12px 100%, 2px 100%, 2px 100%;
+  background-repeat: no-repeat;
+  background-attachment: local, local, scroll, scroll;
+}
+
+/* The frame is a keyboard-scrollable region when it has a name (role="region" tabindex="0"). */
+.bo-table-wrap:focus-visible {
+  outline: 2px solid var(--bo-accent);
+  outline-offset: -2px;
+}
+
+/* With a max-height the frame scrolls vertically and the header row stays pinned inside it. */
+.bo-table-wrap[data-scroll-y="true"] {
+  overflow-y: auto;
+}
+
+.bo-table-wrap[data-scroll-y="true"] .bo-table__footer {
+  position: sticky;
+  bottom: 0;
   background: var(--bo-surface);
 }
 
@@ -1662,8 +1819,78 @@ samp {
   transition: background-color 0.1s var(--bo-ease);
 }
 
-.bo-table tbody tr:hover {
+.bo-table tbody tr:hover,
+.bo-table tbody tr:focus-within {
   background: var(--bo-hover);
+}
+
+/* Row header: the record's name, read as the row's label (not a column heading). */
+.bo-table tbody th[scope="row"] {
+  position: static;
+  padding: 12px var(--bo-s4);
+  border-bottom: 1px solid var(--bo-line);
+  background: transparent;
+  color: var(--bo-ink);
+  font-size: var(--bo-fs);
+  font-stretch: inherit;
+  font-weight: 500;
+  letter-spacing: normal;
+  text-transform: none;
+  vertical-align: middle;
+}
+
+.bo-table tbody tr:last-child th[scope="row"] {
+  border-bottom: 0;
+}
+
+.bo-table--dense tbody th[scope="row"] {
+  padding: var(--bo-s2) var(--bo-s3);
+}
+
+/* A linked row: the first cell's link stretches over the whole row (>= 40px target), the way the
+   attention list does it. Other links, buttons and disclosures in the row stay above the overlay. */
+.bo-table tbody tr[data-linked="true"] {
+  position: relative;
+}
+
+.bo-table__rowlink::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+}
+
+.bo-table tbody tr[data-linked="true"]:has(.bo-table__rowlink:focus-visible) {
+  outline: 2px solid var(--bo-accent);
+  outline-offset: -2px;
+}
+
+.bo-table__rowlink:focus-visible {
+  outline: none;
+}
+
+.bo-table tbody tr[data-linked="true"] td:not(:first-child) a,
+.bo-table tbody tr[data-linked="true"] td:not(:first-child) button,
+.bo-table tbody tr[data-linked="true"] td:not(:first-child) summary,
+.bo-table tbody tr[data-linked="true"] td:not(:first-child) details,
+.bo-table tbody tr[data-linked="true"] td:not(:first-child) input,
+.bo-table tbody tr[data-linked="true"] td:not(:first-child) select,
+.bo-table tbody tr[data-linked="true"] td:not(:first-child) textarea {
+  position: relative;
+  z-index: 1;
+}
+
+/* Skeleton rows while loading. */
+.bo-table__skeleton-row:hover {
+  background: transparent;
+}
+
+.bo-table__skeleton-row .bo-skeleton__line {
+  display: block;
+  height: 14px;
+}
+
+.bo-table__skeleton-row td:first-child .bo-skeleton__line {
+  width: 70%;
 }
 
 .bo-table th[data-align="right"],
@@ -1701,10 +1928,19 @@ samp {
   background: var(--bo-surface-2);
 }
 
+.bo-table--sticky-first tbody th[scope="row"]:first-child {
+  position: sticky;
+  z-index: 2;
+  background: var(--bo-surface);
+}
+
 .bo-table__sort {
   display: inline-flex;
   align-items: center;
   gap: var(--bo-s1);
+  /* 40px tall target inside a 40px header: the negative margin cancels the header's padding. */
+  min-height: 40px;
+  margin-block: -10px;
   padding: 0;
   border: 0;
   background: transparent;
@@ -1770,6 +2006,13 @@ samp {
   gap: var(--bo-s2);
 }
 
+/* Previous / next are icon links: keep them a comfortable 40px target. */
+.bo-pagination .bo-button[data-size] {
+  min-width: 40px;
+  min-height: 40px;
+  justify-content: center;
+}
+
 /* Identifiers and references read as data: mono, never wrapped mid-token. */
 .bo-ref {
   font-family: var(--bo-mono);
@@ -1795,6 +2038,22 @@ samp {
   flex-wrap: wrap;
   align-items: center;
   gap: var(--bo-s2);
+}
+
+.bo-filters__actions .bo-button[data-size] {
+  min-height: 40px;
+}
+
+/* On a phone the filters stack in one column, full width, with the actions at the bottom. */
+@media (max-width: 560px) {
+  .bo-filters {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .bo-filters__actions .bo-button[data-size] {
+    flex: 1 1 auto;
+    justify-content: center;
+  }
 }
 
 .bo-filters__count {
@@ -1885,15 +2144,66 @@ samp {
 }
 
 .bo-field__error {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--bo-s1);
   margin: 0;
   color: var(--bo-danger);
   font-size: var(--bo-fs);
   font-weight: 600;
 }
 
+.bo-field__error .bo-icon {
+  flex: none;
+  margin-top: 2px;
+}
+
+.bo-error-summary {
+  display: grid;
+  gap: var(--bo-s2);
+  padding: var(--bo-s3) var(--bo-s4);
+  border: 1px solid var(--bo-line-strong);
+  border-radius: var(--bo-r-panel);
+  background: var(--bo-surface-2);
+  color: var(--bo-ink);
+  font-size: var(--bo-fs);
+  scroll-margin-top: calc(var(--bo-topbar) + 22px + var(--bo-s3));
+}
+
+.bo-error-summary:focus-visible {
+  outline: 2px solid var(--bo-accent);
+  outline-offset: 2px;
+}
+
+.bo-error-summary__title {
+  display: flex;
+  align-items: center;
+  gap: var(--bo-s2);
+  margin: 0;
+  font-weight: 600;
+}
+
+.bo-error-summary__title .bo-icon {
+  flex: none;
+  color: var(--bo-danger);
+}
+
+.bo-error-summary__list {
+  display: grid;
+  gap: var(--bo-s1);
+  margin: 0;
+  padding-left: var(--bo-s5);
+}
+
+.bo-error-summary__list a {
+  display: inline-block;
+  min-height: 24px;
+  text-decoration: underline;
+}
+
 .bo-field__control {
   width: 100%;
-  min-height: 38px;
+  min-height: 40px;
   padding: 0 var(--bo-s3);
   border: 1px solid var(--bo-control-line);
   border-radius: var(--bo-r-control);
@@ -1904,8 +2214,10 @@ samp {
 }
 
 .bo-field__control::placeholder {
-  color: var(--bo-ink-3);
-  opacity: 0.8;
+  /* Visibly an example, never a typed value: paler than the ink of a value, italic, still >= 3:1 on --bo-inset. */
+  color: color-mix(in oklch, var(--bo-ink-3) 80%, var(--bo-inset));
+  font-style: italic;
+  opacity: 1;
 }
 
 .bo-field__control:hover:not(:disabled) {
@@ -1930,6 +2242,8 @@ samp {
   background: var(--bo-surface-2);
   color: var(--bo-ink-3);
   cursor: not-allowed;
+  -webkit-text-fill-color: var(--bo-ink-3);
+  opacity: 1;
 }
 
 textarea.bo-field__control {
@@ -1952,7 +2266,25 @@ select.bo-field__control {
   display: flex;
   align-items: flex-start;
   gap: 10px;
+  min-height: 40px;
+  padding-block: 8px;
   font-size: var(--bo-fs-body);
+  cursor: pointer;
+}
+
+.bo-check:has(input:disabled) {
+  cursor: not-allowed;
+  color: var(--bo-ink-3);
+}
+
+.bo-check input:focus-visible {
+  outline: 2px solid var(--bo-accent);
+  outline-offset: 2px;
+}
+
+.bo-check:has(input:focus-visible) .bo-check__text > span:first-child {
+  text-decoration: underline;
+  text-underline-offset: 3px;
 }
 
 .bo-check input {
@@ -1960,6 +2292,7 @@ select.bo-field__control {
   width: 18px;
   height: 18px;
   margin: 2px 0 0;
+  cursor: inherit;
   accent-color: var(--bo-accent);
 }
 
@@ -2021,11 +2354,26 @@ select.bo-field__control {
   opacity: 0.5;
 }
 
+.bo-switch:focus-visible {
+  outline: 2px solid var(--bo-accent);
+  outline-offset: 2px;
+}
+
 .bo-switch-row {
   display: flex;
   align-items: center;
   gap: var(--bo-s3);
+  min-height: 40px;
   font-size: var(--bo-fs-body);
+}
+
+.bo-switch-row__label {
+  cursor: pointer;
+}
+
+.bo-switch-row[data-disabled="true"] .bo-switch-row__label {
+  color: var(--bo-ink-3);
+  cursor: not-allowed;
 }
 
 .bo-input-group {
@@ -2120,12 +2468,34 @@ select.bo-field__control {
   display: inline-flex;
   align-items: center;
   gap: var(--bo-s2);
+  min-height: 40px;
   margin-bottom: -1px;
   padding: var(--bo-s2) 2px var(--bo-s3);
   border-bottom: 2px solid transparent;
   color: var(--bo-ink-3);
   font-size: var(--bo-fs);
   font-weight: 500;
+  white-space: nowrap;
+}
+
+.bo-tabs__link:focus-visible {
+  outline-offset: -2px;
+}
+
+/* A phone keeps one row of tabs that scrolls sideways; a fade on the right edge shows there is more. */
+@media (max-width: 760px) {
+  .bo-tabs {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    padding-inline-end: var(--bo-s5);
+    scrollbar-width: thin;
+    -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 24px), transparent);
+    mask-image: linear-gradient(to right, #000 calc(100% - 24px), transparent);
+  }
+
+  .bo-tabs__link {
+    flex: 0 0 auto;
+  }
 }
 
 .bo-tabs__link:hover {
@@ -2191,6 +2561,34 @@ select.bo-field__control {
   animation: bo-pulse 1.4s ease-in-out infinite;
 }
 
+.bo-skeleton__line:last-child {
+  width: 72%;
+}
+
+.bo-skeleton[data-variant="table"] {
+  gap: 0;
+}
+
+.bo-skeleton__row {
+  display: grid;
+  grid-template-columns: 2fr 1fr 1fr;
+  align-items: center;
+  gap: var(--bo-s4);
+  padding: var(--bo-s3) 0;
+  border-bottom: 1px solid var(--bo-line);
+}
+
+.bo-skeleton__row .bo-skeleton__line:last-child {
+  width: auto;
+}
+
+.bo-skeleton[data-variant="card"] {
+  padding: var(--bo-s4);
+  border: 1px solid var(--bo-line);
+  border-radius: var(--bo-r-panel);
+  background: var(--bo-surface);
+}
+
 @keyframes bo-pulse {
   0%,
   100% {
@@ -2203,9 +2601,25 @@ select.bo-field__control {
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .bo-skeleton__line {
+    animation: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
   .bo-skeleton__line,
   .bo-button[data-pending="true"]::before {
     animation: none;
+  }
+
+  html {
+    scroll-behavior: auto;
+  }
+
+  /* Static partial circle instead of a spinning one. */
+  .bo-button[data-pending="true"]::before,
+  .bo-button:active {
+    transform: none;
   }
 
   .bo-nav__link,
@@ -2285,7 +2699,7 @@ select.bo-field__control {
   display: flex;
   align-items: center;
   gap: var(--bo-s2);
-  min-height: 34px;
+  min-height: 40px;
   padding: 0 var(--bo-s2);
   border: 1px solid transparent;
   border-radius: var(--bo-r-control);
@@ -2300,6 +2714,7 @@ select.bo-field__control {
   background: var(--bo-hover);
 }
 
+.bo-theme-option[aria-checked="true"],
 .bo-theme-option[aria-pressed="true"] {
   border-color: var(--bo-accent);
   font-weight: 600;
@@ -2378,6 +2793,42 @@ select.bo-field__control {
   color: var(--bo-ink-2);
   font-weight: 600;
   cursor: pointer;
+}
+
+/* ---------- Lead assignments table (admin /lead-assignments) ---------- */
+/* Status badge never breaks; the action cell stacks the reassign form and its message, wrapped, never clipped. */
+
+.lead-assignments-table .bo-badge {
+  white-space: nowrap;
+}
+
+.lead-assignments-table td {
+  vertical-align: top;
+}
+
+.lead-assignments-table td:last-child {
+  width: 22rem;
+  max-width: 22rem;
+  text-align: left;
+}
+
+.lead-assignments-table .bo-table__actions {
+  display: block;
+}
+
+.lead-assignments-reassign {
+  min-width: 0;
+}
+
+.lead-assignments-reassign[open] > summary {
+  margin-bottom: var(--bo-s3);
+}
+
+.lead-assignments-reassign .bo-form,
+.lead-assignments-reassign .bo-notice {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  white-space: normal;
 }
 
 /* ---------- Responsive ---------- */
@@ -2460,9 +2911,61 @@ select.bo-field__control {
     min-height: 40px;
   }
 
+  .bo-nav__sublink {
+    min-height: 40px;
+  }
+
+  .bo-sidebar {
+    height: 100dvh;
+    overscroll-behavior: contain;
+  }
+
+  .bo-sidebar__nav {
+    overscroll-behavior: contain;
+  }
+
+  .bo-sidebar__close {
+    display: inline-flex;
+  }
+
+  /* The close control sits where the brand row ends: keep the logo and the badge clear of it. */
+  .bo-sidebar__brand {
+    padding-right: 60px;
+  }
+
+  .bo-content {
+    scroll-margin-top: calc(var(--bo-topbar) + 22px);
+  }
+
   :root {
     --bo-fs-title: 30px;
     --bo-fs-stat: 34px;
+  }
+}
+
+/* The drawer slides, the menus fade in nowhere: reduced motion makes both instant. */
+@media (prefers-reduced-motion: reduce) {
+  .bo-sidebar,
+  .bo-shell[data-nav-open="true"] .bo-sidebar,
+  .bo-scrim,
+  .bo-menu,
+  .bo-skip-link,
+  .bo-nav__sublink,
+  .bo-user-menu__button,
+  .bo-theme-option {
+    transition: none;
+    animation: none;
+  }
+}
+
+/* Narrow phones: the sign-in panel keeps its breathing room without squeezing the form. */
+@media (max-width: 480px) {
+  .bo-auth {
+    padding: var(--bo-s3);
+  }
+
+  .bo-auth__panel {
+    padding: var(--bo-s4);
   }
 }
 
@@ -2495,8 +2998,14 @@ select.bo-field__control {
     grid-row: 2;
   }
 
+  /* The label is hidden but the link stays: its ::after still makes the whole row tappable. */
   .bo-attention__go {
-    display: none;
+    position: static;
+    grid-area: 1 / 1;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    opacity: 0;
   }
 
   .bo-page-header {
@@ -2506,6 +3015,14 @@ select.bo-field__control {
   .bo-table th,
   .bo-table td {
     white-space: nowrap;
+  }
+
+  /* The first column carries the record's name: let it wrap so it stays readable beside the scroll. */
+  .bo-table tbody td:first-child:not(.bo-table__empty),
+  .bo-table tbody th[scope="row"] {
+    min-width: 9rem;
+    max-width: 60vw;
+    white-space: normal;
   }
 
   .bo-field__control,
@@ -2518,7 +3035,16 @@ select.bo-field__control {
   }
 
   .bo-button[data-size="sm"] {
-    min-height: 36px;
+    min-height: 40px;
+  }
+
+  .bo-form__actions[data-sticky="true"] {
+    position: sticky;
+    bottom: 0;
+    z-index: 5;
+    margin-inline: calc(var(--bo-s4) * -1);
+    padding: var(--bo-s3) var(--bo-s4);
+    background: var(--bo-ground);
   }
 }
 
@@ -2536,7 +3062,8 @@ select.bo-field__control {
 .bo-card__body > .bo-table-wrap {
   border: 0;
   border-radius: 0;
-  background: transparent;
+  /* Colour only: the table frame keeps its overflow cue (background-image). */
+  background-color: transparent;
 }
 
 .bo-card__body > .bo-filters {

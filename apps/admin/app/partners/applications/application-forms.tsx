@@ -21,7 +21,7 @@ const initialState: PartnerActionState = { status: "idle" };
 function ReasonField({ id }: { id: string }) {
   return (
     <Field id={id} label="Motif (audité)" required hint="Au moins 8 caractères, conservé dans le journal d'audit.">
-      <Input {...fieldControlProps(id, { required: true, hint: "x" })} name="reason" minLength={8} />
+      <Input {...fieldControlProps(id, { required: true, hint: "x" })} name="reason" minLength={8} autoComplete="off" />
     </Field>
   );
 }
@@ -42,7 +42,7 @@ export function ReviewApplicationForm({ applicationId }: { applicationId: string
 }
 
 /** Compliance only. On success the server action opens the new partner page. */
-export function ConvertApplicationForm({ applicationId }: { applicationId: string }) {
+export function ConvertApplicationForm({ applicationId, applicantName, primary = true }: { applicationId: string; applicantName?: string; primary?: boolean }) {
   const [state, formAction] = useActionState(convertApplicationAction, initialState);
   const base = useId();
   return (
@@ -50,8 +50,8 @@ export function ConvertApplicationForm({ applicationId }: { applicationId: strin
       <PartnerActionResult state={state} />
       <ConfirmDialog
         triggerLabel="Convertir en courtier"
-        triggerVariant="primary"
-        title="Convertir la candidature"
+        triggerVariant={primary ? "primary" : "secondary"}
+        title={applicantName ? `Convertir la candidature de ${applicantName}` : "Convertir la candidature"}
         description="Crée un courtier Prospect et une licence brouillon à partir de la candidature. Aucune activation : la fiche doit ensuite être complétée et vérifiée. Décision définitive."
         confirmLabel="Convertir"
         cancelLabel="Annuler"
@@ -69,7 +69,7 @@ export function ConvertApplicationForm({ applicationId }: { applicationId: strin
 const reasonChoices = REJECTION_REASON_OPTIONS.map((code) => ({ value: code, label: REJECTION_REASON_LABELS[code] ?? code }));
 
 /** Compliance only. The candidate receives a neutral e-mail, never the internal note. */
-export function RejectApplicationForm({ applicationId }: { applicationId: string }) {
+export function RejectApplicationForm({ applicationId, applicantName }: { applicationId: string; applicantName?: string }) {
   const [state, formAction] = useActionState(rejectApplicationAction, initialState);
   const base = useId();
   return (
@@ -78,7 +78,7 @@ export function RejectApplicationForm({ applicationId }: { applicationId: string
       <ConfirmDialog
         triggerLabel="Refuser la candidature"
         triggerVariant="danger"
-        title="Refuser la candidature"
+        title={applicantName ? `Refuser la candidature de ${applicantName}` : "Refuser la candidature"}
         description="Décision définitive. Le candidat reçoit un e-mail neutre avec sa référence, sans la note interne."
         confirmLabel="Refuser"
         cancelLabel="Annuler"

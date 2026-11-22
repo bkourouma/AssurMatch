@@ -77,7 +77,8 @@
       "sponsoredSentence": "Les pays, produits et offres visibles dépendent des activations publiques. Une offre sponsorisée est toujours signalée.",
       "allGuides": "Tous les guides",
       "rights": "Tous droits réservés.",
-      "backToTop": "Retour en haut"
+      "backToTop": "Retour en haut",
+      "navLabel": "Liens du pied de page"
     }
   },
   "Common": {
@@ -278,7 +279,8 @@
       "title": "Aucun pays public actif",
       "description": "Aucun pays n'est publiquement activé pour le moment."
     },
-    "fineprint": "Une ouverture de pays dépend de la présence de courtiers partenaires autorisés et d'offres validées."
+    "fineprint": "Une ouverture de pays dépend de la présence de courtiers partenaires autorisés et d'offres validées.",
+    "retry": "Réessayer"
   },
   "Country": {
     "kicker": "Fiche pays",
@@ -324,7 +326,8 @@
     "contactLead": "Un courtier partenaire autorisé pour ce pays peut reprendre votre demande.",
     "whatsapp": "Écrire sur WhatsApp",
     "call": "Appeler {phone}",
-    "fineprint": "Offre indicative, prix indicatif à confirmer par le courtier partenaire. Aucune offre expirée ou non validée n'est affichée comme disponible."
+    "fineprint": "Offre indicative, prix indicatif à confirmer par le courtier partenaire. Aucune offre expirée ou non validée n'est affichée comme disponible.",
+    "retry": "Réessayer"
   },
   "Waitlist": {
     "title": "Liste d'attente — {country}",
@@ -448,7 +451,10 @@
     },
     "empty": {
       "title": "Aucune offre indicative pour ces critères",
-      "description": "Modifiez vos filtres ou élargissez votre recherche. Une offre sponsorisée est affichée uniquement avec sa mention."
+      "description": "Modifiez vos filtres ou élargissez votre recherche. Une offre sponsorisée est affichée uniquement avec sa mention.",
+      "guarantee": "Aucune offre n'inclut cette garantie pour le moment.",
+      "otherProduct": "Choisir un autre produit",
+      "noFilters": "Aucune offre indicative n'est publiée pour ce produit pour le moment. Choisissez un autre produit ou revenez plus tard."
     },
     "fineprint": "Le score est indicatif, calculé selon vos critères par rapport aux offres affichées. Une offre sponsorisée est toujours signalée. Aucune offre expirée ou non validée n'est affichée.",
     "priceHint": "Ce montant est indicatif : le prix exact dépend des informations que vous donnerez au courtier partenaire.",
@@ -472,7 +478,8 @@
     },
     "compareBarMax": "4 offres sélectionnées (maximum atteint).",
     "selectionAssist": "1 offre sélectionnée. Sélectionnez au moins une autre offre indicative (2 à 4 au total) pour lancer la comparaison.",
-    "maxReachedHint": "Maximum de 4 offres atteint. Retirez une offre de la sélection pour en ajouter une autre."
+    "maxReachedHint": "Maximum de 4 offres atteint. Retirez une offre de la sélection pour en ajouter une autre.",
+    "retry": "Réessayer"
   },
   "Compare": {
     "kicker": "Comparaison indicative",
@@ -538,7 +545,8 @@
     "quotePickHint": "Cochez jusqu'à 3 offres. Chaque courtier concerné sera nommé avant votre accord, que vous ne donnez qu'à l'étape de consentement.",
     "quotePickOption": "Inclure {name} dans ma demande",
     "quotePickSubmit": "Continuer vers la demande de devis",
-    "quotePickLimit": "3 offres au maximum par demande."
+    "quotePickLimit": "3 offres au maximum par demande.",
+    "backToOffers": "Retour à la liste des offres"
   },
   "OfferDetail": {
     "kicker": "Offre indicative",
@@ -692,7 +700,8 @@
     "backToOffers": "Retour aux offres",
     "blocked": {
       "title": "Demande de devis indisponible",
-      "description": "La demande de devis n'est pas disponible pour ce pays ou ce produit."
+      "description": "La demande de devis n'est pas disponible pour ce pays ou ce produit.",
+      "back": "Retour au produit"
     },
     "languageUnavailable": {
       "title": "Formulaire indisponible en français",
@@ -704,7 +713,9 @@
       }
     },
     "fineprint": "AssurMatch ne vend pas d'assurance et n'émet ni contrat ni attestation. Le courtier partenaire responsable confirme le devis et les conditions.",
-    "commitmentLink": "Nos engagements sur vos données"
+    "commitmentLink": "Nos engagements sur vos données",
+    "copyReference": "Copier la référence",
+    "referenceCopied": "Référence copiée"
   },
   "QuoteRequest": {
     "referenceLabel": "Référence publique",
@@ -780,6 +791,10 @@
       "closed": {
         "headline": "Demande clôturée",
         "body": "Le traitement de cette demande est terminé. Vous pouvez déposer une nouvelle demande à tout moment."
+      },
+      "consent_withdrawn": {
+        "headline": "Consentement retiré : demande clôturée",
+        "body": "Vous avez retiré votre consentement. Cette demande n'est plus transmise et ne sera plus traitée. Vous pouvez déposer une nouvelle demande à tout moment."
       },
       "not_transmitted": {
         "headline": "Demande non transmise",
@@ -889,8 +904,10 @@
       }
     },
     "access": {
-      "title": "Ce lien de suivi ne permet pas d'afficher une demande",
-      "body": "Le lien est peut-être incomplet ou n'est plus valable. Vous pouvez recevoir un nouveau lien à l'adresse e-mail utilisée pour votre demande.",
+      "title": "Ce lien n'est plus valable",
+      "rateLimitedTitle": "Trop de tentatives",
+      "unavailableTitle": "Service momentanément indisponible",
+      "body": "Utilisez le lien du dernier e-mail reçu de notre part pour suivre votre demande.",
       "cta": "Recevoir un nouveau lien",
       "rateLimited": "Trop de consultations en peu de temps. Réessayez dans quelques minutes.",
       "unavailable": "Le suivi est temporairement indisponible. Réessayez dans quelques minutes."
@@ -1069,6 +1086,11 @@
         "error": "Votre demande n'a pas pu être enregistrée. Réessayez dans quelques instants."
       },
       "typeRequired": "Choisissez le type de demande."
+    },
+    "refresh": {
+      "action": "Actualiser le statut",
+      "pending": "Actualisation en cours.",
+      "done": "Statut actualisé à {time}."
     }
   },
   "VisitorAi": {
@@ -1322,7 +1344,11 @@
     "disclaimerTitle": "Ce que ce guide ne remplace pas",
     "disclaimerBody": "Ce guide explique un principe général, pas votre situation personnelle. Il ne remplace pas l'analyse d'un courtier partenaire autorisé sur votre dossier, ni un avis juridique sur votre contrat. Pour une réponse qui vous engage, comparez les offres puis demandez un devis : un courtier autorisé confirmera ce qui s'applique à votre cas.",
     "productAuto": "Auto",
-    "productVoyage": "Voyage"
+    "productVoyage": "Voyage",
+    "empty": {
+      "title": "Aucun guide publié pour le moment",
+      "description": "Les guides pratiques seront affichés ici dès leur publication. En attendant, la page « Comment ça marche » explique le parcours."
+    }
   },
   "Glossary": {
     "title": "Lexique",
@@ -1333,7 +1359,11 @@
     "indexLabel": "Index alphabétique",
     "termCount": "{count, plural, one {# terme expliqué} other {# termes expliqués}}",
     "selectorLead": "Choisissez un pays et un produit pour afficher les offres indicatives correspondantes.",
-    "seeAlso": "Voir aussi"
+    "seeAlso": "Voir aussi",
+    "empty": {
+      "title": "Le lexique est vide pour le moment",
+      "description": "Les termes d'assurance seront affichés ici dès leur publication."
+    }
   },
   "Faq": {
     "title": "FAQ",
@@ -1343,7 +1373,8 @@
     "lead": "Les réponses aux questions les plus fréquentes sur AssurMatch.",
     "questionCount": "{count, plural, one {# question} other {# questions}}",
     "selectorLead": "Choisissez un pays et un produit pour afficher les offres indicatives correspondantes.",
-    "relatedProduct": "Produit concerné"
+    "relatedProduct": "Produit concerné",
+    "themesLabel": "Thèmes de la FAQ"
   },
   "Contact": {
     "title": "Contact",
@@ -1573,7 +1604,8 @@
     },
     "noCountries": {
       "title": "Candidature momentanément indisponible",
-      "description": "Aucun pays n'accepte de nouvelle candidature de courtier pour le moment."
+      "description": "Aucun pays n'accepte de nouvelle candidature de courtier pour le moment.",
+      "action": "Contacter AssurMatch"
     }
   },
   "BrokerLogin": {

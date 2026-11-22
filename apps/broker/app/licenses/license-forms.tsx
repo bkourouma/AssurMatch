@@ -4,7 +4,7 @@ import { useActionState, useId, useState } from "react";
 import { useRouter } from "next/navigation";
 import { renewLicenseAction, type SelfServiceActionState } from "../lib/self-service-actions";
 import { PROOF_ACCEPT, PROOF_MAX_BYTES, UPLOAD_CSRF_HEADER } from "../lib/self-service-messages";
-import { Button, Field, Form, FormActions, Input, Notice, Select, fieldControlProps } from "../lib/ui/broker-ui";
+import { Button, Field, Form, FormActions, FormRow, Input, Notice, Select, fieldControlProps } from "../lib/ui/broker-ui";
 import styles from "../lib/ui/broker-screens.module.css";
 import { SelfServiceResult } from "../company/company-forms";
 
@@ -23,7 +23,6 @@ export function RenewLicenseForm({ licenseId, licenseNumber, products }: { licen
     <section className={`${styles.entry} ${styles.subsection}`} aria-label={`Déposer le renouvellement de ${licenseNumber}`}>
       <h3 className={styles.entryTitle}>{`Déposer le renouvellement de ${licenseNumber}`}</h3>
       <p className={styles.muted}>La nouvelle licence reste en brouillon jusqu&apos;au dépôt de la preuve, puis en revue jusqu&apos;à la décision de la conformité. L&apos;actuelle reste valide d&apos;ici là.</p>
-      <SelfServiceResult state={state} />
       <Form action={formAction} columns={2} data-license-form="renew">
         <input type="hidden" name="licenseId" value={licenseId} />
         <Field id={`${base}-number`} label="Numéro de la nouvelle licence" required>
@@ -35,15 +34,16 @@ export function RenewLicenseForm({ licenseId, licenseNumber, products }: { licen
         <Field id={`${base}-effective`} label="Date d'effet" required>
           <Input {...fieldControlProps(`${base}-effective`, { required: true })} name="effectiveDate" type="date" />
         </Field>
-        <Field id={`${base}-expiration`} label="Date d'expiration" required>
-          <Input {...fieldControlProps(`${base}-expiration`, { required: true })} name="expirationDate" type="date" />
+        <Field id={`${base}-expiration`} label="Date d'expiration" required hint="Future et postérieure à la date d'effet.">
+          <Input {...fieldControlProps(`${base}-expiration`, { required: true, hint: "x" })} name="expirationDate" type="date" />
         </Field>
-        <Field id={`${base}-products`} label="Produits couverts" hint="Aucune sélection : tous les produits du pays.">
+        <Field id={`${base}-products`} label="Produits couverts" hint="Aucune sélection : tous les produits du pays. Maintenez Ctrl (ou Cmd) pour en choisir plusieurs.">
           <Select {...fieldControlProps(`${base}-products`, { hint: "x" })} name="productIds" multiple options={products} />
         </Field>
         <Field id={`${base}-reason`} label="Commentaire (facultatif, audité)">
           <Input {...fieldControlProps(`${base}-reason`)} name="reason" maxLength={500} />
         </Field>
+        {state.status !== "idle" && state.message ? <FormRow full><SelfServiceResult state={state} /></FormRow> : null}
         <FormActions>
           <Button type="submit" variant="secondary" pending={pending} pendingLabel="Enregistrement...">Enregistrer le renouvellement</Button>
         </FormActions>

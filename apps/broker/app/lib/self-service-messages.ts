@@ -100,6 +100,19 @@ export const TEAM_INVITE_ROLE_OPTIONS = [
   { value: "broker_read_only", label: "Lecture seule" }
 ] as const;
 
+/** What each assignable role can do, in plain words (mirrors the role matrix of `broker-permissions.ts`). */
+export const TEAM_ROLE_DESCRIPTIONS: Record<string, string> = {
+  broker_manager: "Traite les leads (et le CRM selon le plan), gère les offres, la société et l'équipe.",
+  broker_agent: "Traite les leads et ses dossiers CRM assignés ; consulte les offres, la société et l'équipe sans les modifier.",
+  broker_read_only: "Consulte uniquement (leads, offres, société, équipe) : aucune modification possible."
+};
+
+/** Why a row of the team table offers no action (shown instead of an empty cell). */
+export const TEAM_ACTION_UNAVAILABLE_REASONS = {
+  self: "Votre propre accès : non modifiable par vous-même.",
+  owner: "Propriétaire : seul un propriétaire peut agir sur ce compte."
+} as const;
+
 export const TEAM_STATUS_LABELS: Record<string, string> = {
   invited: "Invité (activation en attente)",
   active: "Actif",
@@ -112,6 +125,13 @@ export const PROOF_MAX_BYTES = 5 * 1024 * 1024;
 export const PROOF_ACCEPT = "application/pdf,image/jpeg,image/png";
 export const UPLOAD_CSRF_HEADER = "x-assurmatch-upload";
 
+/**
+ * Same neutral wording as the API (`broker-team.service.ts`: "This e-mail address cannot be invited")
+ * for EVERY address that cannot be invited. It must never say that an account already exists: a
+ * manager could otherwise probe which addresses are registered with AssurMatch (enumeration).
+ */
+export const TEAM_INVITE_UNAVAILABLE_MESSAGE = "Cette adresse e-mail ne peut pas être invitée. Vérifiez-la ou utilisez une autre adresse.";
+
 export const SELF_SERVICE_ERROR_MESSAGES: Record<string, string> = {
   PARTNER_SUSPENDED: TENANT_SUSPENDED_MESSAGE,
   PARTNER_REQUEST_PENDING: "Une demande identique est déjà en attente de décision d'AssurMatch.",
@@ -121,7 +141,7 @@ export const SELF_SERVICE_ERROR_MESSAGES: Record<string, string> = {
   LICENSE_EXPIRED: "La date d'expiration du renouvellement doit être future.",
   DOCUMENT_INVALID: "Fichier refusé : PDF, JPEG ou PNG de 5 Mo au plus, au contenu conforme à son type.",
   DOCUMENT_STORAGE_NOT_CONFIGURED: "Dépôt indisponible : le stockage des documents n'est pas configuré. Contactez AssurMatch.",
-  EMAIL_ALREADY_USED: AUTH_MESSAGES.emailAlreadyUsed,
+  EMAIL_ALREADY_USED: TEAM_INVITE_UNAVAILABLE_MESSAGE,
   RBAC_DENIED: AUTH_MESSAGES.rbacDenied,
   PAYLOAD_TOO_LARGE: AUTH_MESSAGES.payloadTooLarge,
   TEAM_LAST_OWNER: "Le dernier propriétaire actif ne peut pas être désactivé.",
@@ -133,7 +153,7 @@ export function selfServiceErrorMessage(result: { status: number; code?: string 
   const message = result.code ? SELF_SERVICE_ERROR_MESSAGES[result.code] : undefined;
   if (message) return message;
   // Legacy API (before lot 5): a duplicate e-mail on a team invitation came back as a raw 400/409 text.
-  if ((result.status === 400 || result.status === 409) && result.message && /e-?mail.*(already|exist|unique|used|utilis)|unique constraint.*e-?mail|already.*e-?mail/i.test(result.message)) return AUTH_MESSAGES.emailAlreadyUsed;
+  if ((result.status === 400 || result.status === 409) && result.message && /e-?mail.*(already|exist|unique|used|utilis)|unique constraint.*e-?mail|already.*e-?mail/i.test(result.message)) return TEAM_INVITE_UNAVAILABLE_MESSAGE;
   if (result.status === 400) return "Données invalides : vérifiez les champs (e-mail, téléphone au format +225..., justification de 10 caractères au moins, motif de 8 caractères au moins).";
   if (result.status === 401 || result.code === "session_required") return "Session expirée : reconnectez-vous puis recommencez.";
   if (result.status === 403) return "Action refusée : seuls le propriétaire et les managers du courtier peuvent faire cette action.";
@@ -143,6 +163,28 @@ export function selfServiceErrorMessage(result: { status: number; code?: string 
   if (result.status === 422) return "Demande refusée : vérifiez les valeurs saisies.";
   if (result.status === 0) return "API indisponible : réessayez dans quelques instants.";
   return AUTH_MESSAGES.fallback;
+}
+
+/** Licences expiring within this many days are flagged (PRODUCT.md: licence expiry under 30 days). */
+export const LICENSE_EXPIRY_WARNING_DAYS = 30;
+
+/** Whole days from today (UTC) to a date; negative when the date is past; undefined when unreadable. */
+export function daysUntilDate(value?: string | null, now: Date = new Date()): number | undefined {
+  if (!value) return undefined;
+  const target = new Date(value.length === 10 ? `${value}T00:00:00.000Z` : value);
+  if (Number.isNaN(target.getTime())) return undefined;
+  const today = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
+  const day = Date.UTC(target.getUTCFullYear(), target.getUTCMonth(), target.getUTCDate());
+  return Math.round((day - today) / 86_400_000);
+}
+
+/** Expiry flag of a licence: undefined when nothing to flag (far expiry, or licence not in force). */
+export function licenseExpiryFlag(expirationDate: string | null | undefined, status: string, now: Date = new Date()): { tone: "warning" | "danger"; label: string } | undefined {
+  const days = daysUntilDate(expirationDate, now);
+  if (days === undefined) return undefined;
+  if (days < 0) return status === "valid" || status === "expired" ? { tone: "danger", label: "Expirée : à renouveler" } : undefined;
+  if (status !== "valid" || days > LICENSE_EXPIRY_WARNING_DAYS) return undefined;
+  return { tone: "warning", label: days === 0 ? "Expire aujourd'hui" : `Expire dans ${days} jour${days > 1 ? "s" : ""}` };
 }
 
 export function selfServiceFormatDate(value?: string | null): string {

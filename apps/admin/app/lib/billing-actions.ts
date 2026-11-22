@@ -46,7 +46,9 @@ export async function upsertBillingPlanAction(formData: FormData): Promise<void>
   const plan = stringValue(formData.get("plan"));
   const countryCode = stringValue(formData.get("countryCode")).trim().toUpperCase();
   const reason = stringValue(formData.get("reason")).trim();
-  if (!PLANS.has(plan) || countryCode.length !== 2 || reason.length < 3) redirect("/billing?billing=invalid");
+  if (!/^[A-Z]{2}$/.test(countryCode)) redirect("/billing?billing=invalid_country");
+  if (reason.length < 3) redirect("/billing?billing=invalid_reason");
+  if (!PLANS.has(plan)) redirect("/billing?billing=invalid");
   const status = await callBillingApi("/admin/billing/plans", "PUT", {
     plan,
     countryCode,
@@ -78,6 +80,7 @@ export async function grantLeadPackAction(formData: FormData): Promise<void> {
   const reason = stringValue(formData.get("reason")).trim();
   const invoiceId = stringValue(formData.get("invoiceId")).trim();
   const returnTab = stringValue(formData.get("returnTab")) === "comptes" ? `tab=comptes&partner=${encodeURIComponent(partnerId)}&` : "tab=packs&";
+  if (UUID.test(partnerId) && credits >= 1 && reason.length < 3) redirect(`/billing?${returnTab}billing=invalid_reason`);
   if (!UUID.test(partnerId) || credits < 1 || reason.length < 3 || (invoiceId && !UUID.test(invoiceId))) redirect(`/billing?${returnTab}billing=invalid`);
   const status = await callBillingApi("/admin/billing/packs", "POST", { partnerId, credits, reason, ...(invoiceId ? { invoiceId } : {}) });
   if (status === 401) redirect(loginRedirect("/billing", "session_expired"));
@@ -117,7 +120,8 @@ export async function recordInvoicePaymentAction(formData: FormData): Promise<vo
 export async function issueCreditNoteAction(formData: FormData): Promise<void> {
   const invoiceId = stringValue(formData.get("invoiceId")).trim();
   const reason = stringValue(formData.get("reason")).trim();
-  if (!UUID.test(invoiceId) || reason.length < 8) redirect("/billing?tab=factures&billing=invalid");
+  if (UUID.test(invoiceId) && reason.length < 8) redirect("/billing?tab=factures&billing=credit_note_reason");
+  if (!UUID.test(invoiceId)) redirect("/billing?tab=factures&billing=invalid");
   const status = await callBillingApi(`/admin/billing/issued-invoices/${invoiceId}/credit-note`, "POST", { reason });
   if (status === 401) redirect(loginRedirect("/billing?tab=factures", "session_expired"));
   redirect(`/billing?tab=factures&billing=${outcome(status, "credit_note_issued")}`);

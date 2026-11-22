@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useState } from "react";
+import { FormEvent, useEffect, useRef, useState } from "react";
 import { useLocale } from "next-intl";
 import { toLocale } from "../../../i18n/routing";
 import { track } from "../../lib/analytics";
@@ -80,6 +80,16 @@ export function WaitlistForm({ countryIso, labels, products = [], formAction }: 
    * reading the French site is answered in French whatever their `Accept-Language` says.
    */
   const locale = toLocale(useLocale());
+  const emailRef = useRef<HTMLInputElement>(null);
+  const consentRef = useRef<HTMLInputElement>(null);
+
+  // A failed check moves focus to the control it names, so a keyboard or screen-reader visitor lands
+  // on what to fix instead of searching the form for the message.
+  useEffect(() => {
+    if (state.status !== "error") return;
+    if (state.field === "email") emailRef.current?.focus();
+    else if (state.field === "consent") consentRef.current?.focus();
+  }, [state]);
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -90,7 +100,8 @@ export function WaitlistForm({ countryIso, labels, products = [], formAction }: 
     const consent = formData.get("consent") === "on";
     const website = String(formData.get("website") ?? "").trim();
 
-    if (!email) {
+    // Presence and shape only: the server stays the authority on the address.
+    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
       setState({ status: "error", message: labels.emailRequired, field: "email" });
       return;
     }
@@ -145,9 +156,13 @@ export function WaitlistForm({ countryIso, labels, products = [], formAction }: 
       >
         <input
           {...fieldControlProps("am-waitlist-email", { hint: labels.emailHint, error: emailError, required: true })}
+          ref={emailRef}
           name="email"
           type="email"
           autoComplete="email"
+          inputMode="email"
+          autoCapitalize="none"
+          spellCheck={false}
           maxLength={180}
         />
       </Field>
@@ -179,6 +194,7 @@ export function WaitlistForm({ countryIso, labels, products = [], formAction }: 
       <label className="am-j-consent" htmlFor="am-waitlist-consent">
         <input
           id="am-waitlist-consent"
+          ref={consentRef}
           name="consent"
           type="checkbox"
           aria-invalid={consentError ? true : undefined}

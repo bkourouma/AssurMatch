@@ -1,5 +1,5 @@
-import { Badge, Card, DescriptionList, PageHeader, PageStack, StateMessage } from "../lib/ui/admin-ui";
-import { OperationsTabs } from "../lib/ui/operations-tabs";
+import { Badge, Button, Card, Cluster, DescriptionList, PageHeader, PageStack, StateMessage } from "../lib/ui/admin-ui";
+import { OperationsTabs, operationsTabs } from "../lib/ui/operations-tabs";
 
 export default function OperationsPage() {
   return (
@@ -11,6 +11,13 @@ export default function OperationsPage() {
       />
       <OperationsTabs current="/operations" />
       <StateMessage>Les actions opérationnelles dangereuses ne sont pas exposées par cette interface.</StateMessage>
+      <Card title="Consoles d'exploitation" description="Accès direct aux écrans de traitement des demandes.">
+        <Cluster>
+          {operationsTabs.filter((tab) => tab.href !== "/operations").map((tab) => (
+            <Button key={tab.href} href={tab.href} variant="secondary" size="sm">{tab.label}</Button>
+          ))}
+        </Cluster>
+      </Card>
       <Card title="Contrôles en place">
         <DescriptionList
           items={[

@@ -100,7 +100,8 @@ test("without the update right or on a suspended tenant no card is draggable and
   expect(source).toContain("draggable={canMove}");
   expect(source).toContain("onDragStart={canMove ?");
   expect(source).toContain("onDrop={canMove ?");
-  expect(source).toMatch(/\{canMove \? \(\s*<div>\s*<label htmlFor=\{targetId\}>/);
+  // The move menu (label, select, button) only exists inside the canMove branch; the wrapper now carries a layout class.
+  expect(source).toMatch(/\{canMove \? \(\s*<div[^>]*>\s*<label[^>]*htmlFor=\{targetId\}>/);
   expect(source).toContain("if (!canMove || busy) return;");
 });
 

@@ -127,12 +127,27 @@ export interface CheckboxGroupProps {
   defaultValues?: string[] | undefined;
   columns?: 1 | 2 | undefined;
   describedBy?: string | undefined;
+  /** Error shown under the group; the inputs are marked `aria-invalid` and the fieldset points to it. */
+  error?: string | undefined;
 }
 
-export function CheckboxGroup({ legend, name, options, defaultValues, columns = 2, describedBy }: CheckboxGroupProps) {
+/** `aria-describedby` of a choice group: the caller's ids, then the group error id. */
+function groupDescribedBy(name: string, describedBy: string | undefined, error: string | undefined): string | undefined {
+  return [describedBy, error ? `${name}-error` : null].filter(Boolean).join(" ") || undefined;
+}
+
+function GroupError({ name, error }: { name: string; error: string | undefined }) {
+  return error ? (
+    <p className="bo-field__error" id={`${name}-error`} role="alert">
+      {error}
+    </p>
+  ) : null;
+}
+
+export function CheckboxGroup({ legend, name, options, defaultValues, columns = 2, describedBy, error }: CheckboxGroupProps) {
   const selected = new Set(defaultValues ?? []);
   return (
-    <fieldset className="bo-fieldset" aria-describedby={describedBy}>
+    <fieldset className="bo-fieldset" aria-describedby={groupDescribedBy(name, describedBy, error)}>
       <legend>{legend}</legend>
       <div className={columns === 1 ? "bo-check-group bo-check-group--single" : "bo-check-group"}>
         {options.map((option) => (
@@ -143,6 +158,7 @@ export function CheckboxGroup({ legend, name, options, defaultValues, columns = 
               value={option.value}
               defaultChecked={selected.has(option.value)}
               disabled={option.disabled}
+              aria-invalid={error ? true : undefined}
             />
             <span className="bo-check__text">
               <span>{option.label}</span>
@@ -151,6 +167,7 @@ export function CheckboxGroup({ legend, name, options, defaultValues, columns = 
           </label>
         ))}
       </div>
+      <GroupError name={name} error={error} />
     </fieldset>
   );
 }
@@ -162,11 +179,13 @@ export interface RadioGroupProps {
   defaultValue?: string | undefined;
   columns?: 1 | 2 | undefined;
   describedBy?: string | undefined;
+  /** Error shown under the group; the inputs are marked `aria-invalid` and the fieldset points to it. */
+  error?: string | undefined;
 }
 
-export function RadioGroup({ legend, name, options, defaultValue, columns = 2, describedBy }: RadioGroupProps) {
+export function RadioGroup({ legend, name, options, defaultValue, columns = 2, describedBy, error }: RadioGroupProps) {
   return (
-    <fieldset className="bo-fieldset" aria-describedby={describedBy}>
+    <fieldset className="bo-fieldset" aria-describedby={groupDescribedBy(name, describedBy, error)}>
       <legend>{legend}</legend>
       <div className={columns === 1 ? "bo-check-group bo-check-group--single" : "bo-check-group"}>
         {options.map((option) => (
@@ -177,6 +196,7 @@ export function RadioGroup({ legend, name, options, defaultValue, columns = 2, d
               value={option.value}
               defaultChecked={defaultValue === option.value}
               disabled={option.disabled}
+              aria-invalid={error ? true : undefined}
             />
             <span className="bo-check__text">
               <span>{option.label}</span>
@@ -185,6 +205,7 @@ export function RadioGroup({ legend, name, options, defaultValue, columns = 2, d
           </label>
         ))}
       </div>
+      <GroupError name={name} error={error} />
     </fieldset>
   );
 }

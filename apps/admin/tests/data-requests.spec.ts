@@ -148,7 +148,7 @@ test("conversations card is read-only, audited, masked for support and mounted o
   expect(card).not.toMatch(/method:\s*"(POST|PATCH|DELETE)"/);
   // Attachments: no download link.
   expect(card).not.toMatch(/href=\{[^}]*attachment/);
-  expect(source("apps/admin/app/quote-requests/[quoteRequestId]/page.tsx")).toContain("<LeadConversationsCard quoteRequestId={quoteRequestId} show={showConversations} />");
+  expect(source("apps/admin/app/quote-requests/[quoteRequestId]/page.tsx")).toContain("<LeadConversationsCard quoteRequestId={quoteRequestId} show={showConversations}");
   expect(source("apps/admin/app/quote-requests/[quoteRequestId]/page.tsx")).toContain('.conversations) === "1"');
   expect(source("apps/admin/app/lib/admin-api.ts")).not.toMatch(/writeAdmin[^;]*conversations/);
 });

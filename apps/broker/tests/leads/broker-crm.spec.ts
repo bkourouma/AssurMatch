@@ -64,7 +64,7 @@ test("CRM status change requires an allow-listed reason for loss-like statuses",
   expect(actions).toContain("if (crmStatusRequiresReason(status) && !reason) redirect(`/crm/leads/${leadId}?crm=reason_required`);");
   expect(actions).toContain("isCrmOutcomeReason(rawReason)");
   expect(detail).toContain("CRM_OUTCOME_REASONS.map");
-  expect(detail).toContain("Un motif allowliste est obligatoire pour les statuts suivants");
+  expect(detail).toContain("Un motif est obligatoire pour les statuts suivants");
 });
 
 test("CRM lead detail offers note, task and reminder forms on the real detail payload", async () => {

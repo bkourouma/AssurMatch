@@ -8,7 +8,7 @@ import { kanbanMovesEnabled } from "../../lib/kanban-moves";
 import { CRM_PIPELINE_STATUSES } from "../../lib/lead-vocabulary";
 import { advisorDisplayName } from "../../lib/team-options";
 import { AgencyFilterForm } from "../../lib/ui/agency-filter-form";
-import { Badge, Notice, PageHeader, PageStack } from "../../lib/ui/broker-ui";
+import { Badge, Button, Cluster, Notice, PageHeader, PageStack } from "../../lib/ui/broker-ui";
 import { leadSummary } from "../../lib/ui/broker-view-models";
 import { KanbanBoard } from "./kanban-board";
 import type { KanbanCardData } from "./kanban-board";
@@ -56,11 +56,20 @@ export default async function BrokerCrmKanbanPage({ searchParams }: { searchPara
         breadcrumb={[{ label: "CRM", href: "/crm" }, { label: "Vue Kanban" }]}
         title="Vue Kanban"
         description="Leads autorisés regroupés par statut du pipeline, selon votre rôle, votre cabinet et votre conseiller."
-        actions={<Badge tone="info">{canMove ? "Glissez une carte pour changer son statut" : "Lecture seule"}</Badge>}
+        actions={
+          <Cluster>
+            <Badge tone="info">{canMove ? "Glissez une carte, ou utilisez « Déplacer vers »" : "Lecture seule"}</Badge>
+            <Button href="/crm/leads" variant="secondary" size="sm">Vue tableau</Button>
+          </Cluster>
+        }
       />
       <AgencyFilterForm action="/crm/kanban" filter={agency} fieldId="kanban-agency" />
       {kanban.forbidden ? <Notice tone="danger" title="Accès CRM refusé">Vérifiez le plan, la MFA et les permissions CRM. Aucune donnée CRM n'est affichée.</Notice> : null}
-      {kanban.status === "error" ? <Notice tone="warning">Vue Kanban temporairement indisponible.</Notice> : null}
+      {kanban.status === "error" ? (
+        <Notice tone="warning" title="Vue Kanban indisponible">
+          Les colonnes n&apos;ont pas pu être chargées. Aucun lead n&apos;a été modifié. <a href="/crm/kanban">Réessayer</a> ou ouvrir la <a href="/crm/leads">vue tableau</a>.
+        </Notice>
+      ) : null}
       {kanban.status === "success" ? <KanbanBoard columns={columns} canMove={canMove} /> : null}
     </PageStack>
   );

@@ -7,6 +7,7 @@ import { TENANT_SUSPENDED_MESSAGE, isTenantReadOnly } from "../broker-permission
 import { requestManagerAssistantAction, requestPerformanceSummaryAction, validateTenantInsightAction } from "../crm-ai-actions";
 import { Badge, Button, Card, Cluster, Field, Notice, Select, Stack, TenantWriteGuard } from "./broker-ui";
 import { formatDate } from "./broker-view-models";
+import styles from "./broker-screens.module.css";
 
 /**
  * Lot 3 (spec 069 FR-004, DASH-B-009, PRD §10.2): « Résumé IA de performance » et « Assistant manager »
@@ -76,7 +77,7 @@ function InsightList({
   members: readonly BrokerTeamMemberData[];
   emptyLabel: string;
 }) {
-  if (items.length === 0) return <p>{emptyLabel}</p>;
+  if (items.length === 0) return <p className={styles.muted}>{emptyLabel}</p>;
   return (
     <Stack>
       {items.map((interaction) => {
@@ -179,7 +180,10 @@ export async function AiInsightsPanel({
   return (
     <section aria-label="Assistance IA du tableau de bord">
       {notice && NOTICES[notice] ? (
-        <Notice tone={SUCCESS_NOTICES.has(notice) ? "success" : notice === "error" ? "danger" : "warning"}>{NOTICES[notice]}</Notice>
+        <Notice tone={SUCCESS_NOTICES.has(notice) ? "success" : notice === "error" ? "danger" : "warning"}>
+          {NOTICES[notice]}
+          {notice === "queued" ? <> <a href={returnTo}>Actualiser la page</a></> : null}
+        </Notice>
       ) : null}
 
       <Card
