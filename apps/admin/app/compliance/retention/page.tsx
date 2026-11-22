@@ -8,11 +8,13 @@ import {
 } from "../../lib/admin-api";
 import { readFailureDetail } from "../../lib/auth-error-messages";
 import { approveBatch, previewErasure, previewRetention, removePolicyOverride, savePolicyOverride } from "../../lib/retention-actions";
+import { PendingActionButton } from "../../lib/ui/pending-action-button";
 import {
   Badge,
   Button,
   Card,
   CheckboxGroup,
+  Cluster,
   ConfirmDialog,
   DataTable,
   Field,
@@ -118,6 +120,8 @@ function formatDate(value: string | null): string {
   return value ? value.slice(0, 16).replace("T", " ") : "-";
 }
 
+const REASON_HINT = "Obligatoire : 8 à 500 caractères, conservés comme preuve.";
+
 function isApprovable(batch: RetentionBatchData, now: number): boolean {
   return batch.status === "previewed" && Date.parse(batch.previewExpiresAt) > now;
 }
@@ -141,6 +145,11 @@ export default async function DataRetentionPage({ searchParams }: { searchParams
   const loaded = policies.status === "success" || batches.status === "success";
   const batchItems = batches.status === "success" ? batches.data.items : [];
   const openBatches = batchItems.filter((batch) => isApprovable(batch, now)).length;
+
+  const batchKindLabel = (batch: RetentionBatchData) =>
+    batch.kind === "erasure" ? `Effacement (${batch.erasureLookup === "email" ? "par e-mail" : "par référence"})` : "Rétention";
+  // Batches waiting for an approval come first, then the API order (most recent first).
+  const orderedBatches = [...batchItems].sort((left, right) => Number(isApprovable(right, now)) - Number(isApprovable(left, now)));
 
   const policyColumns: Array<DataTableColumn<RetentionPolicyItemData>> = [
     {
@@ -178,7 +187,11 @@ export default async function DataRetentionPage({ searchParams }: { searchParams
         const current = countryId ? item.countryRetentionDays : item.globalRetentionDays;
         const daysId = `retention-days-${item.category}`;
         const reasonId = `retention-reason-${item.category}`;
+        const removeReasonId = `retention-remove-reason-${item.category}`;
+        const categoryName = CATEGORY_LABELS[item.category] ?? item.category;
+        const levelName = countryId ? `pays ${countryLabel(countryId)}` : "global";
         return (
+          <Stack>
           <Form action={savePolicyOverride}>
             <input type="hidden" name="category" value={item.category} />
             {countryId ? <input type="hidden" name="countryId" value={countryId} /> : null}
@@ -193,16 +206,32 @@ export default async function DataRetentionPage({ searchParams }: { searchParams
                 defaultValue={current ?? item.retentionDays}
               />
             </Field>
-            <Field id={reasonId} label="Motif" required>
-              <Input {...fieldControlProps(reasonId, { required: true })} name="reason" minLength={8} maxLength={500} placeholder="Motif de la modification" />
+            <Field id={reasonId} label="Motif (obligatoire)" required>
+              <Input {...fieldControlProps(reasonId, { required: true })} name="reason" minLength={8} maxLength={500} placeholder="Motif de la modification (8 caractères au moins)" />
             </Field>
             <FormActions align="start">
-              <Button type="submit" variant="secondary" size="sm">Enregistrer</Button>
-              {current !== null ? (
-                <Button type="submit" formAction={removePolicyOverride} variant="tertiary" size="sm">Retirer la surcharge</Button>
-              ) : null}
+              <PendingActionButton variant="secondary" size="sm" pendingLabel="Enregistrement...">Enregistrer</PendingActionButton>
             </FormActions>
           </Form>
+          {current !== null ? (
+            <ConfirmDialog
+              triggerLabel="Retirer la surcharge"
+              triggerVariant="tertiary"
+              title={`Retirer la surcharge de « ${categoryName} »`}
+              description={`La surcharge ${levelName} (${current} jours) est retirée : le niveau suivant (pays, global puis défaut) s'applique de nouveau. Le changement est audité avec le motif saisi.`}
+              confirmLabel="Retirer la surcharge"
+              cancelLabel="Annuler"
+              tone="danger"
+              formAction={removePolicyOverride}
+            >
+              <input type="hidden" name="category" value={item.category} />
+              {countryId ? <input type="hidden" name="countryId" value={countryId} /> : null}
+              <Field id={removeReasonId} label="Motif (obligatoire)" required hint={REASON_HINT}>
+                <Input {...fieldControlProps(removeReasonId, { required: true, hint: REASON_HINT })} name="reason" minLength={8} maxLength={500} />
+              </Field>
+            </ConfirmDialog>
+          ) : null}
+          </Stack>
         );
       }
     }
@@ -212,7 +241,7 @@ export default async function DataRetentionPage({ searchParams }: { searchParams
     {
       key: "kind",
       header: "Type",
-      render: (batch) => (batch.kind === "erasure" ? `Effacement (${batch.erasureLookup === "email" ? "par e-mail" : "par référence"})` : "Rétention")
+      render: (batch) => batchKindLabel(batch)
     },
     {
       key: "status",
@@ -266,16 +295,16 @@ export default async function DataRetentionPage({ searchParams }: { searchParams
             <ConfirmDialog
               triggerLabel="Approuver et anonymiser"
               triggerVariant="danger"
-              title="Approuver et anonymiser ce lot"
-              description={`${batch.totalSelected} élément(s) sélectionné(s) seront anonymisés définitivement. Cette action ne peut pas être annulée.`}
+              title={`Approuver et anonymiser le lot du ${formatDate(batch.createdAt)}`}
+              description={`${batchKindLabel(batch)}, portée ${batch.kind === "erasure" ? "personne" : countryLabel(batch.countryId)} : ${batch.totalSelected} élément(s) sélectionné(s) seront anonymisés définitivement. Cette action ne peut pas être annulée.`}
               confirmLabel="Approuver et anonymiser"
               cancelLabel="Annuler"
               tone="danger"
               formAction={approveBatch}
             >
               <input type="hidden" name="batchId" value={batch.id} />
-              <Field id={reasonId} label="Motif" required>
-                <Input {...fieldControlProps(reasonId, { required: true })} name="reason" minLength={8} maxLength={500} placeholder="Motif de l'approbation" />
+              <Field id={reasonId} label="Motif (obligatoire)" required hint={REASON_HINT}>
+                <Input {...fieldControlProps(reasonId, { required: true, hint: REASON_HINT })} name="reason" minLength={8} maxLength={500} placeholder="Motif de l'approbation" />
               </Field>
             </ConfirmDialog>
           );
@@ -308,6 +337,16 @@ export default async function DataRetentionPage({ searchParams }: { searchParams
       ) : null}
       {notice ? <StateMessage tone={notice.tone}>{notice.text}</StateMessage> : null}
 
+      {loaded ? (
+        <nav aria-label="Sections de la page">
+          <Cluster>
+            <a href="#durees">Durées de conservation</a>
+            <a href="#previsualisations">Prévisualiser un lot ou un effacement</a>
+            <a href="#lots">Lots d&apos;anonymisation{openBatches > 0 ? ` (${openBatches} à approuver)` : ""}</a>
+          </Cluster>
+        </nav>
+      ) : null}
+
       {loaded && !purgeEnabled ? (
         <div data-retention-marker="purge-disabled-notice">
           <StateMessage tone="warning" title="Purge désactivée (retention_purge_enabled)">
@@ -328,6 +367,7 @@ export default async function DataRetentionPage({ searchParams }: { searchParams
             ]}
           />
 
+          <div id="durees">
           <Card title="Durées de conservation" description="Priorité: surcharge pays, puis surcharge globale, puis défaut. Bornes: 30 à 3650 jours.">
             <Stack>
               <FilterBar
@@ -356,11 +396,14 @@ export default async function DataRetentionPage({ searchParams }: { searchParams
                 items={policies.data.items}
                 getKey={(item) => item.category}
                 emptyLabel="Aucune politique disponible."
+                emptyDescription="Les durées de conservation n'ont pas pu être chargées : rechargez la page ou vérifiez l'accès conformité."
                 aria-label="Durées de conservation par catégorie"
               />
             </Stack>
           </Card>
+          </div>
 
+          <div id="previsualisations">
           <Grid columns="two">
             <Card
               title="Prévisualiser un lot de rétention"
@@ -380,9 +423,9 @@ export default async function DataRetentionPage({ searchParams }: { searchParams
                   name="categories"
                   options={RETENTION_CATEGORY_KEYS.map((category) => ({ value: category, label: CATEGORY_LABELS[category] }))}
                 />
-                <Field id="retention-preview-reason" label="Motif" required>
+                <Field id="retention-preview-reason" label="Motif (obligatoire)" required hint={REASON_HINT}>
                   <Input
-                    {...fieldControlProps("retention-preview-reason", { required: true })}
+                    {...fieldControlProps("retention-preview-reason", { required: true, hint: REASON_HINT })}
                     name="reason"
                     minLength={8}
                     maxLength={500}
@@ -390,7 +433,7 @@ export default async function DataRetentionPage({ searchParams }: { searchParams
                   />
                 </Field>
                 <FormActions>
-                  <Button type="submit" variant="secondary">Prévisualiser</Button>
+                  <PendingActionButton variant="secondary" pendingLabel="Prévisualisation...">Prévisualiser</PendingActionButton>
                 </FormActions>
               </Form>
             </Card>
@@ -412,9 +455,9 @@ export default async function DataRetentionPage({ searchParams }: { searchParams
                 <Field id="retention-erasure-identifier" label="Référence ou e-mail" required>
                   <Input {...fieldControlProps("retention-erasure-identifier", { required: true })} name="identifier" autoComplete="off" maxLength={254} />
                 </Field>
-                <Field id="retention-erasure-reason" label="Motif" required>
+                <Field id="retention-erasure-reason" label="Motif (obligatoire)" required hint={REASON_HINT}>
                   <Input
-                    {...fieldControlProps("retention-erasure-reason", { required: true })}
+                    {...fieldControlProps("retention-erasure-reason", { required: true, hint: REASON_HINT })}
                     name="reason"
                     minLength={8}
                     maxLength={500}
@@ -422,25 +465,30 @@ export default async function DataRetentionPage({ searchParams }: { searchParams
                   />
                 </Field>
                 <FormActions>
-                  <Button type="submit" variant="secondary">Prévisualiser l&apos;effacement</Button>
+                  <PendingActionButton variant="secondary" pendingLabel="Prévisualisation...">Prévisualiser l&apos;effacement</PendingActionButton>
                 </FormActions>
               </Form>
             </Card>
           </Grid>
 
+          </div>
+
+          <div id="lots">
           <Card
             title="Lots d'anonymisation"
             description="Comptes et métadonnées uniquement: aucun identifiant de personne n'est affiché. Approuver un lot anonymise définitivement les données sélectionnées."
           >
             <DataTable
               columns={batchColumns}
-              items={batchItems}
+              items={orderedBatches}
               getKey={(batch) => batch.id}
+              dense
               emptyLabel="Aucun lot prévisualisé."
               emptyDescription="Prévisualisez un lot de rétention ou un effacement ci-dessus : il apparaîtra ici pour approbation."
               aria-label="Lots d'anonymisation"
             />
           </Card>
+          </div>
         </>
       ) : null}
     </PageStack>

@@ -49,7 +49,7 @@ export default async function FeatureFlagsPage() {
 
       <Card
         title="Désactivation rapide"
-        description="Seuls les flags globaux non sensibles se basculent ici, avec un motif audité."
+        description={`Seuls les flags globaux non sensibles se basculent ici, avec un motif obligatoire et audité. ${toggleable.filter((flag) => flag.value).length} actif(s) sur ${toggleable.length}.`}
       >
         <DataTable
           columns={[
@@ -70,11 +70,12 @@ export default async function FeatureFlagsPage() {
             { key: "value", header: "État", render: (flag) => <ValueBadge value={flag.value} /> },
             { key: "changed", header: "Modifié le", render: (flag) => formatDate(flag.changedAt) },
             { key: "reason", header: "Dernier motif", render: (flag) => flag.reason ?? "-" },
-            { key: "action", header: "Action", render: (flag) => <GlobalFlagToggleForm flagId={flag.id} flagKey={flag.key} currentValue={flag.value} /> }
+            { key: "action", header: "Changer l'état (motif obligatoire)", render: (flag) => <GlobalFlagToggleForm flagId={flag.id} flagKey={flag.key} currentValue={flag.value} /> }
           ]}
           items={toggleable}
           getKey={(flag) => flag.id}
           emptyLabel="Aucun flag global non sensible."
+          emptyDescription="Aucun flag global n'est enregistré pour ce périmètre."
           aria-label="Flags globaux non sensibles"
         />
       </Card>
@@ -84,7 +85,7 @@ export default async function FeatureFlagsPage() {
           columns={[
             { key: "flag", header: "Flag", render: (flag) => <span className="bo-ref">{flag.key}</span> },
             { key: "value", header: "État", render: (flag) => <ValueBadge value={flag.value} /> },
-            { key: "control", header: "Contrôle", render: () => "Aucune activation par cette interface : procédure de conformité" }
+            { key: "control", header: "Contrôle", render: () => "Aucune bascule ici : procédure de conformité (ops:apply-flag-policy)" }
           ]}
           items={sensitiveGlobal}
           getKey={(flag) => flag.id}
@@ -109,6 +110,7 @@ export default async function FeatureFlagsPage() {
           items={scoped}
           getKey={(flag) => flag.id}
           emptyLabel="Aucun flag pays ou produit enregistré."
+          emptyDescription="Ces flags apparaissent dès qu'un pays ou un produit est ouvert depuis le catalogue."
           aria-label="Flags pays et produits"
         />
       </Card>

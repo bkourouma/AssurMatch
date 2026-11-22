@@ -46,7 +46,7 @@ test("admin auth completion pages exist", () => {
   expect(read("activate/page.tsx")).toContain("Activer le compte");
   expect(read("mfa/page.tsx")).toContain("MFA requise");
   expect(read("password-change/page.tsx")).toContain("Changer le mot de passe");
-  expect(read("password-reset/page.tsx")).toContain("Consommer un jeton");
+  expect(read("password-reset/page.tsx")).toContain("Réinitialiser le mot de passe");
 });
 
 test("admin app does not import the public app", () => {

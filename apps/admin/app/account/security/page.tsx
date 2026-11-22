@@ -6,6 +6,8 @@ import { Button, Card, DataTable, PageHeader, PageStack, StateMessage } from "..
 
 const SECURITY_PATH = "/account/security";
 
+export const metadata = { title: "Sécurité du compte" };
+
 // Deterministic French rendering (Africa/Abidjan is UTC+0, the platform reference zone).
 const dateTimeFormat = new Intl.DateTimeFormat("fr-FR", { dateStyle: "medium", timeStyle: "short", timeZone: "Africa/Abidjan" });
 
@@ -39,7 +41,10 @@ export default async function AdminAccountSecurityPage() {
         description="Sur un appareil de confiance, le code MFA n'est pas redemandé pendant 30 jours ; le mot de passe reste toujours exigé. Révoquez-les si un appareil est perdu, partagé ou si vous avez un doute."
       >
         {!result.ok ? (
-          <StateMessage tone="danger">Impossible de charger la liste des appareils de confiance. Réessayez plus tard.</StateMessage>
+          <StateMessage tone="danger">
+            <p>Impossible de charger la liste des appareils de confiance. Vous pouvez réessayer ; la révocation reste disponible ci-dessous.</p>
+            <p><a href={SECURITY_PATH}>Recharger la page</a></p>
+          </StateMessage>
         ) : (
           <DataTable<TrustedDeviceView>
             columns={[
@@ -54,10 +59,10 @@ export default async function AdminAccountSecurityPage() {
             aria-label="Appareils de confiance actifs"
           />
         )}
-        <RevokeTrustedDevicesForm />
+        <RevokeTrustedDevicesForm deviceCount={result.ok ? result.devices.length : undefined} />
       </Card>
 
-      <Card title="Mot de passe" description="Changer votre mot de passe révoque aussi tous vos appareils de confiance.">
+      <Card title="Mot de passe" description="Changer votre mot de passe révoque aussi tous vos appareils de confiance : le code MFA sera redemandé partout.">
         <Button href="/password-change" variant="secondary">Changer le mot de passe</Button>
       </Card>
     </PageStack>

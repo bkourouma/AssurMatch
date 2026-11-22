@@ -1,4 +1,4 @@
-import { readAdminOffers, readScoringRules, type AdminOfferData } from "../lib/admin-api";
+import { readAdminCountries, readAdminOffers, readAdminProducts, readScoringRules, type AdminOfferData } from "../lib/admin-api";
 import {
   Card,
   DataTable,
@@ -23,7 +23,25 @@ function weightsLabel(weights: Record<string, number>): string {
 }
 
 export default async function ScoringPage() {
-  const [rules, offers] = await Promise.all([readScoringRules(), readAdminOffers()]);
+  const [rules, offers, countries, products] = await Promise.all([readScoringRules(), readAdminOffers(), readAdminCountries(), readAdminProducts()]);
+  // Human names for the identifiers; when a list cannot be read the short identifier is shown instead.
+  const countryList = countries.status === "success" ? countries.data : [];
+  const productList = products.status === "success" ? products.data : [];
+  const countryName = (id: string | null) => {
+    if (!id) return "Tous les pays";
+    const country = countryList.find((candidate) => candidate.id === id);
+    return country ? `${country.isoCode} - ${country.name}` : id.slice(0, 8);
+  };
+  const productName = (id: string | null) => {
+    if (!id) return "Tous les produits";
+    return productList.find((candidate) => candidate.id === id)?.name ?? id.slice(0, 8);
+  };
+  // Active rules first, so the ones that currently weight the score are read before the disabled ones.
+  const orderedRules = [...rules.data.items].sort((left, right) => Number(right.status === "active") - Number(left.status === "active"));
+  const ruleOptions = orderedRules.map((rule) => ({
+    id: rule.id,
+    label: `${countryName(rule.countryId)} / ${productName(rule.productId)} - v${rule.version}${rule.status === "active" ? "" : " (désactivée)"}`
+  }));
 
   return (
     <PageStack>
@@ -48,26 +66,31 @@ export default async function ScoringPage() {
             ]}
           />
 
-          <Card title="Règles de scoring">
+          <Card title="Règles de scoring" description="Les règles actives sont listées en premier. Pour modifier ou désactiver une règle, utilisez « Mettre à jour une règle » plus bas.">
             <DataTable
               columns={[
-                { key: "country", header: "Pays", render: (rule) => (rule.countryId ? <span className="bo-ref">{rule.countryId.slice(0, 8)}</span> : "Tous") },
-                { key: "product", header: "Produit", render: (rule) => (rule.productId ? <span className="bo-ref">{rule.productId.slice(0, 8)}</span> : "Tous") },
+                { key: "country", header: "Pays", render: (rule) => countryName(rule.countryId) },
+                { key: "product", header: "Produit", render: (rule) => productName(rule.productId) },
                 { key: "weights", header: "Poids", render: (rule) => weightsLabel(rule.weights) },
                 { key: "status", header: "Statut", render: (rule) => <StatusBadge status={rule.status} tones={ruleStatusTones} /> },
                 { key: "version", header: "Version", render: (rule) => rule.version, numeric: true, align: "right" },
                 { key: "id", header: "Identifiant", render: (rule) => <span className="bo-ref">{rule.id}</span> }
               ]}
-              items={rules.data.items}
+              items={orderedRules}
               getKey={(rule) => rule.id}
+              dense
               emptyLabel="Aucune règle: les poids par défaut du PRD s'appliquent."
               aria-label="Règles de scoring"
             />
           </Card>
 
           <Grid columns="two">
-            <CreateScoringRuleForm defaults={rules.data.defaults} />
-            <UpdateScoringRuleForm ruleIds={rules.data.items.map((rule) => rule.id)} />
+            <CreateScoringRuleForm
+              defaults={rules.data.defaults}
+              countries={countryList.map((country) => ({ value: country.id, label: `${country.isoCode} - ${country.name}` }))}
+              products={productList.map((product) => ({ value: product.id, label: product.name }))}
+            />
+            <UpdateScoringRuleForm rules={ruleOptions} />
           </Grid>
 
           <Card

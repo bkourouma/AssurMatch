@@ -3,7 +3,7 @@
 import { useActionState } from "react";
 import type { AdminConsentRecordView } from "../../../../../packages/shared/contracts/compliance.contracts";
 import { searchConsentRecordsAction, type ConsentRecordSearchState } from "../../lib/consent-record-actions";
-import { Badge, Button, Card, DataTable, Field, Form, FormActions, Input, Select, StateMessage, fieldControlProps, type DataTableColumn, type Tone } from "../../lib/ui/admin-ui";
+import { Badge, Button, Card, DataTable, EmptyState, Field, Form, FormActions, Input, Select, StateMessage, fieldControlProps, type DataTableColumn, type Tone } from "../../lib/ui/admin-ui";
 
 const initialState: ConsentRecordSearchState = { status: "idle" };
 
@@ -22,6 +22,9 @@ function day(value: string | null): string {
   return value ? value.replace("T", " ").slice(0, 16) : "-";
 }
 
+const REFERENCE_HINT = "Format QR-AAAA-XXXXXXXX (année puis 8 caractères), tel qu'indiqué dans l'espace de suivi du visiteur.";
+const EMAIL_HINT = "Comparée à l'empreinte enregistrée : l'adresse n'est ni affichée ni journalisée.";
+
 const columns: Array<DataTableColumn<AdminConsentRecordView>> = [
   { key: "grantedAt", header: "Accordé le", render: (row) => day(row.grantedAt) },
   { key: "purpose", header: "Finalité", render: (row) => PURPOSE_LABELS[row.purpose] ?? row.purpose },
@@ -39,15 +42,22 @@ export function ConsentRecordSearch({ countries }: { countries: Array<{ id: stri
   const [state, formAction, pending] = useActionState(searchConsentRecordsAction, initialState);
   return (
     <>
-      <Card title="Critères" description="Au moins une référence de demande, une adresse e-mail ou un pays. L'e-mail n'est jamais affiché ni journalisé : l'API le compare à l'empreinte enregistrée.">
+      <Card title="Critères" description="Renseignez au moins une référence de demande, une adresse e-mail ou un pays. L'e-mail n'est jamais affiché ni journalisé : l'API le compare à l'empreinte enregistrée. Chaque recherche est journalisée.">
         <Form action={formAction} data-consent-record-search="059">
-          <Field id="cr-reference" label="Référence de la demande">
-            <Input {...fieldControlProps("cr-reference")} name="publicReference" placeholder="QR-2026-XXXXXXXX" />
+          <Field id="cr-reference" label="Référence de la demande (au moins un des trois)" hint={REFERENCE_HINT}>
+            <Input
+              {...fieldControlProps("cr-reference", { hint: REFERENCE_HINT })}
+              name="publicReference"
+              placeholder="QR-2026-XXXXXXXX"
+              pattern="[Qq][Rr]-[0-9]{4}-[A-Za-z0-9]{8}"
+              title="Format attendu : QR-AAAA-XXXXXXXX"
+              autoComplete="off"
+            />
           </Field>
-          <Field id="cr-email" label="E-mail du visiteur">
-            <Input {...fieldControlProps("cr-email")} name="email" type="email" autoComplete="off" />
+          <Field id="cr-email" label="E-mail du visiteur (au moins un des trois)" hint={EMAIL_HINT}>
+            <Input {...fieldControlProps("cr-email", { hint: EMAIL_HINT })} name="email" type="email" autoComplete="off" />
           </Field>
-          <Field id="cr-country" label="Pays">
+          <Field id="cr-country" label="Pays (au moins un des trois)">
             <Select {...fieldControlProps("cr-country")} name="countryId" defaultValue="">
               <option value="">Tous</option>
               {countries.map((country) => <option key={country.id} value={country.id}>{country.label}</option>)}
@@ -62,10 +72,10 @@ export function ConsentRecordSearch({ countries }: { countries: Array<{ id: stri
           <Field id="cr-status" label="Statut">
             <Select {...fieldControlProps("cr-status")} name="status" defaultValue="">
               <option value="">Tous</option>
-              <option value="granted">granted</option>
-              <option value="withdrawn">withdrawn</option>
-              <option value="expired">expired</option>
-              <option value="anonymized">anonymized</option>
+              <option value="granted">Accordé (granted)</option>
+              <option value="withdrawn">Retiré (withdrawn)</option>
+              <option value="expired">Expiré (expired)</option>
+              <option value="anonymized">Anonymisé (anonymized)</option>
             </Select>
           </Field>
           <FormActions>
@@ -73,6 +83,15 @@ export function ConsentRecordSearch({ countries }: { countries: Array<{ id: stri
           </FormActions>
         </Form>
       </Card>
+
+      {state.status === "idle" ? (
+        <Card title="Résultats">
+          <EmptyState
+            title="Aucune recherche lancée"
+            description="Saisissez au moins un critère puis lancez la recherche : les preuves de consentement correspondantes apparaîtront ici."
+          />
+        </Card>
+      ) : null}
 
       {state.status !== "idle" && state.status !== "success" ? (
         <StateMessage tone={state.status === "invalid" ? "warning" : "danger"}>{state.message}</StateMessage>
@@ -85,6 +104,7 @@ export function ConsentRecordSearch({ countries }: { countries: Array<{ id: stri
             items={state.result.items}
             getKey={(row) => row.id}
             emptyLabel="Aucune preuve pour ces critères."
+            emptyDescription="Vérifiez la référence ou l'adresse saisie, ou retirez un filtre (finalité, statut) pour élargir la recherche."
             aria-label="Preuves de consentement"
             dense
           />

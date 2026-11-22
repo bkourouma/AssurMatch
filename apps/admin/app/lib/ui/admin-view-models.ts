@@ -6,6 +6,31 @@ export interface DashboardKpiView {
   value: number | string;
   helper: string;
   tone: Tone;
+  /** Existing list or screen that shows the records behind the figure. */
+  href?: string;
+}
+
+/** Human wording of a compliance journal category; an unknown category stays readable as is. */
+const complianceCategoryLabels: Record<string, string> = {
+  consent_missing: "Consentement absent",
+  crm_flag_closed: "CRM fermé",
+  rbac_denied: "RBAC refusé",
+  cross_tenant_attempt: "Tentative inter-tenant",
+  broker_satisfaction_concern: "Réserve de satisfaction courtier",
+  other: "Autre"
+};
+
+export function complianceCategoryLabel(category: string): string {
+  return complianceCategoryLabels[category] ?? category;
+}
+
+/** Labels of an AI insight lifecycle status (display only). */
+export function aiInsightStatusLabel(status: string): string {
+  if (status === "queued") return "En cours de génération";
+  if (status === "completed") return "Terminé";
+  if (status === "refused") return "Refusé par les garde-fous";
+  if (status === "failed") return "Échec";
+  return status;
 }
 
 // Reference list of flags shown read-only on /feature-flags even when the API does not list them yet. The sensitivity rule itself
@@ -90,20 +115,20 @@ export function dashboardPrdKpis(data: AdminDashboardData): DashboardKpiView[] {
   }
   return [
     { label: "Visites (pages vues)", value: data.visits ? data.visits.total : NOT_MEASURED, helper: data.visits ? "Compteur agrégé sans donnée personnelle" : "Compteur absent, désactivé ou vide", tone: data.visits ? "info" : "disabled" },
-    { label: "Demandes créées", value: data.leadVolumes.received, helper: "Demandes reçues sur la fenêtre", tone: "info" },
+    { label: "Demandes créées", value: data.leadVolumes.received, helper: "Demandes reçues sur la fenêtre", tone: "info", href: "/quote-requests" },
     { label: "Taux visite vers demande", value: percent(data.visitToRequestRate), helper: data.visits && (data.visitToRequestRate === null || data.visitToRequestRate === undefined) ? "Non mesuré sous filtre pays / produit / partenaire (visites non filtrées)" : "Demandes créées / pages vues", tone: data.visitToRequestRate === null || data.visitToRequestRate === undefined ? "disabled" : "info" },
-    { label: "Leads routés", value: data.leadVolumes.transmitted, helper: "Transmissions déjà effectuées", tone: "success" },
+    { label: "Leads routés", value: data.leadVolumes.transmitted, helper: "Transmissions déjà effectuées", tone: "success", href: "/lead-assignments" },
     { label: "Leads non routés", value: data.leadVolumes.nonRouted, helper: "À traiter sans forcer le routage", tone: data.leadVolumes.nonRouted > 0 ? "warning" : "neutral" },
-    { label: "Partenaires actifs", value: data.partners.active, helper: `${data.partners.inactive} inactifs`, tone: "info" },
+    { label: "Partenaires actifs", value: data.partners.active, helper: `${data.partners.inactive} inactifs`, tone: "info", href: "/partners?status=active" },
     { label: "Pays actifs", value: measuredOrNot(data.activeCountries), helper: "Parcours public ouvert, dans le périmètre", tone: "neutral" },
     { label: "Produits actifs", value: measuredOrNot(data.activeProducts), helper: "Produits publics, dans le périmètre", tone: "neutral" },
     { label: "CA abonnement", value: revenueRow("subscription"), helper: data.revenueRestricted ? SUPER_ADMIN_ONLY_NOTE : "Factures émises sur la fenêtre, sans conversion de devise", tone: revenueTone },
     { label: "CA leads", value: revenueRow("leads"), helper: data.revenueRestricted ? SUPER_ADMIN_ONLY_NOTE : "Leads facturés nets des avoirs, sans conversion de devise", tone: revenueTone },
     { label: "SLA courtier", value: sla && sla.averageFirstActionMinutes !== null ? `${sla.averageFirstActionMinutes} min` : NOT_MEASURED, helper: sla ? `Première action moyenne, ${sla.measured} lead(s) mesuré(s)` : "Délai moyen de première action", tone: sla && sla.averageFirstActionMinutes !== null ? "info" : "disabled" },
     { label: "Qualité leads", value: percent(quality?.disputeRate), helper: quality ? `Taux de contestation: ${quality.disputed} contestation(s) pour ${quality.transmitted} lead(s) transmis` : "Taux de contestation", tone: quality?.disputeRate ? "warning" : quality ? "success" : "disabled" },
-    { label: "Alertes conformité", value: complianceTotal, helper: "Refus audités sur la fenêtre", tone: complianceTotal > 0 ? "warning" : "success" },
-    { label: "Offres expirées", value: data.expiredOffersStillReferenced, helper: "Références à vérifier avant exposition", tone: data.expiredOffersStillReferenced > 0 ? "warning" : "success" },
-    { label: "Synthèse IA", value: aiValue, helper: aiHelper, tone: aiTone }
+    { label: "Alertes conformité", value: complianceTotal, helper: "Refus audités sur la fenêtre", tone: complianceTotal > 0 ? "warning" : "success", href: "/dashboard/compliance-alerts" },
+    { label: "Offres expirées", value: data.expiredOffersStillReferenced, helper: "Références à vérifier avant exposition", tone: data.expiredOffersStillReferenced > 0 ? "warning" : "success", href: "/offers?status=expired" },
+    { label: "Synthèse IA", value: aiValue, helper: aiHelper, tone: aiTone, href: "/ai-assistance" }
   ];
 }
 // Lot 6 (end)
@@ -145,8 +170,8 @@ export function dashboardAttention(data: AdminDashboardData): AttentionItem[] {
       count: data.licenseAlerts.expired,
       tone: data.licenseAlerts.expired > 0 ? "danger" : "neutral",
       quiet: data.licenseAlerts.expired === 0,
-      href: "/partners",
-      actionLabel: "Ouvrir les courtiers"
+      href: "/partners?status=expired",
+      actionLabel: "Voir les courtiers concernés"
     },
     {
       label: "Licences à moins de 30 jours",
@@ -154,8 +179,8 @@ export function dashboardAttention(data: AdminDashboardData): AttentionItem[] {
       count: data.licenseAlerts.expiringSoon,
       tone: data.licenseAlerts.expiringSoon > 0 ? "warning" : "neutral",
       quiet: data.licenseAlerts.expiringSoon === 0,
-      href: "/partners",
-      actionLabel: "Ouvrir les courtiers"
+      href: "/partners?expiring=30",
+      actionLabel: "Voir les courtiers concernés"
     },
     {
       label: "Offres expirées encore référencées",
@@ -163,8 +188,8 @@ export function dashboardAttention(data: AdminDashboardData): AttentionItem[] {
       count: data.expiredOffersStillReferenced,
       tone: data.expiredOffersStillReferenced > 0 ? "warning" : "neutral",
       quiet: data.expiredOffersStillReferenced === 0,
-      href: "/offers",
-      actionLabel: "Ouvrir les offres"
+      href: "/offers?status=expired",
+      actionLabel: "Voir les offres expirées"
     }
   ];
 }
@@ -172,10 +197,10 @@ export function dashboardAttention(data: AdminDashboardData): AttentionItem[] {
 /** Volumes of the reporting window and the size of the visible scope, in one strip. */
 export function dashboardStats(data: AdminDashboardData): StatItem[] {
   return [
-    { label: "Leads reçus", value: data.leadVolumes.received, helper: "Sur la fenêtre", tone: "info" },
-    { label: "Leads transmis", value: data.leadVolumes.transmitted, tone: "success" },
+    { label: "Leads reçus", value: data.leadVolumes.received, helper: "Sur la fenêtre", tone: "info", href: "/quote-requests" },
+    { label: "Leads transmis", value: data.leadVolumes.transmitted, tone: "success", href: "/lead-assignments" },
     { label: "Leads refusés", value: data.leadVolumes.refused, tone: data.leadVolumes.refused > 0 ? "warning" : "neutral" },
-    { label: "Partenaires actifs", value: data.partners.active, helper: `${data.partners.inactive} inactifs` },
+    { label: "Partenaires actifs", value: data.partners.active, helper: `${data.partners.inactive} inactifs`, href: "/partners?status=active" },
     { label: "Pays actifs", value: data.scope.countries.length, helper: "Scope de ce rôle" },
     { label: "Produits actifs", value: data.scope.products.length, helper: "Scope de ce rôle" }
   ];

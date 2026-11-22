@@ -2,6 +2,8 @@ import { redirect } from "next/navigation";
 import { MfaPanel } from "../auth-flow-form";
 import { loginRedirect, readBackOfficeSession, sanitizeReturnTo } from "../lib/backoffice-auth";
 
+export const metadata = { title: "Vérification MFA" };
+
 interface PageProps {
   searchParams?: Promise<Record<string, string | string[] | undefined>>;
 }

@@ -3,7 +3,8 @@ import { Badge, DataTable, Field, FilterBar, Input, PageHeader, PageStack, Selec
 import { ReassignAssignmentForm } from "../lib/ui/operations-forms";
 import { OperationsTabs } from "../lib/ui/operations-tabs";
 import { assignmentStatusTones } from "../lib/ui/operations-tones";
-import { assignmentStatusLabel, productLabel } from "../lib/ui/operations-labels";
+import { assignmentStatusLabel, productLabel, PRODUCT_LABELS } from "../lib/ui/operations-labels";
+import { ActiveFilters, type ActiveFilterChip } from "../lib/ui/active-filters";
 import { readFailureDetail } from "../lib/auth-error-messages";
 
 /**
@@ -38,6 +39,20 @@ export default async function AdminLeadAssignmentsPage({ searchParams }: { searc
   const result = await readLeadAssignments({ ...filters, page, pageSize: 50 });
   const partners = [...new Map(result.data.items.map((row) => [row.partnerTenantId, { id: row.partnerTenantId, legalName: row.partnerLegalName ?? row.partnerTenantId }])).values()];
   const activeFilters = Object.values(filters).filter(Boolean).length;
+  const partnerName = (id: string) => partners.find((partner) => partner.id === id)?.legalName ?? id.slice(0, 8);
+  const productOptions = Object.keys(PRODUCT_LABELS);
+  // A product key filtered through the URL but unknown to the catalogue labels stays selectable.
+  if (filters.productKey && !productOptions.includes(filters.productKey)) productOptions.push(filters.productKey);
+  const chips: ActiveFilterChip[] = [
+    ...(filters.status ? [{ key: "status", label: "Statut", value: assignmentStatusLabel(filters.status) }] : []),
+    ...(filters.countryCode ? [{ key: "countryCode", label: "Pays", value: filters.countryCode.toUpperCase() }] : []),
+    ...(filters.productKey ? [{ key: "productKey", label: "Produit", value: productLabel(filters.productKey) }] : []),
+    ...(filters.partnerTenantId ? [{ key: "partnerTenantId", label: "Courtier", value: partnerName(filters.partnerTenantId) }] : []),
+    ...(filters.from ? [{ key: "from", label: "Du", value: filters.from }] : []),
+    ...(filters.to ? [{ key: "to", label: "Au", value: filters.to }] : [])
+  ];
+  const invertedPeriod = Boolean(filters.from && filters.to && filters.from > filters.to);
+  const partnerHint = "Identifiant du courtier, visible sur sa fiche partenaire.";
 
   return (
     <PageStack>
@@ -45,12 +60,15 @@ export default async function AdminLeadAssignmentsPage({ searchParams }: { searc
         breadcrumb={[{ label: "Pilotage" }, { label: "Opérations", href: "/operations" }, { label: "Assignations" }]}
         title="Routage des leads"
         description="Courtier assigné et statut de chaque lead, avec réaffectation auditée. Les coordonnées du visiteur ne sont jamais listées ici."
+        actions={result.status === "success" ? <Badge tone="neutral">{`${result.data.total} affectation(s)${activeFilters > 0 ? " filtrée(s)" : ""}`}</Badge> : null}
       />
       <OperationsTabs current="/lead-assignments" />
 
       {result.status === "unauthenticated" ? <StateMessage tone="danger">Session admin requise.</StateMessage> : null}
       {result.status === "forbidden" ? <StateMessage tone="danger">Accès aux affectations refusé pour ce rôle admin.</StateMessage> : null}
       {result.status === "error" ? <StateMessage tone="danger">Affectations indisponibles. {readFailureDetail(result.error)}</StateMessage> : null}
+
+      {invertedPeriod ? <StateMessage tone="warning">La date « Du » est postérieure à la date « Au » : aucune affectation ne peut correspondre. Corrigez la période.</StateMessage> : null}
 
       <FilterBar action="/lead-assignments" label="Filtres affectations" submitLabel="Filtrer" resetLabel="Réinitialiser" resetHref="/lead-assignments" activeCount={activeFilters}>
         <Field id="la-status" label="Statut">
@@ -62,11 +80,14 @@ export default async function AdminLeadAssignmentsPage({ searchParams }: { searc
         <Field id="la-country" label="Pays (code ISO)">
           <Input {...fieldControlProps("la-country")} name="countryCode" defaultValue={filters.countryCode ?? ""} maxLength={3} />
         </Field>
-        <Field id="la-product" label="Produit (clé)">
-          <Input {...fieldControlProps("la-product")} name="productKey" defaultValue={filters.productKey ?? ""} />
+        <Field id="la-product" label="Produit">
+          <Select {...fieldControlProps("la-product")} name="productKey" defaultValue={filters.productKey ?? ""}>
+            <option value="">Tous</option>
+            {productOptions.map((option) => <option key={option} value={option}>{productLabel(option)}</option>)}
+          </Select>
         </Field>
-        <Field id="la-partner" label="Courtier partenaire (UUID)">
-          <Input {...fieldControlProps("la-partner")} name="partnerTenantId" defaultValue={filters.partnerTenantId ?? ""} />
+        <Field id="la-partner" label="Courtier partenaire (identifiant)" hint={partnerHint}>
+          <Input {...fieldControlProps("la-partner", { hint: partnerHint })} name="partnerTenantId" defaultValue={filters.partnerTenantId ?? ""} />
         </Field>
         <Field id="la-from" label="Du">
           <Input {...fieldControlProps("la-from")} name="from" type="date" defaultValue={filters.from ?? ""} />
@@ -75,6 +96,7 @@ export default async function AdminLeadAssignmentsPage({ searchParams }: { searc
           <Input {...fieldControlProps("la-to")} name="to" type="date" defaultValue={filters.to ?? ""} />
         </Field>
       </FilterBar>
+      <ActiveFilters pathname="/lead-assignments" filters={filters} chips={chips} />
 
       <DataTable
         columns={columns}
@@ -87,7 +109,12 @@ export default async function AdminLeadAssignmentsPage({ searchParams }: { searc
         rowActions={(row) => (
           <details className="lead-assignments-reassign">
             <summary>Réaffecter</summary>
-            <ReassignAssignmentForm assignmentId={row.id} partners={partners.filter((partner) => partner.id !== row.partnerTenantId)} />
+            <ReassignAssignmentForm
+              assignmentId={row.id}
+              partners={partners.filter((partner) => partner.id !== row.partnerTenantId)}
+              reference={row.publicReference ?? row.quoteRequestId.slice(0, 8)}
+              currentPartnerName={row.partnerLegalName ?? row.partnerTenantId.slice(0, 8)}
+            />
           </details>
         )}
         pagination={{

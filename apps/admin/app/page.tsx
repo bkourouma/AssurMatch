@@ -5,11 +5,12 @@ import { readAdminHealth, readAdminDashboard, readComplianceAlerts } from "./lib
 import { formatDateTime, readQuoteRequests } from "./lib/operations-api";
 import type { QuoteRequestRow } from "./lib/operations-api";
 import type { ComplianceAlertsData } from "./lib/admin-api";
-import { AttentionList, Badge, Button, Card, Cluster, DataTable, Form, FormActions, Grid, PageHeader, PageStack, StateMessage, StatStrip } from "./lib/ui/admin-ui";
+import { AttentionList, Badge, Button, Card, DataTable, Form, FormActions, Grid, PageHeader, PageStack, StateMessage, StatStrip } from "./lib/ui/admin-ui";
 import type { DataTableColumn } from "./lib/ui/admin-ui";
 import { quoteStatusTones } from "./lib/ui/operations-tones";
 import { quoteStatusLabel } from "./lib/ui/operations-labels";
-import { dashboardAttention, dashboardStats, flagTone, sensitiveFeatureFlagKeys } from "./lib/ui/admin-view-models";
+import { complianceCategoryLabel, dashboardAttention, dashboardStats } from "./lib/ui/admin-view-models";
+import { SensitiveFlagsCard } from "./lib/ui/dashboard-blocks";
 import { readFailureDetail } from "./lib/auth-error-messages";
 
 export default async function AdminHomePage() {
@@ -58,6 +59,7 @@ export default async function AdminHomePage() {
         breadcrumb={[{ label: "Pilotage" }, { label: "Dashboard" }]}
         title="Dashboard admin"
         description="Ce qui demande une action, puis les volumes de la fenêtre. Les modules sensibles restent contrôlés par les règles et flags existants."
+        actions={<Button href="/dashboard" variant="secondary">Indicateurs détaillés</Button>}
       />
 
       {health.forbidden ? <StateMessage tone="warning">Accès santé système refusé pour ce rôle admin.</StateMessage> : null}
@@ -65,7 +67,9 @@ export default async function AdminHomePage() {
       {dashboard.forbidden ? (
         <StateMessage tone="danger">Accès dashboard plateforme refusé pour ce rôle admin.</StateMessage>
       ) : dashboard.status === "error" ? (
-        <StateMessage tone="danger" title="Dashboard indisponible">L'API admin ne répond pas correctement. {readFailureDetail(dashboard.error)}</StateMessage>
+        <StateMessage tone="danger" title="Dashboard indisponible">
+          L&apos;API admin ne répond pas correctement. {readFailureDetail(dashboard.error)} Rechargez la page ; si l&apos;erreur persiste, vérifiez l&apos;état de l&apos;API avant de relancer. <a href="/">Recharger le dashboard</a>
+        </StateMessage>
       ) : (
         <>
           <section aria-label="Dashboard plateforme synthèse" className="bo-stack">
@@ -78,16 +82,7 @@ export default async function AdminHomePage() {
             <RecentQuoteRequests />
             <RecentAlerts />
           </Grid>
-          <section aria-label="Synthèse conformité et flags sensibles">
-            <Card title="Feature flags sensibles (lecture seule)">
-              <Cluster>
-                {sensitiveFeatureFlagKeys.map((key) => {
-                  const flag = dashboard.data.sensitiveFeatureFlags.find((item) => item.key === key);
-                  return <Badge key={key} tone={flagTone(flag?.value ?? false)}>{key}: {flag?.value ? "actif" : "désactivé"}</Badge>;
-                })}
-              </Cluster>
-            </Card>
-          </section>
+          <SensitiveFlagsCard flags={dashboard.data.sensitiveFeatureFlags} ariaLabel="Synthèse conformité et flags sensibles" />
         </>
       )}
     </PageStack>
@@ -105,29 +100,29 @@ async function RecentQuoteRequests() {
   const result = await readQuoteRequests({ page: 1, pageSize: 6 });
   return (
     <Card title="Dernières demandes de devis" actions={<Button href="/quote-requests" variant="secondary" size="sm">Tout voir</Button>}>
-      <DataTable
-        columns={quoteColumns}
-        items={result.data.items}
-        getKey={(row) => row.id}
-        emptyLabel="Aucune demande reçue"
-        aria-label="Dernières demandes de devis"
-      />
+      {result.status === "success" ? (
+        <DataTable
+          columns={quoteColumns}
+          items={result.data.items}
+          getKey={(row) => row.id}
+          getRowHref={(row) => `/quote-requests/${encodeURIComponent(row.id)}`}
+          emptyLabel="Aucune demande reçue"
+          emptyDescription="Les demandes apparaissent ici dès qu'un visiteur envoie un devis."
+          aria-label="Dernières demandes de devis"
+        />
+      ) : (
+        <StateMessage tone="warning">
+          {result.status === "forbidden" ? "Lecture des demandes refusée pour ce rôle admin." : <>Demandes indisponibles pour le moment. {readFailureDetail(result.error)} Le reste du dashboard n&apos;est pas affecté ; ouvrez <a href="/quote-requests">la liste des demandes</a> pour réessayer.</>}
+        </StateMessage>
+      )}
     </Card>
   );
 }
 
 type AlertRow = ComplianceAlertsData["items"][number];
 
-const alertCategoryLabels: Record<AlertRow["category"], string> = {
-  consent_missing: "Consentement absent",
-  crm_flag_closed: "CRM fermé",
-  rbac_denied: "RBAC refusé",
-  cross_tenant_attempt: "Tentative inter-tenant",
-  other: "Autre"
-};
-
 const alertColumns: Array<DataTableColumn<AlertRow>> = [
-  { key: "category", header: "Catégorie", render: (row) => <Badge tone="warning">{alertCategoryLabels[row.category]}</Badge> },
+  { key: "category", header: "Catégorie", render: (row) => <Badge tone="warning">{complianceCategoryLabel(row.category)}</Badge> },
   { key: "reason", header: "Motif", render: (row) => row.reason },
   { key: "occurred", header: "Le", render: (row) => formatDateTime(row.occurredAt) }
 ];
@@ -136,13 +131,20 @@ async function RecentAlerts() {
   const result = await readComplianceAlerts(1, 6);
   return (
     <Card title="Dernières alertes conformité" actions={<Button href="/dashboard/compliance-alerts" variant="secondary" size="sm">Tout voir</Button>}>
-      <DataTable
-        columns={alertColumns}
-        items={result.data.items}
-        getKey={(row) => row.id}
-        emptyLabel="Aucune alerte"
-        aria-label="Dernières alertes conformité"
-      />
+      {result.status === "success" ? (
+        <DataTable
+          columns={alertColumns}
+          items={result.data.items}
+          getKey={(row) => row.id}
+          emptyLabel="Aucune alerte"
+          emptyDescription="Aucun refus audité récemment."
+          aria-label="Dernières alertes conformité"
+        />
+      ) : (
+        <StateMessage tone="warning">
+          {result.forbidden ? "Lecture des alertes refusée pour ce rôle admin." : <>Alertes indisponibles pour le moment. {readFailureDetail(result.error)} Ouvrez <a href="/dashboard/compliance-alerts">le journal des alertes</a> pour réessayer.</>}
+        </StateMessage>
+      )}
     </Card>
   );
 }

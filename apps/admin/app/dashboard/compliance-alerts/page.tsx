@@ -3,8 +3,10 @@ import { isAdminProfile, loginRedirect, readBackOfficeSession } from "../../lib/
 import { readAdminAlerts, readComplianceAlerts } from "../../lib/admin-api";
 import { acknowledgeAlertAction } from "../../lib/alert-actions";
 import { formatDateTime } from "../../lib/operations-api";
-import { Badge, Button, Card, DataTable, Form, FormActions, Input, Notice, PageHeader, PageStack, StateMessage, StatusBadge, Tabs } from "../../lib/ui/admin-ui";
+import { Badge, Card, DataTable, Form, FormActions, Input, Notice, PageHeader, PageStack, StateMessage, StatusBadge, Tabs } from "../../lib/ui/admin-ui";
 import { readFailureDetail } from "../../lib/auth-error-messages";
+import { complianceCategoryLabel } from "../../lib/ui/admin-view-models";
+import { PendingActionButton } from "../../lib/ui/pending-action-button";
 
 interface Props {
   searchParams: Promise<{ page?: string; pageSize?: string; alert?: string; alertStatus?: string }>;
@@ -14,10 +16,10 @@ interface Props {
 const ALERT_NOTICES: Record<string, { tone: "success" | "warning" | "danger"; text: string }> = {
   acknowledged: { tone: "success", text: "Alerte acquittée. L'acquittement et son motif sont audités." },
   already: { tone: "warning", text: "Cette alerte était déjà acquittée." },
-  invalid: { tone: "warning", text: "Motif d'acquittement requis (8 caractères minimum)." },
+  invalid: { tone: "warning", text: "Alerte non acquittée : saisissez un motif d'au moins 8 caractères dans la ligne concernée, puis acquittez à nouveau." },
   forbidden: { tone: "danger", text: "Acquittement réservé aux administrateurs plateforme et conformité (MFA requise)." },
-  not_found: { tone: "warning", text: "Alerte introuvable." },
-  error: { tone: "danger", text: "Acquittement indisponible pour le moment." }
+  not_found: { tone: "warning", text: "Alerte introuvable : elle a peut-être été retirée. Rechargez la liste." },
+  error: { tone: "danger", text: "Acquittement indisponible pour le moment : l'alerte reste ouverte. Réessayez dans un instant." }
 };
 
 const SEVERITY_TONES = { info: "info", warning: "warning", critical: "danger" } as const;
@@ -73,7 +75,9 @@ export default async function ComplianceAlertsPage({ searchParams }: Props) {
 
   const data = alerts.data;
   const lastPage = Math.max(1, Math.ceil(data.total / data.pageSize));
-  const hrefFor = (nextPage: number) => `/dashboard/compliance-alerts?page=${nextPage}&pageSize=${data.pageSize}`;
+  // The pager keeps the alerts-center filter, so paging the journal never resets "Acquittées" to "Ouvertes".
+  const hrefFor = (nextPage: number) => `/dashboard/compliance-alerts?page=${nextPage}&pageSize=${data.pageSize}&alertStatus=${alertStatus}`;
+  const tabHref = (status: string) => `/dashboard/compliance-alerts?alertStatus=${status}`;
 
   return (
     <PageStack>
@@ -92,13 +96,13 @@ export default async function ComplianceAlertsPage({ searchParams }: Props) {
           <Tabs
             label="Filtre des alertes"
             items={[
-              { label: "Ouvertes", href: "/dashboard/compliance-alerts?alertStatus=open", current: alertStatus === "open" },
-              { label: "Acquittées", href: "/dashboard/compliance-alerts?alertStatus=acknowledged", current: alertStatus === "acknowledged" },
-              { label: "Toutes", href: "/dashboard/compliance-alerts?alertStatus=all", current: alertStatus === "all" }
+              { label: center.status === "error" ? "Ouvertes" : `Ouvertes (${center.data.open})`, href: tabHref("open"), current: alertStatus === "open" },
+              { label: "Acquittées", href: tabHref("acknowledged"), current: alertStatus === "acknowledged" },
+              { label: "Toutes", href: tabHref("all"), current: alertStatus === "all" }
             ]}
           />
           {center.status === "error" ? (
-            <StateMessage tone="warning">Centre d&apos;alertes indisponible. {readFailureDetail(center.error)}</StateMessage>
+            <StateMessage tone="warning">Centre d&apos;alertes indisponible. {readFailureDetail(center.error)} Le journal de conformité ci-dessous reste consultable ; <a href={tabHref(alertStatus)}>rechargez</a> pour réessayer.</StateMessage>
           ) : (
             <DataTable
               columns={[
@@ -110,13 +114,13 @@ export default async function ComplianceAlertsPage({ searchParams }: Props) {
                 { key: "details", header: "Détails", render: (item) => detailsLabel(item.details) },
                 {
                   key: "action",
-                  header: "Acquittement",
+                  header: "Acquittement (motif obligatoire)",
                   render: (item) => item.status === "open" ? (
                     <Form action={acknowledgeAlertAction} data-alert-ack={item.id}>
                       <input type="hidden" name="alertId" value={item.id} />
-                      <Input name="reason" aria-label="Motif d'acquittement (audité)" placeholder="Motif (audité)" minLength={8} required />
+                      <Input name="reason" aria-label={`Motif d'acquittement de l'alerte « ${item.label} » (obligatoire, 8 caractères minimum, audité)`} placeholder="Motif (obligatoire, 8 car. min.)" minLength={8} required />
                       <FormActions>
-                        <Button type="submit" size="sm" variant="secondary">Acquitter</Button>
+                        <PendingActionButton size="sm" variant="secondary" pendingLabel="Acquittement...">Acquitter</PendingActionButton>
                       </FormActions>
                     </Form>
                   ) : `${formatDateTime(item.acknowledgedAt)} - ${item.acknowledgeReason ?? ""}`
@@ -125,7 +129,7 @@ export default async function ComplianceAlertsPage({ searchParams }: Props) {
               items={center.data.items}
               getKey={(item) => item.id}
               emptyLabel="Aucune alerte pour ce filtre."
-              emptyDescription={alertStatus === "open" ? "Rien à acquitter : le worker n'a levé aucune alerte ouverte." : undefined}
+              emptyDescription={alertStatus === "open" ? "Rien à acquitter : le worker n'a levé aucune alerte ouverte." : alertStatus === "acknowledged" ? "Aucune alerte n'a encore été acquittée." : "Le worker n'a levé aucune alerte."}
               aria-label="Centre d'alertes"
             />
           )}
@@ -135,7 +139,7 @@ export default async function ComplianceAlertsPage({ searchParams }: Props) {
         <DataTable
           columns={[
             { key: "occurredAt", header: "Date", render: (item) => formatDateTime(item.occurredAt) },
-            { key: "category", header: "Catégorie", render: (item) => item.category },
+            { key: "category", header: "Catégorie", render: (item) => complianceCategoryLabel(item.category) },
             { key: "reason", header: "Raison", render: (item) => item.reason },
             { key: "target", header: "Cible", render: (item) => `${item.targetType}/${item.targetId ?? "-"}` },
             { key: "tenant", header: "Tenant", render: (item) => (item.partnerTenantId ? <span className="bo-ref">{item.partnerTenantId}</span> : "-") }
@@ -143,6 +147,7 @@ export default async function ComplianceAlertsPage({ searchParams }: Props) {
           items={data.items}
           getKey={(item) => item.id}
           emptyLabel="Aucune alerte conformité dans la fenêtre."
+          emptyDescription="Aucun refus audité (consentement, RBAC, CRM fermé, inter-tenant) sur la période."
           aria-label="Alertes conformité"
           pagination={{
             page: data.page,

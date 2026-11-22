@@ -109,8 +109,8 @@ export const adminNavigation: NavGroup[] = [
       { label: "Facturation", href: "/billing", icon: "receipt", match: ["/billing"] },
       { label: "Messagerie", href: "/messaging", icon: "message", match: ["/messaging"] },
       // Lot 12 (spec 077): retry queue of the optional channels and the generic CRM connector.
-      { label: "Canaux", href: "/channels", icon: "message", match: ["/channels"] },
-      { label: "Connecteurs CRM", href: "/connecteurs-crm", icon: "plug", match: ["/connecteurs-crm"] }
+      { label: "Canaux", href: "/channels", icon: "bell", match: ["/channels"] },
+      { label: "Connecteurs CRM", href: "/connecteurs-crm", icon: "crm", match: ["/connecteurs-crm"] }
     ]
   },
   {
@@ -119,10 +119,16 @@ export const adminNavigation: NavGroup[] = [
       { label: "Utilisateurs", href: "/users", icon: "users", match: ["/users"] },
       { label: "Feature flags", href: "/feature-flags", icon: "flag", match: ["/feature-flags"] },
       { label: "Activation", href: "/activation-checklist", icon: "checklist", match: ["/activation-checklist"] },
-      { label: "Assistance IA", href: "/ai-assistance", icon: "sparkles", match: ["/ai-assistance"] },
+      {
+        label: "Assistance IA",
+        href: "/ai-assistance",
+        icon: "sparkles",
+        match: ["/ai-assistance"],
+        // The AI flags are a sub-screen of the AI assistance (own icon-less entry, no second "flag" icon).
+        children: [{ label: "Flags IA", href: "/ai-assistance/flags", match: ["/ai-assistance/flags"] }]
+      },
       // Lot 9 (spec 072): minimal CMS (FAQ, guides, glossary, legal overrides); the API refuses the other roles.
-      { label: "Contenu", href: "/content", icon: "catalog", match: ["/content"] },
-      { label: "Flags IA", href: "/ai-assistance/flags", icon: "flag", match: ["/ai-assistance/flags"] }
+      { label: "Contenu", href: "/content", icon: "edit", match: ["/content"] }
     ]
   },
   {

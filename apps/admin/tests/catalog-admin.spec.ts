@@ -156,7 +156,7 @@ test("the feature flag screen toggles global non-sensitive flags only", () => {
   expect(page).toContain("flag.scopeType === \"global\"");
   expect(page).toContain("isSensitiveFlagKey(flag.key, sensitiveFeatureFlagKeys)");
   expect(page).toContain("Flags pays et produits (lecture seule)");
-  expect(forms).toContain("Motif (audité)");
+  expect(forms).toContain("Motif (obligatoire, audité)");
   expect(forms).not.toMatch(/<Switch\b|\bSwitch,/);
   expect(actions).toContain("if (isSensitiveFlagKey(key)) return { status: \"error\", message: SENSITIVE_FLAG_EXPLANATION }");
 });

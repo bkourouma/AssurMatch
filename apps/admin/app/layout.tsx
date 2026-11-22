@@ -7,7 +7,7 @@ import { AdminShell } from "./lib/ui/admin-shell";
 import { ADMIN_THEME_COOKIE } from "./lib/theme-cookie";
 
 export const metadata = {
-  title: "AssurMatch Admin",
+  title: { default: "AssurMatch Admin", template: "%s · AssurMatch Admin" },
   description: "Back-office admin AssurMatch"
 };
 

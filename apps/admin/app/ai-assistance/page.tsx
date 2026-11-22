@@ -1,8 +1,10 @@
 import Link from "next/link";
 import { listAdminAiInsights, readAdminAIAssistance } from "../lib/admin-api";
 import { requestAdminInsightAction, validateAdminInsightAction } from "../lib/ai-insight-actions";
-import { Badge, Button, Card, Cluster, DataTable, DescriptionList, EmptyState, Form, Input, PageHeader, PageStack, Split, Stack, StateMessage } from "../lib/ui/admin-ui";
+import { Badge, Card, Cluster, DataTable, DescriptionList, EmptyState, Form, Input, PageHeader, PageStack, Split, Stack, StateMessage } from "../lib/ui/admin-ui";
 import { readFailureDetail } from "../lib/auth-error-messages";
+import { aiInsightStatusLabel, aiValidationLabel } from "../lib/ui/admin-view-models";
+import { PendingActionButton } from "../lib/ui/pending-action-button";
 
 const INSIGHT_LABELS: Record<string, string> = {
   admin_risk_triage: "Triage des risques de conformité",
@@ -19,11 +21,11 @@ const DISPLAY_ONLY_LABELS: Record<string, string> = {
 };
 
 const NOTICES: Record<string, string> = {
-  queued: "Insight IA demande. Rechargez la page dans quelques secondes pour le consulter.",
+  queued: "Insight IA demandé. Rechargez la page dans quelques secondes pour le consulter.",
   validated: "Décision de validation humaine enregistrée et auditée.",
   quota: "Quota quotidien d'assistance IA atteint.",
   disabled: "Assistance IA désactivée par les feature flags.",
-  forbidden: "Action refusée: rôle AI Admin requis.",
+  forbidden: "Action refusée : rôle AI Admin requis.",
   error: "Assistance IA temporairement indisponible."
 };
 
@@ -41,7 +43,7 @@ export default async function AdminAIAssistancePage({ searchParams }: { searchPa
       />
       {assistance.forbidden ? <StateMessage tone="danger">Accès assistance IA refusé pour ce rôle admin.</StateMessage> : null}
       {assistance.status === "error" ? <StateMessage tone="danger">Assistance IA indisponible. {readFailureDetail(assistance.error)}</StateMessage> : null}
-      {ai && NOTICES[ai] ? <StateMessage tone={ai === "queued" || ai === "validated" ? "info" : "warning"}>{NOTICES[ai]}</StateMessage> : null}
+      {ai && NOTICES[ai] ? <StateMessage tone={ai === "queued" || ai === "validated" ? "info" : ai === "forbidden" || ai === "error" ? "danger" : "warning"}>{NOTICES[ai]}</StateMessage> : null}
       {assistance.status === "success" ? (
         <>
           <Split>
@@ -65,11 +67,21 @@ export default async function AdminAIAssistancePage({ searchParams }: { searchPa
                       {assistType === "offer_consistency_check" || assistType === "offer_summary" ? (
                         <Input name="offerId" placeholder="Identifiant de l'offre" aria-label="Identifiant de l'offre" />
                       ) : null}
-                      <Button type="submit" variant="secondary">{label}</Button>
+                      <PendingActionButton variant="secondary" pendingLabel="Demande en cours...">{label}</PendingActionButton>
                     </Form>
                   ))}
                 </Cluster>
               </Card>
+            ) : null}
+
+            {!enabled ? (
+              <StateMessage tone="warning" title="Assistance IA désactivée">
+                Aucun insight ne peut être demandé tant que les feature flags IA sont fermés. L&apos;ouverture est une décision de conformité : consultez <Link href="/ai-assistance/flags">l&apos;état des flags IA par pays et produit</Link>.
+              </StateMessage>
+            ) : null}
+
+            {insights.status === "error" ? (
+              <StateMessage tone="warning">Insights récents indisponibles. {readFailureDetail(insights.error)} Rechargez la page pour réessayer.</StateMessage>
             ) : null}
 
             {insights.status === "success" && insights.data.length === 0 ? (
@@ -81,15 +93,19 @@ export default async function AdminAIAssistancePage({ searchParams }: { searchPa
             ) : null}
 
             {insights.status === "success" && insights.data.length > 0 ? (
-              <Card title="Insights récents">
+              <Card
+                title="Insights récents"
+                description={`${insights.data.filter((insight) => insight.status === "completed" && insight.humanValidationStatus === "pending").length} à valider. Valider ou écarter enregistre votre décision (auditée) ; aucune alerte, offre ou activation n'est modifiée automatiquement.`}
+              >
                 <ul className="bo-list">
                   {insights.data.map((insight) => (
                     <li key={insight.id}>
                       <Stack>
                         <Cluster>
                           <strong>{INSIGHT_LABELS[insight.assistType] ?? DISPLAY_ONLY_LABELS[insight.assistType] ?? insight.assistType}</strong>
-                          <Badge tone={insight.status === "completed" ? "success" : insight.status === "queued" ? "info" : "warning"}>{insight.status}</Badge>
-                          {insight.humanValidationStatus !== "not_required" ? <Badge tone={insight.humanValidationStatus === "pending" ? "warning" : "info"}>validation: {insight.humanValidationStatus}</Badge> : null}
+                          <Badge tone={insight.status === "completed" ? "success" : insight.status === "queued" ? "info" : "warning"} title={insight.status}>{aiInsightStatusLabel(insight.status)}</Badge>
+                          {insight.humanValidationStatus !== "not_required" ? <Badge tone={insight.humanValidationStatus === "pending" ? "warning" : "info"} title={insight.humanValidationStatus}>Validation : {aiValidationLabel(insight.humanValidationStatus)}</Badge> : null}
+                          <span className="bo-description">{insight.createdAt.slice(0, 10)}</span>
                         </Cluster>
                         {insight.status === "completed" && insight.outputText ? <p>{insight.outputText}</p> : null}
                         {insight.status === "refused" ? <p className="bo-description">Insight retenu par les garde-fous ou assistance désactivée ({insight.refusalReason ?? "refus"}).</p> : null}
@@ -99,7 +115,9 @@ export default async function AdminAIAssistancePage({ searchParams }: { searchPa
                               <Form key={decision} action={validateAdminInsightAction}>
                                 <input type="hidden" name="insightId" value={insight.id} />
                                 <input type="hidden" name="decision" value={decision} />
-                                <Button type="submit" variant="secondary" size="sm">{decision === "approved" ? "Valider l'insight" : "Écarter l'insight"}</Button>
+                                <PendingActionButton variant="secondary" size="sm" pendingLabel="Enregistrement...">
+                                  {decision === "approved" ? "Valider l'insight" : "Écarter l'insight"}
+                                </PendingActionButton>
                               </Form>
                             ))}
                           </Cluster>
