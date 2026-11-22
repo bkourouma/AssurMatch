@@ -89,6 +89,9 @@ export type {
   TextareaProps
 } from "./form/controls";
 
+export { FormErrorSummary } from "./form/error-summary";
+export type { FormErrorSummaryItem, FormErrorSummaryProps } from "./form/error-summary";
+
 export { Switch } from "./form/switch";
 export type { SwitchProps } from "./form/switch";
 
