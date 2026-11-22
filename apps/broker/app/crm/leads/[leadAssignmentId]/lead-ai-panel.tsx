@@ -23,6 +23,20 @@ const NOTICES: Record<string, string> = {
   error: "Assistance IA temporairement indisponible."
 };
 
+const STATUS_LABELS: Record<BrokerAiInteraction["status"], string> = {
+  completed: "Terminée",
+  queued: "En cours",
+  refused: "Refusée",
+  failed: "Échec"
+};
+
+const VALIDATION_LABELS: Record<BrokerAiInteraction["humanValidationStatus"], string> = {
+  not_required: "Validation non requise",
+  pending: "Validation humaine : à valider",
+  approved: "Validation humaine : validée",
+  rejected: "Validation humaine : écartée"
+};
+
 function statusTone(status: BrokerAiInteraction["status"]): "success" | "warning" | "info" | "neutral" {
   if (status === "completed") return "success";
   if (status === "refused" || status === "failed") return "warning";
@@ -43,7 +57,12 @@ export function LeadAiPanel({ leadAssignmentId, enabled, availableAssistTypes, i
       title="Assistance IA d'aide à la compréhension"
       description="Suggestions IA à valider: le courtier décide, aucune décision automatique sur le lead, données de contact jamais transmises au modèle."
     >
-      {notice && NOTICES[notice] ? <Notice tone={notice === "error" ? "danger" : "info"}>{NOTICES[notice]}</Notice> : null}
+      {notice && NOTICES[notice] ? (
+        <Notice tone={notice === "error" ? "danger" : notice === "validated" ? "success" : "info"}>
+          {NOTICES[notice]}
+          {notice === "queued" ? <> <a href={`/crm/leads/${leadAssignmentId}?tab=activite`}>Actualiser la page</a></> : null}
+        </Notice>
+      ) : null}
       <TenantWriteGuard readOnly={readOnly}>
       <Cluster>
         {assistTypes.map((assistType) => (
@@ -63,9 +82,11 @@ export function LeadAiPanel({ leadAssignmentId, enabled, availableAssistTypes, i
             <li key={interaction.id} className={styles.entry}>
               <div className={styles.entryHead}>
                 <h3 className={styles.entryTitle}>{ASSIST_LABELS[interaction.assistType] ?? interaction.assistType}</h3>
-                <Badge tone={statusTone(interaction.status)}>{interaction.status}</Badge>
+                <Badge tone={statusTone(interaction.status)}>{STATUS_LABELS[interaction.status] ?? interaction.status}</Badge>
                 {interaction.fallback ? <Badge tone="neutral">mode simplifié</Badge> : null}
-                {interaction.humanValidationStatus !== "not_required" ? <Badge tone={interaction.humanValidationStatus === "pending" ? "warning" : "info"}>validation: {interaction.humanValidationStatus}</Badge> : null}
+                {interaction.humanValidationStatus !== "not_required" ? (
+                  <Badge tone={interaction.humanValidationStatus === "pending" ? "warning" : "info"}>{VALIDATION_LABELS[interaction.humanValidationStatus] ?? interaction.humanValidationStatus}</Badge>
+                ) : null}
               </div>
               {interaction.status === "completed" && interaction.outputText ? <p className={styles.message}>{interaction.outputText}</p> : null}
               {interaction.status === "refused" ? <p className={styles.muted}>Suggestion retenue par les garde-fous ou assistance désactivée ({interaction.refusalReason ?? "refus"}).</p> : null}

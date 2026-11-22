@@ -3,8 +3,11 @@ import { RevokeTrustedDevicesForm } from "../../auth-flow-form";
 import { listTrustedDevices, type TrustedDeviceView } from "../../lib/broker-api";
 import { isBrokerProfile, loginRedirect, readBackOfficeSession } from "../../lib/backoffice-auth";
 import { Button, Card, DataTable, PageHeader, PageStack, StateMessage } from "../../lib/ui/broker-ui";
+import polish from "../../lib/ui/self-service-polish.module.css";
 
 const SECURITY_PATH = "/account/security";
+
+export const metadata = { title: "Sécurité du compte" };
 
 // Deterministic French rendering (Africa/Abidjan is UTC+0, the platform reference zone).
 const dateTimeFormat = new Intl.DateTimeFormat("fr-FR", { dateStyle: "medium", timeStyle: "short", timeZone: "Africa/Abidjan" });
@@ -29,7 +32,6 @@ export default async function BrokerAccountSecurityPage() {
     <PageStack>
       <PageHeader
         breadcrumb={[{ label: "Compte" }, { label: "Compte", href: "/account" }, { label: "Appareils de confiance" }]}
-        kicker="Compte courtier"
         title="Sécurité du compte"
         description="Appareils de confiance et mot de passe de votre compte."
         actions={<Button href="/account" variant="secondary">Retour au compte</Button>}
@@ -40,7 +42,10 @@ export default async function BrokerAccountSecurityPage() {
         description="Sur un appareil de confiance, le code MFA n'est pas redemandé pendant 30 jours ; le mot de passe reste toujours exigé. Révoquez-les si un appareil est perdu, partagé ou si vous avez un doute."
       >
         {!result.ok ? (
-          <StateMessage tone="danger">Impossible de charger la liste des appareils de confiance. Réessayez plus tard.</StateMessage>
+          <StateMessage tone="danger" title="Liste indisponible">
+            <p>Impossible de charger la liste des appareils de confiance. Aucun appareil n&apos;a été modifié.</p>
+            <p><a href={SECURITY_PATH}>Recharger la page</a></p>
+          </StateMessage>
         ) : (
           <DataTable<TrustedDeviceView>
             columns={[
@@ -55,6 +60,7 @@ export default async function BrokerAccountSecurityPage() {
             aria-label="Appareils de confiance actifs"
           />
         )}
+        <p className={polish.lead}>Révoquer retire tous ces appareils à la fois : le code MFA vous sera redemandé à la prochaine connexion.</p>
         <RevokeTrustedDevicesForm />
       </Card>
 

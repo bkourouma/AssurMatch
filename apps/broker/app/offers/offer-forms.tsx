@@ -15,6 +15,8 @@ import {
   BROKER_OFFER_TYPE_DESCRIPTIONS,
   BROKER_OFFER_TYPE_OPTIONS,
   COMPLETENESS_CHECKLIST,
+  OFFER_BLOCKER_LABELS,
+  OFFER_FIELD_HINTS,
   OFFER_INDICATIVE_DISCLAIMERS,
   OFFER_TYPE_LABELS,
   PRIVATE_OFFER_BADGE,
@@ -67,14 +69,39 @@ export function OfferBlockers({ blockers }: { blockers: OfferBlocker[] }) {
 }
 
 export function OfferActionResult({ state }: { state: BrokerOfferActionState }) {
+  const anchor = useRef<HTMLDivElement>(null);
+  // The result sits above a long form: bring it into view after each answer so the outcome is never off screen.
+  useEffect(() => {
+    if (state.status !== "idle") anchor.current?.scrollIntoView({ block: "nearest" });
+  }, [state]);
   if (state.status === "idle") return null;
   const blockers = state.blockers ?? [];
   return (
-    <Notice tone={state.status === "success" ? "success" : "danger"}>
-      {state.message ? <p>{state.message}</p> : null}
-      {blockers.length > 0 ? <OfferBlockers blockers={blockers} /> : null}
-    </Notice>
+    <div ref={anchor}>
+      <Notice tone={state.status === "success" ? "success" : "danger"}>
+        {state.message ? <p>{state.message}</p> : null}
+        {blockers.length > 0 ? <OfferBlockers blockers={blockers} /> : null}
+      </Notice>
+    </div>
   );
+}
+
+/** Blocker `field` names that share one control in the form. */
+const BLOCKER_FIELD_ALIASES: Record<string, string> = { insurerId: "insurerName", indicativePrice: "indicativePriceMin", validity: "validFrom" };
+
+/**
+ * Per-field error messages taken from the `{ code, field }` blockers of a refusal, so each message
+ * sits under the control it concerns (the full list stays in the notice above the form).
+ */
+export function blockerFieldErrors(state: BrokerOfferActionState): Record<string, string> {
+  const errors: Record<string, string> = {};
+  if (state.status !== "error") return errors;
+  for (const blocker of state.blockers ?? []) {
+    if (!blocker.field) continue;
+    const key = BLOCKER_FIELD_ALIASES[blocker.field] ?? blocker.field;
+    errors[key] ??= OFFER_BLOCKER_LABELS[blocker.code] ?? blocker.code;
+  }
+  return errors;
 }
 
 function ReasonField({ id, required }: { id: string; required: boolean }) {
@@ -89,6 +116,7 @@ function ReasonField({ id, required }: { id: string; required: boolean }) {
 
 export function CompletenessChecklist({ completeness }: { completeness: OfferCompleteness }) {
   const missing = new Set<string>(completeness.missing);
+  const remaining = COMPLETENESS_CHECKLIST.filter((item) => missing.has(item.field)).length;
   return (
     <div data-offer-completeness="true" aria-live="polite">
       <Cluster>
@@ -97,6 +125,9 @@ export function CompletenessChecklist({ completeness }: { completeness: OfferCom
           {completeness.complete ? "Minimum atteint : soumission possible" : "Minimum non atteint"}
         </Badge>
       </Cluster>
+      {remaining > 0 ? (
+        <p className="bo-description">{`${remaining} élément${remaining > 1 ? "s" : ""} à compléter avant de pouvoir soumettre l'offre.`}</p>
+      ) : null}
       <ul className="bo-list" aria-label="Complétude minimale">
         {COMPLETENESS_CHECKLIST.map((item) => (
           <li key={item.field}>
@@ -118,7 +149,7 @@ interface GuaranteeRowState {
   detail: string;
 }
 
-function GuaranteesEditor({ base, initial, onChange }: { base: string; initial: OfferFormContent["guarantees"]; onChange: () => void }) {
+function GuaranteesEditor({ base, initial, onChange, error }: { base: string; initial: OfferFormContent["guarantees"]; onChange: () => void; error?: string | undefined }) {
   const counter = useRef(0);
   const nextId = () => {
     counter.current += 1;
@@ -141,6 +172,7 @@ function GuaranteesEditor({ base, initial, onChange }: { base: string; initial: 
   }, [rows, onChange]);
   return (
     <FormSection legend="Garanties (liste détaillée)" description="Au moins une garantie est exigée pour soumettre l'offre. Une ligne par garantie (50 au maximum) ; la clé est déduite du libellé si elle est vide.">
+      {error ? <p className="bo-field__error" role="alert">{`Garanties : ${error.toLowerCase()}. Ajoutez au moins une garantie avec un libellé.`}</p> : null}
       {rows.length === 0 ? <p>Aucune garantie : ajoutez-en au moins une avant de soumettre.</p> : null}
       {rows.map((row, index) => (
         <div key={row.rowId} data-offer-guarantee-row="true">
@@ -160,7 +192,7 @@ function GuaranteesEditor({ base, initial, onChange }: { base: string; initial: 
             <Field id={`${base}-g-detail-${row.rowId}`} label="Détail">
               <Input {...fieldControlProps(`${base}-g-detail-${row.rowId}`)} name="guaranteeDetail" maxLength={300} defaultValue={row.detail} />
             </Field>
-            <Button type="button" size="sm" variant="tertiary" onClick={() => setRows((current) => current.filter((item) => item.rowId !== row.rowId))}>
+            <Button type="button" size="sm" variant="tertiary" aria-label={`Retirer la garantie ${index + 1}`} onClick={() => setRows((current) => current.filter((item) => item.rowId !== row.rowId))}>
               Retirer
             </Button>
           </Cluster>
@@ -189,12 +221,13 @@ function GuaranteesEditor({ base, initial, onChange }: { base: string; initial: 
  * OFFER_INSURER_INVALID); the free text stays as a fallback (« Autre assureur »). A chosen insurer
  * sends `insurerId` plus its name, so the live completeness still counts the insurer.
  */
-function InsurerFields({ base, content, insurers, countryId, onChange }: {
+function InsurerFields({ base, content, insurers, countryId, onChange, error }: {
   base: string;
   content: OfferFormContent | undefined;
   insurers: InsurerChoice[];
   countryId: string;
   onChange: () => void;
+  error?: string | undefined;
 }) {
   const [selectedId, setSelectedId] = useState(content?.insurerId ?? "");
   const options = insurers.filter((insurer) => insurer.countryId === countryId);
@@ -213,9 +246,10 @@ function InsurerFields({ base, content, insurers, countryId, onChange }: {
         id={`${base}-insurer-id`}
         label="Assureur porteur du risque"
         hint={countryId ? "Assureurs actifs du pays de l'offre. Choisissez « Autre assureur » pour saisir un nom libre." : "Choisissez d'abord le pays pour lister les assureurs."}
+        error={error}
       >
         <Select
-          {...fieldControlProps(`${base}-insurer-id`, { hint: "x" })}
+          {...fieldControlProps(`${base}-insurer-id`, { hint: "x", error })}
           name="insurerId"
           value={effectiveId}
           onChange={(event) => setSelectedId(event.target.value)}
@@ -235,78 +269,78 @@ function InsurerFields({ base, content, insurers, countryId, onChange }: {
   );
 }
 
-function OfferContentFields({ base, content, onChange, insurerFields }: { base: string; content: OfferFormContent | undefined; onChange: () => void; insurerFields: ReactNode }) {
+function OfferContentFields({ base, content, onChange, insurerFields, errors }: { base: string; content: OfferFormContent | undefined; onChange: () => void; insurerFields: ReactNode; errors: Record<string, string> }) {
   const disclaimers = content?.publicDisclaimers?.length ? content.publicDisclaimers : [...OFFER_INDICATIVE_DISCLAIMERS];
   return (
     <>
       <FormSection legend="Présentation">
-        <Field id={`${base}-name`} label="Nom commercial" required>
-          <Input {...fieldControlProps(`${base}-name`, { required: true })} name="name" maxLength={160} defaultValue={content?.name ?? ""} />
+        <Field id={`${base}-name`} label="Nom commercial" required hint={OFFER_FIELD_HINTS.name} error={errors.name}>
+          <Input {...fieldControlProps(`${base}-name`, { required: true, hint: "x", error: errors.name })} name="name" maxLength={160} defaultValue={content?.name ?? ""} />
         </Field>
         {insurerFields}
-        <Field id={`${base}-description`} label="Description">
-          <Textarea {...fieldControlProps(`${base}-description`)} name="shortDescription" rows={3} maxLength={1000} defaultValue={content?.shortDescription ?? ""} />
+        <Field id={`${base}-description`} label="Description" hint={OFFER_FIELD_HINTS.description} error={errors.shortDescription}>
+          <Textarea {...fieldControlProps(`${base}-description`, { hint: "x", error: errors.shortDescription })} name="shortDescription" rows={3} maxLength={1000} defaultValue={content?.shortDescription ?? ""} />
         </Field>
-        <Field id={`${base}-summary`} label="Résumé des garanties" hint="Texte libre. La liste des garanties se saisit dans la section « Garanties » plus bas.">
-          <Textarea {...fieldControlProps(`${base}-summary`, { hint: "x" })} name="guaranteeSummary" rows={2} maxLength={1000} defaultValue={content?.guaranteeSummary ?? ""} />
+        <Field id={`${base}-summary`} label="Résumé des garanties" hint="Texte libre. La liste des garanties se saisit dans la section « Garanties » plus bas." error={errors.guaranteeSummary}>
+          <Textarea {...fieldControlProps(`${base}-summary`, { hint: "x", error: errors.guaranteeSummary })} name="guaranteeSummary" rows={2} maxLength={1000} defaultValue={content?.guaranteeSummary ?? ""} />
         </Field>
-        <Field id={`${base}-level`} label="Niveau de garantie (1 à 5)">
-          <Select {...fieldControlProps(`${base}-level`)} name="guaranteeLevel" defaultValue={content?.guaranteeLevel !== undefined ? String(content.guaranteeLevel) : ""}>
+        <Field id={`${base}-level`} label="Niveau de garantie (1 à 5)" hint={OFFER_FIELD_HINTS.level} error={errors.guaranteeLevel}>
+          <Select {...fieldControlProps(`${base}-level`, { hint: "x", error: errors.guaranteeLevel })} name="guaranteeLevel" defaultValue={content?.guaranteeLevel !== undefined ? String(content.guaranteeLevel) : ""}>
             <option value="">Non renseigné</option>
             {[1, 2, 3, 4, 5].map((level) => <option key={level} value={level}>{level}</option>)}
           </Select>
         </Field>
       </FormSection>
-      <GuaranteesEditor base={base} initial={content?.guarantees} onChange={onChange} />
+      <GuaranteesEditor base={base} initial={content?.guarantees} onChange={onChange} error={errors.guarantees} />
       <FormSection legend="Conditions">
-        <Field id={`${base}-exclusions`} label="Exclusions">
-          <Textarea {...fieldControlProps(`${base}-exclusions`)} name="exclusionsSummary" rows={2} maxLength={1000} defaultValue={content?.exclusionsSummary ?? ""} />
+        <Field id={`${base}-exclusions`} label="Exclusions" hint={OFFER_FIELD_HINTS.exclusions} error={errors.exclusionsSummary}>
+          <Textarea {...fieldControlProps(`${base}-exclusions`, { hint: "x", error: errors.exclusionsSummary })} name="exclusionsSummary" rows={2} maxLength={1000} defaultValue={content?.exclusionsSummary ?? ""} />
         </Field>
-        <Field id={`${base}-deductible`} label="Franchise">
-          <Input {...fieldControlProps(`${base}-deductible`)} name="deductibleAmount" type="number" min={0} step="any" defaultValue={content?.deductibleAmount ?? ""} />
+        <Field id={`${base}-deductible`} label="Franchise" hint={OFFER_FIELD_HINTS.deductible} error={errors.deductibleAmount}>
+          <Input {...fieldControlProps(`${base}-deductible`, { hint: "x", error: errors.deductibleAmount })} name="deductibleAmount" type="number" inputMode="decimal" min={0} step="any" defaultValue={content?.deductibleAmount ?? ""} />
         </Field>
-        <Field id={`${base}-ceiling`} label="Plafond">
-          <Input {...fieldControlProps(`${base}-ceiling`)} name="coverageCeiling" type="number" min={0} step="any" defaultValue={content?.coverageCeiling ?? ""} />
+        <Field id={`${base}-ceiling`} label="Plafond" hint={OFFER_FIELD_HINTS.ceiling} error={errors.coverageCeiling}>
+          <Input {...fieldControlProps(`${base}-ceiling`, { hint: "x", error: errors.coverageCeiling })} name="coverageCeiling" type="number" inputMode="decimal" min={0} step="any" defaultValue={content?.coverageCeiling ?? ""} />
         </Field>
-        <Field id={`${base}-documents`} label="Documents requis" hint="Un document par ligne (30 au maximum).">
-          <Textarea {...fieldControlProps(`${base}-documents`, { hint: "x" })} name="requiredDocuments" rows={3} defaultValue={(content?.requiredDocuments ?? []).join("\n")} />
+        <Field id={`${base}-documents`} label="Documents requis" hint="Un document par ligne (30 au maximum)." error={errors.requiredDocuments}>
+          <Textarea {...fieldControlProps(`${base}-documents`, { hint: "x", error: errors.requiredDocuments })} name="requiredDocuments" rows={3} defaultValue={(content?.requiredDocuments ?? []).join("\n")} />
         </Field>
-        <Field id={`${base}-delay`} label="Délai moyen de traitement (jours)">
-          <Input {...fieldControlProps(`${base}-delay`)} name="processingDelayDays" type="number" min={0} max={365} defaultValue={content?.processingDelayDays ?? ""} />
+        <Field id={`${base}-delay`} label="Délai moyen de traitement (jours)" hint={OFFER_FIELD_HINTS.delay} error={errors.processingDelayDays}>
+          <Input {...fieldControlProps(`${base}-delay`, { hint: "x", error: errors.processingDelayDays })} name="processingDelayDays" type="number" inputMode="numeric" min={0} max={365} defaultValue={content?.processingDelayDays ?? ""} />
         </Field>
       </FormSection>
       <FormSection legend="Prix indicatif" description="Prix à confirmer par le courtier partenaire : aucune offre ne vaut devis ferme ni contrat.">
-        <Field id={`${base}-price-min`} label="Prime minimale">
-          <Input {...fieldControlProps(`${base}-price-min`)} name="indicativePriceMin" type="number" min={0} step="any" defaultValue={content?.indicativePriceMin ?? ""} />
+        <Field id={`${base}-price-min`} label="Prime minimale" hint={OFFER_FIELD_HINTS.priceMin} error={errors.indicativePriceMin}>
+          <Input {...fieldControlProps(`${base}-price-min`, { hint: "x", error: errors.indicativePriceMin })} name="indicativePriceMin" type="number" inputMode="decimal" min={0} step="any" defaultValue={content?.indicativePriceMin ?? ""} />
         </Field>
-        <Field id={`${base}-price-max`} label="Prime maximale">
-          <Input {...fieldControlProps(`${base}-price-max`)} name="indicativePriceMax" type="number" min={0} step="any" defaultValue={content?.indicativePriceMax ?? ""} />
+        <Field id={`${base}-price-max`} label="Prime maximale" hint={OFFER_FIELD_HINTS.priceMax} error={errors.indicativePriceMax}>
+          <Input {...fieldControlProps(`${base}-price-max`, { hint: "x", error: errors.indicativePriceMax })} name="indicativePriceMax" type="number" inputMode="decimal" min={0} step="any" defaultValue={content?.indicativePriceMax ?? ""} />
         </Field>
-        <Field id={`${base}-currency`} label="Devise">
-          <Input {...fieldControlProps(`${base}-currency`)} name="currency" minLength={3} maxLength={3} defaultValue={content?.currency ?? "XOF"} />
+        <Field id={`${base}-currency`} label="Devise" hint={OFFER_FIELD_HINTS.currency} error={errors.currency}>
+          <Input {...fieldControlProps(`${base}-currency`, { hint: "x", error: errors.currency })} name="currency" minLength={3} maxLength={3} autoCapitalize="characters" defaultValue={content?.currency ?? "XOF"} />
         </Field>
-        <Field id={`${base}-unit`} label="Unité de prix">
-          <Input {...fieldControlProps(`${base}-unit`)} name="pricingUnit" maxLength={40} placeholder="an" defaultValue={content?.pricingUnit ?? ""} />
+        <Field id={`${base}-unit`} label="Unité de prix" hint={OFFER_FIELD_HINTS.unit} error={errors.pricingUnit}>
+          <Input {...fieldControlProps(`${base}-unit`, { hint: "x", error: errors.pricingUnit })} name="pricingUnit" maxLength={40} placeholder="an" defaultValue={content?.pricingUnit ?? ""} />
         </Field>
-        <Field id={`${base}-flexibility`} label="Fractionnement du paiement">
-          <Select {...fieldControlProps(`${base}-flexibility`)} name="paymentFlexibility" defaultValue={content?.paymentFlexibility ?? ""}>
+        <Field id={`${base}-flexibility`} label="Fractionnement du paiement" hint={OFFER_FIELD_HINTS.flexibility} error={errors.paymentFlexibility}>
+          <Select {...fieldControlProps(`${base}-flexibility`, { hint: "x", error: errors.paymentFlexibility })} name="paymentFlexibility" defaultValue={content?.paymentFlexibility ?? ""}>
             <option value="">Non renseigné</option>
             {Object.entries(PAYMENT_FLEXIBILITY_LABELS).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
           </Select>
         </Field>
       </FormSection>
       <FormSection legend="Validité et source">
-        <Field id={`${base}-from`} label="Début de validité" required>
-          <Input {...fieldControlProps(`${base}-from`, { required: true })} name="validFrom" type="date" defaultValue={isoToDateInput(content?.validFrom)} />
+        <Field id={`${base}-from`} label="Début de validité" required hint={OFFER_FIELD_HINTS.from} error={errors.validFrom}>
+          <Input {...fieldControlProps(`${base}-from`, { required: true, hint: "x", error: errors.validFrom })} name="validFrom" type="date" defaultValue={isoToDateInput(content?.validFrom)} />
         </Field>
-        <Field id={`${base}-until`} label="Fin de validité" required hint="Postérieure au début et future pour être validée.">
-          <Input {...fieldControlProps(`${base}-until`, { required: true, hint: "x" })} name="validUntil" type="date" defaultValue={isoToDateInput(content?.validUntil)} />
+        <Field id={`${base}-until`} label="Fin de validité" required hint="Postérieure au début et future pour être validée." error={errors.validUntil}>
+          <Input {...fieldControlProps(`${base}-until`, { required: true, hint: "x", error: errors.validUntil })} name="validUntil" type="date" defaultValue={isoToDateInput(content?.validUntil)} />
         </Field>
-        <Field id={`${base}-source`} label="Source de l'information">
-          <Input {...fieldControlProps(`${base}-source`)} name="sourceOfInformation" maxLength={200} defaultValue={content?.sourceOfInformation ?? ""} />
+        <Field id={`${base}-source`} label="Source de l'information" hint={OFFER_FIELD_HINTS.source} error={errors.sourceOfInformation}>
+          <Input {...fieldControlProps(`${base}-source`, { hint: "x", error: errors.sourceOfInformation })} name="sourceOfInformation" maxLength={200} defaultValue={content?.sourceOfInformation ?? ""} />
         </Field>
-        <Field id={`${base}-disclaimers`} label="Mentions indicatives" hint="Une mention par ligne. « offre indicative » est obligatoire.">
-          <Textarea {...fieldControlProps(`${base}-disclaimers`, { hint: "x" })} name="publicDisclaimers" rows={2} defaultValue={disclaimers.join("\n")} />
+        <Field id={`${base}-disclaimers`} label="Mentions indicatives" hint="Une mention par ligne. « offre indicative » est obligatoire." error={errors.publicDisclaimers}>
+          <Textarea {...fieldControlProps(`${base}-disclaimers`, { hint: "x", error: errors.publicDisclaimers })} name="publicDisclaimers" rows={2} defaultValue={disclaimers.join("\n")} />
         </Field>
       </FormSection>
     </>
@@ -336,6 +370,7 @@ export function CreateBrokerOfferForm({ scopes, insurers }: { scopes: ScopeChoic
   const base = useId();
   const [offerType, setOfferType] = useState<string>("indicative");
   const [scope, setScope] = useState("");
+  const errors = blockerFieldErrors(state);
   const { formRef, completeness, recompute } = useLiveCompleteness(undefined);
   return (
     <Card title="Contenu de l'offre" description="Créée en brouillon (version 1) ; vous la soumettez à validation quand la complétude minimale est atteinte.">
@@ -362,8 +397,14 @@ export function CreateBrokerOfferForm({ scopes, insurers }: { scopes: ScopeChoic
           base={base}
           content={undefined}
           onChange={recompute}
-          insurerFields={<InsurerFields base={base} content={undefined} insurers={insurers} countryId={scope.split(":")[0] ?? ""} onChange={recompute} />}
+          errors={errors}
+          insurerFields={<InsurerFields base={base} content={undefined} insurers={insurers} countryId={scope.split(":")[0] ?? ""} onChange={recompute} error={errors.insurerName} />}
         />
+        <p className="bo-description" data-offer-draft-note="create">
+          {scopes.length === 0
+            ? "Création impossible : aucune couverture licenciée n'est disponible pour votre cabinet."
+            : "Le brouillon n'est ni soumis ni visible du public. Vous le soumettez à validation depuis la page de l'offre, une fois la complétude minimale atteinte."}
+        </p>
         <FormActions>
           <Button type="submit" pending={pending} pendingLabel="Création..." disabled={scopes.length === 0}>Créer le brouillon</Button>
         </FormActions>
@@ -386,6 +427,7 @@ export function EditBrokerOfferForm({ offerId, offerType, countryId, insurers, c
 }) {
   const [state, formAction, pending] = useActionState(updateBrokerOfferAction, initialState);
   const base = useId();
+  const errors = blockerFieldErrors(state);
   const { formRef, completeness, recompute } = useLiveCompleteness(content);
   return (
     <Card
@@ -410,9 +452,15 @@ export function EditBrokerOfferForm({ offerId, offerType, countryId, insurers, c
           base={base}
           content={content}
           onChange={recompute}
-          insurerFields={<InsurerFields base={base} content={content} insurers={insurers} countryId={countryId} onChange={recompute} />}
+          errors={errors}
+          insurerFields={<InsurerFields base={base} content={content} insurers={insurers} countryId={countryId} onChange={recompute} error={errors.insurerName} />}
         />
         <ReasonField id={`${base}-reason`} required={false} />
+        <p className="bo-description" data-offer-draft-note="update">
+          {hasPending
+            ? "L'enregistrement met à jour la version en cours ; elle n'est publiée qu'après soumission puis validation par AssurMatch."
+            : "L'enregistrement crée une nouvelle version en brouillon ; la version publiée reste en ligne jusqu'à la validation de la nouvelle."}
+        </p>
         <FormActions>
           <Button type="submit" pending={pending} pendingLabel="Enregistrement...">Enregistrer le brouillon</Button>
         </FormActions>
@@ -430,6 +478,7 @@ export function SubmitBrokerOfferForm({ offerId, complete }: { offerId: string; 
     <Form action={formAction} data-offer-form="submit">
       <OfferActionResult state={state} />
       <input type="hidden" name="offerId" value={offerId} />
+      <p className="bo-description">Soumettre envoie la version en cours à AssurMatch pour validation. Tant qu&apos;elle n&apos;est pas validée, la version publiée (s&apos;il y en a une) reste en ligne.</p>
       <ReasonField id={`${base}-reason`} required={false} />
       {!complete ? <Notice tone="warning">Complétude minimale non atteinte : la soumission sera refusée avec la liste des champs manquants.</Notice> : null}
       <FormActions>
@@ -480,8 +529,8 @@ export function RenewBrokerOfferForm({ offerId }: { offerId: string }) {
       <Field id={`${base}-from`} label="Nouveau début de validité" required>
         <Input {...fieldControlProps(`${base}-from`, { required: true })} name="validFrom" type="date" />
       </Field>
-      <Field id={`${base}-until`} label="Nouvelle fin de validité" required>
-        <Input {...fieldControlProps(`${base}-until`, { required: true })} name="validUntil" type="date" />
+      <Field id={`${base}-until`} label="Nouvelle fin de validité" required hint="Future et postérieure au nouveau début.">
+        <Input {...fieldControlProps(`${base}-until`, { required: true, hint: "x" })} name="validUntil" type="date" />
       </Field>
       <ReasonField id={`${base}-reason`} required={false} />
       <FormActions>

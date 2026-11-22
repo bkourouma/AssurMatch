@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useId } from "react";
+import { useActionState, useEffect, useId, useRef } from "react";
 import type { BrokerAccountView } from "../lib/self-service-api";
 import {
   cancelRequestAction,
@@ -9,7 +9,7 @@ import {
   updateCompanyProfileAction,
   type SelfServiceActionState
 } from "../lib/self-service-actions";
-import { Button, Card, ConfirmDialog, Field, Form, FormActions, FormSection, Input, Notice, Select, Textarea, fieldControlProps } from "../lib/ui/broker-ui";
+import { Button, Card, ConfirmDialog, Field, Form, FormActions, FormRow, FormSection, Input, Notice, Select, Textarea, fieldControlProps } from "../lib/ui/broker-ui";
 
 /**
  * Spec 053 US1/US4: company profile forms. Contacts and commercial presentation are edited
@@ -19,15 +19,24 @@ import { Button, Card, ConfirmDialog, Field, Form, FormActions, FormSection, Inp
 const initialState: SelfServiceActionState = { status: "idle" };
 
 export function SelfServiceResult({ state }: { state: SelfServiceActionState }) {
+  const anchor = useRef<HTMLDivElement>(null);
+  // The answer can sit above a long form: bring it into view so the outcome is never off screen.
+  useEffect(() => {
+    if (state.status !== "idle" && state.message) anchor.current?.scrollIntoView({ block: "nearest" });
+  }, [state]);
   if (state.status === "idle" || !state.message) return null;
-  return <Notice tone={state.status === "success" ? "success" : "danger"}>{state.message}</Notice>;
+  return (
+    <div ref={anchor}>
+      <Notice tone={state.status === "success" ? "success" : "danger"}>{state.message}</Notice>
+    </div>
+  );
 }
 
 function TextField({ base, name, label, defaultValue, type = "text", hint }: { base: string; name: string; label: string; defaultValue?: string | null; type?: string; hint?: string }) {
   const id = `${base}-${name}`;
   return (
     <Field id={id} label={label} hint={hint}>
-      <Input {...fieldControlProps(id, hint ? { hint } : {})} name={name} type={type} defaultValue={defaultValue ?? ""} maxLength={160} />
+      <Input {...fieldControlProps(id, hint ? { hint } : {})} name={name} type={type} defaultValue={defaultValue ?? ""} maxLength={160} {...(type === "tel" ? { inputMode: "tel" as const } : {})} />
     </Field>
   );
 }
@@ -37,30 +46,32 @@ export function CompanyProfileForm({ account }: { account: BrokerAccountView }) 
   const base = useId();
   return (
     <Card title="Contacts et présentation" description="Modifiables directement par le propriétaire et les managers. Chaque modification est tracée.">
-      <SelfServiceResult state={state} />
       <Form action={formAction} columns={2} data-company-form="profile">
         <input type="hidden" name="expectedUpdatedAt" value={account.updatedAt} />
         <FormSection legend="Contact principal">
           <TextField base={base} name="primaryEmail" label="E-mail principal" type="email" defaultValue={account.primaryEmail} />
-          <TextField base={base} name="primaryWhatsApp" label="WhatsApp principal" defaultValue={account.primaryWhatsApp} hint="Format international, par exemple +2250102030405." />
+          <TextField base={base} name="primaryWhatsApp" label="WhatsApp principal" type="tel" defaultValue={account.primaryWhatsApp} hint="Format international, par exemple +2250102030405." />
           <TextField base={base} name="city" label="Ville" defaultValue={account.city} />
         </FormSection>
         <FormSection legend="Contact administratif">
           <TextField base={base} name="adminContactName" label="Nom" defaultValue={account.adminContactName} />
           <TextField base={base} name="adminContactEmail" label="E-mail" type="email" defaultValue={account.adminContactEmail} />
-          <TextField base={base} name="adminContactPhone" label="Téléphone" defaultValue={account.adminContactPhone} />
+          <TextField base={base} name="adminContactPhone" label="Téléphone" type="tel" defaultValue={account.adminContactPhone} hint="Format international, par exemple +2250102030405." />
         </FormSection>
         <FormSection legend="Contact commercial">
           <TextField base={base} name="commercialContactName" label="Nom" defaultValue={account.commercialContactName} />
           <TextField base={base} name="commercialContactEmail" label="E-mail" type="email" defaultValue={account.commercialContactEmail} />
-          <TextField base={base} name="commercialContactPhone" label="Téléphone" defaultValue={account.commercialContactPhone} />
+          <TextField base={base} name="commercialContactPhone" label="Téléphone" type="tel" defaultValue={account.commercialContactPhone} hint="Format international, par exemple +2250102030405." />
         </FormSection>
         <FormSection legend="Assureurs partenaires">
           <Field id={`${base}-insurers`} label="Assureurs partenaires" hint="Un nom par ligne ou séparés par des virgules (20 au plus).">
             <Textarea {...fieldControlProps(`${base}-insurers`, { hint: "x" })} name="partnerInsurers" rows={3} defaultValue={account.partnerInsurers.join("\n")} />
           </Field>
-          <TextField base={base} name="reason" label="Commentaire (facultatif, audité)" />
         </FormSection>
+        <FormSection legend="Traçabilité">
+          <TextField base={base} name="reason" label="Commentaire (facultatif, audité)" hint="Conservé dans le journal d'audit avec la modification." />
+        </FormSection>
+        {state.status !== "idle" && state.message ? <FormRow full><SelfServiceResult state={state} /></FormRow> : null}
         <FormActions>
           <Button type="submit" pending={pending} pendingLabel="Enregistrement...">Enregistrer</Button>
         </FormActions>
@@ -73,7 +84,7 @@ export function IdentityChangeRequestForm({ countries }: { countries: Array<{ va
   const [state, formAction, pending] = useActionState(requestIdentityChangeAction, initialState);
   const base = useId();
   return (
-    <Card title="Demander une modification d'identité" description="Raison sociale, nom commercial, RCCM et pays sont vérifiés par AssurMatch avant toute modification. Ne renseignez que les champs à changer.">
+    <Card title="Demander une modification d'identité" description="Raison sociale, nom commercial, RCCM et pays sont vérifiés par AssurMatch avant toute modification. Ne renseignez que les champs à changer. Les données actuelles restent affichées jusqu'à la décision d'AssurMatch.">
       <SelfServiceResult state={state} />
       <Form action={formAction} columns={2} data-company-form="identity-request">
         <TextField base={base} name="legalName" label="Nouvelle raison sociale" />

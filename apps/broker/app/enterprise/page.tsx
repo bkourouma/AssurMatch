@@ -58,6 +58,8 @@ const GRANTABLE_PERMISSIONS = [
 /** Les statuts d'agence restent ceux de l'API: seule leur couleur est decidee ici. */
 const AGENCY_TONES = { active: "success", suspended: "warning" } as const;
 
+export const metadata = { title: "Entreprise" };
+
 const BREADCRUMB = [{ label: "Organisation" }, { label: "Entreprise" }];
 
 const agencyColumns: Array<DataTableColumn<BrokerAgency>> = [
@@ -101,6 +103,11 @@ export default async function BrokerEnterprisePage({ searchParams }: { searchPar
           breadcrumb={BREADCRUMB}
           title="Accès refusé"
           description="L'espace Enterprise exige une session courtier authentifiée et la MFA vérifiée."
+          actions={
+            session.status === "mfa_required" ? (
+              <Button href={`/mfa?returnTo=${encodeURIComponent("/enterprise")}`}>Saisir mon code de vérification</Button>
+            ) : undefined
+          }
         />
       </PageStack>
     );
@@ -114,7 +121,15 @@ export default async function BrokerEnterprisePage({ searchParams }: { searchPar
           description="Multi-agences, rôles personnalisés, engagement de réactivité et charte interne sont réservés au plan Enterprise."
           actions={<Badge tone="disabled">Plan Enterprise requis</Badge>}
         />
-        <Notice tone="info">Votre plan actuel donne accès aux leads et au CRM selon vos permissions.</Notice>
+        <Notice tone="info" title="Pourquoi cet espace est indisponible">
+          <p>
+            {session.profile.partnerPlan === "starter"
+              ? "Votre plan actuel (Starter) donne accès aux leads de votre cabinet."
+              : "Votre plan actuel donne accès aux leads et au CRM, selon vos permissions."}{" "}
+            Les agences, rôles personnalisés, engagement de réactivité et charte du portail s&apos;ouvrent avec le plan Enterprise.
+          </p>
+          <p><a href="/billing">Voir la facturation et le plan du cabinet</a></p>
+        </Notice>
       </PageStack>
     );
   }
@@ -143,6 +158,7 @@ export default async function BrokerEnterprisePage({ searchParams }: { searchPar
           getKey={(agency) => agency.id}
           aria-label="Agences du cabinet"
           emptyLabel="Aucune agence enregistrée."
+          emptyDescription="Créez une première agence avec le formulaire sous ce tableau, puis rattachez-y des membres."
           rowActions={(agency) => (
             <TenantWriteGuard readOnly={readOnly}>
             <ConfirmDialog
@@ -198,8 +214,8 @@ export default async function BrokerEnterprisePage({ searchParams }: { searchPar
           <Field id="agency-name" label="Nom de l'agence">
             <Input id="agency-name" name="name" placeholder="Nom de l'agence" aria-label="Nom de l'agence" />
           </Field>
-          <Field id="agency-country" label="Pays de l'agence">
-            <Input id="agency-country" name="countryCode" maxLength={2} placeholder="CI" aria-label="Pays de l'agence" />
+          <Field id="agency-country" label="Pays de l'agence" hint="Code pays à 2 lettres, par exemple CI.">
+            <Input id="agency-country" name="countryCode" maxLength={2} placeholder="CI" aria-label="Pays de l'agence" aria-describedby="agency-country-hint" autoCapitalize="characters" autoComplete="off" spellCheck={false} />
           </Field>
           <Field id="agency-city" label="Ville de l'agence">
             <Input id="agency-city" name="city" placeholder="Ville" aria-label="Ville de l'agence" />
@@ -266,11 +282,13 @@ export default async function BrokerEnterprisePage({ searchParams }: { searchPar
             <Card title="Objectif interne" description="Il ne peut pas être plus lâche que la cible contractuelle fixée par AssurMatch.">
               <TenantWriteGuard readOnly={readOnly}>
               <Form action={updateSlaAction} columns={2}>
-                <Field id="sla-target" label="Objectif en minutes">
+                <Field id="sla-target" label="Objectif en minutes" hint="Entre 5 et 10 080 minutes (7 jours).">
                   <Input
                     id="sla-target"
                     name="firstActionTargetMinutes"
                     type="number"
+                    inputMode="numeric"
+                    aria-describedby="sla-target-hint"
                     min={5}
                     max={10080}
                     defaultValue={sla.data.firstActionTargetMinutes}
@@ -288,7 +306,10 @@ export default async function BrokerEnterprisePage({ searchParams }: { searchPar
             </Card>
           </>
         ) : (
-          <Notice tone="warning">SLA indisponible: {sla.error ?? "erreur inconnue"}.</Notice>
+          <Notice tone="warning">
+            <p>L&apos;engagement de réactivité est momentanément indisponible.</p>
+            <p><a href="/enterprise">Recharger la page</a></p>
+          </Notice>
         )}
       </Card>
 
@@ -302,8 +323,8 @@ export default async function BrokerEnterprisePage({ searchParams }: { searchPar
             <Field id="branding-label" label="Libellé affiché">
               <Input id="branding-label" name="displayLabel" defaultValue={branding.data.displayLabel} aria-label="Libellé affiché" />
             </Field>
-            <Field id="branding-color" label="Couleur principale">
-              <Input id="branding-color" name="primaryColor" defaultValue={branding.data.primaryColor} aria-label="Couleur principale" />
+            <Field id="branding-color" label="Couleur principale" hint="Format #RRGGBB, par exemple #1F3A8A. Elle n'est appliquée que si le texte reste lisible dessus.">
+              <Input id="branding-color" name="primaryColor" defaultValue={branding.data.primaryColor} aria-label="Couleur principale" aria-describedby="branding-color-hint" autoComplete="off" spellCheck={false} />
             </Field>
             <Field id="branding-reason" label="Motif">
               <Input id="branding-reason" name="reason" placeholder="Motif" aria-label="Motif de la mise à jour de charte" />
@@ -315,7 +336,10 @@ export default async function BrokerEnterprisePage({ searchParams }: { searchPar
           </Form>
           </TenantWriteGuard>
         ) : (
-          <Notice tone="warning">Charte indisponible: {branding.error ?? "erreur inconnue"}.</Notice>
+          <Notice tone="warning">
+            <p>La charte du portail est momentanément indisponible.</p>
+            <p><a href="/enterprise">Recharger la page</a></p>
+          </Notice>
         )}
       </Card>
     </PageStack>

@@ -89,6 +89,48 @@ export const BROKER_OFFER_TYPE_DESCRIPTIONS: Record<string, string> = {
 
 export const PRIVATE_OFFER_BADGE = "Privée — jamais publique";
 
+/**
+ * What an offer status implies for its visibility, in one sentence (list cell and detail notice).
+ * A private offer is never public whatever its status.
+ */
+export function offerStatusImplication(status: string, offerType?: string): string | undefined {
+  const isPrivate = offerType === "private";
+  switch (status) {
+    case "draft":
+      return "Non soumise : pas encore envoyée en validation.";
+    case "submitted":
+      return "Soumise : AssurMatch la valide avant toute publication.";
+    case "published":
+      return isPrivate ? "Active, réservée à votre cabinet." : "Visible du public.";
+    case "suspended":
+      return "Suspendue par AssurMatch : plus affichée au public.";
+    case "withdrawn":
+      return "Retirée : plus affichée, historique conservé.";
+    case "expired":
+      return "Expirée : plus affichée au public, à renouveler.";
+    default:
+      return undefined;
+  }
+}
+
+/** Short, per-field help shown under the offer form controls. */
+export const OFFER_FIELD_HINTS = {
+  name: "Nom de l'offre tel que votre cabinet la présente (160 caractères au plus).",
+  description: "Présentation courte de l'offre, en quelques phrases.",
+  level: "Repère indicatif de 1 à 5 ; laissez « Non renseigné » si vous ne le connaissez pas.",
+  exclusions: "Ce que l'offre ne couvre pas (cas, âges, situations exclus).",
+  deductible: "Montant restant à la charge de l'assuré, dans la devise de l'offre. Laissez vide si non applicable.",
+  ceiling: "Montant maximal remboursé, dans la devise de l'offre. Laissez vide si non applicable.",
+  delay: "Nombre de jours, de 0 à 365.",
+  priceMin: "Dans la devise de l'offre ; doit rester inférieure ou égale à la prime maximale.",
+  priceMax: "Dans la devise de l'offre ; doit rester supérieure ou égale à la prime minimale.",
+  currency: "Code à 3 lettres, par exemple XOF.",
+  unit: "Base du prix, par exemple « an » ou « mois ».",
+  flexibility: "Rythme de paiement proposé ; laissez « Non renseigné » si variable.",
+  source: "D'où viennent les prix et conditions (grille tarifaire, document de l'assureur…).",
+  from: "Date à partir de laquelle l'offre s'applique."
+} as const;
+
 export function offerTypeLabel(offerType: string | undefined): string {
   return OFFER_TYPE_SHORT_LABELS[offerType ?? "indicative"] ?? "Offre indicative";
 }

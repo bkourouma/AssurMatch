@@ -42,6 +42,13 @@ export default async function NewBrokerOfferPage() {
   return (
     <PageStack>
       {header}
+      <Notice tone="neutral" title="En trois étapes">
+        <ol className="bo-list">
+          <li>Choisissez le périmètre (pays et produit) et le type d&apos;offre : le type est définitif.</li>
+          <li>Renseignez le contenu ; la jauge de complétude indique ce qu&apos;il reste à compléter.</li>
+          <li>Créez le brouillon, puis soumettez-le à validation depuis la page de l&apos;offre.</li>
+        </ol>
+      </Notice>
       <CreateBrokerOfferForm
         scopes={scopes.map((scope) => ({ value: `${scope.countryId}:${scope.productId}`, label: `${scope.countryLabel} — ${scope.productLabel}` }))}
         insurers={insurers}

@@ -12,6 +12,7 @@ import {
   PRIVATE_OFFER_BADGE,
   offerDisplayName,
   offerFormatDate,
+  offerStatusImplication,
   offerTypeLabel
 } from "../lib/offer-messages";
 import type { OfferType } from "../../../../packages/shared/contracts/offer-content";
@@ -101,11 +102,14 @@ export default async function BrokerOffersPage({
       key: "status",
       header: "Statut",
       render: (offer) => (
-        <Cluster>
-          <StatusBadge status={offer.status} labels={OFFER_STATUS_LABELS} tones={OFFER_STATUS_TONES} />
-          {offer.pending && offer.published ? <Badge tone="info">{`v${offer.pending.versionNumber} ${offer.pending.status === "submitted" ? "en attente de validation" : "en brouillon"}`}</Badge> : null}
-          {offer.isSponsored ? <Badge tone="warning">Sponsorisé</Badge> : null}
-        </Cluster>
+        <>
+          <Cluster>
+            <StatusBadge status={offer.status} labels={OFFER_STATUS_LABELS} tones={OFFER_STATUS_TONES} />
+            {offer.pending && offer.published ? <Badge tone="info">{`v${offer.pending.versionNumber} ${offer.pending.status === "submitted" ? "en attente de validation" : "en brouillon"}`}</Badge> : null}
+            {offer.isSponsored ? <Badge tone="warning">Sponsorisé</Badge> : null}
+          </Cluster>
+          <div className={styles.entryMeta}>{offerStatusImplication(offer.status, offer.offerType)}</div>
+        </>
       ),
       sortable: true,
       sortValue: (offer) => offer.status
@@ -159,7 +163,12 @@ export default async function BrokerOffersPage({
         </Field>
       </FilterBar>
       {offers.status === "forbidden" ? <Notice tone="danger">Accès aux offres refusé pour ce compte.</Notice> : null}
-      {offers.status === "error" ? <Notice tone="danger">Offres temporairement indisponibles ({offers.error ?? "erreur inconnue"}).</Notice> : null}
+      {offers.status === "error" ? (
+        <Notice tone="danger" title="Offres indisponibles">
+          <p>Les offres n&apos;ont pas pu être chargées ({offers.error ?? "erreur inconnue"}). Vos offres ne sont pas perdues.</p>
+          <Button href="/offers" variant="secondary" size="sm">Réessayer</Button>
+        </Notice>
+      ) : null}
       <DataTable
         columns={columns}
         items={offers.data}
@@ -173,7 +182,13 @@ export default async function BrokerOffersPage({
               ? "Créez une offre indicative : elle est enregistrée en brouillon puis publiée après validation par AssurMatch."
               : "Le propriétaire ou un manager du cabinet crée les offres ; elles apparaîtront ici."
         }
-        emptyAction={!status && !offerType && canWrite ? <Button href="/offers/new" variant="secondary" size="sm">Créer une offre</Button> : undefined}
+        emptyAction={
+          status || offerType
+            ? <Button href="/offers" variant="secondary" size="sm">Réinitialiser les filtres</Button>
+            : canWrite
+              ? <Button href="/offers/new" variant="secondary" size="sm">Créer une offre</Button>
+              : undefined
+        }
       />
     </PageStack>
   );

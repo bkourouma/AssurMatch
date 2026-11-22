@@ -44,7 +44,11 @@ import {
 } from "../../lib/ui/broker-ui";
 import { DisputeStatusCard } from "../../lib/ui/dispute-status-card";
 import { disputeAvailability, formatDate, statusTone } from "../../lib/ui/broker-view-models";
+import { formatDateTime } from "../../lib/conversation-vocabulary";
+import { LeadSubmitButton } from "../../lib/ui/lead-submit-button";
+import { leadNextStep, leadResponseDelay, receivedAgo } from "../../lib/ui/lead-timing";
 import styles from "../../lib/ui/broker-screens.module.css";
+import leadStyles from "../../lib/ui/lead-screens.module.css";
 
 const NOTICES: Record<string, { tone: "info" | "warning" | "danger"; message: string }> = {
   accepted: { tone: "info", message: "Lead accepté. L'action est historisée avec acteur et date." },
@@ -55,7 +59,7 @@ const NOTICES: Record<string, { tone: "info" | "warning" | "danger"; message: st
   already_accepted: { tone: "warning", message: "Ce lead est déjà accepté : aucune nouvelle acceptation n'a été enregistrée." },
   not_acceptable: { tone: "warning", message: "Ce lead ne peut plus être accepté dans son état actuel (rejeté, clôturé ou contesté). Rechargez la page." },
   conflict: { tone: "warning", message: "Clôture refusée : le lead doit être accepté et ne pas être déjà clôturé." },
-  reason_required: { tone: "warning", message: "Un motif allowliste est obligatoire pour rejeter ou contester un lead." },
+  reason_required: { tone: "warning", message: "Un motif est obligatoire pour rejeter ou contester un lead." },
   // Spec 063 (CRM-012): fenêtre de 30 jours et contestation unique.
   dispute_window_expired: { tone: "warning", message: "Contestation refusée : la fenêtre de 30 jours suivant la réception du lead est close." },
   dispute_exists: { tone: "warning", message: "Contestation refusée : ce lead a déjà fait l'objet d'une contestation." },
@@ -85,6 +89,7 @@ const CONTACT_LABELS: Record<string, string> = {
 
 const REASON_OPTIONS = STARTER_ACTION_REASONS.map((reason) => ({ value: reason, label: STARTER_REASON_LABELS[reason] }));
 const OUTCOME_OPTIONS = STARTER_CLOSE_OUTCOMES.map((outcome) => ({ value: outcome, label: STARTER_CLOSE_OUTCOME_LABELS[outcome] }));
+const COMMENT_HINT = "Facultatif, 500 caractères au maximum. Conservé dans l'historique du lead.";
 
 export default async function BrokerLeadDetailPage({
   params,
@@ -106,7 +111,7 @@ export default async function BrokerLeadDetailPage({
           description="Le détail du lead reste masqué tant que la session, la MFA et le tenant courtier ne sont pas valides."
           actions={<Button href="/leads" variant="secondary" size="sm">Retour aux leads</Button>}
         />
-        <Notice tone="warning" title="Détail du lead assigne indisponible">
+        <Notice tone="warning" title="Détail du lead assigné indisponible">
           Aucune donnée protégée n'est affichée. Vérifiez votre session et votre MFA, puis rechargez la page.
         </Notice>
       </PageStack>
@@ -135,6 +140,15 @@ export default async function BrokerLeadDetailPage({
   const proposalNoticeEntry = proposalNotice ? PROPOSAL_NOTICES[proposalNotice] : undefined;
   const contactMasked = lead?.contactVisibility === "masked";
   const reference = lead ? lead.publicReference || lead.leadAssignmentId : undefined;
+  // Response delay and next step: derived from the facts above, no new call and no new rule.
+  const nowMs = Date.now();
+  const responseDelay = lead ? leadResponseDelay({ status: lead.status, assignedAt: lead.assignedAt, events, nowMs }) : undefined;
+  const nextStep = leadNextStep({ tenantReadOnly, isFinal, canMutate, canAccept, canClose, canDispute: availability.canDispute && showActions });
+  const acceptDeniedReason = lead
+    ? lead.status === "accepted"
+      ? "Ce lead est déjà accepté."
+      : `Plus possible dans l'état actuel du lead (${starterStatusLabel(lead.status)}).`
+    : "";
 
   // Les actions du courtier (Accepter, Rejeter, Contester, Clôturer) vivent dans la carte « Actions Starter ».
   const headerActions = lead ? (
@@ -157,21 +171,42 @@ export default async function BrokerLeadDetailPage({
       {detail.status === "forbidden" ? (
         <Notice tone="warning" title="Accès refusé">
           Ce lead n'est pas accessible avec votre tenant, vos permissions ou votre MFA. Aucune donnée protégée n'est affichée.
+          <div className={leadStyles.shortcuts}>
+            <Button href="/leads" variant="secondary">Retour aux leads</Button>
+          </div>
         </Notice>
       ) : null}
       {notFound ? (
         <Notice tone="warning" title="Lead introuvable">
-          Aucun lead ne correspond à cette référence pour votre cabinet.
+          Aucun lead ne correspond à cette référence pour votre cabinet. Vérifiez la référence ou retrouvez le lead dans votre liste.
+          <div className={leadStyles.shortcuts}>
+            <Button href="/leads" variant="secondary">Retour aux leads</Button>
+          </div>
         </Notice>
       ) : null}
       {detail.status === "error" && !notFound ? (
         <Notice tone="danger" title="Lead indisponible">
-          Le détail du lead est temporairement indisponible. Aucune donnée protégée n'est affichée en mode erreur.
+          Le détail du lead est temporairement indisponible. Aucune donnée protégée n'est affichée en mode erreur. Aucune action n'a été enregistrée.
+          <div className={leadStyles.shortcuts}>
+            <Button href={`/leads/${encodeURIComponent(leadAssignmentId)}`} variant="secondary">Réessayer</Button>
+            <Button href="/leads" variant="tertiary">Retour aux leads</Button>
+          </div>
         </Notice>
       ) : null}
 
       {lead ? (
         <>
+        <Notice tone={nextStep.tone} title={nextStep.title}>
+          {nextStep.text}
+          {responseDelay?.state === "waiting" ? ` ${receivedAgo(lead.assignedAt, nowMs) ?? ""}.` : ""}
+          {nextStep.links.length > 0 ? (
+            <div className={`${leadStyles.shortcuts} ${leadStyles.touch}`}>
+              {nextStep.links.map((link) => (
+                <Button key={link.href} href={link.href} variant="secondary" size="sm">{link.label}</Button>
+              ))}
+            </div>
+          ) : null}
+        </Notice>
         <Grid columns="two">
           <Card title="Informations utiles">
             <DescriptionList
@@ -185,7 +220,8 @@ export default async function BrokerLeadDetailPage({
                 { term: "Pays", value: lead.countryCode || "-" },
                 { term: "Produit", value: lead.productKey ? productLabel(lead.productKey) : "-" },
                 { term: "Reçu le", value: formatDate(lead.assignedAt) },
-                { term: "Vu le", value: lead.seenAt ? formatDate(lead.seenAt) : lead.seen ? "Oui" : "Pas encore" }
+                { term: "Vu le", value: lead.seenAt ? formatDate(lead.seenAt) : lead.seen ? "Oui" : "Pas encore" },
+                ...(responseDelay ? [{ term: "Délai de réponse", value: responseDelay.label }] : [])
               ]}
             />
           </Card>
@@ -245,42 +281,52 @@ export default async function BrokerLeadDetailPage({
           </Stack>
 
           <Stack>
+            <div id="actions-lead" className={leadStyles.touch}>
             <Card title="Actions Starter">
               {showActions ? (
                 <>
                   {canAccept ? (
                     <form action={acceptStarterLeadAction}>
                       <input type="hidden" name="leadAssignmentId" value={lead.leadAssignmentId} />
-                      <Cluster>
-                        <Button type="submit">Accepter</Button>
-                        <span>Le courtier reste responsable de la prise de contact et du suivi commercial.</span>
-                      </Cluster>
+                      <Stack>
+                        <div>
+                          <LeadSubmitButton pendingLabel="Acceptation en cours…">Accepter</LeadSubmitButton>
+                        </div>
+                        <p className={leadStyles.hint}>Le courtier reste responsable de la prise de contact et du suivi commercial.</p>
+                      </Stack>
                     </form>
-                  ) : null}
+                  ) : (
+                    <ul className={leadStyles.unavailable}>
+                      <li>
+                        <Badge tone="disabled">Accepter</Badge>
+                        <span className={leadStyles.hint}>{acceptDeniedReason}</span>
+                      </li>
+                    </ul>
+                  )}
 
                   <Cluster>
                     <ConfirmDialog
                       triggerLabel="Rejeter avec motif"
                       title="Rejeter avec motif"
-                      description="Le rejet exige un motif allowliste. L'action est historisée avec acteur, date et motif."
+                      description="Le rejet exige un motif. L'action est historisée avec acteur, date et motif."
                       confirmLabel="Rejeter le lead"
                       cancelLabel="Annuler"
                       tone="danger"
                       formAction={rejectStarterLeadAction}
                     >
                       <input type="hidden" name="leadAssignmentId" value={lead.leadAssignmentId} />
-                      <Field id="reject-reason" label="Motif du rejet" required requiredLabel="obligatoire">
+                      <Field id="reject-reason" label="Motif du rejet" required requiredLabel="obligatoire" hint="Choisissez le motif le plus proche : il est conservé dans l'historique du lead.">
                         <Select
                           id="reject-reason"
                           name="reason" required
                           defaultValue=""
-                          aria-label="Motif du rejet"
+                          aria-describedby="reject-reason-hint"
                           placeholder="Choisir un motif"
                           options={REASON_OPTIONS}
                         />
                       </Field>
-                      <Field id="reject-comment" label="Commentaire interne">
-                        <Input id="reject-comment" name="comment" maxLength={500} placeholder="Optionnel" aria-label="Commentaire de rejet" />
+                      <Field id="reject-comment" label="Commentaire interne" hint={COMMENT_HINT}>
+                        <Input id="reject-comment" name="comment" maxLength={500} placeholder="Optionnel" aria-describedby="reject-comment-hint" />
                       </Field>
                     </ConfirmDialog>
 
@@ -288,25 +334,25 @@ export default async function BrokerLeadDetailPage({
                       <ConfirmDialog
                         triggerLabel="Contester avec motif"
                         title="Contester avec motif"
-                        description={`La contestation exige un motif allowliste. Elle est transmise à la finance AssurMatch, qui statue et vous notifie. ${DISPUTE_FINAL_DECISION_NOTICE}`}
+                        description={`La contestation exige un motif. Elle est transmise à la finance AssurMatch, qui statue et vous notifie. ${DISPUTE_FINAL_DECISION_NOTICE}`}
                         confirmLabel="Contester le lead"
                         cancelLabel="Annuler"
                         tone="danger"
                         formAction={disputeStarterLeadAction}
                       >
                         <input type="hidden" name="leadAssignmentId" value={lead.leadAssignmentId} />
-                        <Field id="dispute-reason" label="Motif de contestation" required requiredLabel="obligatoire">
+                        <Field id="dispute-reason" label="Motif de contestation" required requiredLabel="obligatoire" hint="Une contestation est unique et suivie par la finance AssurMatch.">
                           <Select
                             id="dispute-reason"
                             name="reason" required
                             defaultValue=""
-                            aria-label="Motif de contestation"
+                            aria-describedby="dispute-reason-hint"
                             placeholder="Choisir un motif"
                             options={REASON_OPTIONS}
                           />
                         </Field>
-                        <Field id="dispute-comment" label="Commentaire interne">
-                          <Input id="dispute-comment" name="comment" maxLength={500} placeholder="Optionnel" aria-label="Commentaire de contestation" />
+                        <Field id="dispute-comment" label="Commentaire interne" hint={COMMENT_HINT}>
+                          <Input id="dispute-comment" name="comment" maxLength={500} placeholder="Optionnel" aria-describedby="dispute-comment-hint" />
                         </Field>
                       </ConfirmDialog>
                     ) : (
@@ -316,37 +362,46 @@ export default async function BrokerLeadDetailPage({
                   <Notice tone={availability.canDispute ? "info" : "warning"}>{availability.message}</Notice>
 
                   {canClose ? (
-                    <Cluster>
-                      <ConfirmDialog
-                        triggerLabel="Clôturer"
-                        triggerVariant="primary"
-                        title="Clôturer le lead"
-                        description="Indiquez l'issue de votre suivi. Le visiteur est informé que sa demande est clôturée, sans le détail de l'issue. L'action est historisée et définitive."
-                        confirmLabel="Clôturer le lead"
-                        cancelLabel="Annuler"
-                        formAction={closeStarterLeadAction}
-                      >
-                        <input type="hidden" name="leadAssignmentId" value={lead.leadAssignmentId} />
-                        <Field id="close-outcome" label="Issue" required requiredLabel="obligatoire">
-                          <Select
-                            id="close-outcome"
-                            name="outcome" required
-                            defaultValue=""
-                            aria-label="Issue de la clôture"
-                            placeholder="Choisir une issue"
-                            options={OUTCOME_OPTIONS}
-                          />
-                        </Field>
-                        <Field id="close-comment" label="Commentaire interne">
-                          <Input id="close-comment" name="comment" maxLength={500} placeholder="Optionnel" aria-label="Commentaire de clôture" />
-                        </Field>
-                      </ConfirmDialog>
-                      <span>Lead accepté: clôturez-le une fois le suivi terminé (gagné, perdu ou sans suite).</span>
-                    </Cluster>
-                  ) : null}
+                    <Stack>
+                      <div>
+                        <ConfirmDialog
+                          triggerLabel="Clôturer"
+                          triggerVariant="secondary"
+                          title="Clôturer le lead"
+                          description="Indiquez l'issue de votre suivi. Le visiteur est informé que sa demande est clôturée, sans le détail de l'issue. L'action est historisée et définitive."
+                          confirmLabel="Clôturer le lead"
+                          cancelLabel="Annuler"
+                          formAction={closeStarterLeadAction}
+                        >
+                          <input type="hidden" name="leadAssignmentId" value={lead.leadAssignmentId} />
+                          <Field id="close-outcome" label="Issue" required requiredLabel="obligatoire" hint="Gagné, perdu ou sans suite. Le visiteur n'est pas informé de l'issue.">
+                            <Select
+                              id="close-outcome"
+                              name="outcome" required
+                              defaultValue=""
+                              aria-describedby="close-outcome-hint"
+                              placeholder="Choisir une issue"
+                              options={OUTCOME_OPTIONS}
+                            />
+                          </Field>
+                          <Field id="close-comment" label="Commentaire interne" hint="500 caractères au maximum. Conservé dans l'historique du lead ; la clôture ne peut plus être annulée.">
+                            <Input id="close-comment" name="comment" maxLength={500} placeholder="Optionnel" aria-describedby="close-comment-hint" />
+                          </Field>
+                        </ConfirmDialog>
+                      </div>
+                      <p className={leadStyles.hint}>Lead accepté: clôturez-le une fois le suivi terminé (gagné, perdu ou sans suite).</p>
+                    </Stack>
+                  ) : (
+                    <ul className={leadStyles.unavailable}>
+                      <li>
+                        <Badge tone="disabled">Clôturer</Badge>
+                        <span className={leadStyles.hint}>Disponible une fois le lead accepté.</span>
+                      </li>
+                    </ul>
+                  )}
 
                   <p className={styles.muted}>
-                    Ces actions suivent le workflow existant: rejet et contestation exigent un motif allowliste et toute contestation est historisée.
+                    Le rejet et la contestation exigent un motif. Chaque action est historisée avec son acteur et sa date.
                   </p>
                 </>
               ) : (
@@ -355,6 +410,7 @@ export default async function BrokerLeadDetailPage({
                     <Badge tone="disabled">Accepter</Badge>
                     <Badge tone="disabled">Rejeter avec motif</Badge>
                     <Badge tone="disabled">Contester avec motif</Badge>
+                    <Badge tone="disabled">Clôturer</Badge>
                   </Cluster>
                   <Notice tone="info" title="Lecture seule">
                     {isFinal
@@ -374,29 +430,39 @@ export default async function BrokerLeadDetailPage({
                 ]}
               />
             </Card>
+            </div>
 
             {lead.dispute ? <DisputeStatusCard disputes={[lead.dispute]} /> : null}
 
+            <div id="historique-lead">
             <Card title="Historique minimal">
               {history.status === "error" ? <Notice tone="warning">Historique temporairement indisponible.</Notice> : null}
               {events.length > 0 ? (
-                <ol className="bo-list">
+                <ol className={leadStyles.timeline} aria-label="Événements du lead">
                   {events.map((event) => (
-                    <li key={event.id}>
-                      <span className={styles.entryMeta}>{formatDate(event.occurredAt)}</span> - {starterEventLabel(event.eventType)}
-                      {event.previousStatus || event.nextStatus
-                        ? ` (${starterStatusLabel(event.previousStatus)} -> ${starterStatusLabel(event.nextStatus)})`
-                        : ""}
-                      {event.reason ? ` - motif: ${starterReasonLabel(event.reason)}` : ""}
-                      {event.outcome ? ` - issue: ${starterCloseOutcomeLabel(event.outcome)}` : ""}
-                      {event.comment ? ` - ${event.eventType === "visitor_responded" ? VISITOR_RESPONSE_LABELS[event.comment] ?? event.comment : event.comment}` : ""}
+                    <li key={event.id} className={leadStyles.timelineItem}>
+                      <span className={leadStyles.timelineDate}>{formatDateTime(event.occurredAt)}</span>
+                      <span className={leadStyles.timelineBody}>
+                        <span className={leadStyles.timelineTitle}>{starterEventLabel(event.eventType)}</span>
+                        {event.previousStatus || event.nextStatus ? (
+                          <span className={leadStyles.timelineDetail}>{`${starterStatusLabel(event.previousStatus)} -> ${starterStatusLabel(event.nextStatus)}`}</span>
+                        ) : null}
+                        {event.reason ? <span className={leadStyles.timelineDetail}>{`motif: ${starterReasonLabel(event.reason)}`}</span> : null}
+                        {event.outcome ? <span className={leadStyles.timelineDetail}>{`issue: ${starterCloseOutcomeLabel(event.outcome)}`}</span> : null}
+                        {event.comment ? (
+                          <span className={leadStyles.timelineDetail}>
+                            {event.eventType === "visitor_responded" ? VISITOR_RESPONSE_LABELS[event.comment] ?? event.comment : event.comment}
+                          </span>
+                        ) : null}
+                      </span>
                     </li>
                   ))}
                 </ol>
               ) : (
-                <p className={styles.muted}>Aucun événement historisé pour ce lead.</p>
+                <p className={styles.muted}>Aucun événement historisé pour ce lead. Les actions à venir (acceptation, proposition, clôture) y apparaîtront avec leur date.</p>
               )}
             </Card>
+            </div>
           </Stack>
         </Split>
         </>

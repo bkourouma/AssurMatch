@@ -8,6 +8,7 @@ import { logoutAction } from "../backoffice-session-actions";
 import { BROKER_THEME_COOKIE } from "../theme-cookie";
 import { PLATFORM_MENTION, brandAccentCss } from "../branding";
 import type { BrokerBranding } from "../branding";
+import polish from "./self-service-polish.module.css";
 
 export type BrokerPlan = "starter" | "pro" | "enterprise";
 
@@ -47,6 +48,13 @@ const CRM_GROUP = { label: "CRM" } as const;
 
 function isAuthRoute(pathname: string): boolean {
   return authRoutePrefixes.some((prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`));
+}
+
+/** Way out of an auth screen that has no link of its own; /login and /mfa carry their own actions. */
+function authExitLink(pathname: string): { href: string; label: string } | undefined {
+  if (pathname === "/activate" || pathname === "/password-reset") return { href: "/login", label: "Retour à la connexion" };
+  if (pathname === "/password-change") return { href: "/account", label: "Retour au compte" };
+  return undefined;
 }
 
 /**
@@ -123,9 +131,15 @@ export function BrokerShell({ children, user, plan, showAgenciesOverview, brandi
   const tenantLine = branding ? `${branding.label} · ${PLATFORM_MENTION}` : undefined;
 
   if (isAuthRoute(pathname)) {
+    const exit = authExitLink(pathname);
     return (
-      <AuthShell scope={SCOPE} dataAttributes={{ "data-broker-auth-shell": "simple" }}>
-        {children}
+      <AuthShell
+        scope={SCOPE}
+        dataAttributes={{ "data-broker-auth-shell": "simple" }}
+        footer={exit ? <a className={polish.footerLink} href={exit.href}>{exit.label}</a> : undefined}
+      >
+        {/* The auth panel is a grid: the landmark keeps the same rhythm as the panel itself. */}
+        <div className={polish.authMain}>{children}</div>
       </AuthShell>
     );
   }

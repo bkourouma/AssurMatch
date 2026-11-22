@@ -1,6 +1,9 @@
 import { redirect } from "next/navigation";
 import { MfaPanel } from "../auth-flow-form";
 import { loginRedirect, readBackOfficeSession, sanitizeReturnTo } from "../lib/backoffice-auth";
+import polish from "../lib/ui/self-service-polish.module.css";
+
+export const metadata = { title: "Vérification en deux étapes" };
 
 interface PageProps {
   searchParams?: Promise<Record<string, string | string[] | undefined>>;
@@ -21,6 +24,11 @@ export default async function MfaPage({ searchParams }: PageProps) {
   return (
     <>
       <h1 className="bo-auth__title">MFA requise</h1>
+      <p className={polish.lead}>
+        {mfaEnrolled
+          ? "Saisissez le code de votre application d'authentification pour ouvrir le back-office."
+          : "Vérification en deux étapes obligatoire : générez d'abord votre secret MFA, puis validez avec un code."}
+      </p>
       <MfaPanel returnTo={returnTo} mfaEnrolled={mfaEnrolled} />
     </>
   );

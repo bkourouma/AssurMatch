@@ -1,0 +1,121 @@
+/*
+ * Courtier: small layout helpers for the authentication, account, billing, notification and enterprise
+ * screens. Tokens only (no colour, size or radius of its own); no shadow, no fill. Kept apart from
+ * broker-screens.module.css, which another surface owns.
+ */
+
+/* Authentication screens: the panel is a grid, the landmark keeps the same rhythm as the panel itself. */
+.authMain {
+  display: grid;
+  gap: var(--bo-s4);
+  min-width: 0;
+}
+
+/* Secondary links under an authentication form: underlined (colour alone is not a link cue), 40px tall. */
+.authLinks {
+  display: grid;
+  gap: var(--bo-s1);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: var(--bo-fs);
+}
+
+.authLinks a,
+.footerLink {
+  display: inline-flex;
+  align-items: center;
+  min-height: 40px;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+/* Sentence under an authentication title. */
+.lead {
+  margin: 0;
+  color: var(--bo-ink-3);
+  font-size: var(--bo-fs);
+  line-height: 1.5;
+}
+
+/* One-time secret and backup codes shown in a notice: data in mono, wrapped on a phone. */
+.secretBlock {
+  display: grid;
+  gap: var(--bo-s2);
+}
+
+.secretBlock code {
+  overflow-wrap: anywhere;
+  word-break: break-all;
+}
+
+.codeList {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(11ch, 1fr));
+  gap: var(--bo-s2) var(--bo-s4);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+/* Notification entry: an unread one reads first (full ink, bold title), a read one steps back. */
+.notification {
+  display: grid;
+  gap: var(--bo-s2);
+  min-width: 0;
+}
+
+.notification[data-read="false"] h3 {
+  color: var(--bo-ink);
+  font-weight: 700;
+}
+
+.notification[data-read="true"] h3 {
+  color: var(--bo-ink-2);
+  font-weight: 500;
+}
+
+.notification[data-read="true"] p {
+  color: var(--bo-ink-2);
+}
+
+/* Rows of actions under a block of text (links and buttons side by side, wrapping on a phone). */
+.actionRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--bo-s2) var(--bo-s4);
+}
+
+/* Numbered explanation (how a plan change works): short steps, readable measure. */
+.steps {
+  display: grid;
+  gap: var(--bo-s1);
+  margin: 0;
+  padding-left: var(--bo-s5);
+  max-width: 68ch;
+}
+
+/* Links inside a table cell: a comfortable target on a phone. */
+.cellLinks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--bo-s1) var(--bo-s4);
+}
+
+.cellLinks a {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+@media (max-width: 900px) {
+  .cellLinks a {
+    display: inline-flex;
+    align-items: center;
+    min-height: 40px;
+  }
+
+  .codeList {
+    grid-template-columns: 1fr 1fr;
+  }
+}

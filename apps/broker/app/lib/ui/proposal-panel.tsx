@@ -11,8 +11,9 @@ import {
   VISITOR_RESPONSE_LABELS,
   formatPremium
 } from "../proposal-vocabulary";
-import { Badge, Button, ConfirmDialog, DescriptionList, Field, FormActions, FormRow, Input, Notice, Select, Stack, Textarea, TenantWriteGuard } from "./broker-ui";
+import { Badge, ConfirmDialog, DescriptionList, Field, FormActions, FormRow, Input, Notice, Select, Stack, Textarea, TenantWriteGuard } from "./broker-ui";
 import { formatDate } from "./broker-view-models";
+import { LeadSubmitButton } from "./lead-submit-button";
 import styles from "./broker-screens.module.css";
 
 const STATUS_TONES: Record<string, "info" | "success" | "warning" | "neutral" | "disabled"> = {
@@ -142,6 +143,9 @@ export function ProposalPanel({ channel, leadAssignmentId, data, canMutate, tena
       ) : (
         <p className={styles.muted}>Aucune proposition envoyée pour ce lead. Le visiteur la retrouve dans son espace de suivi dès l&apos;envoi.</p>
       )}
+      {canMutate && !tenantReadOnly && !data.canSend && data.blockers.length === 0 ? (
+        <Notice tone="warning">L&apos;envoi d&apos;une proposition est indisponible pour ce lead pour le moment.</Notice>
+      ) : null}
       {canMutate || tenantReadOnly ? (
         <TenantWriteGuard readOnly={tenantReadOnly || !data.canSend}>
           <form action={action} method="post" encType="multipart/form-data" className={`bo-form bo-form--two ${styles.subsection}`} aria-label="Nouvelle proposition au visiteur">
@@ -153,35 +157,35 @@ export function ProposalPanel({ channel, leadAssignmentId, data, canMutate, tena
                 <Textarea id={`${channel}-proposal-message`} name="message" required maxLength={PROPOSAL_MESSAGE_MAX} rows={5} aria-label="Message de la proposition" />
               </Field>
             </FormRow>
-            <Field id={`${channel}-proposal-min`} label="Prime indicative (ou minimum)">
-              <Input id={`${channel}-proposal-min`} name="priceMin" type="number" min={0} step="any" inputMode="decimal" aria-label="Prime indicative minimum" />
+            <Field id={`${channel}-proposal-min`} label="Prime indicative (ou minimum)" hint="Montant en chiffres. Seul, c'est la prime indicative ; avec un maximum, c'est le bas de la fourchette.">
+              <Input id={`${channel}-proposal-min`} name="priceMin" type="number" min={0} step="any" inputMode="decimal" aria-describedby={`${channel}-proposal-min-hint`} />
             </Field>
-            <Field id={`${channel}-proposal-max`} label="Maximum de la fourchette">
-              <Input id={`${channel}-proposal-max`} name="priceMax" type="number" min={0} step="any" inputMode="decimal" aria-label="Prime indicative maximum" />
+            <Field id={`${channel}-proposal-max`} label="Maximum de la fourchette" hint="Facultatif. À renseigner seulement pour proposer une fourchette.">
+              <Input id={`${channel}-proposal-max`} name="priceMax" type="number" min={0} step="any" inputMode="decimal" aria-describedby={`${channel}-proposal-max-hint`} />
             </Field>
-            <Field id={`${channel}-proposal-currency`} label="Devise" required requiredLabel="obligatoire">
-              <Select id={`${channel}-proposal-currency`} name="currency" defaultValue="XOF" aria-label="Devise" options={PROPOSAL_CURRENCIES.map((currency) => ({ value: currency, label: currency }))} />
+            <Field id={`${channel}-proposal-currency`} label="Devise" required requiredLabel="obligatoire" hint="XOF et XAF correspondent au franc CFA (FCFA).">
+              <Select id={`${channel}-proposal-currency`} name="currency" defaultValue="XOF" aria-describedby={`${channel}-proposal-currency-hint`} options={PROPOSAL_CURRENCIES.map((currency) => ({ value: currency, label: currency }))} />
             </Field>
-            <Field id={`${channel}-proposal-valid`} label="Valable jusqu'au" required requiredLabel="obligatoire">
-              <Input id={`${channel}-proposal-valid`} name="validUntil" type="date" required min={minDate} aria-label="Date de validité" />
+            <Field id={`${channel}-proposal-valid`} label="Valable jusqu'au" required requiredLabel="obligatoire" hint="Dernier jour où la proposition reste valable, à partir de demain.">
+              <Input id={`${channel}-proposal-valid`} name="validUntil" type="date" required min={minDate} aria-describedby={`${channel}-proposal-valid-hint`} />
             </Field>
             <FormRow full>
               <Field id={`${channel}-proposal-guarantees`} label="Principales garanties" hint={`Une garantie par ligne, ${PROPOSAL_GUARANTEES_MAX} au maximum.`}>
-                <Textarea id={`${channel}-proposal-guarantees`} name="guarantees" rows={4} aria-label="Principales garanties" />
+                <Textarea id={`${channel}-proposal-guarantees`} name="guarantees" rows={4} aria-describedby={`${channel}-proposal-guarantees-hint`} />
               </Field>
             </FormRow>
             <FormRow full>
               <Field id={`${channel}-proposal-file`} label="PDF facultatif" hint="PDF, 5 Mo au maximum, analyse par l'antivirus.">
-                <Input id={`${channel}-proposal-file`} name="file" type="file" accept="application/pdf" aria-label="Document PDF de la proposition" />
+                <Input id={`${channel}-proposal-file`} name="file" type="file" accept="application/pdf" aria-describedby={`${channel}-proposal-file-hint`} />
               </Field>
             </FormRow>
             <FormActions>
-              <Button type="submit">Envoyer la proposition au visiteur</Button>
+              <LeadSubmitButton pendingLabel="Envoi en cours…">Envoyer la proposition au visiteur</LeadSubmitButton>
             </FormActions>
           </form>
         </TenantWriteGuard>
       ) : (
-        <Notice tone="info" title="Lecture seule">Votre rôle ne permet pas d&apos;envoyer de proposition.</Notice>
+        <Notice tone="info" title="Lecture seule">Votre rôle ne permet pas d&apos;envoyer de proposition. Demandez au propriétaire ou à un manager du cabinet de répondre au visiteur.</Notice>
       )}
     </Stack>
   );
