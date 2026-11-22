@@ -3,7 +3,7 @@ import { Badge, Button, Card, Cluster, DescriptionList, EmptyState, Grid, PageHe
 import { QuoteReviewForm } from "../../lib/ui/operations-forms";
 import { OperationsTabs } from "../../lib/ui/operations-tabs";
 import { quoteStatusTones } from "../../lib/ui/operations-tones";
-import { productLabel } from "../../lib/ui/operations-labels";
+import { productLabel, quoteStatusLabel, routingReasonsLabel, routingStatusLabel } from "../../lib/ui/operations-labels";
 import { readFailureDetail } from "../../lib/auth-error-messages";
 
 /**
@@ -53,25 +53,25 @@ export default async function AdminQuoteReviewPage({ searchParams }: { searchPar
               key={item.id}
               title={item.publicReference}
               description={`${item.countryCode ?? "-"} / ${productLabel(item.productKey)} - reçue le ${formatDateTime(item.createdAt)}`}
-              actions={<Button href={`/quote-requests/${item.id}`} variant="tertiary" size="sm">Ouvrir la fiche</Button>}
+              actions={<Button href={`/quote-requests/${item.id}`} variant="tertiary" size="sm" aria-label={`Ouvrir la fiche de la demande ${item.publicReference}`}>Ouvrir la fiche</Button>}
             >
               <Grid columns="two">
                 <Stack>
                   <Cluster>
-                    <Badge tone={quoteStatusTones[item.status] ?? "neutral"}>{item.status}</Badge>
-                    <Badge tone="warning">{item.routingStatus}</Badge>
+                    <Badge tone={quoteStatusTones[item.status] ?? "neutral"} title={item.status}>{quoteStatusLabel(item.status)}</Badge>
+                    <Badge tone="warning" title={item.routingStatus}>{routingStatusLabel(item.routingStatus)}</Badge>
                   </Cluster>
                   <DescriptionList
                     items={[
                       { term: "Courtiers partenaires évalués", value: `${eligible.length} éligible(s) sur ${item.candidates.length}` },
                       {
                         term: "Exclus",
-                        value: excluded.length > 0 ? excluded.map((candidate) => `${candidate.legalName} (${candidate.reasons.join(", ")})`).join(" ; ") : "-"
+                        value: excluded.length > 0 ? excluded.map((candidate) => `${candidate.legalName} (${routingReasonsLabel(candidate.reasons)})`).join(" ; ") : "-"
                       }
                     ]}
                   />
                 </Stack>
-                <QuoteReviewForm quoteRequestId={item.id} candidates={item.candidates} />
+                <QuoteReviewForm quoteRequestId={item.id} candidates={item.candidates} reference={item.publicReference} />
               </Grid>
             </Card>
           );

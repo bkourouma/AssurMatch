@@ -16,6 +16,10 @@ function ValueBadge({ value }: { value: boolean }) {
   return <Badge tone={value ? "warning" : "disabled"}>{value ? "Actif" : "Désactivé"}</Badge>;
 }
 
+function sensitivityLabel(value: string): string {
+  return value === "highly_sensitive" ? "Hautement sensible" : value === "sensitive" ? "Sensible" : value;
+}
+
 function formatDate(value: string): string {
   const date = new Date(value);
   return Number.isNaN(date.getTime()) ? value : date.toISOString().slice(0, 16).replace("T", " ");
@@ -56,7 +60,7 @@ export default async function AiScopeFlagsPage() {
               ]}
               items={globalFlags}
               getKey={(flag) => flag.key}
-              emptyLabel="Aucun flag global IA référence."
+              emptyLabel="Aucun flag global IA référencé."
               aria-label="Flags globaux IA"
             />
             <p className="bo-description">Commande d'exploitation :</p>
@@ -85,7 +89,7 @@ export default async function AiScopeFlagsPage() {
               ]}
               items={countries}
               getKey={(country) => country.id}
-              emptyLabel="Aucun pays référence."
+              emptyLabel="Aucun pays référencé."
               aria-label="Flags IA par pays"
             />
           </Card>
@@ -98,7 +102,7 @@ export default async function AiScopeFlagsPage() {
                 {
                   key: "sensitivity",
                   header: "Sensibilité",
-                  render: (product) => <Badge tone={product.sensitivity === "highly_sensitive" ? "danger" : "neutral"}>{product.sensitivity}</Badge>
+                  render: (product) => <Badge tone={product.sensitivity === "highly_sensitive" ? "danger" : "neutral"}><span title={product.sensitivity}>{sensitivityLabel(product.sensitivity)}</span></Badge>
                 },
                 {
                   key: "flags",
@@ -133,7 +137,7 @@ export default async function AiScopeFlagsPage() {
               ]}
               items={products}
               getKey={(product) => product.id}
-              emptyLabel="Aucun produit référence."
+              emptyLabel="Aucun produit référencé."
               aria-label="Flags IA par produit"
             />
           </Card>
@@ -150,6 +154,7 @@ export default async function AiScopeFlagsPage() {
               items={history}
               getKey={(entry) => `${entry.key}:${entry.scopeId ?? ""}:${entry.changedAt}`}
               emptyLabel="Aucun changement enregistré."
+              emptyDescription="Chaque désactivation ou réouverture d'un flag IA apparaîtra ici avec son motif."
               aria-label="Historique des flags IA"
             />
           </Card>

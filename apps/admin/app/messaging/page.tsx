@@ -3,6 +3,9 @@ import { Badge, Card, DataTable, Notice, PageHeader, PageStack, StateMessage } f
 import { MessagingTestForm } from "./messaging-test-form";
 import { readFailureDetail } from "../lib/auth-error-messages";
 
+const CHANNEL_LABELS: Record<string, string> = { sms: "SMS", whatsapp: "WhatsApp" };
+const channelLabel = (channel: string): string => CHANNEL_LABELS[channel] ?? channel;
+
 export default async function AdminMessagingPage() {
   const [providers, deliveries] = await Promise.all([readMessagingProviders(), readMessagingDeliveries()]);
 
@@ -29,7 +32,7 @@ export default async function AdminMessagingPage() {
           <Card title="Canaux">
             <DataTable
               columns={[
-                { key: "channel", header: "Canal", render: (provider) => provider.channel },
+                { key: "channel", header: "Canal", render: (provider) => channelLabel(provider.channel) },
                 { key: "flagKey", header: "Flag", render: (provider) => <span className="bo-ref">{provider.flagKey}</span> },
                 { key: "enabled", header: "Flag actif", render: (provider) => <Badge tone={provider.enabled ? "warning" : "disabled"}>{provider.enabled ? "oui" : "non"}</Badge> },
                 { key: "provider", header: "Fournisseur", render: (provider) => provider.provider },
@@ -39,7 +42,7 @@ export default async function AdminMessagingPage() {
               ]}
               items={providers.data.providers}
               getKey={(provider) => provider.channel}
-              emptyLabel="Aucun canal référence."
+              emptyLabel="Aucun canal référencé."
               aria-label="Canaux de messagerie"
             />
           </Card>
@@ -55,9 +58,12 @@ export default async function AdminMessagingPage() {
             title="Dernières tentatives de diffusion"
             description="Les destinataires sont masqués et le contenu des messages n'est jamais journalisé."
           >
+            {deliveries.status === "error" ? (
+              <StateMessage tone="warning">Historique des tentatives indisponible. {readFailureDetail(deliveries.error)} Les canaux et l&apos;envoi de test restent utilisables ; rechargez la page pour réessayer.</StateMessage>
+            ) : null}
             <DataTable
               columns={[
-                { key: "channel", header: "Canal", render: (delivery) => delivery.channel },
+                { key: "channel", header: "Canal", render: (delivery) => channelLabel(delivery.channel) },
                 { key: "status", header: "Statut", render: (delivery) => <Badge tone={delivery.status === "sent" ? "info" : "warning"}>{delivery.status}</Badge> },
                 { key: "template", header: "Modèle", render: (delivery) => delivery.template },
                 { key: "recipient", header: "Destinataire", render: (delivery) => <span className="bo-ref">{delivery.recipientMasked}</span> },
@@ -66,7 +72,7 @@ export default async function AdminMessagingPage() {
               ]}
               items={deliveries.status === "success" ? deliveries.data : []}
               getKey={(delivery) => delivery.id}
-              emptyLabel="Aucune tentative enregistrée."
+              emptyLabel={deliveries.status === "error" ? "Historique non chargé" : "Aucune tentative enregistrée."}
               emptyDescription="Les envois SMS et WhatsApp apparaissent ici dès qu'un canal est actif et configuré."
               aria-label="Tentatives de diffusion"
             />

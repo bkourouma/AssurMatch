@@ -2,6 +2,8 @@ import { redirect } from "next/navigation";
 import { PasswordChangeForm } from "../auth-flow-form";
 import { loginRedirect, readBackOfficeSession } from "../lib/backoffice-auth";
 
+export const metadata = { title: "Changer le mot de passe" };
+
 export default async function PasswordChangePage() {
   const session = await readBackOfficeSession();
   if (session.status === "unauthenticated" || session.status === "expired") redirect(loginRedirect("/password-change", session.status));
@@ -10,6 +12,9 @@ export default async function PasswordChangePage() {
     <>
       <h1 className="bo-auth__title">Changer le mot de passe</h1>
       <PasswordChangeForm />
+      <p className="bo-auth__footer">
+        <a href="/account/security">Retour à la sécurité du compte</a>
+      </p>
     </>
   );
 }

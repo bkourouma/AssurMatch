@@ -60,7 +60,7 @@ test("manual review queue persists audited decisions through the API (H-02)", ()
     expect(forms, decision).toContain(`${decision}:`);
   }
   expect(forms).toContain("data-operations-form=\"quote-review\"");
-  expect(forms).toContain("Motif (audité");
+  expect(forms).toContain("Motif (obligatoire, audité");
   expect(forms).toContain("candidate.eligible");
 });
 

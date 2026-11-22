@@ -16,8 +16,9 @@ export function MessagingTestForm({ channels }: { channels: string[] }) {
   return (
     <Form action={formAction} data-messaging-test-form="true" autoComplete="off">
       <Notice tone="info">Réservé au super admin, MFA requis. Le destinataire n'est jamais affiché en clair.</Notice>
+      {channels.length === 0 ? <Notice tone="warning">Aucun canal n&apos;est référencé : l&apos;envoi de test est indisponible tant qu&apos;un canal n&apos;est pas configuré.</Notice> : null}
       {state.status !== "idle" ? (
-        <Notice tone={state.status === "success" ? "success" : "danger"}>
+        <Notice tone={state.status === "success" ? "success" : "danger"} title={state.status === "success" ? "Message de test envoyé" : "Envoi de test refusé ou échoué"}>
           <p>{state.message}</p>
           {state.delivery ? (
             <ul className="bo-list">
@@ -34,16 +35,16 @@ export function MessagingTestForm({ channels }: { channels: string[] }) {
         </Select>
       </Field>
       <Field id={`${base}-recipient`} label="Destinataire" hint="Numéro au format international, transmis uniquement au service d'envoi." required>
-        <Input {...fieldControlProps(`${base}-recipient`, { required: true })} name="recipient" type="tel" minLength={5} maxLength={120} autoComplete="off" />
+        <Input {...fieldControlProps(`${base}-recipient`, { required: true, hint: "x" })} name="recipient" type="tel" minLength={5} maxLength={120} autoComplete="off" />
       </Field>
-      <Field id={`${base}-scopeId`} label="Identifiant de portée" hint="Identifiant du destinataire ou du partenaire concerne par le test." required>
-        <Input {...fieldControlProps(`${base}-scopeId`, { required: true })} name="scopeId" autoComplete="off" />
+      <Field id={`${base}-scopeId`} label="Identifiant de portée" hint="Identifiant du destinataire ou du partenaire concerné par le test." required>
+        <Input {...fieldControlProps(`${base}-scopeId`, { required: true, hint: "x" })} name="scopeId" autoComplete="off" />
       </Field>
-      <Field id={`${base}-reason`} label="Motif (audité)" required>
-        <Input {...fieldControlProps(`${base}-reason`, { required: true })} name="reason" minLength={3} maxLength={300} />
+      <Field id={`${base}-reason`} label="Motif (obligatoire, audité)" required hint="Entre 3 et 300 caractères, conservé dans le journal d'audit.">
+        <Input {...fieldControlProps(`${base}-reason`, { required: true, hint: "x" })} name="reason" minLength={3} maxLength={300} />
       </Field>
       <FormActions>
-        <Button type="submit" pending={pending} pendingLabel="Envoi..." disabled={channels.length === 0}>Envoyer un message de test</Button>
+        <Button type="submit" pending={pending} pendingLabel="Envoi du test..." disabled={channels.length === 0}>Envoyer un message de test</Button>
       </FormActions>
     </Form>
   );

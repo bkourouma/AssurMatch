@@ -4,9 +4,11 @@ import { activationControlLabel, canApprovePublicActivation, correctionTarget, f
 import { ACTIVATION_ATTESTABLE_CONTROLS, type ActivationChecklistControl as ChecklistControl, type ActivationChecklistSection } from "../../../../packages/shared/contracts/activation-checklist.contracts";
 import { AttestControlForm, RevokeAttestationForm } from "./attestation-forms";
 import {
+  Button,
   DataTable,
   Field,
   FilterBar,
+  Notice,
   PageHeader,
   PageStack,
   Select,
@@ -27,6 +29,19 @@ function firstParam(value: string | string[] | undefined): string {
  * screen that owns the fix (catalogue, consent texts, quote forms, offers, partners).
  */
 
+/** First failing control that has a screen to fix it, blocked sections first: the operator's next action. */
+function nextCorrection(sections: ActivationChecklistSection[], fallbackCountryId: string | undefined) {
+  const ordered = [...sections.filter((section) => section.status === "blocked"), ...sections.filter((section) => section.status === "warning")];
+  for (const section of ordered) {
+    for (const control of section.controls) {
+      if (control.status === "passed") continue;
+      const target = correctionTarget(control.key, { countryId: section.scope.countryId ?? fallbackCountryId, productId: section.scope.productId });
+      if (target) return { href: target.href, label: activationControlLabel(control.key, control.label), section: section.title };
+    }
+  }
+  return undefined;
+}
+
 /** Spec 070 PRD 35/36: a manual control is passed by a compliance attestation, never computed. */
 function ManualControlAttestation({ control, canAttest }: { control: ChecklistControl; canAttest: boolean }) {
   const target = control.attestationTarget;
@@ -36,7 +51,7 @@ function ManualControlAttestation({ control, canAttest }: { control: ChecklistCo
       <div data-attestation="present">
         <strong>Attestation de conformité</strong>
         {` : par ${control.attestation.attestedById.slice(0, 8)} le ${formatDate(control.attestation.attestedAt)} — ${control.attestation.note}`}
-        {canAttest && target ? <RevokeAttestationForm target={target} /> : null}
+        {canAttest && target ? <RevokeAttestationForm target={target} controlLabel={activationControlLabel(control.key, control.label)} /> : null}
       </div>
     );
   }
@@ -44,7 +59,7 @@ function ManualControlAttestation({ control, canAttest }: { control: ChecklistCo
   return (
     <div data-attestation="missing">
       {canAttest ? (
-        <AttestControlForm target={target} minNoteLength={attestable.minNoteLength} />
+        <AttestControlForm target={target} minNoteLength={attestable.minNoteLength} controlLabel={activationControlLabel(control.key, control.label)} />
       ) : (
         <span className="bo-description">Attestation manuelle requise, réservée à la conformité (compliance_admin, super_admin).</span>
       )}
@@ -69,6 +84,7 @@ export default async function ActivationChecklistPage({
   ]);
   const filteredCountryId = countryFilter ? countries.data.find((country) => country.isoCode === countryFilter)?.id : undefined;
   const activeCount = (countryFilter ? 1 : 0) + (productFilter ? 1 : 0);
+  const next = checklist.status === "success" ? nextCorrection(checklist.data.sections as ActivationChecklistSection[], filteredCountryId) : undefined;
 
   return (
     <PageStack>
@@ -106,7 +122,11 @@ export default async function ActivationChecklistPage({
 
       {checklist.unauthenticated ? <StateMessage tone="danger">Session admin requise.</StateMessage> : null}
       {checklist.forbidden ? <StateMessage tone="danger">Accès checklist refusé pour ce rôle admin ou hors périmètre.</StateMessage> : null}
-      {checklist.status === "error" ? <StateMessage tone="danger">Checklist indisponible. {readFailureDetail(checklist.error)}</StateMessage> : null}
+      {checklist.status === "error" ? (
+        <StateMessage tone="danger" title="Checklist indisponible">
+          {readFailureDetail(checklist.error)} Les filtres sont conservés : rechargez la page pour réessayer.
+        </StateMessage>
+      ) : null}
 
       {checklist.status === "success" ? (
         <>
@@ -118,6 +138,23 @@ export default async function ActivationChecklistPage({
               { label: "Bloquants", value: checklist.data.summary.blocked, tone: checklist.data.summary.blocked > 0 ? "danger" : "neutral" }
             ]}
           />
+
+          {checklist.data.summary.blocked > 0 ? (
+            <Notice tone="danger" title="Activation bloquée">
+              {checklist.data.summary.blocked} élément(s) bloquant(s) : le périmètre ne peut pas être ouvert tant qu&apos;ils ne sont pas corrigés.
+              {next ? <> Prochaine action : <a href={next.href}>corriger « {next.label} »</a> ({next.section}).</> : " Ces contrôles se corrigent par une attestation de conformité ou hors de cette interface."}
+              {checklist.data.summary.warning > 0 ? ` ${checklist.data.summary.warning} point(s) restent à surveiller.` : ""}
+            </Notice>
+          ) : checklist.data.summary.warning > 0 ? (
+            <Notice tone="warning" title="Aucun blocage, points à surveiller">
+              {checklist.data.summary.warning} élément(s) à surveiller avant le go/no-go.
+              {next ? <> Prochaine action : <a href={next.href}>vérifier « {next.label} »</a> ({next.section}).</> : null}
+            </Notice>
+          ) : checklist.data.sections.length > 0 ? (
+            <Notice tone="success" title="Préconditions techniques remplies">
+              Tous les contrôles techniques sont passés. Le go/no-go conformité, juridique, support et opérations reste à faire.
+            </Notice>
+          ) : null}
 
           <DataTable
             columns={[
@@ -160,6 +197,8 @@ export default async function ActivationChecklistPage({
             items={checklist.data.sections as ActivationChecklistSection[]}
             getKey={(section) => section.key}
             emptyLabel="Aucune précondition d'activation disponible."
+            emptyDescription={activeCount > 0 ? "Aucune section ne correspond au pays ou au produit filtré. Réinitialisez les filtres pour revoir tout le périmètre." : undefined}
+            emptyAction={activeCount > 0 ? <Button href="/activation-checklist" variant="secondary" size="sm">Réinitialiser les filtres</Button> : undefined}
             aria-label="Préconditions techniques d'activation"
           />
         </>

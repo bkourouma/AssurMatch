@@ -2,7 +2,8 @@ import { redirect } from "next/navigation";
 import { isAdminProfile, loginRedirect, readBackOfficeSession } from "../lib/backoffice-auth";
 import { readAdminDashboard } from "../lib/admin-api";
 import { AttentionList, Badge, Button, Card, Cluster, DataTable, Grid, PageHeader, PageStack, StateMessage, StatStrip } from "../lib/ui/admin-ui";
-import { AI_DISABLED, aiValidationLabel, dashboardAttention, dashboardPrdKpis, flagTone, sensitiveFeatureFlagKeys } from "../lib/ui/admin-view-models";
+import { AI_DISABLED, aiValidationLabel, dashboardAttention, dashboardPrdKpis } from "../lib/ui/admin-view-models";
+import { SensitiveFlagsCard } from "../lib/ui/dashboard-blocks";
 import { productLabel } from "../lib/ui/operations-labels";
 import { readFailureDetail } from "../lib/auth-error-messages";
 
@@ -38,7 +39,9 @@ export default async function AdminDashboardPage() {
     return (
       <PageStack>
         <PageHeader breadcrumb={breadcrumb} title="Dashboard plateforme" />
-        <StateMessage tone="danger">Dashboard indisponible. {readFailureDetail(dashboard.error)}</StateMessage>
+        <StateMessage tone="danger" title="Dashboard indisponible">
+          Les indicateurs n&apos;ont pas pu être chargés. {readFailureDetail(dashboard.error)} Rechargez la page ; si l&apos;erreur persiste, vérifiez l&apos;état de l&apos;API. <a href="/dashboard">Recharger le dashboard</a>
+        </StateMessage>
       </PageStack>
     );
   }
@@ -49,7 +52,12 @@ export default async function AdminDashboardPage() {
         breadcrumb={breadcrumb}
         title="Dashboard plateforme"
         description="Indicateurs internes opérationnels et conformité. Les chiffres restent des signaux de pilotage et ne modifient aucune règle de routage."
-        actions={<Button href="/reports/export" variant="secondary">Exporter le rapport plateforme (CSV)</Button>}
+        actions={
+          <Cluster>
+            <Button href="/" variant="secondary">Vue d&apos;accueil</Button>
+            <Button href="/reports/export" variant="secondary">Exporter le rapport plateforme (CSV)</Button>
+          </Cluster>
+        }
       />
       <section aria-label="Volumes de leads" className="bo-stack">
         <Card title="À traiter" description="Les files qui attendent une décision, les plus urgentes en premier.">
@@ -81,7 +89,7 @@ export default async function AdminDashboardPage() {
                 {data.aiAlerts.items.length === 0 ? <StateMessage>Aucune alerte IA en attente.</StateMessage> : (
                   <ul className="bo-list">
                     {data.aiAlerts.items.map((item) => (
-                      <li key={item.insightId}>{item.type} - {item.createdAt.slice(0, 10)} - {aiValidationLabel(item.status)}</li>
+                      <li key={item.insightId}><a href="/ai-assistance">{item.type}</a> - {item.createdAt.slice(0, 10)} - {aiValidationLabel(item.status)}</li>
                     ))}
                   </ul>
                 )}
@@ -105,10 +113,10 @@ export default async function AdminDashboardPage() {
         </Card>
         <Card title="Partenaires et offres">
           <ul className="bo-list">
-            <li>Partenaires actifs: {data.partners.active}</li>
-            <li>Partenaires inactifs: {data.partners.inactive}</li>
-            <li>Offres expirées encore référencées: {data.expiredOffersStillReferenced}</li>
-            <li>Licences expirant dans 30 jours: {data.licenseAlerts.expiringSoon}</li>
+            <li><a href="/partners?status=active">Partenaires actifs</a> : {data.partners.active}</li>
+            <li>Partenaires inactifs : {data.partners.inactive}</li>
+            <li><a href="/offers?status=expired">Offres expirées encore référencées</a> : {data.expiredOffersStillReferenced}</li>
+            <li><a href="/partners?expiring=30">Licences expirant dans 30 jours</a> : {data.licenseAlerts.expiringSoon}</li>
           </ul>
         </Card>
       </Grid>
@@ -140,27 +148,21 @@ export default async function AdminDashboardPage() {
         as="section"
         aria-label="Alertes conformité (synthèse)"
         title="Alertes conformité"
+        description="Refus audités sur la fenêtre, par catégorie. Un compteur ouvre le journal détaillé."
         footer={<a href="/dashboard/compliance-alerts">Voir le détail des alertes</a>}
       >
         <StatStrip
           label="Alertes par catégorie"
           items={[
-            { label: "Consentement absent", value: data.complianceAlertCounts.consentMissing, tone: data.complianceAlertCounts.consentMissing > 0 ? "danger" : "success" },
-            { label: "CRM fermé", value: data.complianceAlertCounts.crmFlagClosed, tone: data.complianceAlertCounts.crmFlagClosed > 0 ? "warning" : "success" },
-            { label: "RBAC refusés", value: data.complianceAlertCounts.rbacDenied, tone: data.complianceAlertCounts.rbacDenied > 0 ? "warning" : "success" },
-            { label: "Tentatives inter-tenant", value: data.complianceAlertCounts.crossTenantAttempt, tone: data.complianceAlertCounts.crossTenantAttempt > 0 ? "danger" : "success" }
+            { label: "Consentement absent", value: data.complianceAlertCounts.consentMissing, tone: data.complianceAlertCounts.consentMissing > 0 ? "danger" : "success", href: "/dashboard/compliance-alerts" },
+            { label: "CRM fermé", value: data.complianceAlertCounts.crmFlagClosed, tone: data.complianceAlertCounts.crmFlagClosed > 0 ? "warning" : "success", href: "/dashboard/compliance-alerts" },
+            { label: "RBAC refusés", value: data.complianceAlertCounts.rbacDenied, tone: data.complianceAlertCounts.rbacDenied > 0 ? "warning" : "success", href: "/dashboard/compliance-alerts" },
+            { label: "Tentatives inter-tenant", value: data.complianceAlertCounts.crossTenantAttempt, tone: data.complianceAlertCounts.crossTenantAttempt > 0 ? "danger" : "success", href: "/dashboard/compliance-alerts" },
+            { label: "Autres", value: data.complianceAlertCounts.other, tone: data.complianceAlertCounts.other > 0 ? "warning" : "success", href: "/dashboard/compliance-alerts" }
           ]}
         />
       </Card>
-      <Card as="section" aria-label="Feature flags sensibles" title="Feature flags sensibles (lecture seule)">
-        <Cluster>
-          {sensitiveFeatureFlagKeys.map((key) => {
-            const flag = data.sensitiveFeatureFlags.find((item) => item.key === key);
-            const scope = flag ? `${flag.scopeType}${flag.scopeId ? `:${flag.scopeId}` : ""}` : "global";
-            return <Badge key={key} tone={flagTone(flag?.value ?? false)}>{key} ({scope}): {flag?.value ? "actif" : "désactivé"}</Badge>;
-          })}
-        </Cluster>
-      </Card>
+      <SensitiveFlagsCard flags={data.sensitiveFeatureFlags} ariaLabel="Feature flags sensibles" />
     </PageStack>
   );
 }

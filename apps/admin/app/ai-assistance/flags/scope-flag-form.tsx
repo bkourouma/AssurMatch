@@ -55,11 +55,14 @@ export function ScopeFlagForm({ scopeType, scopeId, scopeLabel, flagKey, current
           <input type="hidden" name="scopeId" value={scopeId} />
           <input type="hidden" name="key" value={flagKey} />
           <input type="hidden" name="value" value="false" />
-          <Field id={`${base}-reason`} label="Motif (audité)" required>
-            <Input {...fieldControlProps(`${base}-reason`, { required: true })} name="reason" minLength={8} maxLength={500} />
+          <p className="bo-description">
+            Désactivation de <code>{flagKey}</code> pour {scopeLabel}. La réouverture passera par la commande d&apos;exploitation (décision de conformité).
+          </p>
+          <Field id={`${base}-reason`} label="Motif (obligatoire, audité)" required hint="Entre 8 et 500 caractères, conservé dans l'historique.">
+            <Input {...fieldControlProps(`${base}-reason`, { required: true, hint: "x" })} name="reason" minLength={8} maxLength={500} autoFocus />
           </Field>
           <FormActions>
-            <Button type="submit" size="sm" variant="secondary" pending={pending} pendingLabel="Envoi...">Confirmer la désactivation</Button>
+            <Button type="submit" size="sm" variant="secondary" pending={pending} pendingLabel="Désactivation...">Confirmer la désactivation</Button>
             <Button type="button" size="sm" variant="secondary" onClick={() => setOpen(false)}>Annuler</Button>
           </FormActions>
         </Form>

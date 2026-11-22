@@ -35,3 +35,6 @@ export const AI_ASSISTED_MODE_NOTE =
 export function qualityScoreLabel(score: number): string {
   return `Qualité du lead : ${score}/100`;
 }
+
+/** Shown under every audited reason field of the routing forms. */
+export const REASON_HINT = "Obligatoire. Conservé dans le journal d'audit.";
