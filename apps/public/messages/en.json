@@ -1344,7 +1344,11 @@
     "disclaimerTitle": "What this guide does not replace",
     "disclaimerBody": "This guide explains a general principle, not your personal situation. It does not replace the analysis of an authorised partner broker on your file, or legal advice on your contract. For an answer that is binding, compare offers and then request a quote: an authorised broker will confirm what applies to your case.",
     "productAuto": "Auto",
-    "productVoyage": "Travel"
+    "productVoyage": "Travel",
+    "empty": {
+      "title": "No guide published yet",
+      "description": "Practical guides will appear here once published. In the meantime, the \"How it works\" page explains the journey."
+    }
   },
   "Glossary": {
     "title": "Glossary",
@@ -1355,7 +1359,11 @@
     "indexLabel": "Alphabetical index",
     "termCount": "{count, plural, one {# term explained} other {# terms explained}}",
     "selectorLead": "Pick a country and a product to display the matching indicative offers.",
-    "seeAlso": "See also"
+    "seeAlso": "See also",
+    "empty": {
+      "title": "The glossary is empty for now",
+      "description": "Insurance terms will appear here once published."
+    }
   },
   "Faq": {
     "title": "FAQ",
@@ -1596,7 +1604,8 @@
     },
     "noCountries": {
       "title": "Applications temporarily unavailable",
-      "description": "No country is accepting a new broker application at the moment."
+      "description": "No country is accepting a new broker application at the moment.",
+      "action": "Contact AssurMatch"
     }
   },
   "BrokerLogin": {

@@ -1344,7 +1344,11 @@
     "disclaimerTitle": "Ce que ce guide ne remplace pas",
     "disclaimerBody": "Ce guide explique un principe général, pas votre situation personnelle. Il ne remplace pas l'analyse d'un courtier partenaire autorisé sur votre dossier, ni un avis juridique sur votre contrat. Pour une réponse qui vous engage, comparez les offres puis demandez un devis : un courtier autorisé confirmera ce qui s'applique à votre cas.",
     "productAuto": "Auto",
-    "productVoyage": "Voyage"
+    "productVoyage": "Voyage",
+    "empty": {
+      "title": "Aucun guide publié pour le moment",
+      "description": "Les guides pratiques seront affichés ici dès leur publication. En attendant, la page « Comment ça marche » explique le parcours."
+    }
   },
   "Glossary": {
     "title": "Lexique",
@@ -1355,7 +1359,11 @@
     "indexLabel": "Index alphabétique",
     "termCount": "{count, plural, one {# terme expliqué} other {# termes expliqués}}",
     "selectorLead": "Choisissez un pays et un produit pour afficher les offres indicatives correspondantes.",
-    "seeAlso": "Voir aussi"
+    "seeAlso": "Voir aussi",
+    "empty": {
+      "title": "Le lexique est vide pour le moment",
+      "description": "Les termes d'assurance seront affichés ici dès leur publication."
+    }
   },
   "Faq": {
     "title": "FAQ",
@@ -1596,7 +1604,8 @@
     },
     "noCountries": {
       "title": "Candidature momentanément indisponible",
-      "description": "Aucun pays n'accepte de nouvelle candidature de courtier pour le moment."
+      "description": "Aucun pays n'accepte de nouvelle candidature de courtier pour le moment.",
+      "action": "Contacter AssurMatch"
     }
   },
   "BrokerLogin": {

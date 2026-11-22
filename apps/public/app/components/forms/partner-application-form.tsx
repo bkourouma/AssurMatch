@@ -249,6 +249,7 @@ export function PartnerApplicationForm({ countries, productsByCountry, plans, la
   const locale = toLocale(useLocale());
   const [currentStep, setCurrentStep] = useState(1);
   const [reviewSnapshot, setReviewSnapshot] = useState<ReviewSnapshot | null>(null);
+  const [focusRequest, setFocusRequest] = useState<{ field: FieldName; id: number } | null>(null);
 
   useEffect(() => {
     document.documentElement.dataset["js"] = "true";
@@ -281,6 +282,38 @@ export function PartnerApplicationForm({ countries, productsByCountry, plans, la
     formRef.current?.querySelector<HTMLElement>(`[data-step-panel="${step}"] legend`)?.focus();
   }
 
+  /**
+   * After a failed check, focus goes to the first control to fix (document order), not to the
+   * legend or the submit button. The step panel may still be hidden when this runs, so the focus
+   * itself happens in the effect below, once the panel has rendered.
+   */
+  function requestFocusOnFirstError(errors: FieldErrors, steps: readonly number[]) {
+    for (const step of steps) {
+      const first = (STEP_FIELDS[step] ?? []).find((key) => errors[key]);
+      if (first) {
+        setFocusRequest((previous) => ({ field: first, id: (previous?.id ?? 0) + 1 }));
+        return;
+      }
+    }
+  }
+
+  useEffect(() => {
+    if (!focusRequest) return;
+    const control = formRef.current?.querySelector<HTMLElement>(`[name="${focusRequest.field}"]`);
+    control?.focus();
+  }, [focusRequest]);
+
+  // An error disappears as soon as its field is edited, instead of lingering until the next "Continuer".
+  function clearFieldError(event: FormEvent<HTMLFormElement>) {
+    const name = (event.target as HTMLInputElement | null)?.name as FieldName | undefined;
+    if (!name || !fieldErrors[name]) return;
+    setFieldErrors((previous) => {
+      const next = { ...previous };
+      delete next[name];
+      return next;
+    });
+  }
+
   function advance() {
     const form = formRef.current;
     if (!form) return;
@@ -294,6 +327,7 @@ export function PartnerApplicationForm({ countries, productsByCountry, plans, la
     if (Object.keys(stepErrors).length > 0) {
       setFieldErrors((previous) => ({ ...previous, ...stepErrors }));
       setState({ status: "error", message: labels.errors.generic });
+      requestFocusOnFirstError(stepErrors, [currentStep]);
       return;
     }
     setFieldErrors((previous) => {
@@ -315,7 +349,10 @@ export function PartnerApplicationForm({ countries, productsByCountry, plans, la
       setState({ status: "error", message: labels.errors.generic });
       // Send the visitor back to the first step that still has an error.
       const firstInvalidStep = [1, 2, 3, 4].find((step) => (STEP_FIELDS[step] ?? []).some((key) => errors[key]));
-      if (firstInvalidStep) goToStep(firstInvalidStep);
+      if (firstInvalidStep) {
+        setCurrentStep(firstInvalidStep);
+        requestFocusOnFirstError(errors, [firstInvalidStep]);
+      }
       return;
     }
 
@@ -382,7 +419,7 @@ export function PartnerApplicationForm({ countries, productsByCountry, plans, la
   const submitting = state.status === "submitting";
 
   return (
-    <form className="am-formcard" data-stepped="true" onSubmit={handleSubmit} noValidate ref={formRef} {...(formAction ? { action: formAction } : {})}>
+    <form className="am-formcard" data-stepped="true" onSubmit={handleSubmit} onInput={clearFieldError} onChange={clearFieldError} noValidate ref={formRef} {...(formAction ? { action: formAction } : {})}>
       <div className="am-formstepper__progress">
         <ProgressBar
           steps={labels.progress.sectionTitles.map((label) => ({ label }))}
@@ -588,9 +625,21 @@ export function PartnerApplicationForm({ countries, productsByCountry, plans, la
           </Field>
         </div>
 
-        <div className="am-field">
-          <span className="am-field__label">{labels.productsLegend}</span>
-          <p className="am-field__hint">{labels.productsHint}</p>
+        <div
+          className="am-field"
+          role="group"
+          aria-labelledby="am-apply-products-label"
+          aria-describedby={fieldErrors.productKeys ? "am-apply-products-hint am-apply-products-error" : "am-apply-products-hint"}
+        >
+          <span className="am-field__label" id="am-apply-products-label">
+            {labels.productsLegend}
+            <span className="am-field__required" aria-hidden="true">
+              {" *"}
+            </span>
+          </span>
+          <p className="am-field__hint" id="am-apply-products-hint">
+            {labels.productsHint}
+          </p>
           {products.length > 0 ? (
             <div className="am-formcard__products">
               {products.map((product) => (
@@ -604,7 +653,7 @@ export function PartnerApplicationForm({ countries, productsByCountry, plans, la
             <p role="status">{labels.productsNone}</p>
           )}
           {fieldErrors.productKeys ? (
-            <p className="am-field__error" role="alert">
+            <p className="am-field__error" id="am-apply-products-error" role="alert">
               <Icon name="alert" size={16} />
               {fieldErrors.productKeys}
             </p>

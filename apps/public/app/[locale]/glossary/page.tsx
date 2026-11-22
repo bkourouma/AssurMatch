@@ -2,6 +2,7 @@ import { getTranslations, setRequestLocale } from "next-intl/server";
 import { toLocale, type AppLocale } from "../../../i18n/routing";
 import { EntrySelector } from "../../components/site/entry-selector";
 import { Breadcrumb } from "../../components/ui/breadcrumb";
+import { EmptyState } from "../../components/ui/empty-state";
 import { Hero } from "../../components/ui/hero";
 import { Section } from "../../components/ui/section";
 import { getEntrySelectorData } from "../../content/entry-selector-data";
@@ -68,22 +69,28 @@ export default async function GlossaryPage({ params }: { params: Promise<{ local
         }
       />
 
-      <nav className="am-glossary-index" aria-label={t("indexLabel")}>
-        <div className="am-container">
-          <ul className="am-glossary-index__list">
-            {groups.map(([letter]) => (
-              <li key={letter}>
-                <a className="am-glossary-index__link" href={`#lettre-${letter}`}>
-                  {letter}
-                </a>
-              </li>
-            ))}
-          </ul>
-        </div>
-      </nav>
+      {entries.length > 0 ? (
+        <nav className="am-glossary-index" aria-label={t("indexLabel")}>
+          <div className="am-container">
+            <ul className="am-glossary-index__list">
+              {groups.map(([letter]) => (
+                <li key={letter}>
+                  <a className="am-glossary-index__link" href={`#lettre-${letter}`}>
+                    {letter}
+                  </a>
+                </li>
+              ))}
+            </ul>
+          </div>
+        </nav>
+      ) : null}
 
       <Section>
-        <p className="am-faq-meta">{t("termCount", { count: entries.length })}</p>
+        {entries.length === 0 ? (
+          <EmptyState title={t("empty.title")} description={t("empty.description")} />
+        ) : (
+          <p className="am-faq-meta">{t("termCount", { count: entries.length })}</p>
+        )}
         {groups.map(([letter, letterEntries]) => (
           <section className="am-glossary-group" key={letter} id={`lettre-${letter}`} aria-labelledby={`lettre-${letter}-titre`}>
             <h2 className="am-glossary-group__letter" id={`lettre-${letter}-titre`}>
