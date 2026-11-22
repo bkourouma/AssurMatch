@@ -213,7 +213,7 @@ function nextStepOf(status: string, canDecide: boolean): string {
   return "aucune.";
 }
 
-const REASON_HINT =`Entre ${DISPUTE_REASON_MIN_LENGTH} et ${DISPUTE_REASON_MAX_LENGTH} caractères. Il est conservé dans le journal d'audit et communiqué au cabinet.`;
+const REASON_HINT = `Entre ${DISPUTE_REASON_MIN_LENGTH} et ${DISPUTE_REASON_MAX_LENGTH} caractères. Il est conservé dans le journal d'audit et communiqué au cabinet.`;
 
 function DisputeDetail({ detail, canDecide, backHref }: { detail: AdminApiState<AdminLeadDispute | null>; canDecide: boolean; backHref: string }) {
   if (detail.status === "forbidden") {

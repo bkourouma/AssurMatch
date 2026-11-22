@@ -7,7 +7,8 @@ import {
   updateInsurerAction,
   type InsurerActionState
 } from "../lib/lot4-offers-actions";
-import { INSURER_EDIT_STATUS_OPTIONS, INSURER_STATUS_HINT, INSURER_STATUS_LABELS } from "../lib/offer-messages";import {
+import { INSURER_EDIT_STATUS_OPTIONS, INSURER_STATUS_HINT, INSURER_STATUS_LABELS } from "../lib/offer-messages";
+import {
   Button,
   Card,
   ConfirmDialog,

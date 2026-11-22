@@ -40,7 +40,7 @@ const STATUS_FILTER_LABELS: Record<string, string> = {
 function nextStepOf(form: QuoteFormDefinitionData): string {
   if (form.status === "draft") return "publier (après vérification du consentement lié)";
   if (form.status === "published") return form.consentSuperseded ? "créer une nouvelle version liée au consentement à jour" : "en ligne ; retirer pour couper l'exposition";
-  if (form.status === "suspended") return "publier à nouveau ou retirer";
+  if (form.status === "suspended") return "publier à nouveau";
   return "aucune (historique conservé)";
 }
 
