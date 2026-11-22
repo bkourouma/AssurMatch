@@ -278,7 +278,8 @@
       "title": "Aucun pays public actif",
       "description": "Aucun pays n'est publiquement activé pour le moment."
     },
-    "fineprint": "Une ouverture de pays dépend de la présence de courtiers partenaires autorisés et d'offres validées."
+    "fineprint": "Une ouverture de pays dépend de la présence de courtiers partenaires autorisés et d'offres validées.",
+    "retry": "Réessayer"
   },
   "Country": {
     "kicker": "Fiche pays",
@@ -324,7 +325,8 @@
     "contactLead": "Un courtier partenaire autorisé pour ce pays peut reprendre votre demande.",
     "whatsapp": "Écrire sur WhatsApp",
     "call": "Appeler {phone}",
-    "fineprint": "Offre indicative, prix indicatif à confirmer par le courtier partenaire. Aucune offre expirée ou non validée n'est affichée comme disponible."
+    "fineprint": "Offre indicative, prix indicatif à confirmer par le courtier partenaire. Aucune offre expirée ou non validée n'est affichée comme disponible.",
+    "retry": "Réessayer"
   },
   "Waitlist": {
     "title": "Liste d'attente — {country}",
@@ -449,7 +451,9 @@
     "empty": {
       "title": "Aucune offre indicative pour ces critères",
       "description": "Modifiez vos filtres ou élargissez votre recherche. Une offre sponsorisée est affichée uniquement avec sa mention.",
-      "guarantee": "Aucune offre n'inclut cette garantie pour le moment."
+      "guarantee": "Aucune offre n'inclut cette garantie pour le moment.",
+      "otherProduct": "Choisir un autre produit",
+      "noFilters": "Aucune offre indicative n'est publiée pour ce produit pour le moment. Choisissez un autre produit ou revenez plus tard."
     },
     "fineprint": "Le score est indicatif, calculé selon vos critères par rapport aux offres affichées. Une offre sponsorisée est toujours signalée. Aucune offre expirée ou non validée n'est affichée.",
     "priceHint": "Ce montant est indicatif : le prix exact dépend des informations que vous donnerez au courtier partenaire.",
@@ -473,7 +477,8 @@
     },
     "compareBarMax": "4 offres sélectionnées (maximum atteint).",
     "selectionAssist": "1 offre sélectionnée. Sélectionnez au moins une autre offre indicative (2 à 4 au total) pour lancer la comparaison.",
-    "maxReachedHint": "Maximum de 4 offres atteint. Retirez une offre de la sélection pour en ajouter une autre."
+    "maxReachedHint": "Maximum de 4 offres atteint. Retirez une offre de la sélection pour en ajouter une autre.",
+    "retry": "Réessayer"
   },
   "Compare": {
     "kicker": "Comparaison indicative",
@@ -539,7 +544,8 @@
     "quotePickHint": "Cochez jusqu'à 3 offres. Chaque courtier concerné sera nommé avant votre accord, que vous ne donnez qu'à l'étape de consentement.",
     "quotePickOption": "Inclure {name} dans ma demande",
     "quotePickSubmit": "Continuer vers la demande de devis",
-    "quotePickLimit": "3 offres au maximum par demande."
+    "quotePickLimit": "3 offres au maximum par demande.",
+    "backToOffers": "Retour à la liste des offres"
   },
   "OfferDetail": {
     "kicker": "Offre indicative",
@@ -693,7 +699,8 @@
     "backToOffers": "Retour aux offres",
     "blocked": {
       "title": "Demande de devis indisponible",
-      "description": "La demande de devis n'est pas disponible pour ce pays ou ce produit."
+      "description": "La demande de devis n'est pas disponible pour ce pays ou ce produit.",
+      "back": "Retour au produit"
     },
     "languageUnavailable": {
       "title": "Formulaire indisponible en français",
@@ -705,7 +712,9 @@
       }
     },
     "fineprint": "AssurMatch ne vend pas d'assurance et n'émet ni contrat ni attestation. Le courtier partenaire responsable confirme le devis et les conditions.",
-    "commitmentLink": "Nos engagements sur vos données"
+    "commitmentLink": "Nos engagements sur vos données",
+    "copyReference": "Copier la référence",
+    "referenceCopied": "Référence copiée"
   },
   "QuoteRequest": {
     "referenceLabel": "Référence publique",

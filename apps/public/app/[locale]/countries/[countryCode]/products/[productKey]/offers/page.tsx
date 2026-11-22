@@ -254,6 +254,7 @@ export default async function PublicOffersPage({
                   {...fieldControlProps("am-filter-min-price", { hint: t("priceHint") })}
                   name="minPrice"
                   type="number"
+                  inputMode="numeric"
                   min="0"
                   defaultValue={first(filters.minPrice)}
                 />
@@ -263,6 +264,7 @@ export default async function PublicOffersPage({
                   {...fieldControlProps("am-filter-max-price", { hint: t("priceHint") })}
                   name="maxPrice"
                   type="number"
+                  inputMode="numeric"
                   min="0"
                   defaultValue={first(filters.maxPrice)}
                 />
@@ -285,6 +287,7 @@ export default async function PublicOffersPage({
                       {...fieldControlProps("am-filter-deductible", { hint: t("maxDeductibleHint") })}
                       name="maxDeductible"
                       type="number"
+                      inputMode="numeric"
                       min="0"
                       defaultValue={first(filters.maxDeductible)}
                     />
@@ -294,6 +297,7 @@ export default async function PublicOffersPage({
                       {...fieldControlProps("am-filter-processing", { hint: t("maxProcessingDaysHint") })}
                       name="maxProcessingDays"
                       type="number"
+                      inputMode="numeric"
                       min="0"
                       defaultValue={first(filters.maxProcessingDays)}
                     />
@@ -392,6 +396,19 @@ export default async function PublicOffersPage({
             align="center"
             title={t("error.title")}
             description={offers.publicMessage ?? t("error.description")}
+            action={
+              <Button
+                variant="secondary"
+                href={{
+                  pathname: "/countries/[countryCode]/products/[productKey]/offers",
+                  params: { countryCode, productKey },
+                  query: Object.fromEntries(Object.entries(filters).filter(([, value]) => value !== undefined && value !== ""))
+                }}
+                icon={<Icon name="refresh" size={18} />}
+              >
+                {t("retry")}
+              </Button>
+            }
           />
         ) : null}
         {offers.status !== "error" && offers.data.length === 0 ? (
@@ -400,17 +417,28 @@ export default async function PublicOffersPage({
             tone="muted"
             align="center"
             title={t("empty.title")}
-            description={guaranteeFilter ? t("empty.guarantee") : t("empty.description")}
+            description={guaranteeFilter ? t("empty.guarantee") : activeFilters > 0 ? t("empty.description") : t("empty.noFilters")}
             action={
-              <Button
-                variant="secondary"
-                href={{
-                  pathname: "/countries/[countryCode]/products/[productKey]/offers",
-                  params: { countryCode, productKey }
-                }}
-              >
-                {t("reset")}
-              </Button>
+              // "Clear the filters" only when some are set; an empty catalogue names another way on instead.
+              activeFilters > 0 ? (
+                <Button
+                  variant="secondary"
+                  href={{
+                    pathname: "/countries/[countryCode]/products/[productKey]/offers",
+                    params: { countryCode, productKey }
+                  }}
+                >
+                  {t("reset")}
+                </Button>
+              ) : (
+                <Button
+                  variant="secondary"
+                  href={{ pathname: "/countries/[countryCode]", params: { countryCode } }}
+                  icon={<Icon name="arrow-left" size={18} />}
+                >
+                  {t("empty.otherProduct")}
+                </Button>
+              )
             }
           />
         ) : null}
