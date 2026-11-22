@@ -14,6 +14,8 @@ export interface NavItem {
   match?: string[] | undefined;
   /** Short pill rendered after the label, e.g. a plan name. */
   badge?: string | undefined;
+  /** Spoken form of `badge` when the visible text is a bare number, e.g. "3 notifications non lues". */
+  badgeLabel?: string | undefined;
   /** Visible but not reachable; the surface decides why, the package never does. */
   disabled?: boolean | undefined;
   disabledHint?: string | undefined;

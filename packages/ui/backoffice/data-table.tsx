@@ -33,6 +33,8 @@ export interface TablePagination {
   /** Accessible names of the two icon-only links; default to French wording. */
   previousLabel?: string | undefined;
   nextLabel?: string | undefined;
+  /** Accessible name of the pagination navigation; the nav landmark is only rendered when given. */
+  paginationLabel?: string | undefined;
 }
 
 export interface DataTableProps<T> {
@@ -56,6 +58,23 @@ export interface DataTableProps<T> {
   /** Accessible name of the table when no visible caption is given. */
   "aria-label"?: string | undefined;
   className?: string | undefined;
+  /**
+   * CSS max-height of the scroll area (e.g. "32rem"). The table then scrolls vertically inside its
+   * frame and the header row stays pinned (a sticky header needs a bounded scroll container).
+   */
+  maxHeight?: string | undefined;
+  /** Renders the first cell of every row as a `<th scope="row">` (the record's name). */
+  rowHeader?: boolean | undefined;
+  /** Accessible text appended to a sortable header link, e.g. "(trié par ordre croissant)". */
+  sortLabel?: ((header: ReactNode, direction: SortDirection | "none") => string) | undefined;
+  /** Shows skeleton rows instead of the items and marks the table `aria-busy`. */
+  loading?: boolean | undefined;
+  /** Number of skeleton rows while loading; defaults to 5. */
+  loadingRows?: number | undefined;
+  /** Hidden status text announced while loading. */
+  loadingLabel?: string | undefined;
+  /** Whether the empty state is a live `role="status"` region; defaults to true (historic behaviour). */
+  announceEmpty?: boolean | undefined;
 }
 
 function ariaSortOf(column: DataTableColumn<unknown>, sort: TableSort | undefined): "ascending" | "descending" | "none" | undefined {
@@ -80,17 +99,37 @@ export function DataTable<T>(props: DataTableProps<T>) {
     pagination,
     rowActions,
     getRowHref,
-    className
+    className,
+    maxHeight,
+    rowHeader,
+    sortLabel,
+    loading,
+    loadingRows = 5,
+    loadingLabel,
+    announceEmpty = true
   } = props;
 
   const tableClasses = ["bo-table", dense ? "bo-table--dense" : null, stickyFirstColumn ? "bo-table--sticky-first" : null, className]
     .filter(Boolean)
     .join(" ");
   const columnCount = columns.length + (rowActions ? 1 : 0);
+  // The frame scrolls sideways on a narrow screen: it needs a name and the keyboard to be usable.
+  const regionName = caption ?? props["aria-label"];
+  const skeletonRows = Math.max(1, Math.floor(loadingRows));
 
   return (
-    <div className="bo-table-wrap">
-      <table className={tableClasses} aria-label={caption ? undefined : props["aria-label"]}>
+    <div
+      className="bo-table-wrap"
+      data-scroll-y={maxHeight ? "true" : undefined}
+      style={maxHeight ? { maxHeight } : undefined}
+      {...(regionName ? { role: "region", "aria-label": regionName, tabIndex: 0 } : {})}
+    >
+      {loading && loadingLabel ? (
+        <span className="bo-visually-hidden" role="status">
+          {loadingLabel}
+        </span>
+      ) : null}
+      <table className={tableClasses} aria-label={caption ? undefined : props["aria-label"]} aria-busy={loading ? true : undefined}>
         {caption ? <caption>{caption}</caption> : null}
         <thead>
           <tr>
@@ -111,6 +150,9 @@ export function DataTable<T>(props: DataTableProps<T>) {
                     <a className="bo-table__sort" href={sortHref(column.key, nextDirection)}>
                       {column.header}
                       <Icon name={active ? (sort.direction === "asc" ? "sortAsc" : "sortDesc") : "sort"} size={14} />
+                      {sortLabel ? (
+                        <span className="bo-visually-hidden">{sortLabel(column.header, active ? sort.direction : "none")}</span>
+                      ) : null}
                     </a>
                   ) : (
                     column.header
@@ -122,15 +164,39 @@ export function DataTable<T>(props: DataTableProps<T>) {
           </tr>
         </thead>
         <tbody>
-          {items.map((item) => {
+          {loading
+            ? Array.from({ length: skeletonRows }, (_value, rowIndex) => (
+                <tr key={`skeleton-${rowIndex}`} className="bo-table__skeleton-row" aria-hidden="true">
+                  {columns.map((column) => (
+                    <td key={column.key} data-align={column.align}>
+                      <span className="bo-skeleton__line" />
+                    </td>
+                  ))}
+                  {rowActions ? (
+                    <td data-align="right">
+                      <span className="bo-skeleton__line" />
+                    </td>
+                  ) : null}
+                </tr>
+              ))
+            : null}
+          {(loading ? [] : items).map((item) => {
             const rowHref = getRowHref?.(item);
             return (
-              <tr key={getKey(item)}>
+              <tr key={getKey(item)} data-linked={rowHref ? "true" : undefined}>
                 {columns.map((column, index) => {
                   const content = column.render(item);
+                  const inner = index === 0 && rowHref ? <a className="bo-table__rowlink" href={rowHref}>{content}</a> : content;
+                  if (index === 0 && rowHeader) {
+                    return (
+                      <th key={column.key} scope="row" data-align={column.align}>
+                        {inner}
+                      </th>
+                    );
+                  }
                   return (
                     <td key={column.key} data-align={column.align} data-numeric={column.numeric ? "true" : undefined}>
-                      {index === 0 && rowHref ? <a href={rowHref}>{content}</a> : content}
+                      {inner}
                     </td>
                   );
                 })}
@@ -142,10 +208,10 @@ export function DataTable<T>(props: DataTableProps<T>) {
               </tr>
             );
           })}
-          {items.length === 0 ? (
+          {!loading && items.length === 0 ? (
             <tr>
               <td className="bo-table__empty" colSpan={columnCount}>
-                <EmptyState title={emptyLabel} description={emptyDescription} action={emptyAction} />
+                <EmptyState title={emptyLabel} description={emptyDescription} action={emptyAction} announce={announceEmpty} />
               </td>
             </tr>
           ) : null}
@@ -157,37 +223,45 @@ export function DataTable<T>(props: DataTableProps<T>) {
 }
 
 function TableFooter({ pagination }: { pagination: TablePagination }) {
-  const { page, pageSize, total, hrefFor, label, previousLabel = "Page précédente", nextLabel = "Page suivante" } = pagination;
+  const { page, pageSize, total, hrefFor, label, previousLabel = "Page précédente", nextLabel = "Page suivante", paginationLabel } = pagination;
   const lastPage = Math.max(1, Math.ceil(total / Math.max(1, pageSize)));
   const from = total === 0 ? 0 : (page - 1) * pageSize + 1;
   const to = Math.min(total, page * pageSize);
+  const atStart = page <= 1;
+  const atEnd = page >= lastPage;
+
+  const controls = (
+    <div className="bo-pagination">
+      <a
+        className="bo-button"
+        data-variant="secondary"
+        data-size="sm"
+        href={atStart ? undefined : hrefFor(page - 1)}
+        aria-label={previousLabel}
+        aria-disabled={atStart ? true : undefined}
+        tabIndex={atStart ? -1 : undefined}
+      >
+        <Icon name="chevronLeft" size={16} />
+      </a>
+      <span aria-current="page">{`${page} / ${lastPage}`}</span>
+      <a
+        className="bo-button"
+        data-variant="secondary"
+        data-size="sm"
+        href={atEnd ? undefined : hrefFor(page + 1)}
+        aria-label={nextLabel}
+        aria-disabled={atEnd ? true : undefined}
+        tabIndex={atEnd ? -1 : undefined}
+      >
+        <Icon name="chevronRight" size={16} />
+      </a>
+    </div>
+  );
 
   return (
     <div className="bo-table__footer">
-      <span>{label ? label(from, to, total) : `${from}-${to} / ${total}`}</span>
-      <div className="bo-pagination">
-        <a
-          className="bo-button"
-          data-variant="secondary"
-          data-size="sm"
-          href={page <= 1 ? undefined : hrefFor(page - 1)}
-          aria-label={previousLabel}
-          aria-disabled={page <= 1 ? true : undefined}
-        >
-          <Icon name="chevronLeft" size={16} />
-        </a>
-        <span>{`${page} / ${lastPage}`}</span>
-        <a
-          className="bo-button"
-          data-variant="secondary"
-          data-size="sm"
-          href={page >= lastPage ? undefined : hrefFor(page + 1)}
-          aria-label={nextLabel}
-          aria-disabled={page >= lastPage ? true : undefined}
-        >
-          <Icon name="chevronRight" size={16} />
-        </a>
-      </div>
+      <span aria-live="polite">{label ? label(from, to, total) : `${from}-${to} / ${total}`}</span>
+      {paginationLabel ? <nav aria-label={paginationLabel}>{controls}</nav> : controls}
     </div>
   );
 }

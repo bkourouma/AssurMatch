@@ -25,7 +25,13 @@ export function PageHeader({ title, description, actions, breadcrumb, breadcrumb
             <ol className="bo-breadcrumb">
               {breadcrumb.map((item, index) => (
                 <li key={`${index}-${item.label}-${item.href ?? ""}`}>
-                  {item.href ? <a href={item.href}>{item.label}</a> : <span>{item.label}</span>}
+                  {item.href ? (
+                    <a href={item.href} aria-current={index === breadcrumb.length - 1 ? "page" : undefined}>
+                      {item.label}
+                    </a>
+                  ) : (
+                    <span aria-current={index === breadcrumb.length - 1 ? "page" : undefined}>{item.label}</span>
+                  )}
                 </li>
               ))}
             </ol>

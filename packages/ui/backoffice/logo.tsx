@@ -26,7 +26,7 @@ export function Logo({ variant = "color", height = 32, priority = false, classNa
     return (
       <span className={className ? `bo-logo bo-logo--auto ${className}` : "bo-logo bo-logo--auto"}>
         <Image className="bo-logo__light" src={SOURCES.color} alt="AssurMatch" width={width} height={height} priority={priority} />
-        <Image className="bo-logo__dark" src={SOURCES.white} alt="" aria-hidden="true" width={width} height={height} priority={priority} />
+        <Image className="bo-logo__dark" src={SOURCES.white} alt="AssurMatch" width={width} height={height} priority={priority} />
       </span>
     );
   }
