@@ -43,6 +43,8 @@ import {
   sortItems
 } from "../lib/ui/admin-ui";
 import type { DataTableColumn } from "../lib/ui/admin-ui";
+import { ActiveFilters, hrefWithout } from "../lib/ui/active-filter-chips";
+import type { ActiveFilterItem } from "../lib/ui/active-filter-chips";
 import { CreatePartnerForm } from "./partner-forms";
 
 /**
@@ -204,6 +206,14 @@ export default async function PartnerDirectoryPage({
   const slaItems: AdminPartnerSlaRowData[] = sla.status === "success" ? sla.data : [];
   const slaRows = sortItems(slaItems, slaColumns, { key: "partner", direction: "asc" });
   const activeFilters = [status, countryId, plan, expiring].filter(Boolean).length;
+  const activeFilterItems: ActiveFilterItem[] = [];
+  if (status) activeFilterItems.push({ label: "Statut", value: partnerStatusLabel(status), removeHref: hrefWithout("/partners", params, "status") });
+  if (countryId) {
+    const country = countryById.get(countryId);
+    activeFilterItems.push({ label: "Pays", value: country ? `${country.name} (${country.isoCode})` : countryId, removeHref: hrefWithout("/partners", params, "countryId") });
+  }
+  if (plan) activeFilterItems.push({ label: "Plan", value: PARTNER_PLAN_LABELS[plan] ?? plan, removeHref: hrefWithout("/partners", params, "plan") });
+  if (expiring) activeFilterItems.push({ label: "Licence expirant sous", value: `${expiring} jours`, removeHref: hrefWithout("/partners", params, "expiring") });
 
   return (
     <PageStack>
@@ -255,10 +265,11 @@ export default async function PartnerDirectoryPage({
             {PARTNER_PLAN_OPTIONS.map((option) => <option key={option} value={option}>{PARTNER_PLAN_LABELS[option]}</option>)}
           </Select>
         </Field>
-        <Field id="partners-expiring" label="Licence expirant sous N jours">
-          <Input {...fieldControlProps("partners-expiring")} name="expiring" type="number" min={1} max={730} defaultValue={expiring ?? ""} placeholder="30" />
+        <Field id="partners-expiring" label="Licence expirant sous N jours" hint="Entre 1 et 730 jours.">
+          <Input {...fieldControlProps("partners-expiring", { hint: "x" })} name="expiring" type="number" min={1} max={730} defaultValue={expiring ?? ""} placeholder="30" />
         </Field>
       </FilterBar>
+      <ActiveFilters items={activeFilterItems} />
       {partners.forbidden ? <StateMessage tone="danger">{adminReadErrorMessage("access_denied")}</StateMessage> : null}
       {partners.status === "error" ? <StateMessage tone="danger">{adminReadErrorMessage(partners.error)}</StateMessage> : null}
       <DataTable
@@ -266,7 +277,14 @@ export default async function PartnerDirectoryPage({
         items={directoryRows}
         getKey={(partner) => partner.id}
         emptyLabel="Aucun courtier pour ces filtres."
-        emptyDescription={activeFilters > 0 ? "Réinitialisez les filtres pour revoir tout l'annuaire." : canPrepare ? "Créez le premier courtier avec le formulaire ci-dessous, ou convertissez une candidature." : "Aucun courtier n'est encore enregistré dans votre périmètre."}
+        emptyDescription={activeFilters > 0 ? "Aucun courtier ne correspond à ces filtres. Retirez-en un ou réinitialisez-les pour revoir tout l'annuaire." : canPrepare ? "Créez le premier courtier avec le formulaire ci-dessous, ou convertissez une candidature." : "Aucun courtier n'est encore enregistré dans votre périmètre."}
+        emptyAction={
+          activeFilters > 0
+            ? <Button href="/partners" variant="secondary">Réinitialiser les filtres</Button>
+            : canPrepare
+              ? <Button href="#creer-courtier">Créer un courtier</Button>
+              : <Button href="/partners/applications" variant="secondary">Voir les candidatures</Button>
+        }
         aria-label="Annuaire des courtiers"
         sort={directoryTable.sort}
         sortHref={directoryTable.sortHref}
@@ -290,6 +308,7 @@ export default async function PartnerDirectoryPage({
           items={slaRows}
           getKey={(row) => row.partnerTenantId}
           emptyLabel="Aucun partenaire mesuré."
+          emptyDescription="Le tableau se remplit dès que des courtiers actifs reçoivent des leads et agissent dessus."
           aria-label="Engagement de réactivité par partenaire"
         />
       </Card>

@@ -32,6 +32,7 @@ import {
   canDownloadPartnerDocuments,
   canPreparePartner,
   partnerFormatDate,
+  partnerNextStep,
   partnerStatusLabel
 } from "../../lib/partner-messages";
 import {
@@ -87,6 +88,7 @@ const NOTICES: Record<string, string> = {
 /** In-page navigation; the anchors are also the targets of the activation blockers' "Corriger" links. */
 const SECTIONS = [
   { label: "Synthèse", href: "#identite" },
+  { label: "Statut", href: "#statut" },
   { label: "Conditions", href: "#conditions" },
   { label: "Demandes", href: "#demandes" },
   { label: "Licences", href: "#licences" },
@@ -173,7 +175,15 @@ export default async function PartnerDetailPage({ params, searchParams }: Partne
 
   const retired = partner.status === "retired";
   const editable = canPrepare && !retired;
-  const partnerRef = { id: partner.id, countryId: partner.countryId };
+  const partnerName = partner.tradeName || partner.legalName;
+  const partnerRef = { id: partner.id, countryId: partner.countryId, name: partnerName };
+  const nextStep = partnerNextStep({
+    status: partner.status,
+    effectiveStatus: partner.effectiveStatus,
+    blockerCount: partner.activationBlockers.length,
+    canPrepare,
+    canDecide
+  });
   const countryById = new Map(countriesResult.data.map((country) => [country.id, country]));
   const productById = new Map(productsResult.data.map((product) => [product.id, product]));
   const countryLabel = (id: string | null) => {
@@ -210,7 +220,7 @@ export default async function PartnerDetailPage({ params, searchParams }: Partne
     <PageStack>
       <PageHeader
         breadcrumb={[{ label: "Partenaires" }, { label: "Courtiers", href: "/partners" }, { label: partner.tradeName || partner.legalName }]}
-        title={partner.tradeName || partner.legalName}
+        title={partnerName}
         description="Chaque modification est auditée avec son motif. Seul un courtier « Actif public » avec une licence valide est routable et visible des visiteurs."
         actions={
           <Cluster>
@@ -222,6 +232,14 @@ export default async function PartnerDetailPage({ params, searchParams }: Partne
       />
 
       {notice ? <Notice tone="success">{notice}</Notice> : null}
+      <Notice tone={nextStep.tone}>
+        <strong>
+          Statut : {partnerStatusLabel(partner.status)}
+          {partner.effectiveStatus === "expired" ?" (licence expirée)" : ""}
+        </strong>
+        {" "}— prochaine étape : {nextStep.text}
+        {nextStep.href ? <> <a href={nextStep.href}>{nextStep.linkLabel}</a></> : null}
+      </Notice>
       {retired ? <Notice tone="warning">Courtier résilié : la fiche est en lecture seule et ses utilisateurs n&apos;ont plus accès au portail.</Notice> : null}
       {!canPrepare ? <Notice tone="info">Lecture seule : votre rôle ne permet aucune action sur les courtiers.</Notice> : null}
 
@@ -354,6 +372,7 @@ export default async function PartnerDetailPage({ params, searchParams }: Partne
             items={brokerRequests}
             getKey={(request) => request.id}
             emptyLabel="Aucune demande du courtier."
+            emptyDescription="Les demandes de modification d'identité ou d'extension de couverture déposées depuis le portail courtier apparaissent ici."
             aria-label="Demandes du courtier"
           />
         </Card>
@@ -380,9 +399,9 @@ export default async function PartnerDetailPage({ params, searchParams }: Partne
               />
               {editable ? (
                 <Cluster>
-                  {canDecide && ["draft", "pending_review"].includes(license.status) ? <LicenseActionForm partnerId={partner.id} licenseId={license.id} action="validate" /> : null}
-                  {canDecide && license.status === "valid" ? <LicenseActionForm partnerId={partner.id} licenseId={license.id} action="suspend" /> : null}
-                  {canDecide && !["revoked", "superseded"].includes(license.status) ? <LicenseActionForm partnerId={partner.id} licenseId={license.id} action="revoke" /> : null}
+                  {canDecide && ["draft", "pending_review"].includes(license.status) ? <LicenseActionForm partnerId={partner.id} licenseId={license.id} action="validate" licenseNumber={license.licenseNumber} /> : null}
+                  {canDecide && license.status === "valid" ? <LicenseActionForm partnerId={partner.id} licenseId={license.id} action="suspend" licenseNumber={license.licenseNumber} /> : null}
+                  {canDecide && !["revoked", "superseded"].includes(license.status) ? <LicenseActionForm partnerId={partner.id} licenseId={license.id} action="revoke" licenseNumber={license.licenseNumber} /> : null}
                   {!["revoked", "superseded"].includes(license.status) ? <RenewLicenseForm partnerId={partner.id} license={license} products={productChoices} /> : null}
                 </Cluster>
               ) : null}
@@ -465,10 +484,12 @@ export default async function PartnerDetailPage({ params, searchParams }: Partne
             items={partner.documents}
             getKey={(document) => document.id}
             emptyLabel="Aucun document déposé."
+            emptyDescription={editable ? "Téléversez la preuve d'agrément avec le formulaire ci-dessous : elle conditionne la validation de la licence." : "La preuve d'agrément conditionne la validation de la licence."}
+            emptyAction={editable ? <Button href="#documents-televerser" variant="secondary">Aller au dépôt de document</Button> : undefined}
             aria-label="Documents d'agrément du courtier"
           />
         </Card>
-        {editable ? <UploadDocumentForm partnerId={partner.id} licenses={licenseChoices} /> : null}
+        {editable ? <div id="documents-televerser"><UploadDocumentForm partnerId={partner.id} licenses={licenseChoices} /></div> : null}
       </div>
 
       <div id="contrat">
@@ -483,6 +504,7 @@ export default async function PartnerDetailPage({ params, searchParams }: Partne
             items={partner.contracts}
             getKey={(contract) => contract.id}
             emptyLabel="Aucun contrat enregistré."
+            emptyDescription="Le contrat signé est une condition d'activation : enregistrez-le une fois le document téléversé et analysé sain."
             aria-label="Contrats du courtier"
           />
           {editable ? (
@@ -561,6 +583,7 @@ export default async function PartnerDetailPage({ params, searchParams }: Partne
             items={partner.users}
             getKey={(user) => user.id}
             emptyLabel="Aucun utilisateur rattaché."
+            emptyDescription="Invitez le propriétaire du courtier avec le formulaire ci-dessous : il est requis pour l'activation."
             aria-label="Utilisateurs du courtier"
           />
           {editable ? <InviteUserForm partnerId={partner.id} plan={partner.plan} /> : null}

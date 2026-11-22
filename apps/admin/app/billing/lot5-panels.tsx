@@ -116,7 +116,16 @@ function addOnColumns(partnerNames: Map<string, string>): Array<DataTableColumn<
     { key: "assignedAt", header: "Affecté le", render: (addOn) => day(addOn.assignedAt) },
     { key: "endedAt", header: "Terminé le", render: (addOn) => day(addOn.endedAt) },
     { key: "reason", header: "Motif", render: (addOn) => addOn.reason },
-    { key: "end", header: "Fin d'affectation", render: (addOn) => (addOn.status === "active" ? <EndAddOnForm addOnId={addOn.id} /> : "-") }
+    {
+      key: "end",
+      header: "Fin d'affectation",
+      render: (addOn) =>
+        addOn.status === "active" ? (
+          <EndAddOnForm addOnId={addOn.id} label={`${ADD_ON_KIND_LABELS[addOn.kind] ?? addOn.kind} chez ${partnerNames.get(addOn.partnerId) ?? addOn.partnerId.slice(0, 8)}`} />
+        ) : (
+          "-"
+        )
+    }
   ];
 }
 
@@ -143,7 +152,10 @@ function planChangeColumns(): Array<DataTableColumn<PlanChangeRequest>> {
       header: "Décision",
       render: (request) =>
         request.status === "pending" ? (
-          <PlanChangeDecisionForm requestId={request.id} />
+          <PlanChangeDecisionForm
+            requestId={request.id}
+            summary={`${request.partnerName ?? request.partnerId.slice(0, 8)}, ${PLAN_LABELS[request.currentPlan] ?? request.currentPlan} vers ${PLAN_LABELS[request.requestedPlan] ?? request.requestedPlan}`}
+          />
         ) : (
           <span>{request.decisionReason ? `${day(request.decidedAt)} - ${request.decisionReason}` : day(request.decidedAt)}</span>
         )
@@ -211,6 +223,12 @@ export async function Lot5BillingPanels({ partners, subscriptionPartnerId, planS
           items={requests.data.items}
           getKey={(request) => request.id}
           emptyLabel="Aucune demande de changement de plan."
+          emptyDescription={
+            statusFilter
+              ? "Aucune demande pour ce statut : réinitialisez le filtre pour voir toutes les demandes."
+              : "Aucune action requise : les demandes envoyées par les cabinets apparaîtront ici, à traiter."
+          }
+          emptyAction={statusFilter ? <Button href="/billing?tab=modules" variant="secondary" size="sm">Réinitialiser le filtre</Button> : undefined}
           aria-label="Demandes de changement de plan"
         />
       </Card>
@@ -225,6 +243,7 @@ export async function Lot5BillingPanels({ partners, subscriptionPartnerId, planS
           items={prices.data}
           getKey={(price) => price.id}
           emptyLabel="Aucun prix de module : aucun module n'est proposé."
+          emptyDescription="Enregistrez un prix avec le formulaire « Enregistrer le prix d'un module » ci-dessous, puis activez-le."
           aria-label="Prix des modules complémentaires"
         />
       </Card>
@@ -237,6 +256,7 @@ export async function Lot5BillingPanels({ partners, subscriptionPartnerId, planS
           items={addOns.data}
           getKey={(addOn) => addOn.id}
           emptyLabel="Aucun module affecté."
+          emptyDescription="Affectez un module à un courtier avec le formulaire « Affecter un module à un courtier » ci-dessous (le prix du module doit être activé)."
           aria-label="Modules affectés aux courtiers"
         />
       </Card>

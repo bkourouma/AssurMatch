@@ -1,5 +1,5 @@
 import { formatDateTime, readProspectDetail } from "../../lib/operations-api";
-import { Badge, Card, DataTable, DescriptionList, PageHeader, PageStack, StateMessage, type DataTableColumn } from "../../lib/ui/admin-ui";
+import { Badge, Button, Card, Cluster, DataTable, DescriptionList, PageHeader, PageStack, StateMessage, type DataTableColumn } from "../../lib/ui/admin-ui";
 import { OperationsTabs } from "../../lib/ui/operations-tabs";
 import { productLabel } from "../../lib/ui/operations-labels";
 import { readFailureDetail } from "../../lib/auth-error-messages";
@@ -34,6 +34,12 @@ export default async function AdminProspectDetailPage({ params }: { params: Prom
         kicker="Opérations"
         title="Détail prospect"
         description="Coordonnées en clair réservées au super admin et au support admin; chaque consultation est enregistrée dans le journal d'audit."
+        actions={
+          <Cluster>
+            {detail ? <Badge tone={detail.anonymized ? "neutral" : "success"}>{detail.anonymized ? "Anonymisé" : "Actif"}</Badge> : null}
+            <Button href="/prospects" variant="secondary">Retour à la liste des prospects</Button>
+          </Cluster>
+        }
       />
       <OperationsTabs current="/prospects" />
 
@@ -70,6 +76,7 @@ export default async function AdminProspectDetailPage({ params }: { params: Prom
           getKey={(row) => row.id}
           getRowHref={(row) => `/quote-requests/${row.id}`}
           emptyLabel="Aucune demande de devis liée."
+          emptyDescription="Ce prospect n'a pas (ou plus) de demande de devis rattachée dans votre périmètre."
           aria-label="Demandes de devis liées"
         />
       </Card>

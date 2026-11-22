@@ -1,5 +1,6 @@
 import { firstValue, formatDateTime, pageHref, pageNumber, readProspects, type ProspectRow } from "../lib/operations-api";
-import { Badge, Card, DataTable, Field, Input, PageHeader, PageStack, Select, StateMessage, fieldControlProps, type DataTableColumn } from "../lib/ui/admin-ui";
+import { Badge, Button, Card, DataTable, Field, Input, PageHeader, PageStack, Select, StateMessage, fieldControlProps, type DataTableColumn } from "../lib/ui/admin-ui";
+import { ActiveFilters, type ActiveFilterItem } from "../lib/ui/active-filter-chips";
 import { OperationsTabs } from "../lib/ui/operations-tabs";
 import { readBackOfficeSession } from "../lib/backoffice-auth";
 import { searchProspectsAction } from "./search-action";
@@ -48,6 +49,14 @@ export default async function AdminProspectsPage({ searchParams }: { searchParam
   const page = pageNumber(params.page);
   const result = await readProspects({ ...filters, page, pageSize: 50 });
   const activeFilters = Object.values(filters).filter(Boolean).length;
+  // A chip drops one filter and keeps the others; only sanitised values (never a contact) are rebuilt.
+  const without = (key: keyof typeof filters) => pageHref("/prospects", { ...filters, [key]: undefined }, 1);
+  const activeItems: ActiveFilterItem[] = [
+    ...(filters.search ? [{ label: "Nom", value: filters.search, removeHref: without("search") }] : []),
+    ...(filters.country ? [{ label: "Pays", value: filters.country, removeHref: without("country") }] : []),
+    ...(filters.product ? [{ label: "Produit", value: filters.product, removeHref: without("product") }] : []),
+    ...(filters.includeAnonymized ? [{ label: "Prospects anonymisés", value: "inclus", removeHref: without("includeAnonymized") }] : [])
+  ];
 
   return (
     <PageStack>
@@ -66,8 +75,13 @@ export default async function AdminProspectsPage({ searchParams }: { searchParam
         {/* POST (server action) then redirect: only a name fragment and the scope filters reach the URL. */}
         <form className="bo-filters" action={searchProspectsAction} role="search" aria-label="Filtres prospects">
           {canSearchByName ? (
-            <Field id="prospect-search" label="Recherche par nom">
-              <Input {...fieldControlProps("prospect-search")} name="search" defaultValue={filters.search ?? ""} autoComplete="off" />
+            <Field id="prospect-search" label="Recherche par nom" hint="Un fragment du nom suffit. Pour un e-mail ou un téléphone, utilisez la recherche exacte ci-dessous.">
+              <Input
+                {...fieldControlProps("prospect-search", { hint: "Un fragment du nom suffit. Pour un e-mail ou un téléphone, utilisez la recherche exacte ci-dessous." })}
+                name="search"
+                defaultValue={filters.search ?? ""}
+                autoComplete="off"
+              />
             </Field>
           ) : null}
           <Field id="prospect-country" label="Pays (code ISO)" hint="Code pays sur 2 lettres, par exemple CI.">
@@ -79,11 +93,11 @@ export default async function AdminProspectsPage({ searchParams }: { searchParam
               placeholder="Ex. : CI"
             />
           </Field>
-          <Field id="prospect-product" label="Produit (clé)">
-            <Input {...fieldControlProps("prospect-product")} name="product" defaultValue={filters.product ?? ""} placeholder="auto" />
+          <Field id="prospect-product" label="Produit (clé)" hint="Clé du produit, par exemple auto.">
+            <Input {...fieldControlProps("prospect-product", { hint: "Clé du produit, par exemple auto." })} name="product" defaultValue={filters.product ?? ""} placeholder="auto" />
           </Field>
-          <Field id="prospect-anonymized" label="Prospects anonymisés">
-            <Select {...fieldControlProps("prospect-anonymized")} name="includeAnonymized" defaultValue={filters.includeAnonymized ?? ""}>
+          <Field id="prospect-anonymized" label="Prospects anonymisés" hint="Exclus par défaut.">
+            <Select {...fieldControlProps("prospect-anonymized", { hint: "Exclus par défaut." })} name="includeAnonymized" defaultValue={filters.includeAnonymized ?? ""}>
               <option value="">Exclure</option>
               <option value="true">Inclure</option>
             </Select>
@@ -94,6 +108,7 @@ export default async function AdminProspectsPage({ searchParams }: { searchParam
             {activeFilters > 0 ? <span className="bo-filters__count">{activeFilters}</span> : null}
           </div>
         </form>
+        <ActiveFilters items={activeItems} />
       </Card>
 
       {contactNotice ? (
@@ -109,6 +124,12 @@ export default async function AdminProspectsPage({ searchParams }: { searchParam
           getKey={(row) => row.id}
           getRowHref={(row) => `/prospects/${row.id}`}
           emptyLabel="Aucun prospect pour ces filtres."
+          emptyDescription={
+            activeFilters > 0
+              ? "Élargissez la recherche : retirez un filtre ou réinitialisez-les tous."
+              : "Aucun prospect dans votre périmètre pays et produit pour le moment."
+          }
+          emptyAction={activeFilters > 0 ? <Button href="/prospects" variant="secondary" size="sm">Réinitialiser les filtres</Button> : undefined}
           aria-label="Prospects"
           pagination={{
             page,

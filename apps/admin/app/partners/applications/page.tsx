@@ -29,6 +29,8 @@ import {
   sortItems
 } from "../../lib/ui/admin-ui";
 import type { DataTableColumn } from "../../lib/ui/admin-ui";
+import { ActiveFilters, hrefWithout } from "../../lib/ui/active-filter-chips";
+import type { ActiveFilterItem } from "../../lib/ui/active-filter-chips";
 
 /**
  * Spec 051 US5/US7: broker applications received from the public site. Reading never activates
@@ -100,6 +102,12 @@ export default async function PartnerApplicationsPage({
   });
   const rows = paginateItems(sortItems(applications.data, columns, table.sort), table.page, table.pageSize);
   const activeFilters = [status, countryId].filter(Boolean).length;
+  const activeFilterItems: ActiveFilterItem[] = [];
+  if (status) activeFilterItems.push({ label: "Statut", value: APPLICATION_STATUS_LABELS[status] ?? status, removeHref: hrefWithout("/partners/applications", params, "status") });
+  if (countryId) {
+    const country = countryById.get(countryId);
+    activeFilterItems.push({ label: "Pays", value: country ? `${country.name} (${country.isoCode})` : countryId, removeHref: hrefWithout("/partners/applications", params, "countryId") });
+  }
 
   return (
     <PageStack>
@@ -131,6 +139,7 @@ export default async function PartnerApplicationsPage({
           </Select>
         </Field>
       </FilterBar>
+      <ActiveFilters items={activeFilterItems} />
       {applications.forbidden ? <StateMessage tone="danger">{adminReadErrorMessage("access_denied")}</StateMessage> : null}
       {applications.status === "error" ? <StateMessage tone="danger">{adminReadErrorMessage(applications.error)}</StateMessage> : null}
       <DataTable
@@ -138,7 +147,12 @@ export default async function PartnerApplicationsPage({
         items={rows}
         getKey={(application) => application.id}
         emptyLabel="Aucune candidature pour ces filtres."
-        emptyDescription={activeFilters > 0 ? "Réinitialisez les filtres pour revoir toutes les candidatures." : "Les candidatures déposées depuis le site public apparaissent ici."}
+        emptyDescription={activeFilters > 0 ? "Aucune candidature ne correspond à ces filtres. Retirez-en un ou réinitialisez-les pour revoir toutes les candidatures." : "Les candidatures déposées depuis le site public apparaissent ici ; aucune action n'est requise pour le moment."}
+        emptyAction={
+          activeFilters > 0
+            ? <Button href="/partners/applications" variant="secondary">Réinitialiser les filtres</Button>
+            : <Button href="/partners" variant="secondary">Ouvrir l&apos;annuaire des courtiers</Button>
+        }
         aria-label="Candidatures courtiers"
         sort={table.sort}
         sortHref={table.sortHref}

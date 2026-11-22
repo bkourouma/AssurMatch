@@ -26,6 +26,7 @@ import {
   StatusBadge
 } from "../../lib/ui/admin-ui";
 import type { DataTableColumn } from "../../lib/ui/admin-ui";
+import type { ContentAction } from "../../lib/content-messages";
 import { ContentWorkflowForm, EditContentEntryForm } from "../content-forms";
 import { fieldsFromPayload } from "../content-payload";
 
@@ -104,6 +105,21 @@ function EntryContent({ entry }: { entry: ContentEntryView }) {
   );
 }
 
+/** « Statut : X, prochaine étape : Y », derived from the actions the viewer may actually take. */
+function contentNextStep(entry: ContentEntryView, actions: ContentAction[], ownSubmission: boolean): string {
+  if (entry.status === "draft") {
+    if (actions.includes("submit")) return "Soumettre à validation quand le texte est prêt.";
+    return "en attente de soumission par un rédacteur.";
+  }
+  if (entry.status === "pending_review") {
+    if (actions.includes("approve")) return "Approuver et publier, ou Rejeter pour renvoyer en brouillon.";
+    if (ownSubmission) return "en attente de l'approbation d'un second acteur (vous ne pouvez pas approuver votre soumission).";
+    return "en attente de l'approbation d'un second acteur.";
+  }
+  if (entry.status === "published") return actions.includes("revise") ? "aucune action en attente. Créer une nouvelle version pour modifier le texte publié." : "aucune action en attente.";
+  return "aucune, cette version est archivée.";
+}
+
 const historyColumns: Array<DataTableColumn<ContentEntryView>> = [
   { key: "version", header: "Version", render: (entry) => <a href={`/content/${encodeURIComponent(entry.id)}`}>v{entry.version}</a>, numeric: true, align: "right" },
   { key: "status", header: "Statut", render: (entry) => <StatusBadge status={entry.status} tones={CONTENT_STATUS_TONES} labels={CONTENT_STATUS_LABELS} /> },
@@ -154,6 +170,11 @@ export default async function ContentDetailPage({ params, searchParams }: Conten
         actions={<Button href="/content" variant="secondary">Retour à la liste</Button>}
       />
 
+      <p data-content-next-step="true">
+        <strong>{`Statut : ${CONTENT_STATUS_LABELS[entry.status]}`}</strong>
+        {` - prochaine étape : ${contentNextStep(entry, actions, ownSubmission)}`}
+      </p>
+
       {notice === "created" ? <Notice tone="success">Brouillon créé. Il n&apos;est visible d&apos;aucun visiteur tant qu&apos;il n&apos;est pas approuvé.</Notice> : null}
       {notice === "revised" ? <Notice tone="success">Nouvelle version en brouillon. La version publiée reste en ligne jusqu&apos;à l&apos;approbation de celle-ci.</Notice> : null}
 
@@ -195,9 +216,9 @@ export default async function ContentDetailPage({ params, searchParams }: Conten
         {actions.includes("submit") ? <ContentWorkflowForm id={entry.id} intent="submit" /> : null}
         {actions.includes("withdraw") ? <ContentWorkflowForm id={entry.id} intent="withdraw" /> : null}
         {actions.includes("approve") ? <ContentWorkflowForm id={entry.id} intent="approve" /> : null}
-        {actions.includes("reject") ? <ContentWorkflowForm id={entry.id} intent="reject" /> : null}
+        {actions.includes("reject") ? <ContentWorkflowForm id={entry.id} intent="reject" entryLabel={entry.label} /> : null}
         {actions.includes("revise") ? <ContentWorkflowForm id={entry.id} intent="revise" /> : null}
-        {actions.includes("archive") ? <ContentWorkflowForm id={entry.id} intent="archive" /> : null}
+        {actions.includes("archive") ? <ContentWorkflowForm id={entry.id} intent="archive" entryLabel={entry.label} /> : null}
       </Grid>
 
       <Card title="Historique des versions" description="Toutes les versions de la même clé, langue et pays.">

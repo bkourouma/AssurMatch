@@ -70,7 +70,7 @@ export default async function AdminInsurerPage({
           concurrencyToken: insurer.concurrencyToken
         }}
       />
-      {insurer.status === "retired" ? null : <RetireInsurerForm insurerId={insurer.id} />}
+      {insurer.status === "retired" ? null : <RetireInsurerForm insurerId={insurer.id} insurerName={insurer.name} />}
     </PageStack>
   );
 }

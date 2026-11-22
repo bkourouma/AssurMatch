@@ -91,6 +91,51 @@ export const CONSENT_CHANNEL_OPTIONS = ["public_web", "admin", "broker", "api"] 
 export const CONSENT_STATUS_OPTIONS = ["draft", "review", "published", "retired"] as const;
 export const LANGUAGE_OPTIONS = ["fr", "en"] as const;
 
+/** Display wording of the catalogue statuses; the submitted and stored values stay the raw codes. */
+export const CATALOG_STATUS_LABELS: Record<string, string> = {
+  draft: "Brouillon",
+  internal: "Interne",
+  partner_test: "Test partenaire",
+  pilot: "Pilote",
+  public: "Public",
+  suspended: "Suspendu",
+  retired: "Retiré",
+  active: "Actif"
+};
+
+export const CONSENT_STATUS_LABELS: Record<string, string> = {
+  draft: "Brouillon",
+  review: "En revue",
+  published: "Publié",
+  retired: "Retiré"
+};
+
+export const CONSENT_PURPOSE_LABELS: Record<string, string> = {
+  lead_transmission: "Transmission du lead",
+  document_upload: "Dépôt de documents",
+  technical_notification: "Notification technique",
+  ai_processing: "Traitement IA",
+  marketing_optional: "Marketing (optionnel)",
+  service_quality_survey: "Enquête qualité de service"
+};
+
+export const LANGUAGE_LABELS: Record<string, string> = { fr: "Français", en: "Anglais" };
+
+/** "Label (code)" for a select option, so the readable name never hides the code the support team quotes. */
+export function labelWithCode(labels: Record<string, string>, code: string): string {
+  const label = labels[code];
+  return label && label !== code ? `${label} (${code})` : code;
+}
+
+/** One sentence naming the current status and what the operator can do next (display only). */
+export function catalogNextStep(kind: "country" | "product", status: string, nextStatuses: readonly string[]): string {
+  const current = labelWithCode(CATALOG_STATUS_LABELS, status);
+  if (status === "retired") return `Statut actuel : ${current}. Aucune transition possible.`;
+  if (nextStatuses.length === 0) return `Statut actuel : ${current}.`;
+  const next = nextStatuses.map((value) => labelWithCode(CATALOG_STATUS_LABELS, value)).join(", ");
+  return `Statut actuel : ${current}. Transitions possibles pour ${kind === "country" ? "ce pays" : "ce produit"} : ${next}.`;
+}
+
 /** French labels of the FR-012 controls returned with 422 `CONSENT_TEXT_INVALID`. */
 export const CONSENT_ISSUE_LABELS: Record<string, string> = {
   content_missing: "Contenu du texte absent : saisissez le texte complet avant publication.",

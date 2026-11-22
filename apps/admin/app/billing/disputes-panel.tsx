@@ -31,6 +31,7 @@ import {
 import type { AdminApiState, AdminLeadDispute, AdminLeadDisputeList } from "../lib/admin-api";
 import { productLabel } from "../lib/ui/operations-labels";
 import { readFailureDetail } from "../lib/auth-error-messages";
+import { ActiveFilters, type ActiveFilterItem } from "../lib/ui/active-filter-chips";
 
 /** Filters of the disputes tab, as typed in the query string (dates are `YYYY-MM-DD`). */
 export interface DisputeTabFilters {
@@ -117,6 +118,17 @@ export function DisputesPanel({ filters, list, detail, partners, canDecide, page
   const items = list.status === "success" ? list.data.items : [];
   const total = list.status === "success" ? list.data.total : 0;
   const pageSize = list.status === "success" ? list.data.pageSize : 20;
+  const without = (key: keyof DisputeTabFilters) => disputesHref({ ...filters, [key]: "" });
+  const activeItems: ActiveFilterItem[] = [
+    ...(filters.status ? [{ label: "Statut", value: DISPUTE_STATUS_LABELS[filters.status] ?? filters.status, removeHref: without("status") }] : []),
+    ...(filters.partnerId
+      ? [{ label: "Cabinet", value: partners.find((partner) => partner.partnerId === filters.partnerId)?.partnerName ?? filters.partnerId.slice(0, 8), removeHref: without("partnerId") }]
+      : []),
+    ...(filters.countryCode ? [{ label: "Pays", value: filters.countryCode, removeHref: without("countryCode") }] : []),
+    ...(filters.from ? [{ label: "Du", value: filters.from, removeHref: without("from") }] : []),
+    ...(filters.to ? [{ label: "Au", value: filters.to, removeHref: without("to") }] : [])
+  ];
+  const openedCount = items.filter((dispute) => dispute.status === "opened").length;
 
   return (
     <>
@@ -154,6 +166,10 @@ export function DisputesPanel({ filters, list, detail, partners, canDecide, page
             <Input {...fieldControlProps("dispute-filter-to")} name="to" type="date" defaultValue={filters.to} />
           </Field>
         </FilterBar>
+        <ActiveFilters items={activeItems} />
+        {canDecide && openedCount > 0 ? (
+          <StateMessage tone="warning">{`${openedCount} contestation(s) ouverte(s) sur cette page : ouvrez une référence de lead pour statuer.`}</StateMessage>
+        ) : null}
 
         {list.status === "forbidden" ? <StateMessage tone="danger">Les contestations ne sont pas accessibles pour ce rôle admin.</StateMessage> : null}
         {list.status === "error" ? <StateMessage tone="danger">Contestations indisponibles. {readFailureDetail(list.error)}</StateMessage> : null}
@@ -163,6 +179,12 @@ export function DisputesPanel({ filters, list, detail, partners, canDecide, page
           items={items}
           getKey={(dispute) => dispute.id}
           emptyLabel="Aucune contestation pour ces filtres."
+          emptyDescription={
+            activeItems.length > 0
+              ? "Élargissez la recherche : retirez un filtre ou réinitialisez-les tous."
+              : "Aucune contestation n'a été déposée dans votre périmètre. Un cabinet peut contester un lead dans les 30 jours suivant sa réception."
+          }
+          emptyAction={activeItems.length > 0 ? <Button href="/billing?tab=contestations" variant="secondary" size="sm">Réinitialiser les filtres</Button> : undefined}
           aria-label="Contestations de leads"
           pagination={{
             page,
@@ -177,6 +199,18 @@ export function DisputesPanel({ filters, list, detail, partners, canDecide, page
       {detail ? <DisputeDetail detail={detail} canDecide={canDecide} backHref={disputesHref(filters, { page })} /> : null}
     </>
   );
+}
+
+/** Wording of the next step of a dispute for the current role; it decides nothing. */
+function nextStepOf(status: string, canDecide: boolean): string {
+  if (status === "opened") {
+    return canDecide
+      ? "statuer sur la contestation (accepter ou rejeter, avec un motif). La décision est définitive."
+      : "décision à prendre par le Finance Admin ou le Super Admin.";
+  }
+  if (status === "accepted") return "vérifier le crédit appliqué ci-dessous ; aucune autre action n'est nécessaire.";
+  if (status === "rejected") return "aucune ; le lead reste facturable et le cabinet est notifié.";
+  return "aucune.";
 }
 
 const REASON_HINT = `Entre ${DISPUTE_REASON_MIN_LENGTH} et ${DISPUTE_REASON_MAX_LENGTH} caractères. Il est conservé dans le journal d'audit et communiqué au cabinet.`;
@@ -196,6 +230,11 @@ function DisputeDetail({ detail, canDecide, backHref }: { detail: AdminApiState<
       title={`Contestation du lead ${dispute.publicReference ?? dispute.leadAssignmentId}`}
       description="Données de la contestation uniquement : les coordonnées et les réponses du visiteur ne sont jamais affichées ici."
     >
+      <p data-dispute-next-step={dispute.status}>
+        <strong>Statut : {DISPUTE_STATUS_LABELS[dispute.status] ?? dispute.status}</strong>
+        {" — prochaine étape : "}
+        {nextStepOf(dispute.status, canDecide)}
+      </p>
       <DescriptionList
         columns={2}
         items={[
@@ -224,8 +263,8 @@ function DisputeDetail({ detail, canDecide, backHref }: { detail: AdminApiState<
         <ConfirmDialog
           triggerLabel="Statuer sur la contestation"
           triggerVariant="primary"
-          title="Statuer sur la contestation"
-          description="La décision est définitive et auditée. Le motif est obligatoire et le cabinet en est notifié. Accepter crédite le lead sur le prochain brouillon ou par un avoir partiel."
+          title={`Statuer sur la contestation du lead ${dispute.publicReference ?? dispute.leadAssignmentId}`}
+          description={`Cabinet : ${dispute.partnerName ?? dispute.partnerTenantId}. La décision est définitive et auditée. Le motif est obligatoire et le cabinet en est notifié. Accepter crédite le lead sur le prochain brouillon ou par un avoir partiel.`}
           confirmLabel="Enregistrer la décision"
           cancelLabel="Annuler"
           formAction={decideLeadDisputeAction}

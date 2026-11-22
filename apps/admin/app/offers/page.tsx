@@ -43,6 +43,7 @@ import {
   sortItems
 } from "../lib/ui/admin-ui";
 import type { DataTableColumn } from "../lib/ui/admin-ui";
+import { ActiveFilters, hrefWithout, type ActiveFilterItem } from "../lib/ui/active-filter-chips";
 
 /**
  * Spec 052 US2/US5 (FR-010): offres indicatives. Filtered list restricted by the API to the
@@ -113,7 +114,7 @@ export default async function AdminOffersPage({
       header: "Offre",
       render: (offer) => (
         <>
-          <a href={`/offers/${encodeURIComponent(offer.id)}`}><strong>{offerName(offer)}</strong></a>
+          <strong>{offerName(offer)}</strong>
           <div className="bo-description">
             {offerTypeLabel(offer.offerType)}
             {offer.offerType === "private" ? <> <Badge tone="warning">{PRIVATE_OFFER_BADGE}</Badge></> : null}
@@ -174,6 +175,22 @@ export default async function AdminOffersPage({
   });
   const rows = paginateItems(sortItems(offers.data, columns, table.sort), table.page, table.pageSize);
   const activeFilters = [countryId, productId, partnerTenantId, status, offerType, sponsoredParam || undefined, expiring].filter((value) => value !== undefined).length;
+  const resetHref = queue ? "/offers?queue=submitted" : "/offers";
+  const removeHref = (drop: string) => hrefWithout("/offers", params, drop);
+  const activeFilterItems: ActiveFilterItem[] = [];
+  if (countryId) {
+    const country = countryById.get(countryId);
+    activeFilterItems.push({ label: "Pays", value: country ? `${country.name} (${country.isoCode})` : countryId, removeHref: removeHref("countryId") });
+  }
+  if (productId) activeFilterItems.push({ label: "Produit", value: productById.get(productId)?.name ?? productId, removeHref: removeHref("productId") });
+  if (partnerTenantId) {
+    const partner = partners.data.find((item) => item.id === partnerTenantId);
+    activeFilterItems.push({ label: "Courtier", value: partner ? partner.tradeName || partner.legalName : partnerTenantId, removeHref: removeHref("partnerTenantId") });
+  }
+  if (status) activeFilterItems.push({ label: "Statut", value: OFFER_STATUS_LABELS[status] ?? status, removeHref: removeHref("status") });
+  if (offerType) activeFilterItems.push({ label: "Type d'offre", value: OFFER_TYPE_SHORT_LABELS[offerType] ?? offerType, removeHref: removeHref("offerType") });
+  if (sponsored !== undefined) activeFilterItems.push({ label: "Sponsorisation", value: sponsored ? "Sponsorisées" : "Non sponsorisées", removeHref: removeHref("sponsored") });
+  if (expiring !== undefined) activeFilterItems.push({ label: "Expiration", value: `sous ${expiring} j`, removeHref: removeHref("expiring") });
 
   return (
     <PageStack>
@@ -202,7 +219,7 @@ export default async function AdminOffersPage({
         label="Filtres offres"
         submitLabel="Filtrer"
         resetLabel="Réinitialiser"
-        resetHref={queue ? "/offers?queue=submitted" : "/offers"}
+        resetHref={resetHref}
         activeCount={activeFilters}
       >
         {queue ? <input type="hidden" name="queue" value="submitted" /> : null}
@@ -247,6 +264,7 @@ export default async function AdminOffersPage({
           <Input {...fieldControlProps("offers-expiring")} name="expiring" type="number" min={0} max={365} defaultValue={expiring ?? ""} placeholder="15" />
         </Field>
       </FilterBar>
+      <ActiveFilters items={activeFilterItems} />
       {offers.status === "forbidden" ? <StateMessage tone="danger">{adminReadErrorMessage("access_denied")}</StateMessage> : null}
       {offers.status === "error" ? <StateMessage tone="danger">{adminReadErrorMessage(offers.error)}</StateMessage> : null}
       <DataTable
@@ -254,7 +272,17 @@ export default async function AdminOffersPage({
         items={rows}
         getKey={(offer) => offer.id}
         emptyLabel={queue ? "Aucune version en attente de validation." : "Aucune offre pour ces filtres."}
-        emptyDescription={queue ? "Les versions soumises par les courtiers ou préparées ici apparaissent dans cette file." : activeFilters > 0 ? "Réinitialisez les filtres pour revoir tout le catalogue." : undefined}
+        emptyDescription={queue ? "Les versions soumises par les courtiers ou préparées ici apparaissent dans cette file." : activeFilters > 0 ? "Réinitialisez les filtres pour revoir tout le catalogue." : "Créez une première offre pour un courtier partenaire : elle reste en brouillon jusqu'à validation par la conformité."}
+        emptyAction={
+          activeFilters > 0
+            ? <Button href={resetHref} variant="secondary">Réinitialiser les filtres</Button>
+            : !queue && canPrepare
+              ? <Button href="/offers/new">Nouvelle offre</Button>
+              : queue
+                ? <Button href="/offers" variant="secondary">Voir toutes les offres</Button>
+                : undefined
+        }
+        getRowHref={(offer) => `/offers/${encodeURIComponent(offer.id)}`}
         aria-label="Offres indicatives"
         sort={table.sort}
         sortHref={table.sortHref}

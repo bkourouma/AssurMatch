@@ -218,6 +218,99 @@ export function canReviewApplication(roles: readonly string[] | undefined): bool
   return hasAny(roles, PREPARATION_ROLES);
 }
 
+/* ------------------------------------------------------------------------- next step banners */
+
+export interface NextStep {
+  /** Tone of the banner that shows the current status and what happens next. */
+  tone: "info" | "warning" | "success" | "neutral";
+  /** What should happen next, one sentence, written for the reader's role. */
+  text: string;
+  /** Optional in-page anchor that leads to the place where the step is done. */
+  href?: string;
+  linkLabel?: string;
+}
+
+/**
+ * Display-only guidance for the partner page header: it reads the status already loaded and never
+ * decides anything; the API remains the authority on every transition.
+ */
+export function partnerNextStep(input: {
+  status: string;
+  effectiveStatus: string;
+  blockerCount: number;
+  canPrepare: boolean;
+  canDecide: boolean;
+}): NextStep {
+  const { status, effectiveStatus, blockerCount, canPrepare, canDecide } = input;
+  const conditions = `${blockerCount} condition${blockerCount > 1 ? "s" : ""} d'activation à remplir`;
+  if (status === "retired") {
+    return { tone: "neutral", text: "aucune, la fiche est résiliée et en lecture seule." };
+  }
+  if (status === "suspended") {
+    return {
+      tone: "warning",
+      text: canDecide ? "la conformité peut réactiver ou résilier le courtier." : "en attente d'une décision de la conformité (réactivation ou résiliation).",
+      href: "#statut",
+      linkLabel: "Voir les actions de statut"
+    };
+  }
+  if (effectiveStatus === "expired") {
+    return {
+      tone: "warning",
+      text: "renouveler ou valider une licence : sans licence valide, le courtier n'est plus routable.",
+      href: "#licences",
+      linkLabel: "Ouvrir les licences"
+    };
+  }
+  if (status === "draft") {
+    if (blockerCount > 0) {
+      return {
+        tone: "info",
+        text: canPrepare ? `${conditions}, puis envoyer la fiche en vérification.` : `${conditions} avant l'envoi en vérification.`,
+        href: "#conditions",
+        linkLabel: "Voir les conditions"
+      };
+    }
+    return {
+      tone: "info",
+      text: canPrepare ? "envoyer la fiche en vérification à la conformité." : "en attente de l'envoi en vérification par un préparateur.",
+      href: "#statut",
+      linkLabel: "Voir les actions de statut"
+    };
+  }
+  if (status === "pending_compliance") {
+    return {
+      tone: "warning",
+      text: canDecide
+        ? blockerCount > 0 ? `${conditions} avant toute activation.` : "décider de l'activation du courtier (Actif test ou Actif public)."
+        : "en attente de la décision de la conformité.",
+      href: blockerCount > 0 ? "#conditions" : "#statut",
+      linkLabel: blockerCount > 0 ? "Voir les conditions" : "Voir les actions de statut"
+    };
+  }
+  if (status === "active_test") {
+    return {
+      tone: "info",
+      text: canDecide ? "passer le courtier en Actif public quand les conditions sont remplies." : "en attente du passage en Actif public par la conformité.",
+      href: "#statut",
+      linkLabel: "Voir les actions de statut"
+    };
+  }
+  return { tone: "success", text: "aucune action requise ; surveiller les licences et le SLA.", href: "#licences", linkLabel: "Voir les licences" };
+}
+
+/** Same idea for an application: what the current status means and who acts next. */
+export function applicationNextStep(input: { status: string; canReview: boolean; canDecide: boolean }): NextStep {
+  const { status, canReview, canDecide } = input;
+  if (status === "accepted") return { tone: "success", text: "compléter la fiche du courtier créé, puis l'envoyer en vérification." };
+  if (status === "rejected") return { tone: "neutral", text: "aucune, la décision est définitive." };
+  if (status === "under_review") {
+    return { tone: "warning", text: canDecide ? "convertir la candidature en courtier ou la refuser." : "en attente de la décision de la conformité (conversion ou refus)." };
+  }
+  if (canReview) return { tone: "info", text: "passer la candidature en examen (ou la convertir / la refuser si vous êtes conformité)." };
+  return { tone: "info", text: canDecide ? "convertir la candidature en courtier ou la refuser." : "en attente d'un examen." };
+}
+
 /* ---------------------------------------------------------------------- activation conditions */
 
 /**

@@ -57,6 +57,7 @@ import {
   Textarea,
   fieldControlProps
 } from "../lib/ui/admin-ui";
+import { UnsavedChangesNotice } from "../lib/ui/unsaved-changes-notice";
 
 /**
  * Spec 051 US7: partner page forms. Pattern A (`useActionState` + server actions of
@@ -74,6 +75,8 @@ export interface SelectChoice {
 interface PartnerRef {
   id: string;
   countryId: string | null;
+  /** Display name, only used to name the partner in confirmation dialogs. */
+  name?: string;
 }
 
 export function PartnerBlockers({ blockers, partner }: { blockers: AdminWriteBlocker[]; partner?: PartnerRef | undefined }) {
@@ -206,8 +209,11 @@ export function CreatePartnerForm({ countries }: { countries: SelectChoice[] }) 
       <Form action={formAction} data-partner-form="create">
         <PartnerActionResult state={state} />
         <IdentityFields countries={countries} base={base} creating />
-        <ReasonField id={`${base}-reason`} />
+        <FormSection legend="Justification">
+          <ReasonField id={`${base}-reason`} />
+        </FormSection>
         <FormActions>
+          <UnsavedChangesNotice />
           <Button type="submit" pending={pending} pendingLabel="Création...">Créer le courtier</Button>
         </FormActions>
       </Form>
@@ -225,8 +231,11 @@ export function EditPartnerForm({ partner, countries }: { partner: AdminPartnerD
         <input type="hidden" name="partnerId" value={partner.id} />
         <input type="hidden" name="expectedUpdatedAt" value={partner.updatedAt} />
         <IdentityFields partner={partner} countries={countries} base={base} creating={false} />
-        <ReasonField id={`${base}-reason`} />
+        <FormSection legend="Justification">
+          <ReasonField id={`${base}-reason`} />
+        </FormSection>
         <FormActions>
+          <UnsavedChangesNotice />
           <Button type="submit" pending={pending} pendingLabel="Enregistrement...">Enregistrer</Button>
         </FormActions>
       </Form>
@@ -258,10 +267,10 @@ export function PartnerStatusTransitionForm({ partner, target }: { partner: Part
         <ConfirmDialog
           triggerLabel={label}
           triggerVariant="danger"
-          title={label}
+          title={partner.name ? `${label} : ${partner.name}` : label}
           description={target === "retired"
-            ? "La résiliation est définitive : les utilisateurs du courtier perdent leur accès et ses leads ne sont plus routés."
-            : "Le courtier n'est plus routé ; ses utilisateurs passent en consultation seule jusqu'à la réactivation."}
+            ? `${partner.name ? `Résilier ${partner.name} est définitif` : "La résiliation est définitive"} : les utilisateurs du courtier perdent leur accès et ses leads ne sont plus routés.`
+            : `${partner.name ? `${partner.name} n'est` : "Le courtier n'est"} plus routé ; ses utilisateurs passent en consultation seule jusqu'à la réactivation.`}
           confirmLabel={label}
           cancelLabel="Annuler"
           tone="danger"
@@ -279,7 +288,7 @@ export function PartnerStatusTransitionForm({ partner, target }: { partner: Part
       <PartnerActionResult state={state} partner={partner} />
       {fields}
       <FormActions>
-        <Button type="submit" size="sm" pending={pending} pendingLabel="Changement...">{label}</Button>
+        <Button type="submit" size="sm" variant={target === "active_test" ? "secondary" : "primary"} pending={pending} pendingLabel="Changement...">{label}</Button>
       </FormActions>
     </Form>
   );
@@ -372,7 +381,7 @@ const LICENSE_ACTION_LABELS = {
 } as const;
 
 /** Compliance only (rendered by the page for compliance_admin and super_admin). */
-export function LicenseActionForm({ partnerId, licenseId, action }: { partnerId: string; licenseId: string; action: "validate" | "suspend" | "revoke" }) {
+export function LicenseActionForm({ partnerId, licenseId, action, licenseNumber }: { partnerId: string; licenseId: string; action: "validate" | "suspend" | "revoke"; licenseNumber?: string }) {
   const [state, formAction] = useActionState(partnerLicenseAction, initialState);
   const base = useId();
   const copy = LICENSE_ACTION_LABELS[action];
@@ -382,7 +391,7 @@ export function LicenseActionForm({ partnerId, licenseId, action }: { partnerId:
       <ConfirmDialog
         triggerLabel={copy.label}
         triggerVariant={action === "validate" ? "primary" : "danger"}
-        title={`${copy.label} la licence`}
+        title={licenseNumber ? `${copy.label} la licence ${licenseNumber}` : `${copy.label} la licence`}
         description={copy.description}
         confirmLabel={copy.label}
         cancelLabel="Annuler"
@@ -477,7 +486,7 @@ export function ReviewDocumentForm({ partnerId, document }: { partnerId: string;
           <ConfirmDialog
             triggerLabel="Accepter"
             triggerVariant="primary"
-            title="Accepter le document"
+            title={`Accepter le document${document.fileName ? ` ${document.fileName}` : ""}`}
             description="Le document devient une preuve d'agrément recevable."
             confirmLabel="Accepter"
             cancelLabel="Annuler"
@@ -493,7 +502,7 @@ export function ReviewDocumentForm({ partnerId, document }: { partnerId: string;
         <ConfirmDialog
           triggerLabel="Refuser"
           triggerVariant="danger"
-          title="Refuser le document"
+          title={`Refuser le document${document.fileName ? ` ${document.fileName}` : ""}`}
           description="Le document n'est plus pris en compte comme preuve d'agrément."
           confirmLabel="Refuser"
           cancelLabel="Annuler"

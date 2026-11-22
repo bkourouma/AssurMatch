@@ -1,4 +1,5 @@
-import { readQuoteFormDefinitions, type QuoteFormDefinitionData } from "../lib/admin-api";
+import { readAdminCountries, readAdminProducts, readQuoteFormDefinitions, type QuoteFormDefinitionData } from "../lib/admin-api";
+import { ActiveFilters, hrefWithout, type ActiveFilterItem } from "../lib/ui/active-filter-chips";
 import {
   Badge,
   Button,
@@ -27,6 +28,22 @@ import { readFailureDetail } from "../lib/auth-error-messages";
 const statusOptions = ["published", "draft", "suspended", "retired"];
 const languageOptions = ["fr", "en"];
 
+/** Filter wording only: the table keeps the raw status badge. */
+const STATUS_FILTER_LABELS: Record<string, string> = {
+  published: "Publié",
+  draft: "Brouillon",
+  suspended: "Suspendu",
+  retired: "Retiré"
+};
+
+/** Status of a version and what to do next (workflow brouillon, publié, retiré). */
+function nextStepOf(form: QuoteFormDefinitionData): string {
+  if (form.status === "draft") return "publier (après vérification du consentement lié)";
+  if (form.status === "published") return form.consentSuperseded ? "créer une nouvelle version liée au consentement à jour" : "en ligne ; retirer pour couper l'exposition";
+  if (form.status === "suspended") return "publier à nouveau";
+  return "aucune (historique conservé)";
+}
+
 function scopeKey(form: QuoteFormDefinitionData): string {
   return `${form.countryId}:${form.productId}:${form.language}`;
 }
@@ -35,15 +52,21 @@ function firstParam(value: string | string[] | undefined): string {
   return Array.isArray(value) ? value[0] ?? "" : value ?? "";
 }
 
-const columns: Array<DataTableColumn<QuoteFormDefinitionData>> = [
-  { key: "country", header: "Pays", render: (form) => <span className="bo-ref">{form.countryId.slice(0, 8)}</span>, sortable: true, sortValue: (form) => form.countryId },
-  { key: "product", header: "Produit", render: (form) => <span className="bo-ref">{form.productId.slice(0, 8)}</span>, sortable: true, sortValue: (form) => form.productId },
+function buildColumns(countryLabel: (id: string) => string, productLabel: (id: string) => string): Array<DataTableColumn<QuoteFormDefinitionData>> {
+  return [
+  { key: "country", header: "Pays", render: (form) => <span className="bo-ref" title={form.countryId}>{countryLabel(form.countryId)}</span>, sortable: true, sortValue: (form) => countryLabel(form.countryId) },
+  { key: "product", header: "Produit", render: (form) => <span title={form.productId}>{productLabel(form.productId)}</span>, sortable: true, sortValue: (form) => productLabel(form.productId) },
   { key: "language", header: "Langue", render: (form) => form.language, sortable: true, sortValue: (form) => form.language },
   { key: "version", header: "Version", render: (form) => form.version, sortable: true, sortValue: (form) => form.version },
   {
     key: "status",
     header: "Statut",
-    render: (form) => <StatusBadge status={form.status} tones={quoteFormStatusTones} />,
+    render: (form) => (
+      <>
+        <StatusBadge status={form.status} tones={quoteFormStatusTones} />
+        <div className="bo-description">Prochaine étape : {nextStepOf(form)}</div>
+      </>
+    ),
     sortable: true,
     sortValue: (form) => form.status
   },
@@ -67,7 +90,8 @@ const columns: Array<DataTableColumn<QuoteFormDefinitionData>> = [
     sortValue: (form) => form.publishedAt ?? null
   },
   { key: "id", header: "Identifiant", render: (form) => <span className="bo-ref">{form.id}</span> }
-];
+  ];
+}
 
 export default async function AdminQuoteFormDefinitionsPage({
   searchParams
@@ -77,8 +101,22 @@ export default async function AdminQuoteFormDefinitionsPage({
   const params = searchParams ? await searchParams : {};
   const statusFilter = firstParam(params.status);
   const languageFilter = firstParam(params.language);
-  const forms = await readQuoteFormDefinitions(languageFilter ? { language: languageFilter } : {});
+  const [forms, countries, products] = await Promise.all([
+    readQuoteFormDefinitions(languageFilter ? { language: languageFilter } : {}),
+    readAdminCountries(),
+    readAdminProducts()
+  ]);
+  const countryById = new Map(countries.data.map((country) => [country.id, country.isoCode]));
+  const productById = new Map(products.data.map((product) => [product.id, product.name]));
+  const countryLabel = (id: string) => countryById.get(id) ?? id.slice(0, 8);
+  const productLabel = (id: string) => productById.get(id) ?? id.slice(0, 8);
+  const columns = buildColumns(countryLabel, productLabel);
   const items = forms.data;
+  /** Readable name of a version for the selects and dialogs: scope, language, version and status. */
+  const formChoice = (form: QuoteFormDefinitionData) => ({
+    id: form.id,
+    label: `${countryLabel(form.countryId)} · ${productLabel(form.productId)} · ${form.language} · v${form.version} (${form.status})`
+  });
   const published = items.filter((form) => form.status === "published");
   const drafts = items.filter((form) => form.status === "draft");
   const exposedScopes = new Set(published.map(scopeKey));
@@ -91,6 +129,10 @@ export default async function AdminQuoteFormDefinitionsPage({
   });
   const visible = statusFilter ? items.filter((form) => form.status === statusFilter) : items;
   const rows = paginateItems(sortItems(visible, columns, table.sort), table.page, table.pageSize);
+  const activeItems: ActiveFilterItem[] = [
+    ...(statusFilter ? [{ label: "Statut", value: STATUS_FILTER_LABELS[statusFilter] ?? statusFilter, removeHref: hrefWithout("/quote-form-definitions", params, "status") }] : []),
+    ...(languageFilter ? [{ label: "Langue", value: languageFilter, removeHref: hrefWithout("/quote-form-definitions", params, "language") }] : [])
+  ];
 
   return (
     <PageStack>
@@ -109,7 +151,10 @@ export default async function AdminQuoteFormDefinitionsPage({
         <>
           {published.length === 0 ? (
             <StateMessage tone="warning">
-              Aucune version publiée: la demande de devis est indisponible pour tous les pays et produits. La checklist d'activation le signale comme bloquant.
+              Aucune version publiée: la demande de devis est indisponible pour tous les pays et produits. La checklist d'activation le signale comme bloquant.{" "}
+              {drafts.length > 0
+                ? <>Prochaine étape : publier un brouillon (formulaire « Publier une version » ci-dessous).</>
+                : <>Prochaine étape : <a href="#creer-formulaire">créer un brouillon</a>, puis le publier.</>}
             </StateMessage>
           ) : null}
 
@@ -141,7 +186,7 @@ export default async function AdminQuoteFormDefinitionsPage({
             <Field id="quote-form-status" label="Statut">
               <Select {...fieldControlProps("quote-form-status")} name="status" defaultValue={statusFilter}>
                 <option value="">Tous</option>
-                {statusOptions.map((option) => <option key={option} value={option}>{option}</option>)}
+                {statusOptions.map((option) => <option key={option} value={option}>{STATUS_FILTER_LABELS[option] ?? option}</option>)}
               </Select>
             </Field>
             <Field id="quote-form-language" label="Langue">
@@ -151,12 +196,18 @@ export default async function AdminQuoteFormDefinitionsPage({
               </Select>
             </Field>
           </FilterBar>
+          <ActiveFilters items={activeItems} />
           <DataTable
             columns={columns}
             items={rows}
             getKey={(form) => form.id}
-            emptyLabel="Aucune définition: le parcours de demande de devis reste indisponible côté public."
-            emptyDescription="Créez un brouillon ci-dessous, liez-le à un consentement publié, puis publiez-le."
+            emptyLabel={items.length > 0 ? "Aucune version pour ces filtres." : "Aucune définition: le parcours de demande de devis reste indisponible côté public."}
+            emptyDescription={items.length > 0 ? "Retirez un filtre ou réinitialisez-les tous pour voir les autres versions." : "Créez un brouillon ci-dessous, liez-le à un consentement publié, puis publiez-le."}
+            emptyAction={
+              items.length > 0
+                ? <Button href="/quote-form-definitions" variant="secondary" size="sm">Réinitialiser les filtres</Button>
+                : <Button href="#creer-formulaire" variant="secondary" size="sm">Créer un brouillon</Button>
+            }
             aria-label="Versions de formulaire de devis"
             sort={table.sort}
             sortHref={table.sortHref}
@@ -181,8 +232,8 @@ export default async function AdminQuoteFormDefinitionsPage({
           <Grid columns="two">
             <div id="creer-formulaire"><CreateQuoteFormDefinitionForm /></div>
             <Stack>
-              <PublishQuoteFormDefinitionForm formIds={items.filter((form) => form.status !== "published").map((form) => form.id)} />
-              <RetireQuoteFormDefinitionForm formIds={published.map((form) => form.id)} />
+              <PublishQuoteFormDefinitionForm forms={items.filter((form) => form.status !== "published").map(formChoice)} />
+              <RetireQuoteFormDefinitionForm forms={published.map(formChoice)} />
             </Stack>
           </Grid>
         </>

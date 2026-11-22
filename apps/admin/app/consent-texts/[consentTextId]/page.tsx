@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import { readAdminConsentText, readAdminCountries, readAdminProducts } from "../../lib/admin-api";
 import { isAdminProfile, loginRedirect, readBackOfficeSession } from "../../lib/backoffice-auth";
-import { adminReadErrorMessage, canApprovePublicActivation, formatDate } from "../../lib/catalog-messages";
+import { CONSENT_STATUS_LABELS, adminReadErrorMessage, canApprovePublicActivation, formatDate, labelWithCode } from "../../lib/catalog-messages";
 import {
   Badge,
   Button,
@@ -59,13 +59,19 @@ export default async function ConsentTextDetailPage({ params, searchParams }: Co
 
   const country = countries.data.find((candidate) => candidate.id === text.countryId);
   const product = text.productId ? products.data.find((candidate) => candidate.id === text.productId) : undefined;
+  const statusLabel = labelWithCode(CONSENT_STATUS_LABELS, text.status);
+  const nextStep = text.status === "draft" || text.status === "review"
+    ? "Prochaine action : publier ce texte (réservé à la conformité). Il n'est utilisé par aucun formulaire de devis tant qu'il n'est pas publié."
+    : text.status === "published"
+      ? "Ce texte est publié donc immuable : une correction passe par une nouvelle version."
+      : "Ce texte est retiré : il ne peut plus être publié ni lié à un nouveau formulaire.";
 
   return (
     <PageStack>
       <PageHeader
         breadcrumb={[{ label: "Catalogue", href: "/catalog" }, { label: "Consentements", href: "/consent-texts" }, { label: text.version }]}
         title={`${text.purpose} · ${country?.isoCode ?? text.countryId.slice(0, 8)} · ${text.language} · ${text.version}`}
-        description="L'empreinte porte sur le modèle (variables non résolues) ; c'est elle qui est conservée avec chaque preuve de consentement."
+        description={`Statut actuel : ${statusLabel}. ${nextStep} L'empreinte porte sur le modèle (variables non résolues) ; c'est elle qui est conservée avec chaque preuve de consentement.`}
         actions={
           <Cluster>
             <StatusBadge status={text.status} tones={consentTextStatusTones} />
@@ -140,7 +146,7 @@ export default async function ConsentTextDetailPage({ params, searchParams }: Co
               )}
             </Card>
           )}
-          {text.status !== "retired" ? <RetireConsentTextForm consentTextId={text.id} /> : <Badge tone="disabled">Retiré</Badge>}
+          {text.status !== "retired" ? <RetireConsentTextForm consentTextId={text.id} version={text.version} /> : <Badge tone="disabled">Retiré</Badge>}
         </Grid>
       ) : (
         <StateMessage>La publication et le retrait sont réservés à la conformité (compliance_admin, super_admin).</StateMessage>

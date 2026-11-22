@@ -3,7 +3,7 @@ import { isAdminProfile, loginRedirect, readBackOfficeSession } from "../../lib/
 import { readAdminUser } from "../../lib/admin-api";
 import { adminUserLifecycleAction, updateAdminUserProfileAction, updateAdminUserRolesAction } from "../actions";
 import { PasswordResetForm } from "../user-action-forms";
-import { adminRoleOptions } from "../user-options";
+import { USER_ACTION_LABELS, adminRoleOptions, userNextStep, userNoticeLabel, userStatusLabel } from "../user-options";
 import {
   Button,
   Card,
@@ -67,7 +67,7 @@ export default async function UserDetailPage({ params, searchParams }: UserDetai
         <PageHeader
           breadcrumb={[{ label: "Plateforme" }, { label: "Utilisateurs", href: "/users" }, { label: "Détail" }]}
           title="Utilisateur introuvable"
-          actions={<Button href="/users" variant="secondary">Retour utilisateurs</Button>}
+          actions={<Button href="/users" variant="secondary">Retourner à la liste</Button>}
         />
       </PageStack>
     );
@@ -86,13 +86,17 @@ export default async function UserDetailPage({ params, searchParams }: UserDetai
           <Cluster>
             <StatusBadge status={user.status} tones={userStatusTones} />
             <StatusBadge status={user.mfaStatus} tones={mfaStatusTones} />
-            <Button href="/users" variant="secondary">Retour liste</Button>
+            <Button href="/users" variant="secondary">Retourner à la liste</Button>
           </Cluster>
         }
       />
 
       {errorNotice ? <StateMessage tone="danger">{errorNotice}</StateMessage> : null}
-      {notice && !errorNotice ? <StateMessage>Action terminée: {notice}.</StateMessage> : null}
+      {notice && !errorNotice ? <StateMessage>Action terminée : {userNoticeLabel(notice)}.</StateMessage> : null}
+      <p data-user-next-step="true">
+        <strong>{`Statut : ${userStatusLabel(user.status)}`}</strong>
+        {` - prochaine étape : ${userNextStep(user.status)}`}
+      </p>
       {result.forbidden ? <StateMessage tone="danger">Accès refusé pour ce profil utilisateur.</StateMessage> : null}
       {result.status === "error" ? <StateMessage tone="warning">Détail indisponible. {readFailureDetail(result.error)}</StateMessage> : null}
 
@@ -119,17 +123,17 @@ export default async function UserDetailPage({ params, searchParams }: UserDetai
             <Field id="user-display-name" label="Nom affiché" required>
               <Input {...fieldControlProps("user-display-name", { required: true })} name="displayName" minLength={2} defaultValue={user.displayName} />
             </Field>
-            <Field id="user-phone" label="Téléphone E.164">
-              <Input {...fieldControlProps("user-phone")} name="phone" defaultValue={user.phone ?? ""} />
+            <Field id="user-phone" label="Téléphone E.164" hint="Format international, par exemple +2250700000000.">
+              <Input {...fieldControlProps("user-phone", { hint: "x" })} name="phone" defaultValue={user.phone ?? ""} />
             </Field>
-            <Field id="user-country-scopes" label="Scopes pays">
-              <Input {...fieldControlProps("user-country-scopes")} name="countryScopes" defaultValue={user.countryScopes.join(", ")} />
+            <Field id="user-country-scopes" label="Scopes pays" hint="Identifiants (UUID) séparés par des virgules.">
+              <Input {...fieldControlProps("user-country-scopes", { hint: "x" })} name="countryScopes" defaultValue={user.countryScopes.join(", ")} />
             </Field>
-            <Field id="user-product-scopes" label="Scopes produits">
-              <Input {...fieldControlProps("user-product-scopes")} name="productScopes" defaultValue={user.productScopes.join(", ")} />
+            <Field id="user-product-scopes" label="Scopes produits" hint="Identifiants (UUID) séparés par des virgules.">
+              <Input {...fieldControlProps("user-product-scopes", { hint: "x" })} name="productScopes" defaultValue={user.productScopes.join(", ")} />
             </Field>
-            <Field id="user-profile-reason" label="Raison auditable" required>
-              <Textarea {...fieldControlProps("user-profile-reason", { required: true })} name="reason" minLength={8} />
+            <Field id="user-profile-reason" label="Raison auditable" required hint="Au moins 8 caractères, conservée dans le journal d'audit.">
+              <Textarea {...fieldControlProps("user-profile-reason", { required: true, hint: "x" })} name="reason" minLength={8} />
             </Field>
             <FormActions>
               <Button type="submit">Mettre à jour</Button>
@@ -148,8 +152,8 @@ export default async function UserDetailPage({ params, searchParams }: UserDetai
               options={adminRoleOptions.map((role) => ({ value: role, label: role }))}
               defaultValues={user.roles}
             />
-            <Field id="user-roles-reason" label="Raison auditable" required>
-              <Textarea {...fieldControlProps("user-roles-reason", { required: true })} name="reason" minLength={8} />
+            <Field id="user-roles-reason" label="Raison auditable" required hint="Au moins 8 caractères, conservée dans le journal d'audit.">
+              <Textarea {...fieldControlProps("user-roles-reason", { required: true, hint: "x" })} name="reason" minLength={8} />
             </Field>
             <FormActions>
               <Button type="submit">Mettre à jour les rôles</Button>
@@ -160,7 +164,7 @@ export default async function UserDetailPage({ params, searchParams }: UserDetai
 
       {tab === "actions" ? (
         <Stack>
-          <PasswordResetForm userId={user.id} />
+          <PasswordResetForm userId={user.id} userEmail={user.email} />
           <Card
             title="Actions sensibles"
             description="Chaque action demande une raison auditable; la confirmation est explicite pour les actions destructives."
@@ -183,8 +187,8 @@ export default async function UserDetailPage({ params, searchParams }: UserDetai
                   key={action}
                   triggerLabel={`Confirmer ${action}`}
                   triggerVariant="danger"
-                  title={`Confirmer ${action}`}
-                  description={`Cette action est auditée et s'applique immédiatement au compte ${user.email}.`}
+                  title={`${USER_ACTION_LABELS[action] ?? action} : ${user.email}`}
+                  description={`Confirmer ${action} sur le compte ${user.email}. Cette action est auditée et s'applique immédiatement.`}
                   confirmLabel={`Confirmer ${action}`}
                   cancelLabel="Annuler"
                   tone="danger"

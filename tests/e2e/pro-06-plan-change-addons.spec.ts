@@ -4,7 +4,7 @@ import { openAs } from "./support/backoffice";
 import { e2eEnv } from "./support/env";
 import { requireWorld, saveWorld, type BrokerWorld } from "./support/journey-state";
 import { apiCall, asRecord, closeSessions, itemsOf, tokenFor, visit } from "./support/pro-roles";
-import { card, rowWith } from "./support/ui";
+import { card, confirmInDialog, fillReason, rowWith } from "./support/ui";
 import { appPage, inviteMember, superAdminAccount } from "./support/world";
 
 // Lot 11b (spec 071 / lot 5, G-06 and add-ons) - plan change requests and add-ons, end to end:
@@ -135,10 +135,15 @@ test("PLAN-03 l'admin refuse une demande avec un motif : le courtier voit la dé
   await expect(pending).toContainText("Pro vers Enterprise");
   await expect(pending).toContainText(JUSTIFICATION);
   // The reason is mandatory (HTML validation blocks an empty submission).
-  await pending.getByRole("button", { name: "Refuser" }).click();
-  await expect(adminRow(admin, "En attente"), "no decision without a reason").toBeVisible();
-  await pending.getByLabel(/Motif de la décision/u).fill(REFUSAL_REASON);
-  await pending.getByRole("button", { name: "Refuser" }).click();
+  await pending.getByRole("button", { name: "Refuser" }).first().click();
+  const emptyDialog = admin.locator("dialog[open]");
+  await expect(emptyDialog).toBeVisible();
+  await emptyDialog.getByRole("button", { name: "Refuser" }).last().click();
+  await expect(emptyDialog, "no decision without a reason").toBeVisible();
+  await expect(adminRow(admin, "En attente")).toBeVisible();
+  await emptyDialog.getByRole("button", { name: /Annuler|Fermer/u }).first().click();
+  await expect(emptyDialog).toHaveCount(0);
+  await confirmInDialog(admin, pending, "Refuser", (dialog) => fillReason(dialog, REFUSAL_REASON));
   await expect(adminRow(admin, "Refusée")).toContainText(REFUSAL_REASON);
   await admin.context().close();
 
@@ -157,8 +162,7 @@ test("PLAN-04 l'admin accepte une demande : effet au prochain cycle mensuel, auc
   const admin = await appPage(browser, e2eEnv.adminUrl);
   await openAs(admin, superAdminAccount(), "/billing?tab=modules");
   const pending = adminRow(admin, "En attente");
-  await pending.getByLabel(/Motif de la décision/u).fill(ACCEPT_REASON);
-  await pending.getByRole("button", { name: "Accepter" }).click();
+  await confirmInDialog(admin, pending, "Accepter", (dialog) => fillReason(dialog, ACCEPT_REASON));
   const accepted = adminRow(admin, "Acceptée");
   await expect(accepted).toContainText(ACCEPT_REASON);
   await expect(accepted).toContainText("prochain cycle");

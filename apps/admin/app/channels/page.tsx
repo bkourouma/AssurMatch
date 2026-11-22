@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import { readChannelOutbox, readMessagingDeliveries, readMessagingProviders } from "../lib/channels-api";
 import { isAdminProfile, loginRedirect, readBackOfficeSession } from "../lib/backoffice-auth";
-import { Badge, Card, DataTable, PageHeader, PageStack, StateMessage, StatStrip, StatusBadge, type Tone } from "../lib/ui/admin-ui";
+import { Badge, Button, Card, Cluster, DataTable, Notice, PageHeader, PageStack, StateMessage, StatStrip, StatusBadge, type Tone } from "../lib/ui/admin-ui";
 import { readFailureDetail } from "../lib/auth-error-messages";
 
 const PAGE_PATH = "/channels";
@@ -15,7 +15,7 @@ const OUTBOX_LABELS: Record<string, string> = {
   dead_letter: "Échec définitif",
   failed: "Échec",
   sent: "Envoyé",
-  cancelled: "Annule"
+  cancelled: "Annulé"
 };
 
 const OUTBOX_TONES: Record<string, Tone> = {
@@ -51,6 +51,8 @@ export default async function ChannelsPage() {
   if (outbox.status === "unauthenticated") redirect(loginRedirect(PAGE_PATH, outbox.error ?? "session_required"));
 
   const counts = OUTBOX_STATUSES.map((status) => ({ status, count: outbox.data.filter((item) => item.status === status).length }));
+  const deadLetterCount = counts.find((entry) => entry.status === "dead_letter")?.count ?? 0;
+  const retryableCount = counts.find((entry) => entry.status === "retryable")?.count ?? 0;
 
   return (
     <PageStack>
@@ -59,6 +61,12 @@ export default async function ChannelsPage() {
         kicker="Messagerie sortante"
         title="Canaux SMS et WhatsApp"
         description="File de reprise des envois SMS et WhatsApp. Cet écran est en lecture seule et n'affiche jamais de numéro de téléphone ni de corps de message."
+        actions={
+          <Cluster>
+            <Button href="/messaging" variant="secondary">Ouvrir la messagerie</Button>
+            <Button href="/connecteurs-crm" variant="secondary">Connecteurs CRM</Button>
+          </Cluster>
+        }
       />
 
       {outbox.status === "forbidden" ? <StateMessage tone="danger">{ACCESS_DENIED}</StateMessage> : null}
@@ -66,6 +74,16 @@ export default async function ChannelsPage() {
 
       {outbox.status === "success" ? (
         <>
+          {deadLetterCount > 0 ? (
+            <Notice tone="danger" title="Envois en échec définitif">
+              {`${deadLetterCount} envoi(s) ne seront plus repris automatiquement. `}
+              <a href="/dashboard/compliance-alerts">Consulter les alertes</a>
+            </Notice>
+          ) : retryableCount > 0 ? (
+            <Notice tone="warning">{`${retryableCount} envoi(s) en attente de reprise : le worker les rejoue selon la règle ci-dessous.`}</Notice>
+          ) : (
+            <Notice tone="success">Aucun envoi en échec ni en attente de reprise dans l&apos;échantillon.</Notice>
+          )}
           <StatStrip
             label="Synthèse de la file de reprise"
             items={counts.map(({ status, count }) => ({ label: `${OUTBOX_LABELS[status]} (${SAMPLE_NOTE})`, value: count, tone: OUTBOX_TONES[status] ?? "neutral" }))}
@@ -86,6 +104,8 @@ export default async function ChannelsPage() {
               items={outbox.data}
               getKey={(item) => item.id}
               emptyLabel="Aucun envoi dans la file de reprise."
+              emptyDescription="Les envois SMS et WhatsApp apparaissent ici dès qu'un message est mis en file. Pour vérifier la chaîne, faites un envoi de test."
+              emptyAction={<Button href="/messaging" variant="secondary">Ouvrir la messagerie</Button>}
               aria-label="File de reprise SMS et WhatsApp"
             />
           </Card>
@@ -114,7 +134,8 @@ export default async function ChannelsPage() {
             ]}
             items={providers.data.providers}
             getKey={(provider) => provider.channel}
-            emptyLabel="Aucun canal référence."
+            emptyLabel="Aucun canal référencé."
+            emptyDescription="Aucun fournisseur SMS ou WhatsApp n'est déclaré côté plateforme."
             aria-label="État des canaux SMS et WhatsApp"
           />
         ) : null}
@@ -139,6 +160,7 @@ export default async function ChannelsPage() {
             items={deliveries.data}
             getKey={(row) => row.id}
             emptyLabel="Aucune diffusion enregistrée."
+            emptyDescription="Le journal se remplit après le premier envoi réel ou de test."
             aria-label="Dernières diffusions SMS et WhatsApp"
           />
         ) : null}

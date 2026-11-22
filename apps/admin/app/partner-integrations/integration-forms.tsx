@@ -12,7 +12,8 @@ import {
   type IntegrationActionState
 } from "../lib/partner-integration-actions";
 import { CatalogActionResult } from "../lib/ui/catalog-action-result";
-import { Button, CheckboxGroup, Field, Form, FormActions, Input, Notice, Select, fieldControlProps } from "../lib/ui/admin-ui";
+import { Button, CheckboxGroup, ConfirmDialog, Field, Form, FormActions, FormSection, Input, Notice, Select, fieldControlProps } from "../lib/ui/admin-ui";
+import { UnsavedChangesNotice } from "../lib/ui/unsaved-changes-notice";
 
 const initialState: IntegrationActionState = { status: "idle" };
 
@@ -49,8 +50,13 @@ function PartnerSelect({ id, partners }: { id: string; partners: PartnerOption[]
 
 function ReasonField({ id, defaultValue }: { id: string; defaultValue?: string }) {
   return (
-    <Field id={id} label="Motif (audité)" required>
-      <Input {...fieldControlProps(id, { required: true })} name="reason" minLength={8} {...(defaultValue ? { defaultValue } : {})} />
+    <Field id={id} label="Motif (audité)" required hint="8 caractères au moins. Le motif est conservé dans le journal d'audit.">
+      <Input
+        {...fieldControlProps(id, { required: true, hint: "8 caractères au moins. Le motif est conservé dans le journal d'audit." })}
+        name="reason"
+        minLength={8}
+        {...(defaultValue ? { defaultValue } : {})}
+      />
     </Field>
   );
 }
@@ -101,13 +107,16 @@ export function CreateApiKeyForm({ partners }: { partners: PartnerOption[] }) {
     <Form action={formAction} data-integration-form="api-key-create">
       <CatalogActionResult state={state} />
       {state.secret ? <SecretReveal secret={state.secret} /> : null}
-      <PartnerSelect id={`${base}-partner`} partners={partners} />
-      <Field id={`${base}-name`} label="Nom de la clé" required>
-        <Input {...fieldControlProps(`${base}-name`, { required: true })} name="name" maxLength={120} />
-      </Field>
+      <FormSection legend="Clé" description="La clé complète n'est montrée qu'à la création : copiez-la alors.">
+        <PartnerSelect id={`${base}-partner`} partners={partners} />
+        <Field id={`${base}-name`} label="Nom de la clé" required hint="Nom interne pour reconnaître la clé dans la liste.">
+          <Input {...fieldControlProps(`${base}-name`, { required: true, hint: "Nom interne pour reconnaître la clé dans la liste." })} name="name" maxLength={120} />
+        </Field>
+      </FormSection>
       <CheckboxGroup legend="Scopes" name="scopes" options={SCOPE_OPTIONS} columns={1} />
       <ReasonField id={`${base}-reason`} />
       <FormActions>
+        <UnsavedChangesNotice />
         <Button type="submit" pending={pending} pendingLabel="Création...">
           Créer la clé API
         </Button>
@@ -116,20 +125,25 @@ export function CreateApiKeyForm({ partners }: { partners: PartnerOption[] }) {
   );
 }
 
-export function RevokeApiKeyForm({ keyId }: { keyId: string }) {
-  const [state, formAction, pending] = useActionState(revokePartnerApiKeyAction, initialState);
+export function RevokeApiKeyForm({ keyId, keyLabel }: { keyId: string; keyLabel: string }) {
+  const [state, formAction] = useActionState(revokePartnerApiKeyAction, initialState);
   const base = useId();
   return (
-    <Form action={formAction} data-integration-form="api-key-revoke">
+    <ConfirmDialog
+      triggerLabel="Révoquer"
+      triggerVariant="danger"
+      title={`Révoquer la clé API ${keyLabel}`}
+      description="La clé ne pourra plus appeler la Partner API. La révocation ne peut pas être annulée depuis cet écran : créez une nouvelle clé si le partenaire en a encore besoin. Le motif est audité."
+      confirmLabel="Révoquer"
+      cancelLabel="Annuler"
+      tone="danger"
+      formAction={formAction}
+      dataAttributes={{ "data-integration-form": "api-key-revoke" }}
+    >
       <CatalogActionResult state={state} />
       <input type="hidden" name="id" value={keyId} />
       <ReasonField id={`${base}-reason`} />
-      <FormActions>
-        <Button type="submit" size="sm" variant="secondary" pending={pending} pendingLabel="Envoi...">
-          Révoquer
-        </Button>
-      </FormActions>
-    </Form>
+    </ConfirmDialog>
   );
 }
 
@@ -140,16 +154,19 @@ export function CreateWebhookEndpointForm({ partners }: { partners: PartnerOptio
     <Form action={formAction} data-integration-form="webhook-endpoint-create">
       <CatalogActionResult state={state} />
       {state.secret ? <SecretReveal secret={state.secret} /> : null}
-      <PartnerSelect id={`${base}-partner`} partners={partners} />
-      <Field id={`${base}-url`} label="URL (HTTPS)" required>
-        <Input {...fieldControlProps(`${base}-url`, { required: true })} name="url" type="url" placeholder="https://" />
-      </Field>
-      <Field id={`${base}-description`} label="Description (facultatif)">
-        <Input {...fieldControlProps(`${base}-description`)} name="description" maxLength={240} />
-      </Field>
+      <FormSection legend="Destination" description="L'endpoint est créé désactivé. L'origine de l'URL doit figurer dans l'allow-list du partenaire (carte « Ajouter une origine autorisée »).">
+        <PartnerSelect id={`${base}-partner`} partners={partners} />
+        <Field id={`${base}-url`} label="URL (HTTPS)" required hint="L'adresse doit commencer par https://.">
+          <Input {...fieldControlProps(`${base}-url`, { required: true, hint: "L'adresse doit commencer par https://." })} name="url" type="url" placeholder="https://" />
+        </Field>
+        <Field id={`${base}-description`} label="Description (facultatif)">
+          <Input {...fieldControlProps(`${base}-description`)} name="description" maxLength={240} />
+        </Field>
+      </FormSection>
       <CheckboxGroup legend="Événements autorisés" name="eventTypes" options={EVENT_OPTIONS} columns={1} />
       <ReasonField id={`${base}-reason`} />
       <FormActions>
+        <UnsavedChangesNotice />
         <Button type="submit" pending={pending} pendingLabel="Création...">
           Créer l&apos;endpoint
         </Button>
@@ -158,22 +175,32 @@ export function CreateWebhookEndpointForm({ partners }: { partners: PartnerOptio
   );
 }
 
-export function EndpointStatusForm({ endpointId, status }: { endpointId: string; status: string }) {
-  const [state, formAction, pending] = useActionState(updatePartnerWebhookEndpointStatusAction, initialState);
+export function EndpointStatusForm({ endpointId, status, endpointLabel }: { endpointId: string; status: string; endpointLabel: string }) {
+  const [state, formAction] = useActionState(updatePartnerWebhookEndpointStatusAction, initialState);
   const base = useId();
   const nextStatus = status === "active" ? "suspended" : "active";
+  const activating = nextStatus === "active";
   return (
-    <Form action={formAction} data-integration-form="webhook-endpoint-status">
+    <ConfirmDialog
+      triggerLabel={activating ? "Activer" : "Suspendre"}
+      triggerVariant={activating ? "secondary" : "danger"}
+      title={`${activating ? "Activer" : "Suspendre"} l'endpoint ${endpointLabel}`}
+      description={
+        activating
+          ? "Les événements autorisés pourront être envoyés à cette URL dès que les envois webhook sont ouverts (flag partner_webhooks_enabled). Le motif est audité."
+          : "Les envois vers cette URL sont mis en pause. L'endpoint peut être réactivé ensuite. Le motif est audité."
+      }
+      confirmLabel={activating ? "Activer" : "Suspendre"}
+      cancelLabel="Annuler"
+      tone={activating ? "primary" : "danger"}
+      formAction={formAction}
+      dataAttributes={{ "data-integration-form": "webhook-endpoint-status" }}
+    >
       <CatalogActionResult state={state} />
       <input type="hidden" name="id" value={endpointId} />
       <input type="hidden" name="status" value={nextStatus} />
       <ReasonField id={`${base}-reason`} />
-      <FormActions>
-        <Button type="submit" size="sm" variant="secondary" pending={pending} pendingLabel="Envoi...">
-          {nextStatus === "active" ? "Activer" : "Suspendre"}
-        </Button>
-      </FormActions>
-    </Form>
+    </ConfirmDialog>
   );
 }
 
@@ -201,11 +228,11 @@ export function CreateAllowlistForm({ partners }: { partners: PartnerOption[] })
     <Form action={formAction} data-integration-form="webhook-allowlist-create">
       <CatalogActionResult state={state} />
       <PartnerSelect id={`${base}-partner`} partners={partners} />
-      <Field id={`${base}-origin`} label="Origine (HTTPS)" required>
-        <Input {...fieldControlProps(`${base}-origin`, { required: true })} name="origin" type="url" placeholder="https://" />
+      <Field id={`${base}-origin`} label="Origine (HTTPS)" required hint="Schéma et domaine, par exemple https://crm.exemple.com.">
+        <Input {...fieldControlProps(`${base}-origin`, { required: true, hint: "Schéma et domaine, par exemple https://crm.exemple.com." })} name="origin" type="url" placeholder="https://" />
       </Field>
-      <Field id={`${base}-path`} label="Chemin (facultatif)">
-        <Input {...fieldControlProps(`${base}-path`)} name="path" maxLength={240} placeholder="/webhooks" />
+      <Field id={`${base}-path`} label="Chemin (facultatif)" hint="Laissez vide pour autoriser tous les chemins de cette origine.">
+        <Input {...fieldControlProps(`${base}-path`, { hint: "Laissez vide pour autoriser tous les chemins de cette origine." })} name="path" maxLength={240} placeholder="/webhooks" />
       </Field>
       <ReasonField id={`${base}-reason`} />
       <FormActions>
@@ -217,19 +244,24 @@ export function CreateAllowlistForm({ partners }: { partners: PartnerOption[] })
   );
 }
 
-export function RevokeAllowlistForm({ entryId }: { entryId: string }) {
-  const [state, formAction, pending] = useActionState(revokePartnerWebhookAllowlistAction, initialState);
+export function RevokeAllowlistForm({ entryId, entryLabel }: { entryId: string; entryLabel: string }) {
+  const [state, formAction] = useActionState(revokePartnerWebhookAllowlistAction, initialState);
   const base = useId();
   return (
-    <Form action={formAction} data-integration-form="webhook-allowlist-revoke">
+    <ConfirmDialog
+      triggerLabel="Révoquer"
+      triggerVariant="danger"
+      title={`Révoquer l'origine autorisée ${entryLabel}`}
+      description="Les endpoints du partenaire sur cette origine ne seront plus autorisés. Le motif est audité."
+      confirmLabel="Révoquer"
+      cancelLabel="Annuler"
+      tone="danger"
+      formAction={formAction}
+      dataAttributes={{ "data-integration-form": "webhook-allowlist-revoke" }}
+    >
       <CatalogActionResult state={state} />
       <input type="hidden" name="id" value={entryId} />
       <ReasonField id={`${base}-reason`} />
-      <FormActions>
-        <Button type="submit" size="sm" variant="secondary" pending={pending} pendingLabel="Envoi...">
-          Révoquer
-        </Button>
-      </FormActions>
-    </Form>
+    </ConfirmDialog>
   );
 }
