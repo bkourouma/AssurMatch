@@ -67,8 +67,22 @@ export default async function FaqPage({ params }: { params: Promise<{ locale: st
 
       <Section className="am-faq-page">
         <p className="am-faq-meta">{t("questionCount", { count: items.length })}</p>
-        {groups.map(([theme, themeItems]) => (
-          <section className="am-faq-group" key={theme || "_"}>
+        {/* Several themes make a long page on a phone: a short jump list saves the scrolling. */}
+        {groups.filter(([theme]) => theme).length > 1 ? (
+          <nav className="am-faq-themes" aria-label={t("themesLabel")}>
+            <ul>
+              {groups.map(([theme], index) =>
+                theme ? (
+                  <li key={theme}>
+                    <a href={`#theme-${index + 1}`}>{theme}</a>
+                  </li>
+                ) : null
+              )}
+            </ul>
+          </nav>
+        ) : null}
+        {groups.map(([theme, themeItems], index) => (
+          <section className="am-faq-group" key={theme || "_"} id={theme ? `theme-${index + 1}` : undefined}>
             {theme ? <h2 className="am-faq-group__title">{theme}</h2> : null}
             <div className="am-faq">
               {themeItems.map((item) => (

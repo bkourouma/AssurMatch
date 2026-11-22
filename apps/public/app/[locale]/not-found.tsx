@@ -13,7 +13,7 @@ import "../styles/pages/institutional.css";
 export default async function LocaleNotFound() {
   const t = await getTranslations("NotFound");
   const howItWorks = await getTranslations("HowItWorks");
-  const guides = await getTranslations("Guides");
+  const tracking = await getTranslations("Tracking");
   const faq = await getTranslations("Faq");
   const contact = await getTranslations("Contact");
   const directory = await listCountryDirectory();
@@ -23,7 +23,7 @@ export default async function LocaleNotFound() {
     { key: "compare", title: t("cta"), icon: "search", href: "/countries" },
     { key: "home", title: t("backHome"), icon: "home", href: "/" },
     { key: "how-it-works", title: howItWorks("title"), icon: "compass", href: "/how-it-works" },
-    { key: "guides", title: guides("title"), icon: "book-open", href: "/guides" },
+    { key: "track", title: tracking("breadcrumb"), icon: "clock", href: "/track" },
     { key: "faq", title: faq("title"), icon: "help-circle", href: "/faq" },
     { key: "contact", title: contact("title"), icon: "mail", href: "/contact" }
   ];
