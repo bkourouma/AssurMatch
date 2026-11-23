@@ -139,7 +139,7 @@ services:
   postgres:
     <<: [*restart, *logging]
     profiles: ["bundled-db"]
-    image: postgres:18-alpine
+    image: postgres:19-alpine
     container_name: assurmatch-prod-postgres
     env_file:
       - path: ${ASSURMATCH_ENV_DIR:-./env}/postgres.env
