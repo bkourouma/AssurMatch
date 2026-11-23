@@ -70,7 +70,7 @@ x-frontend-env: &frontend-env
 
 services:
   postgres:
-    image: postgres:18-alpine
+    image: postgres:19-alpine
     network_mode: host
     command: ["postgres", "-p", "${ASSURMATCH_E2E_POSTGRES_PORT:-48632}", "-c", "listen_addresses=127.0.0.1", "-c", "fsync=off"]
     environment:
